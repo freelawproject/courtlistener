@@ -956,10 +956,7 @@ class JKentScrapeLoaderTest(TestCase):
         report = self.loader_class()(self.database).load()
 
         self.assertEqual((report.seen, report.merged), (2, 2))
-        self.assertEqual(
-            (report.invalid, report.rejected, report.failed),
-            (0, 0, 0),
-        )
+        self.assertEqual((report.invalid, report.failed), (0, 0))
         self.assertEqual(len(report.result.creates["Docket"]), 2)
         self.assertEqual(
             set(Docket.objects.values_list("docket_number", flat=True)),
@@ -1098,9 +1095,10 @@ class JKentScrapeLoaderTest(TestCase):
             "The row after the undecodable one still merges.",
         )
 
-    def test_merger_declining_a_scrape_is_a_rejection(self) -> None:
-        """A merger's `validate` turning a scrape away is not a failure. Is it
-        counted separately?"""
+    def test_merger_declining_a_scrape_is_a_failure(self) -> None:
+        """A merger refuses a scrape in its own `validate`, which it reports as
+        a failure. Is the row counted as one, and the rest of the run left to
+        merge?"""
         loader_class = self.loader_class()
 
         class RejectingMerger(loader_class.merger):  # type: ignore[misc, name-defined]
@@ -1118,9 +1116,10 @@ class JKentScrapeLoaderTest(TestCase):
         ).load()
 
         self.assertEqual(
-            (report.seen, report.rejected, report.merged, report.failed),
+            (report.seen, report.merged, report.failed, report.invalid),
             (2, 1, 1, 0),
         )
+        self.assertEqual(report.result.failures, {"Docket": [None]})
         self.assertEqual(Docket.objects.count(), 1)
 
     def test_a_row_that_raises_does_not_cost_the_run(self) -> None:
@@ -1155,19 +1154,21 @@ class JKentScrapeLoaderTest(TestCase):
         )
 
     def test_a_dry_run_survives_a_database_error(self) -> None:
-        """A dry run merges inside one transaction. Does a row that errors at
-        the database roll back to its own savepoint, leaving the rest of the
-        run to merge instead of failing on a poisoned connection?"""
+        """A dry run merges inside one transaction, so a row the database
+        refuses would abort it. Does an atomic merger's savepoint keep that row
+        from costing the rest of the run?"""
         loader_class = self.loader_class()
 
         class DatabaseErrorMerger(loader_class.merger):  # type: ignore[misc, name-defined]
-            def merge(self) -> Any:
+            atomic: ClassVar[bool] = True
+
+            def merge_one(self) -> Any:
                 if self.scrape.docket_number == "A-1":
                     # Any statement the database refuses will do; what matters
                     # is that it aborts the transaction it runs in.
                     with connection.cursor() as cursor:
                         cursor.execute("SELECT 1 / 0")
-                return super().merge()
+                return super().merge_one()
 
         _run_database(
             self.database,
@@ -1185,10 +1186,10 @@ class JKentScrapeLoaderTest(TestCase):
 
     def test_report_str_names_every_count(self) -> None:
         """The report is what an operator reads off a load. Does its summary
-        state all five counts?"""
-        report = LoadReport(seen=6, merged=1, invalid=2, rejected=1, failed=1)
+        state all four counts?"""
+        report = LoadReport(seen=6, merged=1, invalid=2, failed=1)
 
         self.assertEqual(
             str(report),
-            "6 seen, 1 merged, 2 invalid, 1 rejected, 1 failed",
+            "6 seen, 1 merged, 2 invalid, 1 failed",
         )
