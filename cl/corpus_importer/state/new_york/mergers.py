@@ -689,9 +689,9 @@ class NYCoADocketMetadataMerger(
 ):
     """Merger for the NYCoA-only docket fields.
 
-    The `OneToOneField` lives on this model rather than on `Docket`, so the
-    relation fills in `docket` from the parent and matches on it; this merger
-    must not declare that field itself."""
+    The `OneToOneField` lives on this model rather than on `Docket`, so this is
+    the reverse side of the relation: `OneToOneMerger` fills in `docket` from
+    the parent and matches on it, and this merger must not declare it."""
 
     model: ClassVar[type[Model]] = NYCoADocketMetadata
 
