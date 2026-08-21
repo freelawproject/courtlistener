@@ -72,7 +72,7 @@ dependencies = [
   "unidecode",
   "usaddress>=0.5.16",
   "djangorestframework-filters==1.0.0.dev2",
-  "gunicorn>=23.0.0",
+  "gunicorn>=26.1.0",
   "django-hCaptcha>=0.2.0",
   "reporters-db",
   "django-waffle>=5.0.0",
