@@ -630,6 +630,70 @@ class TestComponentTags(SimpleTestCase):
         """Rendering with nothing required returns an empty string."""
         self.assertEqual(self._render(), "")
 
+    def test_logger_lives_under_the_project_hierarchy(self) -> None:
+        """The module logs under "cl", which owns the console handler."""
+        self.assertTrue(LOGGER.startswith("cl."))
+
+    @mock.patch.object(component_tags.finders, "find", return_value=None)
+    def test_warns_when_minified_sibling_is_missing(self, mock_find) -> None:
+        """An extension-less stub with no .min.js logs a warning."""
+        with self.settings(DEBUG=True):
+            require_script(self.context, "js/alpine/plugins/ghost")
+            with self.assertLogs(LOGGER, level="WARNING") as logs:
+                rendered = self._render()
+
+        mock_find.assert_called_once_with("js/alpine/plugins/ghost.min.js")
+        self.assertEqual(len(logs.records), 1)
+        self.assertIn("js/alpine/plugins/ghost", logs.output[0])
+        self.assertIn(".min.js", logs.output[0])
+        # The page still loads the unminified file.
+        self.assertIn("js/alpine/plugins/ghost.js", rendered)
+
+    @mock.patch.object(component_tags.finders, "find", return_value=None)
+    def test_warning_is_emitted_once_per_request(self, mock_find) -> None:
+        """Repeated requires warn once and hit the filesystem once."""
+        with self.settings(DEBUG=True):
+            require_script(self.context, "js/alpine/plugins/ghost")
+            require_script(self.context, "js/alpine/plugins/ghost")
+            with self.assertLogs(LOGGER, level="WARNING") as logs:
+                self._render()
+
+        self.assertEqual(len(logs.records), 1)
+        mock_find.assert_called_once_with("js/alpine/plugins/ghost.min.js")
+
+    @mock.patch.object(
+        component_tags.finders, "find", return_value="/abs/path.min.js"
+    )
+    def test_no_warning_when_minified_sibling_exists(self, mock_find) -> None:
+        """A stub whose .min.js exists logs nothing."""
+        with self.settings(DEBUG=True):
+            require_script(self.context, "js/alpine/plugins/focus", defer=True)
+            with self.assertNoLogs(LOGGER, level="WARNING"):
+                self._render()
+
+    @mock.patch.object(component_tags.finders, "find", return_value=None)
+    def test_explicit_extension_is_never_checked(self, mock_find) -> None:
+        """An explicit .js path skips the check entirely."""
+        with self.settings(DEBUG=True):
+            require_script(self.context, "js/alpine/components/tabs.js")
+            with self.assertNoLogs(LOGGER, level="WARNING"):
+                self._render()
+
+        mock_find.assert_not_called()
+
+    @mock.patch.object(component_tags.finders, "find", return_value=None)
+    def test_no_filesystem_check_outside_debug(self, mock_find) -> None:
+        """Outside DEBUG nothing is checked and nothing is logged."""
+        with self.settings(DEBUG=False):
+            require_script(self.context, "js/alpine/plugins/ghost")
+            with self.assertNoLogs(LOGGER, level="WARNING"):
+                rendered = self._render()
+
+        mock_find.assert_not_called()
+        self.assertIn("js/alpine/plugins/ghost.min.js", rendered)
+
+    @mock.patch.object(component_tags.finders, "find", return_value=None)
+    def test_reporter_is_a_noop_outside_debug(self, mock_find) -> None:
         """_warn_about_missing_minified is a no-op outside DEBUG."""
         with self.settings(DEBUG=True):
             require_script(self.context, "js/alpine/plugins/ghost")
