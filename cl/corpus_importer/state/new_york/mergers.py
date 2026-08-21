@@ -13,6 +13,9 @@ from typing import Any, ClassVar, cast, override
 
 from asgiref.sync import async_to_sync
 from django.db.models import Model, QuerySet
+from juriscraper.state.new_york.nycourts_gov.vocabularies import (
+    CourtVocabulary,
+)
 
 from cl.corpus_importer.state.common.docket import (
     DocketEntryRelation,
@@ -32,8 +35,8 @@ from cl.corpus_importer.state.merger import (
     ManyStrategy,
     Merger,
     OneToManyRelation,
-    OneToOneRelation,
     RelatedParams,
+    ReverseOneToOneRelation,
     ThroughParameters,
     overwrite,
 )
@@ -44,16 +47,14 @@ from cl.corpus_importer.state.new_york.nycourts_gov import (
     NYCoAIssue,
     NYCoAParty,
     NYCoDocketEntry,
+    Unclassified,
 )
 from cl.corpus_importer.state.new_york.utils import (
     NYCOA_COURT_ID,
-    filing_doctype_value,
-    filing_role_value,
-    filing_type_value,
     is_nycoa_court,
-    issue_category_value,
-    issue_subcategory_value,
+    issue_code,
     make_docket_number_core,
+    mirrored_code,
 )
 from cl.people_db.models import Attorney, Party, PartyType, Role
 from cl.recap.mergers import find_docket_object_query
@@ -64,7 +65,11 @@ from cl.search.state.new_york.models import (
     NYCoADocketMetadata,
     NYCoADocument,
 )
-from cl.search.state.new_york.vocabularies import FilingRole
+from cl.search.state.new_york.vocabularies import (
+    FilingDocType,
+    FilingRole,
+    FilingType,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -107,6 +112,19 @@ def _keep_stored_file(scrape: Any, db: Any) -> Any:
     return scrape if scrape else db
 
 
+def _stated(reading: CourtVocabulary | Unclassified) -> str:
+    """The Court-PASS value to store for a field read off a file name.
+
+    `NYCoADocument.doc_role` and `doc_type` are free text mirroring what the
+    name itself stated, so a name that stated nothing readable is stored blank
+    rather than under one of the reserved readings.
+
+    :param reading: What the scrape schema classified the field as.
+    :return: The value Court-PASS's naming convention uses, or the empty string.
+    """
+    return "" if isinstance(reading, Unclassified) else reading.value
+
+
 class NYCoADocumentMerger[ParamType](
     Merger[NYCoAFile, RelatedParams[ParamType], NYCoADocument]
 ):
@@ -139,15 +157,13 @@ class NYCoADocumentMerger[ParamType](
         lambda doc, params: doc.available, strategy=overwrite
     )
     doc_role: str = Attribute(
-        lambda doc, params: doc.doc_role.value if doc.doc_role else "",
-        strategy=overwrite,
+        lambda doc, params: _stated(doc.doc_role), strategy=overwrite
     )
     doc_party: str = Attribute(
         lambda doc, params: doc.doc_party, strategy=overwrite
     )
     doc_type: str = Attribute(
-        lambda doc, params: doc.doc_type.value if doc.doc_type else "",
-        strategy=overwrite,
+        lambda doc, params: _stated(doc.doc_type), strategy=overwrite
     )
     volume: int | None = Attribute(
         lambda doc, params: _storable_number(doc.volume, "volume", doc),
@@ -208,7 +224,7 @@ def _entry_party_id(
     if len(matched) < 2:
         return matched[0] if matched else None
     # Only an ambiguous name is worth the second query the role costs.
-    role = FilingRole(filing_role_value(entry.entry_role)).label
+    role = FilingRole(mirrored_code(FilingRole, entry.entry_role)).label
     by_role = (
         PartyType.objects.filter(
             docket=docket, party_id__in=matched, name__iexact=role
@@ -252,19 +268,18 @@ class NYCoADocketEntryMerger[ParamType](
         lambda e, params: e.entry_index, strategy=overwrite
     )
     filing_type: int = Attribute(
-        lambda e, params: filing_type_value(
-            e.entry_filing_type, e.raw_filing_type
-        ),
+        lambda e, params: mirrored_code(FilingType, e.entry_filing_type),
         strategy=overwrite,
     )
     filing_type_raw: str = Attribute(
         lambda e, params: e.raw_filing_type, strategy=overwrite
     )
     filing_role: int = Attribute(
-        lambda e, params: filing_role_value(e.entry_role), strategy=overwrite
+        lambda e, params: mirrored_code(FilingRole, e.entry_role),
+        strategy=overwrite,
     )
     filing_doctype: int = Attribute(
-        lambda e, params: filing_doctype_value(e.entry_doctype),
+        lambda e, params: mirrored_code(FilingDocType, e.entry_doctype),
         strategy=overwrite,
     )
     # Keep a party we resolved on an earlier scrape rather than clearing it
@@ -503,8 +518,8 @@ def _case_issues(case: NYCoACase, params: Any) -> Sequence[ScrapedIssue]:
     classified = [
         (
             issue,
-            issue_category_value(issue.category, issue.category_raw),
-            issue_subcategory_value(issue.subcategory, issue.category_raw),
+            issue_code(issue.category),
+            issue_code(issue.subcategory),
         )
         for issue in case.issues
     ]
@@ -527,12 +542,13 @@ class NYCoADocketMetadataMerger(
 ):
     """Merger for the NYCoA-only docket fields.
 
-    The `OneToOneField` lives on this model rather than on `Docket`, so the
-    relation fills in `docket` from the parent and matches on it; this merger
-    must not declare that field itself."""
+    The `OneToOneField` lives on this model rather than on `Docket`, so this
+    merger sets its own `docket` from the parent and matches on it."""
 
     model: ClassVar[type[Model]] = NYCoADocketMetadata
+    key: ClassVar[Iterable[str]] = ["docket"]
 
+    docket: Docket = Attribute(lambda case, params: params.parent)
     # Court-PASS states a case's issues in full, so an issue that is gone from
     # the scrape is one the Court removed.
     issues: list[NYCoADocketIssue] = OneToManyRelation(
@@ -609,7 +625,7 @@ class NYCoADocketMerger(DocketMerger[NYCoACase, None]):
     nycoa_docket_entries: list[NYCoADocketEntry] = DocketEntryRelation(
         NYCoADocketEntryMerger, strategy=ManyStrategy.REPLACE
     )
-    nycoa_metadata: NYCoADocketMetadata = OneToOneRelation(
+    nycoa_metadata: NYCoADocketMetadata = ReverseOneToOneRelation(
         NYCoADocketMetadataMerger, _case_metadata
     )
 
