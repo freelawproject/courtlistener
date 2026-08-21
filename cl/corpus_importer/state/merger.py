@@ -160,14 +160,14 @@ class RelatedParams[ParamType]:
 
     :ivar params: The parameters passed by the user to the merger
     :ivar parent: The object the related object hangs off of
-    :ivar parent_field: The name of the child's field pointing back at
+    :ivar parent_name: The name of the child's field pointing back at
         `parent`, set for the reverse side of a one-to-one relation. The child
         merger fills that field in from `parent` itself, so a child merger
         must not declare it."""
 
     params: ParamType
     parent: Model | None = field(kw_only=True)
-    parent_field: str | None = field(kw_only=True, default=None)
+    parent_name: str | None = field(kw_only=True, default=None)
 
 
 class RelatedMerger[
@@ -235,23 +235,9 @@ class OneToOneMerger[ScrapeType, ParamType, ChildType, RM: Model](
     ]
 ):
     """Class encapsulating logic for merging a one-to-one relationship, in
-    either direction.
+    either direction."""
 
-    Which side of the relation the field is declared on is read off the model
-    rather than asked of the caller, so a merger's specs go on reading like the
-    model's own field definitions.
-
-    On the forward side -- the `OneToOneField` is on this merger's model, as
-    `Docket.originating_court_information` is -- the child is merged first and
-    the parent is created or updated pointing at it.
-
-    On the reverse side -- the `OneToOneField` is on the child, as
-    `NYCoADocketMetadata.docket` is -- the parent has no column to point at the
-    child, so the child is merged once the parent exists and its foreign key is
-    set from the parent automatically. A child merger must not declare that
-    field itself."""
-
-    __slots__: tuple[str, ...] = "forward", "parent_field"
+    __slots__: tuple[str, ...] = "forward", "parent_name"
 
     def __init__(
         self,
@@ -261,7 +247,7 @@ class OneToOneMerger[ScrapeType, ParamType, ChildType, RM: Model](
     ):
         super().__init__(merger=merger, transform=transform, default=None)
         self.forward: bool = True
-        self.parent_field: str | None = None
+        self.parent_name: str | None = None
 
     def validate(self, field: Field | ForeignObjectRel) -> list[Exception]:
         """Validate the field and, along the way, learn which side of the
@@ -273,7 +259,7 @@ class OneToOneMerger[ScrapeType, ParamType, ChildType, RM: Model](
             return errors
         if isinstance(field, OneToOneRel):
             self.forward = False
-            self.parent_field = field.field.name
+            self.parent_name = field.field.name
         return errors
 
     def merge(
@@ -303,7 +289,7 @@ class OneToOneMerger[ScrapeType, ParamType, ChildType, RM: Model](
             merger_input,
             existing=db_obj,
             params=RelatedParams(
-                params, parent=parent, parent_field=self.parent_field
+                params, parent=parent, parent_name=self.parent_name
             ),
         ).merge()
 
@@ -939,10 +925,10 @@ class Merger[ScrapeType, ParamType, M: Model](metaclass=MergerMeta):
             }
         elif (
             isinstance(params, RelatedParams)
-            and params.parent_field is not None
+            and params.parent_name is not None
             and params.parent is not None
         ):
-            relation_params = {params.parent_field: params.parent}
+            relation_params = {params.parent_name: params.parent}
         self._relation_params: dict[str, Model] = relation_params
 
         if manager is None:
