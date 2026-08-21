@@ -36,6 +36,7 @@ from cl.corpus_importer.state.merger import (
     Merger,
     OneToManyRelation,
     OneToOneRelation,
+    OneToOneRelation,
     RelatedParams,
     ThroughParameters,
     overwrite,
@@ -575,9 +576,9 @@ class NYCoADocketMetadataMerger(
 ):
     """Merger for the NYCoA-only docket fields.
 
-    The `OneToOneField` lives on this model rather than on `Docket`, so this is
-    the reverse side of the relation: `OneToOneMerger` fills in `docket` from
-    the parent and matches on it, and this merger must not declare it."""
+    The `OneToOneField` lives on this model rather than on `Docket`, so the
+    relation fills in `docket` from the parent and matches on it; this merger
+    must not declare that field itself."""
 
     model: ClassVar[type[Model]] = NYCoADocketMetadata
 
@@ -657,6 +658,7 @@ class NYCoADocketMerger(DocketMerger[NYCoACase, None]):
     nycoa_docket_entries: list[NYCoADocketEntry] = DocketEntryRelation(
         NYCoADocketEntryMerger, strategy=ManyStrategy.REPLACE
     )
+    nycoa_metadata: NYCoADocketMetadata = OneToOneRelation(
     nycoa_metadata: NYCoADocketMetadata = OneToOneRelation(
         NYCoADocketMetadataMerger, _case_metadata
     )
