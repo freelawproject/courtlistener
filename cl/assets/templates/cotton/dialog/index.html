@@ -5,9 +5,21 @@
 {% require_script "js/alpine/plugins/focus" defer=True %}
 {% require_script "js/alpine/plugins/ui" defer=True %}
 
-<c-vars request dialog_class="" panel_class="" class=""></c-vars>
+<c-vars
+  request
+  dialog_class=""
+  panel_class=""
+  class=""
+  variant=""
+  disable_transitions=""
+/>
 
-<div x-data="dialog" x-id="dialogIdGroup" class="flex justify-center {{ class }}">
+<div
+  x-data="dialog"
+  x-id="dialogIdGroup"
+  class="{% if not variant == 'drawer' %}flex justify-center {% endif %}{{ class }}"
+  {{ attrs }}
+>
   <!-- Trigger -->
   {% if trigger_button %}
     {{ trigger_button }}
@@ -31,17 +43,38 @@
     <!-- Overlay -->
     <div
       x-dialog:overlay
+      x-show="isOpen"
       x-on:click.stop.prevent="close"
+      {% if not disable_transitions %}
+      x-transition:enter="motion-safe:transition motion-safe:ease-out motion-safe:duration-200"
+      x-transition:enter-start="motion-safe:opacity-0"
+      x-transition:enter-end="motion-safe:opacity-100"
+      x-transition:leave="motion-safe:transition motion-safe:ease-in motion-safe:duration-150"
+      x-transition:leave-start="motion-safe:opacity-100"
+      x-transition:leave-end="motion-safe:opacity-0"
+      {% endif %}
       class="fixed z-40 inset-0 bg-greyscale-600/40"
     ></div>
 
     <!-- Panel -->
     <div
-      class="w-full flex flex-col bg-white shadow-md z-50 {{ panel_class }}"
       x-dialog:panel
       x-show="isOpen"
+      {% if variant == "drawer" %}
+      class="fixed inset-y-0 right-0 z-50 flex flex-col w-80 max-w-full bg-white shadow-lg {{ panel_class }}"
+        {% if not disable_transitions %}
+      x-transition:enter="motion-safe:transition motion-safe:ease-out motion-safe:duration-200 motion-safe:transform"
+      x-transition:enter-start="motion-safe:translate-x-full"
+      x-transition:enter-end="motion-safe:translate-x-0"
+      x-transition:leave="motion-safe:transition motion-safe:ease-in motion-safe:duration-150 motion-safe:transform"
+      x-transition:leave-start="motion-safe:translate-x-0"
+      x-transition:leave-end="motion-safe:translate-x-full"
+        {% endif %}
+      {% else %}
+      class="w-full flex flex-col bg-white shadow-md z-50 {{ panel_class }}"
+      {% endif %}
     >
-      {{ panel }}
-    </div>
+    {{ panel }}
+  </div>
   </div>
 </div>
