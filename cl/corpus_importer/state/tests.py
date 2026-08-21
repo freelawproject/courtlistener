@@ -23,7 +23,6 @@ from cl.corpus_importer.state.merger import (
     OneToManyRelation,
     OneToOneRelation,
     RelatedParams,
-    ReverseOneToOneRelation,
     ThroughParameters,
 )
 from cl.people_db.factories import PersonFactory
@@ -284,16 +283,15 @@ class BaseMergerTest(TestCase):
     @merger_test(expected_query_count=6)
     def test_related_mergers_reverse_1to1_creates(self) -> None:
         """Does a reverse one-to-one relation, where the OneToOneField lives on
-        the child, create the child pointing at the parent?"""
+        the child, create the child pointing at the parent? The child merger
+        does not declare the foreign key; the relation sets it."""
         tc = self
 
         class TestRelatedMerger(
             Merger[dict[str, str], RelatedParams[None], TrialCourtData]
         ):
             model: ClassVar[type[Model]] = TrialCourtData
-            key: ClassVar[Iterable[str]] = ["docket"]
 
-            docket: Docket = Attribute(lambda d, params: params.parent)
             docket_number_trial: str = Attribute(lambda d, params: d["dn"])
 
         class TestMerger(Merger[dict[str, Any], None, Docket]):
@@ -302,7 +300,7 @@ class BaseMergerTest(TestCase):
             court: Court = Attribute(default=tc.court)
             source: int = Attribute(default=DocketSources.SCRAPER)
             docket_number: str = Attribute(default=tc.docket.docket_number)
-            trialcourtdata: TrialCourtData = ReverseOneToOneRelation(
+            trialcourtdata: TrialCourtData = OneToOneRelation(
                 TestRelatedMerger, lambda d, params: d["trial"]
             )
 
@@ -331,9 +329,7 @@ class BaseMergerTest(TestCase):
             Merger[dict[str, str], RelatedParams[None], TrialCourtData]
         ):
             model: ClassVar[type[Model]] = TrialCourtData
-            key: ClassVar[Iterable[str]] = ["docket"]
 
-            docket: Docket = Attribute(lambda d, params: params.parent)
             docket_number_trial: str = Attribute(lambda d, params: d["dn"])
 
         class TestMerger(Merger[dict[str, Any], None, Docket]):
@@ -342,7 +338,7 @@ class BaseMergerTest(TestCase):
             court: Court = Attribute(default=tc.court)
             source: int = Attribute(default=DocketSources.SCRAPER)
             docket_number: str = Attribute(default=tc.docket.docket_number)
-            trialcourtdata: TrialCourtData = ReverseOneToOneRelation(
+            trialcourtdata: TrialCourtData = OneToOneRelation(
                 TestRelatedMerger, lambda d, params: d["trial"]
             )
 
@@ -356,6 +352,27 @@ class BaseMergerTest(TestCase):
         self.assertEqual(TrialCourtData.objects.count(), 1)
         existing.refresh_from_db()
         self.assertEqual(existing.docket_number_trial, "CR-999")
+
+    def test_one_to_one_relation_must_be_a_one_to_one_field(self) -> None:
+        """A one-to-one spec reads its direction off the model, so the field it
+        names has to be one-to-one in the first place. Is a spec pointed at
+        anything else refused when the merger is defined?"""
+
+        class TestRelatedMerger(
+            Merger[dict[str, str], RelatedParams[None], DocketEntry]
+        ):
+            model: ClassVar[type[Model]] = DocketEntry
+
+            description: str = Attribute(lambda d, params: d["df"])
+
+        with self.assertRaises(TypeError):
+
+            class TestMerger(Merger[dict[str, Any], None, Docket]):
+                model: ClassVar[type[Model]] = Docket
+
+                docket_entries: list[DocketEntry] = OneToOneRelation(
+                    TestRelatedMerger
+                )
 
     @merger_test(expected_query_count=5)
     def test_related_mergers_child(self) -> None:
