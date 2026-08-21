@@ -48,4 +48,17 @@
       target="_blank"
       rel="nofollow noopener noreferrer">Buy on PACER {% if document.page_count %}(${{ document|price }}){% endif %}
   </a>
+{% elif variant == "mobile_icon" %}
+  <a href="{{ document.external_url }}"
+    {% if not request.COOKIES.buy_on_pacer_modal and not request.COOKIES.recap_install_plea %}
+      data-toggle="modal"
+      data-target="#modal-buy-pacer"
+      class="open_buy_pacer_modal btn btn-default btn-xs"
+    {% else %}
+      class="btn btn-default btn-xs"
+    {% endif %}
+    target="_blank"
+    rel="nofollow noopener noreferrer"
+    title="Buy on PACER {% if document.page_count %}(${{ document|price }}){% endif %}"><i class="fa fa-download"></i>
+  </a>
 {% endif %}

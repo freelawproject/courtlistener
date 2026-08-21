@@ -15,4 +15,12 @@
      class="btn btn-default btn-xs">
     <i class="fa fa-external-link"></i> View on SCOTUS
   </a>
+{% elif variant == "mobile_icon" %}
+  <a href="{{ document.external_url }}"
+     rel="nofollow noopener noreferrer"
+     target="_blank"
+     role="button"
+     class="btn btn-default btn-xs"
+     title="View on SCOTUS"><i class="fa fa-external-link"></i>
+  </a>
 {% endif %}

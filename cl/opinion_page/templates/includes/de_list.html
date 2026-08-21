@@ -166,29 +166,14 @@
                      rel="nofollow"
                      title="Download PDF"><i class="fa fa-download"></i>
                   </a>
-                {% else %}
-                  {# We don't have it #}
-                  {% if rd.is_sealed %}
-                    <span class="btn btn-default btn-xs disabled"
-                          title="Unavailable on PACER">
-                            <i class="fa fa-ban"></i>
-                          </span>
-                  {% else %}
-                    {% if rd.pacer_url %}
-                      <a href="{{ rd.pacer_url }}"
-                        {% if not request.COOKIES.buy_on_pacer_modal and not request.COOKIES.recap_install_plea %}
-                          data-toggle="modal"
-                          data-target="#modal-buy-pacer"
-                          class="open_buy_pacer_modal btn btn-default btn-xs"
-                        {% else%}
-                          class="btn btn-default btn-xs"
-                        {% endif %}
-                        target="_blank"
-                        rel="nofollow noopener noreferrer"
-                        title="Buy on PACER {% if rd.page_count %}(${{ rd|price }}){% endif %}"><i class="fa fa-download"></i>
-                      </a>
-                    {% endif %}
-                  {% endif %}
+                {% elif rd.is_sealed %}
+                  {# Unreachable for SCOTUSDocument -- it has no is_sealed field. #}
+                  <span class="btn btn-default btn-xs disabled"
+                        title="Unavailable on PACER">
+                          <i class="fa fa-ban"></i>
+                        </span>
+                {% elif rd.external_url %}
+                  {% include "includes/document_source_link/index.html" with document=rd docket_source=docket_source variant="mobile_icon" %}
                 {% endif %}
               </div>
             {% endif %}
