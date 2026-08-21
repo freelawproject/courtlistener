@@ -26,7 +26,7 @@ from contextlib import closing
 from dataclasses import dataclass, field
 from enum import Enum, auto
 from pathlib import Path
-from typing import Any, ClassVar
+from typing import Any, ClassVar, cast
 
 from django.db import DatabaseError, transaction
 from django.db.models import Model
@@ -54,9 +54,8 @@ class UnusableScrape(Exception):
 
 
 class RowOutcome(Enum):
-    """What became of one row on the way from the run database to a scrape."""
+    """Why a row did not become a scrape."""
 
-    OK = auto()
     INVALID = auto()
     """The payload did not decode, did not validate against `scrape_model`,
     or `normalize` returned `None` for it."""
@@ -68,18 +67,17 @@ class RowOutcome(Enum):
 class LoadReport:
     """What a load run did.
 
-    The three rejection counts are separate because they call for different
+    The two rejection counts are separate because they call for different
     responses: `invalid` means the loader could not make a scrape of the row,
-    which usually points at scraper drift, `rejected` is the merger declining
-    data it cannot place, and `failed` is data that should have merged and did
-    not.
+    which usually points at scraper drift, while `failed` is data that should
+    have merged and did not.
 
     :ivar seen: Rows the query returned.
     :ivar invalid: Payloads that would not decode, failed validation against
         `scrape_model`, or that `normalize` passed over by returning `None`.
-    :ivar rejected: Scrapes the merger's `validate` turned away.
     :ivar failed: Rows `normalize` refused with `UnusableScrape`, plus merges
-        that ran and reported failures.
+        that ran and reported failures -- which includes a merger turning a
+        scrape away in its own `validate`.
     :ivar merged: Merges that came out clean.
     :ivar result: The union of every merge result, so callers can see which
         objects were created and updated across the whole run.
@@ -87,7 +85,6 @@ class LoadReport:
 
     seen: int = 0
     invalid: int = 0
-    rejected: int = 0
     failed: int = 0
     merged: int = 0
     result: MergeResult[Any] = field(default_factory=MergeResult)
@@ -95,12 +92,11 @@ class LoadReport:
     def __str__(self) -> str:
         return (
             f"{self.seen} seen, {self.merged} merged, "
-            f"{self.invalid} invalid, {self.rejected} rejected, "
-            f"{self.failed} failed"
+            f"{self.invalid} invalid, {self.failed} failed"
         )
 
 
-class JKentScrapeLoader[ScrapeType: BaseModel](ABC):
+class JKentScrapeLoader[ScrapeType: BaseModel, ParamType = None](ABC):
     """Loads one jkent run database into CourtListener.
 
     See the module docstring for what a subclass provides. Typical use is
@@ -114,13 +110,14 @@ class JKentScrapeLoader[ScrapeType: BaseModel](ABC):
     :cvar payload_column: The column holding the scraper's JSON blob.
     :cvar scrape_model: The Pydantic model each normalized payload is
         validated into. This is the merger's input type.
-    :cvar merger: The merger to run for each scrape.
+    :cvar merger: The merger to run for each scrape. A merger that takes
+        parameters gets them from `params`.
     """
 
     query: ClassVar[str]
     payload_column: ClassVar[str] = "data_json"
     scrape_model: type[ScrapeType]
-    merger: type[Merger[ScrapeType, None, Model]]
+    merger: type[Merger[ScrapeType, ParamType, Model]]
 
     def __init__(
         self,
@@ -172,10 +169,15 @@ class JKentScrapeLoader[ScrapeType: BaseModel](ABC):
             rather than a routine skip. See `UnusableScrape`."""
         return payload
 
-    def _prepare(
-        self, row: sqlite3.Row
-    ) -> tuple[ScrapeType | None, RowOutcome]:
-        """Turn one row into a scrape, saying why if it did not become one."""
+    def params(self, scrape: ScrapeType) -> ParamType:
+        """The parameters to merge `scrape` with.
+
+        Defaults to `None`, which is what a merger that takes no parameters
+        wants. Override it for one that takes them."""
+        return cast(ParamType, None)
+
+    def _prepare(self, row: sqlite3.Row) -> ScrapeType | RowOutcome:
+        """Turn one row into a scrape, or say why it did not become one."""
         try:
             payload = json.loads(row[self.payload_column])
         except json.JSONDecodeError as error:
@@ -185,16 +187,16 @@ class JKentScrapeLoader[ScrapeType: BaseModel](ABC):
                 self.database.name,
                 error,
             )
-            return None, RowOutcome.INVALID
+            return RowOutcome.INVALID
         try:
             normalized = self.normalize(payload, row)
         except UnusableScrape as error:
             logger.error("Refusing a row of %s: %s", self.database.name, error)
-            return None, RowOutcome.FAILED
+            return RowOutcome.FAILED
         if normalized is None:
-            return None, RowOutcome.INVALID
+            return RowOutcome.INVALID
         try:
-            return self.scrape_model.model_validate(normalized), RowOutcome.OK
+            return self.scrape_model.model_validate(normalized)
         except ValidationError as error:
             logger.error(
                 "Could not validate %s from %s: %s",
@@ -202,7 +204,7 @@ class JKentScrapeLoader[ScrapeType: BaseModel](ABC):
                 self.database.name,
                 error,
             )
-            return None, RowOutcome.INVALID
+            return RowOutcome.INVALID
 
     def scrapes(self) -> Iterator[ScrapeType]:
         """Yield the scrape for every row that produced one.
@@ -212,17 +214,14 @@ class JKentScrapeLoader[ScrapeType: BaseModel](ABC):
         the rest. Useful on its own for inspecting what the query and
         `normalize` produce without writing anything."""
         for row in self.rows():
-            scrape, outcome = self._prepare(row)
-            if outcome is RowOutcome.OK and scrape is not None:
-                yield scrape
+            prepared = self._prepare(row)
+            if not isinstance(prepared, RowOutcome):
+                yield prepared
 
-    def merge_one(self, scrape: ScrapeType) -> MergeResult[Any] | None:
-        """Merge a single scrape, or return `None` if the merger turned it
-        away. Exists as a seam for subclasses that need to pass merger
-        parameters or handle a merger failure specially."""
-        if not self.merger.validate(scrape):
-            return None
-        return self.merger(scrape, params=None).merge()
+    def merge_one(self, scrape: ScrapeType) -> MergeResult[Any]:
+        """Merge a single scrape. Exists as a seam for subclasses that need to
+        do something around the merge, such as handling a failure specially."""
+        return self.merger(scrape, params=self.params(scrape)).merge()
 
     def load(self) -> LoadReport:
         """Merge everything the query returns and report what happened.
@@ -232,6 +231,16 @@ class JKentScrapeLoader[ScrapeType: BaseModel](ABC):
         should not cost the rest."""
         if not self.dry_run:
             return self._load()
+        if not self.merger.atomic:
+            # A dry run puts every row in one transaction, so a row the
+            # database itself refuses aborts that transaction and every row
+            # after it fails on the poisoned connection. Only the merger can
+            # isolate a row, by opening a savepoint of its own.
+            logger.warning(
+                "%s is not atomic: a row that errors at the database will "
+                "cost every row after it in this dry run.",
+                self.merger.__name__,
+            )
         # The merge still runs; `set_rollback` discards it on the way out.
         with transaction.atomic():
             report = self._load()
@@ -245,17 +254,16 @@ class JKentScrapeLoader[ScrapeType: BaseModel](ABC):
             report.seen += 1
             if report.seen % 250 == 0:
                 logger.info("Loading %s: %s", self.database.name, report)
-            scrape, outcome = self._prepare(row)
-            if outcome is RowOutcome.FAILED:
+            prepared = self._prepare(row)
+            if prepared is RowOutcome.FAILED:
                 report.failed += 1
                 report.result |= MergeResult.failed(self.merger.model.__name__)
                 continue
-            if outcome is not RowOutcome.OK or scrape is None:
+            if prepared is RowOutcome.INVALID:
                 report.invalid += 1
                 continue
             try:
-                with transaction.atomic():
-                    result = self.merge_one(scrape)
+                result = self.merge_one(prepared)
             except (DatabaseError, ValueError) as error:
                 logger.exception(
                     "Merge raised for row %s of %s: %s",
@@ -265,9 +273,6 @@ class JKentScrapeLoader[ScrapeType: BaseModel](ABC):
                 )
                 report.failed += 1
                 report.result |= MergeResult.failed(self.merger.model.__name__)
-                continue
-            if result is None:
-                report.rejected += 1
                 continue
             report.result |= result
             if result.success:
