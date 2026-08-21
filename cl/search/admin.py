@@ -47,6 +47,12 @@ from cl.search.state.florida.models import (
     FloridaDocketEntry,
     FloridaDocument,
 )
+from cl.search.state.new_york.models import (
+    NYCoADocketEntry,
+    NYCoADocketIssue,
+    NYCoADocketMetadata,
+    NYCoADocument,
+)
 from cl.search.state.texas.models import TexasDocketEntry, TexasDocument
 from cl.visualizations.models import SCOTUSMap
 
@@ -984,3 +990,89 @@ class FloridaDocketEntryAdmin(CursorPaginatorAdmin):
     @admin.display(description="Description")
     def get_trunc_description(self, obj):
         return trunc(obj.description or "", 35, ellipsis="...")
+
+
+class NYCoADocketIssueInline(admin.StackedInline):
+    model = NYCoADocketIssue
+    extra = 1
+
+    readonly_fields = (
+        "date_created",
+        "date_modified",
+    )
+
+
+@admin.register(NYCoADocketMetadata)
+class NYCoADocketMetadataAdmin(CursorPaginatorAdmin):
+    inlines = (NYCoADocketIssueInline,)
+    raw_id_fields = ("docket",)
+    list_display = ("__str__",)
+    readonly_fields = (
+        "date_created",
+        "date_modified",
+    )
+
+
+class NYCoADocumentInline(admin.StackedInline):
+    model = NYCoADocument
+    extra = 1
+
+    readonly_fields = (
+        "date_created",
+        "date_modified",
+    )
+
+
+@admin.register(NYCoADocument)
+class NYCoADocumentAdmin(CursorPaginatorAdmin):
+    search_fields = ("file_name",)
+    search_help_text = "Search by NYCoA Document file name."
+    list_select_related = ("docket_entry__docket",)  # Fix N+1 from __str__
+    list_display = (
+        "get_pk",
+        "file_name",
+        "doc_type",
+        "available",
+    )
+    raw_id_fields = ("docket_entry",)
+    readonly_fields = (
+        "date_created",
+        "date_modified",
+    )
+
+    @admin.display(description="NYCoA document")
+    def get_pk(self, obj):
+        return obj.pk
+
+
+@admin.register(NYCoADocketEntry)
+class NYCoADocketEntryAdmin(CursorPaginatorAdmin):
+    inlines = (NYCoADocumentInline,)
+    search_help_text = (
+        "Search NYCoADocketEntries by Docket ID or Court-PASS entry ID."
+    )
+    search_fields = (
+        "docket__id",
+        "docket_entry_id",
+    )
+    list_display = (
+        "get_pk",
+        "filing_type",
+        "filing_role",
+        "filing_doctype",
+        "date_filed",
+        "docket_entry_id",
+    )
+    raw_id_fields = (
+        "docket",
+        "party",
+    )
+    readonly_fields = (
+        "date_created",
+        "date_modified",
+    )
+    list_filter = ("date_filed", "date_created", "date_modified")
+
+    @admin.display(description="NYCoA docket entry")
+    def get_pk(self, obj):
+        return obj.pk
