@@ -69,7 +69,7 @@ WIKI_COVERAGE_OA_URL = f"{WIKI_COVERAGE_BASE_URL}/oral-argument-recordings"
 WIKI_COVERAGE_OPINIONS_URL = f"{WIKI_COVERAGE_BASE_URL}/case-law"
 WIKI_COVERAGE_RECAP_URL = f"{WIKI_COVERAGE_BASE_URL}/federal-cases-and-filings"
 WIKI_COVERAGE_SCOTUS_URL = (
-    f"{WIKI_COVERAGE_BASE_URL}/surpeme-court-cases-and-filings"
+    f"{WIKI_COVERAGE_BASE_URL}/supreme-court-cases-and-filings"
 )
 
 ##############

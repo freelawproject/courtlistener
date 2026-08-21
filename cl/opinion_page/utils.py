@@ -520,6 +520,23 @@ async def get_scotus_metadata_items(docket: Docket) -> list[MetadataItem]:
     return build_scotus_metadata(metadata)
 
 
+async def _common_metadata_sections(
+    docket: Docket, og_info: OriginatingCourtInformation | None
+) -> list[MetadataSection]:
+    """Build the metadata sections that apply across every docket source,
+    not just one. build_originating_court_metadata() already returns []
+    when there's nothing to show.
+    """
+    return [
+        {
+            "items": await sync_to_async(build_originating_court_metadata)(
+                docket, og_info
+            ),
+            "title": "Originating Court Information",
+        },
+    ]
+
+
 async def core_docket_data(
     request: HttpRequest,
     pk: int,
@@ -594,6 +611,7 @@ async def core_docket_data(
     # dropping the 4 keys now would blank out v2's metadata section.
     metadata_sections: list[MetadataSection] = [
         {"items": docket_metadata},
+        *await _common_metadata_sections(docket, og_info),
         *await sync_to_async(docket_source.metadata_sections)(docket),
     ]
 

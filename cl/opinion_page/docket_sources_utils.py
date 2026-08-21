@@ -200,21 +200,13 @@ def _recap_metadata_sections(docket: Docket) -> list[MetadataSection]:
     """Build the metadata sections specific to a RECAP/PACER docket."""
     # Imported here rather than at module scope because cl.opinion_page.utils
     # imports from this module.
-    from cl.opinion_page.utils import (
-        build_bankruptcy_metadata,
-        build_originating_court_metadata,
-    )
+    from cl.opinion_page.utils import build_bankruptcy_metadata
 
     bankr_info = getattr(docket, "bankruptcy_information", None)
-    og_info = getattr(docket, "originating_court_information", None)
     return [
         {
             "items": build_bankruptcy_metadata(bankr_info),
             "title": "Bankruptcy Information",
-        },
-        {
-            "items": build_originating_court_metadata(docket, og_info),
-            "title": "Originating Court Information",
         },
     ]
 
