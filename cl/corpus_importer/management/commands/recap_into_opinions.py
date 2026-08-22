@@ -96,6 +96,7 @@ def import_opinions_from_recap(
             throttle.maybe_wait()
             recap_document_into_opinions.apply_async(
                 args=[{}, recap_document_id, skip_citation_finding],
+                kwargs={"embedding_queue": queue},
                 queue=queue,
             )
             seen_sha1.add(sha1)
