@@ -5,7 +5,7 @@ import math
 import random
 import re
 from collections import defaultdict
-from collections.abc import Generator, Iterator
+from collections.abc import Generator, Iterator, Mapping, Sequence
 from dataclasses import dataclass
 from datetime import date
 from difflib import SequenceMatcher
@@ -1344,7 +1344,7 @@ def get_iquery_pacer_courts_to_scrape() -> list[str]:
 
 
 def create_docket_entry_sequence_numbers(
-    docket_entries: list[dict[str, Any]], date_field: str = "date"
+    docket_entries: Sequence[Mapping[str, Any]], date_field: str = "date"
 ) -> list[str]:
     """Calculates the sequence numbers for a list of docket entries to allow
     consistent matching and merging.
