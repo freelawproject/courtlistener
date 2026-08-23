@@ -1996,20 +1996,17 @@ def get_att_report_by_rd(
     is_acms_document = rd.is_acms_document()
 
     if is_acms_document:
-        report_class = ACMSAttachmentPage
-    elif is_appellate_case:
-        report_class = AppellateAttachmentPage
-    else:
-        report_class = AttachmentPage
-
-    att_report = report_class(pacer_court_id, s)
-
-    if is_acms_document:
+        att_report = ACMSAttachmentPage(pacer_court_id, s)
         docket_case_id = rd.docket_entry.docket.pacer_case_id
         rd_entry_id = rd.pacer_doc_id
         att_report.query(docket_case_id, rd_entry_id)
-    else:
+    elif is_appellate_case:
+        att_report = AppellateAttachmentPage(pacer_court_id, s)
         att_report.query(rd.pacer_doc_id)
+    else:
+        att_report = AttachmentPage(pacer_court_id, s)
+        att_report.query(rd.pacer_doc_id)
+
     return att_report
 
 
