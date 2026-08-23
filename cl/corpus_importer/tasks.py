@@ -14,7 +14,7 @@ from io import BytesIO
 from pyexpat import ExpatError
 from re import Pattern
 from tempfile import NamedTemporaryFile
-from typing import IO, Any
+from typing import IO, Any, TypeIs
 from urllib.parse import urljoin
 
 import botocore.exceptions
@@ -4456,6 +4456,26 @@ def texas_docket_has_appellate_info(
     )
 
 
+# TODO: `TexasCommonScraper` should return `None` on failure and this narrowing
+# function should be replaced by a simple `is None` check.
+def is_texas_docket(
+    d: dict[str, None]
+    | TexasCourtOfAppealsDocket
+    | TexasCourtOfCriminalAppealsDocket
+    | TexasSupremeCourtDocket,
+) -> TypeIs[
+    TexasCourtOfAppealsDocket
+    | TexasCourtOfCriminalAppealsDocket
+    | TexasSupremeCourtDocket
+]:
+    """
+    `TexasCommonScraper` may fail successfully. In which case it returns an
+    empty `dict`. This cannot be readily distinguished from `TypedDict`. This
+    enables type narrowing to happen for `TexasCommonScraper` as-is.
+    """
+    return "court_type" in d
+
+
 def merge_texas_parties(
     docket: Docket, parties: list[TexasCaseParty]
 ) -> MergeResult:
@@ -4926,6 +4946,8 @@ def texas_ingest_docket_task(
 
         parser._parse_text(content.decode("utf-8"))
         docket_data = parser.data
+        if not is_texas_docket(docket_data):
+            raise ValueError("Docket parser failed to produce a valid Docket")
     except Exception as e:
         logger.error(
             "Encountered error parsing Texas docket at URL %s: %s",
