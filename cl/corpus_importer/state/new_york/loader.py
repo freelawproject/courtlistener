@@ -7,7 +7,7 @@ from typing import Any
 from django.db.models import Model
 from juriscraper.state.docket import DocketEntryType, DocketType, PartyType
 
-from cl.corpus_importer.state.loader import JKentScrapeLoader
+from cl.corpus_importer.state.loader import JKentScrapeLoader, UnusableScrape
 from cl.corpus_importer.state.merger import Merger
 from cl.corpus_importer.state.new_york.mergers import NYCoADocketMerger
 from cl.corpus_importer.state.new_york.nycourts_gov import NYCoACase
@@ -33,10 +33,6 @@ WITH scraped AS (
     WHERE result_type = 'NYCourtPassDocket'
       AND is_valid = 1
       AND COALESCE(json_extract(data_json, '$.docket_number'), '') <> ''
-      AND (
-          json_extract(data_json, '$.no_files_for_case') = 1
-          OR COALESCE(json_array_length(data_json, '$.files'), 0) > 0
-      )
 ),
 docket AS (
     SELECT id, data_json, docket_number
@@ -262,7 +258,9 @@ SELECT
         'entries', json(COALESCE(entry.entries, '[]')),
         'parties', json(COALESCE(party.parties, '[]')),
         'transfers', json_array()
-    ) AS payload
+    ) AS payload,
+    json_extract(docket.data_json, '$.no_files_for_case') AS no_files_for_case,
+    COALESCE(json_array_length(docket.data_json, '$.files'), 0) AS file_count
 FROM docket
 LEFT JOIN entry ON entry.docket_id = docket.id
 LEFT JOIN party ON party.docket_id = docket.id
@@ -280,16 +278,41 @@ class NYCoACourtPassLoader(JKentScrapeLoader[NYCoACase]):
     merger: type[Merger[NYCoACase, None, Model]] = NYCoADocketMerger
     document_model = NYCoADocument
 
+    @staticmethod
+    def _refuse_unread_file_list(
+        payload: dict[str, Any], row: sqlite3.Row
+    ) -> None:
+        """Refuse a docket whose filing detail page said nothing about files.
+
+        If NYCourtPass doesn't produce either a notice saying there's no files
+        or a list of files, then assume there's some html error and be noisy
+        about it.
+
+        :param payload: The docket payload, for naming the docket refused.
+        :param row: The query row, read for the two columns `QUERY` selects
+            alongside the payload.
+        :raises UnusableScrape: If the page attested to neither.
+        """
+        if row["no_files_for_case"] == 1 or row["file_count"]:
+            return
+        raise UnusableScrape(
+            f"{payload['docket_number']} states neither that it has no files "
+            "nor any file its filing detail page listed, so its file list "
+            "went unread and merging it would prune every document the "
+            "docket has."
+        )
+
     def normalize(
         self, payload: dict[str, Any], row: sqlite3.Row
     ) -> dict[str, Any]:
-        """Name the enum members `QUERY` has no way to state.
+        """Name the enum members `QUERY` has no way to state, and refuse a
+        docket whose file list did not parse.
 
-        The payload arrives finished apart from these three, each of which
-        stands for something Court-PASS does not state at all: it types neither
-        the case nor its filings in the cross-state vocabulary, and it states a
-        party's role in words that only sometimes name a `PartyType` member.
+        :raises UnusableScrape: For a docket whose filing detail page carried
+            neither the Court's "no files available for this case" line nor a
+            file table the scraper could read. See `_refuse_unread_file_list`.
         """
+        self._refuse_unread_file_list(payload, row)
         payload["docket_type"] = DocketType.UNKNOWN
         for entry in payload["entries"]:
             entry["entry_type"] = DocketEntryType.UNKNOWN
