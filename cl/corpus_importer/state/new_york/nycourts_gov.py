@@ -206,6 +206,7 @@ class NYCoDocketEntry(DocketEntry[NYCoAFile]):
             self.entry_filing_type = Unclassified.UNASSIGNED
         return self
 
+
 class NYCoAIssue(BaseModel):
     """An issue the Court of Appeals assigned to a case, classified.
 
