@@ -35,8 +35,8 @@ from cl.lib.s3_cache import get_s3_cache, make_s3_cache_key
 from cl.lib.string_utils import trunc
 from cl.lib.types import CleanData
 from cl.opinion_page.docket_sources_utils import (
-    DocketEntrySource,
     SCOTUS_SOURCE,
+    DocketEntrySource,
     MetadataItem,
     MetadataSection,
     build_scotus_metadata,

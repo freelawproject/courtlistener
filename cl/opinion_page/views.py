@@ -73,8 +73,8 @@ from cl.opinion_page.decorators import handle_cluster_redirection
 from cl.opinion_page.docket_sources_utils import (
     RECAP_SOURCE,
     SCOTUS_SOURCE,
-    document_url,
     attach_display_fields,
+    document_url,
 )
 from cl.opinion_page.feeds import DocketFeed
 from cl.opinion_page.forms import (
