@@ -13,6 +13,9 @@ from cl.search.state.new_york.vocabularies import UNASSIGNED, UNKNOWN
 logger = logging.getLogger(__name__)
 
 NYCOA_COURT_ID: str = "ny"
+# <Case type>-<Year>-<Case number>, e.g. APL-2024-00177. The case type comes
+# from a dropdown on the search form (APL, CTQ, JCR, ...), so the pattern
+# accepts any short alphabetic prefix rather than enumerating them.
 NYCOA_DN_RE = re.compile(r"[A-Z]{2,4}-\d{4}-\d{3,6}")
 
 
