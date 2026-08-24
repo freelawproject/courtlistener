@@ -38,8 +38,8 @@ from cl.corpus_importer.state.merger import (
     ManyStrategy,
     Merger,
     OneToManyRelation,
+    OneToOneRelation,
     RelatedParams,
-    ReverseOneToOneRelation,
     ThroughParameters,
     overwrite,
 )
@@ -51,7 +51,6 @@ from cl.corpus_importer.state.new_york.nycourts_gov import (
     NYCoAParty,
     NYCoDocketEntry,
     Unclassified,
-<<<<<<< HEAD
 )
 from cl.corpus_importer.state.new_york.storage import (
     PUBLISHED_PREFIX,
@@ -60,8 +59,6 @@ from cl.corpus_importer.state.new_york.storage import (
     is_published,
     is_scraped,
     withdraw_file,
-=======
->>>>>>> ecccedfb8 (refactor(types) type narrowing)
 )
 from cl.corpus_importer.state.new_york.utils import (
     NYCOA_COURT_ID,
@@ -140,19 +137,6 @@ def _keep_downloaded[T](scrape: T | None, db: T | None) -> T | None:
     :return: The value to store.
     """
     return db if scrape is None or scrape == "" else scrape
-
-
-def _stated(reading: CourtVocabulary | Unclassified) -> str:
-    """The Court-PASS value to store for a field read off a file name.
-
-    `NYCoADocument.doc_role` and `doc_type` are free text mirroring what the
-    name itself stated, so a name that stated nothing readable is stored blank
-    rather than under one of the reserved readings.
-
-    :param reading: What the scrape schema classified the field as.
-    :return: The value Court-PASS's naming convention uses, or the empty string.
-    """
-    return "" if isinstance(reading, Unclassified) else reading.value
 
 
 def _stated(reading: CourtVocabulary | Unclassified) -> str:
@@ -705,19 +689,12 @@ class NYCoADocketMetadataMerger(
 ):
     """Merger for the NYCoA-only docket fields.
 
-<<<<<<< HEAD
     The `OneToOneField` lives on this model rather than on `Docket`, so this is
     the reverse side of the relation: `OneToOneMerger` fills in `docket` from
     the parent and matches on it, and this merger must not declare it."""
-=======
-    The `OneToOneField` lives on this model rather than on `Docket`, so this
-    merger sets its own `docket` from the parent and matches on it."""
->>>>>>> ecccedfb8 (refactor(types) type narrowing)
 
     model: ClassVar[type[Model]] = NYCoADocketMetadata
-    key: ClassVar[Iterable[str]] = ["docket"]
 
-    docket: Docket = Attribute(lambda case, params: params.parent)
     # Court-PASS states a case's issues in full, so an issue that is gone from
     # the scrape is one the Court removed.
     issues: list[NYCoADocketIssue] = OneToManyRelation(
@@ -794,7 +771,7 @@ class NYCoADocketMerger(DocketMerger[NYCoACase, None]):
     nycoa_docket_entries: list[NYCoADocketEntry] = DocketEntryRelation(
         NYCoADocketEntryMerger, strategy=ManyStrategy.REPLACE
     )
-    nycoa_metadata: NYCoADocketMetadata = ReverseOneToOneRelation(
+    nycoa_metadata: NYCoADocketMetadata = OneToOneRelation(
         NYCoADocketMetadataMerger, _case_metadata
     )
 
