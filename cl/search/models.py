@@ -1,6 +1,7 @@
 import logging
 import re
 from datetime import datetime
+from pathlib import Path
 from typing import TYPE_CHECKING, Literal, TypeVar
 from urllib.parse import quote
 
@@ -44,6 +45,12 @@ from cl.corpus_importer.state.florida.utils import (
 from cl.corpus_importer.state.florida.utils import (
     make_docket_number_core as make_florida_docket_number_core,
 )
+from cl.corpus_importer.state.new_york.utils import (
+    is_nycoa_court,
+)
+from cl.corpus_importer.state.new_york.utils import (
+    make_docket_number_core as make_nycoa_docket_number_core,
+)
 from cl.custom_filters.templatetags.text_filters import best_case_name
 from cl.lib import fields
 from cl.lib.decorators import document_model
@@ -60,11 +67,13 @@ from cl.lib.model_helpers import (
     normalize_texas_appellate_docket_number,
 )
 from cl.lib.models import AbstractDateTimeModel, AbstractPDF, s3_warning_note
+from cl.lib.recap_utils import get_bucket_name
 from cl.lib.storage import IncrementingAWSMediaStorage, S3PrivateUUIDStorage
 from cl.lib.string_utils import get_token_count_from_string, trunc
 from cl.search.cluster_sources import ClusterSources
 from cl.search.docket_sources import DocketSources
 from cl.search.state.florida.models import *
+from cl.search.state.new_york.models import *
 from cl.search.state.texas.models import *
 from cl.users.models import User
 
@@ -718,6 +727,10 @@ class Docket(AbstractDateTimeModel, DocketSources):
                 self.docket_number_core = make_florida_docket_number_core(
                     self.docket_number_raw, court_id=self.court_id
                 )
+            elif is_nycoa_court(self.court_id):
+                self.docket_number_core = make_nycoa_docket_number_core(
+                    self.docket_number_raw
+                )
             else:
                 self.docket_number_core = make_docket_number_core(
                     self.docket_number_raw
@@ -1306,6 +1319,16 @@ class RECAPDocument(
     def __str__(self) -> str:
         return f"{self.pk}: Docket_{self.docket_entry.docket.docket_number} , document_number_{self.document_number} , attachment_number_{self.attachment_number}"
 
+    def get_pdf_path(self, filename: str, thumbs: bool = False) -> str:
+        """Store PACER documents under the RECAP bucket layout, which the
+        original RECAP server also used, so paths stay compatible."""
+        root = "recap-thumbnails" if thumbs else "recap"
+        bucket = get_bucket_name(
+            self.docket_entry.docket.court_id,
+            self.docket_entry.docket.pacer_case_id,
+        )
+        return str(Path(root) / bucket / filename)
+
     def get_absolute_url(self) -> str:
         if not self.document_number:
             # Numberless entries don't get URLs
@@ -1823,6 +1846,15 @@ class ClaimHistory(AbstractPacerDocument, AbstractPDF, AbstractDateTimeModel):
     class Meta:
         verbose_name_plural = "Claim History Entries"
 
+    def get_pdf_path(self, filename: str, thumbs: bool = False) -> str:
+        """Store claim documents under the claim bucket layout, keyed on the
+        claim's docket rather than the document's own docket entry."""
+        root = "claim-thumbnails" if thumbs else "claim"
+        bucket = get_bucket_name(
+            self.claim.docket.court_id, self.pacer_case_id
+        )
+        return str(Path(root) / bucket / filename)
+
 
 class FederalCourtsQuerySet(models.QuerySet):
     def all(self) -> models.QuerySet:
@@ -1899,7 +1931,7 @@ class Court(models.Model):
 
     Note that a Courthouse object should be created alongside each new Court.
     Even if this is not enforced by the data model, there is some logic tied
-    to that relation. Examples in `find_citations` and `coverage_utils`
+    to that relation. Examples in `find_citations`.
     """
 
     # Note that spaces cannot be used in the keys, or else the SearchForm won't
@@ -4015,6 +4047,17 @@ class ScotusDocketMetadata(AbstractDateTimeModel):
         verbose_name = "SCOTUS Docket Metadata"
         verbose_name_plural = "SCOTUS Docket Metadata"
 
+    def get_pdf_path(self, filename: str, thumbs: bool = False) -> str:
+        """Store the questions-presented PDF under the SCOTUS `qp` directory.
+
+        This model is not itself a document -- the PDF hangs off the docket
+        metadata -- so it satisfies `SupportsPdfPath` without subclassing
+        `AbstractPDF`.
+        """
+        slug = slugify(Path(filename).stem)
+        root = Path("scotus") / ("qp-thumbnails" if thumbs else "qp")
+        return str(root / f"gov.scotus.{slug}.pdf")
+
 
 @pghistory.track()
 @document_model
@@ -4271,6 +4314,14 @@ class SCOTUSDocument(AbstractDateTimeModel, AbstractPDF):
 
     def __str__(self) -> str:
         return f"{self.pk}: Docket_{self.docket_entry.docket.docket_number} , document_number_{self.document_number} , attachment_number_{self.attachment_number}"
+
+    def get_pdf_path(self, filename: str, thumbs: bool = False) -> str:
+        """Store SCOTUS documents under the SCOTUS `documents` directory."""
+        slug = slugify(Path(filename).stem)
+        root = Path("scotus") / (
+            "documents-thumbnails" if thumbs else "documents"
+        )
+        return str(root / f"gov.scotus.{slug}.pdf")
 
     def get_absolute_url(self) -> str:
         if not self.document_number or not self.attachment_number:

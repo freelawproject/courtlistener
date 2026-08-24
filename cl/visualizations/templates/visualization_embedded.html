@@ -19,7 +19,8 @@
 
 {% block footer-scripts %}
     <script type="text/javascript" nonce="{{ request.csp_nonce }}">
-        var opinions = {{ viz.json|safe }};
+        {# escapejs + JSON.parse, never |safe: json_data must not be interpolated raw. #}
+        var opinions = JSON.parse("{{ viz.json|default_if_none:"null"|escapejs }}");
     </script>
     {% include "includes/footer-scripts.html" %}
 {% endblock %}

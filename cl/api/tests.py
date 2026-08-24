@@ -19,7 +19,6 @@ from django.core.cache import caches
 from django.core.exceptions import ValidationError
 from django.core.management import call_command
 from django.db import IntegrityError, connection
-from django.http import HttpRequest, JsonResponse
 from django.test import RequestFactory, SimpleTestCase, override_settings
 from django.test.client import AsyncClient, AsyncRequestFactory
 from django.test.utils import CaptureQueriesContext
@@ -68,11 +67,7 @@ from cl.api.utils import (
     promo_doubling_applies,
     promo_switch_is_active,
 )
-from cl.api.views import (
-    build_chart_data,
-    coverage_data,
-    make_court_variable,
-)
+from cl.api.views import make_court_variable
 from cl.api.webhooks import send_webhook_event
 from cl.audio.api_views import AudioViewSet
 from cl.audio.audio_sources import AudioSources
@@ -184,7 +179,6 @@ class BasicAPIPageTest(ESIndexTestCase, TestCase):
 
     @classmethod
     def setUpTestData(cls):
-        CourtFactory(id="ca1", jurisdiction=Court.FEDERAL_APPELLATE)
         cls.rebuild_index("search.OpinionCluster")
 
     def setUp(self) -> None:
@@ -203,16 +197,6 @@ class BasicAPIPageTest(ESIndexTestCase, TestCase):
 
     async def test_court_index(self) -> None:
         r = await self.async_client.get(reverse("court_index"))
-        self.assertEqual(r.status_code, 200)
-
-    async def test_coverage_api(self) -> None:
-        r = await self.async_client.get(
-            reverse("coverage_data", kwargs={"version": 4, "court": "ca1"})
-        )
-        self.assertEqual(r.status_code, 200)
-
-    async def test_coverage_api_via_url(self) -> None:
-        r = await self.async_client.get("/api/rest/v4/coverage/ca1/")
         self.assertEqual(r.status_code, 200)
 
     async def test_wiki_data_endpoint(self) -> None:
@@ -287,6 +271,20 @@ class BasicAPIPageTest(ESIndexTestCase, TestCase):
             "debts",
         ):
             self.assertIsInstance(financial_disclosures[key], int)
+
+    async def test_wiki_coverage_data_rounds_oa_duration(self) -> None:
+        """Is the total oral argument duration rounded to the nearest minute?
+
+        The wiki renders this value as-is, so CourtListener has to do the
+        rounding itself rather than serving a raw float.
+        """
+        await caches["default"].adelete("wiki-coverage-data")
+        await sync_to_async(AudioFactory)(duration=250)
+        r = await self.async_client.get(reverse("wiki_coverage_data"))
+        data = json.loads(r.content)
+        duration_minutes = data["oral_arguments"]["duration_minutes"]
+        self.assertIsInstance(duration_minutes, int)
+        self.assertEqual(duration_minutes, 4)
 
 
 @override_settings(
@@ -528,45 +526,6 @@ class CoverageTests(ESIndexTestCase, TestCase):
             testing_mode=True,
         )
 
-    async def test_coverage_data_view_provides_court_data(self) -> None:
-        response = await coverage_data(HttpRequest(), "v4", "ca1")
-        self.assertEqual(response.status_code, 200)
-        self.assertIsInstance(response, JsonResponse)
-        self.assertContains(response, "annual_counts")
-        self.assertContains(response, "total")
-
-    async def test_coverage_data_all_courts(self) -> None:
-        r = await self.async_client.get(
-            reverse("coverage_data", kwargs={"version": "4", "court": "all"})
-        )
-        j = json.loads(r.content)
-        self.assertTrue(len(j["annual_counts"].keys()) > 0)
-        self.assertIn("total", j)
-
-    async def test_coverage_data_specific_court(self) -> None:
-        r = await self.async_client.get(
-            reverse(
-                "coverage_data", kwargs={"version": "4", "court": "scotus"}
-            )
-        )
-        j = json.loads(r.content)
-        self.assertEqual(len(j["annual_counts"].keys()), 25)
-        self.assertEqual(j["annual_counts"]["2000"], 1)
-        self.assertEqual(j["annual_counts"]["2024"], 1)
-        self.assertEqual(j["total"], 2)
-
-        # Ensure that coverage can be filtered using a query string.
-        r = await self.async_client.get(
-            reverse(
-                "coverage_data", kwargs={"version": "3", "court": "scotus"}
-            ),
-            {"q": "America"},
-        )
-        j = json.loads(r.content)
-        self.assertEqual(len(j["annual_counts"].keys()), 1)
-        self.assertEqual(j["annual_counts"]["2024"], 1)
-        self.assertEqual(j["total"], 1)
-
     async def test_make_court_variable(self) -> None:
         """Confirm opinions counts per court are properly returned."""
 
@@ -580,47 +539,6 @@ class CoverageTests(ESIndexTestCase, TestCase):
                 self.assertEqual(2, court.count)
             if court.pk == self.court_cand.pk:
                 self.assertEqual(1, court.count)
-
-    async def test_build_chart_data(self) -> None:
-        """Confirm build_chart_data method returns the right data."""
-
-        chart_data = await sync_to_async(build_chart_data)(["scotus", "cand"])
-        for court_data in chart_data:
-            if (
-                court_data["group"]
-                == self.court_scotus.get_jurisdiction_display()
-            ):
-                data = court_data["data"][0]
-                self.assertEqual(data["id"], self.court_scotus.pk)
-                self.assertEqual(data["label"], self.court_scotus.full_name)
-                self.assertEqual(data["data"][0]["val"], 2)
-
-                date_1 = datetime.fromisoformat(
-                    data["data"][0]["timeRange"][0].replace("Z", "+00:00")
-                )
-                date_2 = datetime.fromisoformat(
-                    data["data"][0]["timeRange"][1].replace("Z", "+00:00")
-                )
-                self.assertEqual(date_1.date(), self.c_scotus_1.date_filed)
-                self.assertEqual(date_2.date(), self.c_scotus_2.date_filed)
-
-            if (
-                court_data["group"]
-                == self.court_cand.get_jurisdiction_display()
-            ):
-                data = court_data["data"][0]
-                self.assertEqual(data["id"], self.court_cand.pk)
-                self.assertEqual(data["label"], self.court_cand.full_name)
-                self.assertEqual(data["data"][0]["val"], 1)
-
-                date_1 = datetime.fromisoformat(
-                    data["data"][0]["timeRange"][0].replace("Z", "+00:00")
-                )
-                date_2 = datetime.fromisoformat(
-                    data["data"][0]["timeRange"][1].replace("Z", "+00:00")
-                )
-                self.assertEqual(date_1.date(), self.c_cand_1.date_filed)
-                self.assertEqual(date_2.date(), self.c_cand_1.date_filed)
 
 
 @mock.patch(

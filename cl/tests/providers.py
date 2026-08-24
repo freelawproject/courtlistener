@@ -1,3 +1,4 @@
+import itertools
 import random
 
 from faker import Faker
@@ -8,6 +9,10 @@ from reporters_db import REPORTERS
 from cl.custom_filters.templatetags.text_filters import oxford_join
 
 fake = Faker()
+
+# Module-level so it survives new provider instances and the per-test DB
+# rollback.
+court_name_counter = itertools.count()
 
 
 class LegalProvider(BaseProvider):
@@ -49,10 +54,8 @@ class LegalProvider(BaseProvider):
                 "Eruptanyom",  # Kelvin's pretend world
             ]
         )
-        # The names only give us 5.58 bits of entropy, so we append an extra
-        # 4 bytes to give us 37.58, a reasonable amount of randomness for test
-        # sample sizes.
-        last_word = f"{last_word}-{hex(random.getrandbits(32))[2:]}"
+        # Append a counter to create unique names.
+        last_word = f"{last_word}-{next(court_name_counter)}"
 
         return " ".join([first_word, mid_word, last_word])
 

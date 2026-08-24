@@ -10,10 +10,13 @@ from cl.corpus_importer.state.texas.utils import is_missing_file_page
 from cl.lib.decorators import document_model
 from cl.lib.model_helpers import CSVExportMixin
 from cl.lib.models import AbstractDateTimeModel
+from cl.lib.types import NonEmptyTuple
+from cl.search.state.shared import (
+    AbstractStateDocument,
+    ProcessingError,
+)
 
 __all__ = ["TexasDocketEntry", "TexasDocument"]
-
-from cl.search.state.shared import AbstractStateDocument, ProcessingError
 
 logger = logging.getLogger(__name__)
 
@@ -66,10 +69,6 @@ class TexasDocketEntry(AbstractDateTimeModel, CSVExportMixin):
         # verbose_name_plural = "Texas Docket Entries"
 
 
-EXPECTED_EXTENSIONS = {".pdf", ".html", ".wpd", ".mp3"}
-EXTRACTABLE_EXTENSIONS = {".pdf", ".html", ".wpd"}
-
-
 @pghistory.track()
 @document_model
 class TexasDocument(AbstractDateTimeModel, AbstractStateDocument):
@@ -102,13 +101,14 @@ class TexasDocument(AbstractDateTimeModel, AbstractStateDocument):
         return "texas_"
 
     @classmethod
-    def expected_extensions(cls) -> set[str]:
+    def expected_extensions(cls) -> NonEmptyTuple[str]:
         """File extensions TAMES is known to serve."""
-        return EXPECTED_EXTENSIONS
+        return ".pdf", ".html", ".wpd", ".mp3"
 
-    def can_extract(self, extension: str) -> bool:
-        """Whether text extraction supports files with this extension."""
-        return extension in EXTRACTABLE_EXTENSIONS
+    @classmethod
+    def extractable_extensions(cls) -> NonEmptyTuple[str]:
+        """Extensions that can be sent to text extraction"""
+        return ".pdf", ".html", ".wpd"
 
     def validate_file(self, content: IO[bytes], extension: str) -> int | None:
         """Flag downloads where TAMES returned its "missing file" HTML page
@@ -136,3 +136,9 @@ class TexasDocument(AbstractDateTimeModel, AbstractStateDocument):
             models.Index(fields=["filepath_local"]),
         ]
         unique_together = [["docket_entry", "media_id"]]
+
+    def get_pdf_path(self, filename: str, thumbs: bool = False) -> str:
+        """Store TAMES documents under the shared state layout."""
+        return self.state_pdf_path(
+            "tx", self.docket_entry.docket.court_id, filename, thumbs
+        )
