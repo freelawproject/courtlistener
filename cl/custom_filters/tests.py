@@ -1,16 +1,23 @@
 import datetime
 import logging
+import re
+import shutil
+import tempfile
+from pathlib import Path
 from unittest import mock
 
 from django import forms
+from django.conf import settings
 from django.template import Context, TemplateSyntaxError
+from django.template.utils import get_app_template_dirs
 from django.test import RequestFactory, SimpleTestCase
 
 from cl.custom_filters.templatetags import component_tags
 from cl.custom_filters.templatetags.component_tags import (
     _coerce_defer,
     _resolved_path,
-    _warn_about_missing_minified,
+    _script_problems,
+    _warn_about_unusable_scripts,
     render_required_scripts,
     require_script,
 )
@@ -559,6 +566,18 @@ class TestComponentTags(SimpleTestCase):
     def _render(self) -> str:
         return render_required_scripts(self.context)
 
+    def _file(self, content: bytes) -> str:
+        """Writes a throwaway script file and returns its path."""
+        tmp = Path(tempfile.mkdtemp())
+        self.addCleanup(shutil.rmtree, tmp)
+        path = tmp / "script.js"
+        path.write_bytes(content)
+        return str(path)
+
+    def _resolver(self, files: dict[str, str]):
+        """A finders.find stand-in resolving only the given static paths."""
+        return files.get
+
     def test_extension_resolution(self) -> None:
         """The extension resolves to .js under DEBUG, .min.js otherwise."""
         test_cases = (
@@ -634,42 +653,64 @@ class TestComponentTags(SimpleTestCase):
         """The module logs under "cl", which owns the console handler."""
         self.assertTrue(LOGGER.startswith("cl."))
 
-    @mock.patch.object(component_tags.finders, "find", return_value=None)
-    def test_warns_when_minified_sibling_is_missing(self, mock_find) -> None:
-        """An extension-less stub with no .min.js logs a warning."""
-        with self.settings(DEBUG=True):
-            require_script(self.context, "js/alpine/plugins/ghost")
-            with self.assertLogs(LOGGER, level="WARNING") as logs:
-                rendered = self._render()
+    def test_warns_when_a_variant_is_missing(self) -> None:
+        """A stub whose .min.js was never committed logs a warning."""
+        find = self._resolver({"js/ghost.js": self._file(b"a=1")})
+        with mock.patch.object(component_tags.finders, "find", find):
+            with self.settings(DEBUG=True):
+                require_script(self.context, "js/ghost")
+                with self.assertLogs(LOGGER, level="WARNING") as logs:
+                    rendered = self._render()
 
-        mock_find.assert_called_once_with("js/alpine/plugins/ghost.min.js")
         self.assertEqual(len(logs.records), 1)
-        self.assertIn("js/alpine/plugins/ghost", logs.output[0])
-        self.assertIn(".min.js", logs.output[0])
+        self.assertIn("js/ghost.min.js is missing", logs.output[0])
         # The page still loads the unminified file.
-        self.assertIn("js/alpine/plugins/ghost.js", rendered)
+        self.assertIn("js/ghost.js", rendered)
 
-    @mock.patch.object(component_tags.finders, "find", return_value=None)
-    def test_warning_is_emitted_once_per_request(self, mock_find) -> None:
-        """Repeated requires warn once and hit the filesystem once."""
-        with self.settings(DEBUG=True):
-            require_script(self.context, "js/alpine/plugins/ghost")
-            require_script(self.context, "js/alpine/plugins/ghost")
-            with self.assertLogs(LOGGER, level="WARNING") as logs:
-                self._render()
+    def test_warns_when_a_variant_is_empty(self) -> None:
+        """A stub whose .min.js holds no code logs a warning."""
+        find = self._resolver(
+            {
+                "js/ghost.js": self._file(b"a=1"),
+                "js/ghost.min.js": self._file(b"\n"),
+            }
+        )
+        with mock.patch.object(component_tags.finders, "find", find):
+            with self.settings(DEBUG=True):
+                require_script(self.context, "js/ghost")
+                with self.assertLogs(LOGGER, level="WARNING") as logs:
+                    self._render()
 
         self.assertEqual(len(logs.records), 1)
-        mock_find.assert_called_once_with("js/alpine/plugins/ghost.min.js")
+        self.assertIn("js/ghost.min.js is empty", logs.output[0])
 
-    @mock.patch.object(
-        component_tags.finders, "find", return_value="/abs/path.min.js"
-    )
-    def test_no_warning_when_minified_sibling_exists(self, mock_find) -> None:
-        """A stub whose .min.js exists logs nothing."""
-        with self.settings(DEBUG=True):
-            require_script(self.context, "js/alpine/plugins/focus", defer=True)
-            with self.assertNoLogs(LOGGER, level="WARNING"):
-                self._render()
+    def test_no_warning_when_both_variants_hold_content(self) -> None:
+        """A stub whose files are both real logs nothing."""
+        find = self._resolver(
+            {
+                "js/ghost.js": self._file(b"a=1"),
+                "js/ghost.min.js": self._file(b"a=1"),
+            }
+        )
+        with mock.patch.object(component_tags.finders, "find", find):
+            with self.settings(DEBUG=True):
+                require_script(self.context, "js/ghost", defer=True)
+                with self.assertNoLogs(LOGGER, level="WARNING"):
+                    self._render()
+
+    def test_warning_is_emitted_once_per_request(self) -> None:
+        """Repeated requires warn once and hit the filesystem once."""
+        find = mock.Mock(side_effect=self._resolver({}))
+        with mock.patch.object(component_tags.finders, "find", find):
+            with self.settings(DEBUG=True):
+                require_script(self.context, "js/ghost")
+                require_script(self.context, "js/ghost")
+                with self.assertLogs(LOGGER, level="WARNING") as logs:
+                    self._render()
+
+        # Both variants are missing, so one warning each — not four.
+        self.assertEqual(len(logs.records), 2)
+        self.assertEqual(find.call_count, 2)
 
     @mock.patch.object(component_tags.finders, "find", return_value=None)
     def test_explicit_extension_is_never_checked(self, mock_find) -> None:
@@ -694,12 +735,68 @@ class TestComponentTags(SimpleTestCase):
 
     @mock.patch.object(component_tags.finders, "find", return_value=None)
     def test_reporter_is_a_noop_outside_debug(self, mock_find) -> None:
-        """_warn_about_missing_minified is a no-op outside DEBUG."""
+        """_warn_about_unusable_scripts is a no-op outside DEBUG."""
         with self.settings(DEBUG=True):
             require_script(self.context, "js/alpine/plugins/ghost")
 
         with self.settings(DEBUG=False):
             with self.assertNoLogs(LOGGER, level="WARNING"):
-                _warn_about_missing_minified(self.request)
+                _warn_about_unusable_scripts(self.request)
 
         mock_find.assert_not_called()
+
+
+class RequireScriptAssetsTest(SimpleTestCase):
+    """Guards the state of the templates and static files in this repo.
+
+    The rule itself is exercised in TestComponentTags; this only asks
+    whether what is committed today satisfies it.
+    """
+
+    _REQUIRE_SCRIPT_RE = re.compile(
+        r"""\{%\s*require_script\s+["']([^"']+)["']"""
+    )
+
+    @staticmethod
+    def _project_templates() -> list[Path]:
+        """Every template file Django can load from the project's own dirs."""
+        dirs = [Path(d) for d in settings.TEMPLATES[0]["DIRS"]]
+        dirs += [
+            Path(d)
+            for d in get_app_template_dirs("templates")
+            if Path(d).is_relative_to(settings.INSTALL_ROOT)
+        ]
+        return sorted({f for d in dirs for f in d.rglob("*.html")})
+
+    def _extensionless_requires(self) -> list[tuple[str, int, str]]:
+        """Finds every extension-less require as (template, line, stub)."""
+        found = []
+        for template in self._project_templates():
+            content = template.read_text(encoding="utf-8")
+            for match in self._REQUIRE_SCRIPT_RE.finditer(content):
+                stub = match.group(1)
+                if stub.endswith(".js"):
+                    # Explicit extension: used verbatim in every environment.
+                    continue
+                line = content.count("\n", 0, match.start()) + 1
+                relative = template.relative_to(settings.INSTALL_ROOT)
+                found.append((str(relative), line, stub))
+        return found
+
+    def test_every_extensionless_require_ships_both_variants(self) -> None:
+        """The templates only omit the extension for scripts that ship both."""
+        requires = self._extensionless_requires()
+        self.assertGreater(
+            len(requires), 0, "the template scan found nothing to check"
+        )
+
+        problems = [
+            f"{template}:{line}: {problem}"
+            for template, line, stub in requires
+            for problem in _script_problems(stub)
+        ]
+        if problems:
+            self.fail(
+                "Scripts required without an extension need a .js for DEBUG "
+                "and a .min.js for production:\n" + "\n".join(problems)
+            )
