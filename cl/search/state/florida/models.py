@@ -3,8 +3,12 @@ from django.db import models
 
 from cl.lib.decorators import document_model
 from cl.lib.model_helpers import CSVExportMixin
-from cl.lib.models import AbstractDateTimeModel, AbstractPDF
-from cl.search.state.shared import DocketEntryType, ProcessingError
+from cl.lib.models import AbstractDateTimeModel
+from cl.lib.types import NonEmptyTuple
+from cl.search.state.shared import (
+    AbstractStateDocument,
+    DocketEntryType,
+)
 
 __all__ = ["FloridaDocketEntry", "FloridaDocument"]
 
@@ -85,7 +89,7 @@ class FloridaDocketEntry(AbstractDateTimeModel, CSVExportMixin):
 
 @pghistory.track()
 @document_model
-class FloridaDocument(AbstractDateTimeModel, AbstractPDF):
+class FloridaDocument(AbstractDateTimeModel, AbstractStateDocument):
     """
     Represents an attachment to a Florida docket entry.
 
@@ -95,7 +99,6 @@ class FloridaDocument(AbstractDateTimeModel, AbstractPDF):
     :ivar document_type: The type of the document in Florida ACIS
     :ivar link_uuid: The attachment link UUID retrieved from Florida ACIS. Used to generate document download URL.
     :ivar url: Download URL for attachment. Derived from uuid and link_uuid. Stored for safety.
-    :ivar processing_error: The processing error for the document, if any.
     """
 
     docket_entry = models.ForeignKey(
@@ -103,16 +106,39 @@ class FloridaDocument(AbstractDateTimeModel, AbstractPDF):
         on_delete=models.CASCADE,
         related_name="documents",
     )
-    content_type = models.CharField(max_length=63, blank=True)
+    content_type = models.CharField(max_length=255, blank=True)
     document_name = models.TextField(blank=True)
     document_type = models.TextField(blank=True)
     link_uuid = models.UUIDField()
-    url = models.URLField(max_length=250)
-    processing_error = models.SmallIntegerField(
-        choices=ProcessingError.CHOICES,
-        null=True,
-        blank=True,
-    )
+
+    def make_filename(self) -> str:
+        """Build the stored filename from the document name and link UUID."""
+        return f"{self.document_name}-{self.link_uuid}"
+
+    @classmethod
+    def tmp_prefix(cls) -> str:
+        """Prefix for temporary download files."""
+        return "fl_"
+
+    @classmethod
+    def expected_extensions(cls) -> NonEmptyTuple[str]:
+        """File extensions Florida ACIS is known to serve."""
+        return ".pdf", ".tiff"
+
+    @classmethod
+    def extractable_extensions(cls) -> NonEmptyTuple[str]:
+        """Extensions that can be sent to text extraction"""
+        return (
+            ".pdf",
+            ".html",
+            ".wpd",
+            ".txt",
+            ".tiff",
+        )
+
+    async def fetch_page_count(self) -> int | None:
+        """Florida ACIS gives us the page count directly, so skip sending to the microservice."""
+        return self.page_count
 
     class Meta:
         app_label = "search"
@@ -126,3 +152,9 @@ class FloridaDocument(AbstractDateTimeModel, AbstractPDF):
                 name="unique_link_uuid_per_docket_entry",
             )
         ]
+
+    def get_pdf_path(self, filename: str, thumbs: bool = False) -> str:
+        """Store Florida ACIS documents under the shared state layout."""
+        return self.state_pdf_path(
+            "fl", self.docket_entry.docket.court_id, filename, thumbs
+        )

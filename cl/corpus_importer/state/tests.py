@@ -1,6 +1,7 @@
-from collections.abc import Iterable
-from typing import Any, ClassVar
+from collections.abc import Callable, Iterable
+from typing import Any, ClassVar, ParamSpec, TypeVar
 
+from django.db import connection
 from django.db.models import Model, QuerySet
 
 from cl.corpus_importer.state.merger import (
@@ -25,6 +26,70 @@ from cl.search.models import (
 )
 from cl.tests.cases import TestCase
 
+Param = ParamSpec("Param")
+Return = TypeVar("Return")
+
+
+def merger_test(
+    *, expected_query_count: int | range | None = None
+) -> Callable[[Callable[Param, Return]], Callable[Param, Return]]:
+    def decorator(f: Callable[Param, Return]) -> Callable[Param, Return]:
+        def wrapper(*args: Param.args, **kwargs: Param.kwargs) -> Return:
+            counts = {"merger": 0, "test": 0}
+            merger_sql: list[str] = []
+            merge_depth = 0
+
+            original_merge = Merger.merge
+
+            def counting_merge(merger_self: Any) -> Any:
+                nonlocal merge_depth
+                merge_depth += 1
+                try:
+                    return original_merge(merger_self)
+                finally:
+                    merge_depth -= 1
+
+            def count_query(
+                execute: Any, sql: Any, params: Any, many: Any, context: Any
+            ) -> Any:
+                # Skip savepoint bookkeeping from transaction.atomic(); it only
+                # appears because tests already run inside a transaction.
+                if not sql.startswith(("SAVEPOINT", "RELEASE", "ROLLBACK")):
+                    if merge_depth:
+                        counts["merger"] += 1
+                        merger_sql.append(sql)
+                    else:
+                        counts["test"] += 1
+                return execute(sql, params, many, context)
+
+            Merger.merge = counting_merge  # type: ignore[method-assign, assignment]
+
+            with connection.execute_wrapper(count_query):
+                output = f(*args, **kwargs)
+
+            if expected_query_count is not None:
+                if isinstance(args[0], TestCase):
+                    # It's okay if the query count is below the expect amount, but we still assert it isn't to force
+                    # the expectation to be updated whenever performance is improved.
+                    if isinstance(expected_query_count, int):
+                        args[0].assertEqual(
+                            counts["merger"],
+                            expected_query_count,
+                            "Merger query count should be equal to expectation.",
+                        )
+                    elif isinstance(expected_query_count, range):
+                        args[0].assertIn(
+                            counts["merger"],
+                            expected_query_count,
+                            "Merger query count should be in expected range.",
+                        )
+
+            return output
+
+        return wrapper
+
+    return decorator
+
 
 class BaseMergerTest(TestCase):
     @classmethod
@@ -32,6 +97,7 @@ class BaseMergerTest(TestCase):
         cls.court = CourtFactory.create()
         cls.docket = DocketFactory.create()
 
+    @merger_test(expected_query_count=1)
     def test_merger_creates_object(self) -> None:
         start_count = Docket.objects.count()
 
@@ -72,6 +138,7 @@ class BaseMergerTest(TestCase):
         self.assertEqual(created_docket.court_id, self.court.id)
         self.assertEqual(created_docket.source, DocketSources.SCRAPER)
 
+    @merger_test(expected_query_count=2)
     def test_merger_updates_docket(self) -> None:
         tc = self
         dn = self.docket.docket_number
@@ -81,7 +148,7 @@ class BaseMergerTest(TestCase):
         class TestMerger(Merger[dict[str, str], None, Docket]):
             model: ClassVar[type[Model]] = Docket
 
-            court: Court = Attribute(default=self.court)
+            court_id: Court = Attribute(default=self.court.id)
             source: int = Attribute(default=DocketSources.SCRAPER)
             docket_number: str = Attribute(default=new_dn)
 
@@ -129,6 +196,7 @@ class BaseMergerTest(TestCase):
             self.court.id,
         )
 
+    @merger_test(expected_query_count=1)
     def test_mappings_called(self) -> None:
         map_calls = 0
         dn = "ABCDEFG"
@@ -153,6 +221,7 @@ class BaseMergerTest(TestCase):
         docket = Docket.objects.get(pk=r.creates["Docket"].pop())
         self.assertEqual(docket.docket_number, dn)
 
+    @merger_test(expected_query_count=3)
     def test_related_mergers_1to1(self) -> None:
         class TestRelatedMerger(
             Merger[
@@ -199,6 +268,7 @@ class BaseMergerTest(TestCase):
         self.assertEqual(oci.docket_number, i["mctest"]["sr"])
         self.assertEqual(oci.docket.pk, result.creates["Docket"].pop())
 
+    @merger_test(expected_query_count=5)
     def test_related_mergers_child(self) -> None:
         class TestRelatedMerger(
             Merger[dict[str, str], RelatedParams[None], DocketEntry]
@@ -249,9 +319,11 @@ class BaseMergerTest(TestCase):
             set(de.docket.pk for de in des), set(result.creates["Docket"])
         )
 
+    @merger_test(expected_query_count=9)
     def test_related_mergers_m2m_simple(self) -> None:
         """Does a plain (no-through) many-to-many relation create the targets
-        and link them to the parent?"""
+        and link them to the parent? Uses batched candidate lookups so the
+        bulk-linking path is exercised."""
 
         class TestPersonMerger(
             Merger[dict[str, str], RelatedParams[None], Person]
@@ -262,6 +334,12 @@ class BaseMergerTest(TestCase):
             name_last: str = Attribute(lambda d, params: d["last"])
             slug: str = Attribute(lambda d, params: d["slug"])
             key = ["slug"]
+
+            @classmethod
+            def candidates(
+                cls, parent: Model, params: RelatedParams[None]
+            ) -> QuerySet[Person]:
+                return Person.objects.filter(empanelled_dockets=parent)
 
         class TestMerger(Merger[dict[str, Any], None, Docket]):
             model: ClassVar[type[Model]] = Docket
@@ -293,6 +371,7 @@ class BaseMergerTest(TestCase):
             {"Doe", "Roe"},
         )
 
+    @merger_test(expected_query_count=9)
     def test_related_mergers_m2m_through(self) -> None:
         """Does a many-to-many relation with a `through` model create the
         targets, link them to the parent, and populate the through row's own
@@ -355,6 +434,7 @@ class BaseMergerTest(TestCase):
             {("Alice", "Plaintiff"), ("Bob", "Defendant")},
         )
 
+    @merger_test(expected_query_count=9)
     def test_related_mergers_m2m_simple_disassociate(self) -> None:
         """Does DISASSOCIATE on a plain many-to-many remove stale
         associations while keeping the objects themselves?"""
@@ -406,6 +486,7 @@ class BaseMergerTest(TestCase):
             "The stale association should be removed.",
         )
 
+    @merger_test(expected_query_count=10)
     def test_related_mergers_m2m_through_disassociate(self) -> None:
         """Does DISASSOCIATE on a through many-to-many prune the stale
         through rows while keeping the related objects themselves?"""
@@ -466,6 +547,7 @@ class BaseMergerTest(TestCase):
             {"Alice"},
         )
 
+    @merger_test(expected_query_count=16)
     def test_related_mergers_m2m_through_replace_deletes(self) -> None:
         """Characterization: does REPLACE on a through many-to-many delete
         the stale related objects outright?"""
@@ -514,6 +596,124 @@ class BaseMergerTest(TestCase):
             "REPLACE deletes stale related objects outright.",
         )
 
+    @merger_test(expected_query_count=4)
+    def test_related_mergers_child_replace_keeps_rows_on_invalid_child(
+        self,
+    ) -> None:
+        """Does REPLACE leave existing rows alone when a child's input is
+        invalid? The child gives up before looking anything up, so the row it
+        would have matched isn't known and can't be pruned safely."""
+        stale = DocketEntry.objects.create(
+            docket=self.docket, description="Stale"
+        )
+        tc = self
+
+        class TestRelatedMerger(
+            Merger[dict[str, str], RelatedParams[None], DocketEntry]
+        ):
+            model: ClassVar[type[Model]] = DocketEntry
+            key: ClassVar[Iterable[str]] = ["description"]
+
+            description: str = Attribute(lambda d, params: d["df"])
+
+            @staticmethod
+            def validate(scrape: dict[str, str]) -> bool:
+                return scrape["df"] != "Invalid"
+
+        class TestMerger(Merger[dict[str, Any], None, Docket]):
+            model: ClassVar[type[Model]] = Docket
+
+            court: Court = Attribute(default=tc.docket.court)
+            source: int = Attribute(default=tc.docket.source)
+            docket_number: str = Attribute(default=tc.docket.docket_number)
+            docket_entries: list[DocketEntry] = OneToManyRelation(
+                TestRelatedMerger,
+                lambda d, params: d["entries"],
+            )
+
+            def query(self) -> QuerySet[Docket]:
+                return Docket.objects.filter(pk=tc.docket.pk)
+
+        i = {"entries": [{"df": "Fresh"}, {"df": "Invalid"}]}
+        result = TestMerger(i, params=None).merge()
+
+        self.assertFalse(result.success)
+        self.assertTrue(
+            DocketEntry.objects.filter(pk=stale.pk).exists(),
+            "A failed child merge must not let REPLACE delete existing rows.",
+        )
+        self.assertEqual(
+            set(
+                self.docket.docket_entries.values_list(
+                    "description", flat=True
+                )
+            ),
+            {"Stale", "Fresh"},
+        )
+
+    @merger_test(expected_query_count=3)
+    def test_related_mergers_m2m_replace_keeps_rows_on_ambiguous_child(
+        self,
+    ) -> None:
+        """Does REPLACE leave existing rows alone when a child's lookup
+        matches several rows? The merger can't pick one, so it never learns
+        which row belongs to this scrape."""
+        stale_party = Party.objects.create(name="Stale Party")
+        PartyType.objects.create(
+            docket=self.docket, party=stale_party, name="Plaintiff"
+        )
+        Party.objects.create(name="Ambiguous")
+        Party.objects.create(name="Ambiguous")
+        tc = self
+
+        class TestPartyMerger(
+            Merger[dict[str, str], RelatedParams[None], Party]
+        ):
+            model: ClassVar[type[Model]] = Party
+            key: ClassVar[Iterable[str]] = ["name"]
+
+            name: str = Attribute(lambda d, params: d["name"])
+
+        class TestPartyTypeMerger(
+            Merger[dict[str, str], ThroughParameters[None], PartyType]
+        ):
+            model: ClassVar[type[Model]] = PartyType
+
+            name: str = Attribute(lambda d, params: d["type"])
+
+        class TestMerger(Merger[dict[str, Any], None, Docket]):
+            model: ClassVar[type[Model]] = Docket
+
+            court: Court = Attribute(default=tc.docket.court)
+            source: int = Attribute(default=tc.docket.source)
+            docket_number: str = Attribute(default=tc.docket.docket_number)
+            parties: list[Party] = ManyToManyRelation(
+                TestPartyMerger,
+                TestPartyTypeMerger,
+                lambda d, params: d["parties"],
+            )
+
+            def query(self) -> QuerySet[Docket]:
+                return Docket.objects.filter(pk=tc.docket.pk)
+
+        i = {"parties": [{"name": "Ambiguous", "type": "Plaintiff"}]}
+        result = TestMerger(i, params=None).merge()
+
+        self.assertFalse(result.success)
+        self.assertTrue(
+            Party.objects.filter(pk=stale_party.pk).exists(),
+            "An ambiguous child lookup must not let REPLACE delete existing "
+            "rows.",
+        )
+        self.assertTrue(
+            PartyType.objects.filter(
+                docket=self.docket, party=stale_party
+            ).exists(),
+            "An ambiguous child lookup must not let REPLACE prune existing "
+            "through rows.",
+        )
+
+    @merger_test(expected_query_count=1)
     def test_merger_subclassing(self) -> None:
         class TestMerger(Merger[dict[str, str], dict[str, Any], Docket]):
             model: ClassVar[type[Model]] = Docket
