@@ -20,6 +20,7 @@ of a scrape.
 import json
 import logging
 import sqlite3
+import time
 from abc import ABC
 from collections.abc import Iterator
 from contextlib import closing
@@ -34,9 +35,17 @@ from pydantic import BaseModel, ValidationError
 
 from cl.corpus_importer.state.merger import Merger
 from cl.corpus_importer.state.utils import MergeResult
+from cl.lib.celery_utils import CeleryThrottle
+from cl.lib.indexing_utils import log_last_document_indexed
+from cl.lib.redis_utils import get_redis_interface
 from cl.search.state.shared import AbstractStateDocument
 
 logger = logging.getLogger(__name__)
+
+CHECKPOINT_EVERY = 250
+"""Rows between checkpoints, and between progress logs. A load that dies
+loses at most this many rows' worth of position, which it then re-merges on
+resume -- harmless, because merging is idempotent."""
 
 
 class UnusableScrape(Exception):
@@ -132,25 +141,58 @@ class JKentScrapeLoader[ScrapeType: BaseModel, ParamType = None](ABC):
         dry_run: bool = False,
         extract: bool = True,
         extraction_queue: str = "celery",
+        extraction_throttle: int = 0,
+        db_delay: float = 0.0,
+        start_row: int = 0,
+        checkpoint_key: str | None = None,
     ) -> None:
         """
         :param database: Path to the run's SQLite database.
-        :param limit: Stop after this many rows. For trying a loader out
-            against a large run.
+        :param limit: Stop after this many rows, counted from `start_row`. For
+            trying a loader out against a large run. A limited run keeps no
+            checkpoint, since the position it stopped at means nothing to a
+            later full load.
         :param dry_run: Roll back everything the load writes. The merge still
             runs in full, so the report is real; only the writes are undone.
+            Writes no checkpoint either, having written nothing to resume from.
         :param extract: Dispatch text extraction for the documents the load
-            writes. Not rate-limited.
+            writes.
         :param extraction_queue: The celery queue to extract on.
+        :param extraction_throttle: Keep the extraction queue at roughly this
+            many tasks, waiting for it to drain when it runs longer. Zero
+            dispatches as fast as the merge goes, which for a whole run is
+            enough to bury the queue; see the command's `--skip-extraction`
+            for the other way to pace a backfill.
+        :param db_delay: Seconds to wait after each row, to keep a long load
+            from monopolising the database. Zero runs flat out.
+        :param start_row: Skip this many rows before merging anything. The
+            rows a query returns are ordered, and a run database never
+            changes, so a row's position in one is stable enough to resume
+            from.
+        :param checkpoint_key: Redis key to record progress under as the load
+            goes, for a later run to resume from. The key is deleted once the
+            load reaches the end of the query, so that a finished load leaves
+            nothing behind for the next one to trip over. `None` records
+            nothing.
         """
         self.database = Path(database)
         self.limit = limit
         self.dry_run = dry_run
         self.extract = extract
         self.extraction_queue = extraction_queue
+        self.db_delay = db_delay
+        self.start_row = start_row
+        self.checkpoint_key = checkpoint_key
+        self.throttle = (
+            CeleryThrottle(
+                min_items=extraction_throttle, queue_name=extraction_queue
+            )
+            if extraction_throttle and extract and self.document_model
+            else None
+        )
 
     def rows(self) -> Iterator[sqlite3.Row]:
-        """Stream the rows `query` selects, honouring `limit`.
+        """Stream the rows `query` selects, honouring `start_row` and `limit`.
 
         The connection is read-only: a run database is a record of what a
         scraper saw, and loading it must not change it."""
@@ -161,7 +203,12 @@ class JKentScrapeLoader[ScrapeType: BaseModel, ParamType = None](ABC):
             connection.row_factory = sqlite3.Row
             with closing(connection.execute(self.query)) as cursor:
                 for count, row in enumerate(cursor, start=1):
-                    if self.limit is not None and count > self.limit:
+                    if count <= self.start_row:
+                        continue
+                    if (
+                        self.limit is not None
+                        and count - self.start_row > self.limit
+                    ):
                         return
                     yield row
 
@@ -244,10 +291,6 @@ class JKentScrapeLoader[ScrapeType: BaseModel, ParamType = None](ABC):
         if not self.dry_run:
             return self._load()
         if not self.merger.atomic:
-            # A dry run puts every row in one transaction, so a row the
-            # database itself refuses aborts that transaction and every row
-            # after it fails on the poisoned connection. Only the merger can
-            # isolate a row, by opening a savepoint of its own.
             logger.warning(
                 "%s is not atomic: a row that errors at the database will "
                 "cost every row after it in this dry run.",
@@ -255,19 +298,54 @@ class JKentScrapeLoader[ScrapeType: BaseModel, ParamType = None](ABC):
             )
         if self.extract and self.document_model is not None:
             logger.info("Dry run: dispatching no extraction.")
-        # The merge still runs; `set_rollback` discards it on the way out.
         with transaction.atomic():
             report = self._load()
             transaction.set_rollback(True)
         logger.info("Dry run: rolled back %s", report)
         return report
 
+    @property
+    def checkpointing(self) -> str | None:
+        """The key this load's position is worth recording under, if any."""
+        if self.dry_run or self.limit is not None:
+            return None
+        return self.checkpoint_key
+
+    def _checkpoint(self, row: int) -> None:
+        """Record that the load has finished every row up to and including
+        `row`, counting from the start of the query rather than `start_row`.
+
+        :param row: The last row the load got through."""
+        if (key := self.checkpointing) is None:
+            return
+        try:
+            log_last_document_indexed(row, key)
+        except Exception:
+            logger.exception("Could not checkpoint %s", key)
+
+    def _clear_checkpoint(self) -> None:
+        """Drop the checkpoint, the load having reached the end of the query.
+
+        Leaving it in place would have the next load of the same run database
+        start at the end of the last one, silently merging nothing."""
+        if (key := self.checkpointing) is None:
+            return
+        try:
+            get_redis_interface("CACHE").delete(key)
+        except Exception:
+            logger.exception("Could not clear checkpoint %s", key)
+
     def _load(self) -> LoadReport:
         report = LoadReport()
+        if self.start_row:
+            logger.info(
+                "Loading %s from row %s", self.database.name, self.start_row
+            )
         for row in self.rows():
             report.seen += 1
-            if report.seen % 250 == 0:
+            if report.seen % CHECKPOINT_EVERY == 0:
                 logger.info("Loading %s: %s", self.database.name, report)
+                self._checkpoint(self.start_row + report.seen - 1)
             prepared = self._prepare(row)
             if prepared is RowOutcome.FAILED:
                 report.failed += 1
@@ -308,6 +386,9 @@ class JKentScrapeLoader[ScrapeType: BaseModel, ParamType = None](ABC):
                     self.database.name,
                     result.failures,
                 )
+            if self.db_delay:
+                time.sleep(self.db_delay)
+        self._clear_checkpoint()
         return report
 
     def dispatch_extraction(self, result: MergeResult[Any]) -> None:
@@ -328,4 +409,6 @@ class JKentScrapeLoader[ScrapeType: BaseModel, ParamType = None](ABC):
             "Dispatching extraction for %s %s", len(pks), model.__name__
         )
         for document in model._default_manager.filter(pk__in=pks):
+            if self.throttle is not None:
+                self.throttle.maybe_wait()
             document.extract(self.extraction_queue)
