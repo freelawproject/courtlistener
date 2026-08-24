@@ -7,6 +7,7 @@ earliest filing -- and the rows it leaves out.
 """
 
 import json
+import logging
 import sqlite3
 from contextlib import closing
 from datetime import date
@@ -71,9 +72,6 @@ def _docket(**overrides: Any) -> dict[str, Any]:
         "issues": [],
         "official_citation": None,
         "lower_court_citation": None,
-        # The default docket stands for one whose filing-detail page was read
-        # and reported no files; a docket that never had that page read is not
-        # selected by the loader's query, so it cannot be the default here.
         "no_files_for_case": True,
         "docket_entries": [],
         "attorneys": [],
@@ -123,8 +121,6 @@ class NYCoALoaderTest(TestCase):
         self.directory = TemporaryDirectory()
         self.addCleanup(self.directory.cleanup)
         self.database = Path(self.directory.name) / "run.db"
-        # Celery runs eagerly in dev, so an unpatched load would extract for
-        # real -- reaching for the file and the doctor service.
         extraction = patch("cl.scrapers.tasks.extract_formatted_text_document")
         self.extraction = extraction.start()
         self.addCleanup(extraction.stop)
@@ -331,10 +327,11 @@ class NYCoALoaderTest(TestCase):
             "The first listing on the page stands for every party.",
         )
 
-    def test_skips_a_docket_scraped_without_its_file_list(self) -> None:
-        """A scrape that stopped at the docket page is missing every filing
-        only the file list attests to, and merging would prune them all as
-        withdrawn. Is the docket left out of the load?"""
+    def test_refuses_a_docket_whose_file_list_went_unparsed(self) -> None:
+        """A filing detail page that carried neither the Court's "no files"
+        line nor a file table the scraper could read attests to nothing about
+        the case's filings, and merging its empty file list would prune every
+        document the docket has. Is it refused, and does the rest load?"""
         _run_database(
             self.database,
             [
@@ -349,10 +346,31 @@ class NYCoALoaderTest(TestCase):
         report = NYCoACourtPassLoader(self.database).load()
 
         self.assertEqual(
-            (report.seen, report.merged), (1, 1), "Only the read one loads."
+            (report.seen, report.merged, report.failed, report.invalid),
+            (2, 1, 1, 0),
+            "The refused docket is counted as a failure, not passed over.",
         )
-        self.assertEqual((report.invalid, report.failed), (0, 0))
         self.assertEqual(Docket.objects.get().docket_number, "APL-2024-00178")
+
+    def test_an_unparsed_file_list_names_the_docket_it_lost(self) -> None:
+        """Drift in the file table could cost every docket in a run, and the
+        count alone does not say which. Does the log name the docket?"""
+        _run_database(
+            self.database,
+            [("NYCourtPassDocket", _docket(no_files_for_case=False))],
+        )
+        # The test runner disables logging outright for speed, and what an
+        # operator can find in the log is the point of this test.
+        logging.disable(logging.NOTSET)
+        self.addCleanup(logging.disable)
+
+        with self.assertLogs(
+            "cl.corpus_importer.state.loader", "ERROR"
+        ) as logs:
+            NYCoACourtPassLoader(self.database).load()
+
+        self.assertIn(DOCKET_NUMBER, logs.output[0])
+        self.assertFalse(Docket.objects.exists())
 
     def test_loads_a_docket_stating_an_uncovered_subcategory(self) -> None:
         """A subcategory the vocabulary does not cover must not cost the
