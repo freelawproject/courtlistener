@@ -1491,7 +1491,7 @@ class FloridaDocumentDownloadTest(TestCase):
             pks=fl_document.pk,
             check_if_needed=False,
             model_name="search.FloridaDocument",
-            strip_html_tags=True,
+            strip_html_tags=False,
         )
 
     def test_download_not_found(self) -> None:

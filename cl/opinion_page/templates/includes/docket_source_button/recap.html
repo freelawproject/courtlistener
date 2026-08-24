@@ -1,13 +1,4 @@
-{% if is_scotus %}
-  {% if docket.scotus_docket_url %}
-    <div class="btn-group">
-      <a href="{{ docket.scotus_docket_url }}"
-      class="btn btn-primary"
-      target="_blank"
-      rel="nofollow noopener noreferrer"><i class="fa fa-external-link"></i> View in SCOTUS</a>
-    </div>
-  {% endif %}
-{% elif docket.pacer_docket_url %}
+{% if docket.pacer_docket_url %}
   <div class="btn-group">
     {% if not request.COOKIES.buy_on_pacer_modal and not request.COOKIES.recap_install_plea %}
       <a href="{{ docket.pacer_docket_url }}"

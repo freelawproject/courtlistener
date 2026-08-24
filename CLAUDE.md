@@ -179,5 +179,7 @@ docker exec -it cl-django python manage.py shell
 
 - `rg` may be installed. Use it instead of `grep` if so.
 - `gh` → GitHub CLI for PRs, issues, actions
-- `pre-commit` → code quality checks (ruff, mypy, etc.)
+- `pre-commit` → code quality checks (ruff, mypy, etc.). Its `check python ast`
+  hook already validates Python syntax on every edited file — MUST rely on
+  that instead of ad hoc `python -c "import ast; ast.parse(...)"` snippets.
 - `uv` → Python dependency management (the only tool to use for deps)

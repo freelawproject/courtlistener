@@ -9,7 +9,7 @@ from datetime import date
 from http import HTTPStatus
 from itertools import product
 from unittest import mock
-from unittest.mock import AsyncMock, MagicMock, PropertyMock
+from unittest.mock import AsyncMock, MagicMock, PropertyMock, patch
 from urllib.parse import parse_qs, urlencode, urlparse
 
 from asgiref.sync import async_to_sync, sync_to_async
@@ -39,6 +39,10 @@ from waffle.testutils import override_flag
 
 from cl.citations.utils import slugify_reporter
 from cl.favorites.models import GenericCount
+from cl.lib.file_validation import (
+    NOT_A_PDF_MESSAGE,
+    file_too_large_message,
+)
 from cl.lib.models import THUMBNAIL_STATUSES
 from cl.lib.redis_utils import get_redis_interface
 from cl.lib.storage import clobbering_get_name
@@ -1513,25 +1517,39 @@ class DocketEntrySourceTest(TestCase):
 
 
 class DocketSourceComponentTest(SimpleTestCase):
-    FOLDERS = (
-        "docket_source_button",
-        "docket_source_attribution",
-        "document_source_link",
-    )
+    """Every DocketEntrySource needs a file in each per-source component
+    folder of both template stacks, or the dispatch (c-component on the
+    cotton side, {% include %} on the legacy side) only fails at render
+    time."""
+
+    FOLDERS = {
+        "cotton": (
+            "docket_source_button",
+            "docket_source_attribution",
+            "document_source_link",
+        ),
+        "includes": (
+            "docket_source_button",
+            "docket_source_attribution",
+            "document_source_link",
+            "docket_empty_message",
+        ),
+    }
 
     def test_every_source_resolves_its_components(self) -> None:
         sources = {RECAP_SOURCE, *_SOURCES_BY_COURT_ID.values()}
-        for source, folder in product(sources, self.FOLDERS):
-            path = f"cotton/{folder}/{source.component}.html"
-            with self.subTest(path=path):
-                try:
-                    get_template(path)
-                except TemplateDoesNotExist:
-                    self.fail(
-                        f"Source component {source.component!r} has no "
-                        f"{path}. A component needs a file in each of "
-                        f"{', '.join(self.FOLDERS)}."
-                    )
+        for prefix, folders in self.FOLDERS.items():
+            for source, folder in product(sources, folders):
+                path = f"{prefix}/{folder}/{source.component}.html"
+                with self.subTest(path=path):
+                    try:
+                        get_template(path)
+                    except TemplateDoesNotExist:
+                        self.fail(
+                            f"Source component {source.component!r} has no "
+                            f"{path}. A component needs a file in each of "
+                            f"{', '.join(folders)} under {prefix}/."
+                        )
 
 
 @override_settings(WAFFLE_CACHE_PREFIX="test_scotus_docket_disabled_waffle")
@@ -2258,6 +2276,47 @@ class UploadPublication(TestCase):
             ],
         )
 
+    def test_pdf_content_validation_failure(self, mock) -> None:
+        """Can we fail files that only claim to be PDFs?
+
+        The extension validator trusts the uploader's filename, so a file
+        with a .pdf extension has to be checked for a PDF header too.
+        """
+        disguised_png = SimpleUploadedFile(
+            "file.pdf", b"\x89PNG\r\n\x1a\n", content_type="application/pdf"
+        )
+        form = TennWorkCompClUploadForm(
+            self.work_comp_data,
+            pk="tennworkcompcl",
+            files={"pdf_upload": disguised_png},
+        )
+        form.fields["lead_author"].queryset = Person.objects.filter(
+            positions__court_id="tennworkcompcl"
+        )
+        self.assertFalse(form.is_valid(), form.errors)
+        self.assertEqual(form.errors["pdf_upload"], [NOT_A_PDF_MESSAGE])
+
+    def test_pdf_size_validation_failure(self, mock) -> None:
+        """Can we fail uploads that are over the size limit?
+
+        The limit is patched down rather than tested at its real value, so
+        that the test doesn't have to build a 500 MB file to trip it.
+        """
+        form = TennWorkCompClUploadForm(
+            self.work_comp_data,
+            pk="tennworkcompcl",
+            files={"pdf_upload": self.pdf},
+        )
+        form.fields["lead_author"].queryset = Person.objects.filter(
+            positions__court_id="tennworkcompcl"
+        )
+        with patch("cl.lib.file_validation.MAX_UPLOAD_SIZE", 10):
+            self.assertFalse(form.is_valid(), form.errors)
+            # Asserted under the patch: the message names the live limit.
+            self.assertEqual(
+                form.errors["pdf_upload"], [file_too_large_message()]
+            )
+
     def test_tn_wc_app_upload(self, mock) -> None:
         """Can we test appellate uploading?"""
         form = TennWorkCompAppUploadForm(
@@ -2401,6 +2460,30 @@ class UploadPublication(TestCase):
             cluster__docket__court__id="miss"
         ).count()
         self.assertEqual(pre_count + 1, post_save_count)
+
+    def test_court_upload_strips_html_from_free_text_fields(
+        self, mock
+    ) -> None:
+        """Are case_title/disposition/summary stripped of HTML on upload
+        (GHSA-cvh7-rv7v-wx2j-class)?
+        """
+        payload = "</script><script>alert(1)</script>"
+        self.miss_data["case_title"] = f"Some Case {payload}"
+        self.miss_data["disposition"] = payload
+        self.miss_data["summary"] = payload
+
+        form = MissCourtUploadForm(
+            self.miss_data,
+            pk="miss",
+            files={"pdf_upload": self.pdf},
+        )
+        self.assertEqual(form.is_valid(), True, msg=form.errors)
+        cluster = form.save()
+
+        self.assertNotIn("<script>", cluster.case_name)
+        self.assertNotIn("<script>", cluster.disposition)
+        self.assertNotIn("<script>", cluster.summary)
+        self.assertNotIn("<script>", cluster.docket.case_name)
 
     def test_form_two_judges_2042(self, mock) -> None:
         """Can we still save if there's only one or two judges on the panel?"""

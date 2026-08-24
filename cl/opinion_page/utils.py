@@ -13,7 +13,9 @@ from django.core.exceptions import ObjectDoesNotExist
 from django.http import Http404, HttpRequest
 from django.shortcuts import aget_object_or_404  # type: ignore[attr-defined]
 from django.urls import reverse
+from django.utils.formats import date_format
 from django.utils.http import urlencode
+from django.utils.safestring import mark_safe
 from django.utils.timezone import localtime
 from django_elasticsearch_dsl.search import Search
 from elasticsearch.dsl import Q
@@ -33,8 +35,9 @@ from cl.lib.s3_cache import get_s3_cache, make_s3_cache_key
 from cl.lib.string_utils import trunc
 from cl.lib.types import CleanData
 from cl.opinion_page.docket_sources_utils import (
+    DocketEntrySource,
     MetadataItem,
-    build_scotus_metadata,
+    MetadataSection,
 )
 from cl.people_db.models import Person
 from cl.recap.constants import COURT_TIMEZONES
@@ -115,8 +118,21 @@ def build_docket_metadata(
         items.append(
             {
                 "label": "Last Updated",
-                "value": str(
-                    localtime(docket.date_modified, ZoneInfo(timezone_str))
+                "value": date_format(
+                    localtime(docket.date_modified, ZoneInfo(timezone_str)),
+                    "DATETIME_FORMAT",
+                ),
+                # Explains why this date can lag the docket's real
+                # last-filing date.
+                "has_tooltip": True,
+                "tooltip_message": mark_safe(
+                    "This docket was collected as part of the RECAP "
+                    "Project. Therefore, it is updated when users of the "
+                    "RECAP Extension download the docket from PACER. To "
+                    "see the most up to date version of this docket, "
+                    "click the button above to &quot;View on PACER.&quot; "
+                    "The date shown here is <strong>not</strong> the date "
+                    "of the latest filing in this case."
                 ),
             }
         )
@@ -141,7 +157,7 @@ def build_docket_metadata(
         items.append(
             {
                 "label": "Date Certiorari Granted",
-                "value": str(docket.date_cert_granted),
+                "value": date_format(docket.date_cert_granted),
             }
         )
 
@@ -149,38 +165,50 @@ def build_docket_metadata(
         items.append(
             {
                 "label": "Date Certiorari Denied",
-                "value": str(docket.date_cert_denied),
+                "value": date_format(docket.date_cert_denied),
             }
         )
 
     if docket.date_argued:
         items.append(
-            {"label": "Date Argued", "value": str(docket.date_argued)}
+            {"label": "Date Argued", "value": date_format(docket.date_argued)}
         )
 
-    items.append({"label": "Citation", "value": build_citation_string(docket)})
+    items.append(
+        {
+            "label": "Citation",
+            "value": build_citation_string(docket),
+            # Matches the select-all convenience old citation.html had.
+            "is_copyable": True,
+        }
+    )
 
     if docket.date_reargued:
         items.append(
-            {"label": "Date Reargued", "value": str(docket.date_reargued)}
+            {
+                "label": "Date Reargued",
+                "value": date_format(docket.date_reargued),
+            }
         )
 
     if docket.date_reargument_denied:
         items.append(
             {
                 "label": "Date Reargument Denied",
-                "value": str(docket.date_reargument_denied),
+                "value": date_format(docket.date_reargument_denied),
             }
         )
 
     if docket.date_filed:
-        items.append({"label": "Date Filed", "value": str(docket.date_filed)})
+        items.append(
+            {"label": "Date Filed", "value": date_format(docket.date_filed)}
+        )
 
     if docket.date_terminated:
         items.append(
             {
                 "label": "Date Terminated",
-                "value": str(docket.date_terminated),
+                "value": date_format(docket.date_terminated),
             }
         )
 
@@ -188,7 +216,7 @@ def build_docket_metadata(
         items.append(
             {
                 "label": "Date of Last Known Filing",
-                "value": str(docket.date_last_filing),
+                "value": date_format(docket.date_last_filing),
             }
         )
 
@@ -356,13 +384,15 @@ def build_originating_court_metadata(
         items.append(ordering_judge)
 
     if og_info.date_filed:
-        items.append({"label": "Date Filed", "value": str(og_info.date_filed)})
+        items.append(
+            {"label": "Date Filed", "value": date_format(og_info.date_filed)}
+        )
 
     if og_info.date_judgment:
         items.append(
             {
                 "label": "Date Order/Judgment",
-                "value": str(og_info.date_judgment),
+                "value": date_format(og_info.date_judgment),
             }
         )
 
@@ -370,20 +400,23 @@ def build_originating_court_metadata(
         items.append(
             {
                 "label": "Date Order/Judgment EOD",
-                "value": str(og_info.date_judgment_eod),
+                "value": date_format(og_info.date_judgment_eod),
             }
         )
 
     if og_info.date_filed_noa:
         items.append(
-            {"label": "Date NOA Filed", "value": str(og_info.date_filed_noa)}
+            {
+                "label": "Date NOA Filed",
+                "value": date_format(og_info.date_filed_noa),
+            }
         )
 
     if og_info.date_received_coa:
         items.append(
             {
                 "label": "Date Rec'd COA",
-                "value": str(og_info.date_received_coa),
+                "value": date_format(og_info.date_received_coa),
             }
         )
 
@@ -474,10 +507,38 @@ def make_docket_title(docket: Docket) -> str:
     return title
 
 
+async def _common_metadata_sections(
+    docket: Docket, og_info: OriginatingCourtInformation | None
+) -> list[MetadataSection]:
+    """Build the metadata sections that apply across every docket source,
+    not just one. build_originating_court_metadata() already returns []
+    when there's nothing to show.
+    """
+    return [
+        {
+            "items": await sync_to_async(build_originating_court_metadata)(
+                docket, og_info
+            ),
+            "title": "Originating Court Information",
+        },
+    ]
+
+
 async def core_docket_data(
     request: HttpRequest,
     pk: int,
-) -> tuple[Docket, dict[str, bool | str | Docket | NoteForm]]:
+) -> tuple[
+    Docket,
+    dict[
+        str,
+        bool
+        | str
+        | Docket
+        | NoteForm
+        | DocketEntrySource
+        | list[MetadataSection],
+    ],
+]:
     """Gather the core data for a docket, party, or IDB page."""
     docket: Docket = await aget_object_or_404(Docket, pk=pk)
 
@@ -509,9 +570,29 @@ async def core_docket_data(
 
     has_alert = await user_has_alert(await request.auser(), docket)  # type: ignore[arg-type]
 
-    scotus_metadata = await sync_to_async(getattr)(
-        docket, "scotus_metadata", None
+    timezone_str = COURT_TIMEZONES.get(docket.court_id, "US/Eastern")
+    docket_source = docket.get_entry_source()
+
+    @sync_to_async
+    def _get_og_info(d: Docket) -> OriginatingCourtInformation | None:
+        return getattr(d, "originating_court_information", None)
+
+    og_info = await _get_og_info(docket)
+
+    docket_metadata = await sync_to_async(build_docket_metadata)(
+        docket, timezone_str
     )
+    # metadata_sections is the source-agnostic shape both docket_tabs.html
+    # and the c-docket-page cotton component render. Only the cotton side
+    # reads list_class; includes/metadata_section.html ignores it.
+    metadata_sections: list[MetadataSection] = [
+        {
+            "items": docket_metadata,
+            "list_class": "grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mt-4",
+        },
+        *await _common_metadata_sections(docket, og_info),
+        *await sync_to_async(docket_source.metadata_sections)(docket),
+    ]
 
     return (
         docket,
@@ -520,10 +601,11 @@ async def core_docket_data(
             "title": title,
             "note_form": note_form,
             "has_alert": has_alert,
-            "timezone": COURT_TIMEZONES.get(docket.court_id, "US/Eastern"),
+            "timezone": timezone_str,
             "private": docket.blocked,
             "is_scotus": docket.court_id == "scotus",
-            "scotus_metadata": build_scotus_metadata(scotus_metadata),
+            "docket_source": docket_source,
+            "metadata_sections": metadata_sections,
         },
     )
 

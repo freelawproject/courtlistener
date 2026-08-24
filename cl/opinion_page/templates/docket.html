@@ -39,34 +39,11 @@
   {% include "includes/de_filter.html" %}
   {% include "includes/de_list.html" %}
 {% else %}
+  {# No separate empty-state button -- the persistent PACER/SCOTUS button in docket_tabs.html already covers fa-th-list. #}
   <div class="row">
     <div class="col-sm-8">
-      {% if is_scotus %}
-        <p class="lead">There are no entries for this docket yet.</p>
-      {% else %}
-        <p class="lead">There are no entries for this docket in the RECAP Archive. Please download the latest from PACER while using the RECAP Extension.
-        </p>
-      {% endif %}
+      <p class="lead">{% include "includes/docket_empty_message/index.html" with docket_source=docket_source %}</p>
     </div>
-    {% if not is_scotus and docket.pacer_docket_url %}
-      <div class="col-sm-4 right">
-        <p>
-          {% if not request.COOKIES.buy_on_pacer_modal and not request.COOKIES.recap_install_plea %}
-            <a href="{{ docket.pacer_docket_url }}"
-            data-toggle="modal" data-target="#modal-buy-pacer"
-            class="open_buy_pacer_modal btn btn-lg btn-primary"
-            target="_blank"
-            rel="nofollow noopener noreferrer"><i class="fa fa-external-link"></i>&nbsp;Buy Docket on PACER</a>
-          {% else%}
-            <a href="{{ docket.pacer_docket_url }}"
-            class="btn btn-lg btn-primary"
-            target="_blank"
-            rel="nofollow noopener noreferrer"><i class="fa fa-external-link"></i>&nbsp;Buy Docket on PACER</a>
-          {% endif %}
-
-        </p>
-      </div>
-    {% endif %}
   </div>
 {% endif %}
 

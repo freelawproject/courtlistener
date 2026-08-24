@@ -72,7 +72,6 @@ from cl.lib.utils import human_sort
 from cl.opinion_page.decorators import handle_cluster_redirection
 from cl.opinion_page.docket_sources_utils import (
     RECAP_SOURCE,
-    MetadataSection,
     attach_display_fields,
 )
 from cl.opinion_page.feeds import DocketFeed
@@ -86,7 +85,6 @@ from cl.opinion_page.forms import (
     TennWorkCompClUploadForm,
 )
 from cl.opinion_page.utils import (
-    build_docket_metadata,
     build_docket_tabs,
     core_docket_data,
     es_cited_case_count,
@@ -424,17 +422,6 @@ async def view_docket(
     has_idb_data = bool(docket.idb_data_id)
     has_authorities = await docket.ahas_authorities()
 
-    docket_metadata = await sync_to_async(build_docket_metadata)(
-        docket, context["timezone"]
-    )
-    metadata_sections: list[MetadataSection] = [
-        {
-            "items": docket_metadata,
-            "list_class": "grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mt-4",
-        },
-        *await sync_to_async(source.metadata_sections)(docket),
-    ]
-
     context.update(
         {
             "parties": parties,
@@ -443,10 +430,6 @@ async def view_docket(
             "sort_order_asc": sort_order_asc,
             "form": form,
             "get_string": make_get_string(request),
-            # Named docket_source, not source: docket.source is already the
-            # RECAP/IDB provenance field on the model.
-            "docket_source": source,
-            "metadata_sections": metadata_sections,
             "tabs": build_docket_tabs(
                 docket, parties, has_idb_data, has_authorities
             ),

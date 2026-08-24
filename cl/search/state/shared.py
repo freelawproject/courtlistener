@@ -1,12 +1,15 @@
 import logging
+from pathlib import Path, PurePosixPath
 from typing import IO, Self
 
 from asgiref.sync import async_to_sync
 from django.core.files import File
 from django.db import models
+from django.utils.text import slugify
 
 from cl.lib.decorators import document_model
 from cl.lib.models import AbstractPDF
+from cl.lib.types import NonEmptyTuple
 
 logger = logging.getLogger(__name__)
 
@@ -74,6 +77,47 @@ class AbstractStateDocument(AbstractPDF):
         blank=True,
     )
 
+    @classmethod
+    def state_pdf_path(
+        cls,
+        state_code: str,
+        court_id: str,
+        filename: str,
+        thumbs: bool = False,
+    ) -> str:
+        """Build the S3 path for a state court document.
+
+        Every state scraper stores its documents under the same layout, so
+        subclasses' `get_pdf_path` implementations delegate here rather than
+        each repeating it:
+
+            us/state/<state_code>/<court_id>/gov.<state_code>.<court_id>.<slug><ext>
+
+        Thumbnails go in a `<court_id>-thumbnails` sibling directory so they
+        cannot collide with the document they were generated from.
+
+        Callers pass `court_id` rather than reading it off the document because
+        each model reaches its court by a different relation.
+
+        :param state_code: The two-letter USPS code for the state, lowercased.
+        :param court_id: The ID of the court the document was filed in.
+        :param filename: The filename Django hands to the `upload_to` callback.
+        :param thumbs: Whether to return the thumbnail path instead.
+        :return: The path to store the document at, relative to the bucket
+            root.
+        """
+        slug = slugify(Path(filename).stem)
+        # Court-PASS serves oral argument playlists alongside PDFs, and TAMES
+        # serves .html and .wpd, so the original extension has to survive.
+        ext = Path(filename).suffix or ".pdf"
+        directory = f"{court_id}-thumbnails" if thumbs else court_id
+        return str(
+            Path("us/state")
+            / state_code
+            / directory
+            / f"gov.{state_code}.{court_id}.{slug}{ext}"
+        )
+
     def make_filename(self) -> str:
         """Create the filename to store this document's content under (no extension)."""
         return str(hash(self.url))
@@ -84,15 +128,14 @@ class AbstractStateDocument(AbstractPDF):
         return "tmp_"
 
     @classmethod
-    def expected_extensions(cls) -> set[str]:
+    def expected_extensions(cls) -> NonEmptyTuple[str]:
         """Return the set of expected file extensions for this document."""
-        return set()
+        return (".pdf",)
 
-    def can_extract(self, extension: str) -> bool:
-        """Whether this document is eligible for OCR extraction.
-
-        :param extension: The file extension of the document."""
-        return False
+    @classmethod
+    def extractable_extensions(cls) -> NonEmptyTuple[str]:
+        """Return the set of file extensions that can be extracted."""
+        return (".pdf",)
 
     def validate_file(self, content: IO[bytes], extension: str) -> int | None:
         """Validate the file content and return the processing error if any.
@@ -111,18 +154,69 @@ class AbstractStateDocument(AbstractPDF):
             return int(response.text)
         return None
 
+    def extract(self, queue: str = "celery") -> None:
+        """Run the OCR extraction task for this document.
+
+        :param queue: The queue to use for the extraction task."""
+        from cl.scrapers.tasks import extract_formatted_text_document
+
+        if (
+            self.ocr_status == self.OCR_UNNECESSARY
+            or self.ocr_status == self.OCR_COMPLETE
+        ):
+            logger.info(
+                "OCR extraction unnecessary for %s %s (%s)",
+                self._meta.label,
+                self.pk,
+                self.ocr_status,
+            )
+            return
+
+        if not self.filepath_local.name:
+            logger.info(
+                "No document to extract for %s %s (empty filepath_local.name)",
+                self._meta.label,
+                self.pk,
+            )
+            return
+
+        extension = PurePosixPath(self.filepath_local.name).suffix
+
+        if extension not in self.extractable_extensions():
+            logger.info(
+                "%s %s cannot be extracted (%s)",
+                self._meta.label,
+                self.pk,
+                self.filepath_local.name,
+            )
+            return
+
+        strip_html = extension != ".pdf"
+
+        extract_formatted_text_document.si(
+            pks=self.pk,
+            check_if_needed=False,
+            model_name=self._meta.label,
+            strip_html_tags=strip_html,
+        ).set(queue=queue).apply_async()
+
     @classmethod
-    def download(cls, pk: int) -> Self | None:
+    def download(
+        cls, pk: int, extract: bool = True, queue: str = "celery"
+    ) -> Self | None:
         """Download the document from the URL, save it to a local file. Returns the document if download was
-        successful and `None` otherwise."""
+        successful and `None` otherwise.
+
+        :param pk: The primary key of the document to download.
+        :param extract: Whether to extract the document after downloading.
+        :param queue: The queue to use for the extraction task."""
         # Imported here to avoid a circular import: this module is loaded with
         # cl.search.models, which the task modules import.
         from cl.corpus_importer.tasks import download_document_in_stream
-        from cl.scrapers.tasks import extract_formatted_text_document
         from cl.scrapers.utils import get_extension
 
         try:
-            document = cls.objects.get(pk=pk)
+            document = cls._default_manager.get(pk=pk)
         except cls.DoesNotExist:
             logger.warning(
                 "Document download: %s %s does not exist; skipping.",
@@ -189,18 +283,13 @@ class AbstractStateDocument(AbstractPDF):
             if extension == ".pdf":
                 if pages := async_to_sync(document.fetch_page_count)():
                     document.page_count = pages
-            elif not document.can_extract(extension):
+            elif extension not in cls.extractable_extensions():
                 document.ocr_status = cls.OCR_UNNECESSARY
 
             document.save()
 
-            if document.can_extract(extension):
-                extract_formatted_text_document.si(
-                    pks=document.pk,
-                    check_if_needed=False,
-                    model_name=cls._meta.label,
-                    strip_html_tags=True,
-                ).apply_async()
+            if extract:
+                document.extract(queue)
 
             return document
 

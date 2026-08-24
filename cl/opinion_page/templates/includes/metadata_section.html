@@ -1,0 +1,43 @@
+{% comment %}
+Renders MetadataItem as <p class="bottom"> label/value pairs (see
+docket_sources_utils.py). Mirrors v2's cotton/metadata_section.html.
+is_copyable/has_tooltip/tooltip_message just say what an item wants --
+the actual classes/markup for showing it live here, not in the data.
+{% endcomment %}
+{% for item in items %}
+  <p class="bottom">
+    <span class="meta-data-header">{{ item.label }}:</span>
+    <span class="meta-data-value{% if item.is_copyable %} select-all{% endif %}{% if item.has_tooltip %} cursor-help dotted{% endif %}"
+      {% if item.has_tooltip %}
+        data-toggle="tooltip" data-placement="right" data-html="true" title="{{ item.tooltip_message }}"
+      {% endif %}
+    >
+      {% if item.url %}
+        <a href="{{ item.url }}"
+           {% if item.nofollow and item.is_external %}rel="nofollow noopener noreferrer"
+           {% elif item.nofollow %}rel="nofollow"
+           {% elif item.is_external %}rel="noopener noreferrer"
+           {% endif %}
+           {% if item.is_external %}target="_blank"{% endif %}
+           {% if item.aria_label %}aria-label="{{ item.aria_label }}"{% endif %}
+        >{{ item.value }}{% if item.is_external %} <i class="fa fa-external-link"></i>{% endif %}</a>
+      {% else %}
+        {{ item.value }}
+      {% endif %}
+      {% if item.suffix_text %}
+        {% if item.suffix_url %}
+          (<a href="{{ item.suffix_url }}"
+             {% if item.suffix_nofollow and item.suffix_is_external %}rel="nofollow noopener noreferrer"
+             {% elif item.suffix_nofollow %}rel="nofollow"
+             {% elif item.suffix_is_external %}rel="noopener noreferrer"
+             {% endif %}
+             {% if item.suffix_is_external %}target="_blank"{% endif %}
+             {% if item.suffix_aria_label %}aria-label="{{ item.suffix_aria_label }}"{% endif %}
+          >{{ item.suffix_text }}</a>)
+        {% else %}
+          ({{ item.suffix_text }})
+        {% endif %}
+      {% endif %}
+    </span>
+  </p>
+{% endfor %}

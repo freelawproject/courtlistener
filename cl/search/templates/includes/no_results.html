@@ -14,9 +14,9 @@
     {% endif %}
   </ul>
   {% if type == SEARCH_TYPES.RECAP or type == SEARCH_TYPES.DOCKETS or type_override == SEARCH_TYPES.RECAP or type_override == SEARCH_TYPES.DOCKETS %}
-     <p>The RECAP Archive does not contain everything in PACER. To learn more about what we have and how to add content to the RECAP Archive, please see <a href="{% url "coverage_recap" %}">our coverage page</a>.</p>
+     <p>The RECAP Archive does not contain everything in PACER. To learn more about what we have and how to add content to the RECAP Archive, please see <a href="{{ WIKI_COVERAGE_RECAP_URL }}">our coverage page</a>.</p>
   {% else %}
-    <p>Our <a href="{% url "coverage" %}">coverage page</a> details which jurisdictions we support.
+    <p>Our <a href="{{ WIKI_COVERAGE_URL }}">coverage page</a> details which jurisdictions we support.
     </p>
   {% endif %}
   <p>If you expected more results than this, <a href="{% url "contact" %}">please let us know</a>. We value your feedback.

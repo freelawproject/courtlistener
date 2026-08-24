@@ -1,4 +1,3 @@
-{% load extras %}
 {% load pacer %}
 {% load tz %}
 {% load waffle_tags %}
@@ -82,24 +81,13 @@
             {% if rd.document_number %}
               <div class="col-xs-3">
                 <p>
-                  {% if is_scotus %}
+                  {% if rd.detail_url %}<a href="{{ rd.detail_url }}" rel="nofollow">{% endif %}
+                  {% if rd.is_attachment %}
                     Att<span class="hidden-xs hidden-sm">ach&shy;ment</span>&nbsp;{{ rd.attachment_number }}
                   {% else %}
-                    {% if rd.document_type == rd.ATTACHMENT %}
-                      {% if rd.filepath_local %}
-                        <a href="{{ rd.get_absolute_url }}" rel="nofollow">Att<span
-                                class="hidden-xs hidden-sm">ach&shy;ment</span>&nbsp;{{ rd.attachment_number }}</a>
-                      {% else %}
-                        Att<span class="hidden-xs hidden-sm">ach&shy;ment</span>&nbsp;{{ rd.attachment_number }}
-                      {% endif %}
-                    {% else %}
-                      {% if rd.filepath_local %}
-                        <a href="{{ rd.get_absolute_url }}" rel="nofollow">Main Doc<span class="hidden-xs hidden-sm">&shy;ument</span></a>
-                      {% else %}
-                        Main Doc<span class="hidden-xs hidden-sm">&shy;ument</span>
-                      {% endif %}
-                    {% endif %}
+                    Main Doc<span class="hidden-xs hidden-sm">&shy;ument</span>
                   {% endif %}
+                  {% if rd.detail_url %}</a>{% endif %}
                 </p>
               </div>
             {% endif %}
@@ -146,95 +134,27 @@
                           Internet Archive</a>
                       </li>
                     {% endif %}
-                    {% if is_scotus %}
-                      {% if rd.url|http_url %}
-                        <li role="separator" class="divider"></li>
-                        <li>
-                          <a href="{{ rd.url|http_url }}"
-                             target="_blank"
-                             rel="nofollow noopener noreferrer">
-                            <i class="fa fa-external-link"></i> From the Supreme Court</a>
-                        </li>
-                      {% endif %}
-                    {% else %}
-                      {% if rd.pacer_url %}
-                        <li role="separator" class="divider"></li>
-                        <li>
-                            <a href="{{ rd.pacer_url }}"
-                              {% if not request.COOKIES.buy_on_pacer_modal and not request.COOKIES.recap_install_plea %}
-                                class="open_buy_pacer_modal"
-                                data-toggle="modal"
-                                data-target="#modal-buy-pacer"
-                              {% endif %}
-                              target="_blank"
-                              rel="nofollow noopener noreferrer">
-                                {% if rd.is_free_on_pacer %}From PACER{% else %}Buy on PACER{% endif %} {% if rd.page_count %}(${{ rd|price }}){% endif %}
-                            </a>
-                        </li>
-                      {% endif %}
-                    {% endif %}
+                    {% include "includes/document_source_link/index.html" with document=rd docket_source=docket_source variant="menu_item" %}
                   </ul>
-                {% elif is_scotus %}
-                  {% if rd.url|http_url %}
-                    <a href="{{ rd.url|http_url }}"
-                       rel="nofollow noopener noreferrer"
-                       target="_blank"
-                       role="button"
-                       class="btn btn-default btn-xs">
-                      <i class="fa fa-external-link"></i> View on SCOTUS
-                    </a>
-                  {% endif %}
-                {% else %}
-                  {# We don't have it #}
-                  {% if rd.is_sealed %}
-                    <div class="btn-group btn-group-xs flex">
-                      <button type="button" class="btn btn-primary btn-xs btn-sealed" disabled>
-                        Unavailable
-                      </button>
-                      {% if rd.pacer_url %}
-                        <button type="button"
-                                class="btn btn-primary toggle-disable btn-xs dropdown-toggle dropdown-toggle-split"
-                                data-toggle="dropdown"
-                                aria-haspopup="true"
-                                aria-expanded="false">
-                          <span class="caret"></span>
-                          <span class="sr-only">Toggle Dropdown</span>
-                        </button>
-                        <ul class="dropdown-menu">
-                          <li>
-                            <a href="{{ rd.pacer_url }}"
-                              {% if not request.COOKIES.buy_on_pacer_modal and not request.COOKIES.recap_install_plea %}
-                                data-toggle="modal"
-                                data-target="#modal-buy-pacer"
-                                class="open_buy_pacer_modal"
-                              {% endif %}
-                              target="_blank"
-                              rel="nofollow noopener noreferrer">
-                              <i class="fa fa-external-link"></i> Check Availability on PACER
-                            </a>
-                          </li>
-                        </ul>
-                      {% endif %}
-                    </div>
-                    <div class="prayer-button" data-gap-size="{% if rd.pacer_url %}small{% else %}large{% endif %}">
+                {% elif rd.is_sealed %}
+                  {# Unreachable for SCOTUSDocument -- it has no is_sealed field. #}
+                  <div class="btn-group btn-group-xs flex">
+                    <button type="button" class="btn btn-primary btn-xs btn-sealed" disabled>
+                      Unavailable
+                    </button>
+                    {% include "includes/document_source_link/index.html" with document=rd docket_source=docket_source variant="check_availability" %}
+                  </div>
+                  {% if docket_source.has_pay_and_pray %}
+                    <div class="prayer-button" data-gap-size="{% if rd.external_url %}small{% else %}large{% endif %}">
                       {% include "includes/pray_and_pay_htmx/pray_button.html" with prayer_exists=rd.prayer_exists document_id=rd.id count=rd.prayer_count %}
                     </div>
-                  {% else %}
-                    {% if rd.pacer_url %}
-                      <a href="{{ rd.pacer_url }}"
-                        {% if not request.COOKIES.buy_on_pacer_modal and not request.COOKIES.recap_install_plea %}
-                          class="open_buy_pacer_modal btn btn-default btn-xs"
-                          data-toggle="modal" data-target="#modal-buy-pacer"
-                        {% else %}
-                          class="btn btn-default btn-xs"
-                        {% endif %}
-                          target="_blank"
-                          rel="nofollow noopener noreferrer">Buy on PACER {% if rd.page_count %}(${{ rd|price }}){% endif %}
-                      </a>
-                        <div class="prayer-button" data-gap-size="{% if rd.page_count %}small{% else %}large{% endif %}">
-                          {% include "includes/pray_and_pay_htmx/pray_button.html" with prayer_exists=rd.prayer_exists document_id=rd.id count=rd.prayer_count %}
-                        </div>
-                    {% endif %}
+                  {% endif %}
+                {% elif rd.external_url %}
+                  {% include "includes/document_source_link/index.html" with document=rd docket_source=docket_source variant="button" %}
+                  {% if docket_source.has_pay_and_pray %}
+                    <div class="prayer-button" data-gap-size="{% if rd.page_count %}small{% else %}large{% endif %}">
+                      {% include "includes/pray_and_pay_htmx/pray_button.html" with prayer_exists=rd.prayer_exists document_id=rd.id count=rd.prayer_count %}
+                    </div>
                   {% endif %}
                 {% endif %}
               </div>
@@ -246,29 +166,14 @@
                      rel="nofollow"
                      title="Download PDF"><i class="fa fa-download"></i>
                   </a>
-                {% else %}
-                  {# We don't have it #}
-                  {% if rd.is_sealed %}
-                    <span class="btn btn-default btn-xs disabled"
-                          title="Unavailable on PACER">
-                            <i class="fa fa-ban"></i>
-                          </span>
-                  {% else %}
-                    {% if rd.pacer_url %}
-                      <a href="{{ rd.pacer_url }}"
-                        {% if not request.COOKIES.buy_on_pacer_modal and not request.COOKIES.recap_install_plea %}
-                          data-toggle="modal"
-                          data-target="#modal-buy-pacer"
-                          class="open_buy_pacer_modal btn btn-default btn-xs"
-                        {% else%}
-                          class="btn btn-default btn-xs"
-                        {% endif %}
-                        target="_blank"
-                        rel="nofollow noopener noreferrer"
-                        title="Buy on PACER {% if rd.page_count %}(${{ rd|price }}){% endif %}"><i class="fa fa-download"></i>
-                      </a>
-                    {% endif %}
-                  {% endif %}
+                {% elif rd.is_sealed %}
+                  {# Unreachable for SCOTUSDocument -- it has no is_sealed field. #}
+                  <span class="btn btn-default btn-xs disabled"
+                        title="Unavailable on PACER">
+                          <i class="fa fa-ban"></i>
+                        </span>
+                {% elif rd.external_url %}
+                  {% include "includes/document_source_link/index.html" with document=rd docket_source=docket_source variant="mobile_icon" %}
                 {% endif %}
               </div>
             {% endif %}
