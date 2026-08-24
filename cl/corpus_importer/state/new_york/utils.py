@@ -4,27 +4,11 @@ import re
 from django.db.models import IntegerChoices
 from juriscraper.state.new_york.nycourts_gov.vocabularies import (
     CourtVocabulary,
-    IssueCategory,
-    IssueSubcategory,
-)
-from juriscraper.state.new_york.nycourts_gov.vocabularies import (
-    FilingDocType as ScrapeFilingDocType,
-)
-from juriscraper.state.new_york.nycourts_gov.vocabularies import (
-    FilingRole as ScrapeFilingRole,
-)
-from juriscraper.state.new_york.nycourts_gov.vocabularies import (
-    FilingType as ScrapeFilingType,
 )
 
+from cl.corpus_importer.state.new_york.nycourts_gov import Unclassified
 from cl.lib.string_utils import normalize_dashes
-from cl.search.state.new_york.vocabularies import (
-    UNASSIGNED,
-    UNKNOWN,
-    FilingDocType,
-    FilingRole,
-    FilingType,
-)
+from cl.search.state.new_york.vocabularies import UNASSIGNED, UNKNOWN
 
 logger = logging.getLogger(__name__)
 
@@ -70,14 +54,24 @@ def make_docket_number_core(docket_number: str, /) -> str:
     return re.sub(r"[^a-z0-9]", "", matches[0].lower())
 
 
-def _mirrored_code(
-    mirror: type[IntegerChoices], member: CourtVocabulary
+RESERVED_CODES: dict[Unclassified, int] = {
+    Unclassified.UNKNOWN: UNKNOWN,
+    Unclassified.UNASSIGNED: UNASSIGNED,
+}
+"""The code stored for each of the two readings that name no member."""
+
+
+def mirrored_code(
+    mirror: type[IntegerChoices], member: CourtVocabulary | Unclassified
 ) -> int:
-    """The code CourtListener stores for a member of a Juriscraper vocabulary
+    """The code CourtListener stores for a reading of a Juriscraper vocabulary
     it mirrors.
 
-    :param mirror: CourtListener's mirror of the member's vocabulary.
-    :param member: The member Juriscraper classified.
+    Both kinds of reading map by name, since every mirror defines `UNKNOWN` and
+    `UNASSIGNED` under the names `Unclassified` uses.
+
+    :param mirror: CourtListener's mirror of the vocabulary.
+    :param member: What the scrape schema classified the field as.
     :return: The mirrored code, or `UNASSIGNED` for a member not yet mirrored.
     """
     try:
@@ -94,72 +88,18 @@ def _mirrored_code(
         return UNASSIGNED
 
 
-def filing_type_value(
-    filing_type: ScrapeFilingType | None, raw_filing_type: str
-) -> int:
-    """The code for a filing's type.
+def issue_code(member: CourtVocabulary | Unclassified) -> int:
+    """The code CourtListener stores for a reading of one of the two issue
+    vocabularies.
 
-    :param filing_type: The type the scraper classified.
-    :param raw_filing_type: The string the FILINGS table printed, empty when no
-        table row named this filing.
-    :return: The type's code, `UNKNOWN` when no table row named the filing at
-        all, or `UNASSIGNED` when the table named a type Juriscraper's
-        vocabulary does not cover."""
-    if filing_type is not None:
-        return _mirrored_code(FilingType, filing_type)
-    return UNASSIGNED if raw_filing_type.strip() else UNKNOWN
+    Those two are too large to mirror, so their codes are Juriscraper's own
+    rather than a mirror's; see `cl.search.state.new_york.vocabularies`.
 
-
-def filing_role_value(role: ScrapeFilingRole | None) -> int:
-    """The code for a filing's party role.
-
-    :param role: The role the scraper classified. None when the filing implies
-        no role, and also None when the file name stated one it could not read.
-    :return: The role's code, or `UNKNOWN`."""
-    return UNKNOWN if role is None else _mirrored_code(FilingRole, role)
-
-
-def filing_doctype_value(doctype: ScrapeFilingDocType | None) -> int:
-    """The code for a filing's document type.
-
-    :param doctype: The document type the scraper classified. None when the
-        filing carries no document, and also None when the file name's type
-        could not be read -- roughly 6% of names.
-    :return: The document type's code, or `UNKNOWN`."""
-    return (
-        UNKNOWN if doctype is None else _mirrored_code(FilingDocType, doctype)
-    )
-
-
-def issue_category_value(
-    category: IssueCategory | None, category_raw: str
-) -> int:
-    """The code for the category of an issue the Court assigned to a case.
-
-    :param category: The category the scraper classified.
-    :param category_raw: The issue as Court-PASS stated it.
-    :return: The category's code, `UNKNOWN` when the Court stated no issue at
-        all, or `UNASSIGNED` when it stated a category Juriscraper's vocabulary
-        does not cover."""
-    if category is not None:
-        return category.code
-    return UNASSIGNED if category_raw.strip() else UNKNOWN
-
-
-def issue_subcategory_value(
-    subcategory: IssueSubcategory | None, category_raw: str
-) -> int:
-    """The code for the subcategory of an issue the Court assigned to a case.
-
-    :param subcategory: The subcategory the scraper classified. None both when
-        the Court stated a bare category and when it stated a subcategory the
-        vocabulary does not cover.
-    :param category_raw: The issue as Court-PASS stated it. Whether it holds the
-        double dash the Court joins the two halves with is what separates those
-        two cases.
-    :return: The subcategory's code, `UNKNOWN` when the Court stated a bare
-        category, or `UNASSIGNED` when it stated one that is not covered."""
-    if subcategory is not None:
-        return subcategory.code
-    _, _, stated = category_raw.partition("--")
-    return UNASSIGNED if stated.strip() else UNKNOWN
+    :param member: What the scrape schema classified the category or subcategory
+        as.
+    :return: The published code, or the reserved one for a reading that names no
+        member.
+    """
+    if isinstance(member, Unclassified):
+        return RESERVED_CODES[member]
+    return member.code
