@@ -1,6 +1,6 @@
 from collections.abc import Awaitable, Callable, Iterable
-from dataclasses import dataclass, field
-from typing import Any, NotRequired, TypedDict
+from dataclasses import dataclass
+from typing import Any, NamedTuple, NotRequired, TypedDict
 
 from django.db.models import Exists, OuterRef, Prefetch, QuerySet
 from django.urls import reverse
@@ -103,6 +103,16 @@ def build_scotus_metadata(
     return items
 
 
+class AdminNames(NamedTuple):
+    """Admin URL/permission names for one of the two admin links
+    rd_admin_tools.html shows -- one for the docket entry, one for the
+    document itself.
+    """
+
+    entry: str
+    document: str
+
+
 @dataclass(frozen=True)
 class DocketEntrySource:
     """Describes how to fetch, sort, and display docket entries and
@@ -148,19 +158,15 @@ class DocketEntrySource:
     metadata_sections: Callable[[Docket], list[MetadataSection]]
     component: str
     has_pay_and_pray: bool = True
-    admin_url_names: dict[str, str] = field(
-        default_factory=lambda: {
-            "entry": "admin:search_docketentry_change",
-            "document": "admin:search_recapdocument_change",
-        }
+    admin_url_names: AdminNames = AdminNames(
+        entry="admin:search_docketentry_change",
+        document="admin:search_recapdocument_change",
     )
     # Model names used to build the view/change/delete
     # permission triad checked before showing an admin link.
-    admin_perm_names: dict[str, str] = field(
-        default_factory=lambda: {
-            "entry": "docketentry",
-            "document": "recapdocument",
-        }
+    admin_perm_names: AdminNames = AdminNames(
+        entry="docketentry",
+        document="recapdocument",
     )
     admin_document_label: str = "RECAP Document"
 
@@ -242,6 +248,7 @@ def _recap_documents_for_docket_and_number(
         docket_entry__docket_id=docket_id, document_number=doc_num
     )
 
+
 async def _get_recap_document_for_render(pk: int) -> RECAPDocument:
     """Fetch a single RECAPDocument for the document detail page, with
     the docket/court relation and the authorities annotation it needs
@@ -293,8 +300,6 @@ def _scotus_documents_for_entry(de: SCOTUSDocketEntry) -> QuerySet:
     return de.scotusdocument_set.all()
 
 
-
-
 def _scotus_documents_for_docket_and_number(
     docket_id: int, doc_num: str
 ) -> QuerySet:
@@ -303,7 +308,6 @@ def _scotus_documents_for_docket_and_number(
     return SCOTUSDocument.objects.filter(
         docket_entry__docket_id=docket_id, document_number=doc_num
     )
-
 
 
 async def _get_scotus_document_for_render(pk: int) -> SCOTUSDocument:
@@ -348,13 +352,9 @@ def _scotus_document_label(document: SCOTUSDocument) -> str:
 
 
 def _scotus_document_detail_url(document: SCOTUSDocument) -> str | None:
-    """Return None: SCOTUS documents have no CourtListener page in the
-    legacy design yet.
-
-    When that page exists, returning its URL here is all it takes for the
-    docket entry templates to start linking SCOTUS document labels.
-    """
-    return None
+    """Return the URL of the CourtListener page for one SCOTUS document,
+    or None if it doesn't resolve to one."""
+    return document.get_absolute_url() or None
 
 
 def _scotus_document_external_url(document: SCOTUSDocument) -> str | None:
@@ -391,14 +391,14 @@ SCOTUS_SOURCE = DocketEntrySource(
     get_document_for_render=_get_scotus_document_for_render,
     has_pay_and_pray=False,
     component="scotus",
-    admin_url_names={
-        "entry": "admin:search_scotusdocketentry_change",
-        "document": "admin:search_scotusdocument_change",
-    },
-    admin_perm_names={
-        "entry": "scotusdocketentry",
-        "document": "scotusdocument",
-    },
+    admin_url_names=AdminNames(
+        entry="admin:search_scotusdocketentry_change",
+        document="admin:search_scotusdocument_change",
+    ),
+    admin_perm_names=AdminNames(
+        entry="scotusdocketentry",
+        document="scotusdocument",
+    ),
     admin_document_label="SCOTUS Document",
 )
 
