@@ -298,6 +298,20 @@ class NYCoADocketEntryMerger[ParamType](
     )
 
 
+class ScrapedAttorney(NYCoAAttorney):
+    """One of a party's attorneys, with what the role merger needs beyond the
+    attorney.
+
+    :ivar primary: Whether this is the first attorney Court-PASS listed for the
+        party. Court-PASS never states an attorney's role, so the role follows
+        the convention the other states' mergers use -- the first attorney
+        listed is the party's lead and the rest are unknown -- which a child
+        merger cannot work out on its own because it cannot see its siblings.
+    """
+
+    primary: bool = False
+
+
 def _attorney_contact_raw(attorney: NYCoAAttorney, params: Any) -> str:
     """Fold the firm and address Court-PASS prints for an attorney into the one
     free-text contact field CourtListener keeps for them."""
@@ -318,7 +332,9 @@ def _attorney_phone(attorney: NYCoAAttorney, params: Any) -> str:
     return phone[:PHONE_MAX_LENGTH]
 
 
-class NYCoAAttorneyMerger(AttorneyMerger[NYCoAAttorney, RelatedParams[None]]):
+class NYCoAAttorneyMerger(
+    AttorneyMerger[ScrapedAttorney, RelatedParams[None]]
+):
     """Merger for an attorney on a Court-PASS docket."""
 
     contact_raw: str = Attribute(_attorney_contact_raw, strategy=overwrite)
@@ -326,14 +342,24 @@ class NYCoAAttorneyMerger(AttorneyMerger[NYCoAAttorney, RelatedParams[None]]):
 
 
 def _attorney_role(
-    attorney: NYCoAAttorney, params: ThroughParameters[Any]
+    attorney: ScrapedAttorney, params: ThroughParameters[Any]
 ) -> int:
-    """Court-PASS states which party an attorney represents but never in what
-    role, and the role is not nullable."""
-    return Role.UNKNOWN
+    """The role to store for an attorney Court-PASS lists for a party.
+
+    Court-PASS states which party an attorney represents but never in what
+    role, and the role is not nullable, so the attorney the Court listed first
+    is stored as the party's lead and the rest as unknown -- the convention the
+    other states' mergers follow. See `ScrapedAttorney`.
+
+    :param attorney: The attorney, marked with whether the Court listed it
+        first.
+    :param params: Unused; the role is read off the attorney alone.
+    :return: The `Role` code to store.
+    """
+    return Role.ATTORNEY_LEAD if attorney.primary else Role.UNKNOWN
 
 
-class NYCoARoleMerger(RoleMerger[NYCoAAttorney, RelatedParams[None]]):
+class NYCoARoleMerger(RoleMerger[ScrapedAttorney, RelatedParams[None]]):
     """Merger for the link between a Court-PASS attorney and the party.
 
     Overrides only `role`, which Court-PASS never states; see
@@ -355,6 +381,19 @@ class NYCoAPartyTypeMerger(PartyTypeMerger[NYCoAParty, RelatedParams[None]]):
     name: str = Attribute(_party_type_name)
 
 
+def _party_attorneys(party: NYCoAParty, params: Any) -> list[ScrapedAttorney]:
+    """The party's attorneys, each marked with whether the Court listed it
+    first.
+
+    Which attorney that is decides the role stored for all of them, and only
+    the party sees them all at once. See `ScrapedAttorney`."""
+    return [
+        # `dict` copies the scraped fields across without re-serializing them.
+        ScrapedAttorney(**dict(attorney), primary=index == 0)
+        for index, attorney in enumerate(party.representatives)
+    ]
+
+
 class NYCoAPartyMerger(PartyMerger[NYCoAParty, RelatedParams[None]]):
     """Merger for a party on a Court-PASS docket.
 
@@ -362,24 +401,18 @@ class NYCoAPartyMerger(PartyMerger[NYCoAParty, RelatedParams[None]]):
     breaking a tie; see `resolve_query`."""
 
     attorneys: list[Attorney] = AttorneyRelation(
-        attorney=NYCoAAttorneyMerger, role=NYCoARoleMerger
+        attorney=NYCoAAttorneyMerger,
+        role=NYCoARoleMerger,
+        transform=_party_attorneys,
     )
 
     @override
     def resolve_query(self, qs: QuerySet[Party]) -> tuple[bool, Party | None]:
         """Pick which of the docket's parties this scraped one is.
 
-        A name is not unique on a Court-PASS docket: in a family case the Court
-        lists one person under two roles -- the child and the respondent -- and
-        each is its own party with its own attorney. `PartyMerger` matches on
-        the name alone, which finds both and, with the base implementation,
-        fails the whole docket on every scrape after the first. The role the
-        Court printed is what separates them, so it decides here.
-
-        A single candidate is taken whatever its role, so that a party the
-        Court has re-designated -- a respondent who becomes a
-        respondent-appellant on a cross-appeal -- keeps its row rather than
-        being duplicated under the new role.
+        A name is not unique on a Court-PASS docket. We make a best effort here
+        to match parties when they have the same name (family cases), and log when
+        we can't disambiguate.
 
         :param qs: The candidates `PartyMerger.query` found. The framework caps
             this at two rows; a third party sharing one name would need a later
