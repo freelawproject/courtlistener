@@ -428,6 +428,8 @@ class SealingOrderDetectionTest(SimpleTestCase):
             "sealing",
             "sealed",
             "redacted",
+            "struck",
+            "stricken",
             "pseudonym",
             "anonymity",
             "press coverage",
