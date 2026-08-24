@@ -1112,8 +1112,45 @@ class NYCoAPartyMergerTest(NYCoAMergerTestCase):
         self.assertEqual(role.attorney.phone, "(518) 555-1212")
         self.assertEqual(
             role.role,
-            Role.UNKNOWN,
-            "Court-PASS states no attorney role, and the role is not nullable.",
+            Role.ATTORNEY_LEAD,
+            "Court-PASS states no attorney role, so the first attorney it "
+            "lists is the party's lead.",
+        )
+
+    @merger_test(expected_query_count=25)
+    def test_merge_makes_the_first_attorney_listed_the_lead(self) -> None:
+        """Court-PASS states no attorney's role. Is the first attorney it lists
+        for a party stored as that party's lead, with the rest unknown?"""
+        case = NYCoACaseFactory.create(
+            docket_number=DOCKET_NUMBER,
+            parties=[
+                NYCoAPartyFactory.create(
+                    name="Smith",
+                    representatives=[
+                        NYCoAAttorneyFactory.create(name="Jane Roe"),
+                        NYCoAAttorneyFactory.create(name="John Doe"),
+                        NYCoAAttorneyFactory.create(name="Ada Poe"),
+                    ],
+                )
+            ],
+        )
+
+        result = NYCoADocketMerger(case, params=None).merge()
+
+        self.assertTrue(result.success)
+        roles = {
+            role.attorney.name: role.role
+            for role in Role.objects.filter(
+                docket=self.merged_docket(result)
+            ).select_related("attorney")
+        }
+        self.assertEqual(
+            roles,
+            {
+                "Jane Roe": Role.ATTORNEY_LEAD,
+                "John Doe": Role.UNKNOWN,
+                "Ada Poe": Role.UNKNOWN,
+            },
         )
 
     @merger_test(expected_query_count=19)
@@ -1267,6 +1304,81 @@ class NYCoAPartyMergerTest(NYCoAMergerTestCase):
             parties,
             "Each role must stay on the party row it was first written to.",
         )
+
+    @merger_test(expected_query_count=48)
+    def test_refusing_a_party_costs_only_that_party(self) -> None:
+        """A shared name the role cannot separate is one the party merger
+        refuses. That refusal is reported in the docket's own result, so does
+        the rest of the case still merge and stay merged -- the docket merger
+        being atomic notwithstanding?"""
+        case = NYCoACaseFactory.create(
+            docket_number=DOCKET_NUMBER,
+            case_name="Matter of A. R.",
+            parties=[
+                NYCoAPartyFactory.create(
+                    name="A. R.",
+                    party_role_raw="Child",
+                    representatives=[
+                        NYCoAAttorneyFactory.create(name="Zoe Allen")
+                    ],
+                ),
+                NYCoAPartyFactory.create(
+                    name="A. R.",
+                    party_role_raw="Respondent",
+                    representatives=[
+                        NYCoAAttorneyFactory.create(name="Mike Weinstein")
+                    ],
+                ),
+            ],
+            entries=[NYCoAFilingFactory.create()],
+        )
+        first = NYCoADocketMerger(case, params=None).merge()
+        self.assertTrue(first.success)
+
+        # Neither stored role is one this scrape states, so neither party can
+        # be told from the other.
+        case.parties[0].party_role_raw = "Appellant"
+        case.parties[1].party_role_raw = "Appellee"
+        case.case_name = "Matter of A. R. (No. 2)"
+        case.decision_date = date(2025, 6, 12)
+        case.entries.append(NYCoAFilingFactory.create())
+        second = NYCoADocketMerger(case, params=None).merge()
+
+        self.assertFalse(
+            second.success, "The party the merger refused is a failure."
+        )
+        self.assertEqual(
+            list(second.failures),
+            ["Party"],
+            "Only the party merge failed.",
+        )
+        docket = self.merged_docket(first)
+        docket.refresh_from_db()
+        self.assertEqual(
+            docket.case_name,
+            "Matter of A. R. (No. 2)",
+            "The docket's own fields merged and were committed.",
+        )
+        self.assertEqual(
+            docket.nycoa_metadata.decision_date, date(2025, 6, 12)
+        )
+        self.assertEqual(
+            NYCoADocketEntry.objects.filter(docket=docket).count(),
+            2,
+            "The new filing merged alongside the refused party.",
+        )
+        # The parties the merger refused are left exactly as the first scrape
+        # wrote them, rather than being re-roled, duplicated, or pruned.
+        self.assertEqual(Party.objects.filter(name="A. R.").count(), 2)
+        self.assertEqual(
+            sorted(
+                PartyType.objects.filter(party__name="A. R.").values_list(
+                    "name", flat=True
+                )
+            ),
+            ["Child", "Respondent"],
+        )
+        self.assertEqual(Role.objects.filter(docket=docket).count(), 2)
 
     @merger_test(expected_query_count=31)
     def test_remerge_party_whose_role_changed(self) -> None:
