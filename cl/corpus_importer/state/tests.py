@@ -5,7 +5,7 @@ from contextlib import closing, contextmanager
 from pathlib import Path
 from tempfile import TemporaryDirectory
 from typing import Any, ClassVar, ParamSpec, TypeVar
-from unittest.mock import patch
+from unittest.mock import Mock, call, patch
 
 from botocore.exceptions import ClientError
 from django.db import connection
@@ -33,6 +33,12 @@ from cl.corpus_importer.state.run_db import (
     downloaded_run_database,
     scrape_bucket_client,
 )
+from cl.corpus_importer.state.utils import MergeResult
+from cl.lib.indexing_utils import (
+    get_last_parent_document_id_processed,
+    log_last_document_indexed,
+)
+from cl.lib.redis_utils import get_redis_interface
 from cl.people_db.factories import PersonFactory
 from cl.people_db.models import Party, PartyType, Person
 from cl.search.docket_sources import DocketSources
@@ -890,10 +896,10 @@ class LoaderScrape(BaseModel):
     case_name: str = ""
 
 
-class JKentScrapeLoaderTest(TestCase):
-    """Tests for the generic jkent run-database loader.
+class LoaderTestCase(TestCase):
+    """A run database in a temporary directory and a loader over it.
 
-    The loader is court-agnostic, so these exercise it through a throwaway
+    The loader is court-agnostic, so its tests exercise it through a throwaway
     scrape model and merger rather than through any one state's loader.
     """
 
@@ -942,6 +948,10 @@ class JKentScrapeLoaderTest(TestCase):
             }
             | attributes,
         )
+
+
+class JKentScrapeLoaderTest(LoaderTestCase):
+    """Tests for the generic jkent run-database loader."""
 
     def test_missing_database(self) -> None:
         """Is a run database that isn't there reported as such, rather than
@@ -1201,6 +1211,210 @@ class JKentScrapeLoaderTest(TestCase):
             str(report),
             "6 seen, 1 merged, 2 invalid, 1 failed",
         )
+
+    def test_db_delay_waits_between_rows(self) -> None:
+        """A long load has to leave the database room to serve everyone else.
+        Does `db_delay` wait after each row?"""
+        _run_database(
+            self.database,
+            [{"docket_number": f"A-{n}"} for n in range(3)],
+        )
+
+        with patch("cl.corpus_importer.state.loader.time.sleep") as sleep:
+            self.loader_class()(self.database, db_delay=0.25).load()
+
+        self.assertEqual(sleep.call_args_list, [call(0.25)] * 3)
+
+    def test_no_db_delay_does_not_wait(self) -> None:
+        """The default is to run flat out. Does a zero delay skip the wait
+        rather than sleeping zero seconds three thousand times?"""
+        _run_database(
+            self.database,
+            [{"docket_number": f"A-{n}"} for n in range(3)],
+        )
+
+        with patch("cl.corpus_importer.state.loader.time.sleep") as sleep:
+            self.loader_class()(self.database).load()
+
+        sleep.assert_not_called()
+
+    def document_loader_class(self) -> type[JKentScrapeLoader[Any]]:
+        """A loader whose merges write three documents, for the extraction
+        dispatch to have something to pace. The document model is a stand-in:
+        `dispatch_extraction` only names it and reads rows off it."""
+        document_model = Mock(__name__="Doc")
+        document_model._default_manager.filter.return_value = [
+            Mock() for _ in range(3)
+        ]
+        return self.loader_class(document_model=document_model)
+
+    def test_extraction_throttle_paces_every_document(self) -> None:
+        """Extraction is dispatched from inside the merge loop, which can
+        outrun the workers over a whole run. Does the throttle get its say
+        before each document goes to the queue?"""
+        loader_class = self.document_loader_class()
+        with patch(
+            "cl.corpus_importer.state.loader.CeleryThrottle"
+        ) as throttle_class:
+            loader = loader_class(
+                self.database, extraction_throttle=4, extraction_queue="batch1"
+            )
+            loader.dispatch_extraction(MergeResult(creates={"Doc": {1, 2, 3}}))
+
+        throttle_class.assert_called_once_with(
+            min_items=4, queue_name="batch1"
+        )
+        self.assertEqual(throttle_class.return_value.maybe_wait.call_count, 3)
+
+    def test_no_extraction_throttle_builds_no_throttle(self) -> None:
+        """Building a throttle polls the celery queue. Does a load that asked
+        for none leave the queue alone?"""
+        loader = self.document_loader_class()(self.database)
+
+        self.assertIsNone(loader.throttle)
+
+
+class JKentScrapeLoaderCheckpointTest(LoaderTestCase):
+    """Tests for the position a load records so a later one can resume it.
+
+    Checkpoints go to the real Redis, since the point of one is that it
+    outlives the process that wrote it.
+    """
+
+    def setUp(self) -> None:
+        super().setUp()
+        self.key = "state_scrape_load:test:run.db"
+        self.redis = get_redis_interface("CACHE")
+        self.redis.delete(self.key)
+        self.addCleanup(self.redis.delete, self.key)
+        patcher = patch(
+            "cl.corpus_importer.state.loader.CHECKPOINT_EVERY", new=2
+        )
+        patcher.start()
+        self.addCleanup(patcher.stop)
+
+    def checkpoint(self) -> int:
+        """The row the checkpoint names, or 0 for no checkpoint."""
+        return get_last_parent_document_id_processed(self.key)
+
+    def test_a_load_checkpoints_the_rows_it_finished(self) -> None:
+        """A load that dies is resumed from its last checkpoint, so the
+        checkpoint must never name a row the load had not got through. Does it
+        name the last finished row?"""
+        _run_database(
+            self.database,
+            [{"docket_number": f"A-{n}"} for n in range(5)],
+        )
+        loader = self.loader_class()(self.database, checkpoint_key=self.key)
+
+        # Stop the load partway, as a dying process would.
+        with patch.object(
+            loader,
+            "merge_one",
+            side_effect=[MergeResult(), MergeResult(), OSError("gone")],
+        ):
+            with self.assertRaises(OSError):
+                loader.load()
+
+        # The checkpoint was written at the top of row 2, by which point only
+        # row 1 had merged. Row 2 merged after it and is loaded again on
+        # resume, which merging idempotently makes harmless -- naming a row
+        # the load had not reached would not be.
+        self.assertEqual(self.checkpoint(), 1)
+
+    def test_a_checkpoint_resumes_the_rows_it_left(self) -> None:
+        """A checkpoint is only worth writing if it starts the next load in
+        the right place. Does resuming from one merge exactly the rest?"""
+        _run_database(
+            self.database,
+            [{"docket_number": f"A-{n}"} for n in range(5)],
+        )
+        log_last_document_indexed(2, self.key)
+
+        report = self.loader_class()(
+            self.database, start_row=self.checkpoint()
+        ).load()
+
+        self.assertEqual((report.seen, report.merged), (3, 3))
+        self.assertEqual(
+            set(Docket.objects.values_list("docket_number", flat=True)),
+            {"A-2", "A-3", "A-4"},
+        )
+
+    def test_a_finished_load_clears_its_checkpoint(self) -> None:
+        """A checkpoint left behind by a load that finished would send the
+        next load of the same run database straight to the end, merging
+        nothing. Is it dropped?"""
+        _run_database(
+            self.database,
+            [{"docket_number": f"A-{n}"} for n in range(5)],
+        )
+
+        self.loader_class()(self.database, checkpoint_key=self.key).load()
+
+        self.assertEqual(self.checkpoint(), 0)
+
+    def test_a_dry_run_leaves_no_checkpoint(self) -> None:
+        """A dry run rolls back everything it merged, so there is nothing to
+        resume. Does it leave the checkpoint alone?"""
+        _run_database(
+            self.database,
+            [{"docket_number": f"A-{n}"} for n in range(5)],
+        )
+        log_last_document_indexed(2, self.key)
+
+        self.loader_class()(
+            self.database, checkpoint_key=self.key, dry_run=True
+        ).load()
+
+        self.assertEqual(self.checkpoint(), 2, "The real load's position.")
+
+    def test_a_limited_run_leaves_no_checkpoint(self) -> None:
+        """A limited run stops at a row that means nothing to a full load.
+        Does it neither record that position nor clear a real one?"""
+        _run_database(
+            self.database,
+            [{"docket_number": f"A-{n}"} for n in range(5)],
+        )
+        log_last_document_indexed(2, self.key)
+
+        self.loader_class()(
+            self.database, checkpoint_key=self.key, limit=4
+        ).load()
+
+        self.assertEqual(self.checkpoint(), 2, "The real load's position.")
+
+    def test_a_load_given_no_key_checkpoints_nothing(self) -> None:
+        """Does a load with no checkpoint key run without touching Redis?"""
+        _run_database(
+            self.database,
+            [{"docket_number": f"A-{n}"} for n in range(5)],
+        )
+
+        with patch(
+            "cl.corpus_importer.state.loader.log_last_document_indexed"
+        ) as log:
+            self.loader_class()(self.database).load()
+
+        log.assert_not_called()
+
+    def test_a_load_survives_a_checkpoint_it_cannot_write(self) -> None:
+        """A checkpoint is a convenience, not the load. Does an unreachable
+        Redis cost the run its resume point and nothing more?"""
+        _run_database(
+            self.database,
+            [{"docket_number": f"A-{n}"} for n in range(5)],
+        )
+
+        with patch(
+            "cl.corpus_importer.state.loader.log_last_document_indexed",
+            side_effect=ConnectionError("no redis"),
+        ):
+            report = self.loader_class()(
+                self.database, checkpoint_key=self.key
+            ).load()
+
+        self.assertEqual((report.seen, report.merged), (5, 5))
 
 
 class FakeBucket:
