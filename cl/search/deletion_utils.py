@@ -82,6 +82,10 @@ def delete_document_citations(rd: RECAPDocument) -> None:
     """
     rd.cited_opinions.all().delete()
     rd.unmatched_citations.all().delete()
+    if settings.ELASTICSEARCH_DISABLED:
+        # The indexing signals check this too, so honoring it here keeps
+        # sealing usable with ES turned off instead of half-indexing.
+        return
     update_es_document.delay(
         "ESRECAPDocument",
         ["cites"],

@@ -12,7 +12,7 @@ from unittest import mock
 from django.contrib import admin, messages
 from django.core.exceptions import PermissionDenied
 from django.core.management import call_command
-from django.test import Client, RequestFactory
+from django.test import Client, RequestFactory, override_settings
 from django.urls import reverse
 
 from cl.citations.models import UnmatchedCitationFromRECAPDocument
@@ -23,6 +23,7 @@ from cl.search.deletion_utils import (
     get_blocking_relations,
     get_deletion_blockers,
     seal_cluster,
+    seal_documents,
 )
 from cl.search.documents import ES_CHILD_ID, DocketDocument
 from cl.search.factories import (
@@ -545,6 +546,63 @@ class OpinionClusterSealFileCleanupTest(TestCase):
         mock_invalidate_cloudfront.assert_not_called()
 
 
+class RECAPDocumentSealCitationsTest(TestCase):
+    """Sealing a RECAPDocument must delete the citations mined from its
+    text. Covers the path taken when Elasticsearch is turned off, which the
+    ES tests below can't reach."""
+
+    @classmethod
+    def setUpTestData(cls):
+        cls.court = CourtFactory(id="canb", jurisdiction="FB")
+
+    @override_settings(ELASTICSEARCH_DISABLED=True)
+    @mock.patch("cl.search.deletion_utils.update_es_document")
+    @mock.patch("cl.search.deletion_utils.time.sleep")
+    @mock.patch("cl.search.deletion_utils.delete_from_ia")
+    @mock.patch("cl.search.deletion_utils.invalidate_cloudfront")
+    def test_seal_deletes_citations_with_es_disabled(
+        self,
+        mock_invalidate_cloudfront,
+        mock_delete_from_ia,
+        mock_sleep,
+        mock_update_es_document,
+    ):
+        docket = DocketFactory(court=self.court, source=Docket.RECAP)
+        de = DocketEntryFactory(docket=docket, entry_number=1)
+        rd = RECAPDocumentFactory(
+            docket_entry=de,
+            document_number="1",
+            plain_text="Citing 1 U.S. 1 and 2 U.S. 2.",
+        )
+        opinion = OpinionWithParentsFactory()
+        OpinionsCitedByRECAPDocumentFactory(
+            citing_document=rd,
+            cited_opinion=opinion,
+            depth=1,
+        )
+        UnmatchedCitationFromRECAPDocument.objects.create(
+            citing_recapdocument=rd,
+            status=UnmatchedCitationFromRECAPDocument.NO_CITATION,
+            citation_string="2 U.S. 2",
+            court_id="",
+            volume="2",
+            reporter="U.S.",
+            page="2",
+            type=Citation.FEDERAL,
+        )
+
+        seal_documents(RECAPDocument.objects.filter(pk=rd.pk))
+
+        rd.refresh_from_db()
+        self.assertTrue(rd.is_sealed)
+        self.assertFalse(rd.cited_opinions.exists())
+        self.assertFalse(rd.unmatched_citations.exists())
+        # Only the linkage goes away; the cited opinion itself must stay.
+        self.assertTrue(Opinion.objects.filter(pk=opinion.pk).exists())
+        # With ES off, nothing should be queued up for it.
+        mock_update_es_document.delay.assert_not_called()
+
+
 class RECAPDocumentSealActionESTest(
     CountESTasksTestCase, ESIndexTestCase, TransactionTestCase
 ):
@@ -689,27 +747,26 @@ class RECAPDocumentSealActionESTest(
             plain_text="Citing 1 U.S. 1 and 2 U.S. 2.",
         )
         opinion = OpinionWithParentsFactory()
-        with self.captureOnCommitCallbacks(execute=True):
-            OpinionsCitedByRECAPDocumentFactory(
-                citing_document=rd,
-                cited_opinion=opinion,
-                depth=1,
-            )
-            UnmatchedCitationFromRECAPDocument.objects.create(
-                citing_recapdocument=rd,
-                status=UnmatchedCitationFromRECAPDocument.NO_CITATION,
-                citation_string="2 U.S. 2",
-                court_id="",
-                volume="2",
-                reporter="U.S.",
-                page="2",
-                type=Citation.FEDERAL,
-            )
-            # Mirror production: the citation rows are pushed into ES by
-            # this task, not by saving the RECAPDocument.
-            index_related_cites_fields.delay(
-                OpinionsCitedByRECAPDocument.__name__, rd.pk
-            )
+        OpinionsCitedByRECAPDocumentFactory(
+            citing_document=rd,
+            cited_opinion=opinion,
+            depth=1,
+        )
+        UnmatchedCitationFromRECAPDocument.objects.create(
+            citing_recapdocument=rd,
+            status=UnmatchedCitationFromRECAPDocument.NO_CITATION,
+            citation_string="2 U.S. 2",
+            court_id="",
+            volume="2",
+            reporter="U.S.",
+            page="2",
+            type=Citation.FEDERAL,
+        )
+        # Mirror production: the citation rows are pushed into ES by this
+        # task, not by saving the RECAPDocument.
+        index_related_cites_fields.delay(
+            OpinionsCitedByRECAPDocument.__name__, rd.pk
+        )
 
         rd_doc = DocketDocument.get(id=ES_CHILD_ID(rd.pk).RECAP)
         self.assertEqual(list(rd_doc.cites), [opinion.pk])
@@ -719,10 +776,9 @@ class RECAPDocumentSealActionESTest(
         recap_admin.message_user = mock.Mock()
         url = reverse("admin:search_recapdocument_changelist")
         request = self.factory.post(url)
-        with self.captureOnCommitCallbacks(execute=True):
-            recap_admin.seal_documents(
-                request, RECAPDocument.objects.filter(pk=rd.pk)
-            )
+        recap_admin.seal_documents(
+            request, RECAPDocument.objects.filter(pk=rd.pk)
+        )
 
         # Confirm DB cleanup:
         self.assertFalse(rd.cited_opinions.exists())
@@ -763,28 +819,27 @@ class RECAPDocumentSealActionESTest(
             plain_text="Citing 1 U.S. 1.",
         )
         opinion = OpinionWithParentsFactory()
-        with self.captureOnCommitCallbacks(execute=True):
-            for rd in (rd_sealed, rd_unsealed):
-                OpinionsCitedByRECAPDocumentFactory(
-                    citing_document=rd,
-                    cited_opinion=opinion,
-                    depth=1,
-                )
-            UnmatchedCitationFromRECAPDocument.objects.create(
-                citing_recapdocument=rd_sealed,
-                status=UnmatchedCitationFromRECAPDocument.NO_CITATION,
-                citation_string="2 U.S. 2",
-                court_id="",
-                volume="2",
-                reporter="U.S.",
-                page="2",
-                type=Citation.FEDERAL,
+        for rd in (rd_sealed, rd_unsealed):
+            OpinionsCitedByRECAPDocumentFactory(
+                citing_document=rd,
+                cited_opinion=opinion,
+                depth=1,
             )
-            # Get the stale citations into ES, the way they'd have been
-            # indexed back when the document still had its text.
-            index_related_cites_fields.delay(
-                OpinionsCitedByRECAPDocument.__name__, rd_sealed.pk
-            )
+        UnmatchedCitationFromRECAPDocument.objects.create(
+            citing_recapdocument=rd_sealed,
+            status=UnmatchedCitationFromRECAPDocument.NO_CITATION,
+            citation_string="2 U.S. 2",
+            court_id="",
+            volume="2",
+            reporter="U.S.",
+            page="2",
+            type=Citation.FEDERAL,
+        )
+        # Get the stale citations into ES, the way they'd have been indexed
+        # back when the document still had its text.
+        index_related_cites_fields.delay(
+            OpinionsCitedByRECAPDocument.__name__, rd_sealed.pk
+        )
 
         rd_sealed_doc = DocketDocument.get(id=ES_CHILD_ID(rd_sealed.pk).RECAP)
         self.assertEqual(list(rd_sealed_doc.cites), [opinion.pk])
@@ -794,8 +849,7 @@ class RECAPDocumentSealActionESTest(
         self.assertTrue(rd_sealed.cited_opinions.exists())
         self.assertTrue(rd_sealed.unmatched_citations.exists())
 
-        with self.captureOnCommitCallbacks(execute=True):
-            call_command("clean_sealed_document_citations")
+        call_command("clean_sealed_document_citations")
 
         self.assertFalse(rd_sealed.cited_opinions.exists())
         self.assertFalse(rd_sealed.unmatched_citations.exists())
