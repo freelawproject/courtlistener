@@ -54,10 +54,14 @@ def make_court_metadata(external_id: int) -> CourtMetadata:
     )
 
 
-def make_update(court_external_id: int = 2) -> FloridaUpdate:
+def make_update(
+    court_external_id: int = 2, date_filed: datetime | None = None
+) -> FloridaUpdate:
     """Build a FloridaUpdate for a fresh case UUID in the given court."""
     return FloridaUpdate.model_construct(
-        case_uuid=uuid4(), court_external_id=court_external_id
+        case_uuid=uuid4(),
+        court_external_id=court_external_id,
+        date_filed=date_filed or START,
     )
 
 
@@ -132,8 +136,8 @@ class FloridaDocumentPollParserTest(SimpleTestCase):
     """Unit test for the poll-endpoint results parser."""
 
     def test_parse_full_extracts_case_identifiers(self):
-        """The parser must pull the case UUID and court external ID out of
-        each result's caseHeader."""
+        """The parser must pull the case UUID, court external ID, and filing
+        date out of each result's caseHeader."""
         case_uuid = uuid4()
         payload = json.dumps(
             {
@@ -143,6 +147,7 @@ class FloridaDocumentPollParserTest(SimpleTestCase):
                             "caseHeader": {
                                 "caseInstanceUUID": str(case_uuid),
                                 "courtID": 2,
+                                "filedDate": "2026-08-19T12:00:00Z",
                             }
                         }
                     ]
@@ -162,7 +167,9 @@ class FloridaDocumentPollParserTest(SimpleTestCase):
             parsed.results,
             [
                 FloridaUpdate.model_construct(
-                    case_uuid=case_uuid, court_external_id=2
+                    case_uuid=case_uuid,
+                    court_external_id=2,
+                    date_filed=datetime(2026, 8, 19, 12, tzinfo=UTC),
                 )
             ],
         )
@@ -226,11 +233,12 @@ class FlPollerPollTest(SimpleTestCase):
 
     def test_new_cases_are_archived_and_dispatched(self):
         """Every discovered case must be archived to S3, handed to the Celery
-        ingestion task on the requested queue, and advance the checkpoint."""
+        ingestion task on the requested queue, and move the checkpoint to the
+        earliest update date seen."""
         case_a = FloridaCaseFactory()
         case_b = FloridaCaseFactory()
-        update_a = make_update()
-        update_b = make_update()
+        update_a = make_update(date_filed=FROZEN_NOW - timedelta(days=2))
+        update_b = make_update(date_filed=FROZEN_NOW - timedelta(days=1))
         scraper = FakeFloridaScraper(
             self.courts,
             pages={DOCKET_ENDPOINT: [make_page([update_a, update_b])]},
@@ -287,7 +295,7 @@ class FlPollerPollTest(SimpleTestCase):
             self.mock_ingest.si.return_value.set.return_value.apply_async.call_count,
             2,
         )
-        self.assertEqual(POLL_TRACKER.get(), case_b.date_filed)
+        self.assertEqual(POLL_TRACKER.get(), update_a.date_filed.date())
 
     def test_duplicate_updates_are_ingested_once(self):
         """An update surfaced by both the docket-entry and new-case endpoints

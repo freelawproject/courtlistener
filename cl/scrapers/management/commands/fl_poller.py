@@ -151,8 +151,10 @@ class Command(FLScrapeCommand, StatePollCommand):
         download_attachments: bool,
     ):
         throttle.maybe_wait()
-        current = self.checkpoint_tracker.get() or datetime.now(UTC)
-        self.checkpoint_tracker.set(min(update.date_filed, current))
+        # The tracker stores plain dates, so compare dates to avoid mixing
+        # them with the update's datetime.
+        current = self.checkpoint_tracker.get() or datetime.now(UTC).date()
+        self.checkpoint_tracker.set(min(update.date_filed.date(), current))
         # We don't have access to the bucket here, but it should only be used for logging in fl_ingest_docket_task so
         # this is fine.
         fl_ingest_docket_task.si((case, "", key), download_attachments).set(
@@ -226,7 +228,12 @@ class Command(FLScrapeCommand, StatePollCommand):
                     queue_name,
                 )
                 self.send_merge_task(
-                    case, throttle, key, queue_name, download_attachments
+                    case,
+                    update,
+                    throttle,
+                    key,
+                    queue_name,
+                    download_attachments,
                 )
             last_polled = now
             await asyncio.sleep(polling_delay * 60)
