@@ -1,5 +1,6 @@
 from django import template
 from django.conf import settings
+from django.middleware.csp import get_nonce
 from django.template import TemplateSyntaxError
 from django.templatetags.static import static
 from django.utils.html import format_html
@@ -98,10 +99,10 @@ def render_required_scripts(context):
     if not registry:
         return ""
 
-    nonce_attr = ""
-    nonce = getattr(context["request"], "csp_nonce", "")
-    if nonce:
-        nonce_attr = f' nonce="{nonce}"'
+    # get_nonce() returns a lazy object that only generates the nonce when it
+    # is interpolated below, so check for None instead of truthiness.
+    nonce = get_nonce(context["request"])
+    nonce_attr = "" if nonce is None else f' nonce="{nonce}"'
 
     pieces = []
     for path, defer_flag in registry.items():

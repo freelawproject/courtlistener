@@ -55,7 +55,7 @@
   <script type="text/javascript" src="{% static "js/search-relative-dates.js" %}"></script>
   {% if alerts_context %}
     {{ alerts_context|json_script:"alerts-data" }}
-    <script type="text/javascript" nonce="{{ request.csp_nonce }}">
+    <script type="text/javascript" nonce="{{ csp_nonce }}">
       const alertsContext = JSON.parse(
         document.getElementById("alerts-data").textContent
       );
@@ -64,13 +64,13 @@
   {% endif %}
   {% include "includes/date_picker.html" %}
   {% if alert_form.errors or request.GET.show_alert_modal %}
-    <script type="text/javascript" nonce="{{ request.csp_nonce }}">
+    <script type="text/javascript" nonce="{{ csp_nonce }}">
       $(window).on('load',function(){
         $("#modal-save-alert").modal('show');
       });
     </script>
   {% endif %}
-  <script type="text/javascript" nonce="{{ request.csp_nonce }}">
+  <script type="text/javascript" nonce="{{ csp_nonce }}">
     $("#modal-save-alert").on('show.bs.modal', function (e) {
       const modalBody = $('.modal-body.logged-in');
       if (modalBody.length === 0){

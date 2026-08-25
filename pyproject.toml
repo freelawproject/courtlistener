@@ -34,7 +34,6 @@ dependencies = [
   "Django>=6.0.7, <6.1",
   "django-cache-memoize",
   "django-cors-headers>=4.9.0",
-  "django-csp>=4.0",
   "django-extensions>=4.1",
   "django-filter>=26.1",
   "django-localflavor>=5.0",

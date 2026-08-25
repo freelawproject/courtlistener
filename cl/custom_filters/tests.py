@@ -1,9 +1,15 @@
 import datetime
 
 from django import forms
+from django.http import HttpResponse
+from django.middleware.csp import ContentSecurityPolicyMiddleware, get_nonce
 from django.template import Context
 from django.test import RequestFactory, SimpleTestCase
 
+from cl.custom_filters.templatetags.component_tags import (
+    render_required_scripts,
+    require_script,
+)
 from cl.custom_filters.templatetags.extras import (
     get_canonical_element,
     get_full_host,
@@ -528,3 +534,28 @@ class TestSvgTag(SimpleTestCase):
         with self.settings(DEBUG=False):
             result = svg("nonexistent_svg_that_does_not_exist")
             self.assertEqual(result, "")
+
+
+class TestRequiredScripts(SimpleTestCase):
+    def test_scripts_are_rendered_with_the_csp_nonce(self) -> None:
+        """Do the scripts a component requires get the request's CSP nonce?
+
+        Without the nonce, the browser refuses to run them, so this is the
+        seam between our components and Django's CSP middleware.
+        """
+        request = RequestFactory().get("/")
+        middleware = ContentSecurityPolicyMiddleware(
+            lambda request: HttpResponse()
+        )
+        middleware.process_request(request)
+        context = Context({"request": request})
+
+        require_script(context, "js/alpine/components/tabs.js")
+        html = render_required_scripts(context)
+
+        self.assertInHTML(
+            f'<script type="text/javascript" '
+            f'src="/static/js/alpine/components/tabs.js" '
+            f'nonce="{get_nonce(request)}"></script>',
+            html,
+        )

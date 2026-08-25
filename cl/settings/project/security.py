@@ -1,7 +1,7 @@
 import socket
 
 import environ
-from csp.constants import NONCE, SELF
+from django.utils.csp import CSP
 
 from ..django import DATABASES, INSTALLED_APPS, MIDDLEWARE, TESTING
 from ..third_party.aws import AWS_S3_CUSTOM_DOMAIN
@@ -96,65 +96,63 @@ PERMISSIONS_POLICY: dict[str, list[str]] = {
 # Components:
 # - hCaptcha: https://docs.hcaptcha.com/#content-security-policy-settings
 # - Plausible: https://github.com/plausible/docs/issues/20
-CONTENT_SECURITY_POLICY = {
-    "DIRECTIVES": {
-        "connect-src": [
-            SELF,
-            f"https://{AWS_S3_CUSTOM_DOMAIN}/",  # for embedded PDFs
-            "https://hcaptcha.com/",
-            "https://*.hcaptcha.com/",
-            "https://plausible.io/",
-        ],
-        "default-src": [SELF, f"https://{AWS_S3_CUSTOM_DOMAIN}/"],
-        "script-src": [
-            SELF,
-            NONCE,
-            "'report-sample'",
-            f"https://{AWS_S3_CUSTOM_DOMAIN}/",
-            "https://hcaptcha.com/",
-            "https://*.hcaptcha.com/",
-            "https://plausible.io/",
-        ],
-        "object-src": [
-            SELF,
-            f"https://{AWS_S3_CUSTOM_DOMAIN}/",  # for embedded PDFs
-        ],
-        "style-src": [
-            SELF,
-            "'report-sample'",
-            f"https://{AWS_S3_CUSTOM_DOMAIN}/",
-            "https://hcaptcha.com/",
-            "https://*.hcaptcha.com/",
-            "'unsafe-inline'",
-        ],
-        "font-src": [
-            SELF,
-            f"https://{AWS_S3_CUSTOM_DOMAIN}/",
-            "data:",  # Some browser extensions like this.
-        ],
-        "frame-src": [
-            SELF,
-            f"https://{AWS_S3_CUSTOM_DOMAIN}/",  # for embedded PDFs
-            "https://hcaptcha.com/",
-            "https://*.hcaptcha.com/",
-        ],
-        "img-src": [
-            SELF,
-            f"https://{AWS_S3_CUSTOM_DOMAIN}/",
-            "https://portraits.free.law/",
-            "https://seals.free.law/",
-            "data:",  # @tailwindcss/forms uses data URIs for images.
-        ],
-        "media-src": [
-            SELF,
-            f"https://{AWS_S3_CUSTOM_DOMAIN}/",
-            "data:",  # Some browser extensions like this.
-        ],
-        "base-uri": [SELF],
-        "upgrade-insecure-requests": False,
-    }
+SECURE_CSP = {
+    "connect-src": [
+        CSP.SELF,
+        f"https://{AWS_S3_CUSTOM_DOMAIN}/",  # for embedded PDFs
+        "https://hcaptcha.com/",
+        "https://*.hcaptcha.com/",
+        "https://plausible.io/",
+    ],
+    "default-src": [CSP.SELF, f"https://{AWS_S3_CUSTOM_DOMAIN}/"],
+    "script-src": [
+        CSP.SELF,
+        CSP.NONCE,
+        CSP.REPORT_SAMPLE,
+        f"https://{AWS_S3_CUSTOM_DOMAIN}/",
+        "https://hcaptcha.com/",
+        "https://*.hcaptcha.com/",
+        "https://plausible.io/",
+    ],
+    "object-src": [
+        CSP.SELF,
+        f"https://{AWS_S3_CUSTOM_DOMAIN}/",  # for embedded PDFs
+    ],
+    "style-src": [
+        CSP.SELF,
+        CSP.REPORT_SAMPLE,
+        f"https://{AWS_S3_CUSTOM_DOMAIN}/",
+        "https://hcaptcha.com/",
+        "https://*.hcaptcha.com/",
+        CSP.UNSAFE_INLINE,
+    ],
+    "font-src": [
+        CSP.SELF,
+        f"https://{AWS_S3_CUSTOM_DOMAIN}/",
+        "data:",  # Some browser extensions like this.
+    ],
+    "frame-src": [
+        CSP.SELF,
+        f"https://{AWS_S3_CUSTOM_DOMAIN}/",
+        "https://hcaptcha.com/",
+        "https://*.hcaptcha.com/",
+    ],
+    "img-src": [
+        CSP.SELF,
+        f"https://{AWS_S3_CUSTOM_DOMAIN}/",
+        "https://portraits.free.law/",
+        "https://seals.free.law/",
+        "data:",  # @tailwindcss/forms uses data URIs for images.
+    ],
+    "media-src": [
+        CSP.SELF,
+        f"https://{AWS_S3_CUSTOM_DOMAIN}/",
+        "data:",  # Some browser extensions like this.
+    ],
+    "base-uri": [CSP.SELF],
+    "upgrade-insecure-requests": False,
 }
 if not any(
     (DEVELOPMENT, TESTING)
 ):  # Development and test aren’t used over HTTPS (yet)
-    CONTENT_SECURITY_POLICY["DIRECTIVES"]["upgrade-insecure-requests"] = True
+    SECURE_CSP["upgrade-insecure-requests"] = True
