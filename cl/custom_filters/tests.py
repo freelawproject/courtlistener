@@ -10,7 +10,7 @@ from django import forms
 from django.conf import settings
 from django.template import Context, TemplateSyntaxError
 from django.template.utils import get_app_template_dirs
-from django.test import RequestFactory, SimpleTestCase
+from django.test import RequestFactory, SimpleTestCase, override_settings
 
 from cl.custom_filters.templatetags import component_tags
 from cl.custom_filters.templatetags.component_tags import (
@@ -578,6 +578,15 @@ class TestComponentTags(SimpleTestCase):
         """A finders.find stand-in resolving only the given static paths."""
         return files.get
 
+    def _static_dir(self, files: dict[str, bytes]) -> str:
+        """Builds a throwaway static dir holding *files* under ``js/``."""
+        root = Path(tempfile.mkdtemp())
+        self.addCleanup(shutil.rmtree, root)
+        (root / "js").mkdir()
+        for name, content in files.items():
+            (root / "js" / name).write_bytes(content)
+        return str(root)
+
     def test_extension_resolution(self) -> None:
         """The extension resolves to .js under DEBUG, .min.js otherwise."""
         test_cases = (
@@ -653,8 +662,33 @@ class TestComponentTags(SimpleTestCase):
         """The module logs under "cl", which owns the console handler."""
         self.assertTrue(LOGGER.startswith("cl."))
 
-    def test_warns_when_a_variant_is_missing(self) -> None:
-        """A stub whose .min.js was never committed logs a warning."""
+    def test_detects_missing_and_empty_variants(self) -> None:
+        """A stub needs a .js and a .min.js, and both must hold code."""
+        code = b"a=1"
+        cases = [
+            # (files sitting in the static dir, expected problems)
+            ({"thing.js": code, "thing.min.js": code}, []),
+            ({"thing.js": code}, ["js/thing.min.js is missing"]),
+            ({"thing.min.js": code}, ["js/thing.js is missing"]),
+            ({}, ["js/thing.js is missing", "js/thing.min.js is missing"]),
+            (
+                {"thing.js": code, "thing.min.js": b"\n"},
+                ["js/thing.min.js is empty"],
+            ),
+            (
+                {"thing.js": b" \t\n", "thing.min.js": code},
+                ["js/thing.js is empty"],
+            ),
+        ]
+        for files, expected in cases:
+            with self.subTest(files=sorted(files)):
+                with override_settings(
+                    STATICFILES_DIRS=[self._static_dir(files)]
+                ):
+                    self.assertEqual(_script_problems("js/thing"), expected)
+
+    def test_problems_surface_as_warnings(self) -> None:
+        """Each problem with a stub's files becomes one warning."""
         find = self._resolver({"js/ghost.js": self._file(b"a=1")})
         with mock.patch.object(component_tags.finders, "find", find):
             with self.settings(DEBUG=True):
@@ -666,23 +700,6 @@ class TestComponentTags(SimpleTestCase):
         self.assertIn("js/ghost.min.js is missing", logs.output[0])
         # The page still loads the unminified file.
         self.assertIn("js/ghost.js", rendered)
-
-    def test_warns_when_a_variant_is_empty(self) -> None:
-        """A stub whose .min.js holds no code logs a warning."""
-        find = self._resolver(
-            {
-                "js/ghost.js": self._file(b"a=1"),
-                "js/ghost.min.js": self._file(b"\n"),
-            }
-        )
-        with mock.patch.object(component_tags.finders, "find", find):
-            with self.settings(DEBUG=True):
-                require_script(self.context, "js/ghost")
-                with self.assertLogs(LOGGER, level="WARNING") as logs:
-                    self._render()
-
-        self.assertEqual(len(logs.records), 1)
-        self.assertIn("js/ghost.min.js is empty", logs.output[0])
 
     def test_no_warning_when_both_variants_hold_content(self) -> None:
         """A stub whose files are both real logs nothing."""
