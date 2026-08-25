@@ -164,9 +164,9 @@ class Command(BaseCommand):
         checkpoint_key = compose_redis_key(loader, database)
         if auto_resume:
             if start_row:
-                logger.warning(
-                    "--auto-resume is taking precedence over --start-row %s.",
-                    start_row,
+                raise CommandError(
+                    f"--start-row {start_row} and --auto-resume are "
+                    "mutually exclusive for clarity and simplicity."
                 )
             start_row = get_last_parent_document_id_processed(checkpoint_key)
             logger.info("Auto-resuming from row %s.", start_row)
