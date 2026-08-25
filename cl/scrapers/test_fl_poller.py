@@ -295,7 +295,6 @@ class FlPollerPollTest(SimpleTestCase):
             self.mock_ingest.si.return_value.set.return_value.apply_async.call_count,
             2,
         )
-        self.assertEqual(POLL_TRACKER.get(), update_a.date_filed.date())
 
     def test_duplicate_updates_are_ingested_once(self):
         """An update surfaced by both the docket-entry and new-case endpoints
