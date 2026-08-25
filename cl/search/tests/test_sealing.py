@@ -14,6 +14,7 @@ from django.core.exceptions import PermissionDenied
 from django.test import Client, RequestFactory
 from django.urls import reverse
 
+from cl.citations.models import UnmatchedCitationFromRECAPDocument
 from cl.favorites.factories import NoteFactory, UserTagFactory
 from cl.search.admin import OpinionClusterAdmin, RECAPDocumentAdmin
 from cl.search.deletion_utils import (
@@ -32,20 +33,26 @@ from cl.search.factories import (
     OpinionClusterFactory,
     OpinionClusterWithParentsFactory,
     OpinionFactory,
+    OpinionsCitedByRECAPDocumentFactory,
+    OpinionWithParentsFactory,
     RECAPDocumentFactory,
     SCOTUSDocketEntryFactory,
     TrialCourtDataFactory,
 )
 from cl.search.models import (
     PRECEDENTIAL_STATUS,
+    Citation,
     ClusterRedirection,
     Docket,
+    Opinion,
     OpinionCluster,
+    OpinionsCitedByRECAPDocument,
     RECAPDocument,
     ScotusDocketMetadata,
 )
 from cl.search.state.florida.factories import FloridaDocketEntryFactory
 from cl.search.state.texas.factories import TexasDocketEntryFactory
+from cl.search.tasks import index_related_cites_fields
 from cl.tests.cases import (
     CountESTasksTestCase,
     ESIndexTestCase,
@@ -656,3 +663,76 @@ class RECAPDocumentSealActionESTest(
 
         # Clean up index.
         docket.delete()
+
+    @mock.patch("cl.search.deletion_utils.time.sleep")
+    @mock.patch("cl.search.deletion_utils.delete_from_ia")
+    @mock.patch("cl.search.deletion_utils.invalidate_cloudfront")
+    def test_seal_documents_removes_citations(
+        self, mock_invalidate_cloudfront, mock_delete_from_ia, mock_sleep
+    ):
+        """Confirm that sealing a RECAPDocument drops the citations mined
+        from its text, in the DB and in ES."""
+
+        docket = DocketFactory(
+            court=self.court,
+            pacer_case_id="qwerty",
+            docket_number="12-cv-02354",
+            case_name="Vargas v. Wilkins",
+            source=Docket.RECAP,
+        )
+        de = DocketEntryFactory(docket=docket, entry_number=1)
+        rd = RECAPDocumentFactory(
+            docket_entry=de,
+            document_number="1",
+            is_available=True,
+            plain_text="Citing 1 U.S. 1 and 2 U.S. 2.",
+        )
+        opinion = OpinionWithParentsFactory()
+        with self.captureOnCommitCallbacks(execute=True):
+            OpinionsCitedByRECAPDocumentFactory(
+                citing_document=rd,
+                cited_opinion=opinion,
+                depth=1,
+            )
+            UnmatchedCitationFromRECAPDocument.objects.create(
+                citing_recapdocument=rd,
+                status=UnmatchedCitationFromRECAPDocument.NO_CITATION,
+                citation_string="2 U.S. 2",
+                court_id="",
+                volume="2",
+                reporter="U.S.",
+                page="2",
+                type=Citation.FEDERAL,
+            )
+            # Mirror production: the citation rows are pushed into ES by
+            # this task, not by saving the RECAPDocument.
+            index_related_cites_fields.delay(
+                OpinionsCitedByRECAPDocument.__name__, rd.pk
+            )
+
+        rd_doc = DocketDocument.get(id=ES_CHILD_ID(rd.pk).RECAP)
+        self.assertEqual(list(rd_doc.cites), [opinion.pk])
+
+        # Call seal_documents action.
+        recap_admin = RECAPDocumentAdmin(RECAPDocument, self.site)
+        recap_admin.message_user = mock.Mock()
+        url = reverse("admin:search_recapdocument_changelist")
+        request = self.factory.post(url)
+        with self.captureOnCommitCallbacks(execute=True):
+            recap_admin.seal_documents(
+                request, RECAPDocument.objects.filter(pk=rd.pk)
+            )
+
+        # Confirm DB cleanup:
+        self.assertFalse(rd.cited_opinions.exists())
+        self.assertFalse(rd.unmatched_citations.exists())
+        # Only the linkage goes away; the cited opinion itself must stay.
+        self.assertTrue(Opinion.objects.filter(pk=opinion.pk).exists())
+
+        # Confirm ES cleanup:
+        rd_doc = DocketDocument.get(id=ES_CHILD_ID(rd.pk).RECAP)
+        self.assertEqual(list(rd_doc.cites), [])
+
+        # Clean up index.
+        docket.delete()
+        opinion.cluster.docket.delete()
