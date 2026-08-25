@@ -1788,6 +1788,10 @@ class ScotusDocketV2ContentRenderTest(TestCase):
         self.assertNotIn("Buy on PACER", content)
         self.assertIn("Get Alerts", content)
         self.assertIn("View in SCOTUS", content)
+        self.assertIn(
+            "sourced from the Supreme Court of the United States", content
+        )
+        self.assertIn(settings.WIKI_COVERAGE_SCOTUS_URL, content)
 
 
 class OgRedirectLookupViewTest(TestCase):
