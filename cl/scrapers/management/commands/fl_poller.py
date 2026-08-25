@@ -13,7 +13,7 @@ from juriscraper.state.florida.common import (
     FloridaPaginatedResultsParser,
 )
 from juriscraper.state.florida.scraper import CourtMetadata, PaginationFailed
-from pydantic import AliasPath, BaseModel, ConfigDict, Field
+from pydantic import AliasChoices, AliasPath, BaseModel, ConfigDict, Field
 from pydantic.types import UUID4
 
 from cl.corpus_importer.tasks import fl_ingest_docket_task
@@ -38,6 +38,12 @@ class FloridaUpdate(BaseModel):
     )
     court_external_id: int = Field(
         validation_alias=AliasPath("caseHeader", "courtID")
+    )
+    date_filed: datetime = Field(
+        validation_alias=AliasChoices(
+            AliasPath("docketEntryHeader", "filedDate"),
+            AliasPath("caseHeader", "filedDate"),
+        )
     )
 
 
@@ -66,14 +72,12 @@ class Command(FLScrapeCommand, StatePollCommand):
 
         parser.add_argument(
             "--no-download-attachments",
-            type=bool,
-            default=False,
+            action="store_true",
             help="Set to download attachments for newly discovered dockets.",
         )
         parser.add_argument(
             "--auto-resume",
-            type=bool,
-            default=False,
+            action="store_true",
             help="Set to resume polling from the last saved checkpoint.",
         )
 
@@ -140,13 +144,15 @@ class Command(FLScrapeCommand, StatePollCommand):
     def send_merge_task(
         self,
         case: FloridaCase,
+        update: FloridaUpdate,
         throttle: CeleryThrottle,
         key: str,
         queue_name: str,
         download_attachments: bool,
     ):
         throttle.maybe_wait()
-        self.checkpoint_tracker.set(case.date_filed)
+        current = self.checkpoint_tracker.get() or datetime.now(UTC)
+        self.checkpoint_tracker.set(min(update.date_filed, current))
         # We don't have access to the bucket here, but it should only be used for logging in fl_ingest_docket_task so
         # this is fine.
         fl_ingest_docket_task.si((case, "", key), download_attachments).set(

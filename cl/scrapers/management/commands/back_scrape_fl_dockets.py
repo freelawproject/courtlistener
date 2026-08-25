@@ -169,27 +169,12 @@ class Command(StateBackScrapeCommand, FLScrapeCommand):
         parser.add_argument(
             "--full-scrape",
             action="store_true",
-            default=False,
             help="If set the scraper will fetch all docket metadata in addition to the list of dockets.",
         )
         parser.add_argument(
             "--use-cache",
             action="store_true",
-            default=False,
             help="If set the scraper will use the cache to avoid re-downloading files. Useful when running a second pass with the --full-scrape option.",
-        )
-        parser.add_argument(
-            "--queue",
-            default="batch1",
-            help="The celery queue to dispatch S3 archive tasks to.",
-        )
-        parser.add_argument(
-            "--throttle-min-items",
-            dest="throttle_min_items",
-            type=int,
-            default=50,
-            help="CeleryThrottle min queue depth; the throttle keeps the "
-            "queue between this and 2x this value.",
         )
         parser.add_argument(
             "--skip-parsed",
