@@ -1,6 +1,7 @@
 import pickle
 import random
 from dataclasses import dataclass
+from http.cookiejar import Cookie
 from urllib.parse import urlparse
 
 from django.conf import settings
@@ -132,6 +133,15 @@ class ProxyPacerSession(PacerSession):
         saml_credentials = super()._get_saml_auth_request_parameters(court_id)
         # Update cookies so they can be sent over non-HTTPS connections
         for cookie in self.cookies:
+            # `RequestsCookieJar` claims to be a `MutableMapping[str, str | None]`,
+            # but `__iter__` ignores override mismatch and returns an
+            # `Iterator[Cookie]`. Here we verify this behavior, clarifying things
+            # for static type checking and making sure that a future failure is
+            # more easily recognized.
+            if not isinstance(cookie, Cookie):
+                raise TypeError(
+                    f"expected Cookie, got {type(cookie).__name__}"
+                )
             cookie.secure = False
         return saml_credentials
 
