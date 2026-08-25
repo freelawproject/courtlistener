@@ -50,56 +50,6 @@ def get_zoho_cache_key() -> str:
     return "zoho_token"
 
 
-def build_zoho_payload_from_user(user, module: str) -> dict[str | Field, Any]:
-    """
-    Build a Zoho CRM payload dictionary from a User instance.
-
-    This function maps a User’s attributes and related profile data
-    to the corresponding Zoho CRM fields. Standard Zoho fields are represented
-    by `Field` instances, while custom fields use string keys.
-
-    :param user: The user whose data will be mapped to Zoho CRM fields.
-    :param module: The Zoho module name ('Leads' or 'Contacts').
-    :return: A dictionary mapping Zoho field identifiers (either `Field`
-    instances or string keys) to their corresponding values.
-    """
-    payload = {
-        "CourtListener_ID": user.pk,
-        Field.Leads.email(): user.email,
-    }
-    # Basic user info
-    if user.first_name:
-        payload[Field.Leads.first_name()] = user.first_name
-    if user.last_name:
-        payload[Field.Leads.last_name()] = user.last_name
-
-    is_lead = module == "Leads"
-    # Profile-related fields
-    profile = user.profile
-    if profile.employer and is_lead:
-        payload[Field.Leads.company()] = profile.employer
-
-    if profile.city:
-        field_name = (
-            Field.Leads.city() if is_lead else Field.Contacts.mailing_city()
-        )
-        payload[field_name] = profile.city
-
-    if profile.state:
-        field_name = (
-            Field.Leads.state() if is_lead else Field.Contacts.mailing_state()
-        )
-        payload[field_name] = profile.state
-
-    if profile.zip_code:
-        field_name = (
-            Field.Leads.zip_code() if is_lead else Field.Contacts.mailing_zip()
-        )
-        payload[field_name] = profile.zip_code
-
-    return payload
-
-
 class ZohoBase:
     """Base class for all Zoho API clients.
 
@@ -438,14 +388,55 @@ class UpdateRecordMixin:
         return ZohoModule.handle_api_response(response)
 
 
+class BuildPayloadMixin:
+    """Mixin for shared payload building logic between contact and lead modules."""
+
+    def build_payload_from_user(self, user) -> dict[str | Field, Any]:
+        payload = {
+            "CourtListener_ID": user.pk,
+            Field.Leads.email(): user.email,
+        }
+        # Basic user info
+        if user.first_name:
+            payload[Field.Leads.first_name()] = user.first_name
+        if user.last_name:
+            payload[Field.Leads.last_name()] = user.last_name
+
+        return payload
+
+
 class LeadsModule(
     CreateRecordMixin,
     UpdateRecordMixin,
     SearchRecordMixin,
     AddTagsMixin,
+    BuildPayloadMixin,
     ZohoModule,
 ):
     module_name = "Leads"
+
+    def build_payload_from_user(self, user) -> dict[str | Field, Any]:
+        payload = super().build_payload_from_user(user)
+
+        # Profile-related fields
+        profile = user.profile
+
+        if profile.employer:
+            payload[Field.Leads.company()] = profile.employer
+
+        if profile.city:
+            field_name = Field.Leads.city()
+            payload[field_name] = profile.city
+
+        if profile.state:
+            field_name = Field.Leads.state()
+            payload[field_name] = profile.state
+
+        if profile.zip_code:
+            field_name = Field.Leads.zip_code()
+            payload[field_name] = profile.zip_code
+
+        return payload
 
 
 class ContactsModule(
@@ -453,6 +444,27 @@ class ContactsModule(
     UpdateRecordMixin,
     SearchRecordMixin,
     AddTagsMixin,
+    BuildPayloadMixin,
     ZohoModule,
 ):
     module_name = "Contacts"
+
+    def build_payload_from_user(self, user) -> dict[str | Field, Any]:
+        payload = super().build_payload_from_user(user)
+
+        # Profile-related fields
+        profile = user.profile
+
+        if profile.city:
+            field_name = Field.Contacts.mailing_city()
+            payload[field_name] = profile.city
+
+        if profile.state:
+            field_name = Field.Contacts.mailing_state()
+            payload[field_name] = profile.state
+
+        if profile.zip_code:
+            field_name = Field.Contacts.mailing_zip()
+            payload[field_name] = profile.zip_code
+
+        return payload
