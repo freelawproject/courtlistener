@@ -75,9 +75,9 @@ def verify_subscription_success(html: str) -> tuple[bool, str]:
     # The message may be directly in the span or inside a <font> child.
     font_children = cast(list[etree._Element], span.xpath("font"))
     if font_children:
-        message = font_children[0].text or ""
+        message = cast(str, font_children[0].text) or ""
     else:
-        message = span.text or ""
+        message = cast(str, span.text) or ""
     message = message.strip()
 
     if not message:
@@ -274,9 +274,9 @@ class Command(StatePollCommand):
     def handle(self, *args: Any, **options: Any) -> None:
         global shutdown_requested
 
-        if not settings.TAMES_USER:  # type: ignore[misc]
+        if not settings.TAMES_USER:
             raise CommandError("TAMES_USER must be set.")
-        tames_user: dict[str, str] = json.loads(settings.TAMES_USER)  # type: ignore[misc]
+        tames_user: dict[str, str] = json.loads(settings.TAMES_USER)
 
         redis = get_redis_interface("CACHE")
         courts = (
