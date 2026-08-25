@@ -18,13 +18,14 @@ from django.contrib.auth.models import User
 from django.contrib.auth.tokens import default_token_generator
 from django.core import mail
 from django.core.cache import cache as django_cache
+from django.core.exceptions import ValidationError
 from django.core.mail import (
     EmailMessage,
     EmailMultiAlternatives,
     get_connection,
     send_mail,
 )
-from django.test import AsyncClient
+from django.test import AsyncClient, RequestFactory
 from django.test.client import Client
 from django.test.utils import override_settings
 from django.urls import reverse
@@ -93,7 +94,7 @@ from cl.tests.cases import (
 from cl.tests.utils import MockResponse as MockPostResponse
 from cl.tests.utils import make_session_client
 from cl.users import signals as user_signals
-from cl.users.admin import UserAdmin
+from cl.users.admin import UserAdmin, UserProfileInline
 from cl.users.email_handlers import (
     add_bcc_random,
     get_email_body,
@@ -4427,6 +4428,51 @@ class UserAdminApiCallsCountTest(TestCase):
         mock_get_redis.return_value = mock_redis
         result = self.user_admin.api_calls_count(self.user)
         self.assertEqual(result, 0)
+
+
+class UserProfileAdminActivationKeyTest(TestCase):
+    """Tests that the admin can save a profile with a spent activation key.
+
+    Regression test for #7831: confirm_email() blanks activation_key once it
+    has been used (GHSA-638g-xf9h-6qcg), but the field was required, so the
+    User admin page could not be saved for any confirmed account.
+    """
+
+    @classmethod
+    def setUpTestData(cls) -> None:
+        cls.profile = UserProfileWithParentsFactory.create()
+
+    def test_blank_activation_key_passes_model_validation(self) -> None:
+        """Does a spent (blank) activation key survive full_clean()?"""
+        self.profile.activation_key = ""
+        try:
+            self.profile.full_clean()
+        except ValidationError as e:
+            self.fail(f"A blank activation_key failed validation: {e}")
+
+    def test_admin_inline_does_not_require_an_activation_key(self) -> None:
+        """Can the profile inline be submitted with a blank activation key?"""
+        request = RequestFactory().get("/")
+        request.user = self.profile.user
+        formset_class = UserProfileInline(User, admin.site).get_formset(
+            request
+        )
+        prefix = formset_class.get_default_prefix()
+        data = {
+            f"{prefix}-TOTAL_FORMS": "1",
+            f"{prefix}-INITIAL_FORMS": "1",
+            f"{prefix}-MIN_NUM_FORMS": "0",
+            f"{prefix}-MAX_NUM_FORMS": "1",
+            f"{prefix}-0-id": str(self.profile.pk),
+            f"{prefix}-0-user": str(self.profile.user.pk),
+            f"{prefix}-0-activation_key": "",
+        }
+        formset = formset_class(data=data, instance=self.profile.user)
+        self.assertTrue(
+            formset.is_valid(),
+            f"The profile inline rejected a blank activation_key: "
+            f"{formset.errors}",
+        )
 
 
 class UserProfileTotalApiUsageTest(TestCase):
