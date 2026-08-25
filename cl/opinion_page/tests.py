@@ -1639,8 +1639,9 @@ class ScotusDocketFlagEnabledTest(TestCase):
         self.assertEqual(r.status_code, HTTPStatus.OK)
 
     async def test_scotus_entries_and_documents_render(self) -> None:
-        """SCOTUSDocketEntry/SCOTUSDocument content shows up
-        on the docket page template, and PACER-only UI is hidden."""
+        """SCOTUSDocketEntry/SCOTUSDocument content shows up on the docket
+        page template, and PACER-only UI is hidden. Docket alerts are not
+        PACER-only, so that button stays."""
         entry = await sync_to_async(SCOTUSDocketEntryFactory)(
             docket=self.docket,
             description="Petition for a writ of certiorari filed.",
@@ -1745,7 +1746,8 @@ class ScotusDocketFlagEnabledTest(TestCase):
 class ScotusDocketV2ContentRenderTest(TestCase):
     """The v2/Cotton docket page must get the same SCOTUS treatment
     as the legacy template - entries/documents/metadata render,
-    PACER-only UI is hidden.
+    PACER-only UI is hidden. Docket alerts are not PACER-only, so that
+    button stays.
     """
 
     @classmethod

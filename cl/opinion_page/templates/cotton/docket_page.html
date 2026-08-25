@@ -46,50 +46,47 @@
     {% svg "tag" class="w-4 h-4" aria_hidden="true" %}
     Tags
   </c-button>
-  {# TODO: A SCOTUS docket never shows alerts, having no PACER URL. #}
-  {% if docket.pacer_docket_url %}
-    {# TODO: Wire up alert toggle interactivity (auth checks, AJAX toggle, state change). #}
-    <c-menu-button
-      button_variant="outline"
-      widget_aria_label="Docket alerts menu"
-      trigger_aria_label="Get Alerts"
-      menu_aria_label="Alert options"
-    >
-      <c-slot name="button_content">
-        {% svg "bell" class="w-4 h-4" aria_hidden="true" %}
-        Get Alerts
-        <span
-          class="transition-transform duration-200 group-aria-[expanded=true]:rotate-180 flex justify-center items-center w-4 h-4"
-          aria-hidden="true"
-        >{% svg "chevron" class="w-full h-full text-greyscale-400" %}</span>
-      </c-slot>
-      <c-slot name="menu_content">
-        <c-menu-button.item
-          href="{% url 'docket_feed' docket.pk %}"
-          icon="rss"
-          icon_class="w-4 h-4 text-greyscale-500"
-          rel="nofollow"
-        >
-          Subscribe with RSS
-        </c-menu-button.item>
-        <c-menu-button.item
-          href="{% url 'new_docket_alert' %}?pacer_case_id={{ docket.pacer_case_id }}&court_id={{ docket.court_id }}"
-          icon="forward"
-          icon_class="w-4 h-4 text-greyscale-500"
-          rel="nofollow"
-        >
-          Share Alert Link
-        </c-menu-button.item>
-        <c-menu-button.item
-          href="{{ WIKI_HELP_URL }}/alerts/docket-alerts-for-pacer"
-          icon="circle_question_mark"
-          icon_class="w-4 h-4 text-greyscale-500"
-        >
-          Learn More
-        </c-menu-button.item>
-      </c-slot>
-    </c-menu-button>
-  {% endif %}
+  {# TODO: Wire up alert toggle interactivity (auth checks, AJAX toggle, state change). #}
+  <c-menu-button
+    button_variant="outline"
+    widget_aria_label="Docket alerts menu"
+    trigger_aria_label="Get Alerts"
+    menu_aria_label="Alert options"
+  >
+    <c-slot name="button_content">
+      {% svg "bell" class="w-4 h-4" aria_hidden="true" %}
+      Get Alerts
+      <span
+        class="transition-transform duration-200 group-aria-[expanded=true]:rotate-180 flex justify-center items-center w-4 h-4"
+        aria-hidden="true"
+      >{% svg "chevron" class="w-full h-full text-greyscale-400" %}</span>
+    </c-slot>
+    <c-slot name="menu_content">
+      <c-menu-button.item
+        href="{% url 'docket_feed' docket.pk %}"
+        icon="rss"
+        icon_class="w-4 h-4 text-greyscale-500"
+        rel="nofollow"
+      >
+        Subscribe with RSS
+      </c-menu-button.item>
+      <c-menu-button.item
+        href="{% url 'new_docket_alert' %}?pacer_case_id={{ docket.pacer_case_id }}&court_id={{ docket.court_id }}"
+        icon="forward"
+        icon_class="w-4 h-4 text-greyscale-500"
+        rel="nofollow"
+      >
+        Share Alert Link
+      </c-menu-button.item>
+      <c-menu-button.item
+        href="{{ WIKI_HELP_URL }}/alerts/docket-alerts-for-pacer"
+        icon="circle_question_mark"
+        icon_class="w-4 h-4 text-greyscale-500"
+      >
+        Learn More
+      </c-menu-button.item>
+    </c-slot>
+  </c-menu-button>
   <c-docket-source-button :docket="docket" :docket_source="docket_source" />
 </div>
 

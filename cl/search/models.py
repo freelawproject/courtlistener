@@ -889,7 +889,13 @@ class Docket(AbstractDateTimeModel, DocketSources):
         )
 
     @property
-    def pacer_docket_url(self):
+    def pacer_docket_url(self) -> str | None:
+        """Return the PACER docket report URL, or None if the docket isn't in PACER."""
+        from cl.opinion_page.docket_sources_utils import RECAP_SOURCE
+
+        if self.get_entry_source() is not RECAP_SOURCE:
+            return None
+
         if self.court.jurisdiction == Court.FEDERAL_APPELLATE:
             if self.court.pk in ["ca5", "ca7", "ca11"]:
                 path = "/cmecf/servlet/TransportRoom?"
