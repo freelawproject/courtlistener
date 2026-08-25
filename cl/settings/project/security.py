@@ -150,6 +150,10 @@ SECURE_CSP = {
         "data:",  # Some browser extensions like this.
     ],
     "base-uri": [CSP.SELF],
+    # We publish a lot of documents and HTML that we get from third parties. If
+    # any of it contains a form, this keeps the browser from submitting it
+    # anywhere but back to us, where it will simply fail.
+    "form-action": [CSP.SELF],
     "upgrade-insecure-requests": False,
 }
 if not any(

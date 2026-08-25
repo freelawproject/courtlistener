@@ -605,3 +605,56 @@ class ZohoRoutingTest(SimpleUserDataMixin, TestCase):
         call_kwargs = mock_task.delay.call_args.kwargs
         self.assertEqual(call_kwargs["request_type"], "Sealing Order")
         self.assertEqual(call_kwargs["assignee_id"], "")
+
+
+class ContentSecurityPolicyTest(TestCase):
+    """Tests for the site-wide CSP header configured in cl.settings."""
+
+    @staticmethod
+    def parse_csp(response: HttpResponse) -> dict[str, list[str]]:
+        """Parses a response's CSP header into a dict of directives.
+
+        :param response: A response carrying a Content-Security-Policy header.
+        :return: A dict mapping each directive name to its list of values.
+        """
+        header = response.headers["Content-Security-Policy"]
+        directives = {}
+        for directive in header.split(";"):
+            name, _, values = directive.strip().partition(" ")
+            directives[name] = values.split()
+        return directives
+
+    async def test_navigation_is_locked_to_our_own_domain(self) -> None:
+        """Do we stop third-party content from sending users elsewhere?
+
+        We publish a lot of HTML that we get from third parties, so we use CSP
+        to keep any forms or <base> tags it contains from pointing at another
+        site.
+        """
+        r = cast(
+            HttpResponse, await self.async_client.get(reverse("help_home"))
+        )
+        directives = self.parse_csp(r)
+        self.assertEqual(directives["form-action"], ["'self'"])
+        self.assertEqual(directives["base-uri"], ["'self'"])
+
+    async def test_script_nonce_matches_the_rendered_page(self) -> None:
+        """Does the nonce in the header match the one in the HTML?
+
+        If these ever drift apart, every inline script on the site breaks, so
+        check that the nonce plumbing between the middleware and the templates
+        is intact.
+        """
+        r = cast(
+            HttpResponse, await self.async_client.get(reverse("help_home"))
+        )
+        script_src = self.parse_csp(r)["script-src"]
+        nonces = [
+            value[len("'nonce-") : -len("'")]
+            for value in script_src
+            if value.startswith("'nonce-")
+        ]
+        self.assertEqual(
+            len(nonces), 1, msg=f"Expected one nonce in: {script_src}"
+        )
+        self.assertIn(f'nonce="{nonces[0]}"', r.content.decode())
