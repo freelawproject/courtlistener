@@ -228,7 +228,7 @@ opinion_v4_search_api_keys = {
     "procedural_history": lambda x: x["result"].cluster.procedural_history,
     "posture": lambda x: x["result"].cluster.posture,
     "syllabus": lambda x: x["result"].cluster.syllabus,
-    "opinions": [],  # type: ignore
+    "opinions": [],
     "meta": [],
 }
 
@@ -398,7 +398,7 @@ recap_type_v4_api_keys.update(
             else None
         ),
         "meta": [],
-        "recap_documents": [],  # type: ignore
+        "recap_documents": [],
     }
 )
 
@@ -558,7 +558,7 @@ people_v4_fields = {
             else []
         )
     ),
-    "positions": [],  # type: ignore
+    "positions": [],
     "aba_rating": lambda x: (
         [r.get_rating_display() for r in x["result"].person.aba_ratings.all()]
         if x["result"].person.aba_ratings.all()

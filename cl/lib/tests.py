@@ -1177,9 +1177,9 @@ class TestPACERPartyParsing(SimpleTestCase):
         ]
         for i, pair in enumerate(pairs):
             print(f"Normalizing address {i}...", end="")
-            result = normalize_attorney_contact(pair["q"])  # type: ignore
+            result = normalize_attorney_contact(pair["q"])
             self.maxDiff = None
-            self.assertEqual(result, pair["a"])  # type: ignore
+            self.assertEqual(result, pair["a"])
             print("✓")
 
     def test_making_a_lookup_key(self) -> None:
@@ -1481,7 +1481,7 @@ class TestElasticsearchUtils(SimpleTestCase):
             },
         ]
         for test in tests:
-            output = check_for_proximity_tokens(test["input_str"])  # type: ignore
+            output = check_for_proximity_tokens(cast(str, test["input_str"]))
             self.assertEqual(output, test["output"])
 
         # Check for Unbalanced parentheses.
@@ -1518,11 +1518,13 @@ class TestElasticsearchUtils(SimpleTestCase):
             },
         ]
         for test in tests:
-            output = check_unbalanced_parenthesis(test["input_str"])  # type: ignore
+            output = check_unbalanced_parenthesis(cast(str, test["input_str"]))
             self.assertEqual(output, test["output"])
 
         for test in tests:
-            output = sanitize_unbalanced_parenthesis(test["input_str"])  # type: ignore
+            output = sanitize_unbalanced_parenthesis(
+                cast(str, test["input_str"])
+            )
             self.assertEqual(output, test["sanitized"])
 
         # Check for Unbalanced quotes.
@@ -1569,11 +1571,11 @@ class TestElasticsearchUtils(SimpleTestCase):
             },
         ]
         for test in tests:
-            output = check_unbalanced_quotes(test["input_str"])  # type: ignore
+            output = check_unbalanced_quotes(cast(str, test["input_str"]))
             self.assertEqual(output, test["output"])
 
         for test in tests:
-            output = sanitize_unbalanced_quotes(test["input_str"])  # type: ignore
+            output = sanitize_unbalanced_quotes(cast(str, test["input_str"]))
             self.assertEqual(output, test["sanitized"])
 
     def test_can_get_parties_from_bankruptcy_case_name(self) -> None:
@@ -2004,7 +2006,7 @@ class TestQueryWrapper(TestCase):
         request = self.request_factory.get("/lazy/user/path/")
         lazy_user = SimpleLazyObject(lambda: self.user)
         # Force evaluation of the lazy object
-        _ = lazy_user.pk  # type: ignore[attr-defined]
+        _ = lazy_user.pk
         request.user = cast(User, lazy_user)
         request.resolver_match = cast(
             ResolverMatch, self.MockResolverMatch("lazy-view")
