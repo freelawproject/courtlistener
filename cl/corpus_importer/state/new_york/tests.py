@@ -635,7 +635,7 @@ class NYCoADocketEntryMergerTest(NYCoAMergerTestCase):
         filing = NYCoAFilingFactory.create(
             docket_entry_id="e:appellant-brief:smith:1",
             date_filed=None,
-            entry_index=None,
+            entry_index=1,
             attachments=[],
         )
         case = NYCoACaseFactory.create(
@@ -1193,6 +1193,7 @@ class NYCoAPartyMergerTest(NYCoAMergerTestCase):
                     ],
                 )
             ],
+            entries=[],
         )
 
         result = NYCoADocketMerger(case, params=None).merge()
@@ -1398,7 +1399,7 @@ class NYCoAPartyMergerTest(NYCoAMergerTestCase):
                     ],
                 ),
             ],
-            entries=[NYCoAFilingFactory.create()],
+            entries=[NYCoAFilingFactory.create(attachments=[])],
         )
         first = NYCoADocketMerger(case, params=None).merge()
         self.assertTrue(first.success)
@@ -1409,7 +1410,7 @@ class NYCoAPartyMergerTest(NYCoAMergerTestCase):
         case.parties[1].party_role_raw = "Appellee"
         case.case_name = "Matter of A. R. (No. 2)"
         case.decision_date = date(2025, 6, 12)
-        case.entries.append(NYCoAFilingFactory.create())
+        case.entries.append(NYCoAFilingFactory.create(attachments=[]))
         second = NYCoADocketMerger(case, params=None).merge()
 
         self.assertFalse(
