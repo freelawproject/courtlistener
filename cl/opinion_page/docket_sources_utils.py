@@ -50,7 +50,6 @@ class MetadataSection(TypedDict):
 
     items: list[MetadataItem]
     title: NotRequired[str]
-    list_class: NotRequired[str]
 
 
 def build_scotus_metadata(

@@ -583,13 +583,11 @@ async def core_docket_data(
         docket, timezone_str
     )
     # metadata_sections is the source-agnostic shape both docket_tabs.html
-    # and the c-docket-page cotton component render. Only the cotton side
-    # reads list_class; includes/metadata_section.html ignores it.
+    # and the c-docket-page cotton component render. The core docket
+    # metadata is first by construction; each stack styles that section
+    # itself.
     metadata_sections: list[MetadataSection] = [
-        {
-            "items": docket_metadata,
-            "list_class": "grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mt-4",
-        },
+        {"items": docket_metadata},
         *await _common_metadata_sections(docket, og_info),
         *await sync_to_async(docket_source.metadata_sections)(docket),
     ]

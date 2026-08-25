@@ -1485,7 +1485,7 @@ Sample code here.
       </c-library.item>
       <c-library.item only>
         <c-slot name="label"><code>metadata_sections</code></c-slot>
-        <c-slot name="description">List of section dicts, rendered in order as <code>c-metadata-section</code>s. Each has <code>items</code> and optionally <code>title</code> and <code>list_class</code>. <code>view_docket</code> builds it as the generic section followed by whatever sections the docket's source adds, so the page never names a source. See <code>c-metadata-section</code> for the item shape.</c-slot>
+        <c-slot name="description">List of section dicts, rendered in order as <code>c-metadata-section</code>s. Each has <code>items</code> and optionally <code>title</code>. <code>view_docket</code> builds it as the generic section followed by whatever sections the docket's source adds, so the page never names a source. See <code>c-metadata-section</code> for the item shape.</c-slot>
       </c-library.item>
       <c-library.item only>
         <c-slot name="label"><code>tabs</code></c-slot>
@@ -1765,7 +1765,7 @@ Sample code here.
   &lt;c-metadata-section
     :items="section.items"
     :title="section.title"
-    :list_class="section.list_class"
+    list_class="{% if forloop.first %}grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mt-4{% endif %}"
   /&gt;
 {% endfor %}{% endverbatim %}
       </c-code>
