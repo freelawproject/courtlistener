@@ -546,63 +546,6 @@ class OpinionClusterSealFileCleanupTest(TestCase):
         mock_invalidate_cloudfront.assert_not_called()
 
 
-class RECAPDocumentSealCitationsTest(TestCase):
-    """Sealing a RECAPDocument must delete the citations mined from its
-    text. Covers the path taken when Elasticsearch is turned off, which the
-    ES tests below can't reach."""
-
-    @classmethod
-    def setUpTestData(cls):
-        cls.court = CourtFactory(id="canb", jurisdiction="FB")
-
-    @override_settings(ELASTICSEARCH_DISABLED=True)
-    @mock.patch("cl.search.deletion_utils.update_es_document")
-    @mock.patch("cl.search.deletion_utils.time.sleep")
-    @mock.patch("cl.search.deletion_utils.delete_from_ia")
-    @mock.patch("cl.search.deletion_utils.invalidate_cloudfront")
-    def test_seal_deletes_citations_with_es_disabled(
-        self,
-        mock_invalidate_cloudfront,
-        mock_delete_from_ia,
-        mock_sleep,
-        mock_update_es_document,
-    ):
-        docket = DocketFactory(court=self.court, source=Docket.RECAP)
-        de = DocketEntryFactory(docket=docket, entry_number=1)
-        rd = RECAPDocumentFactory(
-            docket_entry=de,
-            document_number="1",
-            plain_text="Citing 1 U.S. 1 and 2 U.S. 2.",
-        )
-        opinion = OpinionWithParentsFactory()
-        OpinionsCitedByRECAPDocumentFactory(
-            citing_document=rd,
-            cited_opinion=opinion,
-            depth=1,
-        )
-        UnmatchedCitationFromRECAPDocument.objects.create(
-            citing_recapdocument=rd,
-            status=UnmatchedCitationFromRECAPDocument.NO_CITATION,
-            citation_string="2 U.S. 2",
-            court_id="",
-            volume="2",
-            reporter="U.S.",
-            page="2",
-            type=Citation.FEDERAL,
-        )
-
-        seal_documents(RECAPDocument.objects.filter(pk=rd.pk))
-
-        rd.refresh_from_db()
-        self.assertTrue(rd.is_sealed)
-        self.assertFalse(rd.cited_opinions.exists())
-        self.assertFalse(rd.unmatched_citations.exists())
-        # Only the linkage goes away; the cited opinion itself must stay.
-        self.assertTrue(Opinion.objects.filter(pk=opinion.pk).exists())
-        # With ES off, nothing should be queued up for it.
-        mock_update_es_document.delay.assert_not_called()
-
-
 class RECAPDocumentSealActionESTest(
     CountESTasksTestCase, ESIndexTestCase, TransactionTestCase
 ):
@@ -858,6 +801,66 @@ class RECAPDocumentSealActionESTest(
 
         rd_sealed_doc = DocketDocument.get(id=ES_CHILD_ID(rd_sealed.pk).RECAP)
         self.assertEqual(list(rd_sealed_doc.cites), [])
+
+        # Clean up index.
+        docket.delete()
+        opinion.cluster.docket.delete()
+
+    @override_settings(ELASTICSEARCH_DISABLED=True)
+    @mock.patch("cl.search.deletion_utils.update_es_document")
+    @mock.patch("cl.search.deletion_utils.time.sleep")
+    @mock.patch("cl.search.deletion_utils.delete_from_ia")
+    @mock.patch("cl.search.deletion_utils.invalidate_cloudfront")
+    def test_seal_deletes_citations_with_es_disabled(
+        self,
+        mock_invalidate_cloudfront,
+        mock_delete_from_ia,
+        mock_sleep,
+        mock_update_es_document,
+    ):
+        """Sealing must still drop the citation rows when Elasticsearch is
+        turned off, and must not reach for ES while it's disabled."""
+
+        docket = DocketFactory(
+            court=self.court,
+            pacer_case_id="poiuy",
+            docket_number="12-cv-02356",
+            case_name="Vargas v. Wilkins",
+            source=Docket.RECAP,
+        )
+        de = DocketEntryFactory(docket=docket, entry_number=1)
+        rd = RECAPDocumentFactory(
+            docket_entry=de,
+            document_number="1",
+            plain_text="Citing 1 U.S. 1 and 2 U.S. 2.",
+        )
+        opinion = OpinionWithParentsFactory()
+        OpinionsCitedByRECAPDocumentFactory(
+            citing_document=rd,
+            cited_opinion=opinion,
+            depth=1,
+        )
+        UnmatchedCitationFromRECAPDocument.objects.create(
+            citing_recapdocument=rd,
+            status=UnmatchedCitationFromRECAPDocument.NO_CITATION,
+            citation_string="2 U.S. 2",
+            court_id="",
+            volume="2",
+            reporter="U.S.",
+            page="2",
+            type=Citation.FEDERAL,
+        )
+
+        seal_documents(RECAPDocument.objects.filter(pk=rd.pk))
+
+        rd.refresh_from_db()
+        self.assertTrue(rd.is_sealed)
+        self.assertFalse(rd.cited_opinions.exists())
+        self.assertFalse(rd.unmatched_citations.exists())
+        # Only the linkage goes away; the cited opinion itself must stay.
+        self.assertTrue(Opinion.objects.filter(pk=opinion.pk).exists())
+        # With ES off, nothing should be queued up for it.
+        mock_update_es_document.delay.assert_not_called()
 
         # Clean up index.
         docket.delete()
