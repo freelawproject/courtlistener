@@ -1,7 +1,7 @@
 """Tests for sealing OpinionClusters and RECAPDocuments.
 
 Covers the OpinionCluster seal admin views/actions (cl.search.admin,
-cl.search.utils.delete_cluster_files) and the RECAPDocument seal_documents
+cl.search.deletion_utils.seal_cluster) and the RECAPDocument seal_documents
 admin action, including its propagation into Elasticsearch.
 """
 
@@ -16,6 +16,12 @@ from django.urls import reverse
 
 from cl.favorites.factories import NoteFactory, UserTagFactory
 from cl.search.admin import OpinionClusterAdmin, RECAPDocumentAdmin
+from cl.search.deletion_utils import (
+    check_blocking_relations,
+    get_blocking_relations,
+    get_deletion_blockers,
+    seal_cluster,
+)
 from cl.search.documents import ES_CHILD_ID, DocketDocument
 from cl.search.factories import (
     BankruptcyInformationFactory,
@@ -211,9 +217,7 @@ class OpinionClusterSealClustersActionTest(TestCase):
         )
 
         # Check blocking objects:
-        blocking_relations = clusters_admin.get_blocking_relations(
-            self.cluster_3
-        )
+        blocking_relations = get_blocking_relations(self.cluster_3)
 
         user_tag_qs = blocking_relations.get("favorites.UserTag")
         self.assertTrue(user_tag_qs.exists())
@@ -379,19 +383,18 @@ class OpinionClusterSealDocketBlockersTest(TestCase):
                 origin_docket=docket
             ),
         }
-        clusters_admin = OpinionClusterAdmin(OpinionCluster, admin.site)
         for key, build_blocker in blocker_builders.items():
             with self.subTest(blocker=key):
                 cluster = self.make_cluster()
                 docket = cluster.docket
                 build_blocker(docket)
 
-                blockers = clusters_admin.check_blocking_relations(cluster)
+                blockers = check_blocking_relations(cluster)
                 self.assertTrue(
                     blockers[key], f"{key} should block docket deletion."
                 )
-                cluster_blocked, docket_blocked = (
-                    clusters_admin.get_deletion_blockers(cluster)
+                cluster_blocked, docket_blocked = get_deletion_blockers(
+                    cluster
                 )
                 self.assertFalse(
                     cluster_blocked, f"{key} should not block the cluster."
@@ -400,9 +403,7 @@ class OpinionClusterSealDocketBlockersTest(TestCase):
                     docket_blocked, f"{key} should block the docket."
                 )
 
-                clusters_admin.seal_cluster(
-                    cluster, delete_docket=not docket_blocked
-                )
+                seal_cluster(cluster, delete_docket=not docket_blocked)
                 self.assertFalse(
                     OpinionCluster.objects.filter(pk=cluster.pk).exists(),
                     "Cluster should have been deleted.",
@@ -451,7 +452,7 @@ class OpinionClusterSealFileCleanupTest(TestCase):
     def setUpTestData(cls):
         cls.court = CourtFactory(id="ca10")
 
-    @mock.patch("cl.search.utils.invalidate_cloudfront")
+    @mock.patch("cl.search.deletion_utils.invalidate_cloudfront")
     def test_seal_cluster_deletes_files_and_invalidates_cdn(
         self, mock_invalidate_cloudfront
     ):
@@ -473,8 +474,7 @@ class OpinionClusterSealFileCleanupTest(TestCase):
         )
         OpinionFactory(cluster=cluster, local_path="opinions/opinion.pdf")
 
-        clusters_admin = OpinionClusterAdmin(OpinionCluster, admin.site)
-        clusters_admin.seal_cluster(cluster, delete_docket=True)
+        seal_cluster(cluster, delete_docket=True)
 
         self.assertFalse(
             OpinionCluster.objects.filter(pk=cluster.pk).exists(),
@@ -499,7 +499,7 @@ class OpinionClusterSealFileCleanupTest(TestCase):
             ],
         )
 
-    @mock.patch("cl.search.utils.invalidate_cloudfront")
+    @mock.patch("cl.search.deletion_utils.invalidate_cloudfront")
     def test_seal_cluster_with_no_files_invalidates_nothing(
         self, mock_invalidate_cloudfront
     ):
@@ -512,11 +512,10 @@ class OpinionClusterSealFileCleanupTest(TestCase):
             case_name="No Files v. Test",
             date_filed=datetime.date.today(),
         )
-        clusters_admin = OpinionClusterAdmin(OpinionCluster, admin.site)
-        clusters_admin.seal_cluster(cluster, delete_docket=True)
+        seal_cluster(cluster, delete_docket=True)
         mock_invalidate_cloudfront.assert_not_called()
 
-    @mock.patch("cl.search.utils.invalidate_cloudfront")
+    @mock.patch("cl.search.deletion_utils.invalidate_cloudfront")
     def test_seal_cluster_leaves_docket_file_when_docket_kept(
         self, mock_invalidate_cloudfront
     ):
@@ -531,8 +530,7 @@ class OpinionClusterSealFileCleanupTest(TestCase):
             case_name="Keep Docket v. Test",
             date_filed=datetime.date.today(),
         )
-        clusters_admin = OpinionClusterAdmin(OpinionCluster, admin.site)
-        clusters_admin.seal_cluster(cluster, delete_docket=False)
+        seal_cluster(cluster, delete_docket=False)
 
         docket.refresh_from_db()
         self.assertEqual(docket.filepath_local, "recap/docket.xml")
@@ -557,9 +555,9 @@ class RECAPDocumentSealActionESTest(
         self.site = admin.site
         super().setUp()
 
-    @mock.patch("cl.search.utils.time.sleep")
-    @mock.patch("cl.search.utils.delete_from_ia")
-    @mock.patch("cl.search.utils.invalidate_cloudfront")
+    @mock.patch("cl.search.deletion_utils.time.sleep")
+    @mock.patch("cl.search.deletion_utils.delete_from_ia")
+    @mock.patch("cl.search.deletion_utils.invalidate_cloudfront")
     def test_seal_documents_action(
         self, mock_invalidate_cloudfront, mock_delete_from_ia, mock_sleep
     ):

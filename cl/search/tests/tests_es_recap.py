@@ -7299,8 +7299,8 @@ class IndexDocketRECAPDocumentsCommandTest(
         child_count = len(article[0].xpath(".//h4"))
         self.assertEqual(2, child_count)
 
-    @mock.patch("cl.search.utils.delete_from_ia")
-    @mock.patch("cl.search.utils.invalidate_cloudfront")
+    @mock.patch("cl.search.deletion_utils.delete_from_ia")
+    @mock.patch("cl.search.deletion_utils.invalidate_cloudfront")
     def test_re_index_recap_documents_sealed(
         self, mock_delete_from_ia, mock_invalidate_cloudfront
     ):

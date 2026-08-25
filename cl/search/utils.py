@@ -1,24 +1,15 @@
-import time
 from datetime import UTC, datetime, timedelta
-from urllib import parse
 
-import botocore.exceptions
-import requests
 from cache_memoize import cache_memoize
-from django.conf import settings
 from django.contrib.auth.models import User
-from django.db.models import FileField, QuerySet, Sum, Value
+from django.db.models import Sum, Value
 from django.db.models.functions import Coalesce, Floor
 from django.utils.timezone import make_aware, now
-from requests import Response
 
 from cl.audio.models import Audio
 from cl.custom_filters.templatetags.text_filters import naturalduration
-from cl.lib.cloud_front import invalidate_cloudfront
-from cl.lib.decorators import retry
-from cl.lib.models import THUMBNAIL_STATUSES
 from cl.lib.redis_utils import get_redis_interface
-from cl.search.models import Opinion, OpinionCluster
+from cl.search.models import Opinion
 from cl.search.selectors import get_total_estimate_count
 from cl.stats.constants import StatMetric
 
@@ -115,134 +106,3 @@ def get_homepage_stats():
         "private": False,  # VERY IMPORTANT!
     }
     return homepage_data
-
-
-def delete_from_ia(url: str) -> Response:
-    """Delete an item from Internet Archive by URL
-
-    :param url: The URL of the item, for example,
-    https://archive.org/download/gov.uscourts.nyed.299029/gov.uscourts.nyed.299029.30.0.pdf
-    :return: The requests.Response of the request to IA.
-    """
-    # Get the path and drop the /download/ part of it to just get the bucket
-    # and the path
-    path = parse.urlparse(url).path
-    bucket_path = path.split("/", 2)[2]
-    storage_domain = "https://s3.us.archive.org"
-    return requests.delete(
-        f"{storage_domain}/{bucket_path}",
-        headers={
-            "Authorization": f"LOW {settings.IA_ACCESS_KEY}:{settings.IA_SECRET_KEY}",
-            "x-archive-cascade-delete": "1",
-        },
-        timeout=60,
-    )
-
-
-def seal_documents(queryset: QuerySet) -> list[str]:
-    """Delete a queryset of RECAPDocuments and mark them as sealed.
-
-    :param queryset: A queryset of RECAPDocuments you wish to seal.
-    :return: a list of URLs that did not succeed or an empty list if everything
-    worked well.
-    """
-    ia_failures = []
-    deleted_filepaths = []
-    for i, rd in enumerate(queryset):
-        if i > 0:
-            # Throttle deletions to avoid overloading archive.org.
-            time.sleep(1)
-
-        # Thumbnail
-        if rd.thumbnail:
-            deleted_filepaths.append(rd.thumbnail.name)
-            rd.thumbnail.delete()
-
-        # PDF
-        if rd.filepath_local:
-            deleted_filepaths.append(rd.filepath_local.name)
-            rd.filepath_local.delete()
-
-        # Internet Archive
-        if rd.filepath_ia:
-            url = rd.filepath_ia
-            r = delete_from_ia(url)
-            if not r.ok:
-                ia_failures.append(url)
-
-        # Clean up other fields and call save()
-        # Important to use save() to ensure these changes are updated in ES
-        rd.date_upload = None
-        rd.is_available = False
-        rd.is_sealed = True
-        rd.sha1 = ""
-        rd.page_count = None
-        rd.file_size = None
-        rd.ia_upload_failure_count = None
-        rd.filepath_ia = ""
-        rd.thumbnail_status = THUMBNAIL_STATUSES.NEEDED
-        rd.plain_text = ""
-        rd.ocr_status = None
-        rd.save()
-
-    # Do a CloudFront invalidation
-    invalidate_cloudfront([f"/{path}" for path in deleted_filepaths])
-
-    return ia_failures
-
-
-@retry(
-    (botocore.exceptions.HTTPClientError, botocore.exceptions.ConnectionError),
-    tries=3,
-    delay=1,
-    backoff=2,
-)
-def delete_cluster_files(cluster: OpinionCluster, delete_docket: bool) -> None:
-    """Delete the storage files for a cluster about to be sealed.
-
-    Unlike `seal_documents`, this doesn't flag anything as sealed or keep
-    the row around — it's meant to run immediately before the caller hard
-    deletes the cluster (and, if `delete_docket` is set, its docket), so the
-    PDFs and other files those rows point at in S3 don't end up orphaned.
-    Must be called before the rows are deleted: it reads `local_path` etc.
-    off live objects.
-
-    :param cluster: The OpinionCluster about to be deleted.
-    :param delete_docket: Whether the cluster's docket will be deleted too,
-        and so whether its file should be cleaned up as well.
-    :return: None
-    """
-    deleted_filepaths = []
-
-    for opinion in cluster.sub_opinions.all():
-        if not opinion.local_path:
-            continue
-        path = opinion.local_path.name
-        # save=False: the Opinion row is about to be deleted by the
-        # caller's cascade anyway, so there's no point writing this
-        # change back to a row that won't exist a moment later.
-        opinion.local_path.delete(save=False)
-        deleted_filepaths.append(path)
-
-    cluster_file_fields = [
-        field.name
-        for field in OpinionCluster._meta.get_fields()
-        if isinstance(field, FileField)
-    ]
-    for field_name in cluster_file_fields:
-        field_file = getattr(cluster, field_name)
-        if not field_file:
-            continue
-        path = field_file.name
-        field_file.delete(save=False)
-        deleted_filepaths.append(path)
-
-    if delete_docket and cluster.docket.filepath_local:
-        path = cluster.docket.filepath_local.name
-        cluster.docket.filepath_local.delete(save=False)
-        deleted_filepaths.append(path)
-
-    if not deleted_filepaths:
-        return
-
-    invalidate_cloudfront([f"/{path}" for path in deleted_filepaths])
