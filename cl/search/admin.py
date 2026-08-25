@@ -54,6 +54,7 @@ from cl.search.state.new_york.models import (
     NYCoADocument,
 )
 from cl.search.state.texas.models import TexasDocketEntry, TexasDocument
+from cl.search.utils import delete_cluster_files
 from cl.visualizations.models import SCOTUSMap
 
 
@@ -327,6 +328,11 @@ class OpinionClusterAdmin(IndexedPkSearchMixin, CursorPaginatorAdmin):
         """
         docket = cluster.docket
         cluster_pk = cluster.pk
+        # Must run before the delete() calls below: it reads the file
+        # fields off the live rows, and cleans them out of S3 and
+        # CloudFront so sealing doesn't leave the PDFs behind for anyone
+        # who already has the URL.
+        delete_cluster_files(cluster, delete_docket)
         with transaction.atomic():
             cluster.delete()
             ClusterRedirection.objects.create(

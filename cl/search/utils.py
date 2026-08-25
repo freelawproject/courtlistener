@@ -2,11 +2,12 @@ import time
 from datetime import UTC, datetime, timedelta
 from urllib import parse
 
+import botocore.exceptions
 import requests
 from cache_memoize import cache_memoize
 from django.conf import settings
 from django.contrib.auth.models import User
-from django.db.models import QuerySet, Sum, Value
+from django.db.models import FileField, QuerySet, Sum, Value
 from django.db.models.functions import Coalesce, Floor
 from django.utils.timezone import make_aware, now
 from requests import Response
@@ -14,9 +15,10 @@ from requests import Response
 from cl.audio.models import Audio
 from cl.custom_filters.templatetags.text_filters import naturalduration
 from cl.lib.cloud_front import invalidate_cloudfront
+from cl.lib.decorators import retry
 from cl.lib.models import THUMBNAIL_STATUSES
 from cl.lib.redis_utils import get_redis_interface
-from cl.search.models import Opinion
+from cl.search.models import Opinion, OpinionCluster
 from cl.search.selectors import get_total_estimate_count
 from cl.stats.constants import StatMetric
 
@@ -187,3 +189,60 @@ def seal_documents(queryset: QuerySet) -> list[str]:
     invalidate_cloudfront([f"/{path}" for path in deleted_filepaths])
 
     return ia_failures
+
+
+@retry(
+    (botocore.exceptions.HTTPClientError, botocore.exceptions.ConnectionError),
+    tries=3,
+    delay=1,
+    backoff=2,
+)
+def delete_cluster_files(cluster: OpinionCluster, delete_docket: bool) -> None:
+    """Delete the storage files for a cluster about to be sealed.
+
+    Unlike `seal_documents`, this doesn't flag anything as sealed or keep
+    the row around — it's meant to run immediately before the caller hard
+    deletes the cluster (and, if `delete_docket` is set, its docket), so the
+    PDFs and other files those rows point at in S3 don't end up orphaned.
+    Must be called before the rows are deleted: it reads `local_path` etc.
+    off live objects.
+
+    :param cluster: The OpinionCluster about to be deleted.
+    :param delete_docket: Whether the cluster's docket will be deleted too,
+        and so whether its file should be cleaned up as well.
+    :return: None
+    """
+    deleted_filepaths = []
+
+    for opinion in cluster.sub_opinions.all():
+        if not opinion.local_path:
+            continue
+        path = opinion.local_path.name
+        # save=False: the Opinion row is about to be deleted by the
+        # caller's cascade anyway, so there's no point writing this
+        # change back to a row that won't exist a moment later.
+        opinion.local_path.delete(save=False)
+        deleted_filepaths.append(path)
+
+    cluster_file_fields = [
+        field.name
+        for field in OpinionCluster._meta.get_fields()
+        if isinstance(field, FileField)
+    ]
+    for field_name in cluster_file_fields:
+        field_file = getattr(cluster, field_name)
+        if not field_file:
+            continue
+        path = field_file.name
+        field_file.delete(save=False)
+        deleted_filepaths.append(path)
+
+    if delete_docket and cluster.docket.filepath_local:
+        path = cluster.docket.filepath_local.name
+        cluster.docket.filepath_local.delete(save=False)
+        deleted_filepaths.append(path)
+
+    if not deleted_filepaths:
+        return
+
+    invalidate_cloudfront([f"/{path}" for path in deleted_filepaths])
