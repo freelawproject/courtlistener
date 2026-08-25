@@ -2,18 +2,16 @@ from http import HTTPStatus
 from typing import Any, cast
 from unittest.mock import MagicMock, patch
 
-from asgiref.sync import sync_to_async
 from django.contrib.auth.models import User
-from django.core.cache import cache
 from django.http import HttpResponse
 from django.test import override_settings
 from django.urls import reverse
 from lxml.html import fromstring
 from waffle.testutils import override_flag
 
-from cl.audio.factories import AudioWithParentsFactory
 from cl.lib.test_helpers import SimpleUserDataMixin
 from cl.simple_pages.forms import ContactForm
+from cl.simple_pages.sitemap import SimpleSitemap
 from cl.tests.cases import SimpleTestCase, TestCase
 
 
@@ -308,31 +306,34 @@ class PageLoadTestMixin(TestCase):
         return r
 
 
+class SimpleSitemapTest(TestCase):
+    def test_every_sitemap_entry_reverses(self) -> None:
+        """Does every sitemap entry point to a URL name that still exists?
+
+        Regression test for stale entries left behind when a page is
+        removed, like the old contribute page.
+        """
+        sitemap = SimpleSitemap()
+        for item in sitemap.items():
+            with self.subTest(view_name=item["view_name"]):
+                self.assertTrue(sitemap.location(item))
+
+        r = self.client.get(reverse("sitemaps", kwargs={"section": "simple"}))
+        self.assertEqual(r.status_code, HTTPStatus.OK)
+
+
 class SimplePagesTest(PageLoadTestMixin, SimpleUserDataMixin, TestCase):
     async def test_simple_pages(self) -> None:
         """Do all the simple pages load properly?"""
         reverse_params: list[dict[str, Any]] = [
-            # Coverage
-            {"viewname": "coverage"},
-            {"viewname": "coverage_fds"},
-            {"viewname": "coverage_recap"},
-            {"viewname": "coverage_oa"},
             # Info pages
-            {"viewname": "faq"},
-            {"viewname": "feeds_info"},
             {"viewname": "robots"},
             # Contact
             {"viewname": "contact"},
             {"viewname": "contact_thanks"},
             # Help pages
             {"viewname": "help_home"},
-            {"viewname": "alert_help"},
-            {"viewname": "delete_help"},
-            {"viewname": "markdown_help"},
-            {"viewname": "advanced_search"},
-            {"viewname": "recap_email_help"},
             {"viewname": "broken_email_help"},
-            {"viewname": "citegeist_help"},
             # Monitoring pages
             {"viewname": "celery_queue_lengths"},
             {"viewname": "heartbeat"},
@@ -368,16 +369,6 @@ class SimplePagesTest(PageLoadTestMixin, SimpleUserDataMixin, TestCase):
         for reverse_param in reverse_params:
             await self.assert_page_loads_ok(reverse_param)
 
-    async def test_oa_minute_count_in_the_coverage_page(self) -> None:
-        "is the minute count rounded in the coverage page?"
-        cache.delete("coverage-data-v3")
-        await sync_to_async(AudioWithParentsFactory)(duration=250)
-        r = await self.async_client.get(reverse("coverage"))
-        self.assertIn("4 minutes of recordings.", r.content.decode())
-        self.assertIn(
-            "with 4 minutes of recordings (and counting).", r.content.decode()
-        )
-
 
 @override_flag("use_new_design", True)
 @override_settings(WAFFLE_CACHE_PREFIX="test_v2_register_waffle")
@@ -392,16 +383,7 @@ class V2PagesRegisterTest(PageLoadTestMixin, SimpleUserDataMixin, TestCase):
     V2_PAGES: list[tuple[dict[str, Any], str]] = [
         # Help pages — (reverse_param, expected v2 template)
         ({"viewname": "help_home"}, "v2_help/index.html"),
-        ({"viewname": "coverage"}, "v2_help/coverage.html"),
-        ({"viewname": "coverage_fds"}, "v2_help/coverage_fds.html"),
-        ({"viewname": "coverage_oa"}, "v2_help/coverage_oa.html"),
-        ({"viewname": "coverage_recap"}, "v2_help/coverage_recap.html"),
-        ({"viewname": "alert_help"}, "v2_help/alert_help.html"),
-        ({"viewname": "tag_notes_help"}, "v2_help/tags_help.html"),
-        ({"viewname": "recap_email_help"}, "v2_help/recap_email_help.html"),
-        ({"viewname": "markdown_help"}, "v2_help/markdown_help.html"),
         # Info pages
-        ({"viewname": "citegeist_help"}, "v2_citegeist.html"),
         ({"viewname": "components"}, "v2_components.html"),
     ]
 
@@ -446,6 +428,8 @@ class SealingOrderDetectionTest(SimpleTestCase):
             "sealing",
             "sealed",
             "redacted",
+            "struck",
+            "stricken",
             "pseudonym",
             "anonymity",
             "press coverage",

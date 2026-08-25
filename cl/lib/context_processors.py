@@ -18,8 +18,14 @@ def inject_settings(request):
         "DOCKET_ALERT_RECAP_BONUS": settings.DOCKET_ALERT_RECAP_BONUS,
         "SEARCH_TYPES": SEARCH_TYPES,
         "WIKI_API_URL": settings.WIKI_API_BASE_URL,
+        "WIKI_HELP_URL": settings.WIKI_HELP_BASE_URL,
         "WIKI_TERMS_URL": settings.WIKI_TERMS_URL,
         "WIKI_REMOVAL_URL": settings.WIKI_REMOVAL_URL,
+        "WIKI_COVERAGE_URL": settings.WIKI_COVERAGE_URL,
+        "WIKI_COVERAGE_FDS_URL": settings.WIKI_COVERAGE_FDS_URL,
+        "WIKI_COVERAGE_OA_URL": settings.WIKI_COVERAGE_OA_URL,
+        "WIKI_COVERAGE_OPINIONS_URL": settings.WIKI_COVERAGE_OPINIONS_URL,
+        "WIKI_COVERAGE_RECAP_URL": settings.WIKI_COVERAGE_RECAP_URL,
     }
 
 
@@ -50,19 +56,11 @@ info_tips = (
     ),
     'The current design of CourtListener was <a href="https://free.law/2014/11/13/check-out-courtlisteners-new-paint-and-features/">created by a volunteer</a>.',
     # Neutral Citations
-    'WestLaw currently has a monopoly on citations. This hinders legal innovation but few courts have adopted <a href="{}#explain-neutral-citations">neutral citations</a>.'.format(
-        reverse("faq")
-    ),
+    'WestLaw currently has a monopoly on citations. This hinders legal innovation but few courts have adopted <a href="https://free.law/advocacy/neutral-citations">neutral citations</a>.',
     # Features
-    'You can <a href="{}">create an alert</a> for any query to receive an email if the query has new results.'.format(
-        reverse("alert_help")
-    ),
-    'There is an <a href="{}">RSS feed</a> for every query so you can easily stay up to date.'.format(
-        reverse("feeds_info")
-    ),
-    'You can make sophisticated queries using a number of <a href="{}">advanced search features</a>.'.format(
-        reverse("advanced_search")
-    ),
+    f'You can <a href="{settings.WIKI_HELP_BASE_URL}/alerts/search-alerts-for-case-law-and-filings">create an alert</a> for any query to receive an email if the query has new results.',
+    f'There is an <a href="{settings.WIKI_HELP_BASE_URL}/general/using-atom-and-rss-feeds-for-the-latest-updates">RSS feed</a> for every query so you can easily stay up to date.',
+    f'You can make sophisticated queries using a number of <a href="{settings.WIKI_HELP_BASE_URL}/search/advanced-search-and-query-techniques">advanced search features</a>.',
     'You can get an alert whenever an opinion is cited by <a href="https://free.law/2020/02/20/citation-alerts/">using a Citation Search</a>.',
     'We <a href="https://free.law/2016/02/22/viz/">partnered with University of Baltimore</a> to make a system of visualizing Supreme Court Cases.',
     'Information from the Supreme Court Database <a href="https://free.law/2016/09/06/legacy-scdb/">is available for nearly every SCOTUS case</a>, making it easy to get in-depth analysis.',
@@ -71,9 +69,7 @@ info_tips = (
         reverse("advanced_oa")
     ),
     f'CourtListener has an <a href="{settings.WIKI_API_BASE_URL}">API</a> so anybody can easily use our data.',
-    'Oral argument podcasts <a href="{}">are available wherever you get your podcasts</a>.'.format(
-        reverse("podcasts")
-    ),
+    f'Oral argument podcasts <a href="{settings.WIKI_HELP_BASE_URL}/general/custom-podcasts-of-oral-argument-audio-recordings">are available wherever you get your podcasts</a>.',
     "We have more than a million minutes of oral argument audio. More than anywhere else on the Internet.",
     # RECAP & PACER
     '<a href="https://free.law/recap/">RECAP</a> is our browser extension that saves you money whenever you use PACER.',
@@ -88,9 +84,7 @@ info_tips = (
     'Want to learn more about PACER? <a href="https://free.law/pacer-facts/">We have an extensive fact sheet</a>.',
     'You can <a href="https://free.law/recap/hacking-recap-links/">use the link to any RECAP PDF to pull up the docket</a>.',
     "We have more than 200 million pages of PACER documents searchable in the RECAP Archive.",
-    'You can <a href="{}">create an alert for any docket in the RECAP Archive</a>. Just press the "Get Alerts" button.'.format(
-        reverse("alert_help")
-    ),
+    f'You can <a href="{settings.WIKI_HELP_BASE_URL}/alerts/docket-alerts-for-pacer">create an alert for any docket in the RECAP Archive</a>. Just press the "Get Alerts" button.',
 )
 
 

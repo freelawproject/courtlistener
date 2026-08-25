@@ -140,7 +140,6 @@
             {% if user.is_authenticated %}
               <ul class="nav navbar-nav navbar-right">
                 <li><a href="https://free.law/about/">About</a></li>
-                <li><a href="{% url "faq" %}">FAQ</a></li>
                 <li class="dropdown">
                   <a href="#"
                      class="dropdown-toggle"
@@ -179,7 +178,6 @@
             {% else %}
               <ul class="nav navbar-nav navbar-right">
                 <li><a href="https://free.law/about/">About</a></li>
-                <li><a href="{% url "faq" %}">FAQ</a></li>
                 <li class="visible-xs">
                   <a href="https://free.law/membership/"
                     >Become a Member</a>
@@ -226,7 +224,7 @@
                     >Look Up Citations</a>
                 </li>
                 <li>
-                  <a href="{% url "coverage_opinions" %}">About this Collection</a>
+                  <a href="{{ WIKI_COVERAGE_OPINIONS_URL }}">About this Collection</a>
                 </li>
                 <li>
                   <a href="{{ WIKI_API_URL }}/rest/v4/case-law">API</a>
@@ -250,10 +248,10 @@
                     <a href="{% url "top_prayers" %}">Pray and Pay Project</a>
                   </li>
                 <li>
-                  <a href="{% url "alert_help" %}#recap-alerts">Get Case Alerts</a>
+                  <a href="{{ WIKI_HELP_URL }}/alerts/docket-alerts-for-pacer">Get Case Alerts</a>
                 </li>
                 <li>
-                  <a href="{% url "coverage_recap" %}">About this Collection</a>
+                  <a href="{{ WIKI_COVERAGE_RECAP_URL }}">About this Collection</a>
                 </li>
                 <li>
                   <a href="https://free.law/data-consulting/">Bulk Data Service</a>
@@ -273,13 +271,13 @@
                   <a href="{% url "advanced_oa" %}">Search Oral Arguments</a>
                 </li>
                 <li>
-                  <a href="{% url "alert_help" %}#search-alerts">Get Search Alerts</a>
+                  <a href="{{ WIKI_HELP_URL }}/alerts/search-alerts-for-case-law-and-filings">Get Search Alerts</a>
                 </li>
                 <li>
-                  <a href="{% url "podcasts" %}">Custom Podcasts</a>
+                  <a href="{{ WIKI_HELP_URL }}/general/custom-podcasts-of-oral-argument-audio-recordings">Custom Podcasts</a>
                 </li>
                 <li>
-                  <a href="{% url "coverage_oa" %}">About this Collection</a>
+                  <a href="{{ WIKI_COVERAGE_OA_URL }}">About this Collection</a>
                 </li>
                 <li>
                   <a href="{{ WIKI_API_URL }}/rest/v4/oral-arguments">API</a>
@@ -313,7 +311,7 @@
                   <a href="{% url "financial_disclosures_home" %}">Search Financial Disclosures</a>
                 </li>
                 <li>
-                  <a href="{% url "coverage_fds" %}">About this Collection</a>
+                  <a href="{{ WIKI_COVERAGE_FDS_URL }}">About this Collection</a>
                 </li>
                 <li>
                   <a href="{{ WIKI_API_URL }}/rest/v4/financial-disclosures">API</a>
@@ -378,7 +376,7 @@
               <a href="https://free.law/about/">About</a>
             </div>
             <div class="footer-item">
-              <a href="{% url "help_home" %}">Help</a> &amp; <a href="{% url "faq" %}">FAQ</a>
+              <a href="{% url "help_home" %}">Help</a>
             </div>
             <div class="footer-item">
               <a href="https://donate.free.law/forms/supportflp">Donate</a>
@@ -387,15 +385,15 @@
 
           <div class="col-sm-6 no-gutter">
             <div class="footer-item">
-              <a href="{% url "coverage" %}">About Our Data</a>
+              <a href="{{ WIKI_COVERAGE_URL }}">About Our Data</a>
             </div>
             <div class="footer-item">
               <a href="{{ WIKI_API_URL }}">APIs &amp; Bulk Data</a>
             </div>
             <div class="footer-item">
-              <a href="{% url "feeds_info" %}">Feeds</a> <span
+              <a href="{{ WIKI_HELP_URL }}/general/using-atom-and-rss-feeds-for-the-latest-updates">Feeds</a> <span
               class="alt">&amp;</span>
-              <a href="{% url "podcasts" %}">Podcasts</a>&nbsp;<i
+              <a href="{{ WIKI_HELP_URL }}/general/custom-podcasts-of-oral-argument-audio-recordings">Podcasts</a>&nbsp;<i
               class="gray fa fa-podcast inline"></i>
             </div>
           </div>
