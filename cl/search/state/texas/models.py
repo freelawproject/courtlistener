@@ -10,11 +10,13 @@ from cl.corpus_importer.state.texas.utils import is_missing_file_page
 from cl.lib.decorators import document_model
 from cl.lib.model_helpers import CSVExportMixin
 from cl.lib.models import AbstractDateTimeModel
+from cl.lib.types import NonEmptyTuple
+from cl.search.state.shared import (
+    AbstractStateDocument,
+    ProcessingError,
+)
 
 __all__ = ["TexasDocketEntry", "TexasDocument"]
-
-from cl.lib.types import NonEmptyTuple
-from cl.search.state.shared import AbstractStateDocument, ProcessingError
 
 logger = logging.getLogger(__name__)
 
@@ -134,3 +136,9 @@ class TexasDocument(AbstractDateTimeModel, AbstractStateDocument):
             models.Index(fields=["filepath_local"]),
         ]
         unique_together = [["docket_entry", "media_id"]]
+
+    def get_pdf_path(self, filename: str, thumbs: bool = False) -> str:
+        """Store TAMES documents under the shared state layout."""
+        return self.state_pdf_path(
+            "tx", self.docket_entry.docket.court_id, filename, thumbs
+        )

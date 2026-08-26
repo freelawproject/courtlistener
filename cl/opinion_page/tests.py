@@ -1,4 +1,3 @@
-# mypy: disable-error-code=attr-defined
 import asyncio
 import datetime
 import os
@@ -8,7 +7,7 @@ import threading
 from datetime import date
 from http import HTTPStatus
 from unittest import mock
-from unittest.mock import AsyncMock, MagicMock, PropertyMock
+from unittest.mock import AsyncMock, MagicMock, PropertyMock, patch
 from urllib.parse import parse_qs, urlencode, urlparse
 
 from asgiref.sync import async_to_sync, sync_to_async
@@ -37,6 +36,10 @@ from waffle.testutils import override_flag
 
 from cl.citations.utils import slugify_reporter
 from cl.favorites.models import GenericCount
+from cl.lib.file_validation import (
+    NOT_A_PDF_MESSAGE,
+    file_too_large_message,
+)
 from cl.lib.models import THUMBNAIL_STATUSES
 from cl.lib.redis_utils import get_redis_interface
 from cl.lib.storage import clobbering_get_name
@@ -1946,6 +1949,47 @@ class UploadPublication(TestCase):
                 "extensions are: pdf."
             ],
         )
+
+    def test_pdf_content_validation_failure(self, mock) -> None:
+        """Can we fail files that only claim to be PDFs?
+
+        The extension validator trusts the uploader's filename, so a file
+        with a .pdf extension has to be checked for a PDF header too.
+        """
+        disguised_png = SimpleUploadedFile(
+            "file.pdf", b"\x89PNG\r\n\x1a\n", content_type="application/pdf"
+        )
+        form = TennWorkCompClUploadForm(
+            self.work_comp_data,
+            pk="tennworkcompcl",
+            files={"pdf_upload": disguised_png},
+        )
+        form.fields["lead_author"].queryset = Person.objects.filter(
+            positions__court_id="tennworkcompcl"
+        )
+        self.assertFalse(form.is_valid(), form.errors)
+        self.assertEqual(form.errors["pdf_upload"], [NOT_A_PDF_MESSAGE])
+
+    def test_pdf_size_validation_failure(self, mock) -> None:
+        """Can we fail uploads that are over the size limit?
+
+        The limit is patched down rather than tested at its real value, so
+        that the test doesn't have to build a 500 MB file to trip it.
+        """
+        form = TennWorkCompClUploadForm(
+            self.work_comp_data,
+            pk="tennworkcompcl",
+            files={"pdf_upload": self.pdf},
+        )
+        form.fields["lead_author"].queryset = Person.objects.filter(
+            positions__court_id="tennworkcompcl"
+        )
+        with patch("cl.lib.file_validation.MAX_UPLOAD_SIZE", 10):
+            self.assertFalse(form.is_valid(), form.errors)
+            # Asserted under the patch: the message names the live limit.
+            self.assertEqual(
+                form.errors["pdf_upload"], [file_too_large_message()]
+            )
 
     def test_tn_wc_app_upload(self, mock) -> None:
         """Can we test appellate uploading?"""

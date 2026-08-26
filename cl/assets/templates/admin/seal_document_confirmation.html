@@ -1,5 +1,7 @@
 {% extends "admin/base_site.html" %}
 
+{% block bodyclass %}{{ block.super }} delete-confirmation{% endblock %}
+
 {% block content %}
   <h2>{{ heading }}</h2>
 
@@ -50,8 +52,8 @@
       </table>
 
       <br>
-      <input type="submit" value="Seal Selected Documents" class="default">
-      <a href="{{ cancel_url }}" style="margin-left: 10px;">Cancel</a>
+      <input type="submit" value="Seal Selected Documents">
+      <a role="button" href="{% url cancel_url_name object_pk %}" class="button cancel-link">Cancel</a>
     </form>
 
     <script nonce="{{ request.csp_nonce }}">
@@ -63,6 +65,6 @@
     </script>
   {% else %}
     <p>No documents found.</p>
-    <a href="{{ cancel_url }}">Go back</a>
+    <a href="{% url cancel_url_name object_pk %}">Go back</a>
   {% endif %}
 {% endblock %}
