@@ -272,6 +272,7 @@ ORDER BY docket.docket_number
 class NYCoACourtPassLoader(JKentScrapeLoader[NYCoACase]):
     """Loads a Court-PASS run into CourtListener."""
 
+    name = "nycoa"
     query = QUERY
     payload_column = "payload"
     scrape_model = NYCoACase
