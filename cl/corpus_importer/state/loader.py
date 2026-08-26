@@ -509,9 +509,7 @@ class JKentScrapeLoader[ScrapeType: BaseModel, ParamType = None](ABC):
         return dispatched
 
     def load(self) -> LoadReport:
-        """Dispatch every row to celery for merging + extraction.
-
-        """
+        """Dispatch every row to celery for merging + extraction."""
         report = self._dispatch_all()
         self.verify(report)
         return report
