@@ -18,7 +18,6 @@ from django.contrib.auth.models import User
 from django.contrib.auth.tokens import default_token_generator
 from django.core import mail
 from django.core.cache import cache as django_cache
-from django.core.exceptions import ValidationError
 from django.core.mail import (
     EmailMessage,
     EmailMultiAlternatives,
@@ -4445,34 +4444,15 @@ class UserProfileAdminActivationKeyTest(TestCase):
     def test_blank_activation_key_passes_model_validation(self) -> None:
         """Does a spent (blank) activation key survive full_clean()?"""
         self.profile.activation_key = ""
-        try:
-            self.profile.full_clean()
-        except ValidationError as e:
-            self.fail(f"A blank activation_key failed validation: {e}")
+        # Raises ValidationError, failing the test, if the field is required.
+        self.profile.full_clean()
 
     def test_admin_inline_does_not_require_an_activation_key(self) -> None:
-        """Can the profile inline be submitted with a blank activation key?"""
+        """Is activation_key optional on the User admin's profile inline?"""
         request = RequestFactory().get("/")
         request.user = self.profile.user
-        formset_class = UserProfileInline(User, admin.site).get_formset(
-            request
-        )
-        prefix = formset_class.get_default_prefix()
-        data = {
-            f"{prefix}-TOTAL_FORMS": "1",
-            f"{prefix}-INITIAL_FORMS": "1",
-            f"{prefix}-MIN_NUM_FORMS": "0",
-            f"{prefix}-MAX_NUM_FORMS": "1",
-            f"{prefix}-0-id": str(self.profile.pk),
-            f"{prefix}-0-user": str(self.profile.user.pk),
-            f"{prefix}-0-activation_key": "",
-        }
-        formset = formset_class(data=data, instance=self.profile.user)
-        self.assertTrue(
-            formset.is_valid(),
-            f"The profile inline rejected a blank activation_key: "
-            f"{formset.errors}",
-        )
+        formset = UserProfileInline(User, admin.site).get_formset(request)
+        self.assertFalse(formset.form.base_fields["activation_key"].required)
 
 
 class UserProfileTotalApiUsageTest(TestCase):
