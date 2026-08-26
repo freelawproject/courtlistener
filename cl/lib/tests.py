@@ -31,6 +31,7 @@ from cl.lib.file_validation import (
     validate_file_size,
 )
 from cl.lib.filesizes import convert_size_to_bytes
+from cl.lib.middleware import IncrementalNewTemplateMiddleware
 from cl.lib.mime_types import lookup_mime_type
 from cl.lib.model_helpers import (
     clean_docket_number,
@@ -85,7 +86,6 @@ from cl.search.factories import (
     OpinionClusterWithMultipleOpinionsFactory,
 )
 from cl.search.models import Court, Docket, Opinion, OpinionCluster
-from cl.lib.middleware import IncrementalNewTemplateMiddleware
 from cl.tests.cases import TestCase
 from cl.users.factories import UserFactory
 
