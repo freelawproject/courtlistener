@@ -1,12 +1,14 @@
 from datetime import timedelta
 
+from asgiref.sync import async_to_sync
+from django.db.models import Model
 from django.db.models.signals import post_delete, post_save
 from django.dispatch import receiver
 from django.utils.timezone import now
 
 from .models import Prayer, PrayerAvailability
 from .tasks import check_prayer_pacer
-from .utils import prayer_unavailable
+from .utils import NOTEABLE_MODELS, get_notes_for, prayer_unavailable
 
 
 @receiver(
@@ -74,3 +76,23 @@ def mark_document_accessible_after_prayer_availability_deletion(
 
     recap_document.is_sealed = False
     recap_document.save()
+
+
+def delete_orphaned_notes(sender, instance: Model, **kwargs):
+    """Delete a Note when the object it points to is deleted (#7725).
+
+    Only needed for the GenericForeignKey shape -- a legacy-shaped Note is
+    already cleaned up by that FK's own on_delete=CASCADE, since object_id
+    is a plain integer column with no DB-level FK constraint of its own.
+    """
+    async_to_sync(get_notes_for)(instance).delete()
+
+
+# One receiver per model in NOTEABLE_MODELS -- adding a model there is
+# enough to get its cleanup.
+for _model in NOTEABLE_MODELS:
+    post_delete.connect(
+        delete_orphaned_notes,
+        sender=_model,
+        dispatch_uid=f"favorites.delete_orphaned_notes.{_model._meta.label}",
+    )
