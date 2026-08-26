@@ -1,3 +1,4 @@
+import copy
 import json
 from datetime import date, datetime, timedelta
 from pathlib import Path
@@ -38,6 +39,11 @@ from pydantic import ValidationError
 from cl.alerts.factories import DocketAlertFactory
 from cl.alerts.models import DocketAlert
 from cl.audio.factories import AudioFactory
+from cl.corpus_importer.centralia_import import (
+    install_structured_opinion,
+    map_opinion_type,
+    should_install,
+)
 from cl.corpus_importer.court_regexes import match_court_string
 from cl.corpus_importer.factories import (
     CaseBodyFactory,
@@ -179,11 +185,13 @@ from cl.search.factories import (
     OpinionClusterWithChildrenAndParentsFactory,
     OpinionClusterWithMultipleOpinionsFactory,
     OpinionClusterWithParentsFactory,
+    OpinionFactory,
     OpinionWithChildrenFactory,
     OpinionWithParentsFactory,
     RECAPDocumentFactory,
 )
 from cl.search.models import (
+    PRECEDENTIAL_STATUS,
     SEARCH_TYPES,
     CaseTransfer,
     Citation,
@@ -6215,3 +6223,299 @@ class TamesMissingFileTest(SimpleTestCase):
         """Verify a normal HTML page is not flagged as missing."""
         normal_html = b"<html><body><p>Normal page content</p></body></html>"
         self.assertFalse(is_missing_file_page(normal_html))
+
+
+class CentraliaMapOpinionTypeTest(SimpleTestCase):
+    """Test mapping centralia writing types onto CL opinion types."""
+
+    def test_map_opinion_type(self):
+        """Do centralia types map to the right CL type and per_curiam?"""
+        test_cases = (
+            ("majority", Opinion.LEAD, False),
+            ("per-curiam", Opinion.LEAD, True),
+            ("concurrence", Opinion.CONCURRENCE, False),
+            ("concurrence-in-result", Opinion.CONCURRENCE, False),
+            (
+                "concurring-in-part-and-dissenting-in-part",
+                Opinion.CONCUR_IN_PART,
+                False,
+            ),
+            ("dissent", Opinion.DISSENT, False),
+            ("addendum", Opinion.ADDENDUM, False),
+            ("rehearing", Opinion.REHEARING, False),
+            # Papers centralia does not name are the court's own decision.
+            ("order", Opinion.LEAD, False),
+            ("something-new", Opinion.LEAD, False),
+            ("", Opinion.LEAD, False),
+        )
+        for centralia_type, expected_type, per_curiam in test_cases:
+            with self.subTest(centralia_type=centralia_type):
+                self.assertEqual(
+                    map_opinion_type(centralia_type),
+                    (expected_type, per_curiam),
+                )
+
+    def test_never_maps_to_combined(self):
+        """Is COMBINED never produced?
+
+        COMBINED means an import could not tell the writings apart, which
+        is precisely what centralia does tell us.
+        """
+        for centralia_type in ("majority", "order", "filing", "", "unknown"):
+            with self.subTest(centralia_type=centralia_type):
+                cl_type, _ = map_opinion_type(centralia_type)
+                self.assertNotEqual(cl_type, Opinion.COMBINED)
+
+
+class CentraliaShouldInstallTest(SimpleTestCase):
+    """Test the gate deciding whether a structured read is stored."""
+
+    @staticmethod
+    def make_payload(**overrides):
+        """Build a minimal installable payload, then apply overrides."""
+        payload = {
+            "status": "valid",
+            "cluster": {"doc_type": "opinion"},
+            "opinions": [
+                {"order": 1, "type": "majority", "html": "<p>Affirmed.</p>"}
+            ],
+            "headmatter": {"text": "COURT OF APPEALS"},
+            "diagnostics": {
+                "scan_pages": [],
+                "text_missing_pages": [],
+                "cid_pages": [],
+            },
+        }
+        payload.update(overrides)
+        return payload
+
+    def test_declines_bad_payloads(self):
+        """Are untrustworthy payloads declined?"""
+        opinion = Opinion(plain_text="Affirmed.")
+        test_cases = (
+            ("scanned status", {"status": "scanned"}),
+            ("failed status", {"status": "failed"}),
+            # A parse that left content unplaced or raised a warning. The
+            # flat text stands until a human has looked at it.
+            ("review status", {"status": "review"}),
+            (
+                "scan pages",
+                {
+                    "diagnostics": {
+                        "scan_pages": [2],
+                        "text_missing_pages": [],
+                        "cid_pages": [],
+                    }
+                },
+            ),
+            (
+                "textless pages",
+                {
+                    "diagnostics": {
+                        "scan_pages": [],
+                        "text_missing_pages": [3],
+                        "cid_pages": [],
+                    }
+                },
+            ),
+            (
+                "CID pages",
+                {
+                    "diagnostics": {
+                        "scan_pages": [],
+                        "text_missing_pages": [],
+                        "cid_pages": [1],
+                    }
+                },
+            ),
+            ("no writings", {"opinions": []}),
+            (
+                "html-less writings",
+                {"opinions": [{"order": 1, "type": "majority", "html": ""}]},
+            ),
+            (
+                "review-flavored writing html",
+                {
+                    "opinions": [
+                        {
+                            "order": 1,
+                            "type": "majority",
+                            "html": '<span class="chip">majority</span><p>Hi</p>',
+                        }
+                    ]
+                },
+            ),
+        )
+        for label, overrides in test_cases:
+            with self.subTest(label=label):
+                installable, reason = should_install(
+                    opinion, self.make_payload(**overrides)
+                )
+                self.assertFalse(installable, msg=reason)
+
+    def test_declines_partial_reads(self):
+        """Is a read that recovered too little text declined?"""
+        opinion = Opinion(plain_text="x" * 10_000)
+        installable, reason = should_install(opinion, self.make_payload())
+        self.assertFalse(installable)
+        self.assertIn("already extracted", reason)
+
+    def test_installs_a_clean_read(self):
+        """Does a complete read of a real opinion pass the gate?"""
+        opinion = Opinion(plain_text="Affirmed.")
+        installable, reason = should_install(opinion, self.make_payload())
+        self.assertTrue(installable, msg=reason)
+        self.assertEqual(reason, "status=valid")
+
+
+class CentraliaInstallTest(TestCase):
+    """Test installing a structured payload onto CL models."""
+
+    test_dir = (
+        Path(settings.INSTALL_ROOT) / "cl" / "corpus_importer" / "test_assets"
+    )
+
+    @classmethod
+    def setUpTestData(cls):
+        cls.court = CourtFactory(id="test", jurisdiction="F")
+        with open(cls.test_dir / "centralia_payload_multi.json") as f:
+            cls.multi_payload = json.load(f)
+        with open(cls.test_dir / "centralia_payload_single.json") as f:
+            cls.single_payload = json.load(f)
+
+    def setUp(self):
+        self.cluster = OpinionClusterFactory(
+            docket=DocketFactory(court=self.court),
+            date_filed=date(2024, 1, 1),
+        )
+        self.seed = OpinionFactory(
+            cluster=self.cluster,
+            type=Opinion.COMBINED,
+            plain_text="The judgment is affirmed.",
+            html="",
+            xml_harvard="<sentinel/>",
+            download_url="https://example.com/opinion.pdf",
+        )
+
+    def test_installs_a_multi_writing_payload(self):
+        """Are the cluster, docket, OCI and both writings installed?"""
+        pks = install_structured_opinion(self.seed, self.multi_payload)
+
+        self.cluster.refresh_from_db()
+        self.assertEqual(self.cluster.date_filed, date(2024, 5, 2))
+        self.assertEqual(self.cluster.judges, "WALKER, CARNEY, LEE")
+        self.assertEqual(
+            self.cluster.attorneys,
+            "Jane Roe, for Appellant. John Doe, for Appellee.",
+        )
+        self.assertEqual(self.cluster.disposition, "AFFIRMED.")
+        self.assertEqual(self.cluster.case_name_short, "Adidas")
+        self.assertEqual(
+            self.cluster.precedential_status, PRECEDENTIAL_STATUS.PUBLISHED
+        )
+        self.assertEqual(
+            self.cluster.headmatter,
+            self.multi_payload["headmatter"]["html_inline"],
+            msg="headmatter must be centralia's inline cover, verbatim",
+        )
+        self.assertEqual(
+            self.cluster.summary,
+            "<p>The court affirms.</p>\n<p>The injunction stands.</p>",
+        )
+
+        docket = self.cluster.docket
+        original_docket_number = docket.docket_number
+        docket.refresh_from_db()
+        # The scrape's own docket number stands. A consolidated record names
+        # only its first petition, so the payload's is not trusted here.
+        self.assertEqual(docket.docket_number, original_docket_number)
+        self.assertEqual(
+            docket.appeal_from_str,
+            "United States District Court for the Southern District of "
+            "New York",
+        )
+        self.assertEqual(docket.panel_str, "WALKER, CARNEY, LEE")
+        self.assertEqual(docket.date_argued, date(2024, 3, 3))
+        oci = docket.originating_court_information
+        self.assertIsNotNone(oci)
+        self.assertEqual(oci.docket_number, "1:21-cv-05615")
+        self.assertEqual(oci.assigned_to_str, "Jed S. Rakoff")
+
+        self.seed.refresh_from_db()
+        self.assertEqual(self.seed.type, Opinion.LEAD)
+        self.assertFalse(self.seed.per_curiam)
+        self.assertEqual(self.seed.author_str, "Walker")
+        self.assertEqual(self.seed.ordering_key, 1)
+        self.assertEqual(self.seed.html_with_citations, "")
+        self.assertTrue(
+            self.seed.html.startswith('<div class="centralia">'),
+            msg=self.seed.html[:80],
+        )
+        self.assertNotIn("<style", self.seed.html)
+        self.assertEqual(
+            self.seed.xml_harvard,
+            "<sentinel/>",
+            msg="xml_harvard must never be touched",
+        )
+
+        sibling = self.cluster.sub_opinions.exclude(pk=self.seed.pk).get()
+        self.assertEqual(sibling.type, Opinion.DISSENT)
+        self.assertEqual(sibling.author_str, "Lee")
+        self.assertEqual(sibling.ordering_key, 2)
+        self.assertEqual(sibling.download_url, self.seed.download_url)
+        self.assertEqual(pks, [self.seed.pk, sibling.pk])
+
+    def test_a_lone_writing_installs_as_the_lead(self):
+        """Does a single-writing paper become the lead opinion?
+
+        The seed arrives as COMBINED from the text pipeline, which could not
+        tell writings apart. Centralia can, so a paper holding exactly one
+        is that court's decision.
+        """
+        self.assertEqual(self.seed.type, Opinion.COMBINED)
+
+        pks = install_structured_opinion(self.seed, self.single_payload)
+
+        self.seed.refresh_from_db()
+        self.assertEqual(pks, [self.seed.pk])
+        self.assertEqual(self.seed.type, Opinion.LEAD)
+        self.assertTrue(self.seed.per_curiam)
+        self.assertEqual(self.cluster.sub_opinions.count(), 1)
+
+    def test_a_consolidated_record_keeps_the_scraped_docket(self):
+        """Is a multi-petition cover kept out of the docket's identity?
+
+        One PDF can cover several consolidated petitions -- centralia reports
+        the first caption's number and lists the rest in ``other_dockets``.
+        Nothing says which lower court belongs to which case, so neither the
+        docket number nor the originating court may be taken from it.
+        """
+        payload = copy.deepcopy(self.multi_payload)
+        payload["cluster"]["other_dockets"] = ["22-1235", "22-1236"]
+        scraped_docket_number = self.cluster.docket.docket_number
+
+        install_structured_opinion(self.seed, payload)
+
+        docket = self.cluster.docket
+        docket.refresh_from_db()
+        self.assertEqual(docket.docket_number, scraped_docket_number)
+        self.assertIsNone(docket.originating_court_information)
+        self.assertEqual(docket.appeal_from_str, "")
+
+    def test_reinstall_is_stable(self):
+        """Does re-running the install leave the cluster consistent?"""
+        install_structured_opinion(self.seed, self.multi_payload)
+        first_sibling = self.cluster.sub_opinions.exclude(
+            pk=self.seed.pk
+        ).get()
+        pks = install_structured_opinion(self.seed, self.multi_payload)
+
+        self.assertEqual(self.cluster.sub_opinions.count(), 2)
+        self.assertEqual(pks[0], self.seed.pk, msg="seed pk must be stable")
+        self.assertFalse(
+            Opinion.objects.filter(pk=first_sibling.pk).exists(),
+            msg="non-seed writings are regenerated each run",
+        )
+        cluster_headmatter = self.cluster.headmatter
+        self.cluster.refresh_from_db()
+        self.assertEqual(self.cluster.headmatter, cluster_headmatter)
