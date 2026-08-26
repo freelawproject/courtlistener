@@ -1,17 +1,22 @@
 import importlib
 import pkgutil
 import re
+from collections.abc import Iterator
+from pkgutil import ModuleInfo
 
 import juriscraper
+from juriscraper.AbstractSite import AbstractSite
 
 
-def walk_juriscraper():
+def walk_juriscraper() -> Iterator[ModuleInfo]:
     return pkgutil.walk_packages(
         juriscraper.__path__, f"{juriscraper.__name__}."
     )
 
 
-def get_scraper_object_by_name(court_id: str, juriscraper_module: str = ""):
+def get_scraper_object_by_name(
+    court_id: str, juriscraper_module: str = ""
+) -> AbstractSite | None:
     """Identify and instantiate a Site() object given the name of a court
 
     :param court_id: The ID of a site; must correspond with the name of a
@@ -20,7 +25,7 @@ def get_scraper_object_by_name(court_id: str, juriscraper_module: str = ""):
         there is more than 1 scraper for the same court id. For example,
         those on the united_states_backscrapers folders
     :return: An instantiated Site() object from the module requested
-    :rtype: juriscraper.AbstractSite.Site
+    :rtype: juriscraper.AbstractSite.AbstractSite
     """
     if juriscraper_module:
         if re.search(r"\.del$", juriscraper_module):
@@ -46,6 +51,7 @@ def get_scraper_object_by_name(court_id: str, juriscraper_module: str = ""):
                 # has been stripped off it. In any case, just ignore it when
                 # this happens.
                 continue
+    return None
 
 
 def get_module_by_court_id(court_id: str, module_type: str) -> str:

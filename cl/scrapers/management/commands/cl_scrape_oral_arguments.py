@@ -5,6 +5,7 @@ from asgiref.sync import async_to_sync, sync_to_async
 from django.core.files.base import ContentFile
 from django.db import transaction
 from django.utils.encoding import force_bytes
+from juriscraper.AbstractSite import AbstractSite
 from juriscraper.lib.string_utils import CaseNameTweaker
 
 from cl import settings
@@ -110,7 +111,7 @@ class Command(cl_scrape_opinions.Command):
         item,
         next_case_date: date | None,
         ocr_available: bool,
-        site,
+        site: AbstractSite,
         dup_checker: DupChecker,
         court: Court,
         backscrape: bool = False,
