@@ -268,6 +268,25 @@ class NoteTest(SimpleUserDataMixin, AudioTestCase):
         )
         self.assertEqual(form.initial["object_id"], self.opinion_cluster.pk)
 
+    def test_form_rejects_a_dangling_object_id(self) -> None:
+        """Unlike the legacy FKs (real ForeignKeys, validated by
+        ModelChoiceField), object_id is a plain integer -- nothing stops
+        it from naming a row that doesn't exist unless NoteForm.clean()
+        checks it explicitly.
+        """
+        content_type = ContentType.objects.get_for_model(self.opinion_cluster)
+        form = NoteForm(
+            data={
+                "content_type": content_type.pk,
+                "object_id": 999999999,
+                "name": "foo",
+                "notes": "bar",
+            }
+        )
+
+        self.assertFalse(form.is_valid())
+        self.assertIn("object_id", form.errors)
+
     def test_get_note_rejects_content_type_outside_noteable_models(
         self,
     ) -> None:

@@ -5,6 +5,7 @@ from asgiref.sync import sync_to_async
 from django import forms
 from django.contrib.auth.models import AnonymousUser, User
 from django.contrib.contenttypes.models import ContentType
+from django.core.exceptions import ObjectDoesNotExist
 from django.db import models
 from django.forms import ModelForm
 
@@ -58,6 +59,18 @@ class NoteForm(ModelForm):
             content_type, object_id = resolved
             self.initial["content_type"] = content_type.pk
             self.initial["object_id"] = object_id
+
+    def clean(self) -> dict[str, Any]:
+        """Confirm content_type/object_id resolve to a real row."""
+        cleaned_data = super().clean() or {}
+        content_type = cleaned_data.get("content_type")
+        object_id = cleaned_data.get("object_id")
+        if content_type and object_id is not None:
+            try:
+                content_type.get_object_for_this_type(pk=object_id)
+            except ObjectDoesNotExist:
+                self.add_error("object_id", "No such object exists.")
+        return cleaned_data
 
 
 async def get_note_form_for(
