@@ -2722,10 +2722,10 @@ class IncrementalNewTemplateMiddlewareTest(TestCase):
         return middleware.process_template_response(request, response)
 
     def test_template_without_a_v2_counterpart(self) -> None:
-        """Is a template left alone when no v2 version of it exists?
+        """Test if a legacy template is left alone when no v2 version of it exists.
 
-        base.html is a safe stand-in for any template awaiting redesign: the
-        new stack's base is new_base.html, so v2_base.html never exists.
+        We test against base.html: redesign is done on new_base.html, so
+        v2_base.html never exists.
         """
         response = self.process("base.html")
         self.assertEqual(response.template_name, "base.html")
