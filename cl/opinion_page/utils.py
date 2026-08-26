@@ -9,7 +9,6 @@ import waffle
 from asgiref.sync import sync_to_async
 from django.conf import settings
 from django.contrib.auth.models import AnonymousUser, User
-from django.core.exceptions import ObjectDoesNotExist
 from django.http import Http404, HttpRequest
 from django.shortcuts import aget_object_or_404  # type: ignore[attr-defined]
 from django.urls import reverse
@@ -23,8 +22,7 @@ from elasticsearch.exceptions import ApiError, ConnectionTimeout, RequestError
 
 from cl.alerts.models import DocketAlert
 from cl.custom_filters.templatetags.text_filters import best_case_name
-from cl.favorites.forms import NoteForm
-from cl.favorites.models import Note
+from cl.favorites.forms import NoteForm, get_note_form_for
 from cl.lib.bot_detector import is_bot
 from cl.lib.elasticsearch_utils import (
     build_cardinality_count,
@@ -35,8 +33,8 @@ from cl.lib.s3_cache import get_s3_cache, make_s3_cache_key
 from cl.lib.string_utils import trunc
 from cl.lib.types import CleanData
 from cl.opinion_page.docket_sources_utils import (
-    DocketEntrySource,
     SCOTUS_SOURCE,
+    DocketEntrySource,
     MetadataItem,
     MetadataSection,
     build_scotus_metadata,
@@ -572,21 +570,11 @@ async def core_docket_data(
 
     title = make_docket_title(docket)
 
-    try:
-        note = await Note.objects.aget(
-            docket_id=docket.pk,
-            user=await request.auser(),  # type: ignore[attr-defined]
-        )
-    except (ObjectDoesNotExist, TypeError):
-        # Not saved in notes or anonymous user
-        note_form = NoteForm(
-            initial={
-                "docket_id": docket.pk,
-                "name": trunc(best_case_name(docket), 100, ellipsis="..."),
-            }
-        )
-    else:
-        note_form = NoteForm(instance=note)
+    note_form = await get_note_form_for(
+        docket,
+        await request.auser(),  # type: ignore[arg-type]
+        trunc(best_case_name(docket), 100, ellipsis="..."),
+    )
 
     has_alert = await user_has_alert(await request.auser(), docket)  # type: ignore[arg-type]
 

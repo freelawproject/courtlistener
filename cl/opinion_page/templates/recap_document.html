@@ -51,7 +51,7 @@
         {% include "includes/rd_admin_tools.html" with d=rd.docket_entry.docket de=rd.docket_entry admin_url_names=admin_url_names admin_perm_names=admin_perm_names admin_document_label=admin_document_label %}
 
         {# show this div if there is a note, otherwise, put it in place, in anticipation of it becoming one. #}
-        <div class="{% if not note_form.instance.recap_doc_id %}hidden{% endif %} sidebar-section"
+        <div class="{% if not note_form.instance.pk %}hidden{% endif %} sidebar-section"
              id="sidebar-notes">
             <div>
                 <h3 class="inline"><span>Your Notes</span></h3>

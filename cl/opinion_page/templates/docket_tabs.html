@@ -92,7 +92,7 @@
 
     {% if docket.pacer_docket_url or docket_entries %}
       <div class="v-offset-above-2">
-        {% include "includes/add_note_button.html" with form_instance_id=note_form.instance.docket_id %}
+        {% include "includes/add_note_button.html" with form_instance_id=note_form.instance.pk %}
         <div class="btn-group"
              id="react-root"
              data-docket="{{ docket.id }}"
