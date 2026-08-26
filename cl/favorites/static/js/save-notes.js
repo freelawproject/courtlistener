@@ -17,20 +17,16 @@ $(function () {
   $('#saveNote').on("click", function () {
     // validate and process form here
     let note_id = $('#modal-save-note').data('id'),
-      cluster_id = $('input#id_cluster_id').val(),
-      audio_id = $('input#id_audio_id').val(),
-      docket_id = $('input#id_docket_id').val(),
-      recap_doc_id = $('input#id_recap_doc_id').val(),
+      content_type = $('input#id_content_type').val(),
+      object_id = $('input#id_object_id').val(),
       name = $('input#save-note-name-field').val(),
       notes = $('textarea#save-note-notes-field').val();
     $.ajax({
       method: 'POST',
       url: '/notes/create-or-update/',
       data: {
-        cluster_id: cluster_id,
-        audio_id: audio_id,
-        docket_id: docket_id,
-        recap_doc_id: recap_doc_id,
+        content_type: content_type,
+        object_id: object_id,
         notes: notes,
         name: name
       },
@@ -70,12 +66,9 @@ $(function () {
     // Send a post that deletes the note from the DB, and if successful
     // remove the notes from the sidebar; toggle the star icon.
     var note_id = $('#modal-save-note').data('id'),
-      cluster_id = $('input#id_cluster_id').val(),
-      audio_id = $('input#id_audio_id').val(),
-      docket_id = $('input#id_docket_id').val(),
-      recap_doc_id = $('input#id_recap_doc_id').val(),
-      dataString = `&cluster_id=${cluster_id}&audio_id=${audio_id}` +
-        `&docket_id=${docket_id}&recap_doc_id=${recap_doc_id}`;
+      content_type = $('input#id_content_type').val(),
+      object_id = $('input#id_object_id').val(),
+      dataString = `&content_type=${content_type}&object_id=${object_id}`;
     $.ajax({
       type: 'POST',
       url: '/notes/delete/',

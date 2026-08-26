@@ -1,6 +1,7 @@
 from typing import Any
 
 from admin_cursor_paginator import CursorPaginatorAdmin
+from asgiref.sync import async_to_sync
 from django.contrib import admin, messages
 from django.core.exceptions import PermissionDenied
 from django.db import transaction
@@ -11,6 +12,8 @@ from django.urls import path, reverse
 from django.utils.html import format_html
 
 from cl.alerts.models import DocketAlert
+from cl.favorites.models import Note
+from cl.favorites.utils import get_notes_for
 from cl.lib.admin import (
     AdminLinkConfig,
     IndexedPkSearchMixin,
@@ -112,6 +115,21 @@ class CitationInline(admin.TabularInline):
     extra = 1
 
 
+def _note_blockers_for_cluster(cluster: OpinionCluster) -> QuerySet[Note]:
+    """Notes blocking cluster/docket deletion, dual-read aware (#7725).
+
+    Checks both the cluster and its docket -- a Note can be attached to
+    either. Replaces .note_set, which is blind to Notes in the new
+    content_type/object_id shape.
+
+    :param cluster: The OpinionCluster being considered for sealing.
+    :return: A queryset of Notes attached to the cluster or its docket.
+    """
+    return async_to_sync(get_notes_for)(cluster).union(
+        async_to_sync(get_notes_for)(cluster.docket)
+    )
+
+
 @admin.register(OpinionCluster)
 class OpinionClusterAdmin(IndexedPkSearchMixin, CursorPaginatorAdmin):
     change_form_template = "admin/change_form_with_custom_links.html"
@@ -167,9 +185,7 @@ class OpinionClusterAdmin(IndexedPkSearchMixin, CursorPaginatorAdmin):
     SEAL_BLOCKERS_MAP = {
         # These prevent cluster deletion
         "favorites.UserTag": lambda cluster: cluster.docket.user_tags,
-        "favorites.Note": lambda cluster: cluster.docket.note_set.all().union(
-            cluster.note_set.all()
-        ),
+        "favorites.Note": _note_blockers_for_cluster,
         "alerts.DocketAlert": lambda cluster: cluster.docket.alerts,
         "visualizations.SCOTUSMap": lambda cluster: SCOTUSMap.objects.filter(
             Q(cluster_start=cluster)

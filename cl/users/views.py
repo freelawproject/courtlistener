@@ -13,7 +13,7 @@ from django.contrib.auth.views import PasswordResetView
 from django.core.exceptions import SuspiciousOperation, ValidationError
 from django.core.mail import send_mail
 from django.core.validators import validate_email
-from django.db import IntegrityError, transaction
+from django.db import IntegrityError, models, transaction
 from django.db.models import F
 from django.http import (
     HttpRequest,
@@ -52,6 +52,7 @@ from cl.api.utils import (
 from cl.api.views import parse_throttle_rate_for_template
 from cl.custom_filters.decorators import check_honeypot
 from cl.favorites.forms import NoteForm
+from cl.favorites.utils import NOTEABLE_MODELS, get_noted_object
 from cl.lib.crypto import generate_activation_key
 from cl.lib.ratelimiter import (
     ratelimiter_all_2_per_m,
@@ -60,7 +61,7 @@ from cl.lib.ratelimiter import (
 )
 from cl.lib.types import AuthenticatedHttpRequest, EmailType
 from cl.lib.url_utils import get_redirect_or_abort
-from cl.search.models import SEARCH_TYPES
+from cl.search.models import SEARCH_TYPES, RECAPDocument
 from cl.simple_pages.tasks import create_zoho_desk_ticket
 from cl.stats.metrics import accounts_deleted_total
 from cl.users.forms import (
@@ -181,49 +182,48 @@ def view_docket_alerts(request: AuthenticatedHttpRequest) -> HttpResponse:
 @login_required
 @never_cache
 def view_notes(request: AuthenticatedHttpRequest) -> HttpResponse:
+    """Show the logged-in user's notes, grouped by the kind of object
+    each is attached to (docket, opinion, oral argument, or RECAP
+    document).
+    """
     notes = request.user.notes.all().order_by("pk")
-    note_forms = OrderedDict()
-    note_forms["Dockets"] = []
-    note_forms["RECAP Documents"] = []
-    note_forms["Opinions"] = []
-    note_forms["Oral Arguments"] = []
+    note_forms: OrderedDict[str, list[tuple[NoteForm, models.Model]]] = (
+        OrderedDict((label, []) for label in NOTEABLE_MODELS.values())
+    )
     for note in notes:
-        if note.cluster_id:
-            key = "Opinions"
-        elif note.audio_id:
-            key = "Oral Arguments"
-        elif note.recap_doc_id:
-            key = "RECAP Documents"
-        elif note.docket_id:
-            key = "Dockets"
-        note_forms[key].append(NoteForm(instance=note))
+        target = get_noted_object(note)
+        if target is None:
+            continue
+        bucket = NOTEABLE_MODELS.get(type(target))
+        if bucket is None:
+            continue
+        # Carried alongside the form so the template can build a link/
+        # icon without knowing which storage shape this Note is in.
+        note_forms[bucket].append((NoteForm(instance=note), target))
     docket_search_url = (
         "/?type=r&q=xxx AND docket_id:("
-        + " OR ".join(
-            str(a.instance.docket_id.pk) for a in note_forms["Dockets"]
-        )
+        + " OR ".join(str(target.pk) for _, target in note_forms["Dockets"])
         + ")"
     )
     oral_search_url = (
         "/?type=oa&q=xxx AND id:("
         + " OR ".join(
-            str(a.instance.audio_id.pk) for a in note_forms["Oral Arguments"]
+            str(target.pk) for _, target in note_forms["Oral Arguments"]
         )
         + ")"
     )
     recap_search_url = (
         "/?type=r&q=xxx AND docket_entry_id:("
         + " OR ".join(
-            str(a.instance.recap_doc_id.pk)
-            for a in note_forms["RECAP Documents"]
+            str(target.pk)
+            for _, target in note_forms["Documents"]
+            if isinstance(target, RECAPDocument)
         )
         + ")"
     )
     opinion_search_url = (
         "/?q=xxx AND cluster_id:("
-        + " OR ".join(
-            str(a.instance.cluster_id.pk) for a in note_forms["Opinions"]
-        )
+        + " OR ".join(str(target.pk) for _, target in note_forms["Opinions"])
         + ")&stat_Precedential=on&stat_Non-Precedential=on&stat_Errata=on&stat_Separate%20Opinion=on&stat_In-chambers=on&stat_Relating-to%20orders=on&stat_Unknown%20Status=on"
     )
     return TemplateResponse(

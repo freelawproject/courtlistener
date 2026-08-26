@@ -51,8 +51,7 @@ from cl.citations.utils import (
 )
 from cl.custom_filters.templatetags.text_filters import best_case_name
 from cl.favorites.decorators import track_view_counter
-from cl.favorites.forms import NoteForm
-from cl.favorites.models import Note
+from cl.favorites.forms import get_note_form_for
 from cl.favorites.utils import (
     get_existing_prayers_in_bulk,
     get_prayer_counts_in_bulk,
@@ -777,21 +776,11 @@ async def recap_document_context(
         )
         await rd.arefresh_from_db(fields=["thumbnail_status", "thumbnail"])
 
-    try:
-        note = await Note.objects.aget(
-            recap_doc_id=rd.pk,
-            user=await request.auser(),  # type: ignore[attr-defined]
-        )
-    except (ObjectDoesNotExist, TypeError):
-        # Not saved in notes or anonymous user
-        note_form = NoteForm(
-            initial={
-                "recap_doc_id": rd.pk,
-                "name": trunc(title, 100, ellipsis="..."),
-            }
-        )
-    else:
-        note_form = NoteForm(instance=note)
+    note_form = await get_note_form_for(
+        rd,
+        await request.auser(),  # type: ignore[attr-defined]
+        trunc(title, 100, ellipsis="..."),
+    )
 
     # Override the og:url if we're serving a request to an OG crawler bot
     og_file_path_override = f"/{rd.filepath_local}" if is_og_bot else None
@@ -985,22 +974,11 @@ async def setup_opinion_context(
 
     get_string = make_get_string(request)
 
-    try:
-        note = await Note.objects.aget(
-            cluster_id=cluster.pk,
-            user=await request.auser(),  # type: ignore[attr-defined]
-            # type: ignore[attr-defined]
-        )
-    except (ObjectDoesNotExist, TypeError):
-        # Not note or anonymous user
-        note_form = NoteForm(
-            initial={
-                "cluster_id": cluster.pk,
-                "name": trunc(best_case_name(cluster), 100, ellipsis="..."),
-            }
-        )
-    else:
-        note_form = NoteForm(instance=note)
+    note_form = await get_note_form_for(
+        cluster,
+        await request.auser(),  # type: ignore[attr-defined]
+        trunc(best_case_name(cluster), 100, ellipsis="..."),
+    )
 
     # Identify opinions updated/added in partnership with v|lex for 3 years
     three_years_ago = (
