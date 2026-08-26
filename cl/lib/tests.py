@@ -10,9 +10,11 @@ from django.core.cache import cache
 from django.core.exceptions import ValidationError
 from django.core.files.base import ContentFile
 from django.core.files.uploadedfile import SimpleUploadedFile
+from django.template.response import TemplateResponse
 from django.test import RequestFactory, SimpleTestCase, override_settings
 from django.utils.functional import SimpleLazyObject
 from requests.cookies import RequestsCookieJar
+from waffle.testutils import override_flag
 
 from cl.lib.courts import (
     get_active_court_from_cache,
@@ -83,6 +85,7 @@ from cl.search.factories import (
     OpinionClusterWithMultipleOpinionsFactory,
 )
 from cl.search.models import Court, Docket, Opinion, OpinionCluster
+from cl.lib.middleware import IncrementalNewTemplateMiddleware
 from cl.tests.cases import TestCase
 from cl.users.factories import UserFactory
 
@@ -2704,3 +2707,25 @@ class TieredCacheTest(SimpleTestCase):
         result3 = greet("Alice", greeting="Hello")
         self.assertEqual(result3, "Hello, Alice!")
         self.assertEqual(self.call_count, 2)  # Cached
+
+
+@override_flag("use_new_design", True)
+@override_settings(WAFFLE_CACHE_PREFIX="test_incremental_template_waffle")
+class IncrementalNewTemplateMiddlewareTest(TestCase):
+    """Template swapping for pages that are mid-redesign."""
+
+    def process(self, template_name: str) -> TemplateResponse:
+        """Runs an unrendered TemplateResponse through the middleware."""
+        middleware = IncrementalNewTemplateMiddleware(lambda request: None)
+        request = RequestFactory().get("/")
+        response = TemplateResponse(request, template_name, {})
+        return middleware.process_template_response(request, response)
+
+    def test_template_without_a_v2_counterpart(self) -> None:
+        """Is a template left alone when no v2 version of it exists?
+
+        base.html is a safe stand-in for any template awaiting redesign: the
+        new stack's base is new_base.html, so v2_base.html never exists.
+        """
+        response = self.process("base.html")
+        self.assertEqual(response.template_name, "base.html")
