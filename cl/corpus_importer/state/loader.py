@@ -180,7 +180,7 @@ class JKentScrapeLoader[ScrapeType: BaseModel, ParamType = None](ABC):
         """Turn one row into a scrape, or say why it did not become one."""
         try:
             payload = json.loads(row[self.payload_column])
-        except json.JSONDecodeError as error:
+        except (json.JSONDecodeError, TypeError) as error:
             logger.error(
                 "Could not decode %s from %s: %s",
                 self.payload_column,
