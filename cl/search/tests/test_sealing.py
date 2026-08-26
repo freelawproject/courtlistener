@@ -14,6 +14,9 @@ from django.core.exceptions import PermissionDenied
 from django.test import Client, RequestFactory
 from django.urls import reverse
 
+from cl.citations.factories import (
+    UnmatchedCitationFromRECAPDocumentFactory,
+)
 from cl.favorites.factories import NoteFactory, UserTagFactory
 from cl.search.admin import OpinionClusterAdmin, RECAPDocumentAdmin
 from cl.search.deletion_utils import (
