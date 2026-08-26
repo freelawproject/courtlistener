@@ -6,6 +6,7 @@ with its own HTML, and the cover page as portable inline-styled markup.
 """
 
 import logging
+import re
 from datetime import date
 
 from asgiref.sync import async_to_sync
@@ -19,6 +20,7 @@ from cl.search.models import (
     Docket,
     Opinion,
     OriginatingCourtInformation,
+    RECAPDocument,
 )
 
 logger = logging.getLogger(__name__)
@@ -49,21 +51,27 @@ PRECEDENTIAL_STATUS_MAP = {
 }
 
 
-def get_structured_opinion(opinion: Opinion) -> dict | None:
-    """Ask doctor for a structured extraction of an opinion's PDF.
+def get_structured_read(
+    item: Opinion | RECAPDocument, court_id: str
+) -> dict | None:
+    """Ask doctor for a structured extraction of a stored PDF.
 
     The endpoint self-gates: a court centralia has no reader for answers
-    UNKNOWN_COURT or COURT_NOT_RELEASED, so callers need no allowlist.
+    UNKNOWN_COURT, and one it has not finished reviewing answers
+    COURT_NOT_RELEASED, so callers need no allowlist of their own.
 
-    :param opinion: The opinion to read.
+    :param item: The record whose stored file should be read. Any model
+        carrying a PDF works -- an ``Opinion`` from a court's own website or
+        a ``RECAPDocument`` from PACER.
+    :param court_id: The court that issued it. Passed explicitly because
+        the two models reach their court by different paths.
     :return: Doctor's payload, or None when the court is not supported or
         the call failed.
     """
-    court_id = opinion.cluster.docket.court_id
     try:
         response = async_to_sync(microservice)(
             service="opinion-structured",
-            item=opinion,
+            item=item,
             data={"court_id": court_id},
         )
     except HTTPError:
@@ -85,13 +93,142 @@ def get_structured_opinion(opinion: Opinion) -> dict | None:
                 "Error from opinion-structured microservice: %s",
                 response.status_code,
                 extra=dict(
-                    opinion_id=opinion.pk,
+                    item_id=item.pk,
                     court_id=court_id,
                     fingerprint=[f"{court_id}-opinion-structured-failure"],
                 ),
             )
         return None
     return response.json()
+
+
+def get_structured_opinion(opinion: Opinion) -> dict | None:
+    """Ask doctor for a structured extraction of an opinion's PDF.
+
+    :param opinion: The opinion to read.
+    :return: Doctor's payload, or None when the court is not supported or
+        the call failed.
+    """
+    return get_structured_read(opinion, opinion.cluster.docket.court_id)
+
+
+def read_recap_caption(
+    rd: RECAPDocument, court_id: str
+) -> tuple[str | None, bool, str]:
+    """Read the case name a PACER document prints on its own cover.
+
+    PACER names a docket after the first defendant, so a docket's case name
+    can name a different party than the paper is about -- an opinion "as to"
+    a co-defendant -- and it is never the fuller caption the court itself
+    printed. Centralia reads that caption off the page.
+
+    Two different answers come back when it cannot. A pre-printed form is
+    not the court's writing at all: its words belong to the Administrative
+    Office, its blanks parse as party names, and every quality measure reads
+    clean because there is no prose in it to be wrong about -- so the caller
+    should ingest nothing. Anything else (a court centralia has not
+    released, a scan, a read left for review) simply means no caption is
+    available here, and the caller's own naming stands.
+
+    :param rd: The PACER document to read.
+    :param court_id: The court that issued it.
+    :return: A 3-tuple of the caption (None when unavailable), whether the
+        paper is rote and should not be ingested at all, and the reason.
+    """
+    payload = get_structured_read(rd, court_id)
+    if payload is None:
+        return None, False, "no structured read"
+
+    diagnostics = payload.get("diagnostics") or {}
+    if diagnostics.get("is_form"):
+        return None, True, f"form={payload.get('form') or 'unnamed'}"
+
+    status = payload.get("status") or ""
+    if status != INSTALLABLE_STATUS:
+        return None, False, f"status={status}"
+
+    name = ((payload.get("cluster") or {}).get("case_name") or "").strip()
+    if not name:
+        return None, False, "no case name on the cover"
+    return name, False, "ok"
+
+
+# Words that carry no identity in a caption, so they never make two names
+# match: the government's own styling, procedural noise, and party roles.
+_CAPTION_NOISE = frozenset(
+    {
+        "united",
+        "states",
+        "state",
+        "of",
+        "america",
+        "usa",
+        "et",
+        "al",
+        "and",
+        "the",
+        "in",
+        "re",
+        "matter",
+        "petitioner",
+        "petitioners",
+        "respondent",
+        "respondents",
+        "plaintiff",
+        "plaintiffs",
+        "defendant",
+        "defendants",
+        "appellant",
+        "appellants",
+        "appellee",
+        "appellees",
+        "jr",
+        "sr",
+        "ii",
+        "iii",
+        "iv",
+    }
+)
+
+
+def _identifying_words(name: str) -> set[str]:
+    """The words in a case name that actually identify a party.
+
+    Drops the government's styling, party roles and generation suffixes, and
+    the defendant numbers PACER prints ("(4)"), leaving surnames and the
+    distinctive words of an entity's name.
+
+    :param name: A case name, in any casing.
+    :return: The lowercased identifying words.
+    """
+    lowered = re.sub(r"\bvs?\.?\b", " ", (name or "").lower())
+    words = re.findall(r"[a-z][a-z'-]+", lowered)
+    return {w for w in words if w not in _CAPTION_NOISE and len(w) > 1}
+
+
+def same_case(docket_name: str, caption: str) -> bool:
+    """Whether a docket's case name and a printed caption name one case.
+
+    PACER's docket name is a short form of the same case far more often than
+    it is the wrong one: "United States v. Canaca" against a cover reading
+    "UNITED STATES OF AMERICA v. EDIMAR DABLADO CANACA" is one defendant
+    written two ways. But a criminal docket is named for its first defendant,
+    so "United States v. HARRISON" against "UNITED STATES OF AMERICA v.
+    TYISHA SOMERVILLE" is a paper about somebody else in the same
+    prosecution.
+
+    Decided on shared identifying words rather than string equality, since
+    the caption is almost always the fuller of the two.
+
+    :param docket_name: The case name PACER gave the docket.
+    :param caption: The caption centralia read off the page.
+    :return: True when the two name the same party.
+    """
+    docket_words = _identifying_words(docket_name)
+    caption_words = _identifying_words(caption)
+    if not docket_words or not caption_words:
+        return False
+    return bool(docket_words & caption_words)
 
 
 def map_opinion_type(centralia_type: str) -> tuple[str, bool]:
