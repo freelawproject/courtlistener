@@ -20,6 +20,7 @@ from cl.corpus_importer.state.new_york.factories import (
     NYCoAPartyFactory,
 )
 from cl.corpus_importer.state.new_york.mergers import NYCoADocketMerger
+from cl.corpus_importer.state.new_york.nycourts_gov import NYCoACase
 from cl.corpus_importer.state.tests import merger_test
 from cl.corpus_importer.state.utils import MergeResult
 from cl.people_db.models import Attorney, Party, PartyType, Role
@@ -820,7 +821,7 @@ class NYCoADocumentMergerTest(NYCoAMergerTestCase):
     """Tests for merging the files published for a filing."""
 
     @staticmethod
-    def case_with_files(*files, **filing_kwargs) -> "NYCoACaseFactory":
+    def case_with_files(*files, **filing_kwargs) -> NYCoACase:
         filing = NYCoAFilingFactory.create(
             attachments=list(files), **filing_kwargs
         )
