@@ -23,7 +23,14 @@ from juriscraper.state.new_york.nycourts_gov.vocabularies import (
     IssueCategory,
 )
 
+from cl.corpus_importer.state.ledger import PARTS as LEDGER_PARTS
+from cl.corpus_importer.state.loader import (
+    ExtractionReport,
+    LoadPhase,
+    WaitOutcome,
+)
 from cl.corpus_importer.state.new_york.loader import NYCoACourtPassLoader
+from cl.lib.redis_utils import get_redis_interface
 from cl.people_db.models import Party
 from cl.search.factories import CourtFactory
 from cl.search.models import Docket
@@ -124,6 +131,30 @@ class NYCoALoaderTest(TestCase):
         extraction = patch("cl.scrapers.tasks.extract_formatted_text_document")
         self.extraction = extraction.start()
         self.addCleanup(extraction.stop)
+        self.key = f"state_scrape_load:test:{self.id()}"
+        self.redis = get_redis_interface("CACHE")
+        self.clear_run_keys()
+        self.addCleanup(self.clear_run_keys)
+
+    def clear_run_keys(self) -> None:
+        """Take away the run's checkpoint and every part of its ledger."""
+        self.redis.delete(
+            self.key,
+            *(f"{self.key}:{part}" for part in LEDGER_PARTS),
+        )
+
+    def loader(self, **kwargs: Any) -> NYCoACourtPassLoader:
+        """A loader over the test run, keeping a ledger so that its report is
+        filled in from what the merges actually did.
+
+        Neither wait sleeps: celery runs eagerly here, so the merges have
+        already happened, and extraction is mocked out and never will -- a
+        zero `in_flight_time` says exactly that, so the waits reach the
+        stalled exit rather than sitting out the timeout."""
+        kwargs.setdefault("run_key", self.key)
+        kwargs.setdefault("in_flight_time", 0)
+        kwargs.setdefault("verify_timeout", 0)
+        return NYCoACourtPassLoader(self.database, **kwargs)
 
     def scrape(self, rows: list[tuple[str, dict]]) -> Any:
         """The single scrape the loader reads out of a run holding `rows`."""
@@ -343,12 +374,12 @@ class NYCoALoaderTest(TestCase):
             ],
         )
 
-        report = NYCoACourtPassLoader(self.database).load()
+        report = self.loader().load()
 
         self.assertEqual(
-            (report.seen, report.merged, report.failed, report.invalid),
+            (report.seen, report.merged, report.refused, report.invalid),
             (2, 1, 1, 0),
-            "The refused docket is counted as a failure, not passed over.",
+            "The refused docket is counted as refused, not passed over.",
         )
         self.assertEqual(Docket.objects.get().docket_number, "APL-2024-00178")
 
@@ -367,7 +398,7 @@ class NYCoALoaderTest(TestCase):
         with self.assertLogs(
             "cl.corpus_importer.state.loader", "ERROR"
         ) as logs:
-            NYCoACourtPassLoader(self.database).load()
+            self.loader().load()
 
         self.assertIn(DOCKET_NUMBER, logs.output[0])
         self.assertFalse(Docket.objects.exists())
@@ -397,7 +428,7 @@ class NYCoALoaderTest(TestCase):
             ],
         )
 
-        report = NYCoACourtPassLoader(self.database).load()
+        report = self.loader().load()
 
         self.assertEqual(
             (report.seen, report.merged, report.invalid), (1, 1, 0)
@@ -446,7 +477,7 @@ class NYCoALoaderTest(TestCase):
                     ],
                 )
 
-                report = NYCoACourtPassLoader(self.database).load()
+                report = self.loader().load()
 
                 self.assertEqual((report.seen, report.merged), (1, 1))
                 entry = NYCoADocketEntry.objects.get()
@@ -462,7 +493,7 @@ class NYCoALoaderTest(TestCase):
             [("NYCourtPassDocket", _docket(no_files_for_case=True))],
         )
 
-        report = NYCoACourtPassLoader(self.database).load()
+        report = self.loader().load()
 
         self.assertEqual(
             (report.seen, report.merged, report.failed), (1, 1, 0)
@@ -496,7 +527,7 @@ class NYCoALoaderTest(TestCase):
             ],
         )
 
-        report = NYCoACourtPassLoader(self.database).load()
+        report = self.loader().load()
 
         self.assertEqual(report.seen, 1)
         self.assertEqual(report.merged, 1)
@@ -535,7 +566,7 @@ class NYCoALoaderTest(TestCase):
             ],
         )
 
-        report = NYCoACourtPassLoader(self.database).load()
+        report = self.loader().load()
 
         self.assertEqual((report.seen, report.merged), (1, 1))
         self.assertEqual((report.invalid, report.failed), (0, 0))
@@ -564,7 +595,7 @@ class NYCoALoaderTest(TestCase):
         handed off for text extraction as the load goes?"""
         self._run_holding_one_document()
 
-        report = NYCoACourtPassLoader(self.database).load()
+        report = self.loader().load()
 
         self.assertEqual(report.merged, 1)
         document = NYCoADocument.objects.get()
@@ -582,28 +613,157 @@ class NYCoALoaderTest(TestCase):
         """Is a load's extraction queue passed through to the task?"""
         self._run_holding_one_document()
 
-        NYCoACourtPassLoader(self.database, extraction_queue="batch1").load()
+        self.loader(extraction_queue="batch1").load()
 
         self.extraction.si.return_value.set.assert_called_once_with(
             queue="batch1"
         )
 
-    def test_dry_run_dispatches_no_extraction(self) -> None:
-        """A dry run rolls its documents back, so a task holding their PKs
-        would find nothing. Is the dispatch held back?"""
+    def extraction_report(self, **kwargs: Any) -> ExtractionReport:
+        """The extraction half of a load's report over a run of one docket."""
+        report = self.loader(**kwargs).load()
+        self.assertEqual(report.merged, 1)
+        self.assertIsNotNone(report.extraction)
+        assert report.extraction is not None  # For the type checker.
+        return report.extraction
+
+    def test_extraction_that_never_ran_is_reported(self) -> None:
+        """A merge reporting success says extraction was dispatched, not that
+        it ran, and a failed call to the extraction service leaves no other
+        trace. Does the load notice the document sitting there unextracted?"""
         self._run_holding_one_document()
 
-        report = NYCoACourtPassLoader(self.database, dry_run=True).load()
+        extraction = self.extraction_report()
+
+        document = NYCoADocument.objects.get()
+        self.assertEqual(extraction.dispatched, 1)
+        self.assertEqual(
+            (extraction.outstanding, extraction.failed),
+            (1, 0),
+            "Extraction is mocked out here, so it never ran.",
+        )
+        self.assertEqual(extraction.sample, [document.pk])
+        self.assertFalse(extraction.complete)
+        self.assertTrue(
+            extraction.abandoned, "The count never moved, so it is a finding."
+        )
+
+    def test_an_extracted_document_is_not_reported(self) -> None:
+        """The check has to clear once extraction has run, or every load would
+        end by crying wolf. Does a document that came back count as done?"""
+        self._run_holding_one_document()
+
+        with patch.object(NYCoADocument, "extract", autospec=True) as extract:
+            # Stand in for the extraction task having run and written back.
+            def extracted(document: NYCoADocument, queue: str) -> bool:
+                NYCoADocument.objects.filter(pk=document.pk).update(
+                    ocr_status=NYCoADocument.OCR_COMPLETE
+                )
+                return True
+
+            extract.side_effect = extracted
+            extraction = self.extraction_report()
+
+        self.assertEqual(extraction.dispatched, 1)
+        self.assertEqual(extraction.outstanding, 0)
+        self.assertTrue(extraction.complete)
+
+    def test_a_document_extraction_could_not_read_is_counted_apart(
+        self,
+    ) -> None:
+        """A document extraction ran on and failed is the extraction
+        pipeline's problem, not the load's. Is it kept out of the count of
+        documents extraction never reached?"""
+        self._run_holding_one_document()
+
+        with patch.object(NYCoADocument, "extract", autospec=True) as extract:
+
+            def failed(document: NYCoADocument, queue: str) -> bool:
+                NYCoADocument.objects.filter(pk=document.pk).update(
+                    ocr_status=NYCoADocument.OCR_FAILED
+                )
+                return True
+
+            extract.side_effect = failed
+            extraction = self.extraction_report()
+
+        self.assertEqual((extraction.outstanding, extraction.failed), (0, 1))
+        self.assertTrue(
+            extraction.complete, "Nothing here is still waiting to be read."
+        )
+
+    def test_unextracted_documents_get_their_own_sentry_issue(self) -> None:
+        """Extraction that never ran is a different problem from a merge that
+        failed. Is it filed on its own, under the loader rather than the run?"""
+        self._run_holding_one_document()
+        # The test runner disables logging outright for speed, and the error
+        # is what carries this to Sentry.
+        logging.disable(logging.NOTSET)
+        self.addCleanup(logging.disable)
+
+        with self.assertLogs(
+            "cl.corpus_importer.state.loader", "ERROR"
+        ) as logs:
+            self.loader().load()
+
+        self.assertEqual(
+            logs.records[0].fingerprint,  # type: ignore[attr-defined]
+            ["nycoa", LoadPhase.EXTRACTION],
+        )
+        self.assertIn("state_document_download", logs.output[0])
+
+    def test_each_phase_waits_on_its_own_clock(self) -> None:
+        """Extraction cannot begin until the merges that write the documents
+        have landed, so one budget shared between the two waits would have a
+        run that spent it all on slow merges report every document as
+        unextracted. Does each phase get its own wait?"""
+        self._run_holding_one_document()
+        loader = self.loader()
+
+        with patch.object(
+            loader, "_await_drain", wraps=loader._await_drain
+        ) as drain:
+            loader.load()
+
+        self.assertEqual(
+            [call.kwargs["work"] for call in drain.call_args_list],
+            ["merges", "extractions"],
+            "One wait for each, each with its own budget.",
+        )
+
+    def test_extraction_still_running_is_not_called_abandoned(self) -> None:
+        """A run that gives up while extraction is still coming down has found
+        nothing wrong. Is that told apart from extraction that stopped?"""
+        self._run_holding_one_document()
+
+        extraction = self.extraction_report(
+            in_flight_time=600, verify_timeout=0
+        )
+
+        self.assertEqual(extraction.outstanding, 1)
+        self.assertEqual(extraction.wait, WaitOutcome.TIMED_OUT)
+        self.assertFalse(
+            extraction.abandoned,
+            "Nothing says these will not be extracted; the load just stopped "
+            "watching.",
+        )
+
+    def test_a_load_dispatching_no_extraction_checks_none(self) -> None:
+        """Is the extraction check held back for a load that left the work to
+        the sweep, rather than reporting every document as outstanding?"""
+        self._run_holding_one_document()
+
+        report = self.loader(extract=False).load()
 
         self.assertEqual(report.merged, 1)
-        self.extraction.si.assert_not_called()
+        self.assertIsNone(report.extraction)
 
     def test_skipping_extraction_still_merges(self) -> None:
         """`extract=False` leaves the work to the sweep. Is the document
         written all the same, and nothing dispatched?"""
         self._run_holding_one_document()
 
-        report = NYCoACourtPassLoader(self.database, extract=False).load()
+        report = self.loader(extract=False).load()
 
         self.assertEqual(report.merged, 1)
         self.assertTrue(NYCoADocument.objects.exists())
@@ -613,21 +773,10 @@ class NYCoALoaderTest(TestCase):
         """Is a merge that wrote no documents left alone?"""
         _run_database(self.database, [("NYCourtPassDocket", _docket())])
 
-        report = NYCoACourtPassLoader(self.database).load()
+        report = self.loader().load()
 
         self.assertEqual(report.merged, 1)
         self.extraction.si.assert_not_called()
-
-    def test_dry_run_writes_nothing(self) -> None:
-        """Does a dry run report a real merge but leave the database alone?"""
-        _run_database(
-            self.database, [("NYCourtPassDocket", _docket(files=[]))]
-        )
-
-        report = NYCoACourtPassLoader(self.database, dry_run=True).load()
-
-        self.assertEqual(report.merged, 1)
-        self.assertFalse(Docket.objects.exists())
 
     def test_limit(self) -> None:
         """Does `limit` stop the load early?"""
@@ -639,7 +788,7 @@ class NYCoALoaderTest(TestCase):
             ],
         )
 
-        report = NYCoACourtPassLoader(self.database, limit=1).load()
+        report = self.loader(limit=1).load()
 
         self.assertEqual(report.seen, 1)
         self.assertEqual(Docket.objects.count(), 1)
@@ -655,7 +804,7 @@ class NYCoALoaderTest(TestCase):
             ],
         )
 
-        report = NYCoACourtPassLoader(self.database).load()
+        report = self.loader().load()
 
         self.assertEqual(
             report.seen, 1, "The unnumbered docket is not selected."
@@ -669,7 +818,7 @@ class NYCoALoaderTest(TestCase):
             [("NYCourtPassDocket", _docket(argument_date="not a date"))],
         )
 
-        report = NYCoACourtPassLoader(self.database).load()
+        report = self.loader().load()
 
         self.assertEqual(
             (report.seen, report.invalid, report.merged), (1, 1, 0)
