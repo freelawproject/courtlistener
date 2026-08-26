@@ -4,12 +4,12 @@ from unittest.mock import MagicMock, patch
 
 from django.contrib.auth.models import User
 from django.http import HttpResponse
+from django.template.loader import TemplateDoesNotExist, get_template
 from django.test import override_settings
 from django.urls import reverse
 from lxml.html import fromstring
 from waffle.testutils import override_flag
 
-from cl.lib.middleware import template_exists
 from cl.lib.test_helpers import SimpleUserDataMixin
 from cl.simple_pages.forms import ContactForm
 from cl.simple_pages.sitemap import SimpleSitemap
@@ -371,12 +371,6 @@ class SimplePagesTest(PageLoadTestMixin, SimpleUserDataMixin, TestCase):
             await self.assert_page_loads_ok(reverse_param)
 
 
-def legacy_counterpart(v2_template: str) -> str | None:
-    """Returns the legacy template a v2 one replaces, or None if it has none."""
-    legacy = v2_template.removeprefix("v2_")
-    return legacy if template_exists(legacy) else None
-
-
 @override_flag("use_new_design", True)
 @override_settings(WAFFLE_CACHE_PREFIX="test_v2_register_waffle")
 class V2PagesRegisterTest(PageLoadTestMixin, SimpleUserDataMixin, TestCase):
@@ -393,6 +387,16 @@ class V2PagesRegisterTest(PageLoadTestMixin, SimpleUserDataMixin, TestCase):
         # Info pages
         ({"viewname": "components"}, "v2_components.html"),
     ]
+
+    @staticmethod
+    def _get_legacy_counterpart(v2_template: str) -> str | None:
+        """Returns the legacy template a v2 one replaces, None otherwise."""
+        legacy = v2_template.removeprefix("v2_")
+        try:
+            get_template(legacy)
+            return legacy
+        except TemplateDoesNotExist:
+            return None
 
     async def test_v2_pages(self) -> None:
         """Do all registered v2 pages load properly with the redesign flag?"""
@@ -411,15 +415,13 @@ class V2PagesRegisterTest(PageLoadTestMixin, SimpleUserDataMixin, TestCase):
         """
         for reverse_param, v2_template in self.V2_PAGES:
             with (
-                self.subTest(
-                    "Checking v2 page", reverse_params=reverse_param
-                ),
+                self.subTest("Checking v2 page", reverse_params=reverse_param),
                 override_flag("use_new_design", active=False),
             ):
                 r = self.client.get(reverse(**reverse_param))
                 self.assertEqual(r.status_code, HTTPStatus.OK)
                 self.assertTemplateUsed(
-                    r, legacy_counterpart(v2_template) or v2_template
+                    r, self._get_legacy_counterpart(v2_template) or v2_template
                 )
 
 
