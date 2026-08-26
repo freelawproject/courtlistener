@@ -6,10 +6,13 @@ from unittest.mock import MagicMock, patch
 import time_machine
 from asgiref.sync import sync_to_async
 from django.contrib.auth.hashers import make_password
+from django.contrib.auth.models import User
+from django.contrib.contenttypes.models import ContentType
 from django.core import mail
 from django.core.cache import cache
+from django.db import IntegrityError, transaction
 from django.template.defaultfilters import date as template_date
-from django.test import override_settings
+from django.test import RequestFactory, override_settings
 from django.urls import reverse
 from django.utils import timezone
 from django.utils.timezone import make_naive, now
@@ -23,6 +26,7 @@ from cl.donate.models import (
     NeonMembershipLevel,
 )
 from cl.favorites.factories import NoteFactory, PrayerFactory
+from cl.favorites.forms import NoteForm
 from cl.favorites.models import (
     DocketTag,
     GenericCount,
@@ -39,12 +43,14 @@ from cl.favorites.utils import (
     delete_prayer,
     get_existing_prayers_in_bulk,
     get_lifetime_prayer_stats,
+    get_note_for_target,
     get_prayer_counts_in_bulk,
     get_top_prayers,
     get_user_prayer_history,
     get_user_prayers,
     prayer_unavailable,
 )
+from cl.favorites.views import get_note
 from cl.lib.test_helpers import (
     AudioTestCase,
     PrayAndPayTestCase,
@@ -72,6 +78,7 @@ class NoteTest(SimpleUserDataMixin, AudioTestCase):
         cls.docket_2 = DocketFactory(id=2)
         cls.docket_3 = DocketFactory(id=3)
         super().setUpTestData()
+        cls.user = User.objects.get(username="pandora")
         cls.opinion_cluster = OpinionClusterWithParentsFactory(
             docket=cls.docket_1,
             case_name="case name cluster 3",
@@ -85,12 +92,16 @@ class NoteTest(SimpleUserDataMixin, AudioTestCase):
         )
         # Set up some handy variables
         cls.note_cluster_params = {
-            "cluster_id": cls.opinion_cluster.pk,
+            "content_type": ContentType.objects.get_for_model(
+                cls.opinion_cluster
+            ).pk,
+            "object_id": cls.opinion_cluster.pk,
             "name": "foo",
             "notes": "testing notes",
         }
         cls.note_audio_params = {
-            "audio_id": cls.audio_1.pk,
+            "content_type": ContentType.objects.get_for_model(cls.audio_1).pk,
+            "object_id": cls.audio_1.pk,
             "name": "foo",
             "notes": "testing notes",
         }
@@ -120,6 +131,171 @@ class NoteTest(SimpleUserDataMixin, AudioTestCase):
             )
         self.assertEqual(r.status_code, 200)
         self.assertIn("It worked", r.content.decode())
+
+    def test_dual_read_finds_legacy_shaped_note(self) -> None:
+        """A Note saved before #7725 (legacy FK set, content_type null) must
+        still be found by the dual-read lookup, not just new GFK-shaped rows.
+        """
+        legacy_note = NoteFactory(
+            cluster_id=self.opinion_cluster,
+            user=self.user,
+            name="pre-migration note",
+            notes="still here",
+        )
+
+        found = get_note_for_target(
+            type(self.opinion_cluster), self.opinion_cluster.pk, self.user
+        )
+
+        self.assertEqual(found, legacy_note)
+
+    def test_new_note_is_redirect_only_not_dual_write(self) -> None:
+        """A Note created via the real save endpoint today must land
+        entirely in the new content_type/object_id shape -- the legacy
+        FK column for its type is never also populated.
+        """
+        self.assertTrue(
+            self.client.login(username="pandora", password="password")
+        )
+        r = self.client.post(
+            reverse("save_or_update_note"),
+            self.note_cluster_params,
+            follow=True,
+            headers={"x-requested-with": "XMLHttpRequest"},
+        )
+        self.assertEqual(r.status_code, 200)
+
+        note = Note.objects.get(
+            content_type=ContentType.objects.get_for_model(
+                self.opinion_cluster
+            ),
+            object_id=self.opinion_cluster.pk,
+        )
+        self.assertIsNone(note.cluster_id_id)
+
+    def test_editing_a_legacy_note_migrates_it(self) -> None:
+        """Editing a pre-#7725 Note through the real save endpoint ends
+        up with content_type/object_id populated.
+        """
+        legacy_note = NoteFactory(
+            cluster_id=self.opinion_cluster,
+            user=self.user,
+            name="old name",
+            notes="old notes",
+        )
+
+        self.assertTrue(
+            self.client.login(username="pandora", password="password")
+        )
+        r = self.client.post(
+            reverse("save_or_update_note"),
+            {
+                **self.note_cluster_params,
+                "name": "edited name",
+                "notes": "edited notes",
+            },
+            follow=True,
+            headers={"x-requested-with": "XMLHttpRequest"},
+        )
+        self.assertEqual(r.status_code, 200)
+
+        legacy_note.refresh_from_db()
+        self.assertEqual(
+            legacy_note.content_type,
+            ContentType.objects.get_for_model(self.opinion_cluster),
+        )
+        self.assertEqual(legacy_note.object_id, self.opinion_cluster.pk)
+        # The legacy column is left as-is, not cleared.
+        self.assertEqual(legacy_note.cluster_id_id, self.opinion_cluster.pk)
+        self.assertEqual(legacy_note.name, "edited name")
+
+    def test_deleting_noted_object_removes_notes_pointing_at_it(self) -> None:
+        """Deleting a noteable object (#7725) cleans up any Note left
+        pointing at it, regardless of shape.
+        """
+        rd = RECAPDocumentFactory(docket_entry__docket=self.docket_2)
+        other_rd = RECAPDocumentFactory(docket_entry__docket=self.docket_3)
+        gfk_note = NoteFactory.for_object(rd, user=self.user)
+        legacy_note = NoteFactory(
+            cluster_id=self.opinion_cluster, user=self.user
+        )
+        unrelated_note = NoteFactory.for_object(other_rd, user=self.user)
+
+        rd.delete()
+        self.opinion_cluster.delete()
+
+        self.assertFalse(Note.objects.filter(pk=gfk_note.pk).exists())
+        self.assertFalse(Note.objects.filter(pk=legacy_note.pk).exists())
+        self.assertTrue(Note.objects.filter(pk=unrelated_note.pk).exists())
+
+    def test_duplicate_gfk_note_is_rejected(self) -> None:
+        """A second Note for the same (content_type, object_id, user)
+        is rejected.
+        """
+        rd = RECAPDocumentFactory(docket_entry__docket=self.docket_1)
+        NoteFactory.for_object(rd, user=self.user)
+
+        with self.assertRaises(IntegrityError):
+            with transaction.atomic():
+                NoteFactory.for_object(rd, user=self.user)
+
+        other_user = UserFactory()
+        NoteFactory.for_object(rd, user=other_user)
+        self.assertEqual(
+            Note.objects.filter(
+                content_type__isnull=False, object_id=rd.pk
+            ).count(),
+            2,
+        )
+
+    def test_form_prefills_hidden_fields_for_a_legacy_note(
+        self,
+    ) -> None:
+        """NoteForm.__init__ pre-fills content_type/object_id in
+        self.initial when bound to a still-legacy-shaped Note instance,
+        so an unbound (rendered) form already shows the new shape even
+        before anything is saved again.
+        """
+        legacy_note = NoteFactory(
+            cluster_id=self.opinion_cluster, user=self.user
+        )
+
+        form = NoteForm(instance=legacy_note)
+
+        self.assertEqual(
+            form.initial["content_type"],
+            ContentType.objects.get_for_model(self.opinion_cluster).pk,
+        )
+        self.assertEqual(form.initial["object_id"], self.opinion_cluster.pk)
+
+    def test_get_note_rejects_content_type_outside_noteable_models(
+        self,
+    ) -> None:
+        """A request naming a non-noteable model's ContentType
+        (here, User) must not resolve to a Note -- get_note() is the
+        only thing standing between a client-supplied content_type and
+        attaching a Note to an arbitrary model.
+        """
+        user_content_type = ContentType.objects.get_for_model(User)
+        request = RequestFactory().post(
+            "/notes/create-or-update/",
+            {"content_type": user_content_type.pk, "object_id": self.user.pk},
+        )
+        request.user = self.user
+
+        self.assertIsNone(get_note(request))
+
+    def test_get_note_rejects_non_numeric_identifiers(self) -> None:
+        """content_type/object_id that aren't valid integers -- e.g. the
+        literal string "undefined" -- must return None, not raise.
+        """
+        request = RequestFactory().post(
+            "/notes/create-or-update/",
+            {"content_type": "undefined", "object_id": "undefined"},
+        )
+        request.user = self.user
+
+        self.assertIsNone(get_note(request))
 
 
 class UserNotesTest(BaseSeleniumTest):
