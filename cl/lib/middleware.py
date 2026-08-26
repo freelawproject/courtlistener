@@ -73,6 +73,9 @@ class IncrementalNewTemplateMiddleware:
     "help/index.html", the new template should be in "v2_help/index.html"
     and NOT in "help/v2_index.html".
 
+    v2 templates that do not have a legacy counterpart are assumed to be
+    available for **everyone**.
+
     TODO: Remove this middleware once new design is completely rolled out.
     """
 
@@ -83,13 +86,17 @@ class IncrementalNewTemplateMiddleware:
         response = self.get_response(request)
         return response
 
+    @staticmethod
+    def template_exists(template_name: str) -> bool:
+        """Check if a template is resolvable by the configured loaders."""
+        try:
+            get_template(template_name)
+        except TemplateDoesNotExist:
+            return False
+        return True
+
     def process_template_response(self, request, response):
-        # don't remove short-circuit evaluation as flag_is_active hits the db
-        if (
-            not isinstance(response, TemplateResponse)
-            or response.is_rendered
-            or not flag_is_active(request, "use_new_design")
-        ):
+        if not isinstance(response, TemplateResponse) or response.is_rendered:
             return response
 
         # {response.template_name} could return a list if TemplateView is used directly
@@ -107,6 +114,13 @@ class IncrementalNewTemplateMiddleware:
                 )
 
         if not isinstance(old_template, str):
+            return response
+
+        # Checking flag_is_active hits the db, so be sure to short-circuit for cheaper
+        # evaluations first
+        if self.template_exists(old_template) and not flag_is_active(
+            request, "use_new_design"
+        ):
             return response
 
         new_template_name = f"v2_{old_template}"
