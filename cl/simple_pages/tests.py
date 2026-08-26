@@ -9,6 +9,7 @@ from django.urls import reverse
 from lxml.html import fromstring
 from waffle.testutils import override_flag
 
+from cl.lib.middleware import template_exists
 from cl.lib.test_helpers import SimpleUserDataMixin
 from cl.simple_pages.forms import ContactForm
 from cl.simple_pages.sitemap import SimpleSitemap
@@ -370,6 +371,12 @@ class SimplePagesTest(PageLoadTestMixin, SimpleUserDataMixin, TestCase):
             await self.assert_page_loads_ok(reverse_param)
 
 
+def legacy_counterpart(v2_template: str) -> str | None:
+    """Returns the legacy template a v2 one replaces, or None if it has none."""
+    legacy = v2_template.removeprefix("v2_")
+    return legacy if template_exists(legacy) else None
+
+
 @override_flag("use_new_design", True)
 @override_settings(WAFFLE_CACHE_PREFIX="test_v2_register_waffle")
 class V2PagesRegisterTest(PageLoadTestMixin, SimpleUserDataMixin, TestCase):
@@ -395,6 +402,25 @@ class V2PagesRegisterTest(PageLoadTestMixin, SimpleUserDataMixin, TestCase):
             ):
                 r = await self.assert_page_loads_ok(reverse_param)
                 self.assertTemplateUsed(r, v2_template)
+
+    def test_v2_pages_without_the_flag(self) -> None:
+        """Do registered pages still load for a visitor without the flag?
+
+        Each one falls back to its legacy template, or keeps rendering v2
+        when the redesign left no legacy template behind.
+        """
+        for reverse_param, v2_template in self.V2_PAGES:
+            with (
+                self.subTest(
+                    "Checking v2 page", reverse_params=reverse_param
+                ),
+                override_flag("use_new_design", active=False),
+            ):
+                r = self.client.get(reverse(**reverse_param))
+                self.assertEqual(r.status_code, HTTPStatus.OK)
+                self.assertTemplateUsed(
+                    r, legacy_counterpart(v2_template) or v2_template
+                )
 
 
 @patch("hcaptcha.fields.hCaptchaField.validate", return_value=True)
