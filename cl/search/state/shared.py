@@ -154,10 +154,14 @@ class AbstractStateDocument(AbstractPDF):
             return int(response.text)
         return None
 
-    def extract(self, queue: str = "celery") -> None:
+    def extract(self, queue: str = "celery") -> bool:
         """Run the OCR extraction task for this document.
 
-        :param queue: The queue to use for the extraction task."""
+        :param queue: The queue to use for the extraction task.
+        :return: Whether a task was dispatched. `False` covers both a document
+            already extracted and one there is no reading -- neither is going
+            to change status, so a caller checking up on extraction afterwards
+            should not wait on either."""
         from cl.scrapers.tasks import extract_formatted_text_document
 
         if (
@@ -170,7 +174,7 @@ class AbstractStateDocument(AbstractPDF):
                 self.pk,
                 self.ocr_status,
             )
-            return
+            return False
 
         if not self.filepath_local.name:
             logger.info(
@@ -178,7 +182,7 @@ class AbstractStateDocument(AbstractPDF):
                 self._meta.label,
                 self.pk,
             )
-            return
+            return False
 
         extension = PurePosixPath(self.filepath_local.name).suffix
 
@@ -189,7 +193,7 @@ class AbstractStateDocument(AbstractPDF):
                 self.pk,
                 self.filepath_local.name,
             )
-            return
+            return False
 
         strip_html = extension != ".pdf"
 
@@ -199,6 +203,7 @@ class AbstractStateDocument(AbstractPDF):
             model_name=self._meta.label,
             strip_html_tags=strip_html,
         ).set(queue=queue).apply_async()
+        return True
 
     @classmethod
     def download(

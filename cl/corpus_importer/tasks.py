@@ -119,6 +119,9 @@ from cl.corpus_importer.llm_models import CaseNameExtractionResponse
 from cl.corpus_importer.management.utils import TexasDocketMeta
 from cl.corpus_importer.prompts.system import CASE_NAME_EXTRACT_SYSTEM
 from cl.corpus_importer.state.florida.mergers import FloridaDocketMerger
+from cl.corpus_importer.state.ledger import LoadLedger
+from cl.corpus_importer.state.loader import LoadPhase, fingerprint
+from cl.corpus_importer.state.registry import get_loader
 from cl.corpus_importer.state.utils import MergeResult
 from cl.corpus_importer.utils import (
     DownloadPDFResult,
@@ -5208,3 +5211,136 @@ def download_state_document(
         pk, extract=not skip_extraction, queue=extraction_queue
     )
     return instance.pk if instance else None
+
+
+STATE_SCRAPE_MERGE_RETRIES = 3
+
+STATE_SCRAPE_MERGE_BACKOFF = 10
+
+
+@app.task(
+    bind=True, max_retries=STATE_SCRAPE_MERGE_RETRIES, ignore_result=True
+)
+def merge_state_scrape_row(
+    self: Task,
+    loader: str,
+    row: int,
+    payload: str,
+    run_key: str | None,
+    extract: bool,
+    extraction_queue: str,
+) -> None:
+    """Merge one docket of a jkent scrape run, and extract what it wrote.
+
+    Every path out of this task writes the row's outcome to the run's ledger,
+    including the one where the retries run out -- otherwise a docket the
+    database refused five times would be indistinguishable from one that
+    merged, and a load's verification pass exists precisely to tell those
+    apart.
+
+    :param loader: The name the docket's loader is registered under in
+        `cl.corpus_importer.state.registry`.
+    :param row: The docket's row number in the run database's query, which is
+        what the ledger and the load's report name it by.
+    :param payload: The scrape, as the loader's `scrape_model` serialized it.
+    :param run_key: The Redis key the run's ledger hangs off, or `None` for a
+        load keeping no ledger.
+    :param extract: Whether to dispatch text extraction for the documents the
+        merge writes.
+    :param extraction_queue: The celery queue to extract on.
+    """
+    ledger = LoadLedger(run_key) if run_key else None
+    try:
+        loader_class = get_loader(loader)
+    except KeyError:
+        logger.error(
+            "Cannot merge row %s: no state scrape loader named %r.",
+            row,
+            loader,
+            extra=fingerprint(loader, LoadPhase.MERGE),
+        )
+        if ledger:
+            ledger.failed(row)
+        return
+
+    try:
+        label, result = loader_class.merge_payload(payload)
+    except ValidationError as error:
+        logger.error(
+            "Row %s of the %s run no longer validates for %s: %s",
+            row,
+            loader,
+            loader_class.__name__,
+            error,
+            extra=fingerprint(loader, LoadPhase.MERGE),
+        )
+        if ledger:
+            ledger.failed(row)
+        return
+    except (DatabaseError, ValueError) as error:
+        if self.request.retries < self.max_retries:
+            logger.warning(
+                "Merge of row %s of the %s run failed (attempt %s): %s",
+                row,
+                loader,
+                self.request.retries + 1,
+                error,
+            )
+            raise self.retry(
+                exc=error,
+                countdown=STATE_SCRAPE_MERGE_BACKOFF * 2**self.request.retries,
+            )
+        logger.exception(
+            "Merge of row %s of the %s run failed %s times; giving up: %s",
+            row,
+            loader,
+            self.max_retries + 1,
+            error,
+            extra=fingerprint(loader, LoadPhase.MERGE),
+        )
+        if ledger:
+            ledger.failed(row)
+        return
+    except Exception as error:
+        logger.exception(
+            "Merge of row %s of the %s run raised %s: %s",
+            row,
+            loader,
+            type(error).__name__,
+            error,
+            extra=fingerprint(loader, LoadPhase.MERGE),
+        )
+        if ledger:
+            ledger.failed(row)
+        return
+
+    if result.success:
+        logger.info("Merged row %s of the %s run (%s)", row, loader, label)
+        if ledger:
+            ledger.merged(row, result)
+    else:
+        logger.error(
+            "Merge of row %s of the %s run (%s) reported failures: %s",
+            row,
+            loader,
+            label,
+            result.failures,
+            extra=fingerprint(loader, LoadPhase.MERGE),
+        )
+        if ledger:
+            ledger.failed(row, result)
+
+    if not extract:
+        return
+    try:
+        dispatched = loader_class.dispatch_extraction(result, extraction_queue)
+    except Exception:
+        logger.exception(
+            "Could not dispatch extraction for row %s of the %s run",
+            row,
+            loader,
+            extra=fingerprint(loader, LoadPhase.EXTRACTION),
+        )
+        return
+    if ledger:
+        ledger.extracting(len(dispatched))
