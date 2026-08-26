@@ -143,6 +143,7 @@ class NYCoAFile(Document):
     # what `NYCoADocument` does with the column: it cannot be set, is not dumped,
     # and no merger reads it -- `NYCoADocumentMerger` subclasses `Merger` rather
     # than the shared `DocumentMerger`, which is the only thing that would.
+    # pyrefly: ignore[bad-override]
     url: ClassVar[str] = ""
     file_name: str
     content_type: str = ""
