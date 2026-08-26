@@ -42,7 +42,11 @@ from httpx import (
     TimeoutException,
 )
 from juriscraper.lib.exceptions import PacerLoginException, ParsingException
-from juriscraper.lib.string_utils import CaseNameTweaker, harmonize
+from juriscraper.lib.string_utils import (
+    CaseNameTweaker,
+    harmonize,
+    titlecase,
+)
 from juriscraper.pacer import (
     ACMSAttachmentPage,
     ACMSDocketReport,
@@ -114,6 +118,10 @@ from cl.citations.tasks import (
 )
 from cl.citations.utils import filter_out_non_case_law_citations
 from cl.corpus_importer.api_serializers import IADocketSerializer
+from cl.corpus_importer.centralia_import import (
+    read_recap_caption,
+    same_case,
+)
 from cl.corpus_importer.llm_models import CaseNameExtractionResponse
 from cl.corpus_importer.management.utils import TexasDocketMeta
 from cl.corpus_importer.prompts.system import CASE_NAME_EXTRACT_SYSTEM
@@ -226,6 +234,10 @@ from cl.search.state.texas.models import (
 )
 
 HYPERSCAN_TOKENIZER = HyperscanTokenizer(cache_dir=".hyperscan")
+
+# Shortens a case name where it can. Declines names whose first party is
+# the government, which most criminal captions are.
+CASE_NAME_TWEAKER = CaseNameTweaker()
 
 logger = logging.getLogger(__name__)
 
@@ -3137,11 +3149,6 @@ def recap_document_into_opinions(
     ]:
         return task_data
 
-    if jurisdiction == Court.FEDERAL_DISTRICT:
-        if "cv" not in docket.docket_number_raw.lower():
-            logger.info("Skipping non-civil opinion in district court")
-            return task_data
-
     hash_exists_qs = Opinion.objects.filter(sha1=recap_document.sha1)
     if hash_exists_qs.exists():
         logger.info("Skipping existing hash %s", recap_document.sha1)
@@ -3173,11 +3180,50 @@ def recap_document_into_opinions(
         logger.info("Skipping existing hash %s", recap_document.sha1)
         return task_data
 
+    # Civil papers keep the names PACER gave them, which is what this task
+    # has always done and what the LLM pass below was written to correct.
+    #
+    # Everything else is named from the page or not ingested. PACER names a
+    # criminal docket after its first defendant, so the docket name can name
+    # a different person than the paper is about -- there is no version of it
+    # worth storing, and no LLM guess worth making, when the court printed
+    # the caption right there. A court centralia has not released, a scan, or
+    # a pre-printed form therefore waits rather than being named badly.
+    is_civil = "cv" in docket.docket_number_raw.lower()
+    if is_civil:
+        case_name = docket.case_name
+        case_name_full = docket.case_name_full
+        case_name_short = docket.case_name_short
+    else:
+        caption, _is_rote, caption_reason = read_recap_caption(
+            recap_document, court_id
+        )
+        if not caption:
+            logger.info(
+                "Skipping non-civil rd %s, no caption from the page (%s)",
+                recap_document.id,
+                caption_reason,
+            )
+            return task_data
+        # The caption is the full one the court printed, so it is the full
+        # name either way. Which short name goes beside it depends on whether
+        # the docket is describing the same party: "United States v. Canaca"
+        # is just a brief way of writing "...v. EDIMAR DABLADO CANACA", and
+        # brief is what a case name wants. "United States v. HARRISON" beside
+        # a cover reading "...v. TYISHA SOMERVILLE" is naming somebody else,
+        # and only the cover is about this paper.
+        case_name_full = harmonize(titlecase(caption))
+        if same_case(docket.case_name, case_name_full):
+            case_name = docket.case_name
+        else:
+            case_name = case_name_full
+        case_name_short = CASE_NAME_TWEAKER.make_case_name_short(case_name)
+
     with transaction.atomic():
         cluster = OpinionCluster.objects.create(
-            case_name_full=docket.case_name_full,
-            case_name=docket.case_name,
-            case_name_short=docket.case_name_short,
+            case_name_full=case_name_full,
+            case_name=case_name,
+            case_name_short=case_name_short,
             docket=docket,
             date_filed=recap_document.docket_entry.date_filed,
             source=ClusterSources.RECAP,
@@ -3198,8 +3244,9 @@ def recap_document_into_opinions(
             cluster.id,
         )
 
-    # Update case name using llm
-    classify_case_name_by_llm.delay(cluster.pk, recap_document_id)
+    if is_civil:
+        # Only civil clusters carry a PACER-derived name for this to correct.
+        classify_case_name_by_llm.delay(cluster.pk, recap_document_id)
 
     if not skip_citation_finding:
         find_citations_and_parentheticals_for_opinion_by_pks.delay(
