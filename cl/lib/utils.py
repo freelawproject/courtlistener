@@ -3,7 +3,7 @@ import re
 from collections.abc import Iterable
 from itertools import chain, islice, tee
 from re import Match
-from typing import Any
+from typing import Any, TypeIs
 
 from django.conf import settings
 from django.core.cache import cache
@@ -102,7 +102,7 @@ def previous_and_next(some_iterable):
     return zip(prevs, items, nexts)
 
 
-def is_iter(item: Any) -> bool:
+def is_iter(item: Any) -> TypeIs[Iterable]:
     # See: https://stackoverflow.com/a/1952655/64911
     return isinstance(item, Iterable)
 
