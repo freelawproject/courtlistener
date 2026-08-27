@@ -15,82 +15,64 @@
 
 
 {% block title %}Getting Help – CourtListener.com{% endblock %}
-{% block footer-scripts %}
-  {% include "includes/anchors.html" %}
-{% endblock %}
 {% block sidebar %}{% endblock %}
 
 
 {% block content %}
-  <div class="hidden-xs col-sm-2 col-md-3"></div>
-  <div class="col-xs-12 col-sm-8 col-md-6">
-    <h1>Getting Help on CourtListener</h1>
-    <p class="lead">The following help articles are currently available:</p>
-    <ol>
-      <li><p><a href="{% url "alert_help" %}">Help with search and docket alerts</a></p></li>
-      <li><p><a href="{% url "pray_and_pay_help" %}">Help with Pray and Pay project</a></p></li>
-      <li><p><a href="{% url "recap_email_help" %}">Help with @recap.email</a></p></li>
-      <li><p><a href="{% url "advanced_search" %}">Help with advanced search parameters</a></p></li>
-      <li><p><a href="{% url "citegeist_help" %}">How search results are ranked</a></p></li>
-      <li><p><a href="{% url "relative_dates" %}">Help with relative date queries</a></p></li>
-      <li><p><a href="{% url "tag_notes_help" %}">Learn how to tag dockets and save notes</a></p></li>
-      <li><p><a href="{% url "feeds_info" %}">Learn about RSS feeds</a></p></li>
-      <li><p><a href="{% url "podcasts" %}">Learn about our Podcasts</a></p></li>
-      <li><p><a href="{% url "markdown_help" %}">Help formatting with Markdown</a></p></li>
-      <li><p><a href="{% url "donation_help" %}">Help with your donations</a></p></li>
-      <li><p><a href="{% url "delete_help" %}">Help deleting your account</a></p></li>
-    </ol>
+  <div class="col-xs-12">
+    <div class="text-center v-offset-below-3">
+      <h1>Getting Help on CourtListener</h1>
+      <p class="lead">
+        Most answers live in our help articles on the wiki. Can't find
+        what you need there? Jump to a topic below.
+      </p>
+      <p>
+        <a href="{{ WIKI_HELP_URL }}" class="btn btn-primary btn-lg">
+          <i class="fa fa-question-circle"></i>&nbsp; Browse Help Articles
+        </a>
+      </p>
+    </div>
 
-    <h2 class="v-offset-above-3">About our Data</h2>
-    <p class="lead">We've built some of the biggest open datasets in the world. Learn more about them:</p>
-    <ol>
-      <li><p><a href="{% url "coverage" %}">Coverage Homepage</a></p></li>
-      <li><p><a href="{% url "coverage_recap" %}">PACER Data Coverage</a></p></li>
-      <li><p><a href="{% url "coverage_opinions" %}">Case Law Coverage</a></p></li>
-      <li><p><a href="{% url "coverage_fds" %}">Financial Disclosure Coverage</a></p></li>
-      <li><p><a href="https://free.law/datasets#judges-db" target="_blank" rel="noreferrer">Judge Coverage</a></p></li>
-      <li><p><a href="{% url "coverage_oa" %}">Oral Argument Recording Coverage</a></p></li>
-    </ol>
+    <h2 class="v-offset-above-3 text-center">Or Go Straight to a Topic</h2>
+    <div class="row v-offset-above-2">
+      <div class="col-xs-12 col-sm-6 col-md-3">
+        <div class="well text-center">
+          <i class="fa fa-heart fa-2x gray"></i>
+          <h3>Donations &amp; Membership</h3>
+          <p>Help with a donation, a membership, or a receipt.</p>
+          <a href="{% url "donation_help" %}">Get donation help&nbsp;&raquo;</a>
+        </div>
+      </div>
+      <div class="col-xs-12 col-sm-6 col-md-3">
+        <div class="well text-center">
+          <i class="fa fa-line-chart fa-2x gray"></i>
+          <h3>Data Coverage</h3>
+          <p>What's in our case law, PACER, disclosure, and oral argument collections.</p>
+          <a href="{{ WIKI_COVERAGE_URL }}">See our coverage&nbsp;&raquo;</a>
+        </div>
+      </div>
+      <div class="col-xs-12 col-sm-6 col-md-3">
+        <div class="well text-center">
+          <i class="fa fa-code fa-2x gray"></i>
+          <h3>Developer Docs</h3>
+          <p>REST APIs, bulk data, webhooks, MCP, and database replication.</p>
+          <a href="{{ WIKI_API_URL }}">Read the docs&nbsp;&raquo;</a>
+        </div>
+      </div>
+      <div class="col-xs-12 col-sm-6 col-md-3">
+        <div class="well text-center">
+          <i class="fa fa-ban fa-2x gray"></i>
+          <h3>Removing Content</h3>
+          <p>When and how we remove content from CourtListener and search engines.</p>
+          <a href="{{ WIKI_REMOVAL_URL }}">Read our policy&nbsp;&raquo;</a>
+        </div>
+      </div>
+    </div>
 
-    <h2 class="v-offset-above-3">Developer Documentation</h2>
-    <p class="lead">The following documentation is available for developers:</p>
-    <ol>
-      <li><p>API Documentation</p></li>
-      <ul>
-        <li><p><a href="{% url "rest_docs" %}">REST API Overview</a></p></li>
-        <li><p><a href="{% url "citation_lookup_api" %}">Citation Lookup API</a></p></li>
-        <li><p><a href="{% url "search_api_help" %}">Search API</a></p></li>
-        <li><p><a href="{% url "case_law_api_help" %}">Case Law APIs</a></p></li>
-        <li><p><a href="{% url "pacer_api_help" %}">PACER Data APIs</a></p></li>
-        <li><p><a href="{% url "recap_api_help" %}">RECAP APIs</a></p></li>
-        <li><p><a href="{% url "judge_api_help" %}">Judge APIs</a></p></li>
-        <li><p><a href="{% url "financial_disclosures_api_help" %}">Financial Disclosure APIs</a></p></li>
-        <li><p><a href="{% url "citation_api_help" %}">Citation APIs</a></p></li>
-        <li><p><a href="{% url "alert_api_help" %}">Alert APIs</a></p></li>
-        <li><p><a href="{% url "visualization_api_help" %}">Supreme Court Visualization APIs</a></p></li>
-      </ul>
-      <li><p>Webhook Documentation</p></li>
-      <ul>
-        <li><p><a href="{% url "webhooks_docs" %}">Webhook Overview</a></p></li>
-        <li><p><a href="{% url "webhooks_getting_started" %}">Getting Started</a></p></li>
-      </ul>
-      <li><p><a href="{% url "mcp_help" %}">MCP Server for AI Assistants</a> <span class="label label-info">Coming Soon</span></p></li>
-      <li><p><a href="{% url "cluster_redirections_help" %}">Opinion Cluster Redirections</a></p></li>
-      <li><p><a href="{% url "bulk_data_index" %}">Bulk Data Documentation</a></p></li>
-      <li><p><a href="{% url "replication_docs" %}">Replication Documentation</a></p></li>
-      <li><p><a href="{% url "api_index" %}">Data Services on CourtListener</a></p></li>
-    </ol>
-
-    <h2 class="v-offset-above-3">Removing Content</h2>
-    <p>We will not remove content from our systems absent a valid court order, but we will usually remove content from public search engines like Google, upon request.
-    </p>
-    <p><a href="{% url "terms" %}#removal" class="btn btn-default">Read our removal policy to learn more</a></p>
-
-    <h2 class="v-offset-above-3">More Help?</h2>
-    <p>If you're unable to find what you're looking for above you have a few more options:</p>
-    <p>
-      <a href="{% url "faq" %}" class="btn btn-default btn-lg col-xs-4 col-xs-push-1"><span class="hidden-xs">Try our </span>FAQs</a>
-      <a href="{% url "contact" %}" class="btn btn-primary btn-lg col-xs-4 col-xs-push-2">Contact Us</a>
-    </p>
+    <div class="text-center v-offset-above-4 v-offset-below-2">
+      <h2>Still Stuck?</h2>
+      <p class="lead">If you didn't find what you needed above, get in touch directly.</p>
+      <p><a href="{% url "contact" %}" class="btn btn-default btn-lg">Contact Us</a></p>
+    </div>
   </div>
 {% endblock %}

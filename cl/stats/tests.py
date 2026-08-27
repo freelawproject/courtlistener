@@ -682,15 +682,15 @@ class TallyStatWithLabelsTests(TestCase):
         for key in self.r.scan_iter(f"{self.prefix}*"):
             self.r.delete(key)
 
+    @time_machine.travel("2000-01-01", tick=False)
     def test_tally_stat_with_labels_writes_both_keys(self) -> None:
         """Test that tally_stat writes both the date-based key and prometheus key"""
-        # Capture values before to check deltas — the legacy date key is
-        # shared across parallel tests (no prefix), so other tests may
-        # also increment it.
+        # Time is frozen to a fixed past date so the legacy date key (which
+        # has no test-specific prefix) is private to this test; parallel
+        # tests tally under today's real date and can't race it.
         date_key = f"{StatMetric.SEARCH_RESULTS}.{now().date().isoformat()}"
         prom_key = f"{self.prefix}search.results:keyword:web"
-        date_before = int(self.r.get(date_key) or 0)
-        prom_before = int(self.r.get(prom_key) or 0)
+        self.r.delete(date_key)
 
         tally_stat(
             StatMetric.SEARCH_RESULTS,
@@ -701,12 +701,10 @@ class TallyStatWithLabelsTests(TestCase):
         )
 
         # Check date-based key incremented (legacy format)
-        date_value = int(self.r.get(date_key) or 0)
-        self.assertEqual(date_value - date_before, 1)
+        self.assertEqual(int(self.r.get(date_key) or 0), 1)
 
         # Check prometheus key incremented
-        prom_value = int(self.r.get(prom_key) or 0)
-        self.assertEqual(prom_value - prom_before, 1)
+        self.assertEqual(int(self.r.get(prom_key) or 0), 1)
 
     def test_tally_stat_validates_labels(self) -> None:
         """Test that tally_stat validates labels before writing"""

@@ -28,7 +28,6 @@ from cl.audio.utils import make_af_filename, transcription_was_hallucinated
 from cl.celery_init import app
 from cl.corpus_importer.tasks import increment_failure_count, upload_to_ia
 from cl.custom_filters.templatetags.text_filters import best_case_name
-from cl.lib.celery_utils import throttle_task
 from cl.lib.command_utils import logger
 from cl.lib.decorators import retry
 from cl.lib.microservice_utils import microservice
@@ -104,12 +103,9 @@ def downsize_audio_file(audio: Audio) -> Response:
 # https://github.com/openai/openai-python/blob/54a5911f5215148a0bdeb10e2bcfb84f635a75b9/src/openai/_base_client.py#L679-L712
 @app.task(
     bind=True,
-    max_retries=3,
-    retry_backoff=1 * 60,
+    max_retries=1,
+    retry_backoff=10,
 )
-# Rate limit transcription requests to prevent overloading transcription API
-# and getting errors. See #6123
-@throttle_task("1/3m")
 def transcribe_from_open_ai_api(self, audio_pk: int, dont_retry: bool = False):
     """Get transcription from OpenAI API whisper-1 model
 
@@ -168,28 +164,51 @@ def transcribe_from_open_ai_api(self, audio_pk: int, dont_retry: bool = False):
 
         try:
             transcript = client.audio.transcriptions.create(**kwargs)
-        except (
-            RateLimitError,
-            APIConnectionError,
-            ConflictError,
-            InternalServerError,
-        ) as exc:
-            # Handle retryable exception here so as to monitor them in
-            # Sentry
+        except APIConnectionError as exc:
+            # Transient TCP / DNS blip. Usually resolves in seconds, so a
+            # short in-task retry is cheaper than waiting a full daemon
+            # cycle. Capped at max_retries=1.
             if self.request.retries < self.max_retries and not dont_retry:
-                raise self.retry(exc=exc)
+                raise self.retry(exc=exc, countdown=10)
+            return
+        except RateLimitError:
+            # OpenAI 429. Don't burn Celery retries — that just feeds the
+            # workers right back into the same flood and amplifies it.
+            # Returning here leaves stt_status=STT_NEEDED; the dispatch
+            # lock holds for its TTL, then reenqueue_pending_audio_tasks_
+            # daemon picks the audio up on a future cycle (paced).
+            logger.info(
+                "transcribe deferred: OpenAI rate-limited (audio=%s)",
+                audio_pk,
+            )
+            return
+        except InternalServerError:
+            # OpenAI 5xx. If their service is sick, retrying immediately
+            # hammers them while sick. Let the daemon's next cycle re-
+            # dispatch — by then the outage is likely over, and our cap
+            # naturally rate-limits the recovery wave.
+            logger.info(
+                "transcribe deferred: OpenAI server error (audio=%s)",
+                audio_pk,
+            )
+            return
+        except ConflictError:
+            # 409 — rare, usually a duplicate request OpenAI flagged.
+            # Daemon backstop will pick it up if it was actually unfinished.
+            logger.info(
+                "transcribe deferred: OpenAI conflict (audio=%s)", audio_pk
+            )
             return
         except (UnprocessableEntityError, BadRequestError):
-            # BadRequestError is an HTTP 400 and has this message:
-            # 'The audio file could not be decoded or its format is not supported'
+            # 400/422. Terminal: the file itself can't be decoded. Mark
+            # FAILED so the daemon stops trying. Not retryable.
             audio.stt_status = Audio.STT_FAILED
             audio.save()
             return
         except Exception as e:
-            # Sends to Sentry errors that we don't expect or
-            # don't want to retry. Includes some openai package errors:
-            # (openai.AuthenticationError, openai.PermissionDeniedError,
-            # openai.NotFoundError)
+            # Anything else (auth errors, permission denied, 404 from a
+            # bad endpoint, etc.) Goes to Sentry; not retried because the
+            # cause is structural and would just keep failing.
             capture_exception(e)
             return
 

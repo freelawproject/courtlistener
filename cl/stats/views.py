@@ -16,7 +16,7 @@ from cl.stats.utils import (
 )
 
 
-def heartbeat(request: HttpRequest) -> HttpResponse:
+async def heartbeat(request: HttpRequest) -> HttpResponse:
     return HttpResponse("OK", content_type="text/plain")
 
 

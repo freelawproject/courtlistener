@@ -181,7 +181,13 @@ def make_objects(
             ordering_key=opinion_metadata.get("ordering_key"),
         )
 
-        cf = ContentFile(content)
+        # Encode str content to bytes so the file's reported size is the UTF-8
+        # byte count, not the character count. django-storages sends that size
+        # as x-amz-decoded-content-length on the aws-chunked PUT; for non-ASCII
+        # text (e.g. Westlaw HTML with curly quotes/em-dashes) a character count
+        # is short of the real byte count, and S3 rejects the upload with
+        # 500 InternalError. See #7504.
+        cf = ContentFile(force_bytes(content))
         extension = get_extension(content)
         file_name = trunc(item["case_names"].lower(), 75) + extension
         opinion.file_with_date = cluster.date_filed

@@ -6,7 +6,7 @@ from typing import Any, NotRequired, TypedDict
 
 from django.http import HttpRequest
 from django_elasticsearch_dsl.search import Search
-from elasticsearch_dsl.query import QueryString
+from elasticsearch.dsl.query import QueryString
 
 from cl.users.models import User
 
@@ -301,3 +301,7 @@ class ApiPositionMapping(BasePositionMapping):
     def get_db_to_dataclass_map(self):
         parent_map = super().get_db_to_dataclass_map()
         return parent_map | self.__db_to_dataclass_map
+
+
+# https://www.aazuspan.dev/blog/type-safety-and-non-empty-tuples-in-python/
+type NonEmptyTuple[T] = tuple[T, *tuple[T, ...]]

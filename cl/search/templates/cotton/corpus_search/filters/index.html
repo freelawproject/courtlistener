@@ -3,10 +3,12 @@
 <c-vars search_form form_prefix/>
 
 <div class="pt-2 pb-6 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4 items-end">
+  {% with field_id=form_prefix|add:"_courts" %}
   <div class="flex flex-col justify-start gap-1.5 [&_label]:text-sm [&_label]:font-medium [&_label]:text-greyscale-600">
-    <label for="id_courts">Jurisdictions</label>
-    <input name="court" class="border border-greyscale-200 rounded-lg h-10 py-2.5 px-3 focus:outline-none focus:ring-2 focus:ring-primary-600">
+    <label for="{{ field_id }}">Jurisdictions</label>
+    <input id="{{ field_id }}" name="court" class="border border-greyscale-200 rounded-lg h-10 py-2.5 px-3 focus:outline-none focus:ring-2 focus:ring-primary-600">
   </div>
+  {% endwith %}
 
   <c-corpus-search.filters.opinions :search_form="search_form" :request="request" :form_prefix="form_prefix" only />
 

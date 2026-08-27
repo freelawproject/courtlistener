@@ -7,6 +7,7 @@ from cl.corpus_importer.factories import (
     CaseQueryDataFactory,
     FreeOpinionRowDataFactory,
 )
+from cl.search.factories import ScotusDocketDataFactory
 
 DOCKET_NUMBER = "5:18-cr-00227"
 CASE_NAME = "United States v. Maldonado-Passage"
@@ -387,3 +388,29 @@ class FakeCaseQueryReport:
     @property
     def response(self):
         return FakeCaseQueryResponse("<span>Test</span>")
+
+
+class FakeSCOTUSDocketReport:
+    """Minimal stand-in for juriscraper.scotus.SCOTUSDocketReport.
+
+    ``_parse_text`` extracts the ``docket_number`` from the raw JSON string
+    and builds a full ``ScotusDocketDataFactory`` dict keyed to that number,
+    mirroring the real parser's ``.data`` attribute.
+    """
+
+    def __init__(self):
+        self.data: dict = {}
+
+    def _parse_text(self, content: str) -> None:
+        import json
+
+        try:
+            raw = json.loads(content)
+            docket_number = raw.get("docket_number", "")
+        except (json.JSONDecodeError, ValueError):
+            docket_number = ""
+        self.data = ScotusDocketDataFactory(
+            docket_number=docket_number,
+            questions_presented="",
+            docket_entries=[],
+        )

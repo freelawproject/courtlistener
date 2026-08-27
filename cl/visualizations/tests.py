@@ -7,6 +7,7 @@ from http import HTTPStatus
 from typing import ClassVar
 
 from asgiref.sync import sync_to_async
+from django.conf import settings
 from django.contrib.auth.hashers import make_password
 from django.contrib.auth.models import Permission
 from django.urls import reverse
@@ -166,13 +167,35 @@ class TestVizModels(TestCase):
         viz.delete()
         self.assertIsNone(viz.pk, None)
 
+    async def test_embed_view_escapes_json_data(self) -> None:
+        """Is json_data safely escaped in the embed view, even for a
+        private visualization loaded by a non-owner (GHSA-cvh7-rv7v-wx2j)?
+        """
+        payload = "</script><script>alert(1)</script>"
+        viz = await sync_to_async(VisualizationFactory.create)(
+            title="Test SCOTUSMap",
+            published=False,
+            deleted=False,
+            json_versions__json_data=payload,
+        )
+        response = await self.async_client.get(
+            reverse("view_embedded_visualization", kwargs={"pk": viz.pk})
+        )
+        content = response.content.decode()
+        self.assertNotIn(
+            "<script>alert(1)</script>",
+            content,
+            msg="Malicious json_data was rendered unescaped inside a script block.",
+        )
+        self.assertIn("JSON.parse(", content)
+
 
 class TestVisualizationRedirects(SimpleTestCase):
     """Test that deprecated visualization URLs redirect properly."""
 
-    def test_deprecated_urls_redirect_to_api_docs(self) -> None:
-        """Test all deprecated visualization URLs redirect to API docs."""
-        expected_redirect = reverse("visualization_api_help")
+    def test_deprecated_urls_redirect_to_wiki_docs(self) -> None:
+        """Test all deprecated visualization URLs redirect to wiki docs."""
+        expected_redirect = f"{settings.WIKI_API_BASE_URL}/rest/v4/visualizations#deprecation-notice"
         # Raw URLs for visualization paths (catch-all handles these)
         urls = [
             "/visualizations/scotus-mapper/",
@@ -195,8 +218,8 @@ class TestVisualizationRedirects(SimpleTestCase):
                 )
                 self.assertEqual(
                     response.url,
-                    f"{expected_redirect}#deprecation-notice",
-                    msg=f"{url} should redirect to API docs",
+                    expected_redirect,
+                    msg=f"{url} should redirect to wiki docs",
                 )
 
 
@@ -357,34 +380,38 @@ class APIVisualizationTestCase(APITestCase):
         )
         self.assertEqual(response.status_code, HTTPStatus.FORBIDDEN)
 
-    async def test_json_data_permissions(self) -> None:
-        """Are non-owners rejected from editing JSON data?"""
+    async def test_json_data_is_read_only(self) -> None:
+        """Is the visualization JSON API read-only, for owners and
+        non-owners alike (GHSA-cvh7-rv7v-wx2j)?
+        """
         response = await self.make_good_visualization("some title")
-
-        # Try to edit the JSON as current user; should work
         j = response.json()
-        vis_path = j["resource_uri"]
         json_path = j["json_versions"][0]["resource_uri"]
+        jsonversion_list_path = reverse(
+            "jsonversion-list", kwargs={"version": "v3"}
+        )
+
+        # The owner has no write action available either -- there isn't one.
         response = await self.client.patch(
             json_path, {"json_data": "immaterial"}, format="json"
         )
-        self.assertEqual(response.status_code, HTTPStatus.OK)
+        self.assertEqual(response.status_code, HTTPStatus.METHOD_NOT_ALLOWED)
+        response = await self.client.post(
+            jsonversion_list_path,
+            {"map": j["resource_uri"], "json_data": "immaterial"},
+            format="json",
+        )
+        self.assertEqual(response.status_code, HTTPStatus.METHOD_NOT_ALLOWED)
 
-        # Try to edit the JSON as different user, while private; should fail;
-        # user shouldn't know it exists.
-        response = await self.rando_client.patch(
-            json_path, {"json_data": "immaterial"}, format="json"
+        # Nor does a different user, e.g. attempting to attach a JSONVersion
+        # to someone else's map by pointing `map` at it.
+        response = await self.rando_client.post(
+            jsonversion_list_path,
+            {"map": j["resource_uri"], "json_data": "malicious"},
+            format="json",
         )
-        self.assertEqual(response.status_code, HTTPStatus.NOT_FOUND)
+        self.assertEqual(response.status_code, HTTPStatus.METHOD_NOT_ALLOWED)
 
-        # Try to edit the JSON as different user, while public; should fail
-        # Make it public
-        response = await self.client.patch(
-            vis_path, {"published": True}, format="json"
-        )
+        # Reading it, as the owner, still works.
+        response = await self.client.get(json_path)
         self.assertEqual(response.status_code, HTTPStatus.OK)
-        # Try to patch it as a random user
-        response = await self.rando_client.patch(
-            json_path, {"json_data": "immaterial"}, format="json"
-        )
-        self.assertEqual(response.status_code, HTTPStatus.FORBIDDEN)

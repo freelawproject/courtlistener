@@ -96,6 +96,10 @@ class RecapEmailSESStorage(S3Storage):
     bucket_name = "recap.email"
 
 
+class SCOTUSSESStorage(S3Storage):
+    bucket_name = "scotus-email"
+
+
 class TexasEmailSESStorage(S3Storage):
     bucket_name = "texas-email"
 

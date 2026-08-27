@@ -6,7 +6,9 @@ from django.core.files.base import ContentFile
 from django.test import TestCase
 
 from cl.corpus_importer.tasks import (
+    add_scotus_docket_entries,
     download_qp_scotus_pdf,
+    enrich_scotus_attachments,
     ingest_scotus_docket,
     merge_scotus_docket,
     merge_scotus_document,
@@ -415,7 +417,7 @@ class ScotusDocketMergeTest(TestCase):
             lower_court=self.lower_court.full_name,
             docket_entries=[],
         )
-        docket, _ = merge_scotus_docket(data)
+        docket, _, _ = merge_scotus_docket(data)
         docket.refresh_from_db()
 
         dockets = Docket.objects.all()
@@ -436,7 +438,7 @@ class ScotusDocketMergeTest(TestCase):
             lower_court_case_numbers=["23-6433"],
             docket_entries=[],
         )
-        updated_docket, _ = merge_scotus_docket(data)
+        updated_docket, _, _ = merge_scotus_docket(data)
         updated_docket.refresh_from_db()
         self.assertEqual(dockets.count(), 1)
         self.assertEqual(scotus_metadata.count(), 1)
@@ -459,6 +461,56 @@ class ScotusDocketMergeTest(TestCase):
             metadata.questions_presented_url, data["questions_presented"]
         )
 
+    def test_scotus_merger_matches_entry_that_gained_attachments(
+        self,
+    ) -> None:
+        """Confirm an entry merged before it had attachments is matched, not
+        duplicated, when re-merged with attachments and a document number."""
+
+        docket = DocketFactory(court=self.court, source=Docket.SCRAPER)
+        entry_data = {
+            "description": "Petition for a writ of certiorari filed.",
+            "date_filed": datetime.date(2025, 6, 2),
+        }
+
+        # The poller sees the entry before it has attachments, so its
+        # document_number is None.
+        docket_entries = [
+            SCOTUSDocketEntryDataFactory(
+                **entry_data,
+                document_number=None,
+                attachments=[],
+            )
+        ]
+        enrich_scotus_attachments(docket_entries)
+        add_scotus_docket_entries(docket, docket_entries, download_file=False)
+
+        entries = SCOTUSDocketEntry.objects.filter(docket=docket)
+        self.assertEqual(entries.count(), 1)
+        self.assertIsNone(entries.first().entry_number)
+
+        # An attachment is then added to the entry, so the email update
+        # parses a document_number for it.
+        docket_entries = [
+            SCOTUSDocketEntryDataFactory(
+                **entry_data,
+                document_number=310278,
+                attachments=[
+                    SCOTUSAttachmentDataFactory(
+                        description="Petition", document_number=310278
+                    )
+                ],
+            )
+        ]
+        enrich_scotus_attachments(docket_entries)
+        add_scotus_docket_entries(docket, docket_entries, download_file=False)
+
+        entries = SCOTUSDocketEntry.objects.filter(docket=docket)
+        self.assertEqual(
+            entries.count(), 1, "Docket entry was duplicated on re-merge."
+        )
+        self.assertEqual(entries.first().entry_number, 310278)
+
     def test_merge_scotus_docket_source_compounds_existing(self) -> None:
         """Merging into an existing docket compounds its source with SCRAPER."""
         existing = DocketFactory(
@@ -470,7 +522,7 @@ class ScotusDocketMergeTest(TestCase):
             docket_number="24-200",
             docket_entries=[],
         )
-        docket, _ = merge_scotus_docket(data)
+        docket, _, _ = merge_scotus_docket(data)
         docket.refresh_from_db()
         self.assertEqual(docket.pk, existing.pk)
         self.assertEqual(
@@ -490,7 +542,7 @@ class ScotusDocketMergeTest(TestCase):
             docket_number="24-400",
             docket_entries=[],
         )
-        docket, _ = merge_scotus_docket(data)
+        docket, _, _ = merge_scotus_docket(data)
         docket.refresh_from_db()
         self.assertEqual(docket.pk, existing.pk)
         self.assertEqual(
@@ -562,7 +614,7 @@ class ScotusDocketMergeTest(TestCase):
             questions_presented="../qp/14-00556qp.pdf",
             docket_entries=[],
         )
-        docket, _ = merge_scotus_docket(report_data)
+        docket, _, _ = merge_scotus_docket(report_data)
         scotus_meta = ScotusDocketMetadata.objects.get(docket=docket)
         self.assertEqual(
             scotus_meta.questions_presented_url,
@@ -610,7 +662,7 @@ class ScotusDocketMergeTest(TestCase):
             docket_entries=[],
         )
 
-        docket, _ = merge_scotus_docket(data)
+        docket, _, _ = merge_scotus_docket(data)
         docket.refresh_from_db()
 
         self.assertEqual(docket.appeal_from_str, data["lower_court"])
@@ -638,7 +690,7 @@ class ScotusDocketMergeTest(TestCase):
             docket_entries=[],
         )
 
-        docket, _ = merge_scotus_docket(data)
+        docket, _, _ = merge_scotus_docket(data)
         docket.refresh_from_db()
 
         self.assertEqual(docket.appeal_from_str, data["lower_court"])
@@ -667,7 +719,7 @@ class ScotusDocketMergeTest(TestCase):
             docket_entries=[],
         )
 
-        docket, _ = merge_scotus_docket(data)
+        docket, _, _ = merge_scotus_docket(data)
         docket.refresh_from_db()
 
         self.assertEqual(docket.appeal_from_str, data["lower_court"])

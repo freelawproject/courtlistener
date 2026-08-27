@@ -1,3 +1,5 @@
+import sys
+
 import environ
 
 env = environ.FileAwareEnv()
@@ -23,8 +25,14 @@ REST_FRAMEWORK = {
     ),
     "DEFAULT_THROTTLE_RATES": {
         "anon": "100/day",
-        "user": "5000/hour",
+        "user": ["5/min", "50/hour", "125/day"],
         "citations": "60/min",
+        "tags": "1000/hour",
+        "api_usage": ["10/min", "120/hour"],
+        # Fetch API (buying PACER documents). Deliberately much higher than
+        # the global "user" rate and not gated by membership: see #7503.
+        "fetch": "30/min",
+        "events": "60/hour",
     },
     # Auth
     "DEFAULT_AUTHENTICATION_CLASSES": (
@@ -65,5 +73,8 @@ REST_FRAMEWORK = {
 
 if DEVELOPMENT:
     REST_FRAMEWORK["DEFAULT_THROTTLE_RATES"]["anon"] = "10000/day"  # type: ignore
+
+if "test" in sys.argv:
+    REST_FRAMEWORK["DEFAULT_THROTTLE_RATES"]["user"] = "5000/day"  # type: ignore
 
 BLOCK_NEW_V3_USERS = env.bool("BLOCK_NEW_V3_USERS", default=False)
