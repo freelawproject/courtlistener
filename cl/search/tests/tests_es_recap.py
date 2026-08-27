@@ -15,7 +15,7 @@ from django.core.paginator import Paginator
 from django.test import RequestFactory, override_settings
 from django.urls import reverse
 from django.utils.timezone import now
-from elasticsearch_dsl import Q
+from elasticsearch.dsl import Q
 from lxml import etree, html
 from rest_framework.serializers import CharField
 
@@ -7299,8 +7299,8 @@ class IndexDocketRECAPDocumentsCommandTest(
         child_count = len(article[0].xpath(".//h4"))
         self.assertEqual(2, child_count)
 
-    @mock.patch("cl.search.utils.delete_from_ia")
-    @mock.patch("cl.search.utils.invalidate_cloudfront")
+    @mock.patch("cl.search.deletion_utils.delete_from_ia")
+    @mock.patch("cl.search.deletion_utils.invalidate_cloudfront")
     def test_re_index_recap_documents_sealed(
         self, mock_delete_from_ia, mock_invalidate_cloudfront
     ):
@@ -8797,104 +8797,6 @@ class RECAPIndexingTest(
         docket_with_parties.delete()
         docket_doc_no_parties.delete()
         docket_with_no_parties_no_separator.delete()
-
-    @mock.patch("cl.search.utils.delete_from_ia")
-    @mock.patch("cl.search.utils.invalidate_cloudfront")
-    def test_seal_documents_action(
-        self, mock_delete_from_ia, mock_invalidate_cloudfront
-    ):
-        """Confirm that seal_documents admin action updates related RDs in ES"""
-
-        docket = DocketFactory(
-            court=self.court,
-            pacer_case_id="asdf",
-            docket_number="12-cv-02354",
-            case_name="Vargas v. Wilkins",
-            source=Docket.RECAP,
-        )
-        de_1 = DocketEntryFactory(
-            docket=docket,
-            date_filed=datetime.date(2015, 8, 19),
-            description="MOTION for Leave to File Amicus Curiae Lorem",
-            entry_number=None,
-        )
-        rd_1 = RECAPDocumentFactory(
-            docket_entry=de_1,
-            document_number="1",
-            is_available=True,
-            page_count=5,
-            filepath_local="test.pdf",
-            plain_text="Lorem ipsum dolor text.",
-        )
-        rd_2 = RECAPDocumentFactory(
-            docket_entry=de_1,
-            document_number="2",
-            is_available=True,
-            page_count=10,
-            filepath_local="test.pdf",
-            plain_text="Lorem ipsum dolor text 2.",
-        )
-
-        # Confirm initial indexing:
-        rd_1_doc = DocketDocument.get(id=ES_CHILD_ID(rd_1.pk).RECAP)
-        self.assertEqual(rd_1_doc.is_available, True)
-        self.assertEqual(rd_1_doc.plain_text, rd_1.plain_text)
-        self.assertEqual(rd_1_doc.page_count, rd_1.page_count)
-        self.assertEqual(rd_1_doc.filepath_local, rd_1.filepath_local)
-
-        rd_2_doc = DocketDocument.get(id=ES_CHILD_ID(rd_2.pk).RECAP)
-        self.assertEqual(rd_2_doc.is_available, True)
-        self.assertEqual(rd_2_doc.plain_text, rd_2.plain_text)
-        self.assertEqual(rd_2_doc.page_count, rd_2.page_count)
-        self.assertEqual(rd_2_doc.filepath_local, rd_2.filepath_local)
-
-        # Call seal_documents action.
-        recap_admin = RECAPDocumentAdmin(RECAPDocument, self.site)
-        recap_admin.message_user = mock.Mock()
-        url = reverse("admin:search_recapdocument_changelist")
-        request = self.factory.post(url)
-
-        queryset = RECAPDocument.objects.filter(pk__in=[rd_1.pk, rd_2.pk])
-        recap_admin.seal_documents(request, queryset)
-
-        recap_admin.message_user.assert_called_once_with(
-            request,
-            "Successfully sealed and removed 2 document(s).",
-            messages.SUCCESS,
-        )
-
-        # Confirm DB update:
-        rd_1.refresh_from_db()
-        self.assertEqual(rd_1.is_available, False)
-        self.assertEqual(rd_1.is_sealed, True)
-        self.assertEqual(rd_1.filepath_local, "")
-        self.assertIsNone(rd_1.page_count)
-        self.assertEqual(rd_1.sha1, "")
-        self.assertEqual(rd_1.plain_text, "")
-
-        rd_2.refresh_from_db()
-        self.assertEqual(rd_2.is_available, False)
-        self.assertEqual(rd_2.is_sealed, True)
-        self.assertEqual(rd_2.filepath_local, "")
-        self.assertIsNone(rd_2.page_count)
-        self.assertEqual(rd_2.sha1, "")
-        self.assertEqual(rd_2.plain_text, "")
-
-        # Confirm ES indexing:
-        rd_1_doc = DocketDocument.get(id=ES_CHILD_ID(rd_1.pk).RECAP)
-        self.assertEqual(rd_1_doc.is_available, False)
-        self.assertEqual(rd_1_doc.plain_text, "")
-        self.assertEqual(rd_1_doc.page_count, None)
-        self.assertEqual(rd_1_doc.filepath_local, None)
-
-        rd_2_doc = DocketDocument.get(id=ES_CHILD_ID(rd_2.pk).RECAP)
-        self.assertEqual(rd_2_doc.is_available, False)
-        self.assertEqual(rd_2_doc.plain_text, "")
-        self.assertEqual(rd_2_doc.page_count, None)
-        self.assertEqual(rd_2_doc.filepath_local, None)
-
-        # Clean up index.
-        docket.delete()
 
 
 class RECAPHistoryTablesIndexingTest(

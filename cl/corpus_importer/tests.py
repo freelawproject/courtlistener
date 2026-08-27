@@ -1,6 +1,7 @@
 import json
 from datetime import date, datetime, timedelta
 from pathlib import Path
+from typing import assert_type, cast
 from unittest import mock
 from unittest.mock import call, patch
 
@@ -23,10 +24,14 @@ from django.utils.timezone import now
 from eyecite.tokenizers import HyperscanTokenizer
 from factory import RelatedFactory
 from juriscraper.lib.string_utils import harmonize, titlecase
+from juriscraper.pacer.free_documents import FreeOpinionReport
 from juriscraper.state.texas import (
     TexasCaseParty,
+    TexasCourtOfCriminalAppealsDocket,
+    TexasSupremeCourtDocket,
 )
 from juriscraper.state.texas.common import CourtID, CourtType
+from juriscraper.state.texas.court_of_appeals import TexasCourtOfAppealsDocket
 from openai import RateLimitError
 from pydantic import ValidationError
 
@@ -74,6 +79,15 @@ from cl.corpus_importer.management.commands.normalize_judges_opinions import (
 from cl.corpus_importer.management.commands.probe_iquery_pages_daemon import (
     get_latest_pacer_case_id_for_courts,
 )
+from cl.corpus_importer.management.commands.scrape_pacer_free_opinions import (
+    CL_OPERATIONAL_EXCLUSIONS,
+    EXCLUDED_COURT_IDS,
+    OUTSTANDING_FAILED_LOOKBACK_DAYS,
+    do_everything,
+    get_and_save_free_document_reports,
+    get_outstanding_failed_dates,
+    report_free_document_scrape_stalls,
+)
 from cl.corpus_importer.management.commands.update_casenames_wl_dataset import (
     check_case_names_match,
     parse_citations,
@@ -83,12 +97,14 @@ from cl.corpus_importer.signals import (
     update_latest_case_id_and_schedule_iquery_sweep,
 )
 from cl.corpus_importer.state.texas.utils import is_missing_file_page
+from cl.corpus_importer.state.utils import MergeResult
 from cl.corpus_importer.tasks import (
-    MergeResult,
     classify_case_name_by_llm,
     download_texas_document,
     generate_ia_json,
     get_and_save_free_document_report,
+    is_texas_appellate_docket,
+    is_texas_supreme_docket,
     merge_texas_case_transfers,
     merge_texas_docket,
     merge_texas_docket_entry,
@@ -151,7 +167,7 @@ from cl.recap.management.commands.nightly_pacer_updates import (
 )
 from cl.recap.models import UPLOAD_TYPE, PacerHtmlFiles
 from cl.recap.tests.tests import mock_bucket_open
-from cl.scrapers.models import PACERFreeDocumentRow
+from cl.scrapers.models import PACERFreeDocumentLog, PACERFreeDocumentRow
 from cl.scrapers.tasks import update_docket_info_iquery
 from cl.search.cluster_sources import ClusterSources
 from cl.search.factories import (
@@ -171,6 +187,7 @@ from cl.search.models import (
     SEARCH_TYPES,
     CaseTransfer,
     Citation,
+    Court,
     Docket,
     Opinion,
     OpinionCluster,
@@ -618,6 +635,267 @@ class PacerDocketParserTest(TestCase):
         self.assertTrue(row[0].pacer_case_id)
         self.assertTrue(row[0].pacer_doc_id)
         self.assertTrue(row[0].pacer_seq_no)
+
+
+class FreeOpinionExcludedCourtsTest(SimpleTestCase):
+    """The free-opinion exclusion set defers to juriscraper and unions our own
+    operational exclusions, rather than hardcoding a list that drifts."""
+
+    def test_defers_to_juriscraper_and_unions_operational(self) -> None:
+        # Every court juriscraper can't fetch must also be skipped here, and we
+        # add nothing beyond that plus our own operational exclusions. This
+        # guards against anyone re-hardcoding a divergent literal list.
+        expected = set(FreeOpinionReport.EXCLUDED_COURT_IDS) | set(
+            CL_OPERATIONAL_EXCLUSIONS
+        )
+        self.assertEqual(set(EXCLUDED_COURT_IDS), expected)
+
+    def test_operational_exclusions_are_included(self) -> None:
+        for court_id in CL_OPERATIONAL_EXCLUSIONS:
+            self.assertIn(court_id, EXCLUDED_COURT_IDS)
+
+
+class ScrapeFreeOpinionsLoopTest(TestCase):
+    """Tests for the free-opinion catch-up loop and the stall reporter."""
+
+    @classmethod
+    def setUpTestData(cls) -> None:
+        cls.court = CourtFactory.create(
+            id="nysd",
+            jurisdiction=Court.FEDERAL_DISTRICT,
+            in_use=True,
+            end_date=None,
+        )
+
+    def _log(self, day: date, status: int) -> PACERFreeDocumentLog:
+        return PACERFreeDocumentLog.objects.create(
+            court_id=self.court.pk,
+            date_queried=day,
+            status=status,
+        )
+
+    @patch(
+        "cl.corpus_importer.management.commands.scrape_pacer_free_opinions.time.sleep"
+    )
+    @patch(
+        "cl.corpus_importer.management.commands.scrape_pacer_free_opinions.fetch_doc_report"
+    )
+    def test_failed_chunk_does_not_abort_remaining_days(
+        self, mock_fetch, mock_sleep
+    ) -> None:
+        """A single failed day must not bail the rest of the range."""
+        start = date(2025, 11, 1)
+        end = date(2025, 11, 3)
+        # Fail the middle day, succeed the others.
+        mock_fetch.side_effect = lambda court, s, e, day_span=1: s == date(
+            2025, 11, 2
+        )
+
+        get_and_save_free_document_reports(
+            [self.court.pk], start, end, day_span=1
+        )
+
+        queried_days = [c.args[1] for c in mock_fetch.call_args_list]
+        self.assertEqual(
+            queried_days,
+            [date(2025, 11, 1), date(2025, 11, 2), date(2025, 11, 3)],
+            "All three days should be attempted despite the middle failure.",
+        )
+
+    def test_get_outstanding_failed_dates(self) -> None:
+        """Only never-succeeded days within the look-back are returned."""
+        before = date(2026, 5, 20)
+        # Failed, never succeeded -> outstanding.
+        self._log(date(2026, 5, 1), PACERFreeDocumentLog.SCRAPE_FAILED)
+        # Failed then succeeded -> not outstanding.
+        self._log(date(2026, 5, 2), PACERFreeDocumentLog.SCRAPE_FAILED)
+        self._log(date(2026, 5, 2), PACERFreeDocumentLog.SCRAPE_SUCCESSFUL)
+        # Succeeded only -> not outstanding.
+        self._log(date(2026, 5, 3), PACERFreeDocumentLog.SCRAPE_SUCCESSFUL)
+        # Failed but on/after `before` -> covered by the forward range.
+        self._log(date(2026, 5, 20), PACERFreeDocumentLog.SCRAPE_FAILED)
+        # Failed but older than the look-back floor -> dropped.
+        old_day = date(2026, 5, 20) - timedelta(
+            days=OUTSTANDING_FAILED_LOOKBACK_DAYS + 5
+        )
+        self._log(old_day, PACERFreeDocumentLog.SCRAPE_FAILED)
+
+        with time_machine.travel(datetime(2026, 5, 26), tick=False):
+            outstanding = get_outstanding_failed_dates(
+                self.court.pk,
+                before=before,
+                floor=date(2026, 5, 26)
+                - timedelta(days=OUTSTANDING_FAILED_LOOKBACK_DAYS),
+            )
+
+        self.assertEqual(outstanding, [date(2026, 5, 1)])
+
+    @patch(
+        "cl.corpus_importer.management.commands.scrape_pacer_free_opinions.time.sleep"
+    )
+    @patch(
+        "cl.corpus_importer.management.commands.scrape_pacer_free_opinions.fetch_doc_report"
+    )
+    def test_catch_up_retries_outstanding_failed_day(
+        self, mock_fetch, mock_sleep
+    ) -> None:
+        """The no-date path retries a failed day behind the cursor."""
+        mock_fetch.return_value = False
+        with time_machine.travel(datetime(2026, 5, 26), tick=False):
+            today = date(2026, 5, 26)
+            # Recent success -> cursor becomes today - 5 = 2026-05-21.
+            self._log(
+                today - timedelta(days=3),
+                PACERFreeDocumentLog.SCRAPE_SUCCESSFUL,
+            )
+            # A failed day behind the cursor must be retried.
+            self._log(
+                today - timedelta(days=10), PACERFreeDocumentLog.SCRAPE_FAILED
+            )
+
+            get_and_save_free_document_reports(
+                [self.court.pk], None, None, day_span=1
+            )
+
+        queried_days = [c.args[1] for c in mock_fetch.call_args_list]
+        self.assertIn(date(2026, 5, 16), queried_days)
+        # The retried failed day runs before the forward range begins.
+        self.assertEqual(queried_days[0], date(2026, 5, 16))
+
+    @patch(
+        "cl.corpus_importer.management.commands.scrape_pacer_free_opinions.time.sleep"
+    )
+    @patch(
+        "cl.corpus_importer.management.commands.scrape_pacer_free_opinions.fetch_doc_report"
+    )
+    def test_resolved_failed_day_is_kept_but_not_requeried(
+        self, mock_fetch, mock_sleep
+    ) -> None:
+        """A failed day that later succeeded keeps its history and isn't redone."""
+        mock_fetch.return_value = False
+        gap_day = date(2026, 5, 16)
+        with time_machine.travel(datetime(2026, 5, 26), tick=False):
+            today = date(2026, 5, 26)
+            # Recent success -> cursor becomes today - 5 = 2026-05-21.
+            self._log(
+                today - timedelta(days=3),
+                PACERFreeDocumentLog.SCRAPE_SUCCESSFUL,
+            )
+            # gap_day already failed once and later succeeded.
+            self._log(gap_day, PACERFreeDocumentLog.SCRAPE_FAILED)
+            self._log(gap_day, PACERFreeDocumentLog.SCRAPE_SUCCESSFUL)
+
+            get_and_save_free_document_reports(
+                [self.court.pk], None, None, day_span=1
+            )
+
+        queried_days = [c.args[1] for c in mock_fetch.call_args_list]
+        # Resolved day must not be re-queried (it has a success row)...
+        self.assertNotIn(gap_day, queried_days)
+        # ...but its failed row is kept as history.
+        self.assertTrue(
+            PACERFreeDocumentLog.objects.filter(
+                court_id=self.court.pk,
+                status=PACERFreeDocumentLog.SCRAPE_FAILED,
+                date_queried=gap_day,
+            ).exists()
+        )
+
+    @patch(
+        "cl.corpus_importer.management.commands.scrape_pacer_free_opinions.logger"
+    )
+    def test_report_stalls_flags_stale_court(self, mock_logger) -> None:
+        """A court whose newest success is too old is reported."""
+        with time_machine.travel(datetime(2026, 5, 26), tick=False):
+            self._log(date(2026, 4, 1), PACERFreeDocumentLog.SCRAPE_SUCCESSFUL)
+            stalled = report_free_document_scrape_stalls(
+                [self.court.pk], stale_days=14
+            )
+
+        self.assertEqual(stalled, [(self.court.pk, date(2026, 4, 1))])
+        mock_logger.error.assert_called_once()
+        # The Sentry fingerprint groups the alert per court.
+        self.assertEqual(
+            mock_logger.error.call_args.kwargs["extra"]["fingerprint"],
+            ["pacer-free-opinion-stall", self.court.pk],
+        )
+
+    def test_report_stalls_ignores_fresh_court(self) -> None:
+        """A court that advanced recently is not reported."""
+        with time_machine.travel(datetime(2026, 5, 26), tick=False):
+            self._log(
+                date(2026, 5, 25), PACERFreeDocumentLog.SCRAPE_SUCCESSFUL
+            )
+            stalled = report_free_document_scrape_stalls(
+                [self.court.pk], stale_days=14
+            )
+        self.assertEqual(stalled, [])
+
+    @patch(
+        "cl.corpus_importer.management.commands.scrape_pacer_free_opinions.logger"
+    )
+    def test_report_stalls_enumerates_gaps(self, mock_logger) -> None:
+        """Outstanding failed days past the active window are listed as ranges."""
+        with time_machine.travel(datetime(2026, 5, 26), tick=False):
+            # Recent success -> the court itself is not stalled.
+            self._log(
+                date(2026, 5, 25), PACERFreeDocumentLog.SCRAPE_SUCCESSFUL
+            )
+            # A genuine single-day gap.
+            self._log(date(2026, 3, 1), PACERFreeDocumentLog.SCRAPE_FAILED)
+            # Three consecutive gap days -> collapse into one range.
+            self._log(date(2026, 3, 5), PACERFreeDocumentLog.SCRAPE_FAILED)
+            self._log(date(2026, 3, 6), PACERFreeDocumentLog.SCRAPE_FAILED)
+            self._log(date(2026, 3, 7), PACERFreeDocumentLog.SCRAPE_FAILED)
+            # Failed then succeeded -> resolved, not a gap.
+            self._log(date(2026, 3, 2), PACERFreeDocumentLog.SCRAPE_FAILED)
+            self._log(date(2026, 3, 2), PACERFreeDocumentLog.SCRAPE_SUCCESSFUL)
+            # Failed inside the active re-query window -> still being retried.
+            self._log(date(2026, 5, 24), PACERFreeDocumentLog.SCRAPE_FAILED)
+
+            stalled = report_free_document_scrape_stalls(
+                [self.court.pk], stale_days=14
+            )
+
+        self.assertEqual(stalled, [])
+        gap_calls = [
+            c
+            for c in mock_logger.error.call_args_list
+            if c.kwargs.get("extra", {}).get("fingerprint", [None])[0]
+            == "pacer-free-opinion-gaps"
+        ]
+        self.assertEqual(len(gap_calls), 1)
+        # args: (fmt, gap_count, range_count, court_id, range_lines)
+        self.assertEqual(gap_calls[0].args[1], 4)  # 4 gap days
+        self.assertEqual(gap_calls[0].args[2], 2)  # in 2 ranges
+        self.assertEqual(gap_calls[0].args[3], self.court.pk)
+        range_lines = gap_calls[0].args[4]
+        self.assertIn("2026-03-01", range_lines)
+        # Consecutive days collapse into a single "start to end" line.
+        self.assertIn("2026-03-05 to 2026-03-07", range_lines)
+        # Each range is on its own line.
+        self.assertEqual(len(range_lines.splitlines()), 2)
+        self.assertNotIn("2026-03-02", range_lines)
+        self.assertNotIn("2026-05-24", range_lines)
+
+    @patch(
+        "cl.corpus_importer.management.commands.scrape_pacer_free_opinions.report_free_document_scrape_stalls"
+    )
+    @patch(
+        "cl.corpus_importer.management.commands.scrape_pacer_free_opinions.ocr_available"
+    )
+    @patch(
+        "cl.corpus_importer.management.commands.scrape_pacer_free_opinions.get_pdfs"
+    )
+    @patch(
+        "cl.corpus_importer.management.commands.scrape_pacer_free_opinions.get_and_save_free_document_reports"
+    )
+    def test_do_everything_runs_stall_report(
+        self, mock_reports, mock_pdfs, mock_ocr, mock_stalls
+    ) -> None:
+        """do-everything self-monitors by calling the stall reporter."""
+        do_everything([self.court.pk], None, None, "pacerdoc1", day_span=1)
+        mock_stalls.assert_called_once_with([self.court.pk])
 
 
 class GetQuarterTest(SimpleTestCase):
@@ -2175,7 +2453,7 @@ class TexasMergerTest(TestCase):
         )
         self.download_task_mock = self.download_task_patch.start()
         self.extract_document_patch = patch(
-            "cl.corpus_importer.tasks.extract_formatted_text_document.s"
+            "cl.scrapers.tasks.extract_formatted_text_document.si"
         )
         self.extract_document_mock = self.extract_document_patch.start()
         self.download_document_patch = patch(
@@ -2455,8 +2733,8 @@ class TexasMergerTest(TestCase):
         self.download_task_mock.assert_not_called()
 
     @mock.patch("cl.lib.celery_utils.get_task_wait", return_value=0)
-    @mock.patch("cl.corpus_importer.tasks.doc_page_count_service")
-    @mock.patch("cl.corpus_importer.tasks.get_extension", return_value=".pdf")
+    @mock.patch("cl.lib.microservice_utils.doc_page_count_service")
+    @mock.patch("cl.scrapers.utils.get_extension", return_value=".pdf")
     @responses.activate
     def test_merge_texas_document_plaintext_extraction(
         self, ext_mock, pcs_mock, throttle_mock
@@ -2519,25 +2797,30 @@ class TexasMergerTest(TestCase):
                 self.docket_coa1, "2025-01-02.000", case_event, appellate_brief
             )
 
-        assert output.create is True
-        assert output.update is False
-        assert output.success is True
-        assert "TexasDocketEntry" in output.creates
+        self.assertTrue(output.create)
+        self.assertFalse(output.update)
+        self.assertTrue(output.success)
+        self.assertIn("TexasDocketEntry", output.creates)
         entry_pk = next(iter(output.creates["TexasDocketEntry"]))
         created_docket_entry = TexasDocketEntry.objects.get(pk=entry_pk)
-        assert created_docket_entry.docket_id == self.docket_coa1.id
-        assert created_docket_entry.entry_type == case_event["type"]
-        assert created_docket_entry.disposition == case_event["disposition"]
-        assert created_docket_entry.description == (
-            appellate_brief["description"] if appellate_brief else ""
+        self.assertEqual(created_docket_entry.docket_id, self.docket_coa1.id)
+        self.assertEqual(created_docket_entry.entry_type, case_event["type"])
+        self.assertEqual(
+            created_docket_entry.disposition, case_event["disposition"]
         )
-        assert created_docket_entry.remarks == case_event.get("remarks", "")
-        assert created_docket_entry.date_filed == case_event["date"]
+        self.assertEqual(
+            created_docket_entry.description,
+            appellate_brief["description"] if appellate_brief else "",
+        )
+        self.assertEqual(
+            created_docket_entry.remarks, case_event.get("remarks", "")
+        )
+        self.assertEqual(created_docket_entry.date_filed, case_event["date"])
         n_attachments = TexasDocument.objects.filter(
             docket_entry_id=created_docket_entry.id
         ).count()
-        assert n_attachments == 1
-        assert self.extract_document_mock.call_count == 1
+        self.assertEqual(n_attachments, 1)
+        self.assertEqual(self.download_task_mock.call_count, 1)
 
     def test_merge_texas_docket_entry_no_update(self):
         """Can we correctly handle a docket entry update noop?"""
@@ -2564,7 +2847,7 @@ class TexasMergerTest(TestCase):
             document.filepath_local = "a"
             document.save()
         # Reset call count
-        self.extract_document_mock.reset_mock()
+        self.download_task_mock.reset_mock()
 
         # noop
         with self.captureOnCommitCallbacks(execute=True):
@@ -2572,24 +2855,29 @@ class TexasMergerTest(TestCase):
                 self.docket_coa1, "2025-01-02.000", case_event, appellate_brief
             )
 
-        assert output.create is False
-        assert output.update is True
-        assert output.success is True
-        assert entry_pk in output.updates["TexasDocketEntry"]
+        self.assertFalse(output.create)
+        self.assertTrue(output.update)
+        self.assertTrue(output.success)
+        self.assertIn(entry_pk, output.updates["TexasDocketEntry"])
         created_docket_entry = TexasDocketEntry.objects.get(pk=entry_pk)
-        assert created_docket_entry.docket_id == self.docket_coa1.id
-        assert created_docket_entry.entry_type == case_event["type"]
-        assert created_docket_entry.disposition == case_event["disposition"]
-        assert created_docket_entry.description == (
-            appellate_brief["description"] if appellate_brief else ""
+        self.assertEqual(created_docket_entry.docket_id, self.docket_coa1.id)
+        self.assertEqual(created_docket_entry.entry_type, case_event["type"])
+        self.assertEqual(
+            created_docket_entry.disposition, case_event["disposition"]
         )
-        assert created_docket_entry.remarks == case_event.get("remarks", "")
-        assert created_docket_entry.date_filed == case_event["date"]
+        self.assertEqual(
+            created_docket_entry.description,
+            appellate_brief["description"] if appellate_brief else "",
+        )
+        self.assertEqual(
+            created_docket_entry.remarks, case_event.get("remarks", "")
+        )
+        self.assertEqual(created_docket_entry.date_filed, case_event["date"])
         n_attachments = TexasDocument.objects.filter(
             docket_entry_id=created_docket_entry.id
         ).count()
-        assert n_attachments == len(case_event["attachments"])
-        assert self.extract_document_mock.call_count == 0
+        self.assertEqual(n_attachments, len(case_event["attachments"]))
+        self.assertEqual(self.download_task_mock.call_count, 0)
 
     def test_merge_texas_docket_entry_add_document(self):
         """Can we correctly add a new document to an existing docket entry?"""
@@ -2617,7 +2905,7 @@ class TexasMergerTest(TestCase):
             document.filepath_local = "a"
             document.save()
         # Reset call count
-        self.extract_document_mock.reset_mock()
+        self.download_task_mock.reset_mock()
 
         case_event["attachments"].append(TexasCaseDocumentDictFactory())
         with self.captureOnCommitCallbacks(execute=True):
@@ -2625,24 +2913,29 @@ class TexasMergerTest(TestCase):
                 self.docket_coa1, "2025-01-02.000", case_event, appellate_brief
             )
 
-        assert output.create is True
-        assert output.update is True
-        assert output.success is True
-        assert entry_pk in output.updates["TexasDocketEntry"]
+        self.assertTrue(output.create)
+        self.assertTrue(output.update)
+        self.assertTrue(output.success)
+        self.assertIn(entry_pk, output.updates["TexasDocketEntry"])
         created_docket_entry = TexasDocketEntry.objects.get(pk=entry_pk)
-        assert created_docket_entry.docket_id == self.docket_coa1.id
-        assert created_docket_entry.entry_type == case_event["type"]
-        assert created_docket_entry.remarks == case_event.get("remarks", "")
-        assert created_docket_entry.description == (
-            appellate_brief["description"] if appellate_brief else ""
+        self.assertEqual(created_docket_entry.docket_id, self.docket_coa1.id)
+        self.assertEqual(created_docket_entry.entry_type, case_event["type"])
+        self.assertEqual(
+            created_docket_entry.remarks, case_event.get("remarks", "")
         )
-        assert created_docket_entry.disposition == case_event["disposition"]
-        assert created_docket_entry.date_filed == case_event["date"]
+        self.assertEqual(
+            created_docket_entry.description,
+            appellate_brief["description"] if appellate_brief else "",
+        )
+        self.assertEqual(
+            created_docket_entry.disposition, case_event["disposition"]
+        )
+        self.assertEqual(created_docket_entry.date_filed, case_event["date"])
         n_attachments = TexasDocument.objects.filter(
             docket_entry_id=created_docket_entry.id
         ).count()
-        assert n_attachments == initial_n_attachments + 1
-        assert self.extract_document_mock.call_count == 1
+        self.assertEqual(n_attachments, initial_n_attachments + 1)
+        self.assertEqual(self.download_task_mock.call_count, 1)
 
     def test_merge_texas_docket_entry_multiple_matches_with_sequence(self):
         """When multiple entries match by date/type/brief, use the one with matching sequence number."""
@@ -2965,8 +3258,8 @@ class TexasMergerTest(TestCase):
         assert result == []
 
     @mock.patch("cl.lib.celery_utils.get_task_wait", return_value=0)
-    @mock.patch("cl.corpus_importer.tasks.doc_page_count_service")
-    @mock.patch("cl.corpus_importer.tasks.get_extension", return_value=".pdf")
+    @mock.patch("cl.lib.microservice_utils.doc_page_count_service")
+    @mock.patch("cl.scrapers.utils.get_extension", return_value=".pdf")
     @responses.activate
     def test_download_texas_document_pdf_success(
         self, ext_mock, pcs_mock, throttle_mock
@@ -2991,13 +3284,13 @@ class TexasMergerTest(TestCase):
 
         result = download_texas_document(texas_document.pk)
 
-        assert result is not None
+        self.assertIsNotNone(result)
         texas_document.refresh_from_db()
-        assert texas_document.filepath_local is not None
-        assert texas_document.page_count == 1
-        assert texas_document.processing_error is None
-        assert pdf_response.call_count == 1
-        assert pcs_mock.call_count == 1
+        self.assertIsNotNone(texas_document.filepath_local)
+        self.assertEqual(texas_document.page_count, 1)
+        self.assertIsNone(texas_document.processing_error)
+        self.assertEqual(pdf_response.call_count, 1)
+        self.assertEqual(pcs_mock.call_count, 1)
 
     def test_download_texas_document_not_found(self):
         """Do we handle a missing TexasDocument gracefully?"""
@@ -3030,7 +3323,7 @@ class TexasMergerTest(TestCase):
         assert not texas_document.filepath_local
 
     @mock.patch("cl.lib.celery_utils.get_task_wait", return_value=0)
-    @mock.patch("cl.corpus_importer.tasks.get_extension", return_value=".html")
+    @mock.patch("cl.scrapers.utils.get_extension", return_value=".html")
     def test_download_texas_document_html(self, ext_mock, throttle_mock):
         """Does an HTML document get saved to filepath_local?"""
         from tempfile import NamedTemporaryFile
@@ -3048,22 +3341,23 @@ class TexasMergerTest(TestCase):
 
             result = download_texas_document(texas_document.pk)
 
-        # HTML is extractable, so pk is returned and chain continues
-        assert result == texas_document.pk
+        # HTML is extractable, so extraction is dispatched
+        self.assertEqual(result, texas_document.pk)
+        self.extract_document_mock.assert_called_once()
         texas_document.refresh_from_db()
-        assert texas_document.filepath_local
-        assert texas_document.sha1 == "abc123sha1"
-        assert ".html" in texas_document.filepath_local.name
-        assert texas_document.processing_error is None
+        self.assertTrue(texas_document.filepath_local)
+        self.assertEqual(texas_document.sha1, "abc123sha1")
+        self.assertIn(".html", texas_document.filepath_local.name)
+        self.assertIsNone(texas_document.processing_error)
         # No page_count for non-PDFs
-        assert texas_document.page_count is None
+        self.assertIsNone(texas_document.page_count)
 
     @mock.patch("cl.lib.celery_utils.get_task_wait", return_value=0)
-    @mock.patch("cl.corpus_importer.tasks.get_extension", return_value=".mp3")
-    def test_download_texas_document_mp3_breaks_chain(
+    @mock.patch("cl.scrapers.utils.get_extension", return_value=".mp3")
+    def test_download_texas_document_mp3_skips_extraction(
         self, ext_mock, throttle_mock
     ):
-        """Does an MP3 get saved but skip the extract chain?"""
+        """Does an MP3 get saved but skip extraction?"""
         from tempfile import NamedTemporaryFile
 
         texas_document = TexasDocumentFactory.create()
@@ -3079,19 +3373,22 @@ class TexasMergerTest(TestCase):
 
             result = download_texas_document(texas_document.pk)
 
-        # MP3 is not extractable — chain broken, None returned
-        assert result is None
+        # MP3 is not extractable — no extraction dispatched
+        self.assertEqual(result, texas_document.pk)
+        self.extract_document_mock.assert_not_called()
         texas_document.refresh_from_db()
-        assert texas_document.filepath_local
-        assert texas_document.sha1 == "mp3sha1hash"
-        assert ".mp3" in texas_document.filepath_local.name
-        assert texas_document.ocr_status == TexasDocument.OCR_UNNECESSARY
-        assert texas_document.processing_error is None
-        assert not texas_document.plain_text
+        self.assertTrue(texas_document.filepath_local)
+        self.assertEqual(texas_document.sha1, "mp3sha1hash")
+        self.assertIn(".mp3", texas_document.filepath_local.name)
+        self.assertEqual(
+            texas_document.ocr_status, TexasDocument.OCR_UNNECESSARY
+        )
+        self.assertIsNone(texas_document.processing_error)
+        self.assertFalse(texas_document.plain_text)
 
     @mock.patch("cl.lib.celery_utils.get_task_wait", return_value=0)
-    @mock.patch("cl.corpus_importer.tasks.get_extension", return_value=".docx")
-    @mock.patch("cl.corpus_importer.tasks.logger")
+    @mock.patch("cl.scrapers.utils.get_extension", return_value=".docx")
+    @mock.patch("cl.search.state.shared.logger")
     def test_download_texas_document_unknown_extension_logged(
         self, logger_mock, ext_mock, throttle_mock
     ):
@@ -3111,21 +3408,24 @@ class TexasMergerTest(TestCase):
 
             result = download_texas_document(texas_document.pk)
 
-        # Unknown extension is not extractable — chain broken, None returned
-        assert result is None
+        # Unknown extension is not extractable — no extraction dispatched
+        self.assertEqual(result, texas_document.pk)
+        self.extract_document_mock.assert_not_called()
         # Should log a warning about the unknown extension
         logger_mock.warning.assert_any_call(
-            "Texas document download: Unexpected file extension "
-            "'%s' for TexasDocument %s from %s. Proceeding anyway.",
+            "Document download: Unexpected extension '%s' for %s %s from %s. Proceeding anyway.",
             ".docx",
+            "TexasDocument",
             texas_document.pk,
             texas_document.url,
         )
         texas_document.refresh_from_db()
-        assert texas_document.filepath_local
-        assert texas_document.sha1 == "docxsha1"
-        assert texas_document.ocr_status == TexasDocument.OCR_UNNECESSARY
-        assert texas_document.processing_error is None
+        self.assertTrue(texas_document.filepath_local)
+        self.assertEqual(texas_document.sha1, "docxsha1")
+        self.assertEqual(
+            texas_document.ocr_status, TexasDocument.OCR_UNNECESSARY
+        )
+        self.assertIsNone(texas_document.processing_error)
 
     @mock.patch("cl.lib.celery_utils.get_task_wait", return_value=0)
     @responses.activate
@@ -3173,7 +3473,7 @@ class TexasMergerTest(TestCase):
 
     @mock.patch("cl.lib.celery_utils.get_task_wait", return_value=0)
     @mock.patch("cl.scrapers.tasks.microservice", new_callable=mock.AsyncMock)
-    @mock.patch("cl.corpus_importer.tasks.get_extension", return_value=".html")
+    @mock.patch("cl.scrapers.utils.get_extension", return_value=".html")
     def test_html_download_and_extraction_strips_tags(
         self, ext_mock, microservice_mock, throttle_mock
     ):
@@ -3201,11 +3501,11 @@ class TexasMergerTest(TestCase):
 
             download_result = download_texas_document(texas_document.pk)
 
-        # HTML is extractable — pk returned and chain continues
-        assert download_result == texas_document.pk
+        # HTML is extractable — pk returned and extraction dispatched
+        self.assertEqual(download_result, texas_document.pk)
         texas_document.refresh_from_db()
-        assert texas_document.filepath_local
-        assert ".html" in texas_document.filepath_local.name
+        self.assertTrue(texas_document.filepath_local)
+        self.assertIn(".html", texas_document.filepath_local.name)
 
         # Mock Doctor returning HTML content
         microservice_mock.return_value = httpx.Response(
@@ -3226,11 +3526,115 @@ class TexasMergerTest(TestCase):
         )
 
         texas_document.refresh_from_db()
-        assert texas_document.ocr_status == TexasDocument.OCR_UNNECESSARY
-        assert texas_document.processing_error is None
-        assert "<" not in texas_document.plain_text
-        assert "Hello" in texas_document.plain_text
-        assert "world" in texas_document.plain_text
+        self.assertEqual(
+            texas_document.ocr_status, TexasDocument.OCR_UNNECESSARY
+        )
+        self.assertIsNone(texas_document.processing_error)
+        self.assertNotIn("<", texas_document.plain_text)
+        self.assertIn("Hello", texas_document.plain_text)
+        self.assertIn("world", texas_document.plain_text)
+
+    def test_is_texas_appellate_docket(self):
+        appeals_docket_data = cast(
+            TexasCourtOfAppealsDocket
+            | TexasCourtOfCriminalAppealsDocket
+            | TexasSupremeCourtDocket,
+            cast(
+                object,  # cast to `object` suppresses checker warning
+                TexasCourtOfAppealsDocketDictFactory(
+                    court_id=CourtID.FIRST_COURT_OF_APPEALS.value,
+                    docket_number=self.docket_number_coa1,
+                    originating_court=TexasOriginatingDistrictCourtDictFactory(
+                        district=5,
+                    ),
+                ),
+            ),
+        )
+        supreme_docket_data = cast(
+            TexasCourtOfAppealsDocket
+            | TexasCourtOfCriminalAppealsDocket
+            | TexasSupremeCourtDocket,
+            cast(
+                object,  # cast to `object` suppresses checker warning
+                TexasFinalCourtDocketDictFactory(
+                    court_id=CourtID.SUPREME_COURT.value,
+                    docket_number=DocketFactory.create(
+                        court=self.texas_cca
+                    ).docket_number,
+                    appeals_court=TexasAppellateCourtInfoDictFactory(
+                        court_id=CourtID.FIRST_COURT_OF_APPEALS.value,
+                    ),
+                ),
+            ),
+        )
+
+        self.assertTrue(is_texas_appellate_docket(appeals_docket_data))
+        self.assertFalse(is_texas_appellate_docket(supreme_docket_data))
+
+        # Here we make sure that narrowing is legible to analyzer with
+        # `assert_type`
+        if is_texas_appellate_docket(appeals_docket_data):
+            assert_type(appeals_docket_data, TexasCourtOfAppealsDocket)
+        else:
+            self.fail()
+        if not is_texas_appellate_docket(supreme_docket_data):
+            assert_type(
+                supreme_docket_data,
+                TexasCourtOfCriminalAppealsDocket | TexasSupremeCourtDocket,
+            )
+        else:
+            self.fail()
+
+    def test_is_texas_supreme_docket(self):
+        appeals_docket_data = cast(
+            TexasCourtOfAppealsDocket
+            | TexasCourtOfCriminalAppealsDocket
+            | TexasSupremeCourtDocket,
+            cast(
+                object,
+                TexasCourtOfAppealsDocketDictFactory(
+                    court_id=CourtID.FIRST_COURT_OF_APPEALS.value,
+                    docket_number=self.docket_number_coa1,
+                    originating_court=TexasOriginatingDistrictCourtDictFactory(
+                        district=5,
+                    ),
+                ),
+            ),
+        )
+        supreme_docket_data = cast(
+            TexasCourtOfAppealsDocket
+            | TexasCourtOfCriminalAppealsDocket
+            | TexasSupremeCourtDocket,
+            cast(
+                object,
+                TexasFinalCourtDocketDictFactory(
+                    court_id=CourtID.SUPREME_COURT.value,
+                    docket_number=DocketFactory.create(
+                        court=self.texas_cca
+                    ).docket_number,
+                    appeals_court=TexasAppellateCourtInfoDictFactory(
+                        court_id=CourtID.FIRST_COURT_OF_APPEALS.value,
+                    ),
+                ),
+            ),
+        )
+
+        self.assertFalse(is_texas_supreme_docket(appeals_docket_data))
+        self.assertTrue(is_texas_supreme_docket(supreme_docket_data))
+
+        # Here we make sure that narrowing is legible to analyzer with
+        # `assert_type`
+        if not is_texas_supreme_docket(appeals_docket_data):
+            assert_type(appeals_docket_data, TexasCourtOfAppealsDocket)
+        else:
+            self.fail()
+        if is_texas_supreme_docket(supreme_docket_data):
+            assert_type(
+                supreme_docket_data,
+                TexasCourtOfCriminalAppealsDocket | TexasSupremeCourtDocket,
+            )
+        else:
+            self.fail()
 
     def test_merge_texas_docket_originating_court_creates_new(self):
         """Can we create new originating court information?"""
@@ -3238,6 +3642,7 @@ class TexasMergerTest(TestCase):
         self.docket_coa1.save()
         docket_data = TexasCourtOfAppealsDocketDictFactory(
             docket_number=self.docket_number_coa1,
+            docket_number_raw=self.docket_number_coa1,
             originating_court=TexasOriginatingDistrictCourtDictFactory(
                 district=5,
             ),
@@ -3258,6 +3663,10 @@ class TexasMergerTest(TestCase):
             == docket_data["originating_court"]["case"]
         )
         assert (
+            originating_info.docket_number_raw
+            == docket_data["originating_court"]["case"]
+        )
+        assert (
             originating_info.court_reporter
             == docket_data["originating_court"]["reporter"]
         )
@@ -3271,6 +3680,7 @@ class TexasMergerTest(TestCase):
         # Create existing originating court information
         self.docket_coa1.originating_court_information = (
             OriginatingCourtInformation.objects.create(
+                docket_number_raw="OLD-123",
                 docket_number="OLD-123",
                 court_reporter="Old Reporter",
                 assigned_to_str="Old Judge",
@@ -3282,6 +3692,7 @@ class TexasMergerTest(TestCase):
         docket_data = TexasCourtOfAppealsDocketDictFactory(
             court_id=CourtID.FIRST_COURT_OF_APPEALS.value,
             docket_number=self.docket_number_coa1,
+            docket_number_raw=self.docket_number_coa1,
             originating_court=originating_court,
         )
 
@@ -3296,6 +3707,7 @@ class TexasMergerTest(TestCase):
         updated_info = self.docket_coa1.originating_court_information
         assert updated_info is not None
         assert updated_info.docket_number == originating_court["case"]
+        assert updated_info.docket_number_raw == originating_court["case"]
         assert updated_info.court_reporter == originating_court["reporter"]
         assert updated_info.assigned_to_str == originating_court["judge"]
 

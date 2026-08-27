@@ -194,8 +194,11 @@ def _probe_scotus_sequence(
       each hit so a crash between the probe phase and full ingestion can
       resume without re-probing.
 
-    On entry, if ``observed > ingested`` the previous run was interrupted
-    mid-ingestion; only the ingest step is repeated for the gap.
+    On entry, if ``observed > ingested`` (a previous run was interrupted
+    mid-ingestion, or HIGHEST_SCOTUS_OBSERVED_SERIAL was seeded to backfill a
+    known gap), the probe is skipped and the daemon sweeps the gap instead,
+    ingesting at most ``SCOTUS_FIXED_SWEEP`` serials per iteration. Forward
+    probing resumes once ``ingested`` catches up.
 
     :param r: Redis interface.
     :param sequence: The docket-number sequence.
@@ -220,14 +223,24 @@ def _probe_scotus_sequence(
         int(raw_observed) if raw_observed is not None else highest_ingested
     )
 
-    # Recovery path: a previous run completed the probe but was interrupted
-    # mid-ingestion.  Resume from where we left off without re-probing.
+    # Recovery / sweep path: ``highest_observed > highest_ingested`` either
+    # because a previous run was interrupted mid-ingestion, or because the
+    # operator seeded ``HIGHEST_SCOTUS_OBSERVED_SERIAL`` ahead of the ingested
+    # watermark to backfill a known gap. Resume ingestion without re-probing,
+    # but cap each iteration at ``SCOTUS_FIXED_SWEEP`` serials so a large
+    # backlog (thousands of cases) is processed slowly across many iterations
+    # rather than hammering supremecourt.gov in one burst. The daemon falls
+    # back to forward probing once ``highest_ingested`` catches up.
     if highest_observed > highest_ingested:
+        sweep_cap = highest_ingested + settings.SCOTUS_FIXED_SWEEP  # type: ignore[misc]
+        to_serial = min(highest_observed, sweep_cap)
         logger.info(
-            "SCOTUS %s %s: resuming interrupted ingestion (%s..%s].",
+            "SCOTUS %s %s: %s ingestion (%s..%s] (highest observed: %s).",
             sequence,
             term_year_2digit,
+            "sweeping" if to_serial < highest_observed else "resuming",
             highest_ingested,
+            to_serial,
             highest_observed,
         )
         return _ingest_serial_range(
@@ -236,11 +249,12 @@ def _probe_scotus_sequence(
             sequence,
             term_year_2digit,
             from_serial=highest_ingested,
-            to_serial=highest_observed,
+            to_serial=to_serial,
         )
 
     # Normal path: probe forward from the current watermark.
-    jitter = compute_binary_probe_jitter(testing)
+    max_probe = settings.SCOTUS_MAX_PROBE  # type: ignore[misc]
+    jitter = compute_binary_probe_jitter(testing, max_probe=max_probe)
     probe_iteration = 1
     probe_offset = 0
     latest_match = 0
@@ -249,7 +263,7 @@ def _probe_scotus_sequence(
 
     while True:
         candidate_serial, probe_offset = compute_next_binary_probe(
-            highest_ingested, probe_iteration, jitter
+            highest_ingested, probe_iteration, jitter, max_probe=max_probe
         )
         probe_iteration += 1
         candidate = format_docket_number(
@@ -389,6 +403,12 @@ JSON files and archives them to S3. Ingestion of each archived file is
 handed off to Celery via ``process_scotus_docket``. Gaps jumped over by the
 geometric probe are backfilled inline in the same iteration. During July
 it also probes the outgoing (previous) term to catch late filings.
+
+When ``HIGHEST_SCOTUS_OBSERVED_SERIAL`` is ahead of
+``HIGHEST_SCOTUS_KNOWN_SERIAL`` (e.g. an operator seeded the observed
+watermark to onboard a backlog), the daemon switches to sweep mode for that
+(sequence, term) pair: it ingests at most ``SCOTUS_FIXED_SWEEP`` serials per
+iteration and skips probing until the ingested watermark catches up.
 
 """
 

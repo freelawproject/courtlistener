@@ -9,7 +9,7 @@ from django.test.utils import override_settings
 from django.urls import reverse
 from django.utils.dateformat import format
 from django.utils.timezone import localtime, now
-from elasticsearch_dsl import Q, connections
+from elasticsearch.dsl import Q, connections
 from waffle.testutils import override_switch
 
 from cl.alerts.factories import AlertFactory
@@ -3250,6 +3250,148 @@ class RECAPAlertsPercolatorTest(
             RECAPPercolator.exists(id=docket_only_alert_filter_id),
             msg=f"Alert id: {docket_only_alert_filter_id} was not indexed.",
         )
+
+    def test_alert_hit_not_stored_for_non_member_rt_without_webhook(
+        self, mock_prefix
+    ) -> None:
+        """Confirm the hit is not stored in the alert_hits Redis set when a
+        Real-Time alert belongs to a non-member user without a webhook enabled.
+
+        For such alerts the hit is neither delivered via webhook nor scheduled
+        for an email digest (non-members aren't eligible for RT email alerts),
+        so recording it would only grow the Redis set unbounded.
+        """
+
+        with self.captureOnCommitCallbacks(execute=True):
+            non_member = UserProfileWithParentsFactory()
+            # Real-Time alert owned by a non-member user without a webhook.
+            non_member_alert = AlertFactory(
+                user=non_member.user,
+                rate=Alert.REAL_TIME,
+                name="Test RT Non-member No Webhook",
+                query='q="SUBPOENAS SERVED NO HIT"&type=r',
+                alert_type=SEARCH_TYPES.RECAP,
+            )
+            # Member alert with the same query, used as a control to confirm
+            # the ingested docket actually matches the percolator query.
+            member_alert = AlertFactory(
+                user=self.user_profile.user,
+                rate=Alert.REAL_TIME,
+                name="Test RT Member Control",
+                query='q="SUBPOENAS SERVED NO HIT"&type=r',
+                alert_type=SEARCH_TYPES.RECAP,
+            )
+
+        with (
+            mock.patch(
+                "cl.api.webhooks.requests.post",
+                side_effect=lambda *args, **kwargs: MockResponse(
+                    200, mock_raw=True
+                ),
+            ),
+            self.captureOnCommitCallbacks(execute=True),
+        ):
+            docket = DocketFactory(
+                court=self.court,
+                date_filed=datetime.date(2024, 8, 19),
+                case_name="SUBPOENAS SERVED NO HIT",
+                docket_number="1:21-bk-9876",
+                source=Docket.RECAP,
+            )
+
+        r = get_redis_interface("CACHE")
+        # Control: the member alert matched, so its hit is stored in the set.
+        # This proves the ingested docket triggered the shared percolator query.
+        self.assertTrue(
+            has_document_alert_hit_been_triggered(
+                r, member_alert.pk, "d", docket.pk
+            ),
+            msg="The member alert hit should be stored in the Redis set.",
+        )
+        # No webhook should be sent for a non-member user without a webhook.
+        self.assertEqual(
+            WebhookEvent.objects.filter(webhook__user=non_member.user).count(),
+            0,
+            msg="No webhook should be sent for a non-member without a webhook.",
+        )
+        # The non-member alert hit must NOT be stored in the Redis set since
+        # the alert was neither delivered nor scheduled.
+        self.assertFalse(
+            has_document_alert_hit_been_triggered(
+                r, non_member_alert.pk, "d", docket.pk
+            ),
+            msg="Non-member RT alert without a webhook should not be stored.",
+        )
+        self.assertFalse(
+            has_document_alert_hit_been_triggered(
+                r, non_member_alert.pk, "co", docket.pk
+            ),
+            msg="Non-member RT case-only hit should not be stored.",
+        )
+
+        docket.delete()
+
+    def test_alert_hit_stored_for_non_member_rt_with_webhook(
+        self, mock_prefix
+    ) -> None:
+        """Confirm the hit is stored in the alert_hits Redis set when a
+        Real-Time alert belongs to a non-member user that has a webhook enabled.
+
+        Webhooks are delivered for all users in real time regardless of
+        membership, so the hit must be recorded to avoid re-sending it.
+        """
+
+        with self.captureOnCommitCallbacks(execute=True):
+            # self.user_profile_no_member is a non-member with a webhook enabled.
+            non_member_alert = AlertFactory(
+                user=self.user_profile_no_member.user,
+                rate=Alert.REAL_TIME,
+                name="Test RT Non-member With Webhook",
+                query='q="SUBPOENAS SERVED WEBHOOK HIT"&type=r',
+                alert_type=SEARCH_TYPES.RECAP,
+            )
+
+        with (
+            mock.patch(
+                "cl.api.webhooks.requests.post",
+                side_effect=lambda *args, **kwargs: MockResponse(
+                    200, mock_raw=True
+                ),
+            ),
+            self.captureOnCommitCallbacks(execute=True),
+        ):
+            docket = DocketFactory(
+                court=self.court,
+                date_filed=datetime.date(2024, 8, 19),
+                case_name="SUBPOENAS SERVED WEBHOOK HIT",
+                docket_number="1:21-bk-9877",
+                source=Docket.RECAP,
+            )
+
+        # A webhook should be sent for the non-member user with a webhook.
+        self.assertEqual(
+            WebhookEvent.objects.filter(
+                webhook__user=self.user_profile_no_member.user
+            ).count(),
+            1,
+            msg="One webhook should be sent for the non-member with a webhook.",
+        )
+        # Because the webhook was delivered, the hit must be stored in the set.
+        r = get_redis_interface("CACHE")
+        self.assertTrue(
+            has_document_alert_hit_been_triggered(
+                r, non_member_alert.pk, "d", docket.pk
+            ),
+            msg="Non-member RT alert with a webhook should be stored.",
+        )
+        self.assertTrue(
+            has_document_alert_hit_been_triggered(
+                r, non_member_alert.pk, "co", docket.pk
+            ),
+            msg="Non-member RT case-only hit should be stored.",
+        )
+
+        docket.delete()
 
     def test_percolate_document_on_ingestion(self, mock_prefix) -> None:
         """Confirm a Docket or RECAPDocument is percolated upon ingestion."""

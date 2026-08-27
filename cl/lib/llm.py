@@ -2,12 +2,16 @@ from typing import IO
 
 import instructor
 from openai import OpenAI
+from openai.types.chat import (
+    ChatCompletionContentPartParam,
+    ChatCompletionMessageParam,
+)
 from pydantic import BaseModel
 
 
 def call_llm(
     system_prompt: str,
-    user_prompt: str | list[str] | list[dict],
+    user_prompt: str | list[str] | list[ChatCompletionContentPartParam],
     model: str = "openai/gpt-4o-mini",
     response_model: type[BaseModel] | None = None,
     temperature: float = 0.0,
@@ -31,9 +35,13 @@ def call_llm(
     """
 
     # if api_key is provided, inject it, else fallback to env var
-    client = instructor.from_provider(model, api_key=api_key)
+    client = instructor.from_provider(
+        model, async_client=False, api_key=api_key
+    )
 
-    def to_content_part(x: str | dict) -> dict:
+    def to_content_part(
+        x: str | ChatCompletionContentPartParam,
+    ) -> ChatCompletionContentPartParam:
         if isinstance(x, str):
             return {"type": "text", "text": x}
         # Assume already a valid content part dict, e.g. {"type": "text", "text": "..."}
@@ -44,7 +52,7 @@ def call_llm(
     else:
         user_content = [to_content_part(p) for p in user_prompt]
 
-    messages = [
+    messages: list[ChatCompletionMessageParam] = [
         {"role": "system", "content": system_prompt},
         {"role": "user", "content": user_content},
     ]
@@ -62,6 +70,7 @@ def call_llm_transcription(
     audio: tuple[str, IO[bytes]],
     api_key: str,
     model: str = "gpt-4o-transcribe",
+    language: str = "en",
 ) -> str:
     """Call an LLM transcription service with a given base64 encoded audio file.
 
@@ -72,9 +81,10 @@ def call_llm_transcription(
     :param audio: Audio file to transcribe, as a binary IO stream.
     :param api_key: OpenAI transcription API key
     :param model: The OpenAI transcription model to use.
+    :param language: The language of the audio file.
     :return: The transcription text."""
     client = OpenAI(api_key=api_key)
 
     return client.audio.transcriptions.create(
-        model=model, file=audio, response_format="text"
+        model=model, file=audio, response_format="text", language=language
     )

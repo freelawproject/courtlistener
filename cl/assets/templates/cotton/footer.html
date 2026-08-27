@@ -46,13 +46,13 @@
             rel="noopener noreferrer"
             aria-label="Free Law Project blog posts (opens in new tab)"
           >Blog Posts</a>
-          <a href="{% url "help_home" %}" class="text-sm font-medium">Help & FAQ</a>
+          <a href="{% url "help_home" %}" class="text-sm font-medium">Help</a>
           <a href="{% url "contact" %}" class="text-sm font-medium">Contact</a>
           <a href="https://free.law/volunteer" class="text-sm font-medium">Contribute</a>
         </div>
         <div class="flex flex-col w-41 lg:w-30 gap-4">
           <h5 class="text-sm font-normal text-greyscale-600">Data</h5>
-          <a href="{% url "coverage" %}" class="text-sm font-medium">About Our Data</a>
+          <a href="{{ WIKI_COVERAGE_URL }}" class="text-sm font-medium">About Our Data</a>
           <a
             href="https://free.law/data-consulting/"
             class="text-sm font-medium"
@@ -67,12 +67,12 @@
             rel="noopener noreferrer"
             aria-label="Install RECAP extension (opens in new tab)"
           >Install RECAP</a>
-          <a href="{% url "api_index" %}" class="text-sm font-medium">APIs & Bulk Data</a>
+          <a href="{{ WIKI_API_URL }}" class="text-sm font-medium">APIs & Bulk Data</a>
         </div>
         <div class="flex flex-col w-41 lg:w-28 gap-4">
           <h5 class="text-sm font-normal text-greyscale-600">Legal</h5>
-          <a href="{% url "terms" %}" class="text-sm font-medium">Terms & Privacy</a>
-          <a href="{% url "terms" %}#removal" class="text-sm font-medium">Removal</a>
+          <a href="{{ WIKI_TERMS_URL }}" class="text-sm font-medium">Terms & Privacy</a>
+          <a href="{{ WIKI_REMOVAL_URL }}" class="text-sm font-medium">Removal</a>
           <a
             href="https://free.law/vulnerability-disclosure-policy/"
             class="text-sm font-medium"

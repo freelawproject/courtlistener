@@ -10,9 +10,9 @@ jobs:
   lint:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v7
 
-      - uses: actions/setup-python@v6
+      - uses: actions/setup-python@v7
         with:
           # Once codebase is updated, this can easily be changed to any specific version.
           python-version: "3.13"
@@ -23,69 +23,23 @@ jobs:
           enable-cache: true
           version: "0.9.x"
 
-      - uses: pre-commit/action@v3.0.1
-
       - name: Install dependencies
         run: uv sync
+
+      # Also runs pyrefly via the local hook in .pre-commit-config.yaml, which
+      # needs the dependencies installed above.
+      - uses: pre-commit/action@v3.0.1
 
       - name: Debug paths
         run: |
           pwd
           ls -al
 
-      # Add modules here as they're ready (remove them from the file-by-file
-      # checker below as you do so).
-      - name: mypy Static Type Checker (packages)
-        run: |
-          uv run mypy \
-          --follow-imports=skip \
-          --exclude 'migrations/*' \
-          -p cl.alerts \
-          -p cl.audio \
-          -p cl.citations \
-          -p cl.corpus_importer \
-          -p cl.lib \
-          -p cl.opinion_page \
-          -p cl.recap_rss \
-          -p cl.settings \
-          -p cl.simple_pages
+      # The checked modules and files are listed in the project-includes of pyrefly.toml;
+      # add them there as they're ready.
+      # Pre-existing errors are grandfathered in .pyrefly-baseline.json; only
+      # new errors fail the check.
+      - name: pyrefly Static Type Checker
+        run: uv run pyrefly check
 
-      # Add files here as they're ready
-      - name: mypy Static Type Checker (files)
-        run: |
-          uv run mypy \
-          --follow-imports=skip \
-          --exclude 'migrations/*' \
-          cl/api/api_permissions.py \
-          cl/api/management/commands/cl_retry_webhooks.py \
-          cl/api/models.py \
-          cl/api/routers.py \
-          cl/api/tasks.py \
-          cl/api/tests.py \
-          cl/api/utils.py \
-          cl/api/views.py \
-          cl/api/webhooks.py \
-          cl/tests/utils.py \
-          cl/users/email_handlers.py \
-          cl/users/forms.py \
-          cl/users/management/commands/cl_account_management.py \
-          cl/users/management/commands/cl_delete_old_emails.py \
-          cl/users/management/commands/cl_retry_failed_email.py \
-          cl/users/tasks.py \
-          cl/recap/management/commands/remove_appellate_entries_with_long_numbers.py \
-          cl/recap/utils.py \
-          cl/search/management/commands/cl_index_parent_and_child_docs.py \
-          cl/search/management/commands/sweep_indexer.py \
-          cl/search/management/commands/pacer_bulk_fetch.py \
-          cl/search/management/commands/generate_opinion_embeddings.py \
-          cl/search/management/commands/llm_clean_docket_number_daemon.py \
-          cl/search/docket_number_cleaner.py \
-          cl/search/management/commands/clean_docket_number_raw.py \
-          cl/scrapers/management/commands/back_scrape_dockets.py \
-          cl/corpus_importer/management/commands/import_texas_dockets.py \
-          cl/corpus_importer/management/utils.py \
-          cl/lib/decorators.py \
-          cl/corpus_importer/management/commands/import_scotus_dockets.py \
-          cl/corpus_importer/management/commands/probe_scotus_dockets_daemon.py \
-          cl/corpus_importer/scotus_daemon_utils.py \
-          cl/scrapers/management/commands/tames_poller.py
+

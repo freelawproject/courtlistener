@@ -343,6 +343,101 @@ class ScotusDaemonTest(SimpleTestCase):
         ]
         self.assertEqual(fetched_low, ["25-100", "25-101", "25-102", "25-103"])
 
+    def test_sweep_caps_per_iteration_and_falls_back_to_probe(self, *_mocks):
+        """When ``highest_observed`` is far ahead of ``highest_ingested`` (e.g.
+        operator-seeded backlog), each iteration must ingest at most
+        ``SCOTUS_FIXED_SWEEP`` serials and skip probing. Once the ingested
+        watermark catches up, the next iteration must resume normal probing.
+        """
+        self._seed_current_term(25, low=99, high=20000)
+        # Operator seeds the observed watermark 5 serials ahead. With a sweep
+        # cap of 2, this requires three iterations to drain (2 + 2 + 1) before
+        # the daemon can fall back to probing.
+        self.r.hset(self.HIGHEST_OBSERVED_KEY, "low:25", 104)
+
+        valid_low = {f"25-{n}" for n in range(100, 105)}
+
+        def fake_fetch(dn):
+            if dn in valid_low:
+                return f'{{"docket_number":"{dn}"}}', HTTPStatus.OK
+            return None, HTTPStatus.NOT_FOUND
+
+        with (
+            override_settings(SCOTUS_FIXED_SWEEP=2),
+            mock.patch.object(
+                scotus_cmd_module,
+                "fetch_scotus_docket_json",
+                side_effect=fake_fetch,
+            ) as mock_fetch,
+            mock.patch.object(scotus_cmd_module, "save_scotus_raw_to_s3"),
+            mock.patch.object(
+                scotus_cmd_module,
+                "SCOTUSDocketReport",
+                new=FakeSCOTUSDocketReport,
+            ),
+            mock.patch.object(scotus_cmd_module, "process_scotus_docket"),
+            mock.patch.object(scotus_cmd_module.time, "sleep"),
+            time_machine.travel(datetime(2026, 3, 16, 12), tick=False),
+        ):
+            # Iteration 1: cap of 2 should advance 99 -> 101.
+            scotus_cmd_module.run_scotus_probe_iteration(self.r, testing=True)
+            self.assertEqual(
+                self.r.hget(self.HIGHEST_KNOWN_KEY, "low:25"), "101"
+            )
+            iter1_low = [
+                c.args[0]
+                for c in mock_fetch.call_args_list
+                if c.args[0].startswith("25-")
+                and int(c.args[0].split("-")[1]) < 200
+            ]
+            self.assertEqual(iter1_low, ["25-100", "25-101"])
+
+            # Iteration 2: cap of 2 should advance 101 -> 103.
+            mock_fetch.reset_mock()
+            scotus_cmd_module.run_scotus_probe_iteration(self.r, testing=True)
+            self.assertEqual(
+                self.r.hget(self.HIGHEST_KNOWN_KEY, "low:25"), "103"
+            )
+            iter2_low = [
+                c.args[0]
+                for c in mock_fetch.call_args_list
+                if c.args[0].startswith("25-")
+                and int(c.args[0].split("-")[1]) < 200
+            ]
+            self.assertEqual(iter2_low, ["25-102", "25-103"])
+
+            # Iteration 3: only 1 serial left in the gap; sweep drains and
+            # then the recovery branch is no longer entered, but probing
+            # itself is still skipped this iteration (the sweep returns
+            # without falling through to the probe loop). Watermark = 104.
+            mock_fetch.reset_mock()
+            scotus_cmd_module.run_scotus_probe_iteration(self.r, testing=True)
+            self.assertEqual(
+                self.r.hget(self.HIGHEST_KNOWN_KEY, "low:25"), "104"
+            )
+            iter3_low = [
+                c.args[0]
+                for c in mock_fetch.call_args_list
+                if c.args[0].startswith("25-")
+                and int(c.args[0].split("-")[1]) < 200
+            ]
+            self.assertEqual(iter3_low, ["25-104"])
+
+            # Iteration 4: caught up — daemon falls back to forward probing
+            # (geometric offsets above the watermark).
+            mock_fetch.reset_mock()
+            scotus_cmd_module.run_scotus_probe_iteration(self.r, testing=True)
+            iter4_low = [
+                c.args[0]
+                for c in mock_fetch.call_args_list
+                if c.args[0].startswith("25-")
+            ]
+            # All iter4 fetches must be strictly above the watermark (104),
+            # confirming we're no longer in sweep mode.
+            self.assertTrue(iter4_low)
+            for dn in iter4_low:
+                self.assertGreater(int(dn.split("-")[1]), 104)
+
     def test_ingestion_timeout_leaves_watermark_and_sets_wait(self, *_mocks):
         """A Timeout mid-ingestion must not advance the watermark past the last
         successfully processed serial, must set court_wait, and the subsequent

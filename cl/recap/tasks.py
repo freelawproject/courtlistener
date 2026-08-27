@@ -3,6 +3,7 @@ import concurrent.futures
 import hashlib
 import json
 import logging
+import time
 from dataclasses import dataclass
 from datetime import datetime
 from functools import partial
@@ -90,6 +91,7 @@ from cl.corpus_importer.utils import (
     should_check_acms_court,
 )
 from cl.custom_filters.templatetags.text_filters import oxford_join
+from cl.lib.file_validation import content_is_pdf
 from cl.lib.filesizes import convert_size_to_bytes
 from cl.lib.microservice_utils import (
     check_redactions_service,
@@ -608,9 +610,19 @@ async def process_recap_zip(pk: int) -> dict[str, list[int] | list[Task]]:
             # For each document in the zip, create a new PQ
             new_pqs = []
             tasks = []
+            skipped_files = []
             for file_name in archive.namelist():
                 file_content = archive.read(file_name)
                 f = SimpleUploadedFile(file_name, file_content)
+
+                # Security: whoever built the zip named its members, and the
+                # PQs below are created directly, so they never pass through
+                # ProcessingQueueSerializer's PDF check. Confirm the contents
+                # here instead, or a member named `1-main.pdf` holding
+                # anything at all gets stored and served as a document.
+                if not content_is_pdf(f):
+                    skipped_files.append(file_name)
+                    continue
 
                 file_name = file_name.split(".pdf")[0]
                 if "-" in file_name:
@@ -644,12 +656,22 @@ async def process_recap_zip(pk: int) -> dict[str, list[int] | list[Task]]:
                 new_pqs.append(new_pq.pk)
                 await process_recap_pdf(new_pq.pk)
 
+            if skipped_files and not new_pqs:
+                await mark_pq_status(
+                    pq,
+                    f"Zip contained no PDFs. Skipped: {oxford_join(skipped_files)}.",
+                    PROCESSING_STATUS.INVALID_CONTENT,
+                )
+                return {"new_pqs": [], "tasks": []}
+
             # At the end, mark the pq as successful and return the PQ
-            await mark_pq_status(
-                pq,
-                f"Successfully created ProcessingQueue objects: {oxford_join(new_pqs)}",
-                PROCESSING_STATUS.SUCCESSFUL,
-            )
+            message = f"Successfully created ProcessingQueue objects: {oxford_join(new_pqs)}"
+            if skipped_files:
+                message += (
+                    f". Skipped files that are not PDFs: "
+                    f"{oxford_join(skipped_files)}"
+                )
+            await mark_pq_status(pq, message, PROCESSING_STATUS.SUCCESSFUL)
 
             # Returning the tasks allows tests to wait() for the PDFs to complete
             # before checking assertions.
@@ -3031,9 +3053,8 @@ def download_pacer_pdf_and_save_to_pq(
     :param session_data: A SessionData object containing the session's cookies
     and proxy.
     :param cutoff_date: The datetime from which we should query
-     ProcessingQueue objects. For the main RECAPDocument the datetime the
-     EmailProcessingQueue was created. For attachments the datetime the
-     attachment RECAPDocument was created.
+     ProcessingQueue objects, the datetime the EmailProcessingQueue was
+     created, for both the main and attachment RECAPDocuments.
     :param magic_number: The magic number to fetch PACER documents for free.
     :param pacer_case_id: The pacer_case_id to query the free document.
     :param pacer_doc_id: The pacer_doc_id to query the free document.
@@ -3108,6 +3129,7 @@ def get_and_copy_recap_attachment_docs(
     magic_number: str | None,
     pacer_case_id: str,
     user_pk: int,
+    cutoff_date: datetime,
     de_seq_num: str | None = None,
 ) -> list[ProcessingQueue]:
     """Download and copy the corresponding PACER PDF to all the notification
@@ -3119,6 +3141,11 @@ def get_and_copy_recap_attachment_docs(
     :param magic_number: The magic number to fetch PACER documents for free.
     :param pacer_case_id: The pacer_case_id to query the free document.
     :param user_pk: The user to associate with the ProcessingQueue object.
+    :param cutoff_date: The datetime from which ProcessingQueue objects can be
+     reused, the datetime the EmailProcessingQueue was created. This prevents
+     reusing stale PQs from previous notifications whose file was already
+     deleted, while still allowing reuse within this notification's run,
+     retries and multi-docket NEFs.
     :param de_seq_num: The sequential number assigned by the PACER system to
      identify the docket entry within a case.
     :return: None
@@ -3128,7 +3155,6 @@ def get_and_copy_recap_attachment_docs(
     appellate = False
     unique_pqs = []
     for rd_att in att_rds:
-        cutoff_date = rd_att.date_created
         pq = download_pacer_pdf_and_save_to_pq(
             court_id,
             session_data,
@@ -3502,6 +3528,8 @@ def process_recap_email(
     unique_case_ids = []
     got_content_updated = False
     main_rds_available = []
+    saved_existing_main_rds = []
+    main_rd_already_available = False
     with transaction.atomic():
         # Add/update docket entries for each docket mentioned in the
         # notification.
@@ -3568,7 +3596,26 @@ def process_recap_email(
                 # since there is no document to copy.
                 continue
 
-            for rd in rds_created:
+            # Most RDs match existing records. We initially assumed RECAP email would
+            # always be processed before other RECAP sources, but that's not always the
+            # case. If the Celery queue is busy, processing may be delayed, allowing
+            # another source (e.g. the RSS scraper or a docket upload) to create the RD
+            # first. In those cases, we still need to save the PDF if it is not already
+            # available. Previously, PDFs were only saved for RDs created by this task.
+            existing_rds_to_save = [
+                rd
+                for rd in rds_updated
+                if not rd.is_available and rd.pacer_doc_id == pacer_doc_id
+            ]
+            # Track main RDs that already have the document, so the PQ
+            # deletion guard below doesn't report a redundant download as a
+            # loss.
+            main_rd_already_available = main_rd_already_available or any(
+                rd.is_available
+                for rd in rds_updated
+                if rd.pacer_doc_id == pacer_doc_id
+            )
+            for rd in rds_created + existing_rds_to_save:
                 # Download and store the main PACER document and then
                 # assign/copy it to each corresponding RECAPDocument.
                 fq = PacerFetchQueue.objects.create(
@@ -3579,6 +3626,9 @@ def process_recap_email(
                 save_pacer_doc_from_pq(self, rd, fq, pq, magic_number)
                 rd.refresh_from_db()
                 main_rds_available.append(rd.is_available)
+            saved_existing_main_rds.extend(
+                rd for rd in existing_rds_to_save if rd.is_available
+            )
 
         # Get NEF attachments and merge them.
         all_attachment_rds = []
@@ -3606,6 +3656,7 @@ def process_recap_email(
                 magic_number,
                 pacer_case_id,
                 user_pk,
+                epq.date_created,
                 de_seq_num=pacer_seq_no,
             )
 
@@ -3635,6 +3686,17 @@ def process_recap_email(
     # After properly copying the PDF to related RECAPDocuments,
     # mark the PQ object as successful and delete its filepath_local
     if pq.status != PROCESSING_STATUS.FAILED:
+        if (
+            pq.filepath_local
+            and not any(main_rds_available)
+            and not main_rd_already_available
+        ):
+            logger.error(
+                "recap.email: deleting the PDF in PQ %s that was not copied "
+                "to any RECAPDocument. EPQ: %s",
+                pq.pk,
+                epq.pk,
+            )
         async_to_sync(mark_pq_successful)(pq)
 
     for pq in att_pqs:
@@ -3669,7 +3731,7 @@ def process_recap_email(
 
     if not is_potentially_sealed_entry:
         rds_to_extract = (
-            all_attachment_rds + all_created_rds
+            all_attachment_rds + all_created_rds + saved_existing_main_rds
             if not bankr_short_doc_id
             else []
         )
@@ -3776,18 +3838,49 @@ def process_texas_email(self: Task, epq_pk: int) -> None:
                 court_id=email_data["court_id"]
             )
 
-    res = httpx.get(
-        email_data["url"],
-        headers={
-            "User-Agent": "Free Law Project",
-        },
-        timeout=30.0,
-        follow_redirects=True,
-    )
-    res.raise_for_status()
+    MAX_RETRIES = 2
+    docket_data = None
 
-    docket_parser._parse_text(res.text)
-    docket_data = docket_parser.data
+    for retry in range(MAX_RETRIES):
+        response = httpx.get(
+            email_data["url"],
+            headers={"User-Agent": "Free Law Project"},
+            timeout=30.0,
+            follow_redirects=True,
+        )
+        response.raise_for_status()
+
+        try:
+            docket_parser._parse_text(response.text)
+            docket_data = docket_parser.data
+        except ValueError as parse_exc:
+            logger.warning(
+                "Texas docket parse failed for EPQ %s: %s | "
+                "sleeping 60s before inline retry",
+                epq.pk,
+                parse_exc,
+            )
+
+            if retry == MAX_RETRIES - 1:
+                redirects = [
+                    (h.status_code, h.headers.get("location", ""))
+                    for h in response.history
+                ]
+                logger.error(
+                    "Texas docket parse failed for EPQ %s after inline retry: %s | "
+                    "url=%s status=%s len=%s redirects=%s preview=%r",
+                    epq.pk,
+                    parse_exc,
+                    response.url,
+                    response.status_code,
+                    len(response.text),
+                    redirects,
+                    response.text[:500],
+                )
+            else:
+                time.sleep(60)
+        else:
+            break
 
     if not docket_data:
         async_to_sync(mark_pq_status)(
@@ -3798,6 +3891,7 @@ def process_texas_email(self: Task, epq_pk: int) -> None:
         )
         self.request.chain = None
         return None
+
     try:
         result = merge_texas_docket(docket_data, download_attachments=True)
     except Exception as e:

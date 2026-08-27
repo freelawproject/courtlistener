@@ -26,6 +26,7 @@ class Migration(migrations.Migration):
             ],
             options={
                 'abstract': False,
+                'permissions': (('has_recap_email_upload_access', 'Can upload @recap.email messages.'),),
             },
         ),
         migrations.CreateModel(

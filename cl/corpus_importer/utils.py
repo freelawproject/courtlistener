@@ -5,11 +5,11 @@ import math
 import random
 import re
 from collections import defaultdict
-from collections.abc import Generator, Iterator
+from collections.abc import Generator, Iterator, Mapping, Sequence
 from dataclasses import dataclass
 from datetime import date
 from difflib import SequenceMatcher
-from typing import Any
+from typing import Any, cast
 from urllib.parse import urlparse
 
 from asgiref.sync import async_to_sync
@@ -27,7 +27,11 @@ from juriscraper.state.texas import (
     TexasOriginatingAppellateCourt,
     TexasOriginatingDistrictCourt,
 )
-from juriscraper.state.texas.common import CourtID, CourtType
+from juriscraper.state.texas.common import (
+    CourtID,
+    CourtType,
+    TexasOriginatingCourt,
+)
 
 from cl.citations.utils import map_reporter_db_cite_type
 from cl.lib.command_utils import logger
@@ -924,9 +928,9 @@ def clean_body_content(case_body: str, harvard_file: bool = False) -> str:
         opinions = []
         for op in soup.find_all(
             lambda tag: (
-                tag.name == "opinion" and tag.get("data-type") is None
+                (tag.name == "opinion" and tag.get("data-type") is None)
+                or tag.get("data-type") == "opinion"
             )
-            or tag.get("data-type") == "opinion"
         ):
             opinions.append(op.text)
         opinion_text = "".join(
@@ -934,9 +938,12 @@ def clean_body_content(case_body: str, harvard_file: bool = False) -> str:
                 op.text
                 for op in soup.find_all(
                     lambda tag: (
-                        tag.name == "opinion" and tag.get("data-type") is None
+                        (
+                            tag.name == "opinion"
+                            and tag.get("data-type") is None
+                        )
+                        or tag.get("data-type") == "opinion"
                     )
-                    or tag.get("data-type") == "opinion"
                 )
             ]
         )
@@ -1168,38 +1175,47 @@ def make_iquery_probing_key(court_id: str) -> str:
     return f"iquery.probing.enqueued:{court_id}"
 
 
-def compute_binary_probe_jitter(testing: bool) -> int:
+def compute_binary_probe_jitter(
+    testing: bool, max_probe: int | None = None
+) -> int:
     """Compute the jitter for binary probes.
 
     :param testing: A boolean flag indicating whether the function is being
     executed in a testing environment. If True, jitter is disabled and returns 0.
+    :param max_probe: Optional override for the geometric step cap. Defaults to
+    ``settings.IQUERY_MAX_PROBE``. Callers with a smaller search range (e.g.
+    the SCOTUS daemon) pass their own cap so the jitter scales accordingly.
     :return: An integer representing the jitter value for binary probes.
     """
 
-    # The jitter will be a random value between 1 and half of IQUERY_MAX_PROBE.
-    return (
-        random.randint(1, round(settings.IQUERY_MAX_PROBE * 0.5))
-        if not testing
-        else 0
-    )
+    if max_probe is None:
+        max_probe = settings.IQUERY_MAX_PROBE
+    # The jitter will be a random value between 1 and half of max_probe.
+    return random.randint(1, round(max_probe * 0.5)) if not testing else 0
 
 
 def compute_next_binary_probe(
-    highest_known_pacer_case_id: int, iteration: int, jitter: int
+    highest_known_pacer_case_id: int,
+    iteration: int,
+    jitter: int,
+    max_probe: int | None = None,
 ) -> tuple[int, int]:
     """Compute the next binary probe target for a given PACER case ID.
 
     This computes the next probe target using a geometric sequence
     based on the current iteration (2 ** (iteration - 1)), with the increase
-    capped by the IQUERY_MAX_PROBE setting. Once the geometric value reaches
-    this cap, subsequent increments grow linearly by the cap value.
-    In non-testing mode, and except for the first iteration, a jitter is added
-    to the next value to ensure that probing values are not the same as in the
-    previous iteration, increasing the chances of getting a hit.
+    capped by ``max_probe``. Once the geometric value reaches this cap,
+    subsequent increments grow linearly by the cap value. In non-testing mode,
+    and except for the first iteration, a jitter is added to the next value to
+    ensure that probing values are not the same as in the previous iteration,
+    increasing the chances of getting a hit.
 
     :param highest_known_pacer_case_id: The final PACER case ID.
     :param iteration: The current probe iteration number.
     :param jitter: The jitter value to apply.
+    :param max_probe: Optional override for the geometric step cap. Defaults
+    to ``settings.IQUERY_MAX_PROBE``. Callers with a smaller search range
+    (e.g. the SCOTUS daemon) pass their own cap.
     :return: The updated probe_iteration and the PACER case ID to lookup and
     the probe offset + jitter computed.
     """
@@ -1207,7 +1223,8 @@ def compute_next_binary_probe(
     # Avoid applying jitter on the first iteration to speed up
     # the detection of new cases once courts catch up.
     jitter = 0 if iteration == 1 else jitter
-    max_probe = settings.IQUERY_MAX_PROBE
+    if max_probe is None:
+        max_probe = settings.IQUERY_MAX_PROBE
     cap_iteration = int(math.log2(max_probe)) + 1
     if iteration < cap_iteration:
         offset = 2 ** (iteration - 1)
@@ -1327,7 +1344,7 @@ def get_iquery_pacer_courts_to_scrape() -> list[str]:
 
 
 def create_docket_entry_sequence_numbers(
-    docket_entries: list[dict[str, Any]], date_field: str = "date"
+    docket_entries: Sequence[Mapping[str, Any]], date_field: str = "date"
 ) -> list[str]:
     """Calculates the sequence numbers for a list of docket entries to allow
     consistent matching and merging.
@@ -1375,7 +1392,7 @@ def texas_js_court_id_to_court_id(js_court_id: str) -> str | None:
 
 
 def texas_originating_court_to_court_id(
-    court_data: TexasOriginatingAppellateCourt | TexasOriginatingDistrictCourt,
+    court_data: TexasOriginatingCourt,
 ) -> str | None:
     """Attempts to translate Juriscraper Texas originating court data to a
     CourtListener Court ID.
@@ -1385,9 +1402,19 @@ def texas_originating_court_to_court_id(
     court_type = court_data["court_type"]
     match court_type:
         case CourtType.APPELLATE.value:
-            return texas_js_court_id_to_court_id(court_data["court_id"])
+            # Given `CourtType.APPELLATE`, we can safely narrow the type
+            appellate_court_data = cast(
+                TexasOriginatingAppellateCourt, court_data
+            )
+            return texas_js_court_id_to_court_id(
+                appellate_court_data["court_id"]
+            )
         case CourtType.DISTRICT.value:
-            district_number = court_data["district"]
+            # Given `CourtType.DISTRICT`, we can safely narrow the type
+            district_court_data = cast(
+                TexasOriginatingDistrictCourt, court_data
+            )
+            district_number = district_court_data["district"]
             if district_number:
                 if district_number > 1:
                     district_number = district_number + 1
