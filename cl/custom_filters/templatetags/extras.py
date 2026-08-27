@@ -15,7 +15,11 @@ from django.utils.safestring import SafeString, mark_safe
 from django.utils.timezone import make_aware
 from elasticsearch.dsl import AttrDict, AttrList
 
-from cl.search.constants import ALERTS_HL_TAG, SEARCH_HL_TAG
+from cl.search.constants import (
+    ALERTS_HL_TAG,
+    CORPUS_SEARCH_SCOPES,
+    SEARCH_HL_TAG,
+)
 from cl.search.models import SEARCH_TYPES, Court
 
 register = template.Library()
@@ -466,6 +470,12 @@ def get_request_value(request_get, field_name):
 def render_field_with_id(field, field_id):
     """Render a form field with a custom ID attribute."""
     return field.as_widget(attrs={"id": field_id})
+
+
+@register.simple_tag
+def corpus_search_scopes():
+    """Return corpus search tab scopes for server-rendered templates."""
+    return CORPUS_SEARCH_SCOPES
 
 
 @register.filter

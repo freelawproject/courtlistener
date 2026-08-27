@@ -1,4 +1,3 @@
-# mypy: disable-error-code=attr-defined
 import asyncio
 import datetime
 import os

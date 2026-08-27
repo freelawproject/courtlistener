@@ -226,7 +226,7 @@ async def court_publish_page(request: HttpRequest, pk: str) -> HttpResponse:
                 "You do not have permission to access this page."
             )
 
-    # Fix mypy errors
+    # Fix type checker errors
     upload_form: Any
 
     upload_form_classes = {
