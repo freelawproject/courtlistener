@@ -1,7 +1,6 @@
 import datetime
 import re
 from collections.abc import Iterable
-from collections.abc import Iterable as IterableType
 from itertools import chain, islice, tee
 from re import Match
 from typing import Any
@@ -117,7 +116,7 @@ def remove_duplicate_dicts(dicts: list[dict]) -> list[dict]:
 
 
 def human_sort(
-    unordered_list: IterableType[str | tuple[str, Any]],
+    unordered_list: Iterable[str | tuple[str, Any]],
     key: str | None = None,
 ) -> list[str | tuple[str, Any]]:
     """Human sort Lists of strings or list of dictionaries
