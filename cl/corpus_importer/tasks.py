@@ -14,7 +14,7 @@ from io import BytesIO
 from pyexpat import ExpatError
 from re import Pattern
 from tempfile import NamedTemporaryFile
-from typing import IO, Any
+from typing import IO, Any, TypeIs
 from urllib.parse import urljoin
 
 import botocore.exceptions
@@ -1996,20 +1996,17 @@ def get_att_report_by_rd(
     is_acms_document = rd.is_acms_document()
 
     if is_acms_document:
-        report_class = ACMSAttachmentPage
-    elif is_appellate_case:
-        report_class = AppellateAttachmentPage
-    else:
-        report_class = AttachmentPage
-
-    att_report = report_class(pacer_court_id, s)
-
-    if is_acms_document:
+        att_report = ACMSAttachmentPage(pacer_court_id, s)
         docket_case_id = rd.docket_entry.docket.pacer_case_id
         rd_entry_id = rd.pacer_doc_id
         att_report.query(docket_case_id, rd_entry_id)
-    else:
+    elif is_appellate_case:
+        att_report = AppellateAttachmentPage(pacer_court_id, s)
         att_report.query(rd.pacer_doc_id)
+    else:
+        att_report = AttachmentPage(pacer_court_id, s)
+        att_report.query(rd.pacer_doc_id)
+
     return att_report
 
 
@@ -4435,10 +4432,8 @@ def normalize_texas_parties(
     ]
 
 
-def texas_docket_has_appellate_info(
-    docket_data: TexasCourtOfAppealsDocket
-    | TexasCourtOfCriminalAppealsDocket
-    | TexasSupremeCourtDocket,
+def texas_docket_has_valid_appellate_info(
+    docket_data: TexasCourtOfCriminalAppealsDocket | TexasSupremeCourtDocket,
 ) -> bool:
     """
     Helper method returning whether a scraped Texas docket has appellate case
@@ -4453,10 +4448,43 @@ def texas_docket_has_appellate_info(
     :return: Whether the docket has appellate case information.
     """
 
-    return (
-        docket_data["court_type"] != CourtType.APPELLATE.value
-        and docket_data["appeals_court"]["court_id"] != CourtID.UNKNOWN.value
-    )
+    return docket_data["appeals_court"]["court_id"] != CourtID.UNKNOWN.value
+
+
+def is_texas_appellate_docket(
+    d: TexasCourtOfAppealsDocket
+    | TexasCourtOfCriminalAppealsDocket
+    | TexasSupremeCourtDocket,
+) -> TypeIs[TexasCourtOfAppealsDocket]:
+    return d["court_type"] == CourtType.APPELLATE.value
+
+
+def is_texas_supreme_docket(
+    d: TexasCourtOfAppealsDocket
+    | TexasCourtOfCriminalAppealsDocket
+    | TexasSupremeCourtDocket,
+) -> TypeIs[TexasSupremeCourtDocket | TexasCourtOfCriminalAppealsDocket]:
+    return d["court_type"] == CourtType.SUPREME.value
+
+
+# TODO: `TexasCommonScraper` should return `None` on failure and this narrowing
+# function should be replaced by a simple `is None` check.
+def is_texas_docket(
+    d: dict[str, None]
+    | TexasCourtOfAppealsDocket
+    | TexasCourtOfCriminalAppealsDocket
+    | TexasSupremeCourtDocket,
+) -> TypeIs[
+    TexasCourtOfAppealsDocket
+    | TexasCourtOfCriminalAppealsDocket
+    | TexasSupremeCourtDocket
+]:
+    """
+    `TexasCommonScraper` may fail successfully. In which case it returns an
+    empty `dict`. This cannot be readily distinguished from `TypedDict`. This
+    enables type narrowing to happen for `TexasCommonScraper` as-is.
+    """
+    return "court_type" in d
 
 
 def merge_texas_parties(
@@ -4491,7 +4519,9 @@ def merge_texas_docket_originating_court(
     :param docket_data: The docket data from Juriscraper.
     :return: The result of the merge operation."""
 
-    if texas_docket_has_appellate_info(docket_data):
+    if is_texas_supreme_docket(
+        docket_data
+    ) and texas_docket_has_valid_appellate_info(docket_data):
         ocd = docket_data["appeals_court"]
         if not ocd["case_number"]:
             logger.warning(
@@ -4576,9 +4606,16 @@ def merge_texas_case_transfers(
     originating_court = docket_data["originating_court"]
     oc_type = originating_court["court_type"]
     oc_dn: str = originating_court["case"]
-    appeals_court = docket_data.get("appeals_court", {})
-    ac_id = appeals_court.get("court_id", "")
-    ac_dns: list[str] = appeals_court.get("case_number", [])
+    ac_id: str = (
+        docket_data["appeals_court"]["court_id"]
+        if is_texas_supreme_docket(docket_data)
+        else ""
+    )
+    ac_dns: list[str] = (
+        docket_data["appeals_court"]["case_number"]
+        if is_texas_supreme_docket(docket_data)
+        else []
+    )
     trial_court_id = texas_originating_court_to_court_id(originating_court)
     appeal_transfer_origin_court_id: str | None = ""
     appeal_transfer_origin_dns: list[str] = []
@@ -4637,7 +4674,7 @@ def merge_texas_case_transfers(
                 ac_id
             )
             appeal_transfer_origin_dns = ac_dns
-        case _ if docket_data["court_type"] == CourtType.APPELLATE.value:
+        case _ if is_texas_appellate_docket(docket_data):
             logger.info(
                 "Docket %s is an appellate docket", docket.docket_number
             )
@@ -4769,7 +4806,7 @@ def merge_texas_docket(
 
     with transaction.atomic():
         docket = None
-        if docket_data["court_type"] == CourtType.APPELLATE.value:
+        if is_texas_appellate_docket(docket_data):
             logger.info(
                 "Docket is appellate. Checking if disaggregation is necessary..."
             )
@@ -4814,7 +4851,9 @@ def merge_texas_docket(
             docket, docket_data
         )
 
-        if texas_docket_has_appellate_info(docket_data):
+        if is_texas_supreme_docket(
+            docket_data
+        ) and texas_docket_has_valid_appellate_info(docket_data):
             lower_court_data = docket_data["appeals_court"]
             lower_court_id = texas_js_court_id_to_court_id(
                 lower_court_data["court_id"]
@@ -4843,7 +4882,7 @@ def merge_texas_docket(
 
         docket.save()
 
-    if docket_data["court_type"] == CourtType.SUPREME.value:
+    if is_texas_supreme_docket(docket_data):
         trial_court_result = merge_texas_trial_court_data(docket, docket_data)
     else:
         trial_court_result = MergeResult.unnecessary()
@@ -4929,6 +4968,8 @@ def texas_ingest_docket_task(
 
         parser._parse_text(content.decode("utf-8"))
         docket_data = parser.data
+        if not is_texas_docket(docket_data):
+            raise ValueError("Docket parser failed to produce a valid Docket")
     except Exception as e:
         logger.error(
             "Encountered error parsing Texas docket at URL %s: %s",
