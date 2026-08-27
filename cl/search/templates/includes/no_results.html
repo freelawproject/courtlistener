@@ -14,9 +14,9 @@
     {% endif %}
   </ul>
   {% if type == SEARCH_TYPES.RECAP or type == SEARCH_TYPES.DOCKETS or type_override == SEARCH_TYPES.RECAP or type_override == SEARCH_TYPES.DOCKETS %}
-     <p>The RECAP Archive does not contain everything in PACER. To learn more about what we have and how to add content to the RECAP Archive, please see <a href="{% url "coverage_recap" %}">our coverage page</a>.</p>
+     <p>The RECAP Archive does not contain everything in PACER. To learn more about what we have and how to add content to the RECAP Archive, please see <a href="{{ WIKI_COVERAGE_RECAP_URL }}">our coverage page</a>.</p>
   {% else %}
-    <p>Our <a href="{% url "coverage" %}">coverage page</a> details which jurisdictions we support.
+    <p>Our <a href="{{ WIKI_COVERAGE_URL }}">coverage page</a> details which jurisdictions we support.
     </p>
   {% endif %}
   <p>If you expected more results than this, <a href="{% url "contact" %}">please let us know</a>. We value your feedback.
@@ -34,9 +34,11 @@
       {% elif error_message == "unbalanced_quotes" %}
         Did you forget to close one or more quotes?
       {% elif error_message == "disallowed_wildcard_pattern" %}
-         The query contains a <a href="{% url "advanced_search" %}#disallowed-wildcards">disallowed wildcard</a> pattern.
+         The query contains a <a href="{{ WIKI_HELP_URL }}/search/advanced-search-and-query-techniques#wildcards-and-fuzzy-search-and">disallowed wildcard</a> pattern.
       {% elif error_message == "invalid_relative_date_syntax" %}
          The date entered has an invalid format.
+      {% elif error_message == "input_too_long_error" %}
+         Your query is too long for semantic search. Please shorten it or switch to keyword search.
       {% endif %}
     {% else %}
       encountered an error.
@@ -45,16 +47,16 @@
   {% if error_message %}
     {% if suggested_query == "proximity_query" %}
       <h4 class="text-danger" >Are you attempting to perform a proximity search?</h4>
-      <p>Try using this format: <code>"lorem term"~50</code>. For more details, visit our <a href="{% url "advanced_search" %}#proximity">advance search documentation</a>.</p>
+      <p>Try using this format: <code>"lorem term"~50</code>. For more details, visit our <a href="{{ WIKI_HELP_URL }}/search/advanced-search-and-query-techniques#proximity">advance search documentation</a>.</p>
     {% elif suggested_query == "proximity_filter" %}
       <h4 class="text-danger" >Are you attempting to perform a proximity search within a filter?</h4>
-      <p>Proximity queries do not work in filters. Consider using the main search box. For more details, visit our <a href="{% url "advanced_search" %}#proximity">advance search documentation</a>.</p>
+      <p>Proximity queries do not work in filters. Consider using the main search box. For more details, visit our <a href="{{ WIKI_HELP_URL }}/search/advanced-search-and-query-techniques#proximity">advance search documentation</a>.</p>
     {% elif suggested_query %}
       <div class="flex">
         <h4 class="text-danger" >Did you mean:&nbsp;<a href="{% url 'show_results' %}{% querystring q=suggested_query %}">{{suggested_query}}</a></h4>
       </div>
     {% elif error_message == "invalid_relative_date_syntax" %}
-      <p><a href="{% url "relative_dates" %}">See Relative Date Queries documentation for help.</a></p>
+      <p><a href="{{ WIKI_HELP_URL }}/search/use-relative-date-queries-to-keep-alerts-fresh">See Relative Date Queries documentation for help.</a></p>
     {% endif %}
 
     <p>Search tips:</p>
@@ -81,7 +83,7 @@
         <li>CourtListener couldn't make sense of your query.</li>
         <li>Ensure you are not incorrectly using <code>:</code> <code>[</code> <code>]</code> outside a fielded or range query context.<br>
           Avoid using slashes <code>/</code> in a query. When searching for dates as text or other values that includes <code>/</code>, enclose the term in quotes, like <code>"01/05/24"</code>. If you are searching for a date in a date field, consider using a Date Query.<br>
-          For more details, visit our <a href="{% url "advanced_search" %}">advance search documentation.</a>
+          For more details, visit our <a href="{{ WIKI_HELP_URL }}/search/advanced-search-and-query-techniques">advance search documentation.</a>
         </li>
         <li>Our system is down and can't respond.</li>
         <li>Some other reason.</li>

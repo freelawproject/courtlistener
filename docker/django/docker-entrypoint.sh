@@ -33,7 +33,7 @@ case "$1" in
         --limit-request-line 6000 \
         --timeout 180 \
         --max-requests ${MAX_REQUESTS:-2500} \
-        --max-requests-jitter 100 \
+        --max-requests-jitter ${MAX_REQUESTS_JITTER:-100} \
         --bind 0.0.0.0:8000
     ;;
 'rss-scraper')
@@ -48,11 +48,17 @@ case "$1" in
 'probe-iquery-pages-daemon')
     exec ./manage.py probe_iquery_pages_daemon
     ;;
+'probe-scotus-dockets-daemon')
+    exec ./manage.py probe_scotus_dockets_daemon
+    ;;
 'tames-scraper-daemon')
     exec ./manage.py tames_poller
     ;;
 'llm-clean-docket-number-daemon')
     exec ./manage.py llm_clean_docket_number_daemon
+    ;;
+'reenqueue-pending-audio-tasks-daemon')
+    exec ./manage.py reenqueue_pending_audio_tasks_daemon
     ;;
 'cl-send-rt-percolator-alerts')
     exec ./manage.py cl_send_rt_percolator_alerts

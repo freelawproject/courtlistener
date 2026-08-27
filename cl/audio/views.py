@@ -27,19 +27,25 @@ async def view_audio_file(
 
     # --- Fetch transcript metadata ---
     segments_list = []
-    # Get the latest metadata. There can be many metadata rows for a single
-    # audio, if the transcription failed as hallucinated and was retried
-    metadata_qs = AudioTranscriptionMetadata.objects.filter(audio=af).order_by(
-        "-id"
-    )
-    metadata_obj = await metadata_qs.afirst()
+    # Only surface the transcript when the speech-to-text run completed
+    # cleanly. Hallucinated transcripts (and any other non-complete status)
+    # still have rows saved, but the text does not match the audio, so we
+    # must not display it. See cl.audio.tasks.transcribe.
+    if af.stt_status == Audio.STT_COMPLETE:
+        # Get the latest metadata. There can be many metadata rows for a
+        # single audio, if the transcription failed as hallucinated and was
+        # retried
+        metadata_qs = AudioTranscriptionMetadata.objects.filter(
+            audio=af
+        ).order_by("-id")
+        metadata_obj = await metadata_qs.afirst()
 
-    if metadata_obj:
-        # Extract the 'segments' list instead of 'words'
-        segments_list = metadata_obj.metadata.get("segments", [])
-        # Validate if segments_list is actually a list
-        if not isinstance(segments_list, list):
-            segments_list = []  # Reset to empty list if format is unexpected
+        if metadata_obj:
+            # Extract the 'segments' list instead of 'words'
+            segments_list = metadata_obj.metadata.get("segments", [])
+            # Validate if segments_list is actually a list
+            if not isinstance(segments_list, list):
+                segments_list = []  # Reset to empty list if format unexpected
 
     # --- End transcript metadata fetch ---
 

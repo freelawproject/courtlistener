@@ -238,19 +238,76 @@
 {% elif tab == "pdf" %}
     {# PDF #}
     <div class="tab-pane fade in active" id="pdf">
-        <div>
-            <h2 class="opinion-section-title jump-link">
-            {% if pdf_path %}
-                Source: {% if cluster.filepath_pdf_harvard %}Case Law Access Project{% else %}{{ cluster.docket.court }}{% endif %}
-            {% else %}
-                No PDF available
-            {% endif %}
-            </h2>
-        </div>
-        <hr class="hr-opinion">
-        {% if pdf_path %}
+        {% if embeddable_pdfs|length > 1 %}
+            {# Multiple PDFs: accordion #}
+            <div class="panel-group" id="pdf-accordion" role="tablist" style="margin-top: 20px;">
+                {% for pdf in embeddable_pdfs %}
+                    <div class="panel panel-default">
+                        <div class="panel-heading" role="tab" id="pdf-heading-{{ pdf.id }}">
+                            <h4 class="panel-title">
+                                <a role="button"
+                                   data-toggle="collapse"
+                                   data-parent="#pdf-accordion"
+                                   href="#pdf-collapse-{{ pdf.id }}"
+                                   aria-expanded="{% if forloop.first %}true{% else %}false{% endif %}"
+                                   aria-controls="pdf-collapse-{{ pdf.id }}"
+                                   {% if not forloop.first %}class="collapsed"{% endif %}>
+                                    {{ pdf.label }}
+                                </a>
+                            </h4>
+                        </div>
+                        <div id="pdf-collapse-{{ pdf.id }}"
+                             class="panel-collapse collapse{% if forloop.first %} in{% endif %}"
+                             role="tabpanel"
+                             aria-labelledby="pdf-heading-{{ pdf.id }}">
+                            <div class="panel-body">
+                                <div class="embed-responsive embed-responsive-8by11">
+                                    <object data="{{ pdf.url }}?no-og=true"
+                                            type="application/pdf"
+                                            width="100%"
+                                            height="100%"
+                                            class="hidden-xs hidden-sm hidden-md">
+                                        <div class="row">
+                                            <div class="col-sm-1 col-md-2 col-lg-3"></div>
+                                            <div class="col-xs-12 col-sm-10 col-md-8 col-lg-6 text-center">
+                                                <p>Oops! Your browser does not support embedded PDF viewing.</p>
+                                                <a href="{{ pdf.url }}"
+                                                   role="button"
+                                                   class="btn btn-primary">Download PDF&nbsp;<i
+                                                  class="fa fa-file-pdf-o"></i>
+                                                </a>
+                                            </div>
+                                        </div>
+                                    </object>
+                                    <div class="visible-xs-block visible-sm-block visible-md-block hidden-lg">
+                                        <div class="row">
+                                            <div class="col-sm-1 col-md-2 col-lg-3"></div>
+                                            <div class="col-xs-12 col-sm-10 col-md-8 col-lg-6 text-center">
+                                                <p>Oops! PDF viewing is not supported on mobile devices.</p>
+                                                <a href="{{ pdf.url }}"
+                                                   role="button"
+                                                   class="btn btn-primary">Download PDF&nbsp;<i
+                                                  class="fa fa-file-pdf-o"></i>
+                                                </a>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                {% endfor %}
+            </div>
+        {% elif download_file_path %}
+            {# Single PDF: existing behavior #}
+            <div>
+                <h2 class="opinion-section-title jump-link">
+                    Source: {% if cluster.filepath_pdf_harvard %}Case Law Access Project{% else %}{{ cluster.docket.court }}{% endif %}
+                </h2>
+            </div>
+            <hr class="hr-opinion">
             <div class="embed-responsive embed-responsive-8by11">
-                <object data="{{ pdf_path }}?no-og=true"
+                <object data="{{ download_file_path }}?no-og=true"
                         type="application/pdf"
                         width="100%"
                         height="100%"
@@ -259,7 +316,7 @@
                         <div class="col-sm-1 col-md-2 col-lg-3"></div>
                         <div class="col-xs-12 col-sm-10 col-md-8 col-lg-6 text-center">
                             <p>Oops! Your browser does not support embedded PDF viewing.</p>
-                            <a href="{{ pdf_path }}"
+                            <a href="{{ download_file_path }}"
                                role="button"
                                class="btn btn-primary">Download PDF&nbsp;<i
                               class="fa fa-file-pdf-o"></i>
@@ -267,13 +324,12 @@
                         </div>
                     </div>
                 </object>
-
                 <div class="visible-xs-block visible-sm-block visible-md-block hidden-lg">
                     <div class="row">
                         <div class="col-sm-1 col-md-2 col-lg-3"></div>
                         <div class="col-xs-12 col-sm-10 col-md-8 col-lg-6 text-center">
                             <p>Oops! PDF viewing is not supported on mobile devices.</p>
-                            <a href="{{ pdf_path }}"
+                            <a href="{{ download_file_path }}"
                                role="button"
                                class="btn btn-primary">Download PDF&nbsp;<i
                               class="fa fa-file-pdf-o"></i>
@@ -282,6 +338,11 @@
                     </div>
                 </div>
             </div>
+        {% else %}
+            <div>
+                <h2 class="opinion-section-title jump-link">No PDF available</h2>
+            </div>
+            <hr class="hr-opinion">
         {% endif %}
     </div>
 {% else %}

@@ -32,6 +32,7 @@ from cl.people_db.factories import PersonWithChildrenFactory
 from cl.people_db.models import Person
 from cl.tests.base import SELENIUM_TIMEOUT, BaseSeleniumTest
 from cl.tests.cases import TestCase
+from cl.users.factories import UserProfileWithParentsFactory
 
 
 class DisclosureIngestionTest(TestCase):
@@ -248,7 +249,7 @@ class DisclosureAPITest(TestCase):
     async def test_reimbursement_filtering(self) -> None:
         """Can we filter reimbursements by location?"""
         self.path = reverse("reimbursement-list", kwargs={"version": "v3"})
-        self.q = {"location__icontains": "hawaii"}
+        self.q = {"location__istartswith": "Honolulu"}
         r = await self.async_client.get(self.path, self.q)
         self.assertEqual(
             r.json()["count"], 1, msg="Failed Reimbursement filter"
@@ -257,7 +258,7 @@ class DisclosureAPITest(TestCase):
     async def test_spousal_income_filtering(self) -> None:
         """Can we filter spousal income by source_type?"""
         self.path = reverse("spouseincome-list", kwargs={"version": "v3"})
-        self.q = {"source_type__icontains": "trust fund"}
+        self.q = {"source_type__istartswith": "A big"}
         r = await self.async_client.get(self.path, self.q)
         self.assertEqual(
             r.json()["count"], 1, msg="Failed Spousal Income filter"
@@ -266,9 +267,52 @@ class DisclosureAPITest(TestCase):
     async def test_debt_filtering(self) -> None:
         """Can we filter debts by creditor?"""
         self.path = reverse("debt-list", kwargs={"version": "v3"})
-        self.q = {"creditor_name__icontains": "JP Morgan"}
+        self.q = {"creditor_name__istartswith": "JP Morgan"}
         r = await self.async_client.get(self.path, self.q)
         self.assertEqual(r.json()["count"], 1, msg="Failed Debt filter")
+
+
+class DisclosureViewerLoginRequiredTest(TestCase):
+    """Viewing a financial disclosure requires an account."""
+
+    @classmethod
+    def setUpTestData(cls) -> None:
+        cls.profile = UserProfileWithParentsFactory.create()
+        judge = PersonWithChildrenFactory.create()
+        cls.disclosure = FinancialDisclosureFactory.create(
+            person=judge,
+            filepath="financial-disclosures/test-disclosure.pdf",
+        )
+
+    async def test_anonymous_user_is_redirected_to_login(self) -> None:
+        """Are anonymous users redirected to the sign-in page?"""
+        path = reverse(
+            "financial_disclosures_viewer",
+            args=(
+                self.disclosure.person_id,
+                self.disclosure.pk,
+                self.disclosure.person.slug,
+            ),
+        )
+        r = await self.async_client.get(path)
+        self.assertEqual(r.status_code, 302)
+        self.assertEqual(r.url, f"{reverse('sign-in')}?next={path}")
+
+    async def test_authenticated_user_can_view_disclosure(self) -> None:
+        """Can logged-in users view the disclosure page?"""
+        await self.async_client.alogin(
+            username=self.profile.user.username, password="password"
+        )
+        path = reverse(
+            "financial_disclosures_viewer",
+            args=(
+                self.disclosure.person_id,
+                self.disclosure.pk,
+                self.disclosure.person.slug,
+            ),
+        )
+        r = await self.async_client.get(path)
+        self.assertEqual(r.status_code, 200)
 
 
 class DisclosurePageTest(BaseSeleniumTest):

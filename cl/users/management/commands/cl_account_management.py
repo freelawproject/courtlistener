@@ -5,7 +5,7 @@ from django.core.mail import send_mail
 from django.utils.timezone import now
 
 from cl.lib.command_utils import VerboseCommand
-from cl.lib.crypto import sha1_activation_key
+from cl.lib.crypto import generate_activation_key
 from cl.lib.types import EmailType
 from cl.users.models import UserProfile
 from cl.users.utils import emails
@@ -113,7 +113,7 @@ class Command(VerboseCommand):
 
             if not self.options["simulate"]:
                 # Build and save a new activation key for the account.
-                activation_key = sha1_activation_key(up.user.username)
+                activation_key = generate_activation_key()
                 key_expires = now() + datetime.timedelta(5)
                 up.activation_key = activation_key
                 up.key_expires = key_expires

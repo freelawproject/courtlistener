@@ -31,11 +31,11 @@ Download PDF from RECAP with PACER fallback: https://www.courtlistener.com{{ rd.
 {% endfor %}{% endfor %}
 
 {% if notes or tags %}
-Your Note: {% if notes %}{{ notes }}{% else %} You have not added notes to this case. Learn More: https://www.courtlistener.com{% url 'tag_notes_help' %}{% endif %}
+Your Note: {% if notes %}{{ notes }}{% else %} You have not added notes to this case. Learn More: {{ WIKI_HELP_URL }}/general/using-notes-to-annotate-content{% endif %}
 
-Your Tags: {% if tags %}{% for tag in tags %}{{ tag.name }}{% if not forloop.last %}, {% endif %}{% endfor %}{% else %} No tags yet. Learn More: https://www.courtlistener.com{% url 'tag_notes_help' %}{% endif %}
+Your Tags: {% if tags %}{% for tag in tags %}{{ tag.name }}{% if not forloop.last %}, {% endif %}{% endfor %}{% else %} No tags yet. Learn More: {{ WIKI_HELP_URL }}/general/using-tags-to-organize-docket-collections{% endif %}
 {% else %}
-Use notes and tags to organize and share the cases you follow. Learn More: https://www.courtlistener.com{% url 'tag_notes_help' %}
+Use notes and tags to organize and share the cases you follow. Learn More: {{ WIKI_HELP_URL }}/general/using-tags-to-organize-docket-collections
 {% endif %}
 
 {% if not first_email or first_email and auto_subscribe %}

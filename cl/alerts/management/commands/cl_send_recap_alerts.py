@@ -11,10 +11,10 @@ from django.contrib.contenttypes.models import ContentType
 from django.http import QueryDict
 from django.utils import timezone
 from elasticsearch import Elasticsearch
+from elasticsearch.dsl import connections
+from elasticsearch.dsl.response import Hit, Response
+from elasticsearch.dsl.utils import AttrList
 from elasticsearch.exceptions import ApiError, RequestError, TransportError
-from elasticsearch_dsl import connections
-from elasticsearch_dsl.response import Hit, Response
-from elasticsearch_dsl.utils import AttrList
 from redis import Redis
 
 from cl.alerts.management.commands.cl_send_scheduled_alerts import (

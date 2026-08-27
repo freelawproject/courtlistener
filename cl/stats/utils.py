@@ -5,12 +5,12 @@ import redis
 from django.conf import settings
 from django.db import OperationalError, connections
 from django.utils.timezone import now
+from elasticsearch.dsl import connections as es_connections
 from elasticsearch.exceptions import (
     ConnectionError,
     ConnectionTimeout,
     RequestError,
 )
-from elasticsearch_dsl import connections as es_connections
 from waffle import switch_is_active
 
 from cl.lib.db_tools import fetchall_as_dict
@@ -25,7 +25,7 @@ MILESTONES = OrderedDict(
     (
         ("XXS", [1e0, 5e0]),  # 1 - 5
         ("XS", [1e1, 2.5e1, 5e1, 1e2, 2.5e2, 5e2]),  # 10 - 500
-        ("SM", [1e3, 2.5e3, 5e3, 1e4, 2.5e4, 5e4]),  # 1_000 - 50_000
+        ("SM", [1e3, 2.5e3, 5e3, 1e4, 1.5e4, 2.5e4, 5e4]),  # 1_000 - 50_000
         ("MD", [1e5, 2.5e5, 5e5]),  # 100_000 - 500_000
         ("LG", [1e6, 2.5e6, 5e6]),  # 1M - 5M
         ("XL", [1e7, 2.5e7, 5e7]),  # 10M - 50M
@@ -224,7 +224,8 @@ def get_replication_statuses() -> dict[str, list[dict[str, str | int]]]:
             confirmed_flush_lsn,
             pg_current_wal_lsn(),
             (pg_current_wal_lsn() - confirmed_flush_lsn) AS lsn_distance
-        FROM pg_replication_slots;
+        FROM pg_replication_slots
+        WHERE slot_type = 'logical';
     """
     for alias in connections:
         with connections[alias].cursor() as cursor:
