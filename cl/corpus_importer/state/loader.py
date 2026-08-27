@@ -72,13 +72,6 @@ def fingerprint(loader: str, phase: LoadPhase) -> dict[str, list[str]]:
     return {"fingerprint": [loader, phase.value]}
 
 
-def _encode(value: object) -> Any:
-    """JSON-encode what `normalize` may have left in a payload."""
-    if isinstance(value, Enum):
-        return value.value
-    raise TypeError(f"{type(value).__name__} does not belong in a payload")
-
-
 class UnusableScrape(Exception):
     """Raised by `normalize` for a row it refuses to dispatch.
 
@@ -416,18 +409,12 @@ class JKentScrapeLoader[ScrapeType: BaseModel, ParamType = None](ABC):
 
     def _prepare(
         self, number: int, row: sqlite3.Row
-    ) -> tuple[ScrapeType, dict[str, Any]] | RowOutcome:
+    ) -> ScrapeType | RowOutcome:
         """Error handling wrapper over normalize.
 
         :param number: The row's position in the query.
         :param row: The run database row.
-        :return: The scrape and the normalized payload it was made from, or
-            the outcome that stopped it. The payload comes back because it,
-            not the scrape, is what goes to the worker: a scrape model is not
-            obliged to survive a round trip through its own serializer, and at
-            least one of them does not. Validating the same payload twice, on
-            each side, always yields the same scrape; serializing a validated
-            one and reading it back does not.
+        :return: The scrape, or the outcome that stopped it.
         """
         try:
             payload = json.loads(row[self.payload_column])
@@ -453,7 +440,7 @@ class JKentScrapeLoader[ScrapeType: BaseModel, ParamType = None](ABC):
         if normalized is None:
             return RowOutcome.INVALID
         try:
-            return self.scrape_model.model_validate(normalized), normalized
+            return self.scrape_model.model_validate(normalized)
         except ValidationError as error:
             logger.exception(
                 "%s of %s: does not fit %s: %s",
@@ -469,7 +456,7 @@ class JKentScrapeLoader[ScrapeType: BaseModel, ParamType = None](ABC):
         for number, row in self.rows():
             prepared = self._prepare(number, row)
             if not isinstance(prepared, RowOutcome):
-                yield prepared[0]
+                yield prepared
 
     @classmethod
     def merge_one(cls, scrape: ScrapeType) -> MergeResult[Any]:
@@ -480,14 +467,11 @@ class JKentScrapeLoader[ScrapeType: BaseModel, ParamType = None](ABC):
     def merge_payload(cls, payload: str) -> tuple[str, MergeResult[Any]]:
         """Merge one dispatched row, given the payload celery carried.
 
-        :param payload: The normalized payload, as the load serialized it at
-            dispatch. Validating it here reproduces the scrape the load
-            already validated, rather than reading back one it serialized;
-            see `_prepare` for why that distinction matters.
+        :param payload: The scrape, as the load dumped it at dispatch.
         :return: The scrape's label and the result of merging it.
         :raises pydantic.ValidationError: If the payload no longer fits
-            `scrape_model` -- which, since the load validated this same
-            payload before dispatching it, means the message and the code that
+            `scrape_model` -- which, since the load validated the scrape it
+            dumped before dispatching it, means the message and the code that
             will merge it were deployed out of step, and no amount of retrying
             will reconcile them.
         """
@@ -609,8 +593,7 @@ class JKentScrapeLoader[ScrapeType: BaseModel, ParamType = None](ABC):
             if prepared is RowOutcome.INVALID:
                 report.invalid += 1
                 continue
-            scrape, payload = prepared
-            self._dispatch(number, scrape, payload)
+            self._dispatch(number, prepared)
             report.dispatched += 1
             if self.db_delay:
                 time.sleep(self.db_delay)
@@ -620,19 +603,12 @@ class JKentScrapeLoader[ScrapeType: BaseModel, ParamType = None](ABC):
         )
         return report
 
-    def _dispatch(
-        self,
-        number: int,
-        scrape: ScrapeType,
-        payload: dict[str, Any],
-    ) -> None:
+    def _dispatch(self, number: int, scrape: ScrapeType) -> None:
         """Send one row's merge to the queue, writing it down as it goes.
 
         :param number: The row's position in the query.
-        :param scrape: The validated scrape, for the name to record the row
-            under.
-        :param payload: The normalized payload the scrape was validated from,
-            which is what the worker gets. See `_prepare`.
+        :param scrape: The validated scrape. Its own dump is what the worker
+            gets, so what the worker validates is what this load read.
         """
         # Imported here because the task module imports the registry, which
         # imports every loader, which imports this module.
@@ -644,7 +620,7 @@ class JKentScrapeLoader[ScrapeType: BaseModel, ParamType = None](ABC):
         merge_state_scrape_row.si(
             loader=self.name,
             row=number,
-            payload=json.dumps(payload, default=_encode),
+            payload=scrape.model_dump_json(),
             run_key=self.run_key,
             extract=self.extract,
             extraction_queue=self.extraction_queue,
