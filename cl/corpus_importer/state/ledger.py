@@ -40,8 +40,8 @@ class LedgerTotals:
 
     :ivar dispatched: Rows sent to the merge queue.
     :ivar merged: Rows whose merge came back clean.
-    :ivar failed: Rows whose merge reported failures or exhausted its retries.
-        Which rows those were, and why, is in Sentry and the log.
+    :ivar rejected: Rows whose merge ran and reported failures.
+    :ivar errored: Rows whose merge could not run to a verdict at all.
     :ivar documents: Documents sent to the extraction queue.
     :ivar creates: Objects created, counted per model name.
     :ivar updates: Objects updated, counted per model name.
@@ -49,10 +49,16 @@ class LedgerTotals:
 
     dispatched: int = 0
     merged: int = 0
-    failed: int = 0
+    rejected: int = 0
+    errored: int = 0
     documents: int = 0
     creates: dict[str, int] = field(default_factory=dict)
     updates: dict[str, int] = field(default_factory=dict)
+
+    @property
+    def failed(self) -> int:
+        """Rows that did not merge."""
+        return self.rejected + self.errored
 
 
 class LoadLedger:
@@ -133,14 +139,25 @@ class LoadLedger:
         """
         self._settle(row, "merged", result)
 
-    def failed(self, row: int, result: MergeResult[Any] | None = None) -> None:
-        """Record that `row` did not merge.
+    def rejected(self, row: int, result: MergeResult[Any]) -> None:
+        """Record that `row`'s merge failed.
 
         :param row: The row's position in the run database's query.
-        :param result: The merge's result, if it produced one. A merge that
-            failed partway still created and updated objects worth counting.
+        :param result: The merge's result. A merge that failed partway still
+            created and updated objects worth counting.
         """
-        self._settle(row, "failed", result)
+        self._settle(row, "rejected", result)
+
+    def errored(self, row: int) -> None:
+        """Record that `row`'s merge never reached a verdict.
+
+        Kept apart from `rejected` because the two want different people: a
+        rejected row is a scrape to go and fix, an errored one is a row to
+        re-run. See `LedgerTotals`.
+
+        :param row: The row's position in the run database's query.
+        """
+        self._settle(row, "errored", None)
 
     def extracting(self, documents: int) -> None:
         """Record document sent for text extraction, to check up on later.
@@ -194,7 +211,8 @@ class LoadLedger:
         return LedgerTotals(
             dispatched=int(counts.get("dispatched", 0)),
             merged=int(counts.get("merged", 0)),
-            failed=int(counts.get("failed", 0)),
+            rejected=int(counts.get("rejected", 0)),
+            errored=int(counts.get("errored", 0)),
             documents=int(counts.get("documents", 0)),
             creates={model: int(n) for model, n in creates.items()},
             updates={model: int(n) for model, n in updates.items()},
