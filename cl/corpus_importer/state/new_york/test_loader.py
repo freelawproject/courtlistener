@@ -484,6 +484,67 @@ class NYCoALoaderTest(TestCase):
                 self.assertEqual(entry.filing_type, expected)
                 self.assertEqual(entry.filing_type_raw, raw or "")
 
+    def test_the_worker_rebuilds_the_scrape_the_loader_read(self) -> None:
+        """What celery carries is the scrape's own dump, so the worker's
+        `model_validate_json` has to invert `model_dump_json` exactly. The
+        vocabulary fields are where that can fail: an uncovered reading and an
+        unstated one both dump as strings no vocabulary covers, so a
+        vocabulary that could not read its own dump back would silently turn
+        one into the other. Does the worker rebuild the scrape the loader
+        validated?"""
+        _run_database(
+            self.database,
+            [
+                (
+                    "NYCourtPassDocket",
+                    _docket(
+                        docket_entries=[
+                            ENTRY
+                            | {
+                                # A filing the FILINGS table named in words no
+                                # vocabulary covers, implying neither a role
+                                # nor a document type.
+                                "raw_filing_type": "Appellant Sur-Reply Brief",
+                                "entry_filing_type": None,
+                                "entry_role": None,
+                                "entry_doctype": None,
+                            }
+                        ],
+                        # An uncovered role beside an unstated document type.
+                        files=[
+                            FILE
+                            | {"doc_role": "sur-appellant", "doc_type": None}
+                        ],
+                        issues=[
+                            {
+                                "category_raw": (
+                                    "Corporations--Not-For-Profit Corporation"
+                                ),
+                                "category": "Corporations",
+                                "subcategory": "Not-For-Profit Corporation",
+                                "detail": "Whether the by-laws bind.",
+                            }
+                        ],
+                    ),
+                )
+            ],
+        )
+        # The same run, read the way `scrapes()` reads it: this is the scrape
+        # the load validated and dumped onto the queue.
+        read = list(NYCoACourtPassLoader(self.database).scrapes())
+
+        with patch(
+            "cl.corpus_importer.tasks.merge_state_scrape_row.si"
+        ) as task:
+            self.loader(verify=False).load()
+
+        payloads = [call.kwargs["payload"] for call in task.call_args_list]
+        self.assertEqual(len(payloads), 1)
+        self.assertEqual(
+            NYCoACourtPassLoader.scrape_model.model_validate_json(payloads[0]),
+            read[0],
+        )
+
     def test_merges_a_docket_the_court_states_has_no_files(self) -> None:
         """Court-PASS says outright when a case has no files at all. Is that
         docket merged, rather than taken for one whose file list went
