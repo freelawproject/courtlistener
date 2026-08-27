@@ -18,6 +18,13 @@ from zohocrmsdk.src.com.zoho.crm.api.record import (
     RecordOperations,
     ResponseWrapper,
     SearchRecordsParam,
+    SuccessResponse,
+)
+from zohocrmsdk.src.com.zoho.crm.api.tags import (
+    NewTagRequestWrapper,
+    RecordActionWrapper,
+    Tag,
+    TagsOperations,
 )
 
 from cl.lib.command_utils import logger
@@ -140,6 +147,16 @@ class ZohoModule(ZohoBase):
     """
 
     @staticmethod
+    def _format_api_exception(exc: APIException) -> str:
+        """Format a Zoho APIException into a single-line error message."""
+        status = exc.get_status().get_value()
+        code = exc.get_code().get_value()
+        message = exc.get_message().get_value()
+        details = exc.get_details() or {}
+        detail_str = ", ".join(f"{k}: {v}" for k, v in details.items())
+        return f"Zoho API Exception [{code}] {status}: {message} | Details: {detail_str}"
+
+    @staticmethod
     def handle_api_response(response):
         """
         Handle a Zoho API response, raising exceptions on errors.
@@ -161,21 +178,32 @@ class ZohoModule(ZohoBase):
         if response_object is None:
             raise Exception("Zoho API returned an empty response object.")
 
-        if isinstance(response_object, ResponseWrapper | ActionWrapper):
+        if isinstance(
+            response_object,
+            ResponseWrapper | ActionWrapper | RecordActionWrapper,
+        ):
             return response_object.get_data()
 
         if isinstance(response_object, APIException):
-            status = response_object.get_status().get_value()
-            code = response_object.get_code().get_value()
-            message = response_object.get_message().get_value()
-            details = response_object.get_details()
-
-            detail_str = ", ".join(f"{k}: {v}" for k, v in details.items())
-            raise Exception(
-                f"Zoho API Exception [{code}] {status}: {message} | Details: {detail_str}"
-            )
+            raise Exception(ZohoModule._format_api_exception(response_object))
 
         raise Exception("Unexpected response type received from the Zoho API.")
+
+    @staticmethod
+    def get_action_record_id(
+        action_result: SuccessResponse | APIException,
+    ) -> int:
+        """Return the new/updated record id from a single action result.
+
+        Zoho's wrapper responses return a list of items where each item is
+        either a SuccessResponse or an APIException (per-record
+        success/failure). This helper surfaces a per-record APIException with
+        the same formatting `handle_api_response` uses, instead of letting a
+        downstream `KeyError("id")` swallow it.
+        """
+        if isinstance(action_result, APIException):
+            raise Exception(ZohoModule._format_api_exception(action_result))
+        return int(action_result.get_details()["id"])
 
     @staticmethod
     def _build_record(
@@ -339,6 +367,32 @@ class SearchRecordMixin:
         return ZohoModule.handle_api_response(response)
 
 
+class AddTagsMixin:
+    def add_tags(self: HasModuleName, record_id: int, tag_names: list[str]):
+        """
+        Add one or more tags to a Zoho CRM record.
+
+        :param record_id: The Zoho CRM record ID to tag.
+        :param tag_names: List of tag names to add. Tag matching is exact;
+            tags that don't already exist in Zoho will be auto-created.
+        :return: The Zoho API response data, parsed and validated by
+            `ZohoModule.handle_api_response`.
+        """
+        tags = []
+        for name in tag_names:
+            tag = Tag()
+            tag.set_name(name)
+            tags.append(tag)
+
+        wrapper = NewTagRequestWrapper()
+        wrapper.set_tags(tags)
+
+        response = TagsOperations().add_tags(
+            self.module_name, record_id, wrapper
+        )
+        return ZohoModule.handle_api_response(response)
+
+
 class CreateRecordMixin:
     def create_record(self: HasModuleName, fields: dict[str | Field, Any]):
         """
@@ -387,12 +441,20 @@ class UpdateRecordMixin:
 
 
 class LeadsModule(
-    CreateRecordMixin, UpdateRecordMixin, SearchRecordMixin, ZohoModule
+    CreateRecordMixin,
+    UpdateRecordMixin,
+    SearchRecordMixin,
+    AddTagsMixin,
+    ZohoModule,
 ):
     module_name = "Leads"
 
 
 class ContactsModule(
-    CreateRecordMixin, UpdateRecordMixin, SearchRecordMixin, ZohoModule
+    CreateRecordMixin,
+    UpdateRecordMixin,
+    SearchRecordMixin,
+    AddTagsMixin,
+    ZohoModule,
 ):
     module_name = "Contacts"

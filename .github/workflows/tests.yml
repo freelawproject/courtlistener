@@ -11,15 +11,15 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Check out CourtListener
-        uses: actions/checkout@v6
+        uses: actions/checkout@v7
         with:
           path: courtlistener
 
       # Build docker image
       - name: Set up docker Buildx
-        uses: docker/setup-buildx-action@v3
+        uses: docker/setup-buildx-action@v4
       - name: Build docker image
-        uses: docker/build-push-action@v6
+        uses: docker/build-push-action@v7
         with:
           context: ./courtlistener
           file: ./courtlistener/docker/django/Dockerfile
@@ -32,7 +32,7 @@ jobs:
           cache-to: type=gha,mode=max
 
       - name: Upload artifact
-        uses: actions/upload-artifact@v6
+        uses: actions/upload-artifact@v7
         with:
           name: courtlistener
           path: /tmp/courtlistener.tar
@@ -48,7 +48,7 @@ jobs:
         tag_flags: ["--exclude-tag selenium", "--tag selenium"]
     steps:
       - name: Check out CourtListener
-        uses: actions/checkout@v6
+        uses: actions/checkout@v7
         with:
           path: courtlistener
 
@@ -65,7 +65,7 @@ jobs:
         run: echo ${{ github.actor }}
 
       - name: Set up docker Buildx
-        uses: docker/setup-buildx-action@v3
+        uses: docker/setup-buildx-action@v4
         with:
           driver-opts: network=host
 
@@ -74,7 +74,7 @@ jobs:
         working-directory: courtlistener/docker/courtlistener
         run: docker compose pull --quiet --ignore-buildable
       - name: Download courtlistener image
-        uses: actions/download-artifact@v7
+        uses: actions/download-artifact@v8
         with:
           name: courtlistener
           path: /tmp

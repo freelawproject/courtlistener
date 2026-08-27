@@ -10,7 +10,7 @@ import time_machine
 from asgiref.sync import async_to_sync
 from dateutil.tz import tzoffset, tzutc
 from django.conf import settings
-from django.contrib import admin, messages
+from django.contrib import admin
 from django.contrib.auth.hashers import make_password
 from django.core.exceptions import ValidationError
 from django.core.files.base import ContentFile
@@ -20,7 +20,7 @@ from django.http import QueryDict
 from django.test import Client, RequestFactory, override_settings
 from django.urls import reverse
 from django.utils.timezone import now
-from elasticsearch_dsl import Q
+from elasticsearch.dsl import Q
 from factory import RelatedFactory
 from lxml import html
 from selenium.webdriver.common.by import By
@@ -30,13 +30,13 @@ from timeout_decorator import timeout_decorator
 from waffle.testutils import override_flag
 
 from cl.audio.factories import AudioFactory
-from cl.favorites.factories import NoteFactory, UserTagFactory
 from cl.lib.elasticsearch_utils import (
     build_daterange_query,
     simplify_estimated_count,
 )
 from cl.lib.indexing_utils import log_last_document_indexed
 from cl.lib.redis_utils import get_redis_interface
+from cl.lib.search_utils import merge_form_with_courts
 from cl.lib.storage import clobbering_get_name
 from cl.lib.test_helpers import CourtTestCase, PeopleTestCase
 from cl.lib.utils import (
@@ -88,7 +88,6 @@ from cl.search.models import (
     SEARCH_TYPES,
     CaseTransfer,
     Citation,
-    ClusterRedirection,
     Court,
     Docket,
     DocketEntry,
@@ -105,7 +104,7 @@ from cl.search.types import EventTable
 from cl.tests.base import SELENIUM_TIMEOUT, BaseSeleniumTest
 from cl.tests.cases import ESIndexTestCase, TestCase, TransactionTestCase
 from cl.tests.utils import get_with_wait
-from cl.users.factories import UserFactory, UserProfileWithParentsFactory
+from cl.users.factories import UserProfileWithParentsFactory
 
 
 class ModelTest(TestCase):
@@ -3627,7 +3626,6 @@ class AdminActionsTest(TestCase):
     def setUpTestData(cls):
         cls.factory = RequestFactory()
         cls.court_1 = CourtFactory(id="nyappdiv")
-        cls.court_2 = CourtFactory(id="ca6")
 
         cls.cluster_1 = OpinionClusterWithParentsFactory(
             docket=DocketFactory(
@@ -3640,150 +3638,48 @@ class AdminActionsTest(TestCase):
             judges="Doe",
         )
 
-        cls.docket_1 = DocketFactory(
-            court=cls.court_2,
-            source=Docket.HARVARD_AND_RECAP,
-        )
-        cls.de_1 = DocketEntryFactory(
-            docket=cls.docket_1,
-            entry_number=23,
-            date_filed=datetime.date(2015, 8, 4),
-            description="Main Document",
-        )
-        cls.cluster_2 = OpinionClusterFactory.create(
-            precedential_status=PRECEDENTIAL_STATUS.PUBLISHED,
-            docket=cls.docket_1,
-            date_filed=datetime.date(2024, 8, 23),
-            case_name="Foo v. Bar",
-            source="U",
-        )
-
-        cls.user_1 = UserFactory()
-
-        cls.cluster_3 = OpinionClusterWithParentsFactory(
-            docket=DocketFactory(
-                court=cls.court_1,
-                case_name="Lorem v. Ipsum",
-                case_name_full="Lorem v. Ipsum",
-            ),
-            case_name="Lorem v. Ipsum",
-            date_filed=datetime.date.today(),
-            judges="Doe",
-        )
-
-        # The docket from the associated clusted has an user tag
-        cls.tag_1_user_1 = UserTagFactory(user=cls.user_1, name="tag_1_user_1")
-        cls.tag_1_user_1.dockets.add(cls.cluster_3.docket.pk)
-
-        # The cluster has an user note
-        cls.note_cluster_3_user_1 = NoteFactory(
-            user=cls.user_1,
-            cluster_id=cls.cluster_3,
-            notes="Note Test",
-        )
-
-    def test_seal_cluster_action(self):
-        """Test seal_clusters action in OpinionCluster admin page"""
-        # Test 1: Can we seal cluster without any blockages and create redirection?
-
-        cluster_pk = self.cluster_1.pk
-        docket_pk = self.cluster_1.docket.pk
-
-        # Call seal_clusters action.
+    def test_get_search_results_valid_pk(self):
+        """get_search_results returns the matching cluster for a valid PK."""
         clusters_admin = OpinionClusterAdmin(OpinionCluster, self.site)
-        clusters_admin.message_user = mock.Mock()
-        url = reverse("admin:search_opinioncluster_changelist")
-        request = self.factory.post(url)
-
-        queryset = OpinionCluster.objects.filter(pk=cluster_pk)
-        clusters_admin.seal_clusters(request, queryset)
-
-        # Check sealed correctly
-        clusters_admin.message_user.assert_called_once_with(
-            request,
-            "Sealed 1 cluster(s).",
-            messages.SUCCESS,
+        request = self.factory.get(
+            reverse("admin:search_opinioncluster_changelist")
         )
-        # Check docket has been removed
-        docket = Docket.objects.filter(pk=docket_pk)
-        self.assertEqual(
-            docket.count(),
-            0,
-            msg="Docket has not been removed after sealing the cluster.",
+        qs = OpinionCluster.objects.all()
+        results, use_distinct = clusters_admin.get_search_results(
+            request, qs, str(self.cluster_1.pk)
         )
-        # Check cluster redirection has been created
-        redirection = ClusterRedirection.objects.filter(
-            reason=ClusterRedirection.SEALED,
-            deleted_cluster_id=cluster_pk,
-            cluster=None,
+        self.assertIn(self.cluster_1, results)
+        self.assertEqual(results.count(), 1)
+        self.assertFalse(use_distinct)
+
+    def test_get_search_results_invalid_string(self):
+        """get_search_results returns an empty queryset for a non-integer."""
+        clusters_admin = OpinionClusterAdmin(OpinionCluster, self.site)
+        request = self.factory.get(
+            reverse("admin:search_opinioncluster_changelist")
         )
-        self.assertEqual(
-            redirection.count(),
-            1,
-            msg="Got incorrect number of ClusterRedirection results",
+        qs = OpinionCluster.objects.all()
+        results, use_distinct = clusters_admin.get_search_results(
+            request, qs, "not-a-pk"
         )
-        clusters_admin.message_user.reset_mock()
+        self.assertEqual(results.count(), 0)
+        self.assertFalse(use_distinct)
 
-        # Test 2: Can we seal a cluster but not removing the docket and create redirection?
-        cluster2_pk = self.cluster_2.pk
-        docket2_pk = self.cluster_2.docket.pk
-
-        queryset = OpinionCluster.objects.filter(pk=cluster2_pk)
-        clusters_admin.seal_clusters(request, queryset)
-
-        # Check sealed correctly
-        clusters_admin.message_user.assert_called_once_with(
-            request,
-            "Sealed 1 cluster(s).",
-            messages.SUCCESS,
+    def test_get_search_results_empty_string(self):
+        """get_search_results returns the full queryset for an empty term."""
+        clusters_admin = OpinionClusterAdmin(OpinionCluster, self.site)
+        request = self.factory.get(
+            reverse("admin:search_opinioncluster_changelist")
         )
-
-        # Check that docket has not been removed
-        docket = Docket.objects.filter(pk=docket2_pk)
-        self.assertEqual(
-            docket.count(),
-            1,
-            msg="Docket shouldn't have been removed after sealing the cluster.",
-        )
-
-        # Check that the cluster redirection was still created.
-        redirection = ClusterRedirection.objects.filter(
-            reason=ClusterRedirection.SEALED,
-            deleted_cluster_id=cluster2_pk,
-            cluster=None,
+        qs = OpinionCluster.objects.all()
+        results, use_distinct = clusters_admin.get_search_results(
+            request, qs, ""
         )
         self.assertEqual(
-            redirection.count(),
-            1,
-            msg="Got more or less ClusterRedirection results",
+            set(results.values_list("pk", flat=True)),
+            set(qs.values_list("pk", flat=True)),
         )
-        clusters_admin.message_user.reset_mock()
-
-        # Test 3: Can we block seal if something is related to cluster? No, user related information exists
-        cluster3_pk = self.cluster_3.pk
-
-        queryset = OpinionCluster.objects.filter(pk=cluster3_pk)
-        clusters_admin.seal_clusters(request, queryset)
-
-        # Check cannot be sealed
-        clusters_admin.message_user.assert_called_once_with(
-            request,
-            f'ERROR: Problem sealing cluster id: {cluster3_pk} - <a href="/admin/search/opinioncluster/blocking-confirmation/{cluster3_pk}/" target="_blank">View Dependencies</a>',
-            messages.WARNING,
-        )
-
-        # Check blocking objects:
-        get_blocking_relations = clusters_admin.get_blocking_relations(
-            self.cluster_3
-        )
-
-        user_tag_qs = get_blocking_relations.get("favorites.UserTag")
-        self.assertTrue(user_tag_qs.exists())
-        self.assertIn(self.tag_1_user_1, user_tag_qs)
-
-        note_qs = get_blocking_relations.get("favorites.Note")
-        self.assertTrue(note_qs.exists())
-        self.assertIn(self.note_cluster_3_user_1, note_qs)
+        self.assertFalse(use_distinct)
 
 
 class PopulateDocketNumberRawCommandTest(TestCase):
@@ -4080,6 +3976,28 @@ class SearchFormCourtCleanTest(TestCase):
         cd = form.cleaned_data
         court_ids = set(cd["court"].split())
         self.assertEqual(court_ids, {"scotus", "ca1"})
+
+    def test_merge_form_with_courts_marks_checked_courts(self) -> None:
+        search_form = SearchForm(
+            QueryDict("q=test&type=o&court_scotus=on&court_ca2=on"),
+            courts=[self.court_scotus, self.court_ca1, self.court_ca2],
+        )
+        self.assertTrue(search_form.is_valid())
+
+        court_tabs, court_count_human, court_count = merge_form_with_courts(
+            [self.court_scotus, self.court_ca1, self.court_ca2],
+            search_form,
+        )
+
+        self.assertEqual(court_count_human, "2")
+        self.assertEqual(court_count, "2")
+        checked_by_id = {
+            court.pk: court.checked for court in court_tabs["federal"]
+        }
+        self.assertEqual(
+            checked_by_id,
+            {"scotus": True, "ca1": False, "ca2": True},
+        )
 
     def test_no_court_selection_results_in_empty_court_filter(self) -> None:
         """With no court selection, all picker booleans default to True"""

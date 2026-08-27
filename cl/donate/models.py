@@ -211,6 +211,7 @@ class NeonMembershipLevel:
     TIER_2 = 4
     TIER_3 = 5
     TIER_4 = 6
+    LSO_1 = 7
     EDU = 9
 
     # Old group memberships
@@ -262,6 +263,7 @@ class NeonMembershipLevel:
         (TIER_2, "CL Membership - Tier 2"),
         (TIER_3, "CL Membership - Tier 3"),
         (TIER_4, "CL Membership - Tier 4"),
+        (LSO_1, "LSO 1"),
         (EDU, "EDU Membership"),
         (GROUP_SMALLEST, "Group Membership - Smallest"),
         (GROUP_SMALL, "Group Membership - Small"),
@@ -328,9 +330,19 @@ class NeonMembership(AbstractDateTimeModel):
         default=MembershipPaymentStatus.PENDING,
     )
 
+    # Payment statuses that grant membership benefits. PENDING ("waiting for
+    # payment") is included so members keep access while a charge is still
+    # processing; only an outright FAILED/declined payment revokes benefits.
+    ACTIVE_PAYMENT_STATUSES = frozenset(
+        {
+            MembershipPaymentStatus.SUCCEEDED,
+            MembershipPaymentStatus.PENDING,
+        }
+    )
+
     @property
     def is_active(self) -> bool:
-        if self.payment_status != MembershipPaymentStatus.SUCCEEDED:
+        if self.payment_status not in self.ACTIVE_PAYMENT_STATUSES:
             return False
 
         if not self.termination_date:

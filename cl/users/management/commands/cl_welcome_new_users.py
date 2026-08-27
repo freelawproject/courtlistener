@@ -1,6 +1,7 @@
 import sys
 from datetime import datetime, timedelta
 
+from django.conf import settings
 from django.contrib.auth.models import User
 from django.core.mail import EmailMultiAlternatives, get_connection
 from django.db.models import QuerySet
@@ -65,12 +66,18 @@ class Command(VerboseCommand):
         txt_template = loader.get_template("emails/welcome_email.txt")
         messages = []
         for recipient in recipients:
-            email_txt = txt_template.render({"name": recipient.first_name})
+            email_txt = txt_template.render(
+                {
+                    "name": recipient.first_name,
+                    # No request context processors here; inject the wiki URL.
+                    "WIKI_HELP_URL": settings.WIKI_HELP_BASE_URL,
+                }
+            )
             messages.append(
                 EmailMultiAlternatives(
                     subject="Welcome to CourtListener and Free Law Project",
                     body=email_txt,
-                    from_email="Mike Lissner <mike@courtlistener.com>",
+                    from_email=settings.DEFAULT_FROM_EMAIL,
                     to=[recipient.email],
                     headers={
                         "X-Entity-Ref-ID": f"welcome.email:{recipient.pk}"

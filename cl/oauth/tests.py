@@ -17,7 +17,7 @@ class DynamicClientRegistrationTest(APITestCase):
     """Tests for the RFC 7591 DCR endpoint at /o/register/.
 
     Rate limiting is disabled at the class level so that the many
-    POSTs exercising validation branches don't trip the 10/h limiter.
+    POSTs exercising validation branches don't trip the limiter.
     ``DynamicClientRegistrationRateLimitTest`` covers the limiter
     behavior itself.
     """
@@ -156,6 +156,7 @@ class DynamicClientRegistrationTest(APITestCase):
 
 
 @override_settings(
+    OAUTH2_DCR_RATELIMIT="10/h",
     CACHES={
         "default": {
             "BACKEND": "django.core.cache.backends.locmem.LocMemCache",
@@ -189,7 +190,6 @@ class DynamicClientRegistrationRateLimitTest(APITestCase):
 
     def test_ratelimit_blocks_after_threshold(self):
         payload = {"redirect_uris": ["https://mcp.example.com/cb"]}
-        # 10/h is the configured rate.
         for _ in range(10):
             resp = self.client.post(self.url, payload, format="json")
             self.assertEqual(resp.status_code, 201, resp.content)

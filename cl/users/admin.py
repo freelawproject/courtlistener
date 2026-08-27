@@ -1,7 +1,7 @@
 from typing import cast
 
 from django.apps import apps
-from django.contrib import admin
+from django.contrib import admin, messages
 from django.contrib.auth.forms import UserChangeForm
 from django.contrib.auth.models import Permission, User
 from django.db.models import Model
@@ -9,11 +9,13 @@ from rest_framework.authtoken.models import Token
 
 from cl.alerts.admin import AlertInline, DocketAlertInline
 from cl.api.admin import APIThrottleInline, WebhookInline
+from cl.api.utils import apply_membership_throttles
 from cl.donate.admin import (
     DonationInline,
     MonthlyDonationInline,
     NeonMembershipInline,
 )
+from cl.donate.models import NeonMembership
 from cl.favorites.admin import NoteInline, PrayerInline, UserTagInline
 from cl.favorites.models import UserTag
 from cl.lib.admin import (
@@ -21,7 +23,6 @@ from cl.lib.admin import (
     AdminTweaksMixin,
     generate_admin_links,
 )
-from cl.lib.redis_utils import get_redis_interface
 from cl.search.models import SearchQuery
 from cl.users.models import (
     BarMembership,
@@ -100,19 +101,62 @@ class UserAdmin(admin.ModelAdmin, AdminTweaksMixin):
         "email",
         "pk",
     )
+    actions = ["refresh_api_throttles"]
+
+    @admin.action(
+        description="Refresh API throttles from active Neon membership"
+    )
+    def refresh_api_throttles(self, request, queryset):
+        """Resync MEMBERSHIP-source API throttles for the selected users
+        from each user's current active Neon membership.
+
+        MANUAL-source throttles are never touched (the helper only
+        manages MEMBERSHIP rows).
+        """
+        refreshed = 0
+        skipped: list[str] = []
+        not_updated: list[str] = []
+
+        for user in queryset.select_related("membership"):
+            try:
+                membership = user.membership
+            except NeonMembership.DoesNotExist:
+                membership = None
+
+            if not membership or not membership.is_active:
+                skipped.append(user.username)
+                continue
+
+            if apply_membership_throttles(user, membership.level):
+                refreshed += 1
+            else:
+                not_updated.append(user.username)
+
+        if refreshed:
+            self.message_user(
+                request,
+                f"Refreshed API throttles for {refreshed} user(s).",
+                level=messages.SUCCESS,
+            )
+        if skipped:
+            self.message_user(
+                request,
+                f"Skipped (no active Neon membership): {', '.join(skipped)}",
+                level=messages.ERROR,
+            )
+        if not_updated:
+            self.message_user(
+                request,
+                f"Could not refresh throttles (no matching membership level): {', '.join(not_updated)}",
+                level=messages.ERROR,
+            )
 
     def api_calls_count(self, obj):
-        r = get_redis_interface("STATS")
-        total = 0
         if obj.id is None:
             # New user, no API usage, bail.
-            return total
+            return 0
 
-        for api_prefix in ["v3", "v4"]:
-            count = r.zscore(f"api:{api_prefix}.user.counts", obj.id)
-            if count:
-                total += int(count)
-        return total
+        return obj.profile.total_api_usage
 
     api_calls_count.short_description = "API Calls Count"
 
