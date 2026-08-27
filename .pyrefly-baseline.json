@@ -2199,20 +2199,6 @@
       "severity": "error"
     },
     {
-      "column": 21,
-      "path": "cl/disclosures/models.py",
-      "name": "bad-function-definition",
-      "concise_description": "Default `None` is not assignable to parameter `filename` with type `str`",
-      "severity": "error"
-    },
-    {
-      "column": 21,
-      "path": "cl/disclosures/models.py",
-      "name": "bad-function-definition",
-      "concise_description": "Default `None` is not assignable to parameter `filename` with type `str`",
-      "severity": "error"
-    },
-    {
       "column": 13,
       "path": "cl/disclosures/models.py",
       "name": "unsupported-operation",
@@ -4964,13 +4950,6 @@
       "severity": "error"
     },
     {
-      "column": 30,
-      "path": "cl/recap/tasks.py",
-      "name": "bad-function-definition",
-      "concise_description": "Default `None` is not assignable to parameter `attachment_number` with type `int`",
-      "severity": "error"
-    },
-    {
       "column": 21,
       "path": "cl/recap/tasks.py",
       "name": "unbound-name",
@@ -4982,13 +4961,6 @@
       "path": "cl/recap/tasks.py",
       "name": "bad-argument-type",
       "concise_description": "Argument `Any | None` is not assignable to parameter `session_data` with type `SessionData` in function `download_pacer_pdf_and_save_to_pq`",
-      "severity": "error"
-    },
-    {
-      "column": 13,
-      "path": "cl/recap/tasks.py",
-      "name": "bad-argument-type",
-      "concise_description": "Argument `int | None` is not assignable to parameter `attachment_number` with type `int` in function `download_pacer_pdf_and_save_to_pq`",
       "severity": "error"
     },
     {
@@ -5654,13 +5626,6 @@
       "path": "cl/scrapers/management/commands/cl_scrape_oral_arguments.py",
       "name": "bad-argument-type",
       "concise_description": "Argument `bytes | str` is not assignable to parameter `content` with type `bytes`",
-      "severity": "error"
-    },
-    {
-      "column": 62,
-      "path": "cl/scrapers/management/commands/clone_from_cl.py",
-      "name": "bad-function-definition",
-      "concise_description": "Default `None` is not assignable to parameter `fields_to_remove` with type `list[str]`",
       "severity": "error"
     },
     {
@@ -8678,13 +8643,6 @@
       "path": "cl/users/models.py",
       "name": "unsupported-operation",
       "concise_description": "`<` is not supported between `datetime` and `None`",
-      "severity": "error"
-    },
-    {
-      "column": 67,
-      "path": "cl/users/models.py",
-      "name": "bad-function-definition",
-      "concise_description": "Default `None` is not assignable to parameter `append` with type `int`",
       "severity": "error"
     },
     {
