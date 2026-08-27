@@ -15,6 +15,7 @@ ever cost a docket its merge.
 
 from typing import cast
 
+from django.db.models import IntegerChoices
 from juriscraper.state.docket import DocketEntryType
 from juriscraper.state.new_york.nycourts_gov.vocabularies import (
     CourtVocabulary,
@@ -60,6 +61,16 @@ class _UnmirroredRole(CourtVocabulary):
     """
 
     NOT_MIRRORED = "Not Mirrored", 900, "Not Mirrored"
+
+
+_MIRRORS: tuple[
+    tuple[str, type[IntegerChoices], type[CourtVocabulary]], ...
+] = (
+    ("filing type", MirroredFilingType, FilingType),
+    ("filing role", MirroredFilingRole, FilingRole),
+    ("document type", MirroredFilingDocType, FilingDocType),
+)
+"""Every Juriscraper vocabulary CourtListener mirrors, with its mirror."""
 
 
 class DocketNumberTest(SimpleTestCase):
@@ -112,25 +123,52 @@ class VocabularyMappingTest(SimpleTestCase):
     """Tests for the codes CourtListener stores for the schema's readings."""
 
     def test_mirrored_members(self) -> None:
-        """Is each mirrored vocabulary's member stored under its own published
-        code?"""
-        for label, mirror, member in (
-            ("filing type", MirroredFilingType, FilingType.APPELLANT_BRIEF),
-            ("filing role", MirroredFilingRole, FilingRole.APPELLANT),
-            ("document type", MirroredFilingDocType, FilingDocType.BRIEF),
-        ):
+        """Is every member of every mirrored vocabulary stored under its own
+        published code?
+
+        Every member, rather than a sample: a mirror maps by name, so a code
+        renumbered or a member renamed upstream would otherwise store the wrong
+        code, or `UNASSIGNED`, without anything raising. Whichever of the two it
+        is, this is the only place it surfaces.
+        """
+        for label, mirror, vocabulary in _MIRRORS:
+            for member in vocabulary:
+                with self.subTest(label, member=member.name):
+                    self.assertEqual(
+                        mirrored_code(mirror, member),
+                        member.code,
+                        f"{vocabulary.__name__}.{member.name} is not mirrored "
+                        f"under its own code. Add or correct it in "
+                        f"cl.search.state.new_york.vocabularies."
+                        f"{mirror.__name__}.",
+                    )
+
+    def test_mirrors_define_no_member_juriscraper_dropped(self) -> None:
+        """The other direction: does every mirrored name still name a member
+        upstream?
+
+        A member renamed or removed upstream leaves a mirror entry nothing maps
+        onto, so the codes already stored under it stop meaning anything.
+        """
+        for label, mirror, vocabulary in _MIRRORS:
+            names = {member.name for member in vocabulary} | {
+                "UNKNOWN",
+                "UNASSIGNED",
+            }
             with self.subTest(label):
-                self.assertEqual(mirrored_code(mirror, member), member.code)
+                self.assertEqual(
+                    {mirrored.name for mirrored in mirror} - names,
+                    set(),
+                    f"cl.search.state.new_york.vocabularies."
+                    f"{mirror.__name__} mirrors names that "
+                    f"{vocabulary.__name__} no longer defines.",
+                )
 
     def test_mirrored_reserved_readings(self) -> None:
         """Both readings that name no member are stored under the code reserved
         for them, in every mirror. Are they?"""
-        for mirror in (
-            MirroredFilingType,
-            MirroredFilingRole,
-            MirroredFilingDocType,
-        ):
-            with self.subTest(mirror.__name__):
+        for label, mirror, _ in _MIRRORS:
+            with self.subTest(label):
                 self.assertEqual(
                     mirrored_code(mirror, Unclassified.UNKNOWN), UNKNOWN
                 )
@@ -306,3 +344,48 @@ class ClassifiedVocabularyTest(SimpleTestCase):
 
         self.assertEqual(issue.category, IssueCategory.CRIMES)
         self.assertEqual(issue.subcategory, IssueSubcategory.SENTENCE)
+
+    def test_readings_survive_a_round_trip(self) -> None:
+        """Does a model dumped and read back state what it stated before?
+
+        Both readings that name no member dump as their own strings, which no
+        vocabulary covers, so reading one back has to recover it rather than
+        take it for wording the Court stated. Getting that wrong would quietly
+        turn every `UNKNOWN` into an `UNASSIGNED` -- a field nobody stated into
+        the signal that a member needs adding -- on every trip.
+        """
+        for label, model in (
+            (
+                "nothing stated, alongside a type the vocabulary lacks",
+                NYCoAFile(
+                    file_name="SmithvJones-Webcast.asx", doc_type="surbrf"
+                ),
+            ),
+            (
+                "members the vocabularies cover",
+                NYCoAFile(
+                    file_name="SmithvJones-app-Smith-brf.pdf",
+                    doc_role="appellant",
+                    doc_type="brf",
+                ),
+            ),
+            (
+                "an issue stated as a bare category",
+                NYCoAIssue(category_raw="Crimes", category="Crimes"),
+            ),
+            (
+                "a filing no table row named",
+                NYCoDocketEntry(
+                    docket_entry_id="d:none:none:smith:1",
+                    entry_type=DocketEntryType.UNKNOWN,
+                    attachments=[],
+                    entry_index=0,
+                    raw_filing_type="",
+                ),
+            ),
+        ):
+            with self.subTest(label):
+                self.assertEqual(
+                    type(model).model_validate_json(model.model_dump_json()),
+                    model,
+                )

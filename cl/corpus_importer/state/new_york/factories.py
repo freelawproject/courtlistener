@@ -30,6 +30,9 @@ from cl.corpus_importer.state.new_york.nycourts_gov import (
     NYCoDocketEntry,
 )
 from cl.corpus_importer.state.new_york.utils import NYCOA_COURT_ID
+from cl.tests.providers import LegalProvider
+
+Faker.add_provider(LegalProvider)
 
 
 class _Filing(NamedTuple):

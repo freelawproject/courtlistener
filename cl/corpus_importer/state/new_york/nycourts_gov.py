@@ -67,10 +67,11 @@ def _classify[Vocabulary: CourtVocabulary](
     Logging for values we might want to add to our classifiers.
 
     :param vocabulary: The vocabulary to look `value` up in.
-    :param value: Whatever the scrape stated. `None` is `UNKNOWN`, and members
-        of `vocabulary` and of `Unclassified` pass through untouched, so this is
-        safe to apply to a model built in Python as well as one parsed from a
-        scrape.
+    :param value: Whatever the scrape stated. `None` is `UNKNOWN`; members of
+        `vocabulary` and of `Unclassified` pass through untouched; and the
+        strings either kind of member serializes as read back as that member.
+        So this is safe to apply to a model built in Python and to one read
+        back from a dump, as well as to one parsed from a scrape.
     :return: The member, or why the vocabulary names none.
     """
     if isinstance(value, Unclassified | vocabulary):
@@ -80,15 +81,24 @@ def _classify[Vocabulary: CourtVocabulary](
     try:
         return vocabulary(value)
     except ValueError:
-        logger.warning(
-            "Court-PASS stated %s %r, which Juriscraper's vocabulary does not "
-            "cover; recording it as unassigned. Add the member to "
-            "juriscraper.state.new_york.nycourts_gov.vocabularies.%s.",
-            vocabulary.__name__,
-            value,
-            vocabulary.__name__,
-        )
-        return Unclassified.UNASSIGNED
+        pass
+    try:
+        # An `Unclassified` member dumps as its own value, so a model read back
+        # from a dump states one of those where a scrape states the Court's
+        # wording. No vocabulary covers either string, so this cannot shadow a
+        # reading the Court stated.
+        return Unclassified(value)
+    except ValueError:
+        pass
+    logger.warning(
+        "Court-PASS stated %s %r, which Juriscraper's vocabulary does not "
+        "cover; recording it as unassigned. Add the member to "
+        "juriscraper.state.new_york.nycourts_gov.vocabularies.%s.",
+        vocabulary.__name__,
+        value,
+        vocabulary.__name__,
+    )
+    return Unclassified.UNASSIGNED
 
 
 ClassifiedFilingRole = Annotated[
