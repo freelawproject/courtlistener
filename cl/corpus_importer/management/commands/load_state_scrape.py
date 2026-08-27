@@ -164,14 +164,15 @@ class Command(BaseCommand):
             ),
         )
         parser.add_argument(
-            "--verify-only",
+            "--skip-load",
             action="store_true",
             help=(
-                "Skip the load and check up on one that already ran, reading "
-                "its ledger out of Redis. For picking up a run that hit "
-                "--verify-timeout with its queues still moving. Needs the same "
-                "loader and database arguments, since those name the ledger, "
-                "but never fetches the run database itself."
+                "Dispatch nothing, and go straight to checking up on a load "
+                "that already ran by reading its ledger out of Redis. For "
+                "picking up a run that hit --verify-timeout with its queues "
+                "still moving. Needs the same loader and database arguments, "
+                "since those name the ledger, but never fetches the run "
+                "database itself."
             ),
         )
         parser.add_argument(
@@ -198,7 +199,7 @@ class Command(BaseCommand):
                 "each wait does rather than when dispatching did. Hitting it "
                 "is not a failure -- the queue was working and the load "
                 "stopped watching -- so nothing is reported as lost and "
-                "--verify-only can settle it later."
+                "--skip-load can settle it later."
             ),
         )
 
@@ -217,12 +218,17 @@ class Command(BaseCommand):
         start_row: int,
         auto_resume: bool,
         skip_verification: bool,
-        verify_only: bool,
+        skip_load: bool,
         in_flight_time: float,
         verify_timeout: float,
         **options: Any,
     ) -> None:
         """Download the run database, dispatch its merges, and report on them.
+
+        The command is two phases, dispatching and verifying, and each has a
+        flag that skips it. Skipping neither is the usual run; skipping the
+        load settles a run that is already in the queue; skipping verification
+        returns as soon as everything is dispatched.
 
         :param loader: The `LOADERS` name of the court's loader.
         :param database: The run database's path within the storage bucket.
@@ -236,26 +242,26 @@ class Command(BaseCommand):
         :param start_row: Dockets to skip before dispatching anything.
         :param auto_resume: Start from the last checkpointed row.
         :param skip_verification: Do not wait to see what the merges did.
-        :param verify_only: Check up on a load that already ran and dispatch
-            nothing.
+        :param skip_load: Dispatch nothing, and check up on a load that
+            already ran instead.
         :param in_flight_time: Seconds a queue's count must hold steady before
             what is left counts as lost.
         :param verify_timeout: Seconds to wait on a queue still coming down.
-        :raises CommandError: If a pair of contradictory flags is given, or if
-            the run database cannot be fetched.
+        :raises CommandError: If a pair of contradictory flags is given, if
+            both phases are skipped, or if the run database cannot be fetched.
         """
         loader_class = LOADERS[loader]
         run_key = compose_redis_key(loader, database)
-        if verify_only and skip_verification:
+        if skip_load and skip_verification:
             raise CommandError(
-                "--verify-only and --skip-verification ask for opposite "
-                "things: one does nothing but verify, the other does "
-                "everything but. Pass one or the other."
+                "--skip-load and --skip-verification between them skip the "
+                "whole command: one is the dispatching, the other is the "
+                "checking up. Drop one."
             )
-        if verify_only:
+        if skip_load:
             # The ledger is in Redis and the run database is not read at all,
             # so there is nothing to fetch out of the bucket.
-            self.report(
+            self.print_report(
                 loader_class(
                     database,
                     extract=not skip_extraction,
@@ -294,13 +300,11 @@ class Command(BaseCommand):
         except RunDatabaseUnavailable as error:
             raise CommandError(str(error)) from error
 
-        self.report(report, verified=not skip_verification)
+        self.print_report(report, verified=not skip_verification)
 
-    def report(self, report: LoadReport, *, verified: bool) -> None:
+    def print_report(self, report: LoadReport, *, verified: bool) -> None:
         """Write out what the load did, for whoever ran it.
 
-        This is a pretty summary of the run for the executer of the command.
-        Everything is already logged and Sentried as necessary before we get here.
 
         :param report: The load's report.
         :param verified: Whether the load waited on its merges. An unverified
@@ -317,51 +321,67 @@ class Command(BaseCommand):
                 )
             )
             return
-        for label, counts in (
-            ("Created", report.creates),
-            ("Updated", report.updates),
-        ):
-            for model, count in sorted(counts.items()):
-                self.stdout.write(f"  {label} {count} {model}")
+        self.print_counts(report)
         if (extraction := report.extraction) is not None:
             self.stdout.write(f"  Extraction: {extraction}")
             if not extraction.complete:
                 self.stderr.write(
                     self.style.WARNING(
-                        f"{extraction.outstanding} documents written since "
-                        "this run began still have no extracted text"
-                        f"{self.humanize_outcome(extraction.wait)}. "
-                        "`state_document_download --skip-download` will pick "
-                        "them up."
+                        f"Unextracted: {extraction.outstanding} documents"
+                        f"{self.humanize_outcome(extraction.wait)}. Sweep "
+                        "them up with `state_document_download "
+                        "--skip-download`."
                     )
                 )
         if report.missing_count:
             # `missing` is a sample, not the set: a broker that went down
             # leaves a whole run outstanding, and nobody wants that printed.
             self.stderr.write(
-                f"{report.missing_count} dockets were dispatched and never "
-                f"reported back{self.humanize_outcome(report.merge_wait)}. Re-run the "
-                "load over them; merging is idempotent."
+                f"Missing: {report.missing_count} dockets dispatched, never "
+                f"reported back{self.humanize_outcome(report.merge_wait)}. "
+                "Re-run the load; merging is idempotent."
             )
             for row, name in sorted(report.missing.items()):
                 self.stderr.write(f"  row {row}: {name}")
             if (rest := report.missing_count - len(report.missing)) > 0:
                 self.stderr.write(
-                    f"  ... and {rest} more. The log names the Redis key "
+                    f"  ... and {rest} more; the log names the Redis key "
                     "holding all of them."
                 )
         if report.failed or report.invalid or report.refused:
             self.stderr.write(
-                self.style.WARNING(
-                    "Some dockets did not load. See the log for details."
-                )
+                self.style.WARNING("Some dockets did not load. See the log.")
             )
         if not report.rows_read:
             self.stdout.write(
-                "This checked a stored ledger and never opened the run "
-                "database, so it cannot say how many rows were seen, invalid "
-                "or refused."
+                "Ledger only: no run database was opened, so nothing above "
+                "counts rows seen, invalid or refused."
             )
+
+    def print_counts(self, report: LoadReport) -> None:
+        """Write what the run's merges wrote, one line per model, table style.
+
+        :param report: The load's report.
+        """
+        models = sorted(set(report.creates) | set(report.updates))
+        if not models:
+            return
+        name_width = max(len(model) for model in models)
+        count_width = max(
+            len(str(count))
+            for counts in (report.creates, report.updates)
+            for count in counts.values()
+        )
+        for label, counts in (
+            ("Created", report.creates),
+            ("Updated", report.updates),
+        ):
+            for model in models:
+                if (count := counts.get(model)) is None:
+                    continue
+                self.stdout.write(
+                    f"  {label} {model:<{name_width}}  {count:>{count_width}}"
+                )
 
     @staticmethod
     def humanize_outcome(wait: WaitOutcome | None) -> str:
@@ -372,15 +392,10 @@ class Command(BaseCommand):
         """
         match wait:
             case WaitOutcome.STALLED:
-                return (
-                    ", and the queue stopped moving for long enough to say "
-                    "they are not coming"
-                )
+                return " -- queue stalled"
             case WaitOutcome.TIMED_OUT:
                 return (
-                    " yet -- the queue was still coming down when this gave "
-                    "up waiting, so they may well land on their own. Re-run "
-                    "with --verify-only to settle it"
+                    " yet -- timed out. Follow up with --skip-load"
                 )
             case _:
                 return ""
