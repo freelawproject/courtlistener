@@ -4334,13 +4334,6 @@
       "severity": "error"
     },
     {
-      "column": 20,
-      "path": "cl/scrapers/management/commands/cl_scrape_opinions.py",
-      "name": "bad-unpacking",
-      "concise_description": "Cannot unpack tuple[dict[Unknown, Unknown]] (of size 1) into 3 values",
-      "severity": "error"
-    },
-    {
       "column": 9,
       "path": "cl/scrapers/management/commands/cl_scrape_opinions.py",
       "name": "bad-argument-type",
@@ -4352,13 +4345,6 @@
       "path": "cl/scrapers/management/commands/cl_scrape_opinions.py",
       "name": "bad-argument-type",
       "concise_description": "Argument `str | Any` is not assignable to parameter `blocked` with type `bool` in function `cl.scrapers.utils.update_or_create_docket`",
-      "severity": "error"
-    },
-    {
-      "column": 27,
-      "path": "cl/scrapers/management/commands/cl_scrape_opinions.py",
-      "name": "bad-argument-type",
-      "concise_description": "Argument `list[tuple[dict[Unknown, Unknown], bytes, str]]` is not assignable to parameter `opinions_content` with type `list[tuple[dict[Unknown, Unknown]]]` in function `set_ordering_keys`",
       "severity": "error"
     },
     {
