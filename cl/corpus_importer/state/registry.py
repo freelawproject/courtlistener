@@ -1,10 +1,10 @@
 """The loaders a state scrape run can be loaded with, by name.
 
 A load dispatches its merges to celery, so the worker that picks one up has to
-find its way back to the loader that sent it. It cannot be handed the loader
-itself -- a celery message carries JSON -- and it must not be handed an
+find its way back to the loader that sent it. It must not be handed an
 importable path, which would let anything on the queue name any callable in
-the codebase. It is handed a name out of this registry instead.
+the codebase. It is handed a name out of this registry instead, which can only
+name what is registered here.
 
 Register a court by adding its `JKentScrapeLoader` subclass here. The name a
 loader is registered under is its own `name`, so the two cannot drift apart.
