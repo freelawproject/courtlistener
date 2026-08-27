@@ -1,10 +1,12 @@
 import logging
+from datetime import datetime
 from pathlib import Path, PurePosixPath
 from typing import IO, Self
 
 from asgiref.sync import async_to_sync
 from django.core.files import File
 from django.db import models
+from django.db.models import Q, QuerySet
 from django.utils.text import slugify
 
 from cl.lib.decorators import document_model
@@ -137,6 +139,33 @@ class AbstractStateDocument(AbstractPDF):
         """Return the set of file extensions that can be extracted."""
         return (".pdf",)
 
+    @classmethod
+    def written_since(cls, since: datetime) -> QuerySet[Self]:
+        """Documents of this model written since `since` that carry no
+        extracted text.
+
+        :param since: The moment to count from.
+        :return: The documents still missing their text.
+        """
+        extensions = Q()
+        for extension in cls.extractable_extensions():
+            extensions |= Q(filepath_local__endswith=extension)
+        return (
+            cls._default_manager.filter(extensions, date_modified__gte=since)
+            .exclude(filepath_local="")
+            .exclude(ocr_status__in=(cls.OCR_COMPLETE, cls.OCR_UNNECESSARY))
+        )
+
+    @classmethod
+    def unextracted(cls, since: datetime) -> QuerySet[Self]:
+        """Documents that have not been OCRed but have been modified
+        since provided datetime.
+
+        :param since: The moment to count from.
+        :return: The documents nothing has yet tried and failed to read.
+        """
+        return cls.written_since(since).exclude(ocr_status=cls.OCR_FAILED)
+
     def validate_file(self, content: IO[bytes], extension: str) -> int | None:
         """Validate the file content and return the processing error if any.
 
@@ -158,10 +187,7 @@ class AbstractStateDocument(AbstractPDF):
         """Run the OCR extraction task for this document.
 
         :param queue: The queue to use for the extraction task.
-        :return: Whether a task was dispatched. `False` covers both a document
-            already extracted and one there is no reading -- neither is going
-            to change status, so a caller checking up on extraction afterwards
-            should not wait on either."""
+        :return: True if dispatch occured, else False."""
         from cl.scrapers.tasks import extract_formatted_text_document
 
         if (

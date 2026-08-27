@@ -934,12 +934,14 @@ class LoaderTestCase(TestCase):
         self.clear_run_keys()
         self.addCleanup(self.clear_run_keys)
 
-    def clear_run_keys(self) -> None:
-        """Take away the run's checkpoint and every part of its ledger."""
-        self.redis.delete(
-            self.key,
-            *(f"{self.key}:{part}" for part in LEDGER_PARTS),
-        )
+    def clear_run_keys(self, key: str | None = None) -> None:
+        """Take away a run's checkpoint and every part of its ledger.
+
+        :param key: The run key to clear, defaulting to the test's own. A load
+            left to key itself off the run database needs its own cleanup.
+        """
+        key = key or self.key
+        self.redis.delete(key, *(f"{key}:{part}" for part in LEDGER_PARTS))
 
     def ledger(self) -> LoadLedger:
         """The ledger the test's loads report into."""
@@ -1273,6 +1275,12 @@ class JKentScrapeLoaderTest(LoaderTestCase):
             (report.seen, report.dispatched, report.merged, report.failed),
             (2, 2, 1, 1),
         )
+        self.assertEqual(
+            (report.rejected, report.errored),
+            (1, 0),
+            "The merge ran and would not have the scrape, which is the "
+            "scraper's problem rather than a row to re-run.",
+        )
         self.assertTrue(report.accounted_for)
         self.assertEqual(Docket.objects.count(), 1)
 
@@ -1333,6 +1341,12 @@ class JKentScrapeLoaderTest(LoaderTestCase):
             ).load()
 
         self.assertEqual((report.dispatched, report.failed), (1, 1))
+        self.assertEqual(
+            (report.rejected, report.errored),
+            (0, 1),
+            "No merge reached a verdict, so this is a row to re-run rather "
+            "than a scrape to go and fix.",
+        )
         self.assertTrue(
             report.accounted_for,
             "The row was written off, not left looking undispatched.",
@@ -1518,32 +1532,38 @@ class JKentScrapeLoaderTest(LoaderTestCase):
             Docket.objects.count(), 2, "The merges ran all the same."
         )
 
-    def test_a_load_with_no_run_key_cannot_be_verified(self) -> None:
-        """Both halves of a load find each other through the run key. Does a
-        load without one merge anyway, and say why it cannot report?"""
+    def test_a_load_given_no_run_key_still_keeps_a_ledger(self) -> None:
+        """Every load is worth being able to check up on, whether or not
+        anyone meant to resume it. Does a loader built without a run key key
+        one off the run database and verify itself out of it?"""
+        # The derived key names the run database, and the suite runs in
+        # parallel against one Redis, so this run needs a name of its own.
+        self.database = self.database.with_name(f"{self.id()}.db")
         _run_database(self.database, [{"docket_number": "A-1"}])
-        # The test runner disables logging outright for speed, and the warning
-        # is the only thing that says the load cannot be checked up on.
-        logging.disable(logging.NOTSET)
-        self.addCleanup(logging.disable)
+        loader = self.loader(run_key=None)
+        self.addCleanup(self.clear_run_keys, loader.run_key)
 
-        with self.assertLogs(
-            "cl.corpus_importer.state.loader", "WARNING"
-        ) as logs:
-            report = self.loader(run_key=None).load()
+        report = loader.load()
 
-        self.assertIn("keeps no ledger", logs.output[0])
-        self.assertEqual(report.dispatched, 1)
+        self.assertEqual(
+            loader.run_key, f"state_scrape_load:test:{self.database.name}"
+        )
+        self.assertEqual(
+            (report.dispatched, report.merged),
+            (1, 1),
+            "Read back out of the ledger it keyed for itself.",
+        )
         self.assertEqual(Docket.objects.count(), 1)
 
     def test_report_str_names_every_count(self) -> None:
         """The report is what an operator reads off a load. Does its summary
-        state every count?"""
+        state every count, keeping the two ways a merge fails apart?"""
         report = LoadReport(
             seen=8,
             dispatched=5,
-            merged=3,
-            failed=1,
+            merged=2,
+            rejected=1,
+            errored=1,
             invalid=2,
             refused=1,
             missing_count=1,
@@ -1552,9 +1572,10 @@ class JKentScrapeLoaderTest(LoaderTestCase):
 
         self.assertEqual(
             str(report),
-            "8 seen, 5 dispatched, 3 merged, 1 failed, "
+            "8 seen, 5 dispatched, 2 merged, 1 rejected, 1 errored, "
             "2 invalid, 1 refused, 1 missing",
         )
+        self.assertEqual(report.failed, 2, "Both, for a caller wanting one.")
 
     def test_db_delay_waits_between_rows(self) -> None:
         """A long load has to leave the queue room to drain. Does `db_delay`
@@ -1786,19 +1807,31 @@ class JKentScrapeLoaderCheckpointTest(LoaderTestCase):
 
         self.assertEqual(self.checkpoint(), 2, "The real load's position.")
 
-    def test_a_load_given_no_key_checkpoints_nothing(self) -> None:
-        """Does a load with no run key run without touching Redis?"""
+    def test_a_load_given_no_key_checkpoints_under_its_own(self) -> None:
+        """A load nobody named still has to be resumable. Does it checkpoint
+        under the key it derived from the run database?"""
+        # The derived key names the run database, and the suite runs in
+        # parallel against one Redis, so this run needs a name of its own.
+        self.database = self.database.with_name(f"{self.id()}.db")
         _run_database(
             self.database,
             [{"docket_number": f"A-{n}"} for n in range(5)],
         )
+        loader = self.loader(run_key=None)
+        self.addCleanup(self.clear_run_keys, loader.run_key)
 
         with patch(
             "cl.corpus_importer.state.loader.log_last_document_indexed"
         ) as log:
-            self.loader(run_key=None).load()
+            loader.load()
 
-        log.assert_not_called()
+        key = f"state_scrape_load:test:{self.database.name}"
+        self.assertEqual(loader.checkpointing, key)
+        self.assertEqual(
+            [call.args[1] for call in log.call_args_list],
+            [key, key],
+            "Every checkpoint went to the key the load derived for itself.",
+        )
 
     def test_a_load_survives_a_checkpoint_it_cannot_write(self) -> None:
         """A checkpoint is a convenience, not the load. Does an unreachable
@@ -2079,11 +2112,11 @@ class LoadStateScrapeCommandTest(SimpleTestCase):
         self.assertIn("row 7: APL-2024-00177", errors)
         self.assertNotIn("never reported back", self.output.getvalue())
 
-    def test_verify_only_checks_a_stored_ledger_without_a_download(
+    def test_skip_load_checks_a_stored_ledger_without_a_download(
         self,
     ) -> None:
         """A run that gave up while its queues were still moving has to be
-        settleable later. Does --verify-only do that from the ledger alone,
+        settleable later. Does --skip-load do that from the ledger alone,
         without fetching a run database that can run to hundreds of
         megabytes?"""
         self.loader.return_value.verify_only.return_value = LoadReport(
@@ -2094,39 +2127,64 @@ class LoadStateScrapeCommandTest(SimpleTestCase):
             "cl.corpus_importer.management.commands."
             "load_state_scrape.downloaded_run_database"
         ) as download:
-            self.load("--verify-only")
+            self.load("--skip-load")
 
         download.assert_not_called()
         self.loader.return_value.verify_only.assert_called_once_with()
         self.loader.return_value.load.assert_not_called()
 
-    def test_verify_only_does_not_claim_rows_it_never_read(self) -> None:
+    def test_skip_load_does_not_claim_rows_it_never_read(self) -> None:
         """Printing `0 invalid` for a run whose rows were never opened reads as
         "no bad rows" when it means "did not look". Are those counts left out,
         and said to be left out?"""
         self.loader.return_value.verify_only.return_value = LoadReport(
-            rows_read=False, dispatched=9, merged=8, failed=1
+            rows_read=False, dispatched=9, merged=8, rejected=1
         )
 
-        self.load("--verify-only")
+        self.load("--skip-load")
 
         written = self.output.getvalue()
         summary = written.splitlines()[0]
         self.assertEqual(
-            summary, "9 dispatched, 8 merged, 1 failed, 0 missing"
+            summary, "9 dispatched, 8 merged, 1 rejected, 0 errored, 0 missing"
         )
         self.assertNotIn("seen", summary)
         self.assertNotIn("invalid", summary)
-        self.assertIn("never opened the run database", written)
+        self.assertIn("no run database was opened", written)
 
-    def test_verify_only_and_skip_verification_are_contradictory(self) -> None:
-        """One does nothing but verify and the other does everything but. Is
-        the operator made to pick?"""
+    def test_skipping_both_phases_leaves_nothing_to_do(self) -> None:
+        """The two flags each skip one half of the command, and are otherwise
+        free to combine. Is the operator made to pick when they skip both?"""
         with self.assertRaises(CommandError) as raised:
-            self.load("--verify-only", "--skip-verification")
+            self.load("--skip-load", "--skip-verification")
 
-        self.assertIn("opposite things", str(raised.exception))
+        message = str(raised.exception)
+        self.assertIn("--skip-load", message)
+        self.assertIn("--skip-verification", message)
         self.loader.assert_not_called()
+
+    def test_counts_line_up_under_one_another(self) -> None:
+        """A run touching several models is read down a column. Are the model
+        names and their counts padded to a common width?"""
+        self.loader.return_value.load.return_value = LoadReport(
+            seen=2,
+            dispatched=2,
+            merged=2,
+            creates={"Docket": 2, "OpinionCluster": 11},
+            updates={"Docket": 105},
+        )
+
+        self.load()
+
+        written = self.output.getvalue().splitlines()
+        self.assertEqual(
+            written[1:],
+            [
+                "  Created Docket            2",
+                "  Created OpinionCluster   11",
+                "  Updated Docket          105",
+            ],
+        )
 
     def test_a_timed_out_wait_is_not_reported_as_lost_work(self) -> None:
         """Giving up on a queue that was still coming down is not a finding.
@@ -2144,8 +2202,8 @@ class LoadStateScrapeCommandTest(SimpleTestCase):
         self.load()
 
         errors = self.errors.getvalue()
-        self.assertIn("may well land on their own", errors)
-        self.assertIn("--verify-only", errors)
+        self.assertIn("they may yet land", errors)
+        self.assertIn("--skip-load", errors)
 
     def test_a_stalled_wait_is_reported_as_lost_work(self) -> None:
         """A queue that stopped moving is a finding. Does the output say so
@@ -2163,7 +2221,7 @@ class LoadStateScrapeCommandTest(SimpleTestCase):
 
         errors = self.errors.getvalue()
         self.assertIn("they are not coming", errors)
-        self.assertNotIn("--verify-only", errors)
+        self.assertNotIn("--skip-load", errors)
 
     def test_an_unverified_load_does_not_claim_a_clean_run(self) -> None:
         """A load that skipped verification knows only what it dispatched.

@@ -12,9 +12,8 @@ A subclass supplies five things:
   whatever joining and de-duplication the run needs;
 * `normalize`, an optional hook that reshapes each row's payload in Python,
   for the part of the work SQL is a poor fit for;
-* `scrape_model` and `merger`, the Pydantic model the payload is validated
-  into and the merger that writes it to the database.
-
+* `scrape_model`, the Pydantic model each payload is validated into;
+* `merger`, which writes a validated scrape to the database.
 
 The run database is opened read-only.
 """
@@ -32,7 +31,7 @@ from enum import Enum, StrEnum, auto
 from pathlib import Path
 from typing import Any, ClassVar, Final, cast
 
-from django.db.models import Model, Q, QuerySet
+from django.db.models import Model
 from pydantic import BaseModel, ValidationError
 
 from cl.corpus_importer.state.ledger import LoadLedger
@@ -164,9 +163,13 @@ class LoadReport:
     :ivar refused: Rows `normalize` turned away with `UnusableScrape`.
     :ivar dispatched: Rows sent to the merge queue.
     :ivar merged: Dispatched rows whose merge came back clean.
-    :ivar failed: Dispatched rows whose merge reported failures or ran out of
-        retries -- which includes a merger turning a scrape away in its own
-        `validate`.
+    :ivar rejected: Dispatched rows whose merge ran and reported failures,
+        which includes a merger turning a scrape away in its own `validate`.
+        Reported apart from `errored` because the scrape is what is wrong.
+    :ivar errored: Dispatched rows whose merge never reached a verdict: its
+        retries ran out, the payload no longer validates against the deployed
+        code, or something nothing expected was raised. Re-running the load
+        over them is what settles these.
     :ivar missing_count: How many dispatched rows never reported anything at
         all. These are the ones celery lost; re-running the load over the same
         rows is how they get merged.
@@ -175,6 +178,12 @@ class LoadReport:
         sample, not the set, because there is no bound on how large the set
         can get: a broker that went down leaves the whole run in it. The rest
         stay in the ledger's `pending` key in Redis until its TTL expires.
+    :ivar merge_wait: How the load stopped waiting on the merge queue, or
+        `None` where it did not wait at all. `missing_count` only means "never
+        going to happen" when this is `STALLED`.
+    :ivar rows_read: Whether the run database was opened. False for a
+        `verify_only` pass, whose zeroes for `seen`, `invalid` and `refused`
+        mean "did not look" rather than "found none".
     :ivar creates: Objects created, counted per model name.
     :ivar updates: Objects updated, counted per model name.
     :ivar extraction: What became of the documents the run dispatched for text
@@ -186,7 +195,8 @@ class LoadReport:
     refused: int = 0
     dispatched: int = 0
     merged: int = 0
-    failed: int = 0
+    rejected: int = 0
+    errored: int = 0
     missing_count: int = 0
     missing: dict[int, str] = field(default_factory=dict)
     merge_wait: WaitOutcome | None = None
@@ -194,6 +204,11 @@ class LoadReport:
     creates: dict[str, int] = field(default_factory=dict)
     updates: dict[str, int] = field(default_factory=dict)
     extraction: ExtractionReport | None = None
+
+    @property
+    def failed(self) -> int:
+        """Dispatched rows that did not merge, however they came not to."""
+        return self.rejected + self.errored
 
     @property
     def accounted_for(self) -> bool:
@@ -209,12 +224,13 @@ class LoadReport:
         )
 
     def __str__(self) -> str:
-        # verify-only skips stats from the scrape DB.
+        # A load that skipped dispatching has no stats from the scrape DB.
         parts = [f"{self.seen} seen"] if self.rows_read else []
         parts += [
             f"{self.dispatched} dispatched",
             f"{self.merged} merged",
-            f"{self.failed} failed",
+            f"{self.rejected} rejected",
+            f"{self.errored} errored",
         ]
         if self.rows_read:
             parts += [f"{self.invalid} invalid", f"{self.refused} refused"]
@@ -295,8 +311,8 @@ class JKentScrapeLoader[ScrapeType: BaseModel, ParamType = None](ABC):
             The checkpoint records progress as the load goes, for a later run
             to resume from, and is deleted once the load reaches the end of
             the query so that a finished load leaves nothing behind for the
-            next one to trip over. The ledger is what `verify` reads. `None`
-            records neither, and cannot be verified.
+            next one to trip over. The ledger is what `verify` reads. Defaults
+            to `default_run_key()` which should work for almost all cases.
         :param verify: Wait for the dispatched merges to report back and check
             what came of them. See `verify`.
         :param in_flight_time: Seconds a phase's outstanding count has to hold
@@ -315,7 +331,8 @@ class JKentScrapeLoader[ScrapeType: BaseModel, ParamType = None](ABC):
         self.extraction_queue = extraction_queue
         self.db_delay = db_delay
         self.start_row = start_row
-        self.run_key = run_key
+        self.run_key = run_key or self.default_run_key()
+        self.ledger = LoadLedger(self.run_key)
         self.should_verify = verify
         self.in_flight_time = in_flight_time
         self.verify_timeout = verify_timeout
@@ -328,10 +345,12 @@ class JKentScrapeLoader[ScrapeType: BaseModel, ParamType = None](ABC):
             if minimum
         ]
 
-    @property
-    def ledger(self) -> LoadLedger | None:
-        """The record this run's merges report back into."""
-        return None if self.run_key is None else LoadLedger(self.run_key)
+    def default_run_key(self) -> str:
+        """The Redis key a load keys its ledger and checkpoint off, unless overridden.
+
+        :return: The key.
+        """
+        return f"state_scrape_load:{self.name}:{self.database.name}"
 
     def rows(self) -> Iterator[tuple[int, sqlite3.Row]]:
         """Stream the rows `query` selects, honouring `start_row` and `limit`.
@@ -436,7 +455,7 @@ class JKentScrapeLoader[ScrapeType: BaseModel, ParamType = None](ABC):
         try:
             return self.scrape_model.model_validate(normalized), normalized
         except ValidationError as error:
-            logger.error(
+            logger.exception(
                 "%s of %s: does not fit %s: %s",
                 self._identify(normalized, number),
                 self.database.name,
@@ -511,6 +530,8 @@ class JKentScrapeLoader[ScrapeType: BaseModel, ParamType = None](ABC):
     def load(self) -> LoadReport:
         """Dispatch every row to celery for merging + extraction.
 
+        :return: What the run dispatched, and -- unless `verify` was turned
+            off -- what came of it.
         """
         report = self._dispatch_all()
         self.verify(report)
@@ -519,6 +540,14 @@ class JKentScrapeLoader[ScrapeType: BaseModel, ParamType = None](ABC):
     def verify_only(self) -> LoadReport:
         """Check up on a load that already ran, without reading its run
         database.
+
+        The other half of `load`, for settling a run that stopped watching its
+        queues while they were still coming down. This is what the command's
+        `--skip-load` calls.
+
+        :return: What the ledger says became of the run, with the counts only
+            the run database could have supplied left at zero. See
+            `LoadReport.rows_read`.
         """
         report = LoadReport(rows_read=False)
         self.verify(report)
@@ -555,16 +584,14 @@ class JKentScrapeLoader[ScrapeType: BaseModel, ParamType = None](ABC):
     def _dispatch_all(self) -> LoadReport:
         """Read the run database and hand every usable row to the queue."""
         report = LoadReport()
-        ledger = self.ledger
         if self.start_row:
             logger.info(
                 "Loading %s from row %s", self.database.name, self.start_row
             )
-        elif ledger is not None:
+        else:
             # Starting from 0, fresh ledger
-            ledger.clear()
-        if ledger is not None:
-            ledger.start()
+            self.ledger.clear()
+        self.ledger.start()
         for number, row in self.rows():
             report.seen += 1
             if report.seen % CHECKPOINT_EVERY == 0:
@@ -583,7 +610,7 @@ class JKentScrapeLoader[ScrapeType: BaseModel, ParamType = None](ABC):
                 report.invalid += 1
                 continue
             scrape, payload = prepared
-            self._dispatch(number, scrape, payload, ledger)
+            self._dispatch(number, scrape, payload)
             report.dispatched += 1
             if self.db_delay:
                 time.sleep(self.db_delay)
@@ -598,7 +625,6 @@ class JKentScrapeLoader[ScrapeType: BaseModel, ParamType = None](ABC):
         number: int,
         scrape: ScrapeType,
         payload: dict[str, Any],
-        ledger: LoadLedger | None,
     ) -> None:
         """Send one row's merge to the queue, writing it down as it goes.
 
@@ -607,7 +633,6 @@ class JKentScrapeLoader[ScrapeType: BaseModel, ParamType = None](ABC):
             under.
         :param payload: The normalized payload the scrape was validated from,
             which is what the worker gets. See `_prepare`.
-        :param ledger: The run's ledger, or `None` for a load keeping none.
         """
         # Imported here because the task module imports the registry, which
         # imports every loader, which imports this module.
@@ -615,8 +640,7 @@ class JKentScrapeLoader[ScrapeType: BaseModel, ParamType = None](ABC):
 
         for throttle in self.throttles:
             throttle.maybe_wait()
-        if ledger is not None:
-            ledger.dispatched(number, self.label(scrape))
+        self.ledger.dispatched(number, self.label(scrape))
         merge_state_scrape_row.si(
             loader=self.name,
             row=number,
@@ -653,13 +677,7 @@ class JKentScrapeLoader[ScrapeType: BaseModel, ParamType = None](ABC):
         """
         if not self.should_verify:
             return
-        if (ledger := self.ledger) is None:
-            logger.warning(
-                "Not verifying %s: a load with no run key keeps no ledger, so "
-                "there is no record of what its merges did.",
-                self.database.name,
-            )
-            return
+        ledger = self.ledger
         report.missing_count, report.merge_wait = self._await_drain(
             ledger.outstanding_count, poll=MERGE_POLL, work="merges"
         )
@@ -668,11 +686,12 @@ class JKentScrapeLoader[ScrapeType: BaseModel, ParamType = None](ABC):
         totals = ledger.totals()
         report.dispatched = totals.dispatched or report.dispatched
         report.merged = totals.merged
-        report.failed = totals.failed
+        report.rejected = totals.rejected
+        report.errored = totals.errored
         report.creates = totals.creates
         report.updates = totals.updates
-        if self.extract and self.document_model is not None:
-            report.extraction = self._await_extraction(ledger)
+        if self.extract and (model := self.document_model) is not None:
+            report.extraction = self._await_extraction(ledger, model)
         self.alert(report)
         # The ledger is left where it is. It expires on its own, and until it
         # does it is the only account of what a run did -- which a run that
@@ -704,14 +723,16 @@ class JKentScrapeLoader[ScrapeType: BaseModel, ParamType = None](ABC):
             # Each worker already logged the docket it gave up on. This is the
             # run-level count, filed under the same issue.
             logger.error(
-                "%s of %s dockets of the %s run would not merge.",
+                "%s of %s dockets of the %s run would not merge: %s rejected "
+                "by a merge that ran, %s errored before one could.",
                 report.failed,
                 report.dispatched,
                 self.name,
+                report.rejected,
+                report.errored,
                 extra=fingerprint(self.name, LoadPhase.MERGE),
             )
         if report.dropped:
-            ledger = self.ledger
             logger.error(
                 "%s dockets of the %s run were dispatched and never reported "
                 "back, which means celery lost them: a worker died mid-merge "
@@ -723,7 +744,7 @@ class JKentScrapeLoader[ScrapeType: BaseModel, ParamType = None](ABC):
                 self.name,
                 self.database.name,
                 len(report.missing),
-                ledger.pending_key() if ledger else "no ledger",
+                self.ledger.pending_key(),
                 report.missing,
                 extra=fingerprint(self.name, LoadPhase.RECONCILIATION),
             )
@@ -791,7 +812,9 @@ class JKentScrapeLoader[ScrapeType: BaseModel, ParamType = None](ABC):
                 outstanding, steady_since = current, time.monotonic()
         return 0, WaitOutcome.DRAINED
 
-    def _await_extraction(self, ledger: LoadLedger) -> ExtractionReport:
+    def _await_extraction(
+        self, ledger: LoadLedger, model: type[AbstractStateDocument]
+    ) -> ExtractionReport:
         """Wait for the documents the run dispatched to come back extracted.
 
         Waits and reports; whether what it finds is worth an alert is `alert`'s
@@ -799,6 +822,7 @@ class JKentScrapeLoader[ScrapeType: BaseModel, ParamType = None](ABC):
 
         :param ledger: The run's ledger, read for the count dispatched and the
             moment the run began.
+        :param model: The document model the run's merges wrote.
         :return: What became of them.
         """
         totals = ledger.totals()
@@ -808,7 +832,7 @@ class JKentScrapeLoader[ScrapeType: BaseModel, ParamType = None](ABC):
         # Polling asks only for the count; the full picture, which costs two
         # more queries, is put together once at the end.
         _, wait = self._await_drain(
-            lambda: self._unextracted(since).count(),
+            lambda: model.unextracted(since).count(),
             poll=EXTRACTION_POLL,
             work="extractions",
         )
@@ -816,74 +840,31 @@ class JKentScrapeLoader[ScrapeType: BaseModel, ParamType = None](ABC):
         # document extraction ran on and could not read leaves nothing
         # outstanding but is still worth reporting, and it is three queries
         # once at the end of a run.
-        return self._extraction_status(totals.documents, since, wait)
+        return self._extraction_status(model, totals.documents, since, wait)
 
-    def _written_since(
-        self, since: datetime
-    ) -> QuerySet[AbstractStateDocument]:
-        """Documents of this loader's model written since `since` that carry no
-        extracted text.
-
-        Scoped by time rather than by primary key. Keeping every PK a run
-        wrote would cost more Redis than the whole rest of the ledger put
-        together, and buys only the difference between "documents this load
-        left unextracted" and "documents left unextracted since this load
-        began" -- which over-reports if something else writes the same model
-        in the same window, and never under-reports. See `ExtractionReport`.
-
-        The predicate is the one `state_document_download --skip-download`
-        sweeps for, so that what a load reports is exactly what that would
-        pick up. `date_modified` is indexed, which is what makes it cheap
-        enough to poll.
-        """
-        model = self.document_model
-        assert (
-            model is not None
-        )  # Callers check; this is for the type checker.
-        extensions = Q()
-        for extension in model.extractable_extensions():
-            extensions |= Q(filepath_local__endswith=extension)
-        return (
-            model._default_manager.filter(extensions, date_modified__gte=since)
-            .exclude(filepath_local="")
-            .exclude(
-                ocr_status__in=(model.OCR_COMPLETE, model.OCR_UNNECESSARY)
-            )
-        )
-
-    def _unextracted(self, since: datetime) -> QuerySet[AbstractStateDocument]:
-        """Documents extraction has not come back on at all, as against the
-        ones it ran on and could not read. This is the count a load waits on,
-        so it is one query and nothing more."""
-        model = self.document_model
-        assert (
-            model is not None
-        )  # Callers check; this is for the type checker.
-        return self._written_since(since).exclude(ocr_status=model.OCR_FAILED)
-
+    @staticmethod
     def _extraction_status(
-        self, dispatched: int, since: datetime, wait: WaitOutcome
+        model: type[AbstractStateDocument],
+        dispatched: int,
+        since: datetime,
+        wait: WaitOutcome,
     ) -> ExtractionReport:
         """Ask the database what became of this run's documents.
 
         Two counts and a sample, so three queries. Called once, after the wait
-        has ended -- polling uses `_unextracted` alone.
+        has ended -- polling uses `unextracted` alone.
 
+        :param model: The document model the run's merges wrote.
         :param dispatched: How many documents the run sent to be extracted.
         :param since: The moment the run began.
         :param wait: How the wait on extraction ended.
         :return: What the database says.
         """
-        model = self.document_model
-        if model is None:
-            return ExtractionReport(
-                dispatched=dispatched, since=since, wait=wait
-            )
-        unextracted = self._unextracted(since)
+        unextracted = model.unextracted(since)
         return ExtractionReport(
             dispatched=dispatched,
             outstanding=unextracted.count(),
-            failed=self._written_since(since)
+            failed=model.written_since(since)
             .filter(ocr_status=model.OCR_FAILED)
             .count(),
             sample=list(
