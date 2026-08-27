@@ -10,16 +10,50 @@ Input file must be in git --name-status format (STATUS\\tPATH per line).
 from __future__ import annotations
 
 import argparse
+import fnmatch
 import re
 import sys
 from dataclasses import dataclass
 from pathlib import Path
+
+V2_REGISTER_TEST_FILE = "cl/simple_pages/tests.py"
 
 # ---------------------------------------------------------------------------
 # Severity levels
 # ---------------------------------------------------------------------------
 FAIL = "error"
 WARN = "warning"
+
+# ---------------------------------------------------------------------------
+# Per-file skip directives
+# ---------------------------------------------------------------------------
+
+# Checks that can be skipped via {# frontend-checks-skip: ... #} comments.
+# Only advisory/context-dependent checks belong here — security, a11y, and
+# architecture checks must stay enforced.
+SKIPPABLE_CHECKS = {
+    "check_hardcoded_ids",
+    "check_new_stack_leakage",
+    "check_raw_css",
+    "check_include_in_v2",
+}
+
+_skip_directive_re = re.compile(r"\{#\s*frontend-checks-skip:\s*(.+?)\s*#\}")
+
+
+def _parse_skip_checks(lines: list[str]) -> set[str]:
+    """Parse ``{# frontend-checks-skip: ... #}`` comments.
+
+    Returns the intersection of requested skips with SKIPPABLE_CHECKS,
+    so non-allowlisted checks cannot be bypassed.
+    """
+    skip: set[str] = set()
+    for line in lines:
+        m = _skip_directive_re.search(line)
+        if m:
+            skip.update(name.strip() for name in m.group(1).split(","))
+    return skip & SKIPPABLE_CHECKS
+
 
 # ---------------------------------------------------------------------------
 # File classification helpers
@@ -76,15 +110,26 @@ def _get_full_tag(
         # Find opening < at or before col
         open_pos = line.rfind("<", 0, col + 1)
         if open_pos == -1:
-            # Tag opened on a previous line — fall back to line scan
+            # Tag opened on a previous line — scan back for the line with
+            # the last "<" and slice from it, so attributes from a sibling
+            # tag earlier on that line don't leak into the result.
             start = line_idx
+            open_pos = 0
             for j in range(line_idx - 1, -1, -1):
-                if "<" in lines[j]:
+                if (pos := lines[j].rfind("<")) != -1:
                     start = j
+                    open_pos = pos
                     break
-            open_pos = 0  # include from start of matched line
         else:
             start = line_idx
+
+        if start == line_idx:
+            prior_lines = []
+        else:
+            prior_lines = [
+                lines[start][open_pos:],
+                *lines[start + 1 : line_idx],
+            ]
 
         # Find closing > at or after col
         close_pos = line.find(">", col)
@@ -92,9 +137,7 @@ def _get_full_tag(
             # Tag closes on same line
             if start == line_idx:
                 return line[open_pos : close_pos + 1]
-            return (
-                " ".join(lines[start:line_idx]) + " " + line[: close_pos + 1]
-            )
+            return " ".join([*prior_lines, line[: close_pos + 1]])
         # Tag continues on subsequent lines
         end = line_idx
         for j in range(line_idx + 1, len(lines)):
@@ -103,7 +146,7 @@ def _get_full_tag(
                 break
         if start == line_idx:
             return " ".join([line[open_pos:]] + lines[line_idx + 1 : end + 1])
-        return " ".join(lines[start : end + 1])
+        return " ".join([*prior_lines, line, *lines[line_idx + 1 : end + 1]])
 
     # Original behaviour: scan entire lines
     start = line_idx
@@ -129,8 +172,36 @@ def _get_full_tag(
 # ---------------------------------------------------------------------------
 
 
+# href values whose first non-whitespace token proves the link is
+# same-origin (or non-navigable), so target="_blank" carries no
+# tab-nabbing risk.
+_safe_href_re = re.compile(
+    r"""
+    (?<![\w:-])            # the href attribute itself — don't match inside
+                           # data-href, x-bind:href, :href, hx-href, nohref, ...
+    href\s*=\s*["']\s*     # href= and the opening quote
+    (?:                    # the value must start with one of:
+        \{%\s*(?:url|static)\b   # {% url %} (Django reverse — always local) or
+                                 # {% static %} (same origin, STATIC_URL = "static/")
+        | /(?!/)                 # absolute path on this origin
+                                 # (but not //, protocol-relative)
+        | \#                     # in-page anchor
+        | \?                     # query-only, same document
+        | mailto:                # non-navigable schemes (no opener handoff)
+        | tel:
+        | javascript:            # non-navigable in this context
+        | data:
+    )""",
+    re.VERBOSE,
+)
+
+
 def check_tabnabbing(lines: list[str]) -> list[tuple[int, str]]:
-    """target="_blank" must have rel with noopener or noreferrer."""
+    """target="_blank" must have rel with noopener or noreferrer.
+
+    Skipped for hrefs we can prove are same-origin or non-navigable —
+    tab-nabbing requires a cross-origin window handoff.
+    """
     results = []
     target_blank_re = re.compile(r'target\s*=\s*["\']_blank["\']')
     rel_safe_re = re.compile(
@@ -138,17 +209,22 @@ def check_tabnabbing(lines: list[str]) -> list[tuple[int, str]]:
     )
 
     for i, line in enumerate(lines, 1):
-        if target_blank_re.search(line):
-            full_tag = _get_full_tag(lines, i - 1)
-            if not rel_safe_re.search(full_tag):
-                results.append(
-                    (
-                        i,
-                        'target="_blank" without rel containing "noopener" or '
-                        '"noreferrer" — tabnabbing risk '
-                        "(https://developer.mozilla.org/en-US/docs/Web/HTML/Reference/Attributes/rel/noopener)",
-                    )
+        for m in target_blank_re.finditer(line):
+            # Anchor to the column of target="_blank" so we don't pick up
+            # rel/href attributes from a sibling tag on the same line.
+            full_tag = _get_full_tag(lines, i - 1, col=m.start())
+            if rel_safe_re.search(full_tag):
+                continue
+            if _safe_href_re.search(full_tag):
+                continue
+            results.append(
+                (
+                    i,
+                    'target="_blank" without rel containing "noopener" or '
+                    '"noreferrer" — tabnabbing risk '
+                    "(https://developer.mozilla.org/en-US/docs/Web/HTML/Reference/Attributes/rel/noopener)",
                 )
+            )
     return results
 
 
@@ -662,7 +738,10 @@ def _apply_checks(
     findings: list[Finding],
 ) -> None:
     """Run a list of (check_fn, severity) pairs and collect findings."""
+    skip_checks = _parse_skip_checks(lines)
     for fn, severity in checks:
+        if fn.__name__ in skip_checks:
+            continue
         for line_no, msg in fn(lines):
             findings.append(
                 Finding(filepath, line_no, fn.__name__, severity, msg)
@@ -684,6 +763,7 @@ def run_checks(
     components_library_modified = any(
         f.endswith("v2_components.html") for f in changed_files
     )
+    v2_register_test_modified = V2_REGISTER_TEST_FILE in changed_files
 
     for filepath in changed_files:
         abs_path = repo_root / filepath
@@ -700,6 +780,22 @@ def run_checks(
 
         if is_v2_template(filepath):
             _apply_checks(V2_CHECKS, lines, filepath, findings)
+
+            status = file_statuses.get(filepath, "")
+            if (
+                status == "A" or status.startswith("C")
+            ) and not v2_register_test_modified:
+                findings.append(
+                    Finding(
+                        filepath,
+                        1,
+                        "check_v2_register",
+                        WARN,
+                        "New v2 template added but v2 register test "
+                        f"({V2_REGISTER_TEST_FILE}) not modified — add "
+                        "the page's viewname to V2PagesRegisterTest.V2_PAGES",
+                    )
+                )
 
         if is_cotton_component(filepath):
             _apply_checks(COTTON_CHECKS, lines, filepath, findings)
@@ -922,6 +1018,13 @@ def main() -> int:
         default=None,
         help="Write markdown summary to this file (only if findings exist)",
     )
+    parser.add_argument(
+        "--skip-files",
+        nargs="+",
+        default=[],
+        metavar="GLOB",
+        help="Glob patterns for files to skip (e.g. 'cl/assets/templates/v2_foo/*')",
+    )
     args = parser.parse_args()
 
     repo_root = Path(args.repo_root).resolve()
@@ -948,7 +1051,10 @@ def main() -> int:
 
     # Filter to relevant files
     relevant = [
-        f for f in changed_files if f.endswith(".html") or is_input_css(f)
+        f
+        for f in changed_files
+        if (f.endswith(".html") or is_input_css(f))
+        and not any(fnmatch.fnmatch(f, g) for g in args.skip_files)
     ]
 
     if not relevant:

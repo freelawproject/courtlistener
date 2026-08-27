@@ -1,9 +1,12 @@
+import random
 from datetime import datetime, timedelta
 from http import HTTPStatus
+from unittest import mock
 from unittest.mock import MagicMock, patch
 
 import pytest
 import time_machine
+from django.conf import settings
 from django.core import mail
 from django.core.management import call_command
 from django.test import TestCase, override_settings
@@ -325,10 +328,20 @@ class PrometheusIntegrationAPITests(PrometheusIntegrationTestBase):
         final_count = await self._get_metric_count("keyword", "api")
         self.assertEqual(final_count, initial_count + 1)
 
-    async def test_api_semantic_search_increments_metric(self) -> None:
+    @mock.patch("cl.lib.elasticsearch_utils.microservice")
+    async def test_api_semantic_search_increments_metric(
+        self, mock_microservice
+    ) -> None:
         """Verify semantic API searches increment the Prometheus counter"""
         initial_count = await self._get_metric_count("semantic", "api")
 
+        inception_mock = MagicMock()
+        inception_mock.json.return_value = {
+            "embedding": [
+                random.random() for _ in range(settings.EMBEDDING_DIMENSIONS)
+            ]
+        }
+        mock_microservice.return_value = inception_mock
         search_url = reverse("search-list", kwargs={"version": "v4"})
         await self.async_client.get(
             search_url,
@@ -664,28 +677,20 @@ class TallyStatWithLabelsTests(TestCase):
     def setUp(self):
         self.r = get_redis_interface("STATS")
         self.prefix = get_stat_metrics_prefix()
-        # Clean up date-based keys for metrics this class uses
-        for pattern in [
-            "search.results*",
-            "alerts.sent*",
-            "webhooks.sent*",
-        ]:
-            keys = self.r.keys(pattern)
-            if keys:
-                self.r.delete(*keys)
-        # Clean up prometheus keys
+        # Only clean up prometheus keys (test-specific prefix, safe).
+        # Date-based keys use deltas so no cleanup needed here.
         for key in self.r.scan_iter(f"{self.prefix}*"):
             self.r.delete(key)
 
+    @time_machine.travel("2000-01-01", tick=False)
     def test_tally_stat_with_labels_writes_both_keys(self) -> None:
         """Test that tally_stat writes both the date-based key and prometheus key"""
-        # Capture values before to check deltas — the legacy date key is
-        # shared across parallel tests (no prefix), so other tests may
-        # also increment it.
+        # Time is frozen to a fixed past date so the legacy date key (which
+        # has no test-specific prefix) is private to this test; parallel
+        # tests tally under today's real date and can't race it.
         date_key = f"{StatMetric.SEARCH_RESULTS}.{now().date().isoformat()}"
         prom_key = f"{self.prefix}search.results:keyword:web"
-        date_before = int(self.r.get(date_key) or 0)
-        prom_before = int(self.r.get(prom_key) or 0)
+        self.r.delete(date_key)
 
         tally_stat(
             StatMetric.SEARCH_RESULTS,
@@ -696,12 +701,10 @@ class TallyStatWithLabelsTests(TestCase):
         )
 
         # Check date-based key incremented (legacy format)
-        date_value = int(self.r.get(date_key) or 0)
-        self.assertEqual(date_value - date_before, 1)
+        self.assertEqual(int(self.r.get(date_key) or 0), 1)
 
         # Check prometheus key incremented
-        prom_value = int(self.r.get(prom_key) or 0)
-        self.assertEqual(prom_value - prom_before, 1)
+        self.assertEqual(int(self.r.get(prom_key) or 0), 1)
 
     def test_tally_stat_validates_labels(self) -> None:
         """Test that tally_stat validates labels before writing"""

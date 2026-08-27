@@ -97,6 +97,16 @@ class ExportSearchTest(RECAPSearchTestCase, ESIndexTestCase, TestCase):
         #   - Add a row for each child document.
         self.assertEqual(len(results), 3)
 
+    def test_limits_flattened_nested_results(self) -> None:
+        """Limit CSV exports after flattening child documents."""
+        query = 'type=r&q="SUBPOENAS SERVED"'
+        with self.settings(MAX_SEARCH_RESULTS_EXPORTED=2):
+            results, _ = fetch_es_results_for_csv(
+                QueryDict(query.encode(), mutable=True), SEARCH_TYPES.RECAP
+            )
+
+        self.assertEqual(len(results), 2)
+
     def test_avoids_sending_email_for_query_with_error(self) -> None:
         "Confirms we don't send emails when provided with invalid query"
         self.client.login(

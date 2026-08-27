@@ -35,6 +35,9 @@ IA_OA_COLLECTIONS: list[str] = env(
 LASC_USERNAME = env("LASC_USERNAME", default="")
 LASC_PASSWORD = env("LASC_PASSWORD", default="")
 
+# TAMES (Texas courts CaseMail)
+TAMES_USER = env("TAMES_USER", default="")
+
 # Google auth
 here = os.path.dirname(os.path.realpath(__file__))
 GOOGLE_AUTH = {
@@ -47,6 +50,24 @@ GOOGLE_AUTH = {
 # Stats / Metrics
 ################
 STAT_METRICS_PREFIX = "prometheus:stat:"
+
+
+########
+# Wiki #
+########
+WIKI_HELP_BASE_URL = "https://wiki.free.law/c/courtlistener/help"
+WIKI_API_BASE_URL = f"{WIKI_HELP_BASE_URL}/api"
+WIKI_TERMS_URL = "https://wiki.free.law/c/terms/courtlistener/courtlistenercom-terms-of-service-and-policies"
+WIKI_REMOVAL_URL = "https://wiki.free.law/c/terms/courtlistener/courtlistenercom-content-removal-policy"
+# Coverage help pages moved to the wiki (#7766).
+WIKI_COVERAGE_BASE_URL = f"{WIKI_HELP_BASE_URL}/data-coverage"
+WIKI_COVERAGE_URL = WIKI_COVERAGE_BASE_URL
+WIKI_COVERAGE_FDS_URL = (
+    f"{WIKI_COVERAGE_BASE_URL}/judicial-financial-disclosures"
+)
+WIKI_COVERAGE_OA_URL = f"{WIKI_COVERAGE_BASE_URL}/oral-argument-recordings"
+WIKI_COVERAGE_OPINIONS_URL = f"{WIKI_COVERAGE_BASE_URL}/case-law"
+WIKI_COVERAGE_RECAP_URL = f"{WIKI_COVERAGE_BASE_URL}/federal-cases-and-filings"
 
 
 ##############
@@ -77,4 +98,9 @@ WEBHOOK_V1_DEPRECATION_DATE = env(
 # does not need OCR.
 CHARS_THRESHOLD_OCR_PER_PAGE = env.int(
     "CHARS_THRESHOLD_OCR_PER_PAGE", default=200
+)
+
+# SCOTUS email subscription
+SCOTUS_RECAP_EMAIL = env(
+    "SCOTUS_RECAP_EMAIL", default="notifications@scotus.recap.email"
 )

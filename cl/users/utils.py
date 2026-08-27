@@ -8,7 +8,12 @@ from cl.api.models import WebhookHistoryEvent
 from cl.favorites.models import DocketTagEvent, NoteEvent, UserTagEvent
 from cl.lib.crypto import md5
 from cl.lib.types import EmailType
-from cl.users.models import UserProfile
+from cl.users.models import (
+    UserProfile,
+    UserProfileBarMembershipEvent,
+    UserProfileEvent,
+    UserProxyEvent,
+)
 
 
 def create_stub_account(
@@ -36,9 +41,9 @@ def create_stub_account(
             # to a real account with a real username.
             md5(email),
             email,
+            first_name=user_data["first_name"],
+            last_name=user_data["last_name"],
         )
-        new_user.first_name = user_data["first_name"]
-        new_user.last_name = user_data["last_name"]
 
         # Associate a profile
         profile = UserProfile.objects.create(
@@ -77,7 +82,18 @@ def convert_to_stub_account(user: User) -> User:
     profile.zip_code = None
     profile.save()
 
-    profile.barmembership.all().delete()
+    profile.barmembership.clear()
+
+    # Blanking the fields above writes the user's prior values (real name,
+    # address, employer, etc.) into the pghistory event tables — UserProxy
+    # stores the old row on update. Purge that history here, after the final
+    # write, so we don't retain the PII we just tried to remove. This must
+    # run after the blanking, not in delete_user_assets, which executes first.
+    UserProfileEvent.objects.filter(user_id=user.pk).delete()
+    UserProxyEvent.objects.filter(pgh_obj_id=user.pk).delete()
+    UserProfileBarMembershipEvent.objects.filter(
+        userprofile_id=profile.pk
+    ).delete()
 
     return user
 
@@ -94,8 +110,12 @@ def delete_user_assets(user: User) -> None:
     user.docket_alerts.all().delete()
     user.notes.all().delete()
     user_tags.delete()
+    user.search_queries.all().delete()
+    user.emails.all().delete()
+    user.scotus_maps.all().delete()
+    # Donations are financial records we need to keep, so disable the
+    # recurring ones rather than deleting them.
     user.monthly_donations.all().update(enabled=False)
-    user.scotus_maps.all().update(deleted=True)
 
     # After deleting user-related objects, nuke history objects related to the
     # user so that events generated due to delete() are also removed.
@@ -115,17 +135,6 @@ emails: dict[str, EmailType] = {
         "account was: \n\n"
         " - %s\n\n"
         "Can't keep 'em all, I suppose.\n\n",
-        "from_email": settings.DEFAULT_FROM_EMAIL,
-        "to": [a[1] for a in settings.MANAGERS],
-    },
-    "take_out_requested": {
-        "subject": "User wants their data. Need to send it to them.",
-        "body": "A user has requested their data in accordance with GDPR. "
-        "This means that if they're a EU citizen, you have to provide "
-        "them with their data. Their username and email are:\n\n"
-        " - %s\n"
-        " - %s\n\n"
-        "Good luck getting this taken care of.",
         "from_email": settings.DEFAULT_FROM_EMAIL,
         "to": [a[1] for a in settings.MANAGERS],
     },
@@ -260,16 +269,27 @@ emails: dict[str, EmailType] = {
     "not_valid_edu_account": {
         "subject": "Request for a .edu Membership",
         "body": "Hello, %s,\n\n"
-        "Thank you for your interest.\n\n"
-        "We’ve reviewed your request and, unfortunately, it looks like you "
-        "don’t meet the eligibility requirements for a .edu membership. These "
-        "accounts are reserved for users with verified affiliations to "
-        "accredited educational institutions.\n\n"
-        "That said, we’d still love to have you as part of our community. You "
-        "can sign up for a regular membership here: https://free.law/membership/.\n\n"
-        "------------------\n\n"
-        "If you have any questions or believe this decision was made in error, "
-        "please see our contact page, https://www.courtlistener.com/contact/",
+        "We've reviewed your request and, since your email doesn't end in "
+        ".edu, it looks like you don't meet the eligibility requirements for "
+        "an EDU membership. These accounts are reserved for users with "
+        "verified affiliations to accredited educational institutions.\n\n"
+        "If you are one of a small group of individuals where your "
+        "university provided email doesn't end in .edu (which is common for "
+        "international students and a small number of U.S. schools that use "
+        "different email domains), and you'd like to pursue the EDU "
+        "membership option, please fill out our contact form: "
+        "https://www.courtlistener.com/contact/?issue_type=memberships\n\n"
+        "Include the following:\n"
+        "1. Where you're studying or doing research\n"
+        "2. A brief explanation of why you're unable to use a .edu email "
+        "address\n\n"
+        "We'll review your submission and follow up with next steps. More "
+        "details on EDU membership eligibility are available on our wiki: "
+        "https://wiki.free.law/c/courtlistener/help/memberships/individual-memberships/edu-memberships\n\n"
+        "If you are not a student or researcher affiliated with a "
+        "university, we'd still love to have you as part of our community "
+        "as a regular member. You can find more information about our "
+        "memberships at https://wiki.free.law/c/courtlistener/help/memberships.",
         "from_email": settings.DEFAULT_FROM_EMAIL,
     },
     "not_confirmed_edu_account": {

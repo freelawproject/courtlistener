@@ -6,15 +6,15 @@ from cl.api.utils import (
     INTEGER_LOOKUPS,
     NoEmptyFilterSet,
 )
+from cl.audio.audio_sources import AudioSources
 from cl.audio.models import Audio
-from cl.search.cluster_sources import ClusterSources
 from cl.search.filters import DocketFilter
 from cl.search.models import Docket
 
 
 class AudioFilter(NoEmptyFilterSet):
     docket = filters.RelatedFilter(DocketFilter, queryset=Docket.objects.all())
-    source = filters.MultipleChoiceFilter(choices=ClusterSources.NAMES)
+    source = filters.MultipleChoiceFilter(choices=AudioSources.NAMES)
 
     class Meta:
         model = Audio

@@ -1,0 +1,53 @@
+{% load extras %}
+
+<c-vars align="" caption="Options table"></c-vars>
+
+<div class="overflow-auto">
+  <table class="w-full">
+    <caption class="sr-only">{{ caption }}</caption>
+    <thead>
+    <tr class="border-none">
+      {% for column in columns %}
+        <th
+          class="text-sm px-2.5 py-1.5 bg-greyscale-100 text-greyscale-700 font-normal first:rounded-l-lg last:rounded-r-lg [&:not(:first-child)]:max-w-[120px]
+            {% if align == "data-center" %}
+              text-center first:text-start
+            {% elif align == "center" %}
+              text-center
+            {% else %}
+              text-start
+            {% endif %}
+        ">
+          {{ column.label }}
+        </th>
+      {% endfor %}
+    </tr>
+    </thead>
+    <tbody>
+        {{ slot }}
+    </tbody>
+    {% if footer %}
+      <tfoot>
+      {% for item in footer %}
+        <tr>
+          {% for column in columns %}
+            <td class="align-top text-sm p-2
+              {% if align == "data-center" %}
+                text-center first:text-start
+              {% elif align == "center" %}
+                text-center
+              {% else %}
+                text-start
+              {% endif %}
+            ">
+              <strong>
+                {{ item|get:column.field }}
+              </strong>
+            </td>
+          {% endfor %}
+        </tr>
+      {% endfor %}
+      </tfoot>
+    {% endif %}
+  </table>
+</div>

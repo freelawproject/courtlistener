@@ -44,8 +44,12 @@ class JurisdictionPodcast(JurisdictionFeed):
             "type": SEARCH_TYPES.ORAL_ARGUMENT,
         }
         search_query = AudioDocument.search()
-        items = do_es_feed_query(search_query, cd, rows=20)
-        return items
+        return do_es_feed_query(
+            search_query,
+            cd,
+            rows=20,
+            exclude_docs_for_empty_field="local_path",
+        )
 
     def feed_extra_kwargs(self, obj):
         extra_args = {
@@ -109,8 +113,12 @@ class AllJurisdictionsPodcast(JurisdictionPodcast):
             "type": SEARCH_TYPES.ORAL_ARGUMENT,
         }
         search_query = AudioDocument.search()
-        items = do_es_feed_query(search_query, cd, rows=20)
-        return items
+        return do_es_feed_query(
+            search_query,
+            cd,
+            rows=20,
+            exclude_docs_for_empty_field="local_path",
+        )
 
 
 class SearchPodcast(JurisdictionPodcast):
@@ -165,18 +173,17 @@ class SearchPodcast(JurisdictionPodcast):
 
     def items(self, obj):
         search_form = SearchForm(obj.GET)
-        if search_form.is_valid():
-            cd = search_form.cleaned_data
-            override_params = {
-                "order_by": "dateArgued desc",
-            }
-            cd.update(override_params)
-            search_query = AudioDocument.search()
-            items = do_es_feed_query(
-                search_query,
-                cd,
-                rows=20,
-            )
-            return items
-        else:
+        if not search_form.is_valid():
             return []
+        cd = search_form.cleaned_data
+        override_params = {
+            "order_by": "dateArgued desc",
+        }
+        cd.update(override_params)
+        search_query = AudioDocument.search()
+        return do_es_feed_query(
+            search_query,
+            cd,
+            rows=20,
+            exclude_docs_for_empty_field="local_path",
+        )

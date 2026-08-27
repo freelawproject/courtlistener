@@ -9,7 +9,7 @@ from django.core.cache import cache
 from django.test import override_settings
 from django.urls import reverse
 from django.utils.timezone import now
-from elasticsearch_dsl import connections
+from elasticsearch.dsl import connections
 from lxml import html
 
 from cl.alerts.models import Alert

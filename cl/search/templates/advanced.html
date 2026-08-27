@@ -106,19 +106,21 @@
                 <div id="search-container" class="text-center">
                     <label class="sr-only" for="id_q">Search</label>
                     <div class="input-group">
+                        {% include "includes/search_mode_icon.html" %}
                         <input class="form-control input-lg"
                                value="{{ search_form.q.value|default:'' }}"
                                name="q"
                                id="id_q"
                                autocomplete="off"
-                               type="text">
+                               type="text"
+                               placeholder='{% if search_form.type.value == SEARCH_TYPES.OPINION or not search_form.type.value %}{% if search_form.semantic.value %}Natural language search, use &quot;quotes&quot; for exact terms{% else %}Keyword(s) search with operators{% endif %}{% endif %}'>
                         <span class="input-group-btn">
-                        <button type="submit"
-                                class="btn btn-primary btn-lg"
-                                name="search"
-                                id="search-button"><i class="fa fa-search"></i>&nbsp;Search
-                        </button>
-                    </span>
+                            <button type="submit"
+                                    class="btn btn-primary btn-lg"
+                                    name="search"
+                                    id="search-button"><i class="fa fa-search"></i>&nbsp;Search
+                            </button>
+                        </span>
                     </div>
                 </div>
             </form>
@@ -246,7 +248,7 @@
             </div>
             <div class="col-sm-3">
                 {% include "includes/operators_quick_list.html" %}
-                <a class="text-right" href="{% url 'advanced_search' %}">More
+                <a class="text-right" href="{{ WIKI_HELP_URL }}/search/advanced-search-and-query-techniques">More
                     details&hellip;</a>
             </div>
         </div>
@@ -295,7 +297,7 @@
             </div>
             <div class="col-sm-3">
                 {% include "includes/operators_quick_list.html" %}
-                <a class="text-right" href="{% url 'advanced_search' %}">More
+                <a class="text-right" href="{{ WIKI_HELP_URL }}/search/advanced-search-and-query-techniques">More
                     details&hellip;</a>
             </div>
         </div>
@@ -414,7 +416,7 @@
             </div>
             <div class="col-sm-3">
                 {% include "includes/operators_quick_list.html" %}
-                <a class="text-right" href="{% url 'advanced_search' %}">More
+                <a class="text-right" href="{{ WIKI_HELP_URL }}/search/advanced-search-and-query-techniques">More
                     details&hellip;</a>
             </div>
         </div>
@@ -486,7 +488,7 @@
 
             <div class="col-sm-3">
                 {% include "includes/operators_quick_list.html" %}
-                <a class="text-right" href="{% url 'advanced_search' %}">More
+                <a class="text-right" href="{{ WIKI_HELP_URL }}/search/advanced-search-and-query-techniques">More
                     details&hellip;</a>
             </div>
         </div>
@@ -602,7 +604,7 @@
             </div>
             <div class="col-md-4">
                 <h3>Coverage</h3>
-                <p>Our case law database combines the best data from many sources. On our <a href="{% url "coverage_opinions" %}">coverage page</a>, you can see court-by-court graphs of what we have and can see which courts we get data from on an ongoing basis.
+                <p>Our case law database combines the best data from many sources. On our <a href="{{ WIKI_COVERAGE_OPINIONS_URL }}">coverage page</a>, you can see court-by-court graphs of what we have and can see which courts we get data from on an ongoing basis.
                 </p>
                 <p>We are particularly proud of our Supreme Court data, which we consider to be the best collection available. We have made thousands of corrections to the other publicly available data sets, and have enhanced it with data from the <a href="https://free.law/2011/05/25/updated-scotus-dates/">Library of Congress</a> and the <a href="https://free.law/2014/12/21/scdb/">Supreme Court Database</a>.
                 </p>
@@ -620,9 +622,9 @@
             </div>
             <div class="col-md-4">
                 <h3>Alerts</h3>
-                <p>For the courts where we get content on an <a href="{% url "coverage_opinions" %}">ongoing basis</a>, you can set up alerts for any search query. This way, you get an email whenever there is a new decision matching your query.
+                <p>For the courts where we get content on an <a href="{{ WIKI_COVERAGE_OPINIONS_URL }}">ongoing basis</a>, you can set up alerts for any search query. This way, you get an email whenever there is a new decision matching your query.
                 </p>
-                <p>Some popular queries are your company name or that of your competitor, a legal area that you follow, or even <a href="https://free.law/2016/01/30/citation-searching/">a citation alert</a> that emails when a certain case is cited. We also offer <a href="{% url "feeds_info" %}">custom RSS feeds</a> for any search query.
+                <p>Some popular queries are your company name or that of your competitor, a legal area that you follow, or even <a href="https://free.law/2016/01/30/citation-searching/">a citation alert</a> that emails when a certain case is cited. We also offer <a href="{{ WIKI_HELP_URL }}/general/using-atom-and-rss-feeds-for-the-latest-updates">custom RSS feeds</a> for any search query.
                 </p>
                 <p>To get started, do a search, then save it as an alert from the sidebar of your list of results.
                 </p>
@@ -633,7 +635,7 @@
                 </p>
                 <p>
                     <a class="btn btn-primary"
-                       href="{% url 'advanced_search' %}">Learn More</a>
+                       href="{{ WIKI_HELP_URL }}/search/advanced-search-and-query-techniques">Learn More</a>
                 </p>
             </div>
         </div>
@@ -735,16 +737,16 @@
             </div>
             <div class="col-sm-4">
                 <h3>Coverage</h3>
-                <p>We collect oral argument audio from the Supreme Court and all of the Federal Circuit courts that provide it. On the state side, we are slowly adding support for additional courts, and we are looking for support to add more. You can see all of the courts that we support on an ongoing basis <a href="{% url "coverage_oa" %}">on our coverage page</a>.
+                <p>We collect oral argument audio from the Supreme Court and all of the Federal Circuit courts that provide it. On the state side, we are slowly adding support for additional courts, and we are looking for support to add more. You can see all of the courts that we support on an ongoing basis <a href="{{ WIKI_COVERAGE_OA_URL }}">on our coverage page</a>.
                 </p>
-                <p>Our collection of SCOTUS recordings goes back to 2013. Before that, we recommend <a href="https://www.oyez.org" target="_blank">the wonderful Oyez Project</a>, which goes back to 1955.
+                <p>Our collection of SCOTUS recordings goes back to 2013. Before that, we recommend <a href="https://www.oyez.org" target="_blank" rel="noopener noreferrer">the wonderful Oyez Project</a>, which goes back to 1955.
                 </p>
 
                 <h3>Podcasts&nbsp;<i class="fa fa-podcast gray"></i></h3>
-                <p>For every jurisdiction <a href="{% url "coverage_oa" %}">that we support</a>, we provide Podcasts automatically, so you can listen to the latest arguments from that court. It is also possible to create a Podcast from any search that you make, allowing you to make custom Podcasts with only the information you want to hear.
+                <p>For every jurisdiction <a href="{{ WIKI_COVERAGE_OA_URL }}">that we support</a>, we provide Podcasts automatically, so you can listen to the latest arguments from that court. It is also possible to create a Podcast from any search that you make, allowing you to make custom Podcasts with only the information you want to hear.
                 </p>
                 <p>
-                    <a href="{% url "podcasts" %}" class="btn btn-primary">Learn
+                    <a href="{{ WIKI_HELP_URL }}/general/custom-podcasts-of-oral-argument-audio-recordings" class="btn btn-primary">Learn
                         More</a>
                 </p>
             </div>
@@ -775,12 +777,12 @@
             </div>
             <div class="col-md-4">
                 <h3>Studying the Data</h3>
-                <p>Like all of our data, the judicial database is available <a href="{% url "bulk_data_index" %}">in bulk</a> and <a href="{% url "api_index" %}">via our APIs</a>. This means that interested researchers, start-ups, journalists, and the public can download the data or integrate it into their systems.
+                <p>Like all of our data, the judicial database is available <a href="{{ WIKI_API_URL }}/bulk-data/bulk-legal-data">in bulk</a> and <a href="{{ WIKI_API_URL }}">via our APIs</a>. This means that interested researchers, start-ups, journalists, and the public can download the data or integrate it into their systems.
                 </p>
                 <p>We enthusiastically welcome reuse of and contribution to the data.
                 </p>
                 <p>
-                    <a href="{% url "api_index" %}"
+                    <a href="{{ WIKI_API_URL }}"
                        class="btn btn-primary">Learn More</a>
                 </p>
             </div>

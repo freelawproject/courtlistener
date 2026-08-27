@@ -73,7 +73,7 @@
 
 <body class="{% block body-classes %}{% endblock %}">
   {% block header %}
-    <c-header :request="request" :search_form="search_form" only></c-header>
+    <c-header :request="request" :search_form="search_form" :csrf_token="csrf_token" only></c-header>
   {% endblock %}
 
   <main id="main">
@@ -93,9 +93,9 @@
   {% render_required_scripts %}
 
   {% if DEBUG %}
-  <script src="{% static 'js/alpine/alpinejscsp@3.14.8.js' %}" defer nonce="{{ request.csp_nonce }}"></script>
+  <script src="{% static 'js/alpine/alpinejscsp.js' %}" defer nonce="{{ request.csp_nonce }}"></script>
   {% else %}
-  <script src="{% static 'js/alpine/alpinejscsp@3.14.8.min.js' %}" defer nonce="{{ request.csp_nonce }}"></script>
+  <script src="{% static 'js/alpine/alpinejscsp.min.js' %}" defer nonce="{{ request.csp_nonce }}"></script>
   {% endif %}
 
   {# Allows your own scripts in the footer. #}

@@ -1,13 +1,24 @@
 """Models unique to Texas dockets."""
 
+import logging
+from typing import IO
+
 import pghistory
 from django.db import models
 
+from cl.corpus_importer.state.texas.utils import is_missing_file_page
 from cl.lib.decorators import document_model
 from cl.lib.model_helpers import CSVExportMixin
-from cl.lib.models import AbstractDateTimeModel, AbstractPDF
+from cl.lib.models import AbstractDateTimeModel
+from cl.lib.types import NonEmptyTuple
+from cl.search.state.shared import (
+    AbstractStateDocument,
+    ProcessingError,
+)
 
 __all__ = ["TexasDocketEntry", "TexasDocument"]
+
+logger = logging.getLogger(__name__)
 
 
 @pghistory.track()
@@ -60,7 +71,7 @@ class TexasDocketEntry(AbstractDateTimeModel, CSVExportMixin):
 
 @pghistory.track()
 @document_model
-class TexasDocument(AbstractDateTimeModel, AbstractPDF):
+class TexasDocument(AbstractDateTimeModel, AbstractStateDocument):
     """
     Represents an attachment to a Texas docket entry.
 
@@ -79,7 +90,44 @@ class TexasDocument(AbstractDateTimeModel, AbstractPDF):
     description = models.TextField(blank=True)
     media_id = models.UUIDField()
     media_version_id = models.UUIDField()
-    url = models.URLField(max_length=250)
+
+    def make_filename(self) -> str:
+        """Build the stored filename from the media ID and version ID."""
+        return f"{self.media_id}-{self.media_version_id}"
+
+    @classmethod
+    def tmp_prefix(cls) -> str:
+        """Prefix for temporary download files."""
+        return "texas_"
+
+    @classmethod
+    def expected_extensions(cls) -> NonEmptyTuple[str]:
+        """File extensions TAMES is known to serve."""
+        return ".pdf", ".html", ".wpd", ".mp3"
+
+    @classmethod
+    def extractable_extensions(cls) -> NonEmptyTuple[str]:
+        """Extensions that can be sent to text extraction"""
+        return ".pdf", ".html", ".wpd"
+
+    def validate_file(self, content: IO[bytes], extension: str) -> int | None:
+        """Flag downloads where TAMES returned its "missing file" HTML page
+        instead of the document, so the bad URL isn't retried."""
+        if extension == ".html":
+            content.seek(0, 2)
+            file_size = content.tell()
+            content.seek(0)
+            if file_size <= 25_000:
+                full_content = content.read()
+                content.seek(0)
+                if is_missing_file_page(full_content):
+                    logger.warning(
+                        "Texas document download: TexasDocument %s at %s returned a missing file page.",
+                        self.pk,
+                        self.url,
+                    )
+                    return ProcessingError.BAD_URL
+        return None
 
     class Meta:
         app_label = "search"
@@ -88,3 +136,9 @@ class TexasDocument(AbstractDateTimeModel, AbstractPDF):
             models.Index(fields=["filepath_local"]),
         ]
         unique_together = [["docket_entry", "media_id"]]
+
+    def get_pdf_path(self, filename: str, thumbs: bool = False) -> str:
+        """Store TAMES documents under the shared state layout."""
+        return self.state_pdf_path(
+            "tx", self.docket_entry.docket.court_id, filename, thumbs
+        )

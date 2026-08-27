@@ -543,6 +543,9 @@ def update_or_create_originating_court_information(
         if not existing_oci.docket_number and lower_court_number:
             existing_oci.docket_number = lower_court_number
             update = True
+        if not existing_oci.docket_number_raw and lower_court_number:
+            existing_oci.docket_number_raw = lower_court_number
+            update = True
         if not existing_oci.assigned_to_str and lower_court_judge:
             existing_oci.assigned_to_str = lower_court_judge
             update = True
@@ -555,5 +558,6 @@ def update_or_create_originating_court_information(
 
     return OriginatingCourtInformation(
         docket_number=lower_court_number or "",
+        docket_number_raw=lower_court_number or "",
         assigned_to_str=lower_court_judge or "",
     )

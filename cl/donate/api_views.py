@@ -1,4 +1,5 @@
 import datetime
+import logging
 from collections import defaultdict
 from http import HTTPStatus
 from typing import Any
@@ -14,6 +15,10 @@ from rest_framework import mixins, serializers, viewsets
 from rest_framework.request import Request
 from rest_framework.response import Response
 
+from cl.api.utils import (
+    apply_membership_throttles,
+    clear_membership_throttles,
+)
 from cl.donate.api_permissions import AllowNeonWebhook
 from cl.donate.models import (
     MembershipPaymentStatus,
@@ -21,13 +26,16 @@ from cl.donate.models import (
     NeonMembershipLevel,
     NeonWebhookEvent,
 )
-from cl.lib.crypto import sha1_activation_key
+from cl.lib.crypto import generate_activation_key
 from cl.lib.neon_utils import NeonClient
 from cl.lib.types import EmailType
+from cl.users.tasks import tag_zoho_record_for_membership
 from cl.users.utils import (
     create_stub_account,
     emails,
 )
+
+logger = logging.getLogger(__name__)
 
 
 class NeonMembershipWebhookSerializer(serializers.Serializer):
@@ -254,6 +262,11 @@ class MembershipWebhookViewSet(
         Maps a payment status string into its corresponding
         integer value defined in the `MembershipPaymentStatus` class.
 
+        An empty status means Neon attached no payment info to the membership.
+        That happens for free tiers and for memberships granted manually in
+        Neon, treat both as SUCCEEDED so they don't stick in "Awaiting payment
+        processing".
+
         Args:
             status (str): The payment status string (e.g., "succeeded", "failed").
 
@@ -262,7 +275,7 @@ class MembershipWebhookViewSet(
                 Defaults to `PENDING` for unrecognized values.
         """
         match status:
-            case "succeeded":
+            case "succeeded" | "":
                 payment_status = MembershipPaymentStatus.SUCCEEDED
             case "failed":
                 payment_status = MembershipPaymentStatus.FAILED
@@ -318,6 +331,7 @@ class MembershipWebhookViewSet(
         neon_membership.termination_date = membership_data["termEndDate"]
         neon_membership.payment_status = payment_status
         neon_membership.save()
+        apply_membership_throttles(neon_membership.user, membership_level)
 
     def _handle_membership_creation(self, webhook_data) -> None:
         membership_data = self._get_membership_data(webhook_data)
@@ -349,7 +363,7 @@ class MembershipWebhookViewSet(
                 else:
                     # Build and save a new activation key for the account.
                     up = user.profile
-                    activation_key = sha1_activation_key(user.username)
+                    activation_key = generate_activation_key()
                     key_expires = now() + datetime.timedelta(5)
                     up.activation_key = activation_key
                     up.key_expires = key_expires
@@ -385,6 +399,8 @@ class MembershipWebhookViewSet(
             neon_membership.termination_date = membership_data["termEndDate"]
             neon_membership.payment_status = payment_status
             neon_membership.save()
+        apply_membership_throttles(user, membership_level)
+        tag_zoho_record_for_membership.delay(user.pk, membership_level)
 
     @staticmethod
     def _handle_membership_deletion(webhook_data) -> None:
@@ -398,4 +414,5 @@ class MembershipWebhookViewSet(
                 "Error processing webhook, Membership not found",
                 status=HTTPStatus.INTERNAL_SERVER_ERROR,
             )
+        clear_membership_throttles(neon_membership.user)
         neon_membership.delete()

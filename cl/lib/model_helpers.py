@@ -1,13 +1,13 @@
 import logging
-import os
 import re
 from collections.abc import Callable
 from functools import partial
 from pathlib import Path
+from typing import Protocol
 from uuid import uuid4
 
 from django.core.exceptions import ValidationError
-from django.utils.text import get_valid_filename, slugify
+from django.utils.text import get_valid_filename
 from django.utils.timezone import now
 from juriscraper.state.texas.common import (
     DOCKET_NUMBER_REGEXES as TEXAS_DN_REGEXES,
@@ -15,7 +15,7 @@ from juriscraper.state.texas.common import (
 
 from cl.custom_filters.templatetags.text_filters import oxford_join
 from cl.lib.recap_utils import get_bucket_name
-from cl.lib.string_utils import normalize_dashes, trunc
+from cl.lib.string_utils import normalize_dashes
 
 dist_d_num_regex = r"(?:\d:)?(\d\d)-[a-zA-Z]{1,5}-(\d+)"
 appellate_bankr_d_num_regex = r"(\d\d)-(\d+)"
@@ -175,6 +175,42 @@ def is_texas_court(court_id: str) -> bool:
     )
 
 
+def normalize_texas_appellate_docket_number(docket_number: str) -> str:
+    """Normalizes a Texas appellate docket number pulled from the Appellate
+    Case Information table. Returns the original docket number with normalized
+    dashes and converted to lowercase if it can't be normalized into an
+    appellate docket number.
+
+    :param docket_number: The docket number to clean.
+    :return: The cleaned docket number."""
+
+    docket_number = normalize_dashes(docket_number.lower().strip())
+    cr_ending = docket_number.endswith("cr")
+    cv_ending = docket_number.endswith("cv")
+    if docket_number.endswith("r") and not cr_ending:
+        docket_number = docket_number[:-1] + "cr"
+        cr_ending = True
+    if docket_number.endswith("v") and not cv_ending:
+        docket_number = docket_number[:-1] + "cv"
+        cv_ending = True
+    if not cr_ending and not cv_ending:
+        return docket_number
+    parts = [part for part in docket_number.split("-") if part]
+    if len(parts) < 2:
+        return docket_number
+    suffix = parts.pop()
+    if not all(part.isdigit() for part in parts):
+        return docket_number
+    # Three numeric parts (e.g. "09-01-404"): zero-pad to NN-NN-NNNNN
+    if len(parts) == 3:
+        return f"{int(parts[0]):0>2}-{int(parts[1]):0>2}-{int(parts[2]):0>5}-{suffix}"
+    # Joined digits total 9 (e.g. "0199-01326"): re-slice to NN-NN-NNNNN
+    joined = "".join(parts)
+    if len(joined) == 9:
+        return f"{joined[:2]}-{joined[2:4]}-{joined[4:]}-{suffix}"
+    return docket_number
+
+
 def clean_texas_docket_number(docket_number: str | None) -> str:
     """Clean a Texas docket number by extracting the valid docket number
     from potentially dirty input using Juriscraper's regex patterns.
@@ -283,8 +319,8 @@ def make_path(root: str, filename: str) -> str:
     Start with the `root` node, and use the current date as the subdirectories.
     """
     d = now()
-    return os.path.join(
-        root, f"{d.year}", f"{d.month:02d}", f"{d.day:02d}", filename
+    return str(
+        Path(root) / f"{d.year}" / f"{d.month:02d}" / f"{d.day:02d}" / filename
     )
 
 
@@ -317,8 +353,8 @@ def make_lasc_path(instance, filename):
 
     Start with the `root` node, and use the current date as the subdirectories.
     """
-    return os.path.join(
-        "lasc-data", f"{instance.sha1[0:2]}", f"{instance.sha1[2:]}.json"
+    return str(
+        Path("lasc-data") / instance.sha1[0:2] / f"{instance.sha1[2:]}.json"
     )
 
 
@@ -336,64 +372,37 @@ def base_recap_path(instance, filename, base_dir):
 
     Mirrors technique used by original RECAP server to upload PDFs to IA.
     """
-    return os.path.join(
-        base_dir,
-        get_bucket_name(
+    return str(
+        Path(base_dir)
+        / get_bucket_name(
             instance.docket_entry.docket.court_id,
             instance.docket_entry.docket.pacer_case_id,
-        ),
-        filename,
-    )
-
-
-def make_pdf_path(instance, filename, thumbs=False):
-    from cl.lasc.models import LASCPDF
-    from cl.search.models import (
-        ClaimHistory,
-        RECAPDocument,
-        ScotusDocketMetadata,
-        SCOTUSDocument,
-        TexasDocument,
-    )
-
-    if isinstance(instance, RECAPDocument):
-        root = "recap"
-        court_id = instance.docket_entry.docket.court_id
-        pacer_case_id = instance.docket_entry.docket.pacer_case_id
-    elif isinstance(instance, ClaimHistory):
-        root = "claim"
-        court_id = instance.claim.docket.court_id
-        pacer_case_id = instance.pacer_case_id
-    elif isinstance(instance, LASCPDF):
-        slug = slugify(trunc(filename, 40))
-        root = f"/us/state/ca/lasc/{instance.docket_number}/"
-        file_name = f"gov.ca.lasc.{instance.docket_number}.{instance.document_id}.{slug}.pdf"
-
-        return os.path.join(root, file_name)
-    elif isinstance(instance, ScotusDocketMetadata):
-        slug = slugify(Path(filename).stem)
-        file_name = f"gov.scotus.{slug}.pdf"
-        return str(Path("scotus") / "qp" / file_name)
-    elif isinstance(instance, SCOTUSDocument):
-        slug = slugify(Path(filename).stem)
-        file_name = f"gov.scotus.{slug}.pdf"
-        return str(Path("scotus") / "documents" / file_name)
-    elif isinstance(instance, TexasDocument):
-        slug = slugify(Path(filename).stem)
-        court_id = instance.docket_entry.docket.court_id
-        root = Path(f"us/state/tx/{court_id}")
-        file_name = f"gov.tx.{court_id}.{slug}.pdf"
-        return str(root / file_name)
-    else:
-        raise ValueError(
-            f"Unknown model type in make_pdf_path function: {type(instance)}"
         )
-
-    if thumbs:
-        root = f"{root}-thumbnails"
-    return os.path.join(
-        root, get_bucket_name(court_id, pacer_case_id), filename
+        / filename
     )
+
+
+class SupportsPdfPath(Protocol):
+    """A model that knows where its own PDFs live.
+
+    Most implementors get this by subclassing `AbstractPDF`, but not all do --
+    `ScotusDocketMetadata` stores a PDF on a model that is not itself a
+    document -- so the contract is a Protocol rather than the base class.
+    """
+
+    def get_pdf_path(self, filename: str, thumbs: bool = False) -> str: ...
+
+
+def make_pdf_path(
+    instance: SupportsPdfPath, filename: str, thumbs: bool = False
+) -> str:
+    """`upload_to` callback for PDF `FileField`s.
+
+    Existing migrations reference this function by its dotted path, so it must
+    remain importable from here even though the path logic itself now lives on
+    each model's `get_pdf_path`.
+    """
+    return instance.get_pdf_path(filename, thumbs=thumbs)
 
 
 def make_json_path(instance, filename):
@@ -408,7 +417,7 @@ def make_lasc_json_path(instance, filename):
     return make_lasc_path(instance, filename)
 
 
-def make_pdf_thumb_path(instance, filename):
+def make_pdf_thumb_path(instance: SupportsPdfPath, filename: str) -> str:
     return make_pdf_path(instance, filename, thumbs=True)
 
 

@@ -18,11 +18,11 @@ jobs:
   frontend-lint:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v7
         with:
           fetch-depth: 0
 
-      - uses: actions/setup-python@v6
+      - uses: actions/setup-python@v7
         with:
           python-version: "3.13"
 
@@ -38,7 +38,8 @@ jobs:
             --repo-root . \
             --format github \
             --changed-files changed_files.txt \
-            --summary-file summary.md
+            --summary-file summary.md \
+            --skip-files 'cl/*/test_assets/*.html'
 
       - name: Minimize previous bot comments
         if: always()

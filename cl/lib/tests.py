@@ -7,7 +7,9 @@ from unittest.mock import MagicMock, patch
 from asgiref.sync import async_to_sync
 from django.contrib.auth.models import AnonymousUser
 from django.core.cache import cache
+from django.core.exceptions import ValidationError
 from django.core.files.base import ContentFile
+from django.core.files.uploadedfile import SimpleUploadedFile
 from django.test import RequestFactory, SimpleTestCase, override_settings
 from django.utils.functional import SimpleLazyObject
 from requests.cookies import RequestsCookieJar
@@ -20,6 +22,12 @@ from cl.lib.courts import (
 from cl.lib.date_time import midnight_pt
 from cl.lib.decorators import _memory_cache, clear_tiered_cache, tiered_cache
 from cl.lib.elasticsearch_utils import append_query_conjunctions
+from cl.lib.file_validation import (
+    PDF_HEADER_SEARCH_BYTES,
+    content_is_pdf,
+    is_too_large,
+    validate_file_size,
+)
 from cl.lib.filesizes import convert_size_to_bytes
 from cl.lib.mime_types import lookup_mime_type
 from cl.lib.model_helpers import (
@@ -33,6 +41,7 @@ from cl.lib.model_helpers import (
     make_scotus_docket_number_core,
     make_texas_docket_number_core,
     make_upload_path,
+    normalize_texas_appellate_docket_number,
 )
 from cl.lib.pacer import (
     get_blocked_status,
@@ -495,6 +504,27 @@ class TestModelHelpers(TestCase):
         # Invalid input returns empty string
         self.assertEqual(make_texas_docket_number_core("garbage text"), "")
         self.assertEqual(make_texas_docket_number_core(None), "")
+
+    def test_normalize_texas_appellate_docket_number(self) -> None:
+        test_cases = [
+            ("01-00-0387-CV", "01-00-00387-cv"),
+            ("04-97-00972-CV", "04-97-00972-cv"),
+            ("0199-01326-CR", "01-99-01326-cr"),
+            ("09-01-404-CR", "09-01-00404-cr"),
+            ("10-11-196-CR", "10-11-00196-cr"),
+            ("09-11-717-R", "09-11-00717-cr"),
+            ("12-14438", "12-14438"),
+            ("AP-77,129", "ap-77,129"),
+            ("WR-70,849-04", "wr-70,849-04"),
+            ("A-4369-A", "a-4369-a"),
+        ]
+        for i, (input_dn, expected) in enumerate(test_cases):
+            with self.subTest(input_dn=input_dn):
+                self.assertEqual(
+                    normalize_texas_appellate_docket_number(input_dn),
+                    expected,
+                    f"Failed test case {i}",
+                )
 
     def test_avoid_generating_docket_number_core(self) -> None:
         """Can we avoid generating docket_number_core when the docket number
@@ -1173,6 +1203,69 @@ class TestPACERPartyParsing(SimpleTestCase):
         )
 
 
+class TestFileValidation(SimpleTestCase):
+    def test_pdf_detection(self) -> None:
+        """Can we tell PDFs from files that merely claim to be PDFs?"""
+        qa_pairs = [
+            (b"%PDF-1.4\nlorem ipsum", True),
+            (b"%PDF-", True),
+            # Extension and content type are the uploader's to pick, so
+            # neither is enough on its own.
+            (b"<html><body>Hello</body></html>", False),
+            (b"\x89PNG\r\n\x1a\n", False),
+            (b"", False),
+            (b"%PDF", False),
+            # Junk ahead of the header is tolerated, the way Acrobat and
+            # doctor tolerate it.
+            (b"lorem ipsum %PDF-1.4", True),
+            (b"\n\n%PDF-1.7", True),
+            # ...but only within the window we read.
+            (b"a" * PDF_HEADER_SEARCH_BYTES + b"%PDF-1.4", False),
+        ]
+        for content, expected in qa_pairs:
+            with self.subTest(content=content):
+                f = SimpleUploadedFile("file.pdf", content)
+                self.assertEqual(content_is_pdf(f), expected)
+
+    def test_pdf_detection_leaves_the_file_where_it_found_it(self) -> None:
+        """Can the file still be read in full after checking it?"""
+        content = b"%PDF-1.4\nlorem ipsum"
+        f = SimpleUploadedFile("file.pdf", content)
+        self.assertTrue(content_is_pdf(f))
+        self.assertEqual(f.read(), content)
+
+    def test_pdf_detection_restores_position_after_a_failed_read(
+        self,
+    ) -> None:
+        """Is the file put back even when reading it blows up?"""
+
+        class ExplodingFile(ContentFile):
+            def read(self, *args, **kwargs):
+                raise OSError("disk gone")
+
+        f = ExplodingFile(b"%PDF-1.4 lorem ipsum")
+        f.seek(3)
+        with self.assertRaises(OSError):
+            content_is_pdf(f)
+        self.assertEqual(f.tell(), 3)
+
+    def test_file_size_validation(self) -> None:
+        """Do we reject files that are over the size limit?
+
+        The limit is patched down rather than tested at its real value, so
+        that the test doesn't have to build a 500 MB file to trip it.
+        """
+        small_file = SimpleUploadedFile("file.pdf", b"%PDF-1.4 small")
+        self.assertFalse(is_too_large(small_file))
+        validate_file_size(small_file)
+
+        with mock.patch("cl.lib.file_validation.MAX_UPLOAD_SIZE", 10):
+            big_file = SimpleUploadedFile("file.pdf", b"%PDF-1.4 too big")
+            self.assertTrue(is_too_large(big_file))
+            with self.assertRaises(ValidationError):
+                validate_file_size(big_file)
+
+
 class TestFilesizeConversions(SimpleTestCase):
     def test_filesize_conversions(self) -> None:
         """Can we convert human filesizes to bytes?"""
@@ -1201,10 +1294,22 @@ class TestFilesizeConversions(SimpleTestCase):
 class TestRateLimiters(SimpleTestCase):
     def test_parsing_rates(self) -> None:
         qa_pairs = [
+            # Single-letter unit
             ("1/s", (1, 1)),
-            ("10/10s", (10, 10)),
             ("1/m", (1, 60)),
+            # Multiplier + single-letter unit
+            ("10/10s", (10, 10)),
             ("1/5m", (1, 300)),
+            # Word-form unit
+            ("10/second", (10, 1)),
+            ("60/minute", (60, 60)),
+            ("5000/hour", (5000, 3600)),
+            ("100/day", (100, 86400)),
+            # abbreviated word-form unit
+            ("10/sec", (10, 1)),
+            ("60/min", (60, 60)),
+            ("5000/hr", (5000, 3600)),
+            ("100/d", (100, 86400)),
         ]
         for q, a in qa_pairs:
             with self.subTest("Parsing rates...", rate=q):

@@ -2,7 +2,7 @@
 {% require_script "js/third_party/flatpickr/flatpickr@4.6.13" %}
 {% require_script "js/third_party/flatpickr/plugins/confirmDate@4.6.13" %}
 {% require_script "js/alpine/components/date_selector.js" %}
-{% require_script "js/alpine/plugins/focus@3.14.8" defer=True %}
+{% require_script "js/alpine/plugins/focus" defer=True %}
 
 {% comment %}
 - This component renders a date range selector with date pickers for calendar dates.
@@ -10,10 +10,13 @@
 - When relative dates are disabled, a second label can be introduced for the ending date.
 {% endcomment %}
 
+{# request: Required to import the scripts. #}
+{# label: For relative dates, this labels the entire widget. Otherwise, it's the initial date. #}
+{# second_label: Only used when relative dates are disabled, and labels the ending date. #}
 <c-vars
-  request {# Required to import the scripts. #}
-  label {# For relative dates, this labels the entire widget. Otherwise, it's the initial date. #}
-  second_label {# Only used when relative dates are disabled, and labels the ending date. #}
+  request
+  label
+  second_label
   relative
   date_after_field_name
   date_before_field_name
@@ -43,7 +46,7 @@
       <div class="text-sm font-medium text-greyscale-600" x-bind:id="labelId">{{ label }}</div>
       {% if relative %}
         <a
-          href="{% url "relative_dates" %}"
+          href="{{ WIKI_HELP_URL }}/search/use-relative-date-queries-to-keep-alerts-fresh"
           aria-label="Learn about relative date queries"
         >
           {% svg "circle_question_mark" aria_hidden="true" class="text-greyscale-400" %}

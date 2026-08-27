@@ -1,8 +1,10 @@
 import argparse
 import time
 
+from django.conf import settings
+
+from cl.audio.dispatch import dispatch_transcribe
 from cl.audio.models import Audio
-from cl.audio.tasks import transcribe_from_open_ai_api
 from cl.lib.command_utils import VerboseCommand, logger
 from cl.lib.types import OptionsType
 from cl.lib.utils import deepgetattr
@@ -38,6 +40,20 @@ def handle_open_ai_transcriptions(options) -> None:
 
     :return None
     """
+    # Dispatch goes through cl.audio.dispatch.dispatch_transcribe so its
+    # per-pk Redis lock dedupes against the re-enqueue daemon if both run
+    # at once. The --rpm pacing below is therefore a soft cap on *this*
+    # command's enqueue rate, not the cluster-wide transcription rate —
+    # if the daemon is also dispatching, the effective OpenAI call rate
+    # is the sum of both.
+    if settings.AUDIO_REENQUEUE_DAEMON_ENABLED:
+        logger.warning(
+            "AUDIO_REENQUEUE_DAEMON_ENABLED=True: the daemon is also "
+            "dispatching transcriptions. Per-pk dedup is enforced by the "
+            "dispatch lock, but the OpenAI call rate is the sum of this "
+            "command and the daemon. Consider lowering --rpm."
+        )
+
     requests_per_minute = options["rpm"]
 
     status_code = options.get("status_to_process")
@@ -59,11 +75,17 @@ def handle_open_ai_transcriptions(options) -> None:
         if not audio_can_be_processed_by_open_ai_api(audio):
             continue
 
-        valid_count += 1
-        transcribe_from_open_ai_api.apply_async(
-            args=(audio.pk, options["dont_retry_task"]),
+        if not dispatch_transcribe(
+            audio.pk,
             queue=options["queue"],
-        )
+            dont_retry=options["dont_retry_task"],
+        ):
+            logger.info(
+                "Audio %s skipped: dispatch lock held (already in flight)",
+                audio.pk,
+            )
+            continue
+        valid_count += 1
 
         # For parallel processing: seed RPM requests per minute
         # if requests_per_minute == 0, do not sleep
