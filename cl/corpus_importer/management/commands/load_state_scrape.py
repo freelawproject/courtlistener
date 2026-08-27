@@ -394,8 +394,6 @@ class Command(BaseCommand):
             case WaitOutcome.STALLED:
                 return " -- queue stalled"
             case WaitOutcome.TIMED_OUT:
-                return (
-                    " yet -- timed out. Follow up with --skip-load"
-                )
+                return " yet -- timed out. Follow up with --skip-load"
             case _:
                 return ""
