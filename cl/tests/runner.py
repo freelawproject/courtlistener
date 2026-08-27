@@ -41,12 +41,16 @@ class OurCasesTestLoader(TestLoader):
 
 class TestRunner(DiscoverRunner):
     test_loader = OurCasesTestLoader()
-    test_runner = XMLTestRunner
 
     def __init__(self, *args, enable_logging, xml_output=None, **kwargs):
         super().__init__(*args, **kwargs)
         self.enable_logging = enable_logging
         self.xml_output = xml_output
+        if xml_output:
+            # Shadow DiscoverRunner.test_runner for this instance only, so
+            # run_suite() builds an XMLTestRunner. Leaving the class attribute
+            # alone keeps the default text runner for everyone else.
+            self.test_runner = XMLTestRunner
 
     @classmethod
     def add_arguments(cls, parser):
@@ -78,23 +82,15 @@ class TestRunner(DiscoverRunner):
         # parser.set_defaults(buffer=True)
 
     def get_test_runner_kwargs(self):
+        """Build the kwargs for the test runner.
+
+        Adds XMLTestRunner's ``output`` directory when ``--xml-output`` was
+        passed; otherwise returns Django's defaults untouched.
+        """
         kwargs = super().get_test_runner_kwargs()
         if self.xml_output:
             kwargs["output"] = self.xml_output
         return kwargs
-
-    def run_suite(self, suite, **kwargs):
-        kwargs = self.get_test_runner_kwargs()
-        if self.xml_output:
-            runner = self.test_runner(**kwargs)
-        else:
-            # Fall back to the default TextTestRunner when no XML output
-            # is requested, preserving the original behavior.
-            runner = super().test_runner(**kwargs)
-        try:
-            return runner.run(suite)
-        finally:
-            runner = None
 
     def setup_databases(self, **kwargs):
         # Force to always delete the database if it exists

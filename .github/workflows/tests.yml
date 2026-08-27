@@ -42,6 +42,12 @@ jobs:
   test:
     runs-on: ubuntu-latest
     needs: build
+    # dorny/test-reporter publishes results as a check run, which needs
+    # checks:write. Declared explicitly so the job doesn't depend on the
+    # repo-wide default workflow token setting.
+    permissions:
+      contents: read
+      checks: write
     strategy:
       fail-fast: false
       matrix:
@@ -125,17 +131,28 @@ jobs:
           if-no-files-found: ignore
       - name: Export test results from docker to host
         if: always()
-        run: docker cp 'cl-django:/tmp/test-results' courtlistener/test-results
+        # There is nothing to copy if the tests never ran -- the stack failed
+        # to come up, say -- and docker cp exits non-zero when the source is
+        # missing. Swallow that so this step doesn't pile a second, misleading
+        # failure on top of the real one. An empty result set still surfaces:
+        # the Test Report step below fails on it.
+        run: docker cp 'cl-django:/tmp/test-results' courtlistener/test-results || true
       - name: Save test results as Github artifact
-        uses: actions/upload-artifact@v6
+        uses: actions/upload-artifact@v7
         if: always()
         with:
           name: test-results-${{ strategy.job-index }}
           path: courtlistener/test-results/
           if-no-files-found: ignore
+      # Skipped for PRs from forks: GitHub forces GITHUB_TOKEN to read-only
+      # there, so creating the check run would 403 and fail the job. Those
+      # runs still get the XML from the artifact uploaded above.
       - name: Test Report
         uses: dorny/test-reporter@v2
-        if: ${{ !cancelled() }}
+        if: >
+          ${{ !cancelled()
+          && (github.event_name != 'pull_request'
+          || github.event.pull_request.head.repo.full_name == github.repository) }}
         with:
           name: Test Results (${{ matrix.tag_flags }})
           path: test-results/*.xml
