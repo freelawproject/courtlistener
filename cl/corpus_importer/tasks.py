@@ -5218,7 +5218,7 @@ def merge_state_scrape_row(
     loader: str,
     row: int,
     payload: str,
-    run_key: str | None,
+    run_key: str,
     extract: bool,
     extraction_queue: str,
 ) -> None:
@@ -5228,20 +5228,21 @@ def merge_state_scrape_row(
     including the one where the retries run out -- otherwise a docket the
     database refused five times would be indistinguishable from one that
     merged, and a load's verification pass exists precisely to tell those
-    apart.
+    apart. A merge that ran and would not have the scrape is recorded as
+    rejected; one that never reached a verdict is recorded as errored, since
+    only the latter is worth re-running the load over.
 
     :param loader: The name the docket's loader is registered under in
         `cl.corpus_importer.state.registry`.
     :param row: The docket's row number in the run database's query, which is
         what the ledger and the load's report name it by.
     :param payload: The scrape, as the loader's `scrape_model` serialized it.
-    :param run_key: The Redis key the run's ledger hangs off, or `None` for a
-        load keeping no ledger.
+    :param run_key: The Redis key the run's ledger hangs off.
     :param extract: Whether to dispatch text extraction for the documents the
         merge writes.
     :param extraction_queue: The celery queue to extract on.
     """
-    ledger = LoadLedger(run_key) if run_key else None
+    ledger = LoadLedger(run_key)
     try:
         loader_class = get_loader(loader)
     except KeyError:
@@ -5251,8 +5252,7 @@ def merge_state_scrape_row(
             loader,
             extra=fingerprint(loader, LoadPhase.MERGE),
         )
-        if ledger:
-            ledger.failed(row)
+        ledger.errored(row)
         return
 
     try:
@@ -5266,8 +5266,7 @@ def merge_state_scrape_row(
             error,
             extra=fingerprint(loader, LoadPhase.MERGE),
         )
-        if ledger:
-            ledger.failed(row)
+        ledger.errored(row)
         return
     except (DatabaseError, ValueError) as error:
         if self.request.retries < self.max_retries:
@@ -5290,8 +5289,7 @@ def merge_state_scrape_row(
             error,
             extra=fingerprint(loader, LoadPhase.MERGE),
         )
-        if ledger:
-            ledger.failed(row)
+        ledger.errored(row)
         return
     except Exception as error:
         logger.exception(
@@ -5302,14 +5300,12 @@ def merge_state_scrape_row(
             error,
             extra=fingerprint(loader, LoadPhase.MERGE),
         )
-        if ledger:
-            ledger.failed(row)
+        ledger.errored(row)
         return
 
     if result.success:
         logger.info("Merged row %s of the %s run (%s)", row, loader, label)
-        if ledger:
-            ledger.merged(row, result)
+        ledger.merged(row, result)
     else:
         logger.error(
             "Merge of row %s of the %s run (%s) reported failures: %s",
@@ -5319,8 +5315,7 @@ def merge_state_scrape_row(
             result.failures,
             extra=fingerprint(loader, LoadPhase.MERGE),
         )
-        if ledger:
-            ledger.failed(row, result)
+        ledger.rejected(row, result)
 
     if not extract:
         return
@@ -5334,5 +5329,4 @@ def merge_state_scrape_row(
             extra=fingerprint(loader, LoadPhase.EXTRACTION),
         )
         return
-    if ledger:
-        ledger.extracting(len(dispatched))
+    ledger.extracting(len(dispatched))
