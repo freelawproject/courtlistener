@@ -52,8 +52,9 @@ from cl.api.utils import (
 from cl.api.views import parse_throttle_rate_for_template
 from cl.custom_filters.decorators import check_honeypot
 from cl.favorites.forms import NoteForm
-from cl.lib.crypto import sha1_activation_key
+from cl.lib.crypto import generate_activation_key
 from cl.lib.ratelimiter import (
+    ratelimiter_all_2_per_m,
     ratelimiter_unsafe_10_per_m,
     ratelimiter_unsafe_2000_per_h,
 )
@@ -366,7 +367,7 @@ def view_settings(request: AuthenticatedHttpRequest) -> HttpResponse:
         changed_email = old_email != new_email
         if changed_email:
             # Email was changed.
-            up.activation_key = sha1_activation_key(user.username)
+            up.activation_key = generate_activation_key()
             up.key_expires = now() + timedelta(5)
             up.email_confirmed = False
 
@@ -567,7 +568,7 @@ def register(request: HttpRequest) -> HttpResponse:
                     user.save()
 
                     # Build and assign the activation key
-                    up.activation_key = sha1_activation_key(user.username)
+                    up.activation_key = generate_activation_key()
                     up.key_expires = now() + timedelta(days=5)
                     up.save()
 
@@ -664,6 +665,7 @@ def register_success(request: HttpRequest) -> HttpResponse:
     )
 
 
+@ratelimiter_all_2_per_m
 @sensitive_variables("activation_key")
 @never_cache
 def confirm_email(request, activation_key):
@@ -671,6 +673,9 @@ def confirm_email(request, activation_key):
 
     Checks if a hash in a confirmation link is valid, and if so sets the user's
     email address as valid.
+
+    Rate limited per IP (GHSA-638g-xf9h-6qcg) since this view has no other
+    protection against brute-forcing activation_key.
     """
     ups = UserProfile.objects.filter(activation_key=activation_key)
     if not len(ups):
@@ -706,6 +711,10 @@ def confirm_email(request, activation_key):
     # Tests pass; Save the profile
     for up in ups:
         up.email_confirmed = True
+        # Invalidate the key so it's single-use (GHSA-638g-xf9h-6qcg): once
+        # spent, it shouldn't still work as a lookup value if it ever leaks
+        # (server logs, browser history, a referrer header) or gets reused.
+        up.activation_key = ""
         up.save()
         if not settings.DEVELOPMENT:
             if up.neon_account_id:
@@ -751,23 +760,28 @@ def request_email_confirmation(request: HttpRequest) -> HttpResponse:
                 )
                 return HttpResponseRedirect(reverse("email_confirm_success"))
 
-            activation_key = sha1_activation_key(cd["email"])
             key_expires = now() + timedelta(days=5)
+            email: EmailType = emails["confirm_existing_account"]
 
             for user in users:
+                # Generate one activation key per user. This prevents an
+                # attacker from creating and gaining access to an account in
+                # between when a victim creates their account and when they
+                # confirm it. See: https://github.com/freelawproject/courtlistener-ghsa-638g-xf9h-6qcg/pull/1
+                activation_key = generate_activation_key()
+
                 # associate it with the user's accounts.
                 up = user.profile
                 up.activation_key = activation_key
                 up.key_expires = key_expires
                 up.save()
 
-            email: EmailType = emails["confirm_existing_account"]
-            send_mail(
-                email["subject"],
-                email["body"] % activation_key,
-                email["from_email"],
-                [user.email],
-            )
+                send_mail(
+                    email["subject"],
+                    email["body"] % activation_key,
+                    email["from_email"],
+                    [user.email],
+                )
             return HttpResponseRedirect(reverse("email_confirm_success"))
     else:
         form = EmailConfirmationForm()

@@ -5,11 +5,11 @@ import math
 import random
 import re
 from collections import defaultdict
-from collections.abc import Generator, Iterator
+from collections.abc import Generator, Iterator, Mapping, Sequence
 from dataclasses import dataclass
 from datetime import date
 from difflib import SequenceMatcher
-from typing import Any
+from typing import Any, cast
 from urllib.parse import urlparse
 
 from asgiref.sync import async_to_sync
@@ -27,7 +27,11 @@ from juriscraper.state.texas import (
     TexasOriginatingAppellateCourt,
     TexasOriginatingDistrictCourt,
 )
-from juriscraper.state.texas.common import CourtID, CourtType
+from juriscraper.state.texas.common import (
+    CourtID,
+    CourtType,
+    TexasOriginatingCourt,
+)
 
 from cl.citations.utils import map_reporter_db_cite_type
 from cl.lib.command_utils import logger
@@ -924,9 +928,9 @@ def clean_body_content(case_body: str, harvard_file: bool = False) -> str:
         opinions = []
         for op in soup.find_all(
             lambda tag: (
-                tag.name == "opinion" and tag.get("data-type") is None
+                (tag.name == "opinion" and tag.get("data-type") is None)
+                or tag.get("data-type") == "opinion"
             )
-            or tag.get("data-type") == "opinion"
         ):
             opinions.append(op.text)
         opinion_text = "".join(
@@ -934,9 +938,12 @@ def clean_body_content(case_body: str, harvard_file: bool = False) -> str:
                 op.text
                 for op in soup.find_all(
                     lambda tag: (
-                        tag.name == "opinion" and tag.get("data-type") is None
+                        (
+                            tag.name == "opinion"
+                            and tag.get("data-type") is None
+                        )
+                        or tag.get("data-type") == "opinion"
                     )
-                    or tag.get("data-type") == "opinion"
                 )
             ]
         )
@@ -1337,7 +1344,7 @@ def get_iquery_pacer_courts_to_scrape() -> list[str]:
 
 
 def create_docket_entry_sequence_numbers(
-    docket_entries: list[dict[str, Any]], date_field: str = "date"
+    docket_entries: Sequence[Mapping[str, Any]], date_field: str = "date"
 ) -> list[str]:
     """Calculates the sequence numbers for a list of docket entries to allow
     consistent matching and merging.
@@ -1385,7 +1392,7 @@ def texas_js_court_id_to_court_id(js_court_id: str) -> str | None:
 
 
 def texas_originating_court_to_court_id(
-    court_data: TexasOriginatingAppellateCourt | TexasOriginatingDistrictCourt,
+    court_data: TexasOriginatingCourt,
 ) -> str | None:
     """Attempts to translate Juriscraper Texas originating court data to a
     CourtListener Court ID.
@@ -1395,9 +1402,19 @@ def texas_originating_court_to_court_id(
     court_type = court_data["court_type"]
     match court_type:
         case CourtType.APPELLATE.value:
-            return texas_js_court_id_to_court_id(court_data["court_id"])
+            # Given `CourtType.APPELLATE`, we can safely narrow the type
+            appellate_court_data = cast(
+                TexasOriginatingAppellateCourt, court_data
+            )
+            return texas_js_court_id_to_court_id(
+                appellate_court_data["court_id"]
+            )
         case CourtType.DISTRICT.value:
-            district_number = court_data["district"]
+            # Given `CourtType.DISTRICT`, we can safely narrow the type
+            district_court_data = cast(
+                TexasOriginatingDistrictCourt, court_data
+            )
+            district_number = district_court_data["district"]
             if district_number:
                 if district_number > 1:
                     district_number = district_number + 1

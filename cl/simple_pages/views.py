@@ -1,4 +1,3 @@
-import json
 import logging
 import re
 from datetime import date
@@ -8,16 +7,10 @@ from typing import Any
 from asgiref.sync import sync_to_async
 from django.contrib.auth.models import User
 from django.core.cache import cache
-from django.db.models import (
-    Count,
-    QuerySet,
-    Sum,
-)
 from django.http import HttpRequest, HttpResponse, HttpResponseRedirect
 from django.template.response import TemplateResponse
 from django.urls import reverse
 
-from cl.audio.models import Audio
 from cl.disclosures.models import (
     Agreement,
     Debt,
@@ -29,14 +22,11 @@ from cl.disclosures.models import (
     Reimbursement,
     SpouseIncome,
 )
-from cl.people_db.models import Person
-from cl.search.cluster_sources import ClusterSources
-from cl.search.models import (
-    Court,
-    OpinionCluster,
-    RECAPDocument,
+from cl.opinion_page.docket_sources_utils import (
+    RECAP_SOURCE,
+    attach_display_fields,
 )
-from cl.simple_pages.coverage_utils import fetch_data, fetch_federal_data
+from cl.search.models import Court, RECAPDocument
 from cl.simple_pages.forms import ContactForm
 from cl.simple_pages.tasks import create_zoho_desk_ticket
 
@@ -58,19 +48,6 @@ async def broken_email_help(request: HttpRequest) -> HttpResponse:
         "help/broken_email_help.html",
         {"private": True},
     )
-
-
-async def build_court_dicts(courts: QuerySet) -> list[dict[str, str]]:
-    """Takes the court objects, and manipulates them into a list of more useful
-    dictionaries"""
-    court_dicts = [{"pk": "all", "short_name": "All Courts"}]
-    court_dicts.extend(
-        [
-            {"pk": court.pk, "short_name": court.full_name}
-            async for court in courts
-        ]
-    )
-    return court_dicts
 
 
 async def get_coverage_data_fds(bust_cache: bool = False) -> dict[str, int]:
@@ -106,138 +83,6 @@ async def get_coverage_data_fds(bust_cache: bool = False) -> dict[str, int]:
         await cache.aset(coverage_key, coverage_data, one_week_minutes)
 
     return coverage_data
-
-
-async def coverage_fds(request: HttpRequest) -> HttpResponse:
-    """The financial disclosure coverage page"""
-    coverage_data = await get_coverage_data_fds()
-    return TemplateResponse(request, "help/coverage_fds.html", coverage_data)
-
-
-async def get_coverage_data_o(request: HttpRequest) -> dict[str, Any]:
-    """Get the opinion coverage data
-
-    :param request: The user's request
-    :return:
-    """
-    coverage_cache_key = "coverage-data-v3"
-    coverage_data = await cache.aget(coverage_cache_key)
-    if coverage_data is None:
-        courts = Court.objects.filter(in_use=True)
-        courts_json = json.dumps(await build_court_dicts(courts))
-        # Build up the sourcing stats.
-        counts = OpinionCluster.objects.values("source").annotate(
-            Count("source")
-        )
-        count_pro = 0
-        count_lawbox = 0
-        count_scraper = 0
-        async for d in counts:
-            if ClusterSources.PUBLIC_RESOURCE in d["source"]:
-                count_pro += d["source__count"]
-            if ClusterSources.COURT_WEBSITE in d["source"]:
-                count_scraper += d["source__count"]
-            if ClusterSources.LAWBOX in d["source"]:
-                count_lawbox += d["source__count"]
-
-        opinion_courts = Court.objects.filter(
-            in_use=True, has_opinion_scraper=True
-        )
-        count_fds = await FinancialDisclosure.objects.all().acount()
-        count_investments = await Investment.objects.all().acount()
-        count_people = await Person.objects.all().acount()
-
-        oa_aggregate = await Audio.objects.aaggregate(Sum("duration"))
-        oa_duration = oa_aggregate["duration__sum"]
-        if oa_duration:
-            oa_duration /= 60  # Avoids a "unsupported operand type" error
-
-        coverage_data = {
-            "sorted_courts": courts_json,
-            "oa_duration": oa_duration,
-            "count_pro": count_pro,
-            "count_lawbox": count_lawbox,
-            "count_scraper": count_scraper,
-            "count_fds": count_fds,
-            "count_investments": count_investments,
-            "count_people": count_people,
-            "courts_with_opinion_scrapers": opinion_courts,
-            "private": False,
-        }
-        one_day = 60 * 60 * 24
-        await cache.aset(coverage_cache_key, coverage_data, one_day)
-    return coverage_data
-
-
-async def coverage(request: HttpRequest) -> HttpResponse:
-    coverage_data_o = await get_coverage_data_o(request)
-    return TemplateResponse(request, "help/coverage.html", coverage_data_o)
-
-
-async def coverage_oa(request: HttpRequest) -> HttpResponse:
-    oral_argument_courts = Court.objects.filter(
-        in_use=True, has_oral_argument_scraper=True
-    )
-    return TemplateResponse(
-        request,
-        "help/coverage_oa.html",
-        {
-            "courts_with_oral_argument_scrapers": oral_argument_courts,  # -> can be safely removed once new design is launched
-            "courts_list": [
-                {
-                    "href": f"/?q=&court_{court.pk}=on&order_by=dateArgued+desc&type=oa",
-                    "label": court,
-                    "ref": "nofollow",
-                }
-                async for court in oral_argument_courts
-            ],
-            "private": False,
-        },
-    )
-
-
-async def coverage_opinions(request: HttpRequest) -> HttpResponse:
-    """Generate Coverage Opinion Page
-
-    :param request: A django request
-    :return: The page requested
-    """
-    coverage_data_op = await cache.aget("coverage_data_op")
-    if coverage_data_op is None:
-        coverage_data_op = {
-            "private": False,
-            "federal": await fetch_federal_data(),
-            "sections": {
-                "state": await fetch_data(Court.STATE_JURISDICTIONS),
-                "territory": await fetch_data(Court.TERRITORY_JURISDICTIONS),
-                "international": await fetch_data(
-                    [Court.INTERNATIONAL], group_by_state=False
-                ),
-                "tribal": await fetch_data(
-                    Court.TRIBAL_JURISDICTIONS, group_by_state=False
-                ),
-                "special": await fetch_data(
-                    [Court.FEDERAL_SPECIAL], group_by_state=False
-                ),
-                "military": await fetch_data(
-                    Court.MILITARY_JURISDICTIONS, group_by_state=False
-                ),
-            },
-        }
-        one_day = 60 * 60 * 24
-        await cache.aset("coverage_data_op", coverage_data_op, one_day)
-
-    return TemplateResponse(
-        request, "help/coverage_opinions.html", coverage_data_op
-    )
-
-
-async def coverage_recap(request: HttpRequest) -> HttpResponse:
-    return TemplateResponse(
-        request,
-        "help/coverage_recap.html",
-        {"private": False},
-    )
 
 
 async def contact(
@@ -369,6 +214,12 @@ async def components(request: HttpRequest) -> HttpResponse:
             self.id = pk
             self.pk = pk
             self.date_upload = None
+            # Filled in from the source config when the document is attached
+            # to its entry, exactly as view_docket does it.
+            self.label: str = ""
+            self.detail_url: str | None = None
+            self.external_url: str | None = None
+            self.has_actions: bool = True
 
         @property
         def pacer_url(self) -> str:
@@ -381,16 +232,6 @@ async def components(request: HttpRequest) -> HttpResponse:
         def get_absolute_url(self) -> str:
             return f"/docket/{self.pk}/document/"
 
-    class MockRECAPDocManager:
-        def __init__(self, docs: list[MockRECAPDoc]):
-            self._docs = docs
-
-        def all(self) -> list[MockRECAPDoc]:
-            return self._docs
-
-        def count(self) -> int:
-            return len(self._docs)
-
     class MockDocketEntry:
         def __init__(
             self,
@@ -398,14 +239,19 @@ async def components(request: HttpRequest) -> HttpResponse:
             entry_number: int | None,
             date_filed: date,
             description: str,
-            recap_documents: list[MockRECAPDoc],
+            documents: list[MockRECAPDoc],
             pk: int = 0,
         ):
             self.entry_number = entry_number
             self.date_filed = date_filed
             self.datetime_filed = None
             self.description = description
-            self.recap_documents = MockRECAPDocManager(recap_documents)
+            # view_docket attaches documents plus their resolved display
+            # fields; the demo goes through the same source config so the
+            # library shows what the real page shows.
+            self.documents = documents
+            for document in documents:
+                attach_display_fields(RECAP_SOURCE, document)
             self.pk = pk
 
     demo_entries = [
@@ -417,7 +263,7 @@ async def components(request: HttpRequest) -> HttpResponse:
                 " (Filing fee $400 receipt number 0090-4495374)"
             ),
             pk=100,
-            recap_documents=[
+            documents=[
                 MockRECAPDoc(
                     document_type=RECAPDocument.PACER_DOCUMENT,
                     document_number="1",
@@ -454,7 +300,7 @@ async def components(request: HttpRequest) -> HttpResponse:
             date_filed=date(2024, 4, 21),
             description="Case Assigned to Judge Ellen S. Huvelle. (jd)",
             pk=101,
-            recap_documents=[],
+            documents=[],
         ),
     ]
 
@@ -485,8 +331,22 @@ async def components(request: HttpRequest) -> HttpResponse:
         entry_gte = MockFieldValue()
         entry_lte = MockFieldValue()
 
+    class MockCourt:
+        FEDERAL_APPELLATE = Court.FEDERAL_APPELLATE
+        jurisdiction = Court.FEDERAL_DISTRICT
+
     class MockDocket:
         pk = 12345
+        court = MockCourt()
+
+        def __getattr__(self, name: str) -> str:
+            # Docket exposes one pacer_*_url property per PACER report. The
+            # library only needs them to be non-empty for the menu to render,
+            # so they all resolve to one placeholder rather than being listed
+            # out one by one.
+            if name.startswith("pacer_") and name.endswith("_url"):
+                return "https://ecf.dcd.uscourts.gov/cgi-bin/DktRpt.pl"
+            raise AttributeError(name)
 
     return TemplateResponse(
         request,
@@ -494,9 +354,26 @@ async def components(request: HttpRequest) -> HttpResponse:
         {
             "private": True,
             "demo_docket_entries": demo_entries,
+            "demo_document": demo_entries[0].documents[2],
+            "docket_source": RECAP_SOURCE,
             "demo_page_obj": MockPageObj(),
             "demo_docket": MockDocket(),
             "demo_filter_form": MockDocketFilterForm(),
+            "demo_metadata_items": [
+                {"label": "Date Filed", "value": "January 14, 2025"},
+                {
+                    "label": "Questions Presented",
+                    "value": "View",
+                    "url": "https://www.supremecourt.gov/qp/24-001qp.pdf",
+                    "is_external": True,
+                },
+                {
+                    "label": "Originating Court",
+                    "value": "N.D. Cal.",
+                    "suffix_text": "3:24-cv-01234",
+                    "suffix_url": "/docket/1/example/",
+                },
+            ],
         },
     )
 

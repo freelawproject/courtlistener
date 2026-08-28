@@ -224,7 +224,7 @@
                     >Look Up Citations</a>
                 </li>
                 <li>
-                  <a href="{% url "coverage_opinions" %}">About this Collection</a>
+                  <a href="{{ WIKI_COVERAGE_OPINIONS_URL }}">About this Collection</a>
                 </li>
                 <li>
                   <a href="{{ WIKI_API_URL }}/rest/v4/case-law">API</a>
@@ -251,7 +251,7 @@
                   <a href="{{ WIKI_HELP_URL }}/alerts/docket-alerts-for-pacer">Get Case Alerts</a>
                 </li>
                 <li>
-                  <a href="{% url "coverage_recap" %}">About this Collection</a>
+                  <a href="{{ WIKI_COVERAGE_RECAP_URL }}">About this Collection</a>
                 </li>
                 <li>
                   <a href="https://free.law/data-consulting/">Bulk Data Service</a>
@@ -277,7 +277,7 @@
                   <a href="{{ WIKI_HELP_URL }}/general/custom-podcasts-of-oral-argument-audio-recordings">Custom Podcasts</a>
                 </li>
                 <li>
-                  <a href="{% url "coverage_oa" %}">About this Collection</a>
+                  <a href="{{ WIKI_COVERAGE_OA_URL }}">About this Collection</a>
                 </li>
                 <li>
                   <a href="{{ WIKI_API_URL }}/rest/v4/oral-arguments">API</a>
@@ -311,7 +311,7 @@
                   <a href="{% url "financial_disclosures_home" %}">Search Financial Disclosures</a>
                 </li>
                 <li>
-                  <a href="{% url "coverage_fds" %}">About this Collection</a>
+                  <a href="{{ WIKI_COVERAGE_FDS_URL }}">About this Collection</a>
                 </li>
                 <li>
                   <a href="{{ WIKI_API_URL }}/rest/v4/financial-disclosures">API</a>
@@ -385,7 +385,7 @@
 
           <div class="col-sm-6 no-gutter">
             <div class="footer-item">
-              <a href="{% url "coverage" %}">About Our Data</a>
+              <a href="{{ WIKI_COVERAGE_URL }}">About Our Data</a>
             </div>
             <div class="footer-item">
               <a href="{{ WIKI_API_URL }}">APIs &amp; Bulk Data</a>
