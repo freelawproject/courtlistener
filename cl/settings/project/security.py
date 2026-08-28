@@ -133,7 +133,7 @@ SECURE_CSP = {
     ],
     "frame-src": [
         CSP.SELF,
-        f"https://{AWS_S3_CUSTOM_DOMAIN}/",
+        f"https://{AWS_S3_CUSTOM_DOMAIN}/",  # for embedded PDFs
         "https://hcaptcha.com/",
         "https://*.hcaptcha.com/",
     ],
