@@ -42,12 +42,12 @@ jobs:
   test:
     runs-on: ubuntu-latest
     needs: build
-    # dorny/test-reporter publishes results as a check run, which needs
-    # checks:write. Declared explicitly so the job doesn't depend on the
-    # repo-wide default workflow token setting.
+    # dorny/test-reporter runs in its default use-actions-summary mode, which
+    # writes the report to the job summary rather than creating a check run, so
+    # it needs no write scopes. Declared explicitly to keep the token
+    # least-privilege regardless of the repo-wide default.
     permissions:
       contents: read
-      checks: write
     strategy:
       fail-fast: false
       matrix:
@@ -144,15 +144,13 @@ jobs:
           name: test-results-${{ strategy.job-index }}
           path: courtlistener/test-results/
           if-no-files-found: ignore
-      # Skipped for PRs from forks: GitHub forces GITHUB_TOKEN to read-only
-      # there, so creating the check run would 403 and fail the job. Those
-      # runs still get the XML from the artifact uploaded above.
+      # Safe on fork PRs: writing the job summary needs no token scopes, so the
+      # read-only GITHUB_TOKEN GitHub forces there is enough. Flip
+      # use-actions-summary off and this becomes a check run, which needs
+      # checks:write above and will 403 on forks.
       - name: Test Report
         uses: dorny/test-reporter@df6247429542221bc30d46a036ee47af1102c451 # v2
-        if: >
-          ${{ !cancelled()
-          && (github.event_name != 'pull_request'
-          || github.event.pull_request.head.repo.full_name == github.repository) }}
+        if: ${{ !cancelled() }}
         with:
           name: Test Results (${{ matrix.tag_flags }})
           path: test-results/*.xml
