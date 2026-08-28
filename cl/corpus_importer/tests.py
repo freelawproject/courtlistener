@@ -1,6 +1,7 @@
 import json
 from datetime import date, datetime, timedelta
 from pathlib import Path
+from typing import assert_type, cast
 from unittest import mock
 from unittest.mock import call, patch
 
@@ -26,8 +27,11 @@ from juriscraper.lib.string_utils import harmonize, titlecase
 from juriscraper.pacer.free_documents import FreeOpinionReport
 from juriscraper.state.texas import (
     TexasCaseParty,
+    TexasCourtOfCriminalAppealsDocket,
+    TexasSupremeCourtDocket,
 )
 from juriscraper.state.texas.common import CourtID, CourtType
+from juriscraper.state.texas.court_of_appeals import TexasCourtOfAppealsDocket
 from openai import RateLimitError
 from pydantic import ValidationError
 
@@ -99,6 +103,8 @@ from cl.corpus_importer.tasks import (
     download_texas_document,
     generate_ia_json,
     get_and_save_free_document_report,
+    is_texas_appellate_docket,
+    is_texas_supreme_docket,
     merge_texas_case_transfers,
     merge_texas_docket,
     merge_texas_docket_entry,
@@ -3527,6 +3533,108 @@ class TexasMergerTest(TestCase):
         self.assertNotIn("<", texas_document.plain_text)
         self.assertIn("Hello", texas_document.plain_text)
         self.assertIn("world", texas_document.plain_text)
+
+    def test_is_texas_appellate_docket(self):
+        appeals_docket_data = cast(
+            TexasCourtOfAppealsDocket
+            | TexasCourtOfCriminalAppealsDocket
+            | TexasSupremeCourtDocket,
+            cast(
+                object,  # cast to `object` suppresses checker warning
+                TexasCourtOfAppealsDocketDictFactory(
+                    court_id=CourtID.FIRST_COURT_OF_APPEALS.value,
+                    docket_number=self.docket_number_coa1,
+                    originating_court=TexasOriginatingDistrictCourtDictFactory(
+                        district=5,
+                    ),
+                ),
+            ),
+        )
+        supreme_docket_data = cast(
+            TexasCourtOfAppealsDocket
+            | TexasCourtOfCriminalAppealsDocket
+            | TexasSupremeCourtDocket,
+            cast(
+                object,  # cast to `object` suppresses checker warning
+                TexasFinalCourtDocketDictFactory(
+                    court_id=CourtID.SUPREME_COURT.value,
+                    docket_number=DocketFactory.create(
+                        court=self.texas_cca
+                    ).docket_number,
+                    appeals_court=TexasAppellateCourtInfoDictFactory(
+                        court_id=CourtID.FIRST_COURT_OF_APPEALS.value,
+                    ),
+                ),
+            ),
+        )
+
+        self.assertTrue(is_texas_appellate_docket(appeals_docket_data))
+        self.assertFalse(is_texas_appellate_docket(supreme_docket_data))
+
+        # Here we make sure that narrowing is legible to analyzer with
+        # `assert_type`
+        if is_texas_appellate_docket(appeals_docket_data):
+            assert_type(appeals_docket_data, TexasCourtOfAppealsDocket)
+        else:
+            self.fail()
+        if not is_texas_appellate_docket(supreme_docket_data):
+            assert_type(
+                supreme_docket_data,
+                TexasCourtOfCriminalAppealsDocket | TexasSupremeCourtDocket,
+            )
+        else:
+            self.fail()
+
+    def test_is_texas_supreme_docket(self):
+        appeals_docket_data = cast(
+            TexasCourtOfAppealsDocket
+            | TexasCourtOfCriminalAppealsDocket
+            | TexasSupremeCourtDocket,
+            cast(
+                object,
+                TexasCourtOfAppealsDocketDictFactory(
+                    court_id=CourtID.FIRST_COURT_OF_APPEALS.value,
+                    docket_number=self.docket_number_coa1,
+                    originating_court=TexasOriginatingDistrictCourtDictFactory(
+                        district=5,
+                    ),
+                ),
+            ),
+        )
+        supreme_docket_data = cast(
+            TexasCourtOfAppealsDocket
+            | TexasCourtOfCriminalAppealsDocket
+            | TexasSupremeCourtDocket,
+            cast(
+                object,
+                TexasFinalCourtDocketDictFactory(
+                    court_id=CourtID.SUPREME_COURT.value,
+                    docket_number=DocketFactory.create(
+                        court=self.texas_cca
+                    ).docket_number,
+                    appeals_court=TexasAppellateCourtInfoDictFactory(
+                        court_id=CourtID.FIRST_COURT_OF_APPEALS.value,
+                    ),
+                ),
+            ),
+        )
+
+        self.assertFalse(is_texas_supreme_docket(appeals_docket_data))
+        self.assertTrue(is_texas_supreme_docket(supreme_docket_data))
+
+        # Here we make sure that narrowing is legible to analyzer with
+        # `assert_type`
+        if not is_texas_supreme_docket(appeals_docket_data):
+            assert_type(appeals_docket_data, TexasCourtOfAppealsDocket)
+        else:
+            self.fail()
+        if is_texas_supreme_docket(supreme_docket_data):
+            assert_type(
+                supreme_docket_data,
+                TexasCourtOfCriminalAppealsDocket | TexasSupremeCourtDocket,
+            )
+        else:
+            self.fail()
 
     def test_merge_texas_docket_originating_court_creates_new(self):
         """Can we create new originating court information?"""
