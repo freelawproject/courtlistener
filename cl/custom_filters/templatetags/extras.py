@@ -476,3 +476,18 @@ def render_field_with_id(field, field_id):
 def corpus_search_scopes():
     """Return corpus search tab scopes for server-rendered templates."""
     return CORPUS_SEARCH_SCOPES
+
+
+@register.filter
+def http_url(url: str) -> str:
+    """Return the URL only if it uses the http/https scheme, else "".
+
+    Guards against rendering an unvalidated string as a
+    ``javascript:`` URI in an ``href`` attribute.
+
+    :param url: The URL to check.
+    :return: The URL if safe, otherwise an empty string.
+    """
+    if url and url.startswith(("http://", "https://")):
+        return url
+    return ""
