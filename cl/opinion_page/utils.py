@@ -533,6 +533,7 @@ async def core_docket_data(
         str,
         bool
         | str
+        | None
         | Docket
         | NoteForm
         | DocketEntrySource
@@ -607,6 +608,11 @@ async def core_docket_data(
             "private": docket.blocked,
             "is_scotus": docket.court_id == "scotus",
             "docket_source": docket_source,
+            # Resolved here because templates can't call the single-arg
+            # source callable; gates the docket toolbar on every tab.
+            "docket_source_url": await sync_to_async(docket_source.docket_url)(
+                docket
+            ),
             "metadata_sections": metadata_sections,
         },
     )

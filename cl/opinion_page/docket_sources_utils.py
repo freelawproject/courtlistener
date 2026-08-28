@@ -153,6 +153,13 @@ class DocketEntrySource:
     returns standalone titled sections rendered after the common ones
     (e.g. RECAP's Bankruptcy Information).
 
+    ``docket_url`` returns the docket's page on the source's own site, or
+    None when the source has no page for it. core_docket_data() resolves
+    it once into the ``docket_source_url`` context variable, which gates
+    the docket toolbar in docket_tabs.html -- gating on
+    ``docket.pacer_docket_url`` there would hide the toolbar for every
+    non-PACER source.
+
     Every callable below touches the ORM, so callers in async views MUST
     wrap them in ``sync_to_async``.
     """
@@ -165,6 +172,7 @@ class DocketEntrySource:
     document_label: Callable[[Any], str]
     document_detail_url: Callable[[Any], str | None]
     document_external_url: Callable[[Any], str | None]
+    docket_url: Callable[[Docket], str | None]
     component: str
     has_pay_and_pray: bool = True
     document_has_actions: Callable[[Any], bool] = _always_has_actions
@@ -197,6 +205,11 @@ def _recap_entries(docket: Docket) -> QuerySet:
 
 def _recap_documents_for_entry(de: DocketEntry) -> QuerySet:
     return de.recap_documents.all()
+
+
+def _recap_docket_url(docket: Docket) -> str | None:
+    """Return the docket's PACER docket report URL, or None."""
+    return docket.pacer_docket_url
 
 
 def _recap_document_is_attachment(document: RECAPDocument) -> bool:
@@ -264,6 +277,7 @@ RECAP_SOURCE = DocketEntrySource(
     document_detail_url=_recap_document_detail_url,
     document_external_url=_recap_document_external_url,
     document_has_actions=_recap_document_has_actions,
+    docket_url=_recap_docket_url,
     metadata_sections=_recap_metadata_sections,
     component="recap",
 )
@@ -327,6 +341,12 @@ def _scotus_metadata_items(docket: Docket) -> list[MetadataItem]:
     return build_scotus_metadata(getattr(docket, "scotus_metadata", None))
 
 
+def _scotus_docket_url(docket: Docket) -> str | None:
+    """Return the docket's page on supremecourt.gov, or None when the
+    docket has no docket_number to build it from."""
+    return docket.scotus_docket_url or None
+
+
 SCOTUS_SOURCE = DocketEntrySource(
     entries_queryset=_scotus_entries,
     documents_for_entry=_scotus_documents_for_entry,
@@ -336,6 +356,7 @@ SCOTUS_SOURCE = DocketEntrySource(
     document_label=_scotus_document_label,
     document_detail_url=_scotus_document_detail_url,
     document_external_url=_scotus_document_external_url,
+    docket_url=_scotus_docket_url,
     metadata_items=_scotus_metadata_items,
     has_pay_and_pray=False,
     component="scotus",

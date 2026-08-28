@@ -1637,6 +1637,25 @@ class ScotusDocketFlagEnabledTest(TestCase):
         )
         self.assertEqual(r.status_code, HTTPStatus.OK)
 
+    async def test_docket_toolbar_renders_on_non_entries_tabs(self) -> None:
+        """The docket toolbar (notes/tags/alerts/source button) is gated on
+        docket_source_url or docket_entries. docket_entries is only in
+        context on the entries tab, and pacer_docket_url is None for
+        SCOTUS, so tabs like Parties must gate on the source-agnostic
+        docket_source_url or the toolbar silently disappears there.
+        """
+        r = await self.async_client.get(
+            reverse(
+                "docket_parties",
+                kwargs={
+                    "docket_id": self.docket.pk,
+                    "slug": self.docket.slug,
+                },
+            )
+        )
+        self.assertEqual(r.status_code, HTTPStatus.OK)
+        self.assertIn("View in SCOTUS", r.content.decode())
+
     async def test_scotus_entries_and_documents_render(self) -> None:
         """SCOTUSDocketEntry/SCOTUSDocument content shows up on the docket
         page template, and PACER-only UI is hidden. Docket alerts are not

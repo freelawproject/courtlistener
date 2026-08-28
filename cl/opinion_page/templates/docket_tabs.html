@@ -90,7 +90,7 @@
 
     <h2>{{ docket.court }}</h2>
 
-    {% if docket.pacer_docket_url or docket_entries %}
+    {% if docket_source_url or docket_entries %}
       <div class="v-offset-above-2">
         {% include "includes/add_note_button.html" with form_instance_id=note_form.instance.docket_id %}
         <div class="btn-group"
