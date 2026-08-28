@@ -1,3 +1,4 @@
+{% if docket_source_url %}
 <a href="{% url "toggle_docket_alert" %}"
    data-id="{{ docket.pk }}"
    data-enable-message="Get Alerts"
@@ -32,3 +33,4 @@
        data-disable-icon-class="fa-bell-slash-o"></i>&nbsp;<span class="alert_btn_txt">Get Alerts</span>
   {% endif %}
 </a>
+{% endif %}

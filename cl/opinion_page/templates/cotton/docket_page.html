@@ -46,6 +46,7 @@
     {% svg "tag" class="w-4 h-4" aria_hidden="true" %}
     Tags
   </c-button>
+  {% if docket_source_url %}
   {# TODO: Wire up alert toggle interactivity (auth checks, AJAX toggle, state change). #}
   <c-menu-button
     button_variant="outline"
@@ -87,6 +88,7 @@
       </c-menu-button.item>
     </c-slot>
   </c-menu-button>
+  {% endif %}
   <c-docket-source-button :docket="docket" :docket_source="docket_source" />
 </div>
 
