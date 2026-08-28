@@ -153,7 +153,7 @@ class DocketEntrySource:
     ``metadata_items`` returns items appended to the core docket metadata
     block, so they render as part of that block with no heading or visual
     division (e.g. the SCOTUS docket metadata). ``metadata_sections``
-    returns standalone titled sections rendered after the common ones
+    returns standalone titled sections rendered before the common ones
     (e.g. RECAP's Bankruptcy Information).
 
     ``docket_url`` returns the docket's page on the source's own site, or

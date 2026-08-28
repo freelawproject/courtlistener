@@ -592,13 +592,16 @@ async def core_docket_data(
     # metadata is first by construction, with the source's own items
     # (e.g. SCOTUS docket metadata) merged into it so they render as one
     # undivided block; each stack styles that section itself.
+    # Source sections come before the common ones to preserve the
+    # long-standing order: Bankruptcy Information, then Originating
+    # Court Information.
     metadata_sections: list[MetadataSection] = [
         {
             "items": docket_metadata
             + await sync_to_async(docket_source.metadata_items)(docket)
         },
-        *await _common_metadata_sections(docket, og_info),
         *await sync_to_async(docket_source.metadata_sections)(docket),
+        *await _common_metadata_sections(docket, og_info),
     ]
 
     return (
