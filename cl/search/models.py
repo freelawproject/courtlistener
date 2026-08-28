@@ -2,7 +2,8 @@ import logging
 import re
 from datetime import datetime
 from pathlib import Path
-from typing import Literal, TypeVar
+from typing import TYPE_CHECKING, Literal, TypeVar
+from urllib.parse import quote
 
 import nh3
 import pghistory
@@ -75,6 +76,9 @@ from cl.search.state.florida.models import *
 from cl.search.state.new_york.models import *
 from cl.search.state.texas.models import *
 from cl.users.models import User
+
+if TYPE_CHECKING:
+    from cl.opinion_page.docket_sources_utils import DocketEntrySource
 
 HYPERSCAN_TOKENIZER = HyperscanTokenizer(cache_dir=".hyperscan")
 
@@ -885,7 +889,13 @@ class Docket(AbstractDateTimeModel, DocketSources):
         )
 
     @property
-    def pacer_docket_url(self):
+    def pacer_docket_url(self) -> str | None:
+        """Return the PACER docket report URL, or None if the docket isn't in PACER."""
+        from cl.opinion_page.docket_sources_utils import RECAP_SOURCE
+
+        if self.get_entry_source() is not RECAP_SOURCE:
+            return None
+
         if self.court.jurisdiction == Court.FEDERAL_APPELLATE:
             if self.court.pk in ["ca5", "ca7", "ca11"]:
                 path = "/cmecf/servlet/TransportRoom?"
@@ -900,6 +910,26 @@ class Docket(AbstractDateTimeModel, DocketSources):
                 return self.pacer_appellate_url_with_caseId(path)
         else:
             return self.pacer_district_url("DktRpt.pl")
+
+    @property
+    def scotus_docket_url(self) -> str:
+        if not self.docket_number:
+            return ""
+        return (
+            "https://www.supremecourt.gov/search.aspx"
+            f"?filename=/docket/docketfiles/html/public/{quote(self.docket_number)}.html"
+        )
+
+    def get_entry_source(self) -> "DocketEntrySource":
+        """Return the DocketEntrySource config for this docket's court -
+        RECAP/PACER by default, with per-court overrides.
+        """
+        from cl.opinion_page.docket_sources_utils import (
+            _SOURCES_BY_COURT_ID,
+            RECAP_SOURCE,
+        )
+
+        return _SOURCES_BY_COURT_ID.get(self.court_id, RECAP_SOURCE)
 
     @property
     def pacer_alias_url(self):
