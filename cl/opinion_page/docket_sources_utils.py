@@ -106,6 +106,18 @@ def _always_has_actions(document: Any) -> bool:
     return True
 
 
+def _no_metadata_items(docket: Docket) -> list[MetadataItem]:
+    """Return no items: by default a source adds nothing to the core
+    docket metadata block."""
+    return []
+
+
+def _no_metadata_sections(docket: Docket) -> list[MetadataSection]:
+    """Return no sections: by default a source adds no metadata sections
+    of its own."""
+    return []
+
+
 @dataclass(frozen=True)
 class DocketEntrySource:
     """Describes how to fetch, sort, and display docket entries for one
@@ -135,6 +147,12 @@ class DocketEntrySource:
     ``http_url``, as ``_scotus_document_external_url`` does. A source MUST
     NOT return a raw third-party string.
 
+    ``metadata_items`` returns items appended to the core docket metadata
+    block, so they render as part of that block with no heading or visual
+    division (e.g. the SCOTUS docket metadata). ``metadata_sections``
+    returns standalone titled sections rendered after the common ones
+    (e.g. RECAP's Bankruptcy Information).
+
     Every callable below touches the ORM, so callers in async views MUST
     wrap them in ``sync_to_async``.
     """
@@ -147,10 +165,13 @@ class DocketEntrySource:
     document_label: Callable[[Any], str]
     document_detail_url: Callable[[Any], str | None]
     document_external_url: Callable[[Any], str | None]
-    metadata_sections: Callable[[Docket], list[MetadataSection]]
     component: str
     has_pay_and_pray: bool = True
     document_has_actions: Callable[[Any], bool] = _always_has_actions
+    metadata_items: Callable[[Docket], list[MetadataItem]] = _no_metadata_items
+    metadata_sections: Callable[[Docket], list[MetadataSection]] = (
+        _no_metadata_sections
+    )
 
 
 def attach_display_fields(source: DocketEntrySource, document: Any) -> None:
@@ -299,15 +320,11 @@ def _scotus_document_external_url(document: SCOTUSDocument) -> str | None:
     return http_url(document.url) or None
 
 
-def _scotus_metadata_sections(docket: Docket) -> list[MetadataSection]:
-    """Build the metadata sections specific to a SCOTUS docket."""
-    return [
-        {
-            "items": build_scotus_metadata(
-                getattr(docket, "scotus_metadata", None)
-            ),
-        }
-    ]
+def _scotus_metadata_items(docket: Docket) -> list[MetadataItem]:
+    """Build the SCOTUS-specific items appended to the core docket
+    metadata, so they render inside that block rather than as a section
+    of their own."""
+    return build_scotus_metadata(getattr(docket, "scotus_metadata", None))
 
 
 SCOTUS_SOURCE = DocketEntrySource(
@@ -319,7 +336,7 @@ SCOTUS_SOURCE = DocketEntrySource(
     document_label=_scotus_document_label,
     document_detail_url=_scotus_document_detail_url,
     document_external_url=_scotus_document_external_url,
-    metadata_sections=_scotus_metadata_sections,
+    metadata_items=_scotus_metadata_items,
     has_pay_and_pray=False,
     component="scotus",
 )

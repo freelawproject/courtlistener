@@ -584,10 +584,14 @@ async def core_docket_data(
     )
     # metadata_sections is the source-agnostic shape both docket_tabs.html
     # and the c-docket-page cotton component render. The core docket
-    # metadata is first by construction; each stack styles that section
-    # itself.
+    # metadata is first by construction, with the source's own items
+    # (e.g. SCOTUS docket metadata) merged into it so they render as one
+    # undivided block; each stack styles that section itself.
     metadata_sections: list[MetadataSection] = [
-        {"items": docket_metadata},
+        {
+            "items": docket_metadata
+            + await sync_to_async(docket_source.metadata_items)(docket)
+        },
         *await _common_metadata_sections(docket, og_info),
         *await sync_to_async(docket_source.metadata_sections)(docket),
     ]
