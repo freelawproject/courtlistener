@@ -2771,7 +2771,24 @@ class OpinionCluster(AbstractDateTimeModel):
     def authorities_with_data(self) -> QuerySet["OpinionCluster"]:
         """Return authorities with their total citation depth and display data."""
         return (
-            self.authorities.prefetch_related("citations")
+            self.authorities.defer(
+                "arguments",
+                "attorneys",
+                "correction",
+                "cross_reference",
+                "disposition",
+                "headmatter",
+                "headnotes",
+                "history",
+                "judges",
+                "nature_of_suit",
+                "other_dates",
+                "posture",
+                "procedural_history",
+                "summary",
+                "syllabus",
+            )
+            .prefetch_related("citations")
             .select_related("docket__court")
             .order_by("-citation_depth", "-citation_count", "-date_filed")
         )

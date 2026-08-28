@@ -88,6 +88,8 @@ class OpinionClusterAuthoritiesTest(TestCase):
                     authority.docket.court.full_name,
                     authority.citation_string,
                     authority.citation_depth,
+                    authority.caption,
+                    authority.get_absolute_url(),
                 )
                 for authority in authorities
             ]
