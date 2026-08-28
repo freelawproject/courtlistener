@@ -37,6 +37,8 @@ class MetadataItem(TypedDict):
     suffix_nofollow: NotRequired[bool]
     suffix_is_external: NotRequired[bool]
     suffix_aria_label: NotRequired[str]
+    suffix_has_tooltip: NotRequired[bool]
+    suffix_tooltip_message: NotRequired[str]
     is_copyable: NotRequired[bool]
     has_tooltip: NotRequired[bool]
     tooltip_message: NotRequired[str]

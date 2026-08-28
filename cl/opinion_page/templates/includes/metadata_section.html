@@ -33,6 +33,7 @@ the actual classes/markup for showing it live here, not in the data.
              {% endif %}
              {% if item.suffix_is_external %}target="_blank"{% endif %}
              {% if item.suffix_aria_label %}aria-label="{{ item.suffix_aria_label }}"{% endif %}
+             {% if item.suffix_has_tooltip %}data-toggle="tooltip" data-placement="right" title="{{ item.suffix_tooltip_message }}"{% endif %}
           >{{ item.suffix_text }}</a>)
         {% else %}
           ({{ item.suffix_text }})

@@ -361,6 +361,10 @@ def build_originating_court_metadata(
                     f"Search the RECAP Archive for docket number "
                     f"{og_info.docket_number}"
                 )
+                item["suffix_has_tooltip"] = True
+                item["suffix_tooltip_message"] = (
+                    "Search for this docket number in the RECAP Archive."
+                )
             elif og_info.administrative_link:
                 item["suffix_url"] = og_info.administrative_link
                 item["suffix_is_external"] = True
