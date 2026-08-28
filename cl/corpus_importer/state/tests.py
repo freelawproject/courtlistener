@@ -2188,8 +2188,8 @@ class LoadStateScrapeCommandTest(SimpleTestCase):
 
     def test_a_timed_out_wait_is_not_reported_as_lost_work(self) -> None:
         """Giving up on a queue that was still coming down is not a finding.
-        Does the output say the dockets may yet land, and point at the flag
-        that settles it?"""
+        Does the output name the timeout as the reason it stopped watching,
+        and point at the flag that settles it?"""
         self.loader.return_value.load.return_value = LoadReport(
             seen=9,
             dispatched=9,
@@ -2202,7 +2202,7 @@ class LoadStateScrapeCommandTest(SimpleTestCase):
         self.load()
 
         errors = self.errors.getvalue()
-        self.assertIn("they may yet land", errors)
+        self.assertIn("never reported back yet -- timed out", errors)
         self.assertIn("--skip-load", errors)
 
     def test_a_stalled_wait_is_reported_as_lost_work(self) -> None:
@@ -2220,7 +2220,7 @@ class LoadStateScrapeCommandTest(SimpleTestCase):
         self.load()
 
         errors = self.errors.getvalue()
-        self.assertIn("they are not coming", errors)
+        self.assertIn("never reported back -- queue stalled", errors)
         self.assertNotIn("--skip-load", errors)
 
     def test_an_unverified_load_does_not_claim_a_clean_run(self) -> None:
