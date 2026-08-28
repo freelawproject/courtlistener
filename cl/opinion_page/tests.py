@@ -1532,6 +1532,7 @@ class DocketSourceComponentTest(SimpleTestCase):
             "docket_source_attribution",
             "document_source_link",
             "docket_empty_message",
+            "docket_empty_cta",
         ),
     }
 

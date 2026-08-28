@@ -39,11 +39,11 @@
   {% include "includes/de_filter.html" %}
   {% include "includes/de_list.html" %}
 {% else %}
-  {# No separate empty-state button -- the persistent PACER/SCOTUS button in docket_tabs.html already covers fa-th-list. #}
   <div class="row">
     <div class="col-sm-8">
       <p class="lead">{% include "includes/docket_empty_message/index.html" with docket_source=docket_source %}</p>
     </div>
+    {% include "includes/docket_empty_cta/index.html" with docket=docket docket_source=docket_source %}
   </div>
 {% endif %}
 

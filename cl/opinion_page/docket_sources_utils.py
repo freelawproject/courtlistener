@@ -130,7 +130,8 @@ class DocketEntrySource:
     template stacks hold one file per component: under cotton/, the
     docket_source_button/, docket_source_attribution/ and
     document_source_link/ folders; under includes/, those three plus
-    docket_empty_message/. A source named "xyz" needs xyz.html in every
+    docket_empty_message/ and docket_empty_cta/. A source named "xyz"
+    needs xyz.html in every
     folder of both stacks. A missing one fails at render time with an
     error that doesn't name it, so DocketSourceComponentTest checks that
     every component resolves. Sources that render the same copy MAY share
