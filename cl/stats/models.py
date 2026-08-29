@@ -1,20 +1,5 @@
 from django.contrib.auth.models import User
 from django.db import models
-from django.utils.encoding import force_str
-
-
-class Stat(models.Model):
-    name = models.CharField(max_length=50, db_index=True)
-    date_logged = models.DateField(db_index=True)
-    count = models.IntegerField()
-
-    def __str__(self) -> str:
-        return force_str(
-            f"{self.pk}: {self.name} on {self.date_logged}: {self.count}"
-        )
-
-    class Meta:
-        unique_together = ("date_logged", "name")
 
 
 class Event(models.Model):
