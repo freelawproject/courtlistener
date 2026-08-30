@@ -3232,11 +3232,9 @@ class UnmatchedCitationTest(TransactionTestCase):
     cluster = None
     opinion: Opinion
 
-    @classmethod
-    def setUpClass(cls):
-        cls.cluster = OpinionClusterWithChildrenAndParentsFactory()
-        cls.opinion = cls.cluster.sub_opinions.first()
-        UnmatchedCitation.objects.all().delete()
+    def setUp(self) -> None:
+        self.cluster = OpinionClusterWithChildrenAndParentsFactory()
+        self.opinion = self.cluster.sub_opinions.first()
 
     def test_1st_creation(self) -> None:
         """Can we save unmatched citations?"""
