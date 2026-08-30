@@ -88,7 +88,6 @@ from cl.search.factories import (
 )
 from cl.search.models import (
     PRECEDENTIAL_STATUS,
-    Court,
     Docket,
     DocketEntry,
     RECAPDocument,
@@ -945,7 +944,7 @@ class DocketAlertTest(TestCase):
     @classmethod
     def setUpTestData(cls) -> None:
         cls.user = UserFactory()
-        cls.court = Court.objects.get(id="scotus")
+        cls.court = CourtFactory(id="scotus", jurisdiction="F")
 
         # Create a DOCKET_ALERT webhook
         cls.webhook = WebhookFactory(
@@ -2689,7 +2688,7 @@ class DocketAlertAPITests(APITestCase):
         cls.user_1 = UserFactory()
         cls.user_2 = UserFactory()
 
-        cls.court = Court.objects.get(id="scotus")
+        cls.court = CourtFactory(id="scotus", jurisdiction="F")
         cls.docket = DocketFactory(
             case_name="BARTON v. State Board for Rodgers Educator Certification",
             docket_number_core="0600078",
@@ -3373,7 +3372,7 @@ class DocketAlertGetNotesTagsTests(TestCase):
     def setUpTestData(cls) -> None:
         cls.user_1 = UserFactory()
         cls.user_2 = UserFactory()
-        cls.court = Court.objects.get(id="scotus")
+        cls.court = CourtFactory(id="scotus", jurisdiction="F")
         cls.docket_1 = DocketFactory(
             court=cls.court,
         )
