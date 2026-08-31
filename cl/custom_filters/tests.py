@@ -36,6 +36,7 @@ from cl.custom_filters.templatetags.text_filters import (
     naturalduration,
     oxford_join,
 )
+from cl.lib.widgets import NEW_STACK_WIDGET_CLASSES, TextInput
 from cl.people_db.models import (
     GRANULARITY_DAY,
     GRANULARITY_MONTH,
@@ -318,7 +319,7 @@ class TestExtras(SimpleTestCase):
         rendered = render_field_with_id(form["name"], "custom_id")
         self.assertNotIn('id="id_name"', rendered)
 
-    def test_render_field_with_corpus_search_form(self):
+    def test_render_field_with_corpus_search_form(self) -> None:
         """Test render_field_with_id works with actual CorpusSearchForm
 
         Validates all field types used in corpus search:
@@ -329,43 +330,81 @@ class TestExtras(SimpleTestCase):
         Ensures custom IDs are applied and default Django IDs are removed.
         """
         form = CorpusSearchForm()
+        common_classes = NEW_STACK_WIDGET_CLASSES
+        placeholders = {
+            "filed_after": "mm/dd/yyyy",
+            "filed_before": "mm/dd/yyyy",
+            "entry_date_filed_after": "After",
+            "entry_date_filed_before": "Before",
+            "born_after": "mm/dd/yyyy",
+            "born_before": "mm/dd/yyyy",
+            "argued_after": "mm/dd/yyy",
+            "argued_before": "mm/dd/yyy",
+        }
 
-        # Test TextInput fields
-        text_fields = [
-            "case_name",
-            "docket_number",
-            "judge",
-            "citation",
-            "party_name",
-            "atty_name",
-            "name",
-            "school",
-            "appointer",
-        ]
-
-        for field_name in text_fields:
+        for field_name, field in form.fields.items():
+            if not isinstance(field.widget, TextInput):
+                continue
             with self.subTest(field=field_name):
-                custom_id = f"test_{field_name}_id"
-                rendered = render_field_with_id(form[field_name], custom_id)
-                self.assertIn(f'id="{custom_id}"', rendered)
-                self.assertIn(f'name="{field_name}"', rendered)
-                # Ensure default Django ID is not present
-                self.assertNotIn(f'id="id_{field_name}"', rendered)
+                self.assertEqual(field.widget.attrs["class"], common_classes)
+                self.assertEqual(field.widget.attrs["autocomplete"], "off")
+
+        for field_name, placeholder in placeholders.items():
+            with self.subTest(placeholder=field_name):
+                self.assertEqual(
+                    form.fields[field_name].widget.attrs["placeholder"],
+                    placeholder,
+                )
+
+        rendered = render_field_with_id(form["case_name"], "test_case_name_id")
+        self.assertEqual(
+            rendered.partition(">")[0] + ">",
+            '<input type="text" name="case_name" '
+            f'class="{common_classes}" autocomplete="off" '
+            'id="test_case_name_id">',
+        )
+        rendered = render_field_with_id(
+            form["filed_after"], "test_filed_after_id"
+        )
+        self.assertEqual(
+            rendered.partition(">")[0] + ">",
+            '<input type="text" name="filed_after" '
+            'placeholder="mm/dd/yyyy" '
+            f'class="{common_classes}" autocomplete="off" '
+            'id="test_filed_after_id">',
+        )
 
         # Test Select/ChoiceField
-        select_fields = [
-            "dob_state",
-            "selection_method",
-            "political_affiliation",
-        ]
-
-        for field_name in select_fields:
+        select_classes = {
+            "dob_state": f"{common_classes} input-text",
+            "selection_method": common_classes,
+            "political_affiliation": f"{common_classes} input-text",
+        }
+        for field_name, expected_classes in select_classes.items():
             with self.subTest(field=field_name):
-                custom_id = f"mobile_judges_{field_name}"
-                rendered = render_field_with_id(form[field_name], custom_id)
-                self.assertIn(f'id="{custom_id}"', rendered)
-                self.assertIn(f'name="{field_name}"', rendered)
-                self.assertIn("<select", rendered)
+                self.assertEqual(
+                    form.fields[field_name].widget.attrs,
+                    {"class": expected_classes},
+                )
+
+        rendered = render_field_with_id(
+            form["dob_state"], "mobile_judges_dob_state"
+        )
+        self.assertEqual(
+            rendered.partition(">")[0] + ">",
+            '<select name="dob_state" '
+            f'class="{common_classes} input-text" '
+            'id="mobile_judges_dob_state">',
+        )
+        rendered = render_field_with_id(
+            form["selection_method"], "mobile_judges_selection_method"
+        )
+        self.assertEqual(
+            rendered.partition(">")[0] + ">",
+            '<select name="selection_method" '
+            f'class="{common_classes}" '
+            'id="mobile_judges_selection_method">',
+        )
 
         # Test CheckboxInput
         checkbox_id = "desktop_recap_available_only"
