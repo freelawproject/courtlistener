@@ -103,6 +103,13 @@ Omit the extension only for scripts that have minified versions (the tag resolve
 {% require_script "js/alpine/plugins/intersect" defer=True %}
 ```
 
+A stub with no extension MUST have both a `.js` and a non-empty `.min.js`:
+DEBUG loads the first, production the second. Vendored code ships both; our own
+components and composables are not minified, so they MUST be required with
+`.js`. Breaking this is invisible in development, so two guards catch it: the
+tag warns in the runserver console while you're on the page, and
+`RequireScriptAssetsTest` fails the test suite.
+
 Plugins MUST be deferred (`defer=True`).
 
 ### File organization
