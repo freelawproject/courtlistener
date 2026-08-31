@@ -19,7 +19,7 @@ from cl.custom_filters.templatetags.text_filters import (
     naturalduration,
     oxford_join,
 )
-from cl.lib.widgets import TextInput
+from cl.lib.widgets import NEW_STACK_WIDGET_CLASSES, TextInput
 from cl.people_db.models import (
     GRANULARITY_DAY,
     GRANULARITY_MONTH,
@@ -313,7 +313,7 @@ class TestExtras(SimpleTestCase):
         Ensures custom IDs are applied and default Django IDs are removed.
         """
         form = CorpusSearchForm()
-        common_classes = "focus:ring-0 focus:outline-none w-full"
+        common_classes = NEW_STACK_WIDGET_CLASSES
         placeholders = {
             "filed_after": "mm/dd/yyyy",
             "filed_before": "mm/dd/yyyy",
