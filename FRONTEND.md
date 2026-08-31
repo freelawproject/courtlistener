@@ -72,6 +72,13 @@ Sync notice format:
 - Don't create single-use utility classes — use inline Tailwind classes instead
 - Branding values (colors, spacing, fonts) go in `tailwind.config.js`, not as custom classes in `input.css`
 
+### Django form widgets
+
+- New-stack Django forms MUST use `TextInput` and `Select` from `cl.lib.widgets` for the standard new-stack widget configuration
+- Use `TextInput` for standard text-input styling and `autocomplete="off"`
+- Use `Select` for standard select styling, with `input_text=True` when the select requires the `input-text` component class
+- Keep field-specific attributes, such as `placeholder`, in the form field declaration
+
 ## Alpine.js
 
 CourtListener uses the CSP-friendly Alpine build. Nearly all Alpine documentation examples use inline JS that will NOT work here.
@@ -95,6 +102,13 @@ Omit the extension only for scripts that have minified versions (the tag resolve
 ```html
 {% require_script "js/alpine/plugins/intersect" defer=True %}
 ```
+
+A stub with no extension MUST have both a `.js` and a non-empty `.min.js`:
+DEBUG loads the first, production the second. Vendored code ships both; our own
+components and composables are not minified, so they MUST be required with
+`.js`. Breaking this is invisible in development, so two guards catch it: the
+tag warns in the runserver console while you're on the page, and
+`RequireScriptAssetsTest` fails the test suite.
 
 Plugins MUST be deferred (`defer=True`).
 
