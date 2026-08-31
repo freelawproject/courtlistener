@@ -14,8 +14,8 @@ from django.utils.dateformat import format
 from django.utils.html import strip_tags
 from django.utils.timezone import localtime, now
 from django_elasticsearch_dsl.registries import registry
-from elasticsearch.dsl import Search
 from elasticsearch.dsl.connections import connections
+from elasticsearch.helpers import bulk, scan
 from lxml import etree, html
 from lxml.html import HtmlElement
 from rest_framework.test import APITestCase as DRFTestCase
@@ -126,9 +126,6 @@ class APITestCase(
     pass
 
 
-ES_DOCUMENT_SNAPSHOT_LIMIT = 5000
-
-
 @test.override_settings(
     ELASTICSEARCH_DSL_AUTO_REFRESH=True,
     ELASTICSEARCH_DISABLED=False,
@@ -216,79 +213,44 @@ class ESIndexTestCase(SimpleTestCase):
         keys = r.keys("celery_throttle:*")
 
     @classmethod
-    def _es_index_names(cls) -> list[str]:
-        """Names of every index this class created."""
-        return [index._name for index in registry.get_indices()]
-
-    @classmethod
-    def _es_read_all(cls) -> dict[str, dict[str, tuple[str | None, dict]]]:
-        """Map every live index to its documents, keyed by id."""
-        names = cls._es_index_names()
-        if not names:
-            return {}
+    def _es_snapshot(cls) -> list[dict]:
+        """Every document in this class's indices, as bulk-ready actions."""
         client = connections.get_connection()
-        try:
-            client.indices.refresh(
-                index=",".join(names), ignore_unavailable=True
+        names = [index._name for index in registry.get_indices()]
+        client.indices.refresh(index=names, ignore_unavailable=True)
+        return [
+            {
+                "_index": hit["_index"],
+                "_id": hit["_id"],
+                "_source": hit["_source"],
+                **({"routing": hit["_routing"]} if "_routing" in hit else {}),
+            }
+            for hit in scan(
+                client,
+                index=names,
+                query={"query": {"match_all": {}}},
+                ignore_unavailable=True,
             )
-            hits = (
-                Search(index=names)
-                .params(ignore_unavailable=True)
-                .query("match_all")
-                .extra(size=ES_DOCUMENT_SNAPSHOT_LIMIT)
-                .execute()
-            )
-        except Exception:
-            return {}
-        if hits.hits.total.value > ES_DOCUMENT_SNAPSHOT_LIMIT:
-            raise RuntimeError(
-                f"{hits.hits.total.value} documents exceed the snapshot limit "
-                f"of {ES_DOCUMENT_SNAPSHOT_LIMIT}; raise it in cl/tests/cases.py."
-            )
-        contents: dict[str, dict[str, tuple[str | None, dict]]] = {
-            name: {} for name in names
-        }
-        for hit in hits:
-            index_docs = contents.setdefault(hit.meta.index, {})
-            index_docs[hit.meta.id] = (
-                getattr(hit.meta, "routing", None),
-                hit.to_dict(),
-            )
-        return contents
-
-    def _es_restore(self) -> None:
-        """Undo any index write the test made."""
-        before = getattr(self, "_es_documents", None)
-        if before is None:
-            return
-        client = connections.get_connection()
-        after = self._es_read_all()
-        for name, current in after.items():
-            original = before.get(name, {})
-            for doc_id, (routing, source) in current.items():
-                if doc_id not in original:
-                    client.delete(index=name, id=doc_id, routing=routing)
-                elif original[doc_id][1] != source:
-                    client.index(
-                        index=name,
-                        id=doc_id,
-                        document=original[doc_id][1],
-                        routing=original[doc_id][0],
-                    )
-            for doc_id, (routing, source) in original.items():
-                if doc_id not in current:
-                    client.index(
-                        index=name, id=doc_id, document=source, routing=routing
-                    )
+        ]
 
     @classmethod
     def _pre_setup(cls) -> None:
         super()._pre_setup()
-        cls._es_documents = cls._es_read_all()
+        cls._es_documents = cls._es_snapshot()
 
     def _post_teardown(self) -> None:
         super()._post_teardown()
-        self._es_restore()
+        # Roll the indices back to whatever they held before the test ran.
+        client = connections.get_connection()
+        client.delete_by_query(
+            index=[index._name for index in registry.get_indices()],
+            query={"match_all": {}},
+            conflicts="proceed",
+            ignore_unavailable=True,
+            refresh=True,
+        )
+        if self._es_documents:
+            bulk(client, self._es_documents, refresh=True)
 
     def tearDown(self) -> None:
         self.restart_celery_throttle_key()
