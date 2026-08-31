@@ -1,6 +1,7 @@
 from datetime import timedelta
 from unittest.mock import patch
 
+from django import forms
 from django.db import connection
 from django.test import AsyncClient, override_settings
 from django.urls import reverse
@@ -15,6 +16,7 @@ from cl.lib.test_helpers import (
     SearchTestCase,
     SimpleUserDataMixin,
 )
+from cl.search.forms import CorpusSearchForm
 from cl.search.models import Docket, Opinion, RECAPDocument
 from cl.search.utils import get_v2_homepage_stats
 from cl.stats.models import Stat
@@ -180,6 +182,21 @@ class HomepageStructureTest(SimpleUserDataMixin, TestCase):
         for label in expected_labels:
             with self.subTest(label=label):
                 self.assertIn(label, html, f"Not found in template: {label}")
+
+
+class CorpusSearchFormWidgetTest(TestCase):
+    """Tests enforcing shared widget usage in CorpusSearchForm."""
+
+    def test_uses_custom_text_and_select_widgets(self) -> None:
+        """Prevent fields from reverting to built-in widgets with CL alternatives."""
+        built_in_widgets = (forms.TextInput, forms.Select)
+        prohibited_widgets = {
+            field_name: type(field.widget).__name__
+            for field_name, field in CorpusSearchForm().fields.items()
+            if type(field.widget) in built_in_widgets
+        }
+
+        self.assertEqual(prohibited_widgets, {})
 
 
 @override_flag("use_new_design", True)
