@@ -3704,7 +3704,14 @@ class SearchAlertsOAESTests(
         self.assertEqual(len(webhook_events), 4)
 
         # Compare webhook content.
-        content = webhook_events[0].content
+        matching = [
+            event.content
+            for event in webhook_events
+            if event.content["payload"]["alert"]["query"]
+            == self.search_alert.query
+        ]
+        self.assertEqual(len(matching), 1)
+        content = matching[0]
         self.assertEqual(
             content["payload"]["alert"]["query"], self.search_alert.query
         )
