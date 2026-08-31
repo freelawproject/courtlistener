@@ -229,10 +229,6 @@
 
         <div class="form-group" style="margin-top: 16px">
           <label for="id_message" x-text="messageLabel">Message</label>
-          <p class="help-block">
-            While AI can be powerful, we prefer communicating with humans, not
-            AI. Please do not use AI to generate your message to us.
-          </p>
           {{ form.message }}
           {% if form.message.errors %}
             <p class="help-block">
