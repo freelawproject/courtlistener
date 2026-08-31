@@ -589,6 +589,7 @@ class ApiQueryCountTests(TestCase):
         api_prefix = "api:test_counts.count"
         r.set(api_prefix, 101)
         self.clear_query_caches()
+        self.client.get(reverse("audio-list", kwargs={"version": "v3"}))
 
     def tearDown(self) -> None:
         UserProfile.objects.all().delete()
