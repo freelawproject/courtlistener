@@ -228,7 +228,7 @@ async def court_publish_page(request: HttpRequest, pk: str) -> HttpResponse:
                 "You do not have permission to access this page."
             )
 
-    # Fix mypy errors
+    # Fix type checker errors
     upload_form: Any
 
     upload_form_classes = {
@@ -1203,7 +1203,7 @@ async def view_opinion_authorities(
     :return: Table of Authorities tab
     """
     cluster: OpinionCluster = await aget_object_or_404(
-        await get_opinions_queryset("sub_opinions__opinions_cited"),
+        await get_opinions_queryset("no_text_fields"),
         pk=pk,
     )
 

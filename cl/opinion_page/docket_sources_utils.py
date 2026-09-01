@@ -39,19 +39,21 @@ class MetadataItem(TypedDict):
     suffix_nofollow: NotRequired[bool]
     suffix_is_external: NotRequired[bool]
     suffix_aria_label: NotRequired[str]
+    suffix_has_tooltip: NotRequired[bool]
+    suffix_tooltip_message: NotRequired[str]
     is_copyable: NotRequired[bool]
     has_tooltip: NotRequired[bool]
     tooltip_message: NotRequired[str]
 
 
 class MetadataSection(TypedDict):
-    """Shape of one rendered metadata section (see includes/metadata_section.html).
+    """Shape of one rendered metadata section. Rendered by both the
+    c-metadata-section cotton component and includes/metadata_section.html.
     A section with no items renders nothing, so callers MAY return empty
     sections rather than filtering them out."""
 
     items: list[MetadataItem]
     title: NotRequired[str]
-    list_class: NotRequired[str]
 
 
 def build_scotus_metadata(
@@ -113,6 +115,23 @@ class AdminNames(NamedTuple):
     document: str
 
 
+def _always_has_actions(document: Any) -> bool:
+    """Return True: by default every document gets its action buttons."""
+    return True
+
+
+def _no_metadata_items(docket: Docket) -> list[MetadataItem]:
+    """Return no items: by default a source adds nothing to the core
+    docket metadata block."""
+    return []
+
+
+def _no_metadata_sections(docket: Docket) -> list[MetadataSection]:
+    """Return no sections: by default a source adds no metadata sections
+    of its own."""
+    return []
+
+
 @dataclass(frozen=True)
 class DocketEntrySource:
     """Describes how to fetch, sort, and display docket entries and
@@ -120,14 +139,16 @@ class DocketEntrySource:
     SCOTUS is the first override. A future state-specific model plugs in
     by adding one more instance and a court_id mapping below.
 
-    ``component`` picks which file renders this source's copy. Three
-    folders under cotton/ hold one file per component --
+    ``component`` picks which file renders this source's copy. Both
+    template stacks hold one file per component: under cotton/, the
     docket_source_button/, docket_source_attribution/ and
-    document_source_link/ -- so a source named "xyz" needs xyz.html in
-    all three. A missing one fails at render time with an error that
-    doesn't name it, so the source tests check that every component
-    resolves. Sources that render the same copy MAY share a component
-    instead of copying files.
+    document_source_link/ folders; under includes/, those three plus
+    docket_empty_message/, docket_empty_cta/ and docket_source_li/. A
+    source named "xyz" needs xyz.html in every
+    folder of both stacks. A missing one fails at render time with an
+    error that doesn't name it, so DocketSourceComponentTest checks that
+    every component resolves. Sources that render the same copy MAY share
+    a component instead of copying files.
 
     ``document_detail_url`` returns a CourtListener path that we build
     ourselves, or None. docket_entry_rows.html renders it unfiltered into
@@ -139,6 +160,19 @@ class DocketEntrySource:
     prefix, as ``RECAPDocument.pacer_url`` does, or filter it through
     ``http_url``, as ``_scotus_document_external_url`` does. A source MUST
     NOT return a raw third-party string.
+
+    ``metadata_items`` returns items appended to the core docket metadata
+    block, so they render as part of that block with no heading or visual
+    division (e.g. the SCOTUS docket metadata). ``metadata_sections``
+    returns standalone titled sections rendered before the common ones
+    (e.g. RECAP's Bankruptcy Information).
+
+    ``docket_url`` returns the docket's page on the source's own site, or
+    None when the source has no page for it. core_docket_data() resolves
+    it once into the ``docket_source_url`` context variable, which gates
+    the docket toolbar in docket_tabs.html -- gating on
+    ``docket.pacer_docket_url`` there would hide the toolbar for every
+    non-PACER source.
 
     Every callable below touches the ORM, so callers in async views MUST
     wrap them in ``sync_to_async``.
@@ -155,7 +189,7 @@ class DocketEntrySource:
     document_label: Callable[[Any], str]
     document_detail_url: Callable[[Any], str | None]
     document_external_url: Callable[[Any], str | None]
-    metadata_sections: Callable[[Docket], list[MetadataSection]]
+    docket_url: Callable[[Docket], str | None]
     component: str
     has_pay_and_pray: bool = True
     admin_url_names: AdminNames = AdminNames(
@@ -169,6 +203,11 @@ class DocketEntrySource:
         document="recapdocument",
     )
     admin_document_label: str = "RECAP Document"
+    document_has_actions: Callable[[Any], bool] = _always_has_actions
+    metadata_items: Callable[[Docket], list[MetadataItem]] = _no_metadata_items
+    metadata_sections: Callable[[Docket], list[MetadataSection]] = (
+        _no_metadata_sections
+    )
 
 
 def attach_display_fields(source: DocketEntrySource, document: Any) -> None:
@@ -177,6 +216,10 @@ def attach_display_fields(source: DocketEntrySource, document: Any) -> None:
     document.label = source.document_label(document)
     document.detail_url = source.document_detail_url(document)
     document.external_url = source.document_external_url(document)
+    document.has_actions = source.document_has_actions(document)
+
+
+# RECAP
 
 
 def _recap_entries(docket: Docket) -> QuerySet:
@@ -193,6 +236,11 @@ def _recap_entries(docket: Docket) -> QuerySet:
 def _recap_documents_for_entry(de: DocketEntry) -> QuerySet:
     """Return the RECAPDocuments attached to this docket entry."""
     return de.recap_documents.all()
+
+
+def _recap_docket_url(docket: Docket) -> str | None:
+    """Return the docket's PACER docket report URL, or None."""
+    return docket.pacer_docket_url
 
 
 def _recap_document_is_attachment(document: RECAPDocument) -> bool:
@@ -222,6 +270,17 @@ def _recap_document_external_url(document: RECAPDocument) -> str | None:
     """Return the PACER URL for one RECAP document, or None if it has
     none."""
     return document.pacer_url or None
+
+
+def _recap_document_has_actions(document: RECAPDocument) -> bool:
+    """Return whether one RECAP document gets action buttons.
+
+    Numberless minute entries are not individually addressable on PACER, so
+    there is nothing to download, buy or pray for. Legacy hides the whole
+    action area for them; see the `{# Hide this if an unnumbered minute
+    entry #}` guard in includes/de_list.html.
+    """
+    return bool(document.document_number)
 
 
 def _recap_metadata_sections(docket: Docket) -> list[MetadataSection]:
@@ -277,6 +336,8 @@ RECAP_SOURCE = DocketEntrySource(
     document_label=_recap_document_label,
     document_detail_url=_recap_document_detail_url,
     document_external_url=_recap_document_external_url,
+    document_has_actions=_recap_document_has_actions,
+    docket_url=_recap_docket_url,
     metadata_sections=_recap_metadata_sections,
     component="recap",
     documents_for_docket_and_number=_recap_documents_for_docket_and_number,
@@ -284,6 +345,7 @@ RECAP_SOURCE = DocketEntrySource(
 )
 
 
+# SCOTUS
 def _scotus_entries(docket: Docket) -> QuerySet:
     """Return this docket's SCOTUSDocketEntry queryset, with
     scotusdocument_set prefetched for the docket page's entry list."""
@@ -366,15 +428,17 @@ def _scotus_document_external_url(document: SCOTUSDocument) -> str | None:
     return http_url(document.url) or None
 
 
-def _scotus_metadata_sections(docket: Docket) -> list[MetadataSection]:
-    """Build the metadata sections specific to a SCOTUS docket."""
-    return [
-        {
-            "items": build_scotus_metadata(
-                getattr(docket, "scotus_metadata", None)
-            ),
-        }
-    ]
+def _scotus_metadata_items(docket: Docket) -> list[MetadataItem]:
+    """Build the SCOTUS-specific items appended to the core docket
+    metadata, so they render inside that block rather than as a section
+    of their own."""
+    return build_scotus_metadata(getattr(docket, "scotus_metadata", None))
+
+
+def _scotus_docket_url(docket: Docket) -> str | None:
+    """Return the docket's page on supremecourt.gov, or None when the
+    docket has no docket_number to build it from."""
+    return docket.scotus_docket_url or None
 
 
 SCOTUS_SOURCE = DocketEntrySource(
@@ -386,9 +450,10 @@ SCOTUS_SOURCE = DocketEntrySource(
     document_label=_scotus_document_label,
     document_detail_url=_scotus_document_detail_url,
     document_external_url=_scotus_document_external_url,
-    metadata_sections=_scotus_metadata_sections,
     documents_for_docket_and_number=_scotus_documents_for_docket_and_number,
     get_document_for_render=_get_scotus_document_for_render,
+    docket_url=_scotus_docket_url,
+    metadata_items=_scotus_metadata_items,
     has_pay_and_pray=False,
     component="scotus",
     admin_url_names=AdminNames(

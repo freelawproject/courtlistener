@@ -39,7 +39,6 @@ from cl.opinion_page.docket_sources_utils import (
     DocketEntrySource,
     MetadataItem,
     MetadataSection,
-    build_scotus_metadata,
 )
 from cl.people_db.models import Person
 from cl.recap.constants import COURT_TIMEZONES
@@ -53,7 +52,6 @@ from cl.search.models import (
     OpinionCluster,
     OriginatingCourtInformation,
     SCOTUSDocketEntry,
-    ScotusDocketMetadata,
 )
 
 logger = logging.getLogger(__name__)
@@ -367,6 +365,10 @@ def build_originating_court_metadata(
                     f"Search the RECAP Archive for docket number "
                     f"{og_info.docket_number}"
                 )
+                item["suffix_has_tooltip"] = True
+                item["suffix_tooltip_message"] = (
+                    "Search for this docket number in the RECAP Archive."
+                )
             elif og_info.administrative_link:
                 item["suffix_url"] = og_info.administrative_link
                 item["suffix_is_external"] = True
@@ -513,17 +515,6 @@ def make_docket_title(docket: Docket) -> str:
     return title
 
 
-async def get_scotus_metadata_items(docket: Docket) -> list[MetadataItem]:
-    """Build the SCOTUS metadata items for a docket, or [] if it isn't one.
-    Skips the query entirely for non-SCOTUS dockets."""
-    if docket.court_id != "scotus":
-        return []
-    metadata = await ScotusDocketMetadata.objects.filter(
-        docket=docket
-    ).afirst()
-    return build_scotus_metadata(metadata)
-
-
 async def _common_metadata_sections(
     docket: Docket, og_info: OriginatingCourtInformation | None
 ) -> list[MetadataSection]:
@@ -550,10 +541,10 @@ async def core_docket_data(
         str,
         bool
         | str
+        | None
         | Docket
         | NoteForm
         | DocketEntrySource
-        | list[MetadataItem]
         | list[MetadataSection],
     ],
 ]:
@@ -594,31 +585,29 @@ async def core_docket_data(
     docket_source = docket.get_entry_source()
 
     @sync_to_async
-    def _get_related(
-        d: Docket,
-    ) -> tuple[
-        BankruptcyInformation | None,
-        OriginatingCourtInformation | None,
-    ]:
-        return (
-            getattr(d, "bankruptcy_information", None),
-            getattr(d, "originating_court_information", None),
-        )
+    def _get_og_info(d: Docket) -> OriginatingCourtInformation | None:
+        return getattr(d, "originating_court_information", None)
 
-    bankr_info, og_info = await _get_related(docket)
+    og_info = await _get_og_info(docket)
 
     docket_metadata = await sync_to_async(build_docket_metadata)(
         docket, timezone_str
     )
-    # metadata_sections is the source-agnostic shape docket_tabs.html
-    # uses. The 4 metadata/bankruptcy_metadata/originating_court_metadata/
-    # scotus_metadata keys below are v2's older, separate shape -- v2_docket.html
-    # on this branch still read them individually. Both must stay until #7068 merge;
-    # dropping the 4 keys now would blank out v2's metadata section.
+    # metadata_sections is the source-agnostic shape both docket_tabs.html
+    # and the c-docket-page cotton component render. The core docket
+    # metadata is first by construction, with the source's own items
+    # (e.g. SCOTUS docket metadata) merged into it so they render as one
+    # undivided block; each stack styles that section itself.
+    # Source sections come before the common ones to preserve the
+    # long-standing order: Bankruptcy Information, then Originating
+    # Court Information.
     metadata_sections: list[MetadataSection] = [
-        {"items": docket_metadata},
-        *await _common_metadata_sections(docket, og_info),
+        {
+            "items": docket_metadata
+            + await sync_to_async(docket_source.metadata_items)(docket)
+        },
         *await sync_to_async(docket_source.metadata_sections)(docket),
+        *await _common_metadata_sections(docket, og_info),
     ]
 
     return (
@@ -632,12 +621,11 @@ async def core_docket_data(
             "private": docket.blocked,
             "is_scotus": is_scotus,
             "docket_source": docket_source,
-            "metadata": docket_metadata,
-            "bankruptcy_metadata": build_bankruptcy_metadata(bankr_info),
-            "originating_court_metadata": await sync_to_async(
-                build_originating_court_metadata
-            )(docket, og_info),
-            "scotus_metadata": await get_scotus_metadata_items(docket),
+            # Resolved here because templates can't call the single-arg
+            # source callable; gates the docket toolbar on every tab.
+            "docket_source_url": await sync_to_async(docket_source.docket_url)(
+                docket
+            ),
             "metadata_sections": metadata_sections,
         },
     )
