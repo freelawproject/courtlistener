@@ -1,4 +1,3 @@
-import time
 from datetime import date, datetime, timedelta
 from http import HTTPStatus
 from unittest.mock import MagicMock, patch
@@ -380,8 +379,13 @@ class UserNotesTest(BaseSeleniumTest):
         self.assertIn("Save", button.text)
         button.click()
 
-        # And notices the change on the page immediately
-        time.sleep(0.5)  # Selenium is too fast.
+        # And notices the change on the page immediately. Saving is an XHR
+        # that rewrites the row, so wait for the new name to land.
+        WebDriverWait(self.browser, SELENIUM_TIMEOUT).until(
+            EC.text_to_be_present_in_element(
+                (By.TAG_NAME, "body"), "Renamed Note"
+            )
+        )
         self.assertIn("Notes", self.browser.title)
         self.assert_text_in_node("Renamed Note", "body")
         self.assert_text_in_node("Modified Notes", "body")
