@@ -407,6 +407,14 @@ class NYCoAPartyMerger(PartyMerger[NYCoAParty, RelatedParams[None]]):
     )
 
     @override
+    def query(self) -> QuerySet[Party]:
+        """The docket's parties by date created.
+
+        :return: `PartyMerger`'s candidates, oldest first.
+        """
+        return super().query().order_by("date_created")
+
+    @override
     def resolve_query(self, qs: QuerySet[Party]) -> tuple[bool, Party | None]:
         """Pick which of the docket's parties this scraped one is.
 
@@ -427,7 +435,9 @@ class NYCoAPartyMerger(PartyMerger[NYCoAParty, RelatedParams[None]]):
         docket = cast(Docket, self.params.parent)
         role = _party_type_name(self.scrape, None)
         for candidate in candidates:
-            if candidate.party_types.filter(docket=docket, name=role).exists():
+            if candidate.party_types.filter(
+                docket=docket, name__iexact=role
+            ).exists():
                 return True, candidate
         logger.error(
             "Docket %s lists %s under several roles and none is %s; refusing "
@@ -645,7 +655,7 @@ class NYCoADocketMerger(DocketMerger[NYCoACase, None]):
     )
     date_filed: date | None = Attribute(lambda case, params: case.date_filed)
     date_argued: date | None = Attribute(
-        lambda case, params: case.argument_date, strategy=overwrite
+        lambda case, params: case.argument_date
     )
     date_last_filing: date | None = Attribute(
         _date_last_filing, strategy=overwrite
