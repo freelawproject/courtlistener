@@ -28,6 +28,7 @@ because `is_published` has to answer for a path with no document to ask, so
 
 ABSENT_SOURCE: frozenset[str] = frozenset({"NoSuchKey", "NoSuchBucket", "404"})
 
+
 class PublishOutcome(Enum):
     """What became of one attempt to move a file into the public bucket."""
 
