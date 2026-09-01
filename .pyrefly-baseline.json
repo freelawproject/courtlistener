@@ -925,6 +925,30 @@
       "severity": "error"
     },
     {
+      "line": 2301,
+      "column": 28,
+      "stop_line": 2301,
+      "stop_column": 40,
+      "path": "cl/corpus_importer/tasks.py",
+      "code": -2,
+      "name": "bad-argument-type",
+      "description": "Argument `str` is not assignable to parameter `pacer_doc_id` with type `int | None` in function `juriscraper.pacer.reports.BaseReport.download_pdf`",
+      "concise_description": "Argument `str` is not assignable to parameter `pacer_doc_id` with type `int | None` in function `juriscraper.pacer.reports.BaseReport.download_pdf`",
+      "severity": "error"
+    },
+    {
+      "line": 2337,
+      "column": 24,
+      "stop_line": 2337,
+      "stop_column": 36,
+      "path": "cl/corpus_importer/tasks.py",
+      "code": -2,
+      "name": "bad-argument-type",
+      "description": "Argument `str` is not assignable to parameter `pacer_doc_id` with type `int | None` in function `juriscraper.pacer.reports.BaseReport.download_pdf`",
+      "concise_description": "Argument `str` is not assignable to parameter `pacer_doc_id` with type `int | None` in function `juriscraper.pacer.reports.BaseReport.download_pdf`",
+      "severity": "error"
+    },
+    {
       "line": 3092,
       "column": 12,
       "stop_line": 3092,
@@ -934,6 +958,78 @@
       "name": "bad-return",
       "description": "Returned type `httpx._models.Response` is not assignable to declared return type `requests.models.Response`",
       "concise_description": "Returned type `httpx._models.Response` is not assignable to declared return type `requests.models.Response`",
+      "severity": "error"
+    },
+    {
+      "line": 5123,
+      "column": 9,
+      "stop_line": 5123,
+      "stop_column": 27,
+      "path": "cl/corpus_importer/tasks.py",
+      "code": -2,
+      "name": "missing-attribute",
+      "description": "Object of class `Deserializable` has no attribute `docket_number`",
+      "concise_description": "Object of class `Deserializable` has no attribute `docket_number`",
+      "severity": "error"
+    },
+    {
+      "line": 5127,
+      "column": 20,
+      "stop_line": 5127,
+      "stop_column": 32,
+      "path": "cl/corpus_importer/tasks.py",
+      "code": -2,
+      "name": "missing-attribute",
+      "description": "Object of class `Deserializable` has no attribute `entries`",
+      "concise_description": "Object of class `Deserializable` has no attribute `entries`",
+      "severity": "error"
+    },
+    {
+      "line": 5128,
+      "column": 54,
+      "stop_line": 5128,
+      "stop_column": 66,
+      "path": "cl/corpus_importer/tasks.py",
+      "code": -2,
+      "name": "missing-attribute",
+      "description": "Object of class `Deserializable` has no attribute `entries`",
+      "concise_description": "Object of class `Deserializable` has no attribute `entries`",
+      "severity": "error"
+    },
+    {
+      "line": 5132,
+      "column": 13,
+      "stop_line": 5132,
+      "stop_column": 31,
+      "path": "cl/corpus_importer/tasks.py",
+      "code": -2,
+      "name": "missing-attribute",
+      "description": "Object of class `Deserializable` has no attribute `docket_number`",
+      "concise_description": "Object of class `Deserializable` has no attribute `docket_number`",
+      "severity": "error"
+    },
+    {
+      "line": 5136,
+      "column": 41,
+      "stop_line": 5136,
+      "stop_column": 45,
+      "path": "cl/corpus_importer/tasks.py",
+      "code": -2,
+      "name": "bad-argument-type",
+      "description": "Argument `Deserializable` is not assignable to parameter `scrape` with type `FloridaCase` in function `cl.corpus_importer.state.merger.Merger.__init__`",
+      "concise_description": "Argument `Deserializable` is not assignable to parameter `scrape` with type `FloridaCase` in function `cl.corpus_importer.state.merger.Merger.__init__`",
+      "severity": "error"
+    },
+    {
+      "line": 5141,
+      "column": 13,
+      "stop_line": 5141,
+      "stop_column": 31,
+      "path": "cl/corpus_importer/tasks.py",
+      "code": -2,
+      "name": "missing-attribute",
+      "description": "Object of class `Deserializable` has no attribute `docket_number`",
+      "concise_description": "Object of class `Deserializable` has no attribute `docket_number`",
       "severity": "error"
     },
     {

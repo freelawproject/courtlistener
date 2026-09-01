@@ -2,7 +2,8 @@ import logging
 import re
 from datetime import datetime
 from pathlib import Path
-from typing import Literal, TypeVar
+from typing import TYPE_CHECKING, Literal, TypeVar
+from urllib.parse import quote
 
 import nh3
 import pghistory
@@ -37,7 +38,6 @@ from localflavor.us.models import USPostalCodeField, USZipCodeField
 from localflavor.us.us_states import OBSOLETE_STATES, USPS_CHOICES
 from model_utils import FieldTracker
 
-from cl.citations.utils import get_citation_depth_between_clusters
 from cl.corpus_importer.state.florida.utils import (
     is_florida_court,
 )
@@ -75,6 +75,9 @@ from cl.search.state.florida.models import *
 from cl.search.state.new_york.models import *
 from cl.search.state.texas.models import *
 from cl.users.models import User
+
+if TYPE_CHECKING:
+    from cl.opinion_page.docket_sources_utils import DocketEntrySource
 
 HYPERSCAN_TOKENIZER = HyperscanTokenizer(cache_dir=".hyperscan")
 
@@ -885,7 +888,13 @@ class Docket(AbstractDateTimeModel, DocketSources):
         )
 
     @property
-    def pacer_docket_url(self):
+    def pacer_docket_url(self) -> str | None:
+        """Return the PACER docket report URL, or None if the docket isn't in PACER."""
+        from cl.opinion_page.docket_sources_utils import RECAP_SOURCE
+
+        if self.get_entry_source() is not RECAP_SOURCE:
+            return None
+
         if self.court.jurisdiction == Court.FEDERAL_APPELLATE:
             if self.court.pk in ["ca5", "ca7", "ca11"]:
                 path = "/cmecf/servlet/TransportRoom?"
@@ -900,6 +909,26 @@ class Docket(AbstractDateTimeModel, DocketSources):
                 return self.pacer_appellate_url_with_caseId(path)
         else:
             return self.pacer_district_url("DktRpt.pl")
+
+    @property
+    def scotus_docket_url(self) -> str:
+        if not self.docket_number:
+            return ""
+        return (
+            "https://www.supremecourt.gov/search.aspx"
+            f"?filename=/docket/docketfiles/html/public/{quote(self.docket_number)}.html"
+        )
+
+    def get_entry_source(self) -> "DocketEntrySource":
+        """Return the DocketEntrySource config for this docket's court -
+        RECAP/PACER by default, with per-court overrides.
+        """
+        from cl.opinion_page.docket_sources_utils import (
+            _SOURCES_BY_COURT_ID,
+            RECAP_SOURCE,
+        )
+
+        return _SOURCES_BY_COURT_ID.get(self.court_id, RECAP_SOURCE)
 
     @property
     def pacer_alias_url(self):
@@ -2697,64 +2726,31 @@ class OpinionCluster(AbstractDateTimeModel):
         return ", ".join(str(c) for c in citations)
 
     @property
-    def authorities(self):
+    def authorities(self) -> QuerySet["OpinionCluster"]:
         """Returns a queryset that can be used for querying and caching
         authorities.
+
+        Citation relationships connect individual opinions, but an authority
+        is displayed at the cluster level. Traverse and aggregate those
+        relationships in the database so the number of queries does not grow
+        with the number of sub-opinions or authorities.
         """
-        # All clusters that have sub_opinions cited by the sub_opinions of
-        # the current cluster, ordered by citation count, descending.
-        # Note that:
-        #  - sum()'ing an empty list with a nested one, flattens the nested
-        #    list.
-        #  - QuerySets are lazy by default, so we need to call list() on the
-        #    queryset object to evaluate it here and now.
-        #  - We explicitly exclude self (self.pk) from the results to avoid
-        #    a cluster being listed as its own authority.
         return (
             OpinionCluster.objects.filter(
-                sub_opinions__in=sum(
-                    [
-                        list(sub_opinion.opinions_cited.all().only("pk"))
-                        for sub_opinion in self.sub_opinions.all()
-                    ],
-                    [],
-                )
+                sub_opinions__citing_opinions__citing_opinion__cluster_id=self.pk
             )
             .exclude(pk=self.pk)
+            .annotate(
+                citation_depth=Sum("sub_opinions__citing_opinions__depth")
+            )
             .order_by("-citation_count", "-date_filed")
         )
 
-    async def aauthorities(self):
+    async def aauthorities(self) -> QuerySet["OpinionCluster"]:
         """Returns a queryset that can be used for querying and caching
         authorities.
         """
-        # All clusters that have sub_opinions cited by the sub_opinions of
-        # the current cluster, ordered by citation count, descending.
-        # Note that:
-        #  - sum()'ing an empty list with a nested one, flattens the nested
-        #    list.
-        #  - QuerySets are lazy by default, so we need to call list() on the
-        #    queryset object to evaluate it here and now.
-        #  - We explicitly exclude self (self.pk) from the results to avoid
-        #    a cluster being listed as its own authority.
-        return (
-            OpinionCluster.objects.filter(
-                sub_opinions__in=sum(
-                    [
-                        [
-                            i
-                            async for i in sub_opinion.opinions_cited.all().only(
-                                "pk"
-                            )
-                        ]
-                        async for sub_opinion in self.sub_opinions.all()
-                    ],
-                    [],
-                )
-            )
-            .exclude(pk=self.pk)
-            .order_by("-citation_count", "-date_filed")
-        )
+        return self.authorities
 
     @property
     def parentheticals(self):
@@ -2801,31 +2797,39 @@ class OpinionCluster(AbstractDateTimeModel):
             self._has_private_authority = private
         return self._has_private_authority
 
-    async def aauthorities_with_data(self):
-        """Returns a list of this cluster's authorities with an extra field
-        appended related to citation counts, for eventual injection into a
-        view template.
-        The returned list is sorted by that citation count field.
-        """
-        authorities_with_data = []
-        authorities_base = await self.aauthorities()
-        authorities_qs = (
-            authorities_base.prefetch_related("citations")
-            .select_related("docket__court")
-            .order_by("-citation_count", "-date_filed")
-        )
-        async for authority in authorities_qs:
-            authority.citation_depth = (
-                await get_citation_depth_between_clusters(
-                    citing_cluster_pk=self.pk, cited_cluster_pk=authority.pk
-                )
+    @property
+    def authorities_with_data(self) -> QuerySet["OpinionCluster"]:
+        """Return authorities with their total citation depth and display data."""
+        return (
+            self.authorities.defer(
+                "arguments",
+                "attorneys",
+                "correction",
+                "cross_reference",
+                "disposition",
+                "headmatter",
+                "headnotes",
+                "history",
+                "judges",
+                "nature_of_suit",
+                "other_dates",
+                "posture",
+                "procedural_history",
+                "summary",
+                "syllabus",
             )
-            authorities_with_data.append(authority)
-
-        authorities_with_data.sort(
-            key=lambda x: x.citation_depth, reverse=True
+            .prefetch_related("citations")
+            .select_related("docket__court")
+            .order_by("-citation_depth", "-citation_count", "-date_filed")
         )
-        return authorities_with_data
+
+    async def aauthorities_with_data(self) -> list["OpinionCluster"]:
+        """Returns a list of this cluster's authorities with an extra field
+        appended related to citation depth, for eventual injection into a
+        view template.
+        The returned list is sorted by that citation depth field.
+        """
+        return [authority async for authority in self.authorities_with_data]
 
     def top_visualizations(self):
         return self.visualizations.filter(

@@ -236,8 +236,8 @@ class SealableDocumentAdmin(admin.ModelAdmin):
         :param request: The current HTTP request.
         :param queryset: QuerySet of RECAPDocuments to seal (bulk action).
         """
+        from cl.search.deletion_utils import seal_documents
         from cl.search.models import RECAPDocument
-        from cl.search.utils import seal_documents
 
         if queryset is None:
             doc_ids = request.POST.getlist("doc_ids")
