@@ -147,15 +147,17 @@ class NYCoADocketMergerTest(NYCoAMergerTestCase):
         self.assertFalse(Docket.objects.exists())
 
     @merger_test(expected_query_count=8)
-    def test_merge_keeps_existing_date_filed(self) -> None:
-        """Court-PASS has no filing date of its own. Does a scrape without one
-        leave a date another source established alone?"""
+    def test_merge_keeps_existing_dates(self) -> None:
+        """Court-PASS has no filing date of its own. Does a scrape leave a
+        date another source established alone?"""
         docket = self.existing_docket()
         docket.date_filed = date(2020, 5, 5)
+        docket.date_argued = date(2021, 6, 6)
         docket.save()
         case = NYCoACaseFactory.create(
             docket_number=DOCKET_NUMBER,
             date_filed=None,
+            argument_date=None,
             entries=[],
             parties=[],
         )
@@ -165,6 +167,7 @@ class NYCoADocketMergerTest(NYCoAMergerTestCase):
         self.assertTrue(result.success)
         docket.refresh_from_db()
         self.assertEqual(docket.date_filed, date(2020, 5, 5))
+        self.assertEqual(docket.date_argued, date(2021, 6, 6))
 
     @merger_test(expected_query_count=17)
     def test_merge_date_last_filing_uses_latest_filing(self) -> None:
