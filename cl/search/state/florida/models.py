@@ -106,7 +106,7 @@ class FloridaDocument(AbstractDateTimeModel, AbstractStateDocument):
         on_delete=models.CASCADE,
         related_name="documents",
     )
-    content_type = models.CharField(max_length=63, blank=True)
+    content_type = models.CharField(max_length=255, blank=True)
     document_name = models.TextField(blank=True)
     document_type = models.TextField(blank=True)
     link_uuid = models.UUIDField()
@@ -152,3 +152,9 @@ class FloridaDocument(AbstractDateTimeModel, AbstractStateDocument):
                 name="unique_link_uuid_per_docket_entry",
             )
         ]
+
+    def get_pdf_path(self, filename: str, thumbs: bool = False) -> str:
+        """Store Florida ACIS documents under the shared state layout."""
+        return self.state_pdf_path(
+            "fl", self.docket_entry.docket.court_id, filename, thumbs
+        )
