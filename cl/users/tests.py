@@ -24,6 +24,7 @@ from django.core.mail import (
     get_connection,
     send_mail,
 )
+from django.db import connection
 from django.test import AsyncClient, RequestFactory
 from django.test.client import Client
 from django.test.utils import override_settings
@@ -4855,3 +4856,35 @@ class RefreshAPIThrottlesAdminTest(TestCase):
         )
         # Inactive user got nothing
         self.assertFalse(APIThrottle.objects.filter(user=self.target).exists())
+
+
+class EmailLowerIndexTest(TestCase):
+    """The functional index the case-insensitive email lookups depend on.
+
+    Email lookups elsewhere query with `Lower("email")` so that Postgres and
+    Python agree on case folding. That is only cheap while the matching
+    functional index exists on `auth_user`, and because the index lives in a
+    raw-SQL migration rather than on Django's `User` model, nothing else would
+    notice if it went away.
+    """
+
+    def test_lower_email_index_exists(self) -> None:
+        """`auth_user` has a `lower(email)` index that lookups can use."""
+        with connection.cursor() as cursor:
+            cursor.execute(
+                """
+                SELECT indexdef
+                FROM pg_indexes
+                WHERE tablename = 'auth_user'
+                  AND indexname = 'auth_user_email_lower_idx'
+                """
+            )
+            row = cursor.fetchone()
+
+        self.assertIsNotNone(
+            row, "auth_user_email_lower_idx is missing from auth_user."
+        )
+        self.assertIn("lower((email)::text)", row[0])
+        # Non-unique for now: the duplicate addresses already in the table
+        # can't be merged until later in the sequence (#7437).
+        self.assertNotIn("UNIQUE", row[0])
