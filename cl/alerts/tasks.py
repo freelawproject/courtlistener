@@ -39,6 +39,7 @@ from cl.api.tasks import (
 from cl.celery_init import app
 from cl.custom_filters.templatetags.text_filters import best_case_name
 from cl.favorites.models import Note, UserTag
+from cl.favorites.utils import build_dual_read_query
 from cl.lib.command_utils import logger
 from cl.lib.decorators import retry
 from cl.lib.redis_utils import (
@@ -189,7 +190,9 @@ def get_docket_notes_and_tags_by_user(
 
     notes = None
     note = (
-        Note.objects.filter(docket_id=d_pk, user_id=user_pk)
+        Note.objects.filter(
+            build_dual_read_query(Docket, d_pk), user_id=user_pk
+        )
         .only("notes")
         .first()
     )
