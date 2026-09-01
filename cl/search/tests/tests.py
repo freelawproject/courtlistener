@@ -1936,7 +1936,10 @@ class OpinionSearchFunctionalTest(BaseSeleniumTest):
     @override_flag("store-search-queries", active=True)
     @override_settings(WAFFLE_CACHE_PREFIX="test_opinion_search_functions")
     def test_basic_homepage_search_and_signin_and_signout(self) -> None:
-        wait = WebDriverWait(self.browser, 1)
+        # Every lookup below is for something that should be there, so budget
+        # the same as the rest of the suite. A one second budget passes only on
+        # a machine that never hesitates.
+        wait = WebDriverWait(self.browser, SELENIUM_TIMEOUT)
 
         # Dora navigates to the CL website.
         self.browser.get(self.live_server_url)
