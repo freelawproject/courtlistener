@@ -1,6 +1,7 @@
 """Storage utilities for moving from the private bucket to the public one."""
 
 import logging
+from enum import Enum, auto
 from typing import Any, cast
 
 from botocore.exceptions import BotoCoreError, ClientError
@@ -20,6 +21,15 @@ PUBLISHED_PREFIX: str = (
     f"us/state/{NY_STATE_CODE}/{NYCOA_COURT_ID}/"
     f"gov.{NY_STATE_CODE}.{NYCOA_COURT_ID}."
 )
+
+ABSENT_SOURCE: frozenset[str] = frozenset({"NoSuchKey", "NoSuchBucket", "404"})
+
+class PublishOutcome(Enum):
+    """What became of one attempt to move a file into the public bucket."""
+
+    PUBLISHED = auto()
+    MISSING = auto()
+    FAILED = auto()
 
 
 def is_published(path: str) -> bool:
@@ -51,7 +61,7 @@ def _document_storage() -> S3Storage:
 
 def copy_file(
     private_key: str, published_key: str, content_type: str = ""
-) -> bool:
+) -> PublishOutcome:
     """Copy a scraped file from the private bucket into the public one.
 
     The copy is server-side, and `published_key` is deterministic, so a file
@@ -69,9 +79,9 @@ def copy_file(
     :param published_key: The key to publish it under.
     :param content_type: The MIME type to serve the file as. Left to S3's
         default when the scrape stated none.
-    :return: Whether the file is now published. `False` is logged, and the
-        caller must not store `published_key` for a document whose file is not
-        there.
+    :return: Whether the file is now published, and if not, why not. Anything
+        other than `PublishOutcome.PUBLISHED` is logged, and the caller must
+        not store `published_key` for a document whose file is not there.
     """
     storage = _document_storage()
     params: dict[str, Any] = dict(storage.get_object_parameters(published_key))
@@ -94,7 +104,7 @@ def copy_file(
             MetadataDirective="REPLACE",
             **params,
         )
-    except (BotoCoreError, ClientError):
+    except (BotoCoreError, ClientError) as error:
         if storage.exists(published_key):
             logger.info(
                 "Court-PASS file %s is already published as %s; nothing left "
@@ -102,14 +112,30 @@ def copy_file(
                 private_key,
                 published_key,
             )
-            return True
+            return PublishOutcome.PUBLISHED
         logger.exception(
             "Could not publish Court-PASS file %s to %s.",
             private_key,
             published_key,
         )
+        return (
+            PublishOutcome.MISSING
+            if _source_absent(error)
+            else PublishOutcome.FAILED
+        )
+    return PublishOutcome.PUBLISHED
+
+
+def _source_absent(error: BotoCoreError | ClientError) -> bool:
+    """Whether a failed copy failed because there was nothing at the source.
+
+    :param error: What the copy raised.
+    :return: Whether the private bucket holds no such key.
+    """
+    if not isinstance(error, ClientError):
         return False
-    return True
+    code = error.response.get("Error", {}).get("Code", "")
+    return str(code) in ABSENT_SOURCE
 
 
 def discard_private_file(private_key: str) -> None:

@@ -54,6 +54,7 @@ from cl.corpus_importer.state.new_york.nycourts_gov import (
 )
 from cl.corpus_importer.state.new_york.storage import (
     PUBLISHED_PREFIX,
+    PublishOutcome,
     copy_file,
     discard_private_file,
     is_published,
@@ -67,7 +68,7 @@ from cl.corpus_importer.state.new_york.utils import (
     make_docket_number_core,
     mirrored_code,
 )
-from cl.corpus_importer.state.utils import MergeResult
+from cl.corpus_importer.state.utils import NO_FILES, FileTally, MergeResult
 from cl.people_db.models import Attorney, Party, PartyType, Role
 from cl.recap.mergers import find_docket_object_query
 from cl.search.models import Docket
@@ -198,17 +199,25 @@ class NYCoADocumentMerger[ParamType](
     def merge_one(self) -> tuple[MergeResult[Any], NYCoADocument | None]:
         """Publish the file, then write the document once.
 
-        :return: The merge result and the merged document, unchanged.
+        :return: The merge result, carrying what became of the file, and the
+            merged document.
         """
-        self.publish()
-        return super().merge_one()
+        published = self.publish()
+        result, document = super().merge_one()
+        return result | MergeResult(files=published), document
 
-    def publish(self) -> None:
+    def publish(self) -> FileTally:
         """Move the scraped file into the bucket CourtListener serves, and
-        rewrite the path the merge is about to store to say so."""
+        rewrite the path the merge is about to store to say so.
+
+        :return: What became of the file, for the load's report to add up.
+            Empty where there was no move to make: a scrape that reports no
+            file, one already published, and one this document has already
+            been through are all nothing to count.
+        """
         private_key = self.scrape.local_path
         if not private_key or is_published(private_key):
-            return
+            return NO_FILES
         if not is_scraped(private_key):
             logger.error(
                 "Court-PASS names %s a file at %s, which is in neither the "
@@ -217,7 +226,7 @@ class NYCoADocumentMerger[ParamType](
                 private_key,
             )
             self.transformed["filepath_local"] = ""
-            return
+            return FileTally(missing=1)
 
         naming = NYCoADocument(
             docket_entry=cast(NYCoADocketEntry, self.params.parent),
@@ -229,15 +238,20 @@ class NYCoADocumentMerger[ParamType](
             if existing.filepath_local.name == published_key:
                 # Already moved, on the merge that first saw this file.
                 self.transformed["filepath_local"] = published_key
-                return
+                return NO_FILES
 
-        if not copy_file(
+        match copy_file(
             private_key, published_key, self.transformed["content_type"]
         ):
-            self.transformed["filepath_local"] = ""
-            return
+            case PublishOutcome.MISSING:
+                self.transformed["filepath_local"] = ""
+                return FileTally(missing=1)
+            case PublishOutcome.FAILED:
+                self.transformed["filepath_local"] = ""
+                return FileTally(failed=1)
         transaction.on_commit(partial(discard_private_file, private_key))
         self.transformed["filepath_local"] = published_key
+        return FileTally(moved=1)
 
     @override
     def needs_update(self) -> bool:

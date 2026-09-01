@@ -3,7 +3,7 @@
 from datetime import date
 from unittest.mock import MagicMock, patch
 
-from botocore.exceptions import ClientError
+from botocore.exceptions import BotoCoreError, ClientError
 from django.conf import settings
 from django.db import connection
 from django.test.utils import CaptureQueriesContext
@@ -30,12 +30,13 @@ from cl.corpus_importer.state.new_york.nycourts_gov import NYCoACase
 from cl.corpus_importer.state.new_york.storage import (
     PRIVATE_PREFIX,
     PUBLISHED_PREFIX,
+    PublishOutcome,
     copy_file,
     discard_private_file,
     withdraw_file,
 )
 from cl.corpus_importer.state.tests import merger_test
-from cl.corpus_importer.state.utils import MergeResult
+from cl.corpus_importer.state.utils import FileTally, MergeResult
 from cl.lib.model_helpers import make_pdf_path
 from cl.people_db.models import Attorney, Party, PartyType, Role
 from cl.search.factories import CourtFactory, DocketFactory
@@ -59,14 +60,14 @@ class NYCoAMergerTestCase(TestCase):
     Stands in for S3 throughout: publishing a document moves its file between
     buckets, so every merge that touches a file would otherwise reach for the
     network. `published`, `discarded` and `withdrawn` record what the merge
-    asked for, and `publish_fails` makes the copy report failure the way one
-    the bucket refused would.
+    asked for, and `publish_outcome` makes the copy report whichever way of
+    failing a test is after.
     """
 
     published: list[tuple[str, str]]
     discarded: list[str]
     withdrawn: list[str]
-    publish_fails: bool
+    publish_outcome: PublishOutcome
 
     @classmethod
     def setUpTestData(cls) -> None:
@@ -77,15 +78,15 @@ class NYCoAMergerTestCase(TestCase):
         self.published = []
         self.discarded = []
         self.withdrawn = []
-        self.publish_fails = False
+        self.publish_outcome = PublishOutcome.PUBLISHED
 
         def copy_file(
             private_key: str, published_key: str, content_type: str = ""
-        ) -> bool:
-            if self.publish_fails:
-                return False
+        ) -> PublishOutcome:
+            if self.publish_outcome is not PublishOutcome.PUBLISHED:
+                return self.publish_outcome
             self.published.append((private_key, published_key))
-            return True
+            return PublishOutcome.PUBLISHED
 
         for name, double in (
             ("copy_file", copy_file),
@@ -1299,8 +1300,9 @@ class NYCoAStorageTest(SimpleTestCase):
     def test_copy_describes_how_the_file_should_be_served(self) -> None:
         """Does the copy land in the public bucket with the ACL, cache headers
         and content type a file served from there needs?"""
-        self.assertTrue(
-            copy_file(self.PRIVATE_KEY, self.PUBLISHED_KEY, "application/pdf")
+        self.assertIs(
+            copy_file(self.PRIVATE_KEY, self.PUBLISHED_KEY, "application/pdf"),
+            PublishOutcome.PUBLISHED,
         )
 
         self.client.copy_object.assert_called_once_with(
@@ -1336,7 +1338,34 @@ class NYCoAStorageTest(SimpleTestCase):
         """A copy that did not happen must not be reported as published."""
         self.client.copy_object.side_effect = self.refusal()
 
-        self.assertFalse(copy_file(self.PRIVATE_KEY, self.PUBLISHED_KEY))
+        self.assertIs(
+            copy_file(self.PRIVATE_KEY, self.PUBLISHED_KEY),
+            PublishOutcome.FAILED,
+        )
+
+    def test_copy_reports_a_source_that_is_not_there(self) -> None:
+        """A file the private bucket does not hold will not appear on a
+        re-run, unlike one the bucket refused, so a load has to be able to
+        tell the two apart. Is the difference read off the error the copy
+        already raised, rather than by asking the bucket again?"""
+        self.client.copy_object.side_effect = self.missing_source()
+
+        self.assertIs(
+            copy_file(self.PRIVATE_KEY, self.PUBLISHED_KEY),
+            PublishOutcome.MISSING,
+        )
+        self.client.head_object.assert_not_called()
+
+    def test_copy_reports_a_bare_failure_as_a_refusal(self) -> None:
+        """A `BotoCoreError` never got an answer out of S3, so it says nothing
+        about whether the file is there. Is it counted as the retriable kind
+        rather than blamed on a missing source?"""
+        self.client.copy_object.side_effect = BotoCoreError()
+
+        self.assertIs(
+            copy_file(self.PRIVATE_KEY, self.PUBLISHED_KEY),
+            PublishOutcome.FAILED,
+        )
 
     def test_copy_accepts_a_file_that_is_already_published(self) -> None:
         """The move deletes the original, so a merge that published a file and
@@ -1346,7 +1375,10 @@ class NYCoAStorageTest(SimpleTestCase):
         self.client.copy_object.side_effect = self.missing_source()
         self.storage.exists.return_value = True
 
-        self.assertTrue(copy_file(self.PRIVATE_KEY, self.PUBLISHED_KEY))
+        self.assertIs(
+            copy_file(self.PRIVATE_KEY, self.PUBLISHED_KEY),
+            PublishOutcome.PUBLISHED,
+        )
         self.storage.exists.assert_called_once_with(self.PUBLISHED_KEY)
 
     def test_discard_deletes_from_the_private_bucket(self) -> None:
@@ -1453,7 +1485,7 @@ class NYCoADocumentPublishTest(NYCoAMergerTestCase):
         than a path into a bucket `filepath_local` is never read against. The
         original is still in the private bucket, so the next merge of the case
         tries again."""
-        self.publish_fails = True
+        self.publish_outcome = PublishOutcome.FAILED
         case = self.case_with_files(
             NYCoAFileFactory.create(
                 file_name="SmithvJones-app-Smith-brf.pdf",
@@ -1470,6 +1502,82 @@ class NYCoADocumentPublishTest(NYCoAMergerTestCase):
         self.assertEqual(NYCoADocument.objects.get().filepath_local, "")
         self.assertEqual(
             self.discarded, [], "The only copy of the file has to survive."
+        )
+
+    def test_a_moved_file_is_tallied(self) -> None:
+        """The load has no way of its own to see a file move, since the merge
+        that moves it runs in a worker. Does the result carry the count back?"""
+        case = self.case_with_files(
+            NYCoAFileFactory.create(
+                file_name="SmithvJones-app-Smith-brf.pdf",
+                local_path=f"{PRIVATE_PREFIX}brf.pdf",
+            )
+        )
+
+        with self.captureOnCommitCallbacks(execute=True):
+            result = NYCoADocketMerger(case, params=None).merge()
+
+        self.assertEqual(result.files, FileTally(moved=1))
+
+    def test_a_file_that_could_not_be_moved_is_tallied_apart_from_a_missing_one(
+        self,
+    ) -> None:
+        """A file the bucket refused is worth re-running the load over and one
+        that was never there is not, so the two cannot be reported as one
+        number. Does each land in its own count?"""
+        for outcome, expected in (
+            (PublishOutcome.FAILED, FileTally(failed=1)),
+            (PublishOutcome.MISSING, FileTally(missing=1)),
+        ):
+            with self.subTest(outcome=outcome):
+                self.publish_outcome = outcome
+                case = self.case_with_files(
+                    NYCoAFileFactory.create(
+                        file_name="SmithvJones-app-Smith-brf.pdf",
+                        local_path=f"{PRIVATE_PREFIX}brf.pdf",
+                    )
+                )
+
+                with self.captureOnCommitCallbacks(execute=True):
+                    result = NYCoADocketMerger(case, params=None).merge()
+
+                self.assertEqual(result.files, expected)
+                NYCoADocument.objects.all().delete()
+
+    def test_a_file_outside_either_bucket_is_tallied_as_missing(self) -> None:
+        """A path in neither layout is a file publishing cannot even look for.
+        Is it counted with the ones the bucket did not hold, since neither will
+        appear on a re-run?"""
+        case = self.case_with_files(
+            NYCoAFileFactory.create(
+                file_name="SmithvJones-app-Smith-brf.pdf",
+                local_path="/tmp/brf.pdf",
+            )
+        )
+
+        with self.captureOnCommitCallbacks(execute=True):
+            result = NYCoADocketMerger(case, params=None).merge()
+
+        self.assertEqual(result.files, FileTally(missing=1))
+        self.assertEqual(self.published, [], "There was nothing to copy.")
+
+    def test_a_file_already_published_is_not_tallied_again(self) -> None:
+        """The tally is what a run moved, so re-merging an unchanged case has
+        to add nothing to it. Does a second merge count no files?"""
+        case = self.case_with_files(
+            NYCoAFileFactory.create(
+                file_name="SmithvJones-app-Smith-brf.pdf",
+                local_path=f"{PRIVATE_PREFIX}brf.pdf",
+            )
+        )
+        with self.captureOnCommitCallbacks(execute=True):
+            NYCoADocketMerger(case, params=None).merge()
+
+        with self.captureOnCommitCallbacks(execute=True):
+            result = NYCoADocketMerger(case, params=None).merge()
+
+        self.assertFalse(
+            result.files, f"Counted a move that did not happen: {result.files}"
         )
 
     @merger_test(expected_query_count=30)
