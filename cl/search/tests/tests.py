@@ -23,7 +23,13 @@ from django.utils.timezone import now
 from elasticsearch.dsl import Q
 from factory import RelatedFactory
 from lxml import html
+from selenium.common.exceptions import (
+    NoSuchElementException,
+    StaleElementReferenceException,
+    TimeoutException,
+)
 from selenium.webdriver.common.by import By
+from selenium.webdriver.remote.webelement import WebElement
 from selenium.webdriver.support import expected_conditions as EC
 from selenium.webdriver.support.wait import WebDriverWait
 from timeout_decorator import timeout_decorator
@@ -1684,6 +1690,46 @@ class OpinionSearchFunctionalTest(BaseSeleniumTest):
         result_count = self.browser.find_element(By.ID, "result-count")
         self.assertIn("Opinions", result_count.text)
 
+    def _get_opinion_tab(self, label: str) -> WebElement:
+        """Find a tab in the opinion detail page's tab bar by its label.
+
+        :param label: The tab's label, e.g. "Cited By". Non-breaking spaces in
+            the rendered label are matched by a regular space.
+        :return: The tab's link element.
+        """
+        return self.browser.find_element(
+            By.XPATH,
+            "//ul[contains(@class, 'nav-tabs')]//li"
+            f"//a[contains(translate(., '\u00a0', ' '), '{label}')]",
+        )
+
+    def _get_opinion_tab_count(self, label: str) -> int:
+        """Return the count shown on an opinion tab, e.g. 13 for "Cited By (13)".
+
+        :param label: The tab's label, e.g. "Cited By".
+        :return: The count displayed on the tab.
+        :raises AssertionError: If no count appears before the Selenium timeout.
+        """
+        try:
+            match = WebDriverWait(
+                self.browser,
+                SELENIUM_TIMEOUT,
+                # The tab goes stale while htmx swaps the bar out from under us.
+                ignored_exceptions=(
+                    NoSuchElementException,
+                    StaleElementReferenceException,
+                ),
+            ).until(
+                lambda _: re.search(
+                    r"\((\d+)\)", self._get_opinion_tab(label).text
+                )
+            )
+        except TimeoutException:
+            self.fail(
+                f'"{label}" tab text must contain a number in parentheses (e.g., "(13)")'
+            )
+        return int(match.group(1))
+
     def test_query_cleanup_integration(self) -> None:
         # Dora goes to CL and performs a Search using a numbered citation
         # (e.g. "12-9238" or "3:18-cv-2383")
@@ -1748,8 +1794,9 @@ class OpinionSearchFunctionalTest(BaseSeleniumTest):
     def test_opinion_search_result_detail_page(self) -> None:
         # Dora navigates to CL and does a simple wild card search
         self.browser.get(self.live_server_url)
-        self.browser.find_element(By.ID, "id_q").send_keys("voutila")
-        self.browser.find_element(By.ID, "id_q").submit()
+        searchbox = self.browser.find_element(By.ID, "id_q")
+        searchbox.send_keys("voutila")
+        searchbox.submit()
 
         # Seeing an Opinion immediately on the first page of results, she
         # wants more details so she clicks the title and drills into the result
@@ -1782,23 +1829,13 @@ class OpinionSearchFunctionalTest(BaseSeleniumTest):
         )
 
         # Verify "Cited By" tab exists and it has a count on it
-        cited_by_tab = self.browser.find_element(
-            By.XPATH,
-            '//ul[contains(@class, "nav-tabs")]//li//a[contains(., "Cited\u00a0By")]',
-        )
-        self.assertIsNotNone(cited_by_tab, "'Cited By' tab does not exist")
-        cited_by_count = re.search(r"\((\d+)\)", cited_by_tab.text)
-        self.assertIsNotNone(
-            cited_by_count,
-            '"Cited By" tab text must contain a number in parentheses (e.g., "(13)")',
-        )
-        cited_by_count = int(cited_by_count.group(1))
+        cited_by_count = self._get_opinion_tab_count("Cited By")
         self.assertGreaterEqual(
             cited_by_count, 1, f"Wrong Cited By count: {cited_by_count}"
         )
 
         # Go to cited by page and verify we loaded it correctly and then go back to main page
-        cited_by_tab.click()
+        self._get_opinion_tab("Cited By").click()
         section_title = self.browser.find_element(
             By.CSS_SELECTOR, ".opinion-section-title"
         )
@@ -1818,19 +1855,7 @@ class OpinionSearchFunctionalTest(BaseSeleniumTest):
         self.browser.back()
 
         # Verify "Authorities" tab exists and it has a count on it
-        authorities_tab = self.browser.find_element(
-            By.XPATH,
-            '//ul[contains(@class, "nav-tabs")]//li//a[contains(., "Authorities")]',
-        )
-        self.assertIsNotNone(
-            authorities_tab, "'Authorities' tab does not exist"
-        )
-        authorities_count = re.search(r"\((\d+)\)", authorities_tab.text)
-        self.assertIsNotNone(
-            authorities_count,
-            '"Authorities" tab text must contain a number in parentheses (e.g., "(13)")',
-        )
-        authorities_count = int(authorities_count.group(1))
+        authorities_count = self._get_opinion_tab_count("Authorities")
         self.assertGreaterEqual(
             authorities_count,
             1,
@@ -1838,7 +1863,7 @@ class OpinionSearchFunctionalTest(BaseSeleniumTest):
         )
 
         # Go to authorities page and verify we loaded it correctly and then go back to main page
-        authorities_tab.click()
+        self._get_opinion_tab("Authorities").click()
         section_title = self.browser.find_element(
             By.CSS_SELECTOR, ".opinion-section-title"
         )
