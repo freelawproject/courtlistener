@@ -30,6 +30,11 @@ from cl.corpus_importer.state.loader import (
     WaitOutcome,
 )
 from cl.corpus_importer.state.new_york.loader import NYCoACourtPassLoader
+from cl.corpus_importer.state.new_york.storage import (
+    PRIVATE_PREFIX,
+    PublishOutcome,
+)
+from cl.corpus_importer.state.utils import FileTally
 from cl.lib.redis_utils import get_redis_interface
 from cl.people_db.models import Party
 from cl.search.factories import CourtFactory
@@ -44,6 +49,11 @@ from cl.tests.cases import TestCase
 
 DOCKET_NUMBER = "APL-2024-00177"
 DOCKET_NUMBER_CORE = "apl202400177"
+
+#: Where the scraper leaves a downloaded file. A merge publishes only what
+#: sits under the private prefix, so a run fixture whose path is anything else
+#: writes documents with no file at all and nothing to extract.
+PRIVATE_PATH = f"{PRIVATE_PREFIX}nycourts_gov/{DOCKET_NUMBER}_brief_0.pdf"
 
 
 def _run_database(path: Path, rows: list[tuple[str, dict]]) -> None:
@@ -118,7 +128,16 @@ FILE = {
 
 
 class NYCoALoaderTest(TestCase):
-    """Tests for turning a Court-PASS run database into merged dockets."""
+    """Tests for turning a Court-PASS run database into merged dockets.
+
+    Stands in for S3 as well as for the extraction queue: a merge moves each
+    file it writes a document for out of the private bucket, so a load run
+    against a real storage backend would reach for the network once per file.
+    `publish_outcome` makes the copy report whichever way of failing a test is
+    after.
+    """
+
+    publish_outcome: PublishOutcome
 
     @classmethod
     def setUpTestData(cls) -> None:
@@ -131,10 +150,25 @@ class NYCoALoaderTest(TestCase):
         extraction = patch("cl.scrapers.tasks.extract_formatted_text_document")
         self.extraction = extraction.start()
         self.addCleanup(extraction.stop)
+        self.publish_outcome = PublishOutcome.PUBLISHED
+        self.stub_storage()
         self.key = f"state_scrape_load:test:{self.id()}"
         self.redis = get_redis_interface("CACHE")
         self.clear_run_keys()
         self.addCleanup(self.clear_run_keys)
+
+    def stub_storage(self) -> None:
+        """Keep the merges' file moves off the network."""
+        for name, double in (
+            ("copy_file", lambda *_args, **_kw: self.publish_outcome),
+            ("discard_private_file", lambda *_args: None),
+            ("withdraw_file", lambda *_args: None),
+        ):
+            patcher = patch(
+                f"cl.corpus_importer.state.new_york.mergers.{name}", double
+            )
+            patcher.start()
+            self.addCleanup(patcher.stop)
 
     def clear_run_keys(self) -> None:
         """Take away the run's checkpoint and every part of its ledger."""
@@ -178,7 +212,7 @@ class NYCoALoaderTest(TestCase):
                     "NYCourtPassDocket",
                     _docket(docket_entries=[ENTRY], files=[FILE]),
                 ),
-                ("NYCourtPassFile", FILE | {"local_path": "/tmp/brief.pdf"}),
+                ("NYCourtPassFile", FILE | {"local_path": PRIVATE_PATH}),
             ]
         )
 
@@ -192,7 +226,7 @@ class NYCoALoaderTest(TestCase):
         self.assertEqual(entry.attachments[0].doc_type, FilingDocType.BRIEF)
         self.assertEqual(
             entry.attachments[0].local_path,
-            "/tmp/brief.pdf",
+            PRIVATE_PATH,
             "The download record's local path is joined onto the file.",
         )
 
@@ -647,7 +681,7 @@ class NYCoALoaderTest(TestCase):
                     "NYCourtPassDocket",
                     _docket(docket_entries=[ENTRY], files=[FILE]),
                 ),
-                ("NYCourtPassFile", FILE | {"local_path": "/tmp/brief.pdf"}),
+                ("NYCourtPassFile", FILE | {"local_path": PRIVATE_PATH}),
             ],
         )
 
@@ -807,6 +841,135 @@ class NYCoALoaderTest(TestCase):
             extraction.abandoned,
             "Nothing says these will not be extracted; the load just stopped "
             "watching.",
+        )
+
+    def test_reports_the_files_the_run_moved(self) -> None:
+        """Only the workers see a file move, so a load has no way to know what
+        became of one except by what the merges wrote down. Does the count
+        reach the report?"""
+        self._run_holding_one_document()
+
+        report = self.loader().load()
+
+        self.assertEqual(report.files, FileTally(moved=1))
+
+    def test_reports_the_files_the_run_could_not_move(self) -> None:
+        """A file that never reached the public bucket leaves a document with
+        nothing to serve, which no other count in the report would show. Are
+        the two ways of failing reported apart, so a reader knows whether
+        re-running the load would mend it?"""
+        self._run_holding_one_document()
+        for outcome, expected in (
+            (PublishOutcome.FAILED, FileTally(failed=1)),
+            (PublishOutcome.MISSING, FileTally(missing=1)),
+        ):
+            with self.subTest(outcome=outcome):
+                self.clear_run_keys()
+                self.publish_outcome = outcome
+
+                report = self.loader().load()
+
+                self.assertEqual(report.merged, 1)
+                self.assertEqual(report.files, expected)
+                self.assertEqual(
+                    report.files.unpublished,
+                    1,
+                    "Neither kind is a file CourtListener can serve.",
+                )
+                Docket.objects.all().delete()
+
+    def test_unmoved_files_get_their_own_sentry_issue(self) -> None:
+        """A file stuck in the private bucket is a different problem from a
+        merge that failed -- the merge succeeded. Is it filed on its own?"""
+        self.publish_outcome = PublishOutcome.FAILED
+        self._run_holding_one_document()
+        logging.disable(logging.NOTSET)
+        self.addCleanup(logging.disable)
+
+        with self.assertLogs(
+            "cl.corpus_importer.state.loader", "ERROR"
+        ) as logs:
+            report = self.loader().load()
+
+        self.assertEqual(report.files, FileTally(failed=1))
+        self.assertEqual(
+            [record.fingerprint for record in logs.records],  # type: ignore[attr-defined]
+            [["nycoa", LoadPhase.PUBLISHING]],
+            "The merges themselves were clean; only the copy was not.",
+        )
+
+    def test_a_run_that_moved_nothing_reports_no_files(self) -> None:
+        """A docket with no files to move must not read as a run whose files
+        all failed. Is an empty tally left empty?"""
+        _run_database(self.database, [("NYCourtPassDocket", _docket())])
+
+        report = self.loader().load()
+
+        self.assertEqual(report.merged, 1)
+        self.assertFalse(report.files)
+
+    def test_file_counts_survive_into_a_verify_only_pass(self) -> None:
+        """`--skip-load` reads the ledger and never opens the run database, so
+        anything the merges reported has to be in Redis rather than in the
+        loading process. Are the file counts still there?"""
+        self._run_holding_one_document()
+        self.loader().load()
+
+        report = self.loader().verify_only()
+
+        self.assertFalse(report.rows_read)
+        self.assertEqual(report.files, FileTally(moved=1))
+
+    def test_a_resumed_load_adds_to_the_file_counts_it_left(self) -> None:
+        """A load picked up with `--auto-resume` keeps its predecessor's
+        ledger. Do the file counts add up across the two attempts rather than
+        starting over?"""
+        _run_database(
+            self.database,
+            [
+                (
+                    "NYCourtPassDocket",
+                    _docket(
+                        docket_number="APL-2024-00001",
+                        docket_entries=[ENTRY],
+                        files=[FILE],
+                    ),
+                ),
+                (
+                    "NYCourtPassDocket",
+                    _docket(
+                        docket_number="APL-2024-00002",
+                        docket_entries=[ENTRY],
+                        files=[FILE],
+                    ),
+                ),
+                (
+                    "NYCourtPassFile",
+                    FILE
+                    | {
+                        "docket_number": "APL-2024-00001",
+                        "local_path": PRIVATE_PATH,
+                    },
+                ),
+                (
+                    "NYCourtPassFile",
+                    FILE
+                    | {
+                        "docket_number": "APL-2024-00002",
+                        "local_path": f"{PRIVATE_PATH}2",
+                    },
+                ),
+            ],
+        )
+        first = self.loader(limit=1).load()
+        self.assertEqual(first.files, FileTally(moved=1))
+
+        second = self.loader(start_row=1).load()
+
+        self.assertEqual(
+            second.files,
+            FileTally(moved=2),
+            "The ledger spans the run, not the pass over it.",
         )
 
     def test_a_load_dispatching_no_extraction_checks_none(self) -> None:
