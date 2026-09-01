@@ -29,6 +29,7 @@ from cl.corpus_importer.state.new_york.nycourts_gov import (
     NYCoAParty,
     NYCoDocketEntry,
 )
+from cl.corpus_importer.state.new_york.storage import PRIVATE_PREFIX
 from cl.corpus_importer.state.new_york.utils import NYCOA_COURT_ID
 from cl.tests.providers import LegalProvider
 
@@ -141,7 +142,10 @@ class NYCoAFileFactory(Factory):
     doc_role = FilingRole.APPELLANT
     doc_party = "Smith"
     doc_type = FilingDocType.BRIEF
-    local_path = Sequence(lambda n: f"/tmp/nycoa/{n}.pdf")
+    local_path = Sequence(
+        lambda n: f"{PRIVATE_PREFIX}nycourts_gov/"
+        f"APL-2024-00177_smithvjones-app-smith{n}-brf_1.pdf"
+    )
 
 
 class NYCoAIssueFactory(Factory):

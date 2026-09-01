@@ -1,5 +1,6 @@
 """Models unique to New York Court of Appeals (Court-PASS) dockets."""
 
+from pathlib import PurePosixPath
 from typing import Self
 
 import pghistory
@@ -300,13 +301,15 @@ class NYCoADocument(AbstractDateTimeModel, AbstractStateDocument):
             )
 
     def make_filename(self) -> str:
-        """Build the stored filename from this document's ID and file name.
+        """The name to store this document's content under.
 
-        Overridden because the base implementation derives the name from `url`,
-        which is one shared POST endpoint for all of Court-PASS and so would
-        name every document identically.
+        Overridden because the base implementation derives the name from
+        `url`, which is one shared POST endpoint for all of Court-PASS and so
+        would name every document identically.
+
+        :return: The base name of the stored path with file type suffix.
         """
-        return f"{self.pk}-{self.file_name}"
+        return PurePosixPath(self.filepath_local.name or "").name
 
     @classmethod
     def tmp_prefix(cls) -> str:
@@ -354,7 +357,14 @@ class NYCoADocument(AbstractDateTimeModel, AbstractStateDocument):
         ]
 
     def get_pdf_path(self, filename: str, thumbs: bool = False) -> str:
-        """Store Court-PASS documents under the shared state layout."""
+        """Store Court-PASS documents under the shared state layout.
+
+        :param filename: The name to file the document under, which for
+            Court-PASS is `make_filename`'s.
+        :param thumbs: Whether to return the thumbnail path instead.
+        :return: The path to store the document at, relative to the bucket
+            root.
+        """
         return self.state_pdf_path(
             "ny", self.docket_entry.docket.court_id, filename, thumbs
         )
