@@ -454,6 +454,7 @@ dev = [
     { name = "types-redis" },
     { name = "types-requests" },
     { name = "types-simplejson" },
+    { name = "unittest-xml-reporting" },
 ]
 
 [package.metadata]
@@ -572,6 +573,7 @@ dev = [
     { name = "types-redis", specifier = ">=4.6.0.20241004" },
     { name = "types-requests", specifier = ">=2.33.0.20260518" },
     { name = "types-simplejson", specifier = ">=3.20.0.20250822" },
+    { name = "unittest-xml-reporting", specifier = ">=4.0.0" },
 ]
 
 [[package]]
@@ -3548,6 +3550,18 @@ source = { registry = "https://pypi.org/simple" }
 sdist = { url = "https://files.pythonhosted.org/packages/94/7d/a8a765761bbc0c836e397a2e48d498305a865b70a8600fd7a942e85dcf63/Unidecode-1.4.0.tar.gz", hash = "sha256:ce35985008338b676573023acc382d62c264f307c8f7963733405add37ea2b23", size = 200149, upload-time = "2025-04-24T08:45:03.798Z" }
 wheels = [
     { url = "https://files.pythonhosted.org/packages/8f/b7/559f59d57d18b44c6d1250d2eeaa676e028b9c527431f5d0736478a73ba1/Unidecode-1.4.0-py3-none-any.whl", hash = "sha256:c3c7606c27503ad8d501270406e345ddb480a7b5f38827eafe4fa82a137f0021", size = 235837, upload-time = "2025-04-24T08:45:01.609Z" },
+]
+
+[[package]]
+name = "unittest-xml-reporting"
+version = "4.0.0"
+source = { registry = "https://pypi.org/simple" }
+dependencies = [
+    { name = "lxml" },
+]
+sdist = { url = "https://files.pythonhosted.org/packages/42/6b/5847d0e6e95d08e056f23b3f8cd95bede2d3ade10a1c1a9d5b50916454e1/unittest_xml_reporting-4.0.0.tar.gz", hash = "sha256:bfa1ed65e9e6f33c161d04470d89050458cfb65a5a5d0358834ef7ce037d9136", size = 43152, upload-time = "2026-01-07T15:50:58.983Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/fe/5d/18d3c571c3a842a0ffbc4ad04637646a991d05eb3eab412b5226bbdbf294/unittest_xml_reporting-4.0.0-py2.py3-none-any.whl", hash = "sha256:e3e24bac8ea27c454d8be1d718851b2c5c8f712d75281920b6af81bdfef2f9bc", size = 20298, upload-time = "2026-01-07T15:50:57.222Z" },
 ]
 
 [[package]]
