@@ -178,7 +178,7 @@ class UserCreationFormExtended(UserCreationForm, CleanEmailMixin):
             {"autocomplete": "family-name", "required": True}
         )
 
-    class Meta:
+    class Meta(UserCreationForm.Meta):
         model = User
         fields = (
             "username",
@@ -186,6 +186,10 @@ class UserCreationFormExtended(UserCreationForm, CleanEmailMixin):
             "first_name",
             "last_name",
         )
+        # Django's own Meta maps username to UsernameField, which normalizes
+        # the value to NFKC. This form has always built username as a plain
+        # CharField, so reset the mapping rather than inherit it.
+        field_classes = {}
 
     def clean_first_name(self):
         first_name = self.cleaned_data.get("first_name")
