@@ -16,7 +16,7 @@ from typing import Any, Final
 from django.utils import timezone
 from redis import Redis
 
-from cl.corpus_importer.state.utils import MergeResult
+from cl.corpus_importer.state.utils import NO_FILES, FileTally, MergeResult
 from cl.lib.redis_utils import get_redis_interface
 
 logger = logging.getLogger(__name__)
@@ -28,6 +28,12 @@ themselves out."""
 
 PARTS: Final = ("pending", "counts", "creates", "updates", "started")
 """Every key a ledger writes, for `clear` to take away together."""
+
+FILE_COUNTS: Final = {
+    "moved": "files_moved",
+    "missing": "files_missing",
+    "failed": "files_failed",
+}
 
 
 @dataclass(frozen=True)
@@ -45,6 +51,8 @@ class LedgerTotals:
     :ivar documents: Documents sent to the extraction queue.
     :ivar creates: Objects created, counted per model name.
     :ivar updates: Objects updated, counted per model name.
+    :ivar files: What the run's merges did with the scraped files they had to
+        publish. See `cl.corpus_importer.state.utils.FileTally`.
     """
 
     dispatched: int = 0
@@ -54,6 +62,7 @@ class LedgerTotals:
     documents: int = 0
     creates: dict[str, int] = field(default_factory=dict)
     updates: dict[str, int] = field(default_factory=dict)
+    files: FileTally = NO_FILES
 
     @property
     def failed(self) -> int:
@@ -129,7 +138,7 @@ class LoadLedger:
             pipeline.execute()
         except Exception:
             logger.exception("Could not dispatch row %s to %s", row, self.key)
-        self._count("dispatched")
+        self._count(dispatched=1)
 
     def merged(self, row: int, result: MergeResult[Any]) -> None:
         """Record that `row` merged cleanly, and what its merge wrote.
@@ -165,7 +174,7 @@ class LoadLedger:
         :param documents: How many went to the extraction queue.
         """
         if documents:
-            self._count("documents", documents)
+            self._count(documents=documents)
 
     def outstanding_count(self) -> int:
         """How many dispatched rows are pending an outcome.
@@ -216,6 +225,12 @@ class LoadLedger:
             documents=int(counts.get("documents", 0)),
             creates={model: int(n) for model, n in creates.items()},
             updates={model: int(n) for model, n in updates.items()},
+            files=FileTally(
+                **{
+                    attribute: int(counts.get(field_name, 0))
+                    for attribute, field_name in FILE_COUNTS.items()
+                }
+            ),
         )
 
     def _settle(
@@ -226,19 +241,22 @@ class LoadLedger:
             self._redis.hdel(self._name("pending"), str(row))
         except Exception:
             logger.exception("Could not settle row %s of %s", row, self.key)
-        self._count(outcome)
+        counts = {outcome: 1}
+        if result is not None:
+            counts |= _file_counts(result.files)
+        self._count(**counts)
         if result is None:
             return
-        for part, counts in (
+        for part, models in (
             ("creates", result.creates),
             ("updates", result.updates),
         ):
-            if not counts:
+            if not models:
                 continue
             try:
                 name = self._name(part)
                 pipeline = self._redis.pipeline()
-                for model, pks in counts.items():
+                for model, pks in models.items():
                     pipeline.hincrby(name, model, len(pks))
                 pipeline.expire(name, self.ttl)
                 pipeline.execute()
@@ -247,15 +265,42 @@ class LoadLedger:
                     "Could not count %s against %s", part, self.key
                 )
 
-    def _count(self, field_name: str, by: int = 1) -> None:
-        """Add to one of the run's counters, and keep it alive."""
+    def _count(self, **counts: int) -> None:
+        """Add to the run's counters, and keep them alive.
+
+        :param counts: Field in the `counts` hash to how much to add to it.
+            Sent as one pipeline, since every counter a call is given lives in
+            the same hash.
+        """
+        if not counts:
+            return
         try:
             name = self._name("counts")
             pipeline = self._redis.pipeline()
-            pipeline.hincrby(name, field_name, by)
+            for field_name, by in counts.items():
+                pipeline.hincrby(name, field_name, by)
             pipeline.expire(name, self.ttl)
             pipeline.execute()
         except Exception:
             logger.exception(
-                "Could not count %s against %s", field_name, self.key
+                "Could not count %s against %s",
+                ", ".join(counts),
+                self.key,
             )
+
+
+def _file_counts(files: FileTally) -> dict[str, int]:
+    """The counter fields one merge's file outcomes add to.
+
+    :param files: What the merge did with the files it had to publish.
+    :return: Field in the `counts` hash to how much to add, leaving out the
+        outcomes that did not happen so that the usual merge writes nothing
+        extra at all.
+    """
+    if not files:
+        return {}
+    return {
+        field_name: count
+        for attribute, field_name in FILE_COUNTS.items()
+        if (count := getattr(files, attribute))
+    }
