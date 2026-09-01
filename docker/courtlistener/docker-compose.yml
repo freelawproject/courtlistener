@@ -50,7 +50,7 @@ services:
       args:
         POSTGRES_VERSION: 15.2-alpine
     ports:
-      - "${CL_POSTGRES_PORT:-5432}:5432"
+      - "127.0.0.1:${CL_POSTGRES_PORT:-5432}:5432"
     environment:
       POSTGRES_USER: "postgres"
       POSTGRES_PASSWORD: "postgres"
@@ -170,7 +170,7 @@ services:
       cl-disclosures:
         condition: service_started
     ports:
-      - "${CL_DJANGO_PORT:-8000}:8000"
+      - "127.0.0.1:${CL_DJANGO_PORT:-8000}:8000"
     user: root
     volumes:
       - ${CL_POSTGRES_RUN_DIR:-/var/run/postgresql}:/var/run/postgresql
@@ -201,7 +201,7 @@ services:
     container_name: cl-selenium
     image: seleniarm/standalone-chromium:124.0
     ports:
-      - "${CL_VNC_PORT:-5900}:5900"  # VNC server
+      - "127.0.0.1:${CL_VNC_PORT:-5900}:5900"  # VNC server
     volumes:
       - ${CL_SHM_DIR:-/dev/shm}:/dev/shm
     networks:
@@ -257,7 +257,7 @@ services:
       - ${CL_BASE_DIR:-../../}/cl/search/elasticsearch_files/synonyms_en.txt:/usr/share/elasticsearch/config/dictionaries/synonyms_en.txt
       - ${CL_BASE_DIR:-../../}/cl/search/elasticsearch_files/stopwords_en.txt:/usr/share/elasticsearch/config/dictionaries/stopwords_en.txt
     ports:
-      - "${CL_ES_PORT:-9200}:9200"
+      - "127.0.0.1:${CL_ES_PORT:-9200}:9200"
     networks:
       - cl_net_overlay
     healthcheck:
