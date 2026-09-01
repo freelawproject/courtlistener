@@ -45,7 +45,7 @@ from cl.corpus_importer.state.run_db import (
     downloaded_run_database,
     scrape_bucket_client,
 )
-from cl.corpus_importer.state.utils import MergeResult
+from cl.corpus_importer.state.utils import FileTally, MergeResult
 from cl.corpus_importer.tasks import merge_state_scrape_row
 from cl.lib.indexing_utils import (
     get_last_parent_document_id_processed,
@@ -1462,6 +1462,73 @@ class JKentScrapeLoaderTest(LoaderTestCase):
         )
         self.assertEqual(self.ledger().totals().merged, 5, "Only the count.")
 
+    def test_file_counts_share_the_run_s_counter_hash(self) -> None:
+        """A load moves a file per document, so anything the ledger spent per
+        file would dwarf what it spends per docket. Do the file tallies ride
+        along in the counter hash the row's own outcome is written to, rather
+        than taking a key or a round trip of their own?"""
+        ledger = self.ledger()
+        ledger.dispatched(1, "A-1")
+
+        ledger.merged(1, MergeResult(files=FileTally(moved=2, missing=1)))
+
+        self.assertEqual(
+            set(self.redis.keys(f"{self.key}:*")),
+            {f"{self.key}:counts"},
+            "The file counts cost the ledger no key of their own.",
+        )
+        self.assertEqual(ledger.totals().files, FileTally(moved=2, missing=1))
+
+    def test_a_merge_that_moved_no_files_counts_none(self) -> None:
+        """Most loaders publish nothing at all, and most merges of the one that
+        does move no files. Is the usual merge left writing exactly what it
+        wrote before?"""
+        ledger = self.ledger()
+        ledger.dispatched(1, "A-1")
+
+        ledger.merged(1, MergeResult())
+
+        self.assertEqual(
+            set(self.redis.hkeys(f"{self.key}:counts")),
+            {"dispatched", "merged"},
+            "Nothing was moved, so nothing counts it.",
+        )
+        self.assertFalse(ledger.totals().files)
+
+    def test_file_counts_add_up_across_rows(self) -> None:
+        """The tally spans the run rather than any one docket. Does each row's
+        merge add to it?"""
+        ledger = self.ledger()
+
+        for row, files in enumerate(
+            (
+                FileTally(moved=3),
+                FileTally(moved=1, failed=2),
+                FileTally(missing=1),
+            )
+        ):
+            ledger.dispatched(row, f"A-{row}")
+            ledger.merged(row, MergeResult(files=files))
+
+        self.assertEqual(
+            ledger.totals().files, FileTally(moved=4, missing=1, failed=2)
+        )
+
+    def test_a_rejected_row_still_counts_the_files_it_moved(self) -> None:
+        """Publishing happens before the write that can fail, so a merge that
+        went on to be rejected has still left files in the public bucket. Are
+        they counted, rather than lost with the row?"""
+        ledger = self.ledger()
+        ledger.dispatched(1, "A-1")
+
+        ledger.rejected(
+            1,
+            MergeResult(failures={"Docket": [None]}, files=FileTally(moved=1)),
+        )
+
+        self.assertEqual(ledger.totals().files, FileTally(moved=1))
+        self.assertEqual(ledger.totals().rejected, 1)
+
     def test_a_falling_count_is_waited_on(self) -> None:
         """A count still coming down means somebody is working on our rows.
         Does the load keep waiting, and poll the count rather than dragging
@@ -2222,6 +2289,56 @@ class LoadStateScrapeCommandTest(SimpleTestCase):
         errors = self.errors.getvalue()
         self.assertIn("never reported back -- queue stalled", errors)
         self.assertNotIn("--skip-load", errors)
+
+    def test_the_files_a_run_moved_are_written_out(self) -> None:
+        """A load that publishes files does work no row count shows. Is what
+        became of them written where the model counts are?"""
+        self.loader.return_value.load.return_value = LoadReport(
+            seen=2, dispatched=2, merged=2, files=FileTally(moved=17)
+        )
+
+        self.load()
+
+        self.assertIn(
+            "Files: 17 moved, 0 not found, 0 could not be moved",
+            self.output.getvalue(),
+        )
+        self.assertEqual(
+            self.errors.getvalue(),
+            "",
+            "Every file landed, so there is nothing to warn about.",
+        )
+
+    def test_files_that_never_reached_the_bucket_are_warned_about(
+        self,
+    ) -> None:
+        """A document pointing at nothing serves nothing and extracts nothing,
+        which no other count in the report shows. Does the warning say how many
+        re-running the load would mend, and how many it would not?"""
+        self.loader.return_value.load.return_value = LoadReport(
+            seen=2,
+            dispatched=2,
+            merged=2,
+            files=FileTally(moved=5, missing=2, failed=3),
+        )
+
+        self.load()
+
+        errors = self.errors.getvalue()
+        self.assertIn("5 files never reached the public bucket", errors)
+        self.assertIn("the 3 the bucket refused", errors)
+        self.assertIn("the 2 it could not find", errors)
+
+    def test_a_run_that_moved_no_files_says_nothing_about_them(self) -> None:
+        """Most loaders publish nothing at all. Is the files line held back
+        rather than printing three zeroes on every load?"""
+        self.loader.return_value.load.return_value = LoadReport(
+            seen=2, dispatched=2, merged=2
+        )
+
+        self.load()
+
+        self.assertNotIn("Files:", self.output.getvalue())
 
     def test_an_unverified_load_does_not_claim_a_clean_run(self) -> None:
         """A load that skipped verification knows only what it dispatched.
