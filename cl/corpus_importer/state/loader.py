@@ -36,7 +36,7 @@ from pydantic import BaseModel, ValidationError
 
 from cl.corpus_importer.state.ledger import LoadLedger
 from cl.corpus_importer.state.merger import Merger
-from cl.corpus_importer.state.utils import MergeResult
+from cl.corpus_importer.state.utils import NO_FILES, FileTally, MergeResult
 from cl.lib.celery_utils import CeleryThrottle
 from cl.lib.indexing_utils import log_last_document_indexed
 from cl.lib.redis_utils import get_redis_interface
@@ -59,6 +59,7 @@ class LoadPhase(StrEnum):
     MERGE = "state-scrape-merge-failed"
     EXTRACTION = "state-scrape-extraction-incomplete"
     RECONCILIATION = "state-scrape-rows-dropped"
+    PUBLISHING = "state-scrape-files-unpublished"
 
 
 def fingerprint(loader: str, phase: LoadPhase) -> dict[str, list[str]]:
@@ -179,6 +180,8 @@ class LoadReport:
         mean "did not look" rather than "found none".
     :ivar creates: Objects created, counted per model name.
     :ivar updates: Objects updated, counted per model name.
+    :ivar files: What the run's merges did with the scraped files they had to
+        move into the public bucket.
     :ivar extraction: What became of the documents the run dispatched for text
         extraction, or `None` where the load did not check.
     """
@@ -196,6 +199,7 @@ class LoadReport:
     rows_read: bool = True
     creates: dict[str, int] = field(default_factory=dict)
     updates: dict[str, int] = field(default_factory=dict)
+    files: FileTally = NO_FILES
     extraction: ExtractionReport | None = None
 
     @property
@@ -666,6 +670,7 @@ class JKentScrapeLoader[ScrapeType: BaseModel, ParamType = None](ABC):
         report.errored = totals.errored
         report.creates = totals.creates
         report.updates = totals.updates
+        report.files = totals.files
         if self.extract and (model := self.document_model) is not None:
             report.extraction = self._await_extraction(ledger, model)
         self.alert(report)
@@ -683,11 +688,12 @@ class JKentScrapeLoader[ScrapeType: BaseModel, ParamType = None](ABC):
         raised and a caller that is not a management command has no other way
         to hear about them.
 
-        Each category is fingerprinted so the three arrive in Sentry as three
+        Each category is fingerprinted so the four arrive in Sentry as four
         issues rather than one heap: a docket the database would not take, a
-        docket celery lost, and a document nothing ever read are three
-        different problems with three different people to chase. See
-        `fingerprint` for why they group by loader and not by run.
+        docket celery lost, a file that never reached the public bucket, and a
+        document nothing ever read are four different problems with four
+        different people to chase. See `fingerprint` for why they group by
+        loader and not by run.
 
         Note the asymmetry with the per-docket failures the workers report:
         those reach Sentry whether or not this ever runs. Everything here
@@ -723,6 +729,21 @@ class JKentScrapeLoader[ScrapeType: BaseModel, ParamType = None](ABC):
                 self.ledger.pending_key(),
                 report.missing,
                 extra=fingerprint(self.name, LoadPhase.RECONCILIATION),
+            )
+        if unpublished := report.files.unpublished:
+            logger.error(
+                "%s files of the %s run are not in the bucket CourtListener "
+                "serves, so %s documents point at nothing. %s were not where "
+                "the scrape said they were, which re-running the load will "
+                "not mend -- the scrape has to run again. %s were refused by "
+                "the bucket, which re-running the load will. Run database %s.",
+                unpublished,
+                self.name,
+                unpublished,
+                report.files.missing,
+                report.files.failed,
+                self.database.name,
+                extra=fingerprint(self.name, LoadPhase.PUBLISHING),
             )
         if (extraction := report.extraction) and extraction.abandoned:
             logger.error(
