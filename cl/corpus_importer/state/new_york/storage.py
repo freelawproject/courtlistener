@@ -24,6 +24,7 @@ PUBLISHED_PREFIX: str = (
 
 ABSENT_SOURCE: frozenset[str] = frozenset({"NoSuchKey", "NoSuchBucket", "404"})
 
+
 class PublishOutcome(Enum):
     """What became of one attempt to move a file into the public bucket."""
 
