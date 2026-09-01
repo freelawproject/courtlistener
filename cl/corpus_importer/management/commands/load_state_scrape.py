@@ -322,6 +322,19 @@ class Command(BaseCommand):
             )
             return
         self.print_counts(report)
+        if report.files:
+            self.stdout.write(f"  Files: {report.files}")
+            if unpublished := report.files.unpublished:
+                self.stderr.write(
+                    self.style.WARNING(
+                        f"Unpublished: {unpublished} files never reached the "
+                        "public bucket, so the documents pointing at them "
+                        "have no file to serve or extract. Re-running the "
+                        f"load will move the {report.files.failed} the bucket "
+                        f"refused; the {report.files.missing} it could not "
+                        "find need the scrape run again. See the log."
+                    )
+                )
         if (extraction := report.extraction) is not None:
             self.stdout.write(f"  Extraction: {extraction}")
             if not extraction.complete:
