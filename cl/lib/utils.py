@@ -88,7 +88,9 @@ def chunks(iterable, chunk_size: int):
         yield chain([first], islice(iterator, chunk_size - 1))
 
 
-def previous_and_next(some_iterable):
+def previous_and_next[T](
+    some_iterable: Iterable[T],
+) -> Iterable[tuple[T | None, T, T | None]]:
     """Provide previous and next values while iterating a list.
 
     This is from: https://stackoverflow.com/a/1012089/64911
@@ -96,6 +98,10 @@ def previous_and_next(some_iterable):
     This will allow you to lazily iterate a list such that as you iterate, you
     get a tuple containing the previous, current, and next value.
     """
+    prevs: Iterable[T | None]
+    items: Iterable[T]
+    nexts: Iterable[T | None]
+
     prevs, items, nexts = tee(some_iterable, 3)
     prevs = chain([None], prevs)
     nexts = chain(islice(nexts, 1, None), [None])
