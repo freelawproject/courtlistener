@@ -1,6 +1,6 @@
 import datetime
 import re
-from collections.abc import Iterable
+from collections.abc import Generator, Iterable
 from itertools import chain, islice, tee
 from re import Match
 from typing import Any, TypeIs
@@ -71,7 +71,9 @@ def deepgetattr(obj, name, default=_UNSPECIFIED):
             return default
 
 
-def chunks(iterable, chunk_size: int):
+def chunks[T](
+    iterable: Iterable[T], chunk_size: int
+) -> Generator[Iterable[T]]:
     """Warning: If you're considering using this method, you might want to
     consider using itertools.batched instead.
     Like the chunks function, but the iterable can be a generator.
