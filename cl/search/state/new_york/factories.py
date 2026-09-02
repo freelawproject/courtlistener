@@ -58,9 +58,11 @@ class NYCoADocketEntryFactory(DjangoModelFactory):
     party_name = Faker("name")
     date_filed = Faker("date_object")
     date_due = LazyAttribute(
-        lambda d: d.date_filed + timedelta(days=random.randint(7, 60))
-        if d.date_filed
-        else None
+        lambda d: (
+            d.date_filed + timedelta(days=random.randint(7, 60))
+            if d.date_filed
+            else None
+        )
     )
 
     @post_generation
@@ -91,9 +93,11 @@ class NYCoADocumentFactory(DjangoModelFactory):
         lambda d: random.randint(1, 5) if random.random() < 0.2 else None
     )
     part = LazyAttribute(
-        lambda d: random.randint(1, 3)
-        if d.volume and random.random() < 0.5
-        else None
+        lambda d: (
+            random.randint(1, 3)
+            if d.volume and random.random() < 0.5
+            else None
+        )
     )
 
     class Meta:
