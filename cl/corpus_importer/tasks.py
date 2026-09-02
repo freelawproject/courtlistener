@@ -1977,7 +1977,7 @@ def get_appellate_docket_by_docket_number(
 def get_att_report_by_rd(
     rd: RECAPDocument,
     session_data: SessionData,
-) -> AttachmentPage | None:
+) -> ACMSAttachmentPage | AppellateAttachmentPage | AttachmentPage | None:
     """Method to get the attachment report for the item in PACER.
 
     :param rd: The RECAPDocument object to use as a source.
@@ -2022,7 +2022,7 @@ def get_attachment_page_by_rd(
     self: Task,
     rd_pk: int,
     session_data: SessionData,
-) -> AttachmentPage | None:
+) -> ACMSAttachmentPage | AppellateAttachmentPage | AttachmentPage | None:
     """Get the attachment page for the item in PACER.
 
     :param self: The celery task
