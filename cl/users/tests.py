@@ -4321,6 +4321,63 @@ class RegisterViewTest(TestCase):
         # The username field should display an error.
         self.assertIn("username", form.errors)
 
+    async def test_register_normalizes_folding_username(self) -> None:
+        """A username with NFKC-foldable lookalikes registers as ASCII.
+
+        UsernameField.to_python() normalizes before validators run, so a
+        fullwidth or ligature character is folded to its ASCII equivalent and
+        then accepted, rather than rejected as non-ASCII.
+        """
+        data = {
+            # Fullwidth "a" (U+FF41) folds to a plain ASCII "a".
+            "username": "\uff41dmin3",
+            "email": "admin3@example.com",
+            "first_name": "User",
+            "last_name": "Admin",
+            "password1": "TestPassw0rd!",
+            "password2": "TestPassw0rd!",
+            "consent": True,
+        }
+
+        response = await self.async_client.post(
+            reverse("register"), data, follow=True
+        )
+        self.assertEqual(response.status_code, HTTPStatus.OK)
+        # Stored under the folded ASCII name, not the fullwidth original.
+        self.assertTrue(await User.objects.filter(username="admin3").aexists())
+        self.assertFalse(
+            await User.objects.filter(username="\uff41dmin3").aexists()
+        )
+
+    async def test_register_rejects_folded_username_collision(self) -> None:
+        """Folding must not let a lookalike take over an existing username."""
+        await User.objects.acreate_user(
+            username="admin4", email="admin4@example.com"
+        )
+
+        data = {
+            # Folds to "admin4", which is already taken.
+            "username": "\uff41dmin4",
+            "email": "impostor@example.com",
+            "first_name": "User",
+            "last_name": "Admin",
+            "password1": "TestPassw0rd!",
+            "password2": "TestPassw0rd!",
+            "consent": True,
+        }
+
+        response = await self.async_client.post(
+            reverse("register"), data, follow=True
+        )
+        self.assertEqual(response.status_code, HTTPStatus.OK)
+        form = response.context.get("form")
+        self.assertIsNotNone(form, "Expected 'form' in template context")
+        self.assertIn("username", form.errors)
+        # Only the original account exists.
+        self.assertEqual(
+            await User.objects.filter(username="admin4").acount(), 1
+        )
+
     def test_generate_activation_key_is_not_brute_forceable(self) -> None:
         """Is the activation key a high-entropy CSPRNG token?
 

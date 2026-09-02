@@ -146,7 +146,14 @@ class UserCreationFormExtended(UserCreationForm, CleanEmailMixin):
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
-        # Protect against homoglyph attacks
+        # Protect against homoglyph attacks. Meta inherits Django's
+        # field_classes, so username is a UsernameField and its to_python()
+        # has already NFKC-normalized the value by the time validators run.
+        # That folds lookalikes such as fullwidth or ligature characters into
+        # ASCII, which this validator then accepts; the resulting name is
+        # still subject to the case-insensitive uniqueness check, so it
+        # cannot collide with an existing account. Cyrillic and Greek
+        # lookalikes have no ASCII decomposition and are still rejected here.
         self.fields["username"].validators = [ASCIIUsernameValidator()]
 
         self.fields["username"].label = "User Name*"
@@ -186,10 +193,6 @@ class UserCreationFormExtended(UserCreationForm, CleanEmailMixin):
             "first_name",
             "last_name",
         )
-        # Django's own Meta maps username to UsernameField, which normalizes
-        # the value to NFKC. This form has always built username as a plain
-        # CharField, so reset the mapping rather than inherit it.
-        field_classes = {}
 
     def clean_first_name(self):
         first_name = self.cleaned_data.get("first_name")
