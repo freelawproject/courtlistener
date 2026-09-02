@@ -1,0 +1,63 @@
+{
+  "status": "valid",
+  "court_id": "test",
+  "versions": {"centralia": "0.0.5"},
+  "cluster": {
+    "doc_type": "opinion",
+    "case_name": "Adidas America, Inc. v. Thom Browne, Inc.",
+    "case_name_short": "Adidas",
+    "docket_number": "22-1234",
+    "date_filed": "May 2, 2024",
+    "date_filed_iso": "2024-05-02",
+    "date_argued": "March 3, 2024",
+    "date_argued_iso": "2024-03-03",
+    "precedential_status": "published",
+    "judges": "B e f o r e : WALKER, CARNEY, and LEE, Circuit Judges.",
+    "panel": ["WALKER", "CARNEY", "LEE"],
+    "attorneys": "Jane Roe, for Appellant. John Doe, for Appellee.",
+    "parties": [],
+    "disposition": "AFFIRMED.",
+    "history": null,
+    "lower_court": "United States District Court for the Southern District of New York",
+    "lower_court_docket": ["1:21-cv-05615"],
+    "lower_court_judge": "Jed S. Rakoff",
+    "summary": "The court affirms.\nThe injunction stands.",
+    "syllabus": null,
+    "headnotes": null
+  },
+  "opinions": [
+    {
+      "order": 1,
+      "type": "majority",
+      "author_name": "Walker",
+      "html": "<div class=\"opinion\"><p>The judgment of the district court is affirmed.<sup class=\"fnmark\" id=\"ref-o1-1\"><a href=\"#fn-o1-1\">1</a></sup></p><div class=\"fns\"><div class=\"fn\" id=\"fn-o1-1\"><a class=\"lbl\" href=\"#ref-o1-1\">1</a><div><p class=\"noindent\">We review de novo.</p></div></div></div></div>",
+      "text": "The judgment of the district court is affirmed.\n\n[1] We review de novo."
+    },
+    {
+      "order": 2,
+      "type": "dissent",
+      "author_name": "Lee",
+      "html": "<div class=\"opinion\"><div class=\"byline\">LEE, Circuit Judge, dissenting:</div><p>I respectfully dissent.</p></div>",
+      "text": "I respectfully dissent."
+    }
+  ],
+  "headmatter": {
+    "rows": [],
+    "by_role": {},
+    "html": "<div class=\"hmrow ac\">UNITED STATES COURT OF APPEALS</div>",
+    "html_inline": "<div style=\"text-align:center\">UNITED STATES COURT OF APPEALS</div><div style=\"text-align:center\">FOR THE SECOND CIRCUIT</div>",
+    "text": "UNITED STATES COURT OF APPEALS FOR THE SECOND CIRCUIT",
+    "untinted": 0,
+    "footnotes": []
+  },
+  "sections": {},
+  "diagnostics": {
+    "status": "valid",
+    "rollout": "released",
+    "scan_pages": [],
+    "text_missing_pages": [],
+    "cid_pages": [],
+    "opinion_count": 2,
+    "warnings": []
+  }
+}
