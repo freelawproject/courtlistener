@@ -65,7 +65,7 @@ from cl.donate.models import (
     NeonMembership,
     NeonMembershipLevel,
 )
-from cl.favorites.factories import UserTagFactory
+from cl.favorites.factories import NoteFactory, UserTagFactory
 from cl.favorites.models import (
     DocketTag,
     DocketTagEvent,
@@ -79,7 +79,7 @@ from cl.lib.test_helpers import (
     SimpleUserDataMixin,
     UserProfileWithParentsFactory,
 )
-from cl.search.factories import DocketFactory
+from cl.search.factories import DocketFactory, RECAPDocumentFactory
 from cl.search.models import SearchQuery
 from cl.tests.base import SELENIUM_TIMEOUT, BaseSeleniumTest
 from cl.tests.cases import (
@@ -1014,6 +1014,31 @@ class ProfileTest(SimpleUserDataMixin, TestCase):
                         self.assertEqual(vals["direction"], "down")
                     else:
                         self.assertEqual(vals["direction"], "up")
+
+    async def test_recap_search_url_uses_document_id_not_docket_entry_id(
+        self,
+    ) -> None:
+        """Does the "Search Notes" link for RECAP documents key off the
+        document's own id, not its parent DocketEntry's? RECAPDocument and
+        DocketEntry have independent pk sequences, so using the wrong field
+        would silently pull results from the wrong docket whenever the two
+        happen to collide.
+        """
+        user = await sync_to_async(User.objects.get)(username="pandora")
+        rd = await sync_to_async(RECAPDocumentFactory)()
+        await sync_to_async(NoteFactory)(
+            user=user, cluster_id=None, recap_doc_id=rd
+        )
+
+        self.assertTrue(
+            await self.async_client.alogin(
+                username="pandora", password="password"
+            )
+        )
+        r = await self.async_client.get(reverse("profile_notes"))
+        self.assertEqual(
+            r.context["recap_search_url"], f"/?type=r&q=xxx AND id:({rd.pk})"
+        )
 
 
 class DisposableEmailTest(SimpleUserDataMixin, TestCase):
