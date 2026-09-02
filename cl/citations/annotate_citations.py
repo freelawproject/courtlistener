@@ -3,7 +3,7 @@ import re
 
 from django.urls import reverse
 from eyecite import annotate_citations
-from eyecite.models import IdCitation, SupraCitation
+from eyecite.models import FullLawCitation, IdCitation, SupraCitation
 
 from cl.citations.match_citations import (
     MULTIPLE_MATCHES_RESOURCE,
@@ -29,12 +29,14 @@ def generate_annotations(
     annotations: list[list] = []
     for opinion, citations in citation_resolutions.items():
         if opinion is NO_MATCH_RESOURCE:  # If unsuccessfully matched...
-            annotation = [
-                '<span class="citation no-link">',
-                "</span>",
-            ]
             # Annotate all unmatched citations
-            annotations.extend([[c.span()] + annotation for c in citations])
+            for c in citations:
+                opening_tag = (
+                    '<span class="citation no-link" data-type="law">'
+                    if isinstance(c, FullLawCitation)
+                    else '<span class="citation no-link">'
+                )
+                annotations.append([c.span(), opening_tag, "</span>"])
         elif opinion is MULTIPLE_MATCHES_RESOURCE:
             # Multiple matches, can't disambiguate
             for c in citations:
