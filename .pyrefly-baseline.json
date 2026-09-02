@@ -925,9 +925,9 @@
       "severity": "error"
     },
     {
-      "line": 2301,
+      "line": 2299,
       "column": 28,
-      "stop_line": 2301,
+      "stop_line": 2299,
       "stop_column": 40,
       "path": "cl/corpus_importer/tasks.py",
       "code": -2,
@@ -937,9 +937,9 @@
       "severity": "error"
     },
     {
-      "line": 2337,
+      "line": 2335,
       "column": 24,
-      "stop_line": 2337,
+      "stop_line": 2335,
       "stop_column": 36,
       "path": "cl/corpus_importer/tasks.py",
       "code": -2,
@@ -949,21 +949,9 @@
       "severity": "error"
     },
     {
-      "line": 3092,
-      "column": 12,
-      "stop_line": 3092,
-      "stop_column": 20,
-      "path": "cl/corpus_importer/tasks.py",
-      "code": -2,
-      "name": "bad-return",
-      "description": "Returned type `httpx._models.Response` is not assignable to declared return type `requests.models.Response`",
-      "concise_description": "Returned type `httpx._models.Response` is not assignable to declared return type `requests.models.Response`",
-      "severity": "error"
-    },
-    {
-      "line": 5123,
+      "line": 5150,
       "column": 9,
-      "stop_line": 5123,
+      "stop_line": 5150,
       "stop_column": 27,
       "path": "cl/corpus_importer/tasks.py",
       "code": -2,
@@ -973,9 +961,9 @@
       "severity": "error"
     },
     {
-      "line": 5127,
+      "line": 5154,
       "column": 20,
-      "stop_line": 5127,
+      "stop_line": 5154,
       "stop_column": 32,
       "path": "cl/corpus_importer/tasks.py",
       "code": -2,
@@ -985,9 +973,9 @@
       "severity": "error"
     },
     {
-      "line": 5128,
+      "line": 5155,
       "column": 54,
-      "stop_line": 5128,
+      "stop_line": 5155,
       "stop_column": 66,
       "path": "cl/corpus_importer/tasks.py",
       "code": -2,
@@ -997,9 +985,9 @@
       "severity": "error"
     },
     {
-      "line": 5132,
+      "line": 5159,
       "column": 13,
-      "stop_line": 5132,
+      "stop_line": 5159,
       "stop_column": 31,
       "path": "cl/corpus_importer/tasks.py",
       "code": -2,
@@ -1009,9 +997,9 @@
       "severity": "error"
     },
     {
-      "line": 5136,
+      "line": 5163,
       "column": 41,
-      "stop_line": 5136,
+      "stop_line": 5163,
       "stop_column": 45,
       "path": "cl/corpus_importer/tasks.py",
       "code": -2,
@@ -1021,9 +1009,9 @@
       "severity": "error"
     },
     {
-      "line": 5141,
+      "line": 5168,
       "column": 13,
-      "stop_line": 5141,
+      "stop_line": 5168,
       "stop_column": 31,
       "path": "cl/corpus_importer/tasks.py",
       "code": -2,
@@ -1033,9 +1021,9 @@
       "severity": "error"
     },
     {
-      "line": 359,
+      "line": 363,
       "column": 9,
-      "stop_line": 359,
+      "stop_line": 363,
       "stop_column": 37,
       "path": "cl/corpus_importer/utils.py",
       "code": -2,
@@ -1045,9 +1033,9 @@
       "severity": "error"
     },
     {
-      "line": 359,
+      "line": 363,
       "column": 39,
-      "stop_line": 359,
+      "stop_line": 363,
       "stop_column": 67,
       "path": "cl/corpus_importer/utils.py",
       "code": -2,
@@ -1057,9 +1045,9 @@
       "severity": "error"
     },
     {
-      "line": 361,
+      "line": 365,
       "column": 12,
-      "stop_line": 361,
+      "stop_line": 365,
       "stop_column": 18,
       "path": "cl/corpus_importer/utils.py",
       "code": -2,
@@ -1069,9 +1057,9 @@
       "severity": "error"
     },
     {
-      "line": 127,
+      "line": 128,
       "column": 17,
-      "stop_line": 127,
+      "stop_line": 128,
       "stop_column": 35,
       "path": "cl/lib/context_processors.py",
       "code": -2,
@@ -1285,9 +1273,9 @@
       "severity": "error"
     },
     {
-      "line": 584,
+      "line": 621,
       "column": 45,
-      "stop_line": 584,
+      "stop_line": 621,
       "stop_column": 66,
       "path": "cl/opinion_page/tests.py",
       "code": -2,
@@ -1297,9 +1285,9 @@
       "severity": "error"
     },
     {
-      "line": 593,
+      "line": 630,
       "column": 45,
-      "stop_line": 593,
+      "stop_line": 630,
       "stop_column": 66,
       "path": "cl/opinion_page/tests.py",
       "code": -2,
@@ -1309,9 +1297,9 @@
       "severity": "error"
     },
     {
-      "line": 633,
+      "line": 670,
       "column": 13,
-      "stop_line": 633,
+      "stop_line": 670,
       "stop_column": 27,
       "path": "cl/opinion_page/tests.py",
       "code": -2,
@@ -1321,9 +1309,9 @@
       "severity": "error"
     },
     {
-      "line": 1901,
+      "line": 2278,
       "column": 9,
-      "stop_line": 1901,
+      "stop_line": 2278,
       "stop_column": 44,
       "path": "cl/opinion_page/tests.py",
       "code": -2,
@@ -1333,9 +1321,9 @@
       "severity": "error"
     },
     {
-      "line": 1941,
+      "line": 2318,
       "column": 9,
-      "stop_line": 1941,
+      "stop_line": 2318,
       "stop_column": 44,
       "path": "cl/opinion_page/tests.py",
       "code": -2,
@@ -1345,9 +1333,9 @@
       "severity": "error"
     },
     {
-      "line": 1967,
+      "line": 2344,
       "column": 9,
-      "stop_line": 1967,
+      "stop_line": 2344,
       "stop_column": 44,
       "path": "cl/opinion_page/tests.py",
       "code": -2,
@@ -1357,9 +1345,9 @@
       "severity": "error"
     },
     {
-      "line": 1984,
+      "line": 2361,
       "column": 9,
-      "stop_line": 1984,
+      "stop_line": 2361,
       "stop_column": 44,
       "path": "cl/opinion_page/tests.py",
       "code": -2,
@@ -1369,9 +1357,9 @@
       "severity": "error"
     },
     {
-      "line": 2002,
+      "line": 2379,
       "column": 9,
-      "stop_line": 2002,
+      "stop_line": 2379,
       "stop_column": 44,
       "path": "cl/opinion_page/tests.py",
       "code": -2,
@@ -1381,9 +1369,9 @@
       "severity": "error"
     },
     {
-      "line": 2003,
+      "line": 2380,
       "column": 9,
-      "stop_line": 2003,
+      "stop_line": 2380,
       "stop_column": 45,
       "path": "cl/opinion_page/tests.py",
       "code": -2,
@@ -1393,9 +1381,9 @@
       "severity": "error"
     },
     {
-      "line": 2004,
+      "line": 2381,
       "column": 9,
-      "stop_line": 2004,
+      "stop_line": 2381,
       "stop_column": 44,
       "path": "cl/opinion_page/tests.py",
       "code": -2,
@@ -1405,9 +1393,9 @@
       "severity": "error"
     },
     {
-      "line": 2044,
+      "line": 2421,
       "column": 9,
-      "stop_line": 2044,
+      "stop_line": 2421,
       "stop_column": 44,
       "path": "cl/opinion_page/tests.py",
       "code": -2,
@@ -1417,9 +1405,9 @@
       "severity": "error"
     },
     {
-      "line": 2045,
+      "line": 2422,
       "column": 9,
-      "stop_line": 2045,
+      "stop_line": 2422,
       "stop_column": 45,
       "path": "cl/opinion_page/tests.py",
       "code": -2,
@@ -1429,9 +1417,9 @@
       "severity": "error"
     },
     {
-      "line": 2046,
+      "line": 2423,
       "column": 9,
-      "stop_line": 2046,
+      "stop_line": 2423,
       "stop_column": 44,
       "path": "cl/opinion_page/tests.py",
       "code": -2,
@@ -1441,9 +1429,9 @@
       "severity": "error"
     },
     {
-      "line": 2063,
+      "line": 2440,
       "column": 9,
-      "stop_line": 2063,
+      "stop_line": 2440,
       "stop_column": 44,
       "path": "cl/opinion_page/tests.py",
       "code": -2,
@@ -1453,9 +1441,9 @@
       "severity": "error"
     },
     {
-      "line": 2064,
+      "line": 2441,
       "column": 9,
-      "stop_line": 2064,
+      "stop_line": 2441,
       "stop_column": 45,
       "path": "cl/opinion_page/tests.py",
       "code": -2,
@@ -1465,9 +1453,9 @@
       "severity": "error"
     },
     {
-      "line": 2065,
+      "line": 2442,
       "column": 9,
-      "stop_line": 2065,
+      "stop_line": 2442,
       "stop_column": 44,
       "path": "cl/opinion_page/tests.py",
       "code": -2,
@@ -1477,9 +1465,9 @@
       "severity": "error"
     },
     {
-      "line": 2175,
+      "line": 2552,
       "column": 9,
-      "stop_line": 2175,
+      "stop_line": 2552,
       "stop_column": 44,
       "path": "cl/opinion_page/tests.py",
       "code": -2,
@@ -1489,9 +1477,9 @@
       "severity": "error"
     },
     {
-      "line": 2176,
+      "line": 2553,
       "column": 9,
-      "stop_line": 2176,
+      "stop_line": 2553,
       "stop_column": 45,
       "path": "cl/opinion_page/tests.py",
       "code": -2,
@@ -1501,9 +1489,9 @@
       "severity": "error"
     },
     {
-      "line": 2210,
+      "line": 2587,
       "column": 9,
-      "stop_line": 2210,
+      "stop_line": 2587,
       "stop_column": 45,
       "path": "cl/opinion_page/tests.py",
       "code": -2,
@@ -1513,9 +1501,9 @@
       "severity": "error"
     },
     {
-      "line": 3295,
+      "line": 3832,
       "column": 16,
-      "stop_line": 3295,
+      "stop_line": 3832,
       "stop_column": 54,
       "path": "cl/opinion_page/tests.py",
       "code": -2,
@@ -1525,9 +1513,9 @@
       "severity": "error"
     },
     {
-      "line": 3400,
+      "line": 3937,
       "column": 50,
-      "stop_line": 3400,
+      "stop_line": 3937,
       "stop_column": 59,
       "path": "cl/opinion_page/tests.py",
       "code": -2,
@@ -1537,9 +1525,9 @@
       "severity": "error"
     },
     {
-      "line": 855,
+      "line": 953,
       "column": 28,
-      "stop_line": 855,
+      "stop_line": 953,
       "stop_column": 36,
       "path": "cl/opinion_page/utils.py",
       "code": -2,
@@ -1549,9 +1537,9 @@
       "severity": "error"
     },
     {
-      "line": 167,
+      "line": 166,
       "column": 27,
-      "stop_line": 176,
+      "stop_line": 175,
       "stop_column": 10,
       "path": "cl/opinion_page/views.py",
       "code": -2,
