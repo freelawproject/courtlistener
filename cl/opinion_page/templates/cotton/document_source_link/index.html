@@ -1,0 +1,9 @@
+<c-vars
+  document=""
+  docket_source=""
+  variant="button"
+/>
+
+{% if document.external_url %}
+  <c-component is="document_source_link.{{ docket_source.component }}" :document="document" :variant="variant" only />
+{% endif %}

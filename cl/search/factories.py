@@ -38,6 +38,7 @@ from cl.search.models import (
     ParentheticalGroup,
     RECAPDocument,
     SCOTUSDocketEntry,
+    ScotusDocketMetadata,
     SCOTUSDocument,
     TrialCourtData,
 )
@@ -397,6 +398,16 @@ class SCOTUSDocumentFactory(DjangoModelFactory):
     description = Faker("text", max_nb_chars=20)
 
 
+class ScotusDocketMetadataFactory(DjangoModelFactory):
+    class Meta:
+        model = ScotusDocketMetadata
+
+    docket = SubFactory(DocketFactory)
+    capital_case = False
+    linked_with = ""
+    questions_presented_url = ""
+
+
 class OpinionsCitedByRECAPDocumentFactory(DjangoModelFactory):
     """Make a OpinionsCitedByRECAPDocument with parents"""
 
@@ -489,9 +500,11 @@ class CaseTransferFactory(DjangoModelFactory):
     origin_docket = SubFactory(DocketFactory)
     destination_court = SubFactory(CourtFactory)
     destination_docket_number = LazyAttribute(
-        lambda ct: ct.destination_docket.docket_number
-        if ct.destination_docket
-        else None
+        lambda ct: (
+            ct.destination_docket.docket_number
+            if ct.destination_docket
+            else None
+        )
     )
     destination_docket = SubFactory(DocketFactory)
     transfer_date = Faker("date_object")

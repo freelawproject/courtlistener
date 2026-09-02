@@ -1,15 +1,33 @@
 import datetime
+import logging
+import re
+import shutil
+import tempfile
+from pathlib import Path
+from unittest import mock
 
 from django import forms
-from django.template import Context
-from django.test import RequestFactory, SimpleTestCase
+from django.conf import settings
+from django.template import Context, TemplateSyntaxError
+from django.template.utils import get_app_template_dirs
+from django.test import RequestFactory, SimpleTestCase, override_settings
 
+from cl.custom_filters.templatetags import component_tags
+from cl.custom_filters.templatetags.component_tags import (
+    _coerce_defer,
+    _resolved_path,
+    _script_problems,
+    _warn_about_unusable_scripts,
+    render_required_scripts,
+    require_script,
+)
 from cl.custom_filters.templatetags.extras import (
     get_canonical_element,
     get_full_host,
     get_item,
     granular_date,
     highlight_query,
+    http_url,
     humanize_number,
     render_field_with_id,
 )
@@ -18,6 +36,7 @@ from cl.custom_filters.templatetags.text_filters import (
     naturalduration,
     oxford_join,
 )
+from cl.lib.widgets import NEW_STACK_WIDGET_CLASSES, TextInput
 from cl.people_db.models import (
     GRANULARITY_DAY,
     GRANULARITY_MONTH,
@@ -300,7 +319,7 @@ class TestExtras(SimpleTestCase):
         rendered = render_field_with_id(form["name"], "custom_id")
         self.assertNotIn('id="id_name"', rendered)
 
-    def test_render_field_with_corpus_search_form(self):
+    def test_render_field_with_corpus_search_form(self) -> None:
         """Test render_field_with_id works with actual CorpusSearchForm
 
         Validates all field types used in corpus search:
@@ -311,43 +330,81 @@ class TestExtras(SimpleTestCase):
         Ensures custom IDs are applied and default Django IDs are removed.
         """
         form = CorpusSearchForm()
+        common_classes = NEW_STACK_WIDGET_CLASSES
+        placeholders = {
+            "filed_after": "mm/dd/yyyy",
+            "filed_before": "mm/dd/yyyy",
+            "entry_date_filed_after": "After",
+            "entry_date_filed_before": "Before",
+            "born_after": "mm/dd/yyyy",
+            "born_before": "mm/dd/yyyy",
+            "argued_after": "mm/dd/yyy",
+            "argued_before": "mm/dd/yyy",
+        }
 
-        # Test TextInput fields
-        text_fields = [
-            "case_name",
-            "docket_number",
-            "judge",
-            "citation",
-            "party_name",
-            "atty_name",
-            "name",
-            "school",
-            "appointer",
-        ]
-
-        for field_name in text_fields:
+        for field_name, field in form.fields.items():
+            if not isinstance(field.widget, TextInput):
+                continue
             with self.subTest(field=field_name):
-                custom_id = f"test_{field_name}_id"
-                rendered = render_field_with_id(form[field_name], custom_id)
-                self.assertIn(f'id="{custom_id}"', rendered)
-                self.assertIn(f'name="{field_name}"', rendered)
-                # Ensure default Django ID is not present
-                self.assertNotIn(f'id="id_{field_name}"', rendered)
+                self.assertEqual(field.widget.attrs["class"], common_classes)
+                self.assertEqual(field.widget.attrs["autocomplete"], "off")
+
+        for field_name, placeholder in placeholders.items():
+            with self.subTest(placeholder=field_name):
+                self.assertEqual(
+                    form.fields[field_name].widget.attrs["placeholder"],
+                    placeholder,
+                )
+
+        rendered = render_field_with_id(form["case_name"], "test_case_name_id")
+        self.assertEqual(
+            rendered.partition(">")[0] + ">",
+            '<input type="text" name="case_name" '
+            f'class="{common_classes}" autocomplete="off" '
+            'id="test_case_name_id">',
+        )
+        rendered = render_field_with_id(
+            form["filed_after"], "test_filed_after_id"
+        )
+        self.assertEqual(
+            rendered.partition(">")[0] + ">",
+            '<input type="text" name="filed_after" '
+            'placeholder="mm/dd/yyyy" '
+            f'class="{common_classes}" autocomplete="off" '
+            'id="test_filed_after_id">',
+        )
 
         # Test Select/ChoiceField
-        select_fields = [
-            "dob_state",
-            "selection_method",
-            "political_affiliation",
-        ]
-
-        for field_name in select_fields:
+        select_classes = {
+            "dob_state": f"{common_classes} input-text",
+            "selection_method": common_classes,
+            "political_affiliation": f"{common_classes} input-text",
+        }
+        for field_name, expected_classes in select_classes.items():
             with self.subTest(field=field_name):
-                custom_id = f"mobile_judges_{field_name}"
-                rendered = render_field_with_id(form[field_name], custom_id)
-                self.assertIn(f'id="{custom_id}"', rendered)
-                self.assertIn(f'name="{field_name}"', rendered)
-                self.assertIn("<select", rendered)
+                self.assertEqual(
+                    form.fields[field_name].widget.attrs,
+                    {"class": expected_classes},
+                )
+
+        rendered = render_field_with_id(
+            form["dob_state"], "mobile_judges_dob_state"
+        )
+        self.assertEqual(
+            rendered.partition(">")[0] + ">",
+            '<select name="dob_state" '
+            f'class="{common_classes} input-text" '
+            'id="mobile_judges_dob_state">',
+        )
+        rendered = render_field_with_id(
+            form["selection_method"], "mobile_judges_selection_method"
+        )
+        self.assertEqual(
+            rendered.partition(">")[0] + ">",
+            '<select name="selection_method" '
+            f'class="{common_classes}" '
+            'id="mobile_judges_selection_method">',
+        )
 
         # Test CheckboxInput
         checkbox_id = "desktop_recap_available_only"
@@ -528,3 +585,292 @@ class TestSvgTag(SimpleTestCase):
         with self.settings(DEBUG=False):
             result = svg("nonexistent_svg_that_does_not_exist")
             self.assertEqual(result, "")
+
+
+LOGGER = component_tags.logger.name
+
+
+class TestComponentTags(SimpleTestCase):
+    """Tests for the require_script / render_required_scripts tag pair."""
+
+    def setUp(self) -> None:
+        self.request = RequestFactory().get("/")
+        self.context = Context({"request": self.request})
+
+        # Our test runner disables logging unless --enable-logging is
+        # passed (see cl.tests.runner), so opt back in here.
+        previous_level = logging.root.manager.disable
+        logging.disable(logging.NOTSET)
+        self.addCleanup(logging.disable, previous_level)
+
+    def _render(self) -> str:
+        return render_required_scripts(self.context)
+
+    def _file(self, content: bytes) -> str:
+        """Writes a throwaway script file and returns its path."""
+        tmp = Path(tempfile.mkdtemp())
+        self.addCleanup(shutil.rmtree, tmp)
+        path = tmp / "script.js"
+        path.write_bytes(content)
+        return str(path)
+
+    def _resolver(self, files: dict[str, str]):
+        """A finders.find stand-in resolving only the given static paths."""
+        return files.get
+
+    def _static_dir(self, files: dict[str, bytes]) -> str:
+        """Builds a throwaway static dir holding *files* under ``js/``."""
+        root = Path(tempfile.mkdtemp())
+        self.addCleanup(shutil.rmtree, root)
+        (root / "js").mkdir()
+        for name, content in files.items():
+            (root / "js" / name).write_bytes(content)
+        return str(root)
+
+    def test_extension_resolution(self) -> None:
+        """The extension resolves to .js under DEBUG, .min.js otherwise."""
+        test_cases = (
+            # (path, DEBUG, expected)
+            ("js/alpine/plugins/focus", True, "js/alpine/plugins/focus.js"),
+            (
+                "js/alpine/plugins/focus",
+                False,
+                "js/alpine/plugins/focus.min.js",
+            ),
+            # An explicit extension is used verbatim in both environments,
+            # even when it's already minified.
+            ("js/foo.js", True, "js/foo.js"),
+            ("js/foo.js", False, "js/foo.js"),
+            ("js/foo.min.js", False, "js/foo.min.js"),
+        )
+        for path, debug, expected in test_cases:
+            with self.subTest(path=path, debug=debug):
+                with self.settings(DEBUG=debug):
+                    self.assertEqual(_resolved_path(path), expected)
+
+    def test_defer_flag_coercion(self) -> None:
+        """Booleans and their string spellings coerce; anything else raises."""
+        for value, expected in (
+            (True, True),
+            (False, False),
+            ("true", True),
+            ("false", False),
+            ("True", True),
+            ("FALSE", False),
+        ):
+            with self.subTest(value=value):
+                self.assertEqual(_coerce_defer(value, "js/foo.js"), expected)
+
+        for invalid in ("yes", "1", None, 2):
+            with self.subTest(value=invalid):
+                with self.assertRaises(TemplateSyntaxError):
+                    _coerce_defer(invalid, "js/foo.js")
+
+    def test_conflicting_defer_flags_raise(self) -> None:
+        """Requiring one script with conflicting defer flags is an error."""
+        require_script(self.context, "js/foo.js", defer=True)
+        with self.assertRaises(TemplateSyntaxError):
+            require_script(self.context, "js/foo.js", defer=False)
+
+    def test_scripts_are_deduplicated(self) -> None:
+        """Repeated requires render a single script tag."""
+        require_script(self.context, "js/foo.js")
+        require_script(self.context, "js/foo.js")
+        self.assertEqual(self._render().count("<script"), 1)
+
+    def test_render_emits_defer_and_nonce(self) -> None:
+        """Rendered tags carry the defer attribute and the CSP nonce."""
+        self.request.csp_nonce = "abc123"
+        require_script(self.context, "js/foo.js")
+        require_script(self.context, "js/bar.js", defer=True)
+        rendered = self._render()
+
+        self.assertIn('src="/static/js/foo.js" nonce="abc123"', rendered)
+        self.assertIn('src="/static/js/bar.js" defer nonce="abc123"', rendered)
+
+    def test_no_request_in_context_is_a_noop(self) -> None:
+        """Both tags are no-ops without a request in the context."""
+        empty = Context({})
+        self.assertEqual(require_script(empty, "js/foo"), "")
+        self.assertEqual(render_required_scripts(empty), "")
+
+    def test_render_without_required_scripts(self) -> None:
+        """Rendering with nothing required returns an empty string."""
+        self.assertEqual(self._render(), "")
+
+    def test_logger_lives_under_the_project_hierarchy(self) -> None:
+        """The module logs under "cl", which owns the console handler."""
+        self.assertTrue(LOGGER.startswith("cl."))
+
+    def test_detects_missing_and_empty_variants(self) -> None:
+        """A stub needs a .js and a .min.js, and both must hold code."""
+        code = b"a=1"
+        cases = [
+            # (files sitting in the static dir, expected problems)
+            ({"thing.js": code, "thing.min.js": code}, []),
+            ({"thing.js": code}, ["js/thing.min.js is missing"]),
+            ({"thing.min.js": code}, ["js/thing.js is missing"]),
+            ({}, ["js/thing.js is missing", "js/thing.min.js is missing"]),
+            (
+                {"thing.js": code, "thing.min.js": b"\n"},
+                ["js/thing.min.js is empty"],
+            ),
+            (
+                {"thing.js": b" \t\n", "thing.min.js": code},
+                ["js/thing.js is empty"],
+            ),
+        ]
+        for files, expected in cases:
+            with self.subTest(files=sorted(files)):
+                with override_settings(
+                    STATICFILES_DIRS=[self._static_dir(files)]
+                ):
+                    self.assertEqual(_script_problems("js/thing"), expected)
+
+    def test_problems_surface_as_warnings(self) -> None:
+        """Each problem with a stub's files becomes one warning."""
+        find = self._resolver({"js/ghost.js": self._file(b"a=1")})
+        with mock.patch.object(component_tags.finders, "find", find):
+            with self.settings(DEBUG=True):
+                require_script(self.context, "js/ghost")
+                with self.assertLogs(LOGGER, level="WARNING") as logs:
+                    rendered = self._render()
+
+        self.assertEqual(len(logs.records), 1)
+        self.assertIn("js/ghost.min.js is missing", logs.output[0])
+        # The page still loads the unminified file.
+        self.assertIn("js/ghost.js", rendered)
+
+    def test_no_warning_when_both_variants_hold_content(self) -> None:
+        """A stub whose files are both real logs nothing."""
+        find = self._resolver(
+            {
+                "js/ghost.js": self._file(b"a=1"),
+                "js/ghost.min.js": self._file(b"a=1"),
+            }
+        )
+        with mock.patch.object(component_tags.finders, "find", find):
+            with self.settings(DEBUG=True):
+                require_script(self.context, "js/ghost", defer=True)
+                with self.assertNoLogs(LOGGER, level="WARNING"):
+                    self._render()
+
+    def test_warning_is_emitted_once_per_request(self) -> None:
+        """Repeated requires warn once and hit the filesystem once."""
+        find = mock.Mock(side_effect=self._resolver({}))
+        with mock.patch.object(component_tags.finders, "find", find):
+            with self.settings(DEBUG=True):
+                require_script(self.context, "js/ghost")
+                require_script(self.context, "js/ghost")
+                with self.assertLogs(LOGGER, level="WARNING") as logs:
+                    self._render()
+
+        # Both variants are missing, so one warning each — not four.
+        self.assertEqual(len(logs.records), 2)
+        self.assertEqual(find.call_count, 2)
+
+    @mock.patch.object(component_tags.finders, "find", return_value=None)
+    def test_explicit_extension_is_never_checked(self, mock_find) -> None:
+        """An explicit .js path skips the check entirely."""
+        with self.settings(DEBUG=True):
+            require_script(self.context, "js/alpine/components/tabs.js")
+            with self.assertNoLogs(LOGGER, level="WARNING"):
+                self._render()
+
+        mock_find.assert_not_called()
+
+    @mock.patch.object(component_tags.finders, "find", return_value=None)
+    def test_no_filesystem_check_outside_debug(self, mock_find) -> None:
+        """Outside DEBUG nothing is checked and nothing is logged."""
+        with self.settings(DEBUG=False):
+            require_script(self.context, "js/alpine/plugins/ghost")
+            with self.assertNoLogs(LOGGER, level="WARNING"):
+                rendered = self._render()
+
+        mock_find.assert_not_called()
+        self.assertIn("js/alpine/plugins/ghost.min.js", rendered)
+
+    @mock.patch.object(component_tags.finders, "find", return_value=None)
+    def test_reporter_is_a_noop_outside_debug(self, mock_find) -> None:
+        """_warn_about_unusable_scripts is a no-op outside DEBUG."""
+        with self.settings(DEBUG=True):
+            require_script(self.context, "js/alpine/plugins/ghost")
+
+        with self.settings(DEBUG=False):
+            with self.assertNoLogs(LOGGER, level="WARNING"):
+                _warn_about_unusable_scripts(self.request)
+
+        mock_find.assert_not_called()
+
+
+class RequireScriptAssetsTest(SimpleTestCase):
+    """Guards the state of the templates and static files in this repo.
+
+    The rule itself is exercised in TestComponentTags; this only asks
+    whether what is committed today satisfies it.
+    """
+
+    _REQUIRE_SCRIPT_RE = re.compile(
+        r"""\{%\s*require_script\s+["']([^"']+)["']"""
+    )
+
+    @staticmethod
+    def _project_templates() -> list[Path]:
+        """Every template file Django can load from the project's own dirs."""
+        dirs = [Path(d) for d in settings.TEMPLATES[0]["DIRS"]]
+        dirs += [
+            Path(d)
+            for d in get_app_template_dirs("templates")
+            if Path(d).is_relative_to(settings.INSTALL_ROOT)
+        ]
+        return sorted({f for d in dirs for f in d.rglob("*.html")})
+
+    def _extensionless_requires(self) -> list[tuple[str, int, str]]:
+        """Finds every extension-less require as (template, line, stub)."""
+        found = []
+        for template in self._project_templates():
+            content = template.read_text(encoding="utf-8")
+            for match in self._REQUIRE_SCRIPT_RE.finditer(content):
+                stub = match.group(1)
+                if stub.endswith(".js"):
+                    # Explicit extension: used verbatim in every environment.
+                    continue
+                line = content.count("\n", 0, match.start()) + 1
+                relative = template.relative_to(settings.INSTALL_ROOT)
+                found.append((str(relative), line, stub))
+        return found
+
+    def test_every_extensionless_require_ships_both_variants(self) -> None:
+        """The templates only omit the extension for scripts that ship both."""
+        requires = self._extensionless_requires()
+        self.assertGreater(
+            len(requires), 0, "the template scan found nothing to check"
+        )
+
+        problems = [
+            f"{template}:{line}: {problem}"
+            for template, line, stub in requires
+            for problem in _script_problems(stub)
+        ]
+        if problems:
+            self.fail(
+                "Scripts required without an extension need a .js for DEBUG "
+                "and a .min.js for production:\n" + "\n".join(problems)
+            )
+
+
+class TestHttpUrlFilter(SimpleTestCase):
+    """Tests for the http_url template filter."""
+
+    def test_allows_http_and_https(self) -> None:
+        self.assertEqual(
+            http_url("https://example.com"), "https://example.com"
+        )
+        self.assertEqual(http_url("http://example.com"), "http://example.com")
+
+    def test_blocks_javascript_scheme(self) -> None:
+        self.assertEqual(http_url("javascript:alert(1)"), "")
+
+    def test_blocks_empty_and_none(self) -> None:
+        self.assertEqual(http_url(""), "")
+        self.assertEqual(http_url(None), "")
