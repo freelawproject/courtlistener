@@ -10,7 +10,7 @@ from collections.abc import (
 )
 from dataclasses import dataclass, field
 from enum import Enum
-from functools import reduce
+from functools import cache, reduce
 from typing import (
     Any,
     ClassVar,
@@ -36,6 +36,21 @@ if typing.TYPE_CHECKING:
     from django.db.models.fields.related_descriptors import RelatedManager
 
 logger = logging.getLogger(__name__)
+
+
+@cache
+def auto_now_fields(model: type[Model]) -> tuple[str, ...]:
+    """Collect the names of a model's `auto_now` fields (e.g. `date_modified`).
+
+    :param model: The model to inspect.
+
+    :return: The names of every concrete `auto_now` field on the model."""
+
+    return tuple(
+        f.name
+        for f in model._meta.concrete_fields
+        if getattr(f, "auto_now", False)
+    )
 
 
 def overwrite[T](scrape: T | None, db: T | None) -> T | None:
@@ -1092,6 +1107,8 @@ class Merger[ScrapeType, ParamType, M: Model](metaclass=MergerMeta):
                 self.model.__name__, self.existing.pk
             )
             updated += self.pre_update(updated)
+            if updated:
+                updated += auto_now_fields(self.model)
             self.existing.save(update_fields=updated)
 
         return result
