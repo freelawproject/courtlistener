@@ -1,0 +1,65 @@
+{% load svg_tags %}
+
+<c-vars docket="" />
+
+{% if docket.pacer_docket_url %}
+  <c-menu-button
+    button_variant="outline"
+    widget_aria_label="PACER links menu"
+    trigger_aria_label="View on PACER"
+    menu_aria_label="PACER report links"
+  >
+    <c-slot name="button_content">
+      {% svg "external" class="w-4 h-4" aria_hidden="true" %}
+      View on PACER
+      <span
+        class="transition-transform duration-200 group-aria-[expanded=true]:rotate-180 flex justify-center items-center w-4 h-4"
+        aria-hidden="true"
+      >{% svg "chevron" class="w-full h-full text-greyscale-400" %}</span>
+    </c-slot>
+    <c-slot name="menu_content">
+      <c-menu-button.item href="{{ docket.pacer_docket_url }}" icon="external" icon_class="w-4 h-4 text-greyscale-500" target="_blank" rel="nofollow noreferrer">
+        Docket Report
+      </c-menu-button.item>
+      {% if docket.court.jurisdiction != docket.court.FEDERAL_APPELLATE %}
+        <c-menu-button.divider />
+        <c-menu-button.item href="{{ docket.pacer_alias_url }}" icon="external" icon_class="w-4 h-4 text-greyscale-500" target="_blank" rel="nofollow noreferrer">
+          Alias Report
+        </c-menu-button.item>
+        <c-menu-button.item href="{{ docket.pacer_associated_cases_url }}" icon="external" icon_class="w-4 h-4 text-greyscale-500" target="_blank" rel="nofollow noreferrer">
+          Associated Cases
+        </c-menu-button.item>
+        <c-menu-button.item href="{{ docket.pacer_attorney_url }}" icon="external" icon_class="w-4 h-4 text-greyscale-500" target="_blank" rel="nofollow noreferrer">
+          Attorney Report
+        </c-menu-button.item>
+        <c-menu-button.item href="{{ docket.pacer_case_file_location_url }}" icon="external" icon_class="w-4 h-4 text-greyscale-500" target="_blank" rel="nofollow noreferrer">
+          Case File Location
+        </c-menu-button.item>
+        <c-menu-button.item href="{{ docket.pacer_summary_url }}" icon="external" icon_class="w-4 h-4 text-greyscale-500" target="_blank" rel="nofollow noreferrer">
+          Case Summary
+        </c-menu-button.item>
+        <c-menu-button.item href="{{ docket.pacer_deadlines_and_hearings_url }}" icon="external" icon_class="w-4 h-4 text-greyscale-500" target="_blank" rel="nofollow noreferrer">
+          Deadlines/Hearings
+        </c-menu-button.item>
+        <c-menu-button.item href="{{ docket.pacer_filers_url }}" icon="external" icon_class="w-4 h-4 text-greyscale-500" target="_blank" rel="nofollow noreferrer">
+          Filers Report
+        </c-menu-button.item>
+        <c-menu-button.item href="{{ docket.pacer_history_and_documents_url }}" icon="external" icon_class="w-4 h-4 text-greyscale-500" target="_blank" rel="nofollow noreferrer">
+          History/Documents
+        </c-menu-button.item>
+        <c-menu-button.item href="{{ docket.pacer_party_url }}" icon="external" icon_class="w-4 h-4 text-greyscale-500" target="_blank" rel="nofollow noreferrer">
+          Party Report
+        </c-menu-button.item>
+        <c-menu-button.item href="{{ docket.pacer_related_transactions_url }}" icon="external" icon_class="w-4 h-4 text-greyscale-500" target="_blank" rel="nofollow noreferrer">
+          Related Transactions
+        </c-menu-button.item>
+        <c-menu-button.item href="{{ docket.pacer_status_url }}" icon="external" icon_class="w-4 h-4 text-greyscale-500" target="_blank" rel="nofollow noreferrer">
+          Status Report
+        </c-menu-button.item>
+        <c-menu-button.item href="{{ docket.pacer_view_doc_url }}" icon="external" icon_class="w-4 h-4 text-greyscale-500" target="_blank" rel="nofollow noreferrer">
+          Purchase a Document
+        </c-menu-button.item>
+      {% endif %}
+    </c-slot>
+  </c-menu-button>
+{% endif %}

@@ -38,6 +38,7 @@ from cl.search.models import (
     ParentheticalGroup,
     RECAPDocument,
     SCOTUSDocketEntry,
+    ScotusDocketMetadata,
     SCOTUSDocument,
     TrialCourtData,
 )
@@ -395,6 +396,16 @@ class SCOTUSDocumentFactory(DjangoModelFactory):
     attachment_number = Faker("random_int", min=1, max=10)
     url = Faker("url")
     description = Faker("text", max_nb_chars=20)
+
+
+class ScotusDocketMetadataFactory(DjangoModelFactory):
+    class Meta:
+        model = ScotusDocketMetadata
+
+    docket = SubFactory(DocketFactory)
+    capital_case = False
+    linked_with = ""
+    questions_presented_url = ""
 
 
 class OpinionsCitedByRECAPDocumentFactory(DjangoModelFactory):
