@@ -687,8 +687,8 @@ class ScrapeFreeOpinionsLoopTest(TestCase):
         start = date(2025, 11, 1)
         end = date(2025, 11, 3)
         # Fail the middle day, succeed the others.
-        mock_fetch.side_effect = lambda court, s, e, day_span=1: s == date(
-            2025, 11, 2
+        mock_fetch.side_effect = lambda court, s, e, day_span=1: (
+            s == date(2025, 11, 2)
         )
 
         get_and_save_free_document_reports(
@@ -4645,9 +4645,10 @@ class ScrapeIqueryPagesTest(TestCase):
                 override_settings(IQUERY_SWEEP_UPLOADS_SIGNAL_ENABLED=False),
                 patch(
                     "cl.corpus_importer.signals.update_latest_case_id_and_schedule_iquery_sweep",
-                    side_effect=lambda *args,
-                    **kwargs: update_latest_case_id_and_schedule_iquery_sweep(
-                        *args, **kwargs
+                    side_effect=lambda *args, **kwargs: (
+                        update_latest_case_id_and_schedule_iquery_sweep(
+                            *args, **kwargs
+                        )
                     ),
                 ) as mock_iquery_sweep,
                 self.captureOnCommitCallbacks(execute=True),
@@ -4681,9 +4682,10 @@ class ScrapeIqueryPagesTest(TestCase):
             with (
                 patch(
                     "cl.corpus_importer.signals.update_latest_case_id_and_schedule_iquery_sweep",
-                    side_effect=lambda *args,
-                    **kwargs: update_latest_case_id_and_schedule_iquery_sweep(
-                        *args, **kwargs
+                    side_effect=lambda *args, **kwargs: (
+                        update_latest_case_id_and_schedule_iquery_sweep(
+                            *args, **kwargs
+                        )
                     ),
                 ) as mock_iquery_sweep,
                 self.captureOnCommitCallbacks(execute=True),
@@ -4720,9 +4722,10 @@ class ScrapeIqueryPagesTest(TestCase):
             with (
                 patch(
                     "cl.corpus_importer.signals.update_latest_case_id_and_schedule_iquery_sweep",
-                    side_effect=lambda *args,
-                    **kwargs: update_latest_case_id_and_schedule_iquery_sweep(
-                        *args, **kwargs
+                    side_effect=lambda *args, **kwargs: (
+                        update_latest_case_id_and_schedule_iquery_sweep(
+                            *args, **kwargs
+                        )
                     ),
                 ) as mock_iquery_sweep,
                 self.captureOnCommitCallbacks(execute=True),
@@ -4757,9 +4760,10 @@ class ScrapeIqueryPagesTest(TestCase):
             with (
                 patch(
                     "cl.corpus_importer.signals.update_latest_case_id_and_schedule_iquery_sweep",
-                    side_effect=lambda *args,
-                    **kwargs: update_latest_case_id_and_schedule_iquery_sweep(
-                        *args, **kwargs
+                    side_effect=lambda *args, **kwargs: (
+                        update_latest_case_id_and_schedule_iquery_sweep(
+                            *args, **kwargs
+                        )
                     ),
                 ) as mock_iquery_sweep,
                 self.captureOnCommitCallbacks(execute=True),
@@ -4792,9 +4796,10 @@ class ScrapeIqueryPagesTest(TestCase):
                 override_settings(IQUERY_SWEEP_UPLOADS_SIGNAL_ENABLED=True),
                 patch(
                     "cl.corpus_importer.signals.update_latest_case_id_and_schedule_iquery_sweep",
-                    side_effect=lambda *args,
-                    **kwargs: update_latest_case_id_and_schedule_iquery_sweep(
-                        *args, **kwargs
+                    side_effect=lambda *args, **kwargs: (
+                        update_latest_case_id_and_schedule_iquery_sweep(
+                            *args, **kwargs
+                        )
                     ),
                 ) as mock_iquery_sweep,
                 self.captureOnCommitCallbacks(execute=True),
@@ -4851,9 +4856,10 @@ class ScrapeIqueryPagesTest(TestCase):
                 override_settings(IQUERY_SWEEP_UPLOADS_SIGNAL_ENABLED=False),
                 patch(
                     "cl.corpus_importer.signals.update_latest_case_id_and_schedule_iquery_sweep",
-                    side_effect=lambda *args,
-                    **kwargs: update_latest_case_id_and_schedule_iquery_sweep(
-                        *args, **kwargs
+                    side_effect=lambda *args, **kwargs: (
+                        update_latest_case_id_and_schedule_iquery_sweep(
+                            *args, **kwargs
+                        )
                     ),
                 ) as mock_iquery_sweep,
                 self.captureOnCommitCallbacks(execute=True),
@@ -5287,9 +5293,10 @@ class ScrapeIqueryPagesTest(TestCase):
                 override_settings(IQUERY_SWEEP_UPLOADS_SIGNAL_ENABLED=False),
                 patch(
                     "cl.corpus_importer.signals.update_latest_case_id_and_schedule_iquery_sweep",
-                    side_effect=lambda *args,
-                    **kwargs: update_latest_case_id_and_schedule_iquery_sweep(
-                        *args, **kwargs
+                    side_effect=lambda *args, **kwargs: (
+                        update_latest_case_id_and_schedule_iquery_sweep(
+                            *args, **kwargs
+                        )
                     ),
                 ) as mock_iquery_sweep,
                 self.captureOnCommitCallbacks(execute=True),
@@ -5307,9 +5314,10 @@ class ScrapeIqueryPagesTest(TestCase):
                 override_settings(IQUERY_SWEEP_UPLOADS_SIGNAL_ENABLED=True),
                 patch(
                     "cl.corpus_importer.signals.update_latest_case_id_and_schedule_iquery_sweep",
-                    side_effect=lambda *args,
-                    **kwargs: update_latest_case_id_and_schedule_iquery_sweep(
-                        *args, **kwargs
+                    side_effect=lambda *args, **kwargs: (
+                        update_latest_case_id_and_schedule_iquery_sweep(
+                            *args, **kwargs
+                        )
                     ),
                 ) as mock_iquery_sweep,
                 self.captureOnCommitCallbacks(execute=True),

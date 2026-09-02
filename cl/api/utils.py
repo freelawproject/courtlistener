@@ -1146,9 +1146,11 @@ def get_current_throttle_usage(user: User) -> list[ThrottleUsageRow]:
 
     # Limit closest to being hit first; blocked rows float to the top.
     usage_rows.sort(
-        key=lambda r: 1.0
-        if r["blocked"]
-        else (r["used"] / r["limit"] if r["limit"] else 0.0),
+        key=lambda r: (
+            1.0
+            if r["blocked"]
+            else (r["used"] / r["limit"] if r["limit"] else 0.0)
+        ),
         reverse=True,
     )
     return usage_rows
