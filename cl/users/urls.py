@@ -5,10 +5,7 @@ from django_ses.views import SESEventWebhookView
 from rest_framework.routers import DefaultRouter
 
 from cl.lib.AuthenticationBackend import ConfirmedEmailAuthenticationForm
-from cl.lib.ratelimiter import (
-    ratelimiter_unsafe_10_per_m,
-    ratelimiter_unsafe_2000_per_h,
-)
+from cl.lib.ratelimiter import ratelimiter_unsafe_10_per_m
 from cl.users import api_views as user_views
 from cl.users import views
 from cl.users.forms import CustomSetPasswordForm
@@ -30,14 +27,12 @@ urlpatterns = [
     path(
         "sign-in/",
         ratelimiter_unsafe_10_per_m(
-            ratelimiter_unsafe_2000_per_h(
-                views.SafeRedirectLoginView.as_view(
-                    **{
-                        "template_name": "register/login.html",
-                        "authentication_form": ConfirmedEmailAuthenticationForm,
-                        "extra_context": {"private": False},
-                    }
-                )
+            views.SafeRedirectLoginView.as_view(
+                **{
+                    "template_name": "register/login.html",
+                    "authentication_form": ConfirmedEmailAuthenticationForm,
+                    "extra_context": {"private": False},
+                }
             )
         ),
         name="sign-in",

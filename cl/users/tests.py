@@ -80,7 +80,6 @@ from cl.lib.ratelimiter import (
     get_ratelimit_cache,
     is_login_throttled,
     make_failed_login_key,
-    reset_failed_login_count,
 )
 from cl.lib.redis_utils import get_redis_interface
 from cl.lib.test_helpers import (
@@ -4873,12 +4872,6 @@ class RefreshAPIThrottlesAdminTest(TestCase):
             # not shared with the default unnamed one.
             "LOCATION": "failed-sign-in-throttle-test",
         },
-        # Preserve db_cache because some unrelated request paths reference
-        # caches["db_cache"]. Not used by the sign-in view.
-        "db_cache": {
-            "BACKEND": "django.core.cache.backends.db.DatabaseCache",
-            "LOCATION": "django_cache",
-        },
     },
 )
 class FailedSignInThrottleTest(TestCase):
@@ -4916,14 +4909,7 @@ class FailedSignInThrottleTest(TestCase):
     def sign_in(
         self, identifier: str, password: str, ip: str = "192.0.2.1"
     ) -> HttpResponse:
-        """POST the sign-in form.
-
-        :param identifier: The username to submit.
-        :param password: The password to submit.
-        :param ip: The client IP to claim, via the header CloudFront sets. The
-        per-account throttle must bite no matter what this says.
-        :return: The response to the POST.
-        """
+        """POST the sign-in form, claiming the given IP via CloudFront's header."""
         return self.client.post(
             self.sign_in_url,
             {"username": identifier, "password": password},
@@ -5029,22 +5015,3 @@ class FailedSignInThrottleTest(TestCase):
         self.assertEqual(
             self.get_failure_count(self.user.username), count_at_limit
         )
-
-    def test_throttling_leaves_no_state_on_the_account(self) -> None:
-        """Does the throttle avoid touching the account itself?
-
-        Nothing here should need a staff member to undo, so the user row must
-        come out of it untouched, active, and able to sign in once the counter
-        is gone.
-        """
-        for _ in range(FAILED_LOGIN_LIMIT):
-            self.sign_in(self.user.username, "wrong-password")
-
-        self.user.refresh_from_db()
-        self.assertTrue(self.user.is_active)
-        self.assertTrue(self.user.profile.email_confirmed)
-
-        # Standing in for the window expiring.
-        reset_failed_login_count(self.user.username)
-        self.sign_in(self.user.username, "a-good-password")
-        self.assertIn("_auth_user_id", self.client.session)

@@ -233,25 +233,8 @@ def parse_rate(rate: str) -> tuple[int, int]:
 ####################################
 # Failed sign-in throttling        #
 ####################################
-# Credential stuffing replays addresses and passwords from other sites' breaches
-# against many accounts at once, usually from many IPs, so a per-IP limit alone
-# doesn't bound it. These helpers count *failed* sign-ins per submitted account
-# identifier, which bounds guessing against a single account no matter where the
-# requests come from.
-#
-# The numbers are a judgment call. Ten failures is far more than someone makes
-# fumbling a password they actually know, so a real user should never see the
-# throttle, and fifteen minutes is short enough that anyone who does trip it
-# isn't stuck for long (and can reset their password in the meantime). For an
-# attacker it caps guessing at forty attempts per hour per account, which is
-# hopeless against any password worth stealing.
 FAILED_LOGIN_LIMIT = 10
 FAILED_LOGIN_WINDOW = 60 * 15  # Seconds
-
-# Cache and network trouble while counting. Redis raises its own ConnectionError
-# (imported above); the built-in OSError covers socket-level failures, and
-# ValueError is what cache.incr() raises if the key expires mid-count.
-FAILED_LOGIN_CACHE_ERRORS = (ConnectionError, OSError, ValueError)
 
 
 def make_failed_login_key(identifier: str) -> str:
@@ -267,7 +250,9 @@ def make_failed_login_key(identifier: str) -> str:
     would turn the throttle into an account-existence oracle.
     :return: The cache key to count that identifier's failures under.
     """
-    digest = hashlib.sha256(identifier.strip().lower().encode()).hexdigest()
+    digest = hashlib.blake2s(
+        identifier.strip().lower().encode(), digest_size=16
+    ).hexdigest()
     return f"rl:failed-login:{digest}"
 
 
@@ -288,11 +273,7 @@ def is_login_throttled(identifier: str) -> bool:
     """
     if not identifier:
         return False
-    try:
-        count = get_ratelimit_cache().get(make_failed_login_key(identifier), 0)
-    except FAILED_LOGIN_CACHE_ERRORS:
-        # Can't reach the cache. Fail open rather than locking out the world.
-        return False
+    count = get_ratelimit_cache().get(make_failed_login_key(identifier), 0)
     return count >= FAILED_LOGIN_LIMIT
 
 
@@ -310,15 +291,16 @@ def record_failed_login(identifier: str) -> None:
         return
     cache = get_ratelimit_cache()
     key = make_failed_login_key(identifier)
+    # add() only succeeds when the key is absent, so the first failure sets the
+    # expiry and later ones raise the count without pushing it back.
+    if cache.add(key, 1, FAILED_LOGIN_WINDOW):
+        return
     try:
-        # add() only succeeds when the key is absent, so the first failure sets
-        # the expiry and later ones raise the count without pushing it back.
-        if not cache.add(key, 1, FAILED_LOGIN_WINDOW):
-            cache.incr(key)
-    except FAILED_LOGIN_CACHE_ERRORS:
-        # Can't reach the cache, so this attempt goes uncounted. The per-IP and
-        # global limits on the view still apply.
-        pass
+        cache.incr(key)
+    except ValueError:
+        # The window lapsed between the add() and the incr(), so the count this
+        # would have raised is gone. Start the next window instead of 500ing.
+        cache.add(key, 1, FAILED_LOGIN_WINDOW)
 
 
 def reset_failed_login_count(identifier: str) -> None:
@@ -329,7 +311,4 @@ def reset_failed_login_count(identifier: str) -> None:
     """
     if not identifier:
         return
-    try:
-        get_ratelimit_cache().delete(make_failed_login_key(identifier))
-    except FAILED_LOGIN_CACHE_ERRORS:
-        pass
+    get_ratelimit_cache().delete(make_failed_login_key(identifier))
