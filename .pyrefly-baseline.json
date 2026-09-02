@@ -925,9 +925,21 @@
       "severity": "error"
     },
     {
-      "line": 2301,
+      "line": 2010,
+      "column": 12,
+      "stop_line": 2010,
+      "stop_column": 22,
+      "path": "cl/corpus_importer/tasks.py",
+      "code": -2,
+      "name": "bad-return",
+      "description": "Returned type `ACMSAttachmentPage | AppellateAttachmentPage | AttachmentPage` is not assignable to declared return type `AttachmentPage | None`",
+      "concise_description": "Returned type `ACMSAttachmentPage | AppellateAttachmentPage | AttachmentPage` is not assignable to declared return type `AttachmentPage | None`",
+      "severity": "error"
+    },
+    {
+      "line": 2298,
       "column": 28,
-      "stop_line": 2301,
+      "stop_line": 2298,
       "stop_column": 40,
       "path": "cl/corpus_importer/tasks.py",
       "code": -2,
@@ -937,9 +949,9 @@
       "severity": "error"
     },
     {
-      "line": 2337,
+      "line": 2334,
       "column": 24,
-      "stop_line": 2337,
+      "stop_line": 2334,
       "stop_column": 36,
       "path": "cl/corpus_importer/tasks.py",
       "code": -2,
@@ -949,9 +961,9 @@
       "severity": "error"
     },
     {
-      "line": 3092,
+      "line": 3089,
       "column": 12,
-      "stop_line": 3092,
+      "stop_line": 3089,
       "stop_column": 20,
       "path": "cl/corpus_importer/tasks.py",
       "code": -2,
@@ -961,9 +973,9 @@
       "severity": "error"
     },
     {
-      "line": 5123,
+      "line": 5153,
       "column": 9,
-      "stop_line": 5123,
+      "stop_line": 5153,
       "stop_column": 27,
       "path": "cl/corpus_importer/tasks.py",
       "code": -2,
@@ -973,9 +985,9 @@
       "severity": "error"
     },
     {
-      "line": 5127,
+      "line": 5157,
       "column": 20,
-      "stop_line": 5127,
+      "stop_line": 5157,
       "stop_column": 32,
       "path": "cl/corpus_importer/tasks.py",
       "code": -2,
@@ -985,9 +997,9 @@
       "severity": "error"
     },
     {
-      "line": 5128,
+      "line": 5158,
       "column": 54,
-      "stop_line": 5128,
+      "stop_line": 5158,
       "stop_column": 66,
       "path": "cl/corpus_importer/tasks.py",
       "code": -2,
@@ -997,9 +1009,9 @@
       "severity": "error"
     },
     {
-      "line": 5132,
+      "line": 5162,
       "column": 13,
-      "stop_line": 5132,
+      "stop_line": 5162,
       "stop_column": 31,
       "path": "cl/corpus_importer/tasks.py",
       "code": -2,
@@ -1009,21 +1021,21 @@
       "severity": "error"
     },
     {
-      "line": 5136,
+      "line": 5166,
       "column": 41,
-      "stop_line": 5136,
+      "stop_line": 5166,
       "stop_column": 45,
       "path": "cl/corpus_importer/tasks.py",
       "code": -2,
       "name": "bad-argument-type",
-      "description": "Argument `Deserializable` is not assignable to parameter `scrape` with type `FloridaCase` in function `cl.corpus_importer.state.merger.Merger.__init__`",
-      "concise_description": "Argument `Deserializable` is not assignable to parameter `scrape` with type `FloridaCase` in function `cl.corpus_importer.state.merger.Merger.__init__`",
+      "description": "Argument `Deserializable | FloridaCase` is not assignable to parameter `scrape` with type `FloridaCase` in function `cl.corpus_importer.state.merger.Merger.__init__`",
+      "concise_description": "Argument `Deserializable | FloridaCase` is not assignable to parameter `scrape` with type `FloridaCase` in function `cl.corpus_importer.state.merger.Merger.__init__`",
       "severity": "error"
     },
     {
-      "line": 5141,
+      "line": 5171,
       "column": 13,
-      "stop_line": 5141,
+      "stop_line": 5171,
       "stop_column": 31,
       "path": "cl/corpus_importer/tasks.py",
       "code": -2,
@@ -1033,9 +1045,9 @@
       "severity": "error"
     },
     {
-      "line": 359,
+      "line": 363,
       "column": 9,
-      "stop_line": 359,
+      "stop_line": 363,
       "stop_column": 37,
       "path": "cl/corpus_importer/utils.py",
       "code": -2,
@@ -1045,9 +1057,9 @@
       "severity": "error"
     },
     {
-      "line": 359,
+      "line": 363,
       "column": 39,
-      "stop_line": 359,
+      "stop_line": 363,
       "stop_column": 67,
       "path": "cl/corpus_importer/utils.py",
       "code": -2,
@@ -1057,9 +1069,9 @@
       "severity": "error"
     },
     {
-      "line": 361,
+      "line": 365,
       "column": 12,
-      "stop_line": 361,
+      "stop_line": 365,
       "stop_column": 18,
       "path": "cl/corpus_importer/utils.py",
       "code": -2,
@@ -1678,18 +1690,6 @@
       "name": "missing-attribute",
       "description": "Object of class `RssFeedStatus` has no attribute `court_id`",
       "concise_description": "Object of class `RssFeedStatus` has no attribute `court_id`",
-      "severity": "error"
-    },
-    {
-      "line": 80,
-      "column": 15,
-      "stop_line": 80,
-      "stop_column": 28,
-      "path": "cl/scrapers/management/commands/tames_poller.py",
-      "code": -2,
-      "name": "missing-attribute",
-      "description": "Object of class `EllipsisType` has no attribute `strip`",
-      "concise_description": "Object of class `EllipsisType` has no attribute `strip`",
       "severity": "error"
     },
     {

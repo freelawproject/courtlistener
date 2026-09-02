@@ -3,6 +3,7 @@
 from datetime import date, datetime
 from tempfile import NamedTemporaryFile
 from unittest import mock
+from uuid import uuid4
 
 import httpx
 from juriscraper.state.docket import (
@@ -1418,6 +1419,66 @@ class FloridaIngestTaskTest(TestCase):
         self.assertTrue(result.success)
         self.assertIn("FloridaDocument", result.creates)
         download_mock.assert_not_called()
+
+    @mock.patch("cl.corpus_importer.tasks.download_fl_document.si")
+    def test_reingest_with_stored_file_skips_download(
+        self, download_mock: mock.Mock
+    ) -> None:
+        """Does re-ingesting an unchanged case skip downloading a document
+        whose file is already stored?"""
+        case = self._make_case()
+        fl_ingest_docket_task((case, "bucket", "key"))
+        document = FloridaDocument.objects.get()
+        document.filepath_local = "florida/stored-file.pdf"
+        document.save()
+        download_mock.reset_mock()
+
+        result = fl_ingest_docket_task((case, "bucket", "key"))
+
+        self.assertTrue(result.success)
+        self.assertNotIn("FloridaDocument", result.creates)
+        self.assertNotIn("FloridaDocument", result.updates)
+        download_mock.assert_not_called()
+
+    @mock.patch("cl.corpus_importer.tasks.download_fl_document.si")
+    def test_reingest_missing_file_downloads_again(
+        self, download_mock: mock.Mock
+    ) -> None:
+        """Does re-ingesting an unchanged case re-dispatch the download for a
+        document whose earlier download never stored a file?"""
+        case = self._make_case()
+        fl_ingest_docket_task((case, "bucket", "key"))
+        document = FloridaDocument.objects.get()
+        download_mock.reset_mock()
+
+        result = fl_ingest_docket_task((case, "bucket", "key"))
+
+        self.assertTrue(result.success)
+        download_mock.assert_called_once_with(document.pk)
+        download_mock.return_value.apply_async.assert_called_once()
+
+    @mock.patch("cl.corpus_importer.tasks.download_fl_document.si")
+    def test_reingest_changed_link_uuid_downloads_again(
+        self, download_mock: mock.Mock
+    ) -> None:
+        """Does a rescrape that changes a document's link UUID dispatch a
+        download even though a file is already stored for the old UUID?"""
+        case = self._make_case()
+        fl_ingest_docket_task((case, "bucket", "key"))
+        old_document = FloridaDocument.objects.get()
+        old_document.filepath_local = "florida/stored-file.pdf"
+        old_document.save()
+        download_mock.reset_mock()
+
+        case.entries[0].attachments[0].document_link_uuid = uuid4()
+        result = fl_ingest_docket_task((case, "bucket", "key"))
+
+        self.assertTrue(result.success)
+        new_document = FloridaDocument.objects.exclude(
+            pk=old_document.pk
+        ).get()
+        download_mock.assert_called_once_with(new_document.pk)
+        download_mock.return_value.apply_async.assert_called_once()
 
     @mock.patch("cl.corpus_importer.tasks.download_fl_document.si")
     def test_ingest_invalid_case_fails(self, download_mock: mock.Mock) -> None:
