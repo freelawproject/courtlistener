@@ -7,8 +7,8 @@ from django.contrib.auth.forms import AuthenticationForm
 from django.urls import reverse
 
 from cl.lib.ratelimiter import (
-    is_login_throttled,
-    record_failed_login,
+    FAILED_LOGIN_LIMIT,
+    count_login_attempt,
     reset_failed_login_count,
 )
 
@@ -31,9 +31,9 @@ class ConfirmedEmailAuthenticationForm(AuthenticationForm):
         super().__init__(*args, **kwargs)
 
     def clean(self) -> dict[str, Any]:
-        """Authenticate the user, counting failures against the identifier.
+        """Authenticate the user, counting attempts against the identifier.
 
-        This is Django's own ``clean()`` with a failure counter around the
+        This is Django's own ``clean()`` with an attempt counter around the
         ``authenticate()`` call. Two things are worth knowing about it:
 
         Over-limit attempts get the *same* error as a wrong password. A distinct
@@ -41,30 +41,29 @@ class ConfirmedEmailAuthenticationForm(AuthenticationForm):
         account, and would tell someone hammering a stranger's address that
         their nuisance had worked.
 
-        A throttled attempt is refused before ``authenticate()`` runs, so it
-        neither costs a password hash nor counts against the identifier. Nobody
-        can hold an account's owner out by continuing to guess: the window
-        always ends a fixed time after the first failure in it.
+        An over-limit attempt is refused before ``authenticate()`` runs, so it
+        costs no password hashes. It still counts, but counting doesn't extend
+        the window: it ends a fixed time after the first attempt in it either
+        way, so nobody can hold an account's owner out by continuing to guess.
 
         :return: The form's cleaned data.
         :raises forms.ValidationError: If the credentials are wrong, the
-        identifier is throttled, or the user isn't allowed to log in.
+        identifier is over its limit, or the user isn't allowed to log in.
         """
         username = self.cleaned_data.get("username")
         password = self.cleaned_data.get("password")
         if username is None or not password:
             return self.cleaned_data
 
-        if is_login_throttled(username):
+        # Count first, then check the password. One unit per POST, however many
+        # candidate accounts the backend has to check the password against.
+        if count_login_attempt(username) > FAILED_LOGIN_LIMIT:
             raise self.get_invalid_login_error()
 
         self.user_cache = authenticate(
             self.request, username=username, password=password
         )
         if self.user_cache is None:
-            # One unit per POST, however many candidate accounts the backend
-            # had to check the password against to get here.
-            record_failed_login(username)
             raise self.get_invalid_login_error()
 
         # The password was right, so this is the account's owner, even if

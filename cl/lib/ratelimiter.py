@@ -256,51 +256,48 @@ def make_failed_login_key(identifier: str) -> str:
     return f"rl:failed-login:{digest}"
 
 
-def is_login_throttled(identifier: str) -> bool:
-    """Has this identifier failed to sign in too many times recently?
+def count_login_attempt(identifier: str) -> int:
+    """Count one sign-in attempt against an identifier and report the total.
 
-    Checking is free: it doesn't count against the identifier, so an attacker
-    hammering somebody else's address can't extend the window and hold its owner
-    out. The window always ends FAILED_LOGIN_WINDOW seconds after the first
-    failure in it, and nothing about it survives that expiry, so there is no
-    state for staff to clear.
+    Count the attempt *before* checking the password, and compare the return
+    against FAILED_LOGIN_LIMIT to decide whether to go on. Reading the count and
+    raising it separately would not hold under load: password checking is slow,
+    so a burst of simultaneous attempts would all read the same pre-increment
+    count and all be let through. Here each attempt gets a distinct number.
 
-    Callers MUST reject a throttled attempt with the same error a wrong password
-    gets. A distinct message would tell an attacker they'd found a live account.
+    Counting attempts rather than failures costs the caller nothing, because a
+    successful sign-in clears the counter; what survives in it is failures.
 
-    :param identifier: The account identifier submitted on the sign-in form.
-    :return: True if further attempts should be refused, otherwise False.
-    """
-    if not identifier:
-        return False
-    count = get_ratelimit_cache().get(make_failed_login_key(identifier), 0)
-    return count >= FAILED_LOGIN_LIMIT
-
-
-def record_failed_login(identifier: str) -> None:
-    """Count one failed sign-in against an identifier.
-
-    Call this exactly once per failed sign-in POST, no matter how many candidate
-    accounts the submitted password had to be checked against, so the count
+    Call this exactly once per sign-in POST, no matter how many candidate
+    accounts the submitted password has to be checked against, so the count
     tracks attempts rather than password hashes.
 
+    The window is anchored to the first attempt in it: add() sets the expiry and
+    incr() leaves it alone, so attempts made while over the limit raise the count
+    without pushing the block out. Nobody can hold an account's owner out beyond
+    the original window by continuing to guess, and nothing survives the expiry,
+    so there is no state for staff to clear.
+
+    Callers MUST reject an over-limit attempt with the same error a wrong
+    password gets. A distinct message would tell an attacker they'd found a live
+    account.
+
     :param identifier: The account identifier submitted on the sign-in form.
-    :return: None
+    :return: How many attempts are now counted in the current window.
     """
     if not identifier:
-        return
+        return 0
     cache = get_ratelimit_cache()
     key = make_failed_login_key(identifier)
-    # add() only succeeds when the key is absent, so the first failure sets the
-    # expiry and later ones raise the count without pushing it back.
     if cache.add(key, 1, FAILED_LOGIN_WINDOW):
-        return
+        return 1
     try:
-        cache.incr(key)
+        return cache.incr(key)
     except ValueError:
         # The window lapsed between the add() and the incr(), so the count this
         # would have raised is gone. Start the next window instead of 500ing.
         cache.add(key, 1, FAILED_LOGIN_WINDOW)
+        return 1
 
 
 def reset_failed_login_count(identifier: str) -> None:

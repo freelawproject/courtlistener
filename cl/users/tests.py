@@ -77,8 +77,8 @@ from cl.lib.crypto import generate_activation_key
 from cl.lib.email_backends import get_email_count
 from cl.lib.ratelimiter import (
     FAILED_LOGIN_LIMIT,
+    FAILED_LOGIN_WINDOW,
     get_ratelimit_cache,
-    is_login_throttled,
     make_failed_login_key,
 )
 from cl.lib.redis_utils import get_redis_interface
@@ -4988,7 +4988,9 @@ class FailedSignInThrottleTest(TestCase):
         for _ in range(FAILED_LOGIN_LIMIT):
             self.sign_in(nobody, "wrong-password")
 
-        self.assertTrue(is_login_throttled(nobody))
+        self.assertGreaterEqual(
+            self.get_failure_count(nobody), FAILED_LOGIN_LIMIT
+        )
 
     def test_case_and_whitespace_variants_share_a_counter(self) -> None:
         """Can an attacker get a fresh counter by shifting the case of the
@@ -4997,21 +4999,34 @@ class FailedSignInThrottleTest(TestCase):
         for _ in range(FAILED_LOGIN_LIMIT):
             self.sign_in(self.user.username.upper(), "wrong-password")
 
-        self.assertTrue(is_login_throttled(f"  {self.user.username}  "))
+        self.assertGreaterEqual(
+            self.get_failure_count(f"  {self.user.username}  "),
+            FAILED_LOGIN_LIMIT,
+        )
 
-    def test_throttled_attempts_do_not_extend_the_window(self) -> None:
+    def test_guessing_on_does_not_extend_the_window(self) -> None:
         """Can somebody hold an account's owner out by continuing to guess?
 
-        They must not be able to: attempts made while throttled are refused
-        without being counted, so the window still ends where it would have.
+        They must not be able to. The window is anchored to the first attempt in
+        it, so guesses made while over the limit raise the count but leave the
+        expiry alone, and the block lifts when it always would have.
         """
-        for _ in range(FAILED_LOGIN_LIMIT):
-            self.sign_in(self.user.username, "wrong-password")
-        count_at_limit = self.get_failure_count(self.user.username)
+        start = now()
+        with time_machine.travel(start, tick=False) as traveller:
+            for _ in range(FAILED_LOGIN_LIMIT):
+                self.sign_in(self.user.username, "wrong-password")
+            self.sign_in(self.user.username, "a-good-password")
+            self.assertNotIn("_auth_user_id", self.client.session)
 
-        for _ in range(5):
-            self.sign_in(self.user.username, "wrong-password")
+            # Keep hammering for the rest of the window.
+            for second in range(60, FAILED_LOGIN_WINDOW, 60):
+                traveller.move_to(start + timedelta(seconds=second))
+                self.sign_in(self.user.username, "wrong-password")
 
-        self.assertEqual(
-            self.get_failure_count(self.user.username), count_at_limit
-        )
+            # The window ends where it began pointing, not where the last guess
+            # would have put it.
+            traveller.move_to(
+                start + timedelta(seconds=FAILED_LOGIN_WINDOW + 1)
+            )
+            self.sign_in(self.user.username, "a-good-password")
+            self.assertIn("_auth_user_id", self.client.session)
