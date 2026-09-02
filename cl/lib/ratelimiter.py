@@ -1,9 +1,10 @@
 import functools
+import hashlib
 import socket
 import sys
 
 from django.conf import settings
-from django.core.cache import caches
+from django.core.cache import BaseCache, caches
 from django.http import HttpRequest
 from django_ratelimit import UNSAFE
 from django_ratelimit.core import get_header
@@ -165,14 +166,23 @@ def verify_ip_address(ip_address: str) -> bool:
     return False
 
 
+def get_ratelimit_cache() -> BaseCache:
+    """Return the cache backend that the rate limiters count in.
+
+    :return: The cache named by the RATELIMIT_USE_CACHE setting, or the default
+    cache if that setting is unset.
+    """
+    cache_name = getattr(settings, "RATELIMIT_USE_CACHE", "default")
+    return caches[cache_name]
+
+
 def is_allowlisted(request: HttpRequest) -> bool:
     """Checks if the IP address is allowlisted due to belonging to an approved
     crawler.
 
     Returns True if so, else False.
     """
-    cache_name = getattr(settings, "RATELIMIT_USE_CACHE", "default")
-    cache = caches[cache_name]
+    cache = get_ratelimit_cache()
     allowlist_cache_prefix = "rl:allowlist"
     ip_address = get_user_ip_from_cloudfront_headers(request)
     if ip_address is None:
@@ -218,3 +228,108 @@ def parse_rate(rate: str) -> tuple[int, int]:
         duration_unit = period[0]
     duration_base = {"s": 1, "m": 60, "h": 3600, "d": 86400}[duration_unit]
     return num_requests, duration_base * duration_multiplier
+
+
+####################################
+# Failed sign-in throttling        #
+####################################
+# Credential stuffing replays addresses and passwords from other sites' breaches
+# against many accounts at once, usually from many IPs, so a per-IP limit alone
+# doesn't bound it. These helpers count *failed* sign-ins per submitted account
+# identifier, which bounds guessing against a single account no matter where the
+# requests come from.
+#
+# The numbers are a judgment call. Ten failures is far more than someone makes
+# fumbling a password they actually know, so a real user should never see the
+# throttle, and fifteen minutes is short enough that anyone who does trip it
+# isn't stuck for long (and can reset their password in the meantime). For an
+# attacker it caps guessing at forty attempts per hour per account, which is
+# hopeless against any password worth stealing.
+FAILED_LOGIN_LIMIT = 10
+FAILED_LOGIN_WINDOW = 60 * 15  # Seconds
+
+# Cache and network trouble while counting. Redis raises its own ConnectionError
+# (imported above); the built-in OSError covers socket-level failures, and
+# ValueError is what cache.incr() raises if the key expires mid-count.
+FAILED_LOGIN_CACHE_ERRORS = (ConnectionError, OSError, ValueError)
+
+
+def make_failed_login_key(identifier: str) -> str:
+    """Build the cache key holding the failed sign-in count for an identifier.
+
+    The identifier is lowercased before hashing, so varying the case of a
+    username or email doesn't buy a fresh bucket. Hashing keeps the key a fixed,
+    cache-safe length and keeps submitted email addresses out of the cache.
+
+    :param identifier: The account identifier submitted on the sign-in form. It
+    is whatever the person typed, not a resolved user, so that attempts against
+    addresses with no account get counted too. Counting only resolved users
+    would turn the throttle into an account-existence oracle.
+    :return: The cache key to count that identifier's failures under.
+    """
+    digest = hashlib.sha256(identifier.strip().lower().encode()).hexdigest()
+    return f"rl:failed-login:{digest}"
+
+
+def is_login_throttled(identifier: str) -> bool:
+    """Has this identifier failed to sign in too many times recently?
+
+    Checking is free: it doesn't count against the identifier, so an attacker
+    hammering somebody else's address can't extend the window and hold its owner
+    out. The window always ends FAILED_LOGIN_WINDOW seconds after the first
+    failure in it, and nothing about it survives that expiry, so there is no
+    state for staff to clear.
+
+    Callers MUST reject a throttled attempt with the same error a wrong password
+    gets. A distinct message would tell an attacker they'd found a live account.
+
+    :param identifier: The account identifier submitted on the sign-in form.
+    :return: True if further attempts should be refused, otherwise False.
+    """
+    if not identifier:
+        return False
+    try:
+        count = get_ratelimit_cache().get(make_failed_login_key(identifier), 0)
+    except FAILED_LOGIN_CACHE_ERRORS:
+        # Can't reach the cache. Fail open rather than locking out the world.
+        return False
+    return count >= FAILED_LOGIN_LIMIT
+
+
+def record_failed_login(identifier: str) -> None:
+    """Count one failed sign-in against an identifier.
+
+    Call this exactly once per failed sign-in POST, no matter how many candidate
+    accounts the submitted password had to be checked against, so the count
+    tracks attempts rather than password hashes.
+
+    :param identifier: The account identifier submitted on the sign-in form.
+    :return: None
+    """
+    if not identifier:
+        return
+    cache = get_ratelimit_cache()
+    key = make_failed_login_key(identifier)
+    try:
+        # add() only succeeds when the key is absent, so the first failure sets
+        # the expiry and later ones raise the count without pushing it back.
+        if not cache.add(key, 1, FAILED_LOGIN_WINDOW):
+            cache.incr(key)
+    except FAILED_LOGIN_CACHE_ERRORS:
+        # Can't reach the cache, so this attempt goes uncounted. The per-IP and
+        # global limits on the view still apply.
+        pass
+
+
+def reset_failed_login_count(identifier: str) -> None:
+    """Forget an identifier's failed sign-ins after it authenticates.
+
+    :param identifier: The account identifier submitted on the sign-in form.
+    :return: None
+    """
+    if not identifier:
+        return
+    try:
+        get_ratelimit_cache().delete(make_failed_login_key(identifier))
+    except FAILED_LOGIN_CACHE_ERRORS:
+        pass
