@@ -4865,12 +4865,35 @@ class RefreshAPIThrottlesAdminTest(TestCase):
         self.assertFalse(APIThrottle.objects.filter(user=self.target).exists())
 
 
+@override_settings(
+    CACHES={
+        "default": {
+            "BACKEND": "django.core.cache.backends.locmem.LocMemCache",
+            # Unique LOCATION so this cache is its own LocMemCache instance,
+            # not shared with the default unnamed one.
+            "LOCATION": "failed-sign-in-throttle-test",
+        },
+        # Preserve db_cache because some unrelated request paths reference
+        # caches["db_cache"]. Not used by the sign-in view.
+        "db_cache": {
+            "BACKEND": "django.core.cache.backends.db.DatabaseCache",
+            "LOCATION": "django_cache",
+        },
+    },
+)
 class FailedSignInThrottleTest(TestCase):
     """Tests for the per-account throttle on failed sign-ins.
 
     The view's decorators are no-ops under test (see cl.lib.ratelimiter), so
     these exercise the form-level throttle, which is where the per-account
     counting happens.
+
+    Why the cache override: the project test runner defaults to ``--parallel=N``
+    (cl/tests/runner.py), and every parallel worker shares the same Redis.
+    ``RestartRateLimitMixin.tearDownClass`` runs ``DEL :1:rl:*``, which covers
+    these counters, so a sibling worker tearing down its class mid-test would
+    reset the count out from under us. A process-local LocMemCache isolates us
+    from sibling workers.
     """
 
     @classmethod
@@ -4886,15 +4909,9 @@ class FailedSignInThrottleTest(TestCase):
 
     def setUp(self) -> None:
         self.sign_in_url = reverse("sign-in")
-        # Counters live in redis, which outlives the test transaction, so
-        # remember what we touched and clear it on the way out.
-        self.identifiers: set[str] = set()
-        self.addCleanup(self.clear_counters)
-
-    def clear_counters(self) -> None:
-        """Drop the failed sign-in counters this test created."""
-        for identifier in self.identifiers:
-            reset_failed_login_count(identifier)
+        # The overridden cache is process-local but still outlives a single
+        # test, so start each one from an empty count.
+        django_cache.clear()
 
     def sign_in(
         self, identifier: str, password: str, ip: str = "192.0.2.1"
@@ -4907,7 +4924,6 @@ class FailedSignInThrottleTest(TestCase):
         per-account throttle must bite no matter what this says.
         :return: The response to the POST.
         """
-        self.identifiers.add(identifier)
         return self.client.post(
             self.sign_in_url,
             {"username": identifier, "password": password},
