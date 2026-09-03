@@ -80,9 +80,12 @@ class EmailOrUsernameModelBackend(ModelBackend):
             identifier, exclude=by_username
         )
         if by_username is None and not candidates:
-            # Nothing to check the password against. Run one throwaway hash so
-            # that an address with no account takes as long as an address with
-            # one, as ModelBackend does.
+            # Nothing to check the password against. Run one throwaway hash
+            # so that an address with no account takes as long as an address
+            # with one. This is Django's own idiom, lifted verbatim from
+            # ModelBackend.authenticate(); the User is never saved, so there
+            # is no stored password here for validate_password() to check.
+            # nosemgrep: python.django.security.audit.unvalidated-password.unvalidated-password
             User().set_password(password)
             return None
 
