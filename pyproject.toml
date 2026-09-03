@@ -57,7 +57,7 @@ dependencies = [
   "ndg-httpsclient>=0.5.1",
   "networkx>=3.6.1",
   "nose",
-  "pandas>=2.3.3",
+  "pandas>=3.0.5",
   "pillow",
   "pycparser>=3.0",
   "pyopenssl",
