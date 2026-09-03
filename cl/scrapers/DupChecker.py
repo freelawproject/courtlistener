@@ -168,7 +168,7 @@ class DupChecker(dict):
         """Looks up `urls` in the DB, to skip known items before download
 
         Meant to skip known items before downloading them, on sites that
-        must be walked in full. 
+        must be walked in full.
 
         :param object_type: Opinion or Audio
         :param current_date: date of the item
