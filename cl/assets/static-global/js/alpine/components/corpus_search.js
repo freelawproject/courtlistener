@@ -72,8 +72,6 @@ document.addEventListener('alpine:init', () => {
     advancedFiltersExpanded: false,
     advancedFiltersExpandedDesktop: false,
     activeFilterCount: 0,
-    // Guaranteed to be the x-data root
-    formEl: null,
     get scopeMenuExpanded() {
       return this.$store.corpusSearch.scopeMenuExpanded;
     },
@@ -142,7 +140,7 @@ document.addEventListener('alpine:init', () => {
       return !this.advancedFiltersExpanded;
     },
     get formInputs() {
-      return Array.from(this.formEl.elements).filter((el) => ['INPUT', 'SELECT'].includes(el.tagName));
+      return Array.from(this.$root.elements).filter((el) => ['INPUT', 'SELECT'].includes(el.tagName));
     },
     get hasActiveFilters() {
       return this.activeFilterCount > 0;
@@ -221,8 +219,6 @@ document.addEventListener('alpine:init', () => {
     },
 
     init() {
-      // Save the x-data root on initialization
-      this.formEl = this.$el;
       this.$watch('selectedScope', (newVal) => {
         this.updateFieldsets(newVal.label);
         this.updateActiveFilterCount();
