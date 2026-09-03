@@ -330,9 +330,19 @@ class NeonMembership(AbstractDateTimeModel):
         default=MembershipPaymentStatus.PENDING,
     )
 
+    # Payment statuses that grant membership benefits. PENDING ("waiting for
+    # payment") is included so members keep access while a charge is still
+    # processing; only an outright FAILED/declined payment revokes benefits.
+    ACTIVE_PAYMENT_STATUSES = frozenset(
+        {
+            MembershipPaymentStatus.SUCCEEDED,
+            MembershipPaymentStatus.PENDING,
+        }
+    )
+
     @property
     def is_active(self) -> bool:
-        if self.payment_status != MembershipPaymentStatus.SUCCEEDED:
+        if self.payment_status not in self.ACTIVE_PAYMENT_STATUSES:
             return False
 
         if not self.termination_date:

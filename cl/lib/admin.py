@@ -87,6 +87,51 @@ def generate_admin_links(
     return generated_links
 
 
+class IndexedPkSearchMixin:
+    """Search a large table by PK without the admin's varchar cast
+
+    Django's admin search builds an `icontains` lookup for every entry in
+    `search_fields`, casting non-text fields to `CharField` to do so. That cast
+    stops Postgres from using the primary key index, which makes the changelist
+    search time out on our biggest tables. Comparing the integer ourselves keeps
+    the lookup on the index.
+
+    This was fixed upstream in Django 6.1, which no longer casts primary keys,
+    so this mixin can be deleted once we're running 6.1.
+
+    Admins using this mixin MUST still set a non-empty `search_fields` (e.g.
+    `("pk",)`), because the admin reads it to decide whether to render the
+    search box at all. Its contents are otherwise ignored: only the PK is
+    searched, and non-numeric input matches nothing, which is what the admin
+    does for any search that comes up empty.
+
+    Must be listed before `ModelAdmin` in the bases so that it wins the MRO.
+
+    See: https://github.com/freelawproject/courtlistener/issues/6790
+    """
+
+    def get_search_results(
+        self, request: HttpRequest, queryset: QuerySet, search_term: str
+    ) -> tuple[QuerySet, bool]:
+        """Filter the changelist queryset down to an exact PK match
+
+        :param request: The current HTTP request.
+        :param queryset: The changelist queryset to filter.
+        :param search_term: The raw string typed into the search box.
+        :return: Two-tuple of the filtered queryset and whether the caller
+            needs to de-duplicate the results (never, here).
+        """
+        if not search_term:
+            return queryset, False
+
+        try:
+            pk = int(search_term.strip())
+        except ValueError:
+            return queryset.none(), False
+
+        return queryset.filter(pk=pk), False
+
+
 class SealableDocumentAdmin(admin.ModelAdmin):
     """Mixin for admin classes that support sealing RECAP documents
     via a confirmation page and bulk actions.
@@ -153,20 +198,23 @@ class SealableDocumentAdmin(admin.ModelAdmin):
         """Render a seal confirmation page (GET) or seal selected
         documents (POST)."""
         obj = get_object_or_404(self.seal_model, pk=pk)
-        cancel_url = reverse(self.seal_change_url_name, args=[pk])
         documents = self.get_seal_documents(obj)
         heading = self.seal_heading_template.format(pk=pk)
 
         if request.method == "POST":
             self._seal_and_report(request)
-            return HttpResponseRedirect(cancel_url)
+            return HttpResponseRedirect(
+                reverse(self.seal_change_url_name, args=[pk])
+            )
 
         context = {
             **self.admin_site.each_context(request),
             "title": "Confirm document sealing",
             "heading": heading,
             "documents": documents,
-            "cancel_url": cancel_url,
+            # Resolved with {% url %} in the template, not a prebuilt href.
+            "cancel_url_name": self.seal_change_url_name,
+            "object_pk": pk,
         }
         return render(
             request,
@@ -188,8 +236,8 @@ class SealableDocumentAdmin(admin.ModelAdmin):
         :param request: The current HTTP request.
         :param queryset: QuerySet of RECAPDocuments to seal (bulk action).
         """
+        from cl.search.deletion_utils import seal_documents
         from cl.search.models import RECAPDocument
-        from cl.search.utils import seal_documents
 
         if queryset is None:
             doc_ids = request.POST.getlist("doc_ids")

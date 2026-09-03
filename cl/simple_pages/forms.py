@@ -8,8 +8,9 @@ from django.utils.html import format_html
 from hcaptcha.fields import hCaptchaField
 
 SEALING_KEYWORDS_REGEX = re.compile(
-    r"urgent|seal(ing|ed)?|redact(ed)?|pseudonym|anonymi(ty|ze)|"
-    r"press[\.\s]?coverage|time[\.\s]?sensitive",
+    r"urgent|seal(ing|ed)?|redact(ed)?|\bstruck\b|\bstricken\b|"
+    r"pseudonym|anonymi(ty|ze)|press[\.\s]?coverage|"
+    r"time[\.\s]?sensitive",
     re.I,
 )
 
@@ -20,6 +21,7 @@ class ContactForm(forms.Form):
     API_HELP = "api"
     MCP = "mcp"
     DATA_QUALITY = "data_quality"
+    DMCA_COMPLAINT = "dmca_complaint"
     RECAP_BUG = "recap"
     REMOVAL_REQUEST = "removal"
     MEMBERSHIPS = "memberships"
@@ -31,6 +33,7 @@ class ContactForm(forms.Form):
         (API_HELP, "Data or API Support"),
         (MCP, "MCP Server"),
         (DATA_QUALITY, "Report Data Quality Problem"),
+        (DMCA_COMPLAINT, "DMCA Complaint"),
         (RECAP_BUG, "RECAP Extension Bug"),
         (REMOVAL_REQUEST, "Case Removal Request"),
         (MEMBERSHIPS, "Memberships or Donations"),

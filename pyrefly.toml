@@ -1,0 +1,128 @@
+# Add modules here as they're ready (remove them from replace-imports-with-any
+# below as you do so).
+project-includes = [
+    "cl/alerts/**",
+    "cl/audio/**",
+    "cl/citations/**",
+    "cl/corpus_importer/**",
+    "cl/lib/**",
+    "cl/opinion_page/**",
+    "cl/recap_rss/**",
+    "cl/search/state/**",
+    "cl/settings/**",
+    "cl/simple_pages/**",
+    # Add files here as they're ready
+    "cl/api/api_permissions.py",
+    "cl/api/management/commands/cl_retry_webhooks.py",
+    "cl/api/models.py",
+    "cl/api/routers.py",
+    "cl/api/tasks.py",
+    "cl/api/tests.py",
+    "cl/api/utils.py",
+    "cl/api/views.py",
+    "cl/api/webhooks.py",
+    "cl/recap/management/commands/remove_appellate_entries_with_long_numbers.py",
+    "cl/recap/utils.py",
+    "cl/scrapers/management/commands/back_scrape_dockets.py",
+    "cl/scrapers/management/commands/back_scrape_fl_dockets.py",
+    "cl/scrapers/management/commands/tames_poller.py",
+    "cl/scrapers/management/utils.py",
+    "cl/search/deletion_utils.py",
+    "cl/search/docket_number_cleaner.py",
+    "cl/search/management/commands/cl_index_parent_and_child_docs.py",
+    "cl/search/management/commands/clean_docket_number_raw.py",
+    "cl/search/management/commands/generate_opinion_embeddings.py",
+    "cl/search/management/commands/llm_clean_docket_number_daemon.py",
+    "cl/search/management/commands/pacer_bulk_fetch.py",
+    "cl/search/management/commands/sweep_indexer.py",
+    "cl/search/tests/test_sealing.py",
+    "cl/tests/utils.py",
+    "cl/users/email_handlers.py",
+    "cl/users/forms.py",
+    "cl/users/management/commands/cl_account_management.py",
+    "cl/users/management/commands/cl_delete_old_emails.py",
+    "cl/users/management/commands/cl_retry_failed_email.py",
+    "cl/users/tasks.py",
+]
+project-excludes = ["**/migrations/**"]
+# Leniency for the mostly-untyped codebase: don't check bodies of unannotated
+# functions, treat their return types as Any, honor `# type: ignore` comments,
+# and treat unresolvable imports as Any.
+check-unannotated-defs = false
+infer-return-types = "never"
+permissive-ignores = true
+ignore-missing-imports = ["*"]
+# Modules whose types are not yet visible to the checker (imports from them
+# resolve to Any). Remove first-party modules from this list as they become
+# type-ready. The third-party packages listed ship their types as source
+# (py.typed) rather than stubs; the codebase has never been checked against
+# them, so their types stay hidden until someone fixes the fallout.
+replace-imports-with-any = [
+    "cl.ai", "cl.ai.*",
+    "cl.api", "cl.api.*",
+    "cl.custom_filters", "cl.custom_filters.*",
+    "cl.disclosures", "cl.disclosures.*",
+    "cl.donate", "cl.donate.*",
+    "cl.favorites", "cl.favorites.*",
+    "cl.lasc", "cl.lasc.*",
+    "cl.oauth", "cl.oauth.*",
+    "cl.people_db", "cl.people_db.*",
+    "cl.recap", "cl.recap.*",
+    "cl.scrapers", "cl.scrapers.*",
+    "cl.search", "cl.search.*",
+    "cl.sitemaps_infinite", "cl.sitemaps_infinite.*",
+    "cl.stats", "cl.stats.*",
+    "cl.tests", "cl.tests.*",
+    "cl.users", "cl.users.*",
+    "cl.visualizations", "cl.visualizations.*",
+    "cl.asgi",
+    "cl.celery_init",
+    "cl.sitemap",
+    "cl.urls",
+    "cl.workers",
+    "eyecite", "eyecite.*",
+    "elasticsearch", "elasticsearch.*",
+    "bs4", "bs4.*",
+]
+# Pre-existing errors are grandfathered here; only new errors fail the check.
+baseline = ".pyrefly-baseline.json"
+
+# Checks the codebase was never previously held to.
+[errors]
+unbound-name = false
+bad-override-param-name = false
+bad-override-mutable-attribute = false
+
+# Modules to hold to a stricter standard. Ideally the whole codebase will be held to these standards eventually.
+[[sub-config]]
+matches = "cl/audio/**"
+check-unannotated-defs = true
+infer-return-types = "checked"
+ignore-missing-imports = []
+
+[sub-config.errors]
+unbound-name = true
+bad-override-param-name = false
+bad-override-mutable-attribute = false
+
+[[sub-config]]
+matches = "cl/recap_rss/**"
+check-unannotated-defs = true
+infer-return-types = "checked"
+ignore-missing-imports = []
+
+[sub-config.errors]
+unbound-name = true
+bad-override-param-name = true
+bad-override-mutable-attribute = true
+
+[[sub-config]]
+matches = "cl/simple_pages/**"
+check-unannotated-defs = true
+infer-return-types = "checked"
+ignore-missing-imports = []
+
+[sub-config.errors]
+unbound-name = true
+bad-override-param-name = true
+bad-override-mutable-attribute = true

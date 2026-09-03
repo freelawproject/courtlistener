@@ -6,7 +6,9 @@ from django.core.files.base import ContentFile
 from django.test import TestCase
 
 from cl.corpus_importer.tasks import (
+    add_scotus_docket_entries,
     download_qp_scotus_pdf,
+    enrich_scotus_attachments,
     ingest_scotus_docket,
     merge_scotus_docket,
     merge_scotus_document,
@@ -38,6 +40,7 @@ from cl.search.models import (
     ScotusDocketMetadata,
     SCOTUSDocument,
 )
+from cl.tests.cases import TestCase as CLTestCase
 
 
 class ScotusDocketMergeTest(TestCase):
@@ -459,6 +462,56 @@ class ScotusDocketMergeTest(TestCase):
             metadata.questions_presented_url, data["questions_presented"]
         )
 
+    def test_scotus_merger_matches_entry_that_gained_attachments(
+        self,
+    ) -> None:
+        """Confirm an entry merged before it had attachments is matched, not
+        duplicated, when re-merged with attachments and a document number."""
+
+        docket = DocketFactory(court=self.court, source=Docket.SCRAPER)
+        entry_data = {
+            "description": "Petition for a writ of certiorari filed.",
+            "date_filed": datetime.date(2025, 6, 2),
+        }
+
+        # The poller sees the entry before it has attachments, so its
+        # document_number is None.
+        docket_entries = [
+            SCOTUSDocketEntryDataFactory(
+                **entry_data,
+                document_number=None,
+                attachments=[],
+            )
+        ]
+        enrich_scotus_attachments(docket_entries)
+        add_scotus_docket_entries(docket, docket_entries, download_file=False)
+
+        entries = SCOTUSDocketEntry.objects.filter(docket=docket)
+        self.assertEqual(entries.count(), 1)
+        self.assertIsNone(entries.first().entry_number)
+
+        # An attachment is then added to the entry, so the email update
+        # parses a document_number for it.
+        docket_entries = [
+            SCOTUSDocketEntryDataFactory(
+                **entry_data,
+                document_number=310278,
+                attachments=[
+                    SCOTUSAttachmentDataFactory(
+                        description="Petition", document_number=310278
+                    )
+                ],
+            )
+        ]
+        enrich_scotus_attachments(docket_entries)
+        add_scotus_docket_entries(docket, docket_entries, download_file=False)
+
+        entries = SCOTUSDocketEntry.objects.filter(docket=docket)
+        self.assertEqual(
+            entries.count(), 1, "Docket entry was duplicated on re-merge."
+        )
+        self.assertEqual(entries.first().entry_number, 310278)
+
     def test_merge_scotus_docket_source_compounds_existing(self) -> None:
         """Merging into an existing docket compounds its source with SCRAPER."""
         existing = DocketFactory(
@@ -866,3 +919,39 @@ class ScotusDocketMergeTest(TestCase):
                     federal_dn_judge_initials_referred=None,
                 )
                 self.assertEqual(found.pk, docket.pk)
+
+
+class ScotusDocketUrlPropertyTest(CLTestCase):
+    """#7584: Docket.scotus_docket_url builds the public case-page link,
+    mirroring the existing pacer_docket_url property's location/shape.
+    """
+
+    @classmethod
+    def setUpTestData(cls) -> None:
+        cls.court = CourtFactory(id="scotus", jurisdiction="F")
+
+    def test_builds_url_from_docket_number(self) -> None:
+        docket = DocketFactory(
+            court=self.court,
+            source=Docket.SCRAPER,
+            docket_number="25-1210",
+        )
+        self.assertEqual(
+            docket.scotus_docket_url,
+            "https://www.supremecourt.gov/search.aspx"
+            "?filename=/docket/docketfiles/html/public/25-1210.html",
+        )
+
+    def test_url_encodes_special_characters(self) -> None:
+        docket = DocketFactory(
+            court=self.court,
+            source=Docket.SCRAPER,
+            docket_number="25 1210",
+        )
+        self.assertIn("25%201210", docket.scotus_docket_url)
+
+    def test_returns_empty_string_when_no_docket_number(self) -> None:
+        docket = DocketFactory(
+            court=self.court, source=Docket.SCRAPER, docket_number=""
+        )
+        self.assertEqual(docket.scotus_docket_url, "")

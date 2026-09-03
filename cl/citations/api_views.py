@@ -3,7 +3,6 @@ from http import HTTPStatus
 from asgiref.sync import async_to_sync
 from django.conf import settings
 from django.db.models import QuerySet
-from django.utils.safestring import SafeString
 from eyecite.models import FullCaseCitation, ShortCaseCitation
 from rest_framework.exceptions import NotFound
 from rest_framework.mixins import CreateModelMixin
@@ -107,7 +106,7 @@ class CitationLookupViewSet(LoggingMixin, CreateModelMixin, GenericViewSet):
             ).data
         )
 
-    def _attempt_reporter_variation(self, reporter) -> list[SafeString]:
+    def _attempt_reporter_variation(self, reporter) -> list[str]:
         """Try to disambiguate an unknown reporter using the variations dict.
 
         Args:
@@ -147,7 +146,7 @@ class CitationLookupViewSet(LoggingMixin, CreateModelMixin, GenericViewSet):
 
         """
         # Look up the reporter to get its proper version (so-2d -> So. 2d)
-        proper_reporter: None | str | list[SafeString]
+        proper_reporter: None | str | list[str]
         proper_reporter = SLUGIFIED_EDITIONS.get(
             slugify_reporter(reporter), None
         )
@@ -192,7 +191,7 @@ class CitationLookupViewSet(LoggingMixin, CreateModelMixin, GenericViewSet):
         }
 
     def _get_clusters_for_canonical_list(
-        self, reporters: list[SafeString], volume: str, page: str
+        self, reporters: list[str], volume: str, page: str
     ) -> tuple[
         QuerySet[OpinionCluster, OpinionCluster] | None, int, list[str]
     ]:
@@ -203,7 +202,7 @@ class CitationLookupViewSet(LoggingMixin, CreateModelMixin, GenericViewSet):
         to find all associated opinion clusters.
 
         Args:
-            reporters (list[SafeString]): A list of strings representing the reporter
+            reporters (list[str]): A list of strings representing the reporter
                                   slugs.
             volume (str): The volume number of citation.
             page (str): The page number where the citation is located.

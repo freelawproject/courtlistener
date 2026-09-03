@@ -1,3 +1,4 @@
+import asyncio
 import datetime
 from collections import OrderedDict, defaultdict
 from datetime import timedelta
@@ -69,6 +70,10 @@ from cl.lib.thumbnails import make_png_thumbnail_for_instance
 from cl.lib.url_utils import get_redirect_or_abort
 from cl.lib.utils import human_sort
 from cl.opinion_page.decorators import handle_cluster_redirection
+from cl.opinion_page.docket_sources_utils import (
+    RECAP_SOURCE,
+    attach_display_fields,
+)
 from cl.opinion_page.feeds import DocketFeed
 from cl.opinion_page.forms import (
     CitationRedirectorForm,
@@ -80,10 +85,7 @@ from cl.opinion_page.forms import (
     TennWorkCompClUploadForm,
 )
 from cl.opinion_page.utils import (
-    build_bankruptcy_metadata,
-    build_docket_metadata,
     build_docket_tabs,
-    build_originating_court_metadata,
     core_docket_data,
     es_cited_case_count,
     es_get_cited_clusters_with_cache,
@@ -96,14 +98,12 @@ from cl.recap.constants import COURT_TIMEZONES
 from cl.recap.models import FjcIntegratedDatabase
 from cl.search.models import (
     SEARCH_TYPES,
-    BankruptcyInformation,
     Citation,
     Court,
     Docket,
     Opinion,
     OpinionCluster,
     OpinionsCitedByRECAPDocument,
-    OriginatingCourtInformation,
     Parenthetical,
     RECAPDocument,
     sort_cites,
@@ -226,7 +226,7 @@ async def court_publish_page(request: HttpRequest, pk: str) -> HttpResponse:
                 "You do not have permission to access this page."
             )
 
-    # Fix mypy errors
+    # Fix type checker errors
     upload_form: Any
 
     upload_form_classes = {
@@ -332,18 +332,16 @@ async def redirect_docket_recap(
 
 
 async def fetch_docket_entries(docket):
-    """Fetch docket entries asociated to docket
+    """Fetch docket entries associated with a docket.
+
+    Uses the source-appropriate model for the docket's court (see
+    cl.opinion_page.docket_sources_utils).
 
     param docket: docket.id to get related docket_entries.
     returns: DocketEntry Queryset.
     """
-    de_list = docket.docket_entries.all().prefetch_related(
-        Prefetch(
-            "recap_documents",
-            queryset=RECAPDocument.objects.defer("plain_text"),
-        )
-    )
-    return de_list
+    source = docket.get_entry_source()
+    return source.entries_queryset(docket)
 
 
 @track_view_counter(tracks="docket", label_format="d.%s:view")
@@ -354,6 +352,7 @@ async def view_docket(
     form = DocketEntryFilterForm(request.GET, request=request)
     docket, context = await core_docket_data(request, pk)
 
+    source = docket.get_entry_source()
     de_list = await fetch_docket_entries(docket)
 
     if await sync_to_async(form.is_valid)():
@@ -369,9 +368,14 @@ async def view_docket(
             de_list = de_list.filter(date_filed__lte=cd["filed_before"])
         if cd.get("order_by") == DocketEntryFilterForm.DESCENDING:
             sort_order_asc = False
-            de_list = de_list.order_by(
-                "-recap_sequence_number", "-entry_number"
-            )
+
+    # Always order explicitly from the source config rather than relying on
+    # each model's Meta.ordering fallback -- DocketEntry defaults ascending
+    # but SCOTUSDocketEntry defaults descending, so an implicit fallback
+    # would silently contradict the sort_order_asc flag used by the template.
+    de_list = de_list.order_by(
+        *(source.order_by_asc if sort_order_asc else source.order_by_desc)
+    )
 
     page = request.GET.get("page", "1")
 
@@ -381,45 +385,42 @@ async def view_docket(
 
     paginated_entries = await paginate_docket_entries(de_list, page)
 
-    # Extract recap documents from the current page.
-    recap_documents = [
-        rd
-        for entry in await sync_to_async(list)(paginated_entries)
-        async for rd in entry.recap_documents.all()
-    ]
-    # Get prayer counts in bulk.
-    prayer_counts = await get_prayer_counts_in_bulk(recap_documents)
-    existing_prayers = {}
+    @sync_to_async
+    def _attach_documents(entries: list) -> list:
+        page_documents = []
+        for entry in entries:
+            entry.documents = list(source.documents_for_entry(entry))
+            for document in entry.documents:
+                attach_display_fields(source, document)
+            page_documents.extend(entry.documents)
+        return page_documents
 
-    user = await request.auser()
-    if user.is_authenticated:
-        # Check prayer existence in bulk.
-        existing_prayers = await get_existing_prayers_in_bulk(
-            user, recap_documents
-        )
+    page_documents = await _attach_documents(
+        await sync_to_async(list)(paginated_entries)
+    )
 
-    # Merge counts and existing prayer status to RECAPDocuments.
-    for rd in recap_documents:
-        rd.prayer_count = prayer_counts.get(rd.id, 0)
-        rd.prayer_exists = existing_prayers.get(rd.id, False)
+    prayer_counts: dict[int, int] = {}
+    existing_prayers: dict[int, bool] = {}
+
+    if source.has_pay_and_pray:
+        # Get prayer counts in bulk.
+        prayer_counts = await get_prayer_counts_in_bulk(page_documents)
+
+        user = await request.auser()
+        if user.is_authenticated:
+            # Check prayer existence in bulk.
+            existing_prayers = await get_existing_prayers_in_bulk(
+                user, page_documents
+            )
+
+        # Merge counts and existing prayer status onto the documents.
+        for doc in page_documents:
+            doc.prayer_count = prayer_counts.get(doc.id, 0)
+            doc.prayer_exists = existing_prayers.get(doc.id, False)
 
     parties = await docket.parties.aexists()
     has_idb_data = bool(docket.idb_data_id)
     has_authorities = await docket.ahas_authorities()
-
-    @sync_to_async
-    def _get_related(
-        d: Docket,
-    ) -> tuple[
-        BankruptcyInformation | None,
-        OriginatingCourtInformation | None,
-    ]:
-        return (
-            getattr(d, "bankruptcy_information", None),
-            getattr(d, "originating_court_information", None),
-        )
-
-    bankr_info, og_info = await _get_related(docket)
 
     context.update(
         {
@@ -429,13 +430,6 @@ async def view_docket(
             "sort_order_asc": sort_order_asc,
             "form": form,
             "get_string": make_get_string(request),
-            "metadata": await sync_to_async(build_docket_metadata)(
-                docket, context["timezone"]
-            ),
-            "bankruptcy_metadata": build_bankruptcy_metadata(bankr_info),
-            "originating_court_metadata": await sync_to_async(
-                build_originating_court_metadata
-            )(docket, og_info),
             "tabs": build_docket_tabs(
                 docket, parties, has_idb_data, has_authorities
             ),
@@ -614,7 +608,20 @@ def download_docket_entries_csv(
     filename = f"{case_name}.{court_id}.{docket_id}.{date_str}.csv"
 
     # TODO check if for large files we'll cache or send file by email
-    csv_content = generate_docket_entries_csv_data(de_list) if de_list else b""
+    try:
+        csv_content = (
+            generate_docket_entries_csv_data(de_list) if de_list else b""
+        )
+    except (NotImplementedError, AttributeError):
+        # Some docket sources (e.g. SCOTUS) don't support CSV export yet.
+        # Only return a handled 501 for those. A RECAP docket hitting
+        # this branch means a real bug in the CSV path, and that should
+        # still raise a error 500.
+        if docket.get_entry_source() is RECAP_SOURCE:
+            raise
+        # A handled 501 triggers the existing "There was a problem. Try
+        # again later." message in export-csv.js instead of crashing.
+        return HttpResponse(status=501)
     response: HttpResponse = HttpResponse(csv_content, content_type="text/csv")
     response["Content-Disposition"] = f'attachment; filename="{filename}"'
     return response
@@ -1093,11 +1100,16 @@ async def update_opinion_tabs(request: HttpRequest, pk: int):
             request, "includes/opinion_tabs.html", {"cluster": None}
         )
 
-    authorities_count = await cluster.aauthority_count()
-    summaries_count = await cluster.parentheticals.acount()
-
-    ui_flag_for_o_es = await sync_to_async(waffle.flag_is_active)(
-        request, "ui_flag_for_o_es"
+    (
+        authorities_count,
+        summaries_count,
+        ui_flag_for_o_es,
+        download_context,
+    ) = await asyncio.gather(
+        cluster.aauthority_count(),
+        cluster.parentheticals.acount(),
+        sync_to_async(waffle.flag_is_active)(request, "ui_flag_for_o_es"),
+        get_downloads_context(cluster),
     )
     # Default count when flag is disabled
     cited_by_count = 0
@@ -1109,9 +1121,9 @@ async def update_opinion_tabs(request: HttpRequest, pk: int):
             str(opinion.pk)
             async for opinion in cluster.sub_opinions.all().only("pk")
         ]
-        cited_by_count = await es_cited_case_count(cluster.id, sub_opinion_pks)
-        related_cases_count = await es_related_case_count(
-            cluster.id, sub_opinion_pks
+        cited_by_count, related_cases_count = await asyncio.gather(
+            es_cited_case_count(cluster.id, sub_opinion_pks),
+            es_related_case_count(cluster.id, sub_opinion_pks),
         )
 
     # Get `tab` from request parameters (fallback to 'opinions')
@@ -1128,7 +1140,6 @@ async def update_opinion_tabs(request: HttpRequest, pk: int):
         "es_enabled": ui_flag_for_o_es,
     }
 
-    download_context = await get_downloads_context(cluster)
     context.update(download_context)
 
     return await sync_to_async(render)(
@@ -1182,7 +1193,7 @@ async def view_opinion_authorities(
     :return: Table of Authorities tab
     """
     cluster: OpinionCluster = await aget_object_or_404(
-        await get_opinions_queryset("sub_opinions__opinions_cited"),
+        await get_opinions_queryset("no_text_fields"),
         pk=pk,
     )
 
@@ -1385,24 +1396,30 @@ async def reporter_or_volume_handler(
         )
 
     # Show all the cases for a volume-reporter dyad
-    cases_in_volume = OpinionCluster.objects.filter(
-        citations__reporter=reporter, citations__volume=volume
-    ).order_by("date_filed")
-
-    if not await cases_in_volume.aexists():
-        return await throw_404(
-            request,
-            {
-                "no_cases": True,
-                "reporter": reporter,
-                "volume_names": volume_names,
-                "volume": volume,
-                "private": False,
-            },
+    cases_in_volume = (
+        OpinionCluster.objects.filter(
+            citations__reporter=reporter, citations__volume=volume
         )
-
-    volume_next, volume_previous = await get_prev_next_volumes(
-        reporter, volume
+        .select_related("docket")
+        .only(
+            "case_name",
+            "case_name_full",
+            "case_name_short",
+            "date_filed",
+            "slug",
+            "blocked",
+            "docket__docket_number",
+        )
+        .prefetch_related(
+            Prefetch(
+                "citations",
+                queryset=Citation.objects.only(
+                    "volume", "reporter", "page", "type", "cluster_id"
+                ),
+            )
+        )
+        .distinct()
+        .order_by("date_filed")
     )
 
     page = request.GET.get("page", 1)
@@ -1417,18 +1434,36 @@ async def reporter_or_volume_handler(
         except EmptyPage:
             return paginator.page(paginator.num_pages)
 
+    cases_page = await paginate_volumes(cases_in_volume, page)
+    if cases_page.paginator.count == 0:
+        return await throw_404(
+            request,
+            {
+                "no_cases": True,
+                "reporter": reporter,
+                "volume_names": volume_names,
+                "volume": volume,
+                "private": False,
+            },
+        )
+
+    volume_next, volume_previous = await get_prev_next_volumes(
+        reporter, volume
+    )
+    has_blocked_cases = await cases_in_volume.filter(blocked=True).aexists()
+
     return TemplateResponse(
         request,
         "volumes_for_reporter.html",
         {
-            "cases": await paginate_volumes(cases_in_volume, page),
+            "cases": cases_page,
             "reporter": reporter,
             "variation_names": variation_names,
             "volume": volume,
             "volume_names": volume_names,
             "volume_previous": volume_previous,
             "volume_next": volume_next,
-            "private": any([case.blocked async for case in cases_in_volume]),
+            "private": has_blocked_cases,
         },
     )
 

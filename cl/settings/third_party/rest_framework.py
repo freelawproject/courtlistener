@@ -28,6 +28,11 @@ REST_FRAMEWORK = {
         "user": ["5/min", "50/hour", "125/day"],
         "citations": "60/min",
         "tags": "1000/hour",
+        "api_usage": ["10/min", "120/hour"],
+        # Fetch API (buying PACER documents). Deliberately much higher than
+        # the global "user" rate and not gated by membership: see #7503.
+        "fetch": "30/min",
+        "events": "60/hour",
     },
     # Auth
     "DEFAULT_AUTHENTICATION_CLASSES": (

@@ -11,15 +11,15 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Check out CourtListener
-        uses: actions/checkout@v7
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
         with:
           path: courtlistener
 
       # Build docker image
       - name: Set up docker Buildx
-        uses: docker/setup-buildx-action@v4
+        uses: docker/setup-buildx-action@37fe631027851001ddb9b187196cc803df7f5f0e # v4
       - name: Build docker image
-        uses: docker/build-push-action@v7
+        uses: docker/build-push-action@53b7df96c91f9c12dcc8a07bcb9ccacbed38856a # v7
         with:
           context: ./courtlistener
           file: ./courtlistener/docker/django/Dockerfile
@@ -32,7 +32,7 @@ jobs:
           cache-to: type=gha,mode=max
 
       - name: Upload artifact
-        uses: actions/upload-artifact@v7
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
         with:
           name: courtlistener
           path: /tmp/courtlistener.tar
@@ -42,13 +42,19 @@ jobs:
   test:
     runs-on: ubuntu-latest
     needs: build
+    # dorny/test-reporter runs in its default use-actions-summary mode, which
+    # writes the report to the job summary rather than creating a check run, so
+    # it needs no write scopes. Declared explicitly to keep the token
+    # least-privilege regardless of the repo-wide default.
+    permissions:
+      contents: read
     strategy:
       fail-fast: false
       matrix:
         tag_flags: ["--exclude-tag selenium", "--tag selenium"]
     steps:
       - name: Check out CourtListener
-        uses: actions/checkout@v7
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
         with:
           path: courtlistener
 
@@ -65,7 +71,7 @@ jobs:
         run: echo ${{ github.actor }}
 
       - name: Set up docker Buildx
-        uses: docker/setup-buildx-action@v4
+        uses: docker/setup-buildx-action@37fe631027851001ddb9b187196cc803df7f5f0e # v4
         with:
           driver-opts: network=host
 
@@ -74,7 +80,7 @@ jobs:
         working-directory: courtlistener/docker/courtlistener
         run: docker compose pull --quiet --ignore-buildable
       - name: Download courtlistener image
-        uses: actions/download-artifact@v8
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8
         with:
           name: courtlistener
           path: /tmp
@@ -106,7 +112,7 @@ jobs:
         run: >
           docker exec -e SELENIUM_DEBUG=1 -e SELENIUM_TIMEOUT=30 cl-django
           ./manage.py test
-          cl --verbosity=2 ${{ matrix.tag_flags }} --parallel
+          cl --verbosity=2 ${{ matrix.tag_flags }} --parallel --xml-output /tmp/test-results
       - name: Export selenium results from docker to host
         if: failure()
         run: |
@@ -117,12 +123,40 @@ jobs:
           docker exec cl-django bash -c "mkdir /extract && mv /tmp/*-selenium.png /extract ||:"
           docker cp 'cl-django:/extract' selenium-screenshots/
       - name: Save selenium screenshot as Github artifacts
-        uses: actions/upload-artifact@master
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
         if: failure()
         with:
           name: selenium-screenshots
           path: selenium-screenshots/extract
           if-no-files-found: ignore
+      - name: Export test results from docker to host
+        if: always()
+        # There is nothing to copy if the tests never ran -- the stack failed
+        # to come up, say -- and docker cp exits non-zero when the source is
+        # missing. Swallow that so this step doesn't pile a second, misleading
+        # failure on top of the real one. An empty result set still surfaces:
+        # the Test Report step below fails on it.
+        run: docker cp 'cl-django:/tmp/test-results' courtlistener/test-results || true
+      - name: Save test results as Github artifact
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
+        if: always()
+        with:
+          name: test-results-${{ strategy.job-index }}
+          path: courtlistener/test-results/
+          if-no-files-found: ignore
+      # Safe on fork PRs: writing the job summary needs no token scopes, so the
+      # read-only GITHUB_TOKEN GitHub forces there is enough. Flip
+      # use-actions-summary off and this becomes a check run, which needs
+      # checks:write above and will 403 on forks.
+      - name: Test Report
+        uses: dorny/test-reporter@a43b3a5f7366b97d083190328d2c652e1a8b6aa2 # v3.0.0
+        if: ${{ !cancelled() }}
+        with:
+          name: Test Results (${{ matrix.tag_flags }})
+          path: test-results/*.xml
+          reporter: java-junit
+          working-directory: courtlistener
+
 
 # Cancel the current workflow (tests) for pull requests (head_ref) only. See:
 # https://docs.github.com/en/actions/using-workflows/workflow-syntax-for-github-actions#example-using-a-fallback-value
