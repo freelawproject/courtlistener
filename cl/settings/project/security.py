@@ -57,6 +57,13 @@ else:
     CSRF_COOKIE_SECURE = True
     SECURE_PROXY_SSL_HEADER = ("HTTP_X_FORWARDED_PROTO", "https")
 
+# Sign people in by username *or* email address. The backend subclasses
+# ModelBackend, so it stays the only backend and permission lookups are
+# unchanged; see cl.lib.AuthenticationBackend for how it resolves credentials.
+AUTHENTICATION_BACKENDS = [
+    "cl.lib.AuthenticationBackend.EmailOrUsernameModelBackend",
+]
+
 AUTH_PASSWORD_VALIDATORS = [
     {
         "NAME": "django.contrib.auth.password_validation.UserAttributeSimilarityValidator",

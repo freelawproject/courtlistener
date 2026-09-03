@@ -24,6 +24,7 @@ from django.core.mail import (
     get_connection,
     send_mail,
 )
+from django.http import HttpResponse
 from django.test import AsyncClient, RequestFactory
 from django.test.client import Client
 from django.test.utils import override_settings
@@ -72,6 +73,7 @@ from cl.favorites.models import (
     UserTag,
     UserTagEvent,
 )
+from cl.lib.AuthenticationBackend import MAX_EMAIL_CANDIDATES
 from cl.lib.crypto import generate_activation_key
 from cl.lib.email_backends import get_email_count
 from cl.lib.redis_utils import get_redis_interface
@@ -104,6 +106,7 @@ from cl.users.factories import (
     UserFactory,
     UserProfileWithParentsFactory,
 )
+from cl.users.forms import PasswordConfirmForm
 from cl.users.management.commands.cl_delete_old_emails import delete_old_emails
 from cl.users.management.commands.cl_retry_failed_email import (
     handle_failing_emails,
@@ -4855,3 +4858,351 @@ class RefreshAPIThrottlesAdminTest(TestCase):
         )
         # Inactive user got nothing
         self.assertFalse(APIThrottle.objects.filter(user=self.target).exists())
+
+
+class EmailOrUsernameSignInTest(TestCase):
+    """Tests for signing in with a username or an email address.
+
+    These go through the sign-in view rather than calling the backend, so that
+    the form's own checks — the generic error, the "confirm your address"
+    message — are part of what's covered.
+    """
+
+    PASSWORD = "a-good-password"
+
+    def make_user(
+        self,
+        username: str,
+        email: str,
+        password: str = PASSWORD,
+        last_login: datetime | None = None,
+        is_active: bool = True,
+        email_confirmed: bool = True,
+        stub_account: bool = False,
+    ) -> User:
+        """Build an account to sign in as.
+
+        :param username: The account's username.
+        :param email: The account's email address.
+        :param password: The plaintext password to set.
+        :param last_login: When the account last signed in, or None for never.
+        :param is_active: Whether the account is active.
+        :param email_confirmed: Whether its address has been confirmed.
+        :param stub_account: Whether it's a stub, as donations create.
+        :return: The new User.
+        """
+        user = UserProfileWithParentsFactory.create(
+            user__username=username,
+            user__email=email,
+            user__password=make_password(password),
+            user__is_active=is_active,
+            email_confirmed=email_confirmed,
+            stub_account=stub_account,
+        ).user
+        if last_login is not None:
+            # last_login isn't settable through the factory's User, which has
+            # no such field declared, and it's what orders the candidates.
+            User.objects.filter(pk=user.pk).update(last_login=last_login)
+            user.refresh_from_db()
+        return user
+
+    def sign_in(self, identifier: str, password: str) -> HttpResponse:
+        """POST the sign-in form.
+
+        :param identifier: What to put in the username field.
+        :param password: What to put in the password field.
+        :return: The view's response.
+        """
+        return self.client.post(
+            reverse("sign-in"),
+            {"username": identifier, "password": password},
+        )
+
+    def assert_signed_in_as(self, user: User) -> None:
+        """Assert the test client's session belongs to the given account.
+
+        :param user: The account the client should be signed in as.
+        :return: None
+        """
+        self.assertEqual(
+            self.client.session.get("_auth_user_id"), str(user.pk)
+        )
+
+    def assert_not_signed_in(self) -> None:
+        """Assert the test client has no session.
+
+        :return: None
+        """
+        self.assertNotIn("_auth_user_id", self.client.session)
+
+    def test_signing_in_with_an_email_address(self) -> None:
+        """Can somebody who only remembers their address sign in with it?"""
+        user = self.make_user("taylor", "Taylor@example.com")
+
+        for identifier in [
+            user.email,
+            user.email.lower(),
+            user.email.upper(),
+            user.username,
+        ]:
+            with self.subTest(identifier=identifier):
+                self.client.logout()
+                self.sign_in(identifier, self.PASSWORD)
+                self.assert_signed_in_as(user)
+
+    def test_the_password_picks_between_duplicate_accounts(self) -> None:
+        """When two accounts share an address, does the submitted password
+        decide which one the person reaches?
+        """
+        shared = "both@example.com"
+        older = self.make_user(
+            "older", shared, "older-password", last_login=now()
+        )
+        newer = self.make_user(
+            "newer", shared, "newer-password", last_login=now()
+        )
+
+        for user, password in [
+            (older, "older-password"),
+            (newer, "newer-password"),
+        ]:
+            with self.subTest(username=user.username):
+                self.client.logout()
+                self.sign_in(shared, password)
+                self.assert_signed_in_as(user)
+
+    def test_the_most_recently_used_account_wins_a_tie(self) -> None:
+        """When two accounts share an address *and* a password, does the one
+        used most recently win?
+
+        That's the account the duplicate-account merge keeps as primary, so a
+        person's experience won't change when their accounts are merged.
+        """
+        shared = "tie@example.com"
+        stale = self.make_user(
+            "stale", shared, last_login=now() - timedelta(days=365)
+        )
+        current = self.make_user("current", shared, last_login=now())
+
+        self.sign_in(shared, self.PASSWORD)
+        self.assert_signed_in_as(current)
+        self.assertNotEqual(
+            self.client.session.get("_auth_user_id"), str(stale.pk)
+        )
+
+    def test_a_confirmed_account_beats_an_unconfirmed_one(self) -> None:
+        """When both a confirmed and an unconfirmed account match, does the
+        confirmed one win, even though it was used less recently?
+
+        The confirmed account signs its owner in; the unconfirmed one can only
+        tell them to go confirm their address. Prefer the one that works.
+        """
+        shared = "mixed@example.com"
+        self.make_user(
+            "unconfirmed",
+            shared,
+            last_login=now(),
+            email_confirmed=False,
+        )
+        confirmed = self.make_user(
+            "confirmed",
+            shared,
+            last_login=now() - timedelta(days=365),
+        )
+
+        self.sign_in(shared, self.PASSWORD)
+        self.assert_signed_in_as(confirmed)
+
+    def test_an_unconfirmed_account_is_told_to_confirm(self) -> None:
+        """Does an unconfirmed account with the right password still get the
+        "validate your email address" message rather than a generic error?
+        """
+        user = self.make_user(
+            "unconfirmed", "unconfirmed@example.com", email_confirmed=False
+        )
+
+        response = self.sign_in(user.email, self.PASSWORD)
+        self.assert_not_signed_in()
+        self.assertContains(response, "validate your email address")
+
+    def test_a_shadowing_username_cannot_reach_the_address_owner(self) -> None:
+        """Can somebody who registers a username equal to another person's
+        email address get into that person's account?
+        """
+        victim = self.make_user(
+            "victim", "victim@example.com", "victim-password"
+        )
+        self.make_user(
+            "victim@example.com", "shadow@example.com", "shadow-password"
+        )
+
+        # The shadow's own password reaches the shadow's own account, not the
+        # victim's.
+        self.sign_in("victim@example.com", "shadow-password")
+        self.assertNotEqual(
+            self.client.session.get("_auth_user_id"), str(victim.pk)
+        )
+
+        # And nothing else gets in without the victim's password.
+        self.client.logout()
+        self.sign_in("victim@example.com", "a-guess")
+        self.assert_not_signed_in()
+
+    def test_a_shadowing_username_cannot_lock_the_owner_out(self) -> None:
+        """Does the person whose address was taken as somebody else's username
+        still get to sign in with that address?
+
+        This is the other half of the shadowing problem: without the
+        fall-through from a failed username match to the email candidates, the
+        shadow would silently lock this person out of email sign-in.
+        """
+        victim = self.make_user(
+            "victim", "victim@example.com", "victim-password"
+        )
+        self.make_user(
+            "victim@example.com", "shadow@example.com", "shadow-password"
+        )
+
+        self.sign_in("victim@example.com", "victim-password")
+        self.assert_signed_in_as(victim)
+
+    def test_every_failure_gives_the_same_error(self) -> None:
+        """Do all the ways of failing look alike, so the form can't be used to
+        find out whether an account exists?
+        """
+        user = self.make_user("taylor", "taylor@example.com")
+        self.make_user("shared-one", "shared@example.com")
+        self.make_user("shared-two", "shared@example.com")
+
+        attempts = [
+            ("an address with no account", "nobody@example.com", "a-guess"),
+            ("a username with no account", "nobody", "a-guess"),
+            ("a real username, wrong password", user.username, "a-guess"),
+            ("a real address, wrong password", user.email, "a-guess"),
+            (
+                "a shared address, wrong password",
+                "shared@example.com",
+                "a-guess",
+            ),
+        ]
+        errors = set()
+        for description, identifier, password in attempts:
+            with self.subTest(description):
+                response = self.sign_in(identifier, password)
+                self.assert_not_signed_in()
+                errors.add(tuple(response.context["form"].non_field_errors()))
+
+        self.assertEqual(len(errors), 1, msg=f"Got varying errors: {errors}")
+
+    def test_only_the_first_few_duplicates_are_checked(self) -> None:
+        """Is the candidate loop capped, so that piling accounts onto one
+        address can't turn a single POST into an unbounded number of password
+        hashes?
+        """
+        shared = "crowded@example.com"
+        # One more account than the cap allows, each used less recently than
+        # the last, so the final one is the one that falls off the end.
+        accounts = [
+            self.make_user(
+                f"crowd-{i}",
+                shared,
+                f"password-{i}",
+                last_login=now() - timedelta(days=i),
+            )
+            for i in range(MAX_EMAIL_CANDIDATES + 1)
+        ]
+        beyond_the_cap = accounts[-1]
+
+        self.sign_in(shared, f"password-{MAX_EMAIL_CANDIDATES}")
+        self.assert_not_signed_in()
+
+        # The account is fine, it's just past the cap: its username still works.
+        self.sign_in(
+            beyond_the_cap.username, f"password-{MAX_EMAIL_CANDIDATES}"
+        )
+        self.assert_signed_in_as(beyond_the_cap)
+
+    def test_inactive_accounts_are_not_reachable_by_address(self) -> None:
+        """Are deactivated accounts kept out of the candidate list?"""
+        self.make_user("gone", "gone@example.com", is_active=False)
+
+        self.sign_in("gone@example.com", self.PASSWORD)
+        self.assert_not_signed_in()
+
+    def test_stub_accounts_are_not_reachable_by_address(self) -> None:
+        """Are stub accounts kept out of the candidate list?
+
+        Stubs are placeholders for people who never signed up, so they have no
+        usable password. This account is given one anyway, to check that
+        they're excluded outright and not just by accident.
+        """
+        self.make_user("stub", "stub@example.com", stub_account=True)
+
+        self.sign_in("stub@example.com", self.PASSWORD)
+        self.assert_not_signed_in()
+
+    def test_the_sign_in_page_asks_for_either_identifier(self) -> None:
+        """Does the page tell people they can use their address?"""
+        response = self.client.get(reverse("sign-in"))
+        self.assertContains(response, "Username or email address")
+
+
+class PasswordConfirmFormTest(TestCase):
+    """Tests for the re-prompt guard on irreversible account operations."""
+
+    def setUp(self) -> None:
+        self.factory = RequestFactory()
+
+    def confirm(self, user: User, password: str) -> PasswordConfirmForm:
+        """Submit the guard as the given user.
+
+        :param user: The signed-in account being re-prompted.
+        :param password: The password they typed.
+        :return: The bound form.
+        """
+        request = self.factory.post("/")
+        request.user = user
+        form = PasswordConfirmForm(
+            request=request, data={"password": password}
+        )
+        form.is_valid()
+        return form
+
+    def test_the_right_password_passes(self) -> None:
+        """Does the guard still let the account's owner through?"""
+        user = UserProfileWithParentsFactory.create(
+            user__username="taylor",
+            user__password=make_password("a-good-password"),
+        ).user
+
+        self.assertTrue(self.confirm(user, "a-good-password").is_valid())
+
+    def test_the_wrong_password_fails(self) -> None:
+        """Does a wrong password still fail?"""
+        user = UserProfileWithParentsFactory.create(
+            user__username="taylor",
+            user__password=make_password("a-good-password"),
+        ).user
+
+        self.assertFalse(self.confirm(user, "a-guess").is_valid())
+
+    def test_another_persons_password_does_not_pass(self) -> None:
+        """Can somebody whose username is another person's email address clear
+        the guard with that person's password?
+
+        They must not be able to. The guard re-prompts for *this* account, so
+        it doesn't matter that authenticate() also resolves addresses.
+        """
+        UserProfileWithParentsFactory.create(
+            user__username="victim",
+            user__email="victim@example.com",
+            user__password=make_password("victim-password"),
+        )
+        shadow = UserProfileWithParentsFactory.create(
+            user__username="victim@example.com",
+            user__email="shadow@example.com",
+            user__password=make_password("shadow-password"),
+        ).user
+
+        self.assertFalse(self.confirm(shadow, "victim-password").is_valid())
+        self.assertTrue(self.confirm(shadow, "shadow-password").is_valid())

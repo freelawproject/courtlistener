@@ -257,10 +257,18 @@ class PasswordConfirmForm(forms.Form):
         password = self.cleaned_data["password"]
 
         if password:
+            # Pass the username, not the User, and check what comes back:
+            # authenticate() also resolves email addresses, and this is a
+            # re-prompt for *this* account, not an identity lookup. Without the
+            # identity check, somebody whose username happened to be another
+            # person's email address could clear this guard with that person's
+            # password.
             user = authenticate(
-                self.request, username=self.request.user, password=password
+                self.request,
+                username=self.request.user.get_username(),
+                password=password,
             )
-            if user is None:
+            if user is None or user.pk != self.request.user.pk:
                 raise ValidationError(
                     "Your password was invalid. Please try again."
                 )
