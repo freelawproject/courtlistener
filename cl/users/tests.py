@@ -31,11 +31,12 @@ from django.urls import reverse
 from django.utils.http import urlsafe_base64_encode
 from django.utils.timezone import now
 from django_ses import SESBackend, signals
+from lxml.html import fromstring
 from rest_framework.authtoken.models import Token
 from rest_framework.throttling import UserRateThrottle
 from selenium.webdriver.common.by import By
 from timeout_decorator import timeout_decorator
-from waffle.testutils import override_switch
+from waffle.testutils import override_flag, override_switch
 
 from cl.alerts.factories import (
     AlertFactory,
@@ -447,6 +448,87 @@ class UserDataTest(LiveServerTestCase):
 @override_settings(WAFFLE_CACHE_PREFIX="ProfileTest")
 @override_switch(DOUBLE_API_THROTTLES_SWITCH, active=False)
 class ProfileTest(SimpleUserDataMixin, TestCase):
+    def test_api_page_requires_authentication(self) -> None:
+        """Does the API profile page continue to require authentication?"""
+        url = reverse("view_api")
+        response = self.client.get(url)
+
+        self.assertEqual(response.status_code, HTTPStatus.FOUND)
+        self.assertEqual(response.url, f"{reverse('sign-in')}?next={url}")
+
+    @override_flag("use_new_design", False)
+    def test_api_page_uses_legacy_template_without_flag(self) -> None:
+        """Does the API profile page retain its legacy implementation?"""
+        self.assertTrue(
+            self.client.login(username="pandora", password="password")
+        )
+
+        response = self.client.get(reverse("view_api"))
+
+        self.assertEqual(response.status_code, HTTPStatus.OK)
+        self.assertTemplateUsed(response, "profile/api.html")
+        self.assertTemplateNotUsed(response, "v2_profile/api.html")
+        self.assertContains(response, "REST APIs and Bulk Data for Developers")
+
+    @override_flag("use_new_design", True)
+    def test_api_page_uses_accessible_profile_shell_with_flag(self) -> None:
+        """Does the redesigned API page render the requested profile shell?"""
+        self.assertTrue(
+            self.client.login(username="pandora", password="password")
+        )
+
+        response = self.client.get(reverse("view_api"))
+
+        self.assertEqual(response.status_code, HTTPStatus.OK)
+        self.assertTemplateUsed(response, "v2_profile/api.html")
+        self.assertTemplateNotUsed(response, "profile/api.html")
+
+        html = fromstring(response.content.decode())
+        profile_nav = html.xpath("//nav[@aria-label='Profile navigation']")
+        self.assertEqual(len(profile_nav), 1)
+
+        nav = profile_nav[0]
+        nav_labels = [
+            link.text_content().strip() for link in nav.xpath(".//a")
+        ]
+        self.assertEqual(
+            nav_labels,
+            [
+                "Alerts",
+                "Notes",
+                "Tags",
+                "Developer Tools",
+                "Prayers",
+                "Your Support",
+                "Account",
+            ],
+        )
+        self.assertNotIn("Visualizations", nav.text_content())
+        self.assertEqual(len(nav.xpath(".//*[@role='separator']")), 1)
+
+        active_links = nav.xpath(".//a[@aria-current='page']")
+        self.assertEqual(len(active_links), 1)
+        self.assertEqual(
+            active_links[0].text_content().strip(), "Developer Tools"
+        )
+
+        mobile_heading = html.xpath(
+            "//h1[contains(concat(' ', normalize-space(@class), ' '), ' md:hidden ')]"
+        )
+        self.assertEqual(len(mobile_heading), 1)
+        self.assertEqual(
+            mobile_heading[0].text_content().strip(), "Developer Tools"
+        )
+
+        sign_out_form = nav.xpath(
+            ".//form[@method='post' and @action=$url]",
+            url=reverse("sign-out"),
+        )
+        self.assertEqual(len(sign_out_form), 1)
+        self.assertEqual(
+            sign_out_form[0].xpath("normalize-space(.//button)"), "Sign out"
+        )
+
     async def test_api_page_with_data(self) -> None:
         """Can we access the API stats page after the API has been used?"""
         # Get the page anonymously to populate the stats with anon data
