@@ -211,10 +211,13 @@ document.addEventListener('alpine:init', () => {
 
     /**
      * Recount the filters the next submit would apply, so the count can be shown
-     * before submitting.
+     * before submitting. Runs on the next tick to wait x-bind:disabled and
+     * x-bind:value directives to settle.
      */
     updateActiveFilterCount() {
-      this.activeFilterCount = this.formInputs.filter(isActiveFilter).length;
+      this.$nextTick(() => {
+        this.activeFilterCount = this.formInputs.filter(isActiveFilter).length;
+      });
     },
 
     init() {
