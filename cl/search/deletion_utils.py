@@ -225,7 +225,9 @@ SEAL_BLOCKERS_MAP = {
     ),
     # These prevent docket deletion but not cluster deletion
     "audio.Audio": lambda cluster: cluster.docket.audio_files,
-    "people_db.AttorneyOrganizationAssociation": lambda cluster: cluster.docket.attorneyorganizationassociation_set,
+    "people_db.AttorneyOrganizationAssociation": lambda cluster: (
+        cluster.docket.attorneyorganizationassociation_set
+    ),
     "people_db.PartyType": lambda cluster: cluster.docket.party_types,
     "people_db.Role": lambda cluster: cluster.docket.role_set,
     "search.BankruptcyInformation": lambda cluster: getattr(
@@ -236,12 +238,18 @@ SEAL_BLOCKERS_MAP = {
     "search.OpinionCluster": lambda cluster: cluster.docket.clusters.exclude(
         pk=cluster.pk
     ),
-    "search.SCOTUSDocketEntry": lambda cluster: cluster.docket.scotusdocketentry_set,
+    "search.SCOTUSDocketEntry": lambda cluster: (
+        cluster.docket.scotusdocketentry_set
+    ),
     "search.ScotusDocketMetadata": lambda cluster: getattr(
         cluster.docket, "scotus_metadata", None
     ),
-    "search.TexasDocketEntry": lambda cluster: cluster.docket.texasdocketentry_set,
-    "search.FloridaDocketEntry": lambda cluster: cluster.docket.florida_docket_entries,
+    "search.TexasDocketEntry": lambda cluster: (
+        cluster.docket.texasdocketentry_set
+    ),
+    "search.FloridaDocketEntry": lambda cluster: (
+        cluster.docket.florida_docket_entries
+    ),
     "search.TrialCourtData": lambda cluster: getattr(
         cluster.docket, "trialcourtdata", None
     ),

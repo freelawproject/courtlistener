@@ -370,20 +370,20 @@ class OpinionClusterSealDocketBlockersTest(TestCase):
     def test_docket_relations_block_docket_deletion(self):
         """Each model pointing at Docket keeps the docket out of the seal."""
         blocker_builders = {
-            "search.BankruptcyInformation": lambda docket: BankruptcyInformationFactory(
-                docket=docket
+            "search.BankruptcyInformation": lambda docket: (
+                BankruptcyInformationFactory(docket=docket)
             ),
-            "search.SCOTUSDocketEntry": lambda docket: SCOTUSDocketEntryFactory(
-                docket=docket
+            "search.SCOTUSDocketEntry": lambda docket: (
+                SCOTUSDocketEntryFactory(docket=docket)
             ),
-            "search.ScotusDocketMetadata": lambda docket: ScotusDocketMetadata.objects.create(
-                docket=docket
+            "search.ScotusDocketMetadata": lambda docket: (
+                ScotusDocketMetadata.objects.create(docket=docket)
             ),
             "search.TexasDocketEntry": lambda docket: TexasDocketEntryFactory(
                 docket=docket
             ),
-            "search.FloridaDocketEntry": lambda docket: FloridaDocketEntryFactory(
-                docket=docket
+            "search.FloridaDocketEntry": lambda docket: (
+                FloridaDocketEntryFactory(docket=docket)
             ),
             "search.TrialCourtData": lambda docket: TrialCourtDataFactory(
                 docket=docket
