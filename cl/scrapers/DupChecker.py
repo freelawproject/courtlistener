@@ -1,3 +1,7 @@
+from collections import Counter
+from datetime import date
+
+from django.db.models import Model
 from juriscraper.AbstractSite import logger
 
 from cl.scrapers.exceptions import (
@@ -15,22 +19,58 @@ class DupChecker(dict):
         full_crawl: bool = False,
         dup_threshold: int = 5,
         *args,
+        is_recency_ordered: bool = True,
         **kwargs,
     ):
+        """Tracks duplicates found while crawling a court
+
+        :param court: the court being crawled
+        :param full_crawl: never break the crawl loop, ignore the site hash
+        :param dup_threshold: consecutive duplicates that mean "up to date"
+        :param is_recency_ordered: whether the site lists new items first.
+            When False, the crawl never breaks early and callers should skip
+            known URLs before downloading, since every item will be visited.
+            Unlike `full_crawl`, the site hash is still honoured and updated.
+
+        `dups_by_lookup` counts every duplicate hit of the run by lookup
+        field, for the run summary. Unlike `dup_count` it is never reset.
+        """
         self.full_crawl = full_crawl
         self.court = court
         self.dup_threshold = dup_threshold
+        self.is_recency_ordered = is_recency_ordered
         self.url_hash = None
         self.dup_count = 0
         self.last_found_date = None
+        self.dups_by_lookup: Counter[str] = Counter()
         super().__init__(*args, **kwargs)
 
-    def _increment(self, current_date):
+    @property
+    def can_abort_early(self) -> bool:
+        """Whether a run of duplicates may end the crawl
+
+        Early exit is only sound when the site puts new items first.
+        """
+        return not self.full_crawl and self.is_recency_ordered
+
+    @property
+    def should_precheck_urls(self) -> bool:
+        """Whether callers should look up items by URL before downloading
+
+        A full walk of the site is only affordable if known items are skipped
+        without fetching them. Backscrapes are excluded: they download every
+        item as they always did, so a document revised at the same URL can
+        still be captured by the sha1 check.
+        """
+        return not self.is_recency_ordered and not self.full_crawl
+
+    def _increment(self, current_date: date, lookup_by: str) -> None:
         """Increments the dup_count and sets the correct date for the latest
         dup.
         """
         self.last_found_date = current_date
         self.dup_count += 1
+        self.dups_by_lookup[lookup_by] += 1
 
     def reset(self):
         """Resets the dup counter and date"""
@@ -77,78 +117,116 @@ class DupChecker(dict):
             # no matter what.
             return False
 
-    def press_on(
-        self,
-        object_type,
-        current_date,
-        next_date,
-        lookup_value,
-        lookup_by="sha1",
-    ):
-        """Checks if a we have an `object_type` with identical content in the CL
-        corpus by looking up `lookup_value` in the `lookup_by` field.
+    @staticmethod
+    def _exists(
+        object_type: type[Model], lookup_value: str, lookup_by: str
+    ) -> bool:
+        """Checks whether an `object_type` with `lookup_value` is in the DB
 
-        If the item is not a duplicate, we will return None, and the caller
-        will proceed normally
-
-        If the item is a duplicate, we will raise SingleDuplicateError
-
-        If the item is a duplicate following a series of duplicates greater than
-        our tolerance threshold, we will raise ConsecutiveDuplicatesError
-
-        If the item is a duplicate and the next item is from an already scraped
-        date, we will raise ConsecutiveDuplicatesError
-
-        Following logic applies:
-         - if we do not have the item
-            - early return
-         - if we have the item already
-            - and if the next date is before this date
-            - or if this is our duplicate threshold is exceeded
-                - break
-            - otherwise
-                - continue
+        :param object_type: the model class to query, Opinion or Audio
+        :param lookup_value: the value to look up
+        :param lookup_by: the field to look up, "sha1" or "download_url"
+        :return: True if the object exists
         """
-        # check for a duplicate in the db.
         if lookup_by == "sha1":
-            exists = object_type.objects.filter(sha1=lookup_value).exists()
-        elif lookup_by == "download_url":
-            exists = object_type.objects.filter(
+            return object_type.objects.filter(sha1=lookup_value).exists()
+        if lookup_by == "download_url":
+            return object_type.objects.filter(
                 download_url=lookup_value
             ).exists()
-        else:
-            raise NotImplementedError("Unknown lookup_by parameter.")
+        raise NotImplementedError("Unknown lookup_by parameter.")
 
-        if not exists:
+    def _abort_reason(
+        self, current_date: date, next_date: date | None
+    ) -> str | None:
+        """Decides whether the duplicate just found should end the crawl
+
+        :param current_date: the date of the duplicate
+        :param next_date: the date of the next item in the site, or None
+        :return: the reason to abort, or None to carry on
+        """
+        if not self.can_abort_early:
+            return None
+
+        # The duplicate is the last item of its date, so everything below
+        # belongs to older dates that earlier runs already processed.
+        if next_date is None or next_date < current_date:
+            return "Next case occurs prior to when we found a duplicate. Court is up to date."
+
+        if self.dup_count >= self.dup_threshold:
+            return f"Found {self.dup_count} duplicates in a row. Court is up to date."
+
+        return None
+
+    def find_known_urls(
+        self,
+        object_type: type[Model],
+        current_date: date,
+        next_date: date | None,
+        urls: list[str],
+    ) -> list[str]:
+        """Looks up `urls` in the DB, to skip known items before download
+
+        Meant to skip known items before downloading them, on sites that
+        must be walked in full. 
+
+        :param object_type: Opinion or Audio
+        :param current_date: date of the item
+        :param next_date: date of the next item in the site, or None
+        :param urls: the item's download URLs
+        :return: the URLs already in the DB
+        """
+        known_urls = []
+        for url in urls:
+            if not url:
+                continue
+            try:
+                self.press_on(
+                    object_type,
+                    current_date,
+                    next_date,
+                    lookup_value=url,
+                    lookup_by="download_url",
+                )
+            except SingleDuplicateError:
+                known_urls.append(url)
+        return known_urls
+
+    def press_on(
+        self,
+        object_type: type[Model],
+        current_date: date,
+        next_date: date | None,
+        lookup_value: str,
+        lookup_by: str = "sha1",
+    ) -> None:
+        """Checks whether `lookup_value` is already in the DB for `object_type`
+
+        Returns None for a new item. Raises `SingleDuplicateError` for a known
+        one, or `ConsecutiveDuplicatesError` when the crawl should stop: the
+        duplicate is the last item of its date, or `dup_threshold` duplicates
+        were found in a row. The crawl never stops on a full crawl, nor on
+        sites that don't list new items first, see `can_abort_early`.
+
+        :param object_type: Opinion or Audio
+        :param current_date: date of the item
+        :param next_date: date of the next item in the site, or None
+        :param lookup_value: a sha1 or a download URL
+        :param lookup_by: "sha1" or "download_url"
+        :return: None
+        """
+        if not self._exists(object_type, lookup_value, lookup_by):
             return
 
-        logger.info(
-            f"Duplicate found on date: {current_date}, with lookup value: {lookup_value}"
+        logger.debug(
+            "Duplicate found on date: %s, with lookup value: %s",
+            current_date,
+            lookup_value,
         )
-        self._increment(current_date)
+        self._increment(current_date, lookup_by)
 
-        # If the next date in the Site object is less than (before) the
-        # current date, we needn't continue because we should already have
-        # that item.
-        if next_date:
-            already_scraped_next_date = next_date < current_date
-        else:
-            already_scraped_next_date = True
-
-        # When in a full crawl, we do not raise a loop breaking
-        # `ConsecutiveDuplicatesError`
-        if not self.full_crawl:
-            if already_scraped_next_date:
-                if self.court.pk == "mich":
-                    # Michigan sometimes has multiple occurrences of the
-                    # same case with different dates on a page.
-                    raise SingleDuplicateError(logger=logger)
-
-                message = "Next case occurs prior to when we found a duplicate. Court is up to date."
-                raise ConsecutiveDuplicatesError(message, logger=logger)
-            elif self.dup_count >= self.dup_threshold:
-                message = f"Found {self.dup_count} duplicates in a row. Court is up to date."
-                raise ConsecutiveDuplicatesError(message, logger=logger)
+        if reason := self._abort_reason(current_date, next_date):
+            raise ConsecutiveDuplicatesError(reason, logger=logger)
 
         # Full crawl or not, this is a duplicate and we shouldn't store it
         raise SingleDuplicateError(logger=logger)
