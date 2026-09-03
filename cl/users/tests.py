@@ -5122,6 +5122,36 @@ class EmailOrUsernameSignInTest(TestCase):
         )
         self.assert_signed_in_as(beyond_the_cap)
 
+    def test_planted_accounts_cannot_crowd_out_a_confirmed_one(self) -> None:
+        """Can somebody take away a person's email sign-in by pointing enough
+        accounts at their address?
+
+        They must not be able to. Registration doesn't yet refuse a second
+        account per address, and changing an address on the settings page
+        clears email_confirmed but leaves last_login alone — so without
+        confirmed-first ordering, MAX_EMAIL_CANDIDATES freshly-repointed
+        accounts would fill the candidate list and push the address's real
+        owner out of it.
+        """
+        shared = "target@example.com"
+        owner = self.make_user(
+            "owner", shared, last_login=now() - timedelta(days=30)
+        )
+        # Each of these was confirmed and used on an address its owner did
+        # control, then repointed at the victim's — recent last_login, but
+        # unconfirmed, because confirming needs the victim's inbox.
+        for i in range(MAX_EMAIL_CANDIDATES):
+            self.make_user(
+                f"planted-{i}",
+                shared,
+                f"planted-password-{i}",
+                last_login=now(),
+                email_confirmed=False,
+            )
+
+        self.sign_in(shared, self.PASSWORD)
+        self.assert_signed_in_as(owner)
+
     def test_inactive_accounts_are_not_reachable_by_address(self) -> None:
         """Are deactivated accounts kept out of the candidate list?"""
         self.make_user("gone", "gone@example.com", is_active=False)

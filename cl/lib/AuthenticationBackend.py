@@ -16,6 +16,11 @@ from django.urls import reverse
 # bounds a timing oracle: response time grows with the number of accounts on an
 # address, and three is a small enough signal to accept.
 #
+# The cap is only safe because of how candidates are ordered: confirmed
+# accounts come first, so accounts somebody planted on an address they cannot
+# read can never push that address's real owner past the cap and out of email
+# sign-in.
+#
 # This is a cap on a transitional state. Once auth_user.email is unique, no
 # address will have more than one account and the loop will only ever run once.
 MAX_EMAIL_CANDIDATES = 3
@@ -89,10 +94,11 @@ class EmailOrUsernameModelBackend(ModelBackend):
             User().set_password(password)
             return None
 
-        # Candidates are ordered by last_login descending, so the first match
-        # is the account the person used most recently. That's also the account
-        # the duplicate-account merge will keep, so the two agree and nothing
-        # changes for the user when their accounts are later merged.
+        # Among confirmed accounts, candidates are ordered by last_login
+        # descending, so the first match is the one the person used most
+        # recently. That's also the account the duplicate-account merge will
+        # keep, so the two agree and nothing changes for the user when their
+        # accounts are later merged.
         unconfirmed_match = None
         for candidate in candidates:
             if not self._password_matches(candidate, password):
@@ -122,8 +128,9 @@ class EmailOrUsernameModelBackend(ModelBackend):
     ) -> list[User]:
         """Find the accounts an email address could refer to.
 
-        Ordered by last_login descending and capped at MAX_EMAIL_CANDIDATES,
-        because every account returned costs a password verification.
+        Ordered by confirmed-then-most-recently-used and capped at
+        MAX_EMAIL_CANDIDATES, because every account returned costs a password
+        verification.
 
         Unconfirmed accounts stay in the list on purpose. Dropping them would
         turn "you never confirmed your address" into a generic "wrong
@@ -132,7 +139,8 @@ class EmailOrUsernameModelBackend(ModelBackend):
         :param identifier: The submitted identifier.
         :param exclude: An account already checked by username, if any, so we
         don't verify the same password against the same account twice.
-        :return: The candidate accounts, most recently used first.
+        :return: The candidate accounts, confirmed ones first and, within
+        that, most recently used first.
         """
         # An address always has an "@" in it, so an identifier without one has
         # no candidates to find, and the query is worth skipping. This also
@@ -153,7 +161,15 @@ class EmailOrUsernameModelBackend(ModelBackend):
             # exclude() leaves profile-less accounts in place; filtering on
             # profile__stub_account=False would drop them.
             .exclude(profile__stub_account=True)
-            .order_by(F("last_login").desc(nulls_last=True))
+            # Confirmed accounts first, then most recently used. Confirmed
+            # first is what keeps the cap below from being weaponised: anybody
+            # can point an account at an address they don't control, but only
+            # somebody who reads that address can confirm it, so planted
+            # accounts can never crowd a confirmed one out of the candidates.
+            .order_by(
+                F("profile__email_confirmed").desc(nulls_last=True),
+                F("last_login").desc(nulls_last=True),
+            )
         )
         if exclude is not None:
             candidates = candidates.exclude(pk=exclude.pk)
