@@ -53,12 +53,7 @@
               >
                 {% svg "funnel" class="h-5 w-5 text-greyscale-400" %}
                 Filters
-                <span
-                  x-show="hasActiveFilters"
-                  x-text="activeFilterCountLabel"
-                  aria-hidden="true"
-                  class="text-gray-600 font-medium"
-                ></span>
+                <c-corpus-search.active-filter-badge />
               </c-button>
             </c-slot>
           </c-corpus-search.mobile.dialog>
