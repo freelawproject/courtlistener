@@ -24,6 +24,7 @@ from cl.search.deletion_utils import (
     get_blocking_relations,
     get_deletion_blockers,
     seal_cluster,
+    seal_documents,
 )
 from cl.search.documents import ES_CHILD_ID, DocketDocument
 from cl.search.factories import (
@@ -707,14 +708,9 @@ class RECAPDocumentSealActionESTest(
         rd_doc = DocketDocument.get(id=ES_CHILD_ID(rd.pk).RECAP)
         self.assertEqual(list(rd_doc.cites), [opinion.pk])
 
-        # Call seal_documents action.
-        recap_admin = RECAPDocumentAdmin(RECAPDocument, self.site)
-        recap_admin.message_user = mock.Mock()
-        url = reverse("admin:search_recapdocument_changelist")
-        request = self.factory.post(url)
-        recap_admin.seal_documents(
-            request, RECAPDocument.objects.filter(pk=rd.pk)
-        )
+        # Seal the document. The admin action is just a thin wrapper around
+        # this, so call it directly.
+        seal_documents(RECAPDocument.objects.filter(pk=rd.pk))
 
         # Confirm DB cleanup:
         self.assertFalse(rd.cited_opinions.exists())
