@@ -9,21 +9,21 @@ resolution-markers = [
 
 [[package]]
 name = "ada-url"
-version = "1.32.0"
+version = "4.0.0"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "cffi" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/cb/da/7220c60e39e3ca6c59172a3ad1862ba79c0a185808eaddb499e1ffbf4c33/ada_url-1.32.0.tar.gz", hash = "sha256:ceefeb2e89d6e007ed58caa461e802b7a0f39fbbbdd7e39a4511fc1e3a6f9777", size = 272514, upload-time = "2026-06-04T20:29:56.5Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/98/4e/f62ef579f693298f62a4657a0429823444025f342161d53f5c1f7bd629c6/ada_url-4.0.0.tar.gz", hash = "sha256:9f399ec867349800a4c2d3aa8df8c533c340494b04d34b1f082b97d9a8b76a07", size = 265328, upload-time = "2026-07-28T19:29:53.846Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/d2/26/7c63d8925b887f7092f07a4ef2dfce40bc1970649f1ffcca509f9539cb94/ada_url-1.32.0-cp313-cp313-macosx_10_15_universal2.whl", hash = "sha256:18b14441d9cb39680ef24dacf49d9266ce3326b14a11df890fee39706fe726fd", size = 718649, upload-time = "2026-06-04T20:29:28.676Z" },
-    { url = "https://files.pythonhosted.org/packages/6f/15/c82697d902357e62b8bd344df962dc67fdf562f6923378a69aec885574db/ada_url-1.32.0-cp313-cp313-macosx_10_15_x86_64.whl", hash = "sha256:3c83f01a2e2e3cb64532f59cf1cee7960a44f393888ab98b4f8d56629b2e0fbe", size = 496777, upload-time = "2026-06-04T20:29:30.283Z" },
-    { url = "https://files.pythonhosted.org/packages/39/4b/36e88208b6a19679821a2597b997f321e99255508e8018867f170e482429/ada_url-1.32.0-cp313-cp313-macosx_11_0_arm64.whl", hash = "sha256:0f6efa3421e20d1cd5d5d849b22282b676a4cff256228486f862dce59ade11d9", size = 493314, upload-time = "2026-06-04T20:29:32.08Z" },
-    { url = "https://files.pythonhosted.org/packages/fe/7c/9eed78ffdc1e1b8fd7f8dfa346f2726d329ecd040938fa76a4ec48ab5740/ada_url-1.32.0-cp313-cp313-manylinux_2_24_aarch64.manylinux_2_28_aarch64.whl", hash = "sha256:2b50e107ef029e27cf95efdfde942dc994cef18c33140a340f2464d4a34aae9d", size = 1753580, upload-time = "2026-06-04T20:29:33.902Z" },
-    { url = "https://files.pythonhosted.org/packages/1d/7e/feea2fafc1c2e672a69c7d3c6fa43508c655534e7ab8d8620d4bc3a79d19/ada_url-1.32.0-cp313-cp313-manylinux_2_24_x86_64.manylinux_2_28_x86_64.whl", hash = "sha256:9320cf887dac87dd81e9d571921c79d2b53922c34c25a579861d092c129eff1d", size = 1789341, upload-time = "2026-06-04T20:29:35.466Z" },
-    { url = "https://files.pythonhosted.org/packages/1f/40/3872612d995bab95ce177519636310626f62e97379500f666083c6a96747/ada_url-1.32.0-cp313-cp313-musllinux_1_2_aarch64.whl", hash = "sha256:aa1c9b5a41da603dedb1d5bafac6ea4df449f88fea482e7e845494fa250a3a1c", size = 2693908, upload-time = "2026-06-04T20:29:37.092Z" },
-    { url = "https://files.pythonhosted.org/packages/00/8a/18789af08b2745a8db8fb21c5375eef8526883c8bb492697c758a8ae9a7b/ada_url-1.32.0-cp313-cp313-musllinux_1_2_x86_64.whl", hash = "sha256:387c8578f38e21fc25eeb791df22644b22321872d4cfc6e9158102cf240c6224", size = 2806680, upload-time = "2026-06-04T20:29:38.874Z" },
-    { url = "https://files.pythonhosted.org/packages/16/02/820c491f3a52ac4c96d296a82035c7553c26378804db170dfb7ccd989f07/ada_url-1.32.0-cp313-cp313-win_amd64.whl", hash = "sha256:49ed3336a72ac0193dfe98b9addc231bdac2c052cc752f4c404b4b780afa661a", size = 450347, upload-time = "2026-06-04T20:29:40.574Z" },
+    { url = "https://files.pythonhosted.org/packages/d5/74/426e9a200d80dbc368c26441e5978e8b2ebc7e3d9af08726d36439ef584e/ada_url-4.0.0-cp313-cp313-macosx_10_15_universal2.whl", hash = "sha256:da4040f51e6c17cf827f38031d3546e4a940c1440523ec0d0319048da21de174", size = 706191, upload-time = "2026-07-28T19:29:29.622Z" },
+    { url = "https://files.pythonhosted.org/packages/4d/6b/4357e137aa0c894671ddbe975d4056dc2855626f0d1e09398c4e4a81fbea/ada_url-4.0.0-cp313-cp313-macosx_10_15_x86_64.whl", hash = "sha256:e1abb7c8bf5acbee94a5bb0b2e3100dcaf0aa3b4294e31e17c5645c85f473595", size = 488396, upload-time = "2026-07-28T19:29:30.948Z" },
+    { url = "https://files.pythonhosted.org/packages/d8/19/6f881a4c36ac84f7ab12426594a12fc2155e82976bf2ff7ea1d080779ad7/ada_url-4.0.0-cp313-cp313-macosx_11_0_arm64.whl", hash = "sha256:be53094f4cf0d435b51cf738486de8decaeafdc465d0b24a1462ecf88fbb2f58", size = 483727, upload-time = "2026-07-28T19:29:32.306Z" },
+    { url = "https://files.pythonhosted.org/packages/88/ac/d02f27798ed2b15067d25e62cec97b6d1626cf9cc9ac8b3d3a45877a830c/ada_url-4.0.0-cp313-cp313-manylinux_2_24_aarch64.manylinux_2_28_aarch64.whl", hash = "sha256:0f691beab142575e6546a37cac142e3abfe3bb7d0b586b648fc56917b5b88ec3", size = 1830312, upload-time = "2026-07-28T19:29:33.605Z" },
+    { url = "https://files.pythonhosted.org/packages/5d/67/525a42ce8f4de030423c497b1a70261921f0347070cb3b22f9ae6ce6a14a/ada_url-4.0.0-cp313-cp313-manylinux_2_24_x86_64.manylinux_2_28_x86_64.whl", hash = "sha256:bdb9e57c9f2d2c4c29dc2b49eeb7c370a8c9550fcd95a44d8434444e236537a2", size = 1861928, upload-time = "2026-07-28T19:29:35.193Z" },
+    { url = "https://files.pythonhosted.org/packages/91/0c/4e7d2ae2c72c963d1c0ee004a88a088ee8c0c669c9910947ea722e144eaa/ada_url-4.0.0-cp313-cp313-musllinux_1_2_aarch64.whl", hash = "sha256:4bc8c4f6cdc816379c14d49ae987a9e35bb5e8ee35517735a49afed08fd16e9e", size = 2768337, upload-time = "2026-07-28T19:29:36.868Z" },
+    { url = "https://files.pythonhosted.org/packages/02/66/a673c258d4aa76b888758d5a468f231bb12686dc3c10ee51c2e5c2dffd7e/ada_url-4.0.0-cp313-cp313-musllinux_1_2_x86_64.whl", hash = "sha256:6f13b0cff78ad3ff48c4179f2eafaa0231be1ca1a4f52d841565a69dd3c7ceeb", size = 2877325, upload-time = "2026-07-28T19:29:38.637Z" },
+    { url = "https://files.pythonhosted.org/packages/25/39/498e9e2a848a8fc0744c2d3fd36436de837bc0bd58a99041ddee832e37ea/ada_url-4.0.0-cp313-cp313-win_amd64.whl", hash = "sha256:5563001339c7f19586df57d832238c45ab065c012c7d884cfd5ed73db8be46d6", size = 434130, upload-time = "2026-07-28T19:29:40.087Z" },
 ]
 
 [[package]]
@@ -464,7 +464,7 @@ dev = [
 
 [package.metadata]
 requires-dist = [
-    { name = "ada-url", specifier = ">=1.32.0" },
+    { name = "ada-url", specifier = ">=4.0.0" },
     { name = "beautifulsoup4", specifier = ">=4.14.3" },
     { name = "boto3", specifier = ">=1.42.24" },
     { name = "celery", specifier = ">=5.6.2" },
@@ -2315,7 +2315,7 @@ name = "pexpect"
 version = "4.9.0"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
-    { name = "ptyprocess" },
+    { name = "ptyprocess", marker = "sys_platform != 'emscripten' and sys_platform != 'win32'" },
 ]
 sdist = { url = "https://files.pythonhosted.org/packages/42/92/cc564bf6381ff43ce1f4d06852fc19a2f11d180f23dc32d9588bee2f149d/pexpect-4.9.0.tar.gz", hash = "sha256:ee7d41123f3c9911050ea2c2dac107568dc43b2d3b0c7557a33212c398ead30f", size = 166450, upload-time = "2023-11-25T09:07:26.339Z" }
 wheels = [
