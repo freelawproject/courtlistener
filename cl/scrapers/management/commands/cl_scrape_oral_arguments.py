@@ -16,6 +16,7 @@ from cl.lib.import_lib import get_scotus_judges
 from cl.lib.string_utils import trunc
 from cl.people_db.lookup_utils import lookup_judges_by_messy_str
 from cl.scrapers.DupChecker import DupChecker
+from cl.scrapers.exceptions import SingleDuplicateError
 from cl.scrapers.management.commands import cl_scrape_opinions
 from cl.scrapers.utils import (
     check_duplicate_ingestion,
@@ -115,6 +116,12 @@ class Command(cl_scrape_opinions.Command):
         court: Court,
         backscrape: bool = False,
     ):
+        # The site is walked in full, so skip known items before download
+        if dup_checker.should_precheck_urls and await sync_to_async(
+            dup_checker.find_known_urls
+        )(Audio, item["case_dates"], next_case_date, [item["download_urls"]]):
+            raise SingleDuplicateError(logger=logger)
+
         content = await site.download_content(
             item["download_urls"], media_root=settings.MEDIA_ROOT
         )
