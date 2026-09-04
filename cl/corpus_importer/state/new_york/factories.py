@@ -1,5 +1,6 @@
 """Factories for mocking the Court-PASS data the NYCoA mergers consume."""
 
+import hashlib
 from typing import NamedTuple
 
 from factory.base import Factory
@@ -29,6 +30,7 @@ from cl.corpus_importer.state.new_york.nycourts_gov import (
     NYCoAParty,
     NYCoDocketEntry,
 )
+from cl.corpus_importer.state.new_york.storage import PRIVATE_PREFIX
 from cl.corpus_importer.state.new_york.utils import NYCOA_COURT_ID
 from cl.tests.providers import LegalProvider
 
@@ -141,7 +143,16 @@ class NYCoAFileFactory(Factory):
     doc_role = FilingRole.APPELLANT
     doc_party = "Smith"
     doc_type = FilingDocType.BRIEF
-    local_path = Sequence(lambda n: f"/tmp/nycoa/{n}.pdf")
+    local_path = Sequence(
+        lambda n: f"{PRIVATE_PREFIX}nycourts_gov/"
+        f"APL-2024-00177_smithvjones-app-smith{n}-brf_1.pdf"
+    )
+    content_hash = LazyAttribute(
+        lambda f: hashlib.sha256(f.local_path.encode()).hexdigest()
+        if f.local_path
+        else ""
+    )
+    file_size = LazyAttribute(lambda f: len(f.local_path) * 1000 or None)
 
 
 class NYCoAIssueFactory(Factory):
