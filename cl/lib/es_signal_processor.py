@@ -225,7 +225,15 @@ def update_es_documents(
                 # Prepend embedding computation task when html_with_citations
                 # is updated
                 if should_compute_embeddings:
-                    c = compute_single_opinion_embeddings.si(instance.pk) | c
+                    embedding_signature = compute_single_opinion_embeddings.si(
+                        instance.pk
+                    )
+                    embedding_queue = getattr(
+                        instance, "embedding_queue", None
+                    )
+                    if embedding_queue is not None:
+                        embedding_signature.set(queue=embedding_queue)
+                    c = embedding_signature | c
                 transaction.on_commit(partial(c.apply_async))
             case OpinionCluster() if es_document is OpinionDocument:  # type: ignore
                 transaction.on_commit(

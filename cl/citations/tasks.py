@@ -124,6 +124,7 @@ def find_citations_and_parentheticals_for_opinion_by_pks(
     disable_parenthetical_groups: bool = False,
     disable_citation_count_update: bool = False,
     percolate_opinion: bool = False,
+    embedding_queue: str | None = None,
 ) -> None:
     """Find citations and authored parentheticals for search.Opinion objects.
 
@@ -136,6 +137,8 @@ def find_citations_and_parentheticals_for_opinion_by_pks(
         be updated. Useful to prevent database overloading during bulk work
     :param percolate_opinion: Whether to percolate the related opinion document in
     order to trigger search alerts.
+    :param embedding_queue: Optional Celery queue for the embedding task created
+    when citation processing updates an opinion.
     :return: None
     """
     opinions: QuerySet[Opinion, Opinion] = Opinion.objects.filter(
@@ -153,6 +156,7 @@ def find_citations_and_parentheticals_for_opinion_by_pks(
         for index, opinion in enumerate(opinions):
             try:
                 logger.info("Starting opinion: %s", opinion.id)
+                setattr(opinion, "embedding_queue", embedding_queue)
                 store_opinion_citations_and_update_parentheticals(
                     opinion,
                     update_citation_count,
@@ -196,6 +200,10 @@ def find_citations_and_parentheticals_for_opinion_by_pks(
                             disable_parenthetical_groups,
                             disable_citation_count_update,
                         ),
+                        kwargs={
+                            **self.request.kwargs,
+                            "embedding_queue": embedding_queue,
+                        },
                     )
     finally:
         if disable_parenthetical_groups:
@@ -215,6 +223,10 @@ def find_citations_and_parentheticals_for_opinion_by_pks(
                 disable_parenthetical_groups,
                 disable_citation_count_update,
             ),
+            kwargs={
+                **self.request.kwargs,
+                "embedding_queue": embedding_queue,
+            },
         )
 
 
