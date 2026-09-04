@@ -80,6 +80,17 @@ show_stack_state() {
 if ! docker info >/dev/null 2>&1; then
     command -v dockerd >/dev/null 2>&1 \
         || bail "Docker is not installed in this environment, so the compose stack can't run."
+    # When the environment is restored from a snapshot, the old pid file
+    # survives while the daemon does not, and its pid may now belong to an
+    # unrelated process, so dockerd refuses to start. Clear it unless a
+    # dockerd really owns it.
+    if [ -f /var/run/docker.pid ]; then
+        old_pid=$(cat /var/run/docker.pid 2>/dev/null || true)
+        if [ -z "$old_pid" ] || [ "$(ps -o comm= -p "$old_pid" 2>/dev/null)" != "dockerd" ]; then
+            log "Removing a stale Docker pid file left by a previous session"
+            rm -f /var/run/docker.pid /var/run/docker.sock
+        fi
+    fi
     log "Starting the Docker daemon (log: $DOCKERD_LOG)..."
     nohup dockerd >"$DOCKERD_LOG" 2>&1 &
     for _ in $(seq 1 60); do
