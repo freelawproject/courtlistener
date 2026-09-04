@@ -17,6 +17,9 @@ from juriscraper.state.docket import TransferReason as ScrapeTransferReason
 from juriscraper.state.florida.cases import FloridaCase
 from juriscraper.state.florida.courts import FloridaCourtID
 
+from cl.corpus_importer.management.commands.state_document_download import (
+    extract_state_documents,
+)
 from cl.corpus_importer.state.florida.factories import (
     FloridaCaseActorFactory,
     FloridaCaseFactory,
@@ -47,6 +50,9 @@ from cl.people_db.factories import (
 from cl.people_db.models import Attorney, Party, PartyType, Role
 from cl.search.factories import CourtFactory, DocketFactory
 from cl.search.models import CaseTransfer, Docket, OriginatingCourtInformation
+from cl.search.state.florida.factories import (
+    FloridaDocketEntryFactory as FloridaDocketEntryModelFactory,
+)
 from cl.search.state.florida.factories import (
     FloridaDocumentFactory as FloridaDocumentModelFactory,
 )
@@ -1626,3 +1632,96 @@ class FloridaDocumentDownloadTest(TestCase):
         )
         self.assertIsNone(fl_document.processing_error)
         self.extract_document_mock.assert_not_called()
+
+
+class StateDocumentExtractionTest(TestCase):
+    """Tests for the extract_state_documents page_count filtering."""
+
+    @classmethod
+    def setUpTestData(cls) -> None:
+        """Create documents covering every page_count scenario. They share
+        one docket entry since each new entry would create a duplicate
+        AttorneyOrganization through the party factories."""
+        entry = FloridaDocketEntryModelFactory.create()
+        cls.small_pdf = FloridaDocumentModelFactory.create(
+            docket_entry=entry, filepath_local="small.pdf", page_count=5
+        )
+        cls.big_pdf = FloridaDocumentModelFactory.create(
+            docket_entry=entry, filepath_local="big.pdf", page_count=51
+        )
+        cls.zero_pdf = FloridaDocumentModelFactory.create(
+            docket_entry=entry, filepath_local="zero.pdf", page_count=0
+        )
+        cls.negative_pdf = FloridaDocumentModelFactory.create(
+            docket_entry=entry,
+            filepath_local="negative.pdf",
+            page_count=-2147483648,
+        )
+        cls.null_pdf = FloridaDocumentModelFactory.create(
+            docket_entry=entry, filepath_local="null.pdf", page_count=None
+        )
+        cls.html_doc = FloridaDocumentModelFactory.create(
+            docket_entry=entry, filepath_local="doc.html", page_count=None
+        )
+
+    def setUp(self) -> None:
+        """Mock the throttle and the extraction task dispatch."""
+        self.throttle_patch = mock.patch(
+            "cl.lib.celery_utils.get_task_wait", return_value=0
+        )
+        self.throttle_patch.start()
+        self.addCleanup(self.throttle_patch.stop)
+        self.extract_document_patch = mock.patch(
+            "cl.corpus_importer.management.commands.state_document_download"
+            ".extract_formatted_text_document.si"
+        )
+        self.extract_document_mock = self.extract_document_patch.start()
+        self.addCleanup(self.extract_document_patch.stop)
+
+    def _scheduled_pks(self) -> set[int]:
+        """Collect every pk scheduled for extraction across all calls."""
+        return {
+            pk
+            for call in self.extract_document_mock.call_args_list
+            for pk in call.kwargs["pks"]
+        }
+
+    def test_page_limit_filters_pdfs_only(self) -> None:
+        """Does --page-limit keep only PDFs with a real page count within
+        the limit, while still scheduling non-PDF documents?"""
+        extract_state_documents(
+            FloridaDocument,
+            throttle_min_items=100,
+            extraction_queue="celery",
+            batch_size=10,
+            delay=0,
+            page_limit=50,
+        )
+
+        self.assertEqual(
+            self._scheduled_pks(),
+            {self.small_pdf.pk, self.html_doc.pk},
+        )
+
+    def test_no_page_limit_schedules_everything(self) -> None:
+        """Without --page-limit, are all documents scheduled regardless of
+        their page_count, including null, zero and negative values?"""
+        extract_state_documents(
+            FloridaDocument,
+            throttle_min_items=100,
+            extraction_queue="celery",
+            batch_size=10,
+            delay=0,
+        )
+
+        self.assertEqual(
+            self._scheduled_pks(),
+            {
+                self.small_pdf.pk,
+                self.big_pdf.pk,
+                self.zero_pdf.pk,
+                self.negative_pdf.pk,
+                self.null_pdf.pk,
+                self.html_doc.pk,
+            },
+        )
