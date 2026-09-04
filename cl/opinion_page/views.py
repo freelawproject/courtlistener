@@ -13,7 +13,7 @@ from django.contrib import messages
 from django.contrib.auth.decorators import login_required
 from django.core.exceptions import ObjectDoesNotExist, PermissionDenied
 from django.core.paginator import EmptyPage, PageNotAnInteger, Paginator
-from django.db.models import Exists, OuterRef, Prefetch, QuerySet
+from django.db.models import Prefetch, QuerySet
 from django.http import (
     HttpRequest,
     HttpResponseRedirect,
@@ -72,7 +72,9 @@ from cl.lib.utils import human_sort
 from cl.opinion_page.decorators import handle_cluster_redirection
 from cl.opinion_page.docket_sources_utils import (
     RECAP_SOURCE,
+    SCOTUS_SOURCE,
     attach_display_fields,
+    document_url,
 )
 from cl.opinion_page.feeds import DocketFeed
 from cl.opinion_page.forms import (
@@ -103,9 +105,9 @@ from cl.search.models import (
     Docket,
     Opinion,
     OpinionCluster,
-    OpinionsCitedByRECAPDocument,
     Parenthetical,
     RECAPDocument,
+    SCOTUSDocument,
     sort_cites,
 )
 from cl.search.selectors import get_clusters_from_citation_str
@@ -571,7 +573,7 @@ async def docket_authorities(
     return TemplateResponse(request, "docket_authorities.html", context)
 
 
-def make_rd_title(rd: RECAPDocument) -> str:
+def make_rd_title(rd: RECAPDocument | SCOTUSDocument) -> str:
     """
     This will result in three database loads if rd hasn't already cached the objects.
     """
@@ -582,9 +584,7 @@ def make_rd_title(rd: RECAPDocument) -> str:
         desc=f"{rd.description} &ndash; " if rd.description else "",
         doc_num=rd.document_number,
         att_num=(
-            f", Att. #{rd.attachment_number}"
-            if rd.document_type == RECAPDocument.ATTACHMENT
-            else ""
+            f", Att. #{rd.attachment_number}" if rd.attachment_number else ""
         ),
         case_name=best_case_name(d),
         court=court.citation_string,
@@ -671,6 +671,8 @@ async def view_recap_authorities(
     )
     if isinstance(response, SimpleTemplateResponse) and response.context_data:
         c = response.context_data
+        if not hasattr(c["rd"], "authorities_with_data"):
+            raise Http404("No authorities available for this document.")
         c["authorities"] = c["rd"].authorities_with_data
     return response
 
@@ -685,20 +687,36 @@ async def recap_document_context(
     template: str = "",
 ) -> HttpResponse:
     """
-    Returns an HttpResponse for a RECAPDocument.
-    This can be either an HttpResponseRedirect or a TemplateResponse.
+    Returns an HttpResponse for a RECAPDocument or SCOTUSDocument,
+    depending on the docket's court. This can be either an
+    HttpResponseRedirect or a TemplateResponse.
     """
+    docket = await aget_object_or_404(Docket, pk=docket_id)
+    source = docket.get_entry_source()
+    is_scotus = source is SCOTUS_SOURCE
+
+    if is_scotus and not await sync_to_async(waffle.flag_is_active)(
+        request, "scotus_docket_page"
+    ):
+        raise Http404("Docket not found.")
 
     # Tuples of (pk, attachment_number, description)
-    rd_values = [
-        x
-        async for x in RECAPDocument.objects.filter(
-            docket_entry__docket_id=docket_id,  # type: ignore[misc]
-            document_number=doc_num,
-        )
-        .order_by("pk")
-        .values_list("pk", "attachment_number", "description")
-    ]
+    try:
+        rd_values = [
+            x
+            async for x in source.documents_for_docket_and_number(
+                docket_id,  # type: ignore[arg-type]
+                doc_num,  # type: ignore[arg-type]
+            )
+            .order_by("pk")
+            .values_list("pk", "attachment_number", "description")
+        ]
+    except ValueError:
+        # doc_num is a free-form <str:doc_num> URL segment, but some
+        # sources (e.g. SCOTUSDocument.document_number) store it as an
+        # IntegerField. A non-numeric doc_num raises here instead of
+        # just matching nothing. Treat it the same as "no match".
+        raise Http404("No document matches the given query.")
 
     if rd_values_tmp := list(filter(lambda x: x[1] == att_num, rd_values)):
         rd_value = rd_values_tmp[0]
@@ -717,34 +735,19 @@ async def recap_document_context(
         if list(filter(lambda x: x[1] == 1, rd_values)):
             # Get the URL to the attachment page and use the querystring
             # if the request included one
-            attachment_page = reverse(
-                "view_recap_attachment",
-                kwargs={
-                    "docket_id": docket_id,
-                    "doc_num": doc_num,
-                    "att_num": 1,
-                    "slug": slug,
-                },
+            attachment_page = document_url(
+                docket_id,  # type: ignore[arg-type]
+                slug,
+                doc_num,  # type: ignore[arg-type]
+                1,
             )
             if request.GET.urlencode():
                 attachment_page += f"?{request.GET.urlencode()}"
             return HttpResponseRedirect(attachment_page)
 
-        raise Http404("No RECAPDocument matches the given query.")
+        raise Http404("No document matches the given query.")
 
-    rd = (
-        await RECAPDocument.objects.select_related(
-            "docket_entry__docket__court"
-        )
-        .annotate(
-            authorities=Exists(
-                OpinionsCitedByRECAPDocument.objects.filter(
-                    citing_document=OuterRef("pk")
-                )
-            )
-        )
-        .aget(pk=rd_value[0])
-    )
+    rd = await source.get_document_for_render(rd_value[0])
 
     # Check if the user has requested automatic redirection to the document
     redirect_to_pacer_modal = False
@@ -758,7 +761,7 @@ async def recap_document_context(
         # is True set redirect_to_pacer_modal to True to open the modal.
         if rd.is_available:
             return HttpResponseRedirect(rd.filepath_local.url)
-        else:
+        elif source.has_pay_and_pray:
             if rd.pacer_url and rd_download_redirect:
                 return HttpResponseRedirect(rd.pacer_url)
             if rd.pacer_url and redirect_or_modal:
@@ -769,7 +772,7 @@ async def recap_document_context(
     if all([needs_thumb, rd.has_valid_pdf, is_og_bot]):
         await make_png_thumbnail_for_instance(
             pk=rd.pk,
-            klass=RECAPDocument,
+            klass=type(rd),
             max_dimension=1068,
         )
         await rd.arefresh_from_db(fields=["thumbnail_status", "thumbnail"])
@@ -793,22 +796,31 @@ async def recap_document_context(
     # Override the og:url if we're serving a request to an OG crawler bot
     og_file_path_override = f"/{rd.filepath_local}" if is_og_bot else None
 
-    prayer_counts = await get_prayer_counts_in_bulk([rd])
-    existing_prayers = {}
-
-    user = await request.auser()
-    if user.is_authenticated:
-        # Check prayer existence.
-        existing_prayers = await get_existing_prayers_in_bulk(user, [rd])
+    prayer_counts: dict[int, int] = {}
+    existing_prayers: dict[int, bool] = {}
+    if source.has_pay_and_pray:
+        prayer_counts = await get_prayer_counts_in_bulk([rd])
+        user = await request.auser()
+        if user.is_authenticated:
+            # Check prayer existence.
+            existing_prayers = await get_existing_prayers_in_bulk(user, [rd])
 
     # Merge counts and existing prayer status to RECAPDocuments.
     rd.prayer_count = prayer_counts.get(rd.id, 0)  # type: ignore[attr-defined]
     rd.prayer_exists = existing_prayers.get(rd.id, False)  # type: ignore[attr-defined]
 
-    court_id = rd.docket_entry.docket.court.id
+    court_id = docket.court_id
 
-    # Generate attachment info
-    attachments = get_attachment_values(rd, rd_values)
+    # Generate attachment info. Use the docket's canonical slug (not the
+    # request's slug segment, which callers can leave blank) -- matches
+    # what get_absolute_url() always used.
+    attachments = get_attachment_values(
+        rd,
+        rd_values,
+        docket_id,  # type: ignore[arg-type]
+        docket.slug,
+        doc_num,  # type: ignore[arg-type]
+    )
 
     return TemplateResponse(
         request,
@@ -821,14 +833,23 @@ async def recap_document_context(
             "private": True,  # Always True for RECAP docs.
             "timezone": COURT_TIMEZONES.get(court_id, "US/Eastern"),
             "redirect_to_pacer_modal": redirect_to_pacer_modal,
-            "authorities": rd.authorities,
+            "authorities": getattr(rd, "authorities", False),
             "attachments": attachments,
+            "is_scotus": is_scotus,
+            "admin_url_names": source.admin_url_names,
+            "admin_perm_names": source.admin_perm_names,
+            "admin_document_label": source.admin_document_label,
+            "has_pay_and_pray": source.has_pay_and_pray,
         },
     )
 
 
 def get_attachment_values(
-    rd: RECAPDocument, rd_values: list[tuple[int, int | None, str]]
+    rd: RECAPDocument | SCOTUSDocument,
+    rd_values: list[tuple[int, int | None, str]],
+    docket_id: int,
+    slug: str,
+    doc_num: str,
 ) -> list[dict[str, str | int | None]]:
     """
     Moved this out of recap_document_context because it is easily severable and
@@ -871,27 +892,16 @@ def get_attachment_values(
                 # This shouldn't be able to go negative, but just making sure.
                 start = rd_index - max_before
             end = rd_index + 1 + max_after  # Doesn't matter if this is over
-        # Save rd values
-        rd_attachment_number = rd.attachment_number
-        rd_document_type = rd.document_type
-        # Now loop through and build attachment dicts.
+        # Build each sibling's URL directly from its (docket_id, slug,
+        # doc_num, attachment_number) - no need to modify `rd`.
         for rdv in rd_values[start:end]:
-            # To get the correct URL, modify the RECAPDocument object we have
-            rd.attachment_number = rdv[1]
-            if rd.attachment_number:
-                rd.document_type = rd.ATTACHMENT
-            else:
-                rd.document_type = rd.PACER_DOCUMENT
             attachments.append(
                 {
                     "attachment_number": rdv[1],  # type: ignore[dict-item]
-                    "url": rd.get_absolute_url(),
+                    "url": document_url(docket_id, slug, doc_num, rdv[1]),
                     "description": rdv[2],
                 }
             )
-        # Reset rd
-        rd.attachment_number = rd_attachment_number
-        rd.document_type = rd_document_type
 
         if end < doc_len:
             attachments.append(

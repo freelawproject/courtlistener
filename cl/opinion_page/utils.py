@@ -35,6 +35,7 @@ from cl.lib.s3_cache import get_s3_cache, make_s3_cache_key
 from cl.lib.string_utils import trunc
 from cl.lib.types import CleanData
 from cl.opinion_page.docket_sources_utils import (
+    SCOTUS_SOURCE,
     DocketEntrySource,
     MetadataItem,
     MetadataSection,
@@ -50,6 +51,7 @@ from cl.search.models import (
     DocketEntry,
     OpinionCluster,
     OriginatingCourtInformation,
+    SCOTUSDocketEntry,
 )
 
 logger = logging.getLogger(__name__)
@@ -81,7 +83,9 @@ def _person_item(
     return None
 
 
-def build_citation_string(obj: Docket | DocketEntry) -> str:
+def build_citation_string(
+    obj: Docket | DocketEntry | SCOTUSDocketEntry,
+) -> str:
     """Build a Bluebook-style citation string for a docket or docket entry.
 
     For dockets: name, docket_number, (court)
@@ -91,7 +95,7 @@ def build_citation_string(obj: Docket | DocketEntry) -> str:
         docket = obj
         date_of_interest = None
         ecf = ""
-    elif isinstance(obj, DocketEntry):
+    elif isinstance(obj, DocketEntry | SCOTUSDocketEntry):
         docket = obj.docket
         date_of_interest = obj.date_filed
         ecf = obj.entry_number
@@ -546,13 +550,15 @@ async def core_docket_data(
 ]:
     """Gather the core data for a docket, party, or IDB page."""
     docket: Docket = await aget_object_or_404(Docket, pk=pk)
+    source = docket.get_entry_source()
+    is_scotus = source is SCOTUS_SOURCE
 
     # SCOTUS content is made available using a waffle flag:
     # every docket-related view shares this helper, so access
     # control resides here.
-    if docket.court_id == "scotus" and not await sync_to_async(
-        waffle.flag_is_active
-    )(request, "scotus_docket_page"):
+    if is_scotus and not await sync_to_async(waffle.flag_is_active)(
+        request, "scotus_docket_page"
+    ):
         raise Http404("Docket not found.")
 
     title = make_docket_title(docket)
@@ -613,7 +619,7 @@ async def core_docket_data(
             "has_alert": has_alert,
             "timezone": timezone_str,
             "private": docket.blocked,
-            "is_scotus": docket.court_id == "scotus",
+            "is_scotus": is_scotus,
             "docket_source": docket_source,
             # Resolved here because templates can't call the single-arg
             # source callable; gates the docket toolbar on every tab.

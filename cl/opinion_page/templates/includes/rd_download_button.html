@@ -1,3 +1,4 @@
+{% load extras %}
 <div class="btn-group">
   {% if rd.is_available %}
     <a href="{{ rd.filepath_local.url }}"
@@ -5,39 +6,69 @@
        class="btn btn-primary">Download PDF&nbsp;<i
       class="fa fa-file-pdf-o"></i>
     </a>
-    <button type="button"
-            class="btn btn-primary dropdown-toggle"
-            data-toggle="dropdown"
-            aria-haspopup="true"
-            aria-expanded="false">
-      <span class="caret"></span>
-      <span class="sr-only">Toggle Dropdown</span>
-    </button>
-    <ul class="dropdown-menu">
-      <li>
-        <a href="{{ rd.filepath_local.url }}">From
-          CourtListener</a>
-      </li>
-      {% if rd.filepath_ia %}
-        <li>
-          <a href="{{ rd.filepath_ia }}">From
-            Internet Archive</a>
-        </li>
-        <li role="separator" class="divider"></li>
+    {% if is_scotus %}
+      {% if rd.url|http_url %}
+        <button type="button"
+                class="btn btn-primary dropdown-toggle"
+                data-toggle="dropdown"
+                aria-haspopup="true"
+                aria-expanded="false">
+          <span class="caret"></span>
+          <span class="sr-only">Toggle Dropdown</span>
+        </button>
+        <ul class="dropdown-menu">
+          <li>
+            <a href="{{ rd.filepath_local.url }}">From CourtListener</a>
+          </li>
+          <li>
+            <a href="{{ rd.url|http_url }}" target="_blank" rel="nofollow noopener noreferrer">From the Supreme Court</a>
+          </li>
+        </ul>
       {% endif %}
-      {% if rd.pacer_url %}
+    {% else %}
+      <button type="button"
+              class="btn btn-primary dropdown-toggle"
+              data-toggle="dropdown"
+              aria-haspopup="true"
+              aria-expanded="false">
+        <span class="caret"></span>
+        <span class="sr-only">Toggle Dropdown</span>
+      </button>
+      <ul class="dropdown-menu">
         <li>
-            <a href="{{ rd.pacer_url }}"
-              {% if not request.COOKIES.buy_on_pacer_modal and not request.COOKIES.recap_install_plea %}
-                data-toggle="modal" data-target="#modal-buy-pacer"
-                class="open_buy_pacer_modal"
-              {% endif %}
-              target="_blank"
-              rel="nofollow noopener noreferrer">
-              <i class="fa fa-external-link"></i> Buy on PACER</a>
+          <a href="{{ rd.filepath_local.url }}">From
+            CourtListener</a>
         </li>
-      {% endif %}
-    </ul>
+        {% if rd.filepath_ia %}
+          <li>
+            <a href="{{ rd.filepath_ia }}">From
+              Internet Archive</a>
+          </li>
+          <li role="separator" class="divider"></li>
+        {% endif %}
+        {% if rd.pacer_url %}
+          <li>
+              <a href="{{ rd.pacer_url }}"
+                {% if not request.COOKIES.buy_on_pacer_modal and not request.COOKIES.recap_install_plea %}
+                  data-toggle="modal" data-target="#modal-buy-pacer"
+                  class="open_buy_pacer_modal"
+                {% endif %}
+                target="_blank"
+                rel="nofollow noopener noreferrer">
+                <i class="fa fa-external-link"></i> Buy on PACER</a>
+          </li>
+        {% endif %}
+      </ul>
+    {% endif %}
+  {% elif is_scotus %}
+    {% if rd.url|http_url %}
+      <a href="{{ rd.url|http_url }}"
+         role="button"
+         class="btn btn-primary"
+         target="_blank"
+         rel="nofollow noopener noreferrer">View on SCOTUS&nbsp;<i class="fa fa-external-link"></i>
+      </a>
+    {% endif %}
   {% else %}
     {# We don't have it #}
     {% if rd.is_sealed %}
