@@ -92,13 +92,14 @@ jobs:
       - name: List docker images
         run: docker image ls -a --no-trunc
 
-      # Docker images are ready. Start them up.
-      - name: Create docker network
-        run: docker network create -d bridge --attachable cl_net_overlay
+      # Docker images are ready. Start them up. The compose file creates the
+      # cl_net_overlay network itself, and --wait blocks until every service
+      # with a healthcheck (postgres, redis, elasticsearch, django) reports
+      # healthy, so the steps below never race the stack coming up.
       - name: Start docker containers
         working-directory: courtlistener/docker/courtlistener
         run: > # don't build, rather use loaded image from build step, specified by merging overriding config
-          docker compose -f docker-compose.yml -f docker-compose.tmpfs.yml -f <(echo 'services: { cl-django: { image: "courtlistener" }, cl-celery: { image: "courtlistener" } }') up -d --no-build --pull=never
+          docker compose -f docker-compose.yml -f docker-compose.tmpfs.yml -f <(echo 'services: { cl-django: { image: "courtlistener" }, cl-celery: { image: "courtlistener" } }') up -d --no-build --pull=never --wait --wait-timeout 600
       - name: List docker containers
         run: docker ps -a --no-trunc
       - name: Show the docker startup logs
