@@ -177,7 +177,7 @@ Getting Started guide above is the walkthrough. Start it from that directory wit
 `docker compose up`; the containers are named `cl-django`, `cl-celery`, `cl-postgres`,
 `cl-redis`, `cl-es`, and so on, and tests run inside `cl-django` as shown below.
 
-In Claude Code on the web, `.claude/hooks/session-start.sh` boots that stack when the
+In Claude Code on the web, `.claude/hooks/session_start.py` boots that stack when the
 session starts and prints how to use it. If it reports a problem, fix the cause and re-run
 the script as it says; the session works without the stack, but the test suite needs it.
 
