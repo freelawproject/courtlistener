@@ -1,10 +1,9 @@
 import datetime
 import re
-from collections.abc import Iterable
-from collections.abc import Iterable as IterableType
+from collections.abc import Generator, Iterable
 from itertools import chain, islice, tee
 from re import Match
-from typing import Any
+from typing import Any, TypeIs
 
 from django.conf import settings
 from django.core.cache import cache
@@ -72,7 +71,9 @@ def deepgetattr(obj, name, default=_UNSPECIFIED):
             return default
 
 
-def chunks(iterable, chunk_size: int):
+def chunks[T](
+    iterable: Iterable[T], chunk_size: int
+) -> Generator[Iterable[T]]:
     """Warning: If you're considering using this method, you might want to
     consider using itertools.batched instead.
     Like the chunks function, but the iterable can be a generator.
@@ -89,7 +90,9 @@ def chunks(iterable, chunk_size: int):
         yield chain([first], islice(iterator, chunk_size - 1))
 
 
-def previous_and_next(some_iterable):
+def previous_and_next[T](
+    some_iterable: Iterable[T],
+) -> Iterable[tuple[T | None, T, T | None]]:
     """Provide previous and next values while iterating a list.
 
     This is from: https://stackoverflow.com/a/1012089/64911
@@ -97,13 +100,17 @@ def previous_and_next(some_iterable):
     This will allow you to lazily iterate a list such that as you iterate, you
     get a tuple containing the previous, current, and next value.
     """
+    prevs: Iterable[T | None]
+    items: Iterable[T]
+    nexts: Iterable[T | None]
+
     prevs, items, nexts = tee(some_iterable, 3)
     prevs = chain([None], prevs)
     nexts = chain(islice(nexts, 1, None), [None])
     return zip(prevs, items, nexts)
 
 
-def is_iter(item: Any) -> bool:
+def is_iter(item: Any) -> TypeIs[Iterable]:
     # See: https://stackoverflow.com/a/1952655/64911
     return isinstance(item, Iterable)
 
@@ -116,15 +123,18 @@ def remove_duplicate_dicts(dicts: list[dict]) -> list[dict]:
     return [dict(t) for t in {tuple(d.items()) for d in dicts}]
 
 
-def human_sort(
-    unordered_list: IterableType[str | tuple[str, Any]],
+def human_sort[T: str | tuple[str, Any]](
+    unordered_list: Iterable[T],
     key: str | None = None,
-) -> list[str | tuple[str, Any]]:
+) -> list[T]:
     """Human sort Lists of strings or list of dictionaries
 
     :param unordered_list: The list we want to sort
     :param key: A key (if any) to sort the dictionary with.
     :return: An ordered list
+
+    TODO: The `tuple[str, Any]` is almost certainly wrong and should be a
+        `dict[str, Any]`, but this requires verification.
     """
     convert = lambda text: int(text) if text.isdigit() else text
     if key:
