@@ -34,7 +34,7 @@ from cl.lib.elasticsearch_utils import (
 from cl.lib.s3_cache import get_s3_cache, make_s3_cache_key
 from cl.lib.string_utils import trunc
 from cl.lib.types import CleanData
-from cl.opinion_page.docket_sources_utils import (
+from cl.opinion_page.docket_entry_sources import (
     DocketEntrySource,
     MetadataItem,
     MetadataSection,
