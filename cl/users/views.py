@@ -530,6 +530,16 @@ async def take_out_done(request: HttpRequest) -> HttpResponse:
 def register(request: HttpRequest) -> HttpResponse:
     """allow only an anonymous user to register"""
     redirect_to = get_redirect_or_abort(request, "next")
+    # Every successful-looking outcome below, including a refused duplicate,
+    # must produce this exact redirect. Anything that differs between the
+    # outcomes tells an observer whether the address already had an account.
+    # The address is stripped to match what the form's EmailField cleans, so
+    # the URL is what register_success expects to validate.
+    email = request.POST.get("email", "").strip()
+    success_url = (
+        reverse("register_success")
+        + f"?next={urlencode(redirect_to)}&email={urlencode(email)}"
+    )
     if request.user.is_anonymous:
         if request.method == "POST":
             try:
@@ -549,13 +559,6 @@ def register(request: HttpRequest) -> HttpResponse:
             consent_form = OptInConsentForm(request.POST)
             if form.is_valid() and consent_form.is_valid():
                 cd = form.cleaned_data
-                # Every successful-looking outcome below, including a refused
-                # duplicate, must produce this exact redirect. Anything that
-                # differs between the outcomes tells an observer whether the
-                # address already had an account.
-                get_str = f"?next={urlencode(redirect_to)}&email={urlencode(cd['email'])}"
-                success_url = reverse("register_success") + get_str
-
                 if form.email_taken:
                     # Somebody already holds this address. Create nothing, and
                     # tell only the address owner, by email, which nobody else
