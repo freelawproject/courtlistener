@@ -6,6 +6,7 @@
   show_first=""
   show_previous=""
   show_page_indicator=""
+  show_range=""
   show_next=""
   show_last=""
   class=""
@@ -46,10 +47,21 @@
       {% endif %}
     </div>
 
-    {# Center: Page indicator #}
-    {% if show_page_indicator %}
+    {# Center: Page indicator and/or item range #}
+    {% if show_page_indicator or show_range %}
       <div class="text-sm text-greyscale-700">
-        <span class="hidden sm:inline">Page</span> {{ page_obj.number|intcomma }} of {{ page_obj.paginator.num_pages|intcomma }}
+        {% if show_page_indicator %}
+          <span><span class="hidden sm:inline">Page</span> {{ page_obj.number|intcomma }} of {{ page_obj.paginator.num_pages|intcomma }}</span>
+        {% endif %}
+        {% if show_page_indicator and show_range %}
+          <span aria-hidden="true">·</span>
+        {% endif %}
+        {# start_index/end_index come from the page object rather than #}
+        {# number * per_page: with `orphans` the last page can hold more #}
+        {# than per_page items. #}
+        {% if show_range %}
+          <span>{{ page_obj.start_index|intcomma }}–{{ page_obj.end_index|intcomma }} of {{ page_obj.paginator.count|intcomma }}</span>
+        {% endif %}
       </div>
     {% endif %}
 

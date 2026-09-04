@@ -4044,3 +4044,35 @@ class DocketFilterPaginationWiringTest(TestCase):
         for href in next_hrefs:
             with self.subTest(href=href):
                 self.assertIn("page=3", href)
+
+    async def test_pagination_shows_entry_range(self) -> None:
+        """The bottom pagination shows "start–end of total" for the current
+        page. The paginator uses `orphans=10`, so the last page can hold more
+        than the page size; the range must come from the page object's
+        start/end index, not from `number * per_page`. Fill the docket so the
+        last page absorbs the orphans and check its range."""
+        # 5 existing + 405 bulk = 410 entries. At 200 per page with
+        # orphans=10 that is two pages: 1–200 and 201–410.
+        await sync_to_async(DocketEntry.objects.bulk_create)(
+            [
+                DocketEntry(
+                    docket=self.docket,
+                    entry_number=n,
+                    date_filed=date(2024, 6, 1),
+                    description=f"bulk entry {n}",
+                )
+                for n in range(100, 505)
+            ]
+        )
+        r = await self._get_docket_and_verify_v2(data={"page": "2"})
+        tree = fromstring(r.content.decode())
+        nav = tree.find('.//nav[@aria-label="Pagination"]')
+        self.assertIsNotNone(nav, "pagination nav missing")
+        # lxml types itertext() as Iterator[_AnyStr]; stringify for str.join.
+        nav_text = " ".join(str(t) for t in nav.itertext()).split()
+        self.assertIn("201–410", nav_text)
+        self.assertEqual(
+            nav_text[nav_text.index("201–410") + 2],
+            "410",
+            f"range total should be the paginator count; nav text={nav_text}",
+        )
