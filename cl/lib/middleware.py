@@ -125,10 +125,7 @@ class IncrementalNewTemplateMiddleware:
 
         new_template_name = f"v2_{old_template}"
 
-        try:
-            # verify the new template actually exists
-            get_template(new_template_name)
-        except TemplateDoesNotExist:
+        if not self.template_exists(new_template_name):
             return response
 
         response.template_name = new_template_name
