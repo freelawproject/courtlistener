@@ -128,7 +128,7 @@ from cl.users.models import (
     UserProxyEvent,
 )
 from cl.users.tasks import tag_zoho_record, tag_zoho_record_for_membership
-from cl.users.utils import create_stub_account
+from cl.users.utils import create_stub_account, message_dict
 from cl.visualizations.factories import VisualizationFactory
 from cl.visualizations.models import SCOTUSMap
 
@@ -4383,6 +4383,244 @@ class RegisterViewTest(TestCase):
             f"{stub_profile.activation_key} is not a 40-char lowercase hex "
             "string",
         )
+
+    @staticmethod
+    def registration_data(username: str, email: str) -> dict[str, str | bool]:
+        """Build a valid registration POST for the given username and email."""
+        return {
+            "username": username,
+            "email": email,
+            "first_name": "User",
+            "last_name": "Person",
+            "password1": "TestPassw0rd!",
+            "password2": "TestPassw0rd!",
+            "consent": True,
+        }
+
+    async def test_taken_email_is_indistinguishable_from_a_fresh_signup(
+        self,
+    ) -> None:
+        """Registering with an address that already has an account must
+        return exactly what a successful registration returns, create no
+        account, and tell only the address owner by email.
+
+        See issue #7854. "This email is already in use" would let anyone test
+        whether an address has a CourtListener account.
+        """
+        email = "shared@example.com"
+        fresh = await self.async_client.post(
+            reverse("register"),
+            self.registration_data("first_signup", email),
+            follow=True,
+        )
+        self.assertEqual(fresh.status_code, HTTPStatus.OK)
+        mail.outbox.clear()
+
+        duplicate = await self.async_client.post(
+            reverse("register"),
+            self.registration_data("second_signup", email),
+            follow=True,
+        )
+
+        self.assertEqual(duplicate.status_code, fresh.status_code)
+        self.assertEqual(duplicate.redirect_chain, fresh.redirect_chain)
+        # The CSP nonce is fresh on every response, so mask it before
+        # comparing the two pages.
+        nonce = re.compile(rb'nonce="[^"]*"')
+        self.assertEqual(
+            nonce.sub(b'nonce=""', duplicate.content),
+            nonce.sub(b'nonce=""', fresh.content),
+        )
+
+        # No second account, and the first one is untouched.
+        self.assertFalse(
+            await User.objects.filter(username="second_signup").aexists()
+        )
+        self.assertEqual(
+            await User.objects.filter(email__iexact=email).acount(), 1
+        )
+
+        # The address owner, and nobody else, hears about the attempt.
+        self.assertEqual(len(mail.outbox), 1)
+        message = mail.outbox[0]
+        self.assertEqual(message.to, [email])
+        self.assertIn("already exists", message.body)
+        self.assertIn(reverse("password_reset"), message.body)
+
+    async def test_email_uniqueness_check_folds_case(self) -> None:
+        """Addresses that differ only in case are the same address."""
+        await sync_to_async(UserProfileWithParentsFactory.create)(
+            user__email="Casey@Example.com"
+        )
+        mail.outbox.clear()
+
+        response = await self.async_client.post(
+            reverse("register"),
+            self.registration_data("casey2", "casey@example.COM"),
+            follow=True,
+        )
+
+        self.assertEqual(response.status_code, HTTPStatus.OK)
+        self.assertFalse(
+            await User.objects.filter(username="casey2").aexists()
+        )
+        self.assertEqual(len(mail.outbox), 1)
+        self.assertEqual(mail.outbox[0].to, ["casey@example.COM"])
+
+    async def test_username_matching_another_email_is_merely_taken(
+        self,
+    ) -> None:
+        """A username equal to another account's email address is rejected
+        with the ordinary "taken" error, and no hint of why."""
+        await sync_to_async(UserProfileWithParentsFactory.create)(
+            user__username="taken_name", user__email="victim@example.com"
+        )
+
+        # Establish what a plain username collision reports...
+        response = await self.async_client.post(
+            reverse("register"),
+            self.registration_data("taken_name", "someone@example.com"),
+        )
+        plain_collision_errors = response.context["form"].errors["username"]
+        self.assertTrue(plain_collision_errors)
+
+        # ...and require the email collision to report exactly the same thing.
+        response = await self.async_client.post(
+            reverse("register"),
+            self.registration_data("Victim@example.com", "other@example.com"),
+        )
+        self.assertEqual(response.status_code, HTTPStatus.OK)
+        username_errors = response.context["form"].errors["username"]
+        self.assertEqual(username_errors, plain_collision_errors)
+        self.assertNotIn("email", " ".join(username_errors).lower())
+        self.assertFalse(
+            await User.objects.filter(
+                username__iexact="victim@example.com"
+            ).aexists()
+        )
+
+    async def test_stub_account_claim_is_not_treated_as_a_duplicate(
+        self,
+    ) -> None:
+        """Claiming a donor stub account binds the form to the account that
+        already holds the address, so it must upgrade the stub rather than be
+        refused as a duplicate."""
+        stub_user, _ = await sync_to_async(create_stub_account)(
+            {
+                "email": "donor@example.com",
+                "first_name": "Donor",
+                "last_name": "Person",
+            },
+            {
+                "address1": "123 Main St",
+                "address2": "",
+                "city": "Anytown",
+                "state": "XX",
+                "zip_code": "00000",
+            },
+        )
+        mail.outbox.clear()
+
+        response = await self.async_client.post(
+            reverse("register"),
+            self.registration_data("donor", "donor@example.com"),
+            follow=True,
+        )
+        self.assertEqual(response.status_code, HTTPStatus.OK)
+
+        stub_user = await User.objects.select_related("profile").aget(
+            pk=stub_user.pk
+        )
+        self.assertEqual(stub_user.username, "donor")
+        self.assertTrue(stub_user.is_active)
+        self.assertFalse(stub_user.profile.stub_account)
+        self.assertEqual(
+            await User.objects.filter(email="donor@example.com").acount(), 1
+        )
+
+        # The claimant gets the activation email, not the "already exists" one.
+        recipients = [m.to for m in mail.outbox]
+        self.assertIn(["donor@example.com"], recipients)
+        subjects = [m.subject for m in mail.outbox]
+        self.assertIn(
+            "Confirm your account on CourtListener.com",
+            subjects,
+        )
+        self.assertNotIn(
+            "You already have an account on CourtListener.com",
+            subjects,
+        )
+
+    @patch("cl.users.views.notify_existing_account_holder")
+    @patch("cl.users.views.send_new_account_emails")
+    async def test_both_outcomes_enqueue_mail_instead_of_sending_it(
+        self, new_account_mock: MagicMock, existing_account_mock: MagicMock
+    ) -> None:
+        """Neither outcome may send mail synchronously in the view. A fresh
+        signup that sent two emails inline while a refused duplicate sent one
+        would be distinguishable by response time alone."""
+        email = "timing@example.com"
+        mail.outbox.clear()
+
+        await self.async_client.post(
+            reverse("register"),
+            self.registration_data("timing_first", email),
+        )
+        user = await User.objects.aget(username="timing_first")
+        new_account_mock.delay.assert_called_once_with(user.pk)
+        existing_account_mock.delay.assert_not_called()
+        self.assertEqual(mail.outbox, [])
+
+        await self.async_client.post(
+            reverse("register"),
+            self.registration_data("timing_second", email),
+        )
+        existing_account_mock.delay.assert_called_once_with(email)
+        new_account_mock.delay.assert_called_once()
+        self.assertEqual(mail.outbox, [])
+
+
+class DuplicateEmailSettingsTest(TestCase):
+    """Users who already hold an address on more than one account exist and
+    must keep working until those duplicates are cleaned up."""
+
+    def setUp(self) -> None:
+        self.client = AsyncClient()
+        self.email = "twice@example.com"
+        UserProfileWithParentsFactory.create(
+            user__username="other_holder", user__email=self.email
+        )
+        self.up = UserProfileWithParentsFactory.create(
+            user__username="pandora",
+            user__password=make_password("password"),
+            user__email=self.email,
+        )
+
+    async def test_existing_duplicate_can_still_save_settings(self) -> None:
+        """Regression test: the registration form's uniqueness check must
+        not leak into UserForm, or a user whose address is shared with another
+        account could never save their settings page. See issue #7854."""
+        self.assertTrue(
+            await self.client.alogin(username="pandora", password="password")
+        )
+        response = await self.client.post(
+            reverse("view_settings"),
+            {
+                "first_name": "Still",
+                "last_name": "Works",
+                "email": self.email,
+            },
+            follow=True,
+        )
+
+        self.assertEqual(response.status_code, HTTPStatus.OK)
+        self.assertIn(
+            message_dict["settings_changed_successfully"]["message"],
+            response.content.decode(),
+        )
+        await self.up.user.arefresh_from_db()
+        self.assertEqual(self.up.user.first_name, "Still")
+        self.assertEqual(self.up.user.email, self.email)
 
 
 class UserAdminApiCallsCountTest(TestCase):
