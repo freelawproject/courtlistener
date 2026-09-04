@@ -252,6 +252,47 @@ class CitationTextTest(TestCase):
                     msg=f"\n{created_html}\n\n    !=\n\n{expected_html}",
                 )
 
+    def test_unmatched_law_citation_is_marked_as_law(self) -> None:
+        """Can a statute be told apart from an unmatched case citation?"""
+        opinion = Opinion(
+            plain_text="See 28 U. S. C. §1332; Shady Grove, 559 U. S. ___."
+        )
+        get_citations_kwargs = make_get_citations_kwargs(opinion)[0]
+        citations = get_citations(
+            tokenizer=HYPERSCAN_TOKENIZER, **get_citations_kwargs
+        )
+
+        created_html = create_cited_html({NO_MATCH_RESOURCE: citations}, {})
+
+        self.assertIn(
+            '<span class="citation no-link" data-type="law">'
+            "28 U. S. C. §1332</span>",
+            created_html,
+        )
+        self.assertIn(
+            '<span class="citation no-link">559 U. S. ___</span>',
+            created_html,
+        )
+
+    def test_session_and_public_laws_are_marked_as_law(self) -> None:
+        """Do the non-U.S.C. law citations get the same marker?"""
+        for text in ["10 Stat. 155", "Pub. L. 94-552", "41 Fed. Reg. 27305"]:
+            with self.subTest(text=text):
+                opinion = Opinion(plain_text=f"See {text} for the rule.")
+                get_citations_kwargs = make_get_citations_kwargs(opinion)[0]
+                citations = get_citations(
+                    tokenizer=HYPERSCAN_TOKENIZER, **get_citations_kwargs
+                )
+
+                created_html = create_cited_html(
+                    {NO_MATCH_RESOURCE: citations}, {}
+                )
+
+                self.assertIn(
+                    f'<span class="citation no-link" data-type="law">{text}',
+                    created_html,
+                )
+
     def test_create_html_with_citations_if_chunked(self):
         """Test create html split over chunks"""
         opinion = OpinionWithChildrenFactory(
