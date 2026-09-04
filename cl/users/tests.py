@@ -4482,11 +4482,11 @@ class RegisterViewTest(TestCase):
         self.assertEqual(len(mail.outbox), 1)
         self.assertEqual(mail.outbox[0].to, ["casey@example.COM"])
 
-    async def test_usernames_containing_at_are_rejected_regardless(
+    async def test_email_shaped_usernames_are_rejected_regardless(
         self,
     ) -> None:
-        """A username containing "@" is refused with the same format error
-        whether or not it matches an existing account's email address.
+        """A username shaped like an email address is refused with the same
+        format error whether or not it matches an existing account's email.
 
         Refusing only the addresses that have accounts, however the error is
         worded, would tell the registrant that the address has an account.
@@ -4500,7 +4500,7 @@ class RegisterViewTest(TestCase):
             "ada@example.com",  # Another account's address
             "Ada@Example.com",  # Same, different case
             "nobody@example.com",  # An address with no account
-            "mal@ory",  # Not even an address, just an "@"
+            "mal@or.y",  # Email-shaped, though nobody's address
         ]:
             with self.subTest(username=username):
                 response = await self.async_client.post(
@@ -4521,6 +4521,21 @@ class RegisterViewTest(TestCase):
 
         # Every attempt got exactly the same error.
         self.assertEqual(len(set(errors_seen)), 1)
+
+    async def test_an_at_sign_alone_does_not_make_a_username_an_email(
+        self,
+    ) -> None:
+        """A username with an "@" but no domain is not email-shaped and is
+        still allowed."""
+        response = await self.async_client.post(
+            reverse("register"),
+            self.registration_data("mal@ory", "mallory@example.com"),
+            follow=True,
+        )
+        self.assertEqual(response.status_code, HTTPStatus.OK)
+        self.assertTrue(
+            await User.objects.filter(username="mal@ory").aexists()
+        )
 
     async def test_stub_account_claim_is_not_treated_as_a_duplicate(
         self,

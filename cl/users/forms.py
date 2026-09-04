@@ -14,7 +14,7 @@ from django.contrib.auth.models import User
 from django.contrib.auth.validators import ASCIIUsernameValidator
 from django.core.exceptions import ValidationError
 from django.core.mail import send_mail
-from django.db.models import QuerySet, Value
+from django.db.models import Value
 from django.db.models.functions import Lower
 from django.forms import ModelForm
 from django.urls import reverse
@@ -23,6 +23,7 @@ from localflavor.us.forms import USStateField, USZipCodeField
 from localflavor.us.us_states import STATE_CHOICES
 
 from cl.api.models import Webhook, WebhookEventType, WebhookVersions
+from cl.lib.AuthenticationBackend import LOOKS_LIKE_EMAIL
 from cl.lib.types import EmailType
 from cl.users.models import UserProfile
 from cl.users.utils import emails
@@ -140,21 +141,26 @@ class UserForm(ModelForm, CleanEmailMixin):
 
 
 def validate_username_is_not_an_email(value: str) -> None:
-    """Reject usernames containing "@", so no username can be an email address.
+    """Reject usernames shaped like an email address.
 
     ASCIIUsernameValidator permits "@" and ".", which makes somebody else's
     email address a registerable username. That interferes with signing in by
     email, and there is no non-revealing way to refuse only the addresses that
     have accounts: "that username is taken" would tell the registrant the
-    address exists here. Refusing every "@" is a flat rule about the format, so
-    the response says nothing about what is in the database.
+    address exists here. Refusing everything email-shaped is a flat rule about
+    the format, so the response says nothing about what is in the database.
+
+    The shape test is the same one the sign-in backend uses to decide whether
+    an identifier is an address, so a username this accepts can never be
+    mistaken for an address at sign-in. Something like "mal@ory" is fine; it
+    has no domain.
 
     :param value: The submitted username.
     :return: None
     """
-    if "@" in value:
+    if LOOKS_LIKE_EMAIL.match(value):
         raise ValidationError(
-            "Usernames cannot be email addresses or contain the @ symbol.",
+            "Usernames cannot be email addresses.",
             code="username_looks_like_email",
         )
 
@@ -172,8 +178,8 @@ class UserCreationFormExtended(UserCreationForm, CleanEmailMixin):
     expected to respond exactly as it would for a successful signup while
     emailing the address owner. Usernames get no such protection because they
     are already public in tag and prayer URLs, so username collisions are
-    reported as errors like any other. What usernames may not do is contain
-    "@": see validate_username_is_not_an_email.
+    reported as errors like any other. What usernames may not do is look like
+    an email address: see validate_username_is_not_an_email.
 
     This check belongs on the registration form only. UserForm, which shares
     CleanEmailMixin, must not get it until existing duplicate accounts have
@@ -237,8 +243,9 @@ class UserCreationFormExtended(UserCreationForm, CleanEmailMixin):
             "username": forms.CharField,
         }
 
-    def _other_accounts_using_email(self, value: str) -> QuerySet[User]:
-        """Find accounts, other than the bound instance, whose email is `value`.
+    def _email_is_taken(self, value: str) -> bool:
+        """Report whether an account other than the bound instance holds
+        `value` as its email address.
 
         Case is folded in SQL with Lower() on both sides rather than with
         str.lower() in Python. The two disagree on some non-ASCII input and the
@@ -251,14 +258,14 @@ class UserCreationFormExtended(UserCreationForm, CleanEmailMixin):
         mistaken for a duplicate.
 
         :param value: The string to compare against the email column.
-        :return: A queryset of the matching users.
+        :return: True if some other account already has that address.
         """
         users = User.objects.annotate(email_lower=Lower("email")).filter(
             email_lower=Lower(Value(value))
         )
         if self.instance.pk:
             users = users.exclude(pk=self.instance.pk)
-        return users
+        return users.exists()
 
     def clean_email(self) -> str:
         """Run the shared email checks, then record whether another account
@@ -268,7 +275,7 @@ class UserCreationFormExtended(UserCreationForm, CleanEmailMixin):
         docstring for why.
         """
         email = super().clean_email()
-        self.email_taken = self._other_accounts_using_email(email).exists()
+        self.email_taken = self._email_is_taken(email)
         return email
 
     def clean_first_name(self):
