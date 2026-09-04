@@ -3643,18 +3643,27 @@ class DocketPageV2TemplateTest(TestCase):
             )
         )
         self.assertTemplateUsed(r, "v2_docket.html")
-        h1 = fromstring(r.content.decode()).xpath(
-            "//h1[@data-type='search.Docket']"
-        )[0]
+        # Walked with iter() rather than xpath(): xpath() is typed as a
+        # union of every result kind, so pyrefly rejects element calls on it.
+        headings = [
+            el
+            for el in fromstring(r.content.decode()).iter("h1")
+            if el.get("data-type") == "search.Docket"
+        ]
+        self.assertEqual(len(headings), 1)
         selectable = [
-            span.text_content().strip()
-            for span in h1.xpath(".//span[contains(@class, 'select-all')]")
+            span
+            for span in headings[0].iter("span")
+            if "select-all" in (span.get("class") or "")
         ]
         self.assertEqual(len(selectable), 2)
-        self.assertEqual(selectable[1], self.docket.docket_number)
-        for span in h1.xpath(".//span[contains(@class, 'select-all')]"):
-            with self.subTest(value=span.text_content().strip()):
-                self.assertIn("cursor-text", span.get("class"))
+        self.assertEqual(
+            "".join(selectable[1].itertext()).strip(),
+            self.docket.docket_number,
+        )
+        for span in selectable:
+            with self.subTest(value="".join(span.itertext()).strip()):
+                self.assertIn("cursor-text", span.get("class") or "")
 
     def test_metadata_section_honors_is_copyable(self) -> None:
         """Only items flagged is_copyable get the select-all treatment."""
@@ -3680,13 +3689,13 @@ class DocketPageV2TemplateTest(TestCase):
                 }
             )
         )
-        details = fromstring(html).xpath("//dd")
+        details = list(fromstring(html).iter("dd"))
         self.assertEqual(len(details), 2)
         plain, copyable = details
-        self.assertNotIn("select-all", plain.get("class", ""))
-        self.assertIn("select-all", copyable.get("class"))
-        self.assertIn("cursor-text", copyable.get("class"))
-        self.assertEqual(copyable.text_content().strip(), "601 U.S. 416")
+        self.assertNotIn("select-all", plain.get("class") or "")
+        self.assertIn("select-all", copyable.get("class") or "")
+        self.assertIn("cursor-text", copyable.get("class") or "")
+        self.assertEqual("".join(copyable.itertext()).strip(), "601 U.S. 416")
 
 
 @override_settings(WAFFLE_CACHE_PREFIX="test_docket_entry_rows_v2_waffle")
