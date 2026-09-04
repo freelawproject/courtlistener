@@ -27,12 +27,14 @@
 name: courtlistener
 
 networks:
-  cl_net_overlay:
+  cl_net_overlay2:
     # Compose creates this network and gives it a fixed name so that every
-    # service has a stable hostname (cl-postgres, cl-redis, cl-es, ...).
-    # If you created it by hand under the old instructions, remove it once
-    # with `docker network rm cl_net_overlay` so compose can own it.
-    name: cl_net_overlay
+    # service has a stable hostname (cl-postgres, cl-redis, cl-es, ...). It
+    # is not the hand-made `cl_net_overlay` the old instructions had you
+    # create: compose refuses to adopt a network it didn't create, so a new
+    # name lets old setups keep working. The old network is unused now and
+    # can be removed with `docker network rm cl_net_overlay`.
+    name: cl_net_overlay2
     driver: bridge
     attachable: true
 
@@ -53,7 +55,7 @@ services:
       timeout: 3s
       retries: 12
     networks:
-      - cl_net_overlay
+      - cl_net_overlay2
 
   # Database (postgresql)
   # During tests this will be automatically migrated for you. In regular use
@@ -90,7 +92,7 @@ services:
       retries: 24
       start_period: 10s
     networks:
-      - cl_net_overlay
+      - cl_net_overlay2
 
   cl-webpack:
     container_name: cl-webpack
@@ -138,7 +140,7 @@ services:
       - ${CL_POSTGRES_RUN_DIR:-/var/run/postgresql}:/var/run/postgresql
       - ${CL_BASE_DIR:-../../}:/opt/courtlistener
     networks:
-      - cl_net_overlay
+      - cl_net_overlay2
     env_file:
       - ../../.env.dev
     environment:
@@ -197,7 +199,7 @@ services:
       - ${CL_BASE_DIR:-../../}:/opt/courtlistener
       - ${CL_BASE_DIR:-../../}/.postgresql:/root/.postgresql
     networks:
-      - cl_net_overlay
+      - cl_net_overlay2
     env_file:
       - ../../.env.dev
     environment:
@@ -226,7 +228,7 @@ services:
     volumes:
       - ${CL_SHM_DIR:-/dev/shm}:/dev/shm
     networks:
-      - cl_net_overlay
+      - cl_net_overlay2
     environment:
       - JAVA_OPTS=-Dwebdriver.chrome.whitelistedIps=
 
@@ -234,19 +236,19 @@ services:
     image: freelawproject/doctor:latest
     container_name: "cl-doctor"
     networks:
-      - cl_net_overlay
+      - cl_net_overlay2
 
   cl-disclosures:
     image: freelawproject/disclosure-extractor:latest
     container_name: "cl-disclosures"
     networks:
-      - cl_net_overlay
+      - cl_net_overlay2
 
   cl-webhook-sentry:
     image: juggernaut/webhook-sentry:latest
     container_name: "cl-webhook-sentry"
     networks:
-      - cl_net_overlay
+      - cl_net_overlay2
 
   cl-es:
     container_name: cl-es
@@ -280,7 +282,7 @@ services:
     ports:
       - "127.0.0.1:${CL_ES_PORT:-9200}:9200"
     networks:
-      - cl_net_overlay
+      - cl_net_overlay2
     healthcheck:
       # The dev cert is self-signed, hence -k. Yellow is fine for a single
       # node: it only means replicas can't be allocated anywhere.

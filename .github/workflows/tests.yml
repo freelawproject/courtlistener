@@ -93,7 +93,7 @@ jobs:
         run: docker image ls -a --no-trunc
 
       # Docker images are ready. Start them up. The compose file creates the
-      # cl_net_overlay network itself, and --wait blocks until every service
+      # cl_net_overlay2 network itself, and --wait blocks until every service
       # with a healthcheck (postgres, redis, elasticsearch, django) reports
       # healthy, so the steps below never race the stack coming up.
       - name: Start docker containers
