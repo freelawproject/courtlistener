@@ -68,8 +68,10 @@ docker compose build cl-django cl-celery  # rebuild after pyproject.toml/uv.lock
   docker compose -f compose.yaml -f docker/courtlistener/docker-compose.tmpfs.yml up --wait
   ```
 
-- **Port collisions.** If something on your machine already uses one of the
-  published ports, move ours with an environment variable:
+- **Published ports.** The stack publishes four ports, bound to `127.0.0.1`
+  only, so nothing else on your network can reach the dev database or search
+  index (they run with default credentials). If something on your machine
+  already uses one of them, move ours with an environment variable:
 
   | Variable           | Default | Service       |
   |--------------------|---------|---------------|
@@ -79,6 +81,20 @@ docker compose build cl-django cl-celery  # rebuild after pyproject.toml/uv.lock
   | `CL_VNC_PORT`      | 5900    | Selenium VNC  |
 
   For example: `CL_POSTGRES_PORT=5433 docker compose up --wait`.
+
+  To reach a port from another device on purpose (a phone on your Wi-Fi,
+  say), rebind it in a personal override file, which compose picks up
+  automatically and git ignores. From the repository root that file is
+  `compose.override.yaml`; from this directory it is
+  `docker-compose.override.yml`. The `!override` tag replaces the port list
+  instead of adding to it:
+
+  ```yaml
+  services:
+    cl-django:
+      ports: !override
+        - "0.0.0.0:8000:8000"
+  ```
 
 - **Elasticsearch won't start on Linux.** Elasticsearch needs
   `vm.max_map_count` of at least 262144. Docker Desktop sets it for you; on a

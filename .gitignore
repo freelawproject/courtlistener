@@ -48,3 +48,10 @@ cl/settings/google_auth.json
 
 .vscode/*
 /.history
+
+# Personal docker compose overrides (see docker/courtlistener/README.md)
+/compose.override.yaml
+/compose.override.yml
+/docker-compose.override.yml
+/docker/courtlistener/compose.override.yaml
+/docker/courtlistener/docker-compose.override.yml
