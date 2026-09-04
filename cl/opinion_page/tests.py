@@ -3793,7 +3793,7 @@ class DocketFilterDrawerAttrPropagationTest(TestCase):
     def setUpTestData(cls) -> None:
         cls.court = CourtFactory(id="canb", jurisdiction="FB")
         cls.docket = DocketFactory(court=cls.court, source=Docket.RECAP)
-        cls.empty_page = Paginator([], 200).get_page(1)
+        cls.empty_page = Paginator([], 100).get_page(1)
 
     def _render(self, form: DocketEntryFilterForm) -> str:
         # Render via a wrapper template that invokes <c-docket-filter> as a
@@ -4051,8 +4051,8 @@ class DocketFilterPaginationWiringTest(TestCase):
         than the page size; the range must come from the page object's
         start/end index, not from `number * per_page`. Fill the docket so the
         last page absorbs the orphans and check its range."""
-        # 5 existing + 405 bulk = 410 entries. At 200 per page with
-        # orphans=10 that is two pages: 1–200 and 201–410.
+        # 5 existing + 205 bulk = 210 entries. At 100 per page with
+        # orphans=10 that is two pages: 1–100 and 101–210.
         await sync_to_async(DocketEntry.objects.bulk_create)(
             [
                 DocketEntry(
@@ -4061,7 +4061,7 @@ class DocketFilterPaginationWiringTest(TestCase):
                     date_filed=date(2024, 6, 1),
                     description=f"bulk entry {n}",
                 )
-                for n in range(100, 505)
+                for n in range(100, 305)
             ]
         )
         r = await self._get_docket_and_verify_v2(data={"page": "2"})
@@ -4070,9 +4070,9 @@ class DocketFilterPaginationWiringTest(TestCase):
         self.assertIsNotNone(nav, "pagination nav missing")
         # lxml types itertext() as Iterator[_AnyStr]; stringify for str.join.
         nav_text = " ".join(str(t) for t in nav.itertext()).split()
-        self.assertIn("201–410", nav_text)
+        self.assertIn("101–210", nav_text)
         self.assertEqual(
-            nav_text[nav_text.index("201–410") + 2],
-            "410",
+            nav_text[nav_text.index("101–210") + 2],
+            "210",
             f"range total should be the paginator count; nav text={nav_text}",
         )
