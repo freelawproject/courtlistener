@@ -124,7 +124,7 @@ def docker_ready() -> bool:
 def process_name(pid: str) -> str | None:
     """The command name of a running pid, or None if there is no such process."""
     try:
-        return Path(f"/proc/{pid}/comm").read_text().strip()
+        return Path(f"/proc/{pid}/comm").read_text(encoding="utf-8").strip()
     except OSError:
         return None
 
@@ -139,7 +139,7 @@ def clear_stale_pidfile(
     """
     if not pidfile.exists():
         return
-    pid = pidfile.read_text().strip()
+    pid = pidfile.read_text(encoding="utf-8").strip()
     if pid and process_name(pid) == daemon:
         return
     log(f"Removing a stale {daemon} pid file left by a previous session")
@@ -172,7 +172,9 @@ def start_dockerd() -> None:
 
 def ensure_max_map_count() -> None:
     """Raise vm.max_map_count to what Elasticsearch requires."""
-    current = int(Path("/proc/sys/vm/max_map_count").read_text())
+    current = int(
+        Path("/proc/sys/vm/max_map_count").read_text(encoding="utf-8")
+    )
     if current >= ES_MIN_MAP_COUNT:
         return
     result = run(
@@ -192,9 +194,9 @@ def ensure_env_file() -> None:
     if env_file.exists():
         return
     log("Creating .env.dev from .env.example")
-    settings = (REPO / ".env.example").read_text()
+    settings = (REPO / ".env.example").read_text(encoding="utf-8")
     settings += f"SECRET_KEY={secrets.token_urlsafe(50)}\nALLOWED_HOSTS=*\n"
-    env_file.write_text(settings)
+    env_file.write_text(settings, encoding="utf-8")
 
 
 def persist_env(name: str, value: str) -> None:
@@ -202,7 +204,7 @@ def persist_env(name: str, value: str) -> None:
     os.environ[name] = value
     env_file = os.environ.get("CLAUDE_ENV_FILE")
     if env_file:
-        with open(env_file, "a") as f:
+        with open(env_file, "a", encoding="utf-8") as f:
             f.write(f"export {name}={shlex.quote(value)}\n")
 
 
@@ -216,7 +218,10 @@ def image_inputs_hash() -> str:
 
 def rebuild_if_dependencies_changed(current_hash: str) -> None:
     """Rebuild the Django image when its inputs changed since it was built."""
-    if not IMAGE_STAMP.exists() or IMAGE_STAMP.read_text() == current_hash:
+    if (
+        not IMAGE_STAMP.exists()
+        or IMAGE_STAMP.read_text(encoding="utf-8") == current_hash
+    ):
         return
     log("Dependencies changed since the Django image was built; rebuilding...")
     if compose("build", "cl-django", "cl-celery", check=False).returncode:
@@ -325,7 +330,7 @@ def main() -> int:
         current_hash = image_inputs_hash()
         rebuild_if_dependencies_changed(current_hash)
         start_stack()
-        IMAGE_STAMP.write_text(current_hash)
+        IMAGE_STAMP.write_text(current_hash, encoding="utf-8")
     except Bail as problem:
         log(f"PROBLEM: {problem}")
         log("The session will start anyway. To retry once fixed, run:")
