@@ -172,10 +172,10 @@ Migration guide: https://wiki.free.law/c/courtlistener/dev-guide/database-migrat
 
 ### Local Stack
 
-The development environment is the Docker Compose stack in `docker/courtlistener/`
-(its README has the quick start). Start it from that directory with `docker compose up`;
-the containers are named `cl-django`, `cl-celery`, `cl-postgres`, `cl-redis`, `cl-es`, and
-so on, and tests run inside `cl-django` as shown below.
+The development environment is the Docker Compose stack in `docker/courtlistener/`; the
+Getting Started guide above is the walkthrough. Start it from that directory with
+`docker compose up`; the containers are named `cl-django`, `cl-celery`, `cl-postgres`,
+`cl-redis`, `cl-es`, and so on, and tests run inside `cl-django` as shown below.
 
 In Claude Code on the web, `.claude/hooks/session-start.sh` boots that stack when the
 session starts and prints how to use it. If it reports a problem, fix the cause and re-run
