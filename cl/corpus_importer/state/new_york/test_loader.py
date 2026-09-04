@@ -6,12 +6,13 @@ filing, folding attorney rows into parties, standing a case's date in from its
 earliest filing -- and the rows it leaves out.
 """
 
+import hashlib
 import json
 import logging
 import sqlite3
 from contextlib import closing
 from datetime import date
-from pathlib import Path
+from pathlib import Path, PurePosixPath
 from tempfile import TemporaryDirectory
 from typing import Any
 from unittest.mock import patch
@@ -56,11 +57,47 @@ DOCKET_NUMBER_CORE = "apl202400177"
 PRIVATE_PATH = f"{PRIVATE_PREFIX}nycourts_gov/{DOCKET_NUMBER}_brief_0.pdf"
 
 
-def _run_database(path: Path, rows: list[tuple[str, dict]]) -> None:
+def archived(local_path: str) -> tuple[str, str, int, str]:
+    """The archive row a jkent run holds for a file it downloaded.
+
+    :param local_path: Where the scraper stored the file.
+    :return: The path, its hash, its size, and the kind of file it is.
+    """
+    digest = hashlib.sha256(local_path.encode()).hexdigest()
+    return (
+        local_path,
+        digest,
+        len(local_path) * 1000,
+        PurePosixPath(local_path).suffix.lstrip("."),
+    )
+
+
+def _run_database(
+    path: Path,
+    rows: list[tuple[str, dict]],
+    archive: list[tuple[str, str, int, str]] | None = None,
+) -> None:
     """Write a minimal stand-in for a jkent run database.
 
     Only the columns the loaders read are created, since the loader's contract
-    is with the `results` table rather than with the whole schema."""
+    is with the `results` and `archived_files` tables rather than with the
+    whole schema.
+
+    :param path: Where to write the database.
+    :param rows: The scrape results, as `(result_type, payload)` pairs.
+    :param archive: The archive rows, as `archived` returns them. Defaults to
+        one per downloaded file, which is the invariant a real run holds to:
+        the scraper hashes and measures every file it stores. Pass this to
+        write a run that breaks it, or one whose file has been rescraped and
+        now hashes differently.
+    """
+    if archive is None:
+        archive = [
+            archived(local_path)
+            for result_type, data in rows
+            if result_type == "NYCourtPassFile"
+            and (local_path := data.get("local_path"))
+        ]
     with closing(sqlite3.connect(path)) as connection:
         connection.execute(
             "CREATE TABLE results ("
@@ -70,9 +107,24 @@ def _run_database(path: Path, rows: list[tuple[str, dict]]) -> None:
             "  is_valid BOOLEAN DEFAULT 1 NOT NULL"
             ")"
         )
+        connection.execute(
+            "CREATE TABLE archived_files ("
+            "  id INTEGER PRIMARY KEY,"
+            "  file_path VARCHAR NOT NULL,"
+            "  expected_type VARCHAR,"
+            "  file_size INTEGER,"
+            "  content_hash VARCHAR"
+            ")"
+        )
         connection.executemany(
             "INSERT INTO results (result_type, data_json) VALUES (?, ?)",
             [(result_type, json.dumps(data)) for result_type, data in rows],
+        )
+        connection.executemany(
+            "INSERT INTO archived_files "
+            "(file_path, content_hash, file_size, expected_type) "
+            "VALUES (?, ?, ?, ?)",
+            archive,
         )
         connection.commit()
 
@@ -191,8 +243,32 @@ class NYCoALoaderTest(TestCase):
         return NYCoACourtPassLoader(self.database, **kwargs)
 
     def scrape(self, rows: list[tuple[str, dict]]) -> Any:
-        """The single scrape the loader reads out of a run holding `rows`."""
+        """The single scrape the loader reads out of a run holding `rows`,
+        whose archive records every file the rows say was downloaded."""
         _run_database(self.database, rows)
+        return self.only_scrape()
+
+    def scrape_with_archive(
+        self,
+        rows: list[tuple[str, dict]],
+        archive: list[tuple[str, str, int, str]],
+    ) -> Any:
+        """The single scrape the loader reads out of a run whose archive is
+        stated rather than derived, for a run that breaks the invariant the
+        derived one holds to.
+
+        :param rows: The scrape results, as `_run_database` takes them.
+        :param archive: The archive rows, as `archived` returns them.
+        :return: The scrape.
+        """
+        _run_database(self.database, rows, archive=archive)
+        return self.only_scrape()
+
+    def only_scrape(self) -> Any:
+        """The one scrape the run database holds, asserting that it holds one.
+
+        :return: The scrape.
+        """
         scrapes = list(NYCoACourtPassLoader(self.database).scrapes())
         self.assertEqual(len(scrapes), 1)
         return scrapes[0]
@@ -229,6 +305,104 @@ class NYCoALoaderTest(TestCase):
             PRIVATE_PATH,
             "The download record's local path is joined onto the file.",
         )
+
+    def test_joins_the_archive_row_onto_the_file(self) -> None:
+        """What the file is and what it hashes to are known only to the
+        download, which the run records apart from the docket. Does the loader
+        put the archive's account of a file onto the file itself?"""
+        _, digest, size, _ = archived(PRIVATE_PATH)
+
+        scrape = self.scrape(
+            [
+                (
+                    "NYCourtPassDocket",
+                    _docket(docket_entries=[ENTRY], files=[FILE]),
+                ),
+                ("NYCourtPassFile", FILE | {"local_path": PRIVATE_PATH}),
+            ]
+        )
+
+        document = scrape.entries[0].attachments[0]
+        self.assertEqual(document.content_hash, digest)
+        self.assertEqual(document.file_size, size)
+        self.assertEqual(
+            document.content_type,
+            "application/pdf",
+            "The archive says the file is a PDF; the loader says what that "
+            "means to S3.",
+        )
+
+    def test_an_oral_argument_playlist_is_typed_as_one(self) -> None:
+        """Court-PASS publishes recordings as playlists rather than PDFs, and
+        a playlist served as a PDF is one a browser will not play. Is the type
+        taken from the file rather than assumed?"""
+        playlist = f"{PRIVATE_PREFIX}nycourts_gov/{DOCKET_NUMBER}_webcast.asx"
+
+        scrape = self.scrape(
+            [
+                (
+                    "NYCourtPassDocket",
+                    _docket(docket_entries=[ENTRY], files=[FILE]),
+                ),
+                ("NYCourtPassFile", FILE | {"local_path": playlist}),
+            ]
+        )
+
+        self.assertEqual(
+            scrape.entries[0].attachments[0].content_type, "video/x-ms-asf"
+        )
+
+    def test_a_file_with_no_archive_row_is_left_undescribed(self) -> None:
+        """A downloaded file is always hashed, so a path with no archive row is
+        the run contradicting itself. Does the file merge anyway, with nothing
+        said about bytes nothing accounted for?"""
+        scrape = self.scrape_with_archive(
+            [
+                (
+                    "NYCourtPassDocket",
+                    _docket(docket_entries=[ENTRY], files=[FILE]),
+                ),
+                ("NYCourtPassFile", FILE | {"local_path": PRIVATE_PATH}),
+            ],
+            archive=[],
+        )
+
+        document = scrape.entries[0].attachments[0]
+        self.assertEqual(document.local_path, PRIVATE_PATH)
+        self.assertEqual(document.content_hash, "")
+        self.assertIsNone(document.file_size)
+        self.assertEqual(
+            document.content_type,
+            "",
+            "S3 falls back to its own default rather than being told a type "
+            "nothing established.",
+        )
+
+    def test_a_file_stored_under_another_extension_is_left_undescribed(
+        self,
+    ) -> None:
+        """The archive's account of a file and the name it was stored under
+        have to agree, or one of them is wrong about what the file is. Is the
+        type withheld rather than read off the wrong one?"""
+        logging.disable(logging.NOTSET)
+        self.addCleanup(logging.disable)
+
+        with self.assertLogs(
+            "cl.corpus_importer.state.new_york.loader", level=logging.ERROR
+        ) as logs:
+            scrape = self.scrape_with_archive(
+                [
+                    (
+                        "NYCourtPassDocket",
+                        _docket(docket_entries=[ENTRY], files=[FILE]),
+                    ),
+                    ("NYCourtPassFile", FILE | {"local_path": PRIVATE_PATH}),
+                ],
+                archive=[(PRIVATE_PATH, "0" * 64, 1024, "asx")],
+            )
+
+        self.assertEqual(scrape.entries[0].attachments[0].content_type, "")
+        self.assertIn("does not end in", logs.output[0])
 
     def test_case_date_filed_is_earliest_filing(self) -> None:
         """Court-PASS dates no case, only its filings. Does the earliest
