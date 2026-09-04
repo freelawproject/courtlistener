@@ -75,13 +75,22 @@ def delete_document_citations(rd: RECAPDocument) -> None:
     Also pushes the now-empty `cites` list into the document's
     Elasticsearch child document. Saving the RECAPDocument doesn't do that:
     ES only tracks changes to the document's own fields, not to this
-    relation.
+    relation. Documents that had no citations to begin with are left
+    alone, ES included.
 
     :param rd: The RECAPDocument whose citations should be removed.
     :return: None
     """
-    rd.cited_opinions.all().delete()
-    rd.unmatched_citations.all().delete()
+    # Both kinds of citation come from the same scrubbed text, so drop them
+    # together or not at all.
+    with transaction.atomic():
+        deleted_cited = rd.cited_opinions.all().delete()[0]
+        deleted_unmatched = rd.unmatched_citations.all().delete()[0]
+    if not (deleted_cited or deleted_unmatched):
+        # Nothing changed, so ES has nothing to catch up on. Callers seal
+        # whole querysets at a time, so bailing here saves a Celery task
+        # and an ES write for every document that had no citations.
+        return
     if settings.ELASTICSEARCH_DISABLED:
         # The indexing signals check this too, so honoring it here keeps
         # sealing usable with ES turned off instead of half-indexing.
