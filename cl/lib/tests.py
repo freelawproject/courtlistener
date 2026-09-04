@@ -2729,3 +2729,15 @@ class IncrementalNewTemplateMiddlewareTest(TestCase):
         """
         response = self.process("base.html")
         self.assertEqual(response.template_name, "base.html")
+
+    @override_flag("use_new_design", False)
+    def test_legacy_template_served_when_flag_off(self) -> None:
+        """A template with a v2 counterpart stays legacy when the flag is off."""
+        response = self.process("homepage.html")
+        self.assertEqual(response.template_name, "homepage.html")
+
+    @override_flag("use_new_design", False)
+    def test_v2_only_template_served_regardless_of_flag(self) -> None:
+        """A v2-only template is served even with the flag off."""
+        response = self.process("components.html")
+        self.assertEqual(response.template_name, "v2_components.html")
