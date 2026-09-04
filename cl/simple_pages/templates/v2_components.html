@@ -1611,7 +1611,11 @@ Sample code here.
       </c-library.item>
       <c-library.item only>
         <c-slot name="label"><code>:docket_source</code></c-slot>
-        <c-slot name="description">The <code>DocketEntrySource</code> the view put in the context. Supplies <code>has_pay_and_pray</code> here and is forwarded to the nested <code>&lt;c-document-source-link&gt;</code> for its <code>component</code>.</c-slot>
+        <c-slot name="description">The <code>DocketEntrySource</code> the view put in the context. Supplies <code>has_pay_and_pray</code> here and is forwarded to the nested <code>&lt;c-document-source-link&gt;</code> and <code>&lt;c-docket-empty-message&gt;</code> for its <code>component</code>.</c-slot>
+      </c-library.item>
+      <c-library.item only>
+        <c-slot name="label"><code>:filters_applied</code></c-slot>
+        <c-slot name="description">Bool — whether the request carried any filter or search param (<code>DocketEntryFilterForm.has_filters()</code>). Picks the empty state: "No docket entries match your filters." when true, the source's own "no entries yet" sentence from <code>&lt;c-docket-empty-message&gt;</code> when false.</c-slot>
       </c-library.item>
     </c-library.list>
 
@@ -1621,7 +1625,41 @@ Sample code here.
 
     <c-expansion-panel title="Code">
       <c-code>
-&lt;c-docket-entry-rows :docket_entries="docket_entries" :docket_source="docket_source" /&gt;
+&lt;c-docket-entry-rows
+  :docket_entries="docket_entries"
+  :docket_source="docket_source"
+  :filters_applied="filters_applied"
+/&gt;
+      </c-code>
+    </c-expansion-panel>
+  </section>
+
+  {# DOCKET EMPTY MESSAGE #}
+  <section class="max-w-full w-full border-t-2 border-greyscale-200" x-intersect.margin.-100px="show" id="docket-empty-message">
+    <h2 class="mt-6 mb-3">Docket empty message</h2>
+    <p>The sentence a docket with no entries at all shows in place of its entry list — "no entries in the RECAP Archive yet" for a RECAP docket, "no entries yet" for a SCOTUS one. It dispatches to <code>cotton/docket_empty_message/&lt;component&gt;.html</code> the same way <code>&lt;c-docket-source-attribution&gt;</code> does, so <code>&lt;c-docket-entry-rows&gt;</code> stays source-agnostic. The sentence carries no wrapper, so the caller supplies the surrounding <code>&lt;p&gt;</code>.</p>
+
+    <h4 class="mt-3">Demo</h4>
+    <div class="my-4 rounded-lg border border-greyscale-200 p-4">
+      <p class="text-sm text-greyscale-700 text-center">
+        <c-docket-empty-message :docket_source="docket_source" />
+      </p>
+    </div>
+
+    <c-library.list title="Props" only>
+      <c-library.item only>
+        <c-slot name="label"><code>:docket_source</code></c-slot>
+        <c-slot name="description">The <code>DocketEntrySource</code> the view put in the context. Its <code>component</code> picks which file renders.</c-slot>
+      </c-library.item>
+    </c-library.list>
+
+    <c-library.list title="Slots" only>
+      <p>No slots</p>
+    </c-library.list>
+
+    <c-expansion-panel title="Code">
+      <c-code>
+&lt;c-docket-empty-message :docket_source="docket_source" /&gt;
       </c-code>
     </c-expansion-panel>
   </section>

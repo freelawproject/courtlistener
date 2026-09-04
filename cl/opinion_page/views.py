@@ -429,6 +429,7 @@ async def view_docket(
             "docket_entries": paginated_entries,
             "sort_order_asc": sort_order_asc,
             "form": form,
+            "filters_applied": form.has_filters(),
             "get_string": make_get_string(request),
             "tabs": build_docket_tabs(
                 docket, parties, has_idb_data, has_authorities

@@ -43,7 +43,11 @@
       />
 
       {# Docket entry rows #}
-      <c-docket-entry-rows :docket_entries="docket_entries" :docket_source="docket_source" />
+      <c-docket-entry-rows
+        :docket_entries="docket_entries"
+        :docket_source="docket_source"
+        :filters_applied="filters_applied"
+      />
 
       <c-pagination
         :page_obj="docket_entries"
