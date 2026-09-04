@@ -83,13 +83,18 @@ services:
     env_file:
       - ../../.env.dev
     working_dir: /opt/courtlistener/cl
-    command: sh -c 'npm install && exec npx webpack --progress --watch --mode=development'
+    # npm install populates cl/node_modules on the host bind mount, which
+    # cl-tailwind-reload needs too, so it waits for this container to be
+    # healthy. The marker file makes "healthy" mean "npm install finished".
+    command: sh -c 'npm install && touch /tmp/npm-install-done && exec npx webpack --progress --watch --mode=development'
     healthcheck:
-      test: sh -c 'ps aux | grep -v grep | grep webpack >/dev/null 2>&1 && echo 0 || echo 1'
-      interval: 1s
-      retries: 45
-      start_period: 1s
-      timeout: 1s
+      test: ["CMD-SHELL", "test -f /tmp/npm-install-done"]
+      interval: 5s
+      timeout: 3s
+      retries: 3
+      # A cold npm install can take several minutes; failures during the
+      # start period don't count against the retries.
+      start_period: 600s
 
   # Task Server
   cl-celery:
