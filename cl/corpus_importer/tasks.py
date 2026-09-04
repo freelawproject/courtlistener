@@ -41,6 +41,7 @@ from httpx import (
     RemoteProtocolError,
     TimeoutException,
 )
+from httpx import Response as HttpxResponse
 from juriscraper.lib.exceptions import PacerLoginException, ParsingException
 from juriscraper.lib.string_utils import CaseNameTweaker, harmonize
 from juriscraper.pacer import (
@@ -1977,7 +1978,7 @@ def get_appellate_docket_by_docket_number(
 def get_att_report_by_rd(
     rd: RECAPDocument,
     session_data: SessionData,
-) -> AttachmentPage | None:
+) -> ACMSAttachmentPage | AppellateAttachmentPage | AttachmentPage | None:
     """Method to get the attachment report for the item in PACER.
 
     :param rd: The RECAPDocument object to use as a source.
@@ -2022,7 +2023,7 @@ def get_attachment_page_by_rd(
     self: Task,
     rd_pk: int,
     session_data: SessionData,
-) -> AttachmentPage | None:
+) -> ACMSAttachmentPage | AppellateAttachmentPage | AttachmentPage | None:
     """Get the attachment page for the item in PACER.
 
     :param self: The celery task
@@ -3074,7 +3075,7 @@ def query_and_save_list_of_creditors(
     backoff=2,
     logger=logger,
 )
-def extract_recap_document_for_opinions(rd: RECAPDocument) -> Response:
+def extract_recap_document_for_opinions(rd: RECAPDocument) -> HttpxResponse:
     """Call recap-extract from doctor with retries
 
     :param rd: the recap document to extract
