@@ -1447,6 +1447,15 @@ class OpinionsESSearchTest(
             msg="Wrong number of Jurisdictions shown in Homepage",
         )
 
+    @override_settings(
+        # Use a local cache to prevent parallel running tests from trampling
+        CACHES={
+            "default": {
+                "BACKEND": "django.core.cache.backends.locmem.LocMemCache",
+                "LOCATION": "last-opinions-home-page",
+            },
+        },
+    )
     def test_last_opinions_home_page(self) -> None:
         """Test last opinions in home page"""
         cache.delete("homepage-data-o-es")
@@ -1477,6 +1486,10 @@ class OpinionsESSearchTest(
                     factory_related_name="cluster",
                 ),
             )
+        # Clean up on the way out even if an assertion below fails.
+        self.addCleanup(o_1.delete)
+        self.addCleanup(o_2.delete)
+
         r = self.client.get(
             reverse("show_results"),
         )
@@ -1494,9 +1507,6 @@ class OpinionsESSearchTest(
             '//span[@id="stat-num-precedential-opinions"]/text()'
         )[0]
         self.assertEqual(int(opinions_count), clusters_count)
-
-        o_1.delete()
-        o_2.delete()
 
     async def test_fail_gracefully(self) -> None:
         """Do we fail gracefully when an invalid search is created?"""
