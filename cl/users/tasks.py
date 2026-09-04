@@ -7,6 +7,7 @@ from django.conf import settings
 from django.contrib.auth.models import User
 from django.core.mail import send_mail
 from django.template import loader
+from django.urls import reverse
 from django.utils.timezone import now
 from requests.exceptions import HTTPError, Timeout
 
@@ -95,6 +96,74 @@ def create_neon_account(self: Task, user_id: int) -> None:
             raise self.retry(exc=exc)
         profile.neon_account_id = new_account_id
         profile.save(update_fields=["neon_account_id"])
+
+
+@app.task(ignore_result=True)
+def send_new_account_emails(user_id: int) -> None:
+    """Send the emails that follow a successful registration.
+
+    Emails the new user their activation link and tells MANAGERS about the
+    signup. The register view enqueues this rather than sending mail inline so
+    that a signup on a fresh address and a signup on a taken address (see
+    notify_existing_account_holder) both return after one enqueue and no SMTP
+    round trips. Otherwise the response time would reveal which case occurred.
+
+    :param user_id: The pk of the User that was just created or claimed.
+    :return: None
+    """
+    user = User.objects.filter(pk=user_id).select_related("profile").first()
+    if user is None:
+        # The account was deleted between the view and the worker picking
+        # this up. Nothing useful to send.
+        logger.warning(
+            "Skipping new account emails: user %s no longer exists.", user_id
+        )
+        return
+
+    # Imported here because cl.users.models imports this module indirectly
+    # (via cl.api.utils), and cl.users.utils imports cl.users.models.
+    from cl.users.utils import emails
+
+    profile = user.profile  # type: ignore
+    confirm_email = emails["confirm_your_new_account"]
+    send_mail(
+        confirm_email["subject"],
+        confirm_email["body"] % (user.username, profile.activation_key),
+        confirm_email["from_email"],
+        [user.email],
+    )
+    managers_email = emails["new_account_created"]
+    send_mail(
+        managers_email["subject"] % user.username,
+        managers_email["body"]
+        % (user.get_full_name() or "Not provided", user.email),
+        managers_email["from_email"],
+        managers_email["to"],
+    )
+
+
+@app.task(ignore_result=True)
+def notify_existing_account_holder(recipient: str) -> None:
+    """Tell an address owner that a signup was attempted with their address.
+
+    Used when registration is refused because the address already has an
+    account. The refusal is never shown in the HTTP response, since that would
+    let anyone test whether an address has an account; this email is how the
+    owner learns what happened and how to get back into their account.
+
+    :param recipient: The email address the signup attempt used.
+    :return: None
+    """
+    # Imported here to avoid a circular import; see send_new_account_emails.
+    from cl.users.utils import emails
+
+    email = emails["account_already_exists"]
+    send_mail(
+        email["subject"],
+        email["body"] % (reverse("sign-in"), reverse("password_reset")),
+        email["from_email"],
+        [recipient],
+    )
 
 
 @app.task(

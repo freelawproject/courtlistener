@@ -14,6 +14,8 @@ from django.contrib.auth.models import User
 from django.contrib.auth.validators import ASCIIUsernameValidator
 from django.core.exceptions import ValidationError
 from django.core.mail import send_mail
+from django.db.models import Value
+from django.db.models.functions import Lower
 from django.forms import ModelForm
 from django.urls import reverse
 from hcaptcha.fields import hCaptchaField
@@ -21,6 +23,7 @@ from localflavor.us.forms import USStateField, USZipCodeField
 from localflavor.us.us_states import STATE_CHOICES
 
 from cl.api.models import Webhook, WebhookEventType, WebhookVersions
+from cl.lib.AuthenticationBackend import LOOKS_LIKE_EMAIL
 from cl.lib.types import EmailType
 from cl.users.models import UserProfile
 from cl.users.utils import emails
@@ -137,17 +140,62 @@ class UserForm(ModelForm, CleanEmailMixin):
         }
 
 
+def validate_username_is_not_an_email(value: str) -> None:
+    """Reject usernames shaped like an email address.
+
+    ASCIIUsernameValidator permits "@" and ".", which makes somebody else's
+    email address a registerable username. That interferes with signing in by
+    email, and there is no non-revealing way to refuse only the addresses that
+    have accounts: "that username is taken" would tell the registrant the
+    address exists here. Refusing everything email-shaped is a flat rule about
+    the format, so the response says nothing about what is in the database.
+
+    The shape test is the same one the sign-in backend uses to decide whether
+    an identifier is an address, so a username this accepts can never be
+    mistaken for an address at sign-in. Something like "mal@ory" is fine; it
+    has no domain.
+
+    :param value: The submitted username.
+    :return: None
+    """
+    if LOOKS_LIKE_EMAIL.match(value):
+        raise ValidationError(
+            "Usernames cannot be email addresses.",
+            code="username_looks_like_email",
+        )
+
+
 class UserCreationFormExtended(UserCreationForm, CleanEmailMixin):
     """A bit of an unusual form because instead of creating it ourselves,
     we are overriding the one from Django. Thus, instead of declaring
     everything explicitly like we normally do, we just override the
     specific parts we want to, after calling the super class's __init__().
+
+    Only one account may hold an email address, but the form never reports
+    that an address is taken: "this email is already in use" would let anyone
+    test whether an address has an account here. Instead the form validates
+    normally and records the collision in ``email_taken``, and the view is
+    expected to respond exactly as it would for a successful signup while
+    emailing the address owner. Usernames get no such protection because they
+    are already public in tag and prayer URLs, so username collisions are
+    reported as errors like any other. What usernames may not do is look like
+    an email address: see validate_username_is_not_an_email.
+
+    This check belongs on the registration form only. UserForm, which shares
+    CleanEmailMixin, must not get it until existing duplicate accounts have
+    been cleaned up, or those users could no longer save their settings page.
     """
+
+    email_taken: bool
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
-        # Protect against homoglyph attacks
-        self.fields["username"].validators = [ASCIIUsernameValidator()]
+        self.email_taken = False
+        self.fields["username"].validators = [
+            # Protect against homoglyph attacks
+            ASCIIUsernameValidator(),
+            validate_username_is_not_an_email,
+        ]
 
         self.fields["username"].label = "User Name*"
         self.fields["email"].label = "Email Address*"
@@ -194,6 +242,41 @@ class UserCreationFormExtended(UserCreationForm, CleanEmailMixin):
             # them, so a plain CharField keeps them rejected instead.
             "username": forms.CharField,
         }
+
+    def _email_is_taken(self, value: str) -> bool:
+        """Report whether an account other than the bound instance holds
+        `value` as its email address.
+
+        Case is folded in SQL with Lower() on both sides rather than with
+        str.lower() in Python. The two disagree on some non-ASCII input and the
+        database collation is locale dependent, so folding in Python here while
+        the LOWER(email) index folds in SQL could let a duplicate past the form
+        only to fail at the index, or reject a legitimate address.
+
+        The bound instance is excluded so that claiming a stub account, where
+        the form is bound to the stub that already holds the address, is not
+        mistaken for a duplicate.
+
+        :param value: The string to compare against the email column.
+        :return: True if some other account already has that address.
+        """
+        users = User.objects.annotate(email_lower=Lower("email")).filter(
+            email_lower=Lower(Value(value))
+        )
+        if self.instance.pk:
+            users = users.exclude(pk=self.instance.pk)
+        return users.exists()
+
+    def clean_email(self) -> str:
+        """Run the shared email checks, then record whether another account
+        already holds this address in ``email_taken``.
+
+        A taken address is deliberately not a validation error. See the class
+        docstring for why.
+        """
+        email = super().clean_email()
+        self.email_taken = self._email_is_taken(email)
+        return email
 
     def clean_first_name(self):
         first_name = self.cleaned_data.get("first_name")
