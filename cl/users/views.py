@@ -543,9 +543,12 @@ def register(request: HttpRequest) -> HttpResponse:
     if request.user.is_anonymous:
         if request.method == "POST":
             try:
+                # Use the same stripped address the form will clean, so a
+                # stub found here is the same account the form's duplicate
+                # check sees, and vice versa.
                 stub_account = User.objects.filter(
                     profile__stub_account=True,
-                ).get(email__iexact=request.POST.get("email"))
+                ).get(email__iexact=email)
             except User.DoesNotExist:
                 stub_account = False
 
@@ -564,6 +567,15 @@ def register(request: HttpRequest) -> HttpResponse:
                     # tell only the address owner, by email, which nobody else
                     # can read. Mail goes through the same async path as the
                     # real signup so the response takes the same shape.
+                    #
+                    # The real signup below also hashes the password when it
+                    # creates the user, and that hash dwarfs everything else
+                    # in the request. Hash here too, so the response time
+                    # doesn't say which path ran. This is Django's own idiom,
+                    # from ModelBackend.authenticate(); the User is never
+                    # saved, so there is no stored password to validate.
+                    # nosemgrep: python.django.security.audit.unvalidated-password.unvalidated-password
+                    User().set_password(cd["password1"])
                     notify_existing_account_holder.delay(cd["email"])
                     return HttpResponseRedirect(success_url)
 

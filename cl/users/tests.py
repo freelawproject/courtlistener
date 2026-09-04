@@ -4537,6 +4537,55 @@ class RegisterViewTest(TestCase):
             await User.objects.filter(username="mal@ory").aexists()
         )
 
+    async def test_refused_duplicate_still_hashes_a_password(self) -> None:
+        """The refused path must pay for a password hash like the real signup
+        does, or response time alone would tell an observer which path ran.
+        """
+        await sync_to_async(UserProfileWithParentsFactory.create)(
+            user__email="taken@example.com"
+        )
+        with patch.object(User, "set_password") as set_password_mock:
+            await self.async_client.post(
+                reverse("register"),
+                self.registration_data("latecomer", "taken@example.com"),
+            )
+        set_password_mock.assert_called_once_with("TestPassw0rd!")
+        self.assertFalse(
+            await User.objects.filter(username="latecomer").aexists()
+        )
+
+    async def test_stub_lookup_ignores_surrounding_whitespace(self) -> None:
+        """An address with stray whitespace must still find the stub account,
+        or the form's stripped-address duplicate check would see that stub as
+        somebody else's account and refuse the claim.
+        """
+        stub_user, _ = await sync_to_async(create_stub_account)(
+            {
+                "email": "donor@example.com",
+                "first_name": "Donor",
+                "last_name": "Person",
+            },
+            {
+                "address1": "123 Main St",
+                "address2": "",
+                "city": "Anytown",
+                "state": "XX",
+                "zip_code": "00000",
+            },
+        )
+
+        response = await self.async_client.post(
+            reverse("register"),
+            self.registration_data("donor", "  donor@example.com  "),
+            follow=True,
+        )
+        self.assertEqual(response.status_code, HTTPStatus.OK)
+        await stub_user.arefresh_from_db()
+        self.assertEqual(stub_user.username, "donor")
+        self.assertEqual(
+            await User.objects.filter(email="donor@example.com").acount(), 1
+        )
+
     async def test_stub_account_claim_is_not_treated_as_a_duplicate(
         self,
     ) -> None:
