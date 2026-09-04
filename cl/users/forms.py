@@ -139,6 +139,26 @@ class UserForm(ModelForm, CleanEmailMixin):
         }
 
 
+def validate_username_is_not_an_email(value: str) -> None:
+    """Reject usernames containing "@", so no username can be an email address.
+
+    ASCIIUsernameValidator permits "@" and ".", which makes somebody else's
+    email address a registerable username. That interferes with signing in by
+    email, and there is no non-revealing way to refuse only the addresses that
+    have accounts: "that username is taken" would tell the registrant the
+    address exists here. Refusing every "@" is a flat rule about the format, so
+    the response says nothing about what is in the database.
+
+    :param value: The submitted username.
+    :return: None
+    """
+    if "@" in value:
+        raise ValidationError(
+            "Usernames cannot be email addresses or contain the @ symbol.",
+            code="username_looks_like_email",
+        )
+
+
 class UserCreationFormExtended(UserCreationForm, CleanEmailMixin):
     """A bit of an unusual form because instead of creating it ourselves,
     we are overriding the one from Django. Thus, instead of declaring
@@ -152,7 +172,8 @@ class UserCreationFormExtended(UserCreationForm, CleanEmailMixin):
     expected to respond exactly as it would for a successful signup while
     emailing the address owner. Usernames get no such protection because they
     are already public in tag and prayer URLs, so username collisions are
-    reported as errors like any other.
+    reported as errors like any other. What usernames may not do is contain
+    "@": see validate_username_is_not_an_email.
 
     This check belongs on the registration form only. UserForm, which shares
     CleanEmailMixin, must not get it until existing duplicate accounts have
@@ -164,8 +185,11 @@ class UserCreationFormExtended(UserCreationForm, CleanEmailMixin):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self.email_taken = False
-        # Protect against homoglyph attacks
-        self.fields["username"].validators = [ASCIIUsernameValidator()]
+        self.fields["username"].validators = [
+            # Protect against homoglyph attacks
+            ASCIIUsernameValidator(),
+            validate_username_is_not_an_email,
+        ]
 
         self.fields["username"].label = "User Name*"
         self.fields["email"].label = "Email Address*"
@@ -235,25 +259,6 @@ class UserCreationFormExtended(UserCreationForm, CleanEmailMixin):
         if self.instance.pk:
             users = users.exclude(pk=self.instance.pk)
         return users
-
-    def clean_username(self) -> str:
-        """Reject usernames that are taken, including by another account's
-        email address.
-
-        Because ASCIIUsernameValidator permits "@" and ".", somebody else's
-        email address is a registerable username, which interferes with
-        logging in by email. Such usernames get the same "already exists"
-        error a genuinely taken username gets; explaining why would reveal
-        that the address has an account.
-        """
-        # Django's clean_username returns None (despite its stub) when it has
-        # already recorded a uniqueness error, so there is nothing to add then.
-        username = super().clean_username()
-        if username and self._other_accounts_using_email(username).exists():
-            raise self.instance.unique_error_message(
-                self._meta.model, ["username"]
-            )
-        return username
 
     def clean_email(self) -> str:
         """Run the shared email checks, then record whether another account

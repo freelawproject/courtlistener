@@ -4482,37 +4482,45 @@ class RegisterViewTest(TestCase):
         self.assertEqual(len(mail.outbox), 1)
         self.assertEqual(mail.outbox[0].to, ["casey@example.COM"])
 
-    async def test_username_matching_another_email_is_merely_taken(
+    async def test_usernames_containing_at_are_rejected_regardless(
         self,
     ) -> None:
-        """A username equal to another account's email address is rejected
-        with the ordinary "taken" error, and no hint of why."""
+        """A username containing "@" is refused with the same format error
+        whether or not it matches an existing account's email address.
+
+        Refusing only the addresses that have accounts, however the error is
+        worded, would tell the registrant that the address has an account.
+        """
         await sync_to_async(UserProfileWithParentsFactory.create)(
-            user__username="taken_name", user__email="victim@example.com"
+            user__username="ada", user__email="ada@example.com"
         )
 
-        # Establish what a plain username collision reports...
-        response = await self.async_client.post(
-            reverse("register"),
-            self.registration_data("taken_name", "someone@example.com"),
-        )
-        plain_collision_errors = response.context["form"].errors["username"]
-        self.assertTrue(plain_collision_errors)
+        errors_seen = []
+        for username in [
+            "ada@example.com",  # Another account's address
+            "Ada@Example.com",  # Same, different case
+            "nobody@example.com",  # An address with no account
+            "mal@ory",  # Not even an address, just an "@"
+        ]:
+            with self.subTest(username=username):
+                response = await self.async_client.post(
+                    reverse("register"),
+                    self.registration_data(username, "mallory@example.com"),
+                )
+                self.assertEqual(response.status_code, HTTPStatus.OK)
+                username_errors = response.context["form"].errors["username"]
+                self.assertEqual(len(username_errors), 1)
+                self.assertNotIn("exists", username_errors[0].lower())
+                self.assertNotIn("taken", username_errors[0].lower())
+                errors_seen.append(tuple(username_errors))
+                self.assertFalse(
+                    await User.objects.filter(
+                        username__iexact=username
+                    ).aexists()
+                )
 
-        # ...and require the email collision to report exactly the same thing.
-        response = await self.async_client.post(
-            reverse("register"),
-            self.registration_data("Victim@example.com", "other@example.com"),
-        )
-        self.assertEqual(response.status_code, HTTPStatus.OK)
-        username_errors = response.context["form"].errors["username"]
-        self.assertEqual(username_errors, plain_collision_errors)
-        self.assertNotIn("email", " ".join(username_errors).lower())
-        self.assertFalse(
-            await User.objects.filter(
-                username__iexact="victim@example.com"
-            ).aexists()
-        )
+        # Every attempt got exactly the same error.
+        self.assertEqual(len(set(errors_seen)), 1)
 
     async def test_stub_account_claim_is_not_treated_as_a_duplicate(
         self,
