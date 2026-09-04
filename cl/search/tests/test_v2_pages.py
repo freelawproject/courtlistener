@@ -349,10 +349,6 @@ class CorpusSearchFormTest(SimpleUserDataMixin, TestCase):
             "BACKEND": "django.core.cache.backends.locmem.LocMemCache",
             "LOCATION": "homepage-stats",
         },
-        "db_cache": {
-            "BACKEND": "django.core.cache.backends.db.DatabaseCache",
-            "LOCATION": "django_cache",
-        },
     },
 )
 class HomepageStatsTest(
