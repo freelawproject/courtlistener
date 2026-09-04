@@ -9,7 +9,6 @@
   form=""
   page_obj=""
   sort_order_asc="True"
-  htmx_target=""
   class=""
 />
 
@@ -42,17 +41,7 @@
       </form>
 
       {# Filter form — uses `contents` so children join the parent flex layout #}
-      <form
-        action=""
-        method="get"
-        class="contents"
-        {% if htmx_target %}
-          hx-get=""
-          hx-target="{{ htmx_target }}"
-          hx-swap="innerHTML"
-          hx-push-url="true"
-        {% endif %}
-      >
+      <form action="" method="get" class="contents">
         {# Date range #}
         <div class="flex items-end gap-2">
           <div>
@@ -210,17 +199,7 @@
 
     {# Filter drawer — contains its own form #}
     <c-filter-drawer title="Filters" class="mt-3" :has_errors="form.errors">
-      <form
-        id="mobile-filter-form"
-        action=""
-        method="get"
-        {% if htmx_target %}
-          hx-get=""
-          hx-target="{{ htmx_target }}"
-          hx-swap="innerHTML"
-          hx-push-url="true"
-        {% endif %}
-      >
+      <form id="mobile-filter-form" action="" method="get">
         {% if form.errors %}
           <p class="text-sm text-red-700 mb-3">There were errors applying your filters.</p>
         {% endif %}

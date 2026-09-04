@@ -1361,10 +1361,6 @@ Sample code here.
         <c-slot name="description">Django paginator page object (required). Provides <code>number</code>, <code>has_previous</code>, <code>has_next</code>, <code>start_index</code>, <code>end_index</code>, <code>paginator.num_pages</code>, <code>paginator.count</code>.</c-slot>
       </c-library.item>
       <c-library.item optional only>
-        <c-slot name="label"><code>base_url</code></c-slot>
-        <c-slot name="description">Base URL for page links. Defaults to current path.</c-slot>
-      </c-library.item>
-      <c-library.item optional only>
         <c-slot name="label"><code>show_first</code></c-slot>
         <c-slot name="description">Show the "First" button. Default: off.</c-slot>
       </c-library.item>
@@ -1708,10 +1704,6 @@ Sample code here.
         <c-slot name="label"><code>:sort_order_asc</code></c-slot>
         <c-slot name="description">Bool — whether ascending sort is active. Default: <code>True</code>.</c-slot>
       </c-library.item>
-      <c-library.item optional only>
-        <c-slot name="label"><code>htmx_target</code></c-slot>
-        <c-slot name="description">CSS selector for the htmx swap target. When set, the form uses htmx instead of full page navigation.</c-slot>
-      </c-library.item>
     </c-library.list>
 
     <c-library.list title="Slots" only>
@@ -1726,7 +1718,6 @@ Sample code here.
   :form="form"
   :page_obj="docket_entries"
   :sort_order_asc="sort_order_asc"
-  htmx_target="#docket-entries"
 /&gt;
       </c-code>
     </c-expansion-panel>
