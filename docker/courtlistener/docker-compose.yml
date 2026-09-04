@@ -31,8 +31,14 @@ services:
   cl-redis:
     container_name: cl-redis
     image: redis
+    # Every healthcheck below polls once a second while the service is
+    # starting (start_interval, within start_period) so dependants and
+    # `up --wait` proceed as soon as possible, then backs off to the regular
+    # interval to keep the steady-state noise down.
     healthcheck:
       test: ["CMD", "redis-cli", "ping"]
+      start_period: 10s
+      start_interval: 1s
       interval: 5s
       timeout: 3s
       retries: 12
@@ -68,6 +74,7 @@ services:
       # first-boot init scripts, a temporary server listens on the socket
       # only, and we must not report healthy until the real one is up.
       test: ["CMD-SHELL", "pg_isready -h 127.0.0.1 -U postgres -d courtlistener"]
+      start_interval: 1s
       interval: 5s
       timeout: 5s
       retries: 24
@@ -86,9 +93,12 @@ services:
     # npm install populates cl/node_modules on the host bind mount, which
     # cl-tailwind-reload needs too, so it waits for this container to be
     # healthy. The marker file makes "healthy" mean "npm install finished".
-    command: sh -c 'npm install && touch /tmp/npm-install-done && exec npx webpack --progress --watch --mode=development'
+    # It lives in the container's own /tmp, so it vanishes with the
+    # container, and is cleared up front in case the container is restarted.
+    command: sh -c 'rm -f /tmp/npm-install-done && npm install && touch /tmp/npm-install-done && exec npx webpack --progress --watch --mode=development'
     healthcheck:
       test: ["CMD-SHELL", "test -f /tmp/npm-install-done"]
+      start_interval: 1s
       interval: 5s
       timeout: 3s
       retries: 3
@@ -191,6 +201,7 @@ services:
       # -f), because a 400 from ALLOWED_HOSTS still proves the server is up
       # and migrations have finished.
       test: ["CMD-SHELL", "curl -sS -o /dev/null http://localhost:8000/"]
+      start_interval: 1s
       interval: 10s
       timeout: 10s
       retries: 30
@@ -264,6 +275,7 @@ services:
       # The dev cert is self-signed, hence -k. Yellow is fine for a single
       # node: it only means replicas can't be allocated anywhere.
       test: ["CMD-SHELL", "curl -fsk -u elastic:password 'https://localhost:9200/_cluster/health?wait_for_status=yellow&timeout=5s'"]
+      start_interval: 1s
       interval: 10s
       timeout: 10s
       retries: 30
