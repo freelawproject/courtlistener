@@ -160,7 +160,7 @@ def notify_existing_account_holder(recipient: str) -> None:
     email = emails["account_already_exists"]
     send_mail(
         email["subject"],
-        email["body"] % reverse("password_reset"),
+        email["body"] % (reverse("sign-in"), reverse("password_reset")),
         email["from_email"],
         [recipient],
     )

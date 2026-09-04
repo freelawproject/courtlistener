@@ -4459,6 +4459,7 @@ class RegisterViewTest(TestCase):
         message = mail.outbox[0]
         self.assertEqual(message.to, [email])
         self.assertIn("already exists", message.body)
+        self.assertIn(reverse("sign-in"), message.body)
         self.assertIn(reverse("password_reset"), message.body)
 
     async def test_email_uniqueness_check_folds_case(self) -> None:
