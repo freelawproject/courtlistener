@@ -1,3 +1,11 @@
+"""Per-source configuration for fetching and rendering docket entries.
+
+The source instances (``RECAP``, ``SCOTUS``) and the ``BY_COURT_ID`` map are
+meant to be read through the module, as ``docket_entry_sources.RECAP``, so
+they stay visually distinct from the unrelated docket *data* sources in
+``cl.search.docket_sources`` (``Docket.RECAP_SOURCES()``, ``Docket.RECAP``).
+"""
+
 from collections.abc import Callable, Iterable
 from dataclasses import dataclass
 from typing import Any, NotRequired, TypedDict
@@ -270,7 +278,7 @@ def _recap_metadata_sections(docket: Docket) -> list[MetadataSection]:
     ]
 
 
-RECAP_SOURCE = DocketEntrySource(
+RECAP = DocketEntrySource(
     entries_queryset=_recap_entries,
     documents_for_entry=_recap_documents_for_entry,
     order_by_asc=("recap_sequence_number", "entry_number"),
@@ -350,7 +358,7 @@ def _scotus_docket_url(docket: Docket) -> str | None:
     return docket.scotus_docket_url or None
 
 
-SCOTUS_SOURCE = DocketEntrySource(
+SCOTUS = DocketEntrySource(
     entries_queryset=_scotus_entries,
     documents_for_entry=_scotus_documents_for_entry,
     order_by_asc=("sequence_number",),
@@ -365,4 +373,6 @@ SCOTUS_SOURCE = DocketEntrySource(
     component="scotus",
 )
 
-_SOURCES_BY_COURT_ID: dict[str, DocketEntrySource] = {"scotus": SCOTUS_SOURCE}
+# Courts whose dockets use a source other than RECAP. Docket.get_entry_source
+# falls back to RECAP for any court not listed here.
+BY_COURT_ID: dict[str, DocketEntrySource] = {"scotus": SCOTUS}
