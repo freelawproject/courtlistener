@@ -100,9 +100,13 @@ jobs:
         working-directory: courtlistener/docker/courtlistener
         run: > # don't build, rather use loaded image from build step, specified by merging overriding config
           docker compose -f docker-compose.yml -f docker-compose.tmpfs.yml -f <(echo 'services: { cl-django: { image: "courtlistener" }, cl-celery: { image: "courtlistener" } }') up -d --no-build --pull=never --wait --wait-timeout 600
+      # Run these even when `up --wait` fails, since that is exactly when the
+      # container list and logs are needed to see which service never came up.
       - name: List docker containers
+        if: always()
         run: docker ps -a --no-trunc
       - name: Show the docker startup logs
+        if: always()
         working-directory: courtlistener/docker/courtlistener
         run: docker compose logs
 
