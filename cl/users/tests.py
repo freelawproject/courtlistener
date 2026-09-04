@@ -4397,6 +4397,23 @@ class RegisterViewTest(TestCase):
             "consent": True,
         }
 
+    @staticmethod
+    def normalize_page(content: bytes) -> bytes:
+        """Mask the parts of a rendered page that legitimately differ between
+        two otherwise identical responses: the per-response CSP nonce and the
+        analytics snippet that base.html includes at random one time in ten.
+        Whitespace is collapsed because that snippet's template block leaves
+        different whitespace behind depending on whether it rendered.
+        """
+        content = re.sub(rb'nonce="[^"]*"', b'nonce=""', content)
+        content = re.sub(
+            rb"<script\s+defer\s+data-domain=.*?</script>",
+            b"",
+            content,
+            flags=re.DOTALL,
+        )
+        return re.sub(rb"\s+", b" ", content)
+
     async def test_taken_email_is_indistinguishable_from_a_fresh_signup(
         self,
     ) -> None:
@@ -4424,12 +4441,9 @@ class RegisterViewTest(TestCase):
 
         self.assertEqual(duplicate.status_code, fresh.status_code)
         self.assertEqual(duplicate.redirect_chain, fresh.redirect_chain)
-        # The CSP nonce is fresh on every response, so mask it before
-        # comparing the two pages.
-        nonce = re.compile(rb'nonce="[^"]*"')
         self.assertEqual(
-            nonce.sub(b'nonce=""', duplicate.content),
-            nonce.sub(b'nonce=""', fresh.content),
+            self.normalize_page(duplicate.content),
+            self.normalize_page(fresh.content),
         )
 
         # No second account, and the first one is untouched.
