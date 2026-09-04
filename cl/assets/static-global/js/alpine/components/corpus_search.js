@@ -5,6 +5,24 @@ const fieldsetIdSeeds = {
   judges: 'p-fieldset',
 };
 
+/**
+ * Returns true when filters are set and will be applied on submit.
+ * Uses `:disabled` pseudo-class to identify elements that are turned off.
+ * Checkboxes only count when checked.
+ * Ignores whitespace-only values.
+ */
+const willBeSubmitted = (el) => {
+  if (el.matches(':disabled') || el.dataset?.ignoreInput === 'true') return false;
+  if (el.type === 'checkbox' || el.type === 'radio') return el.checked;
+  return !!el.value.trim();
+};
+/**
+ * Returns true when a submitted control is a user-set filter. Excludes the
+ * hidden inputs carrying search state (`q`, `type`) and the unnamed inputs the
+ * keyword field and the date pickers use internally.
+ */
+const isActiveFilter = (el) => !!el.name && el.type !== 'hidden' && willBeSubmitted(el);
+
 document.addEventListener('alpine:init', () => {
   /** STORE
    * Values are shared across component instances.
@@ -53,6 +71,7 @@ document.addEventListener('alpine:init', () => {
     ...createUtils(),
     advancedFiltersExpanded: false,
     advancedFiltersExpandedDesktop: false,
+    activeFilterCount: 0,
     get scopeMenuExpanded() {
       return this.$store.corpusSearch.scopeMenuExpanded;
     },
@@ -120,6 +139,18 @@ document.addEventListener('alpine:init', () => {
     get advancedFiltersCollapsed() {
       return !this.advancedFiltersExpanded;
     },
+    get formInputs() {
+      return Array.from(this.$root.elements).filter((el) => ['INPUT', 'SELECT'].includes(el.tagName));
+    },
+    get hasActiveFilters() {
+      return this.activeFilterCount > 0;
+    },
+    get activeFilterCountLabel() {
+      return `(${this.activeFilterCount})`;
+    },
+    get filtersButtonAriaLabel() {
+      return this.hasActiveFilters ? `Filters, ${this.activeFilterCount} active` : 'Filters';
+    },
     updateKeyword(event) {
       this.$store.corpusSearch.keywordQuery = event.target.value;
     },
@@ -173,21 +204,29 @@ document.addEventListener('alpine:init', () => {
      * Also disable inputs that are within the form but flagged to be ignored (e.g. date selector radio buttons to select date type)
      *  */
     onSubmit() {
-      const formInputs = Array.from(this.$el.elements).filter((el) => ['INPUT', 'SELECT'].includes(el.tagName));
-      formInputs.forEach((el) => {
-        const isEmpty = !el.value.trim();
-        const shouldIgnore = el.dataset?.ignoreInput === 'true';
-        if (isEmpty || shouldIgnore) {
-          el.setAttribute('disabled', 'disabled');
-        }
+      this.formInputs.filter((el) => !willBeSubmitted(el)).forEach((el) => el.setAttribute('disabled', 'disabled'));
+    },
+
+    /**
+     * Recount the filters the next submit would apply, so the count can be shown
+     * before submitting. Runs on the next tick to wait x-bind:disabled and
+     * x-bind:value directives to settle.
+     */
+    updateActiveFilterCount() {
+      this.$nextTick(() => {
+        this.activeFilterCount = this.formInputs.filter(isActiveFilter).length;
       });
     },
 
     init() {
-      this.$watch('selectedScope', (newVal) => this.updateFieldsets(newVal.label));
+      this.$watch('selectedScope', (newVal) => {
+        this.updateFieldsets(newVal.label);
+        this.updateActiveFilterCount();
+      });
       this.onBreakpointChange(() => {
         this.advancedFiltersExpandedDesktop = false;
       });
+      this.updateActiveFilterCount();
     },
   }));
 });

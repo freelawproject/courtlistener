@@ -335,6 +335,62 @@ class CorpusSearchFormTest(SimpleUserDataMixin, TestCase):
             "Homepage tablist should not use Alpine x-for for initial render",
         )
 
+    def test_mobile_filters_buttons_expose_active_filter_count(self):
+        """Both mobile Filters buttons carry the badge and the dynamic name.
+
+        The badge is aria-hidden on purpose: the count reaches assistive tech
+        through the button's aria-label, so the two must always travel together.
+        """
+        buttons = self.tree.xpath(
+            '//button[@*[name()="x-bind:aria-label" and .="filtersButtonAriaLabel"]]'
+        )
+        self.assertEqual(
+            len(buttons),
+            2,
+            "Expected the dialog trigger and the dialog's own Filters toggle",
+        )
+        for index, button in enumerate(buttons):
+            with self.subTest(button=index):
+                badges = button.xpath('.//*[@x-text="activeFilterCountLabel"]')
+                self.assertEqual(
+                    len(badges), 1, "Badge missing inside the button"
+                )
+                self.assertEqual(badges[0].get("aria-hidden"), "true")
+                self.assertEqual(badges[0].get("x-show"), "hasActiveFilters")
+
+    def test_search_form_recounts_filters_on_input_and_change(self):
+        """Every corpus search form recounts active filters as fields change."""
+        forms = self.tree.xpath('//form[@x-data="search"]')
+        self.assertGreaterEqual(
+            len(forms), 1, "No corpus search form rendered"
+        )
+        for index, form in enumerate(forms):
+            for event in ("x-on:input", "x-on:change"):
+                with self.subTest(form=index, event=event):
+                    self.assertEqual(
+                        form.xpath(f'@*[name()="{event}"]'),
+                        ["updateActiveFilterCount"],
+                        f"{event} handler missing on the search form",
+                    )
+
+    def test_desktop_filters_button_has_no_badge(self):
+        """The count is a mobile feature (#6085); the desktop header button is unchanged."""
+        resp = self.client.get(reverse("help_home"))
+        self.assertTemplateUsed(resp, "v2_help/index.html")
+        tree = lhtml.fromstring(resp.content.decode())
+        desktop_buttons = tree.xpath(
+            '//button[@aria-controls="advanced-filters-panel"]'
+        )
+        self.assertEqual(
+            len(desktop_buttons),
+            1,
+            "Expected the header's desktop Filters button",
+        )
+        self.assertFalse(
+            desktop_buttons[0].xpath('.//*[@x-text="activeFilterCountLabel"]'),
+            "Desktop Filters button should not render the active filter badge",
+        )
+
 
 @override_flag("use_new_design", True)
 @patch("cl.search.utils.get_redis_interface")

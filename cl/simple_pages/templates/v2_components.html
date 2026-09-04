@@ -39,6 +39,9 @@
         {'href': '#docket-filter', 'text': 'Docket filter'},
         {'href': '#metadata-section', 'text': 'Metadata section'},
       ]},
+      {'href': '#corpus-search', 'text': 'Corpus search', 'children': [
+        {'href': '#active-filter-badge', 'text': 'Active filter badge'},
+      ]},
       {'href': '#pure-markup', 'text': 'Pure markup', 'children': [
       {'href': '#support-banner', 'text': 'Support plea banner'},
     ]},
@@ -1771,7 +1774,52 @@ Sample code here.
       </c-code>
     </c-expansion-panel>
   </section>
+  {# ACTIVE FILTER BADGE #}
+  <section class="max-w-full w-full border-t-2 border-greyscale-200" x-intersect.margin.-100px="show" id="active-filter-badge">
+    <h2 class="mt-6 mb-3">Active filter badge</h2>
+    <p>Shows how many advanced-search filters will be sent on the next submit, next to a "Filters" label, so a user who closed the filters panel knows values are still set. It reads <code>hasActiveFilters</code> and <code>activeFilterCountLabel</code> from the enclosing <code>search</code> Alpine component, so it only works inside <code>&lt;c-corpus-search&gt;</code>.</p>
+    <p>The badge is <code>aria-hidden</code>: the count reaches screen readers through the button's name instead. Bind <code>x-bind:aria-label="filtersButtonAriaLabel"</code> on the button that carries it.</p>
 
+    <h4 class="mt-3">Demo</h4>
+    <p class="text-sm text-greyscale-600 mb-2">Type a case name, pick a date or a relative preset such as "Past Week": the badge shows how many fields would be sent, and disappears when they are cleared. The date selector is the same one RECAP uses — its type radios must not count, and switching type or picking a preset must update the badge.</p>
+    <c-corpus-search class="!flex-col gap-3 my-4 rounded-lg border border-greyscale-200 p-4" only>
+      <div class="grid grid-cols-1 md:grid-cols-2 gap-4 items-end">
+        <div class="flex flex-col gap-1.5">
+          <label for="library-badge-case-name" class="text-sm font-medium text-greyscale-600">Case Name</label>
+          <input id="library-badge-case-name" name="case_name" type="text" class="input-text">
+        </div>
+        <c-corpus-search.date-selector
+          label="Docket Date"
+          relative
+          :request="request"
+          date_after_field_name="filed_after"
+          date_before_field_name="filed_before"
+          only
+        />
+      </div>
+      <c-button variant="outline" type="button" x-bind:aria-label="filtersButtonAriaLabel" class="w-fit">
+        {% svg "funnel" class="h-5 w-5 text-greyscale-400" aria_hidden="true" %}
+        Filters
+        <c-corpus-search.active-filter-badge />
+      </c-button>
+    </c-corpus-search>
+    <c-library.list title="Props" only>
+      <p>No props</p>
+    </c-library.list>
+
+    <c-library.list title="Slots" only>
+      <p>No slots</p>
+    </c-library.list>
+
+    <c-expansion-panel title="Code">
+      <c-code>
+&lt;c-button variant="outline" x-bind:aria-label="filtersButtonAriaLabel"&gt;
+  Filters
+  &lt;c-corpus-search.active-filter-badge /&gt;
+&lt;/c-button&gt;
+      </c-code>
+    </c-expansion-panel>
+  </section>
   {# SUPPORT PLEA BANNER #}
   <c-layout-with-navigation.section class="border-t-2 border-greyscale-200" id="support-banner">
     <h2 class="mt-6 mb-3">Support plea banner</h2>

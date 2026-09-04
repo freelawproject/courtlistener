@@ -33,10 +33,13 @@
           <c-button
             variant="outline"
             x-on:click="toggleAdvancedFilters"
+            x-bind:aria-expanded="advancedFiltersExpanded"
+            x-bind:aria-label="filtersButtonAriaLabel"
             class="w-full justify-center"
           >
-            {% svg "funnel" class="h-5 w-5 text-greyscale-400" %}
+            {% svg "funnel" class="h-5 w-5 text-greyscale-400" aria_hidden="true" %}
             Filters
+            <c-corpus-search.active-filter-badge />
           </c-button>
         </div>
         <div
