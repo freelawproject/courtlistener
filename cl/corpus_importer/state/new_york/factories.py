@@ -187,6 +187,7 @@ class NYCoAFilingFactory(Factory):
 
     class Meta:
         model = NYCoDocketEntry
+
     class Params:
         filing = Faker("random_element", elements=_FILINGS)
 
