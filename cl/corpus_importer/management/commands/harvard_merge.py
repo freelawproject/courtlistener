@@ -53,8 +53,10 @@ def find_data_fields(soup: BeautifulSoup, field_name: str) -> list:
     :return: list of all fields found
     """
     return soup.find_all(
-        lambda tag: (tag.name == field_name and tag.get("data-type") is None)
-        or tag.get("data-type") == field_name
+        lambda tag: (
+            (tag.name == field_name and tag.get("data-type") is None)
+            or tag.get("data-type") == field_name
+        )
     )
 
 
@@ -157,9 +159,11 @@ def fetch_non_harvard_data(harvard_data: dict[str, Any]) -> dict[str, Any]:
     if find_any_legal_field:
         # We have legal field, then collect all legal and attorneys fields
         find_fields = soup.find_all(
-            lambda tag: tag.get("data-type") == "legal"
-            or (tag.name == "attorneys" and tag.get("data-type") is None)
-            or tag.get("data-type") == "attorneys"
+            lambda tag: (
+                tag.get("data-type") == "legal"
+                or (tag.name == "attorneys" and tag.get("data-type") is None)
+                or tag.get("data-type") == "attorneys"
+            )
         )
         if find_fields:
             # Combine attorneys and legal data-type fields
