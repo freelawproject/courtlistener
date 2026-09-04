@@ -1,19 +1,29 @@
-# CourtListener development stack.
+# CourtListener development stack. The developer guide on the wiki is the
+# full walkthrough: https://wiki.free.law/c/courtlistener/dev-guide/getting-started.md
 #
 # This is for development only. It is not secure enough for production and
 # it stores data in ways that would be a bad idea there.
 #
-# Quick start (see README.md next to this file for the details):
+# Quick start:
 #
 #     cp .env.example .env.dev            # then set ALLOWED_HOSTS and SECRET_KEY
 #     docker compose up --wait            # from the repository root, or from here
 #     docker exec cl-django ./manage.py make_dev_data
 #
 # `--wait` blocks until every service with a healthcheck reports healthy, so
-# when it returns the site is answering on http://localhost:8000.
+# when it returns the site is answering on http://localhost:8000 and the test
+# suite can run: docker exec cl-django ./manage.py test cl --exclude-tag selenium
 #
-# Host ports can be moved if they collide with something already running on
-# your machine, e.g. `CL_POSTGRES_PORT=5433 docker compose up`.
+# Published ports (postgres 5432, Django 8000, Selenium VNC 5900, Elasticsearch
+# 9200) bind to 127.0.0.1 only. Move one that collides with something already
+# on your machine with CL_POSTGRES_PORT, CL_DJANGO_PORT, CL_VNC_PORT or
+# CL_ES_PORT, e.g. `CL_POSTGRES_PORT=5433 docker compose up`. To expose one to
+# other devices on purpose, rebind it in a git-ignored personal override file
+# (compose.override.yaml at the repository root, or docker-compose.override.yml
+# here), using `ports: !override` so the list is replaced rather than extended.
+#
+# Postgres data can live in memory for faster tests (CI does this):
+#     docker compose -f compose.yaml -f docker/courtlistener/docker-compose.tmpfs.yml up --wait
 name: courtlistener
 
 networks:
