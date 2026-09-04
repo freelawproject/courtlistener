@@ -1489,7 +1489,7 @@ Sample code here.
       </c-library.item>
       <c-library.item only>
         <c-slot name="label"><code>tabs</code></c-slot>
-        <c-slot name="description">List of <code>{label, url, key}</code> dicts for the tab nav. If only one tab is provided, the nav is hidden.</c-slot>
+        <c-slot name="description">List of <code>{label, url, key, icon}</code> dicts for the tab nav, as built by <code>build_docket_tabs</code>. <code>icon</code> names an SVG in <code>cl/assets/static-global/svg/</code>, rendered before the label on desktop and skipped in the mobile dropdown. If only one tab is provided, the nav is hidden.</c-slot>
       </c-library.item>
       <c-library.item only>
         <c-slot name="label"><code>has_alert</code></c-slot>

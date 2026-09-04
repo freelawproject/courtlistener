@@ -125,7 +125,9 @@
   {% for tab in tabs %}
     <a href="{{ tab.url }}"
        {% if active_tab == tab.key %}aria-current="page"{% endif %}
-       class="px-5 py-3 text-sm font-normal rounded-t-2xl whitespace-nowrap focus-visible:ring-2 focus-visible:ring-primary-400 focus-visible:outline-none {% if active_tab == tab.key %}bg-white text-greyscale-900{% else %}bg-greyscale-50 text-greyscale-600{% endif %}">
+       class="flex items-center gap-1 px-5 py-3 text-sm font-normal rounded-t-2xl whitespace-nowrap focus-visible:ring-2 focus-visible:ring-primary-400 focus-visible:outline-none {% if active_tab == tab.key %}bg-white text-greyscale-900{% else %}bg-greyscale-50 text-greyscale-600{% endif %}">
+      {# Some tab icons hardcode their fill and have several paths, so the wrapper sizes and recolors them. #}
+      <span class="flex items-center justify-center w-4 h-4 shrink-0 [&_path]:fill-current" aria-hidden="true">{% svg tab.icon class="w-full h-full" %}</span>
       {{ tab.label }}
     </a>
   {% endfor %}

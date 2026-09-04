@@ -15,6 +15,7 @@ from asgiref.sync import async_to_sync, sync_to_async
 from django.conf import settings
 from django.contrib.auth.hashers import make_password
 from django.contrib.auth.models import AnonymousUser, Group, Permission, User
+from django.contrib.staticfiles.finders import find
 from django.core.files.uploadedfile import SimpleUploadedFile
 from django.core.management import call_command
 from django.core.paginator import Paginator
@@ -3493,6 +3494,31 @@ class BuildDocketTabsTest(SimpleTestCase):
         tabs = build_docket_tabs(docket, True, True, True)
         keys = [t["key"] for t in tabs]
         self.assertEqual(keys, ["entries", "parties", "idb", "authorities"])
+
+    def test_every_tab_has_an_existing_icon(self) -> None:
+        """Each tab names an SVG the {% svg %} tag can find, mapped by key."""
+        docket = MagicMock()
+        docket.get_absolute_url.return_value = "/docket/1/test/"
+        docket.pk = 1
+        docket.slug = "test"
+
+        tabs = build_docket_tabs(docket, True, True, True)
+        icons = {t["key"]: t["icon"] for t in tabs}
+        self.assertEqual(
+            icons,
+            {
+                "entries": "file_text",
+                "parties": "group",
+                "idb": "circle_question_mark",
+                "authorities": "court",
+            },
+        )
+        for key, icon in icons.items():
+            with self.subTest(tab=key):
+                self.assertIsNotNone(
+                    find(f"svg/{icon}.svg"),
+                    msg=f"svg/{icon}.svg is not a static file.",
+                )
 
     def test_conditional_tabs(self) -> None:
         """Only tabs with data should appear."""
