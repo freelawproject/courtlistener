@@ -26,6 +26,7 @@
         {'href': '#dialog', 'text': 'Dialog'},
         {'href': '#callout', 'text': 'Callout'},
         {'href': '#button', 'text': 'Button'},
+        {'href': '#toggle-switch', 'text': 'Toggle switch'},
         {'href': '#menu-button', 'text': 'Menu button'},
         {'href': '#pagination', 'text': 'Pagination'},
         {'href': '#filter-drawer', 'text': 'Filter drawer'},
@@ -1253,6 +1254,121 @@ Sample code here.
   &lt;c-button variant="ghost" href="#" aria-disabled="true"&gt;Ghost link&lt;/c-button&gt;
   &lt;c-button variant="grey" href="#" aria-disabled="true"&gt;Grey link&lt;/c-button&gt;
 &lt;/div&gt;
+      </c-code>
+    </c-expansion-panel>
+  </c-layout-with-navigation.section>
+
+  {# TOGGLE SWITCH #}
+  <c-layout-with-navigation.section class="border-t-2 border-greyscale-200" id="toggle-switch">
+    <h2 class="mt-6 mb-3">Toggle switch</h2>
+    <p>
+      A reusable on/off switch for immediate binary choices (for example, making a tag public).
+      Built on a native checkbox with <code>role="switch"</code> so it is keyboard and screen-reader accessible.
+      Pass form attributes (<code>checked</code>, <code>disabled</code>, <code>name</code>, <code>value</code>) and behavior hooks (<code>aria-label</code>, <code>hx-*</code>) through to the input.
+    </p>
+
+    <h3 class="mt-3">Demo</h3>
+    <p class="text-sm mb-2">
+      Tab through the Public column switches. Each has its own accessible name. Disabled switches are not interactive.
+    </p>
+    <div class="overflow-auto">
+      <table class="w-full">
+        <caption class="sr-only">Example tags with public visibility switches</caption>
+        <thead>
+          <tr class="border-none">
+            <th class="text-nowrap text-sm p-2 bg-greyscale-100 text-greyscale-700 font-normal text-start first:rounded-l-lg">Name</th>
+            <th class="text-nowrap text-sm p-2 bg-greyscale-100 text-greyscale-700 font-normal text-start">Created</th>
+            <th class="text-nowrap text-sm p-2 bg-greyscale-100 text-greyscale-700 font-normal text-start">Views</th>
+            <th class="text-nowrap text-sm p-2 bg-greyscale-100 text-greyscale-700 font-normal text-start last:rounded-r-lg">Public</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr class="border-b border-b-greyscale-200">
+            <td class="align-middle text-sm font-normal p-2">R Harry J. Diduck</td>
+            <td class="align-middle text-sm font-normal p-2">12/18/2025</td>
+            <td class="align-middle text-sm font-normal p-2">0</td>
+            <td class="align-middle text-sm font-normal p-2">
+              <c-toggle-switch checked aria-label="Make Public for R Harry J. Diduck" />
+            </td>
+          </tr>
+          <tr class="border-b border-b-greyscale-200">
+            <td class="align-middle text-sm font-normal p-2">Private research notes</td>
+            <td class="align-middle text-sm font-normal p-2">11/02/2025</td>
+            <td class="align-middle text-sm font-normal p-2">3</td>
+            <td class="align-middle text-sm font-normal p-2">
+              <c-toggle-switch aria-label="Make Public for Private research notes" />
+            </td>
+          </tr>
+          <tr class="border-b border-b-greyscale-200">
+            <td class="align-middle text-sm font-normal p-2">Shared docket list (disabled on)</td>
+            <td class="align-middle text-sm font-normal p-2">10/14/2025</td>
+            <td class="align-middle text-sm font-normal p-2">12</td>
+            <td class="align-middle text-sm font-normal p-2">
+              <c-toggle-switch checked disabled aria-label="Make Public for Shared docket list (disabled)" />
+            </td>
+          </tr>
+          <tr class="border-b border-b-greyscale-200">
+            <td class="align-middle text-sm font-normal p-2">Archive tag (disabled off)</td>
+            <td class="align-middle text-sm font-normal p-2">09/01/2025</td>
+            <td class="align-middle text-sm font-normal p-2">1</td>
+            <td class="align-middle text-sm font-normal p-2">
+              <c-toggle-switch disabled aria-label="Make Public for Archive tag (disabled)" />
+            </td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+
+    <h4 class="mt-6">Sizes</h4>
+    <div class="flex flex-wrap gap-6 items-center">
+      <c-toggle-switch aria-label="Default size switch example">Default</c-toggle-switch>
+      <c-toggle-switch size="lg" checked aria-label="Large size switch example">Large</c-toggle-switch>
+    </div>
+
+    <h4 class="mt-6">With visible labels</h4>
+    <div class="flex flex-col gap-3">
+      <c-toggle-switch checked>Email notifications</c-toggle-switch>
+      <c-toggle-switch>Weekly digest</c-toggle-switch>
+      <c-toggle-switch checked disabled>Locked setting</c-toggle-switch>
+    </div>
+
+    <c-library.list title="Props" only>
+      <c-library.item optional only>
+        <c-slot name="label"><code>size</code></c-slot>
+        <c-slot name="description">Switch size. Default is 36×20px (16px thumb). Set to <code>lg</code> for 44×24px (20px thumb).</c-slot>
+      </c-library.item>
+      <c-library.item optional only>
+        <c-slot name="label"><code>class</code></c-slot>
+        <c-slot name="description">Additional CSS classes applied to the wrapping <code>&lt;label&gt;</code>.</c-slot>
+      </c-library.item>
+      <c-library.item optional only>
+        <c-slot name="label"><code>checked</code></c-slot>
+        <c-slot name="description">When present, the switch starts on. Passed through to the underlying checkbox.</c-slot>
+      </c-library.item>
+      <c-library.item optional only>
+        <c-slot name="label"><code>disabled</code></c-slot>
+        <c-slot name="description">When present, the switch cannot be toggled and appears faded. Passed through to the underlying checkbox.</c-slot>
+      </c-library.item>
+      <c-library.item optional only>
+        <c-slot name="label">Other input attrs</c-slot>
+        <c-slot name="description">Any undeclared attributes (<code>name</code>, <code>value</code>, <code>aria-label</code>, <code>hx-post</code>, etc.) are forwarded to the <code>&lt;input&gt;</code>.</c-slot>
+      </c-library.item>
+    </c-library.list>
+
+    <c-library.list title="Slots" only>
+      <c-library.item optional only>
+        <c-slot name="label">Default</c-slot>
+        <c-slot name="description">Optional visible label text rendered next to the switch. If omitted, provide an accessible name via <code>aria-label</code> or <code>aria-labelledby</code>.</c-slot>
+      </c-library.item>
+    </c-library.list>
+
+    <c-expansion-panel title="Code">
+      <c-code>
+&lt;c-toggle-switch checked aria-label="Make Public for R Harry J. Diduck" /&gt;
+
+&lt;c-toggle-switch size="lg"&gt;Large with label&lt;/c-toggle-switch&gt;
+
+&lt;c-toggle-switch checked disabled&gt;Locked setting&lt;/c-toggle-switch&gt;
       </c-code>
     </c-expansion-panel>
   </c-layout-with-navigation.section>
