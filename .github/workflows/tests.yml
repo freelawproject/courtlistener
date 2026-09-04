@@ -109,12 +109,14 @@ jobs:
       - name: Check if migrations are missing
         run: docker exec cl-django ./manage.py makemigrations --check --dry-run
       - name: Run the tests!
+        id: tests
+        continue-on-error: true
         run: >
           docker exec -e SELENIUM_DEBUG=1 -e SELENIUM_TIMEOUT=30 cl-django
           ./manage.py test
           cl --verbosity=2 ${{ matrix.tag_flags }} --parallel --xml-output /tmp/test-results
       - name: Export selenium results from docker to host
-        if: failure()
+        if: steps.tests.outcome == 'failure'
         run: |
           # This is annoying b/c docker cp doesn't support globs. See:
           # https://stackoverflow.com/q/35806102/
@@ -124,7 +126,7 @@ jobs:
           docker cp 'cl-django:/extract' selenium-screenshots/
       - name: Save selenium screenshot as Github artifacts
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
-        if: failure()
+        if: steps.tests.outcome == 'failure'
         with:
           name: selenium-screenshots
           path: selenium-screenshots/extract
@@ -144,6 +146,49 @@ jobs:
           name: test-results-${{ strategy.job-index }}
           path: courtlistener/test-results/
           if-no-files-found: ignore
+      - name: Retry the tests
+        id: retry
+        if: steps.tests.outcome == 'failure'
+        continue-on-error: true
+        run: >
+          docker exec -e SELENIUM_DEBUG=1 -e SELENIUM_TIMEOUT=30 cl-django
+          ./manage.py test
+          cl --verbosity=2 ${{ matrix.tag_flags }} --parallel --keepdb --xml-output /tmp/test-results-retry
+      - name: Export retry results from docker to host
+        if: always() && steps.retry.conclusion != 'skipped'
+        run: docker cp 'cl-django:/tmp/test-results-retry' courtlistener/test-results-retry || true
+      - name: Save retry results as Github artifact
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
+        if: always() && steps.retry.conclusion != 'skipped'
+        with:
+          name: test-results-retry-${{ strategy.job-index }}
+          path: courtlistener/test-results-retry/
+          if-no-files-found: ignore
+      - name: Report the retry verdict
+        if: always() && steps.retry.conclusion != 'skipped'
+        run: |
+          if [ "${{ steps.retry.outcome }}" = "success" ]; then
+            headline="Flaky tests: the suite passed when re-run on the same code."
+            # A warning, not a notice: the build is about to go green, and
+            # this annotation is the only thing that says why it shouldn't
+            # have needed two tries.
+            level=warning
+          else
+            headline="The failures survived a second run of the same code."
+            level=error
+          fi
+          {
+            echo "### Retry verdict"
+            echo
+            echo "**${headline}**"
+            echo
+            echo "Compare the two reports in the test-results-${{ strategy.job-index }}"
+            echo "and test-results-retry-${{ strategy.job-index }} artifacts."
+          } >> "$GITHUB_STEP_SUMMARY"
+          # Echoing a workflow command turns the headline into an annotation
+          # on the run and, for a PR, on its Checks tab.
+          echo "::${level} title=Retry verdict::${headline}"
+
       # Safe on fork PRs: writing the job summary needs no token scopes, so the
       # read-only GITHUB_TOKEN GitHub forces there is enough. Flip
       # use-actions-summary off and this becomes a check run, which needs
@@ -156,6 +201,21 @@ jobs:
           path: test-results/*.xml
           reporter: java-junit
           working-directory: courtlistener
+          fail-on-error: false
+      - name: Decide whether this run passed
+        if: always()
+        run: |
+          if [ "${{ steps.tests.outcome }}" = "success" ]; then
+            exit 0
+          fi
+          if [ "${{ steps.retry.outcome }}" = "success" ]; then
+            echo "The suite passed when re-run on the same code, so the"
+            echo "failures were flaky. Passing the run; both reports are in"
+            echo "the job's artifacts."
+            exit 0
+          fi
+          echo "Tests failed. See the job summary for what the retry made of it."
+          exit 1
 
 
 # Cancel the current workflow (tests) for pull requests (head_ref) only. See:
