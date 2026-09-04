@@ -9,17 +9,21 @@ from django.db.models import FileField
 from storages.backends.s3 import S3Storage
 
 from cl.corpus_importer.state.new_york.utils import NYCOA_COURT_ID
-from cl.search.state.new_york.models import NYCoADocument
+from cl.search.state.new_york.models import RECAP_ROOT, NYCoADocument
 
 logger = logging.getLogger(__name__)
 
 NY_STATE_CODE: str = "ny"
 
 PRIVATE_PREFIX: str = f"responses/dockets/{NY_STATE_CODE}/"
-PUBLISHED_PREFIX: str = (
-    f"us/state/{NY_STATE_CODE}/{NYCOA_COURT_ID}/"
-    f"gov.{NY_STATE_CODE}.{NYCOA_COURT_ID}."
-)
+
+PUBLISHED_PREFIX: str = f"{RECAP_ROOT}/gov.uscourts.{NYCOA_COURT_ID}."
+"""How far into a published key is the same for every Court-PASS document.
+
+Everything after this is the case's docket number, and then the file's own
+name; see `NYCoADocument.get_pdf_path`. Written out rather than derived,
+because `is_published` has to answer for a path with no document to ask, so
+`test_published_prefix_matches_pdf_path` is what keeps it honest."""
 
 
 def is_published(path: str) -> bool:
