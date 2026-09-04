@@ -133,30 +133,22 @@ persist_env COMPOSE_FILE "$COMPOSE_FILE"
 persist_env COMPOSE_PATH_SEPARATOR ":"
 
 ##############################################################################
-# 3. The cl_net_overlay network
+# 3. Networks the compose file expects to exist already
 ##############################################################################
-# Older compose files declared the network external and expected you to
-# create it by hand; newer ones create it themselves and refuse to adopt a
-# hand-made one. Handle both so this hook works across that transition.
-network_is_external() {
-    compose config --format json 2>/dev/null | python3 -c '
+# Older compose files declare their network `external: true` and expect you
+# to create it by hand (CI used to do the same); newer ones create their own.
+# Create any external network that is missing so both variants come up.
+compose config --format json 2>/dev/null | python3 -c '
 import json, sys
 cfg = json.load(sys.stdin)
-net = cfg.get("networks", {}).get("cl_net_overlay", {})
-sys.exit(0 if net.get("external") is True else 1)
-' 2>/dev/null
-}
-if network_is_external; then
-    docker network inspect cl_net_overlay >/dev/null 2>&1 \
-        || docker network create -d bridge --attachable cl_net_overlay >/dev/null
-elif docker network inspect cl_net_overlay >/dev/null 2>&1; then
-    label=$(docker network inspect -f '{{index .Labels "com.docker.compose.network"}}' cl_net_overlay)
-    attached=$(docker network inspect -f '{{len .Containers}}' cl_net_overlay)
-    if [ -z "$label" ] && [ "$attached" = "0" ]; then
-        log "Removing hand-made cl_net_overlay network so compose can own it"
-        docker network rm cl_net_overlay >/dev/null
-    fi
-fi
+for name, net in cfg.get("networks", {}).items():
+    if net.get("external") is True:
+        print(net.get("name") or name)
+' 2>/dev/null | while read -r net; do
+    [ -n "$net" ] || continue
+    docker network inspect "$net" >/dev/null 2>&1 \
+        || docker network create -d bridge --attachable "$net" >/dev/null
+done
 
 ##############################################################################
 # 4. Rebuild the Django image when its inputs changed
