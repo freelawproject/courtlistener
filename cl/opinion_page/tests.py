@@ -3988,3 +3988,59 @@ class DocketFilterPaginationWiringTest(TestCase):
             page_two_with_filter,
             f"no pagination link carries entry_gte forward; hrefs={hrefs}",
         )
+
+    async def test_filter_form_has_no_page_submit_control(self) -> None:
+        """Pressing Enter in a filter field triggers implicit submission,
+        which uses the first submit button in tree order as the submitter.
+        If the desktop Prev/Next controls were submit buttons named `page`,
+        every filter change made via Enter would carry the current page
+        number along with the new filter values and land on a stale page.
+        Assert that no submit control anywhere on the page carries `page`,
+        and that Prev/Next are plain links instead."""
+        # Enough entries that page 2 has both a previous and a next page
+        # regardless of the paginator's page size.
+        await sync_to_async(DocketEntry.objects.bulk_create)(
+            [
+                DocketEntry(
+                    docket=self.docket,
+                    entry_number=n,
+                    date_filed=date(2024, 6, 1),
+                    description=f"bulk entry {n}",
+                )
+                for n in range(100, 511)
+            ]
+        )
+        r = await self._get_docket_and_verify_v2(data={"page": "2"})
+        tree = fromstring(r.content.decode())
+
+        page_controls = [
+            el
+            for el in tree.iter("button", "input")
+            if el.get("name") == "page"
+        ]
+        self.assertEqual(
+            page_controls,
+            [],
+            "form controls named `page` would be sent as a submitter value "
+            "on implicit submission, carrying a stale page number along "
+            "with the new filter values",
+        )
+
+        prev_hrefs = [
+            a.get("href", "")
+            for a in tree.iter("a")
+            if a.get("title") == "Previous page"
+        ]
+        next_hrefs = [
+            a.get("href", "")
+            for a in tree.iter("a")
+            if a.get("title") == "Next page"
+        ]
+        self.assertTrue(prev_hrefs, "no Previous page links rendered")
+        self.assertTrue(next_hrefs, "no Next page links rendered")
+        for href in prev_hrefs:
+            with self.subTest(href=href):
+                self.assertIn("page=1", href)
+        for href in next_hrefs:
+            with self.subTest(href=href):
+                self.assertIn("page=3", href)
