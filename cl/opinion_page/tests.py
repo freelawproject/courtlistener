@@ -3658,11 +3658,13 @@ class DocketPageV2TemplateTest(TestCase):
         ]
         self.assertEqual(len(selectable), 2)
         self.assertEqual(
-            "".join(selectable[1].itertext()).strip(),
+            "".join(str(t) for t in selectable[1].itertext()).strip(),
             self.docket.docket_number,
         )
         for span in selectable:
-            with self.subTest(value="".join(span.itertext()).strip()):
+            with self.subTest(
+                value="".join(str(t) for t in span.itertext()).strip()
+            ):
                 self.assertIn("cursor-text", span.get("class") or "")
 
     def test_metadata_section_honors_is_copyable(self) -> None:
@@ -3695,7 +3697,10 @@ class DocketPageV2TemplateTest(TestCase):
         self.assertNotIn("select-all", plain.get("class") or "")
         self.assertIn("select-all", copyable.get("class") or "")
         self.assertIn("cursor-text", copyable.get("class") or "")
-        self.assertEqual("".join(copyable.itertext()).strip(), "601 U.S. 416")
+        self.assertEqual(
+            "".join(str(t) for t in copyable.itertext()).strip(),
+            "601 U.S. 416",
+        )
 
 
 @override_settings(WAFFLE_CACHE_PREFIX="test_docket_entry_rows_v2_waffle")
