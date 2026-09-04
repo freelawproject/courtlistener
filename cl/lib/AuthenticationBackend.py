@@ -1,29 +1,24 @@
+import re
+
 from django import forms
 from django.contrib.auth.backends import ModelBackend
 from django.contrib.auth.base_user import AbstractBaseUser
 from django.contrib.auth.forms import AuthenticationForm
 from django.contrib.auth.models import User
-from django.db.models import F
+from django.db.models import F, Value
 from django.db.models.functions import Lower
 from django.http import HttpRequest
 from django.urls import reverse
+from django.views.decorators.debug import sensitive_variables
 
-# How many accounts sharing an email address we'll check a password against.
-#
-# Each candidate costs a full password verification — roughly 100ms of CPU — so
-# an uncapped loop would let anybody who plants accounts on an address they
-# control turn one login POST into as many hashes as they like. The cap also
-# bounds a timing oracle: response time grows with the number of accounts on an
-# address, and three is a small enough signal to accept.
-#
-# The cap is only safe because of how candidates are ordered: confirmed
-# accounts come first, so accounts somebody planted on an address they cannot
-# read can never push that address's real owner past the cap and out of email
-# sign-in.
-#
-# This is a cap on a transitional state. Once auth_user.email is unique, no
-# address will have more than one account and the loop will only ever run once.
+# There can be many accounts for a given email address. To prevent
+# DOS attacks, only check this many of them, then stop.
 MAX_EMAIL_CANDIDATES = 3
+
+# The loosest test that still tells an address from a username: something, an
+# "@", and a domain with a dot in it. Anything stricter risks turning away an
+# address that an older validator once let into auth_user.
+LOOKS_LIKE_EMAIL = re.compile(r"^[^@\s]+@[^@\s]+\.[^@\s]+$")
 
 
 class EmailOrUsernameModelBackend(ModelBackend):
@@ -46,6 +41,7 @@ class EmailOrUsernameModelBackend(ModelBackend):
       ``ConfirmedEmailAuthenticationForm`` can tell its owner to go confirm it.
     """
 
+    @sensitive_variables("password")
     def authenticate(
         self,
         request: HttpRequest | None,
@@ -76,8 +72,10 @@ class EmailOrUsernameModelBackend(ModelBackend):
         identifier = str(username)
 
         by_username = self._get_by_username(identifier)
-        if by_username is not None and self._password_matches(
-            by_username, password
+        if (
+            by_username is not None
+            and by_username.check_password(password)
+            and self.user_can_authenticate(by_username)
         ):
             return by_username
 
@@ -94,23 +92,21 @@ class EmailOrUsernameModelBackend(ModelBackend):
             User().set_password(password)
             return None
 
-        # Among confirmed accounts, candidates are ordered by last_login
-        # descending, so the first match is the one the person used most
-        # recently. That's also the account the duplicate-account merge will
-        # keep, so the two agree and nothing changes for the user when their
-        # accounts are later merged.
-        unconfirmed_match = None
+        # Candidates come back confirmed-first, then most recently used, so
+        # the first one whose password matches is the best available: a
+        # confirmed account if any matched, otherwise an unconfirmed one that
+        # the form will turn into a "validate your email address" message.
+        # Among confirmed accounts that means the most recently used one wins,
+        # which is also the account the duplicate-account merge will keep, so
+        # nothing changes for the user when their accounts are later merged.
+        # Stopping at the first match also means no password is ever hashed
+        # needlessly.
         for candidate in candidates:
-            if not self._password_matches(candidate, password):
-                continue
-            if self._email_is_confirmed(candidate):
+            if candidate.check_password(
+                password
+            ) and self.user_can_authenticate(candidate):
                 return candidate
-            # Hold on to it, but keep looking: a confirmed account signs its
-            # owner in, while this one can only tell them to confirm their
-            # address. Prefer the one that gets them in.
-            unconfirmed_match = unconfirmed_match or candidate
-
-        return unconfirmed_match
+        return None
 
     def _get_by_username(self, identifier: str) -> User | None:
         """Look an account up by exact username.
@@ -142,24 +138,24 @@ class EmailOrUsernameModelBackend(ModelBackend):
         :return: The candidate accounts, confirmed ones first and, within
         that, most recently used first.
         """
-        # An address always has an "@" in it, so an identifier without one has
-        # no candidates to find, and the query is worth skipping. This also
-        # keeps an empty identifier from matching every account with a blank
-        # email address, which is a legal value on auth_user.
-        if "@" not in identifier:
+        # Only an address has candidates, and the query is worth skipping for
+        # anything else. This also keeps an empty identifier from matching
+        # every account with a blank email address, a legal value on auth_user.
+        if not LOOKS_LIKE_EMAIL.match(identifier):
             return []
 
         candidates = (
             User.objects.select_related("profile")
             # Match on LOWER(email) rather than __iexact, which compiles to
             # UPPER() and so can't use the auth_user_email_lower_idx index.
+            # Fold the submitted value in SQL as well, so both sides use
+            # Postgres's case rules: str.lower() and LOWER() disagree on some
+            # non-ASCII characters.
             .alias(email_lower=Lower("email"))
-            .filter(email_lower=identifier.lower(), is_active=True)
+            .filter(email_lower=Lower(Value(identifier)), is_active=True)
             # Stub accounts are placeholders for people who never signed up.
             # They have no usable password, so they can't match anyway, but
             # keeping them out of the list is one less thing to rely on.
-            # exclude() leaves profile-less accounts in place; filtering on
-            # profile__stub_account=False would drop them.
             .exclude(profile__stub_account=True)
             # Confirmed accounts first, then most recently used. Confirmed
             # first is what keeps the cap below from being weaponised: anybody
@@ -174,28 +170,6 @@ class EmailOrUsernameModelBackend(ModelBackend):
         if exclude is not None:
             candidates = candidates.exclude(pk=exclude.pk)
         return list(candidates[:MAX_EMAIL_CANDIDATES])
-
-    def _password_matches(self, user: User, password: str) -> bool:
-        """Check a password against one account.
-
-        :param user: The account to check against.
-        :param password: The submitted password.
-        :return: Whether the password is right and the account may authenticate.
-        """
-        return bool(
-            user.check_password(password) and self.user_can_authenticate(user)
-        )
-
-    def _email_is_confirmed(self, user: User) -> bool:
-        """Report whether an account has confirmed its email address.
-
-        :param user: The account to inspect.
-        :return: True if it has a profile with a confirmed address.
-        """
-        # Accounts without a profile shouldn't exist, but a missing one here
-        # would mean an unhandled exception on the sign-in page.
-        profile = getattr(user, "profile", None)
-        return bool(profile and profile.email_confirmed)
 
 
 class ConfirmedEmailAuthenticationForm(AuthenticationForm):

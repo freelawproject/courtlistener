@@ -4891,20 +4891,15 @@ class EmailOrUsernameSignInTest(TestCase):
         :param stub_account: Whether it's a stub, as donations create.
         :return: The new User.
         """
-        user = UserProfileWithParentsFactory.create(
+        return UserProfileWithParentsFactory.create(
             user__username=username,
             user__email=email,
             user__password=make_password(password),
             user__is_active=is_active,
+            user__last_login=last_login,
             email_confirmed=email_confirmed,
             stub_account=stub_account,
         ).user
-        if last_login is not None:
-            # last_login isn't settable through the factory's User, which has
-            # no such field declared, and it's what orders the candidates.
-            User.objects.filter(pk=user.pk).update(last_login=last_login)
-            user.refresh_from_db()
-        return user
 
     def sign_in(self, identifier: str, password: str) -> HttpResponse:
         """POST the sign-in form.
