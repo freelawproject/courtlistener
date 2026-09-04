@@ -9,7 +9,6 @@
   form=""
   page_obj=""
   sort_order_asc="True"
-  htmx_target=""
   class=""
 />
 
@@ -42,17 +41,7 @@
       </form>
 
       {# Filter form — uses `contents` so children join the parent flex layout #}
-      <form
-        action=""
-        method="get"
-        class="contents"
-        {% if htmx_target %}
-          hx-get=""
-          hx-target="{{ htmx_target }}"
-          hx-swap="innerHTML"
-          hx-push-url="true"
-        {% endif %}
-      >
+      <form action="" method="get" class="contents">
         {# Date range #}
         <div class="flex items-end gap-2">
           <div>
@@ -126,10 +115,15 @@
           </div>
         </fieldset>
 
-        {# Prev/Next — submit this form with page param #}
+        {# Prev/Next — links, not submit buttons. Implicit submission (Enter in #}
+        {# any field) uses the first submit button in tree order as the #}
+        {# submitter, so submit buttons named `page` here would carry a stale #}
+        {# page number along with the new filter values. As links, the sr-only #}
+        {# Filter button below is the form's only submit, and filter changes #}
+        {# reset to page 1. #}
         <div class="flex items-end gap-1 ml-auto">
           {% if page_obj.has_previous %}
-            <c-button variant="ghost" type="submit" name="page" value="{{ page_obj.previous_page_number }}" title="Previous page" class="px-2 py-2">
+            <c-button variant="ghost" href="{% querystring page=page_obj.previous_page_number %}" title="Previous page" class="px-2 py-2">
               {% svg "chevron" class="w-4 h-4 rotate-90" aria_hidden="true" %}
               <span class="ml-1">Prev</span>
             </c-button>
@@ -140,7 +134,7 @@
             </c-button>
           {% endif %}
           {% if page_obj.has_next %}
-            <c-button variant="ghost" type="submit" name="page" value="{{ page_obj.next_page_number }}" title="Next page" class="px-2 py-2">
+            <c-button variant="ghost" href="{% querystring page=page_obj.next_page_number %}" title="Next page" class="px-2 py-2">
               <span class="mr-1">Next</span>
               {% svg "chevron" class="w-4 h-4 -rotate-90" aria_hidden="true" %}
             </c-button>
@@ -205,17 +199,7 @@
 
     {# Filter drawer — contains its own form #}
     <c-filter-drawer title="Filters" class="mt-3" :has_errors="form.errors">
-      <form
-        id="mobile-filter-form"
-        action=""
-        method="get"
-        {% if htmx_target %}
-          hx-get=""
-          hx-target="{{ htmx_target }}"
-          hx-swap="innerHTML"
-          hx-push-url="true"
-        {% endif %}
-      >
+      <form id="mobile-filter-form" action="" method="get">
         {% if form.errors %}
           <p class="text-sm text-red-700 mb-3">There were errors applying your filters.</p>
         {% endif %}
