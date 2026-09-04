@@ -3665,19 +3665,22 @@ def add_scotus_docket_entries(
     docket: Docket,
     docket_entries: list[dict[str, Any]],
     download_file: bool = True,
-) -> list[int]:
+) -> tuple[list[int], bool]:
     """Add or update SCOTUS docket entries for a docket.
 
     :param docket: The Docket to add entries to.
     :param docket_entries: List of docket entry dicts from the scraper.
     :param download_file: Whether to trigger PDF download and extraction.
-    :return: A list of PKs of SCOTUSDocument objects that were created or
-        updated across all entries.
+    :return: A two-tuple: a list of PKs of SCOTUSDocument objects that were
+        created or updated across all entries, and whether any
+        SCOTUSDocketEntry was newly created (there's something to alert
+        subscribers about).
     """
     sequence_numbers = create_docket_entry_sequence_numbers(
         docket_entries, "date_filed"
     )
     all_doc_pks: list[int] = []
+    content_updated = False
     for sequence_number, docket_entry in zip(
         sequence_numbers, docket_entries, strict=True
     ):
@@ -3696,7 +3699,9 @@ def add_scotus_docket_entries(
             )
             continue
         all_doc_pks.extend(doc_pks)
-    return all_doc_pks
+        if de_created:
+            content_updated = True
+    return all_doc_pks, content_updated
 
 
 def merge_scotus_docket(
@@ -3707,6 +3712,8 @@ def merge_scotus_docket(
 
     This will create or update the Docket row for the SCOTUS and
     then create or update the related ScotusDocketMetadata instance.
+    If any docket entry was newly created, this also triggers a docket
+    alert to current subscribers.
 
     :param report_data: A dictionary containing parsed SCOTUS docket data.
     :param download_file: Whether to trigger PDF download and extraction.
@@ -3833,9 +3840,14 @@ def merge_scotus_docket(
 
     # Docket entries merger:
     enrich_scotus_attachments(report_data["docket_entries"])
-    doc_pks = add_scotus_docket_entries(
+    start_time = now()
+    doc_pks, content_updated = add_scotus_docket_entries(
         d, report_data["docket_entries"], download_file=download_file
     )
+    if content_updated:
+        newly_enqueued = enqueue_docket_alert(d.pk)
+        if newly_enqueued:
+            send_alert_and_webhook.delay(d.pk, start_time)
 
     return d, download_qp, doc_pks
 

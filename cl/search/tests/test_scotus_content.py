@@ -2,9 +2,11 @@ import datetime
 from unittest import mock
 
 from asgiref.sync import async_to_sync
+from django.core import mail
 from django.core.files.base import ContentFile
 from django.test import TestCase
 
+from cl.alerts.models import DocketAlert
 from cl.corpus_importer.tasks import (
     add_scotus_docket_entries,
     download_qp_scotus_pdf,
@@ -41,6 +43,7 @@ from cl.search.models import (
     SCOTUSDocument,
 )
 from cl.tests.cases import TestCase as CLTestCase
+from cl.users.factories import UserFactory
 
 
 class ScotusDocketMergeTest(TestCase):
@@ -531,6 +534,67 @@ class ScotusDocketMergeTest(TestCase):
             Docket.SCRAPER_AND_HARVARD,
             "Source should be compounded with SCRAPER.",
         )
+
+    def test_merge_scotus_docket_triggers_docket_alert_for_a_new_entry(
+        self,
+    ) -> None:
+        """Does merging a SCOTUS docket with a new entry notify current
+        subscribers?"""
+        existing = DocketFactory(
+            court=self.court, docket_number="24-201", source=Docket.SCRAPER
+        )
+        user = UserFactory()
+        DocketAlert.objects.create(docket=existing, user=user)
+
+        docket_entries = [
+            SCOTUSDocketEntryDataFactory(
+                description="Petition for a writ of certiorari filed.",
+                date_filed=datetime.date(2025, 6, 2),
+                document_number=None,
+                attachments=[],
+            )
+        ]
+        data = ScotusDocketDataFactory(
+            docket_number="24-201",
+            docket_entries=docket_entries,
+            parties=[],
+        )
+        docket, _, _ = merge_scotus_docket(data, download_file=False)
+
+        self.assertEqual(docket.pk, existing.pk)
+        self.assertEqual(len(mail.outbox), 1)
+        self.assertEqual(mail.outbox[0].to, [user.email])
+
+    def test_merge_scotus_docket_does_not_alert_when_nothing_is_new(
+        self,
+    ) -> None:
+        """Re-merging an already-seen entry shouldn't notify subscribers --
+        only a newly created SCOTUSDocketEntry triggers the alert."""
+        existing = DocketFactory(
+            court=self.court, docket_number="24-202", source=Docket.SCRAPER
+        )
+        user = UserFactory()
+        DocketAlert.objects.create(docket=existing, user=user)
+
+        docket_entries = [
+            SCOTUSDocketEntryDataFactory(
+                description="Petition for a writ of certiorari filed.",
+                date_filed=datetime.date(2025, 6, 2),
+                document_number=None,
+                attachments=[],
+            )
+        ]
+        data = ScotusDocketDataFactory(
+            docket_number="24-202",
+            docket_entries=docket_entries,
+            parties=[],
+        )
+        merge_scotus_docket(data, download_file=False)
+        mail.outbox.clear()
+
+        # Re-merge the exact same entry -- it already exists.
+        merge_scotus_docket(data, download_file=False)
+        self.assertEqual(len(mail.outbox), 0)
 
     def test_merge_scotus_docket_source_compounds_recap(self) -> None:
         """Merging into a RECAP docket compounds with SCRAPER."""
