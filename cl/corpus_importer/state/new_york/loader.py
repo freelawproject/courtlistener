@@ -22,6 +22,11 @@ PARTY_TYPES: dict[str, PartyType] = {
     "respondent": PartyType.RESPONDENT,
 }
 
+CONTENT_TYPES: dict[str, str] = {
+    "pdf": "application/pdf",
+    "asx": "video/x-ms-asf",
+}
+
 #: One finished docket payload per row, in the standard docket format.
 QUERY = """
 WITH scraped AS (
@@ -48,24 +53,43 @@ docket AS (
     )
     WHERE grid_position = 1 -- deduplicate dockets
 ),
+-- The archive row carries what only the download knows: the hash the
+-- scraper took of the bytes, how many there were, and what kind of file it
+-- asked for. It joins on the stored path, which the scraper names by
+-- content and so never reuses for two files.
 download AS (
-    SELECT docket_number, file_index, local_path
+    SELECT
+        docket_number,
+        file_index,
+        local_path,
+        content_hash,
+        file_size,
+        file_type
     FROM (
         SELECT
-            json_extract(data_json, '$.docket_number') AS docket_number,
-            json_extract(data_json, '$.file_index') AS file_index,
-            json_extract(data_json, '$.local_path') AS local_path,
+            json_extract(results.data_json, '$.docket_number') AS
+                docket_number,
+            json_extract(results.data_json, '$.file_index') AS file_index,
+            json_extract(results.data_json, '$.local_path') AS local_path,
+            COALESCE(archived_files.content_hash, '') AS content_hash,
+            archived_files.file_size AS file_size,
+            COALESCE(archived_files.expected_type, '') AS file_type,
             ROW_NUMBER() OVER (
                 PARTITION BY
-                    json_extract(data_json, '$.docket_number'),
-                    json_extract(data_json, '$.file_index')
-                ORDER BY id DESC
+                    json_extract(results.data_json, '$.docket_number'),
+                    json_extract(results.data_json, '$.file_index')
+                ORDER BY results.id DESC
             ) AS attempt
         FROM results
-        WHERE result_type = 'NYCourtPassFile'
-          AND json_extract(data_json, '$.docket_number') IS NOT NULL
-          AND json_extract(data_json, '$.file_index') IS NOT NULL
-          AND COALESCE(json_extract(data_json, '$.local_path'), '') <> ''
+        LEFT JOIN archived_files
+            ON archived_files.file_path =
+               json_extract(results.data_json, '$.local_path')
+        WHERE results.result_type = 'NYCourtPassFile'
+          AND json_extract(results.data_json, '$.docket_number') IS NOT NULL
+          AND json_extract(results.data_json, '$.file_index') IS NOT NULL
+          AND COALESCE(
+                  json_extract(results.data_json, '$.local_path'), ''
+              ) <> ''
     )
     WHERE attempt = 1
 ),
@@ -82,7 +106,12 @@ file AS (
             'doc_type', json_extract(item.value, '$.doc_type'),
             'volume', json_extract(item.value, '$.volume'),
             'part', json_extract(item.value, '$.part'),
-            'local_path', COALESCE(download.local_path, '')
+            'local_path', COALESCE(download.local_path, ''),
+            'content_hash', COALESCE(download.content_hash, ''),
+            'file_size', download.file_size,
+            -- Named by the scrape's vocabulary rather than as a MIME type,
+            -- which `normalize` resolves; see `CONTENT_TYPES`.
+            'file_type', COALESCE(download.file_type, '')
         ) AS document,
         ROW_NUMBER() OVER (
             PARTITION BY
@@ -303,11 +332,41 @@ class NYCoACourtPassLoader(JKentScrapeLoader[NYCoACase]):
             "docket has."
         )
 
+    @staticmethod
+    def _content_type(document: dict[str, Any]) -> str:
+        """The MIME type to store and to serve a downloaded file under.
+
+        :param document: One file of a filing, as `QUERY` shaped it.
+        :return: The type, or the empty string
+        """
+        kind = document.get("file_type") or ""
+        path = document.get("local_path") or ""
+        if not kind or not path:
+            return ""
+        if not path.lower().endswith(f".{kind.lower()}"):
+            logger.error(
+                "Court-PASS file %s is stored at %s, which does not end in "
+                "the %r the scrape calls it; serving it under no type.",
+                document.get("file_name", ""),
+                path,
+                kind,
+            )
+            return ""
+        if content_type := CONTENT_TYPES.get(kind.lower(), ""):
+            return content_type
+        logger.error(
+            "Court-PASS file %s is a %r, which CONTENT_TYPES does not cover; "
+            "serving it under no type.",
+            document.get("file_name", ""),
+            kind,
+        )
+        return ""
+
     def normalize(
         self, payload: dict[str, Any], row: sqlite3.Row
     ) -> dict[str, Any]:
-        """Name the enum members `QUERY` has no way to state, and refuse a
-        docket whose file list did not parse.
+        """Name the enum members `QUERY` has no way to state, resolve each
+        file's MIME type, and refuse a docket whose file list did not parse.
 
         :raises UnusableScrape: For a docket whose filing detail page carried
             neither the Court's "no files available for this case" line nor a
@@ -317,6 +376,8 @@ class NYCoACourtPassLoader(JKentScrapeLoader[NYCoACase]):
         payload["docket_type"] = DocketType.UNKNOWN
         for entry in payload["entries"]:
             entry["entry_type"] = DocketEntryType.UNKNOWN
+            for document in entry["attachments"]:
+                document["content_type"] = self._content_type(document)
         for party in payload["parties"]:
             role = party["party_role_raw"]
             party["party_type"] = PARTY_TYPES.get(
