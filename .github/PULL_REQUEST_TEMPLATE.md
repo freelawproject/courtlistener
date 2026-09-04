@@ -8,6 +8,14 @@ This fixes...
 <!-- What does this fix, how did you fix it, what approach did you take, what gotchas are there in your code or compromises did you make? -->
 This PR...
 
+## Documentation
+
+ Once merged, the following documentation needs to be updated:
+ <!-- make a bulleted list of tweaks to remember to make here -->
+  - [ ] Page XYZ needs the foo to be wazited
+  - [ ] Images on page XHZ need to be updated
+  - [ ] A new page is needed at URL XYZ
+
 ## Deployment
 
 **This PR should:**
