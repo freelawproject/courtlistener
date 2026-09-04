@@ -1,5 +1,6 @@
 """Factories for mocking the Court-PASS data the NYCoA mergers consume."""
 
+import hashlib
 from typing import NamedTuple
 
 from factory.base import Factory
@@ -146,6 +147,12 @@ class NYCoAFileFactory(Factory):
         lambda n: f"{PRIVATE_PREFIX}nycourts_gov/"
         f"APL-2024-00177_smithvjones-app-smith{n}-brf_1.pdf"
     )
+    content_hash = LazyAttribute(
+        lambda f: hashlib.sha256(f.local_path.encode()).hexdigest()
+        if f.local_path
+        else ""
+    )
+    file_size = LazyAttribute(lambda f: len(f.local_path) * 1000 or None)
 
 
 class NYCoAIssueFactory(Factory):

@@ -87,6 +87,7 @@ class NYCoADocumentFactory(DjangoModelFactory):
     doc_party = Faker("name")
     doc_type = Faker("word")
     page_count = Faker("pyint")
+    sha256 = Faker("sha256")
     # Not a column; assigning the constant exercises the model's setter.
     url = COURT_PASS_DOCUMENT_URL
     volume = LazyAttribute(

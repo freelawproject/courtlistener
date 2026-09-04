@@ -129,6 +129,16 @@ def _keep_stored_file(scrape: FieldFile, db: FieldFile) -> str:
     return (scrape.name or "") or (db.name or "")
 
 
+def _keep_downloaded[T](scrape: T | None, db: T | None) -> T | None:
+    """Merge strategy for scraped files.
+
+    :param scrape: What this scrape's download established, if it made one.
+    :param db: What is already stored for the document.
+    :return: The value to store.
+    """
+    return db if scrape is None or scrape == "" else scrape
+
+
 def _stated(reading: CourtVocabulary | Unclassified) -> str:
     """The Court-PASS value to store for a field read off a file name.
 
@@ -193,6 +203,12 @@ class NYCoADocumentMerger[ParamType](
     filepath_local: str = Attribute(
         lambda doc, params: doc.local_path, strategy=_keep_stored_file
     )
+    sha256: str = Attribute(
+        lambda doc, params: doc.content_hash, strategy=_keep_downloaded
+    )
+    file_size: int | None = Attribute(
+        lambda doc, params: doc.file_size, strategy=_keep_downloaded
+    )
 
     @override
     def merge_one(self) -> tuple[MergeResult[Any], NYCoADocument | None]:
@@ -202,6 +218,12 @@ class NYCoADocumentMerger[ParamType](
         """
         self.publish()
         return super().merge_one()
+
+    def _scrub_fileinfo(self) -> None:
+        """Remove info relevant to file."""
+        self.transformed["filepath_local"] = ""
+        self.transformed["sha256"] = ""
+        self.transformed["file_size"] = None
 
     def publish(self) -> None:
         """Move the scraped file into the bucket CourtListener serves, and
@@ -216,25 +238,34 @@ class NYCoADocumentMerger[ParamType](
                 self.scrape.file_name,
                 private_key,
             )
-            self.transformed["filepath_local"] = ""
+            self._scrub_fileinfo()
             return
+
+        if not self.scrape.content_hash:
+            logger.error(
+                "Court-PASS file %s was downloaded to %s with no hash "
+                "recorded, so a later correction to it cannot be told from "
+                "the copy being published now.",
+                self.scrape.file_name,
+                private_key,
+            )
 
         naming = NYCoADocument(
             docket_entry=cast(NYCoADocketEntry, self.params.parent),
             filepath_local=private_key,
+            sha256=self.scrape.content_hash,
         )
         published_key = naming.get_pdf_path(naming.make_filename())
 
         if (existing := self.existing) is not None:
             if existing.filepath_local.name == published_key:
-                # Already moved, on the merge that first saw this file.
                 self.transformed["filepath_local"] = published_key
                 return
 
         if not copy_file(
             private_key, published_key, self.transformed["content_type"]
         ):
-            self.transformed["filepath_local"] = ""
+            self._scrub_fileinfo()
             return
         transaction.on_commit(partial(discard_private_file, private_key))
         self.transformed["filepath_local"] = published_key
@@ -256,22 +287,20 @@ class NYCoADocumentMerger[ParamType](
     @override
     def pre_update(self, updated_fields: list[str]) -> list[str]:
         """Drop the file of a document the Court has stopped serving, and send
-        one whose file has moved back for extraction.
-
-        A new path means the scraper fetched the file again, so whatever was
-        extracted came from a copy that has been replaced. Clearing
-        `ocr_status` is what puts the document back in front of the extraction
-        sweep."""
+        one whose file has moved back for extraction."""
         updated = super().pre_update(updated_fields)
         if (existing := self.existing) is None:
             return updated
         if self._withdrawn() and existing.filepath_local:
             existing.filepath_local = ""
-            updated.append("filepath_local")
+            existing.sha256 = ""
+            existing.file_size = None
+            updated += ["filepath_local", "sha256", "file_size"]
         if "filepath_local" not in updated_fields + updated:
             return updated
+        existing.page_count = None
         existing.ocr_status = None
-        updated.append("ocr_status")
+        updated += ["page_count", "ocr_status"]
         return updated
 
 

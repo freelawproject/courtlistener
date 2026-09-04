@@ -1,6 +1,7 @@
 """Tests for the New York Court of Appeals (Court-PASS) mergers."""
 
 from datetime import date
+from pathlib import PurePosixPath
 from unittest.mock import MagicMock, patch
 
 from botocore.exceptions import ClientError
@@ -26,7 +27,7 @@ from cl.corpus_importer.state.new_york.factories import (
     NYCoAPartyFactory,
 )
 from cl.corpus_importer.state.new_york.mergers import NYCoADocketMerger
-from cl.corpus_importer.state.new_york.nycourts_gov import NYCoACase
+from cl.corpus_importer.state.new_york.nycourts_gov import NYCoACase, NYCoAFile
 from cl.corpus_importer.state.new_york.storage import (
     PRIVATE_PREFIX,
     PUBLISHED_PREFIX,
@@ -34,6 +35,7 @@ from cl.corpus_importer.state.new_york.storage import (
     discard_private_file,
     withdraw_file,
 )
+from cl.corpus_importer.state.new_york.utils import NYCOA_COURT_ID
 from cl.corpus_importer.state.tests import merger_test
 from cl.corpus_importer.state.utils import MergeResult
 from cl.lib.model_helpers import make_pdf_path
@@ -41,6 +43,9 @@ from cl.people_db.models import Attorney, Party, PartyType, Role
 from cl.search.factories import CourtFactory, DocketFactory
 from cl.search.models import Docket
 from cl.search.state.new_york.models import (
+    RECAP_ROOT,
+    RECAP_THUMBNAIL_ROOT,
+    SHA256_NAME_LENGTH,
     NYCoADocketEntry,
     NYCoADocketIssue,
     NYCoADocketMetadata,
@@ -51,6 +56,30 @@ from cl.tests.cases import SimpleTestCase, TestCase
 
 DOCKET_NUMBER = "APL-2024-00177"
 DOCKET_NUMBER_CORE = "apl202400177"
+
+
+def published_key(file: NYCoAFile, docket_number: str = DOCKET_NUMBER) -> str:
+    """Where publishing a scraped file puts it.
+
+    Spelled out from the scrape rather than taken from `NYCoADocument`, so that
+    a test asserting on a published path is checking the layout rather than
+    agreeing with whatever the model just built.
+
+    :param file: The file as the scraper handed it over.
+    :param docket_number: The docket number of the case it belongs to, which
+        names the directory it is filed in.
+    :return: The key the public bucket holds it under.
+    """
+    stored = PurePosixPath(file.local_path)
+    bucket = f"gov.uscourts.{NYCOA_COURT_ID}.{docket_number}"
+    name = ".".join(
+        [
+            bucket,
+            stored.stem.removeprefix(f"{docket_number}_"),
+            file.content_hash[:SHA256_NAME_LENGTH],
+        ]
+    )
+    return f"{RECAP_ROOT}/{bucket}/{name}{stored.suffix}"
 
 
 class NYCoAMergerTestCase(TestCase):
@@ -923,11 +952,11 @@ class NYCoADocumentMergerTest(NYCoAMergerTestCase):
         self.assertEqual(merged.part, 2)
         # The scraper left the file in the bucket it writes its raw responses
         # to, so the merge moves it into the one CourtListener serves, under
-        # the name the scraper gave it rather than the Court's own.
-        self.assertEqual(
-            merged.filepath_local,
-            f"{PUBLISHED_PREFIX}smith-rec-vol3.pdf",
-        )
+        # the name the scraper gave it -- rather than the Court's own -- with
+        # the file's hash appended.
+        self.assertEqual(merged.sha256, file.content_hash)
+        self.assertEqual(merged.file_size, file.file_size)
+        self.assertEqual(merged.filepath_local, published_key(file))
         self.assertEqual(
             self.published,
             [
@@ -942,15 +971,16 @@ class NYCoADocumentMergerTest(NYCoAMergerTestCase):
     def test_merge_oral_argument_recording(self) -> None:
         """Oral argument recordings are playlists, not PDFs. Does the content
         type survive the merge so the file pass can route them?"""
+        file = NYCoAFileFactory.create(
+            file_name="SmithvJones-Webcast.asx",
+            content_type="video/x-ms-asf",
+            doc_role=None,
+            doc_party="",
+            doc_type=FilingDocType.ORAL_ARGUMENT_WEBCAST,
+            local_path=f"{PRIVATE_PREFIX}smithvjones-webcast.asx",
+        )
         case = self.case_with_files(
-            NYCoAFileFactory.create(
-                file_name="SmithvJones-Webcast.asx",
-                content_type="video/x-ms-asf",
-                doc_role=None,
-                doc_party="",
-                doc_type=FilingDocType.ORAL_ARGUMENT_WEBCAST,
-                local_path=f"{PRIVATE_PREFIX}smithvjones-webcast.asx",
-            ),
+            file,
             docket_entry_id="d:court:smithvjones:_webcast:1",
             raw_filing_type="",
             entry_role=None,
@@ -966,7 +996,7 @@ class NYCoADocumentMergerTest(NYCoAMergerTestCase):
         self.assertEqual(merged.doc_type, FilingDocType.ORAL_ARGUMENT_WEBCAST)
         self.assertEqual(
             merged.filepath_local,
-            f"{PUBLISHED_PREFIX}smithvjones-webcast.asx",
+            published_key(file),
             "A playlist is published like any other file, keeping its own "
             "extension; the extraction sweep leaves it alone because it is "
             "not a PDF.",
@@ -999,31 +1029,35 @@ class NYCoADocumentMergerTest(NYCoAMergerTestCase):
 
     @merger_test(expected_query_count=19)
     def test_the_path_a_document_is_stored_at_is_unique(self) -> None:
-        """`get_pdf_path` files every NY document in one flat directory, so no
-        two of a filing's files may publish under the same name.
+        """`get_pdf_path` files a whole case in one directory, so no two of a
+        filing's files may publish under the same name.
 
         Stated with the names the scraper really gives them -- the docket
         number, the Court's own name slugified, and an ordinal -- against the
         two things that make Court-PASS names hard to keep apart: a case name
         with a dot in it, which a stem would cut the volume off of, and two
-        names differing only in punctuation, which slugify flattens
-        together."""
+        names differing only in punctuation, which slugify flattens together.
+
+        The published name takes the scraper's name as it stands rather than
+        slugifying it again, so it is the scraper that has to have kept these
+        apart. That is what this asserts on: `slugify` here stands in for what
+        the scraper did before storing the file, not for anything the merge
+        does afterwards."""
         court_names = [
             "IKB v. Wells Fargo-app-Wells Fargo-rec-Volume1",
             "IKB v. Wells Fargo-app-Wells Fargo-rec-Volume2",
             "CortlandtvBonderman-app-TPG APAX-appdx-vol1",
             "CortlandtvBonderman-app-TPG, APAX-appdx-vol1",
         ]
-        case = self.case_with_files(
-            *[
-                NYCoAFileFactory.create(
-                    file_name=name,
-                    local_path=f"{PRIVATE_PREFIX}nycourts_gov/"
-                    f"{DOCKET_NUMBER}_{slugify(name)}_{index}.pdf",
-                )
-                for index, name in enumerate(court_names)
-            ]
-        )
+        files = [
+            NYCoAFileFactory.create(
+                file_name=name,
+                local_path=f"{PRIVATE_PREFIX}nycourts_gov/"
+                f"{DOCKET_NUMBER}_{slugify(name)}_{index}.pdf",
+            )
+            for index, name in enumerate(court_names)
+        ]
+        case = self.case_with_files(*files)
 
         with self.captureOnCommitCallbacks(execute=True):
             result = NYCoADocketMerger(case, params=None).merge()
@@ -1038,10 +1072,15 @@ class NYCoADocumentMergerTest(NYCoAMergerTestCase):
             f"Two documents share a path: {paths}",
         )
         self.assertIn(
-            f"{PUBLISHED_PREFIX}apl-2024-00177_ikb-v-wells-fargo-app-wells-"
-            "fargo-rec-volume2_1.pdf",
+            published_key(files[1]),
             paths,
             f"The volume has to survive into the path: {paths}",
+        )
+        self.assertIn(
+            "ikb-v-wells-fargo-app-wells-fargo-rec-volume2",
+            published_key(files[1]),
+            "The readable part of the name has to survive the hash being "
+            "appended to it.",
         )
 
     @merger_test(expected_query_count=27)
@@ -1103,6 +1142,70 @@ class NYCoADocumentMergerTest(NYCoAMergerTestCase):
         self.assertIsNone(
             merged.ocr_status,
             "Nothing was stored, so nothing is waiting to be extracted.",
+        )
+        self.assertEqual(
+            (merged.sha256, merged.file_size),
+            ("", None),
+            "Nothing read the bytes, so nothing can describe them.",
+        )
+
+    @merger_test(expected_query_count=30)
+    def test_remerge_a_corrected_file_replaces_the_published_copy(
+        self,
+    ) -> None:
+        """The Court reissues a document under the name it first used, so the
+        published name carries the file's hash to keep the correction from
+        landing on top of the copy it replaces. Does a rescrape whose file
+        hashes differently publish beside the old one, take the old one down,
+        and send the document back for extraction?"""
+        original = NYCoAFileFactory.create(
+            file_name="SmithvJones-app-Smith-brf.pdf",
+            available=True,
+            local_path=f"{PRIVATE_PREFIX}brf.pdf",
+        )
+        case = self.case_with_files(
+            original, docket_entry_id="e:appellant-brief:smith:1"
+        )
+        with self.captureOnCommitCallbacks(execute=True):
+            NYCoADocketMerger(case, params=None).merge()
+        extracted = NYCoADocument.objects.get()
+        extracted.ocr_status = NYCoADocument.OCR_COMPLETE
+        extracted.page_count = 12
+        extracted.save()
+
+        corrected = NYCoAFileFactory.create(
+            file_name="SmithvJones-app-Smith-brf.pdf",
+            available=True,
+            local_path=f"{PRIVATE_PREFIX}brf-corrected.pdf",
+        )
+        second = self.case_with_files(
+            corrected, docket_entry_id="e:appellant-brief:smith:1"
+        )
+        second.issues = case.issues
+        with self.captureOnCommitCallbacks(execute=True):
+            result = NYCoADocketMerger(second, params=None).merge()
+
+        self.assertTrue(result.success)
+        merged = NYCoADocument.objects.get()
+        self.assertNotEqual(
+            published_key(original),
+            published_key(corrected),
+            "Two different files must not share a published name.",
+        )
+        self.assertEqual(merged.filepath_local, published_key(corrected))
+        self.assertEqual(merged.sha256, corrected.content_hash)
+        self.assertEqual(merged.file_size, corrected.file_size)
+        self.assertEqual(
+            self.withdrawn,
+            [published_key(original)],
+            "The copy the correction replaces is no longer served.",
+        )
+        self.assertIsNone(
+            merged.ocr_status, "A replaced file has to be extracted again."
+        )
+        self.assertIsNone(
+            merged.page_count,
+            "The pages were counted off the copy that has been replaced.",
         )
 
     @merger_test(expected_query_count=29)
@@ -1393,29 +1496,127 @@ class NYCoADocumentPublishTest(NYCoAMergerTestCase):
             docket_number=DOCKET_NUMBER, entries=[filing], parties=[]
         )
 
-    @merger_test(expected_query_count=0)
-    def test_published_prefix_matches_pdf_path(self) -> None:
-        """`PUBLISHED_PREFIX` is written out rather than derived, so it can
-        drift from the layout `state_pdf_path` actually builds. Does a
-        document's own path still start with it?
+    #: A scrape key in the shape the scraper really writes: the docket number,
+    #: the Court's own name slugified, and an ordinal. The published name is
+    #: built from this verbatim rather than slugified again, so a fixture that
+    #: was not already slug-safe would test a name the scraper cannot produce.
+    STORED_PATH = (
+        f"{PRIVATE_PREFIX}nycourts_gov/"
+        f"{DOCKET_NUMBER}_smithvjones-app-smith-brf_1.pdf"
+    )
+    #: What survives of that name once the docket number the bucket already
+    #: states has been taken off it.
+    STORED_STEM = "smithvjones-app-smith-brf_1"
 
-        Stated on a document whose file is still where the scraper left it,
-        because that path is what `make_filename` reads. The published name is
-        the scraper's own, so `get_pdf_path` is applied to a scrape key once
-        rather than re-applied to a path it has already built."""
+    def stored_document(self, **overrides) -> NYCoADocument:
+        """A document whose file is still where the scraper left it, which is
+        the path and hash `make_filename` reads.
+
+        :param overrides: Fields to set on the document.
+        :return: The saved document.
+        """
         entry = NYCoADocketEntry.objects.create(
             docket=self.existing_docket(),
             docket_entry_id="e:appellant-brief:smith:1",
         )
-        document = NYCoADocument.objects.create(
-            docket_entry=entry,
-            file_name="SmithvJones-app-Smith-brf.pdf",
-            filepath_local=f"{PRIVATE_PREFIX}SmithvJones-app-Smith-brf.pdf",
+        return NYCoADocument.objects.create(
+            **{
+                "docket_entry": entry,
+                "file_name": "SmithvJones-app-Smith-brf.pdf",
+                "filepath_local": self.STORED_PATH,
+            }
+            | overrides
+        )
+
+    @merger_test(expected_query_count=0)
+    def test_published_prefix_matches_pdf_path(self) -> None:
+        """`PUBLISHED_PREFIX` is written out rather than derived, so it can
+        drift from the layout `get_pdf_path` actually builds. Does a
+        document's own path still start with it?
+
+        Pinned against the whole path as well, because the prefix stops at the
+        court and everything that tells one document from another comes after
+        it. The published name is built from a scrape key, so `get_pdf_path` is
+        applied to one once rather than re-applied to a path it has already
+        built."""
+        document = self.stored_document(sha256="a" * 64)
+
+        built = make_pdf_path(document, document.make_filename())
+
+        self.assertTrue(
+            built.startswith(PUBLISHED_PREFIX),
+            f"{built} does not start with {PUBLISHED_PREFIX}",
+        )
+        self.assertEqual(
+            built,
+            f"{RECAP_ROOT}/gov.uscourts.{NYCOA_COURT_ID}.{DOCKET_NUMBER}/"
+            f"gov.uscourts.{NYCOA_COURT_ID}.{DOCKET_NUMBER}"
+            f".{self.STORED_STEM}.{'a' * 16}.pdf",
+            "A document is filed in its case's directory, under a name that "
+            "names the case too.",
+        )
+
+    @merger_test(expected_query_count=0)
+    def test_the_docket_number_is_named_once(self) -> None:
+        """The scraper prefixes the docket number to the name it stores a file
+        under, and the published name states it as a field of its own. Is it
+        taken off the scraper's name rather than being said twice?"""
+        document = self.stored_document(sha256="a" * 64)
+
+        name = document.make_filename()
+
+        self.assertEqual(
+            name.count(DOCKET_NUMBER),
+            1,
+            f"The docket number is repeated in {name}",
+        )
+        self.assertNotIn(f"{DOCKET_NUMBER}_", name)
+
+    @merger_test(expected_query_count=0)
+    def test_a_name_the_scraper_did_not_prefix_is_kept_whole(self) -> None:
+        """Only the docket number the bucket has already stated comes off the
+        scraper's name. Does a file the scraper named some other way keep the
+        name it was given, rather than losing a leading field to the strip?"""
+        document = self.stored_document(
+            filepath_local=f"{PRIVATE_PREFIX}nycourts_gov/webcast_1.pdf",
+            sha256="a" * 64,
         )
 
         self.assertEqual(
+            document.make_filename(),
+            f"gov.uscourts.{NYCOA_COURT_ID}.{DOCKET_NUMBER}"
+            f".webcast_1.{'a' * 16}.pdf",
+        )
+
+    @merger_test(expected_query_count=0)
+    def test_a_document_with_no_hash_is_named_without_one(self) -> None:
+        """A file the archive recorded no hash for still has to be publishable.
+        Does the name simply end after the scraper's, rather than carrying a
+        stray separator where the hash would have gone?"""
+        document = self.stored_document()
+
+        self.assertEqual(
             make_pdf_path(document, document.make_filename()),
-            f"{PUBLISHED_PREFIX}smithvjones-app-smith-brf.pdf",
+            f"{RECAP_ROOT}/gov.uscourts.{NYCOA_COURT_ID}.{DOCKET_NUMBER}/"
+            f"gov.uscourts.{NYCOA_COURT_ID}.{DOCKET_NUMBER}"
+            f".{self.STORED_STEM}.pdf",
+        )
+
+    @merger_test(expected_query_count=0)
+    def test_a_thumbnail_cannot_collide_with_its_document(self) -> None:
+        """Thumbnails are named after the document they were made from, so
+        they need a root of their own. Do the two land apart?"""
+        document = self.stored_document(sha256="a" * 64)
+        name = document.make_filename()
+
+        self.assertNotEqual(
+            document.get_pdf_path(name),
+            document.get_pdf_path(name, thumbs=True),
+        )
+        self.assertTrue(
+            document.get_pdf_path(name, thumbs=True).startswith(
+                f"{RECAP_THUMBNAIL_ROOT}/"
+            )
         )
 
     @merger_test(expected_query_count=16)
@@ -1424,12 +1625,11 @@ class NYCoADocumentPublishTest(NYCoAMergerTestCase):
         anything, so a document that had to be published costs one write, not
         a write followed by a correction. Nothing reading the table ever sees
         `filepath_local` naming a key the public bucket does not hold."""
-        case = self.case_with_files(
-            NYCoAFileFactory.create(
-                file_name="SmithvJones-app-Smith-brf.pdf",
-                local_path=f"{PRIVATE_PREFIX}brf.pdf",
-            )
+        file = NYCoAFileFactory.create(
+            file_name="SmithvJones-app-Smith-brf.pdf",
+            local_path=f"{PRIVATE_PREFIX}brf.pdf",
         )
+        case = self.case_with_files(file)
 
         with CaptureQueriesContext(connection) as captured:
             with self.captureOnCommitCallbacks(execute=True):
@@ -1443,7 +1643,7 @@ class NYCoADocumentPublishTest(NYCoAMergerTestCase):
         ]
         self.assertEqual(len(writes), 1, f"Wrote the document twice: {writes}")
         self.assertIn(
-            f"{PUBLISHED_PREFIX}brf.pdf",
+            published_key(file),
             writes[0],
             "The one write is the published path.",
         )
@@ -1485,7 +1685,10 @@ class NYCoADocumentPublishTest(NYCoAMergerTestCase):
             docket_entry_id="e:appellant-brief:smith:1",
         )
         NYCoADocketMerger(case, params=None).merge()
-        published = NYCoADocument.objects.get().filepath_local.name
+        served = NYCoADocument.objects.get()
+        published = served.filepath_local.name
+        served.page_count = 12
+        served.save()
 
         sealed = self.case_with_files(
             NYCoAFileFactory.create(
@@ -1508,6 +1711,11 @@ class NYCoADocumentPublishTest(NYCoAMergerTestCase):
             "The document is still recorded; only its file is gone.",
         )
         self.assertEqual(self.withdrawn, [published])
+        self.assertEqual(
+            (merged.sha256, merged.file_size, merged.page_count),
+            ("", None, None),
+            "Nothing is left to describe once the file is withdrawn.",
+        )
 
     @merger_test(expected_query_count=31)
     def test_remerge_withdraws_a_file_the_scrape_no_longer_lists(self) -> None:
