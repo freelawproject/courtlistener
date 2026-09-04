@@ -117,7 +117,7 @@ dependencies = [
   "zohocrmsdk8-0==7.0.0",
   "django-prometheus>=2.5.0",
   "google-genai>=2.18.1",
-  "django-oauth-toolkit[jwcrypto]==3.2.0",
+  "django-oauth-toolkit==3.4.0",
 ]
 
 [dependency-groups]
