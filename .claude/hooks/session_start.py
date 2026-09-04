@@ -315,14 +315,17 @@ def main() -> int:
     # Make `docker compose ...` use these files from anywhere in the session.
     persist_env("COMPOSE_FILE", ":".join(str(p) for p in COMPOSE_FILES))
     persist_env("COMPOSE_PATH_SEPARATOR", ":")
-    # The sandbox injects placeholder AWS variables for its own proxy. Blank
-    # them so they don't reach the containers looking like real credentials.
+    # The sandbox injects placeholder AWS variables for its own proxy. The
+    # compose file passes them into the containers, where Django would take
+    # them for real credentials, so blank them for the whole session and not
+    # just this script: a later `docker compose up` from the terminal
+    # re-reads the shell environment.
     for name in (
         "AWS_ACCESS_KEY_ID",
         "AWS_SECRET_ACCESS_KEY",
         "AWS_SESSION_TOKEN",
     ):
-        os.environ[name] = ""
+        persist_env(name, "")
     try:
         start_dockerd()
         ensure_max_map_count()
