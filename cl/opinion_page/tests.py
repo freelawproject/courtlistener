@@ -3594,6 +3594,62 @@ class DocketPageV2TemplateTest(TestCase):
         self.assertTrue(len(r.context["metadata_sections"]) > 0)
         self.assertTrue(len(r.context["tabs"]) > 0)
 
+    async def test_title_values_are_single_click_selectable(self) -> None:
+        """The case name and docket number each get their own select-all span,
+        so one click selects exactly one value for copying, as on the legacy
+        page."""
+        r = await self.async_client.get(
+            reverse(
+                "view_docket",
+                args=[self.docket.pk, self.docket.slug],
+            )
+        )
+        self.assertTemplateUsed(r, "v2_docket.html")
+        h1 = fromstring(r.content.decode()).xpath(
+            "//h1[@data-type='search.Docket']"
+        )[0]
+        selectable = [
+            span.text_content().strip()
+            for span in h1.xpath(".//span[contains(@class, 'select-all')]")
+        ]
+        self.assertEqual(len(selectable), 2)
+        self.assertEqual(selectable[1], self.docket.docket_number)
+        for span in h1.xpath(".//span[contains(@class, 'select-all')]"):
+            with self.subTest(value=span.text_content().strip()):
+                self.assertIn("cursor-text", span.get("class"))
+
+    def test_metadata_section_honors_is_copyable(self) -> None:
+        """Only items flagged is_copyable get the select-all treatment."""
+        # Rendered through a wrapper string so the component's own c-vars
+        # don't shadow the context, as DocketFilterDrawerAttrPropagationTest
+        # explains.
+        compiled = CottonCompiler().process(
+            '<c-metadata-section :items="items" />'
+        )
+        html = (
+            engines["django"]
+            .from_string(compiled)
+            .render(
+                {
+                    "items": [
+                        {"label": "Cause", "value": "28:1331"},
+                        {
+                            "label": "Citation",
+                            "value": "601 U.S. 416",
+                            "is_copyable": True,
+                        },
+                    ]
+                }
+            )
+        )
+        details = fromstring(html).xpath("//dd")
+        self.assertEqual(len(details), 2)
+        plain, copyable = details
+        self.assertNotIn("select-all", plain.get("class", ""))
+        self.assertIn("select-all", copyable.get("class"))
+        self.assertIn("cursor-text", copyable.get("class"))
+        self.assertEqual(copyable.text_content().strip(), "601 U.S. 416")
+
 
 @override_settings(WAFFLE_CACHE_PREFIX="test_docket_entry_rows_v2_waffle")
 @override_flag("use_new_design", active=True)

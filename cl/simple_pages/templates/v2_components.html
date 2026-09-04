@@ -1731,7 +1731,7 @@ Sample code here.
     <p>Renders an optional <code>&lt;h2&gt;</code> heading followed by a <code>c-description-list</code> built from a list of item dicts. <code>c-docket-page</code> renders one per entry in its <code>metadata_sections</code> prop, which is how a docket's source adds sections of its own.</p>
 
     <h4 class="mt-3">Demo</h4>
-    <p class="text-sm text-greyscale-600 mb-2">One item of each shape: plain, linked out, and carrying a suffix link after the value.</p>
+    <p class="text-sm text-greyscale-600 mb-2">One item of each shape: plain, linked out, carrying a suffix link after the value, and copyable with a single click.</p>
     <div class="my-4 rounded-lg border border-greyscale-200 p-4">
       <c-metadata-section
         :items="demo_metadata_items"
@@ -1743,7 +1743,7 @@ Sample code here.
     <c-library.list title="Props" only>
       <c-library.item only>
         <c-slot name="label"><code>items</code></c-slot>
-        <c-slot name="description">List of dicts with at least <code>label</code> and <code>value</code>. Optional keys: <code>url</code>, <code>nofollow</code>, <code>is_external</code>, <code>aria_label</code>, <code>suffix_text</code>, <code>suffix_url</code>, <code>suffix_nofollow</code>, <code>suffix_is_external</code>, <code>suffix_aria_label</code>. The section renders nothing if <code>items</code> is empty.</c-slot>
+        <c-slot name="description">List of dicts with at least <code>label</code> and <code>value</code>. Optional keys: <code>url</code>, <code>nofollow</code>, <code>is_external</code>, <code>aria_label</code>, <code>suffix_text</code>, <code>suffix_url</code>, <code>suffix_nofollow</code>, <code>suffix_is_external</code>, <code>suffix_aria_label</code>, <code>is_copyable</code> (a single click selects the whole value for copying). The section renders nothing if <code>items</code> is empty.</c-slot>
       </c-library.item>
       <c-library.item only>
         <c-slot name="label"><code>title</code></c-slot>

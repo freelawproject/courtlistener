@@ -20,10 +20,11 @@
 
 {# Title and court #}
 <hgroup>
+  {# select-all makes each value a one-click selection for copying, as the legacy page does. #}
   <h1 data-type="search.Docket" data-id="{{ docket.pk }}">
-    {{ docket|best_case_name|safe|v_wrapper }}
+    <span class="select-all cursor-text">{{ docket|best_case_name|safe|v_wrapper }}</span>
     {% if docket.docket_number %}
-      (<span class="whitespace-nowrap">{{ docket.docket_number }}</span>)
+      (<span class="select-all cursor-text whitespace-nowrap">{{ docket.docket_number }}</span>)
     {% endif %}
   </h1>
   {% if docket.court %}
