@@ -1,0 +1,4 @@
+{% load text_filters %}
+<!-- Placeholder -- This PR only proves dispatch works. Real SCOTUS content/design
+     is going to be available in the next PR. -->
+<p>{{ count }} New Entr{{ count|pluralize:"y,ies" }} in {{ docket|best_case_name|safe }}</p>

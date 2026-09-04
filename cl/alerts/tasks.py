@@ -48,7 +48,13 @@ from cl.lib.redis_utils import (
 )
 from cl.lib.string_utils import trunc
 from cl.recap.constants import COURT_TIMEZONES
-from cl.search.models import SEARCH_TYPES, Docket, DocketEntry, RECAPDocument
+from cl.search.models import (
+    SEARCH_TYPES,
+    Docket,
+    DocketEntry,
+    RECAPDocument,
+    SCOTUSDocketEntry,
+)
 from cl.search.types import (
     ESDocumentNameType,
     SaveESDocumentReturn,
@@ -202,20 +208,22 @@ def get_docket_notes_and_tags_by_user(
 
 def make_alert_messages(
     d: Docket,
-    new_des: list[DocketEntry],
+    new_des: list[DocketEntry] | list[SCOTUSDocketEntry],
     da_recipients: list[DocketAlertRecipient],
 ) -> list[EmailMultiAlternatives]:
     """Make docket alert messages that can be sent to users
 
     :param d: The docket to work on
-    :param new_des: The new docket entries
+    :param new_des: The new docket entries (SCOTUSDocketEntry for a SCOTUS
+    docket, DocketEntry otherwise -- see Docket.get_alert_source())
     :param da_recipients: A list of DocketAlertRecipients objects
     :return: A list of email messages to send
     """
 
+    source = d.get_alert_source()
     case_name = trunc(best_case_name(d), 100, ellipsis="...")
-    txt_template = loader.get_template("docket_alert_email.txt")
-    html_template = loader.get_template("docket_alert_email.html")
+    txt_template = loader.get_template(source.email_txt_template)
+    html_template = loader.get_template(source.email_html_template)
     subject_template = loader.get_template("docket_alert_subject.txt")
     de_count = len(new_des)
     subject_context = {
@@ -317,6 +325,10 @@ def send_alert_and_webhook(
      The second email comes in to atty1@recap.email. We:
      -Do nothing.
 
+    Entries and email templates are resolved per docket source (RECAP vs.
+    SCOTUS) via Docket.get_alert_source() -- see
+    cl/alerts/docket_alert_sources.py.
+
     :param d_pk: The docket PK that was modified
     :param since: If we run alerts, notify users about items *since* this time.
     :param recap_email_recipients: The recap.email addresses if needed to send
@@ -349,12 +361,11 @@ def send_alert_and_webhook(
         return
 
     d = Docket.objects.get(pk=d_pk)
+    source = d.get_alert_source()
     if des_pks is not None:
-        new_des = DocketEntry.objects.filter(pk__in=des_pks)
+        new_des = source.entries_by_pk(des_pks)
     else:
-        new_des = list(
-            DocketEntry.objects.filter(date_created__gte=since, docket=d)
-        )
+        new_des = list(source.entries_since(d, since))
         des_pks = [de.pk for de in new_des]
     if len(new_des) == 0 and not recap_email_user_only:
         # No new docket entries.
