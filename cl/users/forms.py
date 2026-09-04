@@ -14,6 +14,8 @@ from django.contrib.auth.models import User
 from django.contrib.auth.validators import ASCIIUsernameValidator
 from django.core.exceptions import ValidationError
 from django.core.mail import send_mail
+from django.db.models import QuerySet, Value
+from django.db.models.functions import Lower
 from django.forms import ModelForm
 from django.urls import reverse
 from hcaptcha.fields import hCaptchaField
@@ -142,10 +144,26 @@ class UserCreationFormExtended(UserCreationForm, CleanEmailMixin):
     we are overriding the one from Django. Thus, instead of declaring
     everything explicitly like we normally do, we just override the
     specific parts we want to, after calling the super class's __init__().
+
+    Only one account may hold an email address, but the form never reports
+    that an address is taken: "this email is already in use" would let anyone
+    test whether an address has an account here. Instead the form validates
+    normally and records the collision in ``email_taken``, and the view is
+    expected to respond exactly as it would for a successful signup while
+    emailing the address owner. Usernames get no such protection because they
+    are already public in tag and prayer URLs, so username collisions are
+    reported as errors like any other.
+
+    This check belongs on the registration form only. UserForm, which shares
+    CleanEmailMixin, must not get it until existing duplicate accounts have
+    been cleaned up, or those users could no longer save their settings page.
     """
+
+    email_taken: bool
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
+        self.email_taken = False
         # Protect against homoglyph attacks
         self.fields["username"].validators = [ASCIIUsernameValidator()]
 
@@ -194,6 +212,59 @@ class UserCreationFormExtended(UserCreationForm, CleanEmailMixin):
             # them, so a plain CharField keeps them rejected instead.
             "username": forms.CharField,
         }
+
+    def _other_accounts_using_email(self, value: str) -> QuerySet[User]:
+        """Find accounts, other than the bound instance, whose email is `value`.
+
+        Case is folded in SQL with Lower() on both sides rather than with
+        str.lower() in Python. The two disagree on some non-ASCII input and the
+        database collation is locale dependent, so folding in Python here while
+        the LOWER(email) index folds in SQL could let a duplicate past the form
+        only to fail at the index, or reject a legitimate address.
+
+        The bound instance is excluded so that claiming a stub account, where
+        the form is bound to the stub that already holds the address, is not
+        mistaken for a duplicate.
+
+        :param value: The string to compare against the email column.
+        :return: A queryset of the matching users.
+        """
+        users = User.objects.annotate(email_lower=Lower("email")).filter(
+            email_lower=Lower(Value(value))
+        )
+        if self.instance.pk:
+            users = users.exclude(pk=self.instance.pk)
+        return users
+
+    def clean_username(self) -> str:
+        """Reject usernames that are taken, including by another account's
+        email address.
+
+        Because ASCIIUsernameValidator permits "@" and ".", somebody else's
+        email address is a registerable username, which interferes with
+        logging in by email. Such usernames get the same "already exists"
+        error a genuinely taken username gets; explaining why would reveal
+        that the address has an account.
+        """
+        # Django's clean_username returns None (despite its stub) when it has
+        # already recorded a uniqueness error, so there is nothing to add then.
+        username = super().clean_username()
+        if username and self._other_accounts_using_email(username).exists():
+            raise self.instance.unique_error_message(
+                self._meta.model, ["username"]
+            )
+        return username
+
+    def clean_email(self) -> str:
+        """Run the shared email checks, then record whether another account
+        already holds this address in ``email_taken``.
+
+        A taken address is deliberately not a validation error. See the class
+        docstring for why.
+        """
+        email = super().clean_email()
+        self.email_taken = self._other_accounts_using_email(email).exists()
+        return email
 
     def clean_first_name(self):
         first_name = self.cleaned_data.get("first_name")

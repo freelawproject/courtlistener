@@ -237,6 +237,36 @@ emails: dict[str, EmailType] = {
         "We're always happy to hear from you.",
         "from_email": settings.DEFAULT_FROM_EMAIL,
     },
+    # Sent instead of creating a second account when somebody signs up with an
+    # address that already has one. The HTTP response never says the address
+    # is taken, so this email is the only place the address owner learns that.
+    "account_already_exists": {
+        "subject": "You already have an account on CourtListener.com",
+        "body": "Hello,\n\n"
+        ""
+        "Somebody — probably you — just tried to create a new CourtListener "
+        "account using this email address. An account with this address "
+        "already exists, so we did not create a second one.\n\n"
+        ""
+        "You do not need a new account. To get back into the one you already "
+        "have, sign in with your username and password. If you have "
+        "forgotten either of them, reset your password here and the email we "
+        "send will also remind you of your username:\n\n"
+        ""
+        "    https://www.courtlistener.com%s\n\n"
+        ""
+        "If this was not you, you can ignore this email. No changes were made "
+        "to your account.\n\n"
+        ""
+        "Thanks for using our site,\n\n"
+        ""
+        "The Free Law Project Team\n\n"
+        "-------\n"
+        "For questions or comments, please visit our contact page, "
+        "https://www.courtlistener.com/contact/\n"
+        "We're always happy to hear from you.",
+        "from_email": settings.DEFAULT_FROM_EMAIL,
+    },
     "email_not_confirmed": {
         "subject": "Please confirm your account on %s",
         "body": "Hello, %s,\n\n"
