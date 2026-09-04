@@ -10,6 +10,7 @@ from django.core.files.base import ContentFile
 from django.core.management.base import CommandError
 from django.db import transaction
 from django.utils.encoding import force_bytes
+from juriscraper.AbstractSite import AbstractSite
 from juriscraper.lib.exceptions import BadContentError, InvalidDocumentError
 from juriscraper.lib.importer import build_module_list
 from juriscraper.lib.string_utils import CaseNameTweaker
@@ -291,7 +292,7 @@ class Command(ScraperCommand):
 
     async def scrape_court(
         self,
-        site,
+        site: AbstractSite,
         full_crawl: bool = False,
         ocr_available: bool = True,
         backscrape: bool = False,
@@ -349,7 +350,12 @@ class Command(ScraperCommand):
             await sync_to_async(dup_checker.update_site_hash)(site.hash)
 
     async def get_opinions_content(
-        self, case_dict: dict, site, court, dup_checker, next_case_date
+        self,
+        case_dict: dict,
+        site: AbstractSite,
+        court,
+        dup_checker,
+        next_case_date,
     ) -> list[tuple[dict, bytes, str]]:
         """Downloads opinions and checks if the content is duplicated
 
@@ -433,7 +439,7 @@ class Command(ScraperCommand):
         item,
         next_case_date: date | None,
         ocr_available: bool,
-        site,
+        site: AbstractSite,
         dup_checker: DupChecker,
         court: Court,
     ):

@@ -12,6 +12,7 @@ we ingest it as in a regular scrape
 from asgiref.sync import sync_to_async
 from django.db import IntegrityError
 from django.utils.encoding import force_bytes
+from juriscraper.AbstractSite import AbstractSite
 from juriscraper.lib.exceptions import BadContentError
 
 from cl import settings
@@ -30,7 +31,7 @@ class Command(cl_back_scrape_opinions.Command):
 
     async def scrape_court(
         self,
-        site,
+        site: AbstractSite,
         full_crawl: bool = False,
         ocr_available: bool = True,
         backscrape: bool = False,
