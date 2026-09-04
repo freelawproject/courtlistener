@@ -1,12 +1,15 @@
 import logging
 import sys
 import warnings
+from typing import Any
+from unittest import TestCase as UnitTestCase
 from unittest import TestLoader
 
 from django.test import SimpleTestCase
 from django.test.runner import DiscoverRunner
 from override_storage import override_storage
 from xmlrunner import XMLTestRunner
+from xmlrunner.result import _TestInfo, _XMLTestResult
 
 from cl.tests.cases import (
     APITestCase,
@@ -37,6 +40,39 @@ class OurCasesTestLoader(TestLoader):
             )
             sys.exit(1)
         return super().loadTestsFromTestCase(testCaseClass)
+
+
+class DurationAwareTestInfo(_TestInfo):
+    """A ``_TestInfo`` that prefers the runner-measured test duration."""
+
+    def test_finished(self) -> None:
+        """Finalize timing, overriding xmlrunner's with the measured value."""
+        super().test_finished()
+        if (elapsed := self.test_result.duration) is not None:
+            self.elapsed_time = elapsed
+
+
+class DurationAwareXMLTestResult(_XMLTestResult):
+    """An ``_XMLTestResult`` that writes real per-test times to the XML."""
+
+    def __init__(self, *args: Any, **kwargs: Any) -> None:
+        super().__init__(*args, **kwargs)
+        self.infoclass = DurationAwareTestInfo
+        self.duration: float | None = None
+
+    def addDuration(self, test: UnitTestCase, elapsed: float) -> None:
+        """Stash the measured duration of the test that just ran.
+
+        ``addDuration()`` always arrives before the matching ``stopTest()``,
+        which is what makes a single slot enough to hold it.
+        """
+        super().addDuration(test, elapsed)
+        self.duration = elapsed
+
+    def stopTest(self, test: UnitTestCase) -> None:
+        """Finalize the test, then drop its duration."""
+        super().stopTest(test)
+        self.duration = None
 
 
 class TestRunner(DiscoverRunner):
@@ -81,15 +117,22 @@ class TestRunner(DiscoverRunner):
         # See PR #5888 for more details.
         # parser.set_defaults(buffer=True)
 
-    def get_test_runner_kwargs(self):
+    def get_test_runner_kwargs(self) -> dict[str, Any]:
         """Build the kwargs for the test runner.
 
-        Adds XMLTestRunner's ``output`` directory when ``--xml-output`` was
-        passed; otherwise returns Django's defaults untouched.
+        Adds XMLTestRunner's ``output`` directory and the result class that
+        gives the report real per-test times when ``--xml-output`` was passed;
+        otherwise returns Django's defaults untouched.
+
+        ``--debug-sql`` and ``--pdb`` pick their own result class, which
+        cannot write XML. Those win, so combining either with ``--xml-output``
+        fails loudly rather than quietly producing untimed reports.
         """
         kwargs = super().get_test_runner_kwargs()
         if self.xml_output:
             kwargs["output"] = self.xml_output
+            if kwargs.get("resultclass") is None:
+                kwargs["resultclass"] = DurationAwareXMLTestResult
         return kwargs
 
     def setup_databases(self, **kwargs):

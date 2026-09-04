@@ -36,6 +36,7 @@ project-includes = [
     "cl/search/management/commands/pacer_bulk_fetch.py",
     "cl/search/management/commands/sweep_indexer.py",
     "cl/search/tests/test_sealing.py",
+    "cl/tests/runner.py",
     "cl/tests/utils.py",
     "cl/users/email_handlers.py",
     "cl/users/forms.py",
