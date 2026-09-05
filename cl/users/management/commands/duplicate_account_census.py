@@ -57,13 +57,13 @@ class Command(VerboseCommand):
         report = run_census(email=email)
 
         accounts_path = output_dir / ACCOUNTS_CSV
-        with accounts_path.open("w", newline="") as f:
+        with accounts_path.open("w", newline="", encoding="utf-8") as f:
             write_account_csv(report, f)
         logger.info("Wrote %s", accounts_path)
 
         if not email:
             collisions_path = output_dir / COLLISIONS_CSV
-            with collisions_path.open("w", newline="") as f:
+            with collisions_path.open("w", newline="", encoding="utf-8") as f:
                 write_collision_csv(report, f)
             logger.info("Wrote %s", collisions_path)
 

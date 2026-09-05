@@ -129,6 +129,11 @@ def window_label(days: int | None) -> str:
     return "lifetime" if days is None else f"{days}d"
 
 
+def _today() -> date:
+    """Today's date, for the ``ApiUsage.as_of`` default."""
+    return now().date()
+
+
 @dataclass
 class ApiUsage:
     """Redis API counters, loaded once and joined against accounts in Python.
@@ -149,7 +154,7 @@ class ApiUsage:
     last_request: dict[int, date] = field(default_factory=dict)
     webhooks: dict[int, int] = field(default_factory=dict)
     history_days: int = 0
-    as_of: date = field(default_factory=lambda: now().date())
+    as_of: date = field(default_factory=_today)
 
     def active_within(self, pk: int, days: int | None) -> bool:
         """Did this account make any API request within the window?

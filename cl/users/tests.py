@@ -4885,6 +4885,12 @@ class RefreshAPIThrottlesAdminTest(TestCase):
         self.assertFalse(APIThrottle.objects.filter(user=self.target).exists())
 
 
+def test_census_logging_prefix(version: str) -> str:
+    """A per-version API key prefix that keeps census tests off the real
+    ``api:*`` keys."""
+    return f"api:test_census_{version}"
+
+
 @time_machine.travel(datetime(2026, 9, 4, 12, 0, 0, tzinfo=UTC), tick=False)
 @mock.patch(
     "cl.users.duplicate_census.get_webhook_logging_prefix",
@@ -4892,7 +4898,7 @@ class RefreshAPIThrottlesAdminTest(TestCase):
 )
 @mock.patch(
     "cl.users.duplicate_census.get_logging_prefix",
-    side_effect=lambda version: f"api:test_census_{version}",
+    side_effect=test_census_logging_prefix,
 )
 class DuplicateAccountCensusTest(TestCase):
     """The duplicate-account census: grouping, primary choice, blockers,
@@ -5373,10 +5379,16 @@ class DuplicateAccountCensusTest(TestCase):
             call_command(
                 "duplicate_account_census", output_dir=tmp, stdout=out
             )
-            with open(Path(tmp) / "duplicate_accounts.csv", newline="") as f:
+            with open(
+                Path(tmp) / "duplicate_accounts.csv",
+                newline="",
+                encoding="utf-8",
+            ) as f:
                 rows = list(csv.DictReader(f))
             with open(
-                Path(tmp) / "username_email_collisions.csv", newline=""
+                Path(tmp) / "username_email_collisions.csv",
+                newline="",
+                encoding="utf-8",
             ) as f:
                 collisions = list(csv.DictReader(f))
 
