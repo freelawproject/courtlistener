@@ -1,11 +1,14 @@
+import csv
 import json
 import re
 import time
-from datetime import datetime, timedelta
+from datetime import UTC, datetime, timedelta
 from decimal import Decimal
 from http import HTTPStatus
+from io import StringIO
 from itertools import product
 from pathlib import Path
+from tempfile import TemporaryDirectory
 from unittest import mock
 from unittest.mock import MagicMock, patch
 
@@ -14,7 +17,7 @@ from asgiref.sync import sync_to_async
 from django.conf import settings
 from django.contrib import admin
 from django.contrib.auth.hashers import make_password
-from django.contrib.auth.models import User
+from django.contrib.auth.models import Group, Permission, User
 from django.contrib.auth.tokens import default_token_generator
 from django.core import mail
 from django.core.cache import cache as django_cache
@@ -24,6 +27,7 @@ from django.core.mail import (
     get_connection,
     send_mail,
 )
+from django.core.management import call_command
 from django.test import AsyncClient, RequestFactory
 from django.test.client import Client
 from django.test.utils import override_settings
@@ -31,6 +35,7 @@ from django.urls import reverse
 from django.utils.http import urlsafe_base64_encode
 from django.utils.timezone import now
 from django_ses import SESBackend, signals
+from oauth2_provider.models import AccessToken, Application, RefreshToken
 from rest_framework.authtoken.models import Token
 from rest_framework.throttling import UserRateThrottle
 from selenium.webdriver.common.by import By
@@ -79,7 +84,8 @@ from cl.lib.test_helpers import (
     SimpleUserDataMixin,
     UserProfileWithParentsFactory,
 )
-from cl.search.factories import DocketFactory
+from cl.recap.models import EmailProcessingQueue
+from cl.search.factories import CourtFactory, DocketFactory
 from cl.search.models import SearchQuery
 from cl.tests.base import SELENIUM_TIMEOUT, BaseSeleniumTest
 from cl.tests.cases import (
@@ -94,6 +100,28 @@ from cl.tests.utils import MockResponse as MockPostResponse
 from cl.tests.utils import make_session_client
 from cl.users import signals as user_signals
 from cl.users.admin import UserAdmin, UserProfileInline
+from cl.users.duplicate_census import (
+    BLOCKER_API_HISTORY,
+    BLOCKER_INACTIVE,
+    BLOCKER_MEMBERSHIPS,
+    BLOCKER_OAUTH,
+    BLOCKER_PRIVILEGED,
+    BLOCKER_PUBLIC_PRAYERS,
+    BLOCKER_PUBLISHED_TAGS,
+    BLOCKER_RECAP_EMAIL,
+    BLOCKER_RECENT_API,
+    BLOCKER_RECENT_PRIMARY,
+    BLOCKER_STUB,
+    BLOCKER_UNCONFIRMED,
+    BLOCKER_WEBHOOKS,
+    DuplicateGroup,
+    account_csv_columns,
+    counted_relations,
+    load_api_usage,
+    relation_label,
+    run_census,
+    username_email_collisions,
+)
 from cl.users.email_handlers import (
     add_bcc_random,
     get_email_body,
@@ -4855,3 +4883,524 @@ class RefreshAPIThrottlesAdminTest(TestCase):
         )
         # Inactive user got nothing
         self.assertFalse(APIThrottle.objects.filter(user=self.target).exists())
+
+
+@time_machine.travel(datetime(2026, 9, 4, 12, 0, 0, tzinfo=UTC), tick=False)
+@mock.patch(
+    "cl.users.duplicate_census.get_webhook_logging_prefix",
+    return_value="webhook:test_census",
+)
+@mock.patch(
+    "cl.users.duplicate_census.get_logging_prefix",
+    side_effect=lambda version: f"api:test_census_{version}",
+)
+class DuplicateAccountCensusTest(TestCase):
+    """The duplicate-account census: grouping, primary choice, blockers,
+    Redis usage windows, the username collision list and the command."""
+
+    API_V3 = "api:test_census_v3"
+    API_V4 = "api:test_census_v4"
+    WEBHOOK = "webhook:test_census"
+
+    def setUp(self) -> None:
+        self.r = get_redis_interface("STATS")
+        self.flush_stats()
+
+    def tearDown(self) -> None:
+        self.flush_stats()
+
+    def flush_stats(self) -> None:
+        """Remove every key the census tests seed, so runs do not bleed."""
+        keys = self.r.keys("api:test_census_*") + self.r.keys(
+            "webhook:test_census*"
+        )
+        if keys:
+            self.r.delete(*keys)
+
+    def log_lifetime(
+        self, user: User, count: int, version: str = "v4"
+    ) -> None:
+        """Seed lifetime API requests for a user, the way _log_request does."""
+        self.r.zincrby(
+            f"api:test_census_{version}.user.counts", count, user.pk
+        )
+
+    def log_day(self, user: User, days_ago: int, version: str = "v4") -> None:
+        """Seed a request on a given day for a user, plus its lifetime tally."""
+        day = (now() - timedelta(days=days_ago)).date().isoformat()
+        self.r.zincrby(
+            f"api:test_census_{version}.user.d:{day}.counts", 1, user.pk
+        )
+        self.log_lifetime(user, 1, version)
+
+    @staticmethod
+    def make_group(
+        email: str,
+        n: int = 2,
+        **profile_kwargs: object,
+    ) -> list[User]:
+        """Make ``n`` confirmed, active, otherwise empty accounts that share
+        an address, each with a distinct last_login so the lowest pk is the
+        primary."""
+        users = []
+        for i in range(n):
+            up = UserProfileWithParentsFactory.create(
+                user__email=email,
+                user__last_login=now() - timedelta(days=i + 1),
+                user__date_joined=now() - timedelta(days=400),
+                **profile_kwargs,
+            )
+            users.append(up.user)
+        return users
+
+    def census_groups(self, **kwargs: object) -> dict[str, DuplicateGroup]:
+        """Run the census and key its groups by address."""
+        report = run_census(**kwargs)  # type: ignore[arg-type]
+        return {g.email_key: g for g in report.groups}
+
+    def test_groups_are_case_and_whitespace_insensitive(self, *mocks) -> None:
+        """Accounts group on LOWER(TRIM(email)), blank addresses never group,
+        and singletons are left out."""
+        a = UserProfileWithParentsFactory.create(
+            user__email="Alice@Example.com"
+        ).user
+        b = UserProfileWithParentsFactory.create(
+            user__email=" alice@example.com "
+        ).user
+        c = UserProfileWithParentsFactory.create(
+            user__email="ALICE@EXAMPLE.COM"
+        ).user
+        UserProfileWithParentsFactory.create(user__email="solo@example.com")
+        UserProfileWithParentsFactory.create(user__email="")
+        UserProfileWithParentsFactory.create(user__email="")
+
+        groups = self.census_groups()
+        self.assertEqual(list(groups), ["alice@example.com"])
+        self.assertEqual(
+            [acct.user.pk for acct in groups["alice@example.com"].accounts],
+            [a.pk, b.pk, c.pk],
+        )
+
+    def test_email_filter_restricts_to_one_group(self, *mocks) -> None:
+        """--email narrows the census to one address, through the same
+        database expression as the grouping, and skips the collision scan."""
+        self.make_group("one@example.com")
+        self.make_group("two@example.com")
+        UserProfileWithParentsFactory.create(user__username="two@example.com")
+
+        report = run_census(email="  TWO@example.com ")
+        self.assertEqual(
+            [g.email_key for g in report.groups], ["two@example.com"]
+        )
+        self.assertEqual(report.collisions, [])
+
+    def test_primary_is_most_recent_login_then_lowest_pk(self, *mocks) -> None:
+        """Highest last_login wins, never-logged-in sorts last, ties break on
+        the lowest pk."""
+        never = UserProfileWithParentsFactory.create(
+            user__email="p@example.com", user__last_login=None
+        ).user
+        older = UserProfileWithParentsFactory.create(
+            user__email="p@example.com",
+            user__last_login=now() - timedelta(days=30),
+        ).user
+        newer_1 = UserProfileWithParentsFactory.create(
+            user__email="p@example.com",
+            user__last_login=now() - timedelta(days=1),
+        ).user
+        newer_2 = UserProfileWithParentsFactory.create(
+            user__email="p@example.com",
+            user__last_login=now() - timedelta(days=1),
+        ).user
+
+        group = self.census_groups()["p@example.com"]
+        self.assertEqual(group.primary.user.pk, newer_1.pk)
+        self.assertEqual(
+            {a.user.pk for a in group.secondaries},
+            {never.pk, older.pk, newer_2.pk},
+        )
+
+    def test_clean_group_has_no_blockers(self, *mocks) -> None:
+        """Two confirmed, active, empty accounts are mergeable as-is."""
+        self.make_group("clean@example.com")
+        group = self.census_groups()["clean@example.com"]
+        self.assertEqual(group.blockers, [])
+
+    def test_account_state_blockers(self, *mocks) -> None:
+        """Privileged, inactive, stub and unconfirmed accounts anywhere in a
+        group block it."""
+        privileged = self.make_group("priv@example.com")
+        privileged[1].is_staff = True
+        privileged[1].save()
+        grouped = self.make_group("grp@example.com")
+        grouped[1].groups.add(Group.objects.create(name="census-test"))
+        permitted = self.make_group("perm@example.com")
+        permitted[0].user_permissions.add(
+            Permission.objects.filter(codename="has_recap_api_access").first()
+        )
+        inactive = self.make_group("inactive@example.com")
+        inactive[0].is_active = False
+        inactive[0].save()
+        self.make_group("stub@example.com", stub_account=True)
+        self.make_group("unconfirmed@example.com", email_confirmed=False)
+        no_profile = self.make_group("noprofile@example.com")
+        no_profile[1].profile.delete()
+
+        groups = self.census_groups()
+        expected = {
+            "priv@example.com": [BLOCKER_PRIVILEGED],
+            "grp@example.com": [BLOCKER_PRIVILEGED],
+            "perm@example.com": [BLOCKER_PRIVILEGED],
+            "inactive@example.com": [BLOCKER_INACTIVE],
+            "stub@example.com": [BLOCKER_STUB],
+            "unconfirmed@example.com": [BLOCKER_UNCONFIRMED],
+            "noprofile@example.com": [BLOCKER_UNCONFIRMED],
+        }
+        for email, blockers in expected.items():
+            with self.subTest(email=email):
+                self.assertEqual(groups[email].blockers, blockers)
+
+    def test_multiple_holder_blockers(self, *mocks) -> None:
+        """Memberships, webhooks, live OAuth grants and in-use @recap.email
+        addresses block only when more than one account holds them."""
+        one_member = self.make_group("member1@example.com")
+        NeonMembershipFactory.create(user=one_member[1])
+        two_members = self.make_group("member2@example.com")
+        for user in two_members:
+            NeonMembershipFactory.create(user=user)
+
+        one_hook = self.make_group("hook1@example.com")
+        WebhookFactory.create(user=one_hook[1])
+        WebhookFactory.create(user=one_hook[1])
+        two_hooks = self.make_group("hook2@example.com")
+        for user in two_hooks:
+            WebhookFactory.create(user=user)
+
+        live_and_expired = self.make_group("oauth1@example.com")
+        AccessToken.objects.create(
+            user=live_and_expired[0],
+            token="live-1",
+            expires=now() + timedelta(hours=1),
+        )
+        AccessToken.objects.create(
+            user=live_and_expired[1],
+            token="dead-1",
+            expires=now() - timedelta(hours=1),
+        )
+        two_live = self.make_group("oauth2@example.com")
+        for i, user in enumerate(two_live):
+            AccessToken.objects.create(
+                user=user,
+                token=f"live-2-{i}",
+                expires=now() + timedelta(hours=1),
+            )
+        application = Application.objects.create(
+            name="census-test",
+            client_type="public",
+            authorization_grant_type="authorization-code",
+        )
+        stale_refresh = self.make_group("oauth3@example.com")
+        RefreshToken.objects.create(
+            user=stale_refresh[0], token="fresh", application=application
+        )
+        RefreshToken.objects.filter(token="fresh").update(
+            created=now() - timedelta(days=31)
+        )
+        RefreshToken.objects.create(
+            user=stale_refresh[1],
+            token="revoked",
+            application=application,
+            revoked=now(),
+        )
+        fresh_refresh = self.make_group("oauth4@example.com")
+        for i, user in enumerate(fresh_refresh):
+            RefreshToken.objects.create(
+                user=user, token=f"fresh-{i}", application=application
+            )
+
+        court = CourtFactory.create(id="cacd")
+        uploader = UserFactory.create(username="recap-email-census")
+        one_recap = self.make_group("recap1@example.com")
+        two_recap = self.make_group("recap2@example.com")
+        stale_recap = self.make_group("recap3@example.com")
+        for i, addresses in enumerate(
+            [
+                [one_recap[1].profile.recap_email],
+                [two_recap[0].profile.recap_email.upper()],
+                [two_recap[1].profile.recap_email, "other@recap.email"],
+            ]
+        ):
+            EmailProcessingQueue.objects.create(
+                uploader=uploader,
+                court=court,
+                message_id=f"m-{i}",
+                destination_emails=addresses,
+            )
+        old = EmailProcessingQueue.objects.create(
+            uploader=uploader,
+            court=court,
+            message_id="m-old",
+            destination_emails=[u.profile.recap_email for u in stale_recap],
+        )
+        EmailProcessingQueue.objects.filter(pk=old.pk).update(
+            date_created=now() - timedelta(days=400)
+        )
+
+        groups = self.census_groups()
+        expected = {
+            "member1@example.com": [],
+            "member2@example.com": [BLOCKER_MEMBERSHIPS],
+            "hook1@example.com": [],
+            "hook2@example.com": [BLOCKER_WEBHOOKS],
+            "oauth1@example.com": [],
+            "oauth2@example.com": [BLOCKER_OAUTH],
+            "oauth3@example.com": [],
+            "oauth4@example.com": [BLOCKER_OAUTH],
+            "recap1@example.com": [],
+            "recap2@example.com": [BLOCKER_RECAP_EMAIL],
+            "recap3@example.com": [],
+        }
+        for email, blockers in expected.items():
+            with self.subTest(email=email):
+                self.assertEqual(groups[email].blockers, blockers)
+        self.assertEqual(
+            [
+                a.recap_email_in_use
+                for a in groups["recap2@example.com"].accounts
+            ],
+            [True, True],
+        )
+
+    def test_secondary_only_blockers(self, *mocks) -> None:
+        """Published tags, public prayers and recent API use block only on a
+        secondary; on the primary they are fine."""
+        tag_on_primary = self.make_group("tag1@example.com")
+        UserTagFactory.create(user=tag_on_primary[0], name="t", published=True)
+        tag_on_secondary = self.make_group("tag2@example.com")
+        UserTagFactory.create(
+            user=tag_on_secondary[1], name="t", published=True
+        )
+        UserTagFactory.create(
+            user=tag_on_secondary[1], name="private", published=False
+        )
+
+        prayers_on_primary = self.make_group("pray1@example.com")
+        UserProfile.objects.filter(user=prayers_on_primary[0]).update(
+            prayers_public=True
+        )
+        prayers_on_secondary = self.make_group("pray2@example.com")
+        UserProfile.objects.filter(user=prayers_on_secondary[1]).update(
+            prayers_public=True
+        )
+
+        api_on_primary = self.make_group("api1@example.com")
+        self.log_day(api_on_primary[0], days_ago=10)
+        api_on_secondary = self.make_group("api2@example.com")
+        self.log_day(api_on_secondary[1], days_ago=179, version="v3")
+        api_long_ago = self.make_group("api3@example.com")
+        self.log_day(api_long_ago[1], days_ago=181)
+
+        groups = self.census_groups()
+        expected = {
+            "tag1@example.com": [],
+            "tag2@example.com": [BLOCKER_PUBLISHED_TAGS],
+            "pray1@example.com": [],
+            "pray2@example.com": [BLOCKER_PUBLIC_PRAYERS],
+            "api1@example.com": [],
+            "api2@example.com": [BLOCKER_RECENT_API],
+            # Old use on the secondary is not recent, but it is lifetime use
+            # on an account other than the primary... unless the primary has
+            # none, in which case one account holds all the history.
+            "api3@example.com": [],
+        }
+        for email, blockers in expected.items():
+            with self.subTest(email=email):
+                self.assertEqual(groups[email].blockers, blockers)
+
+    def test_api_history_windows(self, *mocks) -> None:
+        """Lifetime use on both accounts blocks today; the summary says what
+        the 365- and 180-day windows would block instead."""
+        both_recent = self.make_group("w1@example.com")
+        self.log_day(both_recent[0], days_ago=5)
+        self.log_day(both_recent[1], days_ago=100)
+        both_last_year = self.make_group("w2@example.com")
+        self.log_day(both_last_year[0], days_ago=5)
+        self.log_day(both_last_year[1], days_ago=300)
+        both_ancient = self.make_group("w3@example.com")
+        self.log_day(both_ancient[0], days_ago=5)
+        self.log_lifetime(both_ancient[1], 50, version="v3")
+        one_only = self.make_group("w4@example.com")
+        self.log_lifetime(one_only[0], 10)
+
+        report = run_census()
+        groups = {g.email_key: g for g in report.groups}
+        self.assertEqual(
+            groups["w1@example.com"].blockers,
+            [BLOCKER_RECENT_API, BLOCKER_API_HISTORY],
+        )
+        self.assertEqual(
+            groups["w2@example.com"].blockers, [BLOCKER_API_HISTORY]
+        )
+        self.assertEqual(
+            groups["w3@example.com"].blockers, [BLOCKER_API_HISTORY]
+        )
+        self.assertEqual(groups["w4@example.com"].blockers, [])
+        self.assertEqual(
+            report.credential_window_blockers(),
+            {"lifetime": 3, "365d": 2, "180d": 1},
+        )
+        self.assertEqual(report.blocker_counts[BLOCKER_API_HISTORY], 3)
+        self.assertEqual(report.mergeable_groups, 1)
+
+    def test_recent_primary_with_older_secondary_holding_data(
+        self, *mocks
+    ) -> None:
+        """A primary that joined within 30 days while an older secondary holds
+        data is the planted-account signature. An empty older secondary, or a
+        token and throttle row alone, is not data."""
+        for email in (
+            "plant@example.com",
+            "empty@example.com",
+            "throttle@example.com",
+        ):
+            UserProfileWithParentsFactory.create(
+                user__email=email,
+                user__last_login=now(),
+                user__date_joined=now() - timedelta(days=2),
+            )
+        victim = UserProfileWithParentsFactory.create(
+            user__email="plant@example.com",
+            user__last_login=now() - timedelta(days=90),
+            user__date_joined=now() - timedelta(days=900),
+        ).user
+        AlertFactory.create(user=victim)
+        UserProfileWithParentsFactory.create(
+            user__email="empty@example.com",
+            user__last_login=None,
+            user__date_joined=now() - timedelta(days=900),
+        )
+        throttled = UserProfileWithParentsFactory.create(
+            user__email="throttle@example.com",
+            user__last_login=None,
+            user__date_joined=now() - timedelta(days=900),
+        ).user
+        APIThrottleFactory.create(user=throttled)
+
+        groups = self.census_groups()
+        self.assertEqual(
+            groups["plant@example.com"].blockers, [BLOCKER_RECENT_PRIMARY]
+        )
+        self.assertEqual(groups["empty@example.com"].blockers, [])
+        self.assertEqual(groups["throttle@example.com"].blockers, [])
+
+    def test_relation_counts_follow_user_meta(self, *mocks) -> None:
+        """Every constrained FK to User is counted by introspection; m2m and
+        pghistory relations are left out."""
+        labels = [relation_label(rel) for rel in counted_relations()]
+        self.assertIn("alerts.alert.user", labels)
+        self.assertIn("recap.pacerfetchqueue.user", labels)
+        self.assertIn("authtoken.token.user", labels)
+        self.assertNotIn("users.userproxyevent.pgh_obj", labels)
+        self.assertNotIn("pghistory.middlewareevents.user", labels)
+
+        users = self.make_group("rel@example.com")
+        AlertFactory.create(user=users[1])
+        AlertFactory.create(user=users[1])
+        APIThrottleFactory.create(user=users[0])
+
+        group = self.census_groups()["rel@example.com"]
+        first, second = group.accounts
+        self.assertEqual(first.relation_counts["alerts.alert.user"], 0)
+        self.assertEqual(second.relation_counts["alerts.alert.user"], 2)
+        self.assertEqual(first.n_throttles, 1)
+        # Every account gets an API token at creation.
+        self.assertEqual(second.relation_counts["authtoken.token.user"], 1)
+
+    def test_load_api_usage_skips_non_account_members(self, *mocks) -> None:
+        """AnonymousUser and None members are tolerated, both versions sum,
+        and webhook counts are read."""
+        user = UserFactory.create()
+        self.r.zadd(
+            f"{self.API_V3}.user.counts",
+            {"AnonymousUser": 500, str(user.pk): 3},
+        )
+        self.r.zadd(f"{self.API_V4}.user.counts", {"None": 7, str(user.pk): 4})
+        self.r.zadd(f"{self.WEBHOOK}.user.counts", {str(user.pk): 9})
+        today = now().date().isoformat()
+        self.r.zadd(
+            f"{self.API_V4}.user.d:{today}.counts", {"AnonymousUser": 1}
+        )
+
+        usage = load_api_usage(history_days=365, r=self.r)
+        self.assertEqual(usage.lifetime, {user.pk: 7})
+        self.assertEqual(usage.webhooks, {user.pk: 9})
+        self.assertEqual(usage.last_request, {})
+
+    def test_username_email_collisions_across_whole_table(
+        self, *mocks
+    ) -> None:
+        """Usernames equal to another account's address are listed, whether
+        or not either account is in a duplicate group; a username equal to
+        the account's own address is not a collision."""
+        owner = UserProfileWithParentsFactory.create(
+            user__email="Bob@Example.com"
+        ).user
+        squatter = UserProfileWithParentsFactory.create(
+            user__username="bob@example.com", user__email="else@example.com"
+        ).user
+        UserProfileWithParentsFactory.create(
+            user__username="self@example.com", user__email="self@example.com"
+        )
+
+        pairs = [(a.pk, o.pk) for a, o in username_email_collisions()]
+        self.assertEqual(pairs, [(squatter.pk, owner.pk)])
+
+    def test_command_writes_csvs_and_summary(self, *mocks) -> None:
+        """The command writes both CSVs into the output directory and prints
+        the summary, and the account CSV carries one row per account."""
+        users = self.make_group("csv@example.com")
+        self.log_lifetime(users[1], 12)
+        self.make_group("csv2@example.com", n=3, email_confirmed=False)
+        owner = UserProfileWithParentsFactory.create(
+            user__email="own@example.com"
+        ).user
+        UserProfileWithParentsFactory.create(
+            user__username="own@example.com", user__email="other@example.com"
+        )
+
+        out = StringIO()
+        with TemporaryDirectory() as tmp:
+            call_command(
+                "duplicate_account_census", output_dir=tmp, stdout=out
+            )
+            with open(Path(tmp) / "duplicate_accounts.csv", newline="") as f:
+                rows = list(csv.DictReader(f))
+            with open(
+                Path(tmp) / "username_email_collisions.csv", newline=""
+            ) as f:
+                collisions = list(csv.DictReader(f))
+
+        self.assertEqual(list(rows[0]), account_csv_columns())
+        self.assertEqual(len(rows), 5)
+        by_pk = {int(r["user_id"]): r for r in rows}
+        self.assertEqual(by_pk[users[0].pk]["is_primary"], "True")
+        self.assertEqual(by_pk[users[1].pk]["is_primary"], "False")
+        self.assertEqual(by_pk[users[1].pk]["api_lifetime_requests"], "12")
+        self.assertEqual(by_pk[users[1].pk]["group_blockers"], "")
+        self.assertEqual(by_pk[users[1].pk]["n:authtoken.token.user"], "1")
+        csv2_rows = [r for r in rows if r["group_email"] == "csv2@example.com"]
+        self.assertEqual(
+            {r["group_blockers"] for r in csv2_rows}, {BLOCKER_UNCONFIRMED}
+        )
+        self.assertEqual({r["group_size"] for r in csv2_rows}, {"3"})
+
+        self.assertEqual(len(collisions), 1)
+        self.assertEqual(collisions[0]["owner_user_id"], str(owner.pk))
+
+        summary = out.getvalue()
+        self.assertIn("Duplicate groups: 2", summary)
+        self.assertIn("Accounts in those groups: 5", summary)
+        self.assertIn("Groups with no blocker: 1", summary)
+        self.assertIn(f"  {BLOCKER_UNCONFIRMED}: 1", summary)
+        self.assertIn("  lifetime: 0", summary)
+        self.assertIn("another account's email address: 1", summary)
