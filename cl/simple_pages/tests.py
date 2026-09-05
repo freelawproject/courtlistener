@@ -13,6 +13,7 @@ from cl.lib.test_helpers import SimpleUserDataMixin
 from cl.simple_pages.forms import ContactForm
 from cl.simple_pages.sitemap import SimpleSitemap
 from cl.tests.cases import SimpleTestCase, TestCase
+from cl.tests.utils import parse_csp
 
 
 # Mock the hcaptcha thing so that we're sure it validates during tests
@@ -610,20 +611,6 @@ class ZohoRoutingTest(SimpleUserDataMixin, TestCase):
 class ContentSecurityPolicyTest(TestCase):
     """Tests for the site-wide CSP header configured in cl.settings."""
 
-    @staticmethod
-    def parse_csp(response: HttpResponse) -> dict[str, list[str]]:
-        """Parses a response's CSP header into a dict of directives.
-
-        :param response: A response carrying a Content-Security-Policy header.
-        :return: A dict mapping each directive name to its list of values.
-        """
-        header = response.headers["Content-Security-Policy"]
-        directives = {}
-        for directive in header.split(";"):
-            name, _, values = directive.strip().partition(" ")
-            directives[name] = values.split()
-        return directives
-
     async def test_navigation_is_locked_to_our_own_domain(self) -> None:
         """Do we stop third-party content from sending users elsewhere?
 
@@ -634,7 +621,7 @@ class ContentSecurityPolicyTest(TestCase):
         r = cast(
             HttpResponse, await self.async_client.get(reverse("help_home"))
         )
-        directives = self.parse_csp(r)
+        directives = parse_csp(r)
         self.assertEqual(directives["form-action"], ["'self'"])
         self.assertEqual(directives["base-uri"], ["'self'"])
 
@@ -648,7 +635,7 @@ class ContentSecurityPolicyTest(TestCase):
         r = cast(
             HttpResponse, await self.async_client.get(reverse("help_home"))
         )
-        script_src = self.parse_csp(r)["script-src"]
+        script_src = parse_csp(r)["script-src"]
         nonces = [
             value[len("'nonce-") : -len("'")]
             for value in script_src
@@ -657,4 +644,8 @@ class ContentSecurityPolicyTest(TestCase):
         self.assertEqual(
             len(nonces), 1, msg=f"Expected one nonce in: {script_src}"
         )
-        self.assertIn(f'nonce="{nonces[0]}"', r.content.decode())
+        html = r.content.decode()
+        self.assertIn(f'nonce="{nonces[0]}"', html)
+        # A script left with an empty nonce would be refused by the browser,
+        # and the assertion above would still pass on the other scripts.
+        self.assertNotIn('nonce=""', html)
