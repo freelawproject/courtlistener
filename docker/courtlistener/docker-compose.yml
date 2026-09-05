@@ -1,19 +1,65 @@
-# Run using `docker compose up`
+# CourtListener development stack. The developer guide on the wiki is the
+# full walkthrough: https://wiki.free.law/c/courtlistener/dev-guide/getting-started.md
+#
+# This is for development only. It is not secure enough for production and
+# it stores data in ways that would be a bad idea there.
+#
+# Quick start:
+#
+#     cp .env.example .env.dev            # then set ALLOWED_HOSTS and SECRET_KEY
+#     docker compose up --wait            # from the repository root, or from here
+#     docker exec cl-django ./manage.py make_dev_data
+#
+# `--wait` blocks until every service with a healthcheck reports healthy, so
+# when it returns the site is answering on http://localhost:8000 and the test
+# suite can run: docker exec cl-django ./manage.py test cl --exclude-tag selenium
+#
+# Published ports (postgres 5432, Django 8000, Selenium VNC 5900, Elasticsearch
+# 9200) bind to 127.0.0.1 only. Move one that collides with something already
+# on your machine with CL_POSTGRES_PORT, CL_DJANGO_PORT, CL_VNC_PORT or
+# CL_ES_PORT, e.g. `CL_POSTGRES_PORT=5433 docker compose up`. To expose one to
+# other devices on purpose, rebind it in a git-ignored personal override file
+# (compose.override.yaml at the repository root, or docker-compose.override.yml
+# here), using `ports: !override` so the list is replaced rather than extended.
+#
+# Postgres data can live in memory for faster tests (CI does this):
+#     docker compose -f compose.yaml -f docker/courtlistener/docker-compose.tmpfs.yml up --wait
+name: courtlistener
+
 networks:
-  cl_net_overlay:
+  cl_net_overlay2:
+    # Compose creates this network and gives it a fixed name so that every
+    # service has a stable hostname (cl-postgres, cl-redis, cl-es, ...). It
+    # is not the hand-made `cl_net_overlay` the old instructions had you
+    # create: compose refuses to adopt a network it didn't create, so a new
+    # name lets old setups keep working. The old network is unused now and
+    # can be removed with `docker network rm cl_net_overlay`.
+    name: cl_net_overlay2
     driver: bridge
-    external: true
+    attachable: true
+
 services:
   # Redis for caching
   cl-redis:
     container_name: cl-redis
     image: redis
+    # Every healthcheck below polls once a second while the service is
+    # starting (start_interval, within start_period) so dependants and
+    # `up --wait` proceed as soon as possible, then backs off to the regular
+    # interval to keep the steady-state noise down.
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      start_period: 10s
+      start_interval: 1s
+      interval: 5s
+      timeout: 3s
+      retries: 12
     networks:
-      - cl_net_overlay
+      - cl_net_overlay2
 
   # Database (postgresql)
-  # During tests this will be automatically migrated for you, but in regular
-  # use, you will have ot migrate it yourself. See DEVELOPING.md
+  # During tests this will be automatically migrated for you. In regular use
+  # the cl-django container runs the migrations for you when it starts.
   cl-postgresql:
     container_name: cl-postgres
     build:
@@ -22,7 +68,7 @@ services:
       args:
         POSTGRES_VERSION: 15.2-alpine
     ports:
-      - "5432:5432"
+      - "127.0.0.1:${CL_POSTGRES_PORT:-5432}:5432"
     environment:
       POSTGRES_USER: "postgres"
       POSTGRES_PASSWORD: "postgres"
@@ -35,8 +81,18 @@ services:
       - "ssl_cert_file=/etc/ssl/private/cl-postgres.crt"
       - "-c"
       - "ssl_key_file=/etc/ssl/private/cl-postgres.key"
+    healthcheck:
+      # Check over TCP rather than the unix socket: while the image runs its
+      # first-boot init scripts, a temporary server listens on the socket
+      # only, and we must not report healthy until the real one is up.
+      test: ["CMD-SHELL", "pg_isready -h 127.0.0.1 -U postgres -d courtlistener"]
+      start_interval: 1s
+      interval: 5s
+      timeout: 5s
+      retries: 24
+      start_period: 10s
     networks:
-      - cl_net_overlay
+      - cl_net_overlay2
 
   cl-webpack:
     container_name: cl-webpack
@@ -46,13 +102,21 @@ services:
     env_file:
       - ../../.env.dev
     working_dir: /opt/courtlistener/cl
-    command: sh -c 'npm install && exec npx webpack --progress --watch --mode=development'
+    # npm install populates cl/node_modules on the host bind mount, which
+    # cl-tailwind-reload needs too, so it waits for this container to be
+    # healthy. The marker file makes "healthy" mean "npm install finished".
+    # It lives in the container's own /tmp, so it vanishes with the
+    # container, and is cleared up front in case the container is restarted.
+    command: sh -c 'rm -f /tmp/npm-install-done && npm install && touch /tmp/npm-install-done && exec npx webpack --progress --watch --mode=development'
     healthcheck:
-      test: sh -c 'ps aux | grep -v grep | grep webpack >/dev/null 2>&1 && echo 0 || echo 1'
-      interval: 1s
-      retries: 45
-      start_period: 1s
-      timeout: 1s
+      test: ["CMD-SHELL", "test -f /tmp/npm-install-done"]
+      start_interval: 1s
+      interval: 5s
+      timeout: 3s
+      retries: 3
+      # A cold npm install can take several minutes; failures during the
+      # start period don't count against the retries.
+      start_period: 600s
 
   # Task Server
   cl-celery:
@@ -64,23 +128,27 @@ services:
         BUILD_ENV: dev
     command: celery
     depends_on:
-      - cl-postgresql
-      - cl-redis
-      - cl-doctor
-      - cl-disclosures
+      cl-postgresql:
+        condition: service_healthy
+      cl-redis:
+        condition: service_healthy
+      cl-doctor:
+        condition: service_started
+      cl-disclosures:
+        condition: service_started
     volumes:
       - ${CL_POSTGRES_RUN_DIR:-/var/run/postgresql}:/var/run/postgresql
       - ${CL_BASE_DIR:-../../}:/opt/courtlistener
     networks:
-      - cl_net_overlay
+      - cl_net_overlay2
     env_file:
       - ../../.env.dev
     environment:
-        - AWS_ACCESS_KEY_ID=${AWS_ACCESS_KEY_ID}
-        - AWS_SECRET_ACCESS_KEY=${AWS_SECRET_ACCESS_KEY}
-        - AWS_SESSION_TOKEN=${AWS_SESSION_TOKEN}
-        - AWS_DEV_ACCESS_KEY_ID=${AWS_ACCESS_KEY_ID}
-        - AWS_DEV_SECRET_ACCESS_KEY=${AWS_SECRET_ACCESS_KEY}
+        - AWS_ACCESS_KEY_ID=${AWS_ACCESS_KEY_ID:-}
+        - AWS_SECRET_ACCESS_KEY=${AWS_SECRET_ACCESS_KEY:-}
+        - AWS_SESSION_TOKEN=${AWS_SESSION_TOKEN:-}
+        - AWS_DEV_ACCESS_KEY_ID=${AWS_ACCESS_KEY_ID:-}
+        - AWS_DEV_SECRET_ACCESS_KEY=${AWS_SECRET_ACCESS_KEY:-}
 
   cl-tailwind-reload:
     container_name: cl-tailwind-reload
@@ -105,40 +173,62 @@ services:
         BUILD_ENV: dev
     command: web-dev
     depends_on:
-      - cl-postgresql
-      - cl-redis
-      - cl-celery
-      - cl-selenium
-      - cl-doctor
-      - cl-disclosures
-      - cl-es
+      # Django migrates the database on startup, so it needs postgres and
+      # redis to actually be accepting connections, not merely started.
+      # Elasticsearch is slow to boot and the test suite needs it, so wait
+      # for it too; that way `up --wait` means "ready to run tests".
+      cl-postgresql:
+        condition: service_healthy
+      cl-redis:
+        condition: service_healthy
+      cl-es:
+        condition: service_healthy
+      cl-celery:
+        condition: service_started
+      cl-selenium:
+        condition: service_started
+      cl-doctor:
+        condition: service_started
+      cl-disclosures:
+        condition: service_started
     ports:
-      - "8000:8000"
+      - "127.0.0.1:${CL_DJANGO_PORT:-8000}:8000"
     user: root
     volumes:
       - ${CL_POSTGRES_RUN_DIR:-/var/run/postgresql}:/var/run/postgresql
       - ${CL_BASE_DIR:-../../}:/opt/courtlistener
       - ${CL_BASE_DIR:-../../}/.postgresql:/root/.postgresql
     networks:
-      - cl_net_overlay
+      - cl_net_overlay2
     env_file:
       - ../../.env.dev
     environment:
-        - AWS_ACCESS_KEY_ID=${AWS_ACCESS_KEY_ID}
-        - AWS_SECRET_ACCESS_KEY=${AWS_SECRET_ACCESS_KEY}
-        - AWS_SESSION_TOKEN=${AWS_SESSION_TOKEN}
-        - AWS_DEV_ACCESS_KEY_ID=${AWS_ACCESS_KEY_ID}
-        - AWS_DEV_SECRET_ACCESS_KEY=${AWS_SECRET_ACCESS_KEY}
+        - AWS_ACCESS_KEY_ID=${AWS_ACCESS_KEY_ID:-}
+        - AWS_SECRET_ACCESS_KEY=${AWS_SECRET_ACCESS_KEY:-}
+        - AWS_SESSION_TOKEN=${AWS_SESSION_TOKEN:-}
+        - AWS_DEV_ACCESS_KEY_ID=${AWS_ACCESS_KEY_ID:-}
+        - AWS_DEV_SECRET_ACCESS_KEY=${AWS_SECRET_ACCESS_KEY:-}
+    healthcheck:
+      # Healthy once runserver answers at all. Any HTTP status counts (no
+      # -f), because a 400 from ALLOWED_HOSTS still proves the server is up
+      # and migrations have finished.
+      test: ["CMD-SHELL", "curl -sS -o /dev/null http://localhost:8000/"]
+      start_interval: 1s
+      interval: 10s
+      timeout: 10s
+      retries: 30
+      # First boot runs every migration, which can take a few minutes.
+      start_period: 300s
 
   cl-selenium:
     container_name: cl-selenium
     image: seleniarm/standalone-chromium:124.0
     ports:
-      - 5900:5900  # VNC server
+      - "127.0.0.1:${CL_VNC_PORT:-5900}:5900"  # VNC server
     volumes:
       - ${CL_SHM_DIR:-/dev/shm}:/dev/shm
     networks:
-      - cl_net_overlay
+      - cl_net_overlay2
     environment:
       - JAVA_OPTS=-Dwebdriver.chrome.whitelistedIps=
 
@@ -146,19 +236,19 @@ services:
     image: freelawproject/doctor:latest
     container_name: "cl-doctor"
     networks:
-      - cl_net_overlay
+      - cl_net_overlay2
 
   cl-disclosures:
     image: freelawproject/disclosure-extractor:latest
     container_name: "cl-disclosures"
     networks:
-      - cl_net_overlay
+      - cl_net_overlay2
 
   cl-webhook-sentry:
     image: juggernaut/webhook-sentry:latest
     container_name: "cl-webhook-sentry"
     networks:
-      - cl_net_overlay
+      - cl_net_overlay2
 
   cl-es:
     container_name: cl-es
@@ -190,6 +280,15 @@ services:
       - ${CL_BASE_DIR:-../../}/cl/search/elasticsearch_files/synonyms_en.txt:/usr/share/elasticsearch/config/dictionaries/synonyms_en.txt
       - ${CL_BASE_DIR:-../../}/cl/search/elasticsearch_files/stopwords_en.txt:/usr/share/elasticsearch/config/dictionaries/stopwords_en.txt
     ports:
-      - "9200:9200"
+      - "127.0.0.1:${CL_ES_PORT:-9200}:9200"
     networks:
-      - cl_net_overlay
+      - cl_net_overlay2
+    healthcheck:
+      # The dev cert is self-signed, hence -k. Yellow is fine for a single
+      # node: it only means replicas can't be allocated anywhere.
+      test: ["CMD-SHELL", "curl -fsk -u elastic:password 'https://localhost:9200/_cluster/health?wait_for_status=yellow&timeout=5s'"]
+      start_interval: 1s
+      interval: 10s
+      timeout: 10s
+      retries: 30
+      start_period: 60s
