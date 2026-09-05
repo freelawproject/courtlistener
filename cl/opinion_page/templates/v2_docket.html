@@ -9,7 +9,7 @@
 
 {% block content_wrapper %}
 <div class="bg-greyscale-100">
-  <div class="max-w-content mx-auto pt-4 md:pt-20 pb-35">
+  <div class="capped-width px-4 lg:px-10 pt-4 md:pt-20 pb-35">
     <c-docket-page
       :docket="docket"
       :docket_source="docket_source"
@@ -43,7 +43,11 @@
       />
 
       {# Docket entry rows #}
-      <c-docket-entry-rows :docket_entries="docket_entries" :docket_source="docket_source" />
+      <c-docket-entry-rows
+        :docket_entries="docket_entries"
+        :docket_source="docket_source"
+        :filters_applied="filters_applied"
+      />
 
       <c-pagination
         :page_obj="docket_entries"

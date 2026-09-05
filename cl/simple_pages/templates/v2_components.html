@@ -1489,7 +1489,7 @@ Sample code here.
       </c-library.item>
       <c-library.item only>
         <c-slot name="label"><code>tabs</code></c-slot>
-        <c-slot name="description">List of <code>{label, url, key}</code> dicts for the tab nav. If only one tab is provided, the nav is hidden.</c-slot>
+        <c-slot name="description">List of <code>{label, url, key, icon}</code> dicts for the tab nav, as built by <code>build_docket_tabs</code>. <code>icon</code> names an SVG in <code>cl/assets/static-global/svg/</code>, rendered before the label on desktop and skipped in the mobile dropdown. If only one tab is provided, the nav is hidden.</c-slot>
       </c-library.item>
       <c-library.item only>
         <c-slot name="label"><code>has_alert</code></c-slot>
@@ -1611,7 +1611,11 @@ Sample code here.
       </c-library.item>
       <c-library.item only>
         <c-slot name="label"><code>:docket_source</code></c-slot>
-        <c-slot name="description">The <code>DocketEntrySource</code> the view put in the context. Supplies <code>has_pay_and_pray</code> here and is forwarded to the nested <code>&lt;c-document-source-link&gt;</code> for its <code>component</code>.</c-slot>
+        <c-slot name="description">The <code>DocketEntrySource</code> the view put in the context. Supplies <code>has_pay_and_pray</code> here and is forwarded to the nested <code>&lt;c-document-source-link&gt;</code> and <code>&lt;c-docket-empty-message&gt;</code> for its <code>component</code>.</c-slot>
+      </c-library.item>
+      <c-library.item only>
+        <c-slot name="label"><code>:filters_applied</code></c-slot>
+        <c-slot name="description">Bool — whether the request carried any filter or search param (<code>DocketEntryFilterForm.has_filters()</code>). Picks the empty state: "No docket entries match your filters." when true, the source's own "no entries yet" sentence from <code>&lt;c-docket-empty-message&gt;</code> when false.</c-slot>
       </c-library.item>
     </c-library.list>
 
@@ -1621,7 +1625,41 @@ Sample code here.
 
     <c-expansion-panel title="Code">
       <c-code>
-&lt;c-docket-entry-rows :docket_entries="docket_entries" :docket_source="docket_source" /&gt;
+&lt;c-docket-entry-rows
+  :docket_entries="docket_entries"
+  :docket_source="docket_source"
+  :filters_applied="filters_applied"
+/&gt;
+      </c-code>
+    </c-expansion-panel>
+  </section>
+
+  {# DOCKET EMPTY MESSAGE #}
+  <section class="max-w-full w-full border-t-2 border-greyscale-200" x-intersect.margin.-100px="show" id="docket-empty-message">
+    <h2 class="mt-6 mb-3">Docket empty message</h2>
+    <p>The sentence a docket with no entries at all shows in place of its entry list — "no entries in the RECAP Archive yet" for a RECAP docket, "no entries yet" for a SCOTUS one. It dispatches to <code>cotton/docket_empty_message/&lt;component&gt;.html</code> the same way <code>&lt;c-docket-source-attribution&gt;</code> does, so <code>&lt;c-docket-entry-rows&gt;</code> stays source-agnostic. The sentence carries no wrapper, so the caller supplies the surrounding <code>&lt;p&gt;</code>.</p>
+
+    <h4 class="mt-3">Demo</h4>
+    <div class="my-4 rounded-lg border border-greyscale-200 p-4">
+      <p class="text-sm text-greyscale-700 text-center">
+        <c-docket-empty-message :docket_source="docket_source" />
+      </p>
+    </div>
+
+    <c-library.list title="Props" only>
+      <c-library.item only>
+        <c-slot name="label"><code>:docket_source</code></c-slot>
+        <c-slot name="description">The <code>DocketEntrySource</code> the view put in the context. Its <code>component</code> picks which file renders.</c-slot>
+      </c-library.item>
+    </c-library.list>
+
+    <c-library.list title="Slots" only>
+      <p>No slots</p>
+    </c-library.list>
+
+    <c-expansion-panel title="Code">
+      <c-code>
+&lt;c-docket-empty-message :docket_source="docket_source" /&gt;
       </c-code>
     </c-expansion-panel>
   </section>
@@ -1731,7 +1769,7 @@ Sample code here.
     <p>Renders an optional <code>&lt;h2&gt;</code> heading followed by a <code>c-description-list</code> built from a list of item dicts. <code>c-docket-page</code> renders one per entry in its <code>metadata_sections</code> prop, which is how a docket's source adds sections of its own.</p>
 
     <h4 class="mt-3">Demo</h4>
-    <p class="text-sm text-greyscale-600 mb-2">One item of each shape: plain, linked out, and carrying a suffix link after the value.</p>
+    <p class="text-sm text-greyscale-600 mb-2">One item of each shape: plain, linked out, carrying a suffix link after the value, and copyable with a single click.</p>
     <div class="my-4 rounded-lg border border-greyscale-200 p-4">
       <c-metadata-section
         :items="demo_metadata_items"
@@ -1743,7 +1781,7 @@ Sample code here.
     <c-library.list title="Props" only>
       <c-library.item only>
         <c-slot name="label"><code>items</code></c-slot>
-        <c-slot name="description">List of dicts with at least <code>label</code> and <code>value</code>. Optional keys: <code>url</code>, <code>nofollow</code>, <code>is_external</code>, <code>aria_label</code>, <code>suffix_text</code>, <code>suffix_url</code>, <code>suffix_nofollow</code>, <code>suffix_is_external</code>, <code>suffix_aria_label</code>. The section renders nothing if <code>items</code> is empty.</c-slot>
+        <c-slot name="description">List of dicts with at least <code>label</code> and <code>value</code>. Optional keys: <code>url</code>, <code>nofollow</code>, <code>is_external</code>, <code>aria_label</code>, <code>suffix_text</code>, <code>suffix_url</code>, <code>suffix_nofollow</code>, <code>suffix_is_external</code>, <code>suffix_aria_label</code>, <code>is_copyable</code> (a single click selects the whole value for copying). The section renders nothing if <code>items</code> is empty.</c-slot>
       </c-library.item>
       <c-library.item only>
         <c-slot name="label"><code>title</code></c-slot>

@@ -130,9 +130,9 @@ class DocketEntrySource:
 
     ``component`` picks which file renders this source's copy. Both
     template stacks hold one file per component: under cotton/, the
-    docket_source_button/, docket_source_attribution/ and
-    document_source_link/ folders; under includes/, those three plus
-    docket_empty_message/, docket_empty_cta/ and docket_source_li/. A
+    docket_source_button/, docket_source_attribution/,
+    document_source_link/ and docket_empty_message/ folders; under
+    includes/, those four plus docket_empty_cta/ and docket_source_li/. A
     source named "xyz" needs xyz.html in every
     folder of both stacks. A missing one fails at render time with an
     error that doesn't name it, so DocketSourceComponentTest checks that
