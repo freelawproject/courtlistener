@@ -24,6 +24,7 @@ from django.core.mail import (
     get_connection,
     send_mail,
 )
+from django.http import HttpResponse
 from django.test import AsyncClient, RequestFactory
 from django.test.client import Client
 from django.test.utils import override_settings
@@ -74,6 +75,12 @@ from cl.favorites.models import (
 )
 from cl.lib.crypto import generate_activation_key
 from cl.lib.email_backends import get_email_count
+from cl.lib.ratelimiter import (
+    FAILED_LOGIN_LIMIT,
+    FAILED_LOGIN_WINDOW,
+    get_ratelimit_cache,
+    make_failed_login_key,
+)
 from cl.lib.redis_utils import get_redis_interface
 from cl.lib.test_helpers import (
     SimpleUserDataMixin,
@@ -4855,3 +4862,171 @@ class RefreshAPIThrottlesAdminTest(TestCase):
         )
         # Inactive user got nothing
         self.assertFalse(APIThrottle.objects.filter(user=self.target).exists())
+
+
+@override_settings(
+    CACHES={
+        "default": {
+            "BACKEND": "django.core.cache.backends.locmem.LocMemCache",
+            # Unique LOCATION so this cache is its own LocMemCache instance,
+            # not shared with the default unnamed one.
+            "LOCATION": "failed-sign-in-throttle-test",
+        },
+    },
+)
+class FailedSignInThrottleTest(TestCase):
+    """Tests for the per-account throttle on failed sign-ins.
+
+    The view's decorators are no-ops under test (see cl.lib.ratelimiter), so
+    these exercise the form-level throttle, which is where the per-account
+    counting happens.
+
+    Why the cache override: the project test runner defaults to ``--parallel=N``
+    (cl/tests/runner.py), and every parallel worker shares the same Redis.
+    ``RestartRateLimitMixin.tearDownClass`` runs ``DEL :1:rl:*``, which covers
+    these counters, so a sibling worker tearing down its class mid-test would
+    reset the count out from under us. A process-local LocMemCache isolates us
+    from sibling workers.
+    """
+
+    @classmethod
+    def setUpTestData(cls) -> None:
+        cls.user = UserProfileWithParentsFactory.create(
+            user__username="throttled-user",
+            user__password=make_password("a-good-password"),
+        ).user
+        cls.other_user = UserProfileWithParentsFactory.create(
+            user__username="bystander",
+            user__password=make_password("a-good-password"),
+        ).user
+
+    def setUp(self) -> None:
+        self.sign_in_url = reverse("sign-in")
+        # The overridden cache is process-local but still outlives a single
+        # test, so start each one from an empty count.
+        django_cache.clear()
+
+    def sign_in(
+        self, identifier: str, password: str, ip: str = "192.0.2.1"
+    ) -> HttpResponse:
+        """POST the sign-in form, claiming the given IP via CloudFront's header."""
+        return self.client.post(
+            self.sign_in_url,
+            {"username": identifier, "password": password},
+            headers={"cloudfront-viewer-address": f"{ip}:12345"},
+        )
+
+    def get_failure_count(self, identifier: str) -> int:
+        """Read an identifier's current failed sign-in count.
+
+        :param identifier: The identifier to look up.
+        :return: The number of failures counted against it.
+        """
+        return get_ratelimit_cache().get(make_failed_login_key(identifier), 0)
+
+    def test_repeated_failures_throttle_the_account(self) -> None:
+        """Do repeated failures against one account get throttled, even when
+        each attempt comes from a different IP?
+        """
+        first_failure = self.sign_in(
+            self.user.username, "wrong-password", ip="198.51.100.1"
+        )
+        for i in range(FAILED_LOGIN_LIMIT - 1):
+            self.sign_in(
+                self.user.username, "wrong-password", ip=f"198.51.100.{i + 2}"
+            )
+
+        # The password is right this time, but the account is throttled, so it
+        # gets refused — and refused with the very same error a wrong password
+        # got, so nothing about the response says "you found a live account."
+        throttled = self.sign_in(
+            self.user.username, "a-good-password", ip="203.0.113.9"
+        )
+        self.assertNotIn("_auth_user_id", self.client.session)
+        self.assertEqual(throttled.status_code, first_failure.status_code)
+        self.assertEqual(
+            throttled.context["form"].errors,
+            first_failure.context["form"].errors,
+        )
+
+    def test_a_successful_sign_in_resets_the_counter(self) -> None:
+        """Does signing in wipe the slate, so that fumbling a password, getting
+        it right, then fumbling again doesn't add up to a throttle?
+        """
+        for _ in range(FAILED_LOGIN_LIMIT - 1):
+            self.sign_in(self.user.username, "wrong-password")
+        self.assertEqual(
+            self.get_failure_count(self.user.username), FAILED_LOGIN_LIMIT - 1
+        )
+
+        self.sign_in(self.user.username, "a-good-password")
+        self.assertIn("_auth_user_id", self.client.session)
+        self.assertEqual(self.get_failure_count(self.user.username), 0)
+
+        # A second run of fumbles starts from scratch rather than tipping over.
+        self.client.logout()
+        for _ in range(FAILED_LOGIN_LIMIT - 1):
+            self.sign_in(self.user.username, "wrong-password")
+        self.sign_in(self.user.username, "a-good-password")
+        self.assertIn("_auth_user_id", self.client.session)
+
+    def test_the_throttle_is_scoped_to_one_identifier(self) -> None:
+        """Does throttling one account leave everybody else alone?"""
+        for _ in range(FAILED_LOGIN_LIMIT):
+            self.sign_in(self.user.username, "wrong-password")
+
+        self.sign_in(self.other_user.username, "a-good-password")
+        self.assertIn("_auth_user_id", self.client.session)
+
+    def test_identifiers_with_no_account_are_counted(self) -> None:
+        """Are attempts against addresses that don't exist counted too?
+
+        They must be. If only real accounts were counted, getting throttled
+        would itself prove an account existed.
+        """
+        nobody = "nobody@example.com"
+        for _ in range(FAILED_LOGIN_LIMIT):
+            self.sign_in(nobody, "wrong-password")
+
+        self.assertGreaterEqual(
+            self.get_failure_count(nobody), FAILED_LOGIN_LIMIT
+        )
+
+    def test_case_and_whitespace_variants_share_a_counter(self) -> None:
+        """Can an attacker get a fresh counter by shifting the case of the
+        identifier or padding it with whitespace?
+        """
+        for _ in range(FAILED_LOGIN_LIMIT):
+            self.sign_in(self.user.username.upper(), "wrong-password")
+
+        self.assertGreaterEqual(
+            self.get_failure_count(f"  {self.user.username}  "),
+            FAILED_LOGIN_LIMIT,
+        )
+
+    def test_guessing_on_does_not_extend_the_window(self) -> None:
+        """Can somebody hold an account's owner out by continuing to guess?
+
+        They must not be able to. The window is anchored to the first attempt in
+        it, so guesses made while over the limit raise the count but leave the
+        expiry alone, and the block lifts when it always would have.
+        """
+        start = now()
+        with time_machine.travel(start, tick=False) as traveller:
+            for _ in range(FAILED_LOGIN_LIMIT):
+                self.sign_in(self.user.username, "wrong-password")
+            self.sign_in(self.user.username, "a-good-password")
+            self.assertNotIn("_auth_user_id", self.client.session)
+
+            # Keep hammering for the rest of the window.
+            for second in range(60, FAILED_LOGIN_WINDOW, 60):
+                traveller.move_to(start + timedelta(seconds=second))
+                self.sign_in(self.user.username, "wrong-password")
+
+            # The window ends where it began pointing, not where the last guess
+            # would have put it.
+            traveller.move_to(
+                start + timedelta(seconds=FAILED_LOGIN_WINDOW + 1)
+            )
+            self.sign_in(self.user.username, "a-good-password")
+            self.assertIn("_auth_user_id", self.client.session)
