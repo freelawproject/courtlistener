@@ -1851,7 +1851,12 @@ class ScotusDocketV2ContentRenderTest(TestCase):
         self.assertEqual(r.status_code, HTTPStatus.OK)
         self.assertTemplateUsed(r, "v2_docket.html")
         self.assertIn("There are no entries for this docket yet.", content)
-        self.assertNotIn("RECAP Archive", content)
+        # The site chrome links to the RECAP Archive on every page, so the
+        # negative check targets RECAP's empty-state sentence specifically.
+        self.assertNotIn(
+            "There are no entries for this docket in the RECAP Archive",
+            content,
+        )
 
 
 class OgRedirectLookupViewTest(TestCase):
