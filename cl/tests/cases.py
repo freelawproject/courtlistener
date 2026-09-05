@@ -14,6 +14,8 @@ from django.utils.dateformat import format
 from django.utils.html import strip_tags
 from django.utils.timezone import localtime, now
 from django_elasticsearch_dsl.registries import registry
+from elasticsearch.dsl.connections import connections
+from elasticsearch.helpers import bulk, scan
 from lxml import etree, html
 from lxml.html import HtmlElement
 from rest_framework.test import APITestCase as DRFTestCase
@@ -209,6 +211,46 @@ class ESIndexTestCase(SimpleTestCase):
         if keys:
             r.delete(*keys)
         keys = r.keys("celery_throttle:*")
+
+    @classmethod
+    def _es_snapshot(cls) -> list[dict]:
+        """Every document in this class's indices, as bulk-ready actions."""
+        client = connections.get_connection()
+        names = [index._name for index in registry.get_indices()]
+        client.indices.refresh(index=names, ignore_unavailable=True)
+        return [
+            {
+                "_index": hit["_index"],
+                "_id": hit["_id"],
+                "_source": hit["_source"],
+                **({"routing": hit["_routing"]} if "_routing" in hit else {}),
+            }
+            for hit in scan(
+                client,
+                index=names,
+                query={"query": {"match_all": {}}},
+                ignore_unavailable=True,
+            )
+        ]
+
+    @classmethod
+    def _pre_setup(cls) -> None:
+        super()._pre_setup()
+        cls._es_documents = cls._es_snapshot()
+
+    def _post_teardown(self) -> None:
+        super()._post_teardown()
+        # Roll the indices back to whatever they held before the test ran.
+        client = connections.get_connection()
+        client.delete_by_query(
+            index=[index._name for index in registry.get_indices()],
+            query={"match_all": {}},
+            conflicts="proceed",
+            ignore_unavailable=True,
+            refresh=True,
+        )
+        if self._es_documents:
+            bulk(client, self._es_documents, refresh=True)
 
     def tearDown(self) -> None:
         self.restart_celery_throttle_key()
