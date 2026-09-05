@@ -40,7 +40,7 @@
   <script src="{% static "js/progress-bar.js" %}"></script>
   <script type="text/javascript" src="{% static "js/search-relative-dates.js" %}"></script>
   {% include "includes/date_picker.html" %}
-  <script type="text/javascript" nonce="{{ request.csp_nonce }}">
+  <script type="text/javascript" nonce="{{ csp_nonce }}">
     $(document).ready(function () {
       $('#start-scroll').on("click", function () {
         $('html, body').animate({
