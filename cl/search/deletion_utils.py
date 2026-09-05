@@ -4,10 +4,11 @@ Sealing means something slightly different for each: a RECAPDocument keeps
 its row (flagged `is_sealed`) with its files scrubbed, while sealing an
 OpinionCluster hard-deletes the cluster/opinion rows outright and leaves a
 ClusterRedirection behind so the old URLs 410. What they share is the need
-to clean the underlying files out of S3, Internet Archive, and CloudFront
-so nothing is left reachable after the seal. Centralizing that here, rather
-than in the admin, means callers just invoke a function instead of
-re-implementing storage/CDN cleanup themselves.
+to clean the underlying files out of S3, Internet Archive, and CloudFront,
+and to drop the citations mined from the sealed text, so nothing is left
+reachable after the seal. Centralizing that here, rather than in the
+admin, means callers just invoke a function instead of re-implementing
+storage/CDN cleanup themselves.
 
 Also holds the deletion-blocker checks that gate OpinionCluster sealing:
 since sealing hard-deletes the cluster (and maybe its docket), anything
@@ -30,7 +31,13 @@ from requests import Response
 from cl.lib.cloud_front import invalidate_cloudfront
 from cl.lib.decorators import retry
 from cl.lib.models import THUMBNAIL_STATUSES
-from cl.search.models import CaseTransfer, ClusterRedirection, OpinionCluster
+from cl.search.models import (
+    CaseTransfer,
+    ClusterRedirection,
+    OpinionCluster,
+    RECAPDocument,
+)
+from cl.search.tasks import update_es_document
 from cl.visualizations.models import SCOTUSMap
 
 
@@ -53,6 +60,48 @@ def delete_from_ia(url: str) -> Response:
             "x-archive-cascade-delete": "1",
         },
         timeout=60,
+    )
+
+
+def delete_document_citations(rd: RECAPDocument) -> None:
+    """Delete the case law citations mined from a RECAPDocument's text.
+
+    Meant for documents that are being sealed: their text is scrubbed, so
+    the citations extracted from it have to go too. Left in place, the
+    sealed filing keeps appearing in its docket's authorities and in the
+    "Cited By" lists of the opinions it referenced, and the leftover rows
+    show up as related objects if the document is later deleted outright.
+
+    Also pushes the now-empty `cites` list into the document's
+    Elasticsearch child document. Saving the RECAPDocument doesn't do that:
+    ES only tracks changes to the document's own fields, not to this
+    relation. Documents that had no citations to begin with are left
+    alone, ES included.
+
+    :param rd: The RECAPDocument whose citations should be removed.
+    :return: None
+    """
+    # Both kinds of citation come from the same scrubbed text, so drop them
+    # together or not at all.
+    with transaction.atomic():
+        deleted_cited = rd.cited_opinions.all().delete()[0]
+        deleted_unmatched = rd.unmatched_citations.all().delete()[0]
+    if not (deleted_cited or deleted_unmatched):
+        # Nothing changed, so ES has nothing to catch up on. Callers seal
+        # whole querysets at a time, so bailing here saves a Celery task
+        # and an ES write for every document that had no citations.
+        return
+    if settings.ELASTICSEARCH_DISABLED:
+        # The indexing signals check this too, so honoring it here keeps
+        # sealing usable with ES turned off instead of half-indexing.
+        return
+    update_es_document.delay(
+        "ESRECAPDocument",
+        ["cites"],
+        ("search.RECAPDocument", rd.pk),
+        # Losing citations is not something anybody should be alerted
+        # about, so don't send the updated document to the percolator.
+        skip_percolator_request=True,
     )
 
 
@@ -101,6 +150,10 @@ def seal_documents(queryset: QuerySet) -> list[str]:
         rd.plain_text = ""
         rd.ocr_status = None
         rd.save()
+
+        # Runs after save() so its ES update isn't clobbered by the
+        # re-indexing that save() triggers.
+        delete_document_citations(rd)
 
     # Do a CloudFront invalidation
     invalidate_cloudfront([f"/{path}" for path in deleted_filepaths])

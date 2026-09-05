@@ -4,6 +4,7 @@ from unittest.mock import MagicMock, patch
 
 from django.contrib.auth.models import User
 from django.http import HttpResponse
+from django.template.loader import TemplateDoesNotExist, get_template
 from django.test import override_settings
 from django.urls import reverse
 from lxml.html import fromstring
@@ -387,6 +388,16 @@ class V2PagesRegisterTest(PageLoadTestMixin, SimpleUserDataMixin, TestCase):
         ({"viewname": "components"}, "v2_components.html"),
     ]
 
+    @staticmethod
+    def _get_legacy_counterpart(v2_template: str) -> str | None:
+        """Returns the legacy template a v2 one replaces, None otherwise."""
+        legacy = v2_template.removeprefix("v2_")
+        try:
+            get_template(legacy)
+            return legacy
+        except TemplateDoesNotExist:
+            return None
+
     async def test_v2_pages(self) -> None:
         """Do all registered v2 pages load properly with the redesign flag?"""
         for reverse_param, v2_template in self.V2_PAGES:
@@ -395,6 +406,23 @@ class V2PagesRegisterTest(PageLoadTestMixin, SimpleUserDataMixin, TestCase):
             ):
                 r = await self.assert_page_loads_ok(reverse_param)
                 self.assertTemplateUsed(r, v2_template)
+
+    def test_v2_pages_without_the_flag(self) -> None:
+        """Do registered pages still load for a visitor without the flag?
+
+        Each one falls back to its legacy template, or keeps rendering v2
+        when the redesign left no legacy template behind.
+        """
+        for reverse_param, v2_template in self.V2_PAGES:
+            with (
+                self.subTest("Checking v2 page", reverse_params=reverse_param),
+                override_flag("use_new_design", active=False),
+            ):
+                r = self.client.get(reverse(**reverse_param))
+                self.assertEqual(r.status_code, HTTPStatus.OK)
+                self.assertTemplateUsed(
+                    r, self._get_legacy_counterpart(v2_template) or v2_template
+                )
 
 
 @patch("hcaptcha.fields.hCaptchaField.validate", return_value=True)
