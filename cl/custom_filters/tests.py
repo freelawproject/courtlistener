@@ -12,7 +12,7 @@ from django.http import HttpResponse
 from django.middleware.csp import ContentSecurityPolicyMiddleware, get_nonce
 from django.template import Context, TemplateSyntaxError
 from django.template.utils import get_app_template_dirs
-from django.test import RequestFactory, SimpleTestCase, override_settings
+from django.test import RequestFactory, override_settings
 
 from cl.custom_filters.templatetags import component_tags
 from cl.custom_filters.templatetags.component_tags import (
@@ -44,6 +44,7 @@ from cl.people_db.models import (
     GRANULARITY_YEAR,
 )
 from cl.search.forms import CorpusSearchForm
+from cl.tests.cases import SimpleTestCase
 
 
 class TestOxfordJoinFilter(SimpleTestCase):
@@ -660,6 +661,18 @@ class TestComponentTags(SimpleTestCase):
         self.assertIn(
             f'src="/static/js/bar.js" defer nonce="{nonce}"', rendered
         )
+
+    def test_render_omits_the_nonce_without_the_middleware(self) -> None:
+        """A request the CSP middleware never touched renders no nonce.
+
+        An empty nonce="" would be worse than none at all, since a browser
+        enforcing a nonce-based policy would refuse the script.
+        """
+        require_script(self.context, "js/foo.js")
+        rendered = self._render()
+
+        self.assertIn('src="/static/js/foo.js"', rendered)
+        self.assertNotIn("nonce", rendered)
 
     def test_no_request_in_context_is_a_noop(self) -> None:
         """Both tags are no-ops without a request in the context."""
