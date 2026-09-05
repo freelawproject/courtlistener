@@ -38,11 +38,13 @@ project-includes = [
     "cl/search/management/commands/sweep_indexer.py",
     "cl/search/tests/test_sealing.py",
     "cl/tests/utils.py",
+    "cl/users/duplicate_census.py",
     "cl/users/email_handlers.py",
     "cl/users/forms.py",
     "cl/users/management/commands/cl_account_management.py",
     "cl/users/management/commands/cl_delete_old_emails.py",
     "cl/users/management/commands/cl_retry_failed_email.py",
+    "cl/users/management/commands/duplicate_account_census.py",
     "cl/users/tasks.py",
 ]
 project-excludes = ["**/migrations/**"]
