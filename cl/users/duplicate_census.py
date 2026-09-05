@@ -9,7 +9,7 @@ commands are ZCARD, ZSCAN and ZRANGE.
 
 The vocabulary used throughout:
 
-- A *group* is every account whose ``LOWER(TRIM(email))`` matches.
+- A *group* is every account whose ``LOWER(email)`` matches.
 - The *primary* is the account the merge would keep. Highest ``last_login``
   wins, accounts that never logged in sort last, and ties go to the lowest pk.
 - A *secondary* is any other account in the group.
@@ -33,7 +33,7 @@ from typing import IO, Any
 import pghistory.models
 from django.contrib.auth.models import User
 from django.db.models import Count, ForeignObjectRel, QuerySet, Value
-from django.db.models.functions import Lower, Trim
+from django.db.models.functions import Lower
 from django.utils.timezone import now
 from oauth2_provider.models import AccessToken, RefreshToken
 from oauth2_provider.settings import oauth2_settings
@@ -113,8 +113,10 @@ BLOCKER_CLASSES = (
 # Postgres and Python disagree on case folding for some non-ASCII input, and
 # the LOWER(email) index on auth_user uses the Postgres implementation. Every
 # email comparison here therefore goes through this expression, never
-# str.lower().
-EMAIL_KEY = Lower(Trim("email"))
+# str.lower(). It is deliberately the index's exact expression, with no
+# TRIM: stored addresses are already clean, and any wrapper would stop the
+# planner from using the index.
+EMAIL_KEY = Lower("email")
 
 # Sized so that IN (...) lists stay comfortable for the planner.
 PK_CHUNK_SIZE = 1000
@@ -278,13 +280,12 @@ def duplicate_email_keys(email: str | None = None) -> QuerySet:
     qs = (
         User.objects.exclude(email="")
         .annotate(email_key=EMAIL_KEY)
-        .exclude(email_key="")
         .values("email_key")
         .annotate(n=Count("pk"))
         .filter(n__gt=1)
     )
     if email:
-        qs = qs.filter(email_key=Lower(Trim(Value(email))))
+        qs = qs.filter(email_key=Lower(Value(email)))
     return qs.values("email_key")
 
 
@@ -455,7 +456,7 @@ class AccountFacts:
 
     :ivar user: The account.
     :ivar profile: Its profile, or None for the rare account without one.
-    :ivar email_key: ``LOWER(TRIM(email))`` as the database computed it.
+    :ivar email_key: ``LOWER(email)`` as the database computed it.
     :ivar username_key: ``LOWER(username)`` as the database computed it.
     :ivar n_groups: Auth group memberships.
     :ivar n_permissions: Explicit auth permissions.

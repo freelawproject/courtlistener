@@ -4964,14 +4964,14 @@ class DuplicateAccountCensusTest(TestCase):
         report = run_census(**kwargs)  # type: ignore[arg-type]
         return {g.email_key: g for g in report.groups}
 
-    def test_groups_are_case_and_whitespace_insensitive(self, *mocks) -> None:
-        """Accounts group on LOWER(TRIM(email)), blank addresses never group,
-        and singletons are left out."""
+    def test_groups_are_case_insensitive(self, *mocks) -> None:
+        """Accounts group on LOWER(email), blank addresses never group, and
+        singletons are left out."""
         a = UserProfileWithParentsFactory.create(
             user__email="Alice@Example.com"
         ).user
         b = UserProfileWithParentsFactory.create(
-            user__email=" alice@example.com "
+            user__email="alice@example.com"
         ).user
         c = UserProfileWithParentsFactory.create(
             user__email="ALICE@EXAMPLE.COM"
@@ -4994,7 +4994,7 @@ class DuplicateAccountCensusTest(TestCase):
         self.make_group("two@example.com")
         UserProfileWithParentsFactory.create(user__username="two@example.com")
 
-        report = run_census(email="  TWO@example.com ")
+        report = run_census(email="TWO@example.com")
         self.assertEqual(
             [g.email_key for g in report.groups], ["two@example.com"]
         )
