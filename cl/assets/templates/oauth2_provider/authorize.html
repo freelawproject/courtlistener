@@ -30,14 +30,6 @@
         {% endfor %}
       </ul>
 
-      {% if form.redirect_uri.value %}
-        <p>
-          After you decide, you will be redirected to:
-          <br>
-          <code>{{ form.redirect_uri.value }}</code>
-        </p>
-      {% endif %}
-
       <div class="alert alert-warning v-offset-above-2" role="alert">
         <i class="fa fa-exclamation-triangle"></i>
         Only authorize applications you trust. They will be able to
