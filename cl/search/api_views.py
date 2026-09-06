@@ -34,6 +34,7 @@ from cl.search.api_serializers import (
     OAESResultSerializer,
     OpinionClusterESResultSerializer,
     OpinionClusterSerializer,
+    OpinionsCitedByRECAPDocumentSerializer,
     OpinionsCitedSerializer,
     OpinionSerializer,
     OriginalCourtInformationSerializer,
@@ -60,6 +61,7 @@ from cl.search.filters import (
     DocketFilter,
     OpinionClusterFilter,
     OpinionFilter,
+    OpinionsCitedByRECAPDocumentFilter,
     OpinionsCitedFilter,
     RECAPDocumentFilter,
 )
@@ -74,6 +76,7 @@ from cl.search.models import (
     Opinion,
     OpinionCluster,
     OpinionsCited,
+    OpinionsCitedByRECAPDocument,
     OriginatingCourtInformation,
     RECAPDocument,
     Tag,
@@ -391,6 +394,36 @@ class OpinionsCitedViewSet(
     # Additional cursor ordering fields
     cursor_ordering_fields = ["id"]
     queryset = OpinionsCited.objects.all().order_by("-id")
+
+
+class OpinionsCitedByRECAPDocumentViewSet(
+    LoggingMixin,
+    NoFilterCacheListMixin,
+    DeferredFieldsMixin,
+    viewsets.ModelViewSet,
+):
+    serializer_class = OpinionsCitedByRECAPDocumentSerializer
+    filterset_class = OpinionsCitedByRECAPDocumentFilter
+    permission_classes = [
+        DjangoModelPermissions,
+        V3APIPermission,
+    ]
+    ordering_fields = (
+        "id",
+        "depth",
+        "citing_document",
+        "cited_opinion",
+    )
+    # Default cursor ordering key
+    ordering = "-id"
+    # Additional cursor ordering fields
+    cursor_ordering_fields = ["id"]
+    queryset = OpinionsCitedByRECAPDocument.objects.only(
+        "id",
+        "depth",
+        "citing_document",
+        "cited_opinion",
+    ).order_by("-id")
 
 
 class TagViewSet(LoggingMixin, DeferredFieldsMixin, viewsets.ModelViewSet):
