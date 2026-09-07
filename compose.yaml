@@ -1,0 +1,10 @@
+# Lets `docker compose up` work from the repository root.
+#
+# The real definition lives in docker/courtlistener/docker-compose.yml, which
+# CI also uses. `include` resolves that file's relative paths against its own
+# directory, so this is a pure alias and both entry points behave the same.
+#
+# Optional speed-up (postgres data in memory, as CI does it):
+#     docker compose -f compose.yaml -f docker/courtlistener/docker-compose.tmpfs.yml up --wait
+include:
+  - docker/courtlistener/docker-compose.yml

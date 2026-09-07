@@ -48,3 +48,11 @@ cl/settings/google_auth.json
 
 .vscode/*
 /.history
+
+# Personal docker compose overrides, e.g. to expose a dev port to other
+# devices. Compose loads these automatically next to the compose file it runs.
+/compose.override.yaml
+/compose.override.yml
+/docker-compose.override.yml
+/docker/courtlistener/compose.override.yaml
+/docker/courtlistener/docker-compose.override.yml
