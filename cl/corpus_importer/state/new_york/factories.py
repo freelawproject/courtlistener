@@ -183,8 +183,10 @@ class NYCoAFilingFactory(Factory):
     # `e:<filing type>:<party>:<ordinal>`, the shape the scraper keys a filing
     # read from the FILINGS table with.
     docket_entry_id = LazyAttributeSequence(
-        lambda o, n: f"e:{o.raw_filing_type.lower().replace(' ', '-')}:"
-        f"{o.party.replace(' ', '')}:{n + 1}"
+        lambda o, n: (
+            f"e:{o.raw_filing_type.lower().replace(' ', '-')}:"
+            f"{o.party.replace(' ', '')}:{n + 1}"
+        )
     )
     entry_index = Sequence(lambda n: n)
     entry_type = LazyAttribute(lambda o: o.filing.entry_type)

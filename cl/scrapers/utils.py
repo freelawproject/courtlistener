@@ -1,7 +1,6 @@
 import json
 import re
 from datetime import date, datetime
-from urllib.parse import urljoin
 
 import httpx
 from asgiref.sync import async_to_sync
@@ -12,7 +11,6 @@ from eyecite.find import get_citations
 from eyecite.tokenizers import HyperscanTokenizer
 from juriscraper import AbstractSite
 from juriscraper.AbstractSite import logger
-from lxml import html
 from reporters_db import REPORTERS
 
 from cl.citations.utils import map_reporter_db_cite_type
@@ -154,55 +152,6 @@ def get_child_court(child_court_name: str, court_id: str) -> Court | None:
         return None
 
     return child_court
-
-
-async def test_for_meta_redirections(
-    r: httpx.Response,
-) -> tuple[bool, str | None]:
-    """Test for meta data redirections
-
-    :param r: A response object
-    :return:  A boolean and value
-    """
-    response = await microservice(
-        service="buffer-extension",
-        file=r.content,
-        params={"mime": True},
-    )
-    extension = response.text
-
-    if extension == ".html":
-        html_tree = html.fromstring(r.text)
-        try:
-            path = (
-                "//meta[translate(@http-equiv, 'REFSH', 'refsh') = "
-                "'refresh']/@content"
-            )
-            attr = html_tree.xpath(path)[0]
-            wait, text = attr.split(";")
-            if text.lower().startswith("url="):
-                url = text[4:]
-                if not url.startswith("http"):
-                    # Relative URL, adapt
-                    url = urljoin(r.url, url)
-                return True, url
-        except IndexError:
-            return False, None
-    return False, None
-
-
-async def follow_redirections(
-    r: httpx.Response, s: httpx.AsyncClient
-) -> httpx.Response:
-    """
-    Parse and recursively follow meta refresh redirections if they exist until
-    there are no more.
-    """
-    redirected, url = await test_for_meta_redirections(r)
-    if redirected:
-        logger.info(f"Following a meta redirection to: {url.encode()}")
-        r = await follow_redirections(await s.get(url), s)
-    return r
 
 
 @retry(
