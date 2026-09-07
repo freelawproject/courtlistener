@@ -194,8 +194,9 @@ def extract_opinion_content(
         )
         return
 
-    content = response.json()["content"]
-    extracted_by_ocr = response.json()["extracted_by_ocr"]
+    data = response.json()
+    content = data["content"]
+    extracted_by_ocr = data["extracted_by_ocr"]
     # For PDF documents, if there's no content after the extraction without OCR
     # Let's try to extract using OCR.
     if (
@@ -203,16 +204,16 @@ def extract_opinion_content(
         and needs_ocr(content)
         and ".pdf" in str(opinion.local_path)
     ):
-        response = async_to_sync(microservice)(
+        ocr_response = async_to_sync(microservice)(
             service="document-extract-ocr",
             item=opinion,
             params={"ocr_available": ocr_available},
         )
-        if response.is_success:
-            content = response.json()["content"]
+        if ocr_response.is_success:
+            data = ocr_response.json()
+            content = data["content"]
             extracted_by_ocr = True
 
-    data = response.json()
     extension = opinion.local_path.name.split(".")[-1]
     opinion.extracted_by_ocr = extracted_by_ocr
 
@@ -333,8 +334,9 @@ def extract_doc_content(
         )
         return
 
-    content = response.json()["content"]
-    extracted_by_ocr = response.json()["extracted_by_ocr"]
+    data = response.json()
+    content = data["content"]
+    extracted_by_ocr = data["extracted_by_ocr"]
     # For PDF documents, if there's no content after the extraction without OCR
     # Let's try to extract using OCR.
     if (
@@ -342,16 +344,16 @@ def extract_doc_content(
         and needs_ocr(content)
         and ".pdf" in str(opinion.local_path)
     ):
-        response = async_to_sync(microservice)(
+        ocr_response = async_to_sync(microservice)(
             service="document-extract-ocr",
             item=opinion,
             params={"ocr_available": ocr_available},
         )
-        if response.is_success:
-            content = response.json()["content"]
+        if ocr_response.is_success:
+            data = ocr_response.json()
+            content = data["content"]
             extracted_by_ocr = True
 
-    data = response.json()
     extension = opinion.local_path.name.split(".")[-1]
     opinion.extracted_by_ocr = extracted_by_ocr
 
