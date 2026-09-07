@@ -1609,6 +1609,14 @@ class ViewRecapDocketTest(TestCase):
         )
         self.assertEqual(r.status_code, HTTPStatus.OK)
 
+    async def test_pray_and_pay_script_present_for_recap_docket(self) -> None:
+        """pray_and_pay.js has to load for a RECAP dockets."""
+        r = await self.async_client.get(
+            reverse("view_docket", args=[self.docket.pk, self.docket.slug])
+        )
+        self.assertEqual(r.status_code, HTTPStatus.OK)
+        self.assertIn("pray_and_pay.js", r.content.decode())
+
     async def test_appellate_docket_with_appeal_from_loads(self) -> None:
         """Regression for #7306: appellate docket loads in async view."""
         r = await self.async_client.get(
@@ -1944,6 +1952,7 @@ class ScotusDocketFlagEnabledTest(TestCase):
         self.assertNotIn("Buy Docket on PACER", content)
         self.assertIn("Get Alerts", content)
         self.assertNotIn("prayer-button", content)
+        self.assertNotIn("pray_and_pay.js", content)
         self.assertIn("View in SCOTUS", content)
         self.assertNotIn(
             'sourced from <a href="https://www.pacer.gov">PACER</a>',
