@@ -58,6 +58,14 @@ jobs:
       - name: Build and Push
         run: |
           make push-image --file docker/django/Makefile -e VERSION=$(git rev-parse --short HEAD)
+      # The development image (BUILD_ENV=dev) lets the compose stack pull
+      # instead of building; see docker/courtlistener/docker-compose.prebuilt.yml.
+      # It shares every layer up to the dependency install with the image above.
+      - name: Build and Push the development image
+        # A failed dev-image push must never hold up the production deploy.
+        continue-on-error: true
+        run: |
+          make push-dev-image --file docker/django/Makefile -e VERSION=$(git rev-parse --short HEAD)
 
   setup-deploy:
     needs: [get-pr-labels, build]
