@@ -30,7 +30,7 @@
 {% block footer-scripts %}
 	{% include "includes/date_picker.html" %}
 	<script src="{% static "js/jquery.bootstrap-growl.js" %}"></script>
-    <script type="text/javascript" nonce="{{ request.csp_nonce }}">
+    <script type="text/javascript" nonce="{{ csp_nonce }}">
         document.getElementById('court-upload-form').addEventListener('submit', function (e) {
             const form = this;
             const submitButton = this.querySelector('button[type="submit"]');
