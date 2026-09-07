@@ -414,8 +414,10 @@ def _scotus_document_label(document: SCOTUSDocument) -> str:
 
 
 def _scotus_document_detail_url(document: SCOTUSDocument) -> str | None:
-    """Return the URL of the CourtListener page for one SCOTUS document,
-    or None if it doesn't resolve to one."""
+    """Return the URL of the CourtListener page for one SCOTUS document, or
+    None if we don't have the file yet."""
+    if not document.filepath_local:
+        return None
     return document.get_absolute_url() or None
 
 

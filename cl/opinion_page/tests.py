@@ -57,6 +57,7 @@ from cl.opinion_page.docket_sources_utils import (
     RECAP_SOURCE,
     SCOTUS_SOURCE,
     _recap_document_detail_url,
+    _scotus_document_detail_url,
     build_scotus_metadata,
     document_url,
 )
@@ -862,6 +863,30 @@ class ViewSCOTUSDocumentTest(TestCase):
         )
         self.assertEqual(r.status_code, HTTPStatus.OK)
         self.assertContains(r, document.get_absolute_url())
+
+    def test_scotus_document_detail_urls_are_internal(self) -> None:
+        """Mirrors DocketEntryRowsV2Test.test_document_detail_urls_are_internal
+        for SCOTUS, _scotus_document_detail_url must never return an
+        externally-sourced URL."""
+        entry = SCOTUSDocketEntryFactory(docket=self.docket)
+        documents = [
+            SCOTUSDocumentFactory(
+                docket_entry=entry,
+                attachment_number=1,
+                filepath_local="recap_documents/test.pdf",
+            ),
+            SCOTUSDocumentFactory(
+                docket_entry=entry, attachment_number=2, filepath_local=""
+            ),
+        ]
+        for document in documents:
+            with self.subTest(document=document.pk):
+                detail_url = _scotus_document_detail_url(document)
+                if detail_url is not None:
+                    self.assertTrue(
+                        detail_url.startswith("/"),
+                        msg=f"{detail_url} is not an internal path.",
+                    )
 
 
 @override_settings(WAFFLE_CACHE_PREFIX="test_scotus_document_flag_waffle")
@@ -4012,9 +4037,8 @@ class DocketEntryRowsV2Test(TestCase):
         """Detail URLs must be CourtListener paths, since the template renders
         them unfiltered into an href.
 
-        SCOTUS is deliberately left out: _scotus_document_detail_url returns
-        None only until the SCOTUS document detail page exists, so asserting
-        on it would pin a placeholder rather than the contract.
+        SCOTUS is covered separately, in ViewSCOTUSDocumentTest's
+        test_scotus_document_detail_urls_are_internal.
         """
         documents = [
             self.rd_has_pdf,
