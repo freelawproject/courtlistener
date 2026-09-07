@@ -1,6 +1,7 @@
 import json
 import os
 from collections import defaultdict
+from collections.abc import Iterator
 from datetime import date, datetime, timedelta
 from http import HTTPStatus
 from pathlib import Path
@@ -875,6 +876,287 @@ class DupcheckerPressOnTest(TestCase):
             self.fail("Expected loop breaking ConsecutiveDuplicatesError")
         except ConsecutiveDuplicatesError:
             pass
+
+    def test_press_on_last_item_breaks_when_recency_ordered(self) -> None:
+        """A duplicate as the last item means the court is up to date"""
+        args = [*self.press_on_args]
+        args[2] = None
+        with self.assertRaises(ConsecutiveDuplicatesError):
+            self.dc_not_full_crawl.press_on(*args)
+
+    def test_press_on_never_breaks_when_not_recency_ordered(self) -> None:
+        """Sites that don't list new items first never end the crawl early"""
+        dup_checker = DupChecker(
+            self.court, False, 2, is_recency_ordered=False
+        )
+        older_next_date = [*self.press_on_args]
+        older_next_date[2] = now() - timedelta(days=1)
+        last_item = [*self.press_on_args]
+        last_item[2] = None
+        cases = {
+            "first duplicate": self.press_on_args,
+            "duplicate over the threshold": self.press_on_args,
+            "duplicate followed by an older date": older_next_date,
+            "duplicate as the last item": last_item,
+        }
+        for description, args in cases.items():
+            with self.subTest(description=description):
+                with self.assertRaises(SingleDuplicateError):
+                    dup_checker.press_on(*args)
+
+        self.assertFalse(dup_checker.can_abort_early)
+        self.assertTrue(dup_checker.should_precheck_urls)
+        self.assertEqual(dup_checker.dups_by_lookup["sha1"], 4)
+
+    def test_press_on_lookup_by_download_url(self) -> None:
+        """Can we find duplicates by URL, without any content?"""
+        url = "https://example.com/known.pdf"
+        OpinionFactory(
+            cluster=OpinionClusterFactory(docket=DocketFactory()),
+            download_url=url,
+        )
+        args = [Opinion, now(), now()]
+        self.assertIsNone(
+            self.dc_full_crawl.press_on(
+                *args, "https://example.com/new.pdf", lookup_by="download_url"
+            )
+        )
+        with self.assertRaises(SingleDuplicateError):
+            self.dc_full_crawl.press_on(*args, url, lookup_by="download_url")
+        self.assertEqual(self.dc_full_crawl.dups_by_lookup["download_url"], 1)
+
+    def test_press_on_mich_is_not_special(self) -> None:
+        """The old hardcoded exemption is gone; mich opts out in juriscraper"""
+        dup_checker = DupChecker(CourtFactory(id="mich"), False, 2)
+        args = [*self.press_on_args]
+        args[2] = now() - timedelta(days=1)
+        with self.assertRaises(ConsecutiveDuplicatesError):
+            dup_checker.press_on(*args)
+
+
+class FakeSite:
+    """A parsed juriscraper Site: an ordered list of case dicts
+
+    `download_content` returns the URL as bytes, so the sha1 of a document is
+    a function of its URL and tests can create the matching Opinions.
+    """
+
+    def __init__(
+        self,
+        items: list[dict],
+        is_recency_ordered: bool,
+        court_id: str = "juriscraper.opinions.united_states.test",
+    ) -> None:
+        """Builds the site
+
+        :param items: the case dicts, in the order the site would yield them
+        :param is_recency_ordered: the value of the juriscraper attribute
+        :param court_id: the juriscraper module string of the scraper
+        """
+        self.items = items
+        self.is_recency_ordered = is_recency_ordered
+        self.court_id = court_id
+        self.url = "https://example.com/opinions"
+        self.hash = "fake site hash"
+        self.cookies = {}
+        self.downloads: list[str] = []
+
+    def __iter__(self) -> Iterator[dict]:
+        """Yields the items in site order"""
+        yield from self.items
+
+    def __getitem__(self, i: int) -> dict:
+        """Returns the item at `i`, used by the crawl loop to peek ahead"""
+        return self.items[i]
+
+    def __len__(self) -> int:
+        """Returns the number of items"""
+        return len(self.items)
+
+    async def download_content(
+        self, url: str, media_root: str | None = None
+    ) -> bytes:
+        """Records the download and returns the URL as the document bytes"""
+        self.downloads.append(url)
+        return url.encode()
+
+
+@patch(
+    "cl.scrapers.management.commands.cl_scrape_opinions.extract_opinion_content"
+)
+@patch(
+    "cl.scrapers.management.commands.cl_scrape_opinions.get_extension",
+    return_value=".pdf",
+)
+class ScraperCrawlOrderTest(ESIndexTestCase, TestCase):
+    """Does the crawl loop honour the site's `is_recency_ordered` contract?"""
+
+    @classmethod
+    def setUpTestData(cls) -> None:
+        """Creates the court every `FakeSite` belongs to"""
+        cls.court = CourtFactory(id="test", jurisdiction="F")
+        cls.case_date = date(2026, 8, 25)
+
+    def make_item(self, index: int, **extra) -> dict:
+        """Builds one same-date case dict as juriscraper would emit it"""
+        item = {
+            "case_names": f"Case {index} v. State",
+            "case_dates": self.case_date,
+            "download_urls": f"https://example.com/opinion_{index}.pdf",
+            "precedential_statuses": "Published",
+            "blocked_statuses": False,
+            "date_filed_is_approximate": False,
+            "docket_numbers": f"6D2026-{index:04}",
+        }
+        item.update(extra)
+        return item
+
+    def make_known(self, url: str) -> Opinion:
+        """Stores an Opinion as a previous run of `FakeSite` would have"""
+        return OpinionFactory(
+            cluster=OpinionClusterFactory(
+                docket=DocketFactory(court=self.court)
+            ),
+            sha1=sha1(url.encode()),
+            download_url=url,
+        )
+
+    def scrape(self, site: FakeSite) -> None:
+        """Runs a regular, non full crawl, scrape of `site`"""
+        async_to_sync(cl_scrape_opinions.Command().scrape_court)(site)
+
+    def interleaved_items(self) -> list[dict]:
+        """Five known items, a new one, a known one: the pattern that made
+        the DupChecker stop before reaching the new item
+        """
+        items = [self.make_item(i) for i in range(7)]
+        for index in (0, 1, 2, 3, 4, 6):
+            self.make_known(items[index]["download_urls"])
+        return items
+
+    def test_not_recency_ordered_site_ingests_interleaved_items(
+        self, mock_get_extension, mock_extract
+    ) -> None:
+        """Are new items below a run of known items still ingested?"""
+        items = self.interleaved_items()
+        site = FakeSite(items, is_recency_ordered=False)
+
+        self.scrape(site)
+
+        new_url = items[5]["download_urls"]
+        self.assertTrue(Opinion.objects.filter(download_url=new_url).exists())
+        # Known items were skipped by URL, without downloading them
+        self.assertEqual(site.downloads, [new_url])
+        self.assertEqual(Opinion.objects.count(), 7)
+        self.assertEqual(UrlHash.objects.get(pk=site.url).sha1, site.hash)
+
+    def test_recency_ordered_site_still_stops_early(
+        self, mock_get_extension, mock_extract
+    ) -> None:
+        """Pins the current behaviour for sites that list new items first"""
+        items = self.interleaved_items()
+        site = FakeSite(items, is_recency_ordered=True)
+
+        self.scrape(site)
+
+        new_url = items[5]["download_urls"]
+        self.assertFalse(Opinion.objects.filter(download_url=new_url).exists())
+        # Every item up to the abort was downloaded and checked by sha1
+        self.assertEqual(
+            site.downloads, [item["download_urls"] for item in items[:5]]
+        )
+        self.assertEqual(Opinion.objects.count(), 6)
+
+    def test_mich_is_not_recency_ordered_without_the_attribute(
+        self, mock_get_extension, mock_extract
+    ) -> None:
+        """Until the pinned juriscraper declares it, mich keeps its exemption"""
+        CourtFactory(id="mich", jurisdiction="S")
+        items = self.interleaved_items()
+        site = FakeSite(
+            items,
+            is_recency_ordered=True,
+            court_id="juriscraper.opinions.united_states.state.mich",
+        )
+        del site.is_recency_ordered
+
+        self.scrape(site)
+
+        new_url = items[5]["download_urls"]
+        self.assertTrue(Opinion.objects.filter(download_url=new_url).exists())
+        self.assertEqual(site.downloads, [new_url])
+
+    def test_url_precheck_skips_the_whole_cluster(
+        self, mock_get_extension, mock_extract
+    ) -> None:
+        """A cluster with one known sub opinion is skipped before download"""
+        known = self.make_item(0)
+        new_in_known_cluster = self.make_item(1)
+        new_1 = self.make_item(2)
+        new_2 = self.make_item(3)
+        self.make_known(known["download_urls"])
+        items = [
+            self.make_item(
+                10,
+                sub_opinions=[
+                    {**known, "types": Opinion.LEAD},
+                    {**new_in_known_cluster, "types": Opinion.DISSENT},
+                ],
+            ),
+            self.make_item(
+                11,
+                sub_opinions=[
+                    {**new_1, "types": Opinion.LEAD},
+                    {**new_2, "types": Opinion.DISSENT},
+                ],
+            ),
+        ]
+        for item in items:
+            del item["download_urls"]
+        site = FakeSite(items, is_recency_ordered=False)
+
+        self.scrape(site)
+
+        self.assertEqual(
+            site.downloads, [new_1["download_urls"], new_2["download_urls"]]
+        )
+        self.assertFalse(
+            Opinion.objects.filter(
+                download_url=new_in_known_cluster["download_urls"]
+            ).exists()
+        )
+        self.assertEqual(Opinion.objects.count(), 3)
+
+    def test_url_precheck_ignores_blank_urls(
+        self, mock_get_extension, mock_extract
+    ) -> None:
+        """Items with no URL fall through to the sha1 check after download"""
+        # Some courts store a blank URL, which must never match as a duplicate
+        OpinionFactory(
+            cluster=OpinionClusterFactory(docket=DocketFactory()),
+            download_url="",
+        )
+        blank_url_item = self.make_item(0, download_urls="")
+        site = FakeSite([blank_url_item], is_recency_ordered=False)
+
+        self.scrape(site)
+
+        self.assertEqual(site.downloads, [""])
+        self.assertEqual(Opinion.objects.count(), 2)
+
+    def test_oral_argument_url_precheck(
+        self, mock_get_extension, mock_extract
+    ) -> None:
+        """Known audio files are skipped before download as well"""
+        url = "https://example.com/argument.mp3"
+        AudioWithParentsFactory(download_url=url)
+        item = self.make_item(0, download_urls=url)
+        site = FakeSite([item], is_recency_ordered=False)
+
+        async_to_sync(cl_scrape_oral_arguments.Command().scrape_court)(site)
+
+        self.assertEqual(site.downloads, [])
+        self.assertEqual(Audio.objects.count(), 1)
 
 
 class AudioFileTaskTest(TestCase):
