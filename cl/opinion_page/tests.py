@@ -768,9 +768,10 @@ class ViewSCOTUSDocumentTest(TestCase):
         self.assertEqual(r.status_code, HTTPStatus.OK)
         c = r.context
         self.assertEqual(document, c["rd"])
-        self.assertTrue(c["is_scotus"])
+        self.assertIs(c["docket_source"], SCOTUS_SOURCE)
         self.assertFalse(c["authorities"])
         self.assertContains(r, "Download PDF")
+        self.assertNotIn("pray_and_pay.js", r.content.decode())
 
     async def test_get_absolute_url_builds_main_document_url_without_attachment_number(
         self,
@@ -1807,6 +1808,8 @@ class DocketSourceComponentTest(SimpleTestCase):
             "docket_empty_message",
             "docket_empty_cta",
             "docket_source_li",
+            "document_download_button",
+            "document_unavailable_message",
         ),
     }
 

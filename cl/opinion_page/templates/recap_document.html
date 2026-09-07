@@ -135,7 +135,7 @@
                       </p>
                       <p>
                         <div class="v-offset-below-1 v-offset-above-1">
-                          {% include "includes/rd_download_button.html" %}
+                          {% include "includes/document_download_button/index.html" %}
                         </div>
                       </p>
                     </div>
@@ -180,52 +180,7 @@
 
           </div>
         {% else %}
-
-          {% if is_scotus %}
-            <div class="flex flex-column flex-sm-row row-gap-3 alert-danger alert justify-content-between">
-              <div class="col-sm-12">
-                <p class="bottom">
-                  <i class="fa fa-ban"></i> This document is unavailable because it was likely sealed or removed from the source.
-                </p>
-              </div>
-              {% if rd.url|http_url %}
-                <div class="col-sm-12 flex flex-row gap-2 justify-content-end">
-                  <a class="btn btn-primary btn-sm"
-                     href="{{ rd.url|http_url }}"
-                     rel="nofollow noopener noreferrer"
-                     target="_blank">View on SCOTUS</a>
-                </div>
-              {% endif %}
-            </div>
-          {% elif rd.is_sealed %}
-            <div class="col-sm-12 alert-danger alert">
-              <p class="bottom">
-                <i class="fa fa-ban"></i> This item is unavailable in PACER. This is usually caused by the court sealing the document.
-              </p>
-            </div>
-          {% else %}
-            <div id="doc-no-available-warning" class="flex flex-column flex-sm-row row-gap-3 alert-warning alert justify-content-between">
-              <div class="col-sm-12">
-                <p class="bottom">This item is not yet in the RECAP collection.
-                </p>
-              </div>
-              <div class="col-sm-12 flex flex-row gap-2 justify-content-end">
-                {% if rd.pacer_url %}
-                  <a class="btn btn-primary btn-sm"
-                     href="{{ rd.pacer_url }}"
-                     rel="nofollow noopener noreferrer"
-                     target="_blank"><i class="fa fa-dollar"></i>&nbsp;Buy on PACER</a>
-                {% endif %}
-                {% if not request.COOKIES.recap_install_plea %}
-                  <a href="https://free.law/recap/"
-                     class="btn btn-success btn-sm recap_install_plea">Install RECAP</a>
-                {% endif %}
-                <div class="prayer-button">
-                  {% include "includes/pray_and_pay_htmx/pray_button.html" with prayer_exists=rd.prayer_exists document_id=rd.id count=rd.prayer_count regular_size=True%}
-                </div>
-              </div>
-            </div>
-          {% endif %}
+          {% include "includes/document_unavailable_message/index.html" %}
         {% endif %}
       </div>
     </article>

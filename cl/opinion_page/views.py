@@ -835,7 +835,7 @@ async def recap_document_context(
             "redirect_to_pacer_modal": redirect_to_pacer_modal,
             "authorities": getattr(rd, "authorities", False),
             "attachments": attachments,
-            "is_scotus": is_scotus,
+            "docket_source": source,
             "admin_url_names": source.admin_url_names,
             "admin_perm_names": source.admin_perm_names,
             "admin_document_label": source.admin_document_label,
