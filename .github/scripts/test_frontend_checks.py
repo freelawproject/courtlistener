@@ -15,6 +15,37 @@ from pathlib import Path
 import frontend_checks as fc
 
 
+class SkipFileDirectiveTest(unittest.TestCase):
+    """``frontend-checks-skip`` accepts Django and CSS comment syntax."""
+
+    def test_parse_skip_checks(self) -> None:
+        """Both comment syntaxes are parsed and capped to SKIPPABLE_CHECKS."""
+        cases = {
+            "{# frontend-checks-skip: check_include_in_v2, check_jquery #}": {
+                "check_include_in_v2"
+            },
+            "/* frontend-checks-skip: check_raw_css */": {"check_raw_css"},
+        }
+        for directive, expected in cases.items():
+            with self.subTest(directive):
+                self.assertEqual(fc._parse_skip_checks([directive]), expected)
+
+    def test_directive_silences_whole_css_file(self) -> None:
+        """A file-level directive in input.css drops every raw CSS finding."""
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            css = "cl/assets/tailwind/input.css"
+            path = root / css
+            path.parent.mkdir(parents=True)
+            path.write_text(
+                "/* frontend-checks-skip: check_raw_css */\n"
+                ".foo {\n  color: red;\n  margin: 0;\n}\n",
+                encoding="utf-8",
+            )
+            findings = fc.run_checks([css], root, {css: "M"})
+        self.assertEqual(findings, [])
+
+
 class SkipLineDirectiveTest(unittest.TestCase):
     """``frontend-checks-skip-line`` parsing and application."""
 
