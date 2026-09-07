@@ -772,19 +772,32 @@ class ViewSCOTUSDocumentTest(TestCase):
         self.assertFalse(c["authorities"])
         self.assertContains(r, "Download PDF")
 
-    async def test_get_absolute_url_falls_back_when_no_attachment_number(
+    async def test_get_absolute_url_builds_main_document_url_without_attachment_number(
         self,
     ) -> None:
-        """Confirm get_absolute_url() returns "" instead of raising
-        NoReverseMatch if attachment_number is missing.
-        """
+        """A SCOTUSDocument with a document_number but no attachment_number
+        is still served at the main view_recap_document URL by
+        recap_document_context()."""
         entry = await sync_to_async(SCOTUSDocketEntryFactory)(
             docket=self.docket
         )
         document = await sync_to_async(SCOTUSDocumentFactory)(
-            docket_entry=entry, attachment_number=None
+            docket_entry=entry, document_number=7, attachment_number=None
         )
-        self.assertEqual(document.get_absolute_url(), "")
+        self.assertEqual(
+            document.get_absolute_url(),
+            reverse(
+                "view_recap_document",
+                kwargs={
+                    "docket_id": self.docket.pk,
+                    "doc_num": 7,
+                    "slug": self.docket.slug,
+                },
+            ),
+        )
+        r = await self.get(docket_id=self.docket.id, doc_num=7)
+        self.assertEqual(r.status_code, HTTPStatus.OK)
+        self.assertEqual(r.context["rd"], document)
 
     async def test_download_dropdown_excludes_ia_and_pacer(self) -> None:
         entry = await sync_to_async(SCOTUSDocketEntryFactory)(
