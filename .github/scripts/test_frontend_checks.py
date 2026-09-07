@@ -12,7 +12,32 @@ import textwrap
 import unittest
 from pathlib import Path
 
-import frontend_checks as fc
+import frontend_checks
+
+# The script identifies input.css by exact path; v2 templates only need a v2_ directory.
+CSS_FILE = "cl/assets/tailwind/input.css"
+V2_TEMPLATE_FILE = "cl/foo/templates/v2_help/index.html"
+
+
+def _run_checks_on(files: dict[str, str]) -> list[tuple[str, int, str]]:
+    """Write ``{repo-relative path: content}`` into a temp repo and lint them all as modified.
+
+    Simulates the output of ``git diff --name-status`` as required by frontend_checks.
+    Returns ``(file, line, check)`` per finding, in report order.
+    """
+    with tempfile.TemporaryDirectory() as tmp:
+        root = Path(tmp)
+        for rel_path, content in files.items():
+            path = root / rel_path
+            path.parent.mkdir(parents=True)
+            path.write_text(
+                textwrap.dedent(content).lstrip("\n"), encoding="utf-8"
+            )
+        changed = list(files)
+        findings = frontend_checks.run_checks(
+            changed, root, dict.fromkeys(changed, "M")
+        )
+    return [(f.file, f.line, f.check) for f in findings]
 
 
 class SkipFileDirectiveTest(unittest.TestCase):
@@ -28,22 +53,41 @@ class SkipFileDirectiveTest(unittest.TestCase):
         }
         for directive, expected in cases.items():
             with self.subTest(directive):
-                self.assertEqual(fc._parse_skip_checks([directive]), expected)
+                self.assertEqual(
+                    frontend_checks._parse_skip_checks([directive]), expected
+                )
 
     def test_directive_silences_whole_css_file(self) -> None:
         """A file-level directive in input.css drops every raw CSS finding."""
-        with tempfile.TemporaryDirectory() as tmp:
-            root = Path(tmp)
-            css = "cl/assets/tailwind/input.css"
-            path = root / css
-            path.parent.mkdir(parents=True)
-            path.write_text(
-                "/* frontend-checks-skip: check_raw_css */\n"
-                ".foo {\n  color: red;\n  margin: 0;\n}\n",
-                encoding="utf-8",
-            )
-            findings = fc.run_checks([css], root, {css: "M"})
+        findings = _run_checks_on(
+            {
+                CSS_FILE: """
+                    /* frontend-checks-skip: check_raw_css */
+                    .foo {
+                      color: red;
+                      margin: 0;
+                    }
+                    """
+            }
+        )
         self.assertEqual(findings, [])
+
+    def test_directive_only_silences_the_named_check(self) -> None:
+        """Other checks on the same file keep reporting."""
+        findings = _run_checks_on(
+            {
+                V2_TEMPLATE_FILE: """
+                    {% extends "new_base.html" %}
+                    {# frontend-checks-skip: check_include_in_v2 #}
+                    {% include "x.html" %}
+                    <div x-data="dropdown"></div>
+                    """
+            }
+        )
+        self.assertEqual(
+            findings,
+            [(V2_TEMPLATE_FILE, 4, "check_xdata_without_require_script")],
+        )
 
 
 class SkipLineDirectiveTest(unittest.TestCase):
@@ -58,7 +102,7 @@ class SkipLineDirectiveTest(unittest.TestCase):
             "{% include 'x' %} {# frontend-checks-skip-line: check_include_in_v2, check_jquery #}",
         ]
         self.assertEqual(
-            fc._parse_line_skips(lines),
+            frontend_checks._parse_line_skips(lines),
             {1: {"check_raw_css"}, 3: {"check_include_in_v2"}},
         )
 
@@ -67,41 +111,41 @@ class SkipLineDirectiveTest(unittest.TestCase):
         for snippet in ("color: red; /* note */", "/* note */ color: red;"):
             with self.subTest(snippet):
                 self.assertEqual(
-                    [line for line, _ in fc.check_raw_css([snippet])], [1]
+                    [
+                        line
+                        for line, _ in frontend_checks.check_raw_css([snippet])
+                    ],
+                    [1],
                 )
         for snippet in ("/* color: blue; */", "/*\n  color: red;\n*/"):
             with self.subTest(snippet):
-                self.assertEqual(fc.check_raw_css(snippet.splitlines()), [])
+                self.assertEqual(
+                    frontend_checks.check_raw_css(snippet.splitlines()), []
+                )
 
     def test_directive_applies_to_its_own_line_only(self) -> None:
         """A directive silences an allowlisted check on its line and nothing else."""
-        with tempfile.TemporaryDirectory() as tmp:
-            root = Path(tmp)
-            css = "cl/assets/tailwind/input.css"
-            v2 = "cl/foo/templates/v2_help/index.html"
-            files = {
-                css: """
+        findings = _run_checks_on(
+            {
+                CSS_FILE: """
                     .scrollbar-none {
                       scrollbar-width: none; /* frontend-checks-skip-line: check_raw_css */
                       -ms-overflow-style: none;
                     }
                     """,
-                v2: """
+                V2_TEMPLATE_FILE: """
                     {% extends "new_base.html" %}
                     {% include "x.html" %} {# frontend-checks-skip-line: check_include_in_v2 #}
                     <script>$(".x")</script> {# frontend-checks-skip-line: check_jquery #}
                     """,
             }
-            for rel_path, content in files.items():
-                path = root / rel_path
-                path.parent.mkdir(parents=True)
-                path.write_text(
-                    textwrap.dedent(content).lstrip("\n"), encoding="utf-8"
-                )
-            findings = fc.run_checks([css, v2], root, {css: "M", v2: "M"})
+        )
         self.assertEqual(
-            [(f.file, f.line, f.check) for f in findings],
-            [(css, 3, "check_raw_css"), (v2, 3, "check_jquery")],
+            findings,
+            [
+                (CSS_FILE, 3, "check_raw_css"),
+                (V2_TEMPLATE_FILE, 3, "check_jquery"),
+            ],
         )
 
 
