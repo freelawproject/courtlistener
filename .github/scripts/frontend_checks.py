@@ -38,10 +38,11 @@ SKIPPABLE_CHECKS = {
     "check_include_in_v2",
 }
 
-_skip_directive_re = re.compile(r"\{#\s*frontend-checks-skip:\s*(.+?)\s*#\}")
-
-# Same-line variant. Accepts Django ({# #}) and CSS (/* */) comment syntax
-# so it works in both templates and input.css.
+# Directives live in Django ({# #}) or CSS (/* */) comments so they work in
+# both templates and input.css.
+_skip_directive_re = re.compile(
+    r"(?:\{#|/\*)\s*frontend-checks-skip:\s*(.+?)\s*(?:#\}|\*/)"
+)
 _line_skip_directive_re = re.compile(
     r"(?:\{#|/\*)\s*frontend-checks-skip-line:\s*(.+?)\s*(?:#\}|\*/)"
 )
@@ -53,10 +54,10 @@ def _skippable_names(raw: str) -> set[str]:
 
 
 def _parse_skip_checks(lines: list[str]) -> set[str]:
-    """Parse ``{# frontend-checks-skip: ... #}`` comments.
+    """Parse ``frontend-checks-skip: ...`` comments.
 
     Returns the intersection of requested skips with SKIPPABLE_CHECKS,
-    so non-allowlisted checks cannot be bypassed.
+    so non-allowlisted checks cannot be bypassed. Applies to the whole file.
     """
     skip: set[str] = set()
     for line in lines:
