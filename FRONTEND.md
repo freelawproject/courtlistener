@@ -37,6 +37,7 @@ New templates MUST extend `new_base.html` (or another `v2_` template). Only `new
 When a legacy template has a `v2_` counterpart:
 - The legacy template MUST have a sync-notice comment at the top referencing the waffle flag
 - Changes to either version MUST be mirrored in the other for content/behavior parity (implementation details can differ by stack)
+- Deleting the legacy template makes the `v2_` version live for everyone, regardless of the waffle flag. Only do it once the v2 page is production-ready
 
 Sync notice format:
 ```html
@@ -169,6 +170,7 @@ The rules in this doc are enforced as hard errors that block merge. See `fronten
 - `x-data` without a corresponding `{% require_script %}`
 - Placeholder text (TODO, TBD, FIXME, Lorem ipsum)
 - Raw CSS properties in `input.css` (prefer `@apply`)
+- Legacy template deleted while its `v2_` counterpart exists (the v2 page goes live for everyone)
 
 **Skipping a check** (only the checks listed in `SKIPPABLE_CHECKS` in `frontend_checks.py`; security, accessibility and architecture checks cannot be skipped). Use the check name shown in brackets in the CI annotation, e.g. `[check_raw_css]`:
 - Whole file: `{# frontend-checks-skip: check_name, other_check #}` anywhere in a template, or `/* frontend-checks-skip: check_name */` in CSS
