@@ -915,6 +915,28 @@ def run_checks(
             )
         )
 
+    # Deletion check: IncrementalNewTemplateMiddleware serves a v2_ template
+    # to everyone once its legacy counterpart is gone, so deleting the legacy
+    # file is a release, not a cleanup. Warning-level because v2-only pages
+    # can be intentional.
+    for legacy_path in changed_legacy_templates:
+        if file_statuses.get(legacy_path) != "D":
+            continue
+        v2_path = _swap_template_prefix(legacy_path, add_v2=True)
+        if v2_path is None or not (repo_root / v2_path).is_file():
+            continue
+        findings.append(
+            Finding(
+                legacy_path,
+                1,
+                "check_legacy_template_deleted",
+                WARN,
+                f"Legacy template deleted but its v2_ counterpart ({v2_path}) "
+                "exists; deleting it makes the v2 page live for everyone. "
+                "Confirm if this is intentional.",
+            )
+        )
+
     return findings
 
 
