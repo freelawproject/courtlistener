@@ -35,9 +35,9 @@
   {{ transcript_segments_data|json_script:"transcript-segment-data" }}
 
   <script defer type="text/javascript"
-          src="{% static "js/transcript.js" %}" nonce="{{ request.csp_nonce }}"></script>
+          src="{% static "js/transcript.js" %}" nonce="{{ csp_nonce }}"></script>
 
-  <script type="text/javascript" nonce="{{ request.csp_nonce }}">
+  <script type="text/javascript" nonce="{{ csp_nonce }}">
     $(document).ready(function () {
       var player = $("#jquery_jplayer_1");
       var speedBar = $('.jp-speed-bar');
