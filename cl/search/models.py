@@ -4317,6 +4317,36 @@ class SCOTUSDocument(AbstractDateTimeModel, AbstractPDF):
         )
         return str(root / f"gov.scotus.{slug}.pdf")
 
+    def get_absolute_url(self) -> str:
+        if not self.document_number:
+            return ""
+        if self.attachment_number is None:
+            return reverse(
+                "view_recap_document",
+                kwargs={
+                    "docket_id": self.docket_entry.docket_id,
+                    "doc_num": self.document_number,
+                    "slug": self.docket_entry.docket.slug,
+                },
+            )
+        return reverse(
+            "view_recap_attachment",
+            kwargs={
+                "docket_id": self.docket_entry.docket_id,
+                "doc_num": self.document_number,
+                "att_num": self.attachment_number,
+                "slug": self.docket_entry.docket.slug,
+            },
+        )
+
+    @property
+    def is_available(self) -> bool:
+        return bool(self.filepath_local)
+
+    @property
+    def has_valid_pdf(self) -> bool:
+        return self.is_available
+
     @property
     def needs_extraction(self):
         """Does the item need extraction and does it have all the right
