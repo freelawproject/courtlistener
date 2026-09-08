@@ -79,6 +79,9 @@ from cl.corpus_importer.management.commands.normalize_judges_opinions import (
 from cl.corpus_importer.management.commands.probe_iquery_pages_daemon import (
     get_latest_pacer_case_id_for_courts,
 )
+from cl.corpus_importer.management.commands.recap_into_opinions import (
+    import_opinions_from_recap,
+)
 from cl.corpus_importer.management.commands.scrape_pacer_free_opinions import (
     CL_OPERATIONAL_EXCLUSIONS,
     EXCLUDED_COURT_IDS,
@@ -86,6 +89,7 @@ from cl.corpus_importer.management.commands.scrape_pacer_free_opinions import (
     do_everything,
     get_and_save_free_document_reports,
     get_outstanding_failed_dates,
+    get_pdfs,
     report_free_document_scrape_stalls,
 )
 from cl.corpus_importer.management.commands.update_casenames_wl_dataset import (
@@ -114,6 +118,7 @@ from cl.corpus_importer.tasks import (
     merge_texas_trial_court_data,
     normalize_texas_parties,
     probe_or_scrape_iquery_pages,
+    recap_document_into_opinions,
 )
 from cl.corpus_importer.utils import (
     DocketSourceException,
@@ -653,6 +658,119 @@ class FreeOpinionExcludedCourtsTest(SimpleTestCase):
     def test_operational_exclusions_are_included(self) -> None:
         for court_id in CL_OPERATIONAL_EXCLUSIONS:
             self.assertIn(court_id, EXCLUDED_COURT_IDS)
+
+
+class OpinionEmbeddingQueuePropagationTest(TestCase):
+    """Test embedding queue propagation through corpus-importer bulk work."""
+
+    @patch(
+        "cl.corpus_importer.management.commands.scrape_pacer_free_opinions."
+        "PACERFreeDocumentRow.objects.filter"
+    )
+    @patch(
+        "cl.corpus_importer.management.commands.scrape_pacer_free_opinions.chain"
+    )
+    def test_free_opinion_scrape_reuses_batch_queue(
+        self, mock_chain, mock_filter
+    ) -> None:
+        """The free-opinion chain passes its queue into opinion ingestion."""
+        rows = mock_filter.return_value.annotate.return_value.order_by
+        rows.return_value.values_list.return_value = [(123, "cand")]
+
+        get_pdfs(
+            ["cand"],
+            date(2026, 1, 1),
+            date(2026, 1, 1),
+            "batch2",
+        )
+
+        ingestion_signature = mock_chain.call_args.args[2]
+        self.assertEqual(
+            ingestion_signature.kwargs, {"embedding_queue": "batch2"}
+        )
+        self.assertEqual(ingestion_signature.options["queue"], "batch2")
+
+    @patch(
+        "cl.corpus_importer.management.commands.recap_into_opinions."
+        "CeleryThrottle"
+    )
+    @patch(
+        "cl.corpus_importer.management.commands.recap_into_opinions."
+        "recap_document_into_opinions.apply_async"
+    )
+    def test_recap_bulk_import_reuses_batch_queue(
+        self, mock_apply_async, _mock_throttle
+    ) -> None:
+        """The RECAP bulk importer passes its queue into opinion ingestion."""
+        court = CourtFactory(id="nysd", jurisdiction=Court.FEDERAL_DISTRICT)
+        OpinionClusterFactory(
+            docket=DocketFactory(court=court),
+            date_filed=date(2025, 1, 1),
+            source=ClusterSources.COURT_WEBSITE,
+        )
+        recap_document = RECAPDocumentFactory(
+            docket_entry=DocketEntryFactory(
+                docket=DocketFactory(court=court),
+                date_filed=date(2026, 1, 1),
+            ),
+            is_available=True,
+            is_free_on_pacer=True,
+            sha1="recap-bulk-embedding-queue-test",
+        )
+
+        import_opinions_from_recap(
+            court_str=court.pk,
+            total_count=1,
+            queue="batch2",
+            skip_citation_finding=False,
+        )
+
+        mock_apply_async.assert_called_once_with(
+            args=[{}, recap_document.pk, False],
+            kwargs={"embedding_queue": "batch2"},
+            queue="batch2",
+        )
+
+    @patch(
+        "cl.corpus_importer.tasks."
+        "find_citations_and_parentheticals_for_opinion_by_pks.delay"
+    )
+    @patch("cl.corpus_importer.tasks.classify_case_name_by_llm.delay")
+    @patch("cl.corpus_importer.tasks.filter_out_non_case_law_citations")
+    @patch("cl.corpus_importer.tasks.eyecite.get_citations")
+    @patch("cl.corpus_importer.tasks.extract_recap_document_for_opinions")
+    def test_opinion_ingestion_propagates_queue_to_citation_task(
+        self,
+        mock_extract,
+        mock_get_citations,
+        mock_filter_citations,
+        _mock_classify,
+        mock_find_citations,
+    ) -> None:
+        """Opinion ingestion forwards its batch queue to citation processing."""
+        court = CourtFactory(id="cand", jurisdiction=Court.FEDERAL_DISTRICT)
+        docket = DocketFactory(court=court, docket_number_raw="1:26-cv-00001")
+        recap_document = RECAPDocumentFactory(
+            docket_entry=DocketEntryFactory(
+                docket=docket, date_filed=date(2026, 1, 1)
+            ),
+            sha1="embedding-queue-test",
+        )
+        mock_extract.return_value.json.return_value = {
+            "content": "1 U.S. 1",
+            "extracted_by_ocr": False,
+        }
+        mock_get_citations.return_value = [mock.Mock()]
+        mock_filter_citations.return_value = [mock.Mock()]
+
+        recap_document_into_opinions.run(
+            {}, recap_document.pk, False, "batch2"
+        )
+
+        opinion = Opinion.objects.get(sha1=recap_document.sha1)
+        mock_find_citations.assert_called_once_with(
+            [opinion.pk], embedding_queue="batch2"
+        )
 
 
 class ScrapeFreeOpinionsLoopTest(TestCase):

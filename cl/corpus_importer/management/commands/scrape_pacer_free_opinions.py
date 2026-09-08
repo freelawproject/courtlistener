@@ -489,7 +489,7 @@ def get_pdfs(
             # endpoint, so it doesn't depend on the document's content
             # being extracted on `get_and_process_free_pdf`, where it's
             # only extracted if it doesn't require OCR
-            recap_document_into_opinions.s().set(queue=q),
+            recap_document_into_opinions.s(embedding_queue=q).set(queue=q),
             delete_pacer_row.s(pk).set(queue=q),
         )
 

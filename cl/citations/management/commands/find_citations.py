@@ -261,6 +261,7 @@ class Command(VerboseCommand):
                         disable_parenthetical_groups,
                         disable_citation_count_update,
                     ),
+                    kwargs={"embedding_queue": queue_name},
                     queue=queue_name,
                 )
                 chunk = []
