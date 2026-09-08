@@ -43,6 +43,8 @@ jobs:
 
       - name: Minimize previous bot comments
         if: always()
+        # Tolerate error to avoid pipeline failing on forks. See #7847.
+        continue-on-error: true
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
@@ -64,6 +66,8 @@ jobs:
 
       - name: Post PR comment
         if: always() && hashFiles('summary.md') != ''
+        # Tolerate error to avoid pipeline failing on forks. See #7847.
+        continue-on-error: true
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
