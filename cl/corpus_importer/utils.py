@@ -32,6 +32,7 @@ from juriscraper.state.texas.common import (
     CourtType,
     TexasOriginatingCourt,
 )
+from numpy import ndarray
 
 from cl.citations.utils import map_reporter_db_cite_type
 from cl.lib.command_utils import logger
@@ -336,7 +337,7 @@ def compare_documents(file_characters: str, cl_characters: str) -> int:
 
 def similarity_scores(
     texts_to_compare_1: list[str], texts_to_compare_2: list[str]
-) -> list[list[float]]:
+) -> ndarray:
     """Get similarity scores between two sets of lists
 
     Using TF-IDF/Term Frequency-Inverse Document Frequency
@@ -344,7 +345,10 @@ def similarity_scores(
 
     :param texts_to_compare_1: List of text to compare
     :param texts_to_compare_2: List of text to compare
-    :return: Return similarity scores
+    :return: A 2D array of similarity scores, one row per text in
+    `texts_to_compare_1`. `match_opinion_lists` relies on the rows being
+    `ndarray`s (it calls `.argmax()` on each), so this is not a plain
+    `list[list[float]]` despite what callers may expect.
     """
 
     # We import the library inside the function to avoid loading it if it is
@@ -353,8 +357,11 @@ def similarity_scores(
     from sklearn.metrics.pairwise import cosine_similarity
 
     # Weights the word counts by a measure of how often they appear in the
-    # documents, and it returns a sparse matrix
-    X = TfidfVectorizer().fit_transform(
+    # documents, and it returns a sparse matrix. scikit-learn's stub types
+    # this as the base `spmatrix`, which doesn't declare `__getitem__` (scipy
+    # sparse matrices are mid-migration to a typed "sparse array" interface),
+    # so slicing it below can't be checked.
+    X: Any = TfidfVectorizer().fit_transform(
         texts_to_compare_1 + texts_to_compare_2
     )
 

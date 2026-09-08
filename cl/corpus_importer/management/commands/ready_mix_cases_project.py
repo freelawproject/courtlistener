@@ -320,7 +320,12 @@ def add_bank_cases_to_cl(options: OptionsType, r) -> None:
             throttle.update_min_items(len(updated_court_ids))
             throttle.maybe_wait()
 
-            iquery_empty_count = int(r.hget("iquery_empty_results", court_id))
+            # `hget` returns None if the field is missing (it shouldn't be,
+            # since every court_id is reset to 0 above, but int(None) would
+            # otherwise crash if it ever were).
+            iquery_empty_count = int(
+                r.hget("iquery_empty_results", court_id) or 0
+            )
             if iquery_empty_count >= stop_threshold:
                 # Abort for consecutive empty results.
                 # Stop doing this court.

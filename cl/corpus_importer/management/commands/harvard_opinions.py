@@ -6,7 +6,7 @@ import os
 import re
 from datetime import date, datetime, timedelta
 from glob import glob
-from typing import Any, TypedDict
+from typing import Any, TypedDict, cast
 
 import requests
 from bs4 import BeautifulSoup
@@ -187,7 +187,10 @@ def map_opinion_type(harvard_opinion_type: str) -> str:
         "on-the-merits": Opinion.ON_THE_MERITS,
         "on-motion-to-strike-cost-bill": Opinion.ON_MOTION_TO_STRIKE,
     }
-    return type_map.get(harvard_opinion_type, Opinion.COMBINED)
+    # `cl.search` is in pyrefly's `replace-imports-with-any`, so `Opinion`'s
+    # type choice attributes (all `str`s at runtime) are invisible to the
+    # type checker here.
+    return cast(str, type_map.get(harvard_opinion_type, Opinion.COMBINED))
 
 
 def parse_extra_fields(soup, fields, long_field=False) -> dict:

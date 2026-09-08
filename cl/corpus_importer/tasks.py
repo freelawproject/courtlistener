@@ -14,7 +14,7 @@ from io import BytesIO
 from pyexpat import ExpatError
 from re import Pattern
 from tempfile import NamedTemporaryFile
-from typing import IO, Any, TypeIs
+from typing import IO, Any, TypeIs, cast
 from urllib.parse import urljoin
 
 import botocore.exceptions
@@ -2303,7 +2303,13 @@ def download_pacer_pdf_by_rd(
     else:
         report = FreeOpinionReport(pacer_court_id, s)
         r, r_msg = report.download_pdf(
-            pacer_case_id, pacer_doc_id, magic_number, de_seq_num=de_seq_num
+            pacer_case_id,
+            # juriscraper types `pacer_doc_id` as `int`, but PACER document
+            # IDs are opaque strings everywhere else in this codebase (and
+            # in juriscraper itself -- see e.g. `make_doc1_url`).
+            cast(int, pacer_doc_id),
+            magic_number,
+            de_seq_num=de_seq_num,
         )
     return r, r_msg
 
@@ -2339,7 +2345,14 @@ def download_pdf_by_magic_number(
     )
     report = FreeOpinionReport(court_id, s)
     r, r_msg = report.download_pdf(
-        pacer_case_id, pacer_doc_id, magic_number, appellate, de_seq_num, acms
+        pacer_case_id,
+        # See the comment on the other `download_pdf` call in this module:
+        # juriscraper types this as `int`, but it's really an opaque string.
+        cast(int, pacer_doc_id),
+        magic_number,
+        appellate,
+        de_seq_num,
+        acms,
     )
     return r, r_msg
 
@@ -5144,7 +5157,10 @@ def fl_ingest_docket_task(
     """
     case_bytes, bucket, key = download_result
     try:
-        case = FloridaCase.deserialize(case_bytes.decode())
+        # `Deserializable.deserialize` (juriscraper) is annotated to return
+        # `Deserializable` rather than `Self`, so it widens away the
+        # `FloridaCase`-specific attributes accessed below.
+        case = cast(FloridaCase, FloridaCase.deserialize(case_bytes.decode()))
     except Exception:
         logger.exception(
             "Failed to deserialize Florida case stored in %s at %s",
