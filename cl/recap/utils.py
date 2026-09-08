@@ -7,7 +7,12 @@ from django.db.models import QuerySet
 from django.forms.models import model_to_dict
 from django.template import loader
 
-from cl.recap.models import UPLOAD_TYPE, PacerFetchQueue, ProcessingQueue
+from cl.recap.models import (
+    PROCESSING_QUEUE_SOURCE,
+    UPLOAD_TYPE,
+    PacerFetchQueue,
+    ProcessingQueue,
+)
 from cl.search.models import Docket, DocketEntry, RECAPDocument
 
 
@@ -144,6 +149,7 @@ def find_subdocket_pdf_rds_from_data(
                 court_id=court_id,
                 upload_type=UPLOAD_TYPE.PDF,
                 filepath_local=ContentFile(pdf_bytes, name="document.pdf"),
+                source=PROCESSING_QUEUE_SOURCE.REPLICATION,
             )
         )
 
@@ -193,6 +199,7 @@ def find_subdocket_atts_rds_from_data(
                 filepath_local=ContentFile(
                     att_bytes, name="attachment_page.html"
                 ),
+                source=PROCESSING_QUEUE_SOURCE.REPLICATION,
             )
         )
 

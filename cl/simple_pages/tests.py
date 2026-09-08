@@ -4,6 +4,7 @@ from unittest.mock import MagicMock, patch
 
 from django.contrib.auth.models import User
 from django.http import HttpResponse
+from django.template.loader import TemplateDoesNotExist, get_template
 from django.test import override_settings
 from django.urls import reverse
 from lxml.html import fromstring
@@ -13,6 +14,7 @@ from cl.lib.test_helpers import SimpleUserDataMixin
 from cl.simple_pages.forms import ContactForm
 from cl.simple_pages.sitemap import SimpleSitemap
 from cl.tests.cases import SimpleTestCase, TestCase
+from cl.tests.utils import parse_csp
 
 
 # Mock the hcaptcha thing so that we're sure it validates during tests
@@ -387,6 +389,16 @@ class V2PagesRegisterTest(PageLoadTestMixin, SimpleUserDataMixin, TestCase):
         ({"viewname": "components"}, "v2_components.html"),
     ]
 
+    @staticmethod
+    def _get_legacy_counterpart(v2_template: str) -> str | None:
+        """Returns the legacy template a v2 one replaces, None otherwise."""
+        legacy = v2_template.removeprefix("v2_")
+        try:
+            get_template(legacy)
+            return legacy
+        except TemplateDoesNotExist:
+            return None
+
     async def test_v2_pages(self) -> None:
         """Do all registered v2 pages load properly with the redesign flag?"""
         for reverse_param, v2_template in self.V2_PAGES:
@@ -395,6 +407,23 @@ class V2PagesRegisterTest(PageLoadTestMixin, SimpleUserDataMixin, TestCase):
             ):
                 r = await self.assert_page_loads_ok(reverse_param)
                 self.assertTemplateUsed(r, v2_template)
+
+    def test_v2_pages_without_the_flag(self) -> None:
+        """Do registered pages still load for a visitor without the flag?
+
+        Each one falls back to its legacy template, or keeps rendering v2
+        when the redesign left no legacy template behind.
+        """
+        for reverse_param, v2_template in self.V2_PAGES:
+            with (
+                self.subTest("Checking v2 page", reverse_params=reverse_param),
+                override_flag("use_new_design", active=False),
+            ):
+                r = self.client.get(reverse(**reverse_param))
+                self.assertEqual(r.status_code, HTTPStatus.OK)
+                self.assertTemplateUsed(
+                    r, self._get_legacy_counterpart(v2_template) or v2_template
+                )
 
 
 @patch("hcaptcha.fields.hCaptchaField.validate", return_value=True)
@@ -605,3 +634,46 @@ class ZohoRoutingTest(SimpleUserDataMixin, TestCase):
         call_kwargs = mock_task.delay.call_args.kwargs
         self.assertEqual(call_kwargs["request_type"], "Sealing Order")
         self.assertEqual(call_kwargs["assignee_id"], "")
+
+
+class ContentSecurityPolicyTest(TestCase):
+    """Tests for the site-wide CSP header configured in cl.settings."""
+
+    async def test_navigation_is_locked_to_our_own_domain(self) -> None:
+        """Do we stop third-party content from sending users elsewhere?
+
+        We publish a lot of HTML that we get from third parties, so we use CSP
+        to keep any forms or <base> tags it contains from pointing at another
+        site.
+        """
+        r = cast(
+            HttpResponse, await self.async_client.get(reverse("help_home"))
+        )
+        directives = parse_csp(r)
+        self.assertEqual(directives["form-action"], ["'self'"])
+        self.assertEqual(directives["base-uri"], ["'self'"])
+
+    async def test_script_nonce_matches_the_rendered_page(self) -> None:
+        """Does the nonce in the header match the one in the HTML?
+
+        If these ever drift apart, every inline script on the site breaks, so
+        check that the nonce plumbing between the middleware and the templates
+        is intact.
+        """
+        r = cast(
+            HttpResponse, await self.async_client.get(reverse("help_home"))
+        )
+        script_src = parse_csp(r)["script-src"]
+        nonces = [
+            value[len("'nonce-") : -len("'")]
+            for value in script_src
+            if value.startswith("'nonce-")
+        ]
+        self.assertEqual(
+            len(nonces), 1, msg=f"Expected one nonce in: {script_src}"
+        )
+        html = r.content.decode()
+        self.assertIn(f'nonce="{nonces[0]}"', html)
+        # A script left with an empty nonce would be refused by the browser,
+        # and the assertion above would still pass on the other scripts.
+        self.assertNotIn('nonce=""', html)
