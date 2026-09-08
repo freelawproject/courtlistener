@@ -1,0 +1,82 @@
+{% load svg_tags component_tags %}
+{% require_script "js/alpine/components/info_card.js" %}
+
+{# Component Structure #}
+{# card_variant: this modifies borders and background, so far there is only default, could be more variants if needed #}
+{# filters: this allows to send extra information of the filters used or at least that's the use I thought for based on figma. #}
+{# icon: dynamic icon, in case the card is not only used for Info, but maybe warning, error or completation, could be missing. #}
+{# link_text: dynamic val inside the button/link. #}
+{# link_type: link visual as a button-link or link-inline. #}
+{# search_input: the main query of the search or main text of the card, goes into the strong tag #}
+{# is_dismissive: dismiss-button to add cookies functionality. #}
+
+<c-vars
+  card_id=""
+  card_variant=""
+  dismiss_days=""
+  filters=""
+  icon=""
+  is_dismissible
+  href=""
+  link_text=""
+  link_type=""
+  search_input=""
+/>
+{% with cookie_key="card_dismissed_"|add:card_id %}
+{% with base="flex flex-nowrap gap-2 py-[10px] pr-[10px] pl-[16px] border rounded-[10px] md:items-center" %}
+
+{% if not request.COOKIES|get_item:cookie_key %}
+  <div
+    class="{{ base }} {% if card_variant == 'info' %}bg-sky-100/75 border-sky-400 text-sky-800{% endif %}"
+    {% if card_id and is_dismissible %} x-data="dismissibleCard('{{ card_id }}', {{ dismiss_days | default:20 }})" x-ref="card"{% endif %}
+    >
+      {% if icon %}
+        <div class="size-4 sm:self-start md:self-center">
+          {% svg icon aria_hidden="true" %}
+        </div>
+      {% endif %}
+      <div class="flex flex-wrap md:flex-nowrap items-center">
+        <p>
+          {{ slot }}
+          {% if search_input %}
+            <strong>{{ search_input }}</strong>
+          {% endif %}
+          {% if filters %}
+            {{ filters }}
+          {% endif %}
+          {% if href and link_type == "link-inline" %}
+            <a
+              class="inline font-semibold"
+              aria-label="{{link_text}}"
+              href="{{ href }}"
+            >
+              {{ link_text }}
+            </a>
+          {% endif %}
+        </p>
+        {% if href and link_type == "button-link" %}
+          <a
+            class="min-w-fit h-fit rounded-lg py-2 px-[14px] sm:mt-[10px] md:mt-0 text-sm font-medium text-white bg-sky-800 hover:bg-sky-900 focus-visible:ring-sky-300"
+            aria-label="{{link_text}}"
+            href="{{ href }}"
+          >
+            {{ link_text }}
+          </a>
+        {% endif %}
+      </div>
+    {% if card_id and is_dismissible %}
+      <c-button
+        class="self-start rounded-full size-6 p-1 text-sm font-medium text-sky-700/75 focus-visible:ring-sky-300"
+        type="button"
+        x-on:click="close"
+        aria-label="Close Card {{card_id}}"
+      >
+        {% svg "cross" class="size-4" aria_hidden="true" %}
+      </c-button>
+    {% endif %}
+  </div>
+{% endif %}
+
+{% endwith %}
+{% endwith %}
+
