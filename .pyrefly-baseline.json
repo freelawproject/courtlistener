@@ -1478,13 +1478,6 @@
       "severity": "error"
     },
     {
-      "column": 12,
-      "path": "cl/custom_filters/templatetags/extras.py",
-      "name": "bad-return",
-      "concise_description": "Returned type `str` is not assignable to declared return type `SafeString`",
-      "severity": "error"
-    },
-    {
       "column": 13,
       "path": "cl/custom_filters/templatetags/extras.py",
       "name": "bad-argument-type",
