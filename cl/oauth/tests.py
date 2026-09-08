@@ -1,13 +1,17 @@
+import base64
+import hashlib
 from unittest.mock import patch
 
 from django.conf import settings
 from django.core.cache import cache
 from django.core.exceptions import ValidationError
-from django.test import TestCase, override_settings
+from django.test import override_settings
 from django.urls import reverse
 from oauth2_provider.models import get_application_model
 
-from cl.tests.cases import APITestCase, SimpleTestCase
+from cl.tests.cases import APITestCase, SimpleTestCase, TestCase
+from cl.tests.utils import parse_csp
+from cl.users.factories import UserFactory
 
 Application = get_application_model()
 
@@ -327,3 +331,85 @@ class PKCEMethodEnforcementTest(SimpleTestCase):
         self.assertTrue(
             self._grant().validate_code_challenge(challenge, "S256", verifier)
         )
+
+
+class AuthorizeViewCSPTest(TestCase):
+    """The authorize view has to opt out of the site-wide ``form-action``.
+
+    Approving a client POSTs to us and then redirects to the client's
+    ``redirect_uri``, which is by definition another origin. Chrome enforces
+    ``form-action`` against that redirect, so leaving the site-wide policy in
+    place would break the whole flow in some browsers. ``cl.oauth.urls`` wraps
+    the view in ``csp_override`` to drop the directive; these tests hold that
+    exemption to the one view that needs it.
+    """
+
+    @classmethod
+    def setUpTestData(cls) -> None:
+        cls.user = UserFactory()
+        cls.application = Application.objects.create(
+            name="Example MCP Client",
+            client_type=Application.CLIENT_PUBLIC,
+            authorization_grant_type=Application.GRANT_AUTHORIZATION_CODE,
+            redirect_uris="https://mcp.example.com/callback",
+        )
+
+    def setUp(self) -> None:
+        super().setUp()
+        self.client.force_login(self.user)
+
+    def _get_authorize_page(self):
+        """Requests the consent screen the way a real client would."""
+        verifier = "a" * 64
+        challenge = (
+            base64.urlsafe_b64encode(
+                hashlib.sha256(verifier.encode()).digest()
+            )
+            .decode()
+            .rstrip("=")
+        )
+        return self.client.get(
+            reverse("oauth2_provider:authorize"),
+            {
+                "response_type": "code",
+                "client_id": self.application.client_id,
+                "redirect_uri": "https://mcp.example.com/callback",
+                "scope": "api",
+                "code_challenge": challenge,
+                "code_challenge_method": "S256",
+            },
+        )
+
+    def test_authorize_page_omits_form_action(self):
+        """The consent screen ships without the directive that breaks it."""
+        r = self._get_authorize_page()
+        self.assertEqual(r.status_code, 200, r.content)
+        directives = parse_csp(r)
+        self.assertNotIn("form-action", directives)
+
+    def test_authorize_page_keeps_the_rest_of_the_policy(self):
+        """Only form-action is dropped.
+
+        ``csp_override`` replaces the policy wholesale rather than editing it,
+        so a stale copy of the settings would silently weaken this page. Spot
+        check a few directives against the live setting to catch that.
+        """
+        r = self._get_authorize_page()
+        directives = parse_csp(r)
+        self.assertEqual(directives["base-uri"], ["'self'"])
+        self.assertEqual(
+            directives["default-src"], settings.SECURE_CSP["default-src"]
+        )
+        self.assertEqual(
+            set(directives) | {"form-action"},
+            {
+                directive
+                for directive, sources in settings.SECURE_CSP.items()
+                if sources is not False
+            },
+        )
+
+    def test_other_oauth_pages_keep_form_action(self):
+        """The exemption doesn't leak to the URLs mounted beside it."""
+        r = self.client.get(reverse("oauth2_metadata"))
+        self.assertEqual(parse_csp(r)["form-action"], ["'self'"])

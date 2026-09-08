@@ -26,11 +26,11 @@
 {% endblock %}
 
 {% block footer-scripts %}
-  <script src="{% static 'js/alpine/components/contact_form.js' %}" nonce="{{ request.csp_nonce }}"></script>
+  <script src="{% static 'js/alpine/components/contact_form.js' %}" nonce="{{ csp_nonce }}"></script>
   {% if DEBUG %}
-  <script src="{% static 'js/alpine/alpinejscsp.js' %}" defer nonce="{{ request.csp_nonce }}"></script>
+  <script src="{% static 'js/alpine/alpinejscsp.js' %}" defer nonce="{{ csp_nonce }}"></script>
   {% else %}
-  <script src="{% static 'js/alpine/alpinejscsp.min.js' %}" defer nonce="{{ request.csp_nonce }}"></script>
+  <script src="{% static 'js/alpine/alpinejscsp.min.js' %}" defer nonce="{{ csp_nonce }}"></script>
   {% endif %}
 {% endblock %}
 
