@@ -39,10 +39,9 @@ Disable this Alert (one click): https://www.courtlistener.com{% url "disable_ale
 {% endfor %}
 ************************
 {% if recap_alerts_banner %}
-📣 The Wait is Over! You can now get alerts for keywords in the RECAP Archive.
-Set daily or real-time email alerts when PACER cases or filings match your saved search.
-Follow topics, people, organizations, and more.
-Learn more: https://free.law/2025/06/18/recap-search-alerts-for-pacer/
+📣 The power of CourtListener can now be integrated into Claude and is part of Gemini Enterprise for Legal. Combine CourtListener with AI to make the hardest research just a prompt away.
+Learn more about Claude: https://free.law/2026/05/12/courtlistener-is-now-available-inside-claude/
+Learn more about Gemini Enterprise for Legal: https://free.law/2026/08/25/courtlistener-gemini-enterprise-for-legal/
 {% endif %}
 
 This alert brought to you by the 501(c)(3) non-profit Free Law Project
