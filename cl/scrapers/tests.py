@@ -3055,3 +3055,140 @@ class AccountSubscriptionIncludeTest(TestCase):
         self.assertEqual(
             self.subscription.last_subscription, date(2025, 3, 15)
         )
+
+
+class StructuredExtractionHookTest(TestCase):
+    """Test the structured-extraction hook in extract_opinion_content."""
+
+    test_dir = (
+        Path(settings.INSTALL_ROOT) / "cl" / "corpus_importer" / "test_assets"
+    )
+
+    @classmethod
+    def setUpTestData(cls):
+        cls.court = CourtFactory(id="test", jurisdiction="F")
+        with open(cls.test_dir / "centralia_payload_multi.json") as f:
+            cls.payload = json.load(f)
+
+    def setUp(self):
+        self.opinion = OpinionFactory(
+            cluster=OpinionClusterFactory(
+                docket=DocketFactory(court=self.court)
+            ),
+            type=Opinion.COMBINED,
+            plain_text="",
+            html="",
+            local_path="pdf/2024/opinion.pdf",
+        )
+        # The hook calls doctor from two modules, so both bindings get the
+        # same dispatching mock.
+        self.microservice_mock = mock.AsyncMock()
+        for target in (
+            "cl.scrapers.tasks.microservice",
+            "cl.corpus_importer.centralia_import.microservice",
+        ):
+            mock.patch(target, self.microservice_mock).start()
+        self.citations_mock = mock.patch(
+            "cl.scrapers.tasks."
+            "find_citations_and_parentheticals_for_opinion_by_pks.apply_async"
+        ).start()
+        self.merge_mock = mock.patch(
+            "cl.scrapers.tasks.find_and_merge_versions.delay"
+        ).start()
+        self.addCleanup(mock.patch.stopall)
+
+    def use_payload(self, payload, extract_response=None):
+        """Dispatch mocked doctor calls on the service name."""
+        extract_response = extract_response or {
+            "content": "The judgment of the district court is affirmed.",
+            "extracted_by_ocr": False,
+            "page_count": 2,
+            "err": "",
+        }
+
+        def dispatch(service, **kwargs):
+            if service == "document-extract":
+                return httpx.Response(200, json=extract_response)
+            if service == "opinion-structured":
+                return httpx.Response(200, json=payload)
+            raise AssertionError(f"unexpected service {service}")
+
+        self.microservice_mock.side_effect = dispatch
+
+    def called_services(self):
+        """The doctor services the task actually called."""
+        return [
+            c.kwargs.get("service") or c.args[0]
+            for c in self.microservice_mock.call_args_list
+        ]
+
+    def test_installs_and_enqueues_all_pks(self):
+        """Are all affected opinions passed to the citation task?"""
+        self.use_payload(self.payload)
+        extract_opinion_content(self.opinion.pk)
+
+        self.opinion.refresh_from_db()
+        self.assertTrue(
+            self.opinion.html.startswith('<div class="centralia">')
+        )
+        self.assertEqual(
+            self.opinion.cluster.headmatter,
+            self.payload["headmatter"]["html_inline"],
+        )
+        sibling = self.opinion.cluster.sub_opinions.exclude(
+            pk=self.opinion.pk
+        ).get()
+        self.citations_mock.assert_called_once_with(
+            ([self.opinion.pk, sibling.pk], False, False, False)
+        )
+        self.merge_mock.assert_called_once_with(pk=self.opinion.pk)
+
+    def test_extraction_error_skips_structured_call(self):
+        """Does a failed text extraction return before the hook runs?"""
+        self.use_payload(
+            self.payload,
+            extract_response={
+                "content": "whatever came out",
+                "extracted_by_ocr": False,
+                "page_count": 2,
+                "err": "something broke",
+            },
+        )
+        extract_opinion_content(self.opinion.pk)
+
+        self.assertNotIn("opinion-structured", self.called_services())
+        self.citations_mock.assert_not_called()
+
+    def test_ocr_extraction_skips_structured_call(self):
+        """Does an OCR'd document skip the structured round trip?"""
+        self.use_payload(
+            self.payload,
+            extract_response={
+                "content": "read by tesseract",
+                "extracted_by_ocr": True,
+                "page_count": 2,
+                "err": "",
+            },
+        )
+        extract_opinion_content(self.opinion.pk)
+
+        self.assertNotIn("opinion-structured", self.called_services())
+        self.citations_mock.assert_called_once_with(
+            ([self.opinion.pk], False, False, False)
+        )
+
+    def test_untrusted_payload_keeps_the_text(self):
+        """Does a declined payload leave the text extraction standing?"""
+        self.use_payload({**self.payload, "status": "scanned"})
+        extract_opinion_content(self.opinion.pk)
+
+        self.opinion.refresh_from_db()
+        self.assertEqual(self.opinion.html, "")
+        self.assertEqual(
+            self.opinion.plain_text,
+            "The judgment of the district court is affirmed.",
+        )
+        self.assertEqual(self.opinion.cluster.sub_opinions.count(), 1)
+        self.citations_mock.assert_called_once_with(
+            ([self.opinion.pk], False, False, False)
+        )

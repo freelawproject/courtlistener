@@ -27,6 +27,11 @@ from cl.celery_init import app
 from cl.citations.tasks import (
     find_citations_and_parentheticals_for_opinion_by_pks,
 )
+from cl.corpus_importer.centralia_import import (
+    get_structured_opinion,
+    install_structured_opinion,
+    should_install,
+)
 from cl.custom_filters.templatetags.text_filters import best_case_name
 from cl.lib.celery_utils import throttle_task
 from cl.lib.exceptions import ScrapeFailed
@@ -252,11 +257,50 @@ def extract_opinion_content(
         )
         return
 
+    affected_pks = [opinion.pk]
+    # For the courts centralia has readers for, doctor can return the opinion
+    # as structured HTML, which replaces the flat text stored above. It only
+    # reads a digital PDF's text layer, so an OCR'd document skips the round
+    # trip, and it self-gates on court, so an unsupported court just keeps
+    # the text extraction.
+    if (
+        ".pdf" in str(opinion.local_path).lower()
+        and not opinion.extracted_by_ocr
+        and (payload := get_structured_opinion(opinion))
+    ):
+        court_id = opinion.cluster.docket.court_id
+        installable, reason = should_install(opinion, payload)
+        if installable:
+            try:
+                affected_pks = install_structured_opinion(opinion, payload)
+                logger.info(
+                    "Installed structured opinion %s (%s): pks %s",
+                    opinion.pk,
+                    court_id,
+                    affected_pks,
+                )
+            except Exception:
+                logger.error(
+                    "****Error installing structured opinion %s****\n%s",
+                    opinion,
+                    traceback.format_exc(),
+                    extra=dict(
+                        fingerprint=[f"{court_id}-structured-install-failure"]
+                    ),
+                )
+        else:
+            logger.info(
+                "Skipped structured install for opinion %s (%s): %s",
+                opinion.pk,
+                court_id,
+                reason,
+            )
+
     find_and_merge_versions.delay(pk=opinion.id)
 
     # Identify and link citations within the document content
     find_citations_and_parentheticals_for_opinion_by_pks.apply_async(
-        ([opinion.pk], False, False, percolate_opinion)
+        (affected_pks, False, False, percolate_opinion)
     )
 
 
