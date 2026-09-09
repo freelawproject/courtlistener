@@ -5172,6 +5172,166 @@ class EmailOrUsernameSignInTest(TestCase):
         self.assertContains(response, "Username or email address")
 
 
+class PasswordResetConfirmedEmailTest(TestCase):
+    """Tests that reset links only ever go to confirmed addresses.
+
+    An unconfirmed address is one nobody has proven they own. Mailing a reset
+    token to one lets somebody repoint their account at an address they don't
+    control and have us deliver a working token to its owner.
+    """
+
+    PASSWORD = "a-good-password"
+
+    def make_user(
+        self,
+        username: str,
+        email: str,
+        email_confirmed: bool = True,
+        is_active: bool = True,
+        stub_account: bool = False,
+    ) -> User:
+        """Build an account to request a reset for.
+
+        :param username: The account's username.
+        :param email: The account's email address.
+        :param email_confirmed: Whether its address has been confirmed.
+        :param is_active: Whether the account is active.
+        :param stub_account: Whether it's a stub, as donations create.
+        :return: The new User.
+        """
+        return UserProfileWithParentsFactory.create(
+            user__username=username,
+            user__email=email,
+            user__password=make_password(self.PASSWORD),
+            user__is_active=is_active,
+            email_confirmed=email_confirmed,
+            stub_account=stub_account,
+        ).user
+
+    def request_reset(self, email: str) -> HttpResponse:
+        """POST the password reset form.
+
+        :param email: The address to request a reset for.
+        :return: The view's response.
+        """
+        return self.client.post(reverse("password_reset"), {"email": email})
+
+    def reset_link_stem(self) -> str:
+        """Build the leading path of a reset link, minus its token.
+
+        Derived from the URLconf rather than written out, so the assertions
+        below follow the route if it ever moves.
+
+        :return: The path a reset link starts with.
+        """
+        return reverse(
+            "confirm_password",
+            kwargs={"uidb64": "UID", "token": "TOKEN"},
+        ).split("UID")[0]
+
+    def assert_reset_link_sent(self) -> None:
+        """Assert exactly one mail went out and it carries a reset token.
+
+        :return: None
+        """
+        self.assertEqual(len(mail.outbox), 1)
+        self.assertIn(self.reset_link_stem(), mail.outbox[0].body)
+
+    def assert_one_email_without_reset_link(self) -> str:
+        """Assert exactly one mail went out and carries no reset token.
+
+        :return: The body of that mail, for further assertions.
+        """
+        self.assertEqual(len(mail.outbox), 1)
+        body = mail.outbox[0].body
+        self.assertNotIn(self.reset_link_stem(), body)
+        return body
+
+    def test_confirmed_address_gets_a_reset_link(self) -> None:
+        """Does the ordinary case still work?"""
+        self.make_user("alice", "alice@example.com")
+        self.request_reset("alice@example.com")
+        self.assert_reset_link_sent()
+
+    def test_unconfirmed_address_gets_no_reset_link(self) -> None:
+        """Is an unconfirmed account pointed at confirmation instead?"""
+        self.make_user("bob", "bob@example.com", email_confirmed=False)
+        self.request_reset("bob@example.com")
+        body = self.assert_one_email_without_reset_link()
+        self.assertIn(reverse("email_confirmation_request"), body)
+
+    def test_repointed_address_cannot_be_reset(self) -> None:
+        """Can somebody mail a reset token to an address they don't own?
+
+        This is the attack the confirmed-only rule exists for: point an
+        account at a victim's address, ask for a reset, and let the victim
+        take over the account — leaving its API token in the original owner's
+        hands. Changing an address clears email_confirmed, so the request must
+        not produce a reset link.
+        """
+        attacker = self.make_user("attacker", "attacker@example.com")
+        # Repoint the address the way view_settings does.
+        attacker.email = "victim@example.com"
+        attacker.save()
+        profile = attacker.profile
+        profile.email_confirmed = False
+        profile.save()
+
+        self.request_reset("victim@example.com")
+        self.assert_one_email_without_reset_link()
+
+    def test_unknown_address_still_gets_no_account_found(self) -> None:
+        """Is the pre-existing behavior for strangers unchanged?"""
+        self.request_reset("nobody@example.com")
+        body = self.assert_one_email_without_reset_link()
+        self.assertIn(reverse("register"), body)
+
+    def test_stub_accounts_get_no_reset_link(self) -> None:
+        """Are stubs left out, as they were before?
+
+        They have no usable password, so a reset would be meaningless.
+        """
+        self.make_user("stub", "stub@example.com", stub_account=True)
+        User.objects.filter(username="stub").update(password="")
+        self.request_reset("stub@example.com")
+        self.assert_one_email_without_reset_link()
+
+    def test_matching_is_case_insensitive(self) -> None:
+        """Does a differently-cased address still find the account?
+
+        The lookup folds both sides in SQL so it can use the
+        auth_user_email_lower_idx index, so this guards the folding.
+        """
+        self.make_user("carol", "carol@example.com")
+        self.request_reset("CAROL@Example.COM")
+        self.assert_reset_link_sent()
+
+    def test_the_response_never_reveals_which_case_applied(self) -> None:
+        """Do all three outcomes look the same to the browser?
+
+        Otherwise the form becomes a way to test whether an address has an
+        account, and whether that account is confirmed.
+        """
+        self.make_user("dave", "dave@example.com")
+        self.make_user("erin", "erin@example.com", email_confirmed=False)
+        responses = []
+        for address in (
+            "dave@example.com",
+            "erin@example.com",
+            "nobody@example.com",
+        ):
+            with self.subTest(address=address):
+                mail.outbox.clear()
+                response = self.request_reset(address)
+                responses.append(
+                    (response.status_code, response.headers.get("Location"))
+                )
+                # Every case sends exactly one email, so send volume doesn't
+                # distinguish them either.
+                self.assertEqual(len(mail.outbox), 1)
+        self.assertEqual(len(set(responses)), 1)
+
+
 class PasswordConfirmFormTest(TestCase):
     """Tests for the re-prompt guard on irreversible account operations."""
 
