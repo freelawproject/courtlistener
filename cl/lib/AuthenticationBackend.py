@@ -5,7 +5,7 @@ from django.contrib.auth.backends import ModelBackend
 from django.contrib.auth.base_user import AbstractBaseUser
 from django.contrib.auth.forms import AuthenticationForm
 from django.contrib.auth.models import User
-from django.db.models import F, Value
+from django.db.models import F, QuerySet, Value
 from django.db.models.functions import Lower
 from django.http import HttpRequest
 from django.urls import reverse
@@ -19,6 +19,31 @@ MAX_EMAIL_CANDIDATES = 3
 # "@", and a domain with a dot in it. Anything stricter risks turning away an
 # address that an older validator once let into auth_user.
 LOOKS_LIKE_EMAIL = re.compile(r"^[^@\s]+@[^@\s]+\.[^@\s]+$")
+
+
+def accounts_for_email(email: str) -> QuerySet[User]:
+    """Find the live accounts an email address reaches.
+
+    The one definition of what "this address" means, shared by sign-in and by
+    password reset so the two can't drift into disagreeing about which
+    accounts an address refers to. Callers add their own ordering, limits and
+    further filters.
+
+    :param email: The submitted address.
+    :return: A queryset of the accounts holding that address.
+    """
+    return (
+        # Match on LOWER(email) rather than __iexact, which compiles to
+        # UPPER() and so can't use the auth_user_email_lower_idx index. Fold
+        # the submitted value in SQL as well, so both sides use Postgres's
+        # case rules: str.lower() and LOWER() disagree on some non-ASCII
+        # characters.
+        User.objects.alias(email_lower=Lower("email"))
+        .filter(email_lower=Lower(Value(email)), is_active=True)
+        # Stub accounts are placeholders for people who never signed up, so
+        # there is nobody behind them to sign in or ask for a reset.
+        .exclude(profile__stub_account=True)
+    )
 
 
 class EmailOrUsernameModelBackend(ModelBackend):
@@ -145,18 +170,8 @@ class EmailOrUsernameModelBackend(ModelBackend):
             return []
 
         candidates = (
-            User.objects.select_related("profile")
-            # Match on LOWER(email) rather than __iexact, which compiles to
-            # UPPER() and so can't use the auth_user_email_lower_idx index.
-            # Fold the submitted value in SQL as well, so both sides use
-            # Postgres's case rules: str.lower() and LOWER() disagree on some
-            # non-ASCII characters.
-            .alias(email_lower=Lower("email"))
-            .filter(email_lower=Lower(Value(identifier)), is_active=True)
-            # Stub accounts are placeholders for people who never signed up.
-            # They have no usable password, so they can't match anyway, but
-            # keeping them out of the list is one less thing to rely on.
-            .exclude(profile__stub_account=True)
+            accounts_for_email(identifier)
+            .select_related("profile")
             # Confirmed accounts first, then most recently used. Confirmed
             # first is what keeps the cap below from being weaponised: anybody
             # can point an account at an address they don't control, but only

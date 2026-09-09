@@ -15,8 +15,6 @@ from django.contrib.auth.models import User
 from django.contrib.auth.validators import ASCIIUsernameValidator
 from django.core.exceptions import ValidationError
 from django.core.mail import send_mail
-from django.db.models import Value
-from django.db.models.functions import Lower
 from django.forms import ModelForm
 from django.urls import reverse
 from hcaptcha.fields import hCaptchaField
@@ -24,6 +22,7 @@ from localflavor.us.forms import USStateField, USZipCodeField
 from localflavor.us.us_states import STATE_CHOICES
 
 from cl.api.models import Webhook, WebhookEventType, WebhookVersions
+from cl.lib.AuthenticationBackend import accounts_for_email
 from cl.lib.types import EmailType
 from cl.users.models import UserProfile
 from cl.users.utils import emails
@@ -316,6 +315,10 @@ class CustomPasswordResetForm(PasswordResetForm):
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
+        # Set by accounts_at_address(), which is asked the same question more
+        # than once per request.
+        self._accounts: list[User] = []
+        self._accounts_at: str | None = None
 
         self.fields["email"].widget.attrs.update(
             {
@@ -325,38 +328,30 @@ class CustomPasswordResetForm(PasswordResetForm):
             }
         )
 
-    def _get_candidate_accounts(
-        self, email: str, only_confirmed: bool = False
-    ) -> list[User]:
+    def accounts_at_address(self, email: str) -> list[User]:
         """Find the accounts a reset request for an address could act on.
 
-        These are the accounts Django would consider — active, with a usable
-        password — minus stub accounts, which have no usable password anyway.
-        Matching is deliberately identical to
-        ``EmailOrUsernameModelBackend._get_email_candidates()``, so the set of
-        accounts a reset can reach is the set an email sign-in can reach.
+        The accounts Django would consider — active, with a usable password —
+        minus stubs, which have no usable password anyway. Includes accounts
+        whose address nobody has proven they own, so it answers "is there an
+        account here?" rather than "may this address have a reset link?". Use
+        ``get_users()`` for the latter.
 
-        Without ``only_confirmed`` the result includes accounts whose address
-        nobody has proven they own, so it answers "is there an account here?"
-        and not "may this address have a reset link?". Use ``get_users()`` for
-        the latter.
+        Cached, because Django's ``save()`` calls ``get_users()`` again after
+        we have already asked, and this is an unauthenticated endpoint that
+        shouldn't run the same query three times per request.
 
         :param email: The submitted address.
-        :param only_confirmed: Limit to accounts with a confirmed address.
-        :return: The matching accounts.
+        :return: The matching accounts, each with its profile loaded.
         """
-        candidates = (
-            # Match on LOWER(email) rather than __iexact, which compiles to
-            # UPPER() and so can't use the auth_user_email_lower_idx index.
-            # Fold the submitted value in SQL too, so both sides use
-            # Postgres's case rules rather than Python's.
-            User.objects.alias(email_lower=Lower("email"))
-            .filter(email_lower=Lower(Value(email)), is_active=True)
-            .exclude(profile__stub_account=True)
-        )
-        if only_confirmed:
-            candidates = candidates.filter(profile__email_confirmed=True)
-        return [u for u in candidates if u.has_usable_password()]
+        if self._accounts_at != email:
+            self._accounts = [
+                user
+                for user in accounts_for_email(email).select_related("profile")
+                if user.has_usable_password()
+            ]
+            self._accounts_at = email
+        return self._accounts
 
     def get_users(self, email: str) -> Iterator[User]:
         """Return the accounts allowed to receive a reset link.
@@ -375,7 +370,11 @@ class CustomPasswordResetForm(PasswordResetForm):
         :param email: The submitted address.
         :return: The accounts to mail a reset link to.
         """
-        return iter(self._get_candidate_accounts(email, only_confirmed=True))
+        return (
+            user
+            for user in self.accounts_at_address(email)
+            if user.profile.email_confirmed  # type: ignore
+        )
 
     def save(self, *args, **kwargs) -> None:
         """Send whichever of three emails fits the submitted address.
@@ -396,13 +395,14 @@ class CustomPasswordResetForm(PasswordResetForm):
         - Nothing at all: the "no account found" note we've always sent.
         """
         recipient_addr = self.cleaned_data["email"]
-        if list(self.get_users(recipient_addr)):
+        accounts = self.accounts_at_address(recipient_addr)
+        if any(user.profile.email_confirmed for user in accounts):  # type: ignore
             super().save(*args, **kwargs)
             return
 
         email: EmailType
-        if self._get_candidate_accounts(recipient_addr):
-            # Every match is unconfirmed, or get_users() would have found one.
+        if len(accounts) > 0:
+            # Every match is unconfirmed, or the branch above would have run.
             email = emails["reset_needs_confirmation"]
             body = email["body"] % reverse("email_confirmation_request")
         else:
