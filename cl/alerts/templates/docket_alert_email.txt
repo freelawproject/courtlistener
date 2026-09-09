@@ -44,10 +44,7 @@ To disable this alert unsubscribe here: https://www.courtlistener.com{% url 'tog
 {% endif %}
 ************************
 {% if recap_alerts_banner %}
-📣 The Wait is Over! You can now get alerts for keywords in the RECAP Archive.
-Set daily or real-time email alerts when PACER cases or filings match your saved search.
-Follow topics, people, organizations, and more.
-Learn more: https://free.law/2025/06/18/recap-search-alerts-for-pacer/
+{% include "includes/alert_promo_banner.txt" %}
 {% endif %}
 
 This alert brought to you by the 501(c)(3) non-profit Free Law Project

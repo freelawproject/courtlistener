@@ -33,6 +33,7 @@ This alert was sent because you subscribed to this docket with your account on C
 To disable this alert unsubscribe here: https://www.courtlistener.com{% url 'toggle_docket_alert_confirmation' 'unsubscribe' docket_alert_secret_key %}
 {% endif %}
 ************************
+{% include "includes/alert_promo_banner.txt" %}
 
 This alert brought to you by the 501(c)(3) non-profit Free Law Project
 
