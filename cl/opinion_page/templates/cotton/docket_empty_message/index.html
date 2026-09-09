@@ -1,0 +1,4 @@
+{# Pure dispatch to the source-specific "no entries yet" copy. The sentence carries no wrapper, so the caller supplies it. #}
+<c-vars docket_source="" />
+
+<c-component is="docket_empty_message.{{ docket_source.component }}" />

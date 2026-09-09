@@ -15,11 +15,12 @@ from asgiref.sync import async_to_sync, sync_to_async
 from django.conf import settings
 from django.contrib.auth.hashers import make_password
 from django.contrib.auth.models import AnonymousUser, Group, Permission, User
+from django.contrib.staticfiles.finders import find
 from django.core.files.uploadedfile import SimpleUploadedFile
 from django.core.management import call_command
 from django.core.paginator import Paginator
 from django.db import connection
-from django.http import HttpResponse
+from django.http import HttpResponse, QueryDict
 from django.template import TemplateDoesNotExist, engines
 from django.template.loader import get_template
 from django.test import (
@@ -1551,6 +1552,7 @@ class DocketSourceComponentTest(SimpleTestCase):
             "docket_source_button",
             "docket_source_attribution",
             "document_source_link",
+            "docket_empty_message",
         ),
         "includes": (
             "docket_source_button",
@@ -1837,6 +1839,24 @@ class ScotusDocketV2ContentRenderTest(TestCase):
             "sourced from the Supreme Court of the United States", content
         )
         self.assertIn(settings.WIKI_COVERAGE_SCOTUS_URL, content)
+
+    async def test_scotus_empty_state_uses_scotus_copy_in_v2(self) -> None:
+        """An unfiltered SCOTUS docket with no entries gets SCOTUS's own
+        "no entries yet" sentence, not RECAP's."""
+        r = await self.async_client.get(
+            reverse("view_docket", args=[self.docket.pk, self.docket.slug])
+        )
+        content = r.content.decode()
+
+        self.assertEqual(r.status_code, HTTPStatus.OK)
+        self.assertTemplateUsed(r, "v2_docket.html")
+        self.assertIn("There are no entries for this docket yet.", content)
+        # The site chrome links to the RECAP Archive on every page, so the
+        # negative check targets RECAP's empty-state sentence specifically.
+        self.assertNotIn(
+            "There are no entries for this docket in the RECAP Archive",
+            content,
+        )
 
 
 class OgRedirectLookupViewTest(TestCase):
@@ -3469,6 +3489,30 @@ class BuildScotusMetadataTest(TestCase):
         )
 
 
+class DocketEntryFilterFormHasFiltersTest(SimpleTestCase):
+    """has_filters() tells narrowing params apart from sorting and paging."""
+
+    def test_has_filters(self) -> None:
+        cases = {
+            "": False,
+            "order_by=desc": False,
+            "page=2": False,
+            "entry_gte=": False,
+            "entry_gte=1": True,
+            "entry_lte=10": True,
+            "filed_after=01/01/2024": True,
+            "filed_before=01/01/2024": True,
+            "q=motion": True,
+            # An invalid value still counts: the user asked for a filter.
+            "entry_gte=abc": True,
+            "order_by=desc&page=2&filed_after=01/01/2024": True,
+        }
+        for query, expected in cases.items():
+            with self.subTest(query=query):
+                form = DocketEntryFilterForm(QueryDict(query))
+                self.assertEqual(form.has_filters(), expected)
+
+
 class BuildDocketTabsTest(SimpleTestCase):
     """Test the build_docket_tabs helper function."""
 
@@ -3493,6 +3537,31 @@ class BuildDocketTabsTest(SimpleTestCase):
         tabs = build_docket_tabs(docket, True, True, True)
         keys = [t["key"] for t in tabs]
         self.assertEqual(keys, ["entries", "parties", "idb", "authorities"])
+
+    def test_every_tab_has_an_existing_icon(self) -> None:
+        """Each tab names an SVG the {% svg %} tag can find, mapped by key."""
+        docket = MagicMock()
+        docket.get_absolute_url.return_value = "/docket/1/test/"
+        docket.pk = 1
+        docket.slug = "test"
+
+        tabs = build_docket_tabs(docket, True, True, True)
+        icons = {t["key"]: t["icon"] for t in tabs}
+        self.assertEqual(
+            icons,
+            {
+                "entries": "file_text",
+                "parties": "group",
+                "idb": "circle_question_mark",
+                "authorities": "court",
+            },
+        )
+        for key, icon in icons.items():
+            with self.subTest(tab=key):
+                self.assertIsNotNone(
+                    find(f"svg/{icon}.svg"),
+                    msg=f"svg/{icon}.svg is not a static file.",
+                )
 
     def test_conditional_tabs(self) -> None:
         """Only tabs with data should appear."""
@@ -3567,6 +3636,76 @@ class DocketPageV2TemplateTest(TestCase):
         self.assertIn("tabs", r.context)
         self.assertTrue(len(r.context["metadata_sections"]) > 0)
         self.assertTrue(len(r.context["tabs"]) > 0)
+
+    async def test_title_values_are_single_click_selectable(self) -> None:
+        """The case name and docket number each get their own select-all span,
+        so one click selects exactly one value for copying, as on the legacy
+        page."""
+        r = await self.async_client.get(
+            reverse(
+                "view_docket",
+                args=[self.docket.pk, self.docket.slug],
+            )
+        )
+        self.assertTemplateUsed(r, "v2_docket.html")
+        # Walked with iter() rather than xpath(): xpath() is typed as a
+        # union of every result kind, so pyrefly rejects element calls on it.
+        headings = [
+            el
+            for el in fromstring(r.content.decode()).iter("h1")
+            if el.get("data-type") == "search.Docket"
+        ]
+        self.assertEqual(len(headings), 1)
+        selectable = [
+            span
+            for span in headings[0].iter("span")
+            if "select-all" in (span.get("class") or "")
+        ]
+        self.assertEqual(len(selectable), 2)
+        self.assertEqual(
+            "".join(str(t) for t in selectable[1].itertext()).strip(),
+            self.docket.docket_number,
+        )
+        for span in selectable:
+            with self.subTest(
+                value="".join(str(t) for t in span.itertext()).strip()
+            ):
+                self.assertIn("cursor-text", span.get("class") or "")
+
+    def test_metadata_section_honors_is_copyable(self) -> None:
+        """Only items flagged is_copyable get the select-all treatment."""
+        # Rendered through a wrapper string so the component's own c-vars
+        # don't shadow the context, as DocketFilterDrawerAttrPropagationTest
+        # explains.
+        compiled = CottonCompiler().process(
+            '<c-metadata-section :items="items" />'
+        )
+        html = (
+            engines["django"]
+            .from_string(compiled)
+            .render(
+                {
+                    "items": [
+                        {"label": "Cause", "value": "28:1331"},
+                        {
+                            "label": "Citation",
+                            "value": "601 U.S. 416",
+                            "is_copyable": True,
+                        },
+                    ]
+                }
+            )
+        )
+        details = list(fromstring(html).iter("dd"))
+        self.assertEqual(len(details), 2)
+        plain, copyable = details
+        self.assertNotIn("select-all", plain.get("class") or "")
+        self.assertIn("select-all", copyable.get("class") or "")
+        self.assertIn("cursor-text", copyable.get("class") or "")
+        self.assertEqual(
+            "".join(str(t) for t in copyable.itertext()).strip(),
+            "601 U.S. 416",
+        )
 
 
 @override_settings(WAFFLE_CACHE_PREFIX="test_docket_entry_rows_v2_waffle")
@@ -3719,8 +3858,9 @@ class DocketEntryRowsV2Test(TestCase):
         content = await self._get_docket_page()
         self.assertIn(self.rd_numberless.description, content)
 
-    async def test_empty_state(self) -> None:
-        """Empty state message should show when no entries exist."""
+    async def _get_empty_docket_page(self, query: str = "") -> str:
+        """Render a docket that has no entries at all, with the given query
+        string, and return its HTML."""
         empty_docket = await sync_to_async(DocketFactory)(
             court=self.court,
             source=Docket.RECAP,
@@ -3730,10 +3870,59 @@ class DocketEntryRowsV2Test(TestCase):
                 "view_docket",
                 args=[empty_docket.pk, empty_docket.slug],
             )
+            + query
+        )
+        self.assertEqual(r.status_code, HTTPStatus.OK)
+        self.assertTemplateUsed(r, "v2_docket.html")
+        return r.content.decode()
+
+    async def test_empty_state_without_filters_uses_source_copy(self) -> None:
+        """With no filter or search params, an empty docket explains that
+        the source has no entries yet, and the filter bar stays visible."""
+        content = await self._get_empty_docket_page()
+        self.assertIn(
+            "There are no entries for this docket in the RECAP Archive",
+            content,
+        )
+        self.assertNotIn("No docket entries match your filters", content)
+        self.assertIn("Search this docket", content)
+
+    async def test_empty_state_with_filters_uses_filter_copy(self) -> None:
+        """With a filter param present, an empty page blames the filters
+        rather than the source, and the filter bar stays visible so they can
+        be changed."""
+        for query in ("?entry_gte=5", "?filed_after=01/01/2030"):
+            with self.subTest(query=query):
+                content = await self._get_empty_docket_page(query)
+                self.assertIn("No docket entries match your filters", content)
+                self.assertNotIn("RECAP Archive. Please download", content)
+                self.assertIn("Search this docket", content)
+
+    async def test_sort_and_page_params_are_not_filters(self) -> None:
+        """Sorting and paging narrow nothing, so an empty docket under them
+        still gets the "no entries yet" copy."""
+        content = await self._get_empty_docket_page("?order_by=desc&page=1")
+        self.assertIn(
+            "There are no entries for this docket in the RECAP Archive",
+            content,
+        )
+
+    async def test_filters_that_exclude_every_entry_use_filter_copy(
+        self,
+    ) -> None:
+        """A docket with entries that the filters all exclude gets the
+        filter copy, not the "no entries yet" one."""
+        r = await self.async_client.get(
+            reverse(
+                "view_docket",
+                args=[self.docket.pk, self.docket.slug],
+            )
+            + "?entry_gte=999"
         )
         self.assertTemplateUsed(r, "v2_docket.html")
         content = r.content.decode()
-        self.assertIn("No docket entries", content)
+        self.assertIn("No docket entries match your filters", content)
+        self.assertNotIn("RECAP Archive. Please download", content)
 
     async def test_csv_export_for_authenticated_user(self) -> None:
         """CSV export button should render for authenticated users."""

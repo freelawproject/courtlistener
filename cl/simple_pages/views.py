@@ -373,6 +373,11 @@ async def components(request: HttpRequest) -> HttpResponse:
                     "suffix_text": "3:24-cv-01234",
                     "suffix_url": "/docket/1/example/",
                 },
+                {
+                    "label": "Citation",
+                    "value": "601 U.S. 416",
+                    "is_copyable": True,
+                },
             ],
         },
     )
