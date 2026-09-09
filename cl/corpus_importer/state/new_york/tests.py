@@ -28,7 +28,6 @@ from cl.corpus_importer.state.new_york.factories import (
 )
 from cl.corpus_importer.state.new_york.mergers import (
     NYCoADocketMerger,
-    UnhashedFile,
 )
 from cl.corpus_importer.state.new_york.nycourts_gov import NYCoACase, NYCoAFile
 from cl.corpus_importer.state.new_york.storage import (
@@ -1614,10 +1613,10 @@ class NYCoADocumentPublishTest(NYCoAMergerTestCase):
     @merger_test(expected_query_count=0)
     def test_a_document_with_no_hash_is_named_without_one(self) -> None:
         """Naming is total: a document with no hash stored still has to have
-        a name, even though the merge refuses to publish one (see
-        `test_a_downloaded_file_with_no_hash_refuses_the_case`). Does the name
-        simply end after the scraper's, rather than carrying a stray separator
-        where the hash would have gone?"""
+        a name, even though the merge will not publish one (see
+        `test_a_downloaded_file_with_no_hash_is_left_unpublished`). Does the
+        name simply end after the scraper's, rather than carrying a stray
+        separator where the hash would have gone?"""
         document = self.stored_document()
 
         self.assertEqual(
@@ -1697,30 +1696,45 @@ class NYCoADocumentPublishTest(NYCoAMergerTestCase):
             self.discarded, [], "The only copy of the file has to survive."
         )
 
-    def test_a_downloaded_file_with_no_hash_refuses_the_case(self) -> None:
+    def test_a_downloaded_file_with_no_hash_is_left_unpublished(self) -> None:
         """The hash is what keeps a reissued document from being published on
         top of the copy it replaces, so a download the run database recorded
-        none for cannot be named safely. Does the merge refuse it outright
-        rather than publishing under a name that cannot go stale visibly?"""
-        case = self.case_with_files(
-            NYCoAFileFactory.create(
-                file_name="SmithvJones-app-Smith-brf.pdf",
-                local_path=f"{PRIVATE_PREFIX}brf.pdf",
-                content_hash="",
-            )
+        none for cannot be named safely. Does the merge leave that one file
+        where it is, and merge the rest of the case -- the unnamable file's own
+        document among it -- rather than refusing the whole case over it?"""
+        unhashed = NYCoAFileFactory.create(
+            file_name="SmithvJones-app-Smith-brf.pdf",
+            local_path=f"{PRIVATE_PREFIX}brf.pdf",
+            content_hash="",
         )
+        hashed = NYCoAFileFactory.create(
+            file_name="SmithvJones-resp-Jones-brf.pdf",
+            local_path=f"{PRIVATE_PREFIX}resp-brf.pdf",
+        )
+        case = self.case_with_files(unhashed, hashed)
 
         with self.captureOnCommitCallbacks(execute=True):
-            with self.assertRaises(UnhashedFile):
-                NYCoADocketMerger(case, params=None).merge()
+            result = NYCoADocketMerger(case, params=None).merge()
 
+        self.assertTrue(
+            result.success, "One unnamable file must not fail the case."
+        )
+        merged = NYCoADocument.objects.get(file_name=unhashed.file_name)
         self.assertEqual(
-            self.published, [], "Nothing may be published under that name."
+            merged.filepath_local,
+            "",
+            "Nothing may be published under that name.",
+        )
+        self.assertEqual(merged.sha256, "")
+        self.assertEqual(
+            [private for private, _ in self.published],
+            [hashed.local_path],
+            "Only the file that could be named was published.",
         )
         self.assertEqual(
-            Docket.objects.count(),
-            0,
-            "The case is atomic, so refusing one file writes none of it.",
+            self.discarded,
+            [hashed.local_path],
+            "The unnamable file's only copy has to survive for a later run.",
         )
 
     @merger_test(expected_query_count=16)
