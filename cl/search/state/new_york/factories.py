@@ -82,7 +82,6 @@ class NYCoADocumentFactory(DjangoModelFactory):
     docket_entry = SubFactory(NYCoADocketEntryFactory)
     file_name = Sequence(lambda n: f"SmithvJones-app-Smith-brf-{n + 1}.pdf")
     content_type = "application/pdf"
-    available = Faker("boolean", chance_of_getting_true=75)
     doc_role = Faker("word")
     doc_party = Faker("name")
     doc_type = Faker("word")
