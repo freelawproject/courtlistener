@@ -139,7 +139,7 @@ class NYCoAFileFactory(Factory):
 
     file_name = Sequence(lambda n: f"SmithvJones-app-Smith{n}-brf.pdf")
     content_type = "application/pdf"
-    available = False
+    available = True
     doc_role = FilingRole.APPELLANT
     doc_party = "Smith"
     doc_type = FilingDocType.BRIEF
