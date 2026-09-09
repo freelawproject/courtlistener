@@ -96,23 +96,6 @@ volumes, and both are read out of the file name rather than stated by the
 Court."""
 
 
-class UnhashedFile(Exception):
-    """Raised for a scrape that names a downloaded file but no hash for it.
-
-    The hash is the only part of a published name that changes when the Court
-    reissues a document under the name it first used, so publishing without
-    one would put the correction at the key the superseded copy already holds,
-    where the merge takes it for a file it has already published and leaves
-    the old bytes in place; see `NYCoADocument.make_filename`. Rather than
-    publish something that can silently go stale, the merge refuses the file.
-
-    `NYCoADocketMerger` is atomic, so this takes the whole case down with it
-    and nothing about it is written. That is deliberate: a download the run
-    database recorded no hash for means the run itself is missing a row, which
-    is worth looking at rather than working around.
-    """
-
-
 def _storable_number(
     value: int | None, field: str, document: NYCoAFile
 ) -> int | None:
@@ -229,13 +212,12 @@ class NYCoADocumentMerger[ParamType](
         """Publish the file, then write the document once.
 
         :return: The merge result and the merged document, unchanged.
-        :raises UnhashedFile: See `publish`.
         """
         self.publish()
         return super().merge_one()
 
     def _scrub_fileinfo(self) -> None:
-        """Remove info relevant to file."""
+        """Remove info relevant to file"""
         self.transformed["filepath_local"] = ""
         self.transformed["sha256"] = ""
         self.transformed["file_size"] = None
@@ -244,8 +226,6 @@ class NYCoADocumentMerger[ParamType](
         """Move the scraped file into the bucket CourtListener serves, and
         rewrite the path the merge is about to store to say so.
 
-        :raises UnhashedFile: For a scrape that reports a downloaded file the
-            run database recorded no hash for, which cannot be named safely.
         """
         private_key = self.scrape.local_path
         if not private_key or is_published(private_key):
@@ -261,12 +241,14 @@ class NYCoADocumentMerger[ParamType](
             return
 
         if not self.scrape.content_hash:
-            raise UnhashedFile(
-                f"Court-PASS file {self.scrape.file_name} was downloaded to "
-                f"{private_key} with no hash recorded, so a later correction "
-                "to it could not be told from the copy that would be "
-                "published now; refusing the case."
+            logger.error(
+                "Court-PASS file %s was downloaded to %s with no hash "
+                "recorded.",
+                self.scrape.file_name,
+                private_key,
             )
+            self._scrub_fileinfo()
+            return
 
         naming = NYCoADocument(
             docket_entry=cast(NYCoADocketEntry, self.params.parent),
