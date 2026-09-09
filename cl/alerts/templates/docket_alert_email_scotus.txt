@@ -1,2 +1,45 @@
-{% load text_filters %}
-{{ count }} New Entr{{ count|pluralize:"y,ies" }} in {{ docket|best_case_name|safe }}
+{% load text_filters %}{% load extras %}
+**************************
+CourtListener Docket Alert
+**************************
+
+{{ count }} New Entr{{ count|pluralize:"y,ies" }} in {{ docket|best_case_name|safe }} {% if docket.docket_number %}({{ docket.docket_number }}){% endif %}
+{{ docket.court }}
+~~~
+View Docket: https://www.courtlistener.com{{ docket.get_absolute_url }}?order_by=desc{% if docket.scotus_docket_url %}
+View Docket on the Supreme Court website: {{ docket.scotus_docket_url }}{% endif %}
+
+{% for de in new_des %}{% for doc in de.scotusdocument_set.all %}Document Number: {{ de.entry_number|default:"" }}{% if doc.attachment_number %}-{{ doc.attachment_number }}{% endif %}
+Date Filed: {{ de.date_filed|date:"M j, Y"|default:'Unknown' }}
+{% if doc.description %}{{ doc.description|safe|wordwrap:80 }}{% else %}{{ de.description|default:"Unknown docket entry description"|safe|wordwrap:80 }}{% endif %}
+View Document in CourtListener: https://www.courtlistener.com{% if doc.get_absolute_url %}{{ doc.get_absolute_url }}{% else %}{{ docket.get_absolute_url }}#minute-entry-{{ de.pk }}{% endif %}{% if doc.document_number %}{% if doc.filepath_local %}
+Download PDF: {{ doc.filepath_local.url }}{% elif doc.url|http_url %}
+View on the Supreme Court website: https://www.courtlistener.com{{ doc.get_absolute_url }}?redirect_to_download=True{% endif %}{% endif %}
+{% empty %}Document Number: {{ de.entry_number|default:"" }}
+Date Filed: {{ de.date_filed|date:"M j, Y"|default:'Unknown' }}
+{{ de.description|default:"Unknown docket entry description"|safe|wordwrap:80 }}
+
+{% endfor %}{% endfor %}
+{% if notes or tags %}
+Your Note: {% if notes %}{{ notes }}{% else %} You have not added notes to this case. Learn More: {{ WIKI_HELP_URL }}/general/using-notes-to-annotate-content{% endif %}
+
+Your Tags: {% if tags %}{% for tag in tags %}{{ tag.name }}{% if not forloop.last %}, {% endif %}{% endfor %}{% else %} No tags yet. Learn More: {{ WIKI_HELP_URL }}/general/using-tags-to-organize-docket-collections{% endif %}
+{% else %}
+Use notes and tags to organize and share the cases you follow. Learn More: {{ WIKI_HELP_URL }}/general/using-tags-to-organize-docket-collections
+{% endif %}
+
+{% if not first_email or first_email and auto_subscribe %}
+This alert was sent because you subscribed to this docket with your account on CourtListener.com.
+To disable this alert unsubscribe here: https://www.courtlistener.com{% url 'toggle_docket_alert_confirmation' 'unsubscribe' docket_alert_secret_key %}
+{% endif %}
+************************
+{% include "includes/alert_promo_banner.txt" %}
+
+This alert brought to you by the 501(c)(3) non-profit Free Law Project
+
+ - Blog: https://free.law
+ - BlueSky: https://bsky.app/profile/free.law
+ - Donate: https://donate.free.law/forms/supportflp
+ - Become a Member: https://free.law/membership/
+
+Please donate to support our work.

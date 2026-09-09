@@ -888,6 +888,31 @@ class ViewSCOTUSDocumentTest(TestCase):
                         msg=f"{detail_url} is not an internal path.",
                     )
 
+    async def test_download_redirect_to_source_court_website(self) -> None:
+        """redirect_to_download falls back to the source's own external URL
+        when we don't have the file."""
+        entry = await sync_to_async(SCOTUSDocketEntryFactory)(
+            docket=self.docket
+        )
+        document = await sync_to_async(SCOTUSDocumentFactory)(
+            docket_entry=entry,
+            attachment_number=1,
+            filepath_local="",
+            url="https://www.supremecourt.gov/DocketPDF/test.pdf",
+        )
+        path = reverse(
+            "view_recap_attachment",
+            kwargs={
+                "docket_id": self.docket.id,
+                "doc_num": document.document_number,
+                "att_num": document.attachment_number,
+                "slug": self.docket.slug,
+            },
+        )
+        r = await self.async_client.get(path, {"redirect_to_download": True})
+        self.assertEqual(r.status_code, HTTPStatus.FOUND)
+        self.assertEqual(r["Location"], document.url)
+
 
 @override_settings(WAFFLE_CACHE_PREFIX="test_scotus_document_flag_waffle")
 @override_flag("scotus_docket_page", active=False)
