@@ -353,6 +353,22 @@ class CustomPasswordResetForm(PasswordResetForm):
             self._accounts_at = email
         return self._accounts
 
+    def confirmed_accounts_at_address(self, email: str) -> list[User]:
+        """Narrow ``accounts_at_address()`` to the ones that confirmed it.
+
+        The only place that reads ``profile``. Kept beside the fetch that
+        select-relates it, so the two can't drift apart and turn this into a
+        query per account.
+
+        :param email: The submitted address.
+        :return: The accounts at that address that have confirmed it.
+        """
+        return [
+            user
+            for user in self.accounts_at_address(email)
+            if user.profile.email_confirmed  # type: ignore
+        ]
+
     def get_users(self, email: str) -> Iterator[User]:
         """Return the accounts allowed to receive a reset link.
 
@@ -370,11 +386,7 @@ class CustomPasswordResetForm(PasswordResetForm):
         :param email: The submitted address.
         :return: The accounts to mail a reset link to.
         """
-        return (
-            user
-            for user in self.accounts_at_address(email)
-            if user.profile.email_confirmed  # type: ignore
-        )
+        return iter(self.confirmed_accounts_at_address(email))
 
     def save(self, *args, **kwargs) -> None:
         """Send whichever of three emails fits the submitted address.
@@ -396,7 +408,7 @@ class CustomPasswordResetForm(PasswordResetForm):
         """
         recipient_addr = self.cleaned_data["email"]
         accounts = self.accounts_at_address(recipient_addr)
-        if any(user.profile.email_confirmed for user in accounts):  # type: ignore
+        if len(self.confirmed_accounts_at_address(recipient_addr)) > 0:
             super().save(*args, **kwargs)
             return
 
