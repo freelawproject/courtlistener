@@ -29,6 +29,7 @@ from django.test import AsyncClient, RequestFactory
 from django.test.client import Client
 from django.test.utils import override_settings
 from django.urls import reverse
+from django.utils.encoding import force_bytes
 from django.utils.http import urlsafe_base64_encode
 from django.utils.timezone import now
 from django_ses import SESBackend, signals
@@ -5279,6 +5280,35 @@ class PasswordResetConfirmedEmailTest(TestCase):
 
         self.request_reset("victim@example.com")
         self.assert_one_email_without_reset_link()
+
+    def test_a_repointed_address_cannot_ride_along_with_the_owner(
+        self,
+    ) -> None:
+        """When the address's owner has an account of their own, does the
+        reset reach only theirs?
+
+        The nastier version of the attack above. Here the request does produce
+        a reset link, legitimately, for the victim's own account — so "no link
+        was sent" proves nothing, and the check has to be which account the
+        link opens. Get that wrong and the victim is handed the attacker's
+        account by way of a mail they were right to trust.
+        """
+        shared = "victim@example.com"
+        victim = self.make_user("victim", shared)
+        attacker = self.make_user("attacker", "attacker@example.com")
+        # Repoint the address the way view_settings does.
+        attacker.email = shared
+        attacker.save()
+        profile = attacker.profile
+        profile.email_confirmed = False
+        profile.save()
+
+        self.request_reset(shared)
+
+        self.assert_reset_link_sent()
+        body = mail.outbox[0].body
+        self.assertIn(urlsafe_base64_encode(force_bytes(victim.pk)), body)
+        self.assertNotIn(urlsafe_base64_encode(force_bytes(attacker.pk)), body)
 
     def test_unknown_address_still_gets_no_account_found(self) -> None:
         """Is the pre-existing behavior for strangers unchanged?"""
