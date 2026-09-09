@@ -10,9 +10,11 @@ from django.core.cache import cache
 from django.core.exceptions import ValidationError
 from django.core.files.base import ContentFile
 from django.core.files.uploadedfile import SimpleUploadedFile
+from django.template.response import TemplateResponse
 from django.test import RequestFactory, SimpleTestCase, override_settings
 from django.utils.functional import SimpleLazyObject
 from requests.cookies import RequestsCookieJar
+from waffle.testutils import override_flag
 
 from cl.lib.courts import (
     get_active_court_from_cache,
@@ -29,6 +31,7 @@ from cl.lib.file_validation import (
     validate_file_size,
 )
 from cl.lib.filesizes import convert_size_to_bytes
+from cl.lib.middleware import IncrementalNewTemplateMiddleware
 from cl.lib.mime_types import lookup_mime_type
 from cl.lib.model_helpers import (
     clean_docket_number,
@@ -2704,3 +2707,37 @@ class TieredCacheTest(SimpleTestCase):
         result3 = greet("Alice", greeting="Hello")
         self.assertEqual(result3, "Hello, Alice!")
         self.assertEqual(self.call_count, 2)  # Cached
+
+
+@override_flag("use_new_design", True)
+@override_settings(WAFFLE_CACHE_PREFIX="test_incremental_template_waffle")
+class IncrementalNewTemplateMiddlewareTest(TestCase):
+    """Template swapping for pages that are mid-redesign."""
+
+    def process(self, template_name: str) -> TemplateResponse:
+        """Runs an unrendered TemplateResponse through the middleware."""
+        middleware = IncrementalNewTemplateMiddleware(lambda request: None)
+        request = RequestFactory().get("/")
+        response = TemplateResponse(request, template_name, {})
+        return middleware.process_template_response(request, response)
+
+    def test_template_without_a_v2_counterpart(self) -> None:
+        """Test if a legacy template is left alone when no v2 version of it exists.
+
+        We test against base.html: redesign is done on new_base.html, so
+        v2_base.html never exists.
+        """
+        response = self.process("base.html")
+        self.assertEqual(response.template_name, "base.html")
+
+    @override_flag("use_new_design", False)
+    def test_legacy_template_served_when_flag_off(self) -> None:
+        """A template with a v2 counterpart stays legacy when the flag is off."""
+        response = self.process("homepage.html")
+        self.assertEqual(response.template_name, "homepage.html")
+
+    @override_flag("use_new_design", False)
+    def test_v2_only_template_served_regardless_of_flag(self) -> None:
+        """A v2-only template is served even with the flag off."""
+        response = self.process("components.html")
+        self.assertEqual(response.template_name, "v2_components.html")
