@@ -4861,12 +4861,11 @@ class RefreshAPIThrottlesAdminTest(TestCase):
         self.assertFalse(APIThrottle.objects.filter(user=self.target).exists())
 
 
-class EmailOrUsernameSignInTest(TestCase):
-    """Tests for signing in with a username or an email address.
+class AccountBuildingMixin:
+    """Builds accounts for the sign-in and password-reset tests.
 
-    These go through the sign-in view rather than calling the backend, so that
-    the form's own checks — the generic error, the "confirm your address"
-    message — are part of what's covered.
+    Both need the same thing: an account with a known password whose active,
+    confirmed and stub flags can be set per case.
     """
 
     PASSWORD = "a-good-password"
@@ -4881,7 +4880,7 @@ class EmailOrUsernameSignInTest(TestCase):
         email_confirmed: bool = True,
         stub_account: bool = False,
     ) -> User:
-        """Build an account to sign in as.
+        """Build an account.
 
         :param username: The account's username.
         :param email: The account's email address.
@@ -4901,6 +4900,15 @@ class EmailOrUsernameSignInTest(TestCase):
             email_confirmed=email_confirmed,
             stub_account=stub_account,
         ).user
+
+
+class EmailOrUsernameSignInTest(AccountBuildingMixin, TestCase):
+    """Tests for signing in with a username or an email address.
+
+    These go through the sign-in view rather than calling the backend, so that
+    the form's own checks — the generic error, the "confirm your address"
+    message — are part of what's covered.
+    """
 
     def sign_in(self, identifier: str, password: str) -> HttpResponse:
         """POST the sign-in form.
@@ -5173,41 +5181,13 @@ class EmailOrUsernameSignInTest(TestCase):
         self.assertContains(response, "Username or email address")
 
 
-class PasswordResetConfirmedEmailTest(TestCase):
+class PasswordResetConfirmedEmailTest(AccountBuildingMixin, TestCase):
     """Tests that reset links only ever go to confirmed addresses.
 
     An unconfirmed address is one nobody has proven they own. Mailing a reset
     token to one lets somebody repoint their account at an address they don't
     control and have us deliver a working token to its owner.
     """
-
-    PASSWORD = "a-good-password"
-
-    def make_user(
-        self,
-        username: str,
-        email: str,
-        email_confirmed: bool = True,
-        is_active: bool = True,
-        stub_account: bool = False,
-    ) -> User:
-        """Build an account to request a reset for.
-
-        :param username: The account's username.
-        :param email: The account's email address.
-        :param email_confirmed: Whether its address has been confirmed.
-        :param is_active: Whether the account is active.
-        :param stub_account: Whether it's a stub, as donations create.
-        :return: The new User.
-        """
-        return UserProfileWithParentsFactory.create(
-            user__username=username,
-            user__email=email,
-            user__password=make_password(self.PASSWORD),
-            user__is_active=is_active,
-            email_confirmed=email_confirmed,
-            stub_account=stub_account,
-        ).user
 
     def request_reset(self, email: str) -> HttpResponse:
         """POST the password reset form.
