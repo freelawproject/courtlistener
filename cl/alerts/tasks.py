@@ -554,13 +554,13 @@ def create_schedule_alerts_hits_in_bulk(
 ) -> None:
     """Create ScheduledAlertHit records in bulk.
 
-    Uses bulk_create to persist a list of ScheduledAlertHit instances in a
-    single database operation. Do retries upon IntegrityError.
-
     :param scheduled_hits: A list of ScheduledAlertHit instances to be created.
     :return: None
     """
-    ScheduledAlertHit.objects.bulk_create(scheduled_hits)
+    with transaction.atomic():
+        ScheduledAlertHit.objects.bulk_create(
+            scheduled_hits, batch_size=settings.SCHEDULED_ALERT_HIT_BATCH_SIZE
+        )
 
 
 @app.task(ignore_result=True)
