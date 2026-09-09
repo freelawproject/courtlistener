@@ -211,8 +211,20 @@ router_v4.register(r"api-usage", views.ApiUsageViewSet, basename="api-usage")
 # - Remove V3 documentation.
 urlpatterns = [
     path(
-        "api-auth/",
-        include("rest_framework.urls", namespace="rest_framework"),
+        # DRF's browsable API ships its own login page, but it is
+        # django.contrib.auth's stock LoginView behind a DRF template, so it
+        # gets none of the protections /sign-in/ has: no ratelimiting, no
+        # redirect sanitizing, and — because it uses the plain
+        # AuthenticationForm — no confirmed-email check. Our authentication
+        # backend deliberately returns accounts with unconfirmed addresses so
+        # that ConfirmedEmailAuthenticationForm can tell their owners to go
+        # confirm them, which makes a login page that skips that form a way in
+        # for unconfirmed accounts. So point it at the real one instead, as we
+        # do for the admin site's login page in cl.urls. Sessions are shared,
+        # so signing in there still authenticates the browsable API.
+        "api-auth/login/",
+        RedirectView.as_view(pattern_name="sign-in", query_string=True),
+        name="drf_login_redirect",
     ),
     re_path(r"^api/rest/(?P<version>[v3]+)/", include(router.urls)),
     re_path(r"^api/rest/(?P<version>[v4]+)/", include(router_v4.urls)),
