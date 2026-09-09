@@ -26,7 +26,10 @@ from cl.corpus_importer.state.new_york.factories import (
     NYCoAIssueFactory,
     NYCoAPartyFactory,
 )
-from cl.corpus_importer.state.new_york.mergers import NYCoADocketMerger
+from cl.corpus_importer.state.new_york.mergers import (
+    NYCoADocketMerger,
+    UnhashedFile,
+)
 from cl.corpus_importer.state.new_york.nycourts_gov import NYCoACase, NYCoAFile
 from cl.corpus_importer.state.new_york.storage import (
     PRIVATE_PREFIX,
@@ -944,7 +947,6 @@ class NYCoADocumentMergerTest(NYCoAMergerTestCase):
             merged.file_name, "SmithvJones-app-Smith-Rec-vol3.pdf"
         )
         self.assertEqual(merged.content_type, "application/pdf")
-        self.assertTrue(merged.available)
         self.assertEqual(merged.doc_role, FilingRole.APPELLANT)
         self.assertEqual(merged.doc_party, "Smith")
         self.assertEqual(merged.doc_type, FilingDocType.RECORD)
@@ -1125,10 +1127,12 @@ class NYCoADocumentMergerTest(NYCoAMergerTestCase):
             entry.documents.get().file_name, "SmithvJones-app-Smith-brf.pdf"
         )
 
-    @merger_test(expected_query_count=16)
-    def test_merge_file_the_scraper_could_not_fetch(self) -> None:
-        """A sealed file is listed but never served, so the scraper has no path
-        to report. Is the document still recorded, with no stored file?"""
+    @merger_test(expected_query_count=13)
+    def test_merge_file_the_court_will_not_serve(self) -> None:
+        """A file the Court lists but declines to hand over has nothing to
+        record -- no bytes, no hash, nothing to extract -- and a row for it
+        would only be one every file sweep has to skip. Is it left out of the
+        document table while its filing is still recorded?"""
         case = self.case_with_files(
             NYCoAFileFactory.create(available=False, local_path="")
         )
@@ -1136,17 +1140,36 @@ class NYCoADocumentMergerTest(NYCoAMergerTestCase):
         result = NYCoADocketMerger(case, params=None).merge()
 
         self.assertTrue(result.success)
-        merged = NYCoADocument.objects.get()
-        self.assertFalse(merged.available)
-        self.assertEqual(merged.filepath_local, "")
-        self.assertIsNone(
-            merged.ocr_status,
-            "Nothing was stored, so nothing is waiting to be extracted.",
-        )
+        self.assertEqual(NYCoADocument.objects.count(), 0)
         self.assertEqual(
-            (merged.sha256, merged.file_size),
-            ("", None),
-            "Nothing read the bytes, so nothing can describe them.",
+            NYCoADocketEntry.objects.count(),
+            1,
+            "The filing is still on the docket; only its file is not.",
+        )
+
+    @merger_test(expected_query_count=16)
+    def test_merge_keeps_the_files_the_court_does_serve(self) -> None:
+        """A filing can list a file the Court serves beside one it does not.
+        Does the servable one still get a document row?"""
+        case = self.case_with_files(
+            NYCoAFileFactory.create(
+                file_name="SmithvJones-app-Smith-brf.pdf",
+                available=True,
+            ),
+            NYCoAFileFactory.create(
+                file_name="SmithvJones-app-Smith-rec.txt",
+                available=False,
+                local_path="",
+            ),
+        )
+
+        with self.captureOnCommitCallbacks(execute=True):
+            result = NYCoADocketMerger(case, params=None).merge()
+
+        self.assertTrue(result.success)
+        self.assertEqual(
+            [document.file_name for document in NYCoADocument.objects.all()],
+            ["SmithvJones-app-Smith-brf.pdf"],
         )
 
     @merger_test(expected_query_count=30)
@@ -1590,9 +1613,11 @@ class NYCoADocumentPublishTest(NYCoAMergerTestCase):
 
     @merger_test(expected_query_count=0)
     def test_a_document_with_no_hash_is_named_without_one(self) -> None:
-        """A file the archive recorded no hash for still has to be publishable.
-        Does the name simply end after the scraper's, rather than carrying a
-        stray separator where the hash would have gone?"""
+        """Naming is total: a document with no hash stored still has to have
+        a name, even though the merge refuses to publish one (see
+        `test_a_downloaded_file_with_no_hash_refuses_the_case`). Does the name
+        simply end after the scraper's, rather than carrying a stray separator
+        where the hash would have gone?"""
         document = self.stored_document()
 
         self.assertEqual(
@@ -1672,10 +1697,58 @@ class NYCoADocumentPublishTest(NYCoAMergerTestCase):
             self.discarded, [], "The only copy of the file has to survive."
         )
 
-    @merger_test(expected_query_count=30)
-    def test_remerge_withdraws_a_file_the_court_stopped_serving(self) -> None:
-        """A file the Court seals stops being listed as available. Does
-        CourtListener stop serving its copy?"""
+    def test_a_downloaded_file_with_no_hash_refuses_the_case(self) -> None:
+        """The hash is what keeps a reissued document from being published on
+        top of the copy it replaces, so a download the run database recorded
+        none for cannot be named safely. Does the merge refuse it outright
+        rather than publishing under a name that cannot go stale visibly?"""
+        case = self.case_with_files(
+            NYCoAFileFactory.create(
+                file_name="SmithvJones-app-Smith-brf.pdf",
+                local_path=f"{PRIVATE_PREFIX}brf.pdf",
+                content_hash="",
+            )
+        )
+
+        with self.captureOnCommitCallbacks(execute=True):
+            with self.assertRaises(UnhashedFile):
+                NYCoADocketMerger(case, params=None).merge()
+
+        self.assertEqual(
+            self.published, [], "Nothing may be published under that name."
+        )
+        self.assertEqual(
+            Docket.objects.count(),
+            0,
+            "The case is atomic, so refusing one file writes none of it.",
+        )
+
+    @merger_test(expected_query_count=16)
+    def test_a_file_the_scraper_never_fetched_needs_no_hash(self) -> None:
+        """Only a download has a hash to record, and the Court offering a file
+        is no guarantee the scraper came away with it. Does a document whose
+        fetch produced nothing merge with no file, rather than being refused
+        for a hash it was never going to have?"""
+        case = self.case_with_files(
+            NYCoAFileFactory.create(
+                file_name="SmithvJones-app-Smith-brf.pdf",
+                available=True,
+                local_path="",
+            )
+        )
+
+        with self.captureOnCommitCallbacks(execute=True):
+            result = NYCoADocketMerger(case, params=None).merge()
+
+        self.assertTrue(result.success)
+        self.assertEqual(NYCoADocument.objects.get().filepath_local, "")
+
+    @merger_test(expected_query_count=29)
+    def test_remerge_drops_a_document_the_court_stopped_serving(self) -> None:
+        """A file the Court stops serving is listed with its download button
+        disabled. Does the document go with it, published copy and all, so
+        that nothing is left pointing at a file CourtListener may no longer
+        publish?"""
         case = self.case_with_files(
             NYCoAFileFactory.create(
                 file_name="SmithvJones-app-Smith-brf.pdf",
@@ -1685,12 +1758,9 @@ class NYCoADocumentPublishTest(NYCoAMergerTestCase):
             docket_entry_id="e:appellant-brief:smith:1",
         )
         NYCoADocketMerger(case, params=None).merge()
-        served = NYCoADocument.objects.get()
-        published = served.filepath_local.name
-        served.page_count = 12
-        served.save()
+        published = NYCoADocument.objects.get().filepath_local.name
 
-        sealed = self.case_with_files(
+        pulled = self.case_with_files(
             NYCoAFileFactory.create(
                 file_name="SmithvJones-app-Smith-brf.pdf",
                 available=False,
@@ -1698,24 +1768,18 @@ class NYCoADocumentPublishTest(NYCoAMergerTestCase):
             ),
             docket_entry_id="e:appellant-brief:smith:1",
         )
-        sealed.issues = case.issues
+        pulled.issues = case.issues
         with self.captureOnCommitCallbacks(execute=True):
-            result = NYCoADocketMerger(sealed, params=None).merge()
+            result = NYCoADocketMerger(pulled, params=None).merge()
 
         self.assertTrue(result.success)
-        merged = NYCoADocument.objects.get()
-        self.assertFalse(merged.available)
+        self.assertEqual(NYCoADocument.objects.count(), 0)
         self.assertEqual(
-            merged.filepath_local,
-            "",
-            "The document is still recorded; only its file is gone.",
+            NYCoADocketEntry.objects.count(),
+            1,
+            "The filing stays; only the document it can no longer serve goes.",
         )
         self.assertEqual(self.withdrawn, [published])
-        self.assertEqual(
-            (merged.sha256, merged.file_size, merged.page_count),
-            ("", None, None),
-            "Nothing is left to describe once the file is withdrawn.",
-        )
 
     @merger_test(expected_query_count=31)
     def test_remerge_withdraws_a_file_the_scrape_no_longer_lists(self) -> None:
