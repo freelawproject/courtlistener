@@ -252,9 +252,6 @@ class NYCoADocument(AbstractDateTimeModel, AbstractStateDocument):
     party role, party name, and document type.
     :ivar content_type: The MIME type of the file. Court-PASS publishes PDFs
     along with playlist files for oral argument recordings.
-    :ivar available: Whether the file can be downloaded. False for sealed
-    files and files the site lists but does not serve, and the default, so a
-    document is not presumed downloadable until a scrape says it is.
     :ivar doc_role: The party role encoded in the file name, e.g. "appellant".
     Blank when the file name does not follow the naming convention.
     :ivar doc_party: The party name encoded in the file name. Blank when the
@@ -276,7 +273,6 @@ class NYCoADocument(AbstractDateTimeModel, AbstractStateDocument):
     )
     file_name = models.TextField()
     content_type = models.CharField(max_length=255, blank=True)
-    available = models.BooleanField(default=False)
     doc_role = models.TextField(blank=True)
     doc_party = models.TextField(blank=True)
     doc_type = models.TextField(blank=True)

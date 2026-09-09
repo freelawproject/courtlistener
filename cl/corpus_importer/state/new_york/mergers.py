@@ -96,6 +96,23 @@ volumes, and both are read out of the file name rather than stated by the
 Court."""
 
 
+class UnhashedFile(Exception):
+    """Raised for a scrape that names a downloaded file but no hash for it.
+
+    The hash is the only part of a published name that changes when the Court
+    reissues a document under the name it first used, so publishing without
+    one would put the correction at the key the superseded copy already holds,
+    where the merge takes it for a file it has already published and leaves
+    the old bytes in place; see `NYCoADocument.make_filename`. Rather than
+    publish something that can silently go stale, the merge refuses the file.
+
+    `NYCoADocketMerger` is atomic, so this takes the whole case down with it
+    and nothing about it is written. That is deliberate: a download the run
+    database recorded no hash for means the run itself is missing a row, which
+    is worth looking at rather than working around.
+    """
+
+
 def _storable_number(
     value: int | None, field: str, document: NYCoAFile
 ) -> int | None:
@@ -180,9 +197,6 @@ class NYCoADocumentMerger[ParamType](
     content_type: str = Attribute(
         lambda doc, params: doc.content_type, strategy=overwrite
     )
-    available: bool = Attribute(
-        lambda doc, params: doc.available, strategy=overwrite
-    )
     doc_role: str = Attribute(
         lambda doc, params: _stated(doc.doc_role), strategy=overwrite
     )
@@ -215,6 +229,7 @@ class NYCoADocumentMerger[ParamType](
         """Publish the file, then write the document once.
 
         :return: The merge result and the merged document, unchanged.
+        :raises UnhashedFile: See `publish`.
         """
         self.publish()
         return super().merge_one()
@@ -227,7 +242,11 @@ class NYCoADocumentMerger[ParamType](
 
     def publish(self) -> None:
         """Move the scraped file into the bucket CourtListener serves, and
-        rewrite the path the merge is about to store to say so."""
+        rewrite the path the merge is about to store to say so.
+
+        :raises UnhashedFile: For a scrape that reports a downloaded file the
+            run database recorded no hash for, which cannot be named safely.
+        """
         private_key = self.scrape.local_path
         if not private_key or is_published(private_key):
             return
@@ -242,12 +261,11 @@ class NYCoADocumentMerger[ParamType](
             return
 
         if not self.scrape.content_hash:
-            logger.error(
-                "Court-PASS file %s was downloaded to %s with no hash "
-                "recorded, so a later correction to it cannot be told from "
-                "the copy being published now.",
-                self.scrape.file_name,
-                private_key,
+            raise UnhashedFile(
+                f"Court-PASS file {self.scrape.file_name} was downloaded to "
+                f"{private_key} with no hash recorded, so a later correction "
+                "to it could not be told from the copy that would be "
+                "published now; refusing the case."
             )
 
         naming = NYCoADocument(
@@ -271,37 +289,29 @@ class NYCoADocumentMerger[ParamType](
         self.transformed["filepath_local"] = published_key
 
     @override
-    def needs_update(self) -> bool:
-        """Force the update path for a document whose file the Court has
-        stopped serving, so `pre_update` can drop the path in the same write
-        even when nothing else about the document changed."""
-        return self._withdrawn() and bool(
-            self.existing and self.existing.filepath_local
-        )
-
-    def _withdrawn(self) -> bool:
-        """Whether the Court has stopped serving this document's file, which
-        it says by listing the file without making it available."""
-        return not self.scrape.available and not self.scrape.local_path
-
-    @override
     def pre_update(self, updated_fields: list[str]) -> list[str]:
-        """Drop the file of a document the Court has stopped serving, and send
-        one whose file has moved back for extraction."""
+        """Send a document whose file has moved back for extraction."""
         updated = super().pre_update(updated_fields)
         if (existing := self.existing) is None:
             return updated
-        if self._withdrawn() and existing.filepath_local:
-            existing.filepath_local = ""
-            existing.sha256 = ""
-            existing.file_size = None
-            updated += ["filepath_local", "sha256", "file_size"]
         if "filepath_local" not in updated_fields + updated:
             return updated
         existing.page_count = None
         existing.ocr_status = None
         updated += ["page_count", "ocr_status"]
         return updated
+
+
+def _served_attachments(
+    entry: NYCoDocketEntry, params: Any
+) -> Sequence[NYCoAFile]:
+    """The filing's files Court-PASS will actually hand over.
+
+    :param entry: The filing whose files to merge.
+    :param params: Unused; matches the transform signature.
+    :return: The files that get a document row.
+    """
+    return [file for file in entry.attachments if file.available]
 
 
 def _entry_party_id(
@@ -396,10 +406,39 @@ class NYCoADocketEntryMerger[ParamType](
         lambda e, params: e.party, strategy=_keep_party_name
     )
     # Court-PASS lists every file it has for a case, so a file that is gone
-    # from the list is gone from the case.
+    # from the list -- or that it has stopped serving -- is gone from the
+    # case.
     documents: list[NYCoADocument] = AttachmentRelation(
-        NYCoADocumentMerger, strategy=ManyStrategy.REPLACE
+        NYCoADocumentMerger,
+        transform=_served_attachments,
+        strategy=ManyStrategy.REPLACE,
     )
+
+    @override
+    def merge_one(self) -> tuple[MergeResult[Any], NYCoADocketEntry | None]:
+        """Merge the filing, then drop any document it no longer serves a file
+        for.
+
+        :return: The merge result and the merged filing, unchanged.
+        """
+        result, entry = super().merge_one()
+        self._drop_unserved_documents(entry)
+        return result, entry
+
+    def _drop_unserved_documents(self, entry: NYCoADocketEntry | None) -> None:
+        """Delete the documents of a filing Court-PASS now serves no file for.
+
+        This exists to handle the special case of all documents being retracted.
+
+        :param entry: The merged filing, or `None` if the merge produced none.
+        """
+        if self.existing is None or entry is None:
+            return
+        if not self.scrape.attachments:
+            return
+        if any(file.available for file in self.scrape.attachments):
+            return
+        _ = entry.documents.all().delete()
 
 
 class ScrapedAttorney(NYCoAAttorney):
