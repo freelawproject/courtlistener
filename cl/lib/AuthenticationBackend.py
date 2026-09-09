@@ -5,11 +5,12 @@ from django.contrib.auth.backends import ModelBackend
 from django.contrib.auth.base_user import AbstractBaseUser
 from django.contrib.auth.forms import AuthenticationForm
 from django.contrib.auth.models import User
-from django.db.models import F, QuerySet, Value
-from django.db.models.functions import Lower
+from django.db.models import F, QuerySet
 from django.http import HttpRequest
 from django.urls import reverse
 from django.views.decorators.debug import sensitive_variables
+
+from cl.lib.auth import filter_by_email
 
 # There can be many accounts for a given email address. To prevent
 # DOS attacks, only check this many of them, then stop.
@@ -33,13 +34,8 @@ def accounts_for_email(email: str) -> QuerySet[User]:
     :return: A queryset of the accounts holding that address.
     """
     return (
-        # Match on LOWER(email) rather than __iexact, which compiles to
-        # UPPER() and so can't use the auth_user_email_lower_idx index. Fold
-        # the submitted value in SQL as well, so both sides use Postgres's
-        # case rules: str.lower() and LOWER() disagree on some non-ASCII
-        # characters.
-        User.objects.alias(email_lower=Lower("email"))
-        .filter(email_lower=Lower(Value(email)), is_active=True)
+        filter_by_email(User.objects.all(), email)
+        .filter(is_active=True)
         # Stub accounts are placeholders for people who never signed up, so
         # there is nobody behind them to sign in or ask for a reset.
         .exclude(profile__stub_account=True)
