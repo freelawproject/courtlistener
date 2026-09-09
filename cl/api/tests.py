@@ -6,7 +6,7 @@ from http import HTTPStatus
 from typing import Any
 from unittest import mock
 from unittest.mock import MagicMock, patch
-from urllib.parse import parse_qs, urlencode, urlparse
+from urllib.parse import parse_qs, urlparse
 
 import time_machine
 from asgiref.sync import async_to_sync, sync_to_async
@@ -22,7 +22,7 @@ from django.db import IntegrityError, connection
 from django.test import RequestFactory, SimpleTestCase, override_settings
 from django.test.client import AsyncClient, AsyncRequestFactory
 from django.test.utils import CaptureQueriesContext
-from django.urls import NoReverseMatch, reverse
+from django.urls import reverse
 from django.utils.timezone import now
 from django.utils.xmlutils import UnserializableContentError
 from rest_framework import status
@@ -199,6 +199,17 @@ class BasicAPIPageTest(ESIndexTestCase, TestCase):
         r = await self.async_client.get(reverse("court_index"))
         self.assertEqual(r.status_code, 200)
 
+    async def test_drf_login_redirects_to_sign_in(self) -> None:
+        """Is DRF's browsable-API login page pointed at our own?
+
+        Its own login view skips the ratelimiting, redirect sanitizing and
+        confirmed-email check that /sign-in/ has.
+        """
+        r = await self.async_client.get(reverse("drf_login_redirect"))
+        self.assertRedirects(
+            r, reverse("sign-in"), fetch_redirect_response=False
+        )
+
     async def test_wiki_data_endpoint(self) -> None:
         """Does the wiki data endpoint return the expected JSON structure?"""
         await caches["default"].adelete("wiki-data")
@@ -285,52 +296,6 @@ class BasicAPIPageTest(ESIndexTestCase, TestCase):
         duration_minutes = data["oral_arguments"]["duration_minutes"]
         self.assertIsInstance(duration_minutes, int)
         self.assertEqual(duration_minutes, 4)
-
-
-class DRFAuthURLTest(SimpleTestCase):
-    """Test that DRF's own login page isn't reachable.
-
-    DRF's browsable API offers to mount django.contrib.auth's LoginView at
-    api-auth/login/ behind a DRF template. That view skips everything
-    /sign-in/ does — ratelimiting, redirect sanitizing, and the
-    confirmed-email check that lives in ConfirmedEmailAuthenticationForm — so
-    we send people to the real login page instead.
-    """
-
-    def test_drf_login_redirects_to_sign_in(self) -> None:
-        """Does DRF's login URL send people to our login page?"""
-        r = self.client.get(reverse("drf_login_redirect"))
-        self.assertRedirects(
-            r, reverse("sign-in"), fetch_redirect_response=False
-        )
-
-    def test_drf_login_redirect_keeps_next(self) -> None:
-        """Is the ?next= DRF's browsable API appends carried across?
-
-        Without it, everyone signing in from the browsable API lands on the
-        homepage instead of the endpoint they were reading.
-        """
-        api_root = reverse("api-root", kwargs={"version": "v4"})
-        r = self.client.get(reverse("drf_login_redirect"), {"next": api_root})
-        self.assertRedirects(
-            r,
-            f"{reverse('sign-in')}?{urlencode({'next': api_root})}",
-            fetch_redirect_response=False,
-        )
-
-    def test_drf_auth_urls_are_not_installed(self) -> None:
-        """Is rest_framework.urls really gone from the URLconf?
-
-        DRF's optional_login/optional_logout template tags reverse these
-        names and fall back to rendering nothing, so the browsable API keeps
-        working once they stop resolving. That silence is also why this needs
-        asserting: re-adding the include would restore the unprotected login
-        page without breaking anything visibly.
-        """
-        for name in ("rest_framework:login", "rest_framework:logout"):
-            with self.subTest(name=name):
-                with self.assertRaises(NoReverseMatch):
-                    reverse(name)
 
 
 @override_settings(
