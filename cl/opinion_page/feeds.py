@@ -1,6 +1,5 @@
 from datetime import datetime
 
-import waffle
 from django.contrib.syndication.views import Feed
 from django.db.models import QuerySet
 from django.http import Http404, HttpRequest
@@ -8,7 +7,6 @@ from django.utils.feedgenerator import Atom1Feed
 from django.utils.safestring import SafeText, mark_safe
 
 from cl.lib.date_time import midnight_pt
-from cl.opinion_page.docket_sources_utils import SCOTUS_SOURCE
 from cl.opinion_page.utils import make_docket_title
 from cl.search.models import Docket, DocketEntry, SCOTUSDocketEntry
 
@@ -29,30 +27,20 @@ class DocketFeed(Feed):
         return f"Docket updates for {make_docket_title(obj)}"
 
     def get_object(self, request: HttpRequest, docket_id: int) -> Docket:  # type: ignore
-        """Return the docket the feed is for, or raise Http404.
-
-        SCOTUS dockets 404 while the ``scotus_docket_page`` waffle flag is
-        off."""
+        """Return the docket this feed covers, or raise Http404."""
         try:
-            d = Docket.objects.only(
+            return Docket.objects.only(
                 "case_name",
                 "case_name_short",
                 "case_name_full",
                 "docket_number",
-                # For get_entry_source()
+                # For items()'s get_entry_source()
                 "court_id",
                 # For item_link()'s get_absolute_url()
                 "slug",
             ).get(pk=docket_id)
         except Docket.DoesNotExist:
             raise Http404("Unable to find docket")
-
-        if d.get_entry_source() is SCOTUS_SOURCE and not waffle.flag_is_active(
-            request, "scotus_docket_page"
-        ):
-            raise Http404("Unable to find docket")
-
-        return d
 
     def items(
         self, obj: Docket

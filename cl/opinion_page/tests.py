@@ -3180,8 +3180,6 @@ class DocketEntryFileDownload(TestCase):
                 )
 
 
-@override_settings(WAFFLE_CACHE_PREFIX="test_scotus_docket_feed_waffle")
-@override_flag("scotus_docket_page", active=True)
 class DocketFeedTest(TestCase):
     """Does the docket RSS feed render the right content for both RECAP
     and SCOTUS dockets?"""
@@ -3409,36 +3407,6 @@ class DocketFeedTest(TestCase):
         r = await self.get_feed(self.empty_scotus_docket)
         self.assertEqual(r.status_code, HTTPStatus.OK)
         self.assertNotIn("<entry>", r.content.decode())
-
-
-@override_settings(
-    WAFFLE_CACHE_PREFIX="test_scotus_docket_feed_disabled_waffle"
-)
-@override_flag("scotus_docket_page", active=False)
-class ScotusDocketFeedFlagDisabledTest(TestCase):
-    """With the flag off, a SCOTUS docket's feed must 404 too, matching
-    the docket page's own gating."""
-
-    @classmethod
-    def setUpTestData(cls) -> None:
-        cls.scotus_court = CourtFactory(id="scotus", jurisdiction="F")
-        cls.scotus_docket = DocketFactory(court=cls.scotus_court)
-        cls.recap_court = CourtFactory(id="ca9", jurisdiction="F")
-        cls.recap_docket = DocketFactory(court=cls.recap_court)
-
-    async def test_scotus_docket_feed_returns_404_when_flag_disabled(
-        self,
-    ) -> None:
-        r = await self.async_client.get(
-            reverse("docket_feed", kwargs={"docket_id": self.scotus_docket.id})
-        )
-        self.assertEqual(r.status_code, HTTPStatus.NOT_FOUND)
-
-    async def test_recap_docket_feed_unaffected_by_scotus_flag(self) -> None:
-        r = await self.async_client.get(
-            reverse("docket_feed", kwargs={"docket_id": self.recap_docket.id})
-        )
-        self.assertEqual(r.status_code, HTTPStatus.OK)
 
 
 class CachePageIgnoreParamsTest(TestCase):
