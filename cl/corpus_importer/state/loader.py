@@ -50,6 +50,7 @@ EXTRACTION_POLL: Final = 60.0
 DEFAULT_IN_FLIGHT_TIME: Final = 300.0  # Seconds
 DEFAULT_VERIFY_TIMEOUT: Final = 1800.0  # Seconds
 OUTSTANDING_SHOWN: Final = 20
+RETRY_BATCH: Final = 500
 
 
 class LoadPhase(StrEnum):
@@ -349,6 +350,21 @@ class JKentScrapeLoader[ScrapeType: BaseModel, ParamType = None](ABC):
         """
         return f"state_scrape_load:{self.name}:{self.database.name}"
 
+    def all_rows(self) -> Iterator[tuple[int, sqlite3.Row]]:
+        """Stream every row `query` selects.
+
+
+        :yield: The row's position in the query, counting from one, and the
+            row itself.
+        """
+        if not self.database.exists():
+            raise FileNotFoundError(f"No run database at {self.database}")
+        uri = f"file:{self.database.resolve()}?mode=ro"
+        with closing(sqlite3.connect(uri, uri=True)) as connection:
+            connection.row_factory = sqlite3.Row
+            with closing(connection.execute(self.query)) as cursor:
+                yield from enumerate(cursor, start=1)
+
     def rows(self) -> Iterator[tuple[int, sqlite3.Row]]:
         """Stream the rows `query` selects, honouring `start_row` and `limit`.
 
@@ -357,21 +373,12 @@ class JKentScrapeLoader[ScrapeType: BaseModel, ParamType = None](ABC):
             position is what a checkpoint and the ledger name a row by, so it
             has to be the absolute one.
         """
-        if not self.database.exists():
-            raise FileNotFoundError(f"No run database at {self.database}")
-        uri = f"file:{self.database.resolve()}?mode=ro"
-        with closing(sqlite3.connect(uri, uri=True)) as connection:
-            connection.row_factory = sqlite3.Row
-            with closing(connection.execute(self.query)) as cursor:
-                for count, row in enumerate(cursor, start=1):
-                    if count <= self.start_row:
-                        continue
-                    if (
-                        self.limit is not None
-                        and count - self.start_row > self.limit
-                    ):
-                        return
-                    yield count, row
+        for count, row in self.all_rows():
+            if count <= self.start_row:
+                continue
+            if self.limit is not None and count - self.start_row > self.limit:
+                return
+            yield count, row
 
     def normalize(
         self, payload: dict[str, Any], row: sqlite3.Row
@@ -540,6 +547,114 @@ class JKentScrapeLoader[ScrapeType: BaseModel, ParamType = None](ABC):
         report = LoadReport(rows_read=False)
         self.verify(report)
         return report
+
+    def retry(self) -> LoadReport:
+        """Re-dispatch what a previous load of this run left unfinished.
+
+        Reads the two sets the ledger holds -- rows whose merge never reached
+        a verdict, and documents extraction never came back on -- and puts
+        them back on the queues, then verifies the result the way a load does.
+        Both sets are taken as they are read, so whatever fails again is
+        written back by the same paths that recorded it the first time and a
+        retry that fixes everything leaves nothing behind.
+
+        Nothing here checkpoints and nothing clears the ledger: the run's
+        totals and the moment it started have to survive, since the totals are
+        what a retry adds to and the moment is what its extraction re-check
+        is scoped by.
+
+        :return: What the retry dispatched and what came of it.
+        """
+        report = LoadReport(rows_read=False)
+        self._retry_merges(report)
+        self._retry_extractions()
+        self.verify(report)
+        return report
+
+    def _retry_merges(self, report: LoadReport) -> None:
+        """Re-dispatch the rows whose merge never reached a verdict.
+
+        The rows are named by position, so this reads the run database again
+        to get their payloads back. A row that has since stopped being usable
+        -- the loader's own rules having changed under it -- is counted as
+        invalid or refused here rather than being dispatched to fail again.
+
+        :param report: The report to fill in, modified in place.
+        """
+        if not (rows := self.ledger.rows_to_retry()):
+            return
+        logger.info("Retrying %s rows of %s", len(rows), self.database.name)
+        report.rows_read = True
+        found: set[int] = set()
+        for number, row in self.all_rows():
+            if number not in rows:
+                continue
+            found.add(number)
+            report.seen += 1
+            prepared = self._prepare(number, row)
+            if prepared is RowOutcome.REFUSED:
+                report.refused += 1
+                continue
+            if prepared is RowOutcome.INVALID:
+                report.invalid += 1
+                continue
+            self._dispatch(number, prepared)
+            report.dispatched += 1
+            if self.db_delay:
+                time.sleep(self.db_delay)
+        if missing := rows - found:
+            logger.error(
+                "%s rows held for retry are not in %s at all, so they cannot "
+                "be re-merged and have now been dropped from the ledger: %s",
+                len(missing),
+                self.database.name,
+                sorted(missing)[:OUTSTANDING_SHOWN],
+                extra=fingerprint(self.name, LoadPhase.MERGE),
+            )
+
+    def _retry_extractions(self) -> None:
+        """Re-dispatch the documents extraction never came back on.
+
+        What the ledger holds are candidates, not a worklist: they were
+        outstanding when the run last verified itself, and by now some may
+        have been extracted by a later load or by `state_document_download`.
+        Each batch is therefore put back through `unextracted`, which drops
+        those and the ones extraction ran on and failed, before any of it is
+        dispatched.
+        """
+        if not self.extract or (model := self.document_model) is None:
+            return
+        if not (documents := self.ledger.documents_to_retry()):
+            return
+        if (since := self.ledger.started()) is None:
+            # Only reachable if the ledger expired between the two reads.
+            logger.error(
+                "Holding %s documents of the %s run for retry but no longer "
+                "know when the run began, so cannot tell which of them are "
+                "still outstanding. Sweep them up with `state_document_"
+                "download --skip-download`.",
+                len(documents),
+                self.name,
+                extra=fingerprint(self.name, LoadPhase.EXTRACTION),
+            )
+            return
+        logger.info(
+            "Retrying extraction of up to %s documents of %s",
+            len(documents),
+            self.database.name,
+        )
+        ordered = sorted(documents)
+        for start in range(0, len(ordered), RETRY_BATCH):
+            batch = ordered[start : start + RETRY_BATCH]
+            for throttle in self.throttles:
+                throttle.maybe_wait()
+            still_waiting = model.unextracted(since).filter(pk__in=batch)
+            dispatched = sum(
+                1
+                for document in still_waiting
+                if document.extract(self.extraction_queue)
+            )
+            self.ledger.extracting(dispatched)
 
     @property
     def checkpointing(self) -> str | None:
@@ -835,38 +950,42 @@ class JKentScrapeLoader[ScrapeType: BaseModel, ParamType = None](ABC):
         )
         # Always ask for the full picture, even where nothing is outstanding: a
         # document extraction ran on and could not read leaves nothing
-        # outstanding but is still worth reporting, and it is three queries
+        # outstanding but is still worth reporting, and it is two queries
         # once at the end of a run.
-        return self._extraction_status(model, totals.documents, since, wait)
+        return self._extraction_status(
+            ledger, model, totals.documents, since, wait
+        )
 
     @staticmethod
     def _extraction_status(
+        ledger: LoadLedger,
         model: type[AbstractStateDocument],
         dispatched: int,
         since: datetime,
         wait: WaitOutcome,
     ) -> ExtractionReport:
-        """Ask the database what became of this run's documents.
+        """Get's extraction status for this model since the run started.
 
-        Two counts and a sample, so three queries. Called once, after the wait
-        has ended -- polling uses `unextracted` alone.
+        Updates the ledger accordingly.
 
+        :param ledger: The run's ledger, handed the outstanding PKs.
         :param model: The document model the run's merges wrote.
         :param dispatched: How many documents the run sent to be extracted.
         :param since: The moment the run began.
         :param wait: How the wait on extraction ended.
         :return: What the database says.
         """
-        unextracted = model.unextracted(since)
+        outstanding: list[int] = list(
+            model.unextracted(since).values_list("pk", flat=True)
+        )
+        ledger.retry_documents(outstanding)
         return ExtractionReport(
             dispatched=dispatched,
-            outstanding=unextracted.count(),
+            outstanding=len(outstanding),
             failed=model.written_since(since)
             .filter(ocr_status=model.OCR_FAILED)
             .count(),
-            sample=list(
-                unextracted.values_list("pk", flat=True)[:OUTSTANDING_SHOWN]
-            ),
+            sample=outstanding[:OUTSTANDING_SHOWN],
             since=since,
             wait=wait,
         )

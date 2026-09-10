@@ -4,11 +4,18 @@ This is additional bookkeeping to verify that we haven't dropped anything
 during our celery run. We keep track of mergers/extractions in flight, and
 report in the end if anything is missing.
 
+Alongside that, a ledger holds the two sets `--retry` works from: the rows
+whose merge never reached a verdict, and the documents a run wrote that
+extraction never came back on. Both are drained by the retry that reads them
+and refilled by whatever fails again, so neither needs pruning as work
+succeeds -- a row or document that comes back clean is simply never re-added.
+
 Every key is written with a TTL, so a run nobody comes back to verify does not
 leave its ledger behind for good.
 """
 
 import logging
+from collections.abc import Collection
 from dataclasses import dataclass, field
 from datetime import datetime
 from typing import Any, Final
@@ -26,7 +33,15 @@ LEDGER_TTL: Final = 60 * 60 * 24 * 7
 back to a weekend's run on Monday and short enough that abandoned runs clear
 themselves out."""
 
-PARTS: Final = ("pending", "counts", "creates", "updates", "started")
+PARTS: Final = (
+    "pending",
+    "counts",
+    "creates",
+    "updates",
+    "started",
+    "merge_retry",
+    "extraction_retry",
+)
 """Every key a ledger writes, for `clear` to take away together."""
 
 FILE_COUNTS: Final = {
@@ -167,6 +182,7 @@ class LoadLedger:
         :param row: The row's position in the run database's query.
         """
         self._settle(row, "errored", None)
+        self._hold_for_retry(self._name("merge_retry"), (str(row),))
 
     def extracting(self, documents: int) -> None:
         """Record document sent for text extraction, to check up on later.
@@ -202,6 +218,59 @@ class LoadLedger:
             return {}
         rows = sorted((int(row), label) for row, label in pending.items())
         return dict(rows[:limit])
+
+    def retry_documents(self, pks: Collection[int]) -> None:
+        """Record documents extraction has not come back on, to retry later.
+
+        Called from a load's verification pass, which has just asked the
+        database the same question. What lands here is therefore a snapshot
+        taken at that moment rather than a live answer, which is the point:
+        intersected with the same query at retry time, it holds a retry to the
+        documents *this* run was waiting on, where the query alone would sweep
+        in any later run's outstanding documents too.
+
+        :param pks: The documents still waiting. Held as a set, so a second
+            verification pass over the same run adds nothing new.
+        """
+        self._hold_for_retry(
+            self._name("extraction_retry"), tuple(str(pk) for pk in pks)
+        )
+
+    def retry_counts(self) -> tuple[int, int]:
+        """How much is waiting to be retried, without taking any of it.
+
+        :return: Rows whose merge wants re-running, and documents whose
+            extraction does.
+        """
+        try:
+            pipeline = self._redis.pipeline()
+            pipeline.scard(self._name("merge_retry"))
+            pipeline.hlen(self._name("pending"))
+            pipeline.scard(self._name("extraction_retry"))
+            errored, pending, documents = pipeline.execute()
+        except Exception:
+            logger.exception("Could not read the ledger at %s", self.key)
+            return 0, 0
+        return int(errored) + int(pending), int(documents)
+
+    def rows_to_retry(self) -> set[int]:
+        """Take the rows whose merge never reached a verdict.
+        Drains the redis values during read!
+
+        :return: The rows to re-dispatch, by their position in the query.
+        """
+        rows = self._drain_set(self._name("merge_retry"))
+        rows |= self._drain_hash(self._name("pending"))
+        return {int(row) for row in rows if row.lstrip("-").isdigit()}
+
+    def documents_to_retry(self) -> set[int]:
+        """Take the documents extraction never came back on.
+        Drains the redis values during read!
+
+        :return: The document PKs to re-check and re-dispatch.
+        """
+        pks = self._drain_set(self._name("extraction_retry"))
+        return {int(pk) for pk in pks if pk.lstrip("-").isdigit()}
 
     def pending_key(self) -> str:
         """The Redis key holding every outstanding row, for a report to point
@@ -264,6 +333,57 @@ class LoadLedger:
                 logger.exception(
                     "Could not count %s against %s", part, self.key
                 )
+
+    def _hold_for_retry(self, name: str, members: Collection[str]) -> None:
+        """Add `members` to one of the retry sets, and keep it alive.
+
+        :param name: The Redis key of the set.
+        :param members: What to add. An empty collection writes nothing, so a
+            run with nothing to retry leaves no key behind at all.
+        """
+        if not members:
+            return
+        try:
+            pipeline = self._redis.pipeline()
+            pipeline.sadd(name, *members)
+            pipeline.expire(name, self.ttl)
+            pipeline.execute()
+        except Exception:
+            logger.exception(
+                "Could not hold %s members in %s", len(members), name
+            )
+
+    def _drain_set(self, name: str) -> set[str]:
+        """Read a set and delete it in one round trip.
+
+        :param name: The Redis key of the set.
+        :return: What it held, empty where Redis could not be reached.
+        """
+        try:
+            pipeline = self._redis.pipeline()
+            pipeline.smembers(name)
+            pipeline.delete(name)
+            members, _ = pipeline.execute()
+        except Exception:
+            logger.exception("Could not drain %s", name)
+            return set()
+        return set(members)
+
+    def _drain_hash(self, name: str) -> set[str]:
+        """Read a hash's fields and delete it in one round trip.
+
+        :param name: The Redis key of the hash.
+        :return: Its fields, empty where Redis could not be reached.
+        """
+        try:
+            pipeline = self._redis.pipeline()
+            pipeline.hkeys(name)
+            pipeline.delete(name)
+            fields, _ = pipeline.execute()
+        except Exception:
+            logger.exception("Could not drain %s", name)
+            return set()
+        return set(fields)
 
     def _count(self, **counts: int) -> None:
         """Add to the run's counters, and keep them alive.
