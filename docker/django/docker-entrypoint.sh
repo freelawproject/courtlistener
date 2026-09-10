@@ -60,6 +60,9 @@ case "$1" in
 'reenqueue-pending-audio-tasks-daemon')
     exec ./manage.py reenqueue_pending_audio_tasks_daemon
     ;;
+'clean-oauth-tables-daemon')
+    exec ./manage.py clean_oauth_tables_daemon
+    ;;
 'cl-send-rt-percolator-alerts')
     exec ./manage.py cl_send_rt_percolator_alerts
     ;;
