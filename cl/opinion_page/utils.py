@@ -619,7 +619,6 @@ async def core_docket_data(
             "has_alert": has_alert,
             "timezone": timezone_str,
             "private": docket.blocked,
-            "is_scotus": is_scotus,
             "docket_source": docket_source,
             # Resolved here because templates can't call the single-arg
             # source callable; gates the docket toolbar on every tab.

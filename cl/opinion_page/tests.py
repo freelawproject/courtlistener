@@ -866,27 +866,23 @@ class ViewSCOTUSDocumentTest(TestCase):
 
     def test_scotus_document_detail_urls_are_internal(self) -> None:
         """Mirrors DocketEntryRowsV2Test.test_document_detail_urls_are_internal
-        for SCOTUS, _scotus_document_detail_url must never return an
-        externally-sourced URL."""
+        for SCOTUS: _scotus_document_detail_url returns the document's own
+        CourtListener page when we have the file, and None otherwise --
+        never an externally-sourced URL."""
         entry = SCOTUSDocketEntryFactory(docket=self.docket)
-        documents = [
-            SCOTUSDocumentFactory(
-                docket_entry=entry,
-                attachment_number=1,
-                filepath_local="recap_documents/test.pdf",
-            ),
-            SCOTUSDocumentFactory(
-                docket_entry=entry, attachment_number=2, filepath_local=""
-            ),
-        ]
-        for document in documents:
-            with self.subTest(document=document.pk):
-                detail_url = _scotus_document_detail_url(document)
-                if detail_url is not None:
-                    self.assertTrue(
-                        detail_url.startswith("/"),
-                        msg=f"{detail_url} is not an internal path.",
-                    )
+        with_file = SCOTUSDocumentFactory(
+            docket_entry=entry,
+            attachment_number=1,
+            filepath_local="recap_documents/test.pdf",
+        )
+        without_file = SCOTUSDocumentFactory(
+            docket_entry=entry, attachment_number=2, filepath_local=""
+        )
+        self.assertEqual(
+            _scotus_document_detail_url(with_file),
+            with_file.get_absolute_url(),
+        )
+        self.assertIsNone(_scotus_document_detail_url(without_file))
 
 
 @override_settings(WAFFLE_CACHE_PREFIX="test_scotus_document_flag_waffle")
