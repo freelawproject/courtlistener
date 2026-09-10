@@ -38,6 +38,7 @@ from cl.corpus_importer.state.loader import (
     LoadReport,
     WaitOutcome,
 )
+from cl.corpus_importer.state.preflight import PreflightFailed
 from cl.corpus_importer.state.registry import LOADERS
 from cl.corpus_importer.state.run_db import (
     RunDatabaseUnavailable,
@@ -270,7 +271,8 @@ class Command(BaseCommand):
             what is left counts as lost.
         :param verify_timeout: Seconds to wait on a queue still coming down.
         :raises CommandError: If a pair of contradictory flags is given, if
-            both phases are skipped, or if the run database cannot be fetched.
+            both phases are skipped, or if the run database cannot be fetched
+            or does not pass the loader's preflight checks.
         """
         loader_class = LOADERS[loader]
         run_key = compose_redis_key(loader, database)
@@ -336,7 +338,7 @@ class Command(BaseCommand):
                     start_row=start_row,
                     **loader_kwargs,
                 ).load()
-        except RunDatabaseUnavailable as error:
+        except (RunDatabaseUnavailable, PreflightFailed) as error:
             raise CommandError(str(error)) from error
 
         self.print_report(report, verified=not skip_verification)
@@ -385,6 +387,13 @@ class Command(BaseCommand):
             be wrong rather than merely incomplete.
         """
         self.stdout.write(str(report))
+        for check in report.preflight:
+            write = (
+                self.stdout.write
+                if not check.outcome.is_failure
+                else self.stderr.write
+            )
+            write(f"  Checked {check}")
         if not verified:
             self.stderr.write(
                 self.style.WARNING(

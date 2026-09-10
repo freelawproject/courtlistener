@@ -24,7 +24,7 @@ import sqlite3
 import time
 from abc import ABC
 from collections.abc import Callable, Iterator
-from contextlib import closing
+from contextlib import closing, contextmanager
 from dataclasses import dataclass, field
 from datetime import datetime
 from enum import Enum, StrEnum, auto
@@ -36,6 +36,13 @@ from pydantic import BaseModel, ValidationError
 
 from cl.corpus_importer.state.ledger import LoadLedger
 from cl.corpus_importer.state.merger import Merger
+from cl.corpus_importer.state.preflight import (
+    STANDARD_CHECKS,
+    CheckResult,
+    PreflightCheck,
+    PreflightFailed,
+    run_checks,
+)
 from cl.corpus_importer.state.utils import NO_FILES, FileTally, MergeResult
 from cl.lib.celery_utils import CeleryThrottle
 from cl.lib.indexing_utils import log_last_document_indexed
@@ -57,6 +64,7 @@ class LoadPhase(StrEnum):
     """A phase of a load that can go wrong, and the Sentry issue it files
     under."""
 
+    PREFLIGHT = "state-scrape-database-integrity"
     MERGE = "state-scrape-merge-failed"
     EXTRACTION = "state-scrape-extraction-incomplete"
     RECONCILIATION = "state-scrape-rows-dropped"
@@ -185,6 +193,9 @@ class LoadReport:
         move into the public bucket.
     :ivar extraction: What became of the documents the run dispatched for text
         extraction, or `None` where the load did not check.
+    :ivar preflight: What each check made of the run database before the load
+        read it, empty for a pass that opened no database. See
+        `cl.corpus_importer.state.preflight`.
     """
 
     seen: int = 0
@@ -202,6 +213,7 @@ class LoadReport:
     updates: dict[str, int] = field(default_factory=dict)
     files: FileTally = NO_FILES
     extraction: ExtractionReport | None = None
+    preflight: tuple[CheckResult, ...] = ()
 
     @property
     def failed(self) -> int:
@@ -343,6 +355,10 @@ class JKentScrapeLoader[ScrapeType: BaseModel, ParamType = None](ABC):
             if minimum
         ]
 
+    extra_checks: ClassVar[tuple[PreflightCheck, ...]] = ()
+    """Checks this loader wants run over a run database on top of
+    `STANDARD_CHECKS`."""
+
     def default_run_key(self) -> str:
         """The Redis key a load keys its ledger and checkpoint off, unless overridden.
 
@@ -357,13 +373,24 @@ class JKentScrapeLoader[ScrapeType: BaseModel, ParamType = None](ABC):
         :yield: The row's position in the query, counting from one, and the
             row itself.
         """
+        with self.connected() as connection:
+            with closing(connection.execute(self.query)) as cursor:
+                yield from enumerate(cursor, start=1)
+
+    @contextmanager
+    def connected(self) -> Iterator[sqlite3.Connection]:
+        """Open the run database read-only, for the length of the block.
+
+        :yield: The connection, handing back rows that can be read by column
+            name.
+        :raises FileNotFoundError: If the run database is not there.
+        """
         if not self.database.exists():
             raise FileNotFoundError(f"No run database at {self.database}")
         uri = f"file:{self.database.resolve()}?mode=ro"
         with closing(sqlite3.connect(uri, uri=True)) as connection:
             connection.row_factory = sqlite3.Row
-            with closing(connection.execute(self.query)) as cursor:
-                yield from enumerate(cursor, start=1)
+            yield connection
 
     def rows(self) -> Iterator[tuple[int, sqlite3.Row]]:
         """Stream the rows `query` selects, honouring `start_row` and `limit`.
@@ -522,13 +549,60 @@ class JKentScrapeLoader[ScrapeType: BaseModel, ParamType = None](ABC):
         )
         return dispatched
 
+    def preflight(self) -> tuple[CheckResult, ...]:
+        """Put every check to the run database before anything is dispatched.
+
+        Runs all of a DBs preflight checks (unless one raises). Reports all,
+        even successes.
+
+        :return: What each check made of the run database.
+        :raises PreflightFailed: If any check says the load must not go on.
+            Every finding is logged and sent to Sentry before this is raised.
+        """
+        with self.connected() as connection:
+            results = run_checks(
+                connection, (*STANDARD_CHECKS, *self.extra_checks)
+            )
+        for result in results:
+            if not result.outcome.is_failure:
+                logger.info(
+                    "%s: checked %s, found none.",
+                    self.database.name,
+                    result.description,
+                )
+                continue
+            for error in result.errors:
+                logger.error(
+                    "%s: %s -- %s.",
+                    self.database.name,
+                    result.description,
+                    error.summary,
+                    extra=fingerprint(self.name, LoadPhase.PREFLIGHT)
+                    | dict(error.detail),
+                )
+        if failed := [
+            result for result in results if result.outcome.stops_the_load
+        ]:
+            raise PreflightFailed(
+                f"{self.database.name} failed "
+                f"{len(failed)} of {len(results)} checks, so nothing was "
+                "dispatched: " + "; ".join(str(result) for result in failed)
+            )
+        return results
+
     def load(self) -> LoadReport:
         """Dispatch every row to celery for merging + extraction.
 
+        Checks the run database first; see `preflight`.
+
         :return: What the run dispatched, and -- unless `verify` was turned
             off -- what came of it.
+        :raises PreflightFailed: If the run database is not one this loader
+            can read. Nothing is dispatched.
         """
+        checks = self.preflight()
         report = self._dispatch_all()
+        report.preflight = checks
         self.verify(report)
         return report
 
