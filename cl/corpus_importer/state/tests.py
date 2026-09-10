@@ -39,6 +39,17 @@ from cl.corpus_importer.state.merger import (
     RelatedParams,
     ThroughParameters,
 )
+from cl.corpus_importer.state.preflight import (
+    STANDARD_CHECKS,
+    CheckError,
+    CheckOutcome,
+    CheckResult,
+    InvalidRows,
+    PreflightCheck,
+    PreflightFailed,
+    UnhashedFiles,
+    run_checks,
+)
 from cl.corpus_importer.state.registry import LOADERS
 from cl.corpus_importer.state.run_db import (
     RunDatabaseUnavailable,
@@ -890,7 +901,16 @@ def _run_database(path: Path, payloads: list[dict[str, Any] | str]) -> None:
         connection.execute(
             "CREATE TABLE results ("
             "  id INTEGER PRIMARY KEY,"
-            "  data_json VARCHAR NOT NULL"
+            "  result_type VARCHAR NOT NULL DEFAULT 'TestResult',"
+            "  data_json VARCHAR NOT NULL,"
+            "  is_valid BOOLEAN DEFAULT 1 NOT NULL"
+            ")"
+        )
+        connection.execute(
+            "CREATE TABLE archived_files ("
+            "  id INTEGER PRIMARY KEY,"
+            "  file_path VARCHAR NOT NULL,"
+            "  content_hash VARCHAR"
             ")"
         )
         connection.executemany(
@@ -1767,6 +1787,429 @@ class JKentScrapeLoaderExtractionTest(LoaderTestCase):
         )
 
 
+class PreflightCheckTest(SimpleTestCase):
+    """Tests for the checks themselves, apart from any load that runs them."""
+
+    def setUp(self) -> None:
+        self.directory = TemporaryDirectory()
+        self.addCleanup(self.directory.cleanup)
+        self.database = Path(self.directory.name) / "run.db"
+
+    def results(self, rows: list[tuple[str, int]]) -> sqlite3.Connection:
+        """A run database holding `rows`, open and ready to be checked.
+
+        Each call gets a database of its own, so one test can build two.
+
+        :param rows: One `(result_type, is_valid)` pair per row.
+        :return: The open connection.
+        """
+        self.database = (
+            Path(self.directory.name) / f"run-{len(rows)}-{id(rows)}.db"
+        )
+        with closing(sqlite3.connect(self.database)) as connection:
+            connection.execute(
+                "CREATE TABLE results ("
+                "  id INTEGER PRIMARY KEY,"
+                "  result_type VARCHAR NOT NULL,"
+                "  data_json VARCHAR NOT NULL,"
+                "  is_valid BOOLEAN DEFAULT 1 NOT NULL"
+                ")"
+            )
+            connection.executemany(
+                "INSERT INTO results (result_type, data_json, is_valid) "
+                "VALUES (?, '{}', ?)",
+                rows,
+            )
+            connection.commit()
+        opened = sqlite3.connect(self.database)
+        opened.row_factory = sqlite3.Row
+        self.addCleanup(opened.close)
+        return opened
+
+    def test_a_database_with_nothing_invalid_passes(self) -> None:
+        """Does a clean run database come back as passing, with nothing to
+        report?"""
+        result = InvalidRows().run(self.results([("Docket", 1)] * 3))
+
+        self.assertEqual(result.outcome, CheckOutcome.PASSED)
+        self.assertEqual(result.errors, ())
+        self.assertFalse(result.outcome.stops_the_load)
+
+    def test_invalid_rows_are_reported_per_result_type(self) -> None:
+        """The counts are what an operator acts on, and which result type they
+        belong to is what says whether it matters. Is there one finding per
+        type, carrying both counts?"""
+        result = InvalidRows().run(
+            self.results(
+                [("Docket", 1), ("Docket", 1), ("Docket", 0), ("File", 0)]
+            )
+        )
+
+        self.assertEqual(result.outcome, CheckOutcome.PARTIAL)
+        self.assertEqual(
+            [error.detail for error in result.errors],
+            [
+                {"result_type": "Docket", "invalid": 1, "valid": 2},
+                {"result_type": "File", "invalid": 1, "valid": 0},
+            ],
+        )
+
+    def test_a_result_type_with_nothing_invalid_is_not_reported(self) -> None:
+        """A report naming every result type would bury the one that is
+        wrong. Is only the type with invalid rows named?"""
+        result = InvalidRows().run(self.results([("Docket", 1), ("File", 0)]))
+
+        self.assertEqual(
+            [error.detail["result_type"] for error in result.errors], ["File"]
+        )
+
+    def test_invalid_rows_do_not_stop_a_load(self) -> None:
+        """The loader's own query passes over these rows, so the rest of the
+        run is still worth loading. Is this a partial finding rather than one
+        that stops the load?"""
+        result = InvalidRows().run(self.results([("Docket", 0)]))
+
+        self.assertFalse(result.outcome.stops_the_load)
+        self.assertTrue(result.outcome.is_failure)
+
+    def test_a_question_the_database_cannot_answer_is_a_failure(self) -> None:
+        """A column the check names and the database has not got is one the
+        loader's own query names too. Is that reported as a database this
+        loader cannot read, rather than raised out of the check?"""
+        with closing(sqlite3.connect(self.database)) as connection:
+            connection.execute("CREATE TABLE results (id INTEGER)")
+            connection.commit()
+        opened = sqlite3.connect(self.database)
+        opened.row_factory = sqlite3.Row
+        self.addCleanup(opened.close)
+
+        result = InvalidRows().run(opened)
+
+        self.assertTrue(result.outcome.stops_the_load)
+        self.assertIn("no such column", str(result.errors[0]))
+        self.assertIn("query_error", result.errors[0].detail)
+
+    def test_findings_outlive_the_connection_they_were_read_from(
+        self,
+    ) -> None:
+        """The findings are logged, sent to Sentry and printed in the report,
+        all after the run database has been closed. Are they read off the
+        cursor rather than left to be read from a closed one?"""
+        connection = self.results([("Docket", 0)])
+
+        result = InvalidRows().run(connection)
+        connection.close()
+
+        self.assertEqual(
+            [error.detail["invalid"] for error in result.errors],
+            [1],
+            "Reading a finding after the database is shut is what a report "
+            "does.",
+        )
+
+    def test_every_check_runs_even_after_one_fails(self) -> None:
+        """An operator fixing a run database wants everything wrong with it
+        from one attempt. Does a failing check stop the ones after it?"""
+
+        class Failing(PreflightCheck):
+            description = "a thing that is wrong"
+            query = "SELECT 1"
+
+            def evaluate(self, rows: Any) -> CheckResult:
+                return self.failed([CheckError("no good")])
+
+        class Passing(PreflightCheck):
+            description = "a thing that is fine"
+            query = "SELECT 1"
+
+            def evaluate(self, rows: Any) -> CheckResult:
+                return self.passed()
+
+        results = run_checks(
+            self.results([]), (Failing(), Passing(), Failing())
+        )
+
+        self.assertEqual(
+            [result.outcome for result in results],
+            [CheckOutcome.FAILED, CheckOutcome.PASSED, CheckOutcome.FAILED],
+        )
+
+    def archive(self, hashes: list[str]) -> sqlite3.Connection:
+        """A run database whose archive holds a file per entry in `hashes`.
+
+        :param hashes: One content hash per downloaded file. An empty string
+            stands for a file the scraper stored without hashing it.
+        :return: The open connection.
+        """
+        self.database = Path(self.directory.name) / f"archive-{id(hashes)}.db"
+        with closing(sqlite3.connect(self.database)) as connection:
+            connection.execute(
+                "CREATE TABLE archived_files ("
+                "  id INTEGER PRIMARY KEY,"
+                "  file_path VARCHAR NOT NULL,"
+                "  content_hash VARCHAR"
+                ")"
+            )
+            connection.executemany(
+                "INSERT INTO archived_files (file_path, content_hash) "
+                "VALUES (?, ?)",
+                [(f"f{n}.pdf", digest) for n, digest in enumerate(hashes)],
+            )
+            connection.commit()
+        opened = sqlite3.connect(self.database)
+        opened.row_factory = sqlite3.Row
+        self.addCleanup(opened.close)
+        return opened
+
+    def test_every_file_hashed_passes(self) -> None:
+        """Does a run whose scraper hashed everything it downloaded come back
+        clean?"""
+        result = UnhashedFiles().run(self.archive(["a" * 64, "b" * 64]))
+
+        self.assertEqual(result.outcome, CheckOutcome.PASSED)
+
+    def test_a_run_that_downloaded_nothing_passes(self) -> None:
+        """A scrape with no files has no files missing hashes. Does an empty
+        archive pass rather than dividing by nothing?"""
+        result = UnhashedFiles().run(self.archive([]))
+
+        self.assertEqual(result.outcome, CheckOutcome.PASSED)
+        self.assertEqual(result.errors, ())
+
+    def test_anything_short_of_every_file_is_a_finding(self) -> None:
+        """One unhashed file is a document that will be written with no file
+        at all, so the bar is every file rather than most of them. Is a single
+        one reported, with both counts?"""
+        result = UnhashedFiles().run(self.archive(["a" * 64, "", "c" * 64]))
+
+        self.assertEqual(result.outcome, CheckOutcome.PARTIAL)
+        self.assertEqual(
+            result.errors[0].detail,
+            {"unhashed": 1, "hashed": 2, "total": 3},
+        )
+
+    def test_a_null_hash_counts_as_unhashed(self) -> None:
+        """The column is nullable and the scraper may leave it either way. Are
+        NULL and empty string both counted as no hash?"""
+        with closing(sqlite3.connect(self.database)) as connection:
+            connection.execute(
+                "CREATE TABLE archived_files ("
+                "  id INTEGER PRIMARY KEY,"
+                "  file_path VARCHAR NOT NULL,"
+                "  content_hash VARCHAR"
+                ")"
+            )
+            connection.execute(
+                "INSERT INTO archived_files (file_path, content_hash) "
+                "VALUES ('f0.pdf', NULL)"
+            )
+            connection.commit()
+        opened = sqlite3.connect(self.database)
+        opened.row_factory = sqlite3.Row
+        self.addCleanup(opened.close)
+
+        result = UnhashedFiles().run(opened)
+
+        self.assertEqual(result.errors[0].detail["unhashed"], 1)
+
+    def test_unhashed_files_do_not_stop_a_load(self) -> None:
+        """The documents still merge, they just have no file. Is the rest of
+        the run still worth loading?"""
+        result = UnhashedFiles().run(self.archive([""]))
+
+        self.assertFalse(result.outcome.stops_the_load)
+
+    def test_a_result_says_what_was_checked(self) -> None:
+        """A report names what ran as well as what it found. Does a result
+        carry the check's description either way?"""
+        passing = InvalidRows().run(self.results([("Docket", 1)]))
+        partial = InvalidRows().run(self.results([("Docket", 0)]))
+
+        for result in (passing, partial):
+            self.assertEqual(
+                result.description, "rows the scrape marked invalid"
+            )
+            self.assertIn("rows the scrape marked invalid", str(result))
+
+
+class LoaderPreflightTest(LoaderTestCase):
+    """Tests for the checks a load puts its run database through."""
+
+    def invalidate(self, rows: int) -> None:
+        """Mark the first `rows` rows of the run database invalid."""
+        with closing(sqlite3.connect(self.database)) as connection:
+            connection.execute(
+                "UPDATE results SET is_valid = 0 WHERE id <= ?", (rows,)
+            )
+            connection.commit()
+
+    def archive(self, hashes: list[str]) -> None:
+        """Record a downloaded file per entry in `hashes`.
+
+        :param hashes: One content hash per file, an empty string standing for
+            a file the scraper stored without hashing it.
+        """
+        with closing(sqlite3.connect(self.database)) as connection:
+            connection.executemany(
+                "INSERT INTO archived_files (file_path, content_hash) "
+                "VALUES (?, ?)",
+                [(f"f{n}.pdf", digest) for n, digest in enumerate(hashes)],
+            )
+            connection.commit()
+
+    def test_unhashed_files_are_reported_before_any_merge_finds_them(
+        self,
+    ) -> None:
+        """A merge already declines to publish a file it cannot name by
+        content, one file at a time, deep into a run. Does the load say how
+        much of the run is like that before it dispatches anything, and go
+        ahead anyway?"""
+        _run_database(self.database, [{"docket_number": "A-1"}])
+        self.archive(["a" * 64, ""])
+
+        report = self.loader().load()
+
+        self.assertEqual(report.merged, 1, "The run is still worth loading.")
+        unhashed = report.preflight[1]
+        self.assertEqual(unhashed.outcome, CheckOutcome.PARTIAL)
+        self.assertEqual(
+            unhashed.errors[0].detail,
+            {"unhashed": 1, "hashed": 1, "total": 2},
+        )
+
+    def test_the_standard_checks_run_for_every_loader(self) -> None:
+        """A loader that declares no checks of its own still has a run
+        database that can be wrong. Do the standard checks run anyway?"""
+        _run_database(
+            self.database, [{"docket_number": f"A-{n}"} for n in range(3)]
+        )
+
+        report = self.loader().load()
+
+        self.assertEqual(
+            [check.description for check in report.preflight],
+            [check.description for check in STANDARD_CHECKS],
+        )
+
+    def test_a_loader_s_own_checks_run_after_the_standard_ones(self) -> None:
+        """A loader adds checks rather than replacing them, so that one
+        declaring its own cannot drop the standard ones by forgetting to
+        repeat them. Are both run?"""
+
+        class Extra(PreflightCheck):
+            description = "something only this court can get wrong"
+            query = "SELECT 1"
+
+            def evaluate(self, rows: Any) -> CheckResult:
+                return self.passed()
+
+        _run_database(self.database, [{"docket_number": "A-1"}])
+
+        report = self.loader(self.loader_class(extra_checks=(Extra(),))).load()
+
+        self.assertEqual(
+            [check.description for check in report.preflight],
+            [
+                *(check.description for check in STANDARD_CHECKS),
+                "something only this court can get wrong",
+            ],
+        )
+
+    def test_invalid_rows_are_reported_without_stopping_the_load(self) -> None:
+        """Rows the scrape marked invalid are dropped inside the loader's own
+        query, so nothing downstream would ever say they were there. Are they
+        reported, with the rest of the run still loaded?"""
+        _run_database(
+            self.database, [{"docket_number": f"A-{n}"} for n in range(3)]
+        )
+        self.invalidate(1)
+
+        report = self.loader().load()
+
+        self.assertEqual(
+            (report.seen, report.merged),
+            (3, 3),
+            "The query this loader runs does not filter on is_valid, so the "
+            "check reports what a filtering loader would have dropped.",
+        )
+        self.assertEqual(
+            report.preflight[0].errors[0].detail,
+            {"result_type": "TestResult", "invalid": 1, "valid": 2},
+        )
+
+    def test_a_finding_reaches_sentry_with_its_fields(self) -> None:
+        """A Sentry issue is read by its fields rather than by parsing the
+        summary back apart. Does the finding's detail ride along, under the
+        loader's own preflight issue?"""
+        _run_database(self.database, [{"docket_number": "A-1"}])
+        self.invalidate(1)
+        logging.disable(logging.NOTSET)
+        self.addCleanup(logging.disable)
+
+        with self.assertLogs(
+            "cl.corpus_importer.state.loader", "ERROR"
+        ) as logs:
+            self.loader().load()
+
+        record = logs.records[0]
+        self.assertEqual(
+            record.fingerprint,  # type: ignore[attr-defined]
+            ["test", LoadPhase.PREFLIGHT],
+        )
+        self.assertEqual(record.result_type, "TestResult")  # type: ignore[attr-defined]
+        self.assertEqual(record.invalid, 1)  # type: ignore[attr-defined]
+
+    def test_a_check_that_passes_says_so(self) -> None:
+        """A check nobody hears about is a check nobody trusts. Is a clean
+        run database reported as having been checked?"""
+        _run_database(self.database, [{"docket_number": "A-1"}])
+        logging.disable(logging.NOTSET)
+        self.addCleanup(logging.disable)
+
+        with self.assertLogs(
+            "cl.corpus_importer.state.loader", "INFO"
+        ) as logs:
+            self.loader().load()
+
+        self.assertIn(
+            "checked rows the scrape marked invalid, found none",
+            "\n".join(logs.output),
+        )
+
+    def test_a_failed_check_dispatches_nothing(self) -> None:
+        """A run database the loader cannot read is worse than one it will not
+        finish. Does a failing check stop the load before anything is sent?"""
+
+        class Failing(PreflightCheck):
+            description = "a database this loader can read"
+            query = "SELECT 1"
+
+            def evaluate(self, rows: Any) -> CheckResult:
+                return self.failed(
+                    [CheckError("the schema is not the one expected")]
+                )
+
+        _run_database(self.database, [{"docket_number": "A-1"}])
+        logging.disable(logging.NOTSET)
+        self.addCleanup(logging.disable)
+
+        with self.assertLogs("cl.corpus_importer.state.loader", "ERROR"):
+            with self.assertRaises(PreflightFailed) as raised:
+                self.loader(
+                    self.loader_class(extra_checks=(Failing(),))
+                ).load()
+
+        self.assertIn(
+            "the schema is not the one expected", str(raised.exception)
+        )
+        self.assertEqual(Docket.objects.count(), 0, "Nothing was dispatched.")
+        self.assertEqual(
+            self.redis.hlen(f"{self.key}:pending"),
+            0,
+            "And nothing was written down as if it had been.",
+        )
+
+
 class JKentScrapeLoaderRetryTest(LoaderTestCase):
     """Tests for putting back what a load left unfinished.
 
@@ -2467,6 +2910,19 @@ class LoadStateScrapeCommandTest(SimpleTestCase):
         self.assertNotIn("start_row", self.loader.call_args.kwargs)
         self.assertNotIn("limit", self.loader.call_args.kwargs)
 
+    def test_a_run_database_that_fails_its_checks_is_reported(self) -> None:
+        """A load that will not run is an operator's problem to act on, and a
+        traceback buries what to act on. Is a failed check reported the way an
+        unfetchable database is?"""
+        self.loader.return_value.load.side_effect = PreflightFailed(
+            "run.db failed 1 of 2 checks, so nothing was dispatched"
+        )
+
+        with self.assertRaises(CommandError) as raised:
+            self.load()
+
+        self.assertIn("nothing was dispatched", str(raised.exception))
+
     def test_start_row_and_auto_resume_are_contradictory(self) -> None:
         """Each says to start somewhere the other says not to, and honouring
         either one quietly does what the other asked against. Is the operator
@@ -2482,6 +2938,28 @@ class LoadStateScrapeCommandTest(SimpleTestCase):
         )
         self.assertIn("--auto-resume", message)
         self.loader.assert_not_called()
+
+    def test_the_report_names_what_was_checked(self) -> None:
+        """A check that found nothing is still worth saying ran. Does the
+        report name every check, and send the ones with findings to stderr?"""
+        self.loader.return_value.load.return_value = LoadReport(
+            preflight=(
+                CheckResult("a clean thing", CheckOutcome.PASSED),
+                CheckResult(
+                    "a partial thing",
+                    CheckOutcome.PARTIAL,
+                    (CheckError("2 rows are marked invalid"),),
+                ),
+            )
+        )
+
+        self.load()
+
+        self.assertIn("Checked PASSED a clean thing", self.output.getvalue())
+        self.assertIn(
+            "Checked PARTIAL a partial thing: 2 rows are marked invalid",
+            self.errors.getvalue(),
+        )
 
     def test_both_queues_are_throttled_by_default(self) -> None:
         """An unthrottled load puts a whole run's dockets in the broker at
