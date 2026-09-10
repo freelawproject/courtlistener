@@ -171,12 +171,17 @@ class DocketEntrySource:
     ``docket.pacer_docket_url`` there would hide the toolbar for every
     non-PACER source.
 
+    ``main_docs_prefetch`` returns a Prefetch that populates ``main_docs``
+    with the one document representing an entry in the docket RSS feed
+    (DocketFeed.items()).
+
     Every callable below touches the ORM, so callers in async views MUST
     wrap them in ``sync_to_async``.
     """
 
     entries_queryset: Callable[[Docket], QuerySet]
     documents_for_entry: Callable[[Any], Iterable]
+    main_docs_prefetch: Callable[[], Prefetch]
     order_by_asc: tuple[str, ...]
     order_by_desc: tuple[str, ...]
     document_is_attachment: Callable[[Any], bool]
@@ -216,6 +221,20 @@ def _recap_entries(docket: Docket) -> QuerySet:
 
 def _recap_documents_for_entry(de: DocketEntry) -> QuerySet:
     return de.recap_documents.all()
+
+
+def _recap_main_docs_prefetch() -> Prefetch:
+    """Prefetch each entry's main document into `main_docs`, for the
+    docket RSS feed's description and enclosure."""
+    return Prefetch(
+        "recap_documents",
+        queryset=RECAPDocument.objects.filter(
+            document_type=RECAPDocument.PACER_DOCUMENT
+        )
+        .defer("plain_text")
+        .order_by("date_created")[:1],
+        to_attr="main_docs",
+    )
 
 
 def _recap_docket_url(docket: Docket) -> str | None:
@@ -281,6 +300,7 @@ def _recap_metadata_sections(docket: Docket) -> list[MetadataSection]:
 RECAP = DocketEntrySource(
     entries_queryset=_recap_entries,
     documents_for_entry=_recap_documents_for_entry,
+    main_docs_prefetch=_recap_main_docs_prefetch,
     order_by_asc=("recap_sequence_number", "entry_number"),
     order_by_desc=("-recap_sequence_number", "-entry_number"),
     document_is_attachment=_recap_document_is_attachment,
@@ -306,6 +326,20 @@ def _scotus_entries(docket: Docket) -> QuerySet:
 
 def _scotus_documents_for_entry(de: SCOTUSDocketEntry) -> QuerySet:
     return de.scotusdocument_set.all()
+
+
+def _scotus_main_docs_prefetch() -> Prefetch:
+    """Prefetch the lowest-attachment_number document per entry into
+    `main_docs`, for the docket RSS feed's description and enclosure.
+    A SCOTUS entry has no designated main document, so its lowest
+    attachment_number stands in."""
+    return Prefetch(
+        "scotusdocument_set",
+        queryset=SCOTUSDocument.objects.defer("plain_text").order_by(
+            "attachment_number", "date_created"
+        )[:1],
+        to_attr="main_docs",
+    )
 
 
 def _scotus_document_is_attachment(document: SCOTUSDocument) -> bool:
@@ -361,6 +395,7 @@ def _scotus_docket_url(docket: Docket) -> str | None:
 SCOTUS = DocketEntrySource(
     entries_queryset=_scotus_entries,
     documents_for_entry=_scotus_documents_for_entry,
+    main_docs_prefetch=_scotus_main_docs_prefetch,
     order_by_asc=("sequence_number",),
     order_by_desc=("-sequence_number",),
     document_is_attachment=_scotus_document_is_attachment,
