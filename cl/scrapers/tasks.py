@@ -68,6 +68,13 @@ from cl.search.state.shared import AbstractStateDocument, ProcessingError
 
 logger = logging.getLogger(__name__)
 
+# Doctor request failures worth retrying during document extraction.
+# httpx.TransportError covers every way the request can fail to complete at the
+# transport layer: connect/read/write timeouts, connection errors, and
+# RemoteProtocolError (doctor dropping the connection mid-request, which it does
+# on long OCR jobs).
+EXTRACTION_TRANSPORT_ERRORS = (httpx.TransportError,)
+
 ExtractProcessResult = tuple[str, str | None]
 
 
@@ -446,11 +453,7 @@ def find_and_merge_versions(self, pk: int) -> None:
 
 @app.task(
     bind=True,
-    autoretry_for=(
-        httpx.ConnectError,
-        httpx.ConnectTimeout,
-        httpx.ReadTimeout,
-    ),
+    autoretry_for=EXTRACTION_TRANSPORT_ERRORS,
     max_retries=3,
     retry_backoff=10,
 )
@@ -477,11 +480,7 @@ def extract_recap_pdf(
 
 @app.task(
     bind=True,
-    autoretry_for=(
-        httpx.ConnectError,
-        httpx.ConnectTimeout,
-        httpx.ReadTimeout,
-    ),
+    autoretry_for=EXTRACTION_TRANSPORT_ERRORS,
     max_retries=3,
     retry_backoff=10,
 )
@@ -540,11 +539,7 @@ def extract_formatted_text_document(
 
 @app.task(
     bind=True,
-    autoretry_for=(
-        httpx.ConnectError,
-        httpx.ConnectTimeout,
-        httpx.ReadTimeout,
-    ),
+    autoretry_for=EXTRACTION_TRANSPORT_ERRORS,
     max_retries=3,
     retry_backoff=10,
 )
