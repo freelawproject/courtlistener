@@ -227,7 +227,7 @@
     @apply [&:has(select:focus)]:outline [&:has(select:focus)]:outline-2 [&:has(select:focus)]:outline-primary-600 flex;
   }
   .capped-width {
-    @apply w-full max-w-[--content-max-width] mx-auto;
+    @apply w-full max-w-[--content-max-width] mx-auto px-4 lg:px-10 xl:px-0;
   }
   .scrollbar-none {
     scrollbar-width: none;
