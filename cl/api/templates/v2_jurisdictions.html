@@ -5,7 +5,9 @@
 {% block description %}A list of the hundreds of jurisdictions available on CourtListener.{% endblock %}
 {% block og_description %}A list of the hundreds of jurisdictions available on CourtListener.{% endblock %}
 
-{% block content %}
+{% block content_wrapper %}
+<div class="capped-width py-12">
+  {# TITLE + TEXT #}
   <div class="space-y-4 pb-12">
 
     <h1>Available Jurisdictions</h1>
@@ -27,6 +29,7 @@
     </p>
   </div>
 
+  {# TABLE #}
   <c-flex-table
     caption="Jurisdictions available on CourtListener"
     :columns="[
@@ -43,17 +46,19 @@
     ]"
   >
   {% for court in courts %}
-    <tr>
-      <th scope="row">{{ court.full_name }}</th>
+    <tr class="text-xs">
+      <th scope="row" class="min-w-48">{{ court.full_name }}</th>
       <td>{{ court.count|intcomma }}</td>
-      <td>{{ court.get_jurisdiction_display|nbsp }}</td>
-      <td>
+      <td>{{ court.get_jurisdiction_display }}</td>
+      <td class="whitespace-nowrap">
           {% if court.url %}
           <a
             class="links-external"
             title="{{ court.url }}"
             href="{{ court.url }}" target="_blank" rel="noopener noreferrer"
-          >{{ court.url|slice:"20" }}{% if court.url|length > 20 %}&hellip;{% endif %}</a>
+          >
+          {{ court.url|slice:"20" }}{% if court.url|length > 20 %}&hellip;{% endif %}
+        </a>
           {% endif %}
       </td>
       <td>
@@ -64,11 +69,13 @@
           >{{ court.pk }}</a>
       </td>
       <td>{{ court.citation_string }}</td>
-      <td>{{ court.start_date|date:"Y-m-d"|default:"Unknown" }}</td>
-      <td>{{ court.end_date|date:"Y-m-d"|default:"Unknown" }}</td>
+      <td class="whitespace-nowrap">{{ court.start_date|date:"Y-m-d"|default:"Unknown" }}</td>
+      <td class="whitespace-nowrap">{{ court.end_date|date:"Y-m-d"|default:"Unknown" }}</td>
       <td>{{ court.in_use|yesno|title }}</td>
-      <td>{{ court.date_modified|date:"c"|slice:"16"|default:"None yet" }}</td>
+      <td class="whitespace-nowrap">{{ court.date_modified|date:"c"|slice:"16"|default:"None yet" }}</td>
     </tr>
   {% endfor %}
   </c-flex-table>
-{% endblock content %}
+</div>
+
+{% endblock content_wrapper %}
