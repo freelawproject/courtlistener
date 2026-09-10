@@ -607,6 +607,18 @@ async def extract_formatted_text_document_base(
             item=rd,
         )
         if not response.is_success:
+            logger.error(
+                "Text extraction failed for %s %s: doctor returned HTTP %s.",
+                model_name,
+                pk,
+                response.status_code,
+            )
+            # We got no text at all, so the document still needs extracting.
+            # Record that explicitly instead of leaving it silently untouched,
+            # and keep it in a state the extraction sweeps will retry (see
+            # `needs_extraction`).
+            rd.ocr_status = AbstractPDF.OCR_NEEDED
+            await save_extraction_result(rd, ["ocr_status"], has_content=False)
             continue
 
         content = response.json()["content"]
@@ -614,6 +626,7 @@ async def extract_formatted_text_document_base(
         if strip_html_tags and not str(rd.filepath_local).endswith(".pdf"):
             content = strip_tags(content)
         ocr_needed = needs_ocr(content, page_count=rd.page_count)
+        ocr_failed = False
         if ocr_available and ocr_needed:
             response = await microservice(
                 service="document-extract-ocr",
@@ -623,6 +636,15 @@ async def extract_formatted_text_document_base(
             if response.is_success:
                 content = response.json()["content"]
                 extracted_by_ocr = True
+            else:
+                ocr_failed = True
+                logger.error(
+                    "OCR failed for %s %s: doctor returned HTTP %s. Falling "
+                    "back to the text layer, which needs_ocr() rejected.",
+                    model_name,
+                    pk,
+                    response.status_code,
+                )
 
         has_content = bool(content)
         match has_content, extracted_by_ocr:
@@ -635,30 +657,72 @@ async def extract_formatted_text_document_base(
                 rd.ocr_status = AbstractPDF.OCR_FAILED
             case False, False:
                 rd.ocr_status = AbstractPDF.OCR_NEEDED
+        if ocr_failed:
+            # The match above leaves ocr_status alone when we hold text that
+            # needs_ocr() rejected, which would report this document as
+            # successfully extracted. OCR is still owed, so say so and keep it
+            # eligible for the sweeps. OCR_FAILED is not right here: it is
+            # terminal, and nothing retries it.
+            rd.ocr_status = AbstractPDF.OCR_NEEDED
 
         rd.plain_text, _ = anonymize(content)
         rd.plain_text = rd.plain_text.replace("\0", "")
-        # Kludgey fix to handle RECAPDocument's custom save logic.
-        if isinstance(rd, RECAPDocument):
-            # Steer the citation-extraction task the post_save signal enqueues
-            # onto the requested queue (batch jobs use this to keep the default
-            # queue clear).
-            rd.citation_queue = citation_queue
-            await rd.asave(
-                do_extraction=False,
-                update_fields=["ocr_status", "plain_text"],
-            )
-        elif isinstance(rd, AbstractStateDocument):
-            update_fields = ["ocr_status", "plain_text"]
-            if not has_content:
-                rd.processing_error = ProcessingError.EXTRACTION_FAILURE
-                update_fields.append("processing_error")
-            await rd.asave(update_fields=update_fields)
-        else:
-            await rd.asave(update_fields=["ocr_status", "plain_text"])
+        await save_extraction_result(
+            rd,
+            ["ocr_status", "plain_text"],
+            has_content=has_content,
+            citation_queue=citation_queue,
+        )
         processed.append(pk)
 
     return processed
+
+
+async def save_extraction_result(
+    rd: AbstractPDF,
+    update_fields: list[str],
+    has_content: bool,
+    citation_queue: str | None = None,
+) -> None:
+    """Persist the outcome of an extraction attempt on a document.
+
+    Callers MUST set the fields named in `update_fields` on `rd` beforehand;
+    this only handles the per-model differences in save behaviour.
+
+    :param rd: The document to save, with its extraction results already set.
+    :param update_fields: The fields to write. Passing "plain_text" is what
+    triggers the RECAPDocument post_save signal to enqueue citation
+    extraction, so omit it on failure paths that produced no new text.
+    :param has_content: Whether the attempt produced any text. State documents
+    record an explicit processing_error when it did not, and clear it when a
+    later attempt succeeds.
+    :param citation_queue: Celery queue for the citation-extraction task the
+    RECAPDocument post_save signal enqueues when plain_text changes. Lets batch
+    jobs route that costly work off the default queue. See
+    cl.search.signals.handle_recap_doc_change.
+
+    :return: None
+    """
+    # Kludgey fix to handle RECAPDocument's custom save logic.
+    if isinstance(rd, RECAPDocument):
+        # Steer the citation-extraction task the post_save signal enqueues
+        # onto the requested queue (batch jobs use this to keep the default
+        # queue clear).
+        rd.citation_queue = citation_queue
+        await rd.asave(do_extraction=False, update_fields=update_fields)
+        return
+
+    if isinstance(rd, AbstractStateDocument):
+        if not has_content:
+            rd.processing_error = ProcessingError.EXTRACTION_FAILURE
+            update_fields = [*update_fields, "processing_error"]
+        elif rd.processing_error == ProcessingError.EXTRACTION_FAILURE:
+            # An earlier attempt failed and this one succeeded, so the flag is
+            # stale. Other error codes describe the file itself rather than
+            # extraction, so leave those alone.
+            rd.processing_error = None
+            update_fields = [*update_fields, "processing_error"]
+    await rd.asave(update_fields=update_fields)
 
 
 async def extract_pdf_document_base(
