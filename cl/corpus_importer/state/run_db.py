@@ -15,12 +15,12 @@ from collections.abc import Iterator
 from contextlib import contextmanager
 from pathlib import Path
 from tempfile import TemporaryDirectory
-from typing import Any
 
-import boto3
 from boto3.exceptions import Boto3Error
 from botocore.exceptions import BotoCoreError, ClientError
 from django.conf import settings
+
+from cl.lib.storage import AWSMediaStorage
 
 logger = logging.getLogger(__name__)
 
@@ -34,17 +34,16 @@ class RunDatabaseUnavailable(Exception):
     """
 
 
-def scrape_bucket_client() -> Any:
-    """A client for the bucket that holds scrape run databases.
+def scrape_bucket_storage() -> AWSMediaStorage:
+    """The storage backend that reaches the bucket holding run databases.
 
-    Reads CourtListener's S3 credentials, which in development are the
-    `AWS_DEV_*` pair. Returns an untyped boto3 client; boto3 ships no stubs.
+    Django's storage rather than a boto3 client of our own, so that a fetch is
+    authenticated the same way every other CourtListener read of
+    `AWS_STORAGE_BUCKET_NAME` is. That matters for more than tidiness: a
+    deployment holding temporary credentials has a session token to send with
+    them, and a client built from the key pair alone is refused with a 403.
     """
-    return boto3.client(
-        "s3",
-        aws_access_key_id=settings.AWS_ACCESS_KEY_ID or None,
-        aws_secret_access_key=settings.AWS_SECRET_ACCESS_KEY or None,
-    )
+    return AWSMediaStorage()
 
 
 @contextmanager
@@ -65,13 +64,14 @@ def downloaded_run_database(key: str) -> Iterator[Path]:
     name = key.rsplit("/", 1)[-1]
     if name in ("", ".", ".."):
         raise RunDatabaseUnavailable(f"{key!r} is not a path to a database")
+    storage = scrape_bucket_storage()
     bucket = settings.AWS_STORAGE_BUCKET_NAME
-    client = scrape_bucket_client()
     with TemporaryDirectory(prefix="scrape-run-") as directory:
         destination = Path(directory) / name
         logger.info("Downloading s3://%s/%s to %s", bucket, key, destination)
         try:
-            client.download_file(bucket, key, str(destination))
+            # Straight to disk through the bucket resource.
+            storage.bucket.download_file(key, str(destination))
         except (BotoCoreError, ClientError, Boto3Error) as error:
             raise RunDatabaseUnavailable(
                 f"Could not download s3://{bucket}/{key}: {error}"

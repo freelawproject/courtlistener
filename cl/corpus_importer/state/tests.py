@@ -43,7 +43,7 @@ from cl.corpus_importer.state.registry import LOADERS
 from cl.corpus_importer.state.run_db import (
     RunDatabaseUnavailable,
     downloaded_run_database,
-    scrape_bucket_client,
+    scrape_bucket_storage,
 )
 from cl.corpus_importer.state.utils import FileTally, MergeResult
 from cl.corpus_importer.tasks import merge_state_scrape_row
@@ -52,6 +52,7 @@ from cl.lib.indexing_utils import (
     log_last_document_indexed,
 )
 from cl.lib.redis_utils import get_redis_interface
+from cl.lib.storage import AWSMediaStorage
 from cl.people_db.factories import PersonFactory
 from cl.people_db.models import Party, PartyType, Person
 from cl.search.docket_sources import DocketSources
@@ -1766,6 +1767,311 @@ class JKentScrapeLoaderExtractionTest(LoaderTestCase):
         )
 
 
+class JKentScrapeLoaderRetryTest(LoaderTestCase):
+    """Tests for putting back what a load left unfinished.
+
+    Both retry sets are drained by the retry that reads them and refilled by
+    whatever fails again, so most of these check that a set holds exactly the
+    work still outstanding after a retry rather than what it held before one.
+    """
+
+    def merge_retry(self) -> set[str]:
+        """The rows the ledger is holding for a merge retry."""
+        return set(self.redis.smembers(f"{self.key}:merge_retry"))
+
+    def extraction_retry(self) -> set[str]:
+        """The documents the ledger is holding for an extraction retry."""
+        return set(self.redis.smembers(f"{self.key}:extraction_retry"))
+
+    def failing_loader(self, failing: set[str]) -> Any:
+        """A loader whose merger refuses the dockets named in `failing`.
+
+        :param failing: Docket numbers to raise on, read at merge time so a
+            test can empty it and retry the same rows successfully.
+        :return: The loader class.
+        """
+
+        class RefusingMerger(self.loader_class().merger):  # type: ignore[misc, name-defined]
+            def merge(self) -> Any:
+                if self.scrape.docket_number in failing:
+                    raise DatabaseError("the database is having none of it")
+                return super().merge()
+
+        return self.loader_class(merger=RefusingMerger)
+
+    def test_a_row_with_no_verdict_is_held_for_retry(self) -> None:
+        """A merge that never reached a verdict leaves nothing in the database
+        to find it by again. Is the row written down so a retry can?"""
+        ledger = self.ledger()
+        ledger.dispatched(4, "A-4")
+
+        ledger.errored(4)
+
+        self.assertEqual(self.merge_retry(), {"4"})
+
+    def test_a_row_that_reached_a_verdict_is_not_held(self) -> None:
+        """A rejected scrape is one to go and fix, not one to re-run, and a
+        merged row wants nothing at all. Is neither held for retry?"""
+        ledger = self.ledger()
+
+        ledger.dispatched(1, "A-1")
+        ledger.merged(1, MergeResult())
+        ledger.dispatched(2, "A-2")
+        ledger.rejected(2, MergeResult(failures={"Docket": [None]}))
+
+        self.assertEqual(self.merge_retry(), set())
+
+    def test_a_retry_takes_the_rows_it_reads(self) -> None:
+        """The set is drained rather than pruned as rows succeed. Does reading
+        it take it away, so a second retry finds nothing left to do?"""
+        ledger = self.ledger()
+        ledger.dispatched(1, "A-1")
+        ledger.errored(1)
+
+        self.assertEqual(ledger.rows_to_retry(), {1})
+        self.assertEqual(
+            ledger.rows_to_retry(),
+            set(),
+            "The first retry took them.",
+        )
+
+    def test_a_retry_also_takes_the_rows_celery_lost(self) -> None:
+        """A row that was dispatched and never reported back is the one most
+        worth re-running, and it is still sitting in `pending` rather than in
+        the retry set. Is it drained alongside?"""
+        ledger = self.ledger()
+        ledger.dispatched(7, "A-7")
+        ledger.dispatched(8, "A-8")
+        ledger.errored(8)
+
+        self.assertEqual(ledger.rows_to_retry(), {7, 8})
+        self.assertEqual(
+            self.redis.hlen(f"{self.key}:pending"),
+            0,
+            "The lost row was taken too, not left to be found twice.",
+        )
+
+    def test_counting_what_is_waiting_takes_none_of_it(self) -> None:
+        """The command asks how much there is to retry before it pays for the
+        run database. Does asking leave the work where it is?"""
+        ledger = self.ledger()
+        ledger.dispatched(1, "A-1")
+        ledger.errored(1)
+        ledger.dispatched(2, "A-2")
+        ledger.retry_documents([5, 6])
+
+        self.assertEqual(ledger.retry_counts(), (2, 2))
+        self.assertEqual(
+            ledger.retry_counts(),
+            (2, 2),
+            "Counting is not draining.",
+        )
+
+    def test_a_retry_redispatches_only_what_was_held(self) -> None:
+        """Does a retry merge the row that failed, and leave the rows that
+        already merged alone?"""
+        failing = {"A-2"}
+        _run_database(
+            self.database,
+            [{"docket_number": f"A-{n}"} for n in (1, 2, 3)],
+        )
+        loader_class = self.failing_loader(failing)
+        with patch.object(merge_state_scrape_row, "max_retries", 0):
+            self.loader(loader_class).load()
+        self.assertEqual(self.merge_retry(), {"2"})
+        failing.clear()
+
+        report = self.loader(loader_class).retry()
+
+        self.assertEqual(
+            report.seen,
+            1,
+            "Only the row that had no verdict was read back out of the run "
+            "database.",
+        )
+        self.assertEqual(
+            set(Docket.objects.values_list("docket_number", flat=True)),
+            {"A-1", "A-2", "A-3"},
+        )
+
+    def test_a_row_that_merges_on_retry_is_not_held_again(self) -> None:
+        """Nothing prunes the set as rows succeed, so a retry that works has
+        to leave it empty by not writing to it. Does it?"""
+        failing = {"A-1"}
+        _run_database(self.database, [{"docket_number": "A-1"}])
+        loader_class = self.failing_loader(failing)
+        with patch.object(merge_state_scrape_row, "max_retries", 0):
+            self.loader(loader_class).load()
+        failing.clear()
+
+        self.loader(loader_class).retry()
+
+        self.assertEqual(
+            self.merge_retry(),
+            set(),
+            "A retry that fixed everything leaves nothing behind.",
+        )
+
+    def test_a_row_that_errors_again_is_held_again(self) -> None:
+        """A retry that does not settle a row has to leave it retryable. Is
+        the row written back by the same path that recorded it first?"""
+        _run_database(self.database, [{"docket_number": "A-1"}])
+        loader_class = self.failing_loader({"A-1"})
+        with patch.object(merge_state_scrape_row, "max_retries", 0):
+            self.loader(loader_class).load()
+
+        with patch.object(merge_state_scrape_row, "max_retries", 0):
+            self.loader(loader_class).retry()
+
+        self.assertEqual(self.merge_retry(), {"1"})
+
+    def test_a_retry_leaves_the_run_s_totals_standing(self) -> None:
+        """A retry adds to what the run already did rather than replacing it,
+        so it must not clear the ledger the way a fresh load does. Does the
+        moment the run began survive one?"""
+        _run_database(self.database, [{"docket_number": "A-1"}])
+        loader = self.loader()
+        loader.load()
+        started = self.ledger().started()
+
+        loader.retry()
+
+        self.assertEqual(self.ledger().started(), started)
+
+    def test_a_retry_that_cannot_find_a_row_says_so(self) -> None:
+        """A row held for retry that the run database does not have means the
+        wrong database was handed over. Is that raised rather than passed over
+        in silence?"""
+        _run_database(self.database, [{"docket_number": "A-1"}])
+        ledger = self.ledger()
+        ledger.dispatched(99, "A-99")
+        logging.disable(logging.NOTSET)
+        self.addCleanup(logging.disable)
+
+        with self.assertLogs(
+            "cl.corpus_importer.state.loader", "ERROR"
+        ) as logs:
+            self.loader().retry()
+
+        self.assertIn("are not in run.db at all", logs.output[0])
+        self.assertEqual(
+            logs.records[0].fingerprint,  # type: ignore[attr-defined]
+            ["test", LoadPhase.MERGE],
+        )
+
+
+class JKentScrapeLoaderExtractionRetryTest(LoaderTestCase):
+    """Tests for putting back the documents extraction never came back on.
+
+    The document model is a stand-in, as it is for the dispatch tests: what
+    matters here is which query the retry asks and what it does with the
+    answer.
+    """
+
+    def document(self, pk: int, dispatched: bool = True) -> Any:
+        """A document row that reports whether extraction was dispatched."""
+        document = Mock(pk=pk)
+        document.extract.return_value = dispatched
+        return document
+
+    def document_model(self, outstanding: list[int]) -> Any:
+        """A stand-in document model reporting `outstanding` unextracted PKs.
+
+        :param outstanding: The PKs `unextracted` reports, both when a load
+            verifies itself and when a retry re-checks.
+        :return: The model.
+        """
+        model = Mock(__name__="Doc")
+        unextracted = model.unextracted.return_value
+        # What the wait polls on, what the report reads, and what a retry
+        # re-checks against, in that order.
+        unextracted.count.return_value = 0
+        unextracted.values_list.return_value = outstanding
+        unextracted.filter.return_value = [
+            self.document(pk) for pk in outstanding
+        ]
+        model.written_since.return_value.filter.return_value.count.return_value = 0
+        return model
+
+    def verified(self, outstanding: list[int], dispatched: int = 2) -> Any:
+        """Run a load's verification over a stand-in document model.
+
+        Goes through `verify` rather than `load` because what is being tested
+        is what verification records, and a merger writing rows the stand-in
+        model would claim is a fixture of its own.
+
+        :param outstanding: The PKs `unextracted` reports.
+        :param dispatched: How many documents the run says it sent, since a
+            run that sent none never asks the database anything.
+        :return: The model.
+        """
+        model = self.document_model(outstanding)
+        ledger = self.ledger()
+        ledger.start()
+        ledger.extracting(dispatched)
+        self.loader(self.loader_class(document_model=model)).verify(
+            LoadReport()
+        )
+        return model
+
+    def test_outstanding_documents_are_held_for_retry(self) -> None:
+        """A run's verification already asks which of its documents are still
+        unextracted. Are they written down while it has them?"""
+        self.verified([11, 12])
+
+        self.assertEqual(
+            set(self.redis.smembers(f"{self.key}:extraction_retry")),
+            {"11", "12"},
+        )
+
+    def test_a_retry_re_checks_before_dispatching(self) -> None:
+        """The set is a snapshot, and by retry time a later load or a sweep
+        may have extracted some of it. Is the batch put back through
+        `unextracted` rather than dispatched as it stands?"""
+        model = self.document_model([11, 12])
+        ledger = self.ledger()
+        ledger.start()
+        ledger.retry_documents([11, 12, 13])
+        loader = self.loader(self.loader_class(document_model=model))
+
+        loader.retry()
+
+        self.assertEqual(
+            set(
+                model.unextracted.return_value.filter.call_args.kwargs[
+                    "pk__in"
+                ]
+            ),
+            {11, 12, 13},
+            "Every held document is offered to the re-check.",
+        )
+        self.assertEqual(
+            ledger.totals().documents,
+            2,
+            "Only the two the database still calls unextracted were sent.",
+        )
+
+    def test_a_retry_takes_the_documents_it_reads(self) -> None:
+        """Does reading the set take it away, so a second retry has nothing
+        left to re-check?"""
+        ledger = self.ledger()
+        ledger.retry_documents([11, 12])
+
+        self.assertEqual(ledger.documents_to_retry(), {11, 12})
+        self.assertEqual(ledger.documents_to_retry(), set())
+
+    def test_a_run_with_nothing_outstanding_holds_nothing(self) -> None:
+        """A run whose documents all came back extracted should leave no retry
+        set behind at all. Does it?"""
+        self.verified([])
+
+        self.assertEqual(
+            self.redis.exists(f"{self.key}:extraction_retry"),
+            0,
+            "An empty set costs the ledger no key at all.",
+        )
+
+
 class JKentScrapeLoaderCheckpointTest(LoaderTestCase):
     """Tests for the position a load records so a later one can resume it."""
 
@@ -1918,10 +2224,10 @@ class JKentScrapeLoaderCheckpointTest(LoaderTestCase):
 
 
 class FakeBucket:
-    """Stands in for the boto3 client `downloaded_run_database` fetches with.
+    """Stands in for the bucket `downloaded_run_database` fetches through.
 
     Records what was asked for so a test can assert on it, and writes
-    `contents` where the real client would write the object."""
+    `contents` where the real bucket would write the object."""
 
     def __init__(
         self,
@@ -1930,13 +2236,21 @@ class FakeBucket:
     ) -> None:
         self.contents = contents
         self.error = error
-        self.calls: list[tuple[str, str, str]] = []
+        self.calls: list[tuple[str, str]] = []
 
-    def download_file(self, bucket: str, key: str, destination: str) -> None:
-        self.calls.append((bucket, key, destination))
+    def download_file(self, key: str, destination: str) -> None:
+        self.calls.append((key, destination))
         if self.error is not None:
             raise self.error
         Path(destination).write_bytes(self.contents)
+
+
+class FakeStorage:
+    """Stands in for the storage backend the scrape bucket is reached
+    through, which `downloaded_run_database` asks only for its bucket."""
+
+    def __init__(self, bucket: FakeBucket) -> None:
+        self.bucket = bucket
 
 
 @override_settings(
@@ -1954,8 +2268,8 @@ class RunDatabaseTest(SimpleTestCase):
         The patch has to outlive the download, so this wraps the whole context
         rather than handing one back."""
         with patch(
-            "cl.corpus_importer.state.run_db.scrape_bucket_client",
-            return_value=bucket,
+            "cl.corpus_importer.state.run_db.scrape_bucket_storage",
+            return_value=FakeStorage(bucket),
         ):
             with downloaded_run_database(key) as database:
                 yield database
@@ -1971,7 +2285,7 @@ class RunDatabaseTest(SimpleTestCase):
             self.assertEqual(database.read_bytes(), b"a run")
             self.assertEqual(
                 bucket.calls,
-                [("scrapes", "nycourts_gov/2026-08-08.db", str(database))],
+                [("nycourts_gov/2026-08-08.db", str(database))],
             )
 
     def test_takes_the_download_away_afterwards(self) -> None:
@@ -2023,29 +2337,13 @@ class RunDatabaseTest(SimpleTestCase):
 
         self.assertEqual(bucket.calls, [])
 
-    def test_client_reads_courtlistener_credentials(self) -> None:
-        """Is the client built with CourtListener's own S3 credentials?"""
-        with patch("cl.corpus_importer.state.run_db.boto3.client") as client:
-            scrape_bucket_client()
-
-        self.assertEqual(
-            client.call_args.kwargs,
-            {
-                "aws_access_key_id": "key",
-                "aws_secret_access_key": "secret",
-            },
-        )
-
-    @override_settings(AWS_ACCESS_KEY_ID="", AWS_SECRET_ACCESS_KEY="")
-    def test_unset_credentials_leave_boto3_its_own_chain(self) -> None:
-        """An empty credential setting means "nothing configured here", not
-        "sign anonymously" -- a deployment may be getting its credentials from
-        an instance role instead. Is it passed as `None`?"""
-        with patch("cl.corpus_importer.state.run_db.boto3.client") as client:
-            scrape_bucket_client()
-
-        self.assertIsNone(client.call_args.kwargs["aws_access_key_id"])
-        self.assertIsNone(client.call_args.kwargs["aws_secret_access_key"])
+    def test_the_fetch_goes_through_courtlistener_storage(self) -> None:
+        """A run database is fetched with Django's storage backend rather than
+        a client of the loader's own, so that everything a deployment
+        configures for S3 -- a session token, a role, an endpoint -- reaches
+        the fetch too, which a client built from the key pair alone leaves
+        off and is refused for. Is that what the fetch reaches for?"""
+        self.assertIsInstance(scrape_bucket_storage(), AWSMediaStorage)
 
 
 @contextmanager
@@ -2099,6 +2397,75 @@ class LoadStateScrapeCommandTest(SimpleTestCase):
     def started_at(self) -> int:
         """The row the load the command built was told to start from."""
         return self.loader.call_args.kwargs["start_row"]
+
+    def test_retry_refuses_the_flags_that_pick_rows_for_it(self) -> None:
+        """A retry works from the rows the ledger is holding, so anything that
+        says which rows to work on instead is asking for something a retry
+        cannot do. Is each one refused rather than quietly ignored?"""
+        for flag in (
+            ("--start-row", "5"),
+            ("--auto-resume",),
+            ("--skip-load",),
+            ("--limit", "10"),
+        ):
+            with self.subTest(flag[0]):
+                with self.assertRaises(CommandError) as raised:
+                    self.load("--retry", *flag)
+
+                self.assertIn(flag[0], str(raised.exception))
+                self.loader.return_value.retry.assert_not_called()
+
+    def test_a_retry_with_no_dockets_leaves_the_run_database_alone(
+        self,
+    ) -> None:
+        """Run databases run to hundreds of megabytes and a retry only wants
+        one for a docket's payload. Is the fetch skipped when the ledger is
+        holding documents but no dockets?"""
+        self.loader.return_value.ledger.retry_counts.return_value = (0, 12)
+        self.loader.return_value.retry.return_value = LoadReport(
+            rows_read=False
+        )
+
+        with patch(
+            "cl.corpus_importer.management.commands.load_state_scrape."
+            "downloaded_run_database"
+        ) as download:
+            self.load("--retry")
+
+        download.assert_not_called()
+        self.loader.return_value.retry.assert_called_once_with()
+        self.assertEqual(
+            self.loader.call_args.args[0],
+            "nycourts_gov/2026-08-08.db",
+            "The loader is built on the bucket path, since nothing local was "
+            "fetched for it.",
+        )
+
+    def test_a_retry_with_dockets_fetches_the_run_database(self) -> None:
+        """A docket held for retry is named by position, so its payload has to
+        be read back out of the run database. Is it fetched then?"""
+        self.loader.return_value.ledger.retry_counts.return_value = (3, 0)
+        self.loader.return_value.retry.return_value = LoadReport()
+
+        self.load("--retry")
+
+        self.loader.return_value.retry.assert_called_once_with()
+        self.assertEqual(
+            self.loader.call_args.args[0],
+            Path("/nonexistent") / "nycourts_gov/2026-08-08.db",
+            "Built on the downloaded copy rather than on the bucket path.",
+        )
+
+    def test_a_retry_is_not_told_where_to_start(self) -> None:
+        """`start_row` and `limit` would each narrow what a retry re-dispatches
+        behind the ledger's back. Is the retry loader built without them?"""
+        self.loader.return_value.ledger.retry_counts.return_value = (3, 0)
+        self.loader.return_value.retry.return_value = LoadReport()
+
+        self.load("--retry")
+
+        self.assertNotIn("start_row", self.loader.call_args.kwargs)
+        self.assertNotIn("limit", self.loader.call_args.kwargs)
 
     def test_start_row_and_auto_resume_are_contradictory(self) -> None:
         """Each says to start somewhere the other says not to, and honouring

@@ -12,6 +12,12 @@ A load that dies partway can be picked up with `--auto-resume`, which starts
 from the last row the previous load of the same run database checkpointed. The
 checkpoint is dropped once a load reaches the end.
 
+A load that ran to the end but did not merge or extract everything is picked
+up with `--retry`, which re-dispatches what the ledger is still holding rather
+than reading the run database from the top. It is important that this not be
+run while work from that load is still outstanding, otherwise we can duplicate
+work, with a bias towards the work we want to duplicate the least.
+
 Add a court by registering its `JKentScrapeLoader` subclass in
 `cl.corpus_importer.state.registry`.
 """
@@ -28,6 +34,7 @@ from django.core.management.base import (
 from cl.corpus_importer.state.loader import (
     DEFAULT_IN_FLIGHT_TIME,
     DEFAULT_VERIFY_TIMEOUT,
+    JKentScrapeLoader,
     LoadReport,
     WaitOutcome,
 )
@@ -153,6 +160,18 @@ class Command(BaseCommand):
             ),
         )
         parser.add_argument(
+            "--retry",
+            action="store_true",
+            help=(
+                "Retry the dockets whose merge never reached a verdict, "
+                "and the documents extraction never came back on."
+                "Reads both out of the ledger, so it only "
+                "reaches for the run database when there are dockets to "
+                "re-merge. Cannot be combined with --start-row, "
+                "--auto-resume, --skip-load or --limit."
+            ),
+        )
+        parser.add_argument(
             "--skip-verification",
             action="store_true",
             help=(
@@ -217,6 +236,7 @@ class Command(BaseCommand):
         db_delay: float,
         start_row: int,
         auto_resume: bool,
+        retry: bool,
         skip_verification: bool,
         skip_load: bool,
         in_flight_time: float,
@@ -241,6 +261,8 @@ class Command(BaseCommand):
         :param db_delay: Seconds to wait after each docket.
         :param start_row: Dockets to skip before dispatching anything.
         :param auto_resume: Start from the last checkpointed row.
+        :param retry: Put back what the last load left unfinished, rather than
+            dispatching anything new.
         :param skip_verification: Do not wait to see what the merges did.
         :param skip_load: Dispatch nothing, and check up on a load that
             already ran instead.
@@ -257,6 +279,14 @@ class Command(BaseCommand):
                 "--skip-load and --skip-verification between them skip the "
                 "whole command: one is the dispatching, the other is the "
                 "checking up. Drop one."
+            )
+        if retry and (start_row or auto_resume or skip_load or limit):
+            raise CommandError(
+                "--retry re-dispatches the rows the ledger is still holding, "
+                "so it is the ledger that says which rows those are. "
+                "--start-row, --auto-resume, --skip-load and --limit each say "
+                "which rows to work on instead, and none of them combines "
+                "with it."
             )
         if skip_load:
             # The ledger is in Redis and the run database is not read at all,
@@ -280,27 +310,70 @@ class Command(BaseCommand):
                 )
             start_row = get_last_parent_document_id_processed(run_key)
             logger.info("Auto-resuming from row %s.", start_row)
+        loader_kwargs: dict[str, Any] = dict(
+            extract=not skip_extraction,
+            ingest_queue=ingest_queue,
+            ingest_throttle=ingest_throttle,
+            extraction_queue=extraction_queue,
+            extraction_throttle=extraction_throttle,
+            db_delay=db_delay,
+            run_key=run_key,
+            verify=not skip_verification,
+            in_flight_time=in_flight_time,
+            verify_timeout=verify_timeout,
+        )
+        if retry:
+            self.print_report(
+                self.retry_load(loader_class, database, loader_kwargs),
+                verified=not skip_verification,
+            )
+            return
         try:
             with downloaded_run_database(database) as path:
                 report = loader_class(
                     path,
                     limit=limit,
-                    extract=not skip_extraction,
-                    ingest_queue=ingest_queue,
-                    ingest_throttle=ingest_throttle,
-                    extraction_queue=extraction_queue,
-                    extraction_throttle=extraction_throttle,
-                    db_delay=db_delay,
                     start_row=start_row,
-                    run_key=run_key,
-                    verify=not skip_verification,
-                    in_flight_time=in_flight_time,
-                    verify_timeout=verify_timeout,
+                    **loader_kwargs,
                 ).load()
         except RunDatabaseUnavailable as error:
             raise CommandError(str(error)) from error
 
         self.print_report(report, verified=not skip_verification)
+
+    @staticmethod
+    def retry_load(
+        loader_class: type[JKentScrapeLoader[Any, Any]],
+        database: str,
+        loader_kwargs: dict[str, Any],
+    ) -> LoadReport:
+        """Retry errored, pending/missing and extraction failures.
+
+        We only load the scrape db for merge error retries.
+
+        :param loader_class: The court's loader.
+        :param database: The run database's path within the storage bucket.
+        :param loader_kwargs: What to build the loader with.
+        :return: What the retry dispatched and what came of it.
+        :raises CommandError: If the run database is wanted and cannot be
+            fetched.
+        """
+        from_ledger = loader_class(database, **loader_kwargs)
+        rows, documents = from_ledger.ledger.retry_counts()
+        logger.info(
+            "Retrying %s dockets and up to %s documents of %s.",
+            rows,
+            documents,
+            database,
+        )
+        if not rows:
+            # Nothing wants a payload, so the run database stays where it is.
+            return from_ledger.retry()
+        try:
+            with downloaded_run_database(database) as path:
+                return loader_class(path, **loader_kwargs).retry()
+        except RunDatabaseUnavailable as error:
+            raise CommandError(str(error)) from error
 
     def print_report(self, report: LoadReport, *, verified: bool) -> None:
         """Write out what the load did, for whoever ran it.
