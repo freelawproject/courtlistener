@@ -545,25 +545,18 @@ class UnconfirmedApplicationCleanupTest(TestCase):
         self.assertKeptApplicationsExist()
 
 
-class CleanOAuthTablesDaemonTest(TestCase):
-    """The daemon command runs passes and honors its flags."""
+class CleanOAuthTablesCommandTest(TestCase):
+    """The clean_oauth_tables command runs one pass and honors --dry-run."""
 
     @classmethod
     def setUpTestData(cls):
         with time_machine.travel(now() - timedelta(days=2), tick=False):
             cls.stale = ApplicationFactory(name="stale, never authorized")
 
-    def test_one_pass_deletes_unconfirmed_applications(self):
-        call_command("clean_oauth_tables_daemon", "--testing-iterations=1")
+    def test_run_deletes_unconfirmed_applications(self):
+        call_command("clean_oauth_tables")
         self.assertFalse(Application.objects.filter(pk=self.stale.pk).exists())
 
     def test_dry_run_deletes_nothing(self):
-        call_command(
-            "clean_oauth_tables_daemon", "--testing-iterations=1", "--dry-run"
-        )
-        self.assertTrue(Application.objects.filter(pk=self.stale.pk).exists())
-
-    @override_settings(OAUTH_CLEANUP_DAEMON_ENABLED=False)
-    def test_disabled_daemon_exits_without_deleting(self):
-        call_command("clean_oauth_tables_daemon", "--testing-iterations=1")
+        call_command("clean_oauth_tables", "--dry-run")
         self.assertTrue(Application.objects.filter(pk=self.stale.pk).exists())

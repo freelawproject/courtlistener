@@ -23,7 +23,7 @@ project-includes = [
     "cl/api/webhooks.py",
     "cl/oauth/cleanup_utils.py",
     "cl/oauth/factories.py",
-    "cl/oauth/management/commands/clean_oauth_tables_daemon.py",
+    "cl/oauth/management/commands/clean_oauth_tables.py",
     "cl/recap/management/commands/remove_appellate_entries_with_long_numbers.py",
     "cl/recap/utils.py",
     "cl/scrapers/management/commands/back_scrape_dockets.py",
