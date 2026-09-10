@@ -14,6 +14,7 @@ from django.conf import settings
 from django.contrib.auth.models import User
 from django.core.exceptions import ValidationError
 from django.core.files.base import ContentFile
+from django.db import OperationalError
 from django.test import SimpleTestCase
 from django.utils.encoding import force_bytes
 from django.utils.timezone import now
@@ -120,6 +121,7 @@ from cl.search.models import (
     Parenthetical,
     SCOTUSDocketEntry,
     SCOTUSDocument,
+    TexasDocument,
 )
 from cl.search.state.shared import ProcessingError
 from cl.search.state.texas.factories import (
@@ -762,6 +764,47 @@ class ExtractFormattedTextFailureTest(TestCase):
         texas_document.refresh_from_db()
         self.assertIsNone(texas_document.processing_error)
         self.assertIn("Courtlistener", texas_document.plain_text)
+
+
+class ExtractionSaveRetryTest(TestCase):
+    """Tests that saving extraction results survives a DB connection that
+    went stale while doctor was working."""
+
+    @mock.patch("cl.scrapers.tasks.microservice", new_callable=mock.AsyncMock)
+    def test_save_is_retried_on_a_dead_connection(self, microservice_mock):
+        """Does a save that fails on a stale connection get retried?
+
+        Long OCR calls can leave the DB connection idle long enough for
+        Postgres to close it, and the extracted text is only in memory, so
+        the save must survive one dead connection rather than losing the work.
+        """
+        texas_document = TexasDocumentFactory.create(plain_text="")
+        microservice_mock.return_value = httpx.Response(
+            200,
+            json={
+                "content": "Hello Courtlistener.",
+                "extracted_by_ocr": False,
+            },
+        )
+
+        with mock.patch.object(
+            TexasDocument,
+            "asave",
+            new_callable=mock.AsyncMock,
+            side_effect=[
+                OperationalError("server closed the connection unexpectedly"),
+                None,
+            ],
+        ) as asave_mock:
+            processed = async_to_sync(extract_formatted_text_document_base)(
+                texas_document.pk,
+                check_if_needed=False,
+                ocr_available=False,
+                model_name="search.TexasDocument",
+            )
+
+        self.assertEqual(asave_mock.await_count, 2)
+        self.assertEqual(processed, [texas_document.pk])
 
 
 class ExtensionIdentificationTest(SimpleTestCase):
