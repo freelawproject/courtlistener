@@ -802,6 +802,19 @@ class NYCoALoaderTest(TestCase):
         self.assertEqual(report.merged, 1)
         self.assertEqual(Docket.objects.count(), 1)
 
+    def test_the_last_reading_of_a_docket_is_the_one_kept(self) -> None:
+        """A docket read twice in one run was read twice because the run came
+        back to it, so the later reading is the better one -- and it is the
+        reading the file archive keeps too. Is that the one the query keeps?"""
+        scrape = self.scrape(
+            [
+                ("NYCourtPassDocket", _docket(case_name="Smith v. Roe")),
+                ("NYCourtPassDocket", _docket(case_name="Smith v. Jones")),
+            ]
+        )
+
+        self.assertEqual(scrape.case_name, "Smith v. Jones")
+
     def test_load_merges(self) -> None:
         """Does a load actually write the docket and everything under it?"""
         _run_database(

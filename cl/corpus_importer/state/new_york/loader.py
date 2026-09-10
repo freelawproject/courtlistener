@@ -47,11 +47,14 @@ docket AS (
             data_json,
             docket_number,
             ROW_NUMBER() OVER (
-                PARTITION BY docket_number ORDER BY id
+                PARTITION BY docket_number ORDER BY id DESC
             ) AS grid_position
         FROM scraped
     )
-    WHERE grid_position = 1 -- deduplicate dockets
+    -- Deduplicate dockets. A run that read one docket twice keeps the last
+    -- reading, which is also the one `download` keeps of a file fetched
+    -- twice, so the two stay aligned over a rescrape.
+    WHERE grid_position = 1
 ),
 -- The archive row carries what only the download knows: the hash the
 -- scraper took of the bytes, how many there were, and what kind of file it
