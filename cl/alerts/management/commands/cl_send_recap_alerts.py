@@ -21,7 +21,10 @@ from cl.alerts.management.commands.cl_send_scheduled_alerts import (
     get_cut_off_date,
 )
 from cl.alerts.models import Alert, ScheduledAlertHit
-from cl.alerts.tasks import send_search_alert_emails
+from cl.alerts.tasks import (
+    create_schedule_alerts_hits_in_bulk,
+    send_search_alert_emails,
+)
 from cl.alerts.utils import (
     TaskCompletionStatus,
     add_document_hit_to_alert_set,
@@ -805,12 +808,29 @@ def query_and_schedule_alerts(
                 # Send webhooks
                 send_search_alert_webhooks(user, results_to_send, alert.pk)
 
-        # Create scheduled WEEKLY and MONTHLY Alerts in bulk.
-        if scheduled_hits_to_create:
-            ScheduledAlertHit.objects.bulk_create(scheduled_hits_to_create)
+        if not scheduled_hits_to_create:
+            continue
+
+        # Filter out scheduled_hits_to_create by alerts that still exist in
+        existing_ids = set(
+            Alert.objects.filter(
+                pk__in={hit.alert_id for hit in scheduled_hits_to_create}
+            ).values_list("pk", flat=True)
+        )
+        scheduled_hits_to_create_filtered = [
+            hit
+            for hit in scheduled_hits_to_create
+            if hit.alert_id in existing_ids
+        ]
+        # Create scheduled WEEKLY and MONTHLY Alerts in bulk. Shares the
+        # percolator's helper to get the same batching and atomic retries.
+        if scheduled_hits_to_create_filtered:
+            create_schedule_alerts_hits_in_bulk(
+                scheduled_hits_to_create_filtered
+            )
             logger.info(
                 "Scheduled %s '%s' alerts for user '%s'",
-                len(scheduled_hits_to_create),
+                len(scheduled_hits_to_create_filtered),
                 rate,
                 user,
             )
