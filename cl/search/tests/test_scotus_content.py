@@ -40,6 +40,7 @@ from cl.search.models import (
     ScotusDocketMetadata,
     SCOTUSDocument,
 )
+from cl.tests.cases import TestCase as CLTestCase
 
 
 class ScotusDocketMergeTest(TestCase):
@@ -918,3 +919,39 @@ class ScotusDocketMergeTest(TestCase):
                     federal_dn_judge_initials_referred=None,
                 )
                 self.assertEqual(found.pk, docket.pk)
+
+
+class ScotusDocketUrlPropertyTest(CLTestCase):
+    """#7584: Docket.scotus_docket_url builds the public case-page link,
+    mirroring the existing pacer_docket_url property's location/shape.
+    """
+
+    @classmethod
+    def setUpTestData(cls) -> None:
+        cls.court = CourtFactory(id="scotus", jurisdiction="F")
+
+    def test_builds_url_from_docket_number(self) -> None:
+        docket = DocketFactory(
+            court=self.court,
+            source=Docket.SCRAPER,
+            docket_number="25-1210",
+        )
+        self.assertEqual(
+            docket.scotus_docket_url,
+            "https://www.supremecourt.gov/search.aspx"
+            "?filename=/docket/docketfiles/html/public/25-1210.html",
+        )
+
+    def test_url_encodes_special_characters(self) -> None:
+        docket = DocketFactory(
+            court=self.court,
+            source=Docket.SCRAPER,
+            docket_number="25 1210",
+        )
+        self.assertIn("25%201210", docket.scotus_docket_url)
+
+    def test_returns_empty_string_when_no_docket_number(self) -> None:
+        docket = DocketFactory(
+            court=self.court, source=Docket.SCRAPER, docket_number=""
+        )
+        self.assertEqual(docket.scotus_docket_url, "")

@@ -1,0 +1,15 @@
+{% load svg_tags %}
+
+<c-vars docket="" />
+
+{% if docket.scotus_docket_url %}
+  <c-button
+    variant="outline"
+    href="{{ docket.scotus_docket_url }}"
+    target="_blank"
+    rel="nofollow noopener noreferrer"
+  >
+    {% svg "external" class="w-4 h-4" aria_hidden="true" %}
+    View in SCOTUS
+  </c-button>
+{% endif %}
