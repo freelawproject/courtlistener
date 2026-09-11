@@ -15,7 +15,6 @@ from django.urls import reverse
 from django.utils.timezone import now
 from elasticsearch.exceptions import ConnectionError
 from redis import ConnectionError as RedisConnectionError
-from waffle import switch_is_active
 
 from cl.alerts.models import Alert, DocketAlert, ScheduledAlertHit
 from cl.alerts.utils import (
@@ -229,7 +228,6 @@ def make_alert_messages(
         "docket": d,
         "docket_alert_secret_key": None,
         "timezone": COURT_TIMEZONES.get(d.court_id, "US/Eastern"),
-        "recap_alerts_banner": switch_is_active("recap-alerts-email-banner"),
         # Emails render without request context processors, so the wiki URL
         # must be injected here for the tag/note help links.
         "WIKI_HELP_URL": settings.WIKI_HELP_BASE_URL,
@@ -512,9 +510,6 @@ def send_search_alert_emails(
             "hits": hits,
             "hits_limit": settings.SCHEDULED_ALERT_HITS_LIMIT,
             "scheduled_alert": scheduled_alert,
-            "recap_alerts_banner": switch_is_active(
-                "recap-alerts-email-banner"
-            ),
         }
         headers = {}
         query_string = ""
