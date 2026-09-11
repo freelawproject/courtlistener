@@ -38,21 +38,46 @@ SKIPPABLE_CHECKS = {
     "check_include_in_v2",
 }
 
-_skip_directive_re = re.compile(r"\{#\s*frontend-checks-skip:\s*(.+?)\s*#\}")
+# Directives live in Django ({# #}) or CSS (/* */) comments so they work in
+# both templates and input.css.
+_skip_directive_re = re.compile(
+    r"(?:\{#|/\*)\s*frontend-checks-skip:\s*(.+?)\s*(?:#\}|\*/)"
+)
+_line_skip_directive_re = re.compile(
+    r"(?:\{#|/\*)\s*frontend-checks-skip-line:\s*(.+?)\s*(?:#\}|\*/)"
+)
+
+
+def _skippable_names(raw: str) -> set[str]:
+    """Split a comma-separated directive value, keeping only SKIPPABLE_CHECKS."""
+    return {name.strip() for name in raw.split(",")} & SKIPPABLE_CHECKS
 
 
 def _parse_skip_checks(lines: list[str]) -> set[str]:
-    """Parse ``{# frontend-checks-skip: ... #}`` comments.
+    """Parse ``frontend-checks-skip: ...`` comments.
 
     Returns the intersection of requested skips with SKIPPABLE_CHECKS,
-    so non-allowlisted checks cannot be bypassed.
+    so non-allowlisted checks cannot be bypassed. Applies to the whole file.
     """
     skip: set[str] = set()
     for line in lines:
-        m = _skip_directive_re.search(line)
-        if m:
-            skip.update(name.strip() for name in m.group(1).split(","))
-    return skip & SKIPPABLE_CHECKS
+        if m := _skip_directive_re.search(line):
+            skip |= _skippable_names(m.group(1))
+    return skip
+
+
+def _parse_line_skips(lines: list[str]) -> dict[int, set[str]]:
+    """Parse ``frontend-checks-skip-line: ...`` comments.
+
+    Returns a mapping of 1-indexed line number to the skippable checks
+    requested on that same line. Non-allowlisted checks are dropped.
+    """
+    skips: dict[int, set[str]] = {}
+    for i, line in enumerate(lines, 1):
+        if m := _line_skip_directive_re.search(line):
+            if names := _skippable_names(m.group(1)):
+                skips[i] = names
+    return skips
 
 
 # ---------------------------------------------------------------------------
@@ -648,19 +673,25 @@ def check_raw_css(lines: list[str]) -> list[tuple[int, str]]:
     )
     # Looks like a CSS property declaration
     prop_re = re.compile(r"^\s*[\w-]+\s*:")
+    inline_comment_re = re.compile(r"/\*.*?\*/")
 
     in_comment = False
     for i, line in enumerate(lines, 1):
-        stripped = line.strip()
-
-        # Track block comments
-        if "/*" in stripped:
-            in_comment = True
-        if "*/" in stripped:
-            in_comment = False
-            continue
+        # Track multiline block comments (/* ... */)
         if in_comment:
-            continue
+            close_pos = line.find("*/")
+            if close_pos == -1:
+                continue  # entire line is inside comment
+            in_comment = False
+            line = line[close_pos + 2 :]
+
+        # Strip inline comments so a trailing note can't hide a declaration
+        line = inline_comment_re.sub("", line)
+        if "/*" in line:
+            in_comment = True
+            line = line[: line.index("/*")]
+
+        stripped = line.strip()
 
         # Skip empty lines and lines that are just closing braces
         if not stripped or stripped in ("{", "}", ");"):
@@ -737,12 +768,18 @@ def _apply_checks(
     filepath: str,
     findings: list[Finding],
 ) -> None:
-    """Run a list of (check_fn, severity) pairs and collect findings."""
+    """Run a list of (check_fn, severity) pairs and collect findings.
+
+    Honors file-level and same-line skip directives for SKIPPABLE_CHECKS.
+    """
     skip_checks = _parse_skip_checks(lines)
+    line_skips = _parse_line_skips(lines)
     for fn, severity in checks:
         if fn.__name__ in skip_checks:
             continue
         for line_no, msg in fn(lines):
+            if fn.__name__ in line_skips.get(line_no, ()):
+                continue
             findings.append(
                 Finding(filepath, line_no, fn.__name__, severity, msg)
             )
@@ -875,6 +912,28 @@ def run_checks(
                 f"Legacy template with sync notice was modified but "
                 f"v2_ counterpart ({v2_path}) was not — ensure both "
                 f"templates stay in sync",
+            )
+        )
+
+    # Deletion check: IncrementalNewTemplateMiddleware serves a v2_ template
+    # to everyone once its legacy counterpart is gone, so deleting the legacy
+    # file is a release, not a cleanup. Warning-level because v2-only pages
+    # can be intentional.
+    for legacy_path in changed_legacy_templates:
+        if file_statuses.get(legacy_path) != "D":
+            continue
+        v2_path = _swap_template_prefix(legacy_path, add_v2=True)
+        if v2_path is None or not (repo_root / v2_path).is_file():
+            continue
+        findings.append(
+            Finding(
+                legacy_path,
+                1,
+                "check_legacy_template_deleted",
+                WARN,
+                f"Legacy template deleted but its v2_ counterpart ({v2_path}) "
+                "exists; deleting it makes the v2 page live for everyone. "
+                "Confirm if this is intentional.",
             )
         )
 
