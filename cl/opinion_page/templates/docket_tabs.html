@@ -55,7 +55,9 @@
             src="{% static "js/react/vendor.js" %}"></script>
 
     <script type="text/javascript" src="{% static "js/export-csv.js" %}"></script>
-    <script src="{% static "js/pray_and_pay.js" %}"></script>
+    {% if docket_source.has_pay_and_pray %}
+      <script src="{% static "js/pray_and_pay.js" %}"></script>
+    {% endif %}
 {% endblock %}
 
 {% block nav %}
