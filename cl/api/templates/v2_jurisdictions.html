@@ -1,5 +1,5 @@
 {% extends "new_base.html" %}
-{% load text_filters humanize %}
+{% load text_filters humanize extras %}
 
 {% block title %}Available Jurisdictions – CourtListener.com{% endblock %}
 {% block description %}A list of the hundreds of jurisdictions available on CourtListener.{% endblock %}
@@ -51,16 +51,18 @@
       <td>{{ court.count|intcomma }}</td>
       <td>{{ court.get_jurisdiction_display|nbsp  }}</td>
       <td class="whitespace-nowrap">
-          {% if court.url %}
+        {% with escaped_url=court.url|http_url %}
+        {% if court.url %}
           <a
             class="links-external"
-            title="{{ court.url }}"
-            aria-label="{{ court.url }} (opens in new tab)"
-            href="{{ court.url }}" target="_blank" rel="noopener noreferrer"
+            title="{{ escaped_url }}"
+            aria-label="{{ escaped_url }} (opens in new tab)"
+            href="{{ escaped_url }}" target="_blank" rel="noopener noreferrer"
           >
-          {{ court.url|slice:"20" }}{% if court.url|length > 20 %}&hellip;{% endif %}
-        </a>
-          {% endif %}
+          {{ escaped_url|slice:"20" }}{% if escaped_url|length > 20 %}&hellip;{% endif %}
+          </a>
+        {% endif %}
+        {% endwith %}
       </td>
       <td>
           <a
