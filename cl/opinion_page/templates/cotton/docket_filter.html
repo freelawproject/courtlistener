@@ -5,6 +5,7 @@
 
 <c-vars
   docket=""
+  docket_source=""
   form=""
   page_obj=""
   sort_order_asc="True"
@@ -298,4 +299,9 @@
       </c-slot>
     </c-filter-drawer>
   </div>
+
+  <p class="text-sm text-greyscale-500 mt-3">
+    {% svg "circle_question_mark" class="w-4 h-4 inline" aria_hidden="true" %}
+    <c-docket-source-attribution :docket_source="docket_source" />
+  </p>
 </div>

@@ -12,10 +12,9 @@
   <div class="max-w-content mx-auto pt-4 md:pt-20 pb-35">
     <c-docket-page
       :docket="docket"
+      :docket_source="docket_source"
       active_tab="entries"
-      :metadata="metadata"
-      :bankruptcy_metadata="bankruptcy_metadata"
-      :originating_court_metadata="originating_court_metadata"
+      :metadata_sections="metadata_sections"
       :tabs="tabs"
       :has_alert="has_alert"
       :note_form="note_form"
@@ -36,6 +35,7 @@
 
       <c-docket-filter
         :docket="docket"
+        :docket_source="docket_source"
         :form="form"
         :page_obj="docket_entries"
         :sort_order_asc="sort_order_asc"
@@ -43,7 +43,7 @@
       />
 
       {# Docket entry rows #}
-      <c-docket-entry-rows :docket_entries="docket_entries" />
+      <c-docket-entry-rows :docket_entries="docket_entries" :docket_source="docket_source" />
 
       <c-pagination
         :page_obj="docket_entries"

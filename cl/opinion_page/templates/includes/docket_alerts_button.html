@@ -1,36 +1,36 @@
-{% if docket.pacer_docket_url %}
-  <a href="{% url "toggle_docket_alert" %}"
-     data-id="{{ docket.pk }}"
-     data-enable-message="Get Alerts"
-     data-disable-message="Disable Alerts"
-     rel="nofollow"
-     class="btn
-       {% if extra_classes %}{{ extra_classes }} {% endif %}
-       {% if has_alert %}btn-danger{% else %}btn-success{% endif %}
-       {% if user.is_authenticated %}
-         {% if has_alert or user.profile.can_make_another_alert %}
-           {% comment %}
-           Either it already has an alert, or the user can make another
-           {% endcomment %}
-           toggle-docket-alert
-         {% else %}
-           {% comment %}
-           Block for now, but perhaps we'll get a message that RECAP
-           is installed, and we'll unblock as a result.
-           {% endcomment %}
-           no-more-alerts-modal-trigger
-         {% endif %}
+{% if docket_source_url %}
+<a href="{% url "toggle_docket_alert" %}"
+   data-id="{{ docket.pk }}"
+   data-enable-message="Get Alerts"
+   data-disable-message="Disable Alerts"
+   rel="nofollow"
+   class="btn
+     {% if extra_classes %}{{ extra_classes }} {% endif %}
+     {% if has_alert %}btn-danger{% else %}btn-success{% endif %}
+     {% if user.is_authenticated %}
+       {% if has_alert or user.profile.can_make_another_alert %}
+         {% comment %}
+         Either it already has an alert, or the user can make another
+         {% endcomment %}
+         toggle-docket-alert
        {% else %}
-         logged-out-modal-trigger
-       {% endif %}">
-    {% if has_alert %}
-      <i class="fa fa-bell-slash-o"
-         data-enable-icon-class="fa-bell"
-         data-disable-icon-class="fa-bell-slash-o"></i>&nbsp;<span class="alert_btn_txt">Disable Alerts</span>
-    {% else %}
-      <i class="fa fa-bell"
-         data-enable-icon-class="fa-bell"
-         data-disable-icon-class="fa-bell-slash-o"></i>&nbsp;<span class="alert_btn_txt">Get Alerts</span>
-    {% endif %}
-  </a>
+         {% comment %}
+         Block for now, but perhaps we'll get a message that RECAP
+         is installed, and we'll unblock as a result.
+         {% endcomment %}
+         no-more-alerts-modal-trigger
+       {% endif %}
+     {% else %}
+       logged-out-modal-trigger
+     {% endif %}">
+  {% if has_alert %}
+    <i class="fa fa-bell-slash-o"
+       data-enable-icon-class="fa-bell"
+       data-disable-icon-class="fa-bell-slash-o"></i>&nbsp;<span class="alert_btn_txt">Disable Alerts</span>
+  {% else %}
+    <i class="fa fa-bell"
+       data-enable-icon-class="fa-bell"
+       data-disable-icon-class="fa-bell-slash-o"></i>&nbsp;<span class="alert_btn_txt">Get Alerts</span>
+  {% endif %}
+</a>
 {% endif %}

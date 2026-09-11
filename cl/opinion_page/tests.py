@@ -6,6 +6,7 @@ import shutil
 import threading
 from datetime import date
 from http import HTTPStatus
+from itertools import product
 from unittest import mock
 from unittest.mock import AsyncMock, MagicMock, PropertyMock, patch
 from urllib.parse import parse_qs, urlencode, urlparse
@@ -19,7 +20,8 @@ from django.core.management import call_command
 from django.core.paginator import Paginator
 from django.db import connection
 from django.http import HttpResponse
-from django.template import engines
+from django.template import TemplateDoesNotExist, engines
+from django.template.loader import get_template
 from django.test import (
     AsyncRequestFactory,
     RequestFactory,
@@ -49,6 +51,13 @@ from cl.lib.test_helpers import (
     SearchTestCase,
     SimpleUserDataMixin,
     SitemapTest,
+)
+from cl.opinion_page import docket_entry_sources
+from cl.opinion_page.docket_entry_sources import (
+    _recap_document_detail_url,
+    _scotus_document_detail_url,
+    build_scotus_metadata,
+    document_url,
 )
 from cl.opinion_page.forms import (
     DocketEntryFilterForm,
@@ -100,6 +109,9 @@ from cl.search.factories import (
     OpinionsCitedWithParentsFactory,
     RECAPAttachmentFactory,
     RECAPDocumentFactory,
+    SCOTUSDocketEntryFactory,
+    ScotusDocketMetadataFactory,
+    SCOTUSDocumentFactory,
 )
 from cl.search.models import (
     PRECEDENTIAL_STATUS,
@@ -165,6 +177,31 @@ class GetDownloadsContextTest(TestCase):
         self.assertTrue(context["has_downloads"])
         self.assertIn("new_version", context["download_file_path"])
         self.assertNotIn("old_version", context["download_file_path"])
+
+
+class OpinionAuthoritiesViewTest(TestCase):
+    @classmethod
+    def setUpTestData(cls) -> None:
+        cls.cluster = OpinionClusterWithParentsFactory.create()
+        citing_opinion = OpinionFactory.create(cluster=cls.cluster)
+        authority = OpinionClusterWithParentsFactory.create()
+        cited_opinion = OpinionFactory.create(cluster=authority)
+        OpinionsCitedWithParentsFactory.create(
+            citing_opinion=citing_opinion,
+            cited_opinion=cited_opinion,
+        )
+
+    async def test_authorities_page_loads_with_lightweight_opinions(
+        self,
+    ) -> None:
+        path = reverse(
+            "view_case_authorities",
+            kwargs={"pk": self.cluster.pk, "_": "asdf"},
+        )
+        response = await self.async_client.get(path)
+
+        self.assertEqual(response.status_code, HTTPStatus.OK)
+        self.assertContains(response, "Table of Authorities")
 
 
 class UpdateOpinionTabsTest(TestCase):
@@ -676,6 +713,224 @@ class ViewRecapDocumentTest(TestCase):
             docket_id=docket.pk, doc_num=1, slug=docket.slug, follow=True
         )
         self.assertEqual(r.redirect_chain[0][1], HTTPStatus.FOUND)
+        self.assertEqual(r.status_code, HTTPStatus.OK)
+
+
+@override_settings(WAFFLE_CACHE_PREFIX="test_scotus_document_page_waffle")
+@override_flag("scotus_docket_page", active=True)
+class ViewSCOTUSDocumentTest(TestCase):
+    "Tests for view_recap_document rendering SCOTUSDocument records"
+
+    @classmethod
+    def setUpTestData(cls) -> None:
+        cls.court = CourtFactory(id="scotus", jurisdiction="F")
+        cls.docket = DocketFactory(court=cls.court, source=Docket.SCRAPER)
+
+    async def get(self, follow=False, **kwargs):
+        kwargs.setdefault("slug", self.docket.slug)
+        if "att_num" in kwargs:
+            path = reverse("view_recap_attachment", kwargs=kwargs)
+        else:
+            path = reverse("view_recap_document", kwargs=kwargs)
+        return await self.async_client.get(path, follow=follow)
+
+    async def test_invalid_docket(self) -> None:
+        r = await self.get(docket_id=0, doc_num=0)
+        self.assertEqual(r.status_code, HTTPStatus.NOT_FOUND)
+
+    async def test_invalid_document(self) -> None:
+        r = await self.get(docket_id=self.docket.id, doc_num=0)
+        self.assertEqual(r.status_code, HTTPStatus.NOT_FOUND)
+
+    async def test_non_numeric_doc_num_returns_404(self) -> None:
+        """SCOTUSDocument.document_number is an IntegerField,
+        so a non-numeric doc_num used to raise an uncaught
+        ValueError instead of the usual 404.
+        """
+        r = await self.get(docket_id=self.docket.id, doc_num="abc")
+        self.assertEqual(r.status_code, HTTPStatus.NOT_FOUND)
+
+    async def test_valid_document_with_local_file(self) -> None:
+        entry = await sync_to_async(SCOTUSDocketEntryFactory)(
+            docket=self.docket
+        )
+        document = await sync_to_async(SCOTUSDocumentFactory)(
+            docket_entry=entry,
+            attachment_number=1,
+            filepath_local="recap_documents/test.pdf",
+        )
+        r = await self.get(
+            docket_id=self.docket.id,
+            doc_num=document.document_number,
+            att_num=document.attachment_number,
+        )
+        self.assertEqual(r.status_code, HTTPStatus.OK)
+        c = r.context
+        self.assertEqual(document, c["rd"])
+        self.assertIs(c["docket_source"], docket_entry_sources.SCOTUS)
+        self.assertFalse(c["authorities"])
+        self.assertContains(r, "Download PDF")
+        self.assertNotIn("pray_and_pay.js", r.content.decode())
+
+    async def test_get_absolute_url_builds_main_document_url_without_attachment_number(
+        self,
+    ) -> None:
+        """A SCOTUSDocument with a document_number but no attachment_number
+        is still served at the main view_recap_document URL by
+        recap_document_context()."""
+        entry = await sync_to_async(SCOTUSDocketEntryFactory)(
+            docket=self.docket
+        )
+        document = await sync_to_async(SCOTUSDocumentFactory)(
+            docket_entry=entry, document_number=7, attachment_number=None
+        )
+        self.assertEqual(
+            document.get_absolute_url(),
+            reverse(
+                "view_recap_document",
+                kwargs={
+                    "docket_id": self.docket.pk,
+                    "doc_num": 7,
+                    "slug": self.docket.slug,
+                },
+            ),
+        )
+        r = await self.get(docket_id=self.docket.id, doc_num=7)
+        self.assertEqual(r.status_code, HTTPStatus.OK)
+        self.assertEqual(r.context["rd"], document)
+
+    async def test_download_dropdown_excludes_ia_and_pacer(self) -> None:
+        entry = await sync_to_async(SCOTUSDocketEntryFactory)(
+            docket=self.docket
+        )
+        document = await sync_to_async(SCOTUSDocumentFactory)(
+            docket_entry=entry,
+            attachment_number=1,
+            filepath_local="recap_documents/test.pdf",
+            url="https://www.supremecourt.gov/DocketPDF/test.pdf",
+        )
+        r = await self.get(
+            docket_id=self.docket.id,
+            doc_num=document.document_number,
+            att_num=document.attachment_number,
+        )
+        content = r.content.decode()
+        self.assertNotIn("Internet Archive", content)
+        self.assertNotIn("Buy on PACER", content)
+        self.assertIn("From the Supreme Court", content)
+
+    async def test_admin_toolbar_links_to_scotus_admin_pages(self) -> None:
+        entry = await sync_to_async(SCOTUSDocketEntryFactory)(
+            docket=self.docket
+        )
+        document = await sync_to_async(SCOTUSDocumentFactory)(
+            docket_entry=entry, attachment_number=1
+        )
+        staff_user = await sync_to_async(UserFactory)(
+            is_staff=True, is_superuser=True
+        )
+        await self.async_client.aforce_login(staff_user)
+        r = await self.get(
+            docket_id=self.docket.id,
+            doc_num=document.document_number,
+            att_num=document.attachment_number,
+        )
+        content = r.content.decode()
+        self.assertIn(
+            reverse("admin:search_scotusdocketentry_change", args=[entry.pk]),
+            content,
+        )
+        self.assertIn(
+            reverse("admin:search_scotusdocument_change", args=[document.pk]),
+            content,
+        )
+        self.assertNotIn("search_docketentry_change", content)
+        self.assertNotIn("search_recapdocument_change", content)
+
+    async def test_entry_row_links_to_document_page(self) -> None:
+        entry = await sync_to_async(SCOTUSDocketEntryFactory)(
+            docket=self.docket
+        )
+        document = await sync_to_async(SCOTUSDocumentFactory)(
+            docket_entry=entry,
+            attachment_number=1,
+            filepath_local="recap_documents/test.pdf",
+        )
+        r = await self.async_client.get(
+            reverse("view_docket", args=[self.docket.pk, self.docket.slug])
+        )
+        self.assertEqual(r.status_code, HTTPStatus.OK)
+        self.assertContains(r, document.get_absolute_url())
+
+    def test_scotus_document_detail_urls_are_internal(self) -> None:
+        """Mirrors DocketEntryRowsV2Test.test_document_detail_urls_are_internal
+        for SCOTUS: _scotus_document_detail_url returns the document's own
+        CourtListener page when we have the file, and None otherwise --
+        never an externally-sourced URL."""
+        entry = SCOTUSDocketEntryFactory(docket=self.docket)
+        with_file = SCOTUSDocumentFactory(
+            docket_entry=entry,
+            attachment_number=1,
+            filepath_local="recap_documents/test.pdf",
+        )
+        without_file = SCOTUSDocumentFactory(
+            docket_entry=entry, attachment_number=2, filepath_local=""
+        )
+        self.assertEqual(
+            _scotus_document_detail_url(with_file),
+            with_file.get_absolute_url(),
+        )
+        self.assertIsNone(_scotus_document_detail_url(without_file))
+
+
+@override_settings(WAFFLE_CACHE_PREFIX="test_scotus_document_flag_waffle")
+@override_flag("scotus_docket_page", active=False)
+class ScotusDocumentFlagDisabledTest(TestCase):
+    "With the flag off, a SCOTUS document page must 404"
+
+    @classmethod
+    def setUpTestData(cls) -> None:
+        cls.court = CourtFactory(id="scotus", jurisdiction="F")
+        cls.docket = DocketFactory(court=cls.court, source=Docket.RECAP)
+        cls.entry = SCOTUSDocketEntryFactory(docket=cls.docket)
+        cls.document = SCOTUSDocumentFactory(
+            docket_entry=cls.entry, attachment_number=None
+        )
+        cls.other_court = CourtFactory(id="cadc", jurisdiction="F")
+        cls.other_docket = DocketFactory(
+            court=cls.other_court, source=Docket.RECAP
+        )
+        cls.other_entry = DocketEntryFactory(docket=cls.other_docket)
+        cls.other_document = RECAPDocumentFactory(docket_entry=cls.other_entry)
+
+    async def test_scotus_document_returns_404_when_flag_disabled(
+        self,
+    ) -> None:
+        r = await self.async_client.get(
+            reverse(
+                "view_recap_document",
+                kwargs={
+                    "docket_id": self.docket.pk,
+                    "doc_num": self.document.document_number,
+                    "slug": self.docket.slug,
+                },
+            )
+        )
+        self.assertEqual(r.status_code, HTTPStatus.NOT_FOUND)
+
+    async def test_other_court_document_unaffected_by_scotus_flag(
+        self,
+    ) -> None:
+        r = await self.async_client.get(
+            reverse(
+                "view_recap_document",
+                kwargs={
+                    "docket_id": self.other_docket.pk,
+                    "doc_num": self.other_document.document_number,
+                    "slug": self.other_docket.slug,
+                },
+            )
+        )
         self.assertEqual(r.status_code, HTTPStatus.OK)
 
 
@@ -1387,6 +1642,14 @@ class ViewRecapDocketTest(TestCase):
         )
         self.assertEqual(r.status_code, HTTPStatus.OK)
 
+    async def test_pray_and_pay_script_present_for_recap_docket(self) -> None:
+        """pray_and_pay.js has to load for a RECAP dockets."""
+        r = await self.async_client.get(
+            reverse("view_docket", args=[self.docket.pk, self.docket.slug])
+        )
+        self.assertEqual(r.status_code, HTTPStatus.OK)
+        self.assertIn("pray_and_pay.js", r.content.decode())
+
     async def test_appellate_docket_with_appeal_from_loads(self) -> None:
         """Regression for #7306: appellate docket loads in async view."""
         r = await self.async_client.get(
@@ -1460,6 +1723,398 @@ class ViewRecapDocketTest(TestCase):
         self.assertIn(
             "There were errors applying your filters", r.content.decode()
         )
+
+
+class DocketEntrySourceTest(TestCase):
+    """The per-court config that lets view_docket entries
+    without hardcoding RECAP-only model names.
+    """
+
+    @classmethod
+    def setUpTestData(cls) -> None:
+        cls.scotus_court = CourtFactory(id="scotus", jurisdiction="F")
+        cls.scotus_docket = DocketFactory(
+            court=cls.scotus_court, source=Docket.SCRAPER
+        )
+        cls.recap_court = CourtFactory(id="canb", jurisdiction="FB")
+        cls.recap_docket = DocketFactory(
+            court=cls.recap_court, source=Docket.RECAP
+        )
+
+    def test_resolves_scotus_source_for_scotus_court(self) -> None:
+        self.assertIs(
+            self.scotus_docket.get_entry_source(), docket_entry_sources.SCOTUS
+        )
+
+    def test_resolves_recap_source_for_other_courts(self) -> None:
+        self.assertIs(
+            self.recap_docket.get_entry_source(), docket_entry_sources.RECAP
+        )
+
+    def test_scotus_source_callables_execute_without_raising(self) -> None:
+        entry = SCOTUSDocketEntryFactory(docket=self.scotus_docket)
+        document = SCOTUSDocumentFactory(docket_entry=entry)
+        source = self.scotus_docket.get_entry_source()
+        entries = list(source.entries_queryset(self.scotus_docket))
+        self.assertIn(entry, entries)
+        documents = list(source.documents_for_entry(entry))
+        self.assertIn(document, documents)
+
+    def test_recap_source_callables_execute_without_raising(self) -> None:
+        entry = DocketEntryFactory(docket=self.recap_docket)
+        document = RECAPDocumentFactory(docket_entry=entry)
+        source = self.recap_docket.get_entry_source()
+        entries = list(source.entries_queryset(self.recap_docket))
+        self.assertIn(entry, entries)
+        documents = list(source.documents_for_entry(entry))
+        self.assertIn(document, documents)
+
+    def test_scotus_source_document_callables_execute_without_raising(
+        self,
+    ) -> None:
+        entry = SCOTUSDocketEntryFactory(docket=self.scotus_docket)
+        document = SCOTUSDocumentFactory(
+            docket_entry=entry, attachment_number=None
+        )
+        source = self.scotus_docket.get_entry_source()
+        documents = list(
+            source.documents_for_docket_and_number(
+                self.scotus_docket.pk, document.document_number
+            )
+        )
+        self.assertIn(document.pk, [d.pk for d in documents])
+        rendered = async_to_sync(source.get_document_for_render)(document.pk)
+        self.assertEqual(rendered.pk, document.pk)
+
+    def test_recap_source_document_callables_execute_without_raising(
+        self,
+    ) -> None:
+        entry = DocketEntryFactory(docket=self.recap_docket)
+        document = RECAPDocumentFactory(docket_entry=entry)
+        source = self.recap_docket.get_entry_source()
+        documents = list(
+            source.documents_for_docket_and_number(
+                self.recap_docket.pk, document.document_number
+            )
+        )
+        self.assertIn(document.pk, [d.pk for d in documents])
+        rendered = async_to_sync(source.get_document_for_render)(document.pk)
+        self.assertEqual(rendered.pk, document.pk)
+
+
+class DocumentUrlTest(SimpleTestCase):
+    def test_builds_main_document_url(self) -> None:
+        url = document_url(1, "some-slug", "3", None)
+        self.assertEqual(url, "/docket/1/3/some-slug/")
+
+    def test_builds_attachment_url(self) -> None:
+        url = document_url(1, "some-slug", "3", 2)
+        self.assertEqual(url, "/docket/1/3/2/some-slug/")
+
+
+class DocketSourceComponentTest(SimpleTestCase):
+    """Every DocketEntrySource needs a file in each per-source component
+    folder of both template stacks, or the dispatch (c-component on the
+    cotton side, {% include %} on the legacy side) only fails at render
+    time."""
+
+    FOLDERS = {
+        "cotton": (
+            "docket_source_button",
+            "docket_source_attribution",
+            "document_source_link",
+        ),
+        "includes": (
+            "docket_source_button",
+            "docket_source_attribution",
+            "document_source_link",
+            "docket_empty_message",
+            "docket_empty_cta",
+            "docket_source_li",
+            "document_download_button",
+            "document_unavailable_message",
+        ),
+    }
+
+    def test_every_source_resolves_its_components(self) -> None:
+        sources = {
+            docket_entry_sources.RECAP,
+            *docket_entry_sources.BY_COURT_ID.values(),
+        }
+        for prefix, folders in self.FOLDERS.items():
+            for source, folder in product(sources, folders):
+                path = f"{prefix}/{folder}/{source.component}.html"
+                with self.subTest(path=path):
+                    try:
+                        get_template(path)
+                    except TemplateDoesNotExist:
+                        self.fail(
+                            f"Source component {source.component!r} has no "
+                            f"{path}. A component needs a file in each of "
+                            f"{', '.join(folders)} under {prefix}/."
+                        )
+
+
+@override_settings(WAFFLE_CACHE_PREFIX="test_scotus_docket_disabled_waffle")
+@override_flag("scotus_docket_page", active=False)
+class ScotusDocketFlagDisabledTest(TestCase):
+    """With the flag off, a SCOTUS docket must 404 so the
+    public can't tell the page exists yet.
+    """
+
+    @classmethod
+    def setUpTestData(cls) -> None:
+        cls.court = CourtFactory(id="scotus", jurisdiction="F")
+        cls.docket = DocketFactory(court=cls.court, source=Docket.RECAP)
+        cls.other_court = CourtFactory(id="canb", jurisdiction="FB")
+        cls.other_docket = DocketFactory(
+            court=cls.other_court, source=Docket.RECAP
+        )
+
+    async def test_scotus_docket_returns_404_when_flag_disabled(
+        self,
+    ) -> None:
+        r = await self.async_client.get(
+            reverse("view_docket", args=[self.docket.pk, self.docket.slug])
+        )
+        self.assertEqual(r.status_code, HTTPStatus.NOT_FOUND)
+
+    async def test_other_court_docket_unaffected_by_scotus_flag(
+        self,
+    ) -> None:
+        """The flag is scoped to SCOTUS; every other court must render as
+        usual regardless of its state."""
+        r = await self.async_client.get(
+            reverse(
+                "view_docket",
+                args=[self.other_docket.pk, self.other_docket.slug],
+            )
+        )
+        self.assertEqual(r.status_code, HTTPStatus.OK)
+
+    async def test_sibling_tab_views_also_404_when_flag_disabled(
+        self,
+    ) -> None:
+        """The flag check lives in core_docket_data(), so
+        every view that shares it must 404 (not only view_docket).
+        """
+        # view_download_docket requires login.
+        user = await sync_to_async(UserFactory)()
+        await self.async_client.aforce_login(user)
+        for url_name, kwargs in (
+            (
+                "docket_parties",
+                {"docket_id": self.docket.pk, "slug": self.docket.slug},
+            ),
+            (
+                "docket_idb_data",
+                {"docket_id": self.docket.pk, "slug": self.docket.slug},
+            ),
+            (
+                "docket_authorities",
+                {"docket_id": self.docket.pk, "slug": self.docket.slug},
+            ),
+            ("view_download_docket", {"docket_id": self.docket.pk}),
+        ):
+            with self.subTest(url_name=url_name):
+                r = await self.async_client.get(
+                    reverse(url_name, kwargs=kwargs)
+                )
+                self.assertEqual(r.status_code, HTTPStatus.NOT_FOUND)
+
+
+@override_settings(WAFFLE_CACHE_PREFIX="test_scotus_docket_enabled_waffle")
+@override_flag("scotus_docket_page", active=True)
+class ScotusDocketFlagEnabledTest(TestCase):
+    """Users with the flag on should see the normal docket
+    page flow for SCOTUS dockets.
+    """
+
+    @classmethod
+    def setUpTestData(cls) -> None:
+        cls.court = CourtFactory(id="scotus", jurisdiction="F")
+        cls.docket = DocketFactory(court=cls.court, source=Docket.SCRAPER)
+
+    async def test_scotus_docket_renders_when_flag_enabled(self) -> None:
+        r = await self.async_client.get(
+            reverse("view_docket", args=[self.docket.pk, self.docket.slug])
+        )
+        self.assertEqual(r.status_code, HTTPStatus.OK)
+
+    async def test_docket_toolbar_renders_on_non_entries_tabs(self) -> None:
+        """The docket toolbar (notes/tags/alerts/source button) is gated on
+        docket_source_url or docket_entries. docket_entries is only in
+        context on the entries tab, and pacer_docket_url is None for
+        SCOTUS, so tabs like Parties must gate on the source-agnostic
+        docket_source_url or the toolbar silently disappears there.
+        """
+        r = await self.async_client.get(
+            reverse(
+                "docket_parties",
+                kwargs={
+                    "docket_id": self.docket.pk,
+                    "slug": self.docket.slug,
+                },
+            )
+        )
+        self.assertEqual(r.status_code, HTTPStatus.OK)
+        self.assertIn("View in SCOTUS", r.content.decode())
+
+    async def test_scotus_entries_and_documents_render(self) -> None:
+        """SCOTUSDocketEntry/SCOTUSDocument content shows up on the docket
+        page template, and PACER-only UI is hidden. Docket alerts are not
+        PACER-only, so that button stays."""
+        entry = await sync_to_async(SCOTUSDocketEntryFactory)(
+            docket=self.docket,
+            description="Petition for a writ of certiorari filed.",
+        )
+        await sync_to_async(SCOTUSDocumentFactory)(
+            docket_entry=entry,
+            document_number=1,
+            description="Petition for certiorari",
+        )
+        await sync_to_async(ScotusDocketMetadataFactory)(
+            docket=self.docket,
+            capital_case=True,
+            linked_with="No. 23-999",
+        )
+
+        r = await self.async_client.get(
+            reverse("view_docket", args=[self.docket.pk, self.docket.slug])
+        )
+        content = r.content.decode()
+
+        self.assertEqual(r.status_code, HTTPStatus.OK)
+        self.assertIn("Petition for a writ of certiorari filed.", content)
+        self.assertIn("Petition for certiorari", content)
+        self.assertIn("Capital Case", content)
+        self.assertIn("No. 23-999", content)
+        self.assertIn("Export CSV", content)
+        self.assertNotIn("Buy on PACER", content)
+        self.assertNotIn("Buy Docket on PACER", content)
+        self.assertIn("Get Alerts", content)
+        self.assertNotIn("prayer-button", content)
+        self.assertNotIn("pray_and_pay.js", content)
+        self.assertIn("View in SCOTUS", content)
+        self.assertNotIn(
+            'sourced from <a href="https://www.pacer.gov">PACER</a>',
+            content,
+        )
+        self.assertIn(
+            "sourced from the Supreme Court of the United States", content
+        )
+
+    async def test_scotus_docket_entry_filters_still_work(self) -> None:
+        """filters must work against SCOTUSDocketEntry field names
+        (entry_number/date_filed), not just DocketEntry's."""
+        entry1 = await sync_to_async(SCOTUSDocketEntryFactory)(
+            docket=self.docket, entry_number=1
+        )
+        entry2 = await sync_to_async(SCOTUSDocketEntryFactory)(
+            docket=self.docket, entry_number=99
+        )
+
+        r = await self.async_client.get(
+            reverse("view_docket", args=[self.docket.pk, self.docket.slug]),
+            {"entry_gte": 50},
+        )
+        self.assertEqual(r.status_code, HTTPStatus.OK)
+        entries = list(r.context["docket_entries"])
+        self.assertEqual([e.pk for e in entries], [entry2.pk])
+        self.assertNotIn(entry1.pk, [e.pk for e in entries])
+
+    async def test_scotus_docket_default_order_matches_sort_flag(
+        self,
+    ) -> None:
+        """SCOTUSDocketEntry.Meta.ordering defaults to descending
+        (opposite of DocketEntry's ascending), so without an explicit
+        order_by the queryset must not silently contradict the
+        sort_order_asc flag rendered in the template."""
+        entry_a = await sync_to_async(SCOTUSDocketEntryFactory)(
+            docket=self.docket, sequence_number="00000001"
+        )
+        entry_b = await sync_to_async(SCOTUSDocketEntryFactory)(
+            docket=self.docket, sequence_number="00000002"
+        )
+
+        r = await self.async_client.get(
+            reverse("view_docket", args=[self.docket.pk, self.docket.slug])
+        )
+        self.assertEqual(r.status_code, HTTPStatus.OK)
+        self.assertTrue(r.context["sort_order_asc"])
+        entries = list(r.context["docket_entries"])
+        self.assertEqual([e.pk for e in entries], [entry_a.pk, entry_b.pk])
+
+    async def test_scotus_docket_explicit_descending_order(self) -> None:
+        entry_a = await sync_to_async(SCOTUSDocketEntryFactory)(
+            docket=self.docket, sequence_number="00000001"
+        )
+        entry_b = await sync_to_async(SCOTUSDocketEntryFactory)(
+            docket=self.docket, sequence_number="00000002"
+        )
+
+        r = await self.async_client.get(
+            reverse("view_docket", args=[self.docket.pk, self.docket.slug]),
+            {"order_by": "desc"},
+        )
+        self.assertEqual(r.status_code, HTTPStatus.OK)
+        self.assertFalse(r.context["sort_order_asc"])
+        entries = list(r.context["docket_entries"])
+        self.assertEqual([e.pk for e in entries], [entry_b.pk, entry_a.pk])
+
+
+@override_settings(WAFFLE_CACHE_PREFIX="test_scotus_docket_v2_waffle")
+@override_flag("scotus_docket_page", active=True)
+@override_flag("use_new_design", active=True)
+class ScotusDocketV2ContentRenderTest(TestCase):
+    """The v2/Cotton docket page must get the same SCOTUS treatment
+    as the legacy template - entries/documents/metadata render,
+    PACER-only UI is hidden. Docket alerts are not PACER-only, so that
+    button stays.
+    """
+
+    @classmethod
+    def setUpTestData(cls) -> None:
+        cls.court = CourtFactory(id="scotus", jurisdiction="F")
+        cls.docket = DocketFactory(court=cls.court, source=Docket.SCRAPER)
+        cls.user = UserWithChildProfileFactory.create()
+
+    async def test_scotus_entries_and_documents_render_in_v2(self) -> None:
+        await self.async_client.aforce_login(self.user)
+        entry = await sync_to_async(SCOTUSDocketEntryFactory)(
+            docket=self.docket,
+            description="Petition for a writ of certiorari filed.",
+        )
+        await sync_to_async(SCOTUSDocumentFactory)(
+            docket_entry=entry,
+            document_number=1,
+            description="Petition for certiorari",
+        )
+        await sync_to_async(ScotusDocketMetadataFactory)(
+            docket=self.docket,
+            capital_case=True,
+            linked_with="No. 23-999",
+        )
+
+        r = await self.async_client.get(
+            reverse("view_docket", args=[self.docket.pk, self.docket.slug])
+        )
+        content = r.content.decode()
+
+        self.assertEqual(r.status_code, HTTPStatus.OK)
+        self.assertTemplateUsed(r, "v2_docket.html")
+        self.assertIn("Petition for a writ of certiorari filed.", content)
+        self.assertIn("Petition for certiorari", content)
+        self.assertIn("Capital Case", content)
+        self.assertIn("No. 23-999", content)
+        self.assertIn("Export CSV", content)
+        self.assertNotIn("Buy on PACER", content)
+        self.assertIn("Get Alerts", content)
+        self.assertIn("View in SCOTUS", content)
+        self.assertIn(
+            "sourced from the Supreme Court of the United States", content
+        )
+        self.assertIn(settings.WIKI_COVERAGE_SCOTUS_URL, content)
 
 
 class OgRedirectLookupViewTest(TestCase):
@@ -2754,6 +3409,52 @@ class DocketEntryFileDownload(TestCase):
         response = self.client.get(download_path)
         self.assertRedirects(response, redirect_path)
 
+    @override_settings(
+        WAFFLE_CACHE_PREFIX="test_csv_export_scotus_docket_waffle"
+    )
+    @override_flag("scotus_docket_page", active=True)
+    def test_csv_export_return_gracefully_for_scotus_docket(self) -> None:
+        """SCOTUSDocketEntry/SCOTUSDocument don't implement CSV
+        export yet, but the button should stay visible. Clicking
+        it must return a handled error status.
+        """
+        scotus_court = CourtFactory(id="scotus", jurisdiction="F")
+        scotus_docket = DocketFactory(
+            court=scotus_court, source=Docket.SCRAPER
+        )
+        entry = SCOTUSDocketEntryFactory(docket=scotus_docket)
+        SCOTUSDocumentFactory(docket_entry=entry)
+        self.client.login(username=self.user.username, password="password")
+
+        response = self.client.get(
+            reverse(
+                "view_download_docket",
+                kwargs={"docket_id": scotus_docket.id},
+            )
+        )
+        self.assertEqual(response.status_code, HTTPStatus.NOT_IMPLEMENTED)
+
+    def test_csv_export_real_bug_still_surfaces_for_recap_docket(
+        self,
+    ) -> None:
+        """The SCOTUS error catch must not mask a real bug in the
+        RECAP CSV path. That should still raise, not quietly
+        return a handled 501.
+        """
+        self.client.login(username=self.user.username, password="password")
+
+        with mock.patch(
+            "cl.opinion_page.views.generate_docket_entries_csv_data",
+            side_effect=AttributeError("boom"),
+        ):
+            with self.assertRaises(AttributeError):
+                self.client.get(
+                    reverse(
+                        "view_download_docket",
+                        kwargs={"docket_id": self.mocked_docket.id},
+                    )
+                )
+
 
 class CachePageIgnoreParamsTest(TestCase):
     """Test the cache_page_ignore_params decorator."""
@@ -2987,6 +3688,65 @@ class BuildOriginatingCourtMetadataTest(TestCase):
         self.assertNotIn("suffix_url", appealed_from)
 
 
+class BuildScotusMetadataTest(TestCase):
+    """Test the build_scotus_metadata helper function."""
+
+    @classmethod
+    def setUpTestData(cls) -> None:
+        cls.court = CourtFactory(id="scotus", jurisdiction="F")
+        cls.docket = DocketFactory(court=cls.court, source=Docket.SCRAPER)
+
+    def test_returns_empty_when_no_scotus_metadata(self) -> None:
+        self.assertEqual(build_scotus_metadata(None), [])
+
+    def test_renders_capital_case(self) -> None:
+        scotus_metadata = ScotusDocketMetadataFactory(
+            docket=self.docket, capital_case=True
+        )
+        items = build_scotus_metadata(scotus_metadata)
+        capital_case = next(i for i in items if i["label"] == "Capital Case")
+        self.assertEqual(capital_case["value"], "Yes")
+
+    def test_omits_capital_case_when_false(self) -> None:
+        scotus_metadata = ScotusDocketMetadataFactory(
+            docket=self.docket, capital_case=False
+        )
+        items = build_scotus_metadata(scotus_metadata)
+        self.assertFalse(any(i["label"] == "Capital Case" for i in items))
+
+    def test_renders_linked_with(self) -> None:
+        scotus_metadata = ScotusDocketMetadataFactory(
+            docket=self.docket, linked_with="No. 23-456"
+        )
+        items = build_scotus_metadata(scotus_metadata)
+        linked_with = next(i for i in items if i["label"] == "Linked With")
+        self.assertEqual(linked_with["value"], "No. 23-456")
+
+    def test_renders_questions_presented_url_as_external_link(self) -> None:
+        scotus_metadata = ScotusDocketMetadataFactory(
+            docket=self.docket,
+            questions_presented_url="https://example.com/qp.pdf",
+        )
+        items = build_scotus_metadata(scotus_metadata)
+        qp = next(i for i in items if i["label"] == "Questions Presented")
+        self.assertEqual(qp["url"], "https://example.com/qp.pdf")
+        self.assertTrue(qp["is_external"])
+
+    def test_omits_questions_presented_url_with_unsafe_scheme(self) -> None:
+        """questions_presented_url is ingested straight
+        from the SCOTUS scraper. A invalid URL must never reach
+        the rendered href.
+        """
+        scotus_metadata = ScotusDocketMetadataFactory(
+            docket=self.docket,
+            questions_presented_url="javascript:alert(1)",
+        )
+        items = build_scotus_metadata(scotus_metadata)
+        self.assertFalse(
+            any(i["label"] == "Questions Presented" for i in items)
+        )
+
+
 class BuildDocketTabsTest(SimpleTestCase):
     """Test the build_docket_tabs helper function."""
 
@@ -3073,7 +3833,7 @@ class DocketPageV2TemplateTest(TestCase):
         self.assertIn("Contract", content)
 
     async def test_v2_docket_metadata_in_context(self) -> None:
-        """The view should pass metadata and tabs to the template."""
+        """The view should pass metadata sections and tabs to the template."""
         r = await self.async_client.get(
             reverse(
                 "view_docket",
@@ -3081,9 +3841,9 @@ class DocketPageV2TemplateTest(TestCase):
             )
         )
         self.assertTemplateUsed(r, "v2_docket.html")
-        self.assertIn("metadata", r.context)
+        self.assertIn("metadata_sections", r.context)
         self.assertIn("tabs", r.context)
-        self.assertTrue(len(r.context["metadata"]) > 0)
+        self.assertTrue(len(r.context["metadata_sections"]) > 0)
         self.assertTrue(len(r.context["tabs"]) > 0)
 
 
@@ -3144,13 +3904,26 @@ class DocketEntryRowsV2Test(TestCase):
             pacer_doc_id="12347",
         )
 
-        # Entry 2: minute entry (no entry_number, no documents)
+        # Entry 2: minute entry (no entry_number)
         cls.minute_entry = DocketEntryFactory(
             docket=cls.docket,
             entry_number=None,
             date_filed=date(2024, 4, 21),
             description="Case Assigned to Judge Smith",
         )
+        # Numberless minute-entry document: not individually addressable on
+        # PACER, so it gets no action buttons. Built and saved by hand
+        # because RECAPDocumentFactory's _create hook backfills a
+        # document_number (and an entry_number on the entry) whenever it
+        # finds neither, which is exactly the state under test.
+        cls.rd_numberless = RECAPDocumentFactory.build(
+            docket_entry=cls.minute_entry,
+            document_number="",
+            document_type=RECAPDocument.PACER_DOCUMENT,
+            description="Numberless minute entry document",
+            pacer_doc_id="",
+        )
+        cls.rd_numberless.save()
 
     async def _get_docket_page(self) -> str:
         r = await self.async_client.get(
@@ -3206,6 +3979,24 @@ class DocketEntryRowsV2Test(TestCase):
         self.assertIn("Case Assigned to Judge Smith", content)
         self.assertIn(f'id="minute-entry-{self.minute_entry.pk}"', content)
 
+    async def test_numberless_document_renders_no_action_buttons(
+        self,
+    ) -> None:
+        """A numberless document should render none of its action buttons."""
+        content = await self._get_docket_page()
+        # The assertion is on the document's own PACER URL rather than on the
+        # string "Buy on PACER", because the other fixture documents
+        # legitimately render that button on the same page.
+        pacer_url = await sync_to_async(lambda: self.rd_numberless.pacer_url)()
+        self.assertNotIn(pacer_url, content)
+
+    async def test_numberless_document_still_renders_its_description(
+        self,
+    ) -> None:
+        """The guard drops a numberless document's buttons, not its row."""
+        content = await self._get_docket_page()
+        self.assertIn(self.rd_numberless.description, content)
+
     async def test_empty_state(self) -> None:
         """Empty state message should show when no entries exist."""
         empty_docket = await sync_to_async(DocketFactory)(
@@ -3243,6 +4034,28 @@ class DocketEntryRowsV2Test(TestCase):
         self.assertIn('<ol role="list"', content)
         self.assertIn('<ul role="list"', content)
 
+    def test_document_detail_urls_are_internal(self) -> None:
+        """Detail URLs must be CourtListener paths, since the template renders
+        them unfiltered into an href.
+
+        SCOTUS is covered separately, in ViewSCOTUSDocumentTest's
+        test_scotus_document_detail_urls_are_internal.
+        """
+        documents = [
+            self.rd_has_pdf,
+            self.rd_pacer_only,
+            self.rd_sealed,
+            self.rd_numberless,
+        ]
+        for document in documents:
+            with self.subTest(document=document.pk):
+                detail_url = _recap_document_detail_url(document)
+                if detail_url is not None:
+                    self.assertTrue(
+                        detail_url.startswith("/"),
+                        msg=f"{detail_url} is not an internal path.",
+                    )
+
 
 class DocketFilterDrawerAttrPropagationTest(TestCase):
     """The mobile filter drawer auto-opens when a filter submission fails
@@ -3279,6 +4092,7 @@ class DocketFilterDrawerAttrPropagationTest(TestCase):
         return template.render(
             {
                 "docket": self.docket,
+                "docket_source": docket_entry_sources.RECAP,
                 "form": form,
                 "page_obj": self.empty_page,
                 "request": request,

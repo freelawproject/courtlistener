@@ -1,0 +1,2 @@
+{# Pure dispatch to the source-specific "view this docket at its source" dropdown item, for docket lists that mix sources (see docket_li.html). Resolves the component per row because each docket may have a different source. #}
+{% include "includes/docket_source_li/"|add:docket.get_entry_source.component|add:".html" %}

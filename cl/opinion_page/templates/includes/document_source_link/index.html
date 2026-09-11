@@ -1,0 +1,4 @@
+{# Gates on document.external_url once, then dispatches to the source-specific partial. Callers pass document, docket_source, and variant (menu_item/check_availability/button). #}
+{% if document.external_url %}
+  {% include "includes/document_source_link/"|add:docket_source.component|add:".html" with document=document variant=variant %}
+{% endif %}

@@ -24,7 +24,7 @@ from django.core.mail import (
     get_connection,
     send_mail,
 )
-from django.test import AsyncClient
+from django.test import AsyncClient, RequestFactory
 from django.test.client import Client
 from django.test.utils import override_settings
 from django.urls import reverse
@@ -93,7 +93,7 @@ from cl.tests.cases import (
 from cl.tests.utils import MockResponse as MockPostResponse
 from cl.tests.utils import make_session_client
 from cl.users import signals as user_signals
-from cl.users.admin import UserAdmin
+from cl.users.admin import UserAdmin, UserProfileInline
 from cl.users.email_handlers import (
     add_bcc_random,
     get_email_body,
@@ -4427,6 +4427,32 @@ class UserAdminApiCallsCountTest(TestCase):
         mock_get_redis.return_value = mock_redis
         result = self.user_admin.api_calls_count(self.user)
         self.assertEqual(result, 0)
+
+
+class UserProfileAdminActivationKeyTest(TestCase):
+    """Tests that the admin can save a profile with a spent activation key.
+
+    Regression test for #7831: confirm_email() blanks activation_key once it
+    has been used (GHSA-638g-xf9h-6qcg), but the field was required, so the
+    User admin page could not be saved for any confirmed account.
+    """
+
+    @classmethod
+    def setUpTestData(cls) -> None:
+        cls.profile = UserProfileWithParentsFactory.create()
+
+    def test_blank_activation_key_passes_model_validation(self) -> None:
+        """Does a spent (blank) activation key survive full_clean()?"""
+        self.profile.activation_key = ""
+        # Raises ValidationError, failing the test, if the field is required.
+        self.profile.full_clean()
+
+    def test_admin_inline_does_not_require_an_activation_key(self) -> None:
+        """Is activation_key optional on the User admin's profile inline?"""
+        request = RequestFactory().get("/")
+        request.user = self.profile.user
+        formset = UserProfileInline(User, admin.site).get_formset(request)
+        self.assertFalse(formset.form.base_fields["activation_key"].required)
 
 
 class UserProfileTotalApiUsageTest(TestCase):

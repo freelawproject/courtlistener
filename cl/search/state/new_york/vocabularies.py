@@ -19,13 +19,19 @@ Juriscraper's members instead. Their codes are published the same way and are
 never renumbered or reused.
 
 `UNKNOWN` and `UNASSIGNED` are reserved in every vocabulary and belong to no
-member. Juriscraper reports both cases as `None` -- it has nothing to say --
-and the raw string stored beside each of these fields is what tells them apart:
+member:
 
 * `UNKNOWN`: the Court stated nothing. No FILINGS row named the filing, the
   filing type implies no role, the file name carried no readable document type.
 * `UNASSIGNED`: the Court stated something the vocabulary does not cover, which
   is the signal that a member needs adding -- upstream, and then here.
+
+Juriscraper reports both cases as `None` -- it has nothing to say. Which one it
+is, the scrape schema decides, since that is where the raw string the Court
+printed is still at hand;
+`cl.corpus_importer.state.new_york.nycourts_gov.Unclassified` is what it reports
+and it borrows the two names below, so that a member of either kind maps onto a
+code the same way. See `cl.corpus_importer.state.new_york.utils.mirrored_code`.
 """
 
 from django.db import models

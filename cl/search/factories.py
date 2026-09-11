@@ -39,6 +39,7 @@ from cl.search.models import (
     ParentheticalGroup,
     RECAPDocument,
     SCOTUSDocketEntry,
+    ScotusDocketMetadata,
     SCOTUSDocument,
     TrialCourtData,
 )
@@ -394,10 +395,31 @@ class SCOTUSDocumentFactory(DjangoModelFactory):
         model = SCOTUSDocument
 
     docket_entry = SubFactory(SCOTUSDocketEntryFactory)
-    document_number = Faker("random_int", min=1, max=1000)
     attachment_number = Faker("random_int", min=1, max=10)
     url = Faker("url")
     description = Faker("text", max_nb_chars=20)
+
+    @classmethod
+    def _create(cls, model_class, *args, **kwargs):
+        obj = model_class(*args, **kwargs)
+        cls._fixup(obj)
+        obj.save()
+        return obj
+
+    @classmethod
+    def _fixup(cls, obj):
+        if not obj.document_number and (de := obj.docket_entry):
+            obj.document_number = de.entry_number
+
+
+class ScotusDocketMetadataFactory(DjangoModelFactory):
+    class Meta:
+        model = ScotusDocketMetadata
+
+    docket = SubFactory(DocketFactory)
+    capital_case = False
+    linked_with = ""
+    questions_presented_url = ""
 
 
 class OpinionsCitedByRECAPDocumentFactory(DjangoModelFactory):
@@ -492,9 +514,11 @@ class CaseTransferFactory(DjangoModelFactory):
     origin_docket = SubFactory(DocketFactory)
     destination_court = SubFactory(CourtFactory)
     destination_docket_number = LazyAttribute(
-        lambda ct: ct.destination_docket.docket_number
-        if ct.destination_docket
-        else None
+        lambda ct: (
+            ct.destination_docket.docket_number
+            if ct.destination_docket
+            else None
+        )
     )
     destination_docket = SubFactory(DocketFactory)
     transfer_date = Faker("date_object")
