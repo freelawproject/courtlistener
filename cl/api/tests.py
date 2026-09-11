@@ -589,6 +589,9 @@ class ApiQueryCountTests(TestCase):
         api_prefix = "api:test_counts.count"
         r.set(api_prefix, 101)
         self.clear_query_caches()
+        # This call is a bit arbitrary, and intended to warm caches
+        # so that we have consistent cache behavior for tests.
+        self.client.get(reverse("audio-list", kwargs={"version": "v3"}))
 
     def tearDown(self) -> None:
         UserProfile.objects.all().delete()

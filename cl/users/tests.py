@@ -4495,6 +4495,18 @@ class ViewApiUsageTest(TestCase):
     """Tests for /profile/api-usage/."""
 
     @classmethod
+    def setUpClass(cls) -> None:
+        super().setUpClass()
+        # get_all_throttle_overrides() gets its own @tiered_cache namespace
+        # so that parallel test don't clobber each other.
+        patcher = mock.patch(
+            "cl.lib.decorators.get_tiered_cache_prefix",
+            new=lambda: "tiered_view_api_usage_test",
+        )
+        patcher.start()
+        cls.addClassCleanup(patcher.stop)
+
+    @classmethod
     def setUpTestData(cls) -> None:
         cls.user = UserProfileWithParentsFactory.create().user
         cls.user.set_password("password")

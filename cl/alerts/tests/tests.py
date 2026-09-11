@@ -88,7 +88,6 @@ from cl.search.factories import (
 )
 from cl.search.models import (
     PRECEDENTIAL_STATUS,
-    Court,
     Docket,
     DocketEntry,
     RECAPDocument,
@@ -945,7 +944,7 @@ class DocketAlertTest(TestCase):
     @classmethod
     def setUpTestData(cls) -> None:
         cls.user = UserFactory()
-        cls.court = Court.objects.get(id="scotus")
+        cls.court = CourtFactory(id="scotus", jurisdiction="F")
 
         # Create a DOCKET_ALERT webhook
         cls.webhook = WebhookFactory(
@@ -2689,7 +2688,7 @@ class DocketAlertAPITests(APITestCase):
         cls.user_1 = UserFactory()
         cls.user_2 = UserFactory()
 
-        cls.court = Court.objects.get(id="scotus")
+        cls.court = CourtFactory(id="scotus", jurisdiction="F")
         cls.docket = DocketFactory(
             case_name="BARTON v. State Board for Rodgers Educator Certification",
             docket_number_core="0600078",
@@ -3373,7 +3372,7 @@ class DocketAlertGetNotesTagsTests(TestCase):
     def setUpTestData(cls) -> None:
         cls.user_1 = UserFactory()
         cls.user_2 = UserFactory()
-        cls.court = Court.objects.get(id="scotus")
+        cls.court = CourtFactory(id="scotus", jurisdiction="F")
         cls.docket_1 = DocketFactory(
             court=cls.court,
         )
@@ -3645,24 +3644,24 @@ class SearchAlertsOAESTests(
         # Two OA search alert emails should be sent, one for user_profile and
         # one for user_profile_2
         self.assertEqual(len(mail.outbox), 2)
-        text_content = mail.outbox[0].body
-        self.assertEqual(
-            mail.outbox[0].subject,
-            f"1 Alert has hits: {self.search_alert.name}",
-        )
+        emails_by_subject = {email.subject: email for email in mail.outbox}
+        alert_subject = f"1 Alert has hits: {self.search_alert.name}"
+        self.assertIn(alert_subject, emails_by_subject)
+        alert_email = emails_by_subject[alert_subject]
+        text_content = alert_email.body
 
         self.assertIn(rt_oral_argument.case_name, text_content)
 
         # Should have the List-Unsubscribe-Post and List-Unsubscribe header
         # because the email only includes one alert.
-        self.assertIn("List-Unsubscribe", mail.outbox[0].extra_headers)
-        self.assertIn("List-Unsubscribe-Post", mail.outbox[0].extra_headers)
+        self.assertIn("List-Unsubscribe", alert_email.extra_headers)
+        self.assertIn("List-Unsubscribe-Post", alert_email.extra_headers)
         unsubscribe_url = reverse(
             "one_click_disable_alert", args=[self.search_alert.secret_key]
         )
         self.assertIn(
             unsubscribe_url,
-            mail.outbox[0].extra_headers["List-Unsubscribe"],
+            alert_email.extra_headers["List-Unsubscribe"],
         )
 
         # Highlighting tags are not set in text version
@@ -3670,7 +3669,7 @@ class SearchAlertsOAESTests(
 
         # Extract HTML version.
         html_content = None
-        for content, content_type in mail.outbox[0].alternatives:
+        for content, content_type in alert_email.alternatives:
             if content_type == "text/html":
                 html_content = content
                 break
@@ -3705,7 +3704,14 @@ class SearchAlertsOAESTests(
         self.assertEqual(len(webhook_events), 4)
 
         # Compare webhook content.
-        content = webhook_events[0].content
+        matching = [
+            event.content
+            for event in webhook_events
+            if event.content["payload"]["alert"]["query"]
+            == self.search_alert.query
+        ]
+        self.assertEqual(len(matching), 1)
+        content = matching[0]
         self.assertEqual(
             content["payload"]["alert"]["query"], self.search_alert.query
         )
@@ -3834,7 +3840,8 @@ class SearchAlertsOAESTests(
         # Two OA search alert emails should be sent, one for user_profile and
         # one for user_profile_2
         self.assertEqual(len(mail.outbox), 2)
-        text_content = mail.outbox[0].body
+        emails_by_recipient = {email.to[0]: email for email in mail.outbox}
+        text_content = emails_by_recipient[self.user_profile.user.email].body
         self.assertIn(rt_oral_argument.case_name, text_content)
 
         # 4 webhook events should be sent to user_profile.
@@ -3862,7 +3869,8 @@ class SearchAlertsOAESTests(
         call_command("cl_send_rt_percolator_alerts", testing_mode=True)
         # New alerts shouldn't be sent. Since document was just updated.
         self.assertEqual(len(mail.outbox), 2)
-        text_content = mail.outbox[0].body
+        emails_by_recipient = {email.to[0]: email for email in mail.outbox}
+        text_content = emails_by_recipient[self.user_profile.user.email].body
         self.assertIn(rt_oral_argument.case_name, text_content)
 
         # No new webhook events should be triggered.
@@ -4813,29 +4821,32 @@ class SearchAlertsOAESTests(
 
         # Two emails should be sent, one for user_profile and one for user_profile_2
         self.assertEqual(len(mail.outbox), 2)
+        emails_by_recipient = {email.to[0]: email for email in mail.outbox}
+        first_email = emails_by_recipient[self.user_profile.user.email]
+        second_email = emails_by_recipient[self.user_profile_2.user.email]
 
         # Confirm emails contains the hits+ count.
         self.assertIn(
             f"had {settings.SCHEDULED_ALERT_HITS_LIMIT}+ hits",
-            mail.outbox[0].body,
+            first_email.body,
         )
         # No "+" if hits do not reach the SCHEDULED_ALERT_HITS_LIMIT.
         self.assertIn(
             "had 2 hits",
-            mail.outbox[1].body,
+            second_email.body,
         )
 
         # Confirm each email contains the max number of hits for each alert.
         self.assertEqual(
-            mail.outbox[0].body.count("USA vs Bank"),
+            first_email.body.count("USA vs Bank"),
             settings.SCHEDULED_ALERT_HITS_LIMIT,
         )
         self.assertEqual(
-            mail.outbox[0].body.count("Texas vs Corp"),
+            first_email.body.count("Texas vs Corp"),
             2,
         )
         self.assertEqual(
-            mail.outbox[1].body.count("Texas vs Corp"),
+            second_email.body.count("Texas vs Corp"),
             2,
         )
 
