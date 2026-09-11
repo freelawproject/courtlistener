@@ -52,10 +52,8 @@ from cl.lib.test_helpers import (
     SimpleUserDataMixin,
     SitemapTest,
 )
-from cl.opinion_page.docket_sources_utils import (
-    _SOURCES_BY_COURT_ID,
-    RECAP_SOURCE,
-    SCOTUS_SOURCE,
+from cl.opinion_page import docket_entry_sources
+from cl.opinion_page.docket_entry_sources import (
     _recap_document_detail_url,
     _scotus_document_detail_url,
     build_scotus_metadata,
@@ -769,7 +767,7 @@ class ViewSCOTUSDocumentTest(TestCase):
         self.assertEqual(r.status_code, HTTPStatus.OK)
         c = r.context
         self.assertEqual(document, c["rd"])
-        self.assertIs(c["docket_source"], SCOTUS_SOURCE)
+        self.assertIs(c["docket_source"], docket_entry_sources.SCOTUS)
         self.assertFalse(c["authorities"])
         self.assertContains(r, "Download PDF")
         self.assertNotIn("pray_and_pay.js", r.content.decode())
@@ -1744,10 +1742,14 @@ class DocketEntrySourceTest(TestCase):
         )
 
     def test_resolves_scotus_source_for_scotus_court(self) -> None:
-        self.assertIs(self.scotus_docket.get_entry_source(), SCOTUS_SOURCE)
+        self.assertIs(
+            self.scotus_docket.get_entry_source(), docket_entry_sources.SCOTUS
+        )
 
     def test_resolves_recap_source_for_other_courts(self) -> None:
-        self.assertIs(self.recap_docket.get_entry_source(), RECAP_SOURCE)
+        self.assertIs(
+            self.recap_docket.get_entry_source(), docket_entry_sources.RECAP
+        )
 
     def test_scotus_source_callables_execute_without_raising(self) -> None:
         entry = SCOTUSDocketEntryFactory(docket=self.scotus_docket)
@@ -1835,7 +1837,10 @@ class DocketSourceComponentTest(SimpleTestCase):
     }
 
     def test_every_source_resolves_its_components(self) -> None:
-        sources = {RECAP_SOURCE, *_SOURCES_BY_COURT_ID.values()}
+        sources = {
+            docket_entry_sources.RECAP,
+            *docket_entry_sources.BY_COURT_ID.values(),
+        }
         for prefix, folders in self.FOLDERS.items():
             for source, folder in product(sources, folders):
                 path = f"{prefix}/{folder}/{source.component}.html"
@@ -4087,7 +4092,7 @@ class DocketFilterDrawerAttrPropagationTest(TestCase):
         return template.render(
             {
                 "docket": self.docket,
-                "docket_source": RECAP_SOURCE,
+                "docket_source": docket_entry_sources.RECAP,
                 "form": form,
                 "page_obj": self.empty_page,
                 "request": request,

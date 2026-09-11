@@ -69,10 +69,9 @@ from cl.lib.string_utils import trunc
 from cl.lib.thumbnails import make_png_thumbnail_for_instance
 from cl.lib.url_utils import get_redirect_or_abort
 from cl.lib.utils import human_sort
+from cl.opinion_page import docket_entry_sources
 from cl.opinion_page.decorators import handle_cluster_redirection
-from cl.opinion_page.docket_sources_utils import (
-    RECAP_SOURCE,
-    SCOTUS_SOURCE,
+from cl.opinion_page.docket_entry_sources import (
     attach_display_fields,
     document_url,
 )
@@ -337,7 +336,7 @@ async def fetch_docket_entries(docket):
     """Fetch docket entries associated with a docket.
 
     Uses the source-appropriate model for the docket's court (see
-    cl.opinion_page.docket_sources_utils).
+    cl.opinion_page.docket_entry_sources).
 
     param docket: docket.id to get related docket_entries.
     returns: DocketEntry Queryset.
@@ -617,7 +616,7 @@ def download_docket_entries_csv(
         # Only return a handled 501 for those. A RECAP docket hitting
         # this branch means a real bug in the CSV path, and that should
         # still raise a error 500.
-        if docket.get_entry_source() is RECAP_SOURCE:
+        if docket.get_entry_source() is docket_entry_sources.RECAP:
             raise
         # A handled 501 triggers the existing "There was a problem. Try
         # again later." message in export-csv.js instead of crashing.
@@ -693,7 +692,7 @@ async def recap_document_context(
     """
     docket = await aget_object_or_404(Docket, pk=docket_id)
     source = docket.get_entry_source()
-    is_scotus = source is SCOTUS_SOURCE
+    is_scotus = source is docket_entry_sources.SCOTUS
 
     if is_scotus and not await sync_to_async(waffle.flag_is_active)(
         request, "scotus_docket_page"
