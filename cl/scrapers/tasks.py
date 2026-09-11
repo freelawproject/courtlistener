@@ -4,6 +4,7 @@ import re
 import time
 import traceback
 from collections import defaultdict
+from functools import partial
 from io import BytesIO
 
 import botocore.exceptions
@@ -11,11 +12,17 @@ import celery
 import httpx
 import openai
 import requests
-from asgiref.sync import async_to_sync
+from asgiref.sync import async_to_sync, sync_to_async
 from bs4 import BeautifulSoup
 from django.apps import apps
 from django.conf import settings
 from django.core.files.base import ContentFile
+from django.db import (
+    InterfaceError,
+    OperationalError,
+    close_old_connections,
+    connection,
+)
 from django.utils.html import strip_tags
 from httpx import Response
 from juriscraper.lib.exceptions import PacerLoginException
@@ -60,6 +67,13 @@ from cl.search.models import (
 from cl.search.state.shared import AbstractStateDocument, ProcessingError
 
 logger = logging.getLogger(__name__)
+
+# Doctor request failures worth retrying during document extraction.
+# httpx.TransportError covers every way the request can fail to complete at the
+# transport layer: connect/read/write timeouts, connection errors, and
+# RemoteProtocolError (doctor dropping the connection mid-request, which it does
+# on long OCR jobs).
+EXTRACTION_TRANSPORT_ERRORS = (httpx.TransportError,)
 
 ExtractProcessResult = tuple[str, str | None]
 
@@ -439,11 +453,7 @@ def find_and_merge_versions(self, pk: int) -> None:
 
 @app.task(
     bind=True,
-    autoretry_for=(
-        httpx.ConnectError,
-        httpx.ConnectTimeout,
-        httpx.ReadTimeout,
-    ),
+    autoretry_for=EXTRACTION_TRANSPORT_ERRORS,
     max_retries=3,
     retry_backoff=10,
 )
@@ -470,11 +480,7 @@ def extract_recap_pdf(
 
 @app.task(
     bind=True,
-    autoretry_for=(
-        httpx.ConnectError,
-        httpx.ConnectTimeout,
-        httpx.ReadTimeout,
-    ),
+    autoretry_for=EXTRACTION_TRANSPORT_ERRORS,
     max_retries=3,
     retry_backoff=10,
 )
@@ -533,11 +539,7 @@ def extract_formatted_text_document(
 
 @app.task(
     bind=True,
-    autoretry_for=(
-        httpx.ConnectError,
-        httpx.ConnectTimeout,
-        httpx.ReadTimeout,
-    ),
+    autoretry_for=EXTRACTION_TRANSPORT_ERRORS,
     max_retries=3,
     retry_backoff=10,
 )
@@ -561,6 +563,23 @@ def extract_pdf_document(
         model_name,
         citation_queue,
     )
+
+
+def close_stale_connections() -> None:
+    """Drop idle DB connections so the next query opens a fresh one.
+
+    Only worth calling once a query has already failed: with CONN_MAX_AGE=0
+    this closes the connection every time, so calling it pre-emptively just
+    forces a reconnect round trip before every query.
+
+    We guard against being in an atomic block to prevent tests from failing.
+    Must be called with sync_to_async so that the connection check works.
+
+    :return: None
+    """
+    if connection.in_atomic_block:
+        return
+    close_old_connections()
 
 
 async def extract_formatted_text_document_base(
@@ -607,6 +626,18 @@ async def extract_formatted_text_document_base(
             item=rd,
         )
         if not response.is_success:
+            logger.error(
+                "Text extraction failed for %s %s: doctor returned HTTP %s.",
+                model_name,
+                pk,
+                response.status_code,
+            )
+            # We got no text at all, so the document still needs extracting.
+            # Record that explicitly instead of leaving it silently untouched,
+            # and keep it in a state the extraction sweeps will retry (see
+            # `needs_extraction`).
+            rd.ocr_status = AbstractPDF.OCR_NEEDED
+            await save_extraction_result(rd, ["ocr_status"], has_content=False)
             continue
 
         content = response.json()["content"]
@@ -614,6 +645,7 @@ async def extract_formatted_text_document_base(
         if strip_html_tags and not str(rd.filepath_local).endswith(".pdf"):
             content = strip_tags(content)
         ocr_needed = needs_ocr(content, page_count=rd.page_count)
+        ocr_failed = False
         if ocr_available and ocr_needed:
             response = await microservice(
                 service="document-extract-ocr",
@@ -623,6 +655,15 @@ async def extract_formatted_text_document_base(
             if response.is_success:
                 content = response.json()["content"]
                 extracted_by_ocr = True
+            else:
+                ocr_failed = True
+                logger.error(
+                    "OCR failed for %s %s: doctor returned HTTP %s. Falling "
+                    "back to the text layer, which needs_ocr() rejected.",
+                    model_name,
+                    pk,
+                    response.status_code,
+                )
 
         has_content = bool(content)
         match has_content, extracted_by_ocr:
@@ -635,30 +676,91 @@ async def extract_formatted_text_document_base(
                 rd.ocr_status = AbstractPDF.OCR_FAILED
             case False, False:
                 rd.ocr_status = AbstractPDF.OCR_NEEDED
+        if ocr_failed:
+            # The match above leaves ocr_status alone when we hold text that
+            # needs_ocr() rejected, which would report this document as
+            # successfully extracted. OCR is still owed, so say so and keep it
+            # eligible for the sweeps. OCR_FAILED is not right here: it is
+            # terminal, and nothing retries it.
+            rd.ocr_status = AbstractPDF.OCR_NEEDED
 
         rd.plain_text, _ = anonymize(content)
         rd.plain_text = rd.plain_text.replace("\0", "")
-        # Kludgey fix to handle RECAPDocument's custom save logic.
-        if isinstance(rd, RECAPDocument):
-            # Steer the citation-extraction task the post_save signal enqueues
-            # onto the requested queue (batch jobs use this to keep the default
-            # queue clear).
-            rd.citation_queue = citation_queue
-            await rd.asave(
-                do_extraction=False,
-                update_fields=["ocr_status", "plain_text"],
-            )
-        elif isinstance(rd, AbstractStateDocument):
-            update_fields = ["ocr_status", "plain_text"]
-            if not has_content:
-                rd.processing_error = ProcessingError.EXTRACTION_FAILURE
-                update_fields.append("processing_error")
-            await rd.asave(update_fields=update_fields)
-        else:
-            await rd.asave(update_fields=["ocr_status", "plain_text"])
+        await save_extraction_result(
+            rd,
+            ["ocr_status", "plain_text"],
+            has_content=has_content,
+            citation_queue=citation_queue,
+        )
         processed.append(pk)
 
     return processed
+
+
+async def save_extraction_result(
+    rd: AbstractPDF,
+    update_fields: list[str],
+    has_content: bool,
+    citation_queue: str | None = None,
+) -> None:
+    """Persist the outcome of an extraction attempt on a document.
+
+    Callers MUST set the fields named in `update_fields` on `rd` beforehand;
+    this only handles the per-model differences in save behaviour.
+
+    :param rd: The document to save, with its extraction results already set.
+    :param update_fields: The fields to write. Passing "plain_text" is what
+    triggers the RECAPDocument post_save signal to enqueue citation
+    extraction, so omit it on failure paths that produced no new text.
+    :param has_content: Whether the attempt produced any text. State documents
+    record an explicit processing_error when it did not, and clear it when a
+    later attempt succeeds.
+    :param citation_queue: Celery queue for the citation-extraction task the
+    RECAPDocument post_save signal enqueues when plain_text changes. Lets batch
+    jobs route that costly work off the default queue. See
+    cl.search.signals.handle_recap_doc_change.
+
+    :return: None
+    """
+    # Kludgey fix to handle RECAPDocument's custom save logic.
+    if isinstance(rd, RECAPDocument):
+        # Steer the citation-extraction task the post_save signal enqueues
+        # onto the requested queue (batch jobs use this to keep the default
+        # queue clear).
+        rd.citation_queue = citation_queue
+        save = partial(
+            rd.asave, do_extraction=False, update_fields=update_fields
+        )
+    else:
+        if isinstance(rd, AbstractStateDocument):
+            if not has_content:
+                rd.processing_error = ProcessingError.EXTRACTION_FAILURE
+                update_fields = [*update_fields, "processing_error"]
+            elif rd.processing_error == ProcessingError.EXTRACTION_FAILURE:
+                # An earlier attempt failed and this one succeeded, so the
+                # flag is stale. Other error codes describe the file itself
+                # rather than extraction, so leave those alone.
+                rd.processing_error = None
+                update_fields = [*update_fields, "processing_error"]
+        save = partial(rd.asave, update_fields=update_fields)
+
+    try:
+        await save()
+    except (InterfaceError, OperationalError) as exc:
+        # OCR can leave this task idle for minutes, long enough for Postgres
+        # to hang up on us. A dead socket only announces itself when we next
+        # use it, so rather than pre-emptively reconnecting before every
+        # document, we let the write fail, drop the connection, and try once
+        # more on a fresh one. Anything still failing is a real error.
+        logger.warning(
+            "Saving extraction results for %s %s failed (%s). Retrying on a "
+            "fresh DB connection.",
+            type(rd).__name__,
+            rd.pk,
+            exc,
+        )
+        await sync_to_async(close_stale_connections)()
+        await save()
 
 
 async def extract_pdf_document_base(

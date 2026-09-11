@@ -14,6 +14,7 @@ from django.conf import settings
 from django.contrib.auth.models import User
 from django.core.exceptions import ValidationError
 from django.core.files.base import ContentFile
+from django.db import OperationalError
 from django.test import SimpleTestCase
 from django.utils.encoding import force_bytes
 from django.utils.timezone import now
@@ -41,6 +42,7 @@ from cl.lib.exceptions import ScrapeFailed
 from cl.lib.juriscraper_utils import get_module_by_court_id
 from cl.lib.microservice_utils import microservice
 from cl.lib.model_helpers import make_texas_docket_number_core
+from cl.lib.models import AbstractPDF
 from cl.lib.test_helpers import generate_docket_target_sources
 from cl.people_db.factories import PersonFactory
 from cl.recap.models import (
@@ -119,7 +121,9 @@ from cl.search.models import (
     Parenthetical,
     SCOTUSDocketEntry,
     SCOTUSDocument,
+    TexasDocument,
 )
+from cl.search.state.shared import ProcessingError
 from cl.search.state.texas.factories import (
     TexasCourtOfAppealsDocketDictFactory,
     TexasDocumentFactory,
@@ -657,6 +661,150 @@ class ExtractFormattedTextSanitizationTest(TestCase):
         self.assertIn("Hello", texas_document.plain_text)
         self.assertIn("world", texas_document.plain_text)
         self.assertIn("Courtlistener", texas_document.plain_text)
+
+
+class ExtractFormattedTextFailureTest(TestCase):
+    """Tests that extraction failures are recorded on the document rather
+    than passing silently or being reported as successes."""
+
+    @mock.patch("cl.scrapers.tasks.logger.error")
+    @mock.patch("cl.scrapers.tasks.microservice", new_callable=mock.AsyncMock)
+    def test_failed_text_extraction_is_recorded(
+        self, microservice_mock, error_mock
+    ):
+        """Does a failed text-extraction call leave the document retryable
+        and flagged, instead of being dropped silently?
+        """
+        texas_document = TexasDocumentFactory.create(plain_text="")
+        microservice_mock.return_value = httpx.Response(500)
+
+        processed = async_to_sync(extract_formatted_text_document_base)(
+            texas_document.pk,
+            check_if_needed=False,
+            ocr_available=False,
+            model_name="search.TexasDocument",
+        )
+
+        self.assertEqual(processed, [])
+        error_mock.assert_called_once()
+        texas_document.refresh_from_db()
+        self.assertEqual(texas_document.ocr_status, AbstractPDF.OCR_NEEDED)
+        self.assertEqual(
+            texas_document.processing_error,
+            ProcessingError.EXTRACTION_FAILURE,
+        )
+
+    @mock.patch("cl.scrapers.tasks.logger.error")
+    @mock.patch("cl.scrapers.tasks.microservice", new_callable=mock.AsyncMock)
+    def test_failed_ocr_leaves_document_needing_ocr(
+        self, microservice_mock, error_mock
+    ):
+        """Does a failed OCR call mark the document OCR_NEEDED?
+
+        The text layer we fall back on is the one needs_ocr() just rejected,
+        so the document must stay eligible for the extraction sweeps rather
+        than being reported as fully extracted.
+        """
+        texas_document = TexasDocumentFactory.create(plain_text="")
+        # A page header on its own is exactly what needs_ocr() treats as
+        # insufficient, so this triggers the OCR call that then fails.
+        header_only = (
+            "Case 2:06-cv-00376-SRW Document 1-2 Filed 04/25/2006 Page 1 of 1"
+        )
+        microservice_mock.side_effect = [
+            httpx.Response(
+                200,
+                json={"content": header_only, "extracted_by_ocr": False},
+            ),
+            httpx.Response(500),
+        ]
+
+        processed = async_to_sync(extract_formatted_text_document_base)(
+            texas_document.pk,
+            check_if_needed=False,
+            ocr_available=True,
+            model_name="search.TexasDocument",
+        )
+
+        self.assertEqual(microservice_mock.await_count, 2)
+        self.assertEqual(processed, [texas_document.pk])
+        error_mock.assert_called_once()
+        texas_document.refresh_from_db()
+        self.assertEqual(texas_document.ocr_status, AbstractPDF.OCR_NEEDED)
+
+    @mock.patch("cl.scrapers.tasks.microservice", new_callable=mock.AsyncMock)
+    def test_successful_extraction_clears_stale_failure(
+        self, microservice_mock
+    ):
+        """Does a successful retry clear the flag left by a failed attempt?
+
+        Extraction failures are transient (a doctor 500 or timeout), so a
+        document that later extracts fine must not keep reporting itself as
+        an extraction failure.
+        """
+        texas_document = TexasDocumentFactory.create(
+            plain_text="",
+            processing_error=ProcessingError.EXTRACTION_FAILURE,
+        )
+        microservice_mock.return_value = httpx.Response(
+            200,
+            json={
+                "content": "Hello Courtlistener.",
+                "extracted_by_ocr": False,
+            },
+        )
+
+        async_to_sync(extract_formatted_text_document_base)(
+            texas_document.pk,
+            check_if_needed=False,
+            ocr_available=False,
+            model_name="search.TexasDocument",
+        )
+
+        texas_document.refresh_from_db()
+        self.assertIsNone(texas_document.processing_error)
+        self.assertIn("Courtlistener", texas_document.plain_text)
+
+
+class ExtractionSaveRetryTest(TestCase):
+    """Tests that saving extraction results survives a DB connection that
+    went stale while doctor was working."""
+
+    @mock.patch("cl.scrapers.tasks.microservice", new_callable=mock.AsyncMock)
+    def test_save_is_retried_on_a_dead_connection(self, microservice_mock):
+        """Does a save that fails on a stale connection get retried?
+
+        Long OCR calls can leave the DB connection idle long enough for
+        Postgres to close it, and the extracted text is only in memory, so
+        the save must survive one dead connection rather than losing the work.
+        """
+        texas_document = TexasDocumentFactory.create(plain_text="")
+        microservice_mock.return_value = httpx.Response(
+            200,
+            json={
+                "content": "Hello Courtlistener.",
+                "extracted_by_ocr": False,
+            },
+        )
+
+        with mock.patch.object(
+            TexasDocument,
+            "asave",
+            new_callable=mock.AsyncMock,
+            side_effect=[
+                OperationalError("server closed the connection unexpectedly"),
+                None,
+            ],
+        ) as asave_mock:
+            processed = async_to_sync(extract_formatted_text_document_base)(
+                texas_document.pk,
+                check_if_needed=False,
+                ocr_available=False,
+                model_name="search.TexasDocument",
+            )
+
+        self.assertEqual(asave_mock.await_count, 2)
+        self.assertEqual(processed, [texas_document.pk])
 
 
 class ExtensionIdentificationTest(SimpleTestCase):
