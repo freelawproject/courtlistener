@@ -236,4 +236,7 @@
   .scrollbar-none::-webkit-scrollbar {
     @apply hidden;
   }
+  .mock-class {
+    background-color: blue;
+  }
 }
