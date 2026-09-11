@@ -209,7 +209,7 @@ document.addEventListener('alpine:init', () => {
 
     /**
      * Recount the filters the next submit would apply, so the count can be shown
-     * before submitting. Runs on the next tick to wait x-bind:disabled and
+     * before submitting. Runs on the next tick to wait for x-bind:disabled and
      * x-bind:value directives to settle.
      */
     updateActiveFilterCount() {
@@ -226,6 +226,7 @@ document.addEventListener('alpine:init', () => {
       this.onBreakpointChange(() => {
         this.advancedFiltersExpandedDesktop = false;
       });
+      this.updateFieldsets();
       this.updateActiveFilterCount();
     },
   }));
