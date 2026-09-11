@@ -49,12 +49,13 @@
     <tr class="text-xs">
       <th scope="row" class="min-w-48">{{ court.full_name }}</th>
       <td>{{ court.count|intcomma }}</td>
-      <td>{{ court.get_jurisdiction_display }}</td>
+      <td>{{ court.get_jurisdiction_display|nbsp  }}</td>
       <td class="whitespace-nowrap">
           {% if court.url %}
           <a
             class="links-external"
             title="{{ court.url }}"
+            aria-label="{{ court.url }} (opens in new tab)"
             href="{{ court.url }}" target="_blank" rel="noopener noreferrer"
           >
           {{ court.url|slice:"20" }}{% if court.url|length > 20 %}&hellip;{% endif %}
