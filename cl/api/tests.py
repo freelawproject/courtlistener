@@ -25,6 +25,7 @@ from django.test.utils import CaptureQueriesContext
 from django.urls import reverse
 from django.utils.timezone import now
 from django.utils.xmlutils import UnserializableContentError
+from lxml import html as lhtml
 from rest_framework import status
 from rest_framework.authtoken.models import Token
 from rest_framework.exceptions import NotFound, Throttled
@@ -33,7 +34,7 @@ from rest_framework.request import Request
 from rest_framework.response import Response
 from rest_framework.test import APIRequestFactory
 from rest_framework_xml.renderers import XMLRenderer
-from waffle.testutils import override_switch
+from waffle.testutils import override_flag, override_switch
 
 from cl.alerts.api_views import DocketAlertViewSet, SearchAlertViewSet
 from cl.api.api_permissions import V3APIPermission
@@ -285,6 +286,53 @@ class BasicAPIPageTest(ESIndexTestCase, TestCase):
         duration_minutes = data["oral_arguments"]["duration_minutes"]
         self.assertIsInstance(duration_minutes, int)
         self.assertEqual(duration_minutes, 4)
+
+
+@override_settings(WAFFLE_CACHE_PREFIX="test_jurisdictions_v2_waffle")
+@override_flag("use_new_design", active=True)
+class JurisdictionsV2TemplateTest(TestCase):
+    """Row markup of the v2 jurisdictions table that the template builds itself.
+
+    `WAFFLE_CACHE_PREFIX` isolates the flag cache from parallel workers, see
+    `DocketPageV2TemplateTest`.
+    """
+
+    @classmethod
+    def setUpTestData(cls) -> None:
+        cls.with_url = CourtFactory(id="v2withurl", url="https://example.com/")
+        cls.without_url = CourtFactory(id="v2nourl", url="")
+
+    async def test_row_links(self) -> None:
+        """Does every court link to its search, and only courts with a URL to a homepage?"""
+        r = await self.async_client.get(reverse("court_index"))
+        tbody = lhtml.fromstring(r.content).findall(".//tbody")[0]
+        search_url = reverse("show_results")
+        expected = (
+            (self.with_url, [self.with_url.url]),
+            (self.without_url, []),
+        )
+        for court, homepage_links in expected:
+            with self.subTest(court=court.pk):
+                search_href = (
+                    f"{search_url}?q=&court_{court.pk}=on&order_by=score+desc"
+                )
+                rows = [
+                    row
+                    for row in tbody.findall("tr")
+                    if any(
+                        a.get("href") == search_href
+                        for a in row.findall(".//a")
+                    )
+                ]
+                self.assertEqual(len(rows), 1)
+                self.assertEqual(
+                    [
+                        a.get("href")
+                        for a in rows[0].findall(".//a")
+                        if a.get("class") == "links-external"
+                    ],
+                    homepage_links,
+                )
 
 
 @override_settings(

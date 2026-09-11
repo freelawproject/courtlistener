@@ -1,0 +1,84 @@
+{% extends "new_base.html" %}
+{% load text_filters humanize extras %}
+
+{% block title %}Available Jurisdictions – CourtListener.com{% endblock %}
+{% block description %}A list of the hundreds of jurisdictions available on CourtListener.{% endblock %}
+{% block og_description %}A list of the hundreds of jurisdictions available on CourtListener.{% endblock %}
+
+{% block content_wrapper %}
+<div class="capped-width py-12">
+  {# TITLE + TEXT #}
+  <div class="space-y-4 pb-12">
+
+    <h1>Available Jurisdictions</h1>
+
+    <p>
+        We currently have {{ courts.count|intcomma }} jurisdictions available on CourtListener. These jurisdictions are available via
+        our API or can be used in our bulk data queries.
+    </p>
+
+    <p>
+        Some data below is incomplete, missing dates or other information. If you are a legal researcher
+        interested in helping us research this or other data, please get in touch via our <a class="links" href="{% url 'contact' %}?issue_type=api">contact
+        form</a>. We welcome your contribution.
+    </p>
+
+    <p>
+        If you are a developer looking to use this data, we encourage you to check out our <a class="links-external" href="https://github.com/freelawproject/courts-db">courts-db GitHub
+        Repository</a> for helpful scripts and and methods for working with this data.
+    </p>
+  </div>
+
+  {# TABLE #}
+  <c-flex-table
+    caption="Jurisdictions available on CourtListener"
+    :columns="[
+      {'label': 'Name', 'field': 'full_name'},
+      {'label': 'Count', 'field': 'count', 'title': 'The number of cases in this court on CourtListener'},
+      {'label': 'Jurisdiction', 'field': 'jurisdiction'},
+      {'label': 'Homepage', 'field': 'url'},
+      {'label': 'Abbreviation', 'field': 'pk', 'title': 'The value used in our URLs, bulk data, etc.'},
+      {'label': 'Citation Abbreviation', 'field': 'citation_string', 'title': 'Gathered from Blue Book, Cornell.edu and ALWD'},
+      {'label': 'Start Date', 'field': 'start_date', 'title': 'The date the court came into existence'},
+      {'label': 'End Date', 'field': 'end_date', 'title': 'The date the court was abolished, if applicable'},
+      {'label': 'In Use', 'field': 'in_use', 'title': 'Whether the court is in use in CourtListener'},
+      {'label': 'Modified', 'field': 'date_modified', 'title': 'When this row was last modified in our database'},
+    ]"
+  >
+  {% for court in courts %}
+    <tr class="text-xs">
+      <th scope="row" class="min-w-48">{{ court.full_name }}</th>
+      <td>{{ court.count|intcomma }}</td>
+      <td>{{ court.get_jurisdiction_display|nbsp  }}</td>
+      <td class="whitespace-nowrap">
+        {% with escaped_url=court.url|http_url %}
+        {% if court.url %}
+          <a
+            class="links-external"
+            title="{{ escaped_url }}"
+            aria-label="{{ escaped_url }} (opens in new tab)"
+            href="{{ escaped_url }}" target="_blank" rel="noopener noreferrer"
+          >
+          {{ escaped_url|slice:"20" }}{% if escaped_url|length > 20 %}&hellip;{% endif %}
+          </a>
+        {% endif %}
+        {% endwith %}
+      </td>
+      <td>
+          <a
+            class="links"
+            href="{% url 'show_results' %}?q=&court_{{ court.pk }}=on&order_by=score+desc"
+            rel="nofollow"
+          >{{ court.pk }}</a>
+      </td>
+      <td>{{ court.citation_string }}</td>
+      <td class="whitespace-nowrap">{{ court.start_date|date:"Y-m-d"|default:"Unknown" }}</td>
+      <td class="whitespace-nowrap">{{ court.end_date|date:"Y-m-d"|default:"Unknown" }}</td>
+      <td>{{ court.in_use|yesno|title }}</td>
+      <td class="whitespace-nowrap">{{ court.date_modified|date:"c"|slice:"16"|default:"None yet" }}</td>
+    </tr>
+  {% endfor %}
+  </c-flex-table>
+</div>
+
+{% endblock content_wrapper %}
