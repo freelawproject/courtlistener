@@ -56,7 +56,7 @@
       <a role="button" href="{% url cancel_url_name object_pk %}" class="button cancel-link">Cancel</a>
     </form>
 
-    <script nonce="{{ request.csp_nonce }}">
+    <script nonce="{{ csp_nonce }}">
       document.getElementById("select-all").addEventListener("change", function() {
         document.querySelectorAll('input[name="doc_ids"]:not([disabled])').forEach(
           function(cb) { cb.checked = this.checked; }.bind(this)

@@ -22,10 +22,8 @@ from cl.disclosures.models import (
     Reimbursement,
     SpouseIncome,
 )
-from cl.opinion_page.docket_sources_utils import (
-    RECAP_SOURCE,
-    attach_display_fields,
-)
+from cl.opinion_page import docket_entry_sources
+from cl.opinion_page.docket_entry_sources import attach_display_fields
 from cl.search.models import Court, RECAPDocument
 from cl.simple_pages.forms import ContactForm
 from cl.simple_pages.tasks import create_zoho_desk_ticket
@@ -251,7 +249,7 @@ async def components(request: HttpRequest) -> HttpResponse:
             # library shows what the real page shows.
             self.documents = documents
             for document in documents:
-                attach_display_fields(RECAP_SOURCE, document)
+                attach_display_fields(docket_entry_sources.RECAP, document)
             self.pk = pk
 
     demo_entries = [
@@ -355,7 +353,7 @@ async def components(request: HttpRequest) -> HttpResponse:
             "private": True,
             "demo_docket_entries": demo_entries,
             "demo_document": demo_entries[0].documents[2],
-            "docket_source": RECAP_SOURCE,
+            "docket_source": docket_entry_sources.RECAP,
             "demo_page_obj": MockPageObj(),
             "demo_docket": MockDocket(),
             "demo_filter_form": MockDocketFilterForm(),

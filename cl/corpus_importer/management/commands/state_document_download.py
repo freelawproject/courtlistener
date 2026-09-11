@@ -34,7 +34,7 @@ def extract_state_documents(
     extraction_queue: str,
     batch_size: int,
     delay: float,
-    page_limit: int,
+    page_limit: int | None = None,
 ) -> None:
     """Run the extraction task for state document instances needing extraction.
 
@@ -42,15 +42,22 @@ def extract_state_documents(
     whose OCR status is not complete or unnecessary. MP3 files are excluded
     since they cannot be text-extracted. Non-PDF documents (HTML, WPD) are
     extracted with strip_html_tags=True so that plain_text contains plain
-    text rather than markup. Documents with a page_count exceeding
-    page_limit are skipped, allowing smaller documents to be processed first.
+    text rather than markup.
+
+    When page_limit is given, only PDFs with a page_count between 1 and
+    page_limit are scheduled, allowing smaller documents to be processed
+    first. PDFs with a null, zero or negative page_count are skipped too,
+    since those values come from failed or overflowed page counts and usually
+    belong to very large files. Non-PDF documents never get a page_count, so
+    they are always scheduled regardless of page_limit.
 
     :param model: The state document model to extract.
     :param throttle_min_items: CeleryThrottle min_items parameter.
     :param extraction_queue: The celery queue for extraction tasks.
     :param batch_size: The batch size for extraction tasks.
     :param delay: Seconds to sleep between scheduling tasks.
-    :param page_limit: Skip documents with more pages than this value.
+    :param page_limit: If given, only schedule PDFs whose page_count is
+    between 1 and this value. If None, no page_count filter is applied.
     :return: None
     """
     extension_query = Q()
@@ -73,12 +80,12 @@ def extract_state_documents(
 
     unfiltered_count = base_query.count()
 
-    base_query = base_query.filter(
-        Q(page_count__lte=page_limit) | Q(page_count__isnull=True)
-    )
-
     pdf_docs = base_query.filter(filepath_local__endswith=".pdf")
     non_pdf_docs = base_query.exclude(filepath_local__endswith=".pdf")
+    if page_limit is not None:
+        pdf_docs = pdf_docs.filter(
+            page_count__gte=1, page_count__lte=page_limit
+        )
 
     pdf_count = pdf_docs.count()
     non_pdf_count = non_pdf_docs.count()
@@ -112,8 +119,12 @@ def extract_state_documents(
                 f"{processed_count / total_count:.0%}",
             )
             time.sleep(delay)
+    if page_limit is None:
+        logger.info("Done. Scheduled %d.", processed_count)
+        return
     logger.info(
-        "Done. Scheduled %d, skipped %d (over %d pages).",
+        "Done. Scheduled %d, skipped %d PDFs (page count over %d, "
+        "null or non-positive).",
         processed_count,
         unfiltered_count - total_count,
         page_limit,
@@ -247,9 +258,12 @@ class Command(VerboseCommand):
         parser.add_argument(
             "--page-limit",
             type=int,
-            default=50,
-            help="Skip documents with more pages than this value "
-            "(only used when skipping downloads).",
+            default=None,
+            help="Only extract PDFs with a page count between 1 and this "
+            "value. PDFs with a null, zero or negative page count are "
+            "skipped. Non-PDF documents are always extracted. If omitted, "
+            "no page count filter is applied (only used when skipping "
+            "downloads).",
         )
         parser.add_argument(
             "--download-order",
@@ -276,7 +290,7 @@ class Command(VerboseCommand):
         skip_extraction: bool,
         skip_download: bool,
         batch_size: int,
-        page_limit: int,
+        page_limit: int | None,
         download_order: Literal["asc", "desc"],
         auto_resume: bool,
         **options,
@@ -291,7 +305,8 @@ class Command(VerboseCommand):
         :param skip_extraction: Skip the text extraction step.
         :param skip_download: Skip the download step.
         :param batch_size: The batch size for PDF extraction tasks.
-        :param page_limit: Skip documents with more pages than this value.
+        :param page_limit: If given, only extract PDFs with a page count
+        between 1 and this value.
         :param download_order: Sort order for downloading documents by pk.
         :param auto_resume: Resume from last pk stored in Redis."""
         super().handle(*args, **options)
