@@ -367,7 +367,10 @@ class PeopleV3APISearchTest(
     def test_merge_unavailable_fields_api(self) -> None:
         """Confirm unavailable ES fields are properly merged from DB in the API"""
         with self.captureOnCommitCallbacks(execute=True):
-            person = PersonFactory.create(name_first="John American")
+            # prevent Faker from putting people in Lake Susan
+            person = PersonFactory.create(
+                name_first="John American", dob_city="Sacramento"
+            )
             position_5 = PositionFactory.create(
                 date_granularity_start="%Y-%m-%d",
                 court=self.court_1,
