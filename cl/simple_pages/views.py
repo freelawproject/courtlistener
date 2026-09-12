@@ -376,9 +376,13 @@ async def components(request: HttpRequest) -> HttpResponse:
     )
 
 
-async def ratelimited(
-    request: HttpRequest, exception: Exception
-) -> HttpResponse:
+def ratelimited(request: HttpRequest, exception: Exception) -> HttpResponse:
+    """Show the 429 page to a request that tripped a rate limit.
+
+    django-ratelimit dispatches here from RatelimitMiddleware.process_exception,
+    which Django only ever calls synchronously, so this MUST stay sync. As a
+    coroutine it is never awaited and the user gets a 500 instead of the 429.
+    """
     return TemplateResponse(
         request,
         "429.html",

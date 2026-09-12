@@ -5,8 +5,10 @@ from unittest.mock import MagicMock, patch
 from django.contrib.auth.models import User
 from django.http import HttpResponse
 from django.template.loader import TemplateDoesNotExist, get_template
-from django.test import override_settings
+from django.test import RequestFactory, override_settings
 from django.urls import reverse
+from django_ratelimit.exceptions import Ratelimited
+from django_ratelimit.middleware import RatelimitMiddleware
 from lxml.html import fromstring
 from waffle.testutils import override_flag
 
@@ -677,3 +679,25 @@ class ContentSecurityPolicyTest(TestCase):
         # A script left with an empty nonce would be refused by the browser,
         # and the assertion above would still pass on the other scripts.
         self.assertNotIn('nonce=""', html)
+
+
+class RatelimitedViewTest(SimpleTestCase):
+    """Does the throttled-request handler return a real 429 page?
+
+    django-ratelimit hands the request to RATELIMIT_VIEW from
+    RatelimitMiddleware.process_exception, which Django only ever calls
+    synchronously. A coroutine returned from there never gets awaited, so the
+    user sees a 500 instead of the 429 we meant to show them.
+    """
+
+    def test_the_middleware_gets_a_response_not_a_coroutine(self) -> None:
+        request = RequestFactory().get(reverse("sign-in"))
+        middleware = RatelimitMiddleware(lambda r: HttpResponse())
+
+        response = middleware.process_exception(request, Ratelimited())
+
+        self.assertIsInstance(response, HttpResponse)
+        self.assertEqual(
+            cast(HttpResponse, response).status_code,
+            HTTPStatus.TOO_MANY_REQUESTS,
+        )
