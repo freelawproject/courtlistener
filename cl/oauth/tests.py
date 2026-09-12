@@ -546,14 +546,6 @@ class UnconfirmedApplicationCleanupTest(TestCase):
         mock_logger.warning.assert_called_once()
         self.assertIn("no application", mock_logger.warning.call_args.args[0])
 
-    @patch("cl.oauth.cleanup_utils.clear_expired")
-    def test_pass_does_not_clear_tokens_yet(self, mock_clear_expired):
-        """Token clearing is staged behind the application backlog."""
-        run_cleanup_pass()
-        mock_clear_expired.assert_not_called()
-        self.assertFalse(Application.objects.filter(pk=self.stale.pk).exists())
-        self.assertKeptApplicationsExist()
-
 
 class RefreshTokenLifetimeTest(SimpleTestCase):
     """The cap the cleanup uses tracks the toolkit's own refresh window."""
@@ -586,6 +578,61 @@ class RefreshTokenLifetimeTest(SimpleTestCase):
                 refresh_token_lifetime()
 
 
+@override_settings(OAUTH_CLEANUP_UNCONFIRMED_APP_MIN_AGE_HOURS=24)
+class CleanupPassTest(TestCase):
+    """A full pass deletes applications and then clears expired tokens."""
+
+    @classmethod
+    def setUpTestData(cls):
+        cls.user = UserFactory()
+        with time_machine.travel(now() - timedelta(days=2), tick=False):
+            cls.stale = ApplicationFactory(name="stale, never authorized")
+
+    @patch("cl.oauth.cleanup_utils.clear_expired")
+    def test_pass_clears_expired_tokens(self, mock_clear_expired):
+        """The pass deletes applications and clears tokens."""
+        run_cleanup_pass()
+        mock_clear_expired.assert_called_once()
+        self.assertFalse(Application.objects.filter(pk=self.stale.pk).exists())
+
+    @patch("cl.oauth.cleanup_utils.clear_expired")
+    def test_dry_run_skips_token_cleanup(self, mock_clear_expired):
+        """Dry run counts applications and leaves tokens alone."""
+        run_cleanup_pass(dry_run=True)
+        mock_clear_expired.assert_not_called()
+        self.assertTrue(Application.objects.filter(pk=self.stale.pk).exists())
+
+    @patch("cl.oauth.cleanup_utils.refresh_token_lifetime")
+    def test_pass_caps_candidates_at_the_refresh_token_lifetime(
+        self, mock_lifetime
+    ):
+        """Applications older than the refresh token window are left alone."""
+        # Past this age clear_expired() may already have removed the tokens
+        # that prove a user authorized the application, so it is no longer
+        # possible to tell it apart from one that was never authorized.
+        mock_lifetime.return_value = timedelta(days=30)
+        with time_machine.travel(now() - timedelta(days=31), tick=False):
+            ancient = ApplicationFactory(name="authorized long ago")
+        run_cleanup_pass()
+        self.assertTrue(Application.objects.filter(pk=ancient.pk).exists())
+        self.assertFalse(Application.objects.filter(pk=self.stale.pk).exists())
+
+    def test_pass_removes_expired_grants(self):
+        """Expired grants are really cleared, not just counted."""
+        expired_grant = Grant.objects.create(
+            user=self.user,
+            code="expired-code",
+            application=self.stale,
+            expires=now() - timedelta(hours=1),
+            redirect_uri="https://client.example.com/callback",
+        )
+        run_cleanup_pass()
+        self.assertFalse(Grant.objects.filter(pk=expired_grant.pk).exists())
+        # The grant kept its application out of the candidate set this pass.
+        self.assertTrue(Application.objects.filter(pk=self.stale.pk).exists())
+
+
+@override_settings(OAUTH_CLEANUP_UNCONFIRMED_APP_MIN_AGE_HOURS=24)
 class CleanOAuthTablesCommandTest(TestCase):
     """The clean_oauth_tables command runs one pass and honors --dry-run."""
 
