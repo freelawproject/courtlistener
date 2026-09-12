@@ -1,9 +1,10 @@
 import functools
+import hashlib
 import socket
 import sys
 
 from django.conf import settings
-from django.core.cache import caches
+from django.core.cache import BaseCache, caches
 from django.http import HttpRequest
 from django_ratelimit import UNSAFE
 from django_ratelimit.core import get_header
@@ -165,14 +166,23 @@ def verify_ip_address(ip_address: str) -> bool:
     return False
 
 
+def get_ratelimit_cache() -> BaseCache:
+    """Return the cache backend that the rate limiters count in.
+
+    :return: The cache named by the RATELIMIT_USE_CACHE setting, or the default
+    cache if that setting is unset.
+    """
+    cache_name = getattr(settings, "RATELIMIT_USE_CACHE", "default")
+    return caches[cache_name]
+
+
 def is_allowlisted(request: HttpRequest) -> bool:
     """Checks if the IP address is allowlisted due to belonging to an approved
     crawler.
 
     Returns True if so, else False.
     """
-    cache_name = getattr(settings, "RATELIMIT_USE_CACHE", "default")
-    cache = caches[cache_name]
+    cache = get_ratelimit_cache()
     allowlist_cache_prefix = "rl:allowlist"
     ip_address = get_user_ip_from_cloudfront_headers(request)
     if ip_address is None:
@@ -218,3 +228,84 @@ def parse_rate(rate: str) -> tuple[int, int]:
         duration_unit = period[0]
     duration_base = {"s": 1, "m": 60, "h": 3600, "d": 86400}[duration_unit]
     return num_requests, duration_base * duration_multiplier
+
+
+####################################
+# Failed sign-in throttling        #
+####################################
+FAILED_LOGIN_LIMIT = 10
+FAILED_LOGIN_WINDOW = 60 * 15  # Seconds
+
+
+def make_failed_login_key(identifier: str) -> str:
+    """Build the cache key holding the failed sign-in count for an identifier.
+
+    The identifier is lowercased before hashing, so varying the case of a
+    username or email doesn't buy a fresh bucket. Hashing keeps the key a fixed,
+    cache-safe length and keeps submitted email addresses out of the cache.
+
+    :param identifier: The account identifier submitted on the sign-in form. It
+    is whatever the person typed, not a resolved user, so that attempts against
+    addresses with no account get counted too. Counting only resolved users
+    would turn the throttle into an account-existence oracle.
+    :return: The cache key to count that identifier's failures under.
+    """
+    digest = hashlib.blake2s(
+        identifier.strip().lower().encode(), digest_size=16
+    ).hexdigest()
+    return f"rl:failed-login:{digest}"
+
+
+def count_login_attempt(identifier: str) -> int:
+    """Count one sign-in attempt against an identifier and report the total.
+
+    Count the attempt *before* checking the password, and compare the return
+    against FAILED_LOGIN_LIMIT to decide whether to go on. Reading the count and
+    raising it separately would not hold under load: password checking is slow,
+    so a burst of simultaneous attempts would all read the same pre-increment
+    count and all be let through. Here each attempt gets a distinct number.
+
+    Counting attempts rather than failures costs the caller nothing, because a
+    successful sign-in clears the counter; what survives in it is failures.
+
+    Call this exactly once per sign-in POST, no matter how many candidate
+    accounts the submitted password has to be checked against, so the count
+    tracks attempts rather than password hashes.
+
+    The window is anchored to the first attempt in it: add() sets the expiry and
+    incr() leaves it alone, so attempts made while over the limit raise the count
+    without pushing the block out. Nobody can hold an account's owner out beyond
+    the original window by continuing to guess, and nothing survives the expiry,
+    so there is no state for staff to clear.
+
+    Callers MUST reject an over-limit attempt with the same error a wrong
+    password gets. A distinct message would tell an attacker they'd found a live
+    account.
+
+    :param identifier: The account identifier submitted on the sign-in form.
+    :return: How many attempts are now counted in the current window.
+    """
+    if not identifier:
+        return 0
+    cache = get_ratelimit_cache()
+    key = make_failed_login_key(identifier)
+    if cache.add(key, 1, FAILED_LOGIN_WINDOW):
+        return 1
+    try:
+        return cache.incr(key)
+    except ValueError:
+        # The window lapsed between the add() and the incr(), so the count this
+        # would have raised is gone. Start the next window instead of 500ing.
+        cache.add(key, 1, FAILED_LOGIN_WINDOW)
+        return 1
+
+
+def reset_failed_login_count(identifier: str) -> None:
+    """Forget an identifier's failed sign-ins after it authenticates.
+
+    :param identifier: The account identifier submitted on the sign-in form.
+    :return: None
+    """
+    if not identifier:
+        return
+    get_ratelimit_cache().delete(make_failed_login_key(identifier))
