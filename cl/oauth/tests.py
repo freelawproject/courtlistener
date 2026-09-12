@@ -536,6 +536,15 @@ class UnconfirmedApplicationCleanupTest(TestCase):
         )
         self.assertKeptApplicationsExist()
 
+    @patch("cl.oauth.cleanup_utils.logger")
+    def test_window_narrower_than_min_age_warns(self, mock_logger):
+        """An empty age window is logged rather than silently deleting nothing."""
+        unconfirmed_applications(
+            min_age=timedelta(days=2), max_age=timedelta(days=1)
+        )
+        mock_logger.warning.assert_called_once()
+        self.assertIn("no application", mock_logger.warning.call_args.args[0])
+
     @patch("cl.oauth.cleanup_utils.clear_expired")
     def test_pass_does_not_clear_tokens_yet(self, mock_clear_expired):
         """Token clearing is staged behind the application backlog."""

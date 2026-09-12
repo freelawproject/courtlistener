@@ -64,6 +64,13 @@ def unconfirmed_applications(
     ``skip_authorization``, no grant or token rows, older than ``min_age``,
     younger than ``max_age``.
     """
+    if max_age is not None and max_age <= min_age:
+        logger.warning(
+            "max_age (%s) is not greater than min_age (%s); no application "
+            "can match both bounds and none will be deleted.",
+            max_age,
+            min_age,
+        )
     now = timezone.now()
     candidates = Application.objects.filter(
         user__isnull=True,
