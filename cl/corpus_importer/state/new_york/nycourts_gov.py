@@ -145,6 +145,13 @@ class NYCoAFile(Document):
         CourtListener learns where the file is; the merge points
         `filepath_local` straight at it, since it is already in the right
         bucket and needs no fetching.
+    :ivar content_hash: SHA-256 of the file, as the scraper hashed it on the
+        way to storage. Empty on the same terms as `local_path`, since it is
+        the download that produces it. This is how a merge tells a file the
+        Court has corrected from the one already published; see
+        `NYCoADocument.make_filename`.
+    :ivar file_size: Size of the downloaded file in bytes, or ``None`` when the
+        scraper did not fetch it.
     """
 
     # Court-PASS serves files through form postbacks rather than addressable
@@ -164,6 +171,8 @@ class NYCoAFile(Document):
     volume: int | None = None
     part: int | None = None
     local_path: str = ""
+    content_hash: str = ""
+    file_size: int | None = None
 
 
 class NYCoDocketEntry(DocketEntry[NYCoAFile]):
