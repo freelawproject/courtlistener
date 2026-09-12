@@ -199,6 +199,17 @@ class BasicAPIPageTest(ESIndexTestCase, TestCase):
         r = await self.async_client.get(reverse("court_index"))
         self.assertEqual(r.status_code, 200)
 
+    async def test_drf_login_redirects_to_sign_in(self) -> None:
+        """Is DRF's browsable-API login page pointed at our own?
+
+        Its own login view skips the ratelimiting, redirect sanitizing and
+        confirmed-email check that /sign-in/ has.
+        """
+        r = await self.async_client.get(reverse("drf_login_redirect"))
+        self.assertRedirects(
+            r, reverse("sign-in"), fetch_redirect_response=False
+        )
+
     async def test_wiki_data_endpoint(self) -> None:
         """Does the wiki data endpoint return the expected JSON structure?"""
         await caches["default"].adelete("wiki-data")

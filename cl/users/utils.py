@@ -205,6 +205,36 @@ emails: dict[str, EmailType] = {
         "We're always happy to hear from you.",
         "from_email": settings.DEFAULT_FROM_EMAIL,
     },
+    "reset_needs_confirmation": {
+        "subject": "Confirm your email address to reset your CourtListener "
+        "password",
+        "body": "Hello,\n\n"
+        ""
+        "Somebody — probably you — has asked that we send password reset "
+        "instructions to this address. We do have an account using this "
+        "address, but the address has never been confirmed, so we can't "
+        "send a reset link to it yet.\n\n"
+        ""
+        "Confirming an address is how we know the account belongs to "
+        "whoever reads this inbox. Until that happens, anybody could point "
+        "an account at your address, so we don't send reset links to "
+        "unconfirmed addresses. To confirm yours, visit:\n\n"
+        ""
+        "    https://www.courtlistener.com%s\n\n"
+        ""
+        "Once it's confirmed you'll be able to reset your password and "
+        "sign in as usual.\n\n"
+        ""
+        "If this was not you, you can ignore this email. Nothing about the "
+        "account has changed.\n\n"
+        ""
+        "Thanks for using our site,\n\n"
+        "The Free Law Project Team\n\n"
+        "------------------\n"
+        "For questions or comments, please see our contact page, "
+        "https://www.courtlistener.com/contact/.",
+        "from_email": settings.DEFAULT_FROM_EMAIL,
+    },
     # Used both when people want to confirm an email address and when they
     # want to reset their password, with one small tweak in the wording.
     "no_account_found": {
