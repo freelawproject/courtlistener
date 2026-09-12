@@ -1,15 +1,22 @@
 import functools
 import socket
 import sys
+from collections.abc import Callable, Sequence
+from typing import Any
 
+from asgiref.sync import iscoroutinefunction, sync_to_async
 from django.conf import settings
 from django.core.cache import caches
 from django.http import HttpRequest
-from django_ratelimit import UNSAFE
-from django_ratelimit.core import get_header
+from django_ratelimit import ALL, UNSAFE
+from django_ratelimit.core import get_header, is_ratelimited
 from django_ratelimit.decorators import ratelimit
 from django_ratelimit.exceptions import Ratelimited
 from redis import ConnectionError
+
+type RatelimitKey = Callable[[str, HttpRequest], str] | str
+type RatelimitMethod = str | Sequence[str | None]
+type View = Callable[..., Any]
 
 
 def get_user_ip_from_cloudfront_headers(request: HttpRequest) -> str:
@@ -55,7 +62,77 @@ def get_path_to_make_key(group: str, request: HttpRequest) -> str:
     return request.path
 
 
-ratelimiter_all_250_per_h = ratelimit(
+def make_ratelimiter(
+    *,
+    key: RatelimitKey,
+    rate: str,
+    method: RatelimitMethod = ALL,
+) -> Callable[[View], View]:
+    """Build a rate-limiting decorator that works on sync and async views.
+
+    django-ratelimit's own decorator is sync-only. Wrapped around an async
+    view it hands Django a coroutine that nothing awaits, and the request dies
+    with "didn't return an HttpResponse object" instead of being throttled, so
+    MUST NOT be used directly on an async view. Sync views get that decorator
+    unchanged here; async views get an async wrapper around it.
+
+    The counting deliberately runs through django-ratelimit's sync path in a
+    worker thread rather than through Django's async cache API. Every Django
+    cache backend inherits ``BaseCache.aincr``, which is a read-modify-write
+    -- RedisCache does not override it -- so concurrent requests lose
+    increments and the limit doesn't hold. The sync path gets Redis's atomic
+    INCR.
+
+    A throttled request raises ``Ratelimited``, which RatelimitMiddleware
+    turns into the 429 page. Unlike django-ratelimit's decorator, the async
+    path here ignores the ``RATELIMIT_EXCEPTION_CLASS`` setting, which we
+    don't set.
+
+    :param key: What to count by, as django-ratelimit's ``key`` argument: our
+        key functions take (group, request) and return the string to count.
+    :param rate: A django-ratelimit rate, like "10/m".
+    :param method: Which HTTP methods to count. Defaults to all of them.
+    :return: A decorator to apply to a view.
+    """
+    sync_decorator = ratelimit(key=key, rate=rate, method=method)
+
+    def decorator(view: View) -> View:
+        if not iscoroutinefunction(view):
+            return sync_decorator(view)
+
+        @functools.wraps(view)
+        async def wrapper(request: HttpRequest, *args, **kwargs):
+            # thread_sensitive=False: this only touches the cache, so it has
+            # no reason to hold the main thread, where it would serialize
+            # every throttled view behind one Redis round trip at a time.
+            limited = await sync_to_async(
+                is_ratelimited, thread_sensitive=False
+            )(
+                request=request,
+                group=None,
+                fn=view,
+                key=key,
+                rate=rate,
+                method=method,
+                increment=True,
+            )
+            # setattr because django-ratelimit hangs this on the request
+            # too, and HttpRequest has no such attribute to assign to.
+            setattr(  # noqa: B010
+                request,
+                "limited",
+                limited or getattr(request, "limited", False),
+            )
+            if limited:
+                raise Ratelimited
+            return await view(request, *args, **kwargs)
+
+        return wrapper
+
+    return decorator
+
+
+ratelimiter_all_250_per_h = make_ratelimiter(
     key=get_ip_for_ratelimiter,
     rate="250/h",
 )
@@ -70,30 +147,30 @@ if "test" in sys.argv:
     ratelimiter_all_10_per_h = lambda func: func
     ratelimiter_unsafe_2000_per_h = lambda func: func
 else:
-    ratelimiter_all_2_per_m = ratelimit(
+    ratelimiter_all_2_per_m = make_ratelimiter(
         key=get_ip_for_ratelimiter,
         rate="2/m",
     )
-    ratelimiter_unsafe_3_per_m = ratelimit(
+    ratelimiter_unsafe_3_per_m = make_ratelimiter(
         key=get_ip_for_ratelimiter,
         rate="3/m",
         method=UNSAFE,
     )
-    ratelimiter_unsafe_5_per_d = ratelimit(
+    ratelimiter_unsafe_5_per_d = make_ratelimiter(
         key=get_ip_for_ratelimiter,
         rate="5/d",
         method=UNSAFE,
     )
-    ratelimiter_unsafe_10_per_m = ratelimit(
+    ratelimiter_unsafe_10_per_m = make_ratelimiter(
         key=get_ip_for_ratelimiter,
         rate="10/m",
         method=UNSAFE,
     )
-    ratelimiter_all_10_per_h = ratelimit(
+    ratelimiter_all_10_per_h = make_ratelimiter(
         key=get_path_to_make_key,
         rate="10/h",
     )
-    ratelimiter_unsafe_2000_per_h = ratelimit(
+    ratelimiter_unsafe_2000_per_h = make_ratelimiter(
         key=get_path_to_make_key,
         rate="2000/h",
         method=UNSAFE,
@@ -109,11 +186,32 @@ APPROVED_DOMAINS = [
 ]
 
 
-def ratelimit_deny_list(view):
+def ratelimit_deny_list(view: View) -> View:
     """A wrapper for the ratelimit function that adds an allowlist for approved
     crawlers.
+
+    Works on sync and async views alike. The allowlist check does a pair of
+    DNS lookups, so on an async view it runs in a worker thread rather than on
+    the event loop.
     """
     ratelimited_view = ratelimiter_all_250_per_h(view)
+
+    if iscoroutinefunction(view):
+
+        @functools.wraps(view)
+        async def async_wrapper(request: HttpRequest, *args, **kwargs):
+            try:
+                return await ratelimited_view(request, *args, **kwargs)
+            except Ratelimited as e:
+                if await sync_to_async(is_allowlisted)(request):
+                    return await view(request, *args, **kwargs)
+                else:
+                    raise e
+            except ConnectionError:
+                # Unable to connect to redis, let the view proceed this time.
+                return await view(request, *args, **kwargs)
+
+        return async_wrapper
 
     @functools.wraps(view)
     def wrapper(request, *args, **kwargs):
