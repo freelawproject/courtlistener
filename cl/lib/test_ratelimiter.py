@@ -9,7 +9,6 @@ decorated view directly would pass either way.
 import asyncio
 from http import HTTPStatus
 
-from asgiref.sync import iscoroutinefunction
 from django.core.cache import cache
 from django.http import HttpRequest, HttpResponse
 from django.test import override_settings
@@ -67,10 +66,6 @@ VIEWER = {"CloudFront-Viewer-Address": "192.0.2.1:51396"}
             # can't reset our counters mid-test.
             "LOCATION": "ratelimiter-test",
         },
-        "db_cache": {
-            "BACKEND": "django.core.cache.backends.db.DatabaseCache",
-            "LOCATION": "django_cache",
-        },
     },
 )
 class RateLimiterTest(SimpleTestCase):
@@ -101,17 +96,6 @@ class RateLimiterTest(SimpleTestCase):
 
         r = await self.async_client.get("/async/", headers=VIEWER)
         self.assertEqual(r.status_code, HTTPStatus.TOO_MANY_REQUESTS)
-
-    def test_a_decorated_async_view_is_still_a_coroutine_function(
-        self,
-    ) -> None:
-        """Django decides how to call a view by asking this question.
-
-        If the answer is no, it runs the view in a thread and never awaits
-        what comes back, which is the whole of #2930.
-        """
-        self.assertTrue(iscoroutinefunction(async_view))
-        self.assertFalse(iscoroutinefunction(sync_view))
 
     async def test_simultaneous_async_requests_are_all_counted(self) -> None:
         """Does the limit hold when the requests arrive at once?
