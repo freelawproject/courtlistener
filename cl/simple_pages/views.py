@@ -376,9 +376,7 @@ async def components(request: HttpRequest) -> HttpResponse:
     )
 
 
-def ratelimited(
-    request: HttpRequest, exception: Exception
-) -> HttpResponse:
+def ratelimited(request: HttpRequest, exception: Exception) -> HttpResponse:
     """Show the 429 page to a request that tripped a rate limit.
 
     django-ratelimit dispatches here from RatelimitMiddleware.process_exception,
