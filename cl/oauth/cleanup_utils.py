@@ -3,6 +3,7 @@ import time
 from datetime import timedelta
 
 from django.conf import settings
+from django.core.exceptions import ImproperlyConfigured
 from django.db.models import Exists, OuterRef, QuerySet
 from django.utils import timezone
 from oauth2_provider.models import (
@@ -13,6 +14,7 @@ from oauth2_provider.models import (
     get_id_token_model,
     get_refresh_token_model,
 )
+from oauth2_provider.settings import oauth2_settings
 
 logger = logging.getLogger(__name__)
 
@@ -101,6 +103,32 @@ def delete_unconfirmed_applications(
         batch_size=batch_size,
         pause_seconds=pause_seconds,
         dry_run=dry_run,
+    )
+
+
+def refresh_token_lifetime() -> timedelta | None:
+    """Return the configured refresh-token lifetime as a timedelta.
+
+    This reads from ``oauth2_settings`` to stay consistent with
+    ``clear_expired()``, which reads the same setting when deciding whether
+    expired refresh tokens should be removed.
+
+    If the setting is unset or falsy, return ``None`` to match the toolkit's
+    default. In that case, ``clear_expired()`` does not expire refresh tokens,
+    so no lifetime cap is needed.
+    """
+
+    lifetime = oauth2_settings.REFRESH_TOKEN_EXPIRE_SECONDS
+    if not lifetime:
+        return None
+    if isinstance(lifetime, timedelta):
+        return lifetime
+    if isinstance(lifetime, int | float):
+        return timedelta(seconds=lifetime)
+    # Mirror clear_expired()'s own error, which would otherwise surface later
+    # in the pass, after applications had already been deleted.
+    raise ImproperlyConfigured(
+        "REFRESH_TOKEN_EXPIRE_SECONDS must be either a timedelta or seconds"
     )
 
 

@@ -6,7 +6,7 @@ from unittest.mock import patch
 import time_machine
 from django.conf import settings
 from django.core.cache import cache
-from django.core.exceptions import ValidationError
+from django.core.exceptions import ImproperlyConfigured, ValidationError
 from django.core.management import call_command
 from django.test import override_settings
 from django.urls import reverse
@@ -21,6 +21,7 @@ from oauth2_provider.models import (
 
 from cl.oauth.cleanup_utils import (
     delete_unconfirmed_applications,
+    refresh_token_lifetime,
     run_cleanup_pass,
     unconfirmed_applications,
 )
@@ -552,6 +553,37 @@ class UnconfirmedApplicationCleanupTest(TestCase):
         mock_clear_expired.assert_not_called()
         self.assertFalse(Application.objects.filter(pk=self.stale.pk).exists())
         self.assertKeptApplicationsExist()
+
+
+class RefreshTokenLifetimeTest(SimpleTestCase):
+    """The cap the cleanup uses tracks the toolkit's own refresh window."""
+
+    def test_normalizes_supported_configurations(self):
+        """Both spellings of the window resolve, and an unset one is None."""
+        # django-oauth-toolkit accepts a timedelta or a number of seconds, and
+        # treats a falsy value as "never clear refresh tokens".
+        cases = [
+            (60 * 60 * 24 * 30, timedelta(days=30)),
+            (timedelta(days=30), timedelta(days=30)),
+            (None, None),
+            (0, None),
+        ]
+        for configured, expected in cases:
+            with self.subTest(configured=configured):
+                with override_settings(
+                    OAUTH2_PROVIDER={
+                        "REFRESH_TOKEN_EXPIRE_SECONDS": configured
+                    }
+                ):
+                    self.assertEqual(refresh_token_lifetime(), expected)
+
+    def test_rejects_an_unusable_window(self):
+        """An uninterpretable window fails before anything is deleted."""
+        with override_settings(
+            OAUTH2_PROVIDER={"REFRESH_TOKEN_EXPIRE_SECONDS": "30 days"}
+        ):
+            with self.assertRaises(ImproperlyConfigured):
+                refresh_token_lifetime()
 
 
 class CleanOAuthTablesCommandTest(TestCase):
