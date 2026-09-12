@@ -1,5 +1,6 @@
 import datetime
 import pickle
+from http import HTTPStatus
 from typing import TypedDict, cast
 from unittest import mock
 from unittest.mock import MagicMock, patch
@@ -10,9 +11,13 @@ from django.core.cache import cache
 from django.core.exceptions import ValidationError
 from django.core.files.base import ContentFile
 from django.core.files.uploadedfile import SimpleUploadedFile
+from django.http import HttpResponse
 from django.template.response import TemplateResponse
 from django.test import RequestFactory, SimpleTestCase, override_settings
+from django.urls import reverse
 from django.utils.functional import SimpleLazyObject
+from django_ratelimit.exceptions import Ratelimited
+from django_ratelimit.middleware import RatelimitMiddleware
 from requests.cookies import RequestsCookieJar
 from waffle.testutils import override_flag
 
@@ -2741,3 +2746,25 @@ class IncrementalNewTemplateMiddlewareTest(TestCase):
         """A v2-only template is served even with the flag off."""
         response = self.process("components.html")
         self.assertEqual(response.template_name, "v2_components.html")
+
+
+class RatelimitedViewTest(SimpleTestCase):
+    """Does the throttled-request handler return a real 429 page?
+
+    django-ratelimit hands the request to RATELIMIT_VIEW from
+    RatelimitMiddleware.process_exception, which Django only ever calls
+    synchronously. A coroutine returned from there never gets awaited, so the
+    user sees a 500 instead of the 429 we meant to show them.
+    """
+
+    def test_the_middleware_gets_a_response_not_a_coroutine(self) -> None:
+        request = RequestFactory().get(reverse("sign-in"))
+        middleware = RatelimitMiddleware(lambda r: HttpResponse())
+
+        response = middleware.process_exception(request, Ratelimited())
+
+        self.assertIsInstance(response, HttpResponse)
+        self.assertEqual(
+            cast(HttpResponse, response).status_code,
+            HTTPStatus.TOO_MANY_REQUESTS,
+        )
