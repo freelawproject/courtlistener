@@ -5473,6 +5473,53 @@ class AnonThrottleIdentTest(TestCase):
 
         self.assertEqual(throttle.get_ident(request), "10.0.0.1")
 
+    def test_an_authenticated_client_is_keyed_by_user(self) -> None:
+        """The viewer address decides nothing once there's a user.
+
+        get_ident() is only reached on the anonymous branch, so a signed-in
+        user counts by their pk no matter which address CloudFront reports.
+        """
+        user = UserFactory()
+        throttle = ExceptionalUserRateThrottle()
+        first = self.factory.get(
+            "/", HTTP_CLOUDFRONT_VIEWER_ADDRESS="96.23.39.106:51396"
+        )
+        first.user = user
+        second = self.factory.get(
+            "/", HTTP_CLOUDFRONT_VIEWER_ADDRESS="203.0.113.9:22222"
+        )
+        second.user = user
+
+        key = throttle.get_cache_key(first, view=None)
+        self.assertEqual(key, throttle.get_cache_key(second, view=None))
+        self.assertIn(str(user.pk), key)
+
+    def test_two_authenticated_clients_are_counted_separately(self) -> None:
+        """Even sharing one address, as an office behind one NAT would."""
+        throttle = ExceptionalUserRateThrottle()
+        requests = []
+        for _ in range(2):
+            request = self.factory.get(
+                "/", HTTP_CLOUDFRONT_VIEWER_ADDRESS="96.23.39.106:51396"
+            )
+            request.user = UserFactory()
+            requests.append(request)
+
+        self.assertNotEqual(
+            throttle.get_cache_key(requests[0], view=None),
+            throttle.get_cache_key(requests[1], view=None),
+        )
+
+    def test_the_anon_throttle_skips_authenticated_clients(self) -> None:
+        """It returns no key at all for them, as DRF's does."""
+        throttle = CloudFrontAnonRateThrottle()
+        request = self.factory.get(
+            "/", HTTP_CLOUDFRONT_VIEWER_ADDRESS="96.23.39.106:51396"
+        )
+        request.user = UserFactory()
+
+        self.assertIsNone(throttle.get_cache_key(request, view=None))
+
     def test_the_user_scope_keys_anonymous_clients_the_same_way(self) -> None:
         """Anonymous requests are counted in the user scope too.
 
