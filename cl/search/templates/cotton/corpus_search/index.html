@@ -9,6 +9,8 @@
 <form
   x-data="search"
   x-on:submit="onSubmit"
+  x-on:input="updateActiveFilterCount"
+  x-on:change="updateActiveFilterCount"
   x-id="corpusSearchIdGroup"
   role="search"
   action="/"
