@@ -20,7 +20,9 @@ REST_FRAMEWORK = {
     "ALLOWED_VERSIONS": {"v3", "v4"},
     # Throttles
     "DEFAULT_THROTTLE_CLASSES": (
-        "rest_framework.throttling.AnonRateThrottle",
+        # Ours rather than DRF's: both key anonymous clients on the address
+        # CloudFront saw, which is the only stable one we get. See #7655.
+        "cl.api.utils.CloudFrontAnonRateThrottle",
         "cl.api.utils.ExceptionalUserRateThrottle",
     ),
     "DEFAULT_THROTTLE_RATES": {

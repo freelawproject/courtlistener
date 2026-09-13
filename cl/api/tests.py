@@ -11,7 +11,7 @@ from urllib.parse import parse_qs, urlparse
 import time_machine
 from asgiref.sync import async_to_sync, sync_to_async
 from django.contrib.auth.hashers import make_password
-from django.contrib.auth.models import Permission, User
+from django.contrib.auth.models import AnonymousUser, Permission, User
 from django.contrib.contenttypes.models import ContentType
 from django.contrib.humanize.templatetags.humanize import intcomma, ordinal
 from django.contrib.sites.models import Site
@@ -53,6 +53,7 @@ from cl.api.models import (
 from cl.api.pagination import VersionBasedPagination
 from cl.api.utils import (
     DOUBLE_API_THROTTLES_SWITCH,
+    CloudFrontAnonRateThrottle,
     ExceptionalUserRateThrottle,
     FetchRateThrottle,
     LoggingMixin,
@@ -5405,6 +5406,94 @@ class MultiRateThrottleTest(TestCase):
         with self.assertRaises(Throttled) as ctx:
             throttle.allow_request(request, view=None)
         self.assertIn("blocked", str(ctx.exception.detail).lower())
+
+
+@override_settings(
+    CACHES={
+        "default": {
+            "BACKEND": "django.core.cache.backends.locmem.LocMemCache",
+            "LOCATION": "anon-throttle-ident-test",
+        }
+    }
+)
+class AnonThrottleIdentTest(TestCase):
+    """Does the anonymous throttle count a client by one stable key?
+
+    Behind CloudFront, X-Forwarded-For and REMOTE_ADDR both vary from request
+    to request, so keying on them scattered one client's requests across many
+    buckets and the limit stopped holding (#7655).
+    """
+
+    def setUp(self) -> None:
+        caches["default"].clear()
+        self.factory = RequestFactory()
+
+    def _anon_request(self, **headers):
+        request = self.factory.get("/", **headers)
+        request.user = AnonymousUser()
+        return request
+
+    def test_the_viewer_address_decides_the_key(self) -> None:
+        """One viewer behind two proxy paths gets one key, not two."""
+        throttle = CloudFrontAnonRateThrottle()
+        first = self._anon_request(
+            HTTP_CLOUDFRONT_VIEWER_ADDRESS="96.23.39.106:51396",
+            HTTP_X_FORWARDED_FOR="10.0.0.1",
+            REMOTE_ADDR="10.0.0.1",
+        )
+        second = self._anon_request(
+            HTTP_CLOUDFRONT_VIEWER_ADDRESS="96.23.39.106:22222",
+            HTTP_X_FORWARDED_FOR="10.0.0.2",
+            REMOTE_ADDR="10.0.0.2",
+        )
+
+        self.assertEqual(
+            throttle.get_cache_key(first, view=None),
+            throttle.get_cache_key(second, view=None),
+        )
+
+    def test_two_viewers_are_counted_separately(self) -> None:
+        throttle = CloudFrontAnonRateThrottle()
+        one = self._anon_request(
+            HTTP_CLOUDFRONT_VIEWER_ADDRESS="96.23.39.106:51396"
+        )
+        two = self._anon_request(
+            HTTP_CLOUDFRONT_VIEWER_ADDRESS="96.23.39.107:51396"
+        )
+
+        self.assertNotEqual(
+            throttle.get_cache_key(one, view=None),
+            throttle.get_cache_key(two, view=None),
+        )
+
+    def test_it_falls_back_without_the_header(self) -> None:
+        """Local development and tests see no CloudFront header."""
+        throttle = CloudFrontAnonRateThrottle()
+        request = self._anon_request(REMOTE_ADDR="10.0.0.1")
+
+        self.assertEqual(throttle.get_ident(request), "10.0.0.1")
+
+    def test_the_user_scope_keys_anonymous_clients_the_same_way(self) -> None:
+        """Anonymous requests are counted in the user scope too.
+
+        DRF's UserRateThrottle falls back to the ident for a request with no
+        user, which is why an anonymous client can see the user scope's
+        "5/min" message. That key has to be stable for the same reason.
+        """
+        throttle = ExceptionalUserRateThrottle()
+        first = self._anon_request(
+            HTTP_CLOUDFRONT_VIEWER_ADDRESS="96.23.39.106:51396",
+            REMOTE_ADDR="10.0.0.1",
+        )
+        second = self._anon_request(
+            HTTP_CLOUDFRONT_VIEWER_ADDRESS="96.23.39.106:22222",
+            REMOTE_ADDR="10.0.0.2",
+        )
+
+        self.assertEqual(
+            throttle.get_cache_key(first, view=None),
+            throttle.get_cache_key(second, view=None),
+        )
 
 
 @override_settings(

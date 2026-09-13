@@ -34,11 +34,17 @@ def get_user_ip_from_cloudfront_headers(request: HttpRequest) -> str:
 
         96.23.39.106
 
+    The port is split off the right-hand side because an IPv6 address is
+    colon-separated itself: splitting on the first colon would truncate
+    2600:1f18::1234:51396 to "2600", lumping unrelated clients into one key.
+
     :param request: The HTTP request from the user
-    :return: A simple key that can be used to throttle the user if needed.
+    :return: A simple key that can be used to throttle the user if needed. The
+        empty string when CloudFront didn't send the header, as in local
+        development, where callers need their own fallback.
     """
     header = get_header(request, "CloudFront-Viewer-Address")
-    return header.split(":")[0]
+    return header.rsplit(":", 1)[0]
 
 
 def get_ip_for_ratelimiter(group: str, request: HttpRequest) -> str:
