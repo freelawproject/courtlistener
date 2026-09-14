@@ -1056,7 +1056,7 @@ class NotesPageDeadLinkTest(TestCase):
         user = UserProfileWithParentsFactory()
         court = CourtFactory(id="scotus", jurisdiction="F")
         docket = DocketFactory(court=court, source=Docket.SCRAPER)
-        entry = SCOTUSDocketEntryFactory(docket=docket)
+        entry = SCOTUSDocketEntryFactory(docket=docket, entry_number=None)
         document = SCOTUSDocumentFactory(
             docket_entry=entry, attachment_number=None
         )
