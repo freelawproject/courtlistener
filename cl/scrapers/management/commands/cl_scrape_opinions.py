@@ -301,7 +301,15 @@ class Command(ScraperCommand):
         court_str = site.court_id.split(".")[-1].split("_")[0]
         court = await Court.objects.aget(pk=court_str)
 
-        dup_checker = DupChecker(court, full_crawl=full_crawl)
+        dup_checker = DupChecker(
+            court,
+            full_crawl=full_crawl,
+            # Sites from juriscraper releases without the attribute, and mock
+            # sites, lack it. Keep mich's old exemption until the pin is bumped.
+            is_recency_ordered=getattr(
+                site, "is_recency_ordered", court.pk != "mich"
+            ),
+        )
         if await sync_to_async(dup_checker.abort_by_url_hash)(
             site.url, site.hash
         ):
@@ -317,6 +325,7 @@ class Command(ScraperCommand):
         update_site_hash = not full_crawl
 
         added = 0
+        aborted = False
         for i, item in enumerate(site):
             try:
                 next_date = site[i + 1]["case_dates"]
@@ -329,6 +338,7 @@ class Command(ScraperCommand):
                 )
                 added += 1
             except ConsecutiveDuplicatesError:
+                aborted = True
                 break
             except SingleDuplicateError:
                 pass
@@ -337,12 +347,16 @@ class Command(ScraperCommand):
                 update_site_hash = False
 
         # Update the hash if everything finishes properly.
-        logger.debug(
-            "%s: Successfully crawled %s/%s %s.",
+        logger.info(
+            "%s: Successfully crawled %s/%s %s; duplicate hits: %s by url, "
+            "%s by sha1; early exit: %s",
             site.court_id,
             added,
             len(site),
             self.scrape_target_descr,
+            dup_checker.dups_by_lookup["download_url"],
+            dup_checker.dups_by_lookup["sha1"],
+            aborted,
         )
 
         if update_site_hash:
@@ -368,6 +382,10 @@ class Command(ScraperCommand):
             opinions_to_download = case_dict["sub_opinions"]
         else:
             opinions_to_download.append(case_dict)
+
+        await self.raise_if_urls_known(
+            dup_checker, case_dict, opinions_to_download, next_case_date
+        )
 
         # download content
         for sub_opinion in opinions_to_download:
@@ -427,6 +445,51 @@ class Command(ScraperCommand):
             dup_checker.reset()
 
         return opinions_content
+
+    async def raise_if_urls_known(
+        self,
+        dup_checker: DupChecker,
+        case_dict: dict,
+        opinions_to_download: list[dict],
+        next_case_date: date | None,
+    ) -> None:
+        """Skips a cluster whose download URLs we already have, before download
+
+        Only done for sites that don't list new items first: those are walked
+        in full, so fetching every known document again would be too costly.
+        A document revised at a known URL is therefore not ingested again for
+        these sites, except by a backscrape, which downloads everything. The
+        sha1 check after download still applies to what is fetched.
+
+        :param dup_checker: the run's DupChecker
+        :param case_dict: the cluster being ingested
+        :param opinions_to_download: the opinions with a `download_urls`
+        :param next_case_date: date of the next item in the site
+        :return: None
+        :raises SingleDuplicateError: an opinion URL is already in CL
+        """
+        if not dup_checker.should_precheck_urls:
+            return
+
+        urls = [
+            url
+            for sub_opinion in opinions_to_download
+            if (url := sub_opinion.get("download_urls"))
+        ]
+        known_urls = await sync_to_async(dup_checker.find_known_urls)(
+            Opinion, case_dict["case_dates"], next_case_date, urls
+        )
+        if not known_urls:
+            return
+
+        if len(known_urls) < len(urls):
+            logger.error(
+                "Cluster had %s of %s known sub opinion URLs %s",
+                len(known_urls),
+                len(urls),
+                opinions_to_download,
+            )
+        raise SingleDuplicateError(logger=logger)
 
     async def ingest_a_case(
         self,
