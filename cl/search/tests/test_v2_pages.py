@@ -9,6 +9,7 @@ from django.utils import timezone
 from lxml import html as lhtml
 from waffle.testutils import override_flag
 
+from cl.lib import widgets
 from cl.lib.test_helpers import (
     CourtTestCase,
     PeopleTestCase,
@@ -187,16 +188,36 @@ class HomepageStructureTest(SimpleUserDataMixin, TestCase):
 class CorpusSearchFormWidgetTest(TestCase):
     """Tests enforcing shared widget usage in CorpusSearchForm."""
 
-    def test_uses_custom_text_and_select_widgets(self) -> None:
-        """Prevent fields from reverting to built-in widgets with CL alternatives."""
-        built_in_widgets = (forms.TextInput, forms.Select)
-        prohibited_widgets = {
-            field_name: type(field.widget).__name__
-            for field_name, field in CorpusSearchForm().fields.items()
-            if type(field.widget) in built_in_widgets
+    @staticmethod
+    def _get_offending_fields(form: forms.Form) -> dict[str, str]:
+        """Return text/select fields that do not use shared CL widgets."""
+        built_in_widget_families = (forms.TextInput, forms.Select)
+        approved_widgets = (widgets.TextInput, widgets.Select)
+        return {
+            field_name: (
+                f"{type(field.widget).__module__}."
+                f"{type(field.widget).__qualname__}"
+            )
+            for field_name, field in form.fields.items()
+            if isinstance(field.widget, built_in_widget_families)
+            and not isinstance(field.widget, approved_widgets)
         }
 
-        self.assertEqual(prohibited_widgets, {})
+    def test_uses_custom_text_and_select_widgets(self) -> None:
+        """Prevent fields from reverting to built-in widgets with CL alternatives."""
+        offending_fields = self._get_offending_fields(CorpusSearchForm())
+
+        self.assertEqual(offending_fields, {})
+
+    def test_rejects_builtin_date_input(self) -> None:
+        """Catch a date field that falls back to Django's DateInput."""
+        form = CorpusSearchForm()
+        form.fields["filed_after"].widget = forms.DateInput()
+
+        self.assertEqual(
+            self._get_offending_fields(form),
+            {"filed_after": "django.forms.widgets.DateInput"},
+        )
 
 
 @override_flag("use_new_design", True)
