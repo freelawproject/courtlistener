@@ -77,7 +77,7 @@ from cl.search.state.texas.models import *
 from cl.users.models import User
 
 if TYPE_CHECKING:
-    from cl.opinion_page.docket_sources_utils import DocketEntrySource
+    from cl.opinion_page.docket_entry_sources import DocketEntrySource
 
 HYPERSCAN_TOKENIZER = HyperscanTokenizer(cache_dir=".hyperscan")
 
@@ -890,9 +890,9 @@ class Docket(AbstractDateTimeModel, DocketSources):
     @property
     def pacer_docket_url(self) -> str | None:
         """Return the PACER docket report URL, or None if the docket isn't in PACER."""
-        from cl.opinion_page.docket_sources_utils import RECAP_SOURCE
+        from cl.opinion_page import docket_entry_sources
 
-        if self.get_entry_source() is not RECAP_SOURCE:
+        if self.get_entry_source() is not docket_entry_sources.RECAP:
             return None
 
         if self.court.jurisdiction == Court.FEDERAL_APPELLATE:
@@ -923,12 +923,11 @@ class Docket(AbstractDateTimeModel, DocketSources):
         """Return the DocketEntrySource config for this docket's court -
         RECAP/PACER by default, with per-court overrides.
         """
-        from cl.opinion_page.docket_sources_utils import (
-            _SOURCES_BY_COURT_ID,
-            RECAP_SOURCE,
-        )
+        from cl.opinion_page import docket_entry_sources
 
-        return _SOURCES_BY_COURT_ID.get(self.court_id, RECAP_SOURCE)
+        return docket_entry_sources.BY_COURT_ID.get(
+            self.court_id, docket_entry_sources.RECAP
+        )
 
     @property
     def pacer_alias_url(self):
@@ -4302,6 +4301,36 @@ class SCOTUSDocument(AbstractDateTimeModel, AbstractPDF):
             "documents-thumbnails" if thumbs else "documents"
         )
         return str(root / f"gov.scotus.{slug}.pdf")
+
+    def get_absolute_url(self) -> str:
+        if not self.document_number:
+            return ""
+        if self.attachment_number is None:
+            return reverse(
+                "view_recap_document",
+                kwargs={
+                    "docket_id": self.docket_entry.docket_id,
+                    "doc_num": self.document_number,
+                    "slug": self.docket_entry.docket.slug,
+                },
+            )
+        return reverse(
+            "view_recap_attachment",
+            kwargs={
+                "docket_id": self.docket_entry.docket_id,
+                "doc_num": self.document_number,
+                "att_num": self.attachment_number,
+                "slug": self.docket_entry.docket.slug,
+            },
+        )
+
+    @property
+    def is_available(self) -> bool:
+        return bool(self.filepath_local)
+
+    @property
+    def has_valid_pdf(self) -> bool:
+        return self.is_available
 
     @property
     def needs_extraction(self):
