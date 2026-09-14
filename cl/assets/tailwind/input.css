@@ -129,9 +129,9 @@
      chevron.svg's currentColor resolves to black in a background-image. */
   select.input-text {
     @apply pr-9 bg-no-repeat;
-    background-image: url("/static/svg/chevron.svg");
-    background-position: right theme(spacing.3) center;
-    background-size: theme(spacing.5);
+    background-image: url("/static/svg/chevron.svg"); /* frontend-checks-skip-line: check_raw_css */
+    background-position: right theme(spacing.3) center; /* frontend-checks-skip-line: check_raw_css */
+    background-size: theme(spacing.5); /* frontend-checks-skip-line: check_raw_css */
   }
   .links {
     @apply underline text-primary-600 hover:text-primary-800;
@@ -230,8 +230,8 @@
     @apply w-full max-w-[--content-max-width] mx-auto;
   }
   .scrollbar-none {
-    scrollbar-width: none;
-    -ms-overflow-style: none;
+    scrollbar-width: none; /* frontend-checks-skip-line: check_raw_css */
+    -ms-overflow-style: none; /* frontend-checks-skip-line: check_raw_css */
   }
   .scrollbar-none::-webkit-scrollbar {
     @apply hidden;
