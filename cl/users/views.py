@@ -212,7 +212,7 @@ def view_notes(request: AuthenticatedHttpRequest) -> HttpResponse:
         + ")"
     )
     recap_search_url = (
-        "/?type=r&q=xxx AND docket_entry_id:("
+        "/?type=r&q=xxx AND id:("
         + " OR ".join(
             str(a.instance.recap_doc_id.pk)
             for a in note_forms["RECAP Documents"]
