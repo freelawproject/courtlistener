@@ -299,6 +299,42 @@ class CorpusSearchFormTest(SimpleUserDataMixin, TestCase):
             "Expected at least one input with name='filed_before'",
         )
 
+    def test_corpus_search_tabs_are_server_rendered(self):
+        """Corpus search tab labels appear in HTML before Alpine runs.
+
+        Regression for #7035: tabs used Alpine x-for, so labels were missing
+        from the initial HTML and flashed in after JavaScript loaded.
+        """
+        expected_labels = [
+            "Case Law",
+            "RECAP Archive",
+            "Oral Arguments",
+            "Judges",
+        ]
+        tablist = self.tree.xpath(
+            '//*[@role="tablist" and @aria-label="Select the scope of your search"]'
+        )
+        self.assertEqual(
+            len(tablist),
+            1,
+            "Expected one corpus search tablist on the homepage",
+        )
+        tab_labels = [
+            "".join(tab.itertext()).strip()
+            for tab in tablist[0].xpath('.//*[@role="tab"]')
+        ]
+        for label in expected_labels:
+            with self.subTest(label=label):
+                self.assertTrue(
+                    any(label in tab_label for tab_label in tab_labels),
+                    f"Tab label {label!r} missing from server-rendered HTML; "
+                    f"found {tab_labels!r}",
+                )
+        self.assertFalse(
+            tablist[0].xpath(".//template[@x-for]"),
+            "Homepage tablist should not use Alpine x-for for initial render",
+        )
+
 
 @override_flag("use_new_design", True)
 @patch("cl.search.utils.get_redis_interface")

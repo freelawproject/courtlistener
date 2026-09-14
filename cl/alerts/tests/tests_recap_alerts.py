@@ -4424,9 +4424,10 @@ class RECAPAlertsPercolatorTest(
         with (
             mock.patch(
                 "cl.alerts.tasks.has_document_alert_hit_been_triggered",
-                side_effect=lambda *args,
-                **kwargs: self.count_percolator_calls(
-                    has_document_alert_hit_been_triggered, *args, **kwargs
+                side_effect=lambda *args, **kwargs: (
+                    self.count_percolator_calls(
+                        has_document_alert_hit_been_triggered, *args, **kwargs
+                    )
                 ),
             ),
             mock.patch(
@@ -4467,9 +4468,10 @@ class RECAPAlertsPercolatorTest(
         with (
             mock.patch(
                 "cl.alerts.tasks.has_document_alert_hit_been_triggered",
-                side_effect=lambda *args,
-                **kwargs: self.count_percolator_calls(
-                    has_document_alert_hit_been_triggered, *args, **kwargs
+                side_effect=lambda *args, **kwargs: (
+                    self.count_percolator_calls(
+                        has_document_alert_hit_been_triggered, *args, **kwargs
+                    )
                 ),
             ),
             mock.patch(
@@ -4503,9 +4505,10 @@ class RECAPAlertsPercolatorTest(
         with (
             mock.patch(
                 "cl.alerts.tasks.has_document_alert_hit_been_triggered",
-                side_effect=lambda *args,
-                **kwargs: self.count_percolator_calls(
-                    has_document_alert_hit_been_triggered, *args, **kwargs
+                side_effect=lambda *args, **kwargs: (
+                    self.count_percolator_calls(
+                        has_document_alert_hit_been_triggered, *args, **kwargs
+                    )
                 ),
             ),
             mock.patch(
@@ -4560,9 +4563,10 @@ class RECAPAlertsPercolatorTest(
         with (
             mock.patch(
                 "cl.alerts.tasks.has_document_alert_hit_been_triggered",
-                side_effect=lambda *args,
-                **kwargs: self.count_percolator_calls(
-                    has_document_alert_hit_been_triggered, *args, **kwargs
+                side_effect=lambda *args, **kwargs: (
+                    self.count_percolator_calls(
+                        has_document_alert_hit_been_triggered, *args, **kwargs
+                    )
                 ),
             ),
             mock.patch(
@@ -4619,9 +4623,10 @@ class RECAPAlertsPercolatorTest(
         with (
             mock.patch(
                 "cl.alerts.tasks.has_document_alert_hit_been_triggered",
-                side_effect=lambda *args,
-                **kwargs: self.count_percolator_calls(
-                    has_document_alert_hit_been_triggered, *args, **kwargs
+                side_effect=lambda *args, **kwargs: (
+                    self.count_percolator_calls(
+                        has_document_alert_hit_been_triggered, *args, **kwargs
+                    )
                 ),
             ),
             mock.patch(
@@ -4667,9 +4672,10 @@ class RECAPAlertsPercolatorTest(
         with (
             mock.patch(
                 "cl.alerts.tasks.has_document_alert_hit_been_triggered",
-                side_effect=lambda *args,
-                **kwargs: self.count_percolator_calls(
-                    has_document_alert_hit_been_triggered, *args, **kwargs
+                side_effect=lambda *args, **kwargs: (
+                    self.count_percolator_calls(
+                        has_document_alert_hit_been_triggered, *args, **kwargs
+                    )
                 ),
             ),
             mock.patch(
@@ -5338,9 +5344,10 @@ class RECAPAlertsPercolatorTest(
             ),
             mock.patch(
                 "cl.alerts.tasks.prepare_percolator_content",
-                side_effect=lambda *args,
-                **kwargs: self.count_percolator_calls(
-                    prepare_percolator_content, *args, **kwargs
+                side_effect=lambda *args, **kwargs: (
+                    self.count_percolator_calls(
+                        prepare_percolator_content, *args, **kwargs
+                    )
                 ),
             ),
             time_machine.travel(rd_indexing_time, tick=False),
@@ -5411,9 +5418,10 @@ class RECAPAlertsPercolatorTest(
             ),
             mock.patch(
                 "cl.alerts.tasks.prepare_percolator_content",
-                side_effect=lambda *args,
-                **kwargs: self.count_percolator_calls(
-                    prepare_percolator_content, *args, **kwargs
+                side_effect=lambda *args, **kwargs: (
+                    self.count_percolator_calls(
+                        prepare_percolator_content, *args, **kwargs
+                    )
                 ),
             ),
             time_machine.travel(rd_indexing_time, tick=False),

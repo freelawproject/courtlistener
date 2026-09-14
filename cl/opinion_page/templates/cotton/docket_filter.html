@@ -5,11 +5,11 @@
 
 <c-vars
   docket=""
+  docket_source=""
   form=""
   page_obj=""
   sort_order_asc="True"
   htmx_target=""
-  is_scotus=False
   class=""
 />
 
@@ -302,10 +302,6 @@
 
   <p class="text-sm text-greyscale-500 mt-3">
     {% svg "circle_question_mark" class="w-4 h-4 inline" aria_hidden="true" %}
-    {% if is_scotus %}
-      Items on this page are sourced from the Supreme Court of the United States and may not be up to date.
-    {% else %}
-      Items on this page are sourced from <a class="links" href="https://www.pacer.gov">PACER</a> and <a class="links" href="https://free.law/recap/">RECAP</a> and may not be up to date. <a class="links" href="{% url 'coverage_recap' %}">Learn more about our coverage</a>.
-    {% endif %}
+    <c-docket-source-attribution :docket_source="docket_source" />
   </p>
 </div>

@@ -3,16 +3,12 @@
 
 <c-vars
   docket=""
+  docket_source=""
   active_tab=""
-  metadata=""
-  bankruptcy_metadata=""
-  originating_court_metadata=""
-  scotus_metadata=""
+  metadata_sections=""
   tabs=""
   has_alert=""
   note_form=""
-  is_scotus=False
-  hide_docket_alerts=False
   tab_content_id="tab-content"
 />
 
@@ -39,7 +35,7 @@
   <span class="inline-block px-3 py-1 text-sm font-semibold text-red-700 bg-red-100 border border-red-300 rounded-lg">Blocked</span>
 {% endif %}
 
-{# Action buttons — Note and Tags are placeholders. Alerts and PACER use menu buttons. #}
+{# Action buttons — Note and Tags are placeholders. #}
 {# TODO: Wire up Add a Note and Tags button interactivity. #}
 <div class="flex flex-wrap gap-2 mt-4">
   <c-button variant="outline">
@@ -50,147 +46,60 @@
     {% svg "tag" class="w-4 h-4" aria_hidden="true" %}
     Tags
   </c-button>
-  {% if not hide_docket_alerts and docket.pacer_docket_url %}
-    {# TODO: Wire up alert toggle interactivity (auth checks, AJAX toggle, state change). #}
-    <c-menu-button
-      button_variant="outline"
-      widget_aria_label="Docket alerts menu"
-      trigger_aria_label="Get Alerts"
-      menu_aria_label="Alert options"
-    >
-      <c-slot name="button_content">
-        {% svg "bell" class="w-4 h-4" aria_hidden="true" %}
-        Get Alerts
-        <span
-          class="transition-transform duration-200 group-aria-[expanded=true]:rotate-180 flex justify-center items-center w-4 h-4"
-          aria-hidden="true"
-        >{% svg "chevron" class="w-full h-full text-greyscale-400" %}</span>
-      </c-slot>
-      <c-slot name="menu_content">
-        <c-menu-button.item
-          href="{% url 'docket_feed' docket.pk %}"
-          icon="rss"
-          icon_class="w-4 h-4 text-greyscale-500"
-          rel="nofollow"
-        >
-          Subscribe with RSS
-        </c-menu-button.item>
-        <c-menu-button.item
-          href="{% url 'new_docket_alert' %}?pacer_case_id={{ docket.pacer_case_id }}&court_id={{ docket.court_id }}"
-          icon="forward"
-          icon_class="w-4 h-4 text-greyscale-500"
-          rel="nofollow"
-        >
-          Share Alert Link
-        </c-menu-button.item>
-        <c-menu-button.item
-          href="{{ WIKI_HELP_URL }}/alerts/docket-alerts-for-pacer"
-          icon="circle_question_mark"
-          icon_class="w-4 h-4 text-greyscale-500"
-        >
-          Learn More
-        </c-menu-button.item>
-      </c-slot>
-    </c-menu-button>
-  {% endif %}
-  {% if is_scotus %}
-    {% if docket.scotus_docket_url %}
-      <c-button
-        variant="outline"
-        href="{{ docket.scotus_docket_url }}"
-        target="_blank"
-        rel="nofollow noopener noreferrer"
+  {% if docket_source_url %}
+  {# TODO: Wire up alert toggle interactivity (auth checks, AJAX toggle, state change). #}
+  <c-menu-button
+    button_variant="outline"
+    widget_aria_label="Docket alerts menu"
+    trigger_aria_label="Get Alerts"
+    menu_aria_label="Alert options"
+  >
+    <c-slot name="button_content">
+      {% svg "bell" class="w-4 h-4" aria_hidden="true" %}
+      Get Alerts
+      <span
+        class="transition-transform duration-200 group-aria-[expanded=true]:rotate-180 flex justify-center items-center w-4 h-4"
+        aria-hidden="true"
+      >{% svg "chevron" class="w-full h-full text-greyscale-400" %}</span>
+    </c-slot>
+    <c-slot name="menu_content">
+      <c-menu-button.item
+        href="{% url 'docket_feed' docket.pk %}"
+        icon="rss"
+        icon_class="w-4 h-4 text-greyscale-500"
+        rel="nofollow"
       >
-        {% svg "external" class="w-4 h-4" aria_hidden="true" %}
-        View in SCOTUS
-      </c-button>
-    {% endif %}
-  {% elif docket.pacer_docket_url %}
-    <c-menu-button
-      button_variant="outline"
-      widget_aria_label="PACER links menu"
-      trigger_aria_label="View on PACER"
-      menu_aria_label="PACER report links"
-    >
-      <c-slot name="button_content">
-        {% svg "external" class="w-4 h-4" aria_hidden="true" %}
-        View on PACER
-        <span
-          class="transition-transform duration-200 group-aria-[expanded=true]:rotate-180 flex justify-center items-center w-4 h-4"
-          aria-hidden="true"
-        >{% svg "chevron" class="w-full h-full text-greyscale-400" %}</span>
-      </c-slot>
-      <c-slot name="menu_content">
-        <c-menu-button.item href="{{ docket.pacer_docket_url }}" icon="external" icon_class="w-4 h-4 text-greyscale-500" target="_blank" rel="nofollow noreferrer">
-          Docket Report
-        </c-menu-button.item>
-        {% if docket.court.jurisdiction != docket.court.FEDERAL_APPELLATE %}
-          <c-menu-button.divider />
-          <c-menu-button.item href="{{ docket.pacer_alias_url }}" icon="external" icon_class="w-4 h-4 text-greyscale-500" target="_blank" rel="nofollow noreferrer">
-            Alias Report
-          </c-menu-button.item>
-          <c-menu-button.item href="{{ docket.pacer_associated_cases_url }}" icon="external" icon_class="w-4 h-4 text-greyscale-500" target="_blank" rel="nofollow noreferrer">
-            Associated Cases
-          </c-menu-button.item>
-          <c-menu-button.item href="{{ docket.pacer_attorney_url }}" icon="external" icon_class="w-4 h-4 text-greyscale-500" target="_blank" rel="nofollow noreferrer">
-            Attorney Report
-          </c-menu-button.item>
-          <c-menu-button.item href="{{ docket.pacer_case_file_location_url }}" icon="external" icon_class="w-4 h-4 text-greyscale-500" target="_blank" rel="nofollow noreferrer">
-            Case File Location
-          </c-menu-button.item>
-          <c-menu-button.item href="{{ docket.pacer_summary_url }}" icon="external" icon_class="w-4 h-4 text-greyscale-500" target="_blank" rel="nofollow noreferrer">
-            Case Summary
-          </c-menu-button.item>
-          <c-menu-button.item href="{{ docket.pacer_deadlines_and_hearings_url }}" icon="external" icon_class="w-4 h-4 text-greyscale-500" target="_blank" rel="nofollow noreferrer">
-            Deadlines/Hearings
-          </c-menu-button.item>
-          <c-menu-button.item href="{{ docket.pacer_filers_url }}" icon="external" icon_class="w-4 h-4 text-greyscale-500" target="_blank" rel="nofollow noreferrer">
-            Filers Report
-          </c-menu-button.item>
-          <c-menu-button.item href="{{ docket.pacer_history_and_documents_url }}" icon="external" icon_class="w-4 h-4 text-greyscale-500" target="_blank" rel="nofollow noreferrer">
-            History/Documents
-          </c-menu-button.item>
-          <c-menu-button.item href="{{ docket.pacer_party_url }}" icon="external" icon_class="w-4 h-4 text-greyscale-500" target="_blank" rel="nofollow noreferrer">
-            Party Report
-          </c-menu-button.item>
-          <c-menu-button.item href="{{ docket.pacer_related_transactions_url }}" icon="external" icon_class="w-4 h-4 text-greyscale-500" target="_blank" rel="nofollow noreferrer">
-            Related Transactions
-          </c-menu-button.item>
-          <c-menu-button.item href="{{ docket.pacer_status_url }}" icon="external" icon_class="w-4 h-4 text-greyscale-500" target="_blank" rel="nofollow noreferrer">
-            Status Report
-          </c-menu-button.item>
-          <c-menu-button.item href="{{ docket.pacer_view_doc_url }}" icon="external" icon_class="w-4 h-4 text-greyscale-500" target="_blank" rel="nofollow noreferrer">
-            Purchase a Document
-          </c-menu-button.item>
-        {% endif %}
-      </c-slot>
-    </c-menu-button>
+        Subscribe with RSS
+      </c-menu-button.item>
+      <c-menu-button.item
+        href="{% url 'new_docket_alert' %}?pacer_case_id={{ docket.pacer_case_id }}&court_id={{ docket.court_id }}"
+        icon="forward"
+        icon_class="w-4 h-4 text-greyscale-500"
+        rel="nofollow"
+      >
+        Share Alert Link
+      </c-menu-button.item>
+      <c-menu-button.item
+        href="{{ WIKI_HELP_URL }}/alerts/docket-alerts-for-pacer"
+        icon="circle_question_mark"
+        icon_class="w-4 h-4 text-greyscale-500"
+      >
+        Learn More
+      </c-menu-button.item>
+    </c-slot>
+  </c-menu-button>
   {% endif %}
+  <c-docket-source-button :docket="docket" :docket_source="docket_source" />
 </div>
 
-{# METADATA #}
-<c-metadata-section
-  :items="metadata"
-  list_class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mt-4"
-/>
-
-{# BANKRUPTCY INFORMATION #}
-<c-metadata-section
-  :items="bankruptcy_metadata"
-  title="Bankruptcy Information"
-/>
-
-{# ORIGINATING COURT INFORMATION #}
-<c-metadata-section
-  :items="originating_court_metadata"
-  title="Originating Court Information"
-/>
-
-{# SCOTUS DOCKET METADATA #}
-<c-metadata-section
-  :items="scotus_metadata"
-  title="SCOTUS Docket Metadata"
-/>
+{# A section with no items renders nothing. #}
+{% for section in metadata_sections %}
+  <c-metadata-section
+    :items="section.items"
+    :title="section.title"
+    list_class="{% if forloop.first %}grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mt-4{% endif %}"
+  />
+{% endfor %}
 
 {# ORAL ARGUMENT RECORDINGS #}
 {% if docket.audio_files.count %}

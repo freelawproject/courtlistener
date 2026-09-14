@@ -5,24 +5,27 @@ default_language_version:
   python: "python3.13"
 ci:
   autoupdate_schedule: quarterly
+  # pyrefly needs the project environment (uv); pre-commit.ci can't provide
+  # it. The Lint workflow runs the same check.
+  skip: [ pyrefly ]
 repos:
   - repo: https://github.com/pre-commit/pre-commit-hooks
     rev: v6.0.0
     hooks:
-     - id: check-added-large-files
-     - id: check-ast
-     - id: check-json
-     - id: check-merge-conflict
-     - id: check-toml
-     - id: check-xml
-     - id: check-yaml
-     - id: debug-statements
-     - id: detect-private-key
-       exclude: '^docker/postgresql/cl-postgres.key$|^docker/elastic/cl-es.key$'
-     - id: fix-byte-order-marker
-     - id: trailing-whitespace
-       args: [--markdown-linebreak-ext=md]
-       exclude: '^cl/recap/test_assets/.*\.html$'
+      - id: check-added-large-files
+      - id: check-ast
+      - id: check-json
+      - id: check-merge-conflict
+      - id: check-toml
+      - id: check-xml
+      - id: check-yaml
+      - id: debug-statements
+      - id: detect-private-key
+        exclude: '^docker/postgresql/cl-postgres.key$|^docker/elastic/cl-es.key$'
+      - id: fix-byte-order-marker
+      - id: trailing-whitespace
+        args: [ --markdown-linebreak-ext=md ]
+        exclude: '^cl/recap/test_assets/.*\.html$'
 
   - repo: https://github.com/astral-sh/ruff-pre-commit
     rev: v0.14.11
@@ -31,9 +34,19 @@ repos:
         args: [ --fix ]
       - id: ruff-format
 
+  # Runs in the project environment (not an isolated hook environment) so the
+  # checker sees our dependencies; always checks the whole project because the
+  # checked file set is defined by project-includes in pyproject.toml.
+  - repo: local
+    hooks:
+      - id: pyrefly
+        name: pyrefly
+        entry: uv run pyrefly check
+        language: system
+        pass_filenames: false
+        files: '(\.py$|^pyrefly\.toml$|^\.pyrefly-baseline\.json$)'
+
 #
 # Tried and Failed
 #
-# 1. I tried doing mypy too, but it was a mess because it runs in its own
-#   isolated environment, that lacks all our dependencies.
-# 2. semgrep was too slow and had to be moved to a github action.
+# 1. semgrep was too slow and had to be moved to a github action.

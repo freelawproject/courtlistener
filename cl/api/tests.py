@@ -840,8 +840,9 @@ class ApiEventCreationTestCase(TestCase):
     # run in parallel do not affect this one.
     @mock.patch(
         "cl.api.utils.get_logging_prefix",
-        side_effect=lambda *args,
-        **kwargs: f"{get_logging_prefix(*args, **kwargs)}-Test",
+        side_effect=lambda *args, **kwargs: (
+            f"{get_logging_prefix(*args, **kwargs)}-Test"
+        ),
     )
     async def test_api_logged_correctly(self, mock_logging_prefix) -> None:
         # Global stats
@@ -873,8 +874,9 @@ class ApiEventCreationTestCase(TestCase):
     @mock.patch("cl.api.utils.create_or_update_zoho_account")
     @mock.patch(
         "cl.api.utils.get_logging_prefix",
-        side_effect=lambda *args,
-        **kwargs: f"{get_logging_prefix(*args, **kwargs)}-Test",
+        side_effect=lambda *args, **kwargs: (
+            f"{get_logging_prefix(*args, **kwargs)}-Test"
+        ),
     )
     async def test_api_logged_correctly_v4(
         self, mock_logging_prefix, mock_zoho_task
@@ -4566,7 +4568,7 @@ class BankruptcyInformationAPITests(TestCase):
             (d for d in results if d["id"] == self.docket.id), None
         )
         self.assertIsNotNone(docket_with_bankruptcy)
-        assert docket_with_bankruptcy is not None  # for mypy
+        assert docket_with_bankruptcy is not None  # for the type checker
 
         # Confirm the bankruptcy_information field is present and is a URL
         self.assertIn("bankruptcy_information", docket_with_bankruptcy)
@@ -4582,7 +4584,7 @@ class BankruptcyInformationAPITests(TestCase):
             None,
         )
         self.assertIsNotNone(docket_without_bankruptcy)
-        assert docket_without_bankruptcy is not None  # for mypy
+        assert docket_without_bankruptcy is not None  # for the type checker
 
         # Confirm the bankruptcy_information field is None for dockets without it
         self.assertIn("bankruptcy_information", docket_without_bankruptcy)
@@ -4638,7 +4640,7 @@ class BankruptcyInformationAPITests(TestCase):
             (d for d in results if d["id"] == self.docket.id), None
         )
         self.assertIsNotNone(docket_with_bankruptcy)
-        assert docket_with_bankruptcy is not None  # for mypy
+        assert docket_with_bankruptcy is not None  # for the type checker
 
         # Confirm the bankruptcy_information field is NOT present
         self.assertNotIn("bankruptcy_information", docket_with_bankruptcy)
@@ -4675,7 +4677,7 @@ class BankruptcyInformationAPITests(TestCase):
             (d for d in results if d["id"] == self.docket.id), None
         )
         self.assertIsNotNone(docket_with_bankruptcy)
-        assert docket_with_bankruptcy is not None  # for mypy
+        assert docket_with_bankruptcy is not None  # for the type checker
 
         # Should only have the requested fields
         self.assertEqual(
@@ -5438,7 +5440,7 @@ class FetchRateThrottleTest(TestCase):
         num_requests, _ = FetchRateThrottle().parse_rate(
             FetchRateThrottle.THROTTLE_RATES["fetch"]
         )
-        assert num_requests is not None  # for mypy
+        assert num_requests is not None  # for the type checker
         for _ in range(num_requests):
             throttle = FetchRateThrottle()
             self.assertTrue(throttle.allow_request(request, view=None))

@@ -1,4 +1,4 @@
-{% load svg_tags component_tags %}
+{% load svg_tags component_tags extras %}
 {% require_script "js/alpine/components/corpus_search.js" %}
 {% require_script "js/alpine/composables/focus.js" %}
 {% require_script "js/alpine/plugins/focus" defer=True %}
@@ -8,6 +8,7 @@
 <div class="relative">
 
 {% if variant == "tabs" %}
+{% corpus_search_scopes as search_scopes %}
 
   <div
     data-title="{{ title }}"
@@ -21,32 +22,32 @@
     x-on:keydown.home.prevent="focusFirst"
     x-on:keydown.end.prevent="focusLast"
   >
-    <template x-for="scope in searchScopes">
+    {% for scope in search_scopes %}
       <button
         x-on:click="selectScope"
-        x-bind:data-scope="scope.label"
-        x-bind:id="scope.label"
+        data-scope="{{ scope.label }}"
+        id="{{ scope.label }}"
         x-bind:aria-selected="isActiveScope"
         type="button"
         role="tab"
+        class="min-w-41 h-[58px] text-sm font-normal rounded-t-2xl text-greyscale-600 flex justify-center items-center {% if forloop.first %}bg-white{% else %}bg-greyscale-50{% endif %}"
         x-bind:class="scopeTabClass"
       >
         <span class="flex flex-col items-start">
           <span
-            x-bind:data-scope="scope.label"
+            data-scope="{{ scope.label }}"
+            class="{% if forloop.first %}font-semibold text-greyscale-900{% else %}font-medium text-greyscale-700{% endif %}"
             x-bind:class="scopeTabTitleClass"
-            x-text="scope.label"
-            class=""
-          ></span>
+          >{{ scope.label }}</span>
           <span
             x-show="isActiveScope"
-            x-bind:data-scope="scope.label"
-            x-text="scope.shortDescription"
+            data-scope="{{ scope.label }}"
             class="text-xs text-greyscale-500"
-          ></span>
+            {% if not forloop.first %}style="display: none;"{% endif %}
+          >{{ scope.short_description }}</span>
         </span>
       </button>
-    </template>
+    {% endfor %}
     <a href="{{ WIKI_COVERAGE_URL }}" class="ml-auto flex items-center text-sm text-greyscale-600 gap-1 hover:text-greyscale-500">
       {% svg "circle_question_mark" class="text-greyscale-400 hover:text-greyscale-300 h-4 w-4 [@media(max-width:893px)]:h-6 [@media(max-width:893px)]:w-6" %}
       <span class="[@media(max-width:893px)]:hidden">About This Data</span>

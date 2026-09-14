@@ -68,10 +68,9 @@ from cl.lib.string_utils import trunc
 from cl.lib.thumbnails import make_png_thumbnail_for_instance
 from cl.lib.url_utils import get_redirect_or_abort
 from cl.lib.utils import human_sort
+from cl.opinion_page import docket_entry_sources
 from cl.opinion_page.decorators import handle_cluster_redirection
-from cl.opinion_page.docket_sources_utils import (
-    RECAP_SOURCE,
-    SCOTUS_SOURCE,
+from cl.opinion_page.docket_entry_sources import (
     attach_display_fields,
     document_url,
 )
@@ -227,7 +226,7 @@ async def court_publish_page(request: HttpRequest, pk: str) -> HttpResponse:
                 "You do not have permission to access this page."
             )
 
-    # Fix mypy errors
+    # Fix type checker errors
     upload_form: Any
 
     upload_form_classes = {
@@ -336,7 +335,7 @@ async def fetch_docket_entries(docket):
     """Fetch docket entries associated with a docket.
 
     Uses the source-appropriate model for the docket's court (see
-    cl.opinion_page.docket_sources_utils).
+    cl.opinion_page.docket_entry_sources).
 
     param docket: docket.id to get related docket_entries.
     returns: DocketEntry Queryset.
@@ -616,7 +615,7 @@ def download_docket_entries_csv(
         # Only return a handled 501 for those. A RECAP docket hitting
         # this branch means a real bug in the CSV path, and that should
         # still raise a error 500.
-        if docket.get_entry_source() is RECAP_SOURCE:
+        if docket.get_entry_source() is docket_entry_sources.RECAP:
             raise
         # A handled 501 triggers the existing "There was a problem. Try
         # again later." message in export-csv.js instead of crashing.
@@ -692,7 +691,7 @@ async def recap_document_context(
     """
     docket = await aget_object_or_404(Docket, pk=docket_id)
     source = docket.get_entry_source()
-    is_scotus = source is SCOTUS_SOURCE
+    is_scotus = source is docket_entry_sources.SCOTUS
 
     if is_scotus and not await sync_to_async(waffle.flag_is_active)(
         request, "scotus_docket_page"
@@ -824,11 +823,7 @@ async def recap_document_context(
             "redirect_to_pacer_modal": redirect_to_pacer_modal,
             "authorities": getattr(rd, "authorities", False),
             "attachments": attachments,
-            "is_scotus": is_scotus,
-            "admin_url_names": source.admin_url_names,
-            "admin_perm_names": source.admin_perm_names,
-            "admin_document_label": source.admin_document_label,
-            "has_pay_and_pray": source.has_pay_and_pray,
+            "docket_source": source,
         },
     )
 
@@ -1181,7 +1176,7 @@ async def view_opinion_authorities(
     :return: Table of Authorities tab
     """
     cluster: OpinionCluster = await aget_object_or_404(
-        await get_opinions_queryset("sub_opinions__opinions_cited"),
+        await get_opinions_queryset("no_text_fields"),
         pk=pk,
     )
 

@@ -1,5 +1,6 @@
 from http import HTTPStatus
 
+from asgiref.sync import sync_to_async
 from django.conf import settings
 from django.contrib import messages
 from django.contrib.auth.decorators import login_required
@@ -278,6 +279,11 @@ async def new_docket_alert(request: AuthenticatedHttpRequest) -> HttpResponse:
 
     title = f"New Docket Alert for {make_docket_title(docket)}"
     has_alert = await user_has_alert(await request.auser(), docket)  # type: ignore[arg-type]
+    # docket_alerts_button.html gates the alerts button on the docket
+    # having a page at its source, mirroring the docket page toolbar.
+    docket_source_url = await sync_to_async(
+        docket.get_entry_source().docket_url
+    )(docket)
     return TemplateResponse(
         request,
         "docket_alert_new.html",
@@ -285,6 +291,7 @@ async def new_docket_alert(request: AuthenticatedHttpRequest) -> HttpResponse:
             "title": title,
             "has_alert": has_alert,
             "docket": docket,
+            "docket_source_url": docket_source_url,
             "private": True,
         },
     )
