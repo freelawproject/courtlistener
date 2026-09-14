@@ -137,7 +137,6 @@ services:
       cl-disclosures:
         condition: service_started
     volumes:
-      - ${CL_POSTGRES_RUN_DIR:-/var/run/postgresql}:/var/run/postgresql
       - ${CL_BASE_DIR:-../../}:/opt/courtlistener
     networks:
       - cl_net_overlay2
@@ -195,7 +194,6 @@ services:
       - "127.0.0.1:${CL_DJANGO_PORT:-8000}:8000"
     user: root
     volumes:
-      - ${CL_POSTGRES_RUN_DIR:-/var/run/postgresql}:/var/run/postgresql
       - ${CL_BASE_DIR:-../../}:/opt/courtlistener
       - ${CL_BASE_DIR:-../../}/.postgresql:/root/.postgresql
     networks:
