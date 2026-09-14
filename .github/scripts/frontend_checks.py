@@ -28,7 +28,8 @@ WARN = "warning"
 # Per-file skip directives
 # ---------------------------------------------------------------------------
 
-# Checks that can be skipped via {# frontend-checks-skip: ... #} comments.
+# Checks that can be skipped via frontend-checks-skip / frontend-checks-skip-line
+# directives in comment blocks, {# #} for templates and /* */ for css.
 # Only advisory/context-dependent checks belong here — security, a11y, and
 # architecture checks must stay enforced.
 SKIPPABLE_CHECKS = {
