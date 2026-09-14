@@ -10,7 +10,7 @@ from collections.abc import (
 )
 from dataclasses import dataclass, field
 from enum import Enum
-from functools import cache, reduce
+from functools import reduce
 from typing import (
     Any,
     ClassVar,
@@ -36,21 +36,6 @@ if typing.TYPE_CHECKING:
     from django.db.models.fields.related_descriptors import RelatedManager
 
 logger = logging.getLogger(__name__)
-
-
-@cache
-def auto_now_fields(model: type[Model]) -> tuple[str, ...]:
-    """Collect the names of a model's `auto_now` fields (e.g. `date_modified`).
-
-    :param model: The model to inspect.
-
-    :return: The names of every concrete `auto_now` field on the model."""
-
-    return tuple(
-        f.name
-        for f in model._meta.concrete_fields
-        if getattr(f, "auto_now", False)
-    )
 
 
 def overwrite[T](scrape: T | None, db: T | None) -> T | None:
@@ -89,7 +74,7 @@ class MergerSpecification[ScrapeType, ParamType, OutputType]:
         self.name: str = ""
 
     def run_validation(
-        self, merger: "type[Merger[Any, Any, Any]]"
+        self, merger: "type[Merger[ScrapeType, ParamType, Model]]"
     ) -> list[Exception]:
         """Runs validation for this spec against the given merger, returning any errors found."""
         try:
@@ -158,10 +143,10 @@ class AttributeMerger[ScrapeType, ParamType, TransformType](
         ] = strategy
 
 
-def Attribute[TransformType](
-    transform: Callable[[Any, Any], TransformType] | None = None,
+def Attribute[ScrapeType, ParamType, TransformType](
+    transform: Callable[[ScrapeType, ParamType], TransformType] | None = None,
     strategy: Callable[
-        [Any, Any], TransformType | None
+        [TransformType | None, TransformType | None], TransformType | None
     ] = overwrite_if_present,
     *,
     default: TransformType | None = None,
@@ -309,9 +294,10 @@ class OneToOneMerger[ScrapeType, ParamType, ChildType, RM: Model](
         ).merge()
 
 
-def OneToOneRelation[ParamType, ChildType, RM: Model](
+def OneToOneRelation[ScrapeType, ParamType, ChildType, RM: Model](
     merger: "type[Merger[ChildType, RelatedParams[ParamType], RM]]",
-    transform: Callable[..., ChildType | None] | None = None,
+    transform: Callable[[ScrapeType, ParamType], ChildType | None]
+    | None = None,
 ) -> Any:
     return OneToOneMerger(merger, transform)
 
@@ -417,9 +403,10 @@ class OneToManyMerger[ScrapeType, ParamType, ChildType, RM: Model](
         return errors
 
 
-def OneToManyRelation[ParamType, ChildType, RM: Model](
+def OneToManyRelation[ScrapeType, ParamType, ChildType, RM: Model](
     merger: "type[Merger[ChildType, RelatedParams[ParamType], RM]]",
-    transform: Callable[..., Sequence[ChildType]] | None = None,
+    transform: Callable[[ScrapeType, ParamType], Sequence[ChildType]]
+    | None = None,
     *,
     strategy: ManyStrategy = ManyStrategy.REPLACE,
 ) -> Any:
@@ -591,10 +578,17 @@ class ManyToManyMerger[
         return result
 
 
-def ManyToManyRelation[ParamType, ChildType, ThruM: Model, RM: Model](
+def ManyToManyRelation[
+    ScrapeType,
+    ParamType,
+    ChildType,
+    ThruM: Model,
+    RM: Model,
+](
     merger: "type[Merger[ChildType, RelatedParams[ParamType], RM]]",
     through: "type[Merger[ChildType, ThroughParameters[ParamType], ThruM]] | None" = None,
-    transform: Callable[[Any, Any], Sequence[ChildType]] | None = None,
+    transform: Callable[[ScrapeType, ParamType], Sequence[ChildType]]
+    | None = None,
     *,
     strategy: ManyStrategy = ManyStrategy.REPLACE,
     through_strategy: ManyStrategy = ManyStrategy.REPLACE,
@@ -1107,8 +1101,6 @@ class Merger[ScrapeType, ParamType, M: Model](metaclass=MergerMeta):
                 self.model.__name__, self.existing.pk
             )
             updated += self.pre_update(updated)
-            if updated:
-                updated += auto_now_fields(self.model)
             self.existing.save(update_fields=updated)
 
         return result
