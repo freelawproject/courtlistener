@@ -17,8 +17,8 @@ from juriscraper.state.docket import Document as ScrapeDocument
 from cl.corpus_importer.state.merger import (
     Attribute,
     ManyStrategy,
+    ManyToOneRelation,
     Merger,
-    OneToManyRelation,
     RelatedParams,
     overwrite,
 )
@@ -93,7 +93,7 @@ def AttachmentRelation(
     transform: Callable[[Any, Any], Any] = _entry_attachments,
     strategy: ManyStrategy = ManyStrategy.APPEND,
 ) -> list[Any]:
-    return OneToManyRelation(
+    return ManyToOneRelation(
         merger,
         transform,
         strategy=strategy,

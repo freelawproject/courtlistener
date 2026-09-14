@@ -23,8 +23,8 @@ from juriscraper.state.docket import (
 from cl.corpus_importer.state.merger import (
     Attribute,
     ManyStrategy,
+    ManyToOneRelation,
     Merger,
-    OneToManyRelation,
     RelatedParams,
     overwrite,
     overwrite_if_present,
@@ -178,7 +178,7 @@ def CaseTransferRelation(
     *,
     strategy: ManyStrategy = ManyStrategy.APPEND,
 ) -> list[CaseTransfer]:
-    return OneToManyRelation(
+    return ManyToOneRelation(
         merger,
         transform,
         strategy=strategy,

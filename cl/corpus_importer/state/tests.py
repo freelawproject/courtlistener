@@ -19,8 +19,8 @@ from cl.corpus_importer.state.merger import (
     Attribute,
     ManyStrategy,
     ManyToManyRelation,
+    ManyToOneRelation,
     Merger,
-    OneToManyRelation,
     OneToOneRelation,
     RelatedParams,
     ThroughParameters,
@@ -394,7 +394,7 @@ class BaseMergerTest(TestCase):
             docket_number: str = Attribute(
                 default=self.docket.docket_number + "New"
             )
-            docket_entries: list[DocketEntry] = OneToManyRelation(
+            docket_entries: list[DocketEntry] = ManyToOneRelation(
                 TestRelatedMerger,
                 lambda d, params: d["mctest"],
             )
@@ -732,7 +732,7 @@ class BaseMergerTest(TestCase):
             court: Court = Attribute(default=tc.docket.court)
             source: int = Attribute(default=tc.docket.source)
             docket_number: str = Attribute(default=tc.docket.docket_number)
-            docket_entries: list[DocketEntry] = OneToManyRelation(
+            docket_entries: list[DocketEntry] = ManyToOneRelation(
                 TestRelatedMerger,
                 lambda d, params: d["entries"],
             )

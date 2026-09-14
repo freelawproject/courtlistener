@@ -24,10 +24,13 @@ from django.db import transaction
 from django.db.models import (
     Field,
     ForeignObjectRel,
+    ManyToOneRel,
     Model,
+    OneToOneField,
     OneToOneRel,
     QuerySet,
 )
+from django.db.models.fields.related import ManyToManyField, RelatedField
 from django.db.models.manager import Manager
 
 from cl.corpus_importer.state.utils import MergeResult
@@ -196,14 +199,14 @@ class RelatedMerger[
 
     def validate(self, field: Field | ForeignObjectRel) -> list[Exception]:
         errors = super().validate(field)
-        if not field.related_model:
+        if not isinstance(field, RelatedField) and not isinstance(
+            field, ForeignObjectRel
+        ):
             errors.append(
                 TypeError(f"Field {self.name} is not a related field")
             )
-        if (
-            field.related_model is not None
-            and field.related_model != self.merger.model
-        ):
+            return errors
+        if field.related_model != self.merger.model:
             if field.related_model == "self":
                 errors.append(
                     TypeError(
@@ -214,7 +217,6 @@ class RelatedMerger[
                 errors.append(
                     TypeError(
                         f"Field {self.name} is related to {field.related_model.__name__}, not {self.merger.model.__name__}"
-                        # type: ignore[union-attr]
                     )
                 )
         return errors
@@ -254,12 +256,16 @@ class OneToOneMerger[ScrapeType, ParamType, ChildType, RM: Model](
         relation it is. A reverse relation is a `OneToOneRel` rather than a
         `OneToOneField`, and carries the name of the child's own field."""
         errors = super().validate(field)
-        if not field.one_to_one:
-            errors.append(TypeError(f"{self.name}: Is not a one-to-one field"))
-            return errors
-        if isinstance(field, OneToOneRel):
-            self.forward = False
-            self.parent_name = field.field.name
+        match field:
+            case OneToOneField():
+                ...
+            case OneToOneRel():
+                self.forward = False
+                self.parent_name = field.field.name
+            case _:
+                errors.append(
+                    TypeError(f"{self.name}: Is not a one-to-one field")
+                )
         return errors
 
     def merge(
@@ -388,7 +394,7 @@ class NToManyMerger[ScrapeType, ParamType, ChildType, RM: Model](
         return result
 
 
-class OneToManyMerger[ScrapeType, ParamType, ChildType, RM: Model](
+class ManyToOneMerger[ScrapeType, ParamType, ChildType, RM: Model](
     NToManyMerger[ScrapeType, ParamType, ChildType, RM]
 ):
     """Class encapsulating logic for merging a one-to-many relationship. More precisely: defines how to merge a
@@ -396,21 +402,21 @@ class OneToManyMerger[ScrapeType, ParamType, ChildType, RM: Model](
 
     def validate(self, field: Field | ForeignObjectRel) -> list[Exception]:
         errors = super().validate(field)
-        if not field.one_to_many:
+        if not isinstance(field, ManyToOneRel):
             errors.append(
-                TypeError(f"{self.name}: Is not a one-to-many field")
+                TypeError(f"{self.name}: Is not a many-to-one field")
             )
         return errors
 
 
-def OneToManyRelation[ScrapeType, ParamType, ChildType, RM: Model](
+def ManyToOneRelation[ScrapeType, ParamType, ChildType, RM: Model](
     merger: "type[Merger[ChildType, RelatedParams[ParamType], RM]]",
     transform: Callable[[ScrapeType, ParamType], Sequence[ChildType]]
     | None = None,
     *,
     strategy: ManyStrategy = ManyStrategy.REPLACE,
 ) -> Any:
-    return OneToManyMerger(merger, transform, strategy=strategy)
+    return ManyToOneMerger(merger, transform, strategy=strategy)
 
 
 @dataclass
@@ -464,23 +470,24 @@ class ManyToManyMerger[
 
     def validate(self, field: Field | ForeignObjectRel) -> list[Exception]:
         errors = super().validate(field)
-        if not field.many_to_many:
+        if not isinstance(field, ManyToManyField):
             errors.append(
                 TypeError(f"{self.name}: Is not a many-to-many field")
             )
+            return errors
 
         if self.through:
-            if field.remote_field.through != self.through.model:  # type: ignore[union-attr]
+            if field.remote_field.through != self.through.model:
                 errors.append(
                     TypeError(
                         f"{self.name}: Model for through merger is {self.through.model.__name__} not {field.remote_field.through.__name__}"  # type: ignore[union-attr]
                     )
                 )
 
-            if field.remote_field.model != self.merger.model:  # type: ignore[union-attr]
+            if field.related_model != self.merger.model:
                 errors.append(
                     TypeError(
-                        f"{self.name}: Model for source merger is {self.merger.model.__name__} not {field.remote_field.model.__name__}"  # type: ignore[union-attr]
+                        f"{self.name}: Model for source merger is {self.merger.model.__name__} not {field.remote_field.model.__name__}"
                     )
                 )
 
@@ -542,7 +549,7 @@ class ManyToManyMerger[
                     parent=parent,
                     source=parent,
                     source_name=related_manager.source_field_name,  # type: ignore[attr-defined]
-                    target=m.out,  # type: ignore[arg-type]
+                    target=cast(RM, m.out),
                     target_name=related_manager.target_field_name,  # type: ignore[attr-defined]
                 )
                 for m in mergers_with_output

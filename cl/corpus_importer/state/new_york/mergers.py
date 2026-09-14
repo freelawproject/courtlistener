@@ -36,8 +36,8 @@ from cl.corpus_importer.state.common.party import (
 from cl.corpus_importer.state.merger import (
     Attribute,
     ManyStrategy,
+    ManyToOneRelation,
     Merger,
-    OneToManyRelation,
     OneToOneRelation,
     RelatedParams,
     ThroughParameters,
@@ -720,7 +720,7 @@ class NYCoADocketMetadataMerger(
 
     # Court-PASS states a case's issues in full, so an issue that is gone from
     # the scrape is one the Court removed.
-    issues: list[NYCoADocketIssue] = OneToManyRelation(
+    issues: list[NYCoADocketIssue] = ManyToOneRelation(
         NYCoAIssueMerger, _case_issues, strategy=ManyStrategy.REPLACE
     )
     decision_date: date | None = Attribute(

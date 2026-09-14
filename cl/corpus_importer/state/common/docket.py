@@ -15,8 +15,8 @@ from cl.corpus_importer.state.merger import (
     Attribute,
     ManyStrategy,
     ManyToManyRelation,
+    ManyToOneRelation,
     Merger,
-    OneToManyRelation,
     overwrite,
 )
 from cl.people_db.models import Party
@@ -62,7 +62,7 @@ def DocketEntryRelation(
     transform: Callable[[Any, Any], Sequence[Any]] = _docket_entries,
     strategy: ManyStrategy = ManyStrategy.APPEND,
 ) -> list[Any]:
-    return OneToManyRelation(
+    return ManyToOneRelation(
         merger,
         transform,
         strategy=strategy,
