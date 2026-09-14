@@ -3458,6 +3458,21 @@ class BuildScotusMetadataTest(TestCase):
         qp = next(i for i in items if i["label"] == "Questions Presented")
         self.assertEqual(qp["url"], "https://example.com/qp.pdf")
         self.assertTrue(qp["is_external"])
+        # The label itself is the link -- no separate "View" text.
+        self.assertTrue(qp.get("is_label_link"))
+
+    def test_renders_questions_presented_file_as_internal_link(self) -> None:
+        scotus_metadata = ScotusDocketMetadataFactory(
+            docket=self.docket,
+            questions_presented_file=SimpleUploadedFile(
+                "qp.pdf", b"%PDF-1.4", content_type="application/pdf"
+            ),
+        )
+        items = build_scotus_metadata(scotus_metadata)
+        qp = next(i for i in items if i["label"] == "Questions Presented")
+        self.assertTrue(qp["url"])
+        self.assertTrue(qp.get("is_label_link"))
+        self.assertNotIn("is_external", qp)
 
     def test_omits_questions_presented_url_with_unsafe_scheme(self) -> None:
         """questions_presented_url is ingested straight
