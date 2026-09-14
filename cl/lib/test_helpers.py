@@ -70,9 +70,9 @@ opinion_cluster_v3_v4_common_fields = {
         else x["result"].cluster.docket.court.citation_string
     ),
     "court_id": lambda x: x["result"].cluster.docket.court_id,
-    "court_jurisdiction": lambda x: x[
-        "result"
-    ].cluster.docket.court.jurisdiction,
+    "court_jurisdiction": lambda x: (
+        x["result"].cluster.docket.court.jurisdiction
+    ),
     "cluster_id": lambda x: x["result"].cluster_id,
     "docketNumber": lambda x: (
         x["docketNumber"]
@@ -215,12 +215,10 @@ opinion_v3_search_api_keys.update(opinion_cluster_v3_fields)
 opinion_v3_search_api_keys.update(opinion_document_v3_fields)
 
 opinion_v4_search_api_keys = {
-    "non_participating_judge_ids": lambda x: (
-        list(
-            x["result"]
-            .cluster.non_participating_judges.all()
-            .values_list("id", flat=True)
-        )
+    "non_participating_judge_ids": lambda x: list(
+        x["result"]
+        .cluster.non_participating_judges.all()
+        .values_list("id", flat=True)
     ),
     "source": lambda x: x["result"].cluster.source,
     "caseNameFull": lambda x: x["result"].cluster.case_name_full,
@@ -312,9 +310,9 @@ docket_api_common_keys = {
         else x["result"].docket_entry.docket.docket_number
     ),
     "docket_id": lambda x: x["result"].docket_entry.docket_id,
-    "jurisdictionType": lambda x: x[
-        "result"
-    ].docket_entry.docket.jurisdiction_type,
+    "jurisdictionType": lambda x: (
+        x["result"].docket_entry.docket.jurisdiction_type
+    ),
     "juryDemand": lambda x: (
         x["juryDemand"]
         if x.get("juryDemand")
@@ -354,9 +352,9 @@ recap_type_v4_api_keys.update(
                 "attorney_id"
             ]
         ),
-        "case_name_full": lambda x: x[
-            "result"
-        ].docket_entry.docket.case_name_full,
+        "case_name_full": lambda x: (
+            x["result"].docket_entry.docket.case_name_full
+        ),
         "chapter": lambda x: (
             x["result"].docket_entry.docket.bankruptcy_information.chapter
             if hasattr(
@@ -466,12 +464,12 @@ rd_type_v4_api_keys.update(
 )
 
 v4_meta_keys = {
-    "date_created": lambda x: x["result"]
-    .date_created.isoformat()
-    .replace("+00:00", "Z"),
-    "timestamp": lambda x: x["result"]
-    .date_created.isoformat()
-    .replace("+00:00", "Z"),
+    "date_created": lambda x: (
+        x["result"].date_created.isoformat().replace("+00:00", "Z")
+    ),
+    "timestamp": lambda x: (
+        x["result"].date_created.isoformat().replace("+00:00", "Z")
+    ),
     "score": lambda x: {"bm25": None},
 }
 
@@ -658,9 +656,9 @@ position_v4_fields = {
         if x["result"].date_termination
         else None
     ),
-    "date_granularity_termination": lambda x: x[
-        "result"
-    ].date_granularity_termination,
+    "date_granularity_termination": lambda x: (
+        x["result"].date_granularity_termination
+    ),
     "judicial_committee_action": lambda x: x[
         "result"
     ].get_judicial_committee_action_display(),
