@@ -338,7 +338,19 @@ class CorpusSearchFormTest(SimpleUserDataMixin, TestCase):
 
 @override_flag("use_new_design", True)
 @patch("cl.search.utils.get_redis_interface")
-@override_settings(WAFFLE_CACHE_PREFIX="test_homepage_stats_waffle")
+@override_settings(
+    WAFFLE_CACHE_PREFIX="test_homepage_stats_waffle",
+    # get_v2_homepage_stats is @cache_memoize'd into the default cache, which
+    # is Redis and so shared by every --parallel worker. Another worker can
+    # repopulate it between our invalidate() and our request, so give this
+    # class a process-local cache instead.
+    CACHES={
+        "default": {
+            "BACKEND": "django.core.cache.backends.locmem.LocMemCache",
+            "LOCATION": "homepage-stats",
+        },
+    },
+)
 class HomepageStatsTest(
     RECAPSearchTestCase,
     CourtTestCase,
