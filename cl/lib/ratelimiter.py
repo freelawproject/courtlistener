@@ -193,6 +193,22 @@ APPROVED_DOMAINS = [
 ]
 
 
+def should_bypass_ratelimit(request: HttpRequest) -> bool:
+    """Should a request that hit its limit be let through anyway?
+
+    True for an approved crawler, and also when the cache can't be reached to
+    find out: a Redis outage shouldn't turn the allowlist into a 500, so it
+    fails open exactly like the rate-limit check itself does.
+
+    :param request: The HTTP request from the user
+    :return: True when the view should run despite the limit, else False.
+    """
+    try:
+        return is_allowlisted(request)
+    except ConnectionError:
+        return True
+
+
 def ratelimit_deny_list(view: View) -> View:
     """A wrapper for the ratelimit function that adds an allowlist for approved
     crawlers.
@@ -209,11 +225,17 @@ def ratelimit_deny_list(view: View) -> View:
         async def async_wrapper(request: HttpRequest, *args, **kwargs):
             try:
                 return await ratelimited_view(request, *args, **kwargs)
-            except Ratelimited as e:
-                if await sync_to_async(is_allowlisted)(request):
-                    return await view(request, *args, **kwargs)
-                else:
-                    raise e
+            except Ratelimited:
+                # thread_sensitive=False for the same reason as in
+                # make_ratelimiter: this touches only the cache and DNS, and
+                # the shared thread-sensitive worker is the wrong place to
+                # wait on a name server.
+                bypass = await sync_to_async(
+                    should_bypass_ratelimit, thread_sensitive=False
+                )(request)
+                if not bypass:
+                    raise
+                return await view(request, *args, **kwargs)
             except ConnectionError:
                 # Unable to connect to redis, let the view proceed this time.
                 return await view(request, *args, **kwargs)
@@ -224,11 +246,10 @@ def ratelimit_deny_list(view: View) -> View:
     def wrapper(request, *args, **kwargs):
         try:
             return ratelimited_view(request, *args, **kwargs)
-        except Ratelimited as e:
-            if is_allowlisted(request):
-                return view(request, *args, **kwargs)
-            else:
-                raise e
+        except Ratelimited:
+            if not should_bypass_ratelimit(request):
+                raise
+            return view(request, *args, **kwargs)
         except ConnectionError:
             # Unable to connect to redis, let the view proceed this time.
             return view(request, *args, **kwargs)
@@ -274,29 +295,41 @@ def is_allowlisted(request: HttpRequest) -> bool:
     """Checks if the IP address is allowlisted due to belonging to an approved
     crawler.
 
-    Returns True if so, else False.
+    Both answers are cached, not just the "yes". Callers reach this only for
+    an address that is already over its limit, so a "no" that wasn't stored
+    would mean a fresh pair of blocking DNS lookups on every request from
+    whoever is hammering us. The "no" gets a much shorter life than the "yes",
+    so a crawler that moves to a new address is picked up soon after.
+
+    May raise ``redis.ConnectionError`` when the cache is unreachable; callers
+    that must not 500 should go through ``should_bypass_ratelimit`` instead.
+
+    :param request: The HTTP request from the user
+    :return: True when the request comes from an approved crawler, else False.
     """
     cache_name = getattr(settings, "RATELIMIT_USE_CACHE", "default")
     cache = caches[cache_name]
-    allowlist_cache_prefix = "rl:allowlist"
     ip_address = get_user_ip_from_cloudfront_headers(request)
-    if ip_address is None:
+    if not ip_address:
+        # No CloudFront header, as in local development. There's nothing to
+        # look up, and getfqdn("") would answer for this host instead.
         return False
 
-    allowlist_key = f"{allowlist_cache_prefix}:{ip_address}"
+    allowlist_key = f"rl:allowlist:{ip_address}"
 
-    # Check if the ip address is in our allowlist.
-    if cache.get(allowlist_key):
-        return True
+    # bool() rather than truthiness on the entry itself: a False is a real
+    # cached answer, and entries written before this stored the IP string.
+    if (cached := cache.get(allowlist_key)) is not None:
+        return bool(cached)
 
-    # If not whitelisted, verify the IP address and add it to the cache for
-    # future requests.
     approved_crawler = verify_ip_address(ip_address)
-
-    if approved_crawler:
-        # Add the IP to our cache with a one week expiration date
-        a_week = 60 * 60 * 24 * 7
-        cache.set(allowlist_key, ip_address, a_week)
+    a_week = 60 * 60 * 24 * 7
+    an_hour = 60 * 60
+    cache.set(
+        allowlist_key,
+        approved_crawler,
+        a_week if approved_crawler else an_hour,
+    )
 
     return approved_crawler
 

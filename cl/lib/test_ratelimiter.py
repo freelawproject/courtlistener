@@ -8,15 +8,26 @@ decorated view directly would pass either way.
 
 import asyncio
 from http import HTTPStatus
+from unittest import mock
 
 from django.core.cache import cache
 from django.http import HttpRequest, HttpResponse
-from django.test import override_settings
+from django.test import RequestFactory, override_settings
 from django.urls import path
+from django_ratelimit.exceptions import Ratelimited
+from redis import ConnectionError
 
-from cl.lib.ratelimiter import get_ip_for_ratelimiter, make_ratelimiter
+from cl.lib import ratelimiter
+from cl.lib.ratelimiter import (
+    View,
+    get_ip_for_ratelimiter,
+    is_allowlisted,
+    make_ratelimiter,
+    ratelimit_deny_list,
+)
 from cl.tests.cases import SimpleTestCase
 
+one_per_hour = make_ratelimiter(key=get_ip_for_ratelimiter, rate="1/h")
 two_per_hour = make_ratelimiter(key=get_ip_for_ratelimiter, rate="2/h")
 five_per_hour = make_ratelimiter(key=get_ip_for_ratelimiter, rate="5/h")
 
@@ -113,3 +124,158 @@ class RateLimiterTest(SimpleTestCase):
 
         allowed = [r for r in responses if r.status_code == HTTPStatus.OK]
         self.assertEqual(len(allowed), 5)
+
+
+@override_settings(
+    CACHES={
+        "default": {
+            "BACKEND": "django.core.cache.backends.locmem.LocMemCache",
+            "LOCATION": "allowlist-test",
+        },
+    },
+)
+class AllowlistTest(SimpleTestCase):
+    """Does the crawler allowlist answer, and remember, correctly?"""
+
+    def setUp(self) -> None:
+        super().setUp()
+        cache.clear()
+        self.request = RequestFactory().get("/", headers=VIEWER)
+
+    def test_a_yes_is_looked_up_once(self) -> None:
+        with mock.patch.object(
+            ratelimiter, "verify_ip_address", return_value=True
+        ) as verify:
+            self.assertTrue(is_allowlisted(self.request))
+            self.assertTrue(is_allowlisted(self.request))
+
+        self.assertEqual(verify.call_count, 1)
+
+    def test_a_no_is_looked_up_once_too(self) -> None:
+        """Is a rejection cached?
+
+        Without this, an address that keeps hitting its limit pays for a pair
+        of blocking DNS lookups on every single request.
+        """
+        with mock.patch.object(
+            ratelimiter, "verify_ip_address", return_value=False
+        ) as verify:
+            self.assertFalse(is_allowlisted(self.request))
+            self.assertFalse(is_allowlisted(self.request))
+
+        self.assertEqual(verify.call_count, 1)
+
+    def test_an_entry_from_the_old_format_still_counts_as_a_yes(self) -> None:
+        """Entries written before this stored the IP string, not a bool."""
+        cache.set("rl:allowlist:192.0.2.1", "192.0.2.1", 60)
+
+        with mock.patch.object(ratelimiter, "verify_ip_address") as verify:
+            self.assertTrue(is_allowlisted(self.request))
+
+        verify.assert_not_called()
+
+    def test_a_request_without_the_header_is_not_looked_up(self) -> None:
+        """getfqdn("") answers for this host, so there is nothing to ask."""
+        with mock.patch.object(ratelimiter, "verify_ip_address") as verify:
+            self.assertFalse(is_allowlisted(RequestFactory().get("/")))
+
+        verify.assert_not_called()
+
+
+@override_settings(
+    CACHES={
+        "default": {
+            "BACKEND": "django.core.cache.backends.locmem.LocMemCache",
+            "LOCATION": "deny-list-test",
+        },
+    },
+)
+class DenyListTest(SimpleTestCase):
+    """What happens to a request that has already hit the crawler cap?"""
+
+    def setUp(self) -> None:
+        super().setUp()
+        cache.clear()
+        self.request = RequestFactory().get("/", headers=VIEWER)
+
+    @staticmethod
+    def _decorate(view: View) -> View:
+        """Wrap a view in a deny list whose limiter really counts.
+
+        ratelimiter_all_250_per_h no-ops under test, which would leave nothing
+        for the allowlist to be asked about.
+        """
+        with mock.patch.object(
+            ratelimiter, "ratelimiter_all_250_per_h", one_per_hour
+        ):
+            return ratelimit_deny_list(view)
+
+    def test_a_stranger_over_the_cap_is_refused(self) -> None:
+        wrapped = self._decorate(lambda request: HttpResponse("ok"))
+
+        self.assertEqual(wrapped(self.request).status_code, HTTPStatus.OK)
+        with (
+            mock.patch.object(
+                ratelimiter, "verify_ip_address", return_value=False
+            ),
+            self.assertRaises(Ratelimited),
+        ):
+            wrapped(self.request)
+
+    async def test_an_async_stranger_over_the_cap_is_refused(self) -> None:
+        """Does the async wrapper re-raise from inside its except clause?"""
+
+        async def view(request: HttpRequest) -> HttpResponse:
+            return HttpResponse("ok")
+
+        wrapped = self._decorate(view)
+
+        response = await wrapped(self.request)
+        self.assertEqual(response.status_code, HTTPStatus.OK)
+        with (
+            mock.patch.object(
+                ratelimiter, "verify_ip_address", return_value=False
+            ),
+            self.assertRaises(Ratelimited),
+        ):
+            await wrapped(self.request)
+
+    def test_a_crawler_over_the_cap_gets_through(self) -> None:
+        wrapped = self._decorate(lambda request: HttpResponse("ok"))
+
+        self.assertEqual(wrapped(self.request).status_code, HTTPStatus.OK)
+        with mock.patch.object(
+            ratelimiter, "verify_ip_address", return_value=True
+        ):
+            self.assertEqual(wrapped(self.request).status_code, HTTPStatus.OK)
+
+    def test_a_dead_cache_during_the_allowlist_check_is_not_a_500(
+        self,
+    ) -> None:
+        """Does a Redis hiccup inside `except Ratelimited` fail open?
+
+        The neighboring `except ConnectionError` only guards the try body, so
+        an error raised while checking the allowlist would otherwise escape.
+        """
+        wrapped = self._decorate(lambda request: HttpResponse("ok"))
+
+        self.assertEqual(wrapped(self.request).status_code, HTTPStatus.OK)
+        with mock.patch.object(
+            ratelimiter, "is_allowlisted", side_effect=ConnectionError
+        ):
+            self.assertEqual(wrapped(self.request).status_code, HTTPStatus.OK)
+
+    async def test_a_dead_cache_is_not_a_500_on_an_async_view(self) -> None:
+        async def view(request: HttpRequest) -> HttpResponse:
+            return HttpResponse("ok")
+
+        wrapped = self._decorate(view)
+
+        response = await wrapped(self.request)
+        self.assertEqual(response.status_code, HTTPStatus.OK)
+        with mock.patch.object(
+            ratelimiter, "is_allowlisted", side_effect=ConnectionError
+        ):
+            response = await wrapped(self.request)
+
+        self.assertEqual(response.status_code, HTTPStatus.OK)
