@@ -63,7 +63,10 @@ from cl.lib.decorators import cache_page_ignore_params
 from cl.lib.http import is_ajax
 from cl.lib.model_helpers import choices_to_csv
 from cl.lib.models import THUMBNAIL_STATUSES
-from cl.lib.ratelimiter import ratelimiter_all_10_per_h
+from cl.lib.ratelimiter import (
+    ratelimit_deny_list,
+    ratelimiter_all_10_per_h,
+)
 from cl.lib.search_utils import do_es_search, make_get_string
 from cl.lib.string_utils import trunc
 from cl.lib.thumbnails import make_png_thumbnail_for_instance
@@ -446,6 +449,7 @@ async def view_docket_feed(
     return await sync_to_async(DocketFeed())(request, docket_id=docket_id)
 
 
+@ratelimit_deny_list
 async def view_parties(
     request: HttpRequest,
     docket_id: int,
@@ -513,6 +517,7 @@ async def view_parties(
     return TemplateResponse(request, "docket_parties.html", context)
 
 
+@ratelimit_deny_list
 async def docket_idb_data(
     request: HttpRequest,
     docket_id: int,
@@ -626,6 +631,7 @@ def download_docket_entries_csv(
     return response
 
 
+@ratelimit_deny_list
 async def view_recap_document(
     request: HttpRequest,
     docket_id: int | None = None,
@@ -1155,6 +1161,7 @@ async def update_opinion_tabs(request: HttpRequest, pk: int):
 @never_cache
 @handle_cluster_redirection
 @track_view_counter(tracks="cluster", label_format="o.%s:view")
+@ratelimit_deny_list
 async def view_opinion(request: HttpRequest, pk: int, _: str) -> HttpResponse:
     """View Opinions
 
@@ -1170,6 +1177,7 @@ async def view_opinion(request: HttpRequest, pk: int, _: str) -> HttpResponse:
 
 
 @handle_cluster_redirection
+@ratelimit_deny_list
 async def view_opinion_pdf(
     request: HttpRequest, pk: int, _: str
 ) -> HttpResponse:
@@ -1187,6 +1195,7 @@ async def view_opinion_pdf(
 
 
 @handle_cluster_redirection
+@ratelimit_deny_list
 async def view_opinion_authorities(
     request: HttpRequest, pk: int, _: str
 ) -> HttpResponse:
@@ -1211,6 +1220,7 @@ async def view_opinion_authorities(
 
 
 @handle_cluster_redirection
+@ratelimit_deny_list
 async def view_opinion_cited_by(
     request: HttpRequest, pk: int, _: str
 ) -> HttpResponse:
@@ -1235,6 +1245,7 @@ async def view_opinion_cited_by(
 
 
 @handle_cluster_redirection
+@ratelimit_deny_list
 async def view_opinion_summaries(
     request: HttpRequest, pk: int, _: str
 ) -> HttpResponse:
@@ -1274,6 +1285,7 @@ async def view_opinion_summaries(
 
 
 @handle_cluster_redirection
+@ratelimit_deny_list
 async def view_opinion_related_cases(
     request: HttpRequest, pk: int, _: str
 ) -> HttpResponse:
