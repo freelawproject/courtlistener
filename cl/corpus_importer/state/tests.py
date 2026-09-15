@@ -1,6 +1,7 @@
 import json
 import logging
 import sqlite3
+import time
 from collections.abc import Callable, Generator, Iterable, Iterator
 from contextlib import closing, contextmanager
 from io import StringIO
@@ -2140,7 +2141,7 @@ class LoaderPreflightTest(LoaderTestCase):
     def test_a_finding_reaches_sentry_with_its_fields(self) -> None:
         """A Sentry issue is read by its fields rather than by parsing the
         summary back apart. Does the finding's detail ride along, under the
-        loader's own preflight issue?"""
+        loader's own issue for a run that will land incomplete?"""
         _run_database(self.database, [{"docket_number": "A-1"}])
         self.invalidate(1)
         logging.disable(logging.NOTSET)
@@ -2154,7 +2155,7 @@ class LoaderPreflightTest(LoaderTestCase):
         record = logs.records[0]
         self.assertEqual(
             record.fingerprint,  # type: ignore[attr-defined]
-            ["test", LoadPhase.PREFLIGHT],
+            ["test", LoadPhase.PREFLIGHT_PARTIAL],
         )
         self.assertEqual(record.result_type, "TestResult")  # type: ignore[attr-defined]
         self.assertEqual(record.invalid, 1)  # type: ignore[attr-defined]
@@ -2271,9 +2272,9 @@ class JKentScrapeLoaderRetryTest(LoaderTestCase):
         ledger.dispatched(1, "A-1")
         ledger.errored(1)
 
-        self.assertEqual(ledger.rows_to_retry(), {1})
+        self.assertEqual(ledger.rows_to_retry().rows, {1})
         self.assertEqual(
-            ledger.rows_to_retry(),
+            ledger.rows_to_retry().rows,
             set(),
             "The first retry took them.",
         )
@@ -2287,7 +2288,15 @@ class JKentScrapeLoaderRetryTest(LoaderTestCase):
         ledger.dispatched(8, "A-8")
         ledger.errored(8)
 
-        self.assertEqual(ledger.rows_to_retry(), {7, 8})
+        retry = ledger.rows_to_retry()
+
+        self.assertEqual(retry.rows, {7, 8})
+        self.assertEqual(
+            (retry.lost, retry.errored),
+            ({7}, {8}),
+            "The row celery lost is kept apart from the row that errored, "
+            "which is the one carrying a count to settle.",
+        )
         self.assertEqual(
             self.redis.hlen(f"{self.key}:pending"),
             0,
@@ -2380,6 +2389,109 @@ class JKentScrapeLoaderRetryTest(LoaderTestCase):
         loader.retry()
 
         self.assertEqual(self.ledger().started(), started)
+
+    def test_holding_work_for_retry_keeps_the_run_s_anchor_alive(self) -> None:
+        """Every retry set has its expiry pushed out each time something is
+        held in it, while `started` is written once and never refreshed. A run
+        whose retries keep it alive longer than one TTL would therefore lose
+        the moment it began -- which its extraction re-check is scoped by --
+        while it still had documents held to re-check. Is the anchor kept
+        alive alongside the work that needs it?
+
+        Redis expires keys on a clock of its own that `time_machine` cannot
+        move, so this runs against a ledger whose TTL is seconds rather than
+        the usual week and waits the expiry out for real.
+        """
+        ledger = LoadLedger(self.key, ttl=2)
+        ledger.start()
+
+        time.sleep(1.2)
+        ledger.retry_documents([11, 12])
+        time.sleep(1.2)
+
+        self.assertEqual(
+            self.extraction_retry(),
+            {"11", "12"},
+            "Holding the documents pushed their own expiry out.",
+        )
+        self.assertIsNotNone(
+            ledger.started(),
+            "And took the anchor they will be re-checked against with them.",
+        )
+
+    def test_a_row_that_merges_on_retry_stops_counting_as_an_error(
+        self,
+    ) -> None:
+        """The ledger's counters only ever go up, and nothing prunes them as
+        rows recover. A row that errored and then merged on retry would go on
+        being counted -- and alerted on -- as a failure for the rest of the
+        run's life. Is the error taken back when the row goes back?"""
+        failing = {"A-2"}
+        _run_database(
+            self.database, [{"docket_number": f"A-{n}"} for n in (1, 2)]
+        )
+        loader_class = self.failing_loader(failing)
+        with patch.object(merge_state_scrape_row, "max_retries", 0):
+            self.loader(loader_class).load()
+        self.assertEqual(self.ledger().totals().errored, 1)
+        failing.clear()
+
+        report = self.loader(loader_class).retry()
+
+        self.assertEqual(
+            report.errored,
+            0,
+            "The row merged, so it is no longer an error against the run.",
+        )
+        self.assertEqual(report.merged, 2, "Both rows are merged now.")
+        self.assertEqual(
+            report.failed, 0, "So the run has nothing left to alert on."
+        )
+
+    def test_a_row_that_errors_again_still_counts_as_an_error(self) -> None:
+        """Taking the error back as the row is re-dispatched leans on the
+        retry's own merge to count it again if it fails again. Does a row that
+        errored twice report as the one error it still is, rather than as two
+        or as none?"""
+        _run_database(self.database, [{"docket_number": "A-1"}])
+        loader_class = self.failing_loader({"A-1"})
+        with patch.object(merge_state_scrape_row, "max_retries", 0):
+            self.loader(loader_class).load()
+
+        with patch.object(merge_state_scrape_row, "max_retries", 0):
+            report = self.loader(loader_class).retry()
+
+        self.assertEqual(report.errored, 1)
+        self.assertEqual(
+            self.merge_retry(), {"1"}, "And is still there to be retried."
+        )
+
+    def test_a_row_the_retry_cannot_use_keeps_its_error(self) -> None:
+        """The error is taken back where the row is dispatched rather than
+        where it is read, because a row the retry finds it can no longer use
+        never goes back on the queue and is still a failure. Does one that
+        never reaches the queue keep its error counted against the run?"""
+        unusable: set[str] = set()
+
+        class UnusableOnRetry(self.failing_loader({"A-1"})):  # type: ignore[misc, valid-type]
+            def normalize(
+                self, payload: dict[str, Any], row: sqlite3.Row
+            ) -> dict[str, Any] | None:
+                if payload.get("docket_number") in unusable:
+                    return None
+                return payload
+
+        _run_database(self.database, [{"docket_number": "A-1"}])
+        with patch.object(merge_state_scrape_row, "max_retries", 0):
+            self.loader(UnusableOnRetry).load()
+        unusable.add("A-1")
+
+        report = self.loader(UnusableOnRetry).retry()
+
+        self.assertEqual(
+            report.invalid, 1, "The retry could not use the row at all."
+        )
+        self.assertEqual(report.errored, 1, "So its error still stands.")
 
     def test_a_retry_that_cannot_find_a_row_says_so(self) -> None:
         """A row held for retry that the run database does not have means the
@@ -2502,6 +2614,31 @@ class JKentScrapeLoaderExtractionRetryTest(LoaderTestCase):
 
         self.assertEqual(ledger.documents_to_retry(), {11, 12})
         self.assertEqual(ledger.documents_to_retry(), set())
+
+    def test_a_retry_that_lost_its_anchor_keeps_the_documents(self) -> None:
+        """Without the moment the run began there is no window to ask
+        `unextracted` about, so the retry cannot tell which of its documents
+        are still outstanding. Are they left in the ledger for a later sweep
+        to find, rather than drained into a retry that cannot check them?"""
+        model = self.document_model([11, 12])
+        ledger = self.ledger()
+        # Held for retry, but nothing ever recorded when the run began.
+        ledger.retry_documents([11, 12])
+        logging.disable(logging.NOTSET)
+        self.addCleanup(logging.disable)
+
+        with self.assertLogs(
+            "cl.corpus_importer.state.loader", "ERROR"
+        ) as logs:
+            self.loader(self.loader_class(document_model=model)).retry()
+
+        self.assertEqual(
+            set(self.redis.smembers(f"{self.key}:extraction_retry")),
+            {"11", "12"},
+            "The documents are still there to be swept up.",
+        )
+        self.assertIn("no longer know when the run began", logs.output[0])
+        model.unextracted.return_value.filter.assert_not_called()
 
     def test_a_run_with_nothing_outstanding_holds_nothing(self) -> None:
         """A run whose documents all came back extracted should leave no retry
