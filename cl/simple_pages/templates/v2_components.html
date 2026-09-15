@@ -1713,7 +1713,6 @@ Sample code here.
     <p class="text-sm text-greyscale-600 mb-2">Desktop toolbar shown below. Resize below <code>md</code> breakpoint (768px) to see the mobile layout with search, prev/next, and filter drawer trigger.</p>
     <c-docket-filter
       :docket="demo_docket"
-      :docket_source="docket_source"
       :form="demo_filter_form"
       :page_obj="demo_page_obj"
     />
@@ -1722,10 +1721,6 @@ Sample code here.
       <c-library.item only>
         <c-slot name="label"><code>:docket</code></c-slot>
         <c-slot name="description">The Docket model instance (required).</c-slot>
-      </c-library.item>
-      <c-library.item only>
-        <c-slot name="label"><code>:docket_source</code></c-slot>
-        <c-slot name="description">The <code>DocketEntrySource</code> from the view context, forwarded to the nested <code>&lt;c-docket-source-attribution&gt;</code> that renders the source-attribution sentence below the toolbar.</c-slot>
       </c-library.item>
       <c-library.item only>
         <c-slot name="label"><code>:form</code></c-slot>
@@ -1753,7 +1748,6 @@ Sample code here.
       <c-code>
 &lt;c-docket-filter
   :docket="docket"
-  :docket_source="docket_source"
   :form="form"
   :page_obj="docket_entries"
   :sort_order_asc="sort_order_asc"
