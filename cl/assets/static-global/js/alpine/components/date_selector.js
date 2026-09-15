@@ -85,8 +85,13 @@ document.addEventListener('alpine:init', () => {
       this.dropdownMenuOpen = true;
     },
     onComboboxEscape() {
-      if (this.dropdownMenuOpen) this.closeDropdownMenu();
-      else this.dateAfterRelative = '';
+      if (this.dropdownMenuOpen) return this.closeDropdownMenu();
+      this.dateAfterRelative = '';
+      this._emitRelativeInput();
+    },
+    _emitRelativeInput() {
+      const inputEl = document.getElementById(this.relativeInputId);
+      this.$nextTick(() => inputEl?.dispatchEvent(new Event('input', { bubbles: true })));
     },
     enterDropdownFocus() {
       if (!this.dropdownMenuOpen) this.dropdownMenuOpen = true;
@@ -113,6 +118,7 @@ document.addEventListener('alpine:init', () => {
     },
     selectRelativeDate() {
       this.dateAfterRelative = this.$el.dataset.value;
+      this._emitRelativeInput();
       this.focusRelativeInput();
     },
     selectDateType() {
