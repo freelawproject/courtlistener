@@ -4485,17 +4485,18 @@ def download_and_parse_scotus_docket(
         content = cast(bytes, f.read()).decode("utf-8")
 
     ext = s3_key.rsplit(".", 1)[-1].lower()
-    parser_map: dict[str, type] = {
-        "json": SCOTUSDocketReport,
-        "html": SCOTUSDocketReportHTML,
-        "htm": SCOTUSDocketReportHTM,
-    }
-    if not (parser_cls := parser_map.get(ext)):
-        logger.error("Unsupported file extension: %s for %s", ext, s3_key)
-        self.request.chain = None
-        return None
+    match ext:
+        case "json":
+            parser = SCOTUSDocketReport()
+        case "html":
+            parser = SCOTUSDocketReportHTML()
+        case "htm":
+            parser = SCOTUSDocketReportHTM()
+        case _:
+            logger.error("Unsupported file extension: %s for %s", ext, s3_key)
+            self.request.chain = None
+            return None
 
-    parser = parser_cls()
     parser._parse_text(content)
     return parser.data
 

@@ -996,6 +996,13 @@
       "severity": "error"
     },
     {
+      "column": 12,
+      "path": "cl/corpus_importer/tasks.py",
+      "name": "bad-return",
+      "concise_description": "Returned type `dict[Never, Never] | Docket` is not assignable to declared return type `dict[str, Any] | None`",
+      "severity": "error"
+    },
+    {
       "column": 23,
       "path": "cl/corpus_importer/utils.py",
       "name": "missing-attribute",
