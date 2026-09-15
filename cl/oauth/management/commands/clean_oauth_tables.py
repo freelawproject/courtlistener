@@ -12,7 +12,7 @@ from cl.oauth.cleanup_utils import run_cleanup_pass
 class Command(VerboseCommand):
     help = (
         "Delete OAuth applications registered through /o/register/ that no "
-        "user ever authorized and clears expired tokens.."
+        "user ever authorized, then clear expired grants and tokens."
     )
 
     def add_arguments(self, parser: argparse.ArgumentParser) -> None:
@@ -20,7 +20,10 @@ class Command(VerboseCommand):
             "--dry-run",
             action="store_true",
             default=False,
-            help="Log what would be deleted without deleting anything.",
+            help=(
+                "Count the applications that would be deleted without "
+                "deleting anything, and skip token clearing entirely."
+            ),
         )
 
     def handle(self, *args: Any, **options: Any) -> None:
