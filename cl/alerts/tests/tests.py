@@ -819,6 +819,39 @@ class AlertTest(SimpleUserDataMixin, ESIndexTestCase, TestCase):
                 await alert.adelete()
         await self.async_client.alogout()
 
+    async def test_allow_edit_that_resends_unchanged_invalid_query(
+        self,
+    ) -> None:
+        """Editing only the name/rate of an alert whose already-invalid
+        query is resent unchanged succeeds."""
+        pandora = await User.objects.aget(username="pandora")
+        self.assertTrue(
+            await self.async_client.alogin(
+                username="pandora", password="password"
+            )
+        )
+        starting_query = "q=asdf&cited_gt=foo"
+        alert = await Alert.objects.acreate(
+            user=pandora,
+            name="legacy_name",
+            query=starting_query,
+            rate="dly",
+            alert_type=SEARCH_TYPES.OPINION,
+        )
+        params = self.alert_params.copy()
+        # Mirrors what make_get_string() renders into the hidden query
+        # field on the edit-alert page: the same params, plus a trailing
+        # "&", even though nothing about the query actually changed.
+        params["query"] = starting_query + "&"
+        params["name"] = "renamed_alert"
+        params["edit_alert"] = alert.pk
+        r = await self.async_client.post("/", params, follow=True)
+        self.assertIn("edited successfully", r.content.decode())
+        await alert.arefresh_from_db()
+        self.assertEqual(alert.name, "renamed_alert")
+        await alert.adelete()
+        await self.async_client.alogout()
+
     def test_new_alert_gets_secret_key(self) -> None:
         """When you create a new alert, does it get a secret key?"""
         self.assertTrue(self.alert.secret_key)

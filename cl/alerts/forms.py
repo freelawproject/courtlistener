@@ -135,10 +135,12 @@ class CreateAlertForm(ModelForm):
                 "You can't create a match-all alert. Please try narrowing your query."
             )
 
+        query_data = QueryDict(query.encode())
         alert_being_edited = self.instance and self.instance.pk
-        query_changed = not alert_being_edited or query != self.instance.query
+        query_changed = not alert_being_edited or query_data != QueryDict(
+            self.instance.query.encode()
+        )
         if query_changed:
-            query_data = QueryDict(query.encode())
             if not SearchForm(query_data).is_valid():
                 raise ValidationError(
                     "This query is invalid and can't be used for an alert."
