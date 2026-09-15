@@ -2466,11 +2466,30 @@ class JKentScrapeLoaderRetryTest(LoaderTestCase):
             self.merge_retry(), {"1"}, "And is still there to be retried."
         )
 
-    def test_a_row_the_retry_cannot_use_keeps_its_error(self) -> None:
-        """The error is taken back where the row is dispatched rather than
-        where it is read, because a row the retry finds it can no longer use
-        never goes back on the queue and is still a failure. Does one that
-        never reaches the queue keep its error counted against the run?"""
+    def test_a_retry_does_not_count_its_rows_as_dispatched_again(
+        self,
+    ) -> None:
+        """A row a retry puts back was counted as dispatched when it first
+        went. Does the run's total stay at the number of rows it has?"""
+        failing = {"A-2"}
+        _run_database(
+            self.database, [{"docket_number": f"A-{n}"} for n in (1, 2)]
+        )
+        loader_class = self.failing_loader(failing)
+        with patch.object(merge_state_scrape_row, "max_retries", 0):
+            self.loader(loader_class).load()
+        failing.clear()
+
+        report = self.loader(loader_class).retry()
+
+        self.assertEqual(report.dispatched, 2)
+        self.assertEqual(self.ledger().totals().dispatched, 2)
+
+    def test_a_row_the_retry_cannot_use_is_withdrawn(self) -> None:
+        """A row the retry finds it can no longer use never goes back on the
+        queue, and has been drained from the retry set, so nothing will ever
+        settle it. Is its error taken back, rather than alerted on by every
+        later verification of the run?"""
         unusable: set[str] = set()
 
         class UnusableOnRetry(self.failing_loader({"A-1"})):  # type: ignore[misc, valid-type]
@@ -2491,7 +2510,12 @@ class JKentScrapeLoaderRetryTest(LoaderTestCase):
         self.assertEqual(
             report.invalid, 1, "The retry could not use the row at all."
         )
-        self.assertEqual(report.errored, 1, "So its error still stands.")
+        self.assertEqual(
+            (report.errored, report.dispatched),
+            (0, 0),
+            "So it no longer counts against the run as dispatched or errored.",
+        )
+        self.assertEqual(self.merge_retry(), set())
 
     def test_a_retry_that_cannot_find_a_row_says_so(self) -> None:
         """A row held for retry that the run database does not have means the
@@ -2513,6 +2537,19 @@ class JKentScrapeLoaderRetryTest(LoaderTestCase):
             logs.records[0].fingerprint,  # type: ignore[attr-defined]
             ["test", LoadPhase.MERGE],
         )
+
+    def test_an_errored_row_the_run_database_lacks_is_withdrawn(self) -> None:
+        """The retry says once that a held row is not in the run database and
+        drops it. Is its error dropped with it, so later verifications do not
+        keep alerting on a row nothing can retry?"""
+        _run_database(self.database, [{"docket_number": "A-1"}])
+        ledger = self.ledger()
+        ledger.dispatched(99, "A-99")
+        ledger.errored(99)
+
+        report = self.loader().retry()
+
+        self.assertEqual((report.errored, report.dispatched), (0, 0))
 
 
 class JKentScrapeLoaderExtractionRetryTest(LoaderTestCase):

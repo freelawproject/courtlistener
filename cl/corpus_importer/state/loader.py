@@ -34,7 +34,7 @@ from typing import Any, ClassVar, Final, cast
 from django.db.models import Model
 from pydantic import BaseModel, ValidationError
 
-from cl.corpus_importer.state.ledger import LoadLedger
+from cl.corpus_importer.state.ledger import LoadLedger, RetryRows
 from cl.corpus_importer.state.merger import Merger
 from cl.corpus_importer.state.preflight import (
     STANDARD_CHECKS,
@@ -664,7 +664,10 @@ class JKentScrapeLoader[ScrapeType: BaseModel, ParamType = None](ABC):
         The rows are named by position, so this reads the run database again
         to get their payloads back. A row that has since stopped being usable
         -- the loader's own rules having changed under it -- is counted as
-        invalid or refused here rather than being dispatched to fail again.
+        invalid or refused here rather than being dispatched to fail again,
+        and it and any row the run database no longer has are withdrawn from
+        the run's totals, since nothing can retry them. See
+        `LoadLedger.withdrawn`.
 
         :param report: The report to fill in, modified in place.
         """
@@ -674,6 +677,7 @@ class JKentScrapeLoader[ScrapeType: BaseModel, ParamType = None](ABC):
         logger.info("Retrying %s rows of %s", len(rows), self.database.name)
         report.rows_read = True
         found: set[int] = set()
+        unusable: set[int] = set()
         for number, row in self.all_rows():
             if number not in rows:
                 continue
@@ -682,15 +686,23 @@ class JKentScrapeLoader[ScrapeType: BaseModel, ParamType = None](ABC):
             prepared = self._prepare(number, row)
             if prepared is RowOutcome.REFUSED:
                 report.refused += 1
+                unusable.add(number)
                 continue
             if prepared is RowOutcome.INVALID:
                 report.invalid += 1
+                unusable.add(number)
                 continue
-            self._dispatch(number, prepared, retrying=number in retry.errored)
+            self._dispatch(number, prepared, retry=retry)
             report.dispatched += 1
             if self.db_delay:
                 time.sleep(self.db_delay)
-        if missing := rows - found:
+        missing = rows - found
+        withdrawn = unusable | missing
+        self.ledger.withdrawn(
+            errored=len(withdrawn & retry.errored),
+            lost=len(withdrawn & retry.lost),
+        )
+        if missing:
             logger.error(
                 "%s rows held for retry are not in %s at all, so they cannot "
                 "be re-merged and have now been dropped from the ledger: %s",
@@ -813,16 +825,20 @@ class JKentScrapeLoader[ScrapeType: BaseModel, ParamType = None](ABC):
         return report
 
     def _dispatch(
-        self, number: int, scrape: ScrapeType, *, retrying: bool = False
+        self,
+        number: int,
+        scrape: ScrapeType,
+        *,
+        retry: RetryRows | None = None,
     ) -> None:
         """Send one row's merge to the queue, writing it down as it goes.
 
         :param number: The row's position in the query.
         :param scrape: The validated scrape. Its own dump is what the worker
             gets, so what the worker validates is what this load read.
-        :param retrying: Whether the row is going back after an error the run
-            counted against it, which this takes back. See
-            `LoadLedger.dispatched`.
+        :param retry: What a retry read from the ledger, when this is one
+            putting the row back rather than its first dispatch. See
+            `LoadLedger.redispatched`.
         """
         # Imported here because the task module imports the registry, which
         # imports every loader, which imports this module.
@@ -830,7 +846,12 @@ class JKentScrapeLoader[ScrapeType: BaseModel, ParamType = None](ABC):
 
         for throttle in self.throttles:
             throttle.maybe_wait()
-        self.ledger.dispatched(number, self.label(scrape), retrying=retrying)
+        if retry is None:
+            self.ledger.dispatched(number, self.label(scrape))
+        else:
+            self.ledger.redispatched(
+                number, self.label(scrape), errored=number in retry.errored
+            )
         merge_state_scrape_row.si(
             loader=self.name,
             row=number,
