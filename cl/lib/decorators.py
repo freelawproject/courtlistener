@@ -58,35 +58,17 @@ def tiered_cache(
 
     Memory is checked first for speed, then Redis for cross-process sharing.
     If neither has the value, the wrapped function is called and both tiers
-    are populated. (Calling the function is the cache miss, not a third tier.)
-
-    Each tier gets its own timeout, and a value is never served past the
-    Redis tier's expiry. Redis entries are stored as ``(redis_expiry, value)``
-    and a memory entry expires at the *earlier* of ``memory_timeout`` from now
-    and that ``redis_expiry``. Without that clamp, a memory entry filled from
-    a nearly-expired Redis entry would outlive it and stretch the effective
-    cache duration to ``redis_timeout + memory_timeout``. So ``redis_timeout``
-    is the real ceiling on how stale a value can get, and ``memory_timeout``
-    only says how often a process reconsults Redis within that window.
+    are populated.
 
     The memory tier is a per-process front for the shared Redis tier, so
     ``memory_timeout`` MUST NOT exceed ``redis_timeout``. A misconfigured pair
     raises ValueError at decoration time, which means at import time for a
-    module-level decorator. The clamp already makes a longer memory timeout
-    unreachable in practice, but the rule keeps the configuration honest about
-    what it gets: ``memory_timeout`` bounds how long a process can go on
-    serving a value after Redis has moved to a newer one, since a process only
-    reconsults Redis once its memory entry expires. Setting it above
-    ``redis_timeout`` reads as asking for a long-lived process-local cache
-    while silently getting the Redis lifetime instead.
+    module-level decorator.
 
     The ordering also matters for invalidation: ``clear_tiered_cache()``
     empties Redis for everyone, but only clears the memory tier of the process
     that calls it. Every other process stays stale for up to
     ``memory_timeout``.
-
-    A ``None`` return value is cached like any other, since it is wrapped in
-    the stored tuple and so stays distinguishable from a Redis miss.
 
     :param memory_timeout: Timeout in seconds for the in-memory tier. Must be
         at least 1 second and no greater than ``redis_timeout``.
