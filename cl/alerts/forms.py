@@ -2,6 +2,7 @@ from django import forms
 from django.core.exceptions import ValidationError
 from django.forms import ModelForm
 from django.forms.widgets import HiddenInput, Select, TextInput
+from django.http import QueryDict
 from django.urls import reverse
 from django.utils.html import format_html
 from hcaptcha.fields import hCaptchaField
@@ -18,6 +19,7 @@ from cl.alerts.utils import (
     is_match_all_query,
 )
 from cl.donate.models import NeonMembershipLevel
+from cl.search.forms import SearchForm
 from cl.search.models import SEARCH_TYPES
 
 
@@ -119,7 +121,12 @@ class CreateAlertForm(ModelForm):
 
     def clean_query(self):
         """Validate that the query is not a match-all query, as these alerts
-        would trigger for every new document ingested or updated.
+        would trigger for every new document ingested or updated, and that it
+        parses cleanly against SearchForm, mirroring the check the Alerts API
+        performs in SearchAlertSerializer.
+
+        The SearchForm check only runs when the query is new or has changed.
+        This keeps alerts saved before that API validation existed editable.
         """
         query = self.cleaned_data["query"]
         match_all_query = is_match_all_query(query)
@@ -127,8 +134,16 @@ class CreateAlertForm(ModelForm):
             raise ValidationError(
                 "You can't create a match-all alert. Please try narrowing your query."
             )
-        else:
-            return query
+
+        alert_being_edited = self.instance and self.instance.pk
+        query_changed = not alert_being_edited or query != self.instance.query
+        if query_changed:
+            query_data = QueryDict(query.encode())
+            if not SearchForm(query_data).is_valid():
+                raise ValidationError(
+                    "This query is invalid and can't be used for an alert."
+                )
+        return query
 
     def clean_alert_type(self):
         # On alert updates, validates that the alert_type hasn't changed in a
