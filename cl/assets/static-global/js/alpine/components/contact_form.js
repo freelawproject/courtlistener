@@ -20,6 +20,9 @@ document.addEventListener('alpine:init', () => {
       return this.issue.hasAdditionalFields ? 'Is there anything else we should know?' : 'Message';
     },
     get showHint() {
+      // The no-AI note is not tied to one issue type: show it for every type
+      // that offers a message box, so it appears above whatever hint follows.
+      if (this.$el.id === 'no_ai') return this.issue.isValidType;
       return this.issue.noType ? this.$el.id === 'default' : this.issueType === this.$el.id;
     },
     onUpdateIssueType() {

@@ -26,6 +26,7 @@ def inject_settings(request):
         "WIKI_COVERAGE_OA_URL": settings.WIKI_COVERAGE_OA_URL,
         "WIKI_COVERAGE_OPINIONS_URL": settings.WIKI_COVERAGE_OPINIONS_URL,
         "WIKI_COVERAGE_RECAP_URL": settings.WIKI_COVERAGE_RECAP_URL,
+        "WIKI_COVERAGE_SCOTUS_URL": settings.WIKI_COVERAGE_SCOTUS_URL,
     }
 
 

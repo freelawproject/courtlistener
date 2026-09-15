@@ -13,7 +13,7 @@ from django.contrib import messages
 from django.contrib.auth.decorators import login_required
 from django.core.exceptions import ObjectDoesNotExist, PermissionDenied
 from django.core.paginator import EmptyPage, PageNotAnInteger, Paginator
-from django.db.models import Exists, OuterRef, Prefetch, QuerySet
+from django.db.models import Prefetch, QuerySet
 from django.http import (
     HttpRequest,
     HttpResponseRedirect,
@@ -69,7 +69,12 @@ from cl.lib.string_utils import trunc
 from cl.lib.thumbnails import make_png_thumbnail_for_instance
 from cl.lib.url_utils import get_redirect_or_abort
 from cl.lib.utils import human_sort
+from cl.opinion_page import docket_entry_sources
 from cl.opinion_page.decorators import handle_cluster_redirection
+from cl.opinion_page.docket_entry_sources import (
+    attach_display_fields,
+    document_url,
+)
 from cl.opinion_page.feeds import DocketFeed
 from cl.opinion_page.forms import (
     CitationRedirectorForm,
@@ -81,10 +86,7 @@ from cl.opinion_page.forms import (
     TennWorkCompClUploadForm,
 )
 from cl.opinion_page.utils import (
-    build_bankruptcy_metadata,
-    build_docket_metadata,
     build_docket_tabs,
-    build_originating_court_metadata,
     core_docket_data,
     es_cited_case_count,
     es_get_cited_clusters_with_cache,
@@ -97,16 +99,14 @@ from cl.recap.constants import COURT_TIMEZONES
 from cl.recap.models import FjcIntegratedDatabase
 from cl.search.models import (
     SEARCH_TYPES,
-    BankruptcyInformation,
     Citation,
     Court,
     Docket,
     Opinion,
     OpinionCluster,
-    OpinionsCitedByRECAPDocument,
-    OriginatingCourtInformation,
     Parenthetical,
     RECAPDocument,
+    SCOTUSDocument,
     sort_cites,
 )
 from cl.search.selectors import get_clusters_from_citation_str
@@ -333,18 +333,16 @@ async def redirect_docket_recap(
 
 
 async def fetch_docket_entries(docket):
-    """Fetch docket entries asociated to docket
+    """Fetch docket entries associated with a docket.
+
+    Uses the source-appropriate model for the docket's court (see
+    cl.opinion_page.docket_entry_sources).
 
     param docket: docket.id to get related docket_entries.
     returns: DocketEntry Queryset.
     """
-    de_list = docket.docket_entries.all().prefetch_related(
-        Prefetch(
-            "recap_documents",
-            queryset=RECAPDocument.objects.defer("plain_text"),
-        )
-    )
-    return de_list
+    source = docket.get_entry_source()
+    return source.entries_queryset(docket)
 
 
 @track_view_counter(tracks="docket", label_format="d.%s:view")
@@ -355,6 +353,7 @@ async def view_docket(
     form = DocketEntryFilterForm(request.GET, request=request)
     docket, context = await core_docket_data(request, pk)
 
+    source = docket.get_entry_source()
     de_list = await fetch_docket_entries(docket)
 
     if await sync_to_async(form.is_valid)():
@@ -370,9 +369,14 @@ async def view_docket(
             de_list = de_list.filter(date_filed__lte=cd["filed_before"])
         if cd.get("order_by") == DocketEntryFilterForm.DESCENDING:
             sort_order_asc = False
-            de_list = de_list.order_by(
-                "-recap_sequence_number", "-entry_number"
-            )
+
+    # Always order explicitly from the source config rather than relying on
+    # each model's Meta.ordering fallback -- DocketEntry defaults ascending
+    # but SCOTUSDocketEntry defaults descending, so an implicit fallback
+    # would silently contradict the sort_order_asc flag used by the template.
+    de_list = de_list.order_by(
+        *(source.order_by_asc if sort_order_asc else source.order_by_desc)
+    )
 
     page = request.GET.get("page", "1")
 
@@ -382,45 +386,42 @@ async def view_docket(
 
     paginated_entries = await paginate_docket_entries(de_list, page)
 
-    # Extract recap documents from the current page.
-    recap_documents = [
-        rd
-        for entry in await sync_to_async(list)(paginated_entries)
-        async for rd in entry.recap_documents.all()
-    ]
-    # Get prayer counts in bulk.
-    prayer_counts = await get_prayer_counts_in_bulk(recap_documents)
-    existing_prayers = {}
+    @sync_to_async
+    def _attach_documents(entries: list) -> list:
+        page_documents = []
+        for entry in entries:
+            entry.documents = list(source.documents_for_entry(entry))
+            for document in entry.documents:
+                attach_display_fields(source, document)
+            page_documents.extend(entry.documents)
+        return page_documents
 
-    user = await request.auser()
-    if user.is_authenticated:
-        # Check prayer existence in bulk.
-        existing_prayers = await get_existing_prayers_in_bulk(
-            user, recap_documents
-        )
+    page_documents = await _attach_documents(
+        await sync_to_async(list)(paginated_entries)
+    )
 
-    # Merge counts and existing prayer status to RECAPDocuments.
-    for rd in recap_documents:
-        rd.prayer_count = prayer_counts.get(rd.id, 0)
-        rd.prayer_exists = existing_prayers.get(rd.id, False)
+    prayer_counts: dict[int, int] = {}
+    existing_prayers: dict[int, bool] = {}
+
+    if source.has_pay_and_pray:
+        # Get prayer counts in bulk.
+        prayer_counts = await get_prayer_counts_in_bulk(page_documents)
+
+        user = await request.auser()
+        if user.is_authenticated:
+            # Check prayer existence in bulk.
+            existing_prayers = await get_existing_prayers_in_bulk(
+                user, page_documents
+            )
+
+        # Merge counts and existing prayer status onto the documents.
+        for doc in page_documents:
+            doc.prayer_count = prayer_counts.get(doc.id, 0)
+            doc.prayer_exists = existing_prayers.get(doc.id, False)
 
     parties = await docket.parties.aexists()
     has_idb_data = bool(docket.idb_data_id)
     has_authorities = await docket.ahas_authorities()
-
-    @sync_to_async
-    def _get_related(
-        d: Docket,
-    ) -> tuple[
-        BankruptcyInformation | None,
-        OriginatingCourtInformation | None,
-    ]:
-        return (
-            getattr(d, "bankruptcy_information", None),
-            getattr(d, "originating_court_information", None),
-        )
-
-    bankr_info, og_info = await _get_related(docket)
 
     context.update(
         {
@@ -430,13 +431,6 @@ async def view_docket(
             "sort_order_asc": sort_order_asc,
             "form": form,
             "get_string": make_get_string(request),
-            "metadata": await sync_to_async(build_docket_metadata)(
-                docket, context["timezone"]
-            ),
-            "bankruptcy_metadata": build_bankruptcy_metadata(bankr_info),
-            "originating_court_metadata": await sync_to_async(
-                build_originating_court_metadata
-            )(docket, og_info),
             "tabs": build_docket_tabs(
                 docket, parties, has_idb_data, has_authorities
             ),
@@ -578,7 +572,7 @@ async def docket_authorities(
     return TemplateResponse(request, "docket_authorities.html", context)
 
 
-def make_rd_title(rd: RECAPDocument) -> str:
+def make_rd_title(rd: RECAPDocument | SCOTUSDocument) -> str:
     """
     This will result in three database loads if rd hasn't already cached the objects.
     """
@@ -589,9 +583,7 @@ def make_rd_title(rd: RECAPDocument) -> str:
         desc=f"{rd.description} &ndash; " if rd.description else "",
         doc_num=rd.document_number,
         att_num=(
-            f", Att. #{rd.attachment_number}"
-            if rd.document_type == RECAPDocument.ATTACHMENT
-            else ""
+            f", Att. #{rd.attachment_number}" if rd.attachment_number else ""
         ),
         case_name=best_case_name(d),
         court=court.citation_string,
@@ -615,7 +607,20 @@ def download_docket_entries_csv(
     filename = f"{case_name}.{court_id}.{docket_id}.{date_str}.csv"
 
     # TODO check if for large files we'll cache or send file by email
-    csv_content = generate_docket_entries_csv_data(de_list) if de_list else b""
+    try:
+        csv_content = (
+            generate_docket_entries_csv_data(de_list) if de_list else b""
+        )
+    except (NotImplementedError, AttributeError):
+        # Some docket sources (e.g. SCOTUS) don't support CSV export yet.
+        # Only return a handled 501 for those. A RECAP docket hitting
+        # this branch means a real bug in the CSV path, and that should
+        # still raise a error 500.
+        if docket.get_entry_source() is docket_entry_sources.RECAP:
+            raise
+        # A handled 501 triggers the existing "There was a problem. Try
+        # again later." message in export-csv.js instead of crashing.
+        return HttpResponse(status=501)
     response: HttpResponse = HttpResponse(csv_content, content_type="text/csv")
     response["Content-Disposition"] = f'attachment; filename="{filename}"'
     return response
@@ -665,6 +670,8 @@ async def view_recap_authorities(
     )
     if isinstance(response, SimpleTemplateResponse) and response.context_data:
         c = response.context_data
+        if not hasattr(c["rd"], "authorities_with_data"):
+            raise Http404("No authorities available for this document.")
         c["authorities"] = c["rd"].authorities_with_data
     return response
 
@@ -679,20 +686,36 @@ async def recap_document_context(
     template: str = "",
 ) -> HttpResponse:
     """
-    Returns an HttpResponse for a RECAPDocument.
-    This can be either an HttpResponseRedirect or a TemplateResponse.
+    Returns an HttpResponse for a RECAPDocument or SCOTUSDocument,
+    depending on the docket's court. This can be either an
+    HttpResponseRedirect or a TemplateResponse.
     """
+    docket = await aget_object_or_404(Docket, pk=docket_id)
+    source = docket.get_entry_source()
+    is_scotus = source is docket_entry_sources.SCOTUS
+
+    if is_scotus and not await sync_to_async(waffle.flag_is_active)(
+        request, "scotus_docket_page"
+    ):
+        raise Http404("Docket not found.")
 
     # Tuples of (pk, attachment_number, description)
-    rd_values = [
-        x
-        async for x in RECAPDocument.objects.filter(
-            docket_entry__docket_id=docket_id,  # type: ignore[misc]
-            document_number=doc_num,
-        )
-        .order_by("pk")
-        .values_list("pk", "attachment_number", "description")
-    ]
+    try:
+        rd_values = [
+            x
+            async for x in source.documents_for_docket_and_number(
+                docket_id,  # type: ignore[arg-type]
+                doc_num,  # type: ignore[arg-type]
+            )
+            .order_by("pk")
+            .values_list("pk", "attachment_number", "description")
+        ]
+    except ValueError:
+        # doc_num is a free-form <str:doc_num> URL segment, but some
+        # sources (e.g. SCOTUSDocument.document_number) store it as an
+        # IntegerField. A non-numeric doc_num raises here instead of
+        # just matching nothing. Treat it the same as "no match".
+        raise Http404("No document matches the given query.")
 
     if rd_values_tmp := list(filter(lambda x: x[1] == att_num, rd_values)):
         rd_value = rd_values_tmp[0]
@@ -711,34 +734,19 @@ async def recap_document_context(
         if list(filter(lambda x: x[1] == 1, rd_values)):
             # Get the URL to the attachment page and use the querystring
             # if the request included one
-            attachment_page = reverse(
-                "view_recap_attachment",
-                kwargs={
-                    "docket_id": docket_id,
-                    "doc_num": doc_num,
-                    "att_num": 1,
-                    "slug": slug,
-                },
+            attachment_page = document_url(
+                docket_id,  # type: ignore[arg-type]
+                slug,
+                doc_num,  # type: ignore[arg-type]
+                1,
             )
             if request.GET.urlencode():
                 attachment_page += f"?{request.GET.urlencode()}"
             return HttpResponseRedirect(attachment_page)
 
-        raise Http404("No RECAPDocument matches the given query.")
+        raise Http404("No document matches the given query.")
 
-    rd = (
-        await RECAPDocument.objects.select_related(
-            "docket_entry__docket__court"
-        )
-        .annotate(
-            authorities=Exists(
-                OpinionsCitedByRECAPDocument.objects.filter(
-                    citing_document=OuterRef("pk")
-                )
-            )
-        )
-        .aget(pk=rd_value[0])
-    )
+    rd = await source.get_document_for_render(rd_value[0])
 
     # Check if the user has requested automatic redirection to the document
     redirect_to_pacer_modal = False
@@ -752,7 +760,7 @@ async def recap_document_context(
         # is True set redirect_to_pacer_modal to True to open the modal.
         if rd.is_available:
             return HttpResponseRedirect(rd.filepath_local.url)
-        else:
+        elif source.has_pay_and_pray:
             if rd.pacer_url and rd_download_redirect:
                 return HttpResponseRedirect(rd.pacer_url)
             if rd.pacer_url and redirect_or_modal:
@@ -763,7 +771,7 @@ async def recap_document_context(
     if all([needs_thumb, rd.has_valid_pdf, is_og_bot]):
         await make_png_thumbnail_for_instance(
             pk=rd.pk,
-            klass=RECAPDocument,
+            klass=type(rd),
             max_dimension=1068,
         )
         await rd.arefresh_from_db(fields=["thumbnail_status", "thumbnail"])
@@ -787,22 +795,31 @@ async def recap_document_context(
     # Override the og:url if we're serving a request to an OG crawler bot
     og_file_path_override = f"/{rd.filepath_local}" if is_og_bot else None
 
-    prayer_counts = await get_prayer_counts_in_bulk([rd])
-    existing_prayers = {}
-
-    user = await request.auser()
-    if user.is_authenticated:
-        # Check prayer existence.
-        existing_prayers = await get_existing_prayers_in_bulk(user, [rd])
+    prayer_counts: dict[int, int] = {}
+    existing_prayers: dict[int, bool] = {}
+    if source.has_pay_and_pray:
+        prayer_counts = await get_prayer_counts_in_bulk([rd])
+        user = await request.auser()
+        if user.is_authenticated:
+            # Check prayer existence.
+            existing_prayers = await get_existing_prayers_in_bulk(user, [rd])
 
     # Merge counts and existing prayer status to RECAPDocuments.
     rd.prayer_count = prayer_counts.get(rd.id, 0)  # type: ignore[attr-defined]
     rd.prayer_exists = existing_prayers.get(rd.id, False)  # type: ignore[attr-defined]
 
-    court_id = rd.docket_entry.docket.court.id
+    court_id = docket.court_id
 
-    # Generate attachment info
-    attachments = get_attachment_values(rd, rd_values)
+    # Generate attachment info. Use the docket's canonical slug (not the
+    # request's slug segment, which callers can leave blank) -- matches
+    # what get_absolute_url() always used.
+    attachments = get_attachment_values(
+        rd,
+        rd_values,
+        docket_id,  # type: ignore[arg-type]
+        docket.slug,
+        doc_num,  # type: ignore[arg-type]
+    )
 
     return TemplateResponse(
         request,
@@ -815,14 +832,19 @@ async def recap_document_context(
             "private": True,  # Always True for RECAP docs.
             "timezone": COURT_TIMEZONES.get(court_id, "US/Eastern"),
             "redirect_to_pacer_modal": redirect_to_pacer_modal,
-            "authorities": rd.authorities,
+            "authorities": getattr(rd, "authorities", False),
             "attachments": attachments,
+            "docket_source": source,
         },
     )
 
 
 def get_attachment_values(
-    rd: RECAPDocument, rd_values: list[tuple[int, int | None, str]]
+    rd: RECAPDocument | SCOTUSDocument,
+    rd_values: list[tuple[int, int | None, str]],
+    docket_id: int,
+    slug: str,
+    doc_num: str,
 ) -> list[dict[str, str | int | None]]:
     """
     Moved this out of recap_document_context because it is easily severable and
@@ -865,27 +887,16 @@ def get_attachment_values(
                 # This shouldn't be able to go negative, but just making sure.
                 start = rd_index - max_before
             end = rd_index + 1 + max_after  # Doesn't matter if this is over
-        # Save rd values
-        rd_attachment_number = rd.attachment_number
-        rd_document_type = rd.document_type
-        # Now loop through and build attachment dicts.
+        # Build each sibling's URL directly from its (docket_id, slug,
+        # doc_num, attachment_number) - no need to modify `rd`.
         for rdv in rd_values[start:end]:
-            # To get the correct URL, modify the RECAPDocument object we have
-            rd.attachment_number = rdv[1]
-            if rd.attachment_number:
-                rd.document_type = rd.ATTACHMENT
-            else:
-                rd.document_type = rd.PACER_DOCUMENT
             attachments.append(
                 {
                     "attachment_number": rdv[1],  # type: ignore[dict-item]
-                    "url": rd.get_absolute_url(),
+                    "url": document_url(docket_id, slug, doc_num, rdv[1]),
                     "description": rdv[2],
                 }
             )
-        # Reset rd
-        rd.attachment_number = rd_attachment_number
-        rd.document_type = rd_document_type
 
         if end < doc_len:
             attachments.append(
@@ -1187,7 +1198,7 @@ async def view_opinion_authorities(
     :return: Table of Authorities tab
     """
     cluster: OpinionCluster = await aget_object_or_404(
-        await get_opinions_queryset("sub_opinions__opinions_cited"),
+        await get_opinions_queryset("no_text_fields"),
         pk=pk,
     )
 

@@ -491,7 +491,7 @@
   <script type="text/javascript" src="{% static "js/bootstrap.min.js" %}"></script>
 {% endif %}
 <script type="text/javascript" src="{% static "js/base.js" %}"></script>
-<script type="text/javascript" nonce="{{ request.csp_nonce }}">
+<script type="text/javascript" nonce="{{ csp_nonce }}">
   {# Default values are to ensure JS parsing even if 500 error thrown #}
   var isMember = {{ user.profile.is_member|yesno:"true,false" }},
       userAlertCount = {{ user.docket_alerts.subscriptions.count|default:"0" }},
