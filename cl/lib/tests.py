@@ -1,9 +1,11 @@
 import datetime
 import pickle
+import time
 from typing import TypedDict, cast
 from unittest import mock
 from unittest.mock import MagicMock, patch
 
+import time_machine
 from asgiref.sync import async_to_sync
 from django.contrib.auth.models import AnonymousUser
 from django.core.cache import cache
@@ -2605,7 +2607,7 @@ class TieredCacheTest(SimpleTestCase):
     def test_caches_result(self) -> None:
         """Test that tiered_cache caches the result of a function."""
 
-        @tiered_cache(timeout=60)
+        @tiered_cache(memory_timeout=60, redis_timeout=60)
         def expensive_function(x: int) -> int:
             self.call_count += 1
             return x * 2
@@ -2623,7 +2625,7 @@ class TieredCacheTest(SimpleTestCase):
     def test_different_args_produce_different_cache_keys(self) -> None:
         """Test that different arguments produce different cache entries."""
 
-        @tiered_cache(timeout=60)
+        @tiered_cache(memory_timeout=60, redis_timeout=60)
         def multiply(x: int, y: int) -> int:
             self.call_count += 1
             return x * y
@@ -2646,7 +2648,7 @@ class TieredCacheTest(SimpleTestCase):
     def test_memory_cache_is_checked_before_redis(self) -> None:
         """Test that memory cache is checked before Redis cache."""
 
-        @tiered_cache(timeout=60)
+        @tiered_cache(memory_timeout=60, redis_timeout=60)
         def get_value() -> str:
             self.call_count += 1
             return "value"
@@ -2670,7 +2672,7 @@ class TieredCacheTest(SimpleTestCase):
     def test_redis_cache_populates_memory_cache(self) -> None:
         """Test that reading from Redis cache also populates memory cache."""
 
-        @tiered_cache(timeout=60)
+        @tiered_cache(memory_timeout=60, redis_timeout=60)
         def get_data() -> dict:
             self.call_count += 1
             return {"key": "value"}
@@ -2691,7 +2693,7 @@ class TieredCacheTest(SimpleTestCase):
     def test_kwargs_affect_cache_key(self) -> None:
         """Test that keyword arguments are included in cache key."""
 
-        @tiered_cache(timeout=60)
+        @tiered_cache(memory_timeout=60, redis_timeout=60)
         def greet(name: str, greeting: str = "Hello") -> str:
             self.call_count += 1
             return f"{greeting}, {name}!"
@@ -2707,6 +2709,75 @@ class TieredCacheTest(SimpleTestCase):
         result3 = greet("Alice", greeting="Hello")
         self.assertEqual(result3, "Hello, Alice!")
         self.assertEqual(self.call_count, 2)  # Cached
+
+    def test_rejects_memory_tier_outliving_redis_tier(self) -> None:
+        """A memory timeout longer than the Redis one must not be allowed."""
+        with self.assertRaises(ValueError) as cm:
+            tiered_cache(memory_timeout=301, redis_timeout=300)
+        self.assertIn("must not exceed redis_timeout", str(cm.exception))
+
+    def test_rejects_timeouts_under_a_second(self) -> None:
+        """Each tier must be given a usable, positive timeout."""
+        for memory_timeout, redis_timeout in [(0, 60), (60, 0), (-1, -1)]:
+            with self.subTest(memory=memory_timeout, redis=redis_timeout):
+                with self.assertRaises(ValueError) as cm:
+                    tiered_cache(
+                        memory_timeout=memory_timeout,
+                        redis_timeout=redis_timeout,
+                    )
+                self.assertIn("at least 1 second", str(cm.exception))
+
+    def test_allows_equal_timeouts(self) -> None:
+        """Equal timeouts keep the memory tier within the Redis tier."""
+
+        @tiered_cache(memory_timeout=60, redis_timeout=60)
+        def get_value() -> str:
+            self.call_count += 1
+            return "value"
+
+        self.assertEqual(get_value(), "value")
+        self.assertEqual(self.call_count, 1)
+
+    def test_each_tier_uses_its_own_timeout(self) -> None:
+        """The two tiers expire on their own schedules, not a shared one."""
+
+        @tiered_cache(memory_timeout=60, redis_timeout=600)
+        def get_value() -> str:
+            self.call_count += 1
+            return "value"
+
+        start = time.time()
+        self.assertEqual(get_value(), "value")
+
+        self.assertEqual(len(_memory_cache), 1)
+        cache_key, (expiry, _) = next(iter(_memory_cache.items()))
+        self.assertAlmostEqual(expiry - start, 60, delta=5)
+
+        r = get_redis_interface("CACHE")
+        self.assertAlmostEqual(r.ttl(f":1:{cache_key}"), 600, delta=5)
+
+    def test_expired_memory_tier_is_refilled_from_redis(self) -> None:
+        """When only the memory tier expires, Redis answers and refills it."""
+
+        @tiered_cache(memory_timeout=60, redis_timeout=600)
+        def get_value() -> str:
+            self.call_count += 1
+            return "value"
+
+        self.assertEqual(get_value(), "value")
+        self.assertEqual(self.call_count, 1)
+
+        # Move past the memory timeout but well within the Redis one. Redis
+        # expiry is server-side, so the entry there is untouched by the trip.
+        with time_machine.travel(
+            datetime.datetime.now(datetime.UTC)
+            + datetime.timedelta(seconds=120),
+            tick=False,
+        ):
+            self.assertEqual(get_value(), "value")
+            # Served from Redis, not by rerunning the function.
+            self.assertEqual(self.call_count, 1)
+            self.assertEqual(len(_memory_cache), 1)
 
 
 @override_flag("use_new_design", True)
