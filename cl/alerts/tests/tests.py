@@ -748,6 +748,110 @@ class AlertTest(SimpleUserDataMixin, ESIndexTestCase, TestCase):
         )
         await self.async_client.alogout()
 
+    async def test_reject_new_alert_with_invalid_query(self) -> None:
+        """Do we reject a new alert whose query fails SearchForm validation,
+        mirroring the check the Alerts API performs?"""
+        self.assertTrue(
+            await self.async_client.alogin(
+                username="pandora", password="password"
+            )
+        )
+        invalid_queries = {
+            # cited_gt expects a whole number.
+            "non-numeric cited_gt": "q=asdf&cited_gt=foo",
+            # order_by must be one of SearchForm's known choices.
+            "invalid order_by": "q=asdf&order_by=bogus_order",
+            # type must be one of the supported SEARCH_TYPES.
+            "invalid type": "q=asdf&type=bogus_type",
+        }
+        for description, query in invalid_queries.items():
+            with self.subTest(description=description):
+                params = self.alert_params.copy()
+                params["query"] = query
+                r = await self.async_client.post("/", params, follow=True)
+                self.assertEqual(r.status_code, 200)
+                self.assertIn("error creating your alert", r.content.decode())
+                self.assert_form_validation_error(
+                    "This query is invalid and can't be used for an alert.",
+                    r.content.decode(),
+                )
+        self.assertEqual(
+            await Alert.objects.filter(user__username="pandora").acount(), 0
+        )
+        await self.async_client.alogout()
+
+    async def test_reject_edit_that_changes_to_invalid_query(self) -> None:
+        """Editing an alert to a new invalid query is rejected, whether the
+        alert's original query was valid or already invalid, and in both cases
+        the original query is left untouched."""
+        pandora = await User.objects.aget(username="pandora")
+        self.assertTrue(
+            await self.async_client.alogin(
+                username="pandora", password="password"
+            )
+        )
+        starting_queries = {
+            "valid starting query": "q=asdf",
+            "already-invalid starting query": "q=asdf&cited_gt=foo",
+        }
+        for description, starting_query in starting_queries.items():
+            with self.subTest(description=description):
+                alert = await Alert.objects.acreate(
+                    user=pandora,
+                    name="legacy_name",
+                    query=starting_query,
+                    rate="dly",
+                    alert_type=SEARCH_TYPES.OPINION,
+                )
+                params = self.alert_params.copy()
+                params["query"] = "q=asdf&order_by=bogus_order"
+                params["name"] = alert.name
+                params["edit_alert"] = alert.pk
+                r = await self.async_client.post("/", params, follow=True)
+                self.assertIn("error creating your alert", r.content.decode())
+                self.assert_form_validation_error(
+                    "This query is invalid and can't be used for an alert.",
+                    r.content.decode(),
+                )
+                await alert.arefresh_from_db()
+                # The original query is untouched.
+                self.assertEqual(alert.query, starting_query)
+                await alert.adelete()
+        await self.async_client.alogout()
+
+    async def test_allow_edit_that_resends_unchanged_invalid_query(
+        self,
+    ) -> None:
+        """Editing only the name/rate of an alert whose already-invalid
+        query is resent unchanged succeeds."""
+        pandora = await User.objects.aget(username="pandora")
+        self.assertTrue(
+            await self.async_client.alogin(
+                username="pandora", password="password"
+            )
+        )
+        starting_query = "q=asdf&cited_gt=foo"
+        alert = await Alert.objects.acreate(
+            user=pandora,
+            name="legacy_name",
+            query=starting_query,
+            rate="dly",
+            alert_type=SEARCH_TYPES.OPINION,
+        )
+        params = self.alert_params.copy()
+        # Mirrors what make_get_string() renders into the hidden query
+        # field on the edit-alert page: the same params, plus a trailing
+        # "&", even though nothing about the query actually changed.
+        params["query"] = starting_query + "&"
+        params["name"] = "renamed_alert"
+        params["edit_alert"] = alert.pk
+        r = await self.async_client.post("/", params, follow=True)
+        self.assertIn("edited successfully", r.content.decode())
+        await alert.arefresh_from_db()
+        self.assertEqual(alert.name, "renamed_alert")
+        await alert.adelete()
+        await self.async_client.alogout()
+
     def test_new_alert_gets_secret_key(self) -> None:
         """When you create a new alert, does it get a secret key?"""
         self.assertTrue(self.alert.secret_key)
@@ -1917,15 +2021,107 @@ class AlertAPITests(ESIndexTestCase, APITestCase):
         """An alert whose query can't be validated by SearchForm (so the
         estimation can't be computed) is rejected with a 400 instead of being
         silently created."""
-        # cited_gt expects a whole number; "foo" makes SearchForm invalid, so
-        # get_alert_estimation_count returns None.
-        response = await self.make_an_alert(
-            self.client,
-            alert_query=f"q=testing_query&type={SEARCH_TYPES.OPINION}&cited_gt=foo",
+        invalid_queries = {
+            # cited_gt expects a whole number.
+            "non-numeric cited_gt": f"q=testing_query&type={SEARCH_TYPES.OPINION}&cited_gt=foo",
+            # order_by must be one of SearchForm's known choices.
+            "invalid order_by": f"q=testing_query&type={SEARCH_TYPES.OPINION}&order_by=bogus_order",
+        }
+        for description, alert_query in invalid_queries.items():
+            with self.subTest(description=description):
+                response = await self.make_an_alert(
+                    self.client, alert_query=alert_query
+                )
+                self.assertEqual(response.status_code, HTTPStatus.BAD_REQUEST)
+                self.assertIn("invalid", str(response.json()["query"]))
+        self.assertEqual(await Alert.objects.all().acount(), 0)
+
+    async def test_can_patch_other_fields_of_alert_with_legacy_invalid_query(
+        self,
+    ) -> None:
+        """An alert saved before this SearchForm validation existed can still
+        be edited on fields other than the querysd."""
+        # Bypass the serializer to simulate an alert that predates this
+        # validation.
+        legacy_alert = await Alert.objects.acreate(
+            user=self.user_1,
+            name="legacy_name",
+            query=f"q=testing_query&type={SEARCH_TYPES.OPINION}&cited_gt=foo",
+            rate="dly",
+            alert_type=SEARCH_TYPES.OPINION,
+        )
+        alert_path_detail = reverse(
+            "alert-detail",
+            kwargs={"pk": legacy_alert.pk, "version": "v4"},
+        )
+        response = await self.client.patch(
+            alert_path_detail, {"name": "edited_name"}
+        )
+        self.assertEqual(response.status_code, HTTPStatus.OK)
+        await legacy_alert.arefresh_from_db()
+        self.assertEqual(legacy_alert.name, "edited_name")
+        # The invalid query itself is left untouched.
+        self.assertEqual(
+            legacy_alert.query,
+            f"q=testing_query&type={SEARCH_TYPES.OPINION}&cited_gt=foo",
+        )
+
+    async def test_reject_patch_that_changes_to_invalid_query(self) -> None:
+        """Patching an alert's query to a new invalid one is rejected via the
+        API, and the original query is left untouched."""
+        starting_query = f"q=testing_query&type={SEARCH_TYPES.OPINION}"
+        alert = await Alert.objects.acreate(
+            user=self.user_1,
+            name="alert_name",
+            query=starting_query,
+            rate="dly",
+            alert_type=SEARCH_TYPES.OPINION,
+        )
+        alert_path_detail = reverse(
+            "alert-detail",
+            kwargs={"pk": alert.pk, "version": "v4"},
+        )
+        response = await self.client.patch(
+            alert_path_detail,
+            {
+                "query": f"q=testing_query&type={SEARCH_TYPES.OPINION}&order_by=bogus_order"
+            },
         )
         self.assertEqual(response.status_code, HTTPStatus.BAD_REQUEST)
         self.assertIn("invalid", str(response.json()["query"]))
-        self.assertEqual(await Alert.objects.all().acount(), 0)
+        await alert.arefresh_from_db()
+        # The original query is untouched.
+        self.assertEqual(alert.query, starting_query)
+
+    async def test_reject_patch_that_resends_unchanged_invalid_query(
+        self,
+    ) -> None:
+        """Resending a legacy alert's own (already invalid) query in a PATCH
+        is rejected, even though nothing about the query actually changed."""
+        starting_query = (
+            f"q=testing_query&type={SEARCH_TYPES.OPINION}&cited_gt=foo"
+        )
+        legacy_alert = await Alert.objects.acreate(
+            user=self.user_1,
+            name="legacy_name",
+            query=starting_query,
+            rate="dly",
+            alert_type=SEARCH_TYPES.OPINION,
+        )
+        alert_path_detail = reverse(
+            "alert-detail",
+            kwargs={"pk": legacy_alert.pk, "version": "v4"},
+        )
+        response = await self.client.patch(
+            alert_path_detail,
+            {"name": "edited_name", "query": starting_query},
+        )
+        self.assertEqual(response.status_code, HTTPStatus.BAD_REQUEST)
+        self.assertIn("invalid", str(response.json()["query"]))
+        await legacy_alert.arefresh_from_db()
+        # Neither field was updated.
+        self.assertEqual(legacy_alert.name, "legacy_name")
+        self.assertEqual(legacy_alert.query, starting_query)
 
     async def test_alert_rejected_when_query_cant_be_built(self) -> None:
         """An alert whose query passes SearchForm but can't be built into an ES
