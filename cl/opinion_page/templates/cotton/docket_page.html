@@ -91,6 +91,15 @@
   </c-menu-button>
   {% endif %}
   <c-docket-source-button :docket="docket" :docket_source="docket_source" />
+  {% if user.is_authenticated %}
+    <c-button
+      variant="outline"
+      hx-get="{% url 'view_download_docket' docket.id %}"
+      hx-swap="none"
+    >
+      Export entries CSV
+    </c-button>
+  {% endif %}
 </div>
 
 {# A section with no items renders nothing. #}

@@ -1831,7 +1831,7 @@ class ScotusDocketV2ContentRenderTest(TestCase):
         self.assertIn("Petition for certiorari", content)
         self.assertIn("Capital Case", content)
         self.assertIn("No. 23-999", content)
-        self.assertIn("Export CSV", content)
+        self.assertIn("Export entries CSV", content)
         self.assertNotIn("Buy on PACER", content)
         self.assertIn("Get Alerts", content)
         self.assertIn("View in SCOTUS", content)
@@ -3929,7 +3929,7 @@ class DocketEntryRowsV2Test(TestCase):
         user = await sync_to_async(UserWithChildProfileFactory)()
         await sync_to_async(self.async_client.force_login)(user)
         content = await self._get_docket_page()
-        self.assertIn("Export CSV", content)
+        self.assertIn("Export entries CSV", content)
 
     async def test_entries_use_option_d_semantic_markup(self) -> None:
         """Entries render as an <ol> of <li>, with <dl> for metadata and a nested <ul> for RECAP documents."""
