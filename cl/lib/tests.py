@@ -2756,6 +2756,56 @@ class TieredCacheTest(SimpleTestCase):
         r = get_redis_interface("CACHE")
         self.assertAlmostEqual(r.ttl(f":1:{cache_key}"), 600, delta=5)
 
+    def test_memory_tier_is_clamped_to_the_redis_expiry(self) -> None:
+        """A memory entry must never outlive the Redis entry that filled it.
+
+        Filling memory from a nearly-expired Redis entry with a full
+        memory_timeout would stretch the effective cache duration to
+        redis_timeout + memory_timeout.
+        """
+
+        @tiered_cache(memory_timeout=60, redis_timeout=300)
+        def get_value() -> str:
+            self.call_count += 1
+            return "value"
+
+        self.assertEqual(get_value(), "value")
+        cache_key = next(iter(_memory_cache))
+        redis_expiry, _ = cache.get(cache_key)
+
+        # Drop the memory tier and come back 20 seconds shy of the Redis
+        # expiry, where an unclamped memory entry would run 40 seconds past it.
+        _memory_cache.clear()
+        with time_machine.travel(
+            datetime.datetime.now(datetime.UTC)
+            + datetime.timedelta(seconds=280),
+            tick=False,
+        ):
+            self.assertEqual(get_value(), "value")
+            self.assertEqual(self.call_count, 1)
+            expiry, _ = _memory_cache[cache_key]
+            self.assertAlmostEqual(expiry, redis_expiry, delta=1)
+
+    def test_none_return_value_is_cached(self) -> None:
+        """None is a real value here, not a stand-in for a cache miss."""
+
+        @tiered_cache(memory_timeout=60, redis_timeout=60)
+        def get_nothing() -> None:
+            self.call_count += 1
+            return None
+
+        self.assertIsNone(get_nothing())
+        self.assertEqual(self.call_count, 1)
+
+        # Served from memory.
+        self.assertIsNone(get_nothing())
+        self.assertEqual(self.call_count, 1)
+
+        # And from Redis once the memory tier is gone.
+        _memory_cache.clear()
+        self.assertIsNone(get_nothing())
+        self.assertEqual(self.call_count, 1)
+
     def test_expired_memory_tier_is_refilled_from_redis(self) -> None:
         """When only the memory tier expires, Redis answers and refills it."""
 

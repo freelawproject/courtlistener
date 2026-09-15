@@ -23,7 +23,9 @@ logger = logging.getLogger(__name__)
 # In-memory cache for tiered_cache decorator (per-process, fastest tier)
 # Data model: {cache_key: (expiry_timestamp, cached_value)}
 # - cache_key: string built from function module, name, and arguments
-# - expiry_timestamp: float (time.time() + memory_timeout) when it expires
+# - expiry_timestamp: float, the earlier of time.time() + memory_timeout and
+#   the moment the backing Redis entry lapses, so a memory entry can never
+#   outlive the Redis entry it came from
 # - cached_value: the return value of the decorated function
 _memory_cache: dict[str, tuple[float, Any]] = {}
 
@@ -34,8 +36,12 @@ def get_tiered_cache_prefix() -> str:
     """Return the Redis key prefix for tiered_cache.
 
     Useful for avoiding test collisions when overridden via mock.
+
+    The ``v2`` suffix marks the payload shape Redis entries carry (see
+    ``tiered_cache``). Bump it whenever that shape changes, so entries written
+    by a previous deploy are ignored rather than misread while they age out.
     """
-    return "tiered"
+    return "tiered:v2"
 
 
 def tiered_cache(
@@ -54,31 +60,33 @@ def tiered_cache(
     If neither has the value, the wrapped function is called and both tiers
     are populated. (Calling the function is the cache miss, not a third tier.)
 
-    Each tier gets its own timeout, but the memory tier is a per-process front
-    for the shared Redis tier, so ``memory_timeout`` MUST NOT exceed
-    ``redis_timeout``. A misconfigured pair raises ValueError at decoration
-    time, which means at import time for a module-level decorator.
+    Each tier gets its own timeout, and a value is never served past the
+    Redis tier's expiry. Redis entries are stored as ``(redis_expiry, value)``
+    and a memory entry expires at the *earlier* of ``memory_timeout`` from now
+    and that ``redis_expiry``. Without that clamp, a memory entry filled from
+    a nearly-expired Redis entry would outlive it and stretch the effective
+    cache duration to ``redis_timeout + memory_timeout``. So ``redis_timeout``
+    is the real ceiling on how stale a value can get, and ``memory_timeout``
+    only says how often a process reconsults Redis within that window.
 
-    The reason for that rule is that ``memory_timeout`` bounds how long a
-    process can go on serving a value after Redis has moved to a newer one,
-    since a process only reconsults Redis once its memory entry expires:
+    The memory tier is a per-process front for the shared Redis tier, so
+    ``memory_timeout`` MUST NOT exceed ``redis_timeout``. A misconfigured pair
+    raises ValueError at decoration time, which means at import time for a
+    module-level decorator. The clamp already makes a longer memory timeout
+    unreachable in practice, but the rule keeps the configuration honest about
+    what it gets: ``memory_timeout`` bounds how long a process can go on
+    serving a value after Redis has moved to a newer one, since a process only
+    reconsults Redis once its memory entry expires. Setting it above
+    ``redis_timeout`` reads as asking for a long-lived process-local cache
+    while silently getting the Redis lifetime instead.
 
-    - With memory at or below Redis, a refreshed Redis value reaches every
-      process within one memory timeout, and the oldest value anyone can be
-      served is ``redis_timeout + memory_timeout`` (a memory entry can be
-      filled from a Redis entry that is itself about to expire).
-    - With memory above Redis, the memory tier, not Redis, becomes the
-      effective timeout. A process sits on one value across whole Redis
-      generations, never seeing their refreshes, which leaves the shared tier
-      doing nothing but costing a round trip.
+    The ordering also matters for invalidation: ``clear_tiered_cache()``
+    empties Redis for everyone, but only clears the memory tier of the process
+    that calls it. Every other process stays stale for up to
+    ``memory_timeout``.
 
-    The rule also matters for invalidation: ``clear_tiered_cache()`` empties
-    Redis for everyone, but only clears the memory tier of the process that
-    calls it. Every other process stays stale for up to ``memory_timeout``.
-
-    Caveat: a ``None`` return value is not cached, because ``None`` is
-    indistinguishable from a Redis miss. Functions that often return ``None``
-    will run on every call.
+    A ``None`` return value is cached like any other, since it is wrapped in
+    the stored tuple and so stays distinguishable from a Redis miss.
 
     :param memory_timeout: Timeout in seconds for the in-memory tier. Must be
         at least 1 second and no greater than ``redis_timeout``.
@@ -126,21 +134,27 @@ def tiered_cache(
                 # Expired, remove from memory
                 del _memory_cache[cache_key]
 
-            # Tier 2: Check Django cache (Redis)
+            # Tier 2: Check Django cache (Redis). Entries are
+            # (redis_expiry, value); a bare None is the only miss signal, so
+            # a cached None value still reads as a hit.
             redis_cache = caches["default"]
-            value = redis_cache.get(cache_key)
-            if value is not None:
+            if (entry := redis_cache.get(cache_key)) is not None:
+                redis_expiry, value = entry
                 # Store in memory cache for faster subsequent access
                 _memory_cache[cache_key] = (
-                    current_time + memory_timeout,
+                    min(current_time + memory_timeout, redis_expiry),
                     value,
                 )
                 return value
 
             # Cache miss in both tiers: call the function and populate them
             value = func(*args, **kwargs)
-            redis_cache.set(cache_key, value, redis_timeout)
-            _memory_cache[cache_key] = (current_time + memory_timeout, value)
+            redis_expiry = current_time + redis_timeout
+            redis_cache.set(cache_key, (redis_expiry, value), redis_timeout)
+            _memory_cache[cache_key] = (
+                min(current_time + memory_timeout, redis_expiry),
+                value,
+            )
 
             return value
 
