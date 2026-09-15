@@ -55,7 +55,8 @@ document.addEventListener('htmx:afterRequest', function (event) {
   if (event.detail.successful) {
     // Only a brand new prayer should trigger the tutorial modal -- not a
     // removal, and not hitting the daily limit.
-    if (path.includes('/create/')) {
+    let dailyLimitReached = event.detail.xhr.responseText.includes('daily_limit_tooltip');
+    if (path.includes('/create/') && !dailyLimitReached) {
       showTutorialModal();
     }
     // Don't update the button here; it'll be updated by another HTMX event.
