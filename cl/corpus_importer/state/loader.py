@@ -62,9 +62,13 @@ RETRY_BATCH: Final = 500
 
 class LoadPhase(StrEnum):
     """A phase of a load that can go wrong, and the Sentry issue it files
-    under."""
+    under.
+
+    Preflight has two phases to simplify reporting.
+    """
 
     PREFLIGHT = "state-scrape-database-integrity"
+    PREFLIGHT_PARTIAL = "state-scrape-database-incomplete"
     MERGE = "state-scrape-merge-failed"
     EXTRACTION = "state-scrape-extraction-incomplete"
     RECONCILIATION = "state-scrape-rows-dropped"
@@ -571,14 +575,23 @@ class JKentScrapeLoader[ScrapeType: BaseModel, ParamType = None](ABC):
                     result.description,
                 )
                 continue
+            # Distinct fingerprint for partial and full
+            phase, consequence = (
+                (LoadPhase.PREFLIGHT, "so the load will not run")
+                if result.outcome.stops_the_load
+                else (
+                    LoadPhase.PREFLIGHT_PARTIAL,
+                    "so the load will go ahead without them",
+                )
+            )
             for error in result.errors:
                 logger.error(
-                    "%s: %s -- %s.",
+                    "%s: %s -- %s, %s.",
                     self.database.name,
                     result.description,
                     error.summary,
-                    extra=fingerprint(self.name, LoadPhase.PREFLIGHT)
-                    | dict(error.detail),
+                    consequence,
+                    extra=fingerprint(self.name, phase) | dict(error.detail),
                 )
         if failed := [
             result for result in results if result.outcome.stops_the_load
@@ -655,8 +668,9 @@ class JKentScrapeLoader[ScrapeType: BaseModel, ParamType = None](ABC):
 
         :param report: The report to fill in, modified in place.
         """
-        if not (rows := self.ledger.rows_to_retry()):
+        if not (retry := self.ledger.rows_to_retry()):
             return
+        rows = retry.rows
         logger.info("Retrying %s rows of %s", len(rows), self.database.name)
         report.rows_read = True
         found: set[int] = set()
@@ -672,7 +686,7 @@ class JKentScrapeLoader[ScrapeType: BaseModel, ParamType = None](ABC):
             if prepared is RowOutcome.INVALID:
                 report.invalid += 1
                 continue
-            self._dispatch(number, prepared)
+            self._dispatch(number, prepared, retrying=number in retry.errored)
             report.dispatched += 1
             if self.db_delay:
                 time.sleep(self.db_delay)
@@ -698,19 +712,21 @@ class JKentScrapeLoader[ScrapeType: BaseModel, ParamType = None](ABC):
         """
         if not self.extract or (model := self.document_model) is None:
             return
-        if not (documents := self.ledger.documents_to_retry()):
-            return
         if (since := self.ledger.started()) is None:
-            # Only reachable if the ledger expired between the two reads.
-            logger.error(
-                "Holding %s documents of the %s run for retry but no longer "
-                "know when the run began, so cannot tell which of them are "
-                "still outstanding. Sweep them up with `state_document_"
-                "download --skip-download`.",
-                len(documents),
-                self.name,
-                extra=fingerprint(self.name, LoadPhase.EXTRACTION),
-            )
+            _, held = self.ledger.retry_counts()
+            if held:
+                logger.error(
+                    "Holding %s documents of the %s run for retry but no "
+                    "longer know when the run began, so cannot tell which of "
+                    "them are still outstanding. They are left in the ledger "
+                    "until it expires. Sweep them up with `state_document_"
+                    "download --skip-download`.",
+                    held,
+                    self.name,
+                    extra=fingerprint(self.name, LoadPhase.EXTRACTION),
+                )
+            return
+        if not (documents := self.ledger.documents_to_retry()):
             return
         logger.info(
             "Retrying extraction of up to %s documents of %s",
@@ -796,12 +812,17 @@ class JKentScrapeLoader[ScrapeType: BaseModel, ParamType = None](ABC):
         )
         return report
 
-    def _dispatch(self, number: int, scrape: ScrapeType) -> None:
+    def _dispatch(
+        self, number: int, scrape: ScrapeType, *, retrying: bool = False
+    ) -> None:
         """Send one row's merge to the queue, writing it down as it goes.
 
         :param number: The row's position in the query.
         :param scrape: The validated scrape. Its own dump is what the worker
             gets, so what the worker validates is what this load read.
+        :param retrying: Whether the row is going back after an error the run
+            counted against it, which this takes back. See
+            `LoadLedger.dispatched`.
         """
         # Imported here because the task module imports the registry, which
         # imports every loader, which imports this module.
@@ -809,7 +830,7 @@ class JKentScrapeLoader[ScrapeType: BaseModel, ParamType = None](ABC):
 
         for throttle in self.throttles:
             throttle.maybe_wait()
-        self.ledger.dispatched(number, self.label(scrape))
+        self.ledger.dispatched(number, self.label(scrape), retrying=retrying)
         merge_state_scrape_row.si(
             loader=self.name,
             row=number,

@@ -85,6 +85,29 @@ class LedgerTotals:
         return self.rejected + self.errored
 
 
+@dataclass(frozen=True)
+class RetryRows:
+    """The rows a retry has to put back on the queue.
+
+    :ivar errored: Rows whose merge reported that it could not reach a
+        verdict.
+    :ivar lost: Rows that were dispatched and never reported either way, which
+        is celery having dropped them.
+    """
+
+    errored: set[int] = field(default_factory=set)
+    lost: set[int] = field(default_factory=set)
+
+    @property
+    def rows(self) -> set[int]:
+        """Every row to retry, however it came to be one."""
+        return self.errored | self.lost
+
+    def __bool__(self) -> bool:
+        """Whether there is anything to retry at all."""
+        return bool(self.errored or self.lost)
+
+
 class LoadLedger:
     """One run's ledger, keyed off the run database it loads."""
 
@@ -138,12 +161,14 @@ class LoadLedger:
             logger.exception("Could not read the ledger at %s", self.key)
         return None
 
-    def dispatched(self, row: int, label: str) -> None:
+    def dispatched(self, row: int, label: str, retrying: bool = False) -> None:
         """Record that `row` has gone to the merge queue.
 
         :param row: The row's position in the run database's query.
         :param label: Something to recognise the row by, such as its docket
             number, so the report can name it without a second lookup.
+        :param retrying: Whether the row is going back after an error that was
+            counted against the run.
         """
         try:
             name = self._name("pending")
@@ -153,7 +178,10 @@ class LoadLedger:
             pipeline.execute()
         except Exception:
             logger.exception("Could not dispatch row %s to %s", row, self.key)
-        self._count(dispatched=1)
+        counts = {"dispatched": 1}
+        if retrying:
+            counts["errored"] = -1
+        self._count(**counts)
 
     def merged(self, row: int, result: MergeResult[Any]) -> None:
         """Record that `row` merged cleanly, and what its merge wrote.
@@ -253,15 +281,16 @@ class LoadLedger:
             return 0, 0
         return int(errored) + int(pending), int(documents)
 
-    def rows_to_retry(self) -> set[int]:
+    def rows_to_retry(self) -> RetryRows:
         """Take the rows whose merge never reached a verdict.
         Drains the redis values during read!
 
         :return: The rows to re-dispatch, by their position in the query.
         """
-        rows = self._drain_set(self._name("merge_retry"))
-        rows |= self._drain_hash(self._name("pending"))
-        return {int(row) for row in rows if row.lstrip("-").isdigit()}
+        return RetryRows(
+            errored=_numbers(self._drain_set(self._name("merge_retry"))),
+            lost=_numbers(self._drain_hash(self._name("pending"))),
+        )
 
     def documents_to_retry(self) -> set[int]:
         """Take the documents extraction never came back on.
@@ -347,6 +376,8 @@ class LoadLedger:
             pipeline = self._redis.pipeline()
             pipeline.sadd(name, *members)
             pipeline.expire(name, self.ttl)
+            # A no-op to reset the ttl
+            pipeline.expire(self._name("started"), self.ttl)
             pipeline.execute()
         except Exception:
             logger.exception(
@@ -407,6 +438,15 @@ class LoadLedger:
                 ", ".join(counts),
                 self.key,
             )
+
+
+def _numbers(rows: Collection[str]) -> set[int]:
+    """The row numbers among `rows`, which Redis hands back as strings.
+
+    :param rows: What one of the ledger's keys held.
+    :return: Those that are row numbers, as numbers.
+    """
+    return {int(row) for row in rows if row.lstrip("-").isdigit()}
 
 
 def _file_counts(files: FileTally) -> dict[str, int]:
