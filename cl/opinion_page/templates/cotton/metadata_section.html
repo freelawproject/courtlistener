@@ -37,6 +37,8 @@
               {% endif %}
             >{{ item.label }}</a>
           </c-description-term>
+          {# A dt must be followed by a dd to satisfy the dl content model. #}
+          <c-description-details></c-description-details>
         {% else %}
           <c-description-term>{{ item.label }}</c-description-term>
           <c-description-details>
