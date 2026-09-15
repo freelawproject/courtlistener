@@ -5,7 +5,7 @@ from unittest import mock
 from unittest.mock import MagicMock, patch
 
 from asgiref.sync import async_to_sync
-from django.contrib.auth.models import AnonymousUser
+from django.contrib.auth.models import AnonymousUser, User
 from django.core.cache import cache
 from django.core.exceptions import ValidationError
 from django.core.files.base import ContentFile
@@ -16,6 +16,7 @@ from django.utils.functional import SimpleLazyObject
 from requests.cookies import RequestsCookieJar
 from waffle.testutils import override_flag
 
+from cl.lib.auth import filter_by_email
 from cl.lib.courts import (
     get_active_court_from_cache,
     get_minimal_list_of_courts,
@@ -2741,3 +2742,82 @@ class IncrementalNewTemplateMiddlewareTest(TestCase):
         """A v2-only template is served even with the flag off."""
         response = self.process("components.html")
         self.assertEqual(response.template_name, "v2_components.html")
+
+
+class FilterByEmailTest(TestCase):
+    """Tests for the shared address matcher.
+
+    Sign-in, registration, email confirmation and password reset all match
+    addresses through this, so what counts as "the same address" is settled
+    here once rather than four times.
+    """
+
+    @classmethod
+    def setUpTestData(cls) -> None:
+        cls.user = UserFactory.create(
+            username="matcher", email="Matcher@Example.com"
+        )
+        cls.blank = UserFactory.create(username="blank", email="")
+
+    def matched(self, email: str) -> list[str]:
+        """Run the matcher and report who it found.
+
+        :param email: The address to match.
+        :return: The usernames of the matching accounts.
+        """
+        return list(
+            filter_by_email(User.objects.all(), email).values_list(
+                "username", flat=True
+            )
+        )
+
+    def test_case_is_ignored(self) -> None:
+        """Does a differently-cased address still find the account?"""
+        for email in [
+            "Matcher@Example.com",
+            "matcher@example.com",
+            "MATCHER@EXAMPLE.COM",
+        ]:
+            with self.subTest(email=email):
+                self.assertEqual(self.matched(email), ["matcher"])
+
+    def test_an_empty_address_matches_nothing(self) -> None:
+        """Does an empty address match nothing at all?
+
+        It must. Accounts are allowed a blank email, so matching "" against
+        the column would hand back every one of them — and callers reach here
+        straight from submitted form data.
+        """
+        self.assertEqual(self.matched(""), [])
+
+    def test_a_different_address_does_not_match(self) -> None:
+        """Is the match exact, once case is set aside?"""
+        self.assertEqual(self.matched("matcher@example.org"), [])
+
+    def test_the_incoming_queryset_still_narrows(self) -> None:
+        """Does the caller's own filtering survive?
+
+        Callers each want a different slice — registration wants stubs,
+        confirmation wants everybody — so this must only settle the address.
+        """
+        self.assertEqual(
+            list(
+                filter_by_email(
+                    User.objects.filter(username="somebody-else"),
+                    "matcher@example.com",
+                ).values_list("username", flat=True)
+            ),
+            [],
+        )
+
+    def test_the_query_folds_case_in_sql(self) -> None:
+        """Is the comparison done in Postgres rather than in Python?
+
+        Both sides have to fold under the same rules, and LOWER(email) is
+        what the auth_user_email_lower_idx index is built on.
+        """
+        sql = str(
+            filter_by_email(User.objects.all(), "matcher@example.com").query
+        )
+        self.assertIn("LOWER", sql.upper())
+        self.assertNotIn("UPPER", sql.upper())
