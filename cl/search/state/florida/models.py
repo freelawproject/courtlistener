@@ -50,15 +50,21 @@ class AltchaChallengeSolution(BaseModel):
 
 
 class AltchaChallengeParameters(BaseModel):
+    """Parameters of a proof-of-work challenge as issued by the ACIS API.
+
+    Fields are declared in the order the server serializes them. The server's
+    signature covers this object, so the token we send back has to reproduce
+    it byte for byte."""
+
     algorithm: str
     cost: int
+    data: AltchaData
+    expiry: int = Field(alias="expiresAt")
     key_length: int = Field(alias="keyLength")
     key_prefix: str = Field(alias="keyPrefix")
+    key_signature: str = Field(alias="keySignature")
     nonce: str
     salt: str
-    expiry: int = Field(alias="expiresAt")
-    data: AltchaData
-    key_signature: str = Field(alias="keySignature")
 
 
 MAX_ATTEMPT_TIME: float = 30.0
