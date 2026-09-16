@@ -15,8 +15,6 @@ from django.contrib.auth.models import User
 from django.contrib.auth.validators import ASCIIUsernameValidator
 from django.core.exceptions import ValidationError
 from django.core.mail import send_mail
-from django.db.models import Value
-from django.db.models.functions import Lower
 from django.forms import ModelForm
 from django.urls import reverse
 from hcaptcha.fields import hCaptchaField
@@ -24,6 +22,7 @@ from localflavor.us.forms import USStateField, USZipCodeField
 from localflavor.us.us_states import STATE_CHOICES
 
 from cl.api.models import Webhook, WebhookEventType, WebhookVersions
+from cl.lib.auth import filter_by_email
 from cl.lib.AuthenticationBackend import LOOKS_LIKE_EMAIL, accounts_for_email
 from cl.lib.types import EmailType
 from cl.users.models import UserProfile
@@ -248,11 +247,10 @@ class UserCreationFormExtended(UserCreationForm, CleanEmailMixin):
         """Report whether an account other than the bound instance holds
         `value` as its email address.
 
-        Case is folded in SQL with Lower() on both sides rather than with
-        str.lower() in Python. The two disagree on some non-ASCII input and the
-        database collation is locale dependent, so folding in Python here while
-        the LOWER(email) index folds in SQL could let a duplicate past the form
-        only to fail at the index, or reject a legitimate address.
+        Address matching goes through filter_by_email, the one definition of
+        "same address" that sign-in, confirmation and password reset share, so
+        a duplicate this misses can't be one the LOWER(email) index or the
+        sign-in backend would catch.
 
         The bound instance is excluded so that claiming a stub account, where
         the form is bound to the stub that already holds the address, is not
@@ -261,9 +259,7 @@ class UserCreationFormExtended(UserCreationForm, CleanEmailMixin):
         :param value: The string to compare against the email column.
         :return: True if some other account already has that address.
         """
-        users = User.objects.annotate(email_lower=Lower("email")).filter(
-            email_lower=Lower(Value(value))
-        )
+        users = filter_by_email(User.objects.all(), value)
         if self.instance.pk:
             users = users.exclude(pk=self.instance.pk)
         return users.exists()
