@@ -15,35 +15,6 @@ from cl.lib.types import NonEmptyTuple
 
 logger = logging.getLogger(__name__)
 
-# Court refusals get their own logger so they can be alerted on separately. A
-# 5xx is the court having a bad day; a 403 means the court has decided not to
-# serve us, which is a problem with the scraper or our standing, not the
-# document.
-forbidden_logger = logging.getLogger(f"{__name__}.forbidden")
-
-
-def _http_status(exc: Exception) -> int | None:
-    """The status code carried by a `requests` or `httpx` HTTP error, if any.
-
-    :param exc: The exception to inspect."""
-    return getattr(getattr(exc, "response", None), "status_code", None)
-
-
-def _log_fetch_failure(exc: Exception, model: str, pk: int, url: str) -> None:
-    """Log a failed attempt to fetch a document, routing refusals to
-    `forbidden_logger` and everything else, with its traceback, to `logger`.
-
-    :param exc: The exception the fetch raised.
-    :param model: The name of the document model, for the message.
-    :param pk: The primary key of the document.
-    :param url: The URL involved when the fetch failed."""
-    if _http_status(exc) == HTTPStatus.FORBIDDEN:
-        forbidden_logger.error(
-            "Court refused %s %s at %s (403)", model, pk, url
-        )
-        return
-    logger.exception("Failed to fetch %s %s from %s", model, pk, url)
-
 
 class DocketEntryType:
     """
@@ -112,8 +83,9 @@ class AbstractStateDocument(AbstractPDF):
         """Build a URL to fetch the appropriate document from the court website.
 
         The default implementation returns the `url` column unchanged, but it can be overridden for states like Florida that
-        require a proof-of-work token to fetch documents. Returns `None` if we failed to construct a URL and therefore shouldn't
-        attempt downloading anything. Overrides may also raise; `download` logs the error and skips the document either way."""
+        require a proof-of-work token to fetch documents. Returns `None`, after logging why, if we failed to construct a URL
+        and therefore shouldn't attempt downloading anything. Overrides may also raise; `download` logs the error itself in
+        that case and skips the document either way."""
 
         return self.url
 
@@ -276,11 +248,10 @@ class AbstractStateDocument(AbstractPDF):
         # not take down the task that's working through a batch.
         try:
             url = document.build_url()
-        except Exception as exc:
-            _log_fetch_failure(exc, cls.__name__, pk, document.url)
+        except Exception:
+            logger.exception("Failed to build URL for %s %s", cls.__name__, pk)
             return None
         if url is None:
-            logger.error("Failed to build URL for %s %s", cls.__name__, pk)
             return None
 
         logger.info(
@@ -298,7 +269,22 @@ class AbstractStateDocument(AbstractPDF):
                     document, url, result, extract, queue
                 )
         except requests.HTTPError as exc:
-            _log_fetch_failure(exc, cls.__name__, pk, url)
+            # A refusal gets its own message, without a traceback: a 5xx is
+            # the court having a bad day, a 403 is the court turning us away.
+            if exc.response.status_code == HTTPStatus.FORBIDDEN:
+                logger.error(
+                    "Court refused %s %s at %s (403)",
+                    cls.__name__,
+                    pk,
+                    exc.request.url,
+                )
+            else:
+                logger.exception(
+                    "Failed to fetch %s %s from %s",
+                    cls.__name__,
+                    pk,
+                    exc.request.url,
+                )
             return None
 
     @classmethod

@@ -42,6 +42,7 @@ SOLUTION_JSON = {
 BROWSER_TOKEN = "eyJjaGFsbGVuZ2UiOnsicGFyYW1ldGVycyI6eyJhbGdvcml0aG0iOiJQQktERjIvU0hBLTI1NiIsImNvc3QiOjEwMDAwLCJkYXRhIjp7InJlc291cmNlIjoiL2NvdXJ0cy82OGYwMjFjNC02YTQ0LTQ3MzUtOWE3Ni01MzYwYjJlOGFmMTMvY21zL2Nhc2UvNGI1ZWFmYWYtYTZjNy00NTU2LTlhNjAtY2YxNzNjMjA0ODgzL2RvY2tldGVudHJ5ZG9jdW1lbnRzLzdiNmI0MWJmLTNlYjYtNDcwNC04ZjliLTA5MzM2N2JlOWQ2OSJ9LCJleHBpcmVzQXQiOjE3ODk0MjQyMjgsImtleUxlbmd0aCI6MzIsImtleVByZWZpeCI6ImQwMDNjZjhlMjkxNTk4NDJhNGRkMmFiYjkwYTZkNjhhIiwia2V5U2lnbmF0dXJlIjoiMTkxMjA2MTc1Mzg5M2M0OTVjMTkwODBjNDBkOTBlYjkwMjk5MTlkNDdiMTdiOGM2Y2ZiOTdkMWFmODZhOTk3YSIsIm5vbmNlIjoiZWU3NjAxNDhiODEwZjdmZDg1NWI3NWZiNzI4YmM1NGIiLCJzYWx0IjoiOGE0ZDFkMzFmM2U4OTY4ODc5MWY0NmUxOTQxYTZjZDcifSwic2lnbmF0dXJlIjoiYmZlODk2OGEwYjA5ZTU5MDcyMjI1MzYxODgwMDk4ZDY2MzMyM2UxMjQ1Y2UxMjlmNTVlNDRhNGE4ZjM3MmFlYyJ9LCJzb2x1dGlvbiI6eyJjb3VudGVyIjoyMjksImRlcml2ZWRLZXkiOiJkMDAzY2Y4ZTI5MTU5ODQyYTRkZDJhYmI5MGE2ZDY4YWQyMWU1YmJiMWIwOWVkZTE5MzIwYzQzYTE1MmQwYzg3IiwidGltZSI6MjQzLjZ9fQ=="
 
 CHALLENGE_URL = f"{FLORIDA_API_BASE}/altcha/challenge"
+REFUSED_URL = "https://acis-api.test/refused"
 
 
 def challenge_response(status: int, **kwargs) -> httpx.Response:
@@ -109,6 +110,13 @@ class DocumentDownloadTest(TestCase):
         self.enterContext(
             mock.patch("cl.scrapers.tasks.extract_formatted_text_document.si")
         )
+        # Downloads log from both modules; one mock stands in for both loggers.
+        self.logger = mock.Mock()
+        for module in (
+            "cl.search.state.shared",
+            "cl.search.state.florida.models",
+        ):
+            self.enterContext(mock.patch(f"{module}.logger", self.logger))
 
     def fetched_url(self):
         """The URL the document body was requested from, parsed."""
@@ -129,6 +137,7 @@ class DocumentDownloadTest(TestCase):
             CHALLENGE_URL,
             params={"resource": CHALLENGE_RESOURCE},
             headers=mock.ANY,
+            timeout=mock.ANY,
         )
 
         fetched = self.fetched_url()
@@ -147,10 +156,7 @@ class DocumentDownloadTest(TestCase):
             token["solution"]["derivedKey"], SOLUTION_JSON["derivedKey"]
         )
 
-    @mock.patch("cl.search.state.shared.logger")
-    def test_download_logs_token_failures_and_skips(
-        self, logger_mock: mock.Mock
-    ) -> None:
+    def test_download_logs_token_failures_and_skips(self) -> None:
         """When retrieving or solving the challenge raises, is the error
         logged and the document skipped rather than the task failing?"""
         failures = {
@@ -161,53 +167,69 @@ class DocumentDownloadTest(TestCase):
             with self.subTest(name):
                 self.challenge_get.return_value = response
                 self.document_get.reset_mock()
-                logger_mock.reset_mock()
+                self.logger.reset_mock()
 
                 result = FloridaDocument.download(self.document.pk)
 
                 self.assertIsNone(result)
                 self.document_get.assert_not_called()
-                logger_mock.exception.assert_called_once()
+                self.logger.exception.assert_called_once()
                 self.assertIn(
-                    self.document.pk, logger_mock.exception.call_args.args
+                    self.document.pk, self.logger.exception.call_args.args
                 )
 
-    @mock.patch("cl.search.state.shared.forbidden_logger")
-    @mock.patch("cl.search.state.shared.logger")
-    def test_download_logs_refusals_distinctly(
-        self, logger_mock: mock.Mock, forbidden_mock: mock.Mock
-    ) -> None:
+    def test_download_logs_refusals_distinctly(self) -> None:
         """Does a 403 from either the challenge endpoint or the document
         fetch go to the dedicated refusal logger, and nowhere else?"""
         ok_challenge = challenge_response(200, json=CHALLENGE_JSON)
-        refused = requests.HTTPError(response=mock.Mock(status_code=403))
+        refused_document = mock.Mock(status_code=403)
+        refused_document.request.url = REFUSED_URL
+        refused = requests.HTTPError(response=refused_document)
         cases = {
-            "challenge endpoint": (challenge_response(403), None),
-            "document fetch": (ok_challenge, refused),
+            "challenge endpoint": (
+                challenge_response(403),
+                None,
+                CHALLENGE_URL,
+            ),
+            "document fetch": (ok_challenge, refused, REFUSED_URL),
         }
-        for name, (challenge, fetch_error) in cases.items():
+        for name, (challenge, fetch_error, refused_url) in cases.items():
             with self.subTest(name):
                 self.challenge_get.return_value = challenge
                 self.pdf_response.raise_for_status.side_effect = fetch_error
-                logger_mock.reset_mock()
-                forbidden_mock.reset_mock()
+                self.logger.reset_mock()
 
                 result = FloridaDocument.download(self.document.pk)
 
                 self.assertIsNone(result)
-                forbidden_mock.error.assert_called_once()
-                self.assertIn(
-                    self.document.pk, forbidden_mock.error.call_args.args
+                self.logger.error.assert_called_once()
+                *_, logged_pk, logged_url = self.logger.error.call_args.args
+                self.assertEqual(logged_pk, self.document.pk)
+                # The endpoint that refused us, not the document's stored URL:
+                # a block on the shared challenge endpoint must be
+                # distinguishable from a block on one document.
+                self.assertTrue(
+                    str(logged_url).startswith(refused_url),
+                    f"{logged_url!r} does not start with {refused_url!r}",
                 )
-                logger_mock.exception.assert_not_called()
+                self.logger.exception.assert_not_called()
                 self.document.refresh_from_db()
                 self.assertFalse(self.document.filepath_local)
 
-    @mock.patch("cl.search.state.shared.forbidden_logger")
-    @mock.patch("cl.search.state.shared.logger")
-    def test_download_logs_other_fetch_errors_generically(
-        self, logger_mock: mock.Mock, forbidden_mock: mock.Mock
-    ) -> None:
+    def test_download_retries_transient_challenge_failures(self) -> None:
+        """Is a dropped connection to the challenge endpoint retried rather
+        than costing us the document?"""
+        self.challenge_get.side_effect = [
+            httpx.ConnectTimeout("slow gate"),
+            challenge_response(200, json=CHALLENGE_JSON),
+        ]
+
+        result = FloridaDocument.download(self.document.pk)
+
+        self.assertEqual(result, self.document)
+        self.assertEqual(self.challenge_get.call_count, 2)
+
+    def test_download_logs_other_fetch_errors_generically(self) -> None:
         """Is a non-403 HTTP error on the document fetch logged as an ordinary
         failure and the document skipped?"""
         self.challenge_get.return_value = challenge_response(
@@ -220,9 +242,9 @@ class DocumentDownloadTest(TestCase):
         result = FloridaDocument.download(self.document.pk)
 
         self.assertIsNone(result)
-        logger_mock.exception.assert_called_once()
-        self.assertIn(self.document.pk, logger_mock.exception.call_args.args)
-        forbidden_mock.error.assert_not_called()
+        self.logger.exception.assert_called_once()
+        self.assertIn(self.document.pk, self.logger.exception.call_args.args)
+        self.logger.error.assert_not_called()
 
     def test_download_without_gate_uses_bare_url(self) -> None:
         """When the challenge endpoint reports the gate is off (204), is the

@@ -3,6 +3,7 @@ import hashlib
 import logging
 import struct
 import time
+from http import HTTPStatus
 from urllib.parse import parse_qs, urlencode, urljoin, urlparse, urlunparse
 
 import httpx
@@ -11,7 +12,7 @@ from django.db import models
 from juriscraper.state.florida.scraper import FLORIDA_API_BASE
 from pydantic import BaseModel, Field
 
-from cl.lib.decorators import document_model
+from cl.lib.decorators import document_model, retry
 from cl.lib.model_helpers import CSVExportMixin
 from cl.lib.models import AbstractDateTimeModel
 from cl.lib.types import NonEmptyTuple
@@ -25,14 +26,35 @@ logger = logging.getLogger(__name__)
 __all__ = ["FloridaDocketEntry", "FloridaDocument"]
 
 
+CHALLENGE_URL: str = urljoin(FLORIDA_API_BASE, "/altcha/challenge")
+CHALLENGE_TIMEOUT: float = 30.0
+
+
 class AltchaData(BaseModel):
+    """The API path of the document being requested. A solved token is only accepted for
+    this path.
+
+    :ivar resource: The URL path of the document, without host or query."""
+
     resource: str
 
+    @retry(
+        (httpx.ConnectError, httpx.TimeoutException),
+        tries=3,
+        delay=0.25,
+        backoff=1,
+        logger=logger,
+    )
     def fetch(self) -> "AltchaChallenge | None":
+        """Request a fresh challenge for `resource` from ACIS.
+
+        Returns `None` when the endpoint answers 204, which means the gate is
+        switched off and the document can be fetched with its bare URL."""
         response = httpx.get(
-            urljoin(FLORIDA_API_BASE, "/altcha/challenge"),
+            CHALLENGE_URL,
             params={"resource": self.resource},
             headers={"User-Agent": "Courtlistener (Free Law Project)"},
+            timeout=CHALLENGE_TIMEOUT,
         )
 
         response.raise_for_status()
@@ -44,6 +66,12 @@ class AltchaData(BaseModel):
 
 
 class AltchaChallengeSolution(BaseModel):
+    """The solution to an altcha proof-of-work challenge.
+
+    :ivar counter: The counter value whose derived key matched the prefix.
+    :ivar derived_key: The full derived key for that counter, hex encoded.
+    :ivar time: How long solving took, in milliseconds."""
+
     counter: int
     derived_key: str = Field(alias="derivedKey")
     time: float
@@ -71,10 +99,23 @@ MAX_ATTEMPT_TIME: float = 30.0
 
 
 class AltchaChallenge(BaseModel):
+    """A proof-of-work challenge as returned by the ACIS challenge endpoint.
+
+    :ivar parameters: The challenge to solve.
+    :ivar signature: The server's signature over `parameters`, echoed back
+        unchanged in the token."""
+
     parameters: AltchaChallengeParameters
     signature: str
 
     def solve(self) -> AltchaChallengeSolution | None:
+        """Brute-force the counter whose PBKDF2 key starts with the challenge's
+        key prefix, the way the ACIS frontend does.
+
+        The server chose the counter, so there is no bound to search up to;
+        the loop gives up after `MAX_ATTEMPT_TIME` seconds and returns `None`.
+        Only `PBKDF2/SHA-256` is supported; any other algorithm raises
+        `NotImplementedError`."""
         if self.parameters.algorithm != "PBKDF2/SHA-256":
             raise NotImplementedError
         nonce_bytes = bytes.fromhex(self.parameters.nonce)
@@ -107,10 +148,19 @@ class AltchaChallenge(BaseModel):
 
 
 class AltchaChallengeResponse(BaseModel):
+    """A solved challenge, ready to be encoded into the `altcha` query
+    parameter of a document URL.
+
+    :ivar challenge: The challenge as received from the server.
+    :ivar solution: Our answer to it."""
+
     challenge: AltchaChallenge
     solution: AltchaChallengeSolution
 
     def encode(self) -> str:
+        """Serialize to the token the server expects: base64 of the compact
+        JSON, using the server's own key names and key order so its signature
+        over the challenge parameters still verifies."""
         return base64.b64encode(
             self.model_dump_json(by_alias=True).encode()
         ).decode()
@@ -220,7 +270,17 @@ class FloridaDocument(AbstractDateTimeModel, AbstractStateDocument):
 
         scheme, netloc, path, params, query, fragment = urlparse(self.url)
 
-        challenge = AltchaData(resource=path).fetch()
+        try:
+            challenge = AltchaData(resource=path).fetch()
+        except httpx.HTTPStatusError as exc:
+            if exc.response.status_code != HTTPStatus.FORBIDDEN:
+                raise
+            logger.error(
+                "Florida refused proof-of-work parameter fetch for %s at %s (403)",
+                self.pk,
+                exc.request.url,
+            )
+            return None
         if challenge is None:
             return self.url
         solution = challenge.solve()
