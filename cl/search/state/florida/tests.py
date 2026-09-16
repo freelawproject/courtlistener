@@ -4,6 +4,7 @@ from unittest import mock
 from urllib.parse import parse_qs, urlparse
 
 import httpx
+import requests
 from juriscraper.state.florida.scraper import FLORIDA_API_BASE
 
 from cl.search.state.florida.factories import FloridaDocumentFactory
@@ -88,14 +89,16 @@ class DocumentDownloadTest(TestCase):
             url=f"{FLORIDA_API_BASE}{CHALLENGE_RESOURCE}"
         )
 
-        pdf_response = mock.Mock()
-        pdf_response.headers = {"content-type": "application/pdf"}
-        pdf_response.iter_content.return_value = [b"%PDF-1.4 fake"]
-        pdf_response.raise_for_status.return_value = None
+        self.pdf_response = mock.Mock()
+        self.pdf_response.headers = {"content-type": "application/pdf"}
+        self.pdf_response.iter_content.return_value = [b"%PDF-1.4 fake"]
+        self.pdf_response.raise_for_status.return_value = None
         self.document_get = self.enterContext(
             mock.patch("cl.corpus_importer.tasks.requests.get")
         )
-        self.document_get.return_value.__enter__.return_value = pdf_response
+        self.document_get.return_value.__enter__.return_value = (
+            self.pdf_response
+        )
 
         self.challenge_get = self.enterContext(
             mock.patch("cl.search.state.florida.models.httpx.get")
@@ -143,6 +146,83 @@ class DocumentDownloadTest(TestCase):
         self.assertEqual(
             token["solution"]["derivedKey"], SOLUTION_JSON["derivedKey"]
         )
+
+    @mock.patch("cl.search.state.shared.logger")
+    def test_download_logs_token_failures_and_skips(
+        self, logger_mock: mock.Mock
+    ) -> None:
+        """When retrieving or solving the challenge raises, is the error
+        logged and the document skipped rather than the task failing?"""
+        failures = {
+            "challenge endpoint error": challenge_response(500),
+            "malformed challenge": challenge_response(200, json={"bad": 1}),
+        }
+        for name, response in failures.items():
+            with self.subTest(name):
+                self.challenge_get.return_value = response
+                self.document_get.reset_mock()
+                logger_mock.reset_mock()
+
+                result = FloridaDocument.download(self.document.pk)
+
+                self.assertIsNone(result)
+                self.document_get.assert_not_called()
+                logger_mock.exception.assert_called_once()
+                self.assertIn(
+                    self.document.pk, logger_mock.exception.call_args.args
+                )
+
+    @mock.patch("cl.search.state.shared.forbidden_logger")
+    @mock.patch("cl.search.state.shared.logger")
+    def test_download_logs_refusals_distinctly(
+        self, logger_mock: mock.Mock, forbidden_mock: mock.Mock
+    ) -> None:
+        """Does a 403 from either the challenge endpoint or the document
+        fetch go to the dedicated refusal logger, and nowhere else?"""
+        ok_challenge = challenge_response(200, json=CHALLENGE_JSON)
+        refused = requests.HTTPError(response=mock.Mock(status_code=403))
+        cases = {
+            "challenge endpoint": (challenge_response(403), None),
+            "document fetch": (ok_challenge, refused),
+        }
+        for name, (challenge, fetch_error) in cases.items():
+            with self.subTest(name):
+                self.challenge_get.return_value = challenge
+                self.pdf_response.raise_for_status.side_effect = fetch_error
+                logger_mock.reset_mock()
+                forbidden_mock.reset_mock()
+
+                result = FloridaDocument.download(self.document.pk)
+
+                self.assertIsNone(result)
+                forbidden_mock.error.assert_called_once()
+                self.assertIn(
+                    self.document.pk, forbidden_mock.error.call_args.args
+                )
+                logger_mock.exception.assert_not_called()
+                self.document.refresh_from_db()
+                self.assertFalse(self.document.filepath_local)
+
+    @mock.patch("cl.search.state.shared.forbidden_logger")
+    @mock.patch("cl.search.state.shared.logger")
+    def test_download_logs_other_fetch_errors_generically(
+        self, logger_mock: mock.Mock, forbidden_mock: mock.Mock
+    ) -> None:
+        """Is a non-403 HTTP error on the document fetch logged as an ordinary
+        failure and the document skipped?"""
+        self.challenge_get.return_value = challenge_response(
+            200, json=CHALLENGE_JSON
+        )
+        self.pdf_response.raise_for_status.side_effect = requests.HTTPError(
+            response=mock.Mock(status_code=500)
+        )
+
+        result = FloridaDocument.download(self.document.pk)
+
+        self.assertIsNone(result)
+        logger_mock.exception.assert_called_once()
+        self.assertIn(self.document.pk, logger_mock.exception.call_args.args)
+        forbidden_mock.error.assert_not_called()
 
     def test_download_without_gate_uses_bare_url(self) -> None:
         """When the challenge endpoint reports the gate is off (204), is the

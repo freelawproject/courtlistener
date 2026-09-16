@@ -1,7 +1,9 @@
 import logging
+from http import HTTPStatus
 from pathlib import Path, PurePosixPath
 from typing import IO, Self
 
+import requests
 from asgiref.sync import async_to_sync
 from django.core.files import File
 from django.db import models
@@ -12,6 +14,35 @@ from cl.lib.models import AbstractPDF
 from cl.lib.types import NonEmptyTuple
 
 logger = logging.getLogger(__name__)
+
+# Court refusals get their own logger so they can be alerted on separately. A
+# 5xx is the court having a bad day; a 403 means the court has decided not to
+# serve us, which is a problem with the scraper or our standing, not the
+# document.
+forbidden_logger = logging.getLogger(f"{__name__}.forbidden")
+
+
+def _http_status(exc: Exception) -> int | None:
+    """The status code carried by a `requests` or `httpx` HTTP error, if any.
+
+    :param exc: The exception to inspect."""
+    return getattr(getattr(exc, "response", None), "status_code", None)
+
+
+def _log_fetch_failure(exc: Exception, model: str, pk: int, url: str) -> None:
+    """Log a failed attempt to fetch a document, routing refusals to
+    `forbidden_logger` and everything else, with its traceback, to `logger`.
+
+    :param exc: The exception the fetch raised.
+    :param model: The name of the document model, for the message.
+    :param pk: The primary key of the document.
+    :param url: The URL involved when the fetch failed."""
+    if _http_status(exc) == HTTPStatus.FORBIDDEN:
+        forbidden_logger.error(
+            "Court refused %s %s at %s (403)", model, pk, url
+        )
+        return
+    logger.exception("Failed to fetch %s %s from %s", model, pk, url)
 
 
 class DocketEntryType:
@@ -82,7 +113,7 @@ class AbstractStateDocument(AbstractPDF):
 
         The default implementation returns the `url` column unchanged, but it can be overridden for states like Florida that
         require a proof-of-work token to fetch documents. Returns `None` if we failed to construct a URL and therefore shouldn't
-        attempt downloading anything."""
+        attempt downloading anything. Overrides may also raise; `download` logs the error and skips the document either way."""
 
         return self.url
 
@@ -222,7 +253,6 @@ class AbstractStateDocument(AbstractPDF):
         # Imported here to avoid a circular import: this module is loaded with
         # cl.search.models, which the task modules import.
         from cl.corpus_importer.tasks import download_document_in_stream
-        from cl.scrapers.utils import get_extension
 
         try:
             document = cls._default_manager.get(pk=pk)
@@ -242,7 +272,13 @@ class AbstractStateDocument(AbstractPDF):
             )
             return None
 
-        url = document.build_url()
+        # A URL that can't be built is a per-document problem, so it must
+        # not take down the task that's working through a batch.
+        try:
+            url = document.build_url()
+        except Exception as exc:
+            _log_fetch_failure(exc, cls.__name__, pk, document.url)
+            return None
         if url is None:
             logger.error("Failed to build URL for %s %s", cls.__name__, pk)
             return None
@@ -254,56 +290,87 @@ class AbstractStateDocument(AbstractPDF):
             url,
         )
 
-        with download_document_in_stream(
-            url, pk, cls.tmp_prefix(), require_pdf=False
-        ) as result:
-            if result is None:
-                logger.error(
-                    "Failed to download document for %s %s from URL %s.",
-                    cls.__name__,
-                    pk,
-                    url,
+        try:
+            with download_document_in_stream(
+                url, pk, cls.tmp_prefix(), require_pdf=False
+            ) as result:
+                return cls._store_download(
+                    document, url, result, extract, queue
                 )
-                return None
+        except requests.HTTPError as exc:
+            _log_fetch_failure(exc, cls.__name__, pk, url)
+            return None
 
-            tmp, sha1_hash = result
-            content = tmp.read(8192)
-            tmp.seek(0)
+    @classmethod
+    def _store_download(
+        cls,
+        document: Self,
+        url: str,
+        result: tuple[IO[bytes], str] | None,
+        extract: bool,
+        queue: str,
+    ) -> Self | None:
+        """Validate a downloaded file and save it onto `document`. Returns the
+        document on success and `None` if there was nothing to store or the
+        file was rejected.
 
-            extension = get_extension(content)
+        :param document: The document the file belongs to.
+        :param url: The URL the file was fetched from, for logging.
+        :param result: The temporary file and its SHA-1 as yielded by
+            `download_document_in_stream`, or `None` if the download failed.
+        :param extract: Whether to dispatch text extraction after saving.
+        :param queue: The queue to use for the extraction task."""
+        # Imported here to avoid a circular import; see `download`.
+        from cl.scrapers.utils import get_extension
 
-            if extension not in cls.expected_extensions():
-                logger.warning(
-                    "Document download: Unexpected extension '%s' for %s %s from %s. Proceeding anyway.",
-                    extension,
-                    cls.__name__,
-                    pk,
-                    url,
-                )
+        pk = document.pk
+        if result is None:
+            logger.error(
+                "Failed to download document for %s %s from URL %s.",
+                cls.__name__,
+                pk,
+                url,
+            )
+            return None
 
-            if error := document.validate_file(tmp, extension):
-                document.processing_error = error
-                document.save()
-                return None
+        tmp, sha1_hash = result
+        content = tmp.read(8192)
+        tmp.seek(0)
 
-            filename = f"{document.make_filename()}{extension}"
-            downloaded_file = File(tmp)
-            document.filepath_local.save(filename, downloaded_file, save=False)
-            document.file_size = downloaded_file.size
-            document.sha1 = sha1_hash
+        extension = get_extension(content)
 
-            if extension == ".pdf":
-                if pages := async_to_sync(document.fetch_page_count)():
-                    document.page_count = pages
-            elif extension not in cls.extractable_extensions():
-                document.ocr_status = cls.OCR_UNNECESSARY
+        if extension not in cls.expected_extensions():
+            logger.warning(
+                "Document download: Unexpected extension '%s' for %s %s from %s. Proceeding anyway.",
+                extension,
+                cls.__name__,
+                pk,
+                url,
+            )
 
+        if error := document.validate_file(tmp, extension):
+            document.processing_error = error
             document.save()
+            return None
 
-            if extract:
-                document.extract(queue)
+        filename = f"{document.make_filename()}{extension}"
+        downloaded_file = File(tmp)
+        document.filepath_local.save(filename, downloaded_file, save=False)
+        document.file_size = downloaded_file.size
+        document.sha1 = sha1_hash
 
-            return document
+        if extension == ".pdf":
+            if pages := async_to_sync(document.fetch_page_count)():
+                document.page_count = pages
+        elif extension not in cls.extractable_extensions():
+            document.ocr_status = cls.OCR_UNNECESSARY
+
+        document.save()
+
+        if extract:
+            document.extract(queue)
+
+        return document
 
     class Meta:
         abstract = True
