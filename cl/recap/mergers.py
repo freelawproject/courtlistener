@@ -2501,9 +2501,7 @@ async def process_orphan_documents(
     the issue that arises when somebody (somehow) uploads a PDF without first
     uploading a docket.
 
-    Gated behind the PROCESS_ORPHAN_DOCUMENTS_SWITCH waffle switch so the
-    retries can be turned off without a deploy. Callers should not rely on the
-    orphan PQs being reprocessed.
+    Gated behind the PROCESS_ORPHAN_DOCUMENTS_SWITCH waffle switch.
     """
     if not await sync_to_async(switch_is_active)(
         PROCESS_ORPHAN_DOCUMENTS_SWITCH
