@@ -77,6 +77,15 @@ class AbstractStateDocument(AbstractPDF):
         blank=True,
     )
 
+    def build_url(self) -> str | None:
+        """Build a URL to fetch the appropriate document from the court website.
+
+        The default implementation returns the `url` column unchanged, but it can be overridden for states like Florida that
+        require a proof-of-work token to fetch documents. Returns `None` if we failed to construct a URL and therefore shouldn't
+        attempt downloading anything."""
+
+        return self.url
+
     @classmethod
     def state_pdf_path(
         cls,
@@ -233,7 +242,10 @@ class AbstractStateDocument(AbstractPDF):
             )
             return None
 
-        url = document.url
+        url = document.build_url()
+        if url is None:
+            logger.error("Failed to build URL for %s %s", cls.__name__, pk)
+            return None
 
         logger.info(
             "Document download: Fetching document for %s %s from %s",

@@ -1,5 +1,15 @@
+import base64
+import hashlib
+import logging
+import struct
+import time
+from urllib.parse import parse_qs, urlencode, urljoin, urlparse, urlunparse
+
+import httpx
 import pghistory
 from django.db import models
+from juriscraper.state.florida.scraper import FLORIDA_API_BASE
+from pydantic import BaseModel, Field
 
 from cl.lib.decorators import document_model
 from cl.lib.model_helpers import CSVExportMixin
@@ -10,7 +20,94 @@ from cl.search.state.shared import (
     DocketEntryType,
 )
 
+logger = logging.getLogger(__name__)
+
 __all__ = ["FloridaDocketEntry", "FloridaDocument"]
+
+
+class AltchaData(BaseModel):
+    resource: str
+
+    def fetch(self) -> "AltchaChallenge | None":
+        response = httpx.get(
+            urljoin(FLORIDA_API_BASE, "/altcha/challenge"),
+            params={"resource": self.resource},
+            headers={"User-Agent": "Courtlistener (Free Law Project)"},
+        )
+
+        response.raise_for_status()
+
+        if response.status_code == 204:
+            return None
+
+        return AltchaChallenge.model_validate_json(response.text)
+
+
+class AltchaChallengeSolution(BaseModel):
+    counter: int
+    derived_key: str = Field(alias="derivedKey")
+    time: float
+
+
+class AltchaChallengeParameters(BaseModel):
+    algorithm: str
+    cost: int
+    key_length: int = Field(alias="keyLength")
+    key_prefix: str = Field(alias="keyPrefix")
+    nonce: str
+    salt: str
+    expiry: int = Field(alias="expiresAt")
+    data: AltchaData
+    key_signature: str = Field(alias="keySignature")
+
+
+MAX_ATTEMPT_TIME: float = 30.0
+
+
+class AltchaChallenge(BaseModel):
+    parameters: AltchaChallengeParameters
+    signature: str
+
+    def solve(self) -> AltchaChallengeSolution | None:
+        if self.parameters.algorithm != "PBKDF2/SHA-256":
+            raise NotImplementedError
+        nonce_bytes = bytes.fromhex(self.parameters.nonce)
+        salt_bytes = bytes.fromhex(self.parameters.salt)
+        prefix_bytes = bytes.fromhex(self.parameters.key_prefix)
+        start = time.monotonic()
+        solution = None
+        i = 0
+        while time.monotonic() - start < MAX_ATTEMPT_TIME:
+            candidate = hashlib.pbkdf2_hmac(
+                "sha256",
+                nonce_bytes + struct.pack(">I", i),
+                salt_bytes,
+                self.parameters.cost,
+                self.parameters.key_length,
+            )
+            if candidate.startswith(prefix_bytes):
+                solution = candidate
+                break
+            i += 1
+
+        if solution is None:
+            return None
+
+        return AltchaChallengeSolution(
+            counter=i,
+            derivedKey=solution.hex(),
+            time=(time.monotonic() - start) * 1_000,
+        )
+
+
+class AltchaChallengeResponse(BaseModel):
+    challenge: AltchaChallenge
+    solution: AltchaChallengeSolution
+
+    def encode(self) -> str:
+        return base64.b64encode(
+            self.model_dump_json(by_alias=True).encode()
+        ).decode()
 
 
 @pghistory.track()
@@ -110,6 +207,40 @@ class FloridaDocument(AbstractDateTimeModel, AbstractStateDocument):
     document_name = models.TextField(blank=True)
     document_type = models.TextField(blank=True)
     link_uuid = models.UUIDField()
+
+    def build_url(self) -> str | None:
+        """Requests parameters for and computes the altcha proof-of-work token for Florida documents, returning the URL
+        with the token appended."""
+
+        scheme, netloc, path, params, query, fragment = urlparse(self.url)
+
+        challenge = AltchaData(resource=path).fetch()
+        if challenge is None:
+            return self.url
+        solution = challenge.solve()
+        if solution is None:
+            logger.error(
+                "Failed to solve Florida challenge within time limit for %s",
+                self.url,
+            )
+            return None
+        token = AltchaChallengeResponse(
+            challenge=challenge, solution=solution
+        ).encode()
+
+        query_dict = parse_qs(query)
+        query_dict["altcha"] = [token]
+
+        return urlunparse(
+            (
+                scheme,
+                netloc,
+                path,
+                params,
+                urlencode(query_dict, doseq=True),
+                fragment,
+            )
+        )
 
     def make_filename(self) -> str:
         """Build the stored filename from the document name and link UUID."""
