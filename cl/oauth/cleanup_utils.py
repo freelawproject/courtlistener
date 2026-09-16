@@ -3,6 +3,7 @@ import time
 from datetime import timedelta
 
 from django.conf import settings
+from django.core.exceptions import ImproperlyConfigured
 from django.db.models import Exists, OuterRef, QuerySet
 from django.utils import timezone
 from oauth2_provider.models import (
@@ -13,6 +14,7 @@ from oauth2_provider.models import (
     get_id_token_model,
     get_refresh_token_model,
 )
+from oauth2_provider.settings import oauth2_settings
 
 logger = logging.getLogger(__name__)
 
@@ -64,6 +66,13 @@ def unconfirmed_applications(
     ``skip_authorization``, no grant or token rows, older than ``min_age``,
     younger than ``max_age``.
     """
+    if max_age is not None and max_age <= min_age:
+        logger.warning(
+            "max_age (%s) is not greater than min_age (%s); no application "
+            "can match both bounds and none will be deleted.",
+            max_age,
+            min_age,
+        )
     now = timezone.now()
     candidates = Application.objects.filter(
         user__isnull=True,
@@ -97,6 +106,32 @@ def delete_unconfirmed_applications(
     )
 
 
+def refresh_token_lifetime() -> timedelta | None:
+    """Return the configured refresh-token lifetime as a timedelta.
+
+    This reads from ``oauth2_settings`` to stay consistent with
+    ``clear_expired()``, which reads the same setting when deciding whether
+    expired refresh tokens should be removed.
+
+    If the setting is unset or falsy, return ``None`` to match the toolkit's
+    default. In that case, ``clear_expired()`` does not expire refresh tokens,
+    so no lifetime cap is needed.
+    """
+
+    lifetime = oauth2_settings.REFRESH_TOKEN_EXPIRE_SECONDS
+    if not lifetime:
+        return None
+    if isinstance(lifetime, timedelta):
+        return lifetime
+    if isinstance(lifetime, int | float):
+        return timedelta(seconds=lifetime)
+    # Mirror clear_expired()'s own error, which would otherwise surface later
+    # in the pass, after applications had already been deleted.
+    raise ImproperlyConfigured(
+        "REFRESH_TOKEN_EXPIRE_SECONDS must be either a timedelta or seconds"
+    )
+
+
 def clear_expired_tokens() -> None:
     """Run django-oauth-toolkit's ``clear_expired()`` and log the elapsed time."""
     start = time.monotonic()
@@ -105,20 +140,27 @@ def clear_expired_tokens() -> None:
 
 
 def run_cleanup_pass(*, dry_run: bool = False) -> None:
-    """One cleanup pass over the OAuth tables."""
+    """Run one cleanup pass over the OAuth tables.
+
+    Removes never-authorized DCR applications first, then clears expired
+    grants and tokens. The application cleanup uses the refresh-token
+    lifetime as its maximum age so an application is not removed while its
+    authorized tokens could still be valid.
+
+    ``dry_run`` applies only to application cleanup. Since
+    ``clear_expired_tokens()`` does not support dry runs, expired-token
+    cleanup is skipped when ``dry_run`` is enabled.
+    """
     delete_unconfirmed_applications(
         min_age=timedelta(
             hours=settings.OAUTH_CLEANUP_UNCONFIRMED_APP_MIN_AGE_HOURS
         ),
-        # See issue #7796. In the follow-up PR, we will use this:
-        # max_age=timedelta(
-        #     seconds=settings.OAUTH2_PROVIDER["REFRESH_TOKEN_EXPIRE_SECONDS"]
-        # ),
-        max_age=None,
+        max_age=refresh_token_lifetime(),
         batch_size=settings.OAUTH_CLEANUP_BATCH_SIZE,
         pause_seconds=settings.OAUTH_CLEANUP_BATCH_PAUSE,
         dry_run=dry_run,
     )
-    # See issue #7796. In the follow-up PR, we will uncomment this:
-    # if not dry_run:
-    #     clear_expired_tokens()
+    if dry_run:
+        logger.info("Dry run: skipping expired token cleanup.")
+        return
+    clear_expired_tokens()
