@@ -5578,6 +5578,7 @@ class DescriptionCleanupTest(SimpleTestCase):
         self.assertEqual(docket_entry["description"], desc)
 
 
+@override_settings(WAFFLE_CACHE_PREFIX="RecapDocketTaskTest")
 class RecapDocketTaskTest(TestCase):
     @classmethod
     def setUpTestData(cls) -> None:
