@@ -5578,6 +5578,7 @@ class DescriptionCleanupTest(SimpleTestCase):
         self.assertEqual(docket_entry["description"], desc)
 
 
+@override_switch(PROCESS_ORPHAN_DOCUMENTS_SWITCH, active=True)
 @override_settings(WAFFLE_CACHE_PREFIX="RecapDocketTaskTest")
 class RecapDocketTaskTest(TestCase):
     @classmethod
