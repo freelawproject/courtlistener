@@ -48,6 +48,7 @@ from cl.api.utils import (
     get_next_webhook_retry_date,
     get_webhook_deprecation_date,
 )
+from cl.corpus_importer.tasks import save_attachment_pq_object
 from cl.corpus_importer.utils import (
     is_appellate_court,
     should_check_acms_court,
@@ -114,6 +115,7 @@ from cl.recap.mergers import (
     update_docket_metadata,
 )
 from cl.recap.models import (
+    PROCESSING_QUEUE_SOURCE,
     PROCESSING_STATUS,
     REQUEST_TYPE,
     UPLOAD_TYPE,
@@ -175,6 +177,62 @@ from cl.users.factories import (
     UserProfileWithParentsFactory,
     UserWithChildProfileFactory,
 )
+
+
+class ProcessingQueueSourceChoicesTest(SimpleTestCase):
+    """Test the shape of the ProcessingQueue.source field."""
+
+    def test_source_field_uses_processing_queue_source_choices(self):
+        field = ProcessingQueue._meta.get_field("source")
+        self.assertEqual(
+            list(field.choices), list(PROCESSING_QUEUE_SOURCE.NAMES)
+        )
+
+    def test_processing_queue_source_constants_are_unique(self):
+        values = [choice[0] for choice in PROCESSING_QUEUE_SOURCE.NAMES]
+        self.assertEqual(
+            len(values),
+            len(set(values)),
+            msg="PROCESSING_QUEUE_SOURCE constants must be unique.",
+        )
+        self.assertEqual(
+            {
+                PROCESSING_QUEUE_SOURCE.EXTENSION,
+                PROCESSING_QUEUE_SOURCE.EMAIL,
+                PROCESSING_QUEUE_SOURCE.REPLICATION,
+                PROCESSING_QUEUE_SOURCE.UNKNOWN,
+            },
+            set(values),
+        )
+
+    def test_source_field_defaults_to_unknown(self):
+        field = ProcessingQueue._meta.get_field("source")
+        self.assertEqual(field.default, PROCESSING_QUEUE_SOURCE.UNKNOWN)
+
+
+class ManagementCommandPqSourceTest(TestCase):
+    """PQs created by internal management commands
+    do not have their source set explicitly, they're
+    expected to fall back to the model's UNKNOWN default.
+    """
+
+    @classmethod
+    def setUpTestData(cls):
+        cls.user = User.objects.get(username="recap")
+        court = CourtFactory(jurisdiction=Court.FEDERAL_DISTRICT)
+        docket = DocketFactory(source=Docket.RECAP, court=court)
+        cls.rd = RECAPDocumentFactory(
+            docket_entry=DocketEntryFactory(docket=docket),
+            document_number="1",
+            pacer_doc_id="17711118263",
+        )
+
+    def test_management_command_pq_defaults_to_unknown_source(self):
+        pq_pk = save_attachment_pq_object(
+            fakes.FakeAttachmentPage(), self.rd.pk, self.user.pk
+        )
+        pq = ProcessingQueue.objects.get(pk=pq_pk)
+        self.assertEqual(pq.source, PROCESSING_QUEUE_SOURCE.UNKNOWN)
 
 
 class RecapUtilsTest(TestCase):
@@ -325,6 +383,30 @@ class RecapUploadsTest(TestCase):
         self.assertEqual(j["document_number"], 1)
         self.assertEqual(j["pacer_case_id"], "asdf")
         mock.assert_called()
+
+    async def test_uploading_a_pdf_sets_extension_source(self, mock):
+        """A PQ created through the extension/API upload endpoint should be
+        tagged with source=EXTENSION.
+        """
+        r = await self.async_client.post(self.path, self.data)
+        self.assertEqual(r.status_code, HTTPStatus.CREATED)
+
+        j = json.loads(r.content)
+        pq = await ProcessingQueue.objects.aget(pk=j["id"])
+        self.assertEqual(pq.source, PROCESSING_QUEUE_SOURCE.EXTENSION)
+
+    async def test_client_submitted_source_is_ignored(self, mock):
+        """A client-submitted `source` value should be ignored; the PQ
+        should still be tagged with source=EXTENSION, set server-side by
+        the view.
+        """
+        self.data["source"] = PROCESSING_QUEUE_SOURCE.REPLICATION
+        r = await self.async_client.post(self.path, self.data)
+        self.assertEqual(r.status_code, HTTPStatus.CREATED)
+
+        j = json.loads(r.content)
+        pq = await ProcessingQueue.objects.aget(pk=j["id"])
+        self.assertEqual(pq.source, PROCESSING_QUEUE_SOURCE.EXTENSION)
 
     async def test_uploading_a_pdf_that_is_not_a_pdf(self, mock):
         """Are PDF uploads that aren't PDFs rejected?
@@ -1754,6 +1836,42 @@ class ReplicateRecapUploadsTest(TestCase):
             {de.pk for de in DocketEntry.objects.all()}, related_htmls_de
         )
 
+    def test_source_field_set_on_attachment_page_replicas(self):
+        """The original PQ that triggers an attachment page upload keeps its
+        original source, and the replica PQs created for matching subdocket
+        cases are tagged REPLICATION.
+        """
+        for d in (self.d_1, self.d_2, self.d_3):
+            async_to_sync(add_docket_entries)(
+                d, self.de_data_2["docket_entries"]
+            )
+
+        # Simulate the source the extension/API upload endpoint would have
+        # set on this PQ.
+        pq = ProcessingQueue.objects.create(
+            court=self.court,
+            uploader=self.user,
+            pacer_case_id="104491",
+            upload_type=UPLOAD_TYPE.ATTACHMENT_PAGE,
+            filepath_local=self.f,
+            source=PROCESSING_QUEUE_SOURCE.EXTENSION,
+        )
+        with mock.patch(
+            "cl.recap.tasks.get_data_from_att_report",
+            side_effect=lambda x, y: self.att_data_2,
+        ):
+            async_to_sync(process_recap_upload)(pq)
+
+        pq.refresh_from_db()
+        self.assertEqual(pq.source, PROCESSING_QUEUE_SOURCE.EXTENSION)
+
+        replica_pqs = ProcessingQueue.objects.exclude(pk=pq.pk)
+        self.assertEqual(replica_pqs.count(), 2)
+        self.assertEqual(
+            {p.source for p in replica_pqs},
+            {PROCESSING_QUEUE_SOURCE.REPLICATION},
+        )
+
     def test_process_attachments_for_subdocket_pq_with_missing_main_rd(self):
         """Confirm that if the RD related to the initial PQ is missing,
         we can still process attachments for subdocket cases where the
@@ -1973,6 +2091,87 @@ class ReplicateRecapUploadsTest(TestCase):
                 )
 
                 transaction.set_rollback(True)
+
+    @mock.patch("cl.scrapers.tasks.extract_pdf_document_base")
+    def test_source_field_set_on_pdf_upload_replicas(self, mock_extract):
+        """The original PQ that triggers a PDF upload keeps its original
+        source, and the replica PQs created for matching subdocket cases are
+        tagged REPLICATION.
+        """
+        for d in (self.d_1, self.d_2, self.d_3):
+            async_to_sync(add_docket_entries)(
+                d, self.de_data_2["docket_entries"]
+            )
+
+        # Simulate the source the extension/API upload endpoint would have
+        # set on this PQ.
+        pq = ProcessingQueue.objects.create(
+            court=self.court,
+            uploader=self.user,
+            pacer_case_id="104491",
+            pacer_doc_id="04505578697",
+            document_number=5,
+            attachment_number=2,
+            upload_type=UPLOAD_TYPE.PDF,
+            filepath_local=self.f,
+            source=PROCESSING_QUEUE_SOURCE.EXTENSION,
+        )
+        async_to_sync(process_recap_upload)(pq)
+
+        pq.refresh_from_db()
+        self.assertEqual(pq.source, PROCESSING_QUEUE_SOURCE.EXTENSION)
+
+        replica_pqs = ProcessingQueue.objects.exclude(pk=pq.pk)
+        self.assertEqual(replica_pqs.count(), 2)
+        self.assertEqual(
+            {p.source for p in replica_pqs},
+            {PROCESSING_QUEUE_SOURCE.REPLICATION},
+        )
+
+    @mock.patch("cl.scrapers.tasks.extract_pdf_document_base")
+    def test_source_field_not_overwritten_when_pacer_case_id_inferred(
+        self, mock_extract
+    ):
+        """find_subdocket_pdf_rds sets subdocket_replication=True on the
+        *original* PQ when it has to infer a pacer_case_id for it.
+        That flag must not be confused with the new source field:
+        the original PQ's source must remain untouched, only the
+        new replica PQs should be tagged REPLICATION.
+        """
+        for d in (self.d_1, self.d_2, self.d_3):
+            async_to_sync(add_docket_entries)(
+                d, self.de_data_2["docket_entries"]
+            )
+
+        # No pacer_case_id: forces find_subdocket_pdf_rds to infer one and
+        # set subdocket_replication=True on this same original PQ.
+        pq = ProcessingQueue.objects.create(
+            court=self.court,
+            uploader=self.user,
+            pacer_case_id="",
+            pacer_doc_id="04505578697",
+            document_number=5,
+            attachment_number=2,
+            upload_type=UPLOAD_TYPE.PDF,
+            filepath_local=self.f,
+            source=PROCESSING_QUEUE_SOURCE.EXTENSION,
+        )
+        async_to_sync(process_recap_upload)(pq)
+
+        pq.refresh_from_db()
+        self.assertEqual(
+            pq.source,
+            PROCESSING_QUEUE_SOURCE.EXTENSION,
+            msg="The original PQ's source must not be overwritten by the "
+            "internal subdocket_replication flag.",
+        )
+
+        replica_pqs = ProcessingQueue.objects.exclude(pk=pq.pk)
+        self.assertEqual(replica_pqs.count(), 2)
+        self.assertEqual(
+            {p.source for p in replica_pqs},
+            {PROCESSING_QUEUE_SOURCE.REPLICATION},
+        )
 
     @mock.patch("cl.recap.tasks.extract_pdf_document_base")
     def test_processing_subdocket_case_pdf_attachment_upload(
@@ -2301,6 +2500,56 @@ class ReplicateRecapUploadsTest(TestCase):
         "cl.recap.tasks.get_pacer_cookie_from_cache",
         side_effect=lambda x: True,
     )
+    def test_source_field_set_to_replication_for_attachment_page_fq(
+        self,
+        mock_get_pacer_cookie_from_cache,
+        mock_is_pacer_court_accessible,
+        mock_get_att_report_by_rd,
+    ):
+        """An attachment page Fetch Queue purchase doesn't create a PQ for
+        the fetched document itself (fetch_attachment_page merges the data
+        directly). Every PQ it creates is a subdocket replica, so all of
+        them must be tagged REPLICATION.
+        """
+        for d in (self.d_1, self.d_2, self.d_3):
+            async_to_sync(add_docket_entries)(
+                d, self.de_data_2["docket_entries"]
+            )
+
+        main_d_2_rd = RECAPDocument.objects.filter(
+            docket_entry__docket=self.d_2
+        )[0]
+
+        fq = PacerFetchQueue.objects.create(
+            user=User.objects.get(username="recap"),
+            request_type=REQUEST_TYPE.ATTACHMENT_PAGE,
+            recap_document_id=main_d_2_rd.pk,
+        )
+        with mock.patch(
+            "cl.recap.tasks.get_data_from_att_report",
+            side_effect=lambda x, y: self.att_data_2,
+        ):
+            do_pacer_fetch(fq)
+
+        pqs_created = ProcessingQueue.objects.all()
+        self.assertEqual(pqs_created.count(), 2)
+        self.assertEqual(
+            {pq.source for pq in pqs_created},
+            {PROCESSING_QUEUE_SOURCE.REPLICATION},
+        )
+
+    @mock.patch(
+        "cl.recap.tasks.get_att_report_by_rd",
+        return_value=fakes.FakeAttachmentPage,
+    )
+    @mock.patch(
+        "cl.recap.tasks.is_pacer_court_accessible",
+        side_effect=lambda a: True,
+    )
+    @mock.patch(
+        "cl.recap.tasks.get_pacer_cookie_from_cache",
+        side_effect=lambda x: True,
+    )
     @mock.patch(
         "cl.recap.tasks.download_pacer_pdf_by_rd",
         side_effect=lambda z, x, c, v, b, de_seq_num: (
@@ -2526,6 +2775,60 @@ class ReplicateRecapUploadsTest(TestCase):
         )
         # Confirm that the 3 PDFs have been extracted.
         self.assertEqual(mock_extract.call_count, 3)
+
+    @mock.patch(
+        "cl.recap.tasks.is_pacer_court_accessible",
+        side_effect=lambda a: True,
+    )
+    @mock.patch(
+        "cl.recap.tasks.download_pacer_pdf_by_rd",
+        side_effect=lambda z, x, c, v, b, de_seq_num: (
+            MockResponse(
+                200,
+                b"pdf content",
+            ),
+            "OK",
+        ),
+    )
+    @mock.patch(
+        "cl.recap.tasks.get_pacer_cookie_from_cache",
+    )
+    @mock.patch("cl.scrapers.tasks.extract_pdf_document_base")
+    def test_source_field_set_to_replication_for_pdf_fq(
+        self,
+        mock_extract,
+        mock_get_pacer_cookie_from_cache,
+        mock_download_pacer_pdf_by_rd,
+        mock_court_accessible,
+    ):
+        """A PDF Fetch Queue purchase doesn't create a PQ for the fetched
+        document itself (fetch_pacer_doc_by_rd_base writes straight to the
+        RECAPDocument). Every PQ it creates is a subdocket replica, so all
+        of them must be tagged REPLICATION.
+        """
+        for d in (self.d_1, self.d_2, self.d_3):
+            async_to_sync(add_docket_entries)(
+                d, self.de_data_2["docket_entries"]
+            )
+
+        main_d_2_rd = RECAPDocument.objects.filter(
+            docket_entry__docket=self.d_2
+        )[0]
+
+        fq = PacerFetchQueue.objects.create(
+            user=User.objects.get(username="recap"),
+            request_type=REQUEST_TYPE.PDF,
+            recap_document_id=main_d_2_rd.pk,
+        )
+        with self.captureOnCommitCallbacks(execute=True):
+            do_pacer_fetch(fq)
+
+        pqs_created = ProcessingQueue.objects.all()
+        self.assertEqual(pqs_created.count(), 2)
+        self.assertEqual(
+            {pq.source for pq in pqs_created},
+            {PROCESSING_QUEUE_SOURCE.REPLICATION},
+        )
 
     @mock.patch("cl.recap.tasks.extract_pdf_document_base")
     def test_avoid_replication_on_pdf_available(self, mock_extract):
@@ -4450,6 +4753,23 @@ class RecapZipTaskTest(TestCase):
         # Was the mock called once per PDF in the zip?
         expected_call_count = len(results["new_pqs"])
         self.assertEqual(mock_extract.call_count, expected_call_count)
+
+    @mock.patch("cl.recap.tasks.extract_pdf_document.si")
+    def test_zip_children_inherit_extension_source(self, mock_extract):
+        """The PQs created for each file inside an uploaded zip should be
+        tagged EXTENSION, same as the parent zip upload.
+        """
+        pq = ProcessingQueue.objects.get(id=self.pq.id)
+        pq.source = PROCESSING_QUEUE_SOURCE.EXTENSION
+        pq.save()
+        results = async_to_sync(process_recap_zip)(pq.pk)
+
+        child_pqs = ProcessingQueue.objects.filter(pk__in=results["new_pqs"])
+        self.assertEqual(child_pqs.count(), 2)
+        self.assertEqual(
+            {p.source for p in child_pqs},
+            {PROCESSING_QUEUE_SOURCE.EXTENSION},
+        )
 
     def _make_zip_pq(self, members: dict[str, bytes]) -> ProcessingQueue:
         """Build a DOCUMENT_ZIP PQ whose zip holds the given members.

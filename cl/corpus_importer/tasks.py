@@ -41,6 +41,7 @@ from httpx import (
     RemoteProtocolError,
     TimeoutException,
 )
+from httpx import Response as HttpxResponse
 from juriscraper.lib.exceptions import PacerLoginException, ParsingException
 from juriscraper.lib.string_utils import CaseNameTweaker, harmonize
 from juriscraper.pacer import (
@@ -190,6 +191,7 @@ from cl.recap.mergers import (
     update_docket_metadata,
 )
 from cl.recap.models import (
+    PROCESSING_QUEUE_SOURCE,
     UPLOAD_TYPE,
     FjcIntegratedDatabase,
     PacerHtmlFiles,
@@ -1977,7 +1979,7 @@ def get_appellate_docket_by_docket_number(
 def get_att_report_by_rd(
     rd: RECAPDocument,
     session_data: SessionData,
-) -> AttachmentPage | None:
+) -> ACMSAttachmentPage | AppellateAttachmentPage | AttachmentPage | None:
     """Method to get the attachment report for the item in PACER.
 
     :param rd: The RECAPDocument object to use as a source.
@@ -2022,7 +2024,7 @@ def get_attachment_page_by_rd(
     self: Task,
     rd_pk: int,
     session_data: SessionData,
-) -> AttachmentPage | None:
+) -> ACMSAttachmentPage | AppellateAttachmentPage | AttachmentPage | None:
     """Get the attachment page for the item in PACER.
 
     :param self: The celery task
@@ -2147,6 +2149,7 @@ def get_bankr_claims_registry(
 def create_attachment_pq(
     rd_pk: int,
     user_pk: int,
+    source: int = PROCESSING_QUEUE_SOURCE.UNKNOWN,
 ) -> ProcessingQueue:
     """Create a ProcessingQueue instance for an attachment.
 
@@ -2155,6 +2158,9 @@ def create_attachment_pq(
 
     :param rd_pk: The pk of the RECAPDocument.
     :param user_pk: The pk of the User uploading the attachment.
+    :param source: The PROCESSING_QUEUE_SOURCE value to tag this PQ with.
+    Defaults to UNKNOWN since this helper is also used by internal
+    management-command scripts that don't have a more specific source.
     :return: A ProcessingQueue instance for the attachment upload.
     """
 
@@ -2166,6 +2172,7 @@ def create_attachment_pq(
         uploader=user,
         upload_type=UPLOAD_TYPE.ATTACHMENT_PAGE,
         pacer_case_id=rd.docket_entry.docket.pacer_case_id,
+        source=source,
     )
     return pq
 
@@ -2222,6 +2229,7 @@ def save_attachment_pq_from_text(
     pq = create_attachment_pq(
         rd_pk,
         user_pk,
+        source=PROCESSING_QUEUE_SOURCE.EMAIL,
     )
     pq.filepath_local.save(
         "attachment_page.html", ContentFile(att_report_text.encode())
@@ -3074,7 +3082,7 @@ def query_and_save_list_of_creditors(
     backoff=2,
     logger=logger,
 )
-def extract_recap_document_for_opinions(rd: RECAPDocument) -> Response:
+def extract_recap_document_for_opinions(rd: RECAPDocument) -> HttpxResponse:
     """Call recap-extract from doctor with retries
 
     :param rd: the recap document to extract
