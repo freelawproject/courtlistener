@@ -164,13 +164,13 @@ async def court_homepage(request: HttpRequest, pk: str) -> HttpResponse:
 
         mutable_GET = request.GET.copy()
         # Do es search
-        mutable_GET.update(
+        mutable_GET.update(  # type:ignore[no-matching-overload] This is a correct usage for QueryDict.update, but pyrefly thinks we're using MutableMapping.update
             {
                 "order_by": "dateFiled desc",
                 "type": SEARCH_TYPES.OPINION,
                 "court": court,
                 "filed_after": (
-                    datetime.datetime.today() - datetime.timedelta(days=28)  # type: ignore
+                    datetime.datetime.today() - datetime.timedelta(days=28)
                 ),
             }
         )
