@@ -11,6 +11,7 @@ from asgiref.sync import sync_to_async
 from django.conf import settings
 from django.contrib.auth.models import AnonymousUser, User
 from django.core.exceptions import ObjectDoesNotExist
+from django.db.models import QuerySet
 from django.http import Http404, HttpRequest
 from django.shortcuts import aget_object_or_404
 from django.urls import reverse
@@ -40,6 +41,7 @@ from cl.opinion_page.docket_entry_sources import (
     DocketEntrySource,
     MetadataItem,
     MetadataSection,
+    SourceDocketEntry,
 )
 from cl.people_db.models import Person
 from cl.recap.constants import COURT_TIMEZONES
@@ -55,7 +57,7 @@ from cl.search.models import (
     SCOTUSDocketEntry,
 )
 
-logger = logging.getLogger(__name__)
+logger: logging.Logger = logging.getLogger(__name__)
 
 
 def _person_item(
@@ -642,7 +644,9 @@ async def user_has_alert(user: AnonymousUser | User, docket: Docket) -> bool:
     return has_alert
 
 
-def generate_docket_entries_csv_data(docket_entries) -> str:
+def generate_docket_entries_csv_data(
+    docket_entries: QuerySet[SourceDocketEntry] | list[SourceDocketEntry],
+) -> str:
     """Get str representing in memory file from docket_entries.
 
     :param docket_entries: List of DocketEntry that implements CSVExportMixin.
@@ -1020,7 +1024,9 @@ async def es_cited_case_count(
     return cited_by_count
 
 
-async def es_related_case_count(cluster_id, sub_opinion_pks: list[str]) -> int:
+async def es_related_case_count(
+    cluster_id: int, sub_opinion_pks: list[str]
+) -> int:
     """Elastic quick related cases count
 
     :param cluster_id: The cluster id of the object

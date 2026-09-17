@@ -7,7 +7,7 @@ import threading
 from datetime import date
 from http import HTTPStatus
 from itertools import product
-from typing import cast
+from typing import TYPE_CHECKING, Any, cast
 from unittest import mock
 from unittest.mock import AsyncMock, MagicMock, PropertyMock, patch
 from urllib.parse import parse_qs, urlencode, urlparse
@@ -39,6 +39,9 @@ from lxml.etree import _Attrib, _Element
 from lxml.html import fromstring
 from waffle.models import Flag
 from waffle.testutils import override_flag
+
+if TYPE_CHECKING:
+    from django.test.client import _MonkeyPatchedASGIResponse
 
 from cl.citations.utils import slugify_reporter
 from cl.favorites.models import GenericCount
@@ -218,7 +221,7 @@ class UpdateOpinionTabsTest(TestCase):
         both_started = asyncio.Event()
         started_count = 0
 
-        async def wait_for_other_count(result: int, *_args) -> int:
+        async def wait_for_other_count(result: int, *_args: Any) -> int:
             nonlocal started_count
             started_count += 1
             if started_count == 2:
@@ -226,10 +229,10 @@ class UpdateOpinionTabsTest(TestCase):
             await asyncio.wait_for(both_started.wait(), timeout=1)
             return result
 
-        async def get_cited_count(*args) -> int:
+        async def get_cited_count(*args: Any) -> int:
             return await wait_for_other_count(3, *args)
 
-        async def get_related_count(*args) -> int:
+        async def get_related_count(*args: Any) -> int:
             return await wait_for_other_count(7, *args)
 
         cited_count = AsyncMock(side_effect=get_cited_count)
@@ -512,7 +515,12 @@ class ViewRecapDocumentTest(TestCase):
     def setUpTestData(cls) -> None:
         cls.docket = DocketFactory()
 
-    async def get(self, follow: bool = False, params=None, **kwargs):
+    async def get(
+        self,
+        follow: bool = False,
+        params: dict | None = None,
+        **kwargs: int | str,
+    ) -> "_MonkeyPatchedASGIResponse":
         kwargs["slug"] = ""
         if "att_num" in kwargs:
             path = reverse(
@@ -735,7 +743,9 @@ class ViewSCOTUSDocumentTest(TestCase):
         cls.court = CourtFactory(id="scotus", jurisdiction="F")
         cls.docket = DocketFactory(court=cls.court, source=Docket.SCRAPER)
 
-    async def get(self, follow: bool = False, **kwargs):
+    async def get(
+        self, follow: bool = False, **kwargs: int | str
+    ) -> "_MonkeyPatchedASGIResponse":
         kwargs.setdefault("slug", self.docket.slug)
         if "att_num" in kwargs:
             path = reverse("view_recap_attachment", kwargs=kwargs)
@@ -949,7 +959,7 @@ class CitationRedirectorTest(TestCase):
     fixtures = ["test_objects_search.json", "judge_judy.json"]
     citation = {"reporter": "F.2d", "volume": "56", "page": "9"}
 
-    def assertStatus(self, r, status: HTTPStatus) -> None:
+    def assertStatus(self, r: HttpResponse, status: HTTPStatus) -> None:
         self.assertEqual(
             r.status_code,
             status,
@@ -1478,7 +1488,7 @@ class CitationRedirectorTest(TestCase):
         )
         self.assertStatus(r, HTTPStatus.NOT_FOUND)
 
-    async def test_can_handle_text_with_slashes(self):
+    async def test_can_handle_text_with_slashes(self) -> None:
         r = await self.async_client.post(
             reverse("citation_homepage"),
             {"reporter": "ARB/11/20/"},
@@ -1499,7 +1509,7 @@ class CitationRedirectorTest(TestCase):
         self.assertIn("No Citations Detected", r.content.decode())
         self.assertEqual(r.status_code, HTTPStatus.BAD_REQUEST)
 
-    async def test_can_filter_out_non_case_law_citation(self):
+    async def test_can_filter_out_non_case_law_citation(self) -> None:
         chests_of_tea = await sync_to_async(CitationWithParentsFactory.create)(
             volume="22", reporter="U.S.", page="444", type=1
         )
@@ -1515,7 +1525,7 @@ class CitationRedirectorTest(TestCase):
         self.assertTemplateUsed(r, "opinions.html")
         self.assertIn(str(chests_of_tea), r.content.decode())
 
-    async def test_show_error_for_non_opinion_citations(self):
+    async def test_show_error_for_non_opinion_citations(self) -> None:
         r = await self.async_client.post(
             reverse("citation_homepage"),
             {"reporter": "44 Vand. L. Rev. 1041"},
@@ -1525,7 +1535,9 @@ class CitationRedirectorTest(TestCase):
         self.assertIn("No Citations Detected", r.content.decode())
         self.assertEqual(r.status_code, HTTPStatus.BAD_REQUEST)
 
-    async def test_disambiguated_reporter_variants_redirect_properly(self):
+    async def test_disambiguated_reporter_variants_redirect_properly(
+        self,
+    ) -> None:
         """Can we resolve correctly some reporter variants with collisions to slug?"""
 
         test_pairs = [
@@ -1572,7 +1584,7 @@ class CitationRedirectorTest(TestCase):
                     msg=f"Expected path: {expected_path} is different from the obtained path: {path}",
                 )
 
-    async def test_too_ambiguous_reporter_variations(self):
+    async def test_too_ambiguous_reporter_variations(self) -> None:
         """Some abbreviations are too ambiguous to resolve safely"""
 
         test_pairs = [
@@ -1685,7 +1697,9 @@ class ViewRecapDocketTest(TestCase):
         )
         self.assertEqual(r.redirect_chain[0][1], HTTPStatus.FOUND)
 
-    async def test_pagination_returns_last_page_if_page_out_of_range(self):
+    async def test_pagination_returns_last_page_if_page_out_of_range(
+        self,
+    ) -> None:
         """
         Verify that the Docket view handles out-of-range page requests by returning
         the last valid page.
@@ -2537,7 +2551,7 @@ class UploadPublication(TestCase):
             shutil.rmtree(os.path.join(settings.MEDIA_ROOT, "pdf/2019/"))
         Docket.objects.all().delete()
 
-    async def test_access_upload_page(self, mock) -> None:
+    async def test_access_upload_page(self, mock: MagicMock) -> None:
         """Can we successfully access upload page with access?"""
         await self.async_client.alogin(username="learned", password="password")
         response = await self.async_client.get(
@@ -2545,7 +2559,7 @@ class UploadPublication(TestCase):
         )
         self.assertEqual(response.status_code, 200)
 
-    async def test_redirect_without_access(self, mock) -> None:
+    async def test_redirect_without_access(self, mock: MagicMock) -> None:
         """Can we successfully redirect individuals without proper access?"""
         await self.async_client.alogin(
             username="test_user", password="password"
@@ -2555,7 +2569,7 @@ class UploadPublication(TestCase):
         )
         self.assertEqual(response.status_code, 302)
 
-    def test_pdf_upload(self, mock) -> None:
+    def test_pdf_upload(self, mock: MagicMock) -> None:
         """Can we upload a PDF and form?"""
         form = TennWorkCompClUploadForm(
             self.work_comp_data,
@@ -2597,7 +2611,7 @@ class UploadPublication(TestCase):
             msg=f"The citation count should be zero not {cite_count}",
         )
 
-    def test_pdf_validation_failure(self, mock) -> None:
+    def test_pdf_validation_failure(self, mock: MagicMock) -> None:
         """Can we fail upload documents that are not PDFs?"""
         form = TennWorkCompClUploadForm(
             self.work_comp_data,
@@ -2618,7 +2632,7 @@ class UploadPublication(TestCase):
             ],
         )
 
-    def test_pdf_content_validation_failure(self, mock) -> None:
+    def test_pdf_content_validation_failure(self, mock: MagicMock) -> None:
         """Can we fail files that only claim to be PDFs?
 
         The extension validator trusts the uploader's filename, so a file
@@ -2640,7 +2654,7 @@ class UploadPublication(TestCase):
         self.assertFalse(form.is_valid(), form.errors)
         self.assertEqual(form.errors["pdf_upload"], [NOT_A_PDF_MESSAGE])
 
-    def test_pdf_size_validation_failure(self, mock) -> None:
+    def test_pdf_size_validation_failure(self, mock: MagicMock) -> None:
         """Can we fail uploads that are over the size limit?
 
         The limit is patched down rather than tested at its real value, so
@@ -2663,7 +2677,7 @@ class UploadPublication(TestCase):
                 form.errors["pdf_upload"], [file_too_large_message()]
             )
 
-    def test_tn_wc_app_upload(self, mock) -> None:
+    def test_tn_wc_app_upload(self, mock: MagicMock) -> None:
         """Can we test appellate uploading?"""
         form = TennWorkCompAppUploadForm(
             self.work_comp_app_data,
@@ -2703,7 +2717,7 @@ class UploadPublication(TestCase):
             msg=f"The citation count should be zero not {cite_count}",
         )
 
-    def test_required_case_title(self, mock) -> None:
+    def test_required_case_title(self, mock: MagicMock) -> None:
         """Can we validate required testing field case title?"""
         self.work_comp_app_data.pop("case_title")
 
@@ -2721,7 +2735,7 @@ class UploadPublication(TestCase):
             form.errors["case_title"], ["This field is required."]
         )
 
-    def test_form_save(self, mock) -> None:
+    def test_form_save(self, mock: MagicMock) -> None:
         """Can we save successfully to db?"""
 
         pre_count = Opinion.objects.all().count()
@@ -2743,7 +2757,7 @@ class UploadPublication(TestCase):
 
         self.assertEqual(pre_count + 1, Opinion.objects.all().count())
 
-    def test_me_form_save(self, mock) -> None:
+    def test_me_form_save(self, mock: MagicMock) -> None:
         """Can we save maine form successfully to db?"""
 
         pre_count = Opinion.objects.all().count()
@@ -2761,7 +2775,7 @@ class UploadPublication(TestCase):
 
         self.assertEqual(pre_count + 1, Opinion.objects.all().count())
 
-    def test_mo_form_save(self, mock) -> None:
+    def test_mo_form_save(self, mock: MagicMock) -> None:
         """Can we save missouri form successfully to db?"""
 
         pre_count = Opinion.objects.filter(
@@ -2784,7 +2798,7 @@ class UploadPublication(TestCase):
         ).count()
         self.assertEqual(pre_count + 1, post_save_count)
 
-    def test_miss_form_save(self, mock) -> None:
+    def test_miss_form_save(self, mock: MagicMock) -> None:
         """Can we save mississippi form successfully to db?"""
 
         pre_count = Opinion.objects.filter(
@@ -2808,7 +2822,7 @@ class UploadPublication(TestCase):
         self.assertEqual(pre_count + 1, post_save_count)
 
     def test_court_upload_strips_html_from_free_text_fields(
-        self, mock
+        self, mock: MagicMock
     ) -> None:
         """Are case_title/disposition/summary stripped of HTML on upload
         (GHSA-cvh7-rv7v-wx2j-class)?
@@ -2831,7 +2845,7 @@ class UploadPublication(TestCase):
         self.assertNotIn("<script>", cluster.summary)
         self.assertNotIn("<script>", cluster.docket.case_name)
 
-    def test_form_two_judges_2042(self, mock) -> None:
+    def test_form_two_judges_2042(self, mock: MagicMock) -> None:
         """Can we still save if there's only one or two judges on the panel?"""
         pre_count = Opinion.objects.all().count()
 
@@ -2853,7 +2867,7 @@ class UploadPublication(TestCase):
 
         self.assertEqual(pre_count + 1, Opinion.objects.all().count())
 
-    def test_handle_duplicate_pdf(self, mock) -> None:
+    def test_handle_duplicate_pdf(self, mock: MagicMock) -> None:
         """Can we validate PDF not in system?"""
         d = Docket.objects.create(
             source=Docket.DIRECT_INPUT,
@@ -3120,7 +3134,7 @@ class TestAdminButtonsVisibility(TestCase):
             },
         )
 
-    def _admin_url(self, route: str, pk) -> str:
+    def _admin_url(self, route: str, pk: int) -> str:
         """Build a resolved admin URL for assertion checks."""
         return reverse(f"admin:{route}", args=[pk])
 
@@ -3388,9 +3402,9 @@ class DocketEntryFileDownload(TestCase):
     @mock.patch("cl.opinion_page.utils.generate_docket_entries_csv_data")
     def test_view_download_docket_entries_csv(
         self,
-        mock_download_function,
-        mock_core_docket_data,
-        mock_user_has_alert,
+        mock_download_function: MagicMock,
+        mock_core_docket_data: MagicMock,
+        mock_user_has_alert: MagicMock,
     ) -> None:
         """Test download_docket_entries_csv returns csv content"""
 

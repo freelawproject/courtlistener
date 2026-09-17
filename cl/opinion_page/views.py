@@ -13,7 +13,12 @@ from django.contrib import messages
 from django.contrib.auth.decorators import login_required
 from django.contrib.auth.models import AnonymousUser, User
 from django.core.exceptions import ObjectDoesNotExist, PermissionDenied
-from django.core.paginator import EmptyPage, PageNotAnInteger, Paginator
+from django.core.paginator import (
+    EmptyPage,
+    Page,
+    PageNotAnInteger,
+    Paginator,
+)
 from django.db.models import Prefetch, QuerySet
 from django.http import (
     HttpRequest,
@@ -73,6 +78,7 @@ from cl.lib.utils import human_sort
 from cl.opinion_page import docket_entry_sources
 from cl.opinion_page.decorators import handle_cluster_redirection
 from cl.opinion_page.docket_entry_sources import (
+    SourceDocketEntry,
     attach_display_fields,
     document_url,
 )
@@ -95,7 +101,12 @@ from cl.opinion_page.utils import (
     es_related_case_count,
     generate_docket_entries_csv_data,
 )
-from cl.people_db.models import AttorneyOrganization, CriminalCount, Role
+from cl.people_db.models import (
+    AttorneyOrganization,
+    CriminalCount,
+    PartyType,
+    Role,
+)
 from cl.recap.constants import COURT_TIMEZONES
 from cl.recap.models import FjcIntegratedDatabase
 from cl.search.models import (
@@ -112,7 +123,9 @@ from cl.search.models import (
 )
 from cl.search.selectors import get_clusters_from_citation_str
 
-HYPERSCAN_TOKENIZER = HyperscanTokenizer(cache_dir=".hyperscan")
+HYPERSCAN_TOKENIZER: HyperscanTokenizer = HyperscanTokenizer(
+    cache_dir=".hyperscan"
+)
 
 
 async def court_homepage(request: HttpRequest, pk: str) -> HttpResponse:
@@ -335,7 +348,9 @@ async def redirect_docket_recap(
     )
 
 
-async def fetch_docket_entries(docket):
+async def fetch_docket_entries(
+    docket: Docket,
+) -> QuerySet[SourceDocketEntry]:
     """Fetch docket entries associated with a docket.
 
     Uses the source-appropriate model for the docket's court (see
@@ -384,7 +399,9 @@ async def view_docket(
     page = request.GET.get("page", "1")
 
     @sync_to_async
-    def paginate_docket_entries(docket_entries, docket_page: str):
+    def paginate_docket_entries(
+        docket_entries: QuerySet[SourceDocketEntry], docket_page: str
+    ) -> Page:
         return Paginator(docket_entries, 200, orphans=10).get_page(docket_page)
 
     paginated_entries = await paginate_docket_entries(de_list, page)
@@ -490,7 +507,9 @@ async def view_parties(
     )
 
     @sync_to_async
-    def paginate_parties(party_queryset, parties_page: int | str):
+    def paginate_parties(
+        party_queryset: QuerySet[PartyType], parties_page: int | str
+    ) -> Page:
         paginator = Paginator(party_queryset, 1000)
         try:
             return paginator.page(parties_page)
@@ -503,7 +522,9 @@ async def view_parties(
     parties: dict[str, list] = {}
     # Page.object_list is typed as _SupportsPagination, but here it is the
     # sliced QuerySet, which supports async iteration.
-    async for party_type in cast(QuerySet, party_types_paginator.object_list):
+    async for party_type in cast(
+        QuerySet[PartyType], party_types_paginator.object_list
+    ):
         if party_type.name not in parties:
             parties[party_type.name] = []
         parties[party_type.name].append(party_type)
@@ -1031,7 +1052,9 @@ async def setup_opinion_context(
     return context
 
 
-async def get_opinions_queryset(sub_opinions_prefetch: str) -> QuerySet:
+async def get_opinions_queryset(
+    sub_opinions_prefetch: str,
+) -> QuerySet[OpinionCluster]:
     """Prepare a cluster queryset with common prefetchs to prevent extra
     queries
 
@@ -1087,7 +1110,7 @@ async def render_opinion_view(
     )
 
 
-async def update_opinion_tabs(request: HttpRequest, pk: int):
+async def update_opinion_tabs(request: HttpRequest, pk: int) -> HttpResponse:
     """Generate opinions tab dinamically
 
     :param request: The HTTP request from the user
@@ -1434,7 +1457,9 @@ async def reporter_or_volume_handler(
     page = request.GET.get("page", 1)
 
     @sync_to_async
-    def paginate_volumes(volumes, volume_page: int | str):
+    def paginate_volumes(
+        volumes: QuerySet[OpinionCluster], volume_page: int | str
+    ) -> Page:
         paginator = Paginator(volumes, 100, orphans=10)
         try:
             return paginator.page(volume_page)

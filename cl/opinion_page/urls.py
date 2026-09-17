@@ -1,4 +1,4 @@
-from django.urls import path, re_path
+from django.urls import URLPattern, path, re_path
 
 from cl.opinion_page.views import (
     block_item,
@@ -25,7 +25,7 @@ from cl.opinion_page.views import (
     view_recap_document,
 )
 
-urlpatterns = [
+urlpatterns: list[URLPattern] = [
     # Court pages
     path("court/<str:pk>/", court_homepage, name="court_homepage"),
     path(

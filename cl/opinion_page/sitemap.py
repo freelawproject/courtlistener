@@ -26,7 +26,7 @@ class OpinionSitemap(sitemaps.Sitemap):
     priority = 0.5
     limit = 50_000
 
-    def items(self) -> QuerySet:
+    def items(self) -> QuerySet[OpinionCluster]:
         # Unblocked precedential cases that are published in the last 75 years
         # and that have at least one citation, or that were published in the
         # last ten years and not yet cited.
@@ -59,7 +59,7 @@ class BlockedOpinionSitemap(sitemaps.Sitemap):
     priority = 0.6
     limit = 50_000
 
-    def items(self) -> QuerySet:
+    def items(self) -> QuerySet[OpinionCluster]:
         return (
             OpinionCluster.objects.filter(
                 blocked=True,
@@ -85,7 +85,7 @@ class DocketSitemap(InfinitePaginatorSitemap):
     def ordering(self) -> tuple[str]:
         return ("pk",)
 
-    def items(self) -> QuerySet:
+    def items(self) -> QuerySet[Docket]:
         # Give items ten days to get some views.
         recent_date = datetime.today() - timedelta(days=30)
 
@@ -141,7 +141,7 @@ class BlockedDocketSitemap(sitemaps.Sitemap):
     limit = 50_000
     priority = 0.6
 
-    def items(self) -> QuerySet:
+    def items(self) -> QuerySet[Docket]:
         return (
             Docket.objects.filter(
                 source__in=Docket.RECAP_SOURCES(),

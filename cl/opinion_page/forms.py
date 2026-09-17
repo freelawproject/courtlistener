@@ -6,7 +6,8 @@ from typing import Any
 from django import forms
 from django.core.exceptions import ValidationError
 from django.core.validators import FileExtensionValidator, URLValidator
-from django.db.models import Case, IntegerField, Q, Value, When
+from django.db.models import Case, IntegerField, Q, QuerySet, Value, When
+from django.http import HttpRequest
 from django.utils.encoding import force_bytes
 from django.utils.html import format_html, strip_tags
 from juriscraper.lib.string_utils import titlecase
@@ -115,15 +116,20 @@ class DocketEntryFilterForm(forms.Form):
         widget=forms.Select(),
     )
 
-    def __init__(self, *args, **kwargs) -> None:
-        self.request = kwargs.pop("request", None)
+    def __init__(
+        self,
+        *args: Any,
+        request: HttpRequest | None = None,
+        **kwargs: Any,
+    ) -> None:
+        self.request = request
         super().__init__(*args, **kwargs)
 
-    def clean_order_by(self):
+    def clean_order_by(self) -> str:
         data = self.cleaned_data["order_by"]
         if data:
             return data
-        if not self.request.user.is_authenticated:
+        if self.request is None or not self.request.user.is_authenticated:
             return data
         user: UserProfile.user = self.request.user
         if user.profile.docket_default_order_desc:
@@ -184,13 +190,15 @@ class BaseCourtUploadForm(forms.Form):
         widget=forms.FileInput(attrs={"accept": ".pdf"}),
     )
 
-    def __init__(self, *args, **kwargs) -> None:
-        self.pk = kwargs.pop("pk", None)
+    def __init__(
+        self, *args: Any, pk: str | None = None, **kwargs: Any
+    ) -> None:
+        self.pk = pk
         super().__init__(*args, **kwargs)
         self.initial["court_str"] = self.pk
         self.initial["court"] = Court.objects.get(pk=self.pk)
 
-    def clean(self):
+    def clean(self) -> dict[str, Any] | None:
         """Strip HTML out of every free-text field (GHSA-cvh7-rv7v-wx2j-class:
         these render with the `safe` filter wherever case metadata is shown).
         """
@@ -360,7 +368,7 @@ class BaseCourtUploadForm(forms.Form):
         )
 
     @staticmethod
-    def person_label(obj) -> str:
+    def person_label(obj: Person) -> str:
         """Get person full name
 
         :param obj: Person object
@@ -381,7 +389,7 @@ class BaseCourtUploadForm(forms.Form):
         else:
             self.cleaned_data["panel"] = self.cleaned_data.get("panel", [])
 
-    def get_judges_qs(self):
+    def get_judges_qs(self) -> QuerySet[Person]:
         """Get judges from specific court
 
         :return: list of judges from specific court
@@ -566,7 +574,7 @@ class BaseCourtUploadForm(forms.Form):
 class MeCourtUploadForm(BaseCourtUploadForm):
     """Form for Supreme Judicial Court of Maine (me) Upload Portal"""
 
-    def get_judges_qs(self):
+    def get_judges_qs(self) -> QuerySet[Person]:
         return (
             Person.objects.filter(
                 (
@@ -597,7 +605,7 @@ class MeCourtUploadForm(BaseCourtUploadForm):
             .order_by("custom_order", "positions__date_start")
         )
 
-    def __init__(self, *args, **kwargs) -> None:
+    def __init__(self, *args: Any, **kwargs: Any) -> None:
         super().__init__(*args, **kwargs)
 
         # Add required fields for specific court
@@ -643,7 +651,7 @@ class TennWorkCompClUploadForm(BaseCourtUploadForm):
     """Form for Tennessee Court of Workers' Compensation Claims (tennworkcompcl)
     Upload Portal"""
 
-    def __init__(self, *args, **kwargs) -> None:
+    def __init__(self, *args: Any, **kwargs: Any) -> None:
         super().__init__(*args, **kwargs)
         self.add_author_field()
         self.set_judges_qs()
@@ -690,7 +698,7 @@ class TennWorkCompAppUploadForm(BaseCourtUploadForm):
         widget=forms.Select(attrs={"class": "form-control"}),
     )
 
-    def __init__(self, *args, **kwargs) -> None:
+    def __init__(self, *args: Any, **kwargs: Any) -> None:
         super().__init__(*args, **kwargs)
         self.add_author_field()
         self.set_judges_qs()
@@ -771,7 +779,7 @@ class MoCourtUploadForm(BaseCourtUploadForm):
         ),
     )
 
-    def __init__(self, *args, **kwargs) -> None:
+    def __init__(self, *args: Any, **kwargs: Any) -> None:
         super().__init__(*args, **kwargs)
         self.add_author_field()
         self.add_judges_field(required=False)
@@ -818,7 +826,7 @@ class MissCourtUploadForm(BaseCourtUploadForm):
         widget=forms.Textarea(attrs={"class": "form-control"}),
     )
 
-    def __init__(self, *args, **kwargs) -> None:
+    def __init__(self, *args: Any, **kwargs: Any) -> None:
         super().__init__(*args, **kwargs)
         self.add_author_field()
         self.set_judges_qs()

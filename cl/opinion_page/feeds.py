@@ -39,7 +39,7 @@ class DocketFeed(Feed):
         else:
             return d
 
-    def items(self, obj: Docket) -> QuerySet:
+    def items(self, obj: Docket) -> QuerySet[DocketEntry]:
         # Get the items with prefetched main-docs
         main_docs_query = (
             RECAPDocument.objects.filter(
