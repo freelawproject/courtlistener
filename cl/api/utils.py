@@ -743,11 +743,15 @@ class NoFilterCacheListMixin:
         return response
 
 
-@tiered_cache(timeout=300)  # 5 minute cache
+@tiered_cache(memory_timeout=60, redis_timeout=300)
 def get_all_throttle_overrides(
     throttle_type: int,
 ) -> dict[str, list[str]]:
-    """Get all throttle overrides of a given type, cached for 5 minutes.
+    """Get all throttle overrides of a given type, cached in both tiers.
+
+    Overrides are cached for 5 minutes in Redis and 1 minute in memory, so an
+    override change made in one process reaches the others within a minute of
+    the Redis entry being refreshed.
 
     Throttle rates are composed from two sources:
 
@@ -816,7 +820,7 @@ def double_rate(rate: str) -> str:
     return f"{int(num) * 2}/{period}"
 
 
-@tiered_cache(timeout=300)  # 5 minute cache
+@tiered_cache(memory_timeout=60, redis_timeout=300)
 def get_promo_excluded_usernames() -> set[str]:
     """Return usernames excluded from the x2 API promotion.
 
@@ -849,13 +853,13 @@ def get_promo_excluded_usernames() -> set[str]:
     return manual_users | edu_members
 
 
-@tiered_cache(timeout=600)  # 10 minutes
+@tiered_cache(memory_timeout=60, redis_timeout=600)
 def promo_switch_is_active() -> bool:
     """Whether the promo switch is on.
 
     Cached via tiered_cache (memory tier) so we avoid a waffle (Redis) lookup
-    on every API request. A flip takes up to the cache timeout to take effect,
-    which is acceptable for enabling/disabling the promotion.
+    on every API request. A flip takes up to the combined tier timeouts to
+    take effect, which is acceptable for enabling/disabling the promotion.
     """
     return switch_is_active(DOUBLE_API_THROTTLES_SWITCH)
 
