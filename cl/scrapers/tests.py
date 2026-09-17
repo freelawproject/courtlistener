@@ -1226,7 +1226,6 @@ class UpdateFromTextCommandTest(TestCase):
                 source=ClusterSources.COURT_WEBSITE,
             ),
             plain_text="Some text with no matches",
-            id=101,
         )
 
         self.opinion_2022 = OpinionFactory(
@@ -1236,7 +1235,6 @@ class UpdateFromTextCommandTest(TestCase):
                 precedential_status="Unpublished",
                 source=ClusterSources.COURT_WEBSITE,
             ),
-            id=100,
             plain_text="Docket Number: 2022-13\n2022 VT 11",
         )
 
@@ -1250,7 +1248,9 @@ class UpdateFromTextCommandTest(TestCase):
             "cl.scrapers.tasks.get_scraper_object_by_name",
             return_value=test_opinion_scraper.Site(),
         ):
-            cmd.handle(court_id="somepath.sc", opinion_ids=[101])
+            cmd.handle(
+                court_id="somepath.sc", opinion_ids=[self.opinion_sc.pk]
+            )
 
         self.assertFalse(
             any(
