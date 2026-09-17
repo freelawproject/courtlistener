@@ -403,9 +403,10 @@ class BaseCourtUploadForm(forms.Form):
             "third_judge",
             "panel",
         ]:
-            if field_name in self.fields:
-                self.fields[field_name].queryset = judges_qs  # type: ignore[attr-defined]
-                self.fields[field_name].label_from_instance = self.person_label  # type: ignore[attr-defined]
+            field = self.fields.get(field_name)
+            if isinstance(field, forms.ModelChoiceField):
+                field.queryset = judges_qs
+                field.label_from_instance = self.person_label
 
     def validate_neutral_citation(self) -> None:
         """Validate if we already have the neutral citation in the system

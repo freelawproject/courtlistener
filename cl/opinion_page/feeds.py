@@ -26,7 +26,7 @@ class DocketFeed(Feed):
     def title(self, obj: Docket) -> str:
         return f"Docket updates for {make_docket_title(obj)}"
 
-    def get_object(self, request: HttpRequest, docket_id: int) -> Docket:  # type: ignore
+    def get_object(self, request: HttpRequest, docket_id: int) -> Docket:
         try:
             d = Docket.objects.only(
                 "case_name",

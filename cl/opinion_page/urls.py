@@ -27,7 +27,7 @@ from cl.opinion_page.views import (
 
 urlpatterns = [
     # Court pages
-    path("court/<str:pk>/", court_homepage, name="court_homepage"),  # type: ignore[arg-type]
+    path("court/<str:pk>/", court_homepage, name="court_homepage"),
     path(
         "court/<str:pk>/new-opinion/",
         court_publish_page,
@@ -36,7 +36,7 @@ urlpatterns = [
     # Opinion pages
     path(
         "docket/<int:docket_id>/feed/",
-        view_docket_feed,  # type: ignore[arg-type]
+        view_docket_feed,
         name="docket_feed",
     ),
     path(
@@ -44,7 +44,7 @@ urlpatterns = [
         update_opinion_tabs,
         name="update_opinion_tabs",
     ),
-    path("opinion/<int:pk>/<blank-slug:_>/", view_opinion, name="view_case"),  # type: ignore[arg-type]
+    path("opinion/<int:pk>/<blank-slug:_>/", view_opinion, name="view_case"),
     path(
         "opinion/<int:pk>/<blank-slug:_>/authorities/",
         view_opinion_authorities,
@@ -72,81 +72,80 @@ urlpatterns = [
     ),  # with the tab
     path(
         "docket/<int:docket_id>/download/",
-        download_docket_entries_csv,  # type: ignore[arg-type]
+        download_docket_entries_csv,
         name="view_download_docket",
     ),
     path(
         "docket/<int:pk>/<blank-slug:slug>/",
         view_docket,
         name="view_docket",
-        # type: ignore[arg-type]
     ),
     path(
         "recap/gov.uscourts.<str:court>.<str:pacer_case_id>/",
-        redirect_docket_recap,  # type: ignore[arg-type]
+        redirect_docket_recap,
         name="redirect_docket_recap",
     ),
     path(
         "recap/og-lookup/",
-        redirect_og_lookup,  # type: ignore[arg-type]
+        redirect_og_lookup,
         name="redirect_og_lookup",
     ),
     path(
         "docket/<int:docket_id>/parties/<blank-slug:slug>/",
-        view_parties,  # type: ignore[arg-type]
+        view_parties,
         name="docket_parties",
     ),
     path(
         "docket/<int:docket_id>/idb/<blank-slug:slug>/",
-        docket_idb_data,  # type: ignore[arg-type]
+        docket_idb_data,
         name="docket_idb_data",
     ),
     path(
         "docket/<int:docket_id>/authorities/<blank-slug:slug>/",
-        docket_authorities,  # type: ignore[arg-type]
+        docket_authorities,
         name="docket_authorities",
     ),
     path(
         "docket/<int:docket_id>/<str:doc_num>/<blank-slug:slug>/",
-        view_recap_document,  # type: ignore[arg-type]
+        view_recap_document,
         name="view_recap_document",
     ),
     path(
         "docket/<int:docket_id>/<str:doc_num>/<blank-slug:slug>/authorities/",
-        view_recap_authorities,  # type: ignore[arg-type]
+        view_recap_authorities,
         name="view_document_authorities",
     ),
     path(
         "docket/<int:docket_id>/<str:doc_num>/<int:att_num>/<blank-slug:slug>/",
-        view_recap_document,  # type: ignore[arg-type]
+        view_recap_document,
         name="view_recap_attachment",
     ),
     path(
         "docket/<int:docket_id>/<str:doc_num>/<int:att_num>/<blank-slug:slug>/authorities/",
-        view_recap_authorities,  # type: ignore[arg-type]
+        view_recap_authorities,
         name="view_attachment_authorities",
     ),
     # Citation look up pages
     path(
         "c/",
-        citation_homepage,  # type: ignore[arg-type]
+        citation_homepage,
         name="citation_homepage",
     ),
     re_path(
         r"^c/(?:(?P<reporter>.*)/(?P<volume>.*)/(?P<page>.*)/)?$",
-        citation_redirector,  # type: ignore[arg-type]
+        citation_redirector,
         name="citation_redirector",
     ),
     re_path(
         r"^c/(?P<reporter>.*)/(?P<volume>.*)/$",
-        citation_redirector,  # type: ignore[arg-type]
+        citation_redirector,
         name="citation_redirector",
     ),
     path(
         "c/<str:reporter>/",
-        citation_redirector,  # type: ignore[arg-type]
+        citation_redirector,
         name="citation_redirector",
     ),
     # Admin tools
-    path("admin-tools/block-item/", block_item, name="block_item"),  # type: ignore[arg-type]
+    path("admin-tools/block-item/", block_item, name="block_item"),
 ]

@@ -3,6 +3,7 @@ import logging
 import traceback
 from dataclasses import dataclass, field
 from io import StringIO
+from typing import cast
 from zoneinfo import ZoneInfo
 
 import waffle
@@ -11,7 +12,7 @@ from django.conf import settings
 from django.contrib.auth.models import AnonymousUser, User
 from django.core.exceptions import ObjectDoesNotExist
 from django.http import Http404, HttpRequest
-from django.shortcuts import aget_object_or_404  # type: ignore[attr-defined]
+from django.shortcuts import aget_object_or_404
 from django.urls import reverse
 from django.utils.formats import date_format
 from django.utils.http import urlencode
@@ -566,7 +567,7 @@ async def core_docket_data(
     try:
         note = await Note.objects.aget(
             docket_id=docket.pk,
-            user=await request.auser(),  # type: ignore[attr-defined]
+            user=await request.auser(),
         )
     except (ObjectDoesNotExist, TypeError):
         # Not saved in notes or anonymous user
@@ -579,7 +580,9 @@ async def core_docket_data(
     else:
         note_form = NoteForm(instance=note)
 
-    has_alert = await user_has_alert(await request.auser(), docket)  # type: ignore[arg-type]
+    has_alert = await user_has_alert(
+        cast(User | AnonymousUser, await request.auser()), docket
+    )
 
     timezone_str = COURT_TIMEZONES.get(docket.court_id, "US/Eastern")
     docket_source = docket.get_entry_source()

@@ -11,6 +11,7 @@ import waffle
 from asgiref.sync import async_to_sync, sync_to_async
 from django.contrib import messages
 from django.contrib.auth.decorators import login_required
+from django.contrib.auth.models import AnonymousUser, User
 from django.core.exceptions import ObjectDoesNotExist, PermissionDenied
 from django.core.paginator import EmptyPage, PageNotAnInteger, Paginator
 from django.db.models import Prefetch, QuerySet
@@ -24,7 +25,7 @@ from django.http.response import (
     HttpResponseBadRequest,
     HttpResponseNotAllowed,
 )
-from django.shortcuts import (  # type: ignore[attr-defined]
+from django.shortcuts import (
     aget_object_or_404,
     render,
 )
@@ -218,9 +219,11 @@ async def court_publish_page(request: HttpRequest, pk: str) -> HttpResponse:
             "Mississippi Supreme Court and Mississippi Court of Appeals."
         )
     # Validate the user has permission
-    user = await request.auser()
-    if not user.is_staff and not user.is_superuser:  # type: ignore[union-attr]
-        if not await user.groups.filter(  # type: ignore
+    # auser() is typed as AbstractBaseUser | AnonymousUser; the default user
+    # model makes this exact.
+    user = cast(User | AnonymousUser, await request.auser())
+    if not user.is_staff and not user.is_superuser:
+        if not await user.groups.filter(
             name__in=[f"uploaders_{pk}"]
         ).aexists():
             raise PermissionDenied(
@@ -628,8 +631,8 @@ def download_docket_entries_csv(
 
 async def view_recap_document(
     request: HttpRequest,
-    docket_id: int | None = None,
-    doc_num: str | None = None,
+    docket_id: int,
+    doc_num: str,
     att_num: int | None = None,
     slug: str = "",
     is_og_bot: bool = False,
@@ -650,8 +653,8 @@ async def view_recap_document(
 
 async def view_recap_authorities(
     request: HttpRequest,
-    docket_id: int | None = None,
-    doc_num: str | None = None,
+    docket_id: int,
+    doc_num: str,
     att_num: int | None = None,
     slug: str = "",
     is_og_bot: bool = False,
@@ -678,8 +681,8 @@ async def view_recap_authorities(
 
 async def recap_document_context(
     request: HttpRequest,
-    docket_id: int | None = None,
-    doc_num: str | None = None,
+    docket_id: int,
+    doc_num: str,
     att_num: int | None = None,
     slug: str = "",
     is_og_bot: bool = False,
@@ -704,8 +707,8 @@ async def recap_document_context(
         rd_values = [
             x
             async for x in source.documents_for_docket_and_number(
-                docket_id,  # type: ignore[arg-type]
-                doc_num,  # type: ignore[arg-type]
+                docket_id,
+                doc_num,
             )
             .order_by("pk")
             .values_list("pk", "attachment_number", "description")
@@ -735,9 +738,9 @@ async def recap_document_context(
             # Get the URL to the attachment page and use the querystring
             # if the request included one
             attachment_page = document_url(
-                docket_id,  # type: ignore[arg-type]
+                docket_id,
                 slug,
-                doc_num,  # type: ignore[arg-type]
+                doc_num,
                 1,
             )
             if request.GET.urlencode():
@@ -779,7 +782,7 @@ async def recap_document_context(
     try:
         note = await Note.objects.aget(
             recap_doc_id=rd.pk,
-            user=await request.auser(),  # type: ignore[attr-defined]
+            user=await request.auser(),
         )
     except (ObjectDoesNotExist, TypeError):
         # Not saved in notes or anonymous user
@@ -805,8 +808,8 @@ async def recap_document_context(
             existing_prayers = await get_existing_prayers_in_bulk(user, [rd])
 
     # Merge counts and existing prayer status to RECAPDocuments.
-    rd.prayer_count = prayer_counts.get(rd.id, 0)  # type: ignore[attr-defined]
-    rd.prayer_exists = existing_prayers.get(rd.id, False)  # type: ignore[attr-defined]
+    rd.prayer_count = prayer_counts.get(rd.id, 0)
+    rd.prayer_exists = existing_prayers.get(rd.id, False)
 
     court_id = docket.court_id
 
@@ -816,9 +819,9 @@ async def recap_document_context(
     attachments = get_attachment_values(
         rd,
         rd_values,
-        docket_id,  # type: ignore[arg-type]
+        docket_id,
         docket.slug,
-        doc_num,  # type: ignore[arg-type]
+        doc_num,
     )
 
     return TemplateResponse(
@@ -855,7 +858,7 @@ def get_attachment_values(
     max_displayed = 20
     # How many of those should be previous docs
     max_before = 3  # includes current doc
-    attachments = []
+    attachments: list[dict[str, str | int | None]] = []
     if (doc_len := len(rd_values)) > 1:
         if doc_len <= max_displayed + 2:
             # Add two because there is no point having summaries like "plus one
@@ -892,7 +895,7 @@ def get_attachment_values(
         for rdv in rd_values[start:end]:
             attachments.append(
                 {
-                    "attachment_number": rdv[1],  # type: ignore[dict-item]
+                    "attachment_number": rdv[1],
                     "url": document_url(docket_id, slug, doc_num, rdv[1]),
                     "description": rdv[2],
                 }
@@ -906,7 +909,7 @@ def get_attachment_values(
                     "description": f"...and {doc_len - end} more",
                 }
             )
-    return attachments  # type: ignore[return-value]
+    return attachments
 
 
 async def get_downloads_context(cluster: OpinionCluster) -> dict[str, Any]:
@@ -983,8 +986,7 @@ async def setup_opinion_context(
     try:
         note = await Note.objects.aget(
             cluster_id=cluster.pk,
-            user=await request.auser(),  # type: ignore[attr-defined]
-            # type: ignore[attr-defined]
+            user=await request.auser(),
         )
     except (ObjectDoesNotExist, TypeError):
         # Not note or anonymous user
@@ -1050,7 +1052,7 @@ async def get_opinions_queryset(sub_opinions_prefetch: str) -> QuerySet:
             ),
         )
     else:
-        prefetch = Prefetch(sub_opinions_prefetch)  # type: ignore[arg-type]
+        prefetch = Prefetch(sub_opinions_prefetch)
 
     return OpinionCluster.objects.prefetch_related(
         prefetch, "citations"
@@ -1728,7 +1730,9 @@ async def block_item(request: HttpRequest) -> HttpResponse:
             permitted_methods=["POST"], content="Not an ajax request"
         )
 
-    user = await request.auser()  # type: ignore[attr-defined]
+    # auser() is typed as AbstractBaseUser | AnonymousUser; the default user
+    # model makes this exact.
+    user = cast(User | AnonymousUser, await request.auser())
     obj_type = request.POST["type"]
     pk = request.POST["id"]
 
@@ -1737,14 +1741,14 @@ async def block_item(request: HttpRequest) -> HttpResponse:
             "This view can not handle the provided type"
         )
 
-    has_change_docket = await sync_to_async(user.has_perm)(  # type: ignore[union-attr]
+    has_change_docket = await sync_to_async(user.has_perm)(
         "search.change_docket"
     )
     if not has_change_docket:
         raise PermissionDenied("You lack permission to block this item.")
 
     if obj_type == "cluster":
-        has_change_cluster = await sync_to_async(user.has_perm)(  # type: ignore[union-attr]
+        has_change_cluster = await sync_to_async(user.has_perm)(
             "search.change_opinioncluster"
         )
         if not has_change_cluster:

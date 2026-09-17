@@ -4181,7 +4181,7 @@ class DocketFilterPaginationWiringTest(TestCase):
         DocketEntry.objects.bulk_create(
             [
                 DocketEntry(
-                    docket=cls.docket,  # type: ignore[misc]
+                    docket=cls.docket,
                     entry_number=n,
                     date_filed=date(2024, 1, n),
                 )
