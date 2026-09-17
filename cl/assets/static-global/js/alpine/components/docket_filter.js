@@ -15,9 +15,10 @@ document.addEventListener("alpine:init", () => {
           // browser's implicit form submission never fires, and flatpickr's
           // `onKeyDown` config hook is skipped on that path too. This listener
           // is registered after flatpickr's on the same element, so it runs
-          // once the value is normalized and the calendar is closed. It is
-          // submitter-less, so no `page` param is sent, and it also serves the
-          // mobile drawer form, whose Apply button lives outside the form.
+          // once the value is normalized and the calendar is closed. Only
+          // the date inputs need it: the other fields, in both the desktop
+          // and the mobile drawer forms, already submit on Enter through
+          // the browser's implicit submission.
           el.addEventListener("keydown", (event) => {
             if (event.key !== "Enter") return;
             el.form?.requestSubmit();
