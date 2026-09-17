@@ -1,14 +1,10 @@
 """Tests for the New York Court of Appeals (Court-PASS) mergers."""
 
 from datetime import date
-from pathlib import PurePosixPath
-from unittest.mock import MagicMock, patch
+from typing import Any
+from unittest.mock import patch
 
-from botocore.exceptions import BotoCoreError, ClientError
 from django.conf import settings
-from django.db import connection
-from django.test.utils import CaptureQueriesContext
-from django.utils.text import slugify
 from juriscraper.state.docket import PartyType as ScrapedPartyType
 from juriscraper.state.new_york.nycourts_gov.vocabularies import (
     FilingDocType,
@@ -26,78 +22,75 @@ from cl.corpus_importer.state.new_york.factories import (
     NYCoAIssueFactory,
     NYCoAPartyFactory,
 )
+from cl.corpus_importer.state.new_york.loader import NYCoACourtPassLoader
 from cl.corpus_importer.state.new_york.mergers import (
     NYCoADocketMerger,
 )
 from cl.corpus_importer.state.new_york.nycourts_gov import NYCoACase, NYCoAFile
 from cl.corpus_importer.state.new_york.storage import (
     PRIVATE_PREFIX,
-    PUBLISHED_PREFIX,
-    PublishOutcome,
-    copy_file,
-    discard_private_file,
-    withdraw_file,
 )
 from cl.corpus_importer.state.new_york.utils import NYCOA_COURT_ID
+from cl.corpus_importer.state.storage import PublishOutcome
 from cl.corpus_importer.state.tests import merger_test
 from cl.corpus_importer.state.utils import FileTally, MergeResult
-from cl.lib.model_helpers import make_pdf_path
 from cl.people_db.models import Attorney, Party, PartyType, Role
 from cl.search.factories import CourtFactory, DocketFactory
 from cl.search.models import Docket
 from cl.search.state.new_york.models import (
-    RECAP_ROOT,
-    RECAP_THUMBNAIL_ROOT,
-    SHA256_NAME_LENGTH,
     NYCoADocketEntry,
     NYCoADocketIssue,
     NYCoADocketMetadata,
     NYCoADocument,
 )
 from cl.search.state.new_york.vocabularies import UNASSIGNED, UNKNOWN
-from cl.tests.cases import SimpleTestCase, TestCase
+from cl.tests.cases import TestCase
 
 DOCKET_NUMBER = "APL-2024-00177"
 DOCKET_NUMBER_CORE = "apl202400177"
 
 
-def published_key(file: NYCoAFile, docket_number: str = DOCKET_NUMBER) -> str:
-    """Where publishing a scraped file puts it.
+PRIVATE_BUCKET = settings.AWS_PRIVATE_STORAGE_BUCKET_NAME
+PUBLIC_BUCKET = settings.AWS_STORAGE_BUCKET_NAME
 
-    Spelled out from the scrape rather than taken from `NYCoADocument`, so that
+
+def published_key(
+    document: NYCoADocument,
+    filed: date | None,
+    extension: str = ".pdf",
+    thumbs: bool = False,
+) -> str:
+    """Where publishing a document's file puts it.
+
+    Spelled out rather than taken from `NYCoADocument` or the loader, so that
     a test asserting on a published path is checking the layout rather than
-    agreeing with whatever the model just built.
+    agreeing with whatever the code just built.
 
-    :param file: The file as the scraper handed it over.
-    :param docket_number: The docket number of the case it belongs to, which
-        names the directory it is filed in.
+    :param document: The document the file belongs to.
+    :param filed: The date the name should carry, or `None` for undated.
+    :param extension: The file's extension.
+    :param thumbs: Whether to give the thumbnail's key instead.
     :return: The key the public bucket holds it under.
     """
-    stored = PurePosixPath(file.local_path)
-    bucket = f"gov.uscourts.{NYCOA_COURT_ID}.{docket_number}"
-    name = ".".join(
-        [
-            bucket,
-            stored.stem.removeprefix(f"{docket_number}_"),
-            file.content_hash[:SHA256_NAME_LENGTH],
-        ]
-    )
-    return f"{RECAP_ROOT}/{bucket}/{name}{stored.suffix}"
+    docket = document.docket_entry.docket
+    root = "recap-thumbnails" if thumbs else "recap"
+    bucket = f"gov.uscourts.{NYCOA_COURT_ID}.{docket.pk}"
+    stamp = filed.isoformat() if filed else "undated"
+    return f"{root}/{bucket}/{bucket}.{stamp}.{document.pk}{extension}"
 
 
 class NYCoAMergerTestCase(TestCase):
     """Shared setup for the NYCoA merger tests.
 
-    Stands in for S3 throughout: publishing a document moves its file between
-    buckets, so every merge that touches a file would otherwise reach for the
-    network. `published`, `discarded` and `withdrawn` record what the merge
+    Stands in for S3 throughout: publishing copies files between buckets, and
+    a merge that removes a document deletes its files, so either would
+    otherwise reach for the network. `copied` and `deleted` record what was
     asked for, and `publish_outcome` makes the copy report whichever way of
     failing a test is after.
     """
 
-    published: list[tuple[str, str]]
-    discarded: list[str]
-    withdrawn: list[str]
+    copied: list[tuple[str, str, str]]
+    deleted: list[tuple[str, str]]
     publish_outcome: PublishOutcome
 
     @classmethod
@@ -106,27 +99,34 @@ class NYCoAMergerTestCase(TestCase):
 
     def setUp(self) -> None:
         super().setUp()
-        self.published = []
-        self.discarded = []
-        self.withdrawn = []
+        self.copied = []
+        self.deleted = []
         self.publish_outcome = PublishOutcome.PUBLISHED
 
         def copy_file(
-            private_key: str, published_key: str, content_type: str = ""
+            storage: object,
+            source_bucket: str,
+            source_key: str,
+            published_key: str,
+            content_type: str = "",
         ) -> PublishOutcome:
             if self.publish_outcome is not PublishOutcome.PUBLISHED:
                 return self.publish_outcome
-            self.published.append((private_key, published_key))
+            self.copied.append((source_bucket, source_key, published_key))
             return PublishOutcome.PUBLISHED
 
-        for name, double in (
-            ("copy_file", copy_file),
-            ("discard_private_file", self.discarded.append),
-            ("withdraw_file", self.withdrawn.append),
+        def delete_file(storage: object, bucket: str, key: str) -> None:
+            self.deleted.append((bucket, key))
+
+        for target, double in (
+            ("cl.corpus_importer.state.loader.copy_file", copy_file),
+            ("cl.corpus_importer.state.loader.delete_file", delete_file),
+            (
+                "cl.corpus_importer.state.new_york.mergers.delete_file",
+                delete_file,
+            ),
         ):
-            patcher = patch(
-                f"cl.corpus_importer.state.new_york.mergers.{name}", double
-            )
+            patcher = patch(target, double)
             patcher.start()
             self.addCleanup(patcher.stop)
 
@@ -144,6 +144,46 @@ class NYCoAMergerTestCase(TestCase):
             pacer_case_id=None,
             source=Docket.SCRAPER,
         )
+
+    @staticmethod
+    def case_with_files(*files: NYCoAFile, **filing_kwargs: Any) -> NYCoACase:
+        filing = NYCoAFilingFactory.create(
+            attachments=list(files), **filing_kwargs
+        )
+        return NYCoACaseFactory.create(
+            docket_number=DOCKET_NUMBER, entries=[filing], parties=[]
+        )
+
+    def merge(self, case: NYCoACase) -> MergeResult:
+        """Merge a case, running what waits on the merge committing.
+
+        :param case: The scraped case.
+        :return: What the merge did.
+        """
+        with self.captureOnCommitCallbacks(execute=True):
+            return NYCoADocketMerger(case, params=None).merge()
+
+    def load(self, case: NYCoACase) -> MergeResult:
+        """Merge a case and publish its files, as a load's worker does.
+
+        :param case: The scraped case.
+        :return: What the merge and the publish did together.
+        """
+        with self.captureOnCommitCallbacks(execute=True):
+            return NYCoACourtPassLoader.merge_one(case)
+
+    @staticmethod
+    def publish(document: NYCoADocument) -> None:
+        """Point a document at the published copy of its file, the way an
+        earlier load would have left it.
+
+        :param document: The document, whose filing's date has not changed
+            since.
+        """
+        document.filepath_local = published_key(
+            document, document.docket_entry.date_filed
+        )
+        document.save()
 
 
 class NYCoADocketMergerTest(NYCoAMergerTestCase):
@@ -907,15 +947,6 @@ class NYCoADocketEntryMergerTest(NYCoAMergerTestCase):
 class NYCoADocumentMergerTest(NYCoAMergerTestCase):
     """Tests for merging the files published for a filing."""
 
-    @staticmethod
-    def case_with_files(*files, **filing_kwargs) -> NYCoACase:
-        filing = NYCoAFilingFactory.create(
-            attachments=list(files), **filing_kwargs
-        )
-        return NYCoACaseFactory.create(
-            docket_number=DOCKET_NUMBER, entries=[filing], parties=[]
-        )
-
     @merger_test(expected_query_count=16)
     def test_merge_creates_documents(self) -> None:
         """Does merging a filing create its documents with the values the file
@@ -933,8 +964,7 @@ class NYCoADocumentMergerTest(NYCoAMergerTestCase):
         )
         case = self.case_with_files(file)
 
-        with self.captureOnCommitCallbacks(execute=True):
-            result = NYCoADocketMerger(case, params=None).merge()
+        result = self.merge(case)
 
         self.assertTrue(result.success)
         self.assertIn("NYCoADocument", result.creates)
@@ -952,22 +982,15 @@ class NYCoADocumentMergerTest(NYCoAMergerTestCase):
         self.assertEqual(merged.doc_type, FilingDocType.RECORD)
         self.assertEqual(merged.volume, 3)
         self.assertEqual(merged.part, 2)
-        # The scraper left the file in the bucket it writes its raw responses
-        # to, so the merge moves it into the one CourtListener serves, under
-        # the name the scraper gave it -- rather than the Court's own -- with
-        # the file's hash appended.
         self.assertEqual(merged.sha256, file.content_hash)
         self.assertEqual(merged.file_size, file.file_size)
-        self.assertEqual(merged.filepath_local, published_key(file))
         self.assertEqual(
-            self.published,
-            [
-                (
-                    f"{PRIVATE_PREFIX}smith-rec-vol3.pdf",
-                    merged.filepath_local.name,
-                )
-            ],
+            merged.filepath_local,
+            file.local_path,
+            "The published name needs the document's primary key, so the "
+            "merge stores the scraper's key and leaves the move to the load.",
         )
+        self.assertEqual(self.copied, [], "Merging moves no file.")
 
     @merger_test(expected_query_count=16)
     def test_merge_oral_argument_recording(self) -> None:
@@ -996,13 +1019,7 @@ class NYCoADocumentMergerTest(NYCoAMergerTestCase):
         self.assertEqual(merged.file_name, "SmithvJones-Webcast.asx")
         self.assertEqual(merged.content_type, "video/x-ms-asf")
         self.assertEqual(merged.doc_type, FilingDocType.ORAL_ARGUMENT_WEBCAST)
-        self.assertEqual(
-            merged.filepath_local,
-            published_key(file),
-            "A playlist is published like any other file, keeping its own "
-            "extension; the extraction sweep leaves it alone because it is "
-            "not a PDF.",
-        )
+        self.assertEqual(merged.filepath_local, file.local_path)
 
     @merger_test(expected_query_count=16)
     def test_merge_unstorable_volume(self) -> None:
@@ -1029,62 +1046,6 @@ class NYCoADocumentMergerTest(NYCoAMergerTestCase):
         )
         self.assertIsNone(merged.volume)
 
-    @merger_test(expected_query_count=19)
-    def test_the_path_a_document_is_stored_at_is_unique(self) -> None:
-        """`get_pdf_path` files a whole case in one directory, so no two of a
-        filing's files may publish under the same name.
-
-        Stated with the names the scraper really gives them -- the docket
-        number, the Court's own name slugified, and an ordinal -- against the
-        two things that make Court-PASS names hard to keep apart: a case name
-        with a dot in it, which a stem would cut the volume off of, and two
-        names differing only in punctuation, which slugify flattens together.
-
-        The published name takes the scraper's name as it stands rather than
-        slugifying it again, so it is the scraper that has to have kept these
-        apart. That is what this asserts on: `slugify` here stands in for what
-        the scraper did before storing the file, not for anything the merge
-        does afterwards."""
-        court_names = [
-            "IKB v. Wells Fargo-app-Wells Fargo-rec-Volume1",
-            "IKB v. Wells Fargo-app-Wells Fargo-rec-Volume2",
-            "CortlandtvBonderman-app-TPG APAX-appdx-vol1",
-            "CortlandtvBonderman-app-TPG, APAX-appdx-vol1",
-        ]
-        files = [
-            NYCoAFileFactory.create(
-                file_name=name,
-                local_path=f"{PRIVATE_PREFIX}nycourts_gov/"
-                f"{DOCKET_NUMBER}_{slugify(name)}_{index}.pdf",
-            )
-            for index, name in enumerate(court_names)
-        ]
-        case = self.case_with_files(*files)
-
-        with self.captureOnCommitCallbacks(execute=True):
-            result = NYCoADocketMerger(case, params=None).merge()
-
-        self.assertTrue(result.success)
-        paths = set(
-            NYCoADocument.objects.values_list("filepath_local", flat=True)
-        )
-        self.assertEqual(
-            len(paths),
-            len(court_names),
-            f"Two documents share a path: {paths}",
-        )
-        self.assertIn(
-            published_key(files[1]),
-            paths,
-            f"The volume has to survive into the path: {paths}",
-        )
-        self.assertIn(
-            "ikb-v-wells-fargo-app-wells-fargo-rec-volume2",
-            published_key(files[1]),
-            "The readable part of the name has to survive the hash being "
-            "appended to it.",
-        )
-
     @merger_test(expected_query_count=27)
     def test_remerge_documents_is_idempotent(self) -> None:
         """Does merging the same case twice avoid duplicating documents?"""
@@ -1098,7 +1059,7 @@ class NYCoADocumentMergerTest(NYCoAMergerTestCase):
         self.assertNotIn("NYCoADocument", second.creates)
         self.assertEqual(NYCoADocument.objects.count(), 1)
 
-    @merger_test(expected_query_count=17)
+    @merger_test(expected_query_count=18)
     def test_merge_prunes_documents_missing_from_scrape(self) -> None:
         """Is a document the scrape no longer lists deleted?"""
         docket = self.existing_docket()
@@ -1163,8 +1124,7 @@ class NYCoADocumentMergerTest(NYCoAMergerTestCase):
             ),
         )
 
-        with self.captureOnCommitCallbacks(execute=True):
-            result = NYCoADocketMerger(case, params=None).merge()
+        result = self.merge(case)
 
         self.assertTrue(result.success)
         self.assertEqual(
@@ -1172,56 +1132,44 @@ class NYCoADocumentMergerTest(NYCoAMergerTestCase):
             ["SmithvJones-app-Smith-brf.pdf"],
         )
 
-    @merger_test(expected_query_count=30)
-    def test_remerge_a_corrected_file_replaces_the_published_copy(
-        self,
-    ) -> None:
-        """The Court reissues a document under the name it first used, so the
-        published name carries the file's hash to keep the correction from
-        landing on top of the copy it replaces. Does a rescrape whose file
-        hashes differently publish beside the old one, take the old one down,
-        and send the document back for extraction?"""
+    def test_remerge_a_corrected_file_goes_back_for_publishing(self) -> None:
+        """The Court reissues a document under the name it first used, and the
+        published name is the document's, so the correction is published on
+        top of the copy it replaces. Does a rescrape whose file hashes
+        differently point the document back at the scraper's copy, leave the
+        published one for the move to overwrite, and send the document back
+        for extraction?"""
         original = NYCoAFileFactory.create(
             file_name="SmithvJones-app-Smith-brf.pdf",
-            available=True,
             local_path=f"{PRIVATE_PREFIX}brf.pdf",
         )
         case = self.case_with_files(
             original, docket_entry_id="e:appellant-brief:smith:1"
         )
-        with self.captureOnCommitCallbacks(execute=True):
-            NYCoADocketMerger(case, params=None).merge()
+        self.merge(case)
         extracted = NYCoADocument.objects.get()
+        self.publish(extracted)
         extracted.ocr_status = NYCoADocument.OCR_COMPLETE
         extracted.page_count = 12
         extracted.save()
 
         corrected = NYCoAFileFactory.create(
             file_name="SmithvJones-app-Smith-brf.pdf",
-            available=True,
             local_path=f"{PRIVATE_PREFIX}brf-corrected.pdf",
         )
         second = self.case_with_files(
             corrected, docket_entry_id="e:appellant-brief:smith:1"
         )
         second.issues = case.issues
-        with self.captureOnCommitCallbacks(execute=True):
-            result = NYCoADocketMerger(second, params=None).merge()
+        result = self.merge(second)
 
         self.assertTrue(result.success)
         merged = NYCoADocument.objects.get()
-        self.assertNotEqual(
-            published_key(original),
-            published_key(corrected),
-            "Two different files must not share a published name.",
-        )
-        self.assertEqual(merged.filepath_local, published_key(corrected))
+        self.assertEqual(merged.filepath_local, corrected.local_path)
         self.assertEqual(merged.sha256, corrected.content_hash)
         self.assertEqual(merged.file_size, corrected.file_size)
         self.assertEqual(
-            self.withdrawn,
-            [published_key(original)],
-            "The copy the correction replaces is no longer served.",
+            self.deleted, [], "The published copy is overwritten, not deleted."
         )
         self.assertIsNone(
             merged.ocr_status, "A replaced file has to be extracted again."
@@ -1247,7 +1195,7 @@ class NYCoADocumentMergerTest(NYCoAMergerTestCase):
             docket_entry_id="e:appellant-brief:smith:1",
         )
         NYCoADocketMerger(case, params=None).merge()
-        published = NYCoADocument.objects.get().filepath_local.name
+        stored = NYCoADocument.objects.get().filepath_local.name
 
         second = self.case_with_files(
             NYCoAFileFactory.create(
@@ -1261,31 +1209,22 @@ class NYCoADocumentMergerTest(NYCoAMergerTestCase):
         result = NYCoADocketMerger(second, params=None).merge()
 
         self.assertTrue(result.success)
-        self.assertEqual(
-            NYCoADocument.objects.get().filepath_local,
-            published,
-            "The file is still where the first merge published it.",
-        )
+        self.assertEqual(NYCoADocument.objects.get().filepath_local, stored)
 
-    @merger_test(expected_query_count=30)
     def test_remerge_at_a_new_path_sends_the_file_back_for_extraction(
         self,
     ) -> None:
         """The scraper fetching a file again means what was extracted came from
         a copy that has been replaced. Does the document go back in front of the
-        extraction sweep?
-
-        Stated with the scraper writing straight into the public bucket, which
-        is where it is headed and the only kind of new path a published
-        document takes; see `_keep_stored_file`."""
+        extraction sweep?"""
         case = self.case_with_files(
             NYCoAFileFactory.create(
                 file_name="SmithvJones-app-Smith-brf.pdf",
-                local_path=f"{PUBLISHED_PREFIX}first.pdf",
+                local_path=f"{PRIVATE_PREFIX}first.pdf",
             ),
             docket_entry_id="e:appellant-brief:smith:1",
         )
-        NYCoADocketMerger(case, params=None).merge()
+        self.merge(case)
         extracted = NYCoADocument.objects.get()
         extracted.ocr_status = NYCoADocument.OCR_COMPLETE
         extracted.save()
@@ -1293,61 +1232,82 @@ class NYCoADocumentMergerTest(NYCoAMergerTestCase):
         second = self.case_with_files(
             NYCoAFileFactory.create(
                 file_name="SmithvJones-app-Smith-brf.pdf",
-                local_path=f"{PUBLISHED_PREFIX}second.pdf",
+                local_path=f"{PRIVATE_PREFIX}second.pdf",
             ),
             docket_entry_id="e:appellant-brief:smith:1",
         )
         second.issues = case.issues
-        with self.captureOnCommitCallbacks(execute=True):
-            result = NYCoADocketMerger(second, params=None).merge()
+        result = self.merge(second)
 
         self.assertTrue(result.success)
         merged = NYCoADocument.objects.get()
-        self.assertEqual(
-            merged.filepath_local, f"{PUBLISHED_PREFIX}second.pdf"
-        )
-        self.assertEqual(
-            self.published,
-            [],
-            "The scraper published it, so there is nothing to move.",
-        )
-        self.assertEqual(
-            self.withdrawn,
-            [f"{PUBLISHED_PREFIX}first.pdf"],
-            "The copy it replaced is no longer served.",
-        )
+        self.assertEqual(merged.filepath_local, f"{PRIVATE_PREFIX}second.pdf")
         self.assertIsNone(
             merged.ocr_status,
             "A replaced file has to be extracted again.",
         )
 
-    @merger_test(expected_query_count=27)
-    def test_remerge_at_a_stale_scrape_key_keeps_the_published_file(
+    def test_remerge_of_a_published_file_keeps_the_published_path(
         self,
     ) -> None:
-        """The scrape key a document was published from names nothing once the
-        move has run. Does re-loading the same run leave the published copy
-        alone rather than pointing the document back at a file that is gone?"""
-        case = self.case_with_files(
-            NYCoAFileFactory.create(
-                file_name="SmithvJones-app-Smith-brf.pdf",
-                local_path=f"{PRIVATE_PREFIX}brf.pdf",
-            ),
-            docket_entry_id="e:appellant-brief:smith:1",
+        """A later scrape downloads an unchanged file again, to a key of its
+        own. Does re-merging the same file leave the document pointing at its
+        published copy, and delete the scraper's new copy, which nothing will
+        ever point at?"""
+        file = NYCoAFileFactory.create(
+            file_name="SmithvJones-app-Smith-brf.pdf",
+            local_path=f"{PRIVATE_PREFIX}brf.pdf",
         )
-        with self.captureOnCommitCallbacks(execute=True):
-            NYCoADocketMerger(case, params=None).merge()
-        published = NYCoADocument.objects.get().filepath_local.name
+        case = self.case_with_files(
+            file, docket_entry_id="e:appellant-brief:smith:1"
+        )
+        self.merge(case)
+        document = NYCoADocument.objects.get()
+        self.publish(document)
+        published = document.filepath_local.name
+        file.local_path = f"{PRIVATE_PREFIX}rescraped/brf.pdf"
 
-        with self.captureOnCommitCallbacks(execute=True):
-            result = NYCoADocketMerger(case, params=None).merge()
+        result = self.merge(case)
 
         self.assertTrue(result.success)
+        self.assertEqual(result.files, FileTally())
         self.assertEqual(NYCoADocument.objects.get().filepath_local, published)
         self.assertEqual(
-            len(self.published), 1, "The file is only ever moved once."
+            self.deleted,
+            [(PRIVATE_BUCKET, f"{PRIVATE_PREFIX}rescraped/brf.pdf")],
         )
-        self.assertEqual(self.withdrawn, [])
+
+    def test_an_unvouched_file_is_not_missing_where_one_is_stored(
+        self,
+    ) -> None:
+        """A re-scrape whose file has no hash, or a path outside the private
+        bucket, leaves the document with the file it already has. Is that
+        file kept and nothing counted as missing?"""
+        for label, rescraped in (
+            ("no hash", {"content_hash": ""}),
+            ("outside the private bucket", {"local_path": "/tmp/brf.pdf"}),
+        ):
+            with self.subTest(label):
+                NYCoADocument.objects.all().delete()
+                file = NYCoAFileFactory.create(
+                    file_name="SmithvJones-app-Smith-brf.pdf",
+                    local_path=f"{PRIVATE_PREFIX}brf.pdf",
+                )
+                case = self.case_with_files(
+                    file, docket_entry_id="e:appellant-brief:smith:1"
+                )
+                self.merge(case)
+                stored = NYCoADocument.objects.get().filepath_local.name
+                for field_name, value in rescraped.items():
+                    setattr(file, field_name, value)
+
+                result = self.merge(case)
+
+                self.assertTrue(result.success)
+                self.assertEqual(result.files, FileTally())
+                self.assertEqual(
+                    NYCoADocument.objects.get().filepath_local, stored
+                )
 
     @merger_test(expected_query_count=29)
     def test_remerge_at_the_same_path_leaves_extraction_alone(self) -> None:
@@ -1382,358 +1342,12 @@ class NYCoADocumentMergerTest(NYCoAMergerTestCase):
             "The file did not move, so its extracted text still stands.",
         )
 
-
-class NYCoAStorageTest(SimpleTestCase):
-    """Tests for the bucket-to-bucket move publishing is built on.
-
-    The merger tests stand in for this module, so this is where the S3 calls
-    it makes are pinned down.
-    """
-
-    PRIVATE_KEY = f"{PRIVATE_PREFIX}abc123.pdf"
-    PUBLISHED_KEY = f"{PUBLISHED_PREFIX}42-brief.pdf"
-
-    def setUp(self) -> None:
-        super().setUp()
-        self.storage = MagicMock()
-        self.storage.exists.return_value = False
-        self.storage.get_object_parameters.return_value = {
-            "CacheControl": "max-age=315360000"
-        }
-        self.client = self.storage.connection.meta.client
-        patcher = patch(
-            "cl.corpus_importer.state.new_york.storage._document_storage",
-            return_value=self.storage,
-        )
-        patcher.start()
-        self.addCleanup(patcher.stop)
-
-    @staticmethod
-    def refusal() -> ClientError:
-        return ClientError(
-            {"Error": {"Code": "AccessDenied", "Message": "nope"}},
-            "CopyObject",
-        )
-
-    @staticmethod
-    def missing_source() -> ClientError:
-        return ClientError(
-            {"Error": {"Code": "NoSuchKey", "Message": "gone"}},
-            "CopyObject",
-        )
-
-    def test_copy_describes_how_the_file_should_be_served(self) -> None:
-        """Does the copy land in the public bucket with the ACL, cache headers
-        and content type a file served from there needs?"""
-        self.assertIs(
-            copy_file(self.PRIVATE_KEY, self.PUBLISHED_KEY, "application/pdf"),
-            PublishOutcome.PUBLISHED,
-        )
-
-        self.client.copy_object.assert_called_once_with(
-            Bucket=settings.AWS_STORAGE_BUCKET_NAME,
-            Key=self.PUBLISHED_KEY,
-            CopySource={
-                "Bucket": settings.AWS_PRIVATE_STORAGE_BUCKET_NAME,
-                "Key": self.PRIVATE_KEY,
-            },
-            MetadataDirective="REPLACE",
-            CacheControl="max-age=315360000",
-            ACL=settings.AWS_DEFAULT_ACL,
-            ContentType="application/pdf",
-        )
-
-    def test_copy_leaves_the_private_original_alone(self) -> None:
-        """Copying is the half of the move that runs inside the merge's
-        transaction, so it must not be the half that deletes anything."""
-        copy_file(self.PRIVATE_KEY, self.PUBLISHED_KEY)
-
-        self.client.delete_object.assert_not_called()
-
-    def test_copy_without_a_content_type_leaves_it_to_s3(self) -> None:
-        """Court-PASS does not always state a MIME type. Is the argument left
-        off rather than sent empty, which would serve the file as nothing?"""
-        copy_file(self.PRIVATE_KEY, self.PUBLISHED_KEY)
-
-        self.assertNotIn(
-            "ContentType", self.client.copy_object.call_args.kwargs
-        )
-
-    def test_copy_reports_a_refusal(self) -> None:
-        """A copy that did not happen must not be reported as published."""
-        self.client.copy_object.side_effect = self.refusal()
-
-        self.assertIs(
-            copy_file(self.PRIVATE_KEY, self.PUBLISHED_KEY),
-            PublishOutcome.FAILED,
-        )
-
-    def test_copy_reports_a_source_that_is_not_there(self) -> None:
-        """A file the private bucket does not hold will not appear on a
-        re-run, unlike one the bucket refused, so a load has to be able to
-        tell the two apart. Is the difference read off the error the copy
-        already raised, rather than by asking the bucket again?"""
-        self.client.copy_object.side_effect = self.missing_source()
-
-        self.assertIs(
-            copy_file(self.PRIVATE_KEY, self.PUBLISHED_KEY),
-            PublishOutcome.MISSING,
-        )
-        self.client.head_object.assert_not_called()
-
-    def test_copy_reports_a_bare_failure_as_a_refusal(self) -> None:
-        """A `BotoCoreError` never got an answer out of S3, so it says nothing
-        about whether the file is there. Is it counted as the retriable kind
-        rather than blamed on a missing source?"""
-        self.client.copy_object.side_effect = BotoCoreError()
-
-        self.assertIs(
-            copy_file(self.PRIVATE_KEY, self.PUBLISHED_KEY),
-            PublishOutcome.FAILED,
-        )
-
-    def test_copy_accepts_a_file_that_is_already_published(self) -> None:
-        """The move deletes the original, so a merge that published a file and
-        then rolled back leaves nothing to copy from. Is finding the file
-        already where it belongs treated as the move finishing rather than as
-        a failure?"""
-        self.client.copy_object.side_effect = self.missing_source()
-        self.storage.exists.return_value = True
-
-        self.assertIs(
-            copy_file(self.PRIVATE_KEY, self.PUBLISHED_KEY),
-            PublishOutcome.PUBLISHED,
-        )
-        self.storage.exists.assert_called_once_with(self.PUBLISHED_KEY)
-
-    def test_discard_deletes_from_the_private_bucket(self) -> None:
-        """Does dropping the original take it out of the private bucket, and
-        only the private one?"""
-        discard_private_file(self.PRIVATE_KEY)
-
-        self.client.delete_object.assert_called_once_with(
-            Bucket=settings.AWS_PRIVATE_STORAGE_BUCKET_NAME,
-            Key=self.PRIVATE_KEY,
-        )
-
-    def test_discard_swallows_a_refusal(self) -> None:
-        """The file is published either way, so an original that will not
-        delete is a duplicate in a bucket nothing serves, not a failure."""
-        self.client.delete_object.side_effect = self.refusal()
-
-        discard_private_file(self.PRIVATE_KEY)
-
-    def test_withdraw_deletes_from_the_public_bucket(self) -> None:
-        """Does withdrawing a file take it out of the bucket the site serves?"""
-        withdraw_file(self.PUBLISHED_KEY)
-
-        self.storage.delete.assert_called_once_with(self.PUBLISHED_KEY)
-
-    def test_withdraw_swallows_a_refusal(self) -> None:
-        """The row is already gone by the time this runs, so a file left
-        behind must not fail the load."""
-        self.storage.delete.side_effect = self.refusal()
-
-        withdraw_file(self.PUBLISHED_KEY)
-
-
-class NYCoADocumentPublishTest(NYCoAMergerTestCase):
-    """Tests for moving a scraped file into the bucket CourtListener serves,
-    and for taking it back down again."""
-
-    @staticmethod
-    def case_with_files(*files, **filing_kwargs) -> NYCoACase:
-        filing = NYCoAFilingFactory.create(
-            attachments=list(files), **filing_kwargs
-        )
-        return NYCoACaseFactory.create(
-            docket_number=DOCKET_NUMBER, entries=[filing], parties=[]
-        )
-
-    #: A scrape key in the shape the scraper really writes: the docket number,
-    #: the Court's own name slugified, and an ordinal. The published name is
-    #: built from this verbatim rather than slugified again, so a fixture that
-    #: was not already slug-safe would test a name the scraper cannot produce.
-    STORED_PATH = (
-        f"{PRIVATE_PREFIX}nycourts_gov/"
-        f"{DOCKET_NUMBER}_smithvjones-app-smith-brf_1.pdf"
-    )
-    #: What survives of that name once the docket number the bucket already
-    #: states has been taken off it.
-    STORED_STEM = "smithvjones-app-smith-brf_1"
-
-    def stored_document(self, **overrides) -> NYCoADocument:
-        """A document whose file is still where the scraper left it, which is
-        the path and hash `make_filename` reads.
-
-        :param overrides: Fields to set on the document.
-        :return: The saved document.
-        """
-        entry = NYCoADocketEntry.objects.create(
-            docket=self.existing_docket(),
-            docket_entry_id="e:appellant-brief:smith:1",
-        )
-        return NYCoADocument.objects.create(
-            **{
-                "docket_entry": entry,
-                "file_name": "SmithvJones-app-Smith-brf.pdf",
-                "filepath_local": self.STORED_PATH,
-            }
-            | overrides
-        )
-
-    @merger_test(expected_query_count=0)
-    def test_published_prefix_matches_pdf_path(self) -> None:
-        """`PUBLISHED_PREFIX` is written out rather than derived, so it can
-        drift from the layout `get_pdf_path` actually builds. Does a
-        document's own path still start with it?
-
-        Pinned against the whole path as well, because the prefix stops at the
-        court and everything that tells one document from another comes after
-        it. The published name is built from a scrape key, so `get_pdf_path` is
-        applied to one once rather than re-applied to a path it has already
-        built."""
-        document = self.stored_document(sha256="a" * 64)
-
-        built = make_pdf_path(document, document.make_filename())
-
-        self.assertTrue(
-            built.startswith(PUBLISHED_PREFIX),
-            f"{built} does not start with {PUBLISHED_PREFIX}",
-        )
-        self.assertEqual(
-            built,
-            f"{RECAP_ROOT}/gov.uscourts.{NYCOA_COURT_ID}.{DOCKET_NUMBER}/"
-            f"gov.uscourts.{NYCOA_COURT_ID}.{DOCKET_NUMBER}"
-            f".{self.STORED_STEM}.{'a' * 16}.pdf",
-            "A document is filed in its case's directory, under a name that "
-            "names the case too.",
-        )
-
-    @merger_test(expected_query_count=0)
-    def test_the_docket_number_is_named_once(self) -> None:
-        """The scraper prefixes the docket number to the name it stores a file
-        under, and the published name states it as a field of its own. Is it
-        taken off the scraper's name rather than being said twice?"""
-        document = self.stored_document(sha256="a" * 64)
-
-        name = document.make_filename()
-
-        self.assertEqual(
-            name.count(DOCKET_NUMBER),
-            1,
-            f"The docket number is repeated in {name}",
-        )
-        self.assertNotIn(f"{DOCKET_NUMBER}_", name)
-
-    @merger_test(expected_query_count=0)
-    def test_a_name_the_scraper_did_not_prefix_is_kept_whole(self) -> None:
-        """Only the docket number the bucket has already stated comes off the
-        scraper's name. Does a file the scraper named some other way keep the
-        name it was given, rather than losing a leading field to the strip?"""
-        document = self.stored_document(
-            filepath_local=f"{PRIVATE_PREFIX}nycourts_gov/webcast_1.pdf",
-            sha256="a" * 64,
-        )
-
-        self.assertEqual(
-            document.make_filename(),
-            f"gov.uscourts.{NYCOA_COURT_ID}.{DOCKET_NUMBER}"
-            f".webcast_1.{'a' * 16}.pdf",
-        )
-
-    @merger_test(expected_query_count=0)
-    def test_a_document_with_no_hash_is_named_without_one(self) -> None:
-        """Naming is total: a document with no hash stored still has to have
-        a name, even though the merge will not publish one (see
-        `test_a_downloaded_file_with_no_hash_is_left_unpublished`). Does the
-        name simply end after the scraper's, rather than carrying a stray
-        separator where the hash would have gone?"""
-        document = self.stored_document()
-
-        self.assertEqual(
-            make_pdf_path(document, document.make_filename()),
-            f"{RECAP_ROOT}/gov.uscourts.{NYCOA_COURT_ID}.{DOCKET_NUMBER}/"
-            f"gov.uscourts.{NYCOA_COURT_ID}.{DOCKET_NUMBER}"
-            f".{self.STORED_STEM}.pdf",
-        )
-
-    @merger_test(expected_query_count=0)
-    def test_a_thumbnail_cannot_collide_with_its_document(self) -> None:
-        """Thumbnails are named after the document they were made from, so
-        they need a root of their own. Do the two land apart?"""
-        document = self.stored_document(sha256="a" * 64)
-        name = document.make_filename()
-
-        self.assertNotEqual(
-            document.get_pdf_path(name),
-            document.get_pdf_path(name, thumbs=True),
-        )
-        self.assertTrue(
-            document.get_pdf_path(name, thumbs=True).startswith(
-                f"{RECAP_THUMBNAIL_ROOT}/"
-            )
-        )
-
-    @merger_test(expected_query_count=16)
-    def test_a_published_document_is_written_once(self) -> None:
-        """The merge moves the file out of the private bucket before it stores
-        anything, so a document that had to be published costs one write, not
-        a write followed by a correction. Nothing reading the table ever sees
-        `filepath_local` naming a key the public bucket does not hold."""
-        file = NYCoAFileFactory.create(
-            file_name="SmithvJones-app-Smith-brf.pdf",
-            local_path=f"{PRIVATE_PREFIX}brf.pdf",
-        )
-        case = self.case_with_files(file)
-
-        with CaptureQueriesContext(connection) as captured:
-            with self.captureOnCommitCallbacks(execute=True):
-                NYCoADocketMerger(case, params=None).merge()
-
-        writes = [
-            query["sql"]
-            for query in captured.captured_queries
-            if "search_nycoadocument" in query["sql"]
-            and query["sql"].lstrip().upper().startswith(("INSERT", "UPDATE"))
-        ]
-        self.assertEqual(len(writes), 1, f"Wrote the document twice: {writes}")
-        self.assertIn(
-            published_key(file),
-            writes[0],
-            "The one write is the published path.",
-        )
-
-    def test_publish_failure_stores_no_path_at_all(self) -> None:
-        """A copy the bucket refuses leaves the document with no file rather
-        than a path into a bucket `filepath_local` is never read against. The
-        original is still in the private bucket, so the next merge of the case
-        tries again."""
-        self.publish_outcome = PublishOutcome.FAILED
-        case = self.case_with_files(
-            NYCoAFileFactory.create(
-                file_name="SmithvJones-app-Smith-brf.pdf",
-                local_path=f"{PRIVATE_PREFIX}brf.pdf",
-            )
-        )
-
-        with self.captureOnCommitCallbacks(execute=True):
-            result = NYCoADocketMerger(case, params=None).merge()
-
-        self.assertTrue(
-            result.success, "A file we could not move must not fail the case."
-        )
-        self.assertEqual(NYCoADocument.objects.get().filepath_local, "")
-        self.assertEqual(
-            self.discarded, [], "The only copy of the file has to survive."
-        )
-
-    def test_a_downloaded_file_with_no_hash_is_left_unpublished(self) -> None:
-        """The hash is what keeps a reissued document from being published on
-        top of the copy it replaces, so a download the run database recorded
-        none for cannot be named safely. Does the merge leave that one file
-        where it is, and merge the rest of the case -- the unnamable file's own
-        document among it -- rather than refusing the whole case over it?"""
+    def test_a_downloaded_file_with_no_hash_is_not_stored(self) -> None:
+        """The hash is how a later merge tells a corrected file from the one
+        already published, so a download the run database recorded none for
+        cannot be tracked. Does the merge store no file for it, and merge the
+        rest of the case -- its own document among it -- rather than refusing
+        the whole case over it?"""
         unhashed = NYCoAFileFactory.create(
             file_name="SmithvJones-app-Smith-brf.pdf",
             local_path=f"{PRIVATE_PREFIX}brf.pdf",
@@ -1745,29 +1359,39 @@ class NYCoADocumentPublishTest(NYCoAMergerTestCase):
         )
         case = self.case_with_files(unhashed, hashed)
 
-        with self.captureOnCommitCallbacks(execute=True):
-            result = NYCoADocketMerger(case, params=None).merge()
+        result = self.merge(case)
 
         self.assertTrue(
-            result.success, "One unnamable file must not fail the case."
+            result.success, "One untracked file must not fail the case."
         )
+        self.assertEqual(result.files, FileTally(missing=1))
         merged = NYCoADocument.objects.get(file_name=unhashed.file_name)
-        self.assertEqual(
-            merged.filepath_local,
-            "",
-            "Nothing may be published under that name.",
-        )
+        self.assertEqual(merged.filepath_local, "")
         self.assertEqual(merged.sha256, "")
         self.assertEqual(
-            [private for private, _ in self.published],
-            [hashed.local_path],
-            "Only the file that could be named was published.",
+            NYCoADocument.objects.get(
+                file_name=hashed.file_name
+            ).filepath_local,
+            hashed.local_path,
         )
-        self.assertEqual(
-            self.discarded,
-            [hashed.local_path],
-            "The unnamable file's only copy has to survive for a later run.",
+
+    def test_a_file_outside_the_private_bucket_is_tallied_as_missing(
+        self,
+    ) -> None:
+        """A path outside the scraper's layout is a file publishing cannot
+        even look for. Is it stored as no file and counted as missing, since
+        it will not appear on a re-run?"""
+        case = self.case_with_files(
+            NYCoAFileFactory.create(
+                file_name="SmithvJones-app-Smith-brf.pdf",
+                local_path="/tmp/brf.pdf",
+            )
         )
+
+        result = self.merge(case)
+
+        self.assertEqual(result.files, FileTally(missing=1))
+        self.assertEqual(NYCoADocument.objects.get().filepath_local, "")
 
     @merger_test(expected_query_count=16)
     def test_a_file_the_scraper_never_fetched_needs_no_hash(self) -> None:
@@ -1783,94 +1407,23 @@ class NYCoADocumentPublishTest(NYCoAMergerTestCase):
             )
         )
 
-        with self.captureOnCommitCallbacks(execute=True):
-            result = NYCoADocketMerger(case, params=None).merge()
+        result = self.merge(case)
 
         self.assertTrue(result.success)
+        self.assertFalse(result.files)
         self.assertEqual(NYCoADocument.objects.get().filepath_local, "")
 
-    def test_a_moved_file_is_tallied(self) -> None:
-        """The load has no way of its own to see a file move, since the merge
-        that moves it runs in a worker. Does the result carry the count back?"""
-        case = self.case_with_files(
-            NYCoAFileFactory.create(
-                file_name="SmithvJones-app-Smith-brf.pdf",
-                local_path=f"{PRIVATE_PREFIX}brf.pdf",
-            )
-        )
 
-        with self.captureOnCommitCallbacks(execute=True):
-            result = NYCoADocketMerger(case, params=None).merge()
+class NYCoAFileDeletionTest(NYCoAMergerTestCase):
+    """Tests for deleting the files of the documents a merge removes."""
 
-        self.assertEqual(result.files, FileTally(moved=1))
-
-    def test_a_file_that_could_not_be_moved_is_tallied_apart_from_a_missing_one(
+    def test_remerge_deletes_the_files_of_a_document_the_court_stopped_serving(
         self,
     ) -> None:
-        """A file the bucket refused is worth re-running the load over and one
-        that was never there is not, so the two cannot be reported as one
-        number. Does each land in its own count?"""
-        for outcome, expected in (
-            (PublishOutcome.FAILED, FileTally(failed=1)),
-            (PublishOutcome.MISSING, FileTally(missing=1)),
-        ):
-            with self.subTest(outcome=outcome):
-                self.publish_outcome = outcome
-                case = self.case_with_files(
-                    NYCoAFileFactory.create(
-                        file_name="SmithvJones-app-Smith-brf.pdf",
-                        local_path=f"{PRIVATE_PREFIX}brf.pdf",
-                    )
-                )
-
-                with self.captureOnCommitCallbacks(execute=True):
-                    result = NYCoADocketMerger(case, params=None).merge()
-
-                self.assertEqual(result.files, expected)
-                NYCoADocument.objects.all().delete()
-
-    def test_a_file_outside_either_bucket_is_tallied_as_missing(self) -> None:
-        """A path in neither layout is a file publishing cannot even look for.
-        Is it counted with the ones the bucket did not hold, since neither will
-        appear on a re-run?"""
-        case = self.case_with_files(
-            NYCoAFileFactory.create(
-                file_name="SmithvJones-app-Smith-brf.pdf",
-                local_path="/tmp/brf.pdf",
-            )
-        )
-
-        with self.captureOnCommitCallbacks(execute=True):
-            result = NYCoADocketMerger(case, params=None).merge()
-
-        self.assertEqual(result.files, FileTally(missing=1))
-        self.assertEqual(self.published, [], "There was nothing to copy.")
-
-    def test_a_file_already_published_is_not_tallied_again(self) -> None:
-        """The tally is what a run moved, so re-merging an unchanged case has
-        to add nothing to it. Does a second merge count no files?"""
-        case = self.case_with_files(
-            NYCoAFileFactory.create(
-                file_name="SmithvJones-app-Smith-brf.pdf",
-                local_path=f"{PRIVATE_PREFIX}brf.pdf",
-            )
-        )
-        with self.captureOnCommitCallbacks(execute=True):
-            NYCoADocketMerger(case, params=None).merge()
-
-        with self.captureOnCommitCallbacks(execute=True):
-            result = NYCoADocketMerger(case, params=None).merge()
-
-        self.assertFalse(
-            result.files, f"Counted a move that did not happen: {result.files}"
-        )
-
-    @merger_test(expected_query_count=29)
-    def test_remerge_drops_a_document_the_court_stopped_serving(self) -> None:
         """A file the Court stops serving is listed with its download button
-        disabled. Does the document go with it, published copy and all, so
-        that nothing is left pointing at a file CourtListener may no longer
-        publish?"""
+        disabled. Does the document go with it, published copy and thumbnail
+        and all, so that nothing is left serving a file CourtListener may no
+        longer publish?"""
         case = self.case_with_files(
             NYCoAFileFactory.create(
                 file_name="SmithvJones-app-Smith-brf.pdf",
@@ -1879,8 +1432,12 @@ class NYCoADocumentPublishTest(NYCoAMergerTestCase):
             ),
             docket_entry_id="e:appellant-brief:smith:1",
         )
-        NYCoADocketMerger(case, params=None).merge()
-        published = NYCoADocument.objects.get().filepath_local.name
+        self.merge(case)
+        document = NYCoADocument.objects.get()
+        self.publish(document)
+        thumbnail = f"recap-thumbnails/{document.pk}.thumb.1068.png"
+        document.thumbnail = thumbnail
+        document.save()
 
         pulled = self.case_with_files(
             NYCoAFileFactory.create(
@@ -1891,8 +1448,7 @@ class NYCoADocumentPublishTest(NYCoAMergerTestCase):
             docket_entry_id="e:appellant-brief:smith:1",
         )
         pulled.issues = case.issues
-        with self.captureOnCommitCallbacks(execute=True):
-            result = NYCoADocketMerger(pulled, params=None).merge()
+        result = self.merge(pulled)
 
         self.assertTrue(result.success)
         self.assertEqual(NYCoADocument.objects.count(), 0)
@@ -1901,46 +1457,18 @@ class NYCoADocumentPublishTest(NYCoAMergerTestCase):
             1,
             "The filing stays; only the document it can no longer serve goes.",
         )
-        self.assertEqual(self.withdrawn, [published])
-
-    @merger_test(expected_query_count=31)
-    def test_remerge_withdraws_a_file_the_scrape_no_longer_lists(self) -> None:
-        """Court-PASS lists every file it has for a case, so a file that has
-        dropped off the list is one CourtListener should stop serving. Does the
-        row's deletion take its published copy with it?"""
-        case = self.case_with_files(
-            NYCoAFileFactory.create(
-                file_name="SmithvJones-app-Smith-oldbrf.pdf",
-                local_path=f"{PRIVATE_PREFIX}oldbrf.pdf",
-            ),
-            docket_entry_id="e:appellant-brief:smith:1",
+        self.assertCountEqual(
+            self.deleted,
+            [
+                (PUBLIC_BUCKET, document.filepath_local.name),
+                (PUBLIC_BUCKET, thumbnail),
+            ],
         )
-        NYCoADocketMerger(case, params=None).merge()
-        published = NYCoADocument.objects.get().filepath_local.name
 
-        replaced = self.case_with_files(
-            NYCoAFileFactory.create(
-                file_name="SmithvJones-app-Smith-brf.pdf",
-                local_path=f"{PRIVATE_PREFIX}brf.pdf",
-            ),
-            docket_entry_id="e:appellant-brief:smith:1",
-        )
-        replaced.issues = case.issues
-        with self.captureOnCommitCallbacks(execute=True):
-            result = NYCoADocketMerger(replaced, params=None).merge()
-
-        self.assertTrue(result.success)
-        self.assertEqual(
-            NYCoADocument.objects.get().file_name,
-            "SmithvJones-app-Smith-brf.pdf",
-        )
-        self.assertEqual(self.withdrawn, [published])
-
-    @merger_test(expected_query_count=33)
-    def test_remerge_withdraws_the_files_of_a_dropped_filing(self) -> None:
+    def test_remerge_deletes_the_files_of_a_dropped_filing(self) -> None:
         """A filing the scrape no longer lists is deleted outright, and its
         documents go with it in a cascade no document merger sees. Are their
-        published files still withdrawn?"""
+        files still deleted?"""
         case = self.case_with_files(
             NYCoAFileFactory.create(
                 file_name="SmithvJones-app-Smith-brf.pdf",
@@ -1948,8 +1476,9 @@ class NYCoADocumentPublishTest(NYCoAMergerTestCase):
             ),
             docket_entry_id="e:appellant-brief:smith:1",
         )
-        NYCoADocketMerger(case, params=None).merge()
-        published = NYCoADocument.objects.get().filepath_local.name
+        self.merge(case)
+        document = NYCoADocument.objects.get()
+        self.publish(document)
 
         withdrawn_filing = self.case_with_files(
             NYCoAFileFactory.create(
@@ -1959,12 +1488,307 @@ class NYCoADocumentPublishTest(NYCoAMergerTestCase):
             docket_entry_id="e:respondent-brief:jones:1",
         )
         withdrawn_filing.issues = case.issues
-        with self.captureOnCommitCallbacks(execute=True):
-            result = NYCoADocketMerger(withdrawn_filing, params=None).merge()
+        result = self.merge(withdrawn_filing)
 
         self.assertTrue(result.success)
         self.assertEqual(NYCoADocketEntry.objects.count(), 1)
-        self.assertEqual(self.withdrawn, [published])
+        self.assertEqual(
+            self.deleted, [(PUBLIC_BUCKET, document.filepath_local.name)]
+        )
+
+    def test_an_unpublished_file_is_deleted_from_the_private_bucket(
+        self,
+    ) -> None:
+        """A document removed before its file was published still leaves the
+        scraper's copy behind. Is that deleted from the bucket it is in?"""
+        file = NYCoAFileFactory.create(
+            file_name="SmithvJones-app-Smith-oldbrf.pdf",
+            local_path=f"{PRIVATE_PREFIX}oldbrf.pdf",
+        )
+        case = self.case_with_files(
+            file, docket_entry_id="e:appellant-brief:smith:1"
+        )
+        self.merge(case)
+
+        replaced = self.case_with_files(
+            NYCoAFileFactory.create(
+                file_name="SmithvJones-app-Smith-brf.pdf",
+                local_path=f"{PRIVATE_PREFIX}brf.pdf",
+            ),
+            docket_entry_id="e:appellant-brief:smith:1",
+        )
+        replaced.issues = case.issues
+        self.merge(replaced)
+
+        self.assertEqual(self.deleted, [(PRIVATE_BUCKET, file.local_path)])
+
+    def test_a_private_file_another_document_still_uses_is_kept(self) -> None:
+        """The scraper names files by content, so one file listed under two
+        filings is one key. Is it kept while the other document still points
+        at it?"""
+        shared = f"{PRIVATE_PREFIX}shared.pdf"
+        case = NYCoACaseFactory.create(
+            docket_number=DOCKET_NUMBER,
+            parties=[],
+            entries=[
+                NYCoAFilingFactory.create(
+                    docket_entry_id=f"e:appellant-brief:smith:{n}",
+                    attachments=[
+                        NYCoAFileFactory.create(
+                            file_name="SmithvJones-app-Smith-brf.pdf",
+                            local_path=shared,
+                        )
+                    ],
+                )
+                for n in (1, 2)
+            ],
+        )
+        self.merge(case)
+
+        case.entries = case.entries[:1]
+        self.merge(case)
+
+        self.assertEqual(NYCoADocument.objects.count(), 1)
+        self.assertEqual(self.deleted, [])
+
+
+class NYCoAPublishFilesTest(NYCoAMergerTestCase):
+    """Tests for the move a load makes after each merge, from the scraper's
+    key to the one the document's primary keys name."""
+
+    def test_a_thumbnail_parallels_its_document(self) -> None:
+        """Is a thumbnail filed beside its document, under the thumbnail root
+        instead and keeping the extension it was handed?"""
+        filed = date(2024, 3, 1)
+        self.merge(
+            self.case_with_files(NYCoAFileFactory.create(), date_filed=filed)
+        )
+        document = NYCoADocument.objects.get()
+
+        self.assertEqual(
+            document.get_pdf_path("name.png", thumbs=True),
+            published_key(document, filed, ".png", thumbs=True),
+        )
+
+    def test_a_scraped_file_is_published_under_its_document(self) -> None:
+        """Is the file copied out of the private bucket to the name the docket,
+        the filing's date and the document make, the document pointed at it,
+        and the scraper's copy deleted?"""
+        file = NYCoAFileFactory.create(
+            file_name="SmithvJones-app-Smith-brf.pdf",
+            local_path=f"{PRIVATE_PREFIX}brf.pdf",
+        )
+        case = self.case_with_files(file, date_filed=date(2024, 3, 1))
+
+        result = self.load(case)
+
+        document = NYCoADocument.objects.get()
+        expected = published_key(document, date(2024, 3, 1))
+        self.assertEqual(document.filepath_local, expected)
+        self.assertEqual(
+            self.copied, [(PRIVATE_BUCKET, file.local_path, expected)]
+        )
+        self.assertEqual(self.deleted, [(PRIVATE_BUCKET, file.local_path)])
+        self.assertEqual(result.files, FileTally(moved=1))
+        self.assertIn(document.pk, result.updates["NYCoADocument"])
+
+    def test_the_name_keeps_the_file_s_extension(self) -> None:
+        """Court-PASS serves playlists beside PDFs. Does a playlist keep its
+        own extension when published?"""
+        case = self.case_with_files(
+            NYCoAFileFactory.create(
+                file_name="SmithvJones-Webcast.asx",
+                local_path=f"{PRIVATE_PREFIX}webcast.asx",
+            ),
+            date_filed=date(2024, 3, 1),
+        )
+
+        self.load(case)
+
+        document = NYCoADocument.objects.get()
+        self.assertEqual(
+            document.filepath_local,
+            published_key(document, date(2024, 3, 1), ".asx"),
+        )
+
+    def test_the_date_falls_back_through_the_docket(self) -> None:
+        """A filing reconstructed from the file list has no date. Does the name
+        take the date the case was argued, then decided, and only then say it
+        is undated?"""
+        argued, decided = date(2025, 1, 14), date(2025, 3, 20)
+        for argument_date, decision_date, expected in (
+            (argued, decided, argued),
+            (None, decided, decided),
+            (None, None, None),
+        ):
+            with self.subTest(expected=expected):
+                case = self.case_with_files(
+                    NYCoAFileFactory.create(), date_filed=None
+                )
+                case.argument_date = argument_date
+                case.decision_date = decision_date
+
+                self.load(case)
+
+                document = NYCoADocument.objects.get()
+                self.assertEqual(
+                    document.filepath_local, published_key(document, expected)
+                )
+                Docket.objects.all().delete()
+
+    def test_documents_filed_the_same_day_are_named_apart(self) -> None:
+        """Two files of one filing share a docket and a date. Does each still
+        get a name of its own?"""
+        case = self.case_with_files(
+            NYCoAFileFactory.create(file_name="brief.pdf"),
+            NYCoAFileFactory.create(file_name="appendix.pdf"),
+        )
+
+        self.load(case)
+
+        paths = set(
+            NYCoADocument.objects.values_list("filepath_local", flat=True)
+        )
+        self.assertEqual(len(paths), 2, f"Two documents share a path: {paths}")
+
+    def test_a_published_file_is_not_moved_again(self) -> None:
+        """Re-loading an unchanged case has nothing to move. Is nothing copied
+        or counted, and nothing deleted but the scraper's key, which a scrape
+        that downloaded the file again would have left behind?"""
+        file = NYCoAFileFactory.create()
+        case = self.case_with_files(file)
+        self.load(case)
+        self.copied.clear()
+        self.deleted.clear()
+
+        result = self.load(case)
+
+        self.assertEqual(self.copied, [])
+        self.assertEqual(self.deleted, [(PRIVATE_BUCKET, file.local_path)])
+        self.assertFalse(
+            result.files, f"Counted a move that did not happen: {result.files}"
+        )
+
+    def test_a_file_whose_date_changed_is_moved(self) -> None:
+        """A later scrape can date a filing an earlier one could not. Is the
+        published file moved to the name that date makes, and the old copy
+        deleted?"""
+        file = NYCoAFileFactory.create()
+        case = self.case_with_files(
+            file,
+            date_filed=None,
+            docket_entry_id="e:appellant-brief:smith:1",
+        )
+        case.argument_date = None
+        self.load(case)
+        document = NYCoADocument.objects.get()
+        undated = published_key(document, None)
+        self.assertEqual(document.filepath_local, undated)
+        self.copied.clear()
+        self.deleted.clear()
+
+        case.entries[0].date_filed = date(2024, 3, 1)
+        result = self.load(case)
+
+        dated = published_key(document, date(2024, 3, 1))
+        self.assertEqual(NYCoADocument.objects.get().filepath_local, dated)
+        self.assertEqual(self.copied, [(PUBLIC_BUCKET, undated, dated)])
+        self.assertCountEqual(
+            self.deleted,
+            [(PUBLIC_BUCKET, undated), (PRIVATE_BUCKET, file.local_path)],
+        )
+        self.assertEqual(result.files, FileTally(moved=1))
+
+    def test_a_refused_copy_leaves_the_file_to_a_later_load(self) -> None:
+        """The bucket refusing the copy says nothing about the file, which is
+        still in the private bucket. Does the document keep pointing there, so
+        re-running the load finishes the move, with nothing deleted?"""
+        self.publish_outcome = PublishOutcome.FAILED
+        file = NYCoAFileFactory.create(local_path=f"{PRIVATE_PREFIX}brf.pdf")
+
+        result = self.load(self.case_with_files(file))
+
+        self.assertTrue(
+            result.success, "A file we could not move must not fail the case."
+        )
+        self.assertEqual(result.files, FileTally(failed=1))
+        self.assertNotIn("NYCoADocument", result.updates)
+        self.assertEqual(
+            NYCoADocument.objects.get().filepath_local, file.local_path
+        )
+        self.assertEqual(self.deleted, [])
+
+        self.publish_outcome = PublishOutcome.PUBLISHED
+        result = NYCoACourtPassLoader.publish_files(Docket.objects.get())
+
+        self.assertEqual(result.files, FileTally(moved=1))
+
+    def test_a_missing_file_stops_being_pointed_at(self) -> None:
+        """A file the private bucket does not hold will not appear on a
+        re-run. Is the document left with no file rather than a path to
+        nothing?"""
+        self.publish_outcome = PublishOutcome.MISSING
+
+        result = self.load(self.case_with_files(NYCoAFileFactory.create()))
+
+        self.assertEqual(result.files, FileTally(missing=1))
+        self.assertEqual(NYCoADocument.objects.get().filepath_local, "")
+        self.assertEqual(self.deleted, [])
+
+    def test_a_file_shared_by_two_documents_is_deleted_once_both_moved(
+        self,
+    ) -> None:
+        """One scraped file can stand for documents under two filings. Is each
+        published under its own name, and the scraper's copy deleted only once
+        neither still needs it?"""
+        shared = f"{PRIVATE_PREFIX}shared.pdf"
+        case = NYCoACaseFactory.create(
+            docket_number=DOCKET_NUMBER,
+            parties=[],
+            entries=[
+                NYCoAFilingFactory.create(
+                    docket_entry_id=f"e:appellant-brief:smith:{n}",
+                    attachments=[
+                        NYCoAFileFactory.create(
+                            file_name="SmithvJones-app-Smith-brf.pdf",
+                            local_path=shared,
+                        )
+                    ],
+                )
+                for n in (1, 2)
+            ],
+        )
+
+        result = self.load(case)
+
+        self.assertEqual(result.files, FileTally(moved=2))
+        self.assertEqual(
+            [source for _, source, _ in self.copied], [shared, shared]
+        )
+        self.assertEqual(self.deleted, [(PRIVATE_BUCKET, shared)])
+
+    def test_a_document_changed_mid_move_is_left_alone(self) -> None:
+        """Another merge of the same docket can repoint a document while its
+        file is being copied. Is that write kept, and the file it was copied
+        from left for the other merge?"""
+        file = NYCoAFileFactory.create(local_path=f"{PRIVATE_PREFIX}brf.pdf")
+        self.merge(self.case_with_files(file))
+        newer = f"{PRIVATE_PREFIX}newer.pdf"
+
+        def copy_then_repoint(
+            *args: object, **kwargs: object
+        ) -> PublishOutcome:
+            NYCoADocument.objects.update(filepath_local=newer)
+            return PublishOutcome.PUBLISHED
+
+        with patch(
+            "cl.corpus_importer.state.loader.copy_file", copy_then_repoint
+        ):
+            result = NYCoACourtPassLoader.publish_files(Docket.objects.get())
+
+        self.assertEqual(NYCoADocument.objects.get().filepath_local, newer)
+        self.assertFalse(result.files)
+        self.assertEqual(self.deleted, [])
 
 
 class NYCoAPartyMergerTest(NYCoAMergerTestCase):

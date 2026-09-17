@@ -15,6 +15,9 @@ A subclass supplies five things:
 * `scrape_model`, the Pydantic model each payload is validated into;
 * `merger`, which writes a validated scrape to the database.
 
+Loaders that specify a `private_prefix` will have their files moved as part
+of the follow up work for a merge.
+
 The run database is opened read-only.
 """
 
@@ -31,7 +34,9 @@ from enum import Enum, StrEnum, auto
 from pathlib import Path
 from typing import Any, ClassVar, Final, cast
 
-from django.db.models import Model
+from django.conf import settings
+from django.db.models import Model, QuerySet
+from django.utils import timezone
 from pydantic import BaseModel, ValidationError
 
 from cl.corpus_importer.state.ledger import LoadLedger, RetryRows
@@ -43,13 +48,27 @@ from cl.corpus_importer.state.preflight import (
     PreflightFailed,
     run_checks,
 )
+from cl.corpus_importer.state.storage import (
+    PublishOutcome,
+    copy_file,
+    delete_file,
+    file_storage,
+)
 from cl.corpus_importer.state.utils import NO_FILES, FileTally, MergeResult
 from cl.lib.celery_utils import CeleryThrottle
 from cl.lib.indexing_utils import log_last_document_indexed
 from cl.lib.redis_utils import get_redis_interface
+from cl.search.models import Docket
 from cl.search.state.shared import AbstractStateDocument
 
 logger = logging.getLogger(__name__)
+
+DOCKET_PATH: Final = "docket_entry__docket"
+"""The lookup from a state document to its docket.
+
+Not a per-loader setting: `AbstractStateDocument.get_pdf_path` builds a
+document's storage path out of `self.docket_entry.docket`, so a model that
+reached its docket some other way could not be published at all."""
 
 CHECKPOINT_EVERY: Final = 250
 MERGE_POLL: Final = 10.0
@@ -270,6 +289,14 @@ class JKentScrapeLoader[ScrapeType: BaseModel, ParamType = None](ABC):
     :cvar document_model: The state document model this loader's merges write,
         whose rows are sent for text extraction as the merges land. Leave
         `None` for a loader that writes no documents.
+    :cvar private_prefix: Where in the private bucket the scraper leaves the
+        files it downloads. A merge stores these keys as they are, and
+        `publish_files` moves them. Leave empty for a loader whose documents
+        are downloaded some other way.
+    :cvar path_relations: Anything else a document's storage path reads, as
+        lookups from `document_model`. Selected with the documents, so
+        publishing a docket does not go back to the database for each of
+        them.
     """
 
     name: ClassVar[str]
@@ -278,6 +305,8 @@ class JKentScrapeLoader[ScrapeType: BaseModel, ParamType = None](ABC):
     scrape_model: type[ScrapeType]
     merger: type[Merger[ScrapeType, ParamType, Model]]
     document_model: ClassVar[type[AbstractStateDocument] | None] = None
+    private_prefix: ClassVar[str] = ""
+    path_relations: ClassVar[tuple[str, ...]] = ()
 
     def __init__(
         self,
@@ -502,8 +531,14 @@ class JKentScrapeLoader[ScrapeType: BaseModel, ParamType = None](ABC):
 
     @classmethod
     def merge_one(cls, scrape: ScrapeType) -> MergeResult[Any]:
-        """Merge a single scrape. Runs in celery worker."""
-        return cls.merger(scrape, params=cls.params(scrape)).merge()
+        """Merge a single scrape, then publish its files. Runs in celery
+        worker.
+        """
+        merger = cls.merger(scrape, params=cls.params(scrape))
+        result = merger.merge()
+        if not isinstance(docket := merger.out, Docket):
+            return result
+        return result | cls.publish_files(docket)
 
     @classmethod
     def merge_payload(cls, payload: str) -> tuple[str, MergeResult[Any]]:
@@ -519,6 +554,90 @@ class JKentScrapeLoader[ScrapeType: BaseModel, ParamType = None](ABC):
         """
         scrape = cls.scrape_model.model_validate_json(payload)
         return cls.label(scrape), cls.merge_one(scrape)
+
+    @classmethod
+    def publish_files(cls, docket: Docket) -> MergeResult[int]:
+        """Move each of a docket's files from private to public.
+
+        A file goes where the document says it belongs, which for a state
+        document is the RECAP layout its `upload_to` would have filed a
+        download under; see `AbstractStateDocument.get_pdf_path`. Only the
+        extension of the scraped key survives, so a file the scraper named its
+        own way is renamed as it is published.
+
+        :param docket: The docket a merge just committed.
+        :return: The documents repointed, as updates, and what became of each
+            file there was a move to make.
+        """
+        if not cls.private_prefix or (model := cls.document_model) is None:
+            return MergeResult()
+        documents: QuerySet[AbstractStateDocument] = (
+            model._default_manager.filter(**{DOCKET_PATH: docket})
+            .exclude(filepath_local="")
+            .select_related(DOCKET_PATH, *cls.path_relations)
+        )
+        storage = file_storage(model)
+        private = settings.AWS_PRIVATE_STORAGE_BUCKET_NAME
+        public = settings.AWS_STORAGE_BUCKET_NAME
+        moved: set[int] = set()
+        tally = NO_FILES
+        sources: dict[str, str] = {}
+        for document in documents:
+            current = document.filepath_local.name or ""
+            if (target := document.get_pdf_path(current)) == current:
+                continue
+            bucket = (
+                private if current.startswith(cls.private_prefix) else public
+            )
+            outcome = copy_file(
+                storage,
+                bucket,
+                current,
+                target,
+                getattr(document, "content_type", ""),
+            )
+            if outcome is PublishOutcome.FAILED:
+                tally |= FileTally(failed=1)
+                continue
+            repointed = outcome is PublishOutcome.PUBLISHED
+            if not model._default_manager.filter(
+                pk=document.pk, filepath_local=current
+            ).update(
+                filepath_local=target if repointed else "",
+                date_modified=timezone.now(),
+            ):
+                continue
+            if not repointed:
+                tally |= FileTally(missing=1)
+                continue
+            moved.add(document.pk)
+            sources[current] = bucket
+            tally |= FileTally(moved=1)
+        referenced = set(
+            model._default_manager.filter(
+                filepath_local__in=sources
+            ).values_list("filepath_local", flat=True)
+        )
+        for key, bucket in sources.items():
+            if key not in referenced:
+                delete_file(storage, bucket, key)
+        if not moved:
+            return MergeResult(files=tally)
+        return MergeResult(updates={model.__name__: moved}, files=tally)
+
+    @classmethod
+    def published_only(
+        cls, documents: QuerySet[AbstractStateDocument]
+    ) -> QuerySet[AbstractStateDocument]:
+        """Leave out the documents whose file has not been published yet,
+        which extraction could not read.
+
+        :param documents: Documents of `document_model`.
+        :return: Those whose file is where CourtListener serves it from.
+        """
+        if not cls.private_prefix:
+            return documents
+        return documents.exclude(filepath_local__startswith=cls.private_prefix)
 
     @classmethod
     def dispatch_extraction(
@@ -542,7 +661,9 @@ class JKentScrapeLoader[ScrapeType: BaseModel, ParamType = None](ABC):
             return set()
         dispatched = {
             document.pk
-            for document in model._default_manager.filter(pk__in=pks)
+            for document in cls.published_only(
+                model._default_manager.filter(pk__in=pks)
+            )
             if document.extract(queue)
         }
         logger.info(
@@ -750,7 +871,9 @@ class JKentScrapeLoader[ScrapeType: BaseModel, ParamType = None](ABC):
             batch = ordered[start : start + RETRY_BATCH]
             for throttle in self.throttles:
                 throttle.maybe_wait()
-            still_waiting = model.unextracted(since).filter(pk__in=batch)
+            still_waiting = self.published_only(
+                model.unextracted(since).filter(pk__in=batch)
+            )
             dispatched = sum(
                 1
                 for document in still_waiting
@@ -1060,7 +1183,7 @@ class JKentScrapeLoader[ScrapeType: BaseModel, ParamType = None](ABC):
         # Polling asks only for the count; the full picture, which costs two
         # more queries, is put together once at the end.
         _, wait = self._await_drain(
-            lambda: model.unextracted(since).count(),
+            lambda: self.published_only(model.unextracted(since)).count(),
             poll=EXTRACTION_POLL,
             work="extractions",
         )
@@ -1072,8 +1195,9 @@ class JKentScrapeLoader[ScrapeType: BaseModel, ParamType = None](ABC):
             ledger, model, totals.documents, since, wait
         )
 
-    @staticmethod
+    @classmethod
     def _extraction_status(
+        cls,
         ledger: LoadLedger,
         model: type[AbstractStateDocument],
         dispatched: int,
@@ -1092,7 +1216,9 @@ class JKentScrapeLoader[ScrapeType: BaseModel, ParamType = None](ABC):
         :return: What the database says.
         """
         outstanding: list[int] = list(
-            model.unextracted(since).values_list("pk", flat=True)
+            cls.published_only(model.unextracted(since)).values_list(
+                "pk", flat=True
+            )
         )
         ledger.retry_documents(outstanding)
         return ExtractionReport(

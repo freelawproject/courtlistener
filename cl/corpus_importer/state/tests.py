@@ -8,9 +8,10 @@ from io import StringIO
 from pathlib import Path
 from tempfile import TemporaryDirectory
 from typing import Any, ClassVar, ParamSpec, TypeVar
-from unittest.mock import Mock, call, patch
+from unittest.mock import MagicMock, Mock, call, patch
 
-from botocore.exceptions import ClientError
+from botocore.exceptions import BotoCoreError, ClientError
+from django.conf import settings
 from django.core.management import call_command
 from django.core.management.base import CommandError
 from django.db import DatabaseError, connection
@@ -56,6 +57,11 @@ from cl.corpus_importer.state.run_db import (
     RunDatabaseUnavailable,
     downloaded_run_database,
     scrape_bucket_storage,
+)
+from cl.corpus_importer.state.storage import (
+    PublishOutcome,
+    copy_file,
+    delete_file,
 )
 from cl.corpus_importer.state.utils import FileTally, MergeResult
 from cl.corpus_importer.tasks import merge_state_scrape_row
@@ -1785,6 +1791,114 @@ class JKentScrapeLoaderExtractionTest(LoaderTestCase):
                 MergeResult(creates={"Docket": {1}}), "celery"
             ),
             set(),
+        )
+
+
+class StateStorageTest(SimpleTestCase):
+    """Tests for the server-side copies and deletes publishing is built on.
+
+    The loader and merger tests stand in for this module, so this is where the
+    S3 calls it makes are pinned down.
+    """
+
+    SOURCE_KEY = "responses/dockets/ny/abc123.pdf"
+    PUBLISHED_KEY = "recap/gov.uscourts.ny.1/gov.uscourts.ny.1.undated.2.pdf"
+
+    def setUp(self) -> None:
+        super().setUp()
+        self.storage = MagicMock()
+        self.storage.get_object_parameters.return_value = {
+            "CacheControl": "max-age=315360000"
+        }
+        self.client = self.storage.connection.meta.client
+
+    def copy(self, content_type: str = "") -> PublishOutcome:
+        """Copy `SOURCE_KEY` out of the private bucket to `PUBLISHED_KEY`."""
+        return copy_file(
+            self.storage,
+            settings.AWS_PRIVATE_STORAGE_BUCKET_NAME,
+            self.SOURCE_KEY,
+            self.PUBLISHED_KEY,
+            content_type,
+        )
+
+    @staticmethod
+    def error(code: str) -> ClientError:
+        return ClientError(
+            {"Error": {"Code": code, "Message": "nope"}}, "CopyObject"
+        )
+
+    def test_copy_describes_how_the_file_should_be_served(self) -> None:
+        """Does the copy land in the public bucket with the ACL, cache headers
+        and content type a file served from there needs?"""
+        self.assertIs(self.copy("application/pdf"), PublishOutcome.PUBLISHED)
+
+        self.client.copy_object.assert_called_once_with(
+            Bucket=settings.AWS_STORAGE_BUCKET_NAME,
+            Key=self.PUBLISHED_KEY,
+            CopySource={
+                "Bucket": settings.AWS_PRIVATE_STORAGE_BUCKET_NAME,
+                "Key": self.SOURCE_KEY,
+            },
+            MetadataDirective="REPLACE",
+            CacheControl="max-age=315360000",
+            ACL=settings.AWS_DEFAULT_ACL,
+            ContentType="application/pdf",
+        )
+
+    def test_copy_leaves_the_original_alone(self) -> None:
+        """The loader deletes the original only once the document points at
+        the copy. Does copying alone delete nothing?"""
+        self.copy()
+
+        self.client.delete_object.assert_not_called()
+
+    def test_copy_without_a_content_type_leaves_it_to_s3(self) -> None:
+        """A scrape does not always state a MIME type. Is the argument left
+        off rather than sent empty, which would serve the file as nothing?"""
+        self.copy()
+
+        self.assertNotIn(
+            "ContentType", self.client.copy_object.call_args.kwargs
+        )
+
+    def test_copy_reports_how_it_failed(self) -> None:
+        """A source that is not there will not appear on a re-run, unlike a
+        refusal, so the two are reported apart. A `BotoCoreError` never got an
+        answer out of S3, so it counts as the retriable kind. Is each read off
+        the error the copy raised, without asking the bucket again?"""
+        for error, expected in (
+            (self.error("AccessDenied"), PublishOutcome.FAILED),
+            (self.error("NoSuchKey"), PublishOutcome.MISSING),
+            (BotoCoreError(), PublishOutcome.FAILED),
+        ):
+            with self.subTest(expected=expected):
+                self.client.copy_object.side_effect = error
+
+                self.assertIs(self.copy(), expected)
+        self.client.head_object.assert_not_called()
+
+    def test_delete_names_the_bucket(self) -> None:
+        """Files are deleted from both buckets. Does the delete go to the one
+        it was asked to?"""
+        delete_file(
+            self.storage,
+            settings.AWS_PRIVATE_STORAGE_BUCKET_NAME,
+            self.SOURCE_KEY,
+        )
+
+        self.client.delete_object.assert_called_once_with(
+            Bucket=settings.AWS_PRIVATE_STORAGE_BUCKET_NAME,
+            Key=self.SOURCE_KEY,
+        )
+
+    def test_delete_swallows_a_refusal(self) -> None:
+        """The document is settled by the time this runs, so a file left
+        behind must not fail the load."""
+        self.client.delete_object.side_effect = self.error("AccessDenied")
+
+        delete_file(
+            self.storage, settings.AWS_STORAGE_BUCKET_NAME, self.PUBLISHED_KEY
         )
 
 

@@ -13,6 +13,7 @@ from functools import partial
 from typing import Any, ClassVar, cast, override
 
 from asgiref.sync import async_to_sync
+from django.conf import settings
 from django.db import transaction
 from django.db.models import Model, QuerySet
 from django.db.models.fields.files import FieldFile
@@ -53,13 +54,8 @@ from cl.corpus_importer.state.new_york.nycourts_gov import (
     Unclassified,
 )
 from cl.corpus_importer.state.new_york.storage import (
-    PUBLISHED_PREFIX,
-    PublishOutcome,
-    copy_file,
-    discard_private_file,
     is_published,
     is_scraped,
-    withdraw_file,
 )
 from cl.corpus_importer.state.new_york.utils import (
     NYCOA_COURT_ID,
@@ -68,6 +64,7 @@ from cl.corpus_importer.state.new_york.utils import (
     make_docket_number_core,
     mirrored_code,
 )
+from cl.corpus_importer.state.storage import delete_file, file_storage
 from cl.corpus_importer.state.utils import NO_FILES, FileTally, MergeResult
 from cl.people_db.models import Attorney, Party, PartyType, Role
 from cl.recap.mergers import find_docket_object_query
@@ -164,13 +161,12 @@ class NYCoADocumentMerger[ParamType](
     empty and `NYCoADocument.download` refuses to fetch by it.
 
     Nothing needs downloading: the scraper has already fetched the file into
-    the private bucket and reports where, so the merge moves it into the
-    public one rather than fetching it again; see `publish`. That leaves only
-    the text extraction,
-    which `manage.py state_document_download --model search.NYCoADocument
-    --skip-download` picks up from `filepath_local` being set and `ocr_status`
-    not being finished -- the same sweep every other state's documents go
-    through."""
+    the private bucket and reports where, so the merge stores that key and the
+    loader moves the file into the published layout once the merge has
+    committed and the document has the primary key its name needs; see
+    `JKentScrapeLoader.publish_files`. The loader then dispatches extraction
+    for it.
+    """
 
     model: ClassVar[type[Model]] = NYCoADocument
     key: ClassVar[Iterable[str]] = ["file_name"]
@@ -210,14 +206,14 @@ class NYCoADocumentMerger[ParamType](
 
     @override
     def merge_one(self) -> tuple[MergeResult[Any], NYCoADocument | None]:
-        """Publish the file, then write the document once.
+        """Settle which path to store for the file, then write the document.
 
-        :return: The merge result, carrying what became of the file, and the
-            merged document.
+        :return: The merge result, carrying any file the scrape reported that
+            can never be published, and the merged document.
         """
-        published = self.publish()
+        files = self._accept_file()
         result, document = super().merge_one()
-        return result | MergeResult(files=published), document
+        return result | MergeResult(files=files), document
 
     def _scrub_fileinfo(self) -> None:
         """Remove info relevant to file"""
@@ -225,28 +221,51 @@ class NYCoADocumentMerger[ParamType](
         self.transformed["sha256"] = ""
         self.transformed["file_size"] = None
 
-    def publish(self) -> FileTally:
-        """Move the scraped file into the bucket CourtListener serves, and
-        rewrite the path the merge is about to store to say so.
+    def _accept_file(self) -> FileTally:
+        """Decide what the document's `filepath_local` should hold.
 
-        :return: What became of the file, for the load's report to add up.
-            Empty where there was no move to make: a scrape that reports no
-            file, one already published, and one this document has already
-            been through are all nothing to count.
+        Normally that is the scraper's key in the private bucket, which the
+        loader publishes after the merge. Two exceptions: a file this document
+        has already published is kept where it is, and the scraper's copy of it
+        is deleted once the merge commits, since nothing will ever point at it;
+        and a file the scrape cannot vouch for is not stored at all.
+
+        :return: `FileTally(missing=1)` for a file that will never be
+            published, and nothing otherwise. A file the scrape cannot vouch
+            for is not missing where the document already has one, since the
+            merge keeps that path and the loader publishes it if need be.
         """
         private_key = self.scrape.local_path
-        if not private_key or is_published(private_key):
+        if not private_key:
+            return NO_FILES
+        existing = self.existing
+        stored = (existing.filepath_local.name or "") if existing else ""
+        if (
+            existing is not None
+            and self.scrape.content_hash
+            and existing.sha256 == self.scrape.content_hash
+            and is_published(stored)
+        ):
+            self.transformed["filepath_local"] = stored
+            if is_scraped(private_key):
+                transaction.on_commit(
+                    partial(
+                        delete_file,
+                        file_storage(NYCoADocument),
+                        settings.AWS_PRIVATE_STORAGE_BUCKET_NAME,
+                        private_key,
+                    )
+                )
             return NO_FILES
         if not is_scraped(private_key):
             logger.error(
-                "Court-PASS names %s a file at %s, which is in neither the "
-                "private bucket nor the published layout; not publishing it.",
+                "Court-PASS names %s a file at %s, which is not in the private "
+                "bucket; not publishing it.",
                 self.scrape.file_name,
                 private_key,
             )
             self._scrub_fileinfo()
-            return FileTally(missing=1)
-
+            return NO_FILES if stored else FileTally(missing=1)
         if not self.scrape.content_hash:
             logger.error(
                 "Court-PASS file %s was downloaded to %s with no hash "
@@ -255,32 +274,8 @@ class NYCoADocumentMerger[ParamType](
                 private_key,
             )
             self._scrub_fileinfo()
-            return FileTally(missing=1)
-
-        naming = NYCoADocument(
-            docket_entry=cast(NYCoADocketEntry, self.params.parent),
-            filepath_local=private_key,
-            sha256=self.scrape.content_hash,
-        )
-        published_key = naming.get_pdf_path(naming.make_filename())
-
-        if (existing := self.existing) is not None:
-            if existing.filepath_local.name == published_key:
-                self.transformed["filepath_local"] = published_key
-                return NO_FILES
-
-        match copy_file(
-            private_key, published_key, self.transformed["content_type"]
-        ):
-            case PublishOutcome.MISSING:
-                self._scrub_fileinfo()
-                return FileTally(missing=1)
-            case PublishOutcome.FAILED:
-                self._scrub_fileinfo()
-                return FileTally(failed=1)
-        transaction.on_commit(partial(discard_private_file, private_key))
-        self.transformed["filepath_local"] = published_key
-        return FileTally(moved=1)
+            return NO_FILES if stored else FileTally(missing=1)
+        return NO_FILES
 
     @override
     def pre_update(self, updated_fields: list[str]) -> list[str]:
@@ -810,47 +805,73 @@ class NYCoADocketMerger(DocketMerger[NYCoACase, None]):
 
     @override
     def merge_one(self) -> tuple[MergeResult[Any], Docket | None]:
-        """Merge the case, then take down the published files it has stopped
-        pointing at.
+        """Merge the case, then delete the files of the documents it removed.
 
         :return: The merge result and the merged docket, unchanged.
         """
-        published = self._published_files()
+        stored = self._stored_files()
         result, docket = super().merge_one()
-        self._withdraw_unreferenced(published)
+        self._delete_removed(stored)
         return result, docket
 
-    def _published_files(self) -> set[str]:
-        """The published files this docket's documents point at, before the
+    def _stored_files(self) -> dict[int, tuple[str, str]]:
+        """The files each of this docket's documents points at, before the
         merge runs.
 
-        :return: The keys, or an empty set for a docket being created, which
-            has no documents to have published yet.
+        :return: Each document's file and thumbnail keyed by its primary key,
+            or nothing for a docket being created.
         """
         if (docket := self.existing) is None:
-            return set()
-        return set(
-            NYCoADocument.objects.filter(
-                docket_entry__docket=docket,
-                filepath_local__startswith=PUBLISHED_PREFIX,
-            ).values_list("filepath_local", flat=True)
-        )
+            return {}
+        return {
+            pk: (path or "", thumbnail or "")
+            for pk, path, thumbnail in NYCoADocument.objects.filter(
+                docket_entry__docket=docket
+            ).values_list("pk", "filepath_local", "thumbnail")
+        }
 
     @staticmethod
-    def _withdraw_unreferenced(published: set[str]) -> None:
-        """Delete the published files nothing points at any more.
+    def _delete_removed(stored: dict[int, tuple[str, str]]) -> None:
+        """Delete the files of the documents the merge removed, once it
+        commits.
 
-        :param published: The keys the docket pointed at before the merge.
+        Published files are named by primary key, so no surviving document
+        can share one. A file still in the private bucket can be: the scraper
+        names files by content, so one file listed under two filings is one
+        key. Any key another document still points at is left alone.
+
+        :param stored: What `_stored_files` found before the merge.
         """
-        if not published:
+        if not stored:
             return
         kept = set(
-            NYCoADocument.objects.filter(
-                filepath_local__in=published
-            ).values_list("filepath_local", flat=True)
+            NYCoADocument.objects.filter(pk__in=stored).values_list(
+                "pk", flat=True
+            )
         )
-        for orphan in published - kept:
-            transaction.on_commit(partial(withdraw_file, orphan))
+        removed = [stored[pk] for pk in stored.keys() - kept]
+        paths = {path for path, _ in removed if path}
+        referenced = set(
+            NYCoADocument.objects.filter(filepath_local__in=paths).values_list(
+                "filepath_local", flat=True
+            )
+        )
+        storage = file_storage(NYCoADocument)
+        public = settings.AWS_STORAGE_BUCKET_NAME
+        for path, thumbnail in removed:
+            if path and path not in referenced:
+                bucket = (
+                    settings.AWS_PRIVATE_STORAGE_BUCKET_NAME
+                    if is_scraped(path)
+                    else public
+                )
+                transaction.on_commit(
+                    partial(delete_file, storage, bucket, path)
+                )
+            if thumbnail:
+                transaction.on_commit(
+                    partial(delete_file, storage, public, thumbnail)
+                )
 
     @override
     def query(self) -> QuerySet[Docket]:
