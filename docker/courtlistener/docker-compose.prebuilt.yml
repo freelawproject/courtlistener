@@ -1,0 +1,23 @@
+# Pull the development image that CI publishes on every merge to main instead
+# of building it locally, skipping the 10-20 minute first build:
+#
+#     docker compose -f docker-compose.yml -f docker-compose.prebuilt.yml up
+#
+# Caveats:
+#
+# - The image is built for amd64 only. On Apple silicon and other arm64
+#   machines it would run under emulation, so build locally there instead.
+# - The repository is bind-mounted into the containers, so code changes are
+#   live; only the installed dependencies come from the image. After changing
+#   pyproject.toml, uv.lock or cl/package-lock.json, rebuild locally with
+#   `docker compose build cl-django cl-celery`. The local build replaces the
+#   pulled image under the same tag and is used from then on.
+# - `pull_policy: missing` means the pull happens only when the image isn't
+#   present locally, and if the pull fails compose falls back to building.
+services:
+  cl-django:
+    image: freelawproject/courtlistener:latest-dev
+    pull_policy: missing
+  cl-celery:
+    image: freelawproject/courtlistener:latest-dev
+    pull_policy: missing
