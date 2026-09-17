@@ -114,8 +114,10 @@ class DocketSitemap(InfinitePaginatorSitemap):
     def lastmod(self, obj: Docket) -> datetime:
         return obj.date_modified
 
-    def get_latest_lastmod(self):
+    def get_latest_lastmod(self) -> datetime | None:
         latest_modified = self.items().order_by("-date_modified").first()
+        if latest_modified is None:
+            return None
         return latest_modified.date_modified
 
     def priority(self, obj: Docket) -> float:

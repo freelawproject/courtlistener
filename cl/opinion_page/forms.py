@@ -195,6 +195,8 @@ class BaseCourtUploadForm(forms.Form):
         these render with the `safe` filter wherever case metadata is shown).
         """
         cleaned_data = super().clean()
+        if cleaned_data is None:
+            return None
         for name, field in self.fields.items():
             if isinstance(field, forms.CharField) and cleaned_data.get(name):
                 cleaned_data[name] = strip_tags(cleaned_data[name])

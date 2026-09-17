@@ -501,7 +501,9 @@ async def view_parties(
 
     party_types_paginator = await paginate_parties(party_types, page)
     parties: dict[str, list] = {}
-    async for party_type in party_types_paginator.object_list:
+    # Page.object_list is typed as _SupportsPagination, but here it is the
+    # sliced QuerySet, which supports async iteration.
+    async for party_type in cast(QuerySet, party_types_paginator.object_list):
         if party_type.name not in parties:
             parties[party_type.name] = []
         parties[party_type.name].append(party_type)
@@ -877,7 +879,7 @@ def get_attachment_values(
                 max_before -= under_max  # under_max is negative
             if rd_index - max_before <= 1:
                 start = 0
-            elif rd_index > max_before:
+            else:
                 # Add a description-only with the number of additional
                 # documents before
                 attachments.append(

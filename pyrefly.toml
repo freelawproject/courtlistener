@@ -110,6 +110,17 @@ bad-override-param-name = false
 bad-override-mutable-attribute = false
 
 [[sub-config]]
+matches = "cl/opinion_page/**"
+check-unannotated-defs = true
+infer-return-types = "checked"
+ignore-missing-imports = []
+
+[sub-config.errors]
+unbound-name = true
+bad-override-param-name = true
+bad-override-mutable-attribute = true
+
+[[sub-config]]
 matches = "cl/recap_rss/**"
 check-unannotated-defs = true
 infer-return-types = "checked"
