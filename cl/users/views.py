@@ -52,8 +52,8 @@ from cl.api.utils import (
 from cl.api.views import parse_throttle_rate_for_template
 from cl.custom_filters.decorators import check_honeypot
 from cl.favorites.forms import NoteForm
-from cl.lib.auth import filter_by_email
 from cl.favorites.utils import NOTEABLE_MODELS, get_noted_object
+from cl.lib.auth import filter_by_email
 from cl.lib.crypto import generate_activation_key
 from cl.lib.ratelimiter import (
     ratelimiter_all_2_per_m,
