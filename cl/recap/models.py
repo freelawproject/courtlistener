@@ -59,6 +59,21 @@ class UPLOAD_TYPE:
     )
 
 
+class PROCESSING_QUEUE_SOURCE:
+    """Where a ProcessingQueue instance came from."""
+
+    EXTENSION = 1
+    EMAIL = 2
+    REPLICATION = 3
+    UNKNOWN = 4
+    NAMES = (
+        (EXTENSION, "Extension or API upload"),
+        (EMAIL, "recap.email"),
+        (REPLICATION, "Subdocket replication"),
+        (UNKNOWN, "Unknown"),
+    )
+
+
 def make_recap_processing_queue_path(instance, filename):
     return make_path("recap_processing_queue", filename)
 
@@ -185,6 +200,11 @@ class ProcessingQueue(AbstractDateTimeModel):
     upload_type = models.SmallIntegerField(
         help_text="The type of object that is uploaded",
         choices=UPLOAD_TYPE.NAMES,
+    )
+    source = models.SmallIntegerField(
+        help_text="The source that created this ProcessingQueue instance.",
+        choices=PROCESSING_QUEUE_SOURCE.NAMES,
+        default=PROCESSING_QUEUE_SOURCE.UNKNOWN,
     )
     error_message = models.TextField(
         help_text="Any errors that occurred while processing an item",

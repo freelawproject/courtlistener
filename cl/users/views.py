@@ -52,6 +52,7 @@ from cl.api.utils import (
 from cl.api.views import parse_throttle_rate_for_template
 from cl.custom_filters.decorators import check_honeypot
 from cl.favorites.forms import NoteForm
+from cl.lib.auth import filter_by_email
 from cl.lib.crypto import generate_activation_key
 from cl.lib.ratelimiter import (
     ratelimiter_all_2_per_m,
@@ -528,9 +529,10 @@ def register(request: HttpRequest) -> HttpResponse:
     if request.user.is_anonymous:
         if request.method == "POST":
             try:
-                stub_account = User.objects.filter(
-                    profile__stub_account=True,
-                ).get(email__iexact=request.POST.get("email"))
+                stub_account = filter_by_email(
+                    User.objects.filter(profile__stub_account=True),
+                    request.POST.get("email", ""),
+                ).get()
             except User.DoesNotExist:
                 stub_account = False
 
@@ -741,7 +743,7 @@ def request_email_confirmation(request: HttpRequest) -> HttpResponse:
         form = EmailConfirmationForm(request.POST)
         if form.is_valid():
             cd = form.cleaned_data
-            users = User.objects.filter(email__iexact=cd["email"])
+            users = filter_by_email(User.objects.all(), cd["email"])
             if not len(users):
                 # Normally, we'd throw an error here, but instead we pretend it
                 # was a success. Meanwhile, we send an email saying that a
