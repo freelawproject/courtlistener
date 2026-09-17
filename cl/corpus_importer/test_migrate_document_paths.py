@@ -40,7 +40,6 @@ from cl.search.state.florida.factories import (
     FloridaDocumentFactory,
 )
 from cl.search.state.florida.models import florida_local_date
-from cl.search.state.shared import recap_style_state_document_path
 from cl.search.state.texas.factories import (
     TexasDocketEntryFactory,
     TexasDocumentFactory,
@@ -176,12 +175,6 @@ class RecapStylePathHelpersTest(SimpleTestCase):
             with self.subTest(label):
                 self.assertEqual(florida_local_date(value), expected)
         self.assertIsNone(florida_local_date(None))
-
-    def test_state_document_path_requires_saved_document(self) -> None:
-        with self.assertRaises(ValueError):
-            recap_style_state_document_path(
-                None, "tex", 1, "x.pdf", False, date(2024, 1, 1)
-            )
 
     def test_build_new_key_per_spec(self) -> None:
         """Each spec builds its key from the right row fields, with the
@@ -326,6 +319,12 @@ class ModelPdfPathTest(TestCase):
             doc.get_pdf_path("abc.html"),
             f"recap/gov.uscourts.tex.{d}/gov.uscourts.tex.{d}.undated.{doc.pk}.html",
         )
+
+    def test_state_document_path_requires_saved_document(self) -> None:
+        entry = TexasDocketEntryFactory(docket=DocketFactory(court=self.tex))
+        unsaved = TexasDocumentFactory.build(docket_entry=entry)
+        with self.assertRaises(ValueError):
+            unsaved.get_pdf_path("abc.pdf")
 
     def test_florida_document_uses_local_date(self) -> None:
         docket = DocketFactory(court=self.fla)

@@ -11,7 +11,6 @@ from cl.lib.types import NonEmptyTuple
 from cl.search.state.shared import (
     AbstractStateDocument,
     DocketEntryType,
-    recap_style_state_document_path,
 )
 
 __all__ = ["FloridaDocketEntry", "FloridaDocument"]
@@ -175,22 +174,12 @@ class FloridaDocument(AbstractDateTimeModel, AbstractStateDocument):
             )
         ]
 
+    def path_date_filed(self) -> date | None:
+        """ACIS entry timestamps are stored in UTC, so convert to Florida's
+        local calendar day before it goes into the storage path."""
+        return florida_local_date(self.docket_entry.date_filed)
+
     def get_pdf_path(self, filename: str, thumbs: bool = False) -> str:
-        """Store Florida ACIS documents in the RECAP layout, keyed by the
-        entry's filing date (in Florida's timezone) and this document's pk:
-
-            recap/gov.uscourts.<court_id>.<docket_id>/gov.uscourts.<court_id>.<docket_id>.<date_filed>.<pk><ext>
-
-        ACIS serves .tiff as well as .pdf, so the extension of `filename` is
-        preserved. The document must already be saved, since the pk is part
-        of the name.
-        """
-        entry = self.docket_entry
-        return recap_style_state_document_path(
-            self.pk,
-            entry.docket.court_id,
-            entry.docket.pk,
-            filename,
-            thumbs,
-            date_filed=florida_local_date(entry.date_filed),
-        )
+        """Store Florida ACIS documents in the shared RECAP-style state
+        layout."""
+        return self.state_pdf_path(filename, thumbs)
