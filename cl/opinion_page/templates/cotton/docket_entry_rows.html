@@ -3,6 +3,7 @@
 <c-vars
   docket_entries=""
   docket_source=""
+  filters_applied=""
   class=""
 />
 
@@ -150,8 +151,13 @@
     {% endfor %}
   </ol>
 {% else %}
+  {# An empty page means either the filters excluded every entry or the docket has none yet. #}
   <div class="px-4 py-8 text-center text-sm text-greyscale-700">
-    <p>No docket entries match your filters.</p>
+    {% if filters_applied %}
+      <p>No docket entries match your filters.</p>
+    {% else %}
+      <p><c-docket-empty-message :docket_source="docket_source" /></p>
+    {% endif %}
   </div>
 {% endif %}
 </div>
