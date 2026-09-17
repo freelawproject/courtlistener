@@ -1,4 +1,5 @@
 import random
+from typing import cast
 
 from django.conf import settings
 from django.contrib.auth.models import User
@@ -126,7 +127,10 @@ def inject_email_ban_status(
     return dict: The message and date for the user's email status.
     """
     user = request.user
-    if isinstance(user, User):
+    if user.is_authenticated:
+        user = cast(
+            User, user
+        )  # Cast here since according to Django (https://docs.djangoproject.com/en/6.1/ref/request-response/) the `is_authenticated` property should act as a type guard
         email = user.email
         email_banned = EmailFlag.objects.filter(
             email_address=email, flag_type=FLAG_TYPES.BAN
