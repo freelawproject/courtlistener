@@ -77,6 +77,7 @@ urlpatterns = [
     path(
         ".well-known/change-password",
         RedirectView.as_view(pattern_name="password_change"),
+        name="well_known_change_password",
     ),
     path(
         "donate/",

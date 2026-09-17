@@ -22,7 +22,7 @@ class ChangePasswordWellKnownTests(TestCase):
 
     def test_change_password(self) -> None:
         """The standard URL temporarily redirects to a real password page."""
-        response = self.client.get("/.well-known/change-password")
+        response = self.client.get(reverse("well_known_change_password"))
 
         self.assertRedirects(
             response,
