@@ -14,6 +14,7 @@ from cl.lib.types import NonEmptyTuple
 from cl.search.state.shared import (
     AbstractStateDocument,
     ProcessingError,
+    recap_style_state_document_path,
 )
 
 __all__ = ["TexasDocketEntry", "TexasDocument"]
@@ -138,7 +139,21 @@ class TexasDocument(AbstractDateTimeModel, AbstractStateDocument):
         unique_together = [["docket_entry", "media_id"]]
 
     def get_pdf_path(self, filename: str, thumbs: bool = False) -> str:
-        """Store TAMES documents under the shared state layout."""
-        return self.state_pdf_path(
-            "tx", self.docket_entry.docket.court_id, filename, thumbs
+        """Store TAMES documents in the RECAP layout, keyed by the entry's
+        filing date and this document's pk:
+
+            recap/gov.uscourts.<court_id>.<docket_id>/gov.uscourts.<court_id>.<docket_id>.<date_filed>.<pk><ext>
+
+        TAMES serves .html, .wpd and .mp3 as well as .pdf, so the extension of
+        `filename` is preserved. The document must already be saved, since the
+        pk is part of the name.
+        """
+        entry = self.docket_entry
+        return recap_style_state_document_path(
+            self.pk,
+            entry.docket.court_id,
+            entry.docket.pk,
+            filename,
+            thumbs,
+            date_filed=entry.date_filed,
         )

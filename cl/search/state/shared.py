@@ -1,5 +1,5 @@
 import logging
-from datetime import datetime
+from datetime import date, datetime
 from pathlib import Path, PurePosixPath
 from typing import IO, Self
 
@@ -11,6 +11,7 @@ from django.utils.text import slugify
 
 from cl.lib.decorators import document_model
 from cl.lib.models import AbstractPDF
+from cl.lib.recap_utils import format_path_date, make_recap_style_path
 from cl.lib.types import NonEmptyTuple
 
 logger = logging.getLogger(__name__)
@@ -64,6 +65,47 @@ class ProcessingError:
         (BAD_URL, "Bad URL"),
         (EXTRACTION_FAILURE, "Extraction Failure"),
         (SEALED, "Sealed"),
+    )
+
+
+def recap_style_state_document_path(
+    document_pk: int | None,
+    court_id: str,
+    docket_id: int,
+    filename: str,
+    thumbs: bool,
+    date_filed: date | None,
+) -> str:
+    """Build the RECAP-layout storage path for a state court document.
+
+    State documents have no PACER document numbers, so the document's own pk
+    identifies it within the docket:
+
+        recap/gov.uscourts.<court_id>.<docket_id>/gov.uscourts.<court_id>.<docket_id>.<date_filed>.<pk><ext>
+
+    :param document_pk: The document's pk. Must be set, so the document has
+        to be saved before a file is stored for it.
+    :param court_id: The court the docket belongs to.
+    :param docket_id: The CourtListener docket id.
+    :param filename: The filename Django hands to the `upload_to` callback.
+        Only its extension is used, since state scrapers serve several formats.
+    :param thumbs: Whether to return the thumbnail path instead.
+    :param date_filed: The entry's filing date as a plain date in the court's
+        local timezone, or None when undated.
+    :return: The path, relative to the bucket root.
+    :raises ValueError: If the document hasn't been saved yet.
+    """
+    if document_pk is None:
+        raise ValueError(
+            "A state document must be saved before a file can be stored for "
+            "it; its pk is part of the storage path."
+        )
+    return make_recap_style_path(
+        court_id,
+        docket_id,
+        [format_path_date(date_filed), str(document_pk)],
+        Path(filename).suffix or ".pdf",
+        thumbs=thumbs,
     )
 
 

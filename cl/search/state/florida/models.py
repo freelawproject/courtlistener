@@ -1,3 +1,6 @@
+from datetime import date, datetime
+from zoneinfo import ZoneInfo
+
 import pghistory
 from django.db import models
 
@@ -8,9 +11,28 @@ from cl.lib.types import NonEmptyTuple
 from cl.search.state.shared import (
     AbstractStateDocument,
     DocketEntryType,
+    recap_style_state_document_path,
 )
 
 __all__ = ["FloridaDocketEntry", "FloridaDocument"]
+
+# Florida ACIS timestamps are stored in UTC; filing dates in storage paths
+# should reflect the court's local calendar day.
+# The Florida Supreme Court and all six appellate courts are located in cities
+# that use Eastern Time as of 09/17/2026
+FLORIDA_TIMEZONE = ZoneInfo("America/New_York")
+
+
+def florida_local_date(value: datetime | None) -> date | None:
+    """Convert a Florida ACIS timestamp to the court's local filing date.
+
+    :param value: A timezone-aware datetime as stored on FloridaDocketEntry,
+        or None when the entry is undated.
+    :return: The date in Florida's timezone, or None.
+    """
+    if value is None:
+        return None
+    return value.astimezone(FLORIDA_TIMEZONE).date()
 
 
 @pghistory.track()
@@ -154,7 +176,21 @@ class FloridaDocument(AbstractDateTimeModel, AbstractStateDocument):
         ]
 
     def get_pdf_path(self, filename: str, thumbs: bool = False) -> str:
-        """Store Florida ACIS documents under the shared state layout."""
-        return self.state_pdf_path(
-            "fl", self.docket_entry.docket.court_id, filename, thumbs
+        """Store Florida ACIS documents in the RECAP layout, keyed by the
+        entry's filing date (in Florida's timezone) and this document's pk:
+
+            recap/gov.uscourts.<court_id>.<docket_id>/gov.uscourts.<court_id>.<docket_id>.<date_filed>.<pk><ext>
+
+        ACIS serves .tiff as well as .pdf, so the extension of `filename` is
+        preserved. The document must already be saved, since the pk is part
+        of the name.
+        """
+        entry = self.docket_entry
+        return recap_style_state_document_path(
+            self.pk,
+            entry.docket.court_id,
+            entry.docket.pk,
+            filename,
+            thumbs,
+            date_filed=florida_local_date(entry.date_filed),
         )
