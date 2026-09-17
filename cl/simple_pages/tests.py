@@ -6,7 +6,7 @@ from django.contrib.auth.models import User
 from django.http import HttpResponse
 from django.template.loader import TemplateDoesNotExist, get_template
 from django.test import override_settings
-from django.urls import reverse
+from django.urls import resolve, reverse
 from lxml.html import fromstring
 from waffle.testutils import override_flag
 
@@ -15,6 +15,31 @@ from cl.simple_pages.forms import ContactForm
 from cl.simple_pages.sitemap import SimpleSitemap
 from cl.tests.cases import SimpleTestCase, TestCase
 from cl.tests.utils import parse_csp
+
+
+class ChangePasswordWellKnownTests(TestCase):
+    """Ensure password managers can discover the password-change page."""
+
+    def test_change_password(self) -> None:
+        """The standard URL temporarily redirects to a real password page."""
+        response = self.client.get("/.well-known/change-password")
+
+        self.assertRedirects(
+            response,
+            reverse("password_change"),
+            fetch_redirect_response=False,
+        )
+        self.assertEqual(
+            resolve(response["Location"]).url_name, "password_change"
+        )
+
+    def test_resource_that_should_not_exist(self) -> None:
+        """The discovery probe must return a genuine not-found response."""
+        response = self.client.get(
+            "/.well-known/resource-that-should-not-exist-whose-status-code-should-not-be-200"
+        )
+
+        self.assertEqual(response.status_code, HTTPStatus.NOT_FOUND)
 
 
 # Mock the hcaptcha thing so that we're sure it validates during tests
