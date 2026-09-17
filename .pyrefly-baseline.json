@@ -841,9 +841,9 @@
       "severity": "error"
     },
     {
-      "line": 621,
+      "line": 622,
       "column": 45,
-      "stop_line": 621,
+      "stop_line": 622,
       "stop_column": 66,
       "path": "cl/opinion_page/tests.py",
       "code": -2,
@@ -853,9 +853,9 @@
       "severity": "error"
     },
     {
-      "line": 630,
+      "line": 631,
       "column": 45,
-      "stop_line": 630,
+      "stop_line": 631,
       "stop_column": 66,
       "path": "cl/opinion_page/tests.py",
       "code": -2,
@@ -865,9 +865,9 @@
       "severity": "error"
     },
     {
-      "line": 670,
+      "line": 671,
       "column": 13,
-      "stop_line": 670,
+      "stop_line": 671,
       "stop_column": 27,
       "path": "cl/opinion_page/tests.py",
       "code": -2,
@@ -877,9 +877,9 @@
       "severity": "error"
     },
     {
-      "line": 2556,
+      "line": 2557,
       "column": 9,
-      "stop_line": 2556,
+      "stop_line": 2557,
       "stop_column": 44,
       "path": "cl/opinion_page/tests.py",
       "code": -2,
@@ -889,9 +889,9 @@
       "severity": "error"
     },
     {
-      "line": 2596,
+      "line": 2597,
       "column": 9,
-      "stop_line": 2596,
+      "stop_line": 2597,
       "stop_column": 44,
       "path": "cl/opinion_page/tests.py",
       "code": -2,
@@ -901,9 +901,9 @@
       "severity": "error"
     },
     {
-      "line": 2622,
+      "line": 2623,
       "column": 9,
-      "stop_line": 2622,
+      "stop_line": 2623,
       "stop_column": 44,
       "path": "cl/opinion_page/tests.py",
       "code": -2,
@@ -913,21 +913,9 @@
       "severity": "error"
     },
     {
-      "line": 2639,
+      "line": 2640,
       "column": 9,
-      "stop_line": 2639,
-      "stop_column": 44,
-      "path": "cl/opinion_page/tests.py",
-      "code": -2,
-      "name": "missing-attribute",
-      "description": "Object of class `Field` has no attribute `queryset`",
-      "concise_description": "Object of class `Field` has no attribute `queryset`",
-      "severity": "error"
-    },
-    {
-      "line": 2657,
-      "column": 9,
-      "stop_line": 2657,
+      "stop_line": 2640,
       "stop_column": 44,
       "path": "cl/opinion_page/tests.py",
       "code": -2,
@@ -940,7 +928,7 @@
       "line": 2658,
       "column": 9,
       "stop_line": 2658,
-      "stop_column": 45,
+      "stop_column": 44,
       "path": "cl/opinion_page/tests.py",
       "code": -2,
       "name": "missing-attribute",
@@ -952,7 +940,7 @@
       "line": 2659,
       "column": 9,
       "stop_line": 2659,
-      "stop_column": 44,
+      "stop_column": 45,
       "path": "cl/opinion_page/tests.py",
       "code": -2,
       "name": "missing-attribute",
@@ -961,9 +949,9 @@
       "severity": "error"
     },
     {
-      "line": 2699,
+      "line": 2660,
       "column": 9,
-      "stop_line": 2699,
+      "stop_line": 2660,
       "stop_column": 44,
       "path": "cl/opinion_page/tests.py",
       "code": -2,
@@ -976,7 +964,7 @@
       "line": 2700,
       "column": 9,
       "stop_line": 2700,
-      "stop_column": 45,
+      "stop_column": 44,
       "path": "cl/opinion_page/tests.py",
       "code": -2,
       "name": "missing-attribute",
@@ -988,7 +976,7 @@
       "line": 2701,
       "column": 9,
       "stop_line": 2701,
-      "stop_column": 44,
+      "stop_column": 45,
       "path": "cl/opinion_page/tests.py",
       "code": -2,
       "name": "missing-attribute",
@@ -997,9 +985,9 @@
       "severity": "error"
     },
     {
-      "line": 2718,
+      "line": 2702,
       "column": 9,
-      "stop_line": 2718,
+      "stop_line": 2702,
       "stop_column": 44,
       "path": "cl/opinion_page/tests.py",
       "code": -2,
@@ -1012,7 +1000,7 @@
       "line": 2719,
       "column": 9,
       "stop_line": 2719,
-      "stop_column": 45,
+      "stop_column": 44,
       "path": "cl/opinion_page/tests.py",
       "code": -2,
       "name": "missing-attribute",
@@ -1024,7 +1012,7 @@
       "line": 2720,
       "column": 9,
       "stop_line": 2720,
-      "stop_column": 44,
+      "stop_column": 45,
       "path": "cl/opinion_page/tests.py",
       "code": -2,
       "name": "missing-attribute",
@@ -1033,9 +1021,9 @@
       "severity": "error"
     },
     {
-      "line": 2830,
+      "line": 2721,
       "column": 9,
-      "stop_line": 2830,
+      "stop_line": 2721,
       "stop_column": 44,
       "path": "cl/opinion_page/tests.py",
       "code": -2,
@@ -1048,7 +1036,7 @@
       "line": 2831,
       "column": 9,
       "stop_line": 2831,
-      "stop_column": 45,
+      "stop_column": 44,
       "path": "cl/opinion_page/tests.py",
       "code": -2,
       "name": "missing-attribute",
@@ -1057,9 +1045,9 @@
       "severity": "error"
     },
     {
-      "line": 2865,
+      "line": 2832,
       "column": 9,
-      "stop_line": 2865,
+      "stop_line": 2832,
       "stop_column": 45,
       "path": "cl/opinion_page/tests.py",
       "code": -2,
@@ -1069,9 +1057,21 @@
       "severity": "error"
     },
     {
-      "line": 4109,
+      "line": 2866,
+      "column": 9,
+      "stop_line": 2866,
+      "stop_column": 45,
+      "path": "cl/opinion_page/tests.py",
+      "code": -2,
+      "name": "missing-attribute",
+      "description": "Object of class `Field` has no attribute `queryset`",
+      "concise_description": "Object of class `Field` has no attribute `queryset`",
+      "severity": "error"
+    },
+    {
+      "line": 4110,
       "column": 16,
-      "stop_line": 4109,
+      "stop_line": 4110,
       "stop_column": 54,
       "path": "cl/opinion_page/tests.py",
       "code": -2,
@@ -1081,9 +1081,21 @@
       "severity": "error"
     },
     {
-      "line": 4214,
+      "line": 4132,
+      "column": 26,
+      "stop_line": 4132,
+      "stop_column": 66,
+      "path": "cl/opinion_page/tests.py",
+      "code": -2,
+      "name": "unsupported-operation",
+      "description": "`Ellipsis` is not subscriptable",
+      "concise_description": "`Ellipsis` is not subscriptable",
+      "severity": "error"
+    },
+    {
+      "line": 4215,
       "column": 50,
-      "stop_line": 4214,
+      "stop_line": 4215,
       "stop_column": 59,
       "path": "cl/opinion_page/tests.py",
       "code": -2,

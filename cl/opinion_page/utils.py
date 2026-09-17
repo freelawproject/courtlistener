@@ -639,7 +639,7 @@ async def user_has_alert(user: AnonymousUser | User, docket: Docket) -> bool:
     return has_alert
 
 
-def generate_docket_entries_csv_data(docket_entries):
+def generate_docket_entries_csv_data(docket_entries) -> str:
     """Get str representing in memory file from docket_entries.
 
     :param docket_entries: List of DocketEntry that implements CSVExportMixin.

@@ -381,7 +381,7 @@ async def view_docket(
     page = request.GET.get("page", "1")
 
     @sync_to_async
-    def paginate_docket_entries(docket_entries, docket_page):
+    def paginate_docket_entries(docket_entries, docket_page: str):
         return Paginator(docket_entries, 200, orphans=10).get_page(docket_page)
 
     paginated_entries = await paginate_docket_entries(de_list, page)
@@ -487,7 +487,7 @@ async def view_parties(
     )
 
     @sync_to_async
-    def paginate_parties(party_queryset, parties_page):
+    def paginate_parties(party_queryset, parties_page: int | str):
         paginator = Paginator(party_queryset, 1000)
         try:
             return paginator.page(parties_page)
@@ -1430,7 +1430,7 @@ async def reporter_or_volume_handler(
     page = request.GET.get("page", 1)
 
     @sync_to_async
-    def paginate_volumes(volumes, volume_page):
+    def paginate_volumes(volumes, volume_page: int | str):
         paginator = Paginator(volumes, 100, orphans=10)
         try:
             return paginator.page(volume_page)

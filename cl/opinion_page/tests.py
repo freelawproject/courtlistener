@@ -32,6 +32,7 @@ from django.test.utils import CaptureQueriesContext
 from django.urls import reverse
 from django_cotton.compiler_regex import CottonCompiler
 from factory import RelatedFactory
+from lxml.etree import _Element
 from lxml.html import fromstring
 from waffle.models import Flag
 from waffle.testutils import override_flag
@@ -280,7 +281,7 @@ class ESCountAsyncTest(SimpleTestCase):
         query = MagicMock()
         search.query.return_value = query
 
-        def execute_search():
+        def execute_search() -> MagicMock:
             nonlocal execute_thread
             execute_thread = threading.get_ident()
             return response
@@ -427,7 +428,7 @@ class OpinionPageLoadTest(
     TestCase,
 ):
     @classmethod
-    def setUpTestData(cls):
+    def setUpTestData(cls) -> None:
         cls.o_cluster_1 = OpinionClusterWithParentsFactory.create(
             precedential_status=PRECEDENTIAL_STATUS.PUBLISHED,
             citation_count=1,
@@ -505,10 +506,10 @@ class ViewRecapDocumentTest(TestCase):
     """
 
     @classmethod
-    def setUpTestData(cls):
+    def setUpTestData(cls) -> None:
         cls.docket = DocketFactory()
 
-    async def get(self, follow=False, params=None, **kwargs):
+    async def get(self, follow: bool = False, params=None, **kwargs):
         kwargs["slug"] = ""
         if "att_num" in kwargs:
             path = reverse(
@@ -726,7 +727,7 @@ class ViewSCOTUSDocumentTest(TestCase):
         cls.court = CourtFactory(id="scotus", jurisdiction="F")
         cls.docket = DocketFactory(court=cls.court, source=Docket.SCRAPER)
 
-    async def get(self, follow=False, **kwargs):
+    async def get(self, follow: bool = False, **kwargs):
         kwargs.setdefault("slug", self.docket.slug)
         if "att_num" in kwargs:
             path = reverse("view_recap_attachment", kwargs=kwargs)
@@ -940,7 +941,7 @@ class CitationRedirectorTest(TestCase):
     fixtures = ["test_objects_search.json", "judge_judy.json"]
     citation = {"reporter": "F.2d", "volume": "56", "page": "9"}
 
-    def assertStatus(self, r, status):
+    def assertStatus(self, r, status: HTTPStatus) -> None:
         self.assertEqual(
             r.status_code,
             status,
@@ -1600,7 +1601,7 @@ class CitationRedirectorTest(TestCase):
 
 class ViewRecapDocketTest(TestCase):
     @classmethod
-    def setUpTestData(cls):
+    def setUpTestData(cls) -> None:
         cls.court = CourtFactory(id="canb", jurisdiction="FB")
         cls.docket = DocketFactory(
             court=cls.court,
@@ -2875,7 +2876,7 @@ class UploadPublication(TestCase):
 
 class TestBlockSearchItemAjax(TestCase):
     @classmethod
-    def setUpTestData(cls):
+    def setUpTestData(cls) -> None:
         # User admin (superuser)
         cls.admin = UserProfileWithParentsFactory.create(
             user__username="admin",
@@ -3016,7 +3017,7 @@ class TestAdminButtonsVisibility(TestCase):
     across the opinion, docket, and RECAP document pages."""
 
     @classmethod
-    def setUpTestData(cls):
+    def setUpTestData(cls) -> None:
         court = CourtFactory(id="ca3")
         cls.docket = DocketFactory(
             court=court, source=Docket.RECAP, case_name="Foo v. Bar"
@@ -3079,19 +3080,19 @@ class TestAdminButtonsVisibility(TestCase):
         )
         cls.docket_only.user.user_permissions.add(*docket_perms)
 
-    def _get_opinion_url(self):
+    def _get_opinion_url(self) -> str:
         return reverse(
             "view_case",
             args=[self.cluster.pk, self.cluster.slug],
         )
 
-    def _get_docket_url(self):
+    def _get_docket_url(self) -> str:
         return reverse(
             "view_docket",
             args=[self.docket.pk, self.docket.slug],
         )
 
-    def _get_recap_doc_url(self):
+    def _get_recap_doc_url(self) -> str:
         return reverse(
             "view_recap_document",
             kwargs={
@@ -3101,7 +3102,7 @@ class TestAdminButtonsVisibility(TestCase):
             },
         )
 
-    def _admin_url(self, route, pk):
+    def _admin_url(self, route: str, pk) -> str:
         """Build a resolved admin URL for assertion checks."""
         return reverse(f"admin:{route}", args=[pk])
 
@@ -3223,7 +3224,7 @@ class TestAdminButtonsVisibility(TestCase):
 class DocketEntryFileDownload(TestCase):
     """Test Docket entries File Download and required functions."""
 
-    def setUp(self):
+    def setUp(self) -> None:
         court = CourtFactory(id="ca5", jurisdiction="F")
         # Main docket to test
         docket = DocketFactory(
@@ -3315,7 +3316,7 @@ class DocketEntryFileDownload(TestCase):
         )
         self.request.auser = AsyncMock(return_value=self.user)
 
-    def tearDown(self):
+    def tearDown(self) -> None:
         # Clear all test data
         Docket.objects.all().delete()
         DocketEntry.objects.all().delete()
@@ -3401,7 +3402,7 @@ class DocketEntryFileDownload(TestCase):
         )
         self.assertEqual(response["Content-Type"], "text/csv")
 
-    def test_redirect_anonymous_users(self):
+    def test_redirect_anonymous_users(self) -> None:
         download_path = reverse(
             "view_download_docket", kwargs={"docket_id": self.mocked_docket.id}
         )
@@ -3460,7 +3461,7 @@ class CachePageIgnoreParamsTest(TestCase):
     """Test the cache_page_ignore_params decorator."""
 
     @classmethod
-    def setUpTestData(cls):
+    def setUpTestData(cls) -> None:
         court = CourtFactory(id="ca5", jurisdiction="F")
         cls.docket = DocketFactory(
             court=court,
@@ -3469,7 +3470,7 @@ class CachePageIgnoreParamsTest(TestCase):
             pacer_case_id="12345",
         )
 
-    def setUp(self):
+    def setUp(self) -> None:
         r = get_redis_interface("CACHE")
         keys_to_delete = r.keys(":1:custom.views.decorator.cache*")
         if keys_to_delete:
@@ -3520,7 +3521,7 @@ class CachePageIgnoreParamsTest(TestCase):
 
 class ClusterRedirectionTest(TestCase):
     @classmethod
-    def setUpTestData(cls):
+    def setUpTestData(cls) -> None:
         cls.deleted_cluster_id = 99999999
         cls.redirected_cluster = OpinionClusterWithParentsFactory.create(
             precedential_status=PRECEDENTIAL_STATUS.PUBLISHED,
@@ -3533,7 +3534,7 @@ class ClusterRedirectionTest(TestCase):
             reason=ClusterRedirection.DUPLICATE,
         )
 
-    def test_cluster_redirection(self):
+    def test_cluster_redirection(self) -> None:
         """Can we permanently redirect a deleted cluster to an existing one?"""
         deleted_cluster_url = reverse(
             "view_case", kwargs={"pk": self.deleted_cluster_id, "_": "test"}
@@ -4099,7 +4100,7 @@ class DocketFilterDrawerAttrPropagationTest(TestCase):
             }
         )
 
-    def _find_drawer(self, html: str):
+    def _find_drawer(self, html: str) -> _Element | None:
         """Return the element with `x-on:open-filter-drawer` (the drawer root).
 
         Done element-wise instead of XPath because `:` in attribute names

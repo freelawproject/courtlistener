@@ -115,7 +115,7 @@ class DocketEntryFilterForm(forms.Form):
         widget=forms.Select(),
     )
 
-    def __init__(self, *args, **kwargs):
+    def __init__(self, *args, **kwargs) -> None:
         self.request = kwargs.pop("request", None)
         super().__init__(*args, **kwargs)
 
@@ -200,7 +200,7 @@ class BaseCourtUploadForm(forms.Form):
                 cleaned_data[name] = strip_tags(cleaned_data[name])
         return cleaned_data
 
-    def add_author_field(self, required=False):
+    def add_author_field(self, required: bool = False) -> None:
         """Add author field to form
 
         :param required: field is required or not
@@ -219,7 +219,7 @@ class BaseCourtUploadForm(forms.Form):
             ),
         )
 
-    def add_author_str_field(self, required=True):
+    def add_author_str_field(self, required: bool = True) -> None:
         """Add author str field to form
 
         :param required: field is required or not
@@ -238,7 +238,7 @@ class BaseCourtUploadForm(forms.Form):
             ),
         )
 
-    def add_judges_field(self, required=True):
+    def add_judges_field(self, required: bool = True) -> None:
         """Add judges field to form
 
         :param required: field is required or not
@@ -257,7 +257,7 @@ class BaseCourtUploadForm(forms.Form):
             ),
         )
 
-    def add_panel_field(self, required=True):
+    def add_panel_field(self, required: bool = True) -> None:
         """Add panel field to form
 
         :param required: field is required or not
@@ -277,7 +277,7 @@ class BaseCourtUploadForm(forms.Form):
             ),
         )
 
-    def add_argue_fields(self, required=True):
+    def add_argue_fields(self, required: bool = True) -> None:
         """Add argued/reargued field to form
 
         :param required: field is required or not
@@ -308,7 +308,7 @@ class BaseCourtUploadForm(forms.Form):
             ),
         )
 
-    def add_citation_fields(self, required=True) -> None:
+    def add_citation_fields(self, required: bool = True) -> None:
         """Add citations fields to form
 
         :param required: fields are required or not
@@ -337,7 +337,7 @@ class BaseCourtUploadForm(forms.Form):
             ),
         )
 
-    def add_download_url(self, required=False):
+    def add_download_url(self, required: bool = False) -> None:
         """Add download url field to form
 
         :param required: field is required or not
