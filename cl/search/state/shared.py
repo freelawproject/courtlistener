@@ -255,7 +255,11 @@ class AbstractStateDocument(AbstractPDF):
         from cl.scrapers.utils import get_extension
 
         try:
-            document = cls._default_manager.get(pk=pk)
+            # The document's storage path is built from its docket, so fetch
+            # that with it rather than going back for it a query at a time.
+            document = cls._default_manager.select_related(
+                "docket_entry__docket"
+            ).get(pk=pk)
         except cls.DoesNotExist:
             logger.warning(
                 "Document download: %s %s does not exist; skipping.",
