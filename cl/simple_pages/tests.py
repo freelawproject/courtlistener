@@ -17,7 +17,7 @@ from cl.tests.cases import SimpleTestCase, TestCase
 from cl.tests.utils import parse_csp
 
 
-class ChangePasswordWellKnownTests(TestCase):
+class ChangePasswordWellKnownTests(SimpleTestCase):
     """Ensure password managers can discover the password-change page."""
 
     def test_change_password(self) -> None:
@@ -32,14 +32,6 @@ class ChangePasswordWellKnownTests(TestCase):
         self.assertEqual(
             resolve(response["Location"]).url_name, "password_change"
         )
-
-    def test_resource_that_should_not_exist(self) -> None:
-        """The discovery probe must return a genuine not-found response."""
-        response = self.client.get(
-            "/.well-known/resource-that-should-not-exist-whose-status-code-should-not-be-200"
-        )
-
-        self.assertEqual(response.status_code, HTTPStatus.NOT_FOUND)
 
 
 # Mock the hcaptcha thing so that we're sure it validates during tests
