@@ -73,9 +73,9 @@
       "severity": "error"
     },
     {
-      "line": 248,
+      "line": 246,
       "column": 52,
-      "stop_line": 248,
+      "stop_line": 246,
       "stop_column": 72,
       "path": "cl/alerts/tasks.py",
       "code": -2,
@@ -193,9 +193,9 @@
       "severity": "error"
     },
     {
-      "line": 748,
+      "line": 759,
       "column": 9,
-      "stop_line": 748,
+      "stop_line": 759,
       "stop_column": 24,
       "path": "cl/api/tests.py",
       "code": -2,
@@ -205,9 +205,9 @@
       "severity": "error"
     },
     {
-      "line": 851,
+      "line": 863,
       "column": 30,
-      "stop_line": 851,
+      "stop_line": 863,
       "stop_column": 61,
       "path": "cl/api/tests.py",
       "code": -2,
@@ -217,9 +217,9 @@
       "severity": "error"
     },
     {
-      "line": 870,
+      "line": 882,
       "column": 17,
-      "stop_line": 870,
+      "stop_line": 882,
       "stop_column": 49,
       "path": "cl/api/tests.py",
       "code": -2,
@@ -229,9 +229,9 @@
       "severity": "error"
     },
     {
-      "line": 887,
+      "line": 900,
       "column": 30,
-      "stop_line": 887,
+      "stop_line": 900,
       "stop_column": 61,
       "path": "cl/api/tests.py",
       "code": -2,
@@ -241,159 +241,15 @@
       "severity": "error"
     },
     {
-      "line": 906,
+      "line": 919,
       "column": 17,
-      "stop_line": 906,
+      "stop_line": 919,
       "stop_column": 49,
       "path": "cl/api/tests.py",
       "code": -2,
       "name": "bad-argument-type",
       "description": "Argument `Unknown | None` is not assignable to parameter `x` with type `Buffer | SupportsIndex | SupportsInt | SupportsTrunc | str` in function `int.__new__`\n  Protocol `Buffer` requires attribute `__buffer__`\n  The declared type does not allow `None`. Consider narrowing the value with an `is not None` check.",
       "concise_description": "Argument `Unknown | None` is not assignable to parameter `x` with type `Buffer | SupportsIndex | SupportsInt | SupportsTrunc | str` in function `int.__new__`",
-      "severity": "error"
-    },
-    {
-      "line": 2193,
-      "column": 27,
-      "stop_line": 2193,
-      "stop_column": 55,
-      "path": "cl/api/tests.py",
-      "code": -2,
-      "name": "bad-argument-count",
-      "description": "Expected 0 positional arguments, got 1 in function `django.http.request.HttpRequest.__new__`",
-      "concise_description": "Expected 0 positional arguments, got 1 in function `django.http.request.HttpRequest.__new__`",
-      "severity": "error"
-    },
-    {
-      "line": 2194,
-      "column": 9,
-      "stop_line": 2194,
-      "stop_column": 24,
-      "path": "cl/api/tests.py",
-      "code": -2,
-      "name": "missing-attribute",
-      "description": "Object of class `_MutableHttpRequest` has no attribute `version`",
-      "concise_description": "Object of class `_MutableHttpRequest` has no attribute `version`",
-      "severity": "error"
-    },
-    {
-      "line": 2195,
-      "column": 43,
-      "stop_line": 2195,
-      "stop_column": 50,
-      "path": "cl/api/tests.py",
-      "code": -2,
-      "name": "bad-argument-type",
-      "description": "Argument `_MutableHttpRequest` is not assignable to parameter `request` with type `Request` in function `V3DRFPaginationTest.paginate_queryset`",
-      "concise_description": "Argument `_MutableHttpRequest` is not assignable to parameter `request` with type `Request` in function `V3DRFPaginationTest.paginate_queryset`",
-      "severity": "error"
-    },
-    {
-      "line": 2199,
-      "column": 27,
-      "stop_line": 2199,
-      "stop_column": 68,
-      "path": "cl/api/tests.py",
-      "code": -2,
-      "name": "bad-argument-count",
-      "description": "Expected 0 positional arguments, got 1 in function `django.http.request.HttpRequest.__new__`",
-      "concise_description": "Expected 0 positional arguments, got 1 in function `django.http.request.HttpRequest.__new__`",
-      "severity": "error"
-    },
-    {
-      "line": 2200,
-      "column": 9,
-      "stop_line": 2200,
-      "stop_column": 24,
-      "path": "cl/api/tests.py",
-      "code": -2,
-      "name": "missing-attribute",
-      "description": "Object of class `_MutableHttpRequest` has no attribute `version`",
-      "concise_description": "Object of class `_MutableHttpRequest` has no attribute `version`",
-      "severity": "error"
-    },
-    {
-      "line": 2201,
-      "column": 43,
-      "stop_line": 2201,
-      "stop_column": 50,
-      "path": "cl/api/tests.py",
-      "code": -2,
-      "name": "bad-argument-type",
-      "description": "Argument `_MutableHttpRequest` is not assignable to parameter `request` with type `Request` in function `V3DRFPaginationTest.paginate_queryset`",
-      "concise_description": "Argument `_MutableHttpRequest` is not assignable to parameter `request` with type `Request` in function `V3DRFPaginationTest.paginate_queryset`",
-      "severity": "error"
-    },
-    {
-      "line": 2206,
-      "column": 31,
-      "stop_line": 2206,
-      "stop_column": 73,
-      "path": "cl/api/tests.py",
-      "code": -2,
-      "name": "bad-argument-count",
-      "description": "Expected 0 positional arguments, got 1 in function `django.http.request.HttpRequest.__new__`",
-      "concise_description": "Expected 0 positional arguments, got 1 in function `django.http.request.HttpRequest.__new__`",
-      "severity": "error"
-    },
-    {
-      "line": 2207,
-      "column": 13,
-      "stop_line": 2207,
-      "stop_column": 28,
-      "path": "cl/api/tests.py",
-      "code": -2,
-      "name": "missing-attribute",
-      "description": "Object of class `_MutableHttpRequest` has no attribute `version`",
-      "concise_description": "Object of class `_MutableHttpRequest` has no attribute `version`",
-      "severity": "error"
-    },
-    {
-      "line": 2208,
-      "column": 36,
-      "stop_line": 2208,
-      "stop_column": 43,
-      "path": "cl/api/tests.py",
-      "code": -2,
-      "name": "bad-argument-type",
-      "description": "Argument `_MutableHttpRequest` is not assignable to parameter `request` with type `Request` in function `V3DRFPaginationTest.paginate_queryset`",
-      "concise_description": "Argument `_MutableHttpRequest` is not assignable to parameter `request` with type `Request` in function `V3DRFPaginationTest.paginate_queryset`",
-      "severity": "error"
-    },
-    {
-      "line": 2463,
-      "column": 27,
-      "stop_line": 2463,
-      "stop_column": 55,
-      "path": "cl/api/tests.py",
-      "code": -2,
-      "name": "bad-argument-count",
-      "description": "Expected 0 positional arguments, got 1 in function `django.http.request.HttpRequest.__new__`",
-      "concise_description": "Expected 0 positional arguments, got 1 in function `django.http.request.HttpRequest.__new__`",
-      "severity": "error"
-    },
-    {
-      "line": 2464,
-      "column": 9,
-      "stop_line": 2464,
-      "stop_column": 24,
-      "path": "cl/api/tests.py",
-      "code": -2,
-      "name": "missing-attribute",
-      "description": "Object of class `_MutableHttpRequest` has no attribute `version`",
-      "concise_description": "Object of class `_MutableHttpRequest` has no attribute `version`",
-      "severity": "error"
-    },
-    {
-      "line": 2465,
-      "column": 43,
-      "stop_line": 2465,
-      "stop_column": 50,
-      "path": "cl/api/tests.py",
-      "code": -2,
-      "name": "bad-argument-type",
-      "description": "Argument `_MutableHttpRequest` is not assignable to parameter `request` with type `Request` in function `V4DRFPaginationTest.paginate_queryset`",
-      "concise_description": "Argument `_MutableHttpRequest` is not assignable to parameter `request` with type `Request` in function `V4DRFPaginationTest.paginate_queryset`",
       "severity": "error"
     },
     {
@@ -493,9 +349,9 @@
       "severity": "error"
     },
     {
-      "line": 166,
+      "line": 171,
       "column": 60,
-      "stop_line": 166,
+      "stop_line": 171,
       "stop_column": 70,
       "path": "cl/audio/tasks.py",
       "code": -2,
@@ -553,9 +409,9 @@
       "severity": "error"
     },
     {
-      "line": 79,
+      "line": 78,
       "column": 21,
-      "stop_line": 84,
+      "stop_line": 83,
       "stop_column": 22,
       "path": "cl/citations/api_views.py",
       "code": -2,
@@ -565,9 +421,9 @@
       "severity": "error"
     },
     {
-      "line": 98,
+      "line": 97,
       "column": 17,
-      "stop_line": 101,
+      "stop_line": 100,
       "stop_column": 18,
       "path": "cl/citations/api_views.py",
       "code": -2,
@@ -577,9 +433,9 @@
       "severity": "error"
     },
     {
-      "line": 191,
+      "line": 190,
       "column": 45,
-      "stop_line": 191,
+      "stop_line": 190,
       "stop_column": 53,
       "path": "cl/citations/api_views.py",
       "code": -2,
@@ -925,9 +781,9 @@
       "severity": "error"
     },
     {
-      "line": 2299,
+      "line": 2309,
       "column": 28,
-      "stop_line": 2299,
+      "stop_line": 2309,
       "stop_column": 40,
       "path": "cl/corpus_importer/tasks.py",
       "code": -2,
@@ -937,87 +793,15 @@
       "severity": "error"
     },
     {
-      "line": 2335,
+      "line": 2345,
       "column": 24,
-      "stop_line": 2335,
+      "stop_line": 2345,
       "stop_column": 36,
       "path": "cl/corpus_importer/tasks.py",
       "code": -2,
       "name": "bad-argument-type",
       "description": "Argument `str` is not assignable to parameter `pacer_doc_id` with type `int | None` in function `juriscraper.pacer.reports.BaseReport.download_pdf`",
       "concise_description": "Argument `str` is not assignable to parameter `pacer_doc_id` with type `int | None` in function `juriscraper.pacer.reports.BaseReport.download_pdf`",
-      "severity": "error"
-    },
-    {
-      "line": 5150,
-      "column": 9,
-      "stop_line": 5150,
-      "stop_column": 27,
-      "path": "cl/corpus_importer/tasks.py",
-      "code": -2,
-      "name": "missing-attribute",
-      "description": "Object of class `Deserializable` has no attribute `docket_number`",
-      "concise_description": "Object of class `Deserializable` has no attribute `docket_number`",
-      "severity": "error"
-    },
-    {
-      "line": 5154,
-      "column": 20,
-      "stop_line": 5154,
-      "stop_column": 32,
-      "path": "cl/corpus_importer/tasks.py",
-      "code": -2,
-      "name": "missing-attribute",
-      "description": "Object of class `Deserializable` has no attribute `entries`",
-      "concise_description": "Object of class `Deserializable` has no attribute `entries`",
-      "severity": "error"
-    },
-    {
-      "line": 5155,
-      "column": 54,
-      "stop_line": 5155,
-      "stop_column": 66,
-      "path": "cl/corpus_importer/tasks.py",
-      "code": -2,
-      "name": "missing-attribute",
-      "description": "Object of class `Deserializable` has no attribute `entries`",
-      "concise_description": "Object of class `Deserializable` has no attribute `entries`",
-      "severity": "error"
-    },
-    {
-      "line": 5159,
-      "column": 13,
-      "stop_line": 5159,
-      "stop_column": 31,
-      "path": "cl/corpus_importer/tasks.py",
-      "code": -2,
-      "name": "missing-attribute",
-      "description": "Object of class `Deserializable` has no attribute `docket_number`",
-      "concise_description": "Object of class `Deserializable` has no attribute `docket_number`",
-      "severity": "error"
-    },
-    {
-      "line": 5163,
-      "column": 41,
-      "stop_line": 5163,
-      "stop_column": 45,
-      "path": "cl/corpus_importer/tasks.py",
-      "code": -2,
-      "name": "bad-argument-type",
-      "description": "Argument `Deserializable` is not assignable to parameter `scrape` with type `FloridaCase` in function `cl.corpus_importer.state.merger.Merger.__init__`",
-      "concise_description": "Argument `Deserializable` is not assignable to parameter `scrape` with type `FloridaCase` in function `cl.corpus_importer.state.merger.Merger.__init__`",
-      "severity": "error"
-    },
-    {
-      "line": 5168,
-      "column": 13,
-      "stop_line": 5168,
-      "stop_column": 31,
-      "path": "cl/corpus_importer/tasks.py",
-      "code": -2,
-      "name": "missing-attribute",
-      "description": "Object of class `Deserializable` has no attribute `docket_number`",
-      "concise_description": "Object of class `Deserializable` has no attribute `docket_number`",
       "severity": "error"
     },
     {
@@ -1093,9 +877,9 @@
       "severity": "error"
     },
     {
-      "line": 2278,
+      "line": 2556,
       "column": 9,
-      "stop_line": 2278,
+      "stop_line": 2556,
       "stop_column": 44,
       "path": "cl/opinion_page/tests.py",
       "code": -2,
@@ -1105,9 +889,9 @@
       "severity": "error"
     },
     {
-      "line": 2318,
+      "line": 2596,
       "column": 9,
-      "stop_line": 2318,
+      "stop_line": 2596,
       "stop_column": 44,
       "path": "cl/opinion_page/tests.py",
       "code": -2,
@@ -1117,9 +901,9 @@
       "severity": "error"
     },
     {
-      "line": 2344,
+      "line": 2622,
       "column": 9,
-      "stop_line": 2344,
+      "stop_line": 2622,
       "stop_column": 44,
       "path": "cl/opinion_page/tests.py",
       "code": -2,
@@ -1129,9 +913,9 @@
       "severity": "error"
     },
     {
-      "line": 2361,
+      "line": 2639,
       "column": 9,
-      "stop_line": 2361,
+      "stop_line": 2639,
       "stop_column": 44,
       "path": "cl/opinion_page/tests.py",
       "code": -2,
@@ -1141,9 +925,9 @@
       "severity": "error"
     },
     {
-      "line": 2379,
+      "line": 2657,
       "column": 9,
-      "stop_line": 2379,
+      "stop_line": 2657,
       "stop_column": 44,
       "path": "cl/opinion_page/tests.py",
       "code": -2,
@@ -1153,9 +937,9 @@
       "severity": "error"
     },
     {
-      "line": 2380,
+      "line": 2658,
       "column": 9,
-      "stop_line": 2380,
+      "stop_line": 2658,
       "stop_column": 45,
       "path": "cl/opinion_page/tests.py",
       "code": -2,
@@ -1165,9 +949,9 @@
       "severity": "error"
     },
     {
-      "line": 2381,
+      "line": 2659,
       "column": 9,
-      "stop_line": 2381,
+      "stop_line": 2659,
       "stop_column": 44,
       "path": "cl/opinion_page/tests.py",
       "code": -2,
@@ -1177,9 +961,9 @@
       "severity": "error"
     },
     {
-      "line": 2421,
+      "line": 2699,
       "column": 9,
-      "stop_line": 2421,
+      "stop_line": 2699,
       "stop_column": 44,
       "path": "cl/opinion_page/tests.py",
       "code": -2,
@@ -1189,9 +973,9 @@
       "severity": "error"
     },
     {
-      "line": 2422,
+      "line": 2700,
       "column": 9,
-      "stop_line": 2422,
+      "stop_line": 2700,
       "stop_column": 45,
       "path": "cl/opinion_page/tests.py",
       "code": -2,
@@ -1201,9 +985,9 @@
       "severity": "error"
     },
     {
-      "line": 2423,
+      "line": 2701,
       "column": 9,
-      "stop_line": 2423,
+      "stop_line": 2701,
       "stop_column": 44,
       "path": "cl/opinion_page/tests.py",
       "code": -2,
@@ -1213,9 +997,9 @@
       "severity": "error"
     },
     {
-      "line": 2440,
+      "line": 2718,
       "column": 9,
-      "stop_line": 2440,
+      "stop_line": 2718,
       "stop_column": 44,
       "path": "cl/opinion_page/tests.py",
       "code": -2,
@@ -1225,9 +1009,9 @@
       "severity": "error"
     },
     {
-      "line": 2441,
+      "line": 2719,
       "column": 9,
-      "stop_line": 2441,
+      "stop_line": 2719,
       "stop_column": 45,
       "path": "cl/opinion_page/tests.py",
       "code": -2,
@@ -1237,9 +1021,9 @@
       "severity": "error"
     },
     {
-      "line": 2442,
+      "line": 2720,
       "column": 9,
-      "stop_line": 2442,
+      "stop_line": 2720,
       "stop_column": 44,
       "path": "cl/opinion_page/tests.py",
       "code": -2,
@@ -1249,9 +1033,9 @@
       "severity": "error"
     },
     {
-      "line": 2552,
+      "line": 2830,
       "column": 9,
-      "stop_line": 2552,
+      "stop_line": 2830,
       "stop_column": 44,
       "path": "cl/opinion_page/tests.py",
       "code": -2,
@@ -1261,9 +1045,9 @@
       "severity": "error"
     },
     {
-      "line": 2553,
+      "line": 2831,
       "column": 9,
-      "stop_line": 2553,
+      "stop_line": 2831,
       "stop_column": 45,
       "path": "cl/opinion_page/tests.py",
       "code": -2,
@@ -1273,9 +1057,9 @@
       "severity": "error"
     },
     {
-      "line": 2587,
+      "line": 2865,
       "column": 9,
-      "stop_line": 2587,
+      "stop_line": 2865,
       "stop_column": 45,
       "path": "cl/opinion_page/tests.py",
       "code": -2,
@@ -1285,9 +1069,9 @@
       "severity": "error"
     },
     {
-      "line": 3832,
+      "line": 4109,
       "column": 16,
-      "stop_line": 3832,
+      "stop_line": 4109,
       "stop_column": 54,
       "path": "cl/opinion_page/tests.py",
       "code": -2,
@@ -1297,9 +1081,9 @@
       "severity": "error"
     },
     {
-      "line": 3937,
+      "line": 4214,
       "column": 50,
-      "stop_line": 3937,
+      "stop_line": 4214,
       "stop_column": 59,
       "path": "cl/opinion_page/tests.py",
       "code": -2,
@@ -1309,9 +1093,9 @@
       "severity": "error"
     },
     {
-      "line": 953,
+      "line": 958,
       "column": 28,
-      "stop_line": 953,
+      "stop_line": 958,
       "stop_column": 36,
       "path": "cl/opinion_page/utils.py",
       "code": -2,
@@ -1321,9 +1105,9 @@
       "severity": "error"
     },
     {
-      "line": 166,
+      "line": 167,
       "column": 27,
-      "stop_line": 175,
+      "stop_line": 176,
       "stop_column": 10,
       "path": "cl/opinion_page/views.py",
       "code": -2,
@@ -1537,9 +1321,9 @@
       "severity": "error"
     },
     {
-      "line": 70,
+      "line": 82,
       "column": 45,
-      "stop_line": 70,
+      "stop_line": 82,
       "stop_column": 59,
       "path": "cl/search/state/new_york/models.py",
       "code": -2,
@@ -1573,9 +1357,9 @@
       "severity": "error"
     },
     {
-      "line": 24,
+      "line": 27,
       "column": 7,
-      "stop_line": 24,
+      "stop_line": 27,
       "stop_column": 21,
       "path": "cl/tests/utils.py",
       "code": -2,
@@ -1585,74 +1369,74 @@
       "severity": "error"
     },
     {
-      "line": 34,
+      "line": 37,
       "column": 15,
-      "stop_line": 34,
+      "stop_line": 37,
       "stop_column": 18,
       "path": "cl/tests/utils.py",
       "code": -2,
       "name": "bad-override",
-      "description": "Class member `AsyncAPIClient.get` overrides parent class `AsyncClient` in an inconsistent manner\n  `AsyncAPIClient.get` has type `(self: AsyncAPIClient, path: Unknown, data: Unknown | None = None, **extra: Unknown) -> Unknown`, which is not assignable to `(self: AsyncAPIClient, path: _StrOrPromise, data: _GetDataType = ..., follow: bool = ..., secure: bool = ..., *, headers: Mapping[str, Any] | None = ..., query_params: Mapping[Any, Any] | None = ..., **extra: Any) -> Coroutine[Unknown, Unknown, _MonkeyPatchedASGIResponse]`, the type of `AsyncClient.get`\n  Signature mismatch:\n  ...h: _StrOrPromise, data: _GetDataType = ..., follow: bool = ..., secure: bool = ..., *, headers: Mapping[str, Any] | None = ..., query_params: Mapping[Any, Any] | None = ..., **extra: Any) -> Coroutine[Unknown, Unknown, _MonkeyPatchedASGIResponse]: ...\n        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ return type\n        |\n        parameters\n  ...h: Unknown, data: Unknown | None = None, **extra: Unknown) -> Unknown: ...\n        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^     ^^^^^^^ return type\n        |\n        parameters",
+      "description": "Class member `AsyncAPIClient.get` overrides parent class `AsyncClient` in an inconsistent manner\n  `AsyncAPIClient.get` has type `(self: AsyncAPIClient, path: Unknown, data: Unknown | None = None, **extra: Unknown) -> Unknown`, which is not assignable to `(self: AsyncAPIClient, path: _StrOrPromise, data: _GetDataType = ..., follow: bool = ..., secure: bool = ..., *, headers: Mapping[str, str] | None = ..., query_params: Mapping[Any, Any] | None = ..., **extra: Any) -> Coroutine[Unknown, Unknown, _MonkeyPatchedASGIResponse]`, the type of `AsyncClient.get`\n  Signature mismatch:\n  ...h: _StrOrPromise, data: _GetDataType = ..., follow: bool = ..., secure: bool = ..., *, headers: Mapping[str, str] | None = ..., query_params: Mapping[Any, Any] | None = ..., **extra: Any) -> Coroutine[Unknown, Unknown, _MonkeyPatchedASGIResponse]: ...\n        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ return type\n        |\n        parameters\n  ...h: Unknown, data: Unknown | None = None, **extra: Unknown) -> Unknown: ...\n        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^     ^^^^^^^ return type\n        |\n        parameters",
       "concise_description": "Class member `AsyncAPIClient.get` overrides parent class `AsyncClient` in an inconsistent manner",
       "severity": "error"
     },
     {
-      "line": 47,
+      "line": 50,
       "column": 15,
-      "stop_line": 47,
+      "stop_line": 50,
       "stop_column": 19,
       "path": "cl/tests/utils.py",
       "code": -2,
       "name": "bad-override",
-      "description": "Class member `AsyncAPIClient.post` overrides parent class `AsyncClient` in an inconsistent manner\n  `AsyncAPIClient.post` has type `(self: AsyncAPIClient, path: Unknown, data: Unknown | None = None, format: Unknown | None = None, content_type: Unknown | None = None, **extra: Unknown) -> Unknown`, which is not assignable to `(self: AsyncAPIClient, path: _StrOrPromise, data: Any = ..., content_type: str = ..., follow: bool = ..., secure: bool = ..., *, headers: Mapping[str, Any] | None = ..., query_params: Mapping[Any, Any] | None = ..., **extra: Any) -> Coroutine[Unknown, Unknown, _MonkeyPatchedASGIResponse]`, the type of `AsyncClient.post`\n  Signature mismatch:\n  ...h: _StrOrPromise, data: Any = ..., content_type: str = ..., follow: bool = ..., secure: bool = ..., *, headers: Mapping[str, Any] | None = ..., query_params: Mapping[Any, Any] | None = ..., **extra: Any) -> Coroutine[Unknown, Unknown, _MonkeyPatchedASGIResponse]: ...\n        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ return type\n        |\n        parameters\n  ...h: Unknown, data: Unknown | None = None, format: Unknown | None = None, content_type: Unknown | None = None, **extra: Unknown) -> Unknown: ...\n        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^     ^^^^^^^ return type\n        |\n        parameters",
+      "description": "Class member `AsyncAPIClient.post` overrides parent class `AsyncClient` in an inconsistent manner\n  `AsyncAPIClient.post` has type `(self: AsyncAPIClient, path: Unknown, data: Unknown | None = None, format: Unknown | None = None, content_type: Unknown | None = None, **extra: Unknown) -> Unknown`, which is not assignable to `(self: AsyncAPIClient, path: _StrOrPromise, data: Any = ..., content_type: str = ..., follow: bool = ..., secure: bool = ..., *, headers: Mapping[str, str] | None = ..., query_params: Mapping[Any, Any] | None = ..., **extra: Any) -> Coroutine[Unknown, Unknown, _MonkeyPatchedASGIResponse]`, the type of `AsyncClient.post`\n  Signature mismatch:\n  ...h: _StrOrPromise, data: Any = ..., content_type: str = ..., follow: bool = ..., secure: bool = ..., *, headers: Mapping[str, str] | None = ..., query_params: Mapping[Any, Any] | None = ..., **extra: Any) -> Coroutine[Unknown, Unknown, _MonkeyPatchedASGIResponse]: ...\n        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ return type\n        |\n        parameters\n  ...h: Unknown, data: Unknown | None = None, format: Unknown | None = None, content_type: Unknown | None = None, **extra: Unknown) -> Unknown: ...\n        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^     ^^^^^^^ return type\n        |\n        parameters",
       "concise_description": "Class member `AsyncAPIClient.post` overrides parent class `AsyncClient` in an inconsistent manner",
       "severity": "error"
     },
     {
-      "line": 53,
+      "line": 56,
       "column": 15,
-      "stop_line": 53,
+      "stop_line": 56,
       "stop_column": 18,
       "path": "cl/tests/utils.py",
       "code": -2,
       "name": "bad-override",
-      "description": "Class member `AsyncAPIClient.put` overrides parent class `AsyncClient` in an inconsistent manner\n  `AsyncAPIClient.put` has type `(self: AsyncAPIClient, path: Unknown, data: Unknown | None = None, format: Unknown | None = None, content_type: Unknown | None = None, **extra: Unknown) -> Unknown`, which is not assignable to `(self: AsyncAPIClient, path: _StrOrPromise, data: Any = ..., content_type: str = ..., follow: bool = ..., secure: bool = ..., *, headers: Mapping[str, Any] | None = ..., query_params: Mapping[Any, Any] | None = ..., **extra: Any) -> Coroutine[Unknown, Unknown, _MonkeyPatchedASGIResponse]`, the type of `AsyncClient.put`\n  Signature mismatch:\n  ...h: _StrOrPromise, data: Any = ..., content_type: str = ..., follow: bool = ..., secure: bool = ..., *, headers: Mapping[str, Any] | None = ..., query_params: Mapping[Any, Any] | None = ..., **extra: Any) -> Coroutine[Unknown, Unknown, _MonkeyPatchedASGIResponse]: ...\n        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ return type\n        |\n        parameters\n  ...h: Unknown, data: Unknown | None = None, format: Unknown | None = None, content_type: Unknown | None = None, **extra: Unknown) -> Unknown: ...\n        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^     ^^^^^^^ return type\n        |\n        parameters",
+      "description": "Class member `AsyncAPIClient.put` overrides parent class `AsyncClient` in an inconsistent manner\n  `AsyncAPIClient.put` has type `(self: AsyncAPIClient, path: Unknown, data: Unknown | None = None, format: Unknown | None = None, content_type: Unknown | None = None, **extra: Unknown) -> Unknown`, which is not assignable to `(self: AsyncAPIClient, path: _StrOrPromise, data: Any = ..., content_type: str = ..., follow: bool = ..., secure: bool = ..., *, headers: Mapping[str, str] | None = ..., query_params: Mapping[Any, Any] | None = ..., **extra: Any) -> Coroutine[Unknown, Unknown, _MonkeyPatchedASGIResponse]`, the type of `AsyncClient.put`\n  Signature mismatch:\n  ...h: _StrOrPromise, data: Any = ..., content_type: str = ..., follow: bool = ..., secure: bool = ..., *, headers: Mapping[str, str] | None = ..., query_params: Mapping[Any, Any] | None = ..., **extra: Any) -> Coroutine[Unknown, Unknown, _MonkeyPatchedASGIResponse]: ...\n        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ return type\n        |\n        parameters\n  ...h: Unknown, data: Unknown | None = None, format: Unknown | None = None, content_type: Unknown | None = None, **extra: Unknown) -> Unknown: ...\n        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^     ^^^^^^^ return type\n        |\n        parameters",
       "concise_description": "Class member `AsyncAPIClient.put` overrides parent class `AsyncClient` in an inconsistent manner",
       "severity": "error"
     },
     {
-      "line": 59,
+      "line": 62,
       "column": 15,
-      "stop_line": 59,
+      "stop_line": 62,
       "stop_column": 20,
       "path": "cl/tests/utils.py",
       "code": -2,
       "name": "bad-override",
-      "description": "Class member `AsyncAPIClient.patch` overrides parent class `AsyncClient` in an inconsistent manner\n  `AsyncAPIClient.patch` has type `(self: AsyncAPIClient, path: Unknown, data: Unknown | None = None, format: Unknown | None = None, content_type: Unknown | None = None, **extra: Unknown) -> Unknown`, which is not assignable to `(self: AsyncAPIClient, path: _StrOrPromise, data: Any = ..., content_type: str = ..., follow: bool = ..., secure: bool = ..., *, headers: Mapping[str, Any] | None = ..., query_params: Mapping[Any, Any] | None = ..., **extra: Any) -> Coroutine[Unknown, Unknown, _MonkeyPatchedASGIResponse]`, the type of `AsyncClient.patch`\n  Signature mismatch:\n  ...h: _StrOrPromise, data: Any = ..., content_type: str = ..., follow: bool = ..., secure: bool = ..., *, headers: Mapping[str, Any] | None = ..., query_params: Mapping[Any, Any] | None = ..., **extra: Any) -> Coroutine[Unknown, Unknown, _MonkeyPatchedASGIResponse]: ...\n        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ return type\n        |\n        parameters\n  ...h: Unknown, data: Unknown | None = None, format: Unknown | None = None, content_type: Unknown | None = None, **extra: Unknown) -> Unknown: ...\n        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^     ^^^^^^^ return type\n        |\n        parameters",
+      "description": "Class member `AsyncAPIClient.patch` overrides parent class `AsyncClient` in an inconsistent manner\n  `AsyncAPIClient.patch` has type `(self: AsyncAPIClient, path: Unknown, data: Unknown | None = None, format: Unknown | None = None, content_type: Unknown | None = None, **extra: Unknown) -> Unknown`, which is not assignable to `(self: AsyncAPIClient, path: _StrOrPromise, data: Any = ..., content_type: str = ..., follow: bool = ..., secure: bool = ..., *, headers: Mapping[str, str] | None = ..., query_params: Mapping[Any, Any] | None = ..., **extra: Any) -> Coroutine[Unknown, Unknown, _MonkeyPatchedASGIResponse]`, the type of `AsyncClient.patch`\n  Signature mismatch:\n  ...h: _StrOrPromise, data: Any = ..., content_type: str = ..., follow: bool = ..., secure: bool = ..., *, headers: Mapping[str, str] | None = ..., query_params: Mapping[Any, Any] | None = ..., **extra: Any) -> Coroutine[Unknown, Unknown, _MonkeyPatchedASGIResponse]: ...\n        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ return type\n        |\n        parameters\n  ...h: Unknown, data: Unknown | None = None, format: Unknown | None = None, content_type: Unknown | None = None, **extra: Unknown) -> Unknown: ...\n        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^     ^^^^^^^ return type\n        |\n        parameters",
       "concise_description": "Class member `AsyncAPIClient.patch` overrides parent class `AsyncClient` in an inconsistent manner",
       "severity": "error"
     },
     {
-      "line": 65,
+      "line": 68,
       "column": 15,
-      "stop_line": 65,
+      "stop_line": 68,
       "stop_column": 21,
       "path": "cl/tests/utils.py",
       "code": -2,
       "name": "bad-override",
-      "description": "Class member `AsyncAPIClient.delete` overrides parent class `AsyncClient` in an inconsistent manner\n  `AsyncAPIClient.delete` has type `(self: AsyncAPIClient, path: Unknown, data: Unknown | None = None, format: Unknown | None = None, content_type: Unknown | None = None, **extra: Unknown) -> Unknown`, which is not assignable to `(self: AsyncAPIClient, path: _StrOrPromise, data: Any = ..., content_type: str = ..., follow: bool = ..., secure: bool = ..., *, headers: Mapping[str, Any] | None = ..., query_params: Mapping[Any, Any] | None = ..., **extra: Any) -> Coroutine[Unknown, Unknown, _MonkeyPatchedASGIResponse]`, the type of `AsyncClient.delete`\n  Signature mismatch:\n  ...h: _StrOrPromise, data: Any = ..., content_type: str = ..., follow: bool = ..., secure: bool = ..., *, headers: Mapping[str, Any] | None = ..., query_params: Mapping[Any, Any] | None = ..., **extra: Any) -> Coroutine[Unknown, Unknown, _MonkeyPatchedASGIResponse]: ...\n        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ return type\n        |\n        parameters\n  ...h: Unknown, data: Unknown | None = None, format: Unknown | None = None, content_type: Unknown | None = None, **extra: Unknown) -> Unknown: ...\n        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^     ^^^^^^^ return type\n        |\n        parameters",
+      "description": "Class member `AsyncAPIClient.delete` overrides parent class `AsyncClient` in an inconsistent manner\n  `AsyncAPIClient.delete` has type `(self: AsyncAPIClient, path: Unknown, data: Unknown | None = None, format: Unknown | None = None, content_type: Unknown | None = None, **extra: Unknown) -> Unknown`, which is not assignable to `(self: AsyncAPIClient, path: _StrOrPromise, data: Any = ..., content_type: str = ..., follow: bool = ..., secure: bool = ..., *, headers: Mapping[str, str] | None = ..., query_params: Mapping[Any, Any] | None = ..., **extra: Any) -> Coroutine[Unknown, Unknown, _MonkeyPatchedASGIResponse]`, the type of `AsyncClient.delete`\n  Signature mismatch:\n  ...h: _StrOrPromise, data: Any = ..., content_type: str = ..., follow: bool = ..., secure: bool = ..., *, headers: Mapping[str, str] | None = ..., query_params: Mapping[Any, Any] | None = ..., **extra: Any) -> Coroutine[Unknown, Unknown, _MonkeyPatchedASGIResponse]: ...\n        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ return type\n        |\n        parameters\n  ...h: Unknown, data: Unknown | None = None, format: Unknown | None = None, content_type: Unknown | None = None, **extra: Unknown) -> Unknown: ...\n        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^     ^^^^^^^ return type\n        |\n        parameters",
       "concise_description": "Class member `AsyncAPIClient.delete` overrides parent class `AsyncClient` in an inconsistent manner",
       "severity": "error"
     },
     {
-      "line": 71,
+      "line": 74,
       "column": 15,
-      "stop_line": 71,
+      "stop_line": 74,
       "stop_column": 22,
       "path": "cl/tests/utils.py",
       "code": -2,
       "name": "bad-override",
-      "description": "Class member `AsyncAPIClient.options` overrides parent class `AsyncClient` in an inconsistent manner\n  `AsyncAPIClient.options` has type `(self: AsyncAPIClient, path: Unknown, data: Unknown | None = None, format: Unknown | None = None, content_type: Unknown | None = None, **extra: Unknown) -> Unknown`, which is not assignable to `(self: AsyncAPIClient, path: _StrOrPromise, data: dict[str, str] | str = ..., content_type: str = ..., follow: bool = ..., secure: bool = ..., *, headers: Mapping[str, Any] | None = ..., query_params: Mapping[Any, Any] | None = ..., **extra: Any) -> Coroutine[Unknown, Unknown, _MonkeyPatchedASGIResponse]`, the type of `AsyncClient.options`\n  Signature mismatch:\n  ...h: _StrOrPromise, data: dict[str, str] | str = ..., content_type: str = ..., follow: bool = ..., secure: bool = ..., *, headers: Mapping[str, Any] | None = ..., query_params: Mapping[Any, Any] | None = ..., **extra: Any) -> Coroutine[Unknown, Unknown, _MonkeyPatchedASGIResponse]: ...\n        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ return type\n        |\n        parameters\n  ...h: Unknown, data: Unknown | None = None, format: Unknown | None = None, content_type: Unknown | None = None, **extra: Unknown) -> Unknown: ...\n        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^     ^^^^^^^ return type\n        |\n        parameters",
+      "description": "Class member `AsyncAPIClient.options` overrides parent class `AsyncClient` in an inconsistent manner\n  `AsyncAPIClient.options` has type `(self: AsyncAPIClient, path: Unknown, data: Unknown | None = None, format: Unknown | None = None, content_type: Unknown | None = None, **extra: Unknown) -> Unknown`, which is not assignable to `(self: AsyncAPIClient, path: _StrOrPromise, data: dict[str, str] | str = ..., content_type: str = ..., follow: bool = ..., secure: bool = ..., *, headers: Mapping[str, str] | None = ..., query_params: Mapping[Any, Any] | None = ..., **extra: Any) -> Coroutine[Unknown, Unknown, _MonkeyPatchedASGIResponse]`, the type of `AsyncClient.options`\n  Signature mismatch:\n  ...h: _StrOrPromise, data: dict[str, str] | str = ..., content_type: str = ..., follow: bool = ..., secure: bool = ..., *, headers: Mapping[str, str] | None = ..., query_params: Mapping[Any, Any] | None = ..., **extra: Any) -> Coroutine[Unknown, Unknown, _MonkeyPatchedASGIResponse]: ...\n        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ return type\n        |\n        parameters\n  ...h: Unknown, data: Unknown | None = None, format: Unknown | None = None, content_type: Unknown | None = None, **extra: Unknown) -> Unknown: ...\n        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^     ^^^^^^^ return type\n        |\n        parameters",
       "concise_description": "Class member `AsyncAPIClient.options` overrides parent class `AsyncClient` in an inconsistent manner",
       "severity": "error"
     }
