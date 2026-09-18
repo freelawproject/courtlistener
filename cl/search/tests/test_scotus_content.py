@@ -667,7 +667,12 @@ class ScotusDocketMergeTest(TestCase):
         # Confirm the file was stored
         self.assertTrue(scotus_meta.questions_presented_file)
         self.assertTrue(
-            scotus_meta.questions_presented_file.name.endswith("-qp.pdf")
+            scotus_meta.questions_presented_file.name.startswith(
+                f"recap/gov.uscourts.scotus.{docket.pk}/"
+            )
+        )
+        self.assertTrue(
+            scotus_meta.questions_presented_file.name.endswith(".qp.pdf")
         )
 
     def test_merge_scotus_docket_resolves_relative_qp_url(self) -> None:

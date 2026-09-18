@@ -9,6 +9,7 @@ from typing import Any
 from django.conf import settings
 from django.core.cache import cache
 from selenium import webdriver
+from selenium.webdriver.remote.webdriver import WebDriver as RemoteWebDriver
 
 from cl.lib.courts import lookup_child_courts_cache
 from cl.lib.model_helpers import clean_docket_number, is_docket_number
@@ -586,7 +587,7 @@ def parse_string_date(date_value: datetime.date | str) -> str | None:
         raise InvalidRelativeDateSyntax(QueryType.FILTER)
 
 
-def create_selenium_driver(keep_alive=True) -> webdriver.Chrome:
+def create_selenium_driver(keep_alive=True) -> RemoteWebDriver:
     options = webdriver.ChromeOptions()
     if settings.SELENIUM_HEADLESS is True:
         options.add_argument("headless")

@@ -18,7 +18,6 @@ from cl.lib.neon_utils import NeonClient
 from cl.lib.zoho import (
     ContactsModule,
     LeadsModule,
-    build_zoho_payload_from_user,
 )
 
 logger = logging.getLogger(__name__)
@@ -161,7 +160,7 @@ def create_or_update_zoho_account(
     )
     # Update the first matching Lead, if found
     if lead_records:
-        payload = build_zoho_payload_from_user(user, leads_module.module_name)
+        payload = leads_module.build_payload_from_user(user)
         record_id = lead_records[0].get_id()
         leads_module.update_record(record_id, payload | milestone_payload)
         return ("Leads", record_id)
@@ -172,18 +171,13 @@ def create_or_update_zoho_account(
     )
     # Update the first matching Contact, if found
     if contact_records:
-        payload = build_zoho_payload_from_user(
-            user, contacts_module.module_name
-        )
+        payload = contacts_module.build_payload_from_user(user)
         record_id = contact_records[0].get_id()
         contacts_module.update_record(record_id, payload | milestone_payload)
         return ("Contacts", record_id)
 
     # Otherwise, create a new Contact
-    payload = (
-        build_zoho_payload_from_user(user, contacts_module.module_name)
-        | milestone_payload
-    )
+    payload = contacts_module.build_payload_from_user(user) | milestone_payload
     created = contacts_module.create_record(payload)
     return ("Contacts", ContactsModule.get_action_record_id(created[0]))
 
