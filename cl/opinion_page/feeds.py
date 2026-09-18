@@ -1,14 +1,14 @@
 from datetime import datetime
 
 from django.contrib.syndication.views import Feed
-from django.db.models import Prefetch, QuerySet
+from django.db.models import QuerySet
 from django.http import Http404, HttpRequest
 from django.utils.feedgenerator import Atom1Feed
 from django.utils.safestring import SafeText, mark_safe
 
 from cl.lib.date_time import midnight_pt
 from cl.opinion_page.utils import make_docket_title
-from cl.search.models import Docket, DocketEntry, RECAPDocument
+from cl.search.models import Docket, DocketEntry, SCOTUSDocketEntry
 
 
 class DocketFeed(Feed):
@@ -27,55 +27,38 @@ class DocketFeed(Feed):
         return f"Docket updates for {make_docket_title(obj)}"
 
     def get_object(self, request: HttpRequest, docket_id: int) -> Docket:  # type: ignore
+        """Return the docket this feed covers, or raise Http404."""
         try:
-            d = Docket.objects.only(
+            return Docket.objects.only(
                 "case_name",
                 "case_name_short",
                 "case_name_full",
                 "docket_number",
+                # For items()'s get_entry_source()
+                "court_id",
+                # For item_link()'s get_absolute_url()
+                "slug",
             ).get(pk=docket_id)
         except Docket.DoesNotExist:
             raise Http404("Unable to find docket")
-        else:
-            return d
 
-    def items(self, obj: Docket) -> QuerySet:
-        # Get the items with prefetched main-docs
-        main_docs_query = (
-            RECAPDocument.objects.filter(
-                document_type=RECAPDocument.PACER_DOCUMENT
-            )
-            .only("description")
-            .order_by("date_created")
-        )
+    def items(
+        self, obj: Docket
+    ) -> QuerySet[DocketEntry] | QuerySet[SCOTUSDocketEntry]:
+        """Return the docket's 30 most recent dated entries for the feed."""
+        source = obj.get_entry_source()
         return (
-            DocketEntry.objects.filter(docket=obj)
+            source.entries_queryset(obj)
+            # entries_queryset() prefetches every document for the docket
+            # page; the feed only reads main_docs, so drop that and attach
+            # just the one-doc-per-entry prefetch.
+            .prefetch_related(None)
             .exclude(date_filed__isnull=True)
-            .prefetch_related(
-                Prefetch(
-                    "recap_documents",
-                    queryset=main_docs_query,
-                    to_attr="main_docs",
-                )
-            )
-            .select_related("docket")
-            .order_by("-recap_sequence_number", "-entry_number")
-            .only(
-                "description",
-                "entry_number",
-                "date_filed",
-                # For `item_link`
-                "docket__id",
-                "docket__slug",
-                # For `item_title`
-                "docket__case_name",
-                "docket__case_name_full",
-                "docket__case_name_short",
-                "docket__docket_number",
-            )[:30]
+            .prefetch_related(source.main_docs_prefetch())
+            .order_by(*source.order_by_desc)[:30]
         )
 
-    def item_title(self, item: DocketEntry) -> SafeText:
+    def item_title(self, item: DocketEntry | SCOTUSDocketEntry) -> SafeText:
         docket_title = make_docket_title(item.docket)
         entry_number = item.entry_number
         if entry_number:
@@ -84,46 +67,47 @@ class DocketFeed(Feed):
             preface = f"Minute entry from {item.date_filed}"
         return mark_safe(f"{preface} in {docket_title}")
 
-    def item_description(self, item: DocketEntry) -> str:
+    def item_description(self, item: DocketEntry | SCOTUSDocketEntry) -> str:
         try:
-            # main_docs comes from the to_attr parameter above
-            main_rd = item.main_docs[0]
+            # main_docs comes from the source's main_docs_prefetch()
+            main_doc = item.main_docs[0]
         except IndexError:
             # No doc associated with entry
             return item.description
-        return item.description or main_rd.description
+        return item.description or main_doc.description
 
-    def item_link(self, item: DocketEntry) -> str:
+    def item_link(self, item: DocketEntry | SCOTUSDocketEntry) -> str:
         if item.entry_number:
             anchor = f"entry-{item.entry_number}"
         else:
             anchor = f"minute-entry-{item.pk}"
         return f"{item.docket.get_absolute_url()}?order_by=desc#{anchor}"
 
-    def item_pubdate(self, item: DocketEntry) -> datetime:
+    def item_pubdate(self, item: DocketEntry | SCOTUSDocketEntry) -> datetime:
         return midnight_pt(item.date_filed)
 
-    def item_enclosure_url(self, item: DocketEntry) -> str | None:
+    def item_enclosure_url(
+        self, item: DocketEntry | SCOTUSDocketEntry
+    ) -> str | None:
         if not item.entry_number:
             return None
 
-        # If we don't have the rd, abort.
+        # If we don't have a representative document, abort.
         try:
-            main_rd = item.main_docs[0]
+            main_doc = item.main_docs[0]
         except IndexError:
             # No docs with entry
             return None
 
         # Serve the PDF if we have it
-        path = main_rd.filepath_local
+        path = main_doc.filepath_local
         if path:
             return f"https://storage.courtlistener.com/{path}"
 
-        # If we don't have the PDF, serve a link to PACER
-        if main_rd.pacer_url:
-            return main_rd.pacer_url
-
-        return None
+        # If we don't have the PDF, serve a link to the source's own
+        # external URL.
+        source = item.docket.get_entry_source()
+        return source.document_external_url(main_doc)
 
     # See: https://validator.w3.org/feed/docs/error/UseZeroForUnknown.html
     item_enclosure_length = 0
