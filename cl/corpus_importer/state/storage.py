@@ -9,11 +9,10 @@ downloaded again.
 
 import logging
 from enum import Enum, auto
-from typing import Any, cast
+from typing import Any
 
 from botocore.exceptions import BotoCoreError, ClientError
 from django.conf import settings
-from django.db.models import FileField, Model
 from storages.backends.s3 import S3Storage
 
 logger = logging.getLogger(__name__)
@@ -27,16 +26,6 @@ class PublishOutcome(Enum):
     PUBLISHED = auto()
     MISSING = auto()
     FAILED = auto()
-
-
-def file_storage(model: type[Model]) -> S3Storage:
-    """The storage a document model keeps its files in.
-
-    :param model: A model with a `filepath_local` file field.
-    :return: The storage backend of that field.
-    """
-    field = cast(FileField, model._meta.get_field("filepath_local"))
-    return cast(S3Storage, field.storage)
 
 
 def copy_file(
@@ -78,31 +67,28 @@ def copy_file(
             MetadataDirective="REPLACE",
             **params,
         )
-    except (BotoCoreError, ClientError) as error:
-        logger.exception(
-            "Could not publish %s/%s to %s.",
-            source_bucket,
-            source_key,
-            published_key,
-        )
-        return (
-            PublishOutcome.MISSING
-            if _source_absent(error)
-            else PublishOutcome.FAILED
-        )
+    except ClientError as error:
+        _log_failure(source_bucket, source_key, published_key)
+        code = str(error.response.get("Error", {}).get("Code", ""))
+        if code in ABSENT_SOURCE:
+            return PublishOutcome.MISSING
+        return PublishOutcome.FAILED
+    except BotoCoreError:
+        _log_failure(source_bucket, source_key, published_key)
+        return PublishOutcome.FAILED
     return PublishOutcome.PUBLISHED
 
 
-def _source_absent(error: BotoCoreError | ClientError) -> bool:
-    """Whether a failed copy failed because there was nothing at the source.
-
-    :param error: What the copy raised.
-    :return: Whether the source bucket holds no such key.
-    """
-    if not isinstance(error, ClientError):
-        return False
-    code = error.response.get("Error", {}).get("Code", "")
-    return str(code) in ABSENT_SOURCE
+def _log_failure(
+    source_bucket: str, source_key: str, published_key: str
+) -> None:
+    """Log the copy that just raised, with the exception being handled."""
+    logger.exception(
+        "Could not publish %s/%s to %s.",
+        source_bucket,
+        source_key,
+        published_key,
+    )
 
 
 def delete_file(storage: S3Storage, bucket: str, key: str) -> None:

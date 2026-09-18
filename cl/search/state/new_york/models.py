@@ -1,6 +1,5 @@
 """Models unique to New York Court of Appeals (Court-PASS) dockets."""
 
-from datetime import date
 from typing import Self
 
 import pghistory
@@ -340,23 +339,3 @@ class NYCoADocument(AbstractDateTimeModel, AbstractStateDocument):
                 name="unique_nycoa_file_name_per_docket_entry",
             )
         ]
-
-    def path_date_filed(self) -> date | None:
-        """The date this document's storage path is sorted by.
-
-        A Court-PASS filing reconstructed from a document carries no date of
-        its own, so the case's argument date stands in, and failing that the
-        date the Court decided it. A case with none of the three is filed as
-        undated.
-
-        Reaches the Court's metadata, so callers publishing a docket's
-        documents should have selected `docket_entry__docket` and the
-        docket's `nycoa_metadata` along with them.
-        """
-        docket = self.docket_entry.docket
-        metadata = getattr(docket, "nycoa_metadata", None)
-        return (
-            self.docket_entry.date_filed
-            or docket.date_argued
-            or (metadata.decision_date if metadata else None)
-        )

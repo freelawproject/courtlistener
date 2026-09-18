@@ -1465,45 +1465,6 @@ class FloridaDocumentDownloadTest(TestCase):
             sha1,
         )
 
-    @mock.patch("cl.lib.microservice_utils.doc_page_count_service")
-    @mock.patch("cl.scrapers.utils.get_extension", return_value=".tiff")
-    def test_download_names_the_file_by_docket_date_and_document(
-        self,
-        ext_mock: mock.Mock,
-        pcs_mock: mock.Mock,
-    ) -> None:
-        """Is a download filed in its docket's directory, named for the day it
-        was filed in Florida -- or as undated when the entry carries no
-        timestamp -- and for the document itself?"""
-        pcs_mock.return_value = httpx.Response(200, text="1")
-        filer = PartyFactory.create(docket=DocketFactory.create())
-        for filed, stamp in (
-            # 1:30 in the morning UTC is still the evening before in Florida.
-            (datetime(2024, 3, 2, 1, 30, tzinfo=UTC), "2024-03-01"),
-            (None, "undated"),
-        ):
-            with self.subTest(stamp=stamp):
-                fl_document = FloridaDocumentModelFactory.create(
-                    docket_entry__date_filed=filed,
-                    # Each filer the factory builds brings an attorney
-                    # organization with the same lookup key, so one is shared.
-                    docket_entry__submitted_by=filer,
-                )
-                docket = fl_document.docket_entry.docket
-                with NamedTemporaryFile(suffix=".tmp") as tmp:
-                    tmp.write(b"fake tiff data")
-                    tmp.flush()
-                    tmp.seek(0)
-                    self._mock_downloaded_file(tmp, "sha1")
-
-                    download_fl_document(fl_document.pk)
-
-                fl_document.refresh_from_db()
-                bucket = f"gov.uscourts.{docket.court_id}.{docket.pk}"
-                self.assertEqual(
-                    fl_document.filepath_local.name,
-                    f"recap/{bucket}/{bucket}.{stamp}.{fl_document.pk}.tiff",
-                )
 
     @mock.patch("cl.lib.microservice_utils.doc_page_count_service")
     @mock.patch("cl.scrapers.utils.get_extension", return_value=".pdf")

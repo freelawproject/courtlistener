@@ -52,7 +52,6 @@ from cl.corpus_importer.state.storage import (
     PublishOutcome,
     copy_file,
     delete_file,
-    file_storage,
 )
 from cl.corpus_importer.state.utils import NO_FILES, FileTally, MergeResult
 from cl.lib.celery_utils import CeleryThrottle
@@ -293,10 +292,6 @@ class JKentScrapeLoader[ScrapeType: BaseModel, ParamType = None](ABC):
         files it downloads. A merge stores these keys as they are, and
         `publish_files` moves them. Leave empty for a loader whose documents
         are downloaded some other way.
-    :cvar path_relations: Anything else a document's storage path reads, as
-        lookups from `document_model`. Selected with the documents, so
-        publishing a docket does not go back to the database for each of
-        them.
     """
 
     name: ClassVar[str]
@@ -306,7 +301,6 @@ class JKentScrapeLoader[ScrapeType: BaseModel, ParamType = None](ABC):
     merger: type[Merger[ScrapeType, ParamType, Model]]
     document_model: ClassVar[type[AbstractStateDocument] | None] = None
     private_prefix: ClassVar[str] = ""
-    path_relations: ClassVar[tuple[str, ...]] = ()
 
     def __init__(
         self,
@@ -536,9 +530,9 @@ class JKentScrapeLoader[ScrapeType: BaseModel, ParamType = None](ABC):
         """
         merger = cls.merger(scrape, params=cls.params(scrape))
         result = merger.merge()
-        if not isinstance(docket := merger.out, Docket):
-            return result
-        return result | cls.publish_files(docket)
+        if isinstance(merger.out, Docket):
+            result |= cls.publish_files(merger.out)
+        return result
 
     @classmethod
     def merge_payload(cls, payload: str) -> tuple[str, MergeResult[Any]]:
@@ -574,9 +568,9 @@ class JKentScrapeLoader[ScrapeType: BaseModel, ParamType = None](ABC):
         documents: QuerySet[AbstractStateDocument] = (
             model._default_manager.filter(**{DOCKET_PATH: docket})
             .exclude(filepath_local="")
-            .select_related(DOCKET_PATH, *cls.path_relations)
+            .select_related(DOCKET_PATH)
         )
-        storage = file_storage(model)
+        storage = model.file_storage()
         private = settings.AWS_PRIVATE_STORAGE_BUCKET_NAME
         public = settings.AWS_STORAGE_BUCKET_NAME
         moved: set[int] = set()
@@ -600,6 +594,12 @@ class JKentScrapeLoader[ScrapeType: BaseModel, ParamType = None](ABC):
                 tally |= FileTally(failed=1)
                 continue
             repointed = outcome is PublishOutcome.PUBLISHED
+            # A file that was not there to copy is not coming back, so the
+            # document is left with no file rather than a path to nothing:
+            # nothing serves or extracts it, and the next scrape to report a
+            # file for it is stored afresh. The write is conditional on the
+            # path being what was copied, so a merge that repointed the
+            # document meanwhile is left alone.
             if not model._default_manager.filter(
                 pk=document.pk, filepath_local=current
             ).update(

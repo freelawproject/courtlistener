@@ -64,7 +64,7 @@ from cl.corpus_importer.state.new_york.utils import (
     make_docket_number_core,
     mirrored_code,
 )
-from cl.corpus_importer.state.storage import delete_file, file_storage
+from cl.corpus_importer.state.storage import delete_file
 from cl.corpus_importer.state.utils import NO_FILES, FileTally, MergeResult
 from cl.people_db.models import Attorney, Party, PartyType, Role
 from cl.recap.mergers import find_docket_object_query
@@ -251,7 +251,7 @@ class NYCoADocumentMerger[ParamType](
                 transaction.on_commit(
                     partial(
                         delete_file,
-                        file_storage(NYCoADocument),
+                        NYCoADocument.file_storage(),
                         settings.AWS_PRIVATE_STORAGE_BUCKET_NAME,
                         private_key,
                     )
@@ -856,7 +856,7 @@ class NYCoADocketMerger(DocketMerger[NYCoACase, None]):
                 "filepath_local", flat=True
             )
         )
-        storage = file_storage(NYCoADocument)
+        storage = NYCoADocument.file_storage()
         public = settings.AWS_STORAGE_BUCKET_NAME
         for path, thumbnail in removed:
             if path and path not in referenced:

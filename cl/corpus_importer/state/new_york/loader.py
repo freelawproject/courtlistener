@@ -7,11 +7,7 @@ from typing import Any
 from django.db.models import Model
 from juriscraper.state.docket import DocketEntryType, DocketType, PartyType
 
-from cl.corpus_importer.state.loader import (
-    DOCKET_PATH,
-    JKentScrapeLoader,
-    UnusableScrape,
-)
+from cl.corpus_importer.state.loader import JKentScrapeLoader, UnusableScrape
 from cl.corpus_importer.state.merger import Merger
 from cl.corpus_importer.state.new_york.mergers import NYCoADocketMerger
 from cl.corpus_importer.state.new_york.nycourts_gov import NYCoACase
@@ -316,9 +312,6 @@ class NYCoACourtPassLoader(JKentScrapeLoader[NYCoACase]):
     merger: type[Merger[NYCoACase, None, Model]] = NYCoADocketMerger
     document_model = NYCoADocument
     private_prefix = PRIVATE_PREFIX
-    # A document with no date of its own is filed under the Court's decision
-    # date; see `NYCoADocument.path_date_filed`.
-    path_relations = (f"{DOCKET_PATH}__nycoa_metadata",)
 
     @staticmethod
     def _refuse_unread_file_list(

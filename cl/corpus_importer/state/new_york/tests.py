@@ -1611,31 +1611,6 @@ class NYCoAPublishFilesTest(NYCoAMergerTestCase):
             published_key(document, date(2024, 3, 1), ".asx"),
         )
 
-    def test_the_date_falls_back_through_the_docket(self) -> None:
-        """A filing reconstructed from the file list has no date. Does the name
-        take the date the case was argued, then decided, and only then say it
-        is undated?"""
-        argued, decided = date(2025, 1, 14), date(2025, 3, 20)
-        for argument_date, decision_date, expected in (
-            (argued, decided, argued),
-            (None, decided, decided),
-            (None, None, None),
-        ):
-            with self.subTest(expected=expected):
-                case = self.case_with_files(
-                    NYCoAFileFactory.create(), date_filed=None
-                )
-                case.argument_date = argument_date
-                case.decision_date = decision_date
-
-                self.load(case)
-
-                document = NYCoADocument.objects.get()
-                self.assertEqual(
-                    document.filepath_local, published_key(document, expected)
-                )
-                Docket.objects.all().delete()
-
     def test_documents_filed_the_same_day_are_named_apart(self) -> None:
         """Two files of one filing share a docket and a date. Does each still
         get a name of its own?"""
@@ -1679,7 +1654,6 @@ class NYCoAPublishFilesTest(NYCoAMergerTestCase):
             date_filed=None,
             docket_entry_id="e:appellant-brief:smith:1",
         )
-        case.argument_date = None
         self.load(case)
         document = NYCoADocument.objects.get()
         undated = published_key(document, None)
