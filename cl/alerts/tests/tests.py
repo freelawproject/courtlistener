@@ -1147,6 +1147,21 @@ class DocketAlertScotusTest(TestCase):
         send_alert_and_webhook(self.docket.pk, after)
         self.assertEqual(len(mail.outbox), 0)
 
+    def test_multiple_new_entries_render_correctly_in_one_alert_email(
+        self,
+    ) -> None:
+        """A single alert email bundles every entry created since `since`."""
+        de1 = SCOTUSDocketEntryFactory(docket=self.docket)
+        SCOTUSDocumentFactory(docket_entry=de1, description="First entry")
+        de2 = SCOTUSDocketEntryFactory(docket=self.docket)
+        SCOTUSDocumentFactory(docket_entry=de2, description="Second entry")
+
+        send_alert_and_webhook(self.docket.pk, self.before)
+        self.assertEqual(len(mail.outbox), 1)
+        body = mail.outbox[0].body
+        self.assertIn("First entry", body)
+        self.assertIn("Second entry", body)
+
 
 class DisableDocketAlertTest(TestCase):
     """Do old docket alerts get disabled or alerted properly?"""
