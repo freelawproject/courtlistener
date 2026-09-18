@@ -935,7 +935,6 @@ class Docket(AbstractDateTimeModel, DocketSources):
             self.court_id, docket_entry_sources.RECAP
         )
 
-
     def get_alert_source(self) -> "DocketAlertSource":
         """Return the DocketAlertSource config for this docket's court -
         RECAP/PACER by default, with per-court overrides.
