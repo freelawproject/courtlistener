@@ -214,10 +214,9 @@ def get_drifted_children(
         config.child_doc_class.search()
         .query("parent_id", type=config.child_join_type, id=parent_instance.pk)
         .source(list(expected_fields.keys()))
-        .extra(size=max_children)
     )
     drifted = {}
-    for hit in search.execute():
+    for hit in search[:max_children].execute():
         out_of_sync = get_out_of_sync_fields(
             hit.to_dict(), expected_fields, comparable_fields
         )
