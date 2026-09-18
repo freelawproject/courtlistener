@@ -143,6 +143,43 @@ def get_notes_for(obj: models.Model) -> QuerySet[Note]:
     return Note.objects.filter(build_dual_read_query(type(obj), obj.pk))
 
 
+def repoint_notes(
+    main_object: models.Model, version_object: models.Model
+) -> None:
+    """Repoint Notes from version_object onto main_object (#7725).
+
+    For use when merging two noteable rows into one (e.g.
+    merge_opinion_versions): a Note may be in either shape (dual-read), so
+    the FK-based repointing used for other related models can't be reused
+    as-is here.
+
+    A user who already has a Note on main_object keeps that one; the
+    version's Note is left pointed at version_object, to be cleaned up by
+    delete_orphaned_notes when it's deleted - same dedup behavior already
+    used for the legacy-shaped case elsewhere.
+
+    :param main_object: The noteable object absorbing version_object's
+        Notes.
+    :param version_object: The noteable object about to be deleted.
+    :return: None
+    """
+    existing_user_ids = get_notes_for(main_object).values_list(
+        "user_id", flat=True
+    )
+    content_type = ContentType.objects.get_for_model(type(main_object))
+    # Clear the legacy FKs too, even for a Note that arrives here already
+    # in the new shape: version_object is about to be deleted, and its
+    # own on_delete=CASCADE would otherwise take a moved Note down with
+    # it if that FK were left pointed at it.
+    get_notes_for(version_object).exclude(
+        user_id__in=existing_user_ids
+    ).update(
+        content_type=content_type,
+        object_id=main_object.pk,
+        **{field: None for field in LEGACY_NOTE_FIELDS.values()},
+    )
+
+
 def get_note_for_target(
     model_class: type[models.Model],
     object_id: int | str,
