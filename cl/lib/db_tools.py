@@ -94,13 +94,14 @@ def release_db_connection() -> None:
     callers need not do anything afterwards. Any session state (temp tables,
     advisory locks, server-side cursors) is lost with the connection.
 
-    Inside a transaction this is a no-op, since the connection must be held
+    A connection inside a transaction is left alone, since it must be held
     until the block ends. That also covers Celery tasks run eagerly inside
     test transactions.
 
     Connections are thread-local, so call this from the thread that owns
     them; from async code wrap it in a thread-sensitive `sync_to_async`.
     """
-    if connection.in_atomic_block:
-        return
-    connections.close_all()
+    for conn in connections.all(initialized_only=True):
+        if conn.in_atomic_block:
+            continue
+        conn.close()
