@@ -38,9 +38,7 @@ Disable this Alert (one click): https://www.courtlistener.com{% url "disable_ale
 {% endif %}{% if result.local_path %} - Download the original from our backup: https://storage.courtlistener.com/{{ result.local_path }}{% endif %}{% endif %}{% endfor %}
 {% endfor %}
 ************************
-{% if recap_alerts_banner %}
 {% include "includes/alert_promo_banner.txt" %}
-{% endif %}
 
 This alert brought to you by the 501(c)(3) non-profit Free Law Project
  - Blog: https://free.law

@@ -611,6 +611,10 @@ async def extract_formatted_text_document_base(
 
         content = response.json()["content"]
         extracted_by_ocr = response.json()["extracted_by_ocr"]
+        if isinstance(rd, AbstractStateDocument) and (
+            pages := response.json().get("page_count")
+        ):
+            rd.page_count = pages
         if strip_html_tags and not str(rd.filepath_local).endswith(".pdf"):
             content = strip_tags(content)
         ocr_needed = needs_ocr(content, page_count=rd.page_count)
@@ -649,7 +653,7 @@ async def extract_formatted_text_document_base(
                 update_fields=["ocr_status", "plain_text"],
             )
         elif isinstance(rd, AbstractStateDocument):
-            update_fields = ["ocr_status", "plain_text"]
+            update_fields = ["ocr_status", "plain_text", "page_count"]
             if not has_content:
                 rd.processing_error = ProcessingError.EXTRACTION_FAILURE
                 update_fields.append("processing_error")

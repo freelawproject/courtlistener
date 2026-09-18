@@ -224,7 +224,7 @@ def merge_form_with_courts(
 
 async def add_depth_counts(
     search_data: dict[str, Any],
-    search_results: Page,
+    search_results: Page | list,
 ) -> OpinionCluster | None:
     """If the search data contains a single "cites" term (e.g., "cites:(123)"),
     calculate and append the citation depth information between each ES
@@ -249,7 +249,13 @@ async def add_depth_counts(
         except OpinionCluster.DoesNotExist:
             return None
         else:
-            for result in search_results.object_list:
+            # On ES errors the results are an (empty) list, not a Page.
+            results = (
+                search_results.object_list
+                if isinstance(search_results, Page)
+                else search_results
+            )
+            for result in results:
                 result[
                     "citation_depth"
                 ] = await get_citation_depth_between_clusters(

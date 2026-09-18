@@ -34,8 +34,8 @@ from cl.lib.elasticsearch_utils import (
 from cl.lib.s3_cache import get_s3_cache, make_s3_cache_key
 from cl.lib.string_utils import trunc
 from cl.lib.types import CleanData
-from cl.opinion_page.docket_sources_utils import (
-    SCOTUS_SOURCE,
+from cl.opinion_page import docket_entry_sources
+from cl.opinion_page.docket_entry_sources import (
     DocketEntrySource,
     MetadataItem,
     MetadataSection,
@@ -551,7 +551,7 @@ async def core_docket_data(
     """Gather the core data for a docket, party, or IDB page."""
     docket: Docket = await aget_object_or_404(Docket, pk=pk)
     source = docket.get_entry_source()
-    is_scotus = source is SCOTUS_SOURCE
+    is_scotus = source is docket_entry_sources.SCOTUS
 
     # SCOTUS content is made available using a waffle flag:
     # every docket-related view shares this helper, so access
@@ -619,7 +619,6 @@ async def core_docket_data(
             "has_alert": has_alert,
             "timezone": timezone_str,
             "private": docket.blocked,
-            "is_scotus": is_scotus,
             "docket_source": docket_source,
             # Resolved here because templates can't call the single-arg
             # source callable; gates the docket toolbar on every tab.
