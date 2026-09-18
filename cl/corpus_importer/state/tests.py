@@ -1811,11 +1811,16 @@ class StateStorageTest(SimpleTestCase):
             "CacheControl": "max-age=315360000"
         }
         self.client = self.storage.connection.meta.client
+        patcher = patch(
+            "cl.corpus_importer.state.storage.AWSMediaStorage",
+            return_value=self.storage,
+        )
+        patcher.start()
+        self.addCleanup(patcher.stop)
 
     def copy(self, content_type: str = "") -> PublishOutcome:
         """Copy `SOURCE_KEY` out of the private bucket to `PUBLISHED_KEY`."""
         return copy_file(
-            self.storage,
             settings.AWS_PRIVATE_STORAGE_BUCKET_NAME,
             self.SOURCE_KEY,
             self.PUBLISHED_KEY,
@@ -1881,11 +1886,7 @@ class StateStorageTest(SimpleTestCase):
     def test_delete_names_the_bucket(self) -> None:
         """Files are deleted from both buckets. Does the delete go to the one
         it was asked to?"""
-        delete_file(
-            self.storage,
-            settings.AWS_PRIVATE_STORAGE_BUCKET_NAME,
-            self.SOURCE_KEY,
-        )
+        delete_file(settings.AWS_PRIVATE_STORAGE_BUCKET_NAME, self.SOURCE_KEY)
 
         self.client.delete_object.assert_called_once_with(
             Bucket=settings.AWS_PRIVATE_STORAGE_BUCKET_NAME,
@@ -1897,9 +1898,7 @@ class StateStorageTest(SimpleTestCase):
         behind must not fail the load."""
         self.client.delete_object.side_effect = self.error("AccessDenied")
 
-        delete_file(
-            self.storage, settings.AWS_STORAGE_BUCKET_NAME, self.PUBLISHED_KEY
-        )
+        delete_file(settings.AWS_STORAGE_BUCKET_NAME, self.PUBLISHED_KEY)
 
 
 class PreflightCheckTest(SimpleTestCase):

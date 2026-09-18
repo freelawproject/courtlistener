@@ -104,7 +104,6 @@ class NYCoAMergerTestCase(TestCase):
         self.publish_outcome = PublishOutcome.PUBLISHED
 
         def copy_file(
-            storage: object,
             source_bucket: str,
             source_key: str,
             published_key: str,
@@ -115,7 +114,7 @@ class NYCoAMergerTestCase(TestCase):
             self.copied.append((source_bucket, source_key, published_key))
             return PublishOutcome.PUBLISHED
 
-        def delete_file(storage: object, bucket: str, key: str) -> None:
+        def delete_file(bucket: str, key: str) -> None:
             self.deleted.append((bucket, key))
 
         for target, double in (

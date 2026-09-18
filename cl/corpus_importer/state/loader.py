@@ -570,7 +570,6 @@ class JKentScrapeLoader[ScrapeType: BaseModel, ParamType = None](ABC):
             .exclude(filepath_local="")
             .select_related(DOCKET_PATH)
         )
-        storage = model.file_storage()
         private = settings.AWS_PRIVATE_STORAGE_BUCKET_NAME
         public = settings.AWS_STORAGE_BUCKET_NAME
         moved: set[int] = set()
@@ -584,7 +583,6 @@ class JKentScrapeLoader[ScrapeType: BaseModel, ParamType = None](ABC):
                 private if current.startswith(cls.private_prefix) else public
             )
             outcome = copy_file(
-                storage,
                 bucket,
                 current,
                 target,
@@ -620,7 +618,7 @@ class JKentScrapeLoader[ScrapeType: BaseModel, ParamType = None](ABC):
         )
         for key, bucket in sources.items():
             if key not in referenced:
-                delete_file(storage, bucket, key)
+                delete_file(bucket, key)
         if not moved:
             return MergeResult(files=tally)
         return MergeResult(updates={model.__name__: moved}, files=tally)

@@ -251,7 +251,6 @@ class NYCoADocumentMerger[ParamType](
                 transaction.on_commit(
                     partial(
                         delete_file,
-                        NYCoADocument.file_storage(),
                         settings.AWS_PRIVATE_STORAGE_BUCKET_NAME,
                         private_key,
                     )
@@ -856,7 +855,6 @@ class NYCoADocketMerger(DocketMerger[NYCoACase, None]):
                 "filepath_local", flat=True
             )
         )
-        storage = NYCoADocument.file_storage()
         public = settings.AWS_STORAGE_BUCKET_NAME
         for path, thumbnail in removed:
             if path and path not in referenced:
@@ -865,13 +863,9 @@ class NYCoADocketMerger(DocketMerger[NYCoACase, None]):
                     if is_scraped(path)
                     else public
                 )
-                transaction.on_commit(
-                    partial(delete_file, storage, bucket, path)
-                )
+                transaction.on_commit(partial(delete_file, bucket, path))
             if thumbnail:
-                transaction.on_commit(
-                    partial(delete_file, storage, public, thumbnail)
-                )
+                transaction.on_commit(partial(delete_file, public, thumbnail))
 
     @override
     def query(self) -> QuerySet[Docket]:

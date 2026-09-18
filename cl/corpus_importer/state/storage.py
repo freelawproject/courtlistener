@@ -13,7 +13,8 @@ from typing import Any
 
 from botocore.exceptions import BotoCoreError, ClientError
 from django.conf import settings
-from storages.backends.s3 import S3Storage
+
+from cl.lib.storage import AWSMediaStorage
 
 logger = logging.getLogger(__name__)
 
@@ -29,7 +30,6 @@ class PublishOutcome(Enum):
 
 
 def copy_file(
-    storage: S3Storage,
     source_bucket: str,
     source_key: str,
     published_key: str,
@@ -40,8 +40,6 @@ def copy_file(
     Overwrites whatever is already at `published_key`, which is how a file the
     court has corrected replaces the copy published before it.
 
-    :param storage: The storage the published file belongs to, read for the
-        parameters to serve it under.
     :param source_bucket: The bucket the file is in now.
     :param source_key: The key the file is under now.
     :param published_key: The key to publish it under.
@@ -51,6 +49,7 @@ def copy_file(
         other than `PublishOutcome.PUBLISHED` is logged, and the caller must
         not store `published_key` for a document whose file is not there.
     """
+    storage = AWSMediaStorage()
     params: dict[str, Any] = dict(storage.get_object_parameters(published_key))
     if acl := settings.AWS_DEFAULT_ACL:
         params["ACL"] = acl
@@ -91,17 +90,18 @@ def _log_failure(
     )
 
 
-def delete_file(storage: S3Storage, bucket: str, key: str) -> None:
+def delete_file(bucket: str, key: str) -> None:
     """Delete a file nothing points at any more, logging rather than raising
     when the bucket refuses, since the document it belonged to is already
     settled either way.
 
-    :param storage: Any storage connected to the account the bucket is in.
     :param bucket: The bucket to delete from.
     :param key: The key to delete.
     """
     try:
-        storage.connection.meta.client.delete_object(Bucket=bucket, Key=key)
+        AWSMediaStorage().connection.meta.client.delete_object(
+            Bucket=bucket, Key=key
+        )
     except (BotoCoreError, ClientError):
         logger.exception(
             "Could not delete %s/%s; it is still stored with nothing "

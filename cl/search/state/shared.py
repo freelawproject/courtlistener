@@ -1,13 +1,12 @@
 import logging
 from datetime import date, datetime
 from pathlib import Path, PurePosixPath
-from typing import IO, TYPE_CHECKING, Any, Self, cast
+from typing import IO, TYPE_CHECKING, Any, Self
 
 from asgiref.sync import async_to_sync
 from django.core.files import File
 from django.db import models
-from django.db.models import FileField, Q, QuerySet
-from storages.backends.s3 import S3Storage
+from django.db.models import Q, QuerySet
 
 from cl.lib.decorators import document_model
 from cl.lib.models import AbstractPDF
@@ -132,19 +131,6 @@ class AbstractStateDocument(AbstractPDF):
             Path(filename).suffix or ".pdf",
             thumbs=thumbs,
         )
-
-    @classmethod
-    def file_storage(cls) -> S3Storage:
-        """The S3 storage `filepath_local` keeps its files in.
-
-        For the loader, which publishes and deletes files with server-side
-        S3 calls rather than through Django, and so needs the storage's boto
-        client and the parameters it would serve a file under.
-        """
-        # `filepath_local` on the class is a descriptor, so the field, and the
-        # storage it was declared with, is reached through `_meta`.
-        field = cast(FileField, cls._meta.get_field("filepath_local"))
-        return cast(S3Storage, field.storage)
 
     @classmethod
     def tmp_prefix(cls) -> str:
