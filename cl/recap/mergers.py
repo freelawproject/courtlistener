@@ -16,6 +16,7 @@ from django.db.models import Count, Prefetch, Q, QuerySet
 from django.utils.timezone import now
 from juriscraper.lib.string_utils import CaseNameTweaker
 from juriscraper.pacer import AppellateAttachmentPage, AttachmentPage
+from waffle import switch_is_active
 
 from cl.alerts.utils import (
     set_skip_percolation_if_bankruptcy_data,
@@ -81,6 +82,11 @@ from cl.search.models import (
 from cl.search.tasks import index_docket_parties_in_es
 
 logger = logging.getLogger(__name__)
+
+# Waffle switch controlling whether failed PDF ProcessingQueue items get retried
+# after a docket or attachment page merge. Active by default; flip it off in
+# the admin to stop the retries.
+PROCESS_ORPHAN_DOCUMENTS_SWITCH = "process-orphan-documents"
 
 cnt = CaseNameTweaker()
 
@@ -2494,7 +2500,14 @@ async def process_orphan_documents(
     for that docket that were lingering in our processing queue. This addresses
     the issue that arises when somebody (somehow) uploads a PDF without first
     uploading a docket.
+
+    Gated behind the PROCESS_ORPHAN_DOCUMENTS_SWITCH waffle switch.
     """
+    if not await sync_to_async(switch_is_active)(
+        PROCESS_ORPHAN_DOCUMENTS_SWITCH
+    ):
+        return None
+
     pacer_doc_ids = [rd.pacer_doc_id for rd in rds_created]
     if docket_date:
         # If we get a date from the docket, set the cutoff to 30 days prior for

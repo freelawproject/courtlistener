@@ -36,7 +36,9 @@
   {% else %}
     <script src="{% static "js/htmx.min.js" %}"></script>
   {% endif %}
-    <script src="{% static "js/pray_and_pay.js" %}"></script>
+    {% if docket_source.has_pay_and_pray %}
+      <script src="{% static "js/pray_and_pay.js" %}"></script>
+    {% endif %}
 {% endblock %}
 
 {% block sidebar %}
@@ -48,7 +50,7 @@
             </h4>
         </div>
 
-        {% include "includes/rd_admin_tools.html" with d=rd.docket_entry.docket de=rd.docket_entry %}
+        {% include "includes/rd_admin_tools.html" with d=rd.docket_entry.docket de=rd.docket_entry admin_url_names=docket_source.admin_url_names admin_perm_names=docket_source.admin_perm_names admin_document_label=docket_source.admin_document_label %}
 
         {# show this div if there is a note, otherwise, put it in place, in anticipation of it becoming one. #}
         <div class="{% if not note_form.instance.recap_doc_id %}hidden{% endif %} sidebar-section"
@@ -80,11 +82,13 @@
               href="{{ rd.docket_entry.docket.get_absolute_url }}"
               class="no-underline black-link">{{ rd.docket_entry.docket|best_case_name|safe|v_wrapper }}</a></h2>
       {% include "includes/notes_modal.html" %}
+      {% if docket_source.has_pay_and_pray %}
       {% include "includes/buy_pacer_modal.html" %}
       {% if redirect_to_pacer_modal %}
         {% include "includes/redirect_to_pacer_modal.html" %}
       {% endif %}
       {% include "includes/first_prayer_modal.html" %}
+      {% endif %}
       {% include "includes/rd_metadata_headers.html" %}
       <br>
 
@@ -131,7 +135,7 @@
                       </p>
                       <p>
                         <div class="v-offset-below-1 v-offset-above-1">
-                          {% include "includes/rd_download_button.html" %}
+                          {% include "includes/document_download_button/index.html" %}
                         </div>
                       </p>
                     </div>
@@ -176,36 +180,7 @@
 
           </div>
         {% else %}
-
-          {% if rd.is_sealed %}
-            <div class="col-sm-12 alert-danger alert">
-              <p class="bottom">
-                <i class="fa fa-ban"></i> This item is unavailable in PACER. This is usually caused by the court sealing the document.
-              </p>
-            </div>
-          {% else %}
-            <div id="doc-no-available-warning" class="flex flex-column flex-sm-row row-gap-3 alert-warning alert justify-content-between">
-              <div class="col-sm-12">
-                <p class="bottom">This item is not yet in the RECAP collection.
-                </p>
-              </div>
-              <div class="col-sm-12 flex flex-row gap-2 justify-content-end">
-                {% if rd.pacer_url %}
-                  <a class="btn btn-primary btn-sm"
-                     href="{{ rd.pacer_url }}"
-                     rel="nofollow noopener noreferrer"
-                     target="_blank"><i class="fa fa-dollar"></i>&nbsp;Buy on PACER</a>
-                {% endif %}
-                {% if not request.COOKIES.recap_install_plea %}
-                  <a href="https://free.law/recap/"
-                     class="btn btn-success btn-sm recap_install_plea">Install RECAP</a>
-                {% endif %}
-                <div class="prayer-button">
-                  {% include "includes/pray_and_pay_htmx/pray_button.html" with prayer_exists=rd.prayer_exists document_id=rd.id count=rd.prayer_count regular_size=True%}
-                </div>
-              </div>
-            </div>
-          {% endif %}
+          {% include "includes/document_unavailable_message/index.html" %}
         {% endif %}
       </div>
     </article>
