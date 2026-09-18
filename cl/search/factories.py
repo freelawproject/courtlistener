@@ -392,10 +392,21 @@ class SCOTUSDocumentFactory(DjangoModelFactory):
         model = SCOTUSDocument
 
     docket_entry = SubFactory(SCOTUSDocketEntryFactory)
-    document_number = Faker("random_int", min=1, max=1000)
     attachment_number = Faker("random_int", min=1, max=10)
     url = Faker("url")
     description = Faker("text", max_nb_chars=20)
+
+    @classmethod
+    def _create(cls, model_class, *args, **kwargs):
+        obj = model_class(*args, **kwargs)
+        cls._fixup(obj)
+        obj.save()
+        return obj
+
+    @classmethod
+    def _fixup(cls, obj):
+        if not obj.document_number and (de := obj.docket_entry):
+            obj.document_number = de.entry_number
 
 
 class ScotusDocketMetadataFactory(DjangoModelFactory):
