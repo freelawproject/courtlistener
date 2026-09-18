@@ -32,7 +32,7 @@ from dataclasses import dataclass, field
 from datetime import datetime
 from enum import Enum, StrEnum, auto
 from pathlib import Path
-from typing import Any, ClassVar, Final, cast
+from typing import Any, ClassVar, Final, assert_never, cast
 
 from django.conf import settings
 from django.db.models import Model, QuerySet
@@ -588,24 +588,21 @@ class JKentScrapeLoader[ScrapeType: BaseModel, ParamType = None](ABC):
                 target,
                 getattr(document, "content_type", ""),
             )
-            if outcome is PublishOutcome.FAILED:
-                tally |= FileTally(failed=1)
-                continue
-            repointed = outcome is PublishOutcome.PUBLISHED
-            # A file that was not there to copy is not coming back, so the
-            # document is left with no file rather than a path to nothing:
-            # nothing serves or extracts it, and the next scrape to report a
-            # file for it is stored afresh. The write is conditional on the
-            # path being what was copied, so a merge that repointed the
-            # document meanwhile is left alone.
+            match outcome:
+                case PublishOutcome.FAILED:
+                    tally |= FileTally(failed=1)
+                    continue
+                case PublishOutcome.MISSING:
+                    published_location = ""
+                case PublishOutcome.PUBLISHED:
+                    published_location = target
+                case _:
+                    assert_never(outcome)
             if not model._default_manager.filter(
                 pk=document.pk, filepath_local=current
-            ).update(
-                filepath_local=target if repointed else "",
-                date_modified=timezone.now(),
-            ):
+            ).update(filepath_local=published_location, date_modified=timezone.now()):
                 continue
-            if not repointed:
+            if outcome is PublishOutcome.MISSING:
                 tally |= FileTally(missing=1)
                 continue
             moved.add(document.pk)
