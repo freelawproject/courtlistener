@@ -1,0 +1,10 @@
+{% load component_tags %}
+{% require_script "js/alpine/components/corpus_search.js" %}
+
+{# Reads hasActiveFilters and activeFilterCountLabel from the enclosing `search` component, so it only works inside <c-corpus-search>. #}
+<span
+  x-show="hasActiveFilters"
+  x-text="activeFilterCountLabel"
+  aria-hidden="true"
+  class="text-greyscale-600 font-medium"
+></span>
