@@ -23,7 +23,6 @@ from urllib import parse
 
 import botocore.exceptions
 import requests
-from asgiref.sync import async_to_sync
 from django.conf import settings
 from django.db import transaction
 from django.db.models import FileField, Q, QuerySet
@@ -232,9 +231,7 @@ def _note_blockers_for_cluster(cluster: OpinionCluster) -> QuerySet[Note]:
     :param cluster: The OpinionCluster being considered for sealing.
     :return: A queryset of Notes attached to the cluster or its docket.
     """
-    return async_to_sync(get_notes_for)(cluster).union(
-        async_to_sync(get_notes_for)(cluster.docket)
-    )
+    return get_notes_for(cluster).union(get_notes_for(cluster.docket))
 
 
 # nosemgrep: python.lang.bad-return-outside-function

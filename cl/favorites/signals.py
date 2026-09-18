@@ -1,6 +1,5 @@
 from datetime import timedelta
 
-from asgiref.sync import async_to_sync
 from django.db.models import Model
 from django.db.models.signals import post_delete, post_save
 from django.dispatch import receiver
@@ -85,7 +84,7 @@ def delete_orphaned_notes(sender, instance: Model, **kwargs):
     already cleaned up by that FK's own on_delete=CASCADE, since object_id
     is a plain integer column with no DB-level FK constraint of its own.
     """
-    async_to_sync(get_notes_for)(instance).delete()
+    get_notes_for(instance).delete()
 
 
 # One receiver per model in NOTEABLE_MODELS -- adding a model there is

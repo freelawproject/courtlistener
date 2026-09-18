@@ -1,6 +1,5 @@
 from dataclasses import dataclass
 
-from asgiref.sync import sync_to_async
 from django.conf import settings
 from django.contrib.auth.models import AnonymousUser, User
 from django.contrib.contenttypes.models import ContentType
@@ -130,7 +129,7 @@ def get_noted_object(note: Note) -> models.Model | None:
     return getattr(note, found[1])
 
 
-async def get_notes_for(obj: models.Model) -> QuerySet[Note]:
+def get_notes_for(obj: models.Model) -> QuerySet[Note]:
     """Return the Notes attached to a given object, across all users.
 
     Results include notes not yet migrated to content_type/object_id.
@@ -141,8 +140,7 @@ async def get_notes_for(obj: models.Model) -> QuerySet[Note]:
     if obj.pk is None:
         return Note.objects.none()
 
-    query = await sync_to_async(build_dual_read_query)(type(obj), obj.pk)
-    return Note.objects.filter(query)
+    return Note.objects.filter(build_dual_read_query(type(obj), obj.pk))
 
 
 def get_note_for_target(
