@@ -1,6 +1,6 @@
 """Tests for Florida docket and originating-court-information merger."""
 
-from datetime import UTC, date, datetime
+from datetime import date, datetime
 from tempfile import NamedTemporaryFile
 from unittest import mock
 
@@ -1464,7 +1464,6 @@ class FloridaDocumentDownloadTest(TestCase):
             tmp,
             sha1,
         )
-
 
     @mock.patch("cl.lib.microservice_utils.doc_page_count_service")
     @mock.patch("cl.scrapers.utils.get_extension", return_value=".pdf")
