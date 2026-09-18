@@ -600,7 +600,9 @@ class JKentScrapeLoader[ScrapeType: BaseModel, ParamType = None](ABC):
                     assert_never(outcome)
             if not model._default_manager.filter(
                 pk=document.pk, filepath_local=current
-            ).update(filepath_local=published_location, date_modified=timezone.now()):
+            ).update(
+                filepath_local=published_location, date_modified=timezone.now()
+            ):
                 continue
             if outcome is PublishOutcome.MISSING:
                 tally |= FileTally(missing=1)
