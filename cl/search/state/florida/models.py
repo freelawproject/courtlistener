@@ -3,13 +3,12 @@ import hashlib
 import logging
 import struct
 import time
+from datetime import date, datetime
 from http import HTTPStatus
 from urllib.parse import parse_qs, urlencode, urljoin, urlparse, urlunparse
-
-import httpx
-from datetime import date, datetime
 from zoneinfo import ZoneInfo
 
+import httpx
 import pghistory
 from django.db import models
 from juriscraper.state.florida.scraper import FLORIDA_API_BASE
