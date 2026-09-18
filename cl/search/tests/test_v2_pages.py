@@ -1,3 +1,4 @@
+import json
 from datetime import timedelta
 from unittest.mock import patch
 
@@ -17,6 +18,7 @@ from cl.lib.test_helpers import (
     SearchTestCase,
     SimpleUserDataMixin,
 )
+from cl.search.constants import CORPUS_SEARCH_SCOPES
 from cl.search.forms import CorpusSearchForm
 from cl.search.models import Docket, Opinion, RECAPDocument
 from cl.search.utils import get_v2_homepage_stats
@@ -343,12 +345,7 @@ class CorpusSearchFormTest(SimpleUserDataMixin, TestCase):
         Regression for #7035: tabs used Alpine x-for, so labels were missing
         from the initial HTML and flashed in after JavaScript loaded.
         """
-        expected_labels = [
-            "Case Law",
-            "RECAP Archive",
-            "Oral Arguments",
-            "Judges",
-        ]
+        expected_labels = [scope["label"] for scope in CORPUS_SEARCH_SCOPES]
         tablist = self.tree.xpath(
             '//*[@role="tablist" and @aria-label="Select the scope of your search"]'
         )
@@ -356,6 +353,18 @@ class CorpusSearchFormTest(SimpleUserDataMixin, TestCase):
             len(tablist),
             1,
             "Expected one corpus search tablist on the homepage",
+        )
+        scope_scripts = self.tree.xpath(
+            '//script[@id="corpus-search-scopes" and @type="application/json"]'
+        )
+        self.assertEqual(
+            len(scope_scripts),
+            1,
+            "Expected one serialized corpus search scope payload",
+        )
+        self.assertEqual(
+            json.loads(scope_scripts[0].text_content()),
+            list(CORPUS_SEARCH_SCOPES),
         )
         tab_labels = [
             "".join(tab.itertext()).strip()
