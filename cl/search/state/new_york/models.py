@@ -421,10 +421,9 @@ class NYCoADocument(AbstractDateTimeModel, AbstractStateDocument):
         """Store Court-PASS documents under the RECAP bucket layout.
 
         Deliberately not `state_pdf_path`, which the other states use: that
-        layout files a whole court's documents in one flat directory under a
-        slugified name, and slugifying would flatten the dots this name is
-        built out of. Following RECAP instead keeps state documents addressed
-        the same way PACER documents are, a case to a directory; see `bucket`.
+        names files by filing date and pk, whereas Court-PASS documents keep
+        the name `make_filename` derives from Court-PASS's own identifiers.
+        Both follow RECAP, a case to a directory; see `bucket`.
 
         :param filename: The name to file the document under, which for
             Court-PASS is `make_filename`'s.
