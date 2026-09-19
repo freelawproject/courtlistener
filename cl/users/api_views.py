@@ -10,6 +10,7 @@ from rest_framework.response import Response
 from rest_framework.viewsets import ModelViewSet
 
 from cl.api.api_permissions import IsOwner
+from cl.api.authentication import ReplicaRoutingSessionAuthentication
 from cl.api.models import (
     Webhook,
     WebhookEvent,
@@ -29,6 +30,8 @@ class WebhooksViewSet(ModelViewSet):
 
     permission_classes = [IsAuthenticated, IsOwner]
     renderer_classes = [JSONRenderer, TemplateHTMLRenderer]
+    authentication_classes = [ReplicaRoutingSessionAuthentication]
+    throttle_classes = []
 
     def get_queryset(self):
         """
@@ -274,6 +277,8 @@ class WebhookEventViewSet(ModelViewSet):
     permission_classes = [IsAuthenticated, IsOwner]
     renderer_classes = [TemplateHTMLRenderer]
     filterset_class = WebhookEventViewFilter
+    authentication_classes = [ReplicaRoutingSessionAuthentication]
+    throttle_classes = []
 
     def get_queryset(self):
         """

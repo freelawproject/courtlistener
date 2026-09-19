@@ -7,6 +7,7 @@ from django.conf import settings
 from django.contrib.auth.models import User
 from django.core.mail import send_mail
 from django.template import loader
+from django.urls import reverse
 from django.utils.timezone import now
 from requests.exceptions import HTTPError, Timeout
 
@@ -18,7 +19,6 @@ from cl.lib.neon_utils import NeonClient
 from cl.lib.zoho import (
     ContactsModule,
     LeadsModule,
-    build_zoho_payload_from_user,
 )
 
 logger = logging.getLogger(__name__)
@@ -97,6 +97,74 @@ def create_neon_account(self: Task, user_id: int) -> None:
         profile.save(update_fields=["neon_account_id"])
 
 
+@app.task(ignore_result=True)
+def send_new_account_emails(user_id: int) -> None:
+    """Send the emails that follow a successful registration.
+
+    Emails the new user their activation link and tells MANAGERS about the
+    signup. The register view enqueues this rather than sending mail inline so
+    that a signup on a fresh address and a signup on a taken address (see
+    notify_existing_account_holder) both return after one enqueue and no SMTP
+    round trips. Otherwise the response time would reveal which case occurred.
+
+    :param user_id: The pk of the User that was just created or claimed.
+    :return: None
+    """
+    user = User.objects.filter(pk=user_id).select_related("profile").first()
+    if user is None:
+        # The account was deleted between the view and the worker picking
+        # this up. Nothing useful to send.
+        logger.warning(
+            "Skipping new account emails: user %s no longer exists.", user_id
+        )
+        return
+
+    # Imported here because cl.users.models imports this module indirectly
+    # (via cl.api.utils), and cl.users.utils imports cl.users.models.
+    from cl.users.utils import emails
+
+    profile = user.profile  # type: ignore
+    confirm_email = emails["confirm_your_new_account"]
+    send_mail(
+        confirm_email["subject"],
+        confirm_email["body"] % (user.username, profile.activation_key),
+        confirm_email["from_email"],
+        [user.email],
+    )
+    managers_email = emails["new_account_created"]
+    send_mail(
+        managers_email["subject"] % user.username,
+        managers_email["body"]
+        % (user.get_full_name() or "Not provided", user.email),
+        managers_email["from_email"],
+        managers_email["to"],
+    )
+
+
+@app.task(ignore_result=True)
+def notify_existing_account_holder(recipient: str) -> None:
+    """Tell an address owner that a signup was attempted with their address.
+
+    Used when registration is refused because the address already has an
+    account. The refusal is never shown in the HTTP response, since that would
+    let anyone test whether an address has an account; this email is how the
+    owner learns what happened and how to get back into their account.
+
+    :param recipient: The email address the signup attempt used.
+    :return: None
+    """
+    # Imported here to avoid a circular import; see send_new_account_emails.
+    from cl.users.utils import emails
+
+    email = emails["account_already_exists"]
+    send_mail(
+        email["subject"],
+        email["body"] % (reverse("sign-in"), reverse("password_reset")),
+        email["from_email"],
+        [recipient],
+    )
+
+
 @app.task(
     bind=True,
     autoretry_for=(Timeout,),
@@ -138,7 +206,7 @@ def create_or_update_zoho_account(
     This task:
     - Builds a Zoho payload from the User model
     - Checks if the user exists as a Contact or Lead in Zoho
-    - Updates the existing record or creates a new Lead if none exist
+    - Updates the existing record or creates a new Contact if none exist
 
     :param user_id: The primary key of the user to sync with Zoho
     :param milestone: A milestone value to store in the 'API_calls' field
@@ -161,7 +229,7 @@ def create_or_update_zoho_account(
     )
     # Update the first matching Lead, if found
     if lead_records:
-        payload = build_zoho_payload_from_user(user, leads_module.module_name)
+        payload = leads_module.build_payload_from_user(user)
         record_id = lead_records[0].get_id()
         leads_module.update_record(record_id, payload | milestone_payload)
         return ("Leads", record_id)
@@ -172,20 +240,15 @@ def create_or_update_zoho_account(
     )
     # Update the first matching Contact, if found
     if contact_records:
-        payload = build_zoho_payload_from_user(
-            user, contacts_module.module_name
-        )
+        payload = contacts_module.build_payload_from_user(user)
         record_id = contact_records[0].get_id()
         contacts_module.update_record(record_id, payload | milestone_payload)
         return ("Contacts", record_id)
 
-    # Otherwise, create a new Lead
-    payload = (
-        build_zoho_payload_from_user(user, leads_module.module_name)
-        | milestone_payload
-    )
-    created = leads_module.create_record(payload)
-    return ("Leads", LeadsModule.get_action_record_id(created[0]))
+    # Otherwise, create a new Contact
+    payload = contacts_module.build_payload_from_user(user) | milestone_payload
+    created = contacts_module.create_record(payload)
+    return ("Contacts", ContactsModule.get_action_record_id(created[0]))
 
 
 def _membership_tag_for_level(level: int) -> str:

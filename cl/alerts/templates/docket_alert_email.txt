@@ -31,11 +31,11 @@ Download PDF from RECAP with PACER fallback: https://www.courtlistener.com{{ rd.
 {% endfor %}{% endfor %}
 
 {% if notes or tags %}
-Your Note: {% if notes %}{{ notes }}{% else %} You have not added notes to this case. Learn More: https://www.courtlistener.com{% url 'tag_notes_help' %}{% endif %}
+Your Note: {% if notes %}{{ notes }}{% else %} You have not added notes to this case. Learn More: {{ WIKI_HELP_URL }}/general/using-notes-to-annotate-content{% endif %}
 
-Your Tags: {% if tags %}{% for tag in tags %}{{ tag.name }}{% if not forloop.last %}, {% endif %}{% endfor %}{% else %} No tags yet. Learn More: https://www.courtlistener.com{% url 'tag_notes_help' %}{% endif %}
+Your Tags: {% if tags %}{% for tag in tags %}{{ tag.name }}{% if not forloop.last %}, {% endif %}{% endfor %}{% else %} No tags yet. Learn More: {{ WIKI_HELP_URL }}/general/using-tags-to-organize-docket-collections{% endif %}
 {% else %}
-Use notes and tags to organize and share the cases you follow. Learn More: https://www.courtlistener.com{% url 'tag_notes_help' %}
+Use notes and tags to organize and share the cases you follow. Learn More: {{ WIKI_HELP_URL }}/general/using-tags-to-organize-docket-collections
 {% endif %}
 
 {% if not first_email or first_email and auto_subscribe %}
@@ -43,12 +43,9 @@ This alert was sent because you subscribed to this docket with your account on C
 To disable this alert unsubscribe here: https://www.courtlistener.com{% url 'toggle_docket_alert_confirmation' 'unsubscribe' docket_alert_secret_key %}
 {% endif %}
 ************************
-{% if recap_alerts_banner %}
-📣 The Wait is Over! You can now get alerts for keywords in the RECAP Archive.
-Set daily or real-time email alerts when PACER cases or filings match your saved search.
-Follow topics, people, organizations, and more.
-Learn more: https://free.law/2025/06/18/recap-search-alerts-for-pacer/
-{% endif %}
+📣 The power of CourtListener can now be integrated into Claude and is part of Gemini Enterprise for Legal. Combine CourtListener with AI to make the hardest research just a prompt away.
+Learn more about Claude: https://free.law/2026/05/12/courtlistener-is-now-available-inside-claude/
+Learn more about Gemini Enterprise for Legal: https://free.law/2026/08/25/courtlistener-gemini-enterprise-for-legal/
 
 This alert brought to you by the 501(c)(3) non-profit Free Law Project
 

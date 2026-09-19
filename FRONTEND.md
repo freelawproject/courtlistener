@@ -72,6 +72,13 @@ Sync notice format:
 - Don't create single-use utility classes — use inline Tailwind classes instead
 - Branding values (colors, spacing, fonts) go in `tailwind.config.js`, not as custom classes in `input.css`
 
+### Django form widgets
+
+- New-stack Django forms MUST use `TextInput` and `Select` from `cl.lib.widgets` for the standard new-stack widget configuration
+- Use `TextInput` for standard text-input styling and `autocomplete="off"`
+- Use `Select` for standard select styling, with `input_text=True` when the select requires the `input-text` component class
+- Keep field-specific attributes, such as `placeholder`, in the form field declaration
+
 ## Alpine.js
 
 CourtListener uses the CSP-friendly Alpine build. Nearly all Alpine documentation examples use inline JS that will NOT work here.
@@ -95,6 +102,13 @@ Omit the extension only for scripts that have minified versions (the tag resolve
 ```html
 {% require_script "js/alpine/plugins/intersect" defer=True %}
 ```
+
+A stub with no extension MUST have both a `.js` and a non-empty `.min.js`:
+DEBUG loads the first, production the second. Vendored code ships both; our own
+components and composables are not minified, so they MUST be required with
+`.js`. Breaking this is invisible in development, so two guards catch it: the
+tag warns in the runserver console while you're on the page, and
+`RequireScriptAssetsTest` fails the test suite.
 
 Plugins MUST be deferred (`defer=True`).
 
@@ -154,3 +168,8 @@ The rules in this doc are enforced as hard errors that block merge. See `fronten
 - New cotton component without a component library entry
 - `x-data` without a corresponding `{% require_script %}`
 - Placeholder text (TODO, TBD, FIXME, Lorem ipsum)
+- Raw CSS properties in `input.css` (prefer `@apply`)
+
+**Skipping a check** (only the checks listed in `SKIPPABLE_CHECKS` in `frontend_checks.py`; security, accessibility and architecture checks cannot be skipped). Use the check name shown in brackets in the CI annotation, e.g. `[check_raw_css]`:
+- Whole file: `{# frontend-checks-skip: check_name, other_check #}` anywhere in a template, or `/* frontend-checks-skip: check_name */` in CSS
+- Single line: end the offending line with `{# frontend-checks-skip-line: check_name #}` in templates or `/* frontend-checks-skip-line: check_name */` in CSS, like `eslint-disable-line`

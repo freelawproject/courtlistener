@@ -19,7 +19,7 @@
       {% if user.is_authenticated %}
         <div class="modal-body logged-in hidden">
           {% if not request.GET.edit_alert %}
-            <p>Get regular notifications about this query by creating an alert. <a href="{% url "alert_help" %}">Learn more&nbsp;<i
+            <p>Get regular notifications about this query by creating an alert. <a href="{{ WIKI_HELP_URL }}/alerts/search-alerts-for-case-law-and-filings">Learn more&nbsp;<i
                     class="fa fa-question-circle gray"></i></a>
             </p>
           {% endif %}
@@ -103,10 +103,10 @@
 
             {# Hidden unless shown by JS #}
             <div id="quota-warning" class="alert alert-warning hidden">
-              <p>CourtListener is a project of <a href="https://free.law" target="_blank">Free Law Project</a>, a federally-recognized 501(c)(3) non-profit.</p>
+              <p>CourtListener is a project of <a href="https://free.law" target="_blank" rel="noopener noreferrer">Free Law Project</a>, a federally-recognized 501(c)(3) non-profit.</p>
 
               {% if search_form.type.value != SEARCH_TYPES.RECAP %}
-                <p><a href="{% url "faq" %}#real-time-alerts" target="_blank">Real Time alerts</a> are only supported for members of <a href="https://free.law/">Free Law Project</a>.</p>
+                <p><a href="{{ WIKI_HELP_URL }}/alerts/search-alerts-for-case-law-and-filings#enabling-real-time-alerts" target="_blank" rel="noopener noreferrer">Real Time alerts</a> are only supported for members of <a href="https://free.law/">Free Law Project</a>.</p>
                 <p>Please select another rate or become a member to create this alert.</p>
               {% else %}
                 <p id="msg-rt-free" class="hidden">You must be a member to create real-time alerts. Please join Free.law or choose a different rate to create this alert.</p>
@@ -115,15 +115,22 @@
                   You've used all of the alerts included with your membership.
                   To create this alert, upgrade your membership or <a href="{% url 'profile_alerts' %}">disable a RECAP alert</a>.
                 </p>
+                <p id="msg-quota-member-legacy" class="hidden">
+                  You've used all of the alerts included with your legacy membership.
+                  Legacy memberships can't be upgraded online, but <a href="{{ alerts_context.legacyHelpUrl }}" target="_blank" rel="noopener noreferrer">here's how to get more features</a>, or <a href="{% url 'profile_alerts' %}">disable a RECAP alert</a>.
+                </p>
               {% endif %}
 
               <p class="bottom">
                 <a href="https://free.law/membership/"
                    id="no-member-button" class="hidden btn btn-danger"
-                   target="_blank">Join Free.law</a>
+                   target="_blank" rel="noopener noreferrer">Join Free.law</a>
                 <a href="https://donate.free.law/constituent/memberships/upgrade/{{ alerts_context.neon_id }}"
                    id="member-button" class="hidden btn btn-danger"
-                   target="_blank">Upgrade Membership</a>
+                   target="_blank" rel="noopener noreferrer">Upgrade Membership</a>
+                <a href="{{ alerts_context.legacyHelpUrl }}"
+                   id="member-legacy-button" class="hidden btn btn-danger"
+                   target="_blank" rel="noopener noreferrer">Get More Features</a>
               </p>
             </div>
             {% if request.GET.edit_alert %}
@@ -135,12 +142,12 @@
             {% endif %}
             {% if search_form.type.value == SEARCH_TYPES.OPINION %}
               <p class="gray v-offset-above-2">Some jurisdictions do not yet support alerts. Check
-                <a href="{% url "coverage_opinions" %}">our list</a> to be sure your query is supported.
+                <a href="{{ WIKI_COVERAGE_OPINIONS_URL }}">our list</a> to be sure your query is supported.
               </p>
             {% elif search_form.type.value == SEARCH_TYPES.ORAL_ARGUMENT %}
               {# No need for statement here. All OA jurisdictions are scraped. #}
             {% elif search_form.type.value == SEARCH_TYPES.RECAP or search_form.type.value == SEARCH_TYPES.DOCKETS %}
-              <p class="gray v-offset-above-2">RECAP alerts will only be triggered when there is a new responsive document added to the RECAP Archive. Check out <a href="{% url "coverage_recap" %}">how RECAP content is acquired</a> to learn more.
+              <p class="gray v-offset-above-2">RECAP alerts will only be triggered when there is a new responsive document added to the RECAP Archive. Check out <a href="{{ WIKI_COVERAGE_RECAP_URL }}">how RECAP content is acquired</a> to learn more.
               </p>
             {% endif %}
             <div class="row v-offset-above-2">

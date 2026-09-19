@@ -31,7 +31,7 @@
     <p>CourtListener provides two types of alerts, Search Alerts that let you follow cases and topics of interest to you, and RECAP Docket Alerts, which let you follow PACER dockets of interest.
     </p>
     <p>
-      <a href="{% url "alert_help" %}" class="btn btn-lg btn-primary">Learn More</a>
+      <a href="{{ WIKI_HELP_URL }}/alerts/" class="btn btn-lg btn-primary">Learn More</a>
     </p>
   </div>
   <div class="hidden-xs col-sm-1 col-md-3"></div>
@@ -124,7 +124,7 @@
         </table>
       </div>
       <p><a
-        href="{% url "alert_help" %}"
+        href="{{ WIKI_HELP_URL }}/alerts/docket-alerts-for-pacer"
         class="btn btn-default">Learn More About RECAP Alerts</a></p>
     </div>
   {% endif %}

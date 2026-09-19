@@ -81,10 +81,28 @@ class RECAPDocumentReceiverTests(TestCase):
 
                     if test_case.expect_enqueue:
                         mock_apply.assert_called_once_with(
-                            args=([recap_doc.pk],)
+                            args=([recap_doc.pk],), queue="celery"
                         )
                     else:
                         mock_apply.assert_not_called()
+
+    def test_receiver_honors_citation_queue_override(self):
+        """A batch job can steer the citation task off the default queue by
+        setting ``citation_queue`` on the instance before saving."""
+        with patch(
+            "cl.citations.tasks.find_citations_and_parantheticals_for_recap_documents.apply_async"
+        ) as mock_apply:
+            recap_doc = RECAPDocumentFactory.create(
+                plain_text="People v. Molineux, 168 NY 264, 275-276 (N.Y. 1901).",
+                ocr_status=RECAPDocument.OCR_COMPLETE,
+                docket_entry=DocketEntryFactory(),
+            )
+            recap_doc.citation_queue = "batch2"
+            recap_doc.save(update_fields=["ocr_status", "plain_text"])
+
+            mock_apply.assert_called_once_with(
+                args=([recap_doc.pk],), queue="batch2"
+            )
 
 
 @override_settings(DOCKET_NUMBER_CLEANING_ENABLED=True)

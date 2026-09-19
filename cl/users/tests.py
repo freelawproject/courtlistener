@@ -1,6 +1,8 @@
 import json
+import re
 import time
 from datetime import datetime, timedelta
+from decimal import Decimal
 from http import HTTPStatus
 from itertools import product
 from pathlib import Path
@@ -22,10 +24,12 @@ from django.core.mail import (
     get_connection,
     send_mail,
 )
-from django.test import AsyncClient
+from django.http import HttpResponse
+from django.test import AsyncClient, RequestFactory
 from django.test.client import Client
 from django.test.utils import override_settings
 from django.urls import reverse
+from django.utils.encoding import force_bytes
 from django.utils.http import urlsafe_base64_encode
 from django.utils.timezone import now
 from django_ses import SESBackend, signals
@@ -41,7 +45,6 @@ from cl.alerts.factories import (
     DocketAlertWithParentsFactory,
 )
 from cl.alerts.models import DocketAlert, DocketAlertEvent
-from cl.api.constants import SYNC_MEMBERSHIP_THROTTLES_SWITCH
 from cl.api.factories import (
     APIThrottleFactory,
     WebhookEventFactory,
@@ -55,9 +58,12 @@ from cl.api.models import (
     WebhookEventType,
     WebhookVersions,
 )
-from cl.api.utils import clear_tiered_cache
+from cl.api.utils import DOUBLE_API_THROTTLES_SWITCH, clear_tiered_cache
+from cl.donate.factories import NeonMembershipFactory
 from cl.donate.models import (
+    PROVIDERS,
     MembershipPaymentStatus,
+    MonthlyDonation,
     NeonMembership,
     NeonMembershipLevel,
 )
@@ -68,13 +74,22 @@ from cl.favorites.models import (
     UserTag,
     UserTagEvent,
 )
+from cl.lib.AuthenticationBackend import MAX_EMAIL_CANDIDATES
+from cl.lib.crypto import generate_activation_key
 from cl.lib.email_backends import get_email_count
+from cl.lib.ratelimiter import (
+    FAILED_LOGIN_LIMIT,
+    FAILED_LOGIN_WINDOW,
+    get_ratelimit_cache,
+    make_failed_login_key,
+)
 from cl.lib.redis_utils import get_redis_interface
 from cl.lib.test_helpers import (
     SimpleUserDataMixin,
     UserProfileWithParentsFactory,
 )
 from cl.search.factories import DocketFactory
+from cl.search.models import SearchQuery
 from cl.tests.base import SELENIUM_TIMEOUT, BaseSeleniumTest
 from cl.tests.cases import (
     APITestCase,
@@ -85,8 +100,9 @@ from cl.tests.cases import (
     TestCase,
 )
 from cl.tests.utils import MockResponse as MockPostResponse
-from cl.tests.utils import make_client
-from cl.users.admin import UserAdmin
+from cl.tests.utils import make_session_client
+from cl.users import signals as user_signals
+from cl.users.admin import UserAdmin, UserProfileInline
 from cl.users.email_handlers import (
     add_bcc_random,
     get_email_body,
@@ -97,6 +113,7 @@ from cl.users.factories import (
     UserFactory,
     UserProfileWithParentsFactory,
 )
+from cl.users.forms import PasswordConfirmForm
 from cl.users.management.commands.cl_delete_old_emails import delete_old_emails
 from cl.users.management.commands.cl_retry_failed_email import (
     handle_failing_emails,
@@ -108,12 +125,19 @@ from cl.users.models import (
     EMAIL_NOTIFICATIONS,
     FLAG_TYPES,
     STATUS_TYPES,
+    BarMembership,
     EmailFlag,
     EmailSent,
     FailedEmail,
     UserProfile,
+    UserProfileBarMembershipEvent,
+    UserProfileEvent,
+    UserProxyEvent,
 )
 from cl.users.tasks import tag_zoho_record, tag_zoho_record_for_membership
+from cl.users.utils import create_stub_account, message_dict
+from cl.visualizations.factories import VisualizationFactory
+from cl.visualizations.models import SCOTUSMap
 
 
 class UserTest(LiveServerTestCase):
@@ -171,7 +195,7 @@ class UserTest(LiveServerTestCase):
             # No spaces
             ("/test test", True),
             # A safe redirect
-            (reverse("faq"), False),
+            (reverse("help_home"), False),
             # CRLF injection attack
             (
                 "/%0d/evil.com/&email=Your+Account+still+in+maintenance,please+click+Return+below",
@@ -211,9 +235,9 @@ class UserTest(LiveServerTestCase):
         evil_text = "visit https://evil.com/malware.exe to win $100 giftcard"
         url_params = [
             # A safe redirect and email
-            (reverse("faq"), "test@free.law", False),
+            (reverse("help_home"), "test@free.law", False),
             # Text injection attack
-            (reverse("faq"), evil_text, True),
+            (reverse("help_home"), evil_text, True),
             # open redirect and text injection attack
             ("https://evil.com&email=e%40e.net", evil_text, True),
         ]
@@ -248,7 +272,7 @@ class UserTest(LiveServerTestCase):
         """Do we allow good redirects in login while banning bad ones?"""
         next_params = [
             # A safe redirect
-            (reverse("faq"), False),
+            (reverse("help_home"), False),
             # Redirection to the register page
             (reverse("register"), True),
             # No open redirects (to a domain outside CL)
@@ -373,6 +397,11 @@ class UserDataTest(LiveServerTestCase):
             msg="Test string not found in response.content",
         )
 
+        # The key must be invalidated on success (GHSA-638g-xf9h-6qcg) so it
+        # can't be reused as a lookup value if it ever leaks.
+        await up.arefresh_from_db()
+        self.assertEqual(up.activation_key, "")
+
     async def test_confirming_an_email_when_it_is_associated_with_multiple_accounts(
         self,
     ) -> None:
@@ -401,6 +430,9 @@ class UserDataTest(LiveServerTestCase):
         ups = UserProfile.objects.filter(pk__in=[up.pk for up in ups])
         async for up in ups:
             self.assertTrue(up.email_confirmed)
+            # Every account sharing this key gets it invalidated, not just
+            # the one the confirmation link happened to name.
+            self.assertEqual(up.activation_key, "")
 
     def test_get_welcome_email_recipients(self) -> None:
         """This test verifies that we can get the welcome email recipients
@@ -422,6 +454,8 @@ class UserDataTest(LiveServerTestCase):
         self.assertEqual(len(recipients), 0)
 
 
+@override_settings(WAFFLE_CACHE_PREFIX="ProfileTest")
+@override_switch(DOUBLE_API_THROTTLES_SWITCH, active=False)
 class ProfileTest(SimpleUserDataMixin, TestCase):
     async def test_api_page_with_data(self) -> None:
         """Can we access the API stats page after the API has been used?"""
@@ -461,6 +495,29 @@ class ProfileTest(SimpleUserDataMixin, TestCase):
             reverse("delete_profile_done"),
         )
 
+    @patch("cl.users.views.create_zoho_desk_ticket")
+    async def test_take_out_creates_zoho_desk_ticket(
+        self, mock_task: MagicMock
+    ) -> None:
+        """Does requesting a data export create a Zoho Desk ticket?"""
+        user = await sync_to_async(User.objects.get)(username="pandora")
+        self.assertTrue(
+            await self.async_client.alogin(
+                username="pandora", password="password"
+            )
+        )
+        response = await self.async_client.post(
+            reverse("take_out"),
+            follow=True,
+        )
+        self.assertRedirects(response, reverse("take_out_done"))
+        mock_task.delay.assert_called_once()
+        call_kwargs = mock_task.delay.call_args.kwargs
+        self.assertEqual(call_kwargs["email"], user.email)
+        self.assertEqual(call_kwargs["request_type"], "Data Export Request")
+        self.assertIn(user.username, call_kwargs["description"])
+        self.assertIn("Email Confirmed:", call_kwargs["description"])
+
     async def test_reset_api_token_get_renders_confirmation(self) -> None:
         """The reset page renders a password-confirmation form."""
         self.assertTrue(
@@ -495,7 +552,14 @@ class ProfileTest(SimpleUserDataMixin, TestCase):
                 username="pandora", password="password"
             )
         )
-        r = await self.async_client.get(reverse("reset_api_token"))
+        # Use an isolated tiered-cache namespace so the cached promo switch
+        # honors the @override_switch above (get_recent reads the base bucket
+        # when the promo is off) without sharing other tests' cached state.
+        with mock.patch(
+            "cl.lib.decorators.get_tiered_cache_prefix",
+            return_value="tiered_reset_token_recent_usage",
+        ):
+            r = await self.async_client.get(reverse("reset_api_token"))
         self.assertEqual(r.status_code, HTTPStatus.OK)
         self.assertContains(r, "<strong>3</strong>")
         self.assertContains(r, "fa-exclamation-triangle")
@@ -687,6 +751,121 @@ class ProfileTest(SimpleUserDataMixin, TestCase):
         self.assertEqual(user_tag_events_first.name, "tag_1_user_2")
         docket_tag_events_first = await docket_tag_events.afirst()
         self.assertEqual(docket_tag_events_first.tag_id, tag_1_user_2.pk)
+
+    def test_purges_user_data_and_history_on_account_deletion(self) -> None:
+        """Deleting an account hard-deletes the user's logged data and the
+        PII left behind in the pghistory event tables, keeps (but disables)
+        donation records, and leaves a second user's data untouched.
+        """
+        victim = UserProfileWithParentsFactory()
+        bystander = UserProfileWithParentsFactory()
+
+        # Edit tracked fields to generate UserProfile/UserProxy history, and
+        # associate a bar membership to generate barmembership history.
+        bar = BarMembership.objects.create(barMembership="CA")
+        for profile in (victim, bystander):
+            profile.user.first_name = "Real Name"
+            profile.user.save()
+            profile.employer = "Real Employer"
+            profile.save()
+            profile.barmembership.add(bar)
+
+            # Usage logs and assets tied to each user.
+            SearchQuery.objects.create(
+                user=profile.user,
+                source=SearchQuery.WEBSITE,
+                engine=SearchQuery.ELASTICSEARCH,
+                get_params="q=something+private",
+                hit_cache=False,
+                failed=False,
+            )
+            EmailSentFactory(user=profile.user)
+            VisualizationFactory(user=profile.user)
+            MonthlyDonation.objects.create(
+                donor=profile.user,
+                enabled=True,
+                payment_provider=PROVIDERS.CREDIT_CARD,
+                monthly_donation_amount=Decimal("10.00"),
+                monthly_donation_day=1,
+                stripe_customer_id="cus_test",
+            )
+
+        # Sanity check: the victim's history and assets exist before deletion.
+        self.assertTrue(
+            UserProxyEvent.objects.filter(pgh_obj_id=victim.user.pk).exists()
+        )
+        self.assertTrue(
+            UserProfileEvent.objects.filter(user_id=victim.user.pk).exists()
+        )
+        self.assertTrue(
+            UserProfileBarMembershipEvent.objects.filter(
+                userprofile_id=victim.pk
+            ).exists()
+        )
+
+        # Delete the victim's account.
+        self.assertTrue(
+            self.client.login(
+                username=victim.user.username, password="password"
+            )
+        )
+        self.client.post(
+            reverse("delete_account"),
+            {"password": "password"},
+            follow=True,
+        )
+
+        # The victim's logged data and assets are hard-deleted.
+        self.assertFalse(SearchQuery.objects.filter(user=victim.user).exists())
+        self.assertFalse(EmailSent.objects.filter(user=victim.user).exists())
+        self.assertFalse(SCOTUSMap.objects.filter(user=victim.user).exists())
+
+        # The PII left behind in the event tables is purged.
+        self.assertFalse(
+            UserProfileEvent.objects.filter(user_id=victim.user.pk).exists()
+        )
+        self.assertFalse(
+            UserProxyEvent.objects.filter(pgh_obj_id=victim.user.pk).exists()
+        )
+        self.assertFalse(
+            UserProfileBarMembershipEvent.objects.filter(
+                userprofile_id=victim.pk
+            ).exists()
+        )
+
+        # Donations are financial records: kept, but disabled.
+        victim_donations = MonthlyDonation.objects.filter(donor=victim.user)
+        self.assertEqual(victim_donations.count(), 1)
+        self.assertFalse(victim_donations.get().enabled)
+
+        # The bystander is completely untouched.
+        self.assertTrue(
+            SearchQuery.objects.filter(user=bystander.user).exists()
+        )
+        self.assertTrue(EmailSent.objects.filter(user=bystander.user).exists())
+        self.assertTrue(SCOTUSMap.objects.filter(user=bystander.user).exists())
+        self.assertTrue(
+            UserProfileEvent.objects.filter(user_id=bystander.user.pk).exists()
+        )
+        self.assertTrue(
+            UserProxyEvent.objects.filter(
+                pgh_obj_id=bystander.user.pk
+            ).exists()
+        )
+        self.assertTrue(
+            UserProfileBarMembershipEvent.objects.filter(
+                userprofile_id=bystander.pk
+            ).exists()
+        )
+        self.assertTrue(
+            MonthlyDonation.objects.get(donor=bystander.user).enabled
+        )
+
+        # The original bug deleted the shared BarMembership lookup row itself
+        # on account deletion, wiping it for everyone. Guard the regression
+        # directly: the shared row and the bystander's link must both survive.
+        self.assertTrue(BarMembership.objects.filter(pk=bar.pk).exists())
+        self.assertTrue(bystander.barmembership.filter(pk=bar.pk).exists())
 
     async def test_redirect_to_search_alerts_if_no_alerts(self):
         """Tests redirection to search alerts when a user has no alerts"""
@@ -1058,6 +1237,22 @@ class SNSWebhookTest(TestCase):
         )
         # Check if handle_complaint is called
         mock_complaint.assert_called()
+
+    @mock.patch("cl.users.signals.S3PrivateUUIDStorage")
+    @mock.patch("cl.users.signals.logger")
+    @mock.patch("cl.users.signals.random.random", return_value=0)
+    @override_settings(BOUNCES_STORE_RATE=1)
+    def test_store_event_logs_storage_failure(
+        self, mock_random, mock_logger, mock_storage
+    ) -> None:
+        """Storage failures must be visible without failing the webhook."""
+        mock_storage.return_value.save.side_effect = RuntimeError("S3 failed")
+
+        user_signals.store_bounce_or_complaint_obj(
+            {}, "user@example.com", user_signals.SESEventType.BOUNCE
+        )
+
+        mock_logger.exception.assert_called_once()
 
     @mock.patch("cl.users.email_handlers.logging")
     def test_handle_soft_bounce_unexpected(self, mock_logging) -> None:
@@ -3553,8 +3748,8 @@ class WebhooksHTMXTests(APITestCase):
 
     def setUp(self) -> None:
         self.webhook_path = reverse("webhooks-list")
-        self.client = make_client(self.user_1.pk)
-        self.client_2 = make_client(self.user_2.pk)
+        self.client = make_session_client(self.user_1.pk)
+        self.client_2 = make_session_client(self.user_2.pk)
 
     def tearDown(cls):
         Webhook.objects.all().delete()
@@ -4136,6 +4331,391 @@ class RegisterViewTest(TestCase):
         # The username field should display an error.
         self.assertIn("username", form.errors)
 
+    def test_generate_activation_key_is_not_brute_forceable(self) -> None:
+        """Is the activation key a high-entropy CSPRNG token?
+
+        Regression test for GHSA-638g-xf9h-6qcg: the old sha1_activation_key()
+        derived its output from a 20-bit salt plus attacker-known input
+        (username/email), collapsing to a brute-forceable ~1M-value keyspace.
+
+        Our current key has 2^160 possible values while the old had 2^20. The
+        old token would have a 37% chance of collision within 1000 random
+        tokens. The high-entropy version has a 1 in 3×10^42 probability. ∴ a
+        collision within this test indicates a regression to a low
+        entropy generation scheme.
+        """
+        keys = {generate_activation_key() for _ in range(1000)}
+        self.assertEqual(len(keys), 1000, "Generated keys were not unique")
+
+    async def test_claiming_a_stub_account_issues_a_fresh_unguessable_key(
+        self,
+    ) -> None:
+        """Claiming a donor stub account via register() must update the
+        activation key. See GHSA-638g-xf9h-6qcg.
+        """
+        _, stub_profile = await sync_to_async(create_stub_account)(
+            {
+                "email": "donor@example.com",
+                "first_name": "Donor",
+                "last_name": "Person",
+            },
+            {
+                "address1": "123 Main St",
+                "address2": "",
+                "city": "Anytown",
+                "state": "XX",
+                "zip_code": "00000",
+            },
+        )
+        old_key = stub_profile.activation_key
+
+        data = {
+            "username": "attacker",
+            "email": "donor@example.com",
+            "first_name": "Attacker",
+            "last_name": "Person",
+            "password1": "TestPassw0rd!",
+            "password2": "TestPassw0rd!",
+            "consent": True,
+        }
+        response = await self.async_client.post(
+            reverse("register"), data, follow=True
+        )
+        self.assertEqual(response.status_code, HTTPStatus.OK)
+
+        await stub_profile.arefresh_from_db()
+        self.assertNotEqual(stub_profile.activation_key, old_key)
+        self.assertIsNotNone(
+            re.fullmatch(r"[0-9a-f]{40}", stub_profile.activation_key),
+            f"{stub_profile.activation_key} is not a 40-char lowercase hex "
+            "string",
+        )
+
+    @staticmethod
+    def registration_data(username: str, email: str) -> dict[str, str | bool]:
+        """Build a valid registration POST for the given username and email."""
+        return {
+            "username": username,
+            "email": email,
+            "first_name": "User",
+            "last_name": "Person",
+            "password1": "TestPassw0rd!",
+            "password2": "TestPassw0rd!",
+            "consent": True,
+        }
+
+    @staticmethod
+    def normalize_page(content: bytes) -> bytes:
+        """Mask the parts of a rendered page that legitimately differ between
+        two otherwise identical responses: the per-response CSP nonce and the
+        analytics snippet that base.html includes at random one time in ten.
+        Whitespace is collapsed because that snippet's template block leaves
+        different whitespace behind depending on whether it rendered.
+        """
+        content = re.sub(rb'nonce="[^"]*"', b'nonce=""', content)
+        content = re.sub(
+            rb"<script\s+defer\s+data-domain=.*?</script>",
+            b"",
+            content,
+            flags=re.DOTALL,
+        )
+        return re.sub(rb"\s+", b" ", content)
+
+    async def test_taken_email_is_indistinguishable_from_a_fresh_signup(
+        self,
+    ) -> None:
+        """Registering with an address that already has an account must
+        return exactly what a successful registration returns, create no
+        account, and tell only the address owner by email.
+
+        See issue #7854. "This email is already in use" would let anyone test
+        whether an address has a CourtListener account.
+        """
+        email = "shared@example.com"
+        fresh = await self.async_client.post(
+            reverse("register"),
+            self.registration_data("first_signup", email),
+            follow=True,
+        )
+        self.assertEqual(fresh.status_code, HTTPStatus.OK)
+        mail.outbox.clear()
+
+        duplicate = await self.async_client.post(
+            reverse("register"),
+            self.registration_data("second_signup", email),
+            follow=True,
+        )
+
+        self.assertEqual(duplicate.status_code, fresh.status_code)
+        self.assertEqual(duplicate.redirect_chain, fresh.redirect_chain)
+        self.assertEqual(
+            self.normalize_page(duplicate.content),
+            self.normalize_page(fresh.content),
+        )
+
+        # No second account, and the first one is untouched.
+        self.assertFalse(
+            await User.objects.filter(username="second_signup").aexists()
+        )
+        self.assertEqual(
+            await User.objects.filter(email__iexact=email).acount(), 1
+        )
+
+        # The address owner, and nobody else, hears about the attempt.
+        self.assertEqual(len(mail.outbox), 1)
+        message = mail.outbox[0]
+        self.assertEqual(message.to, [email])
+        self.assertIn("already exists", message.body)
+        self.assertIn(reverse("sign-in"), message.body)
+        self.assertIn(reverse("password_reset"), message.body)
+
+    async def test_email_uniqueness_check_folds_case(self) -> None:
+        """Addresses that differ only in case are the same address."""
+        await sync_to_async(UserProfileWithParentsFactory.create)(
+            user__email="Casey@Example.com"
+        )
+        mail.outbox.clear()
+
+        response = await self.async_client.post(
+            reverse("register"),
+            self.registration_data("casey2", "casey@example.COM"),
+            follow=True,
+        )
+
+        self.assertEqual(response.status_code, HTTPStatus.OK)
+        self.assertFalse(
+            await User.objects.filter(username="casey2").aexists()
+        )
+        self.assertEqual(len(mail.outbox), 1)
+        self.assertEqual(mail.outbox[0].to, ["casey@example.COM"])
+
+    async def test_email_shaped_usernames_are_rejected_regardless(
+        self,
+    ) -> None:
+        """A username shaped like an email address is refused with the same
+        format error whether or not it matches an existing account's email.
+
+        Refusing only the addresses that have accounts, however the error is
+        worded, would tell the registrant that the address has an account.
+        """
+        await sync_to_async(UserProfileWithParentsFactory.create)(
+            user__username="ada", user__email="ada@example.com"
+        )
+
+        errors_seen = []
+        for username in [
+            "ada@example.com",  # Another account's address
+            "Ada@Example.com",  # Same, different case
+            "nobody@example.com",  # An address with no account
+            "mal@or.y",  # Email-shaped, though nobody's address
+        ]:
+            with self.subTest(username=username):
+                response = await self.async_client.post(
+                    reverse("register"),
+                    self.registration_data(username, "mallory@example.com"),
+                )
+                self.assertEqual(response.status_code, HTTPStatus.OK)
+                username_errors = response.context["form"].errors["username"]
+                self.assertEqual(len(username_errors), 1)
+                self.assertNotIn("exists", username_errors[0].lower())
+                self.assertNotIn("taken", username_errors[0].lower())
+                errors_seen.append(tuple(username_errors))
+                self.assertFalse(
+                    await User.objects.filter(
+                        username__iexact=username
+                    ).aexists()
+                )
+
+        # Every attempt got exactly the same error.
+        self.assertEqual(len(set(errors_seen)), 1)
+
+    async def test_an_at_sign_alone_does_not_make_a_username_an_email(
+        self,
+    ) -> None:
+        """A username with an "@" but no domain is not email-shaped and is
+        still allowed."""
+        response = await self.async_client.post(
+            reverse("register"),
+            self.registration_data("mal@ory", "mallory@example.com"),
+            follow=True,
+        )
+        self.assertEqual(response.status_code, HTTPStatus.OK)
+        self.assertTrue(
+            await User.objects.filter(username="mal@ory").aexists()
+        )
+
+    async def test_refused_duplicate_still_hashes_a_password(self) -> None:
+        """The refused path must pay for a password hash like the real signup
+        does, or response time alone would tell an observer which path ran.
+        """
+        await sync_to_async(UserProfileWithParentsFactory.create)(
+            user__email="taken@example.com"
+        )
+        with patch.object(User, "set_password") as set_password_mock:
+            await self.async_client.post(
+                reverse("register"),
+                self.registration_data("latecomer", "taken@example.com"),
+            )
+        set_password_mock.assert_called_once_with("TestPassw0rd!")
+        self.assertFalse(
+            await User.objects.filter(username="latecomer").aexists()
+        )
+
+    async def test_stub_lookup_ignores_surrounding_whitespace(self) -> None:
+        """An address with stray whitespace must still find the stub account,
+        or the form's stripped-address duplicate check would see that stub as
+        somebody else's account and refuse the claim.
+        """
+        stub_user, _ = await sync_to_async(create_stub_account)(
+            {
+                "email": "donor@example.com",
+                "first_name": "Donor",
+                "last_name": "Person",
+            },
+            {
+                "address1": "123 Main St",
+                "address2": "",
+                "city": "Anytown",
+                "state": "XX",
+                "zip_code": "00000",
+            },
+        )
+
+        response = await self.async_client.post(
+            reverse("register"),
+            self.registration_data("donor", "  donor@example.com  "),
+            follow=True,
+        )
+        self.assertEqual(response.status_code, HTTPStatus.OK)
+        await stub_user.arefresh_from_db()
+        self.assertEqual(stub_user.username, "donor")
+        self.assertEqual(
+            await User.objects.filter(email="donor@example.com").acount(), 1
+        )
+
+    async def test_stub_account_claim_is_not_treated_as_a_duplicate(
+        self,
+    ) -> None:
+        """Claiming a donor stub account binds the form to the account that
+        already holds the address, so it must upgrade the stub rather than be
+        refused as a duplicate."""
+        stub_user, _ = await sync_to_async(create_stub_account)(
+            {
+                "email": "donor@example.com",
+                "first_name": "Donor",
+                "last_name": "Person",
+            },
+            {
+                "address1": "123 Main St",
+                "address2": "",
+                "city": "Anytown",
+                "state": "XX",
+                "zip_code": "00000",
+            },
+        )
+        mail.outbox.clear()
+
+        response = await self.async_client.post(
+            reverse("register"),
+            self.registration_data("donor", "donor@example.com"),
+            follow=True,
+        )
+        self.assertEqual(response.status_code, HTTPStatus.OK)
+
+        stub_user = await User.objects.select_related("profile").aget(
+            pk=stub_user.pk
+        )
+        self.assertEqual(stub_user.username, "donor")
+        self.assertTrue(stub_user.is_active)
+        self.assertFalse(stub_user.profile.stub_account)
+        self.assertEqual(
+            await User.objects.filter(email="donor@example.com").acount(), 1
+        )
+
+        # The claimant gets the activation email, not the "already exists" one.
+        recipients = [m.to for m in mail.outbox]
+        self.assertIn(["donor@example.com"], recipients)
+        subjects = [m.subject for m in mail.outbox]
+        self.assertIn(
+            "Confirm your account on CourtListener.com",
+            subjects,
+        )
+        self.assertNotIn(
+            "You already have an account on CourtListener.com",
+            subjects,
+        )
+
+    @patch("cl.users.views.notify_existing_account_holder")
+    @patch("cl.users.views.send_new_account_emails")
+    async def test_both_outcomes_enqueue_mail_instead_of_sending_it(
+        self, new_account_mock: MagicMock, existing_account_mock: MagicMock
+    ) -> None:
+        """Neither outcome may send mail synchronously in the view. A fresh
+        signup that sent two emails inline while a refused duplicate sent one
+        would be distinguishable by response time alone."""
+        email = "timing@example.com"
+        mail.outbox.clear()
+
+        await self.async_client.post(
+            reverse("register"),
+            self.registration_data("timing_first", email),
+        )
+        user = await User.objects.aget(username="timing_first")
+        new_account_mock.delay.assert_called_once_with(user.pk)
+        existing_account_mock.delay.assert_not_called()
+        self.assertEqual(mail.outbox, [])
+
+        await self.async_client.post(
+            reverse("register"),
+            self.registration_data("timing_second", email),
+        )
+        existing_account_mock.delay.assert_called_once_with(email)
+        new_account_mock.delay.assert_called_once()
+        self.assertEqual(mail.outbox, [])
+
+
+class DuplicateEmailSettingsTest(TestCase):
+    """Users who already hold an address on more than one account exist and
+    must keep working until those duplicates are cleaned up."""
+
+    def setUp(self) -> None:
+        self.client = AsyncClient()
+        self.email = "twice@example.com"
+        UserProfileWithParentsFactory.create(
+            user__username="other_holder", user__email=self.email
+        )
+        self.up = UserProfileWithParentsFactory.create(
+            user__username="pandora",
+            user__password=make_password("password"),
+            user__email=self.email,
+        )
+
+    async def test_existing_duplicate_can_still_save_settings(self) -> None:
+        """Regression test: the registration form's uniqueness check must
+        not leak into UserForm, or a user whose address is shared with another
+        account could never save their settings page. See issue #7854."""
+        self.assertTrue(
+            await self.client.alogin(username="pandora", password="password")
+        )
+        response = await self.client.post(
+            reverse("view_settings"),
+            {
+                "first_name": "Still",
+                "last_name": "Works",
+                "email": self.email,
+            },
+            follow=True,
+        )
+
+        self.assertEqual(response.status_code, HTTPStatus.OK)
+        self.assertIn(
+            message_dict["settings_changed_successfully"]["message"],
+            response.content.decode(),
+        )
+        await self.up.user.arefresh_from_db()
+        self.assertEqual(self.up.user.first_name, "Still")
+        self.assertEqual(self.up.user.email, self.email)
+
 
 class UserAdminApiCallsCountTest(TestCase):
     """Tests for UserAdmin.api_calls_count.
@@ -4184,6 +4764,32 @@ class UserAdminApiCallsCountTest(TestCase):
         self.assertEqual(result, 0)
 
 
+class UserProfileAdminActivationKeyTest(TestCase):
+    """Tests that the admin can save a profile with a spent activation key.
+
+    Regression test for #7831: confirm_email() blanks activation_key once it
+    has been used (GHSA-638g-xf9h-6qcg), but the field was required, so the
+    User admin page could not be saved for any confirmed account.
+    """
+
+    @classmethod
+    def setUpTestData(cls) -> None:
+        cls.profile = UserProfileWithParentsFactory.create()
+
+    def test_blank_activation_key_passes_model_validation(self) -> None:
+        """Does a spent (blank) activation key survive full_clean()?"""
+        self.profile.activation_key = ""
+        # Raises ValidationError, failing the test, if the field is required.
+        self.profile.full_clean()
+
+    def test_admin_inline_does_not_require_an_activation_key(self) -> None:
+        """Is activation_key optional on the User admin's profile inline?"""
+        request = RequestFactory().get("/")
+        request.user = self.profile.user
+        formset = UserProfileInline(User, admin.site).get_formset(request)
+        self.assertFalse(formset.form.base_fields["activation_key"].required)
+
+
 class UserProfileTotalApiUsageTest(TestCase):
     """Tests for UserProfile.total_api_usage."""
 
@@ -4220,7 +4826,6 @@ class UserProfileTotalApiUsageTest(TestCase):
         self.assertEqual(self.user.profile.total_api_usage, 0)
 
 
-@override_settings(WAFFLE_CACHE_PREFIX="ViewApiUsageTest")
 class ViewApiUsageTest(TestCase):
     """Tests for /profile/api-usage/."""
 
@@ -4238,17 +4843,7 @@ class ViewApiUsageTest(TestCase):
     def tearDown(self) -> None:
         clear_tiered_cache()
 
-    @override_switch(SYNC_MEMBERSHIP_THROTTLES_SWITCH, active=False)
-    def test_switch_off_hides_new_sections(self) -> None:
-        """With the switch off, only the recent-usage section renders."""
-        response = self.client.get(self.url)
-        self.assertEqual(response.status_code, HTTPStatus.OK)
-        self.assertNotContains(response, "Your Access Level")
-        self.assertNotContains(response, "Your Total API Usage")
-        self.assertContains(response, "Your API Recent Usage")
-
-    @override_switch(SYNC_MEMBERSHIP_THROTTLES_SWITCH, active=True)
-    def test_switch_on_shows_default_throttle_rates(self) -> None:
+    def test_shows_default_throttle_rates(self) -> None:
         """Without overrides, access level falls back to settings defaults."""
         response = self.client.get(self.url)
         self.assertEqual(response.status_code, HTTPStatus.OK)
@@ -4256,8 +4851,7 @@ class ViewApiUsageTest(TestCase):
         # Default rate exposed in DEFAULT_THROTTLE_RATES["user"].
         self.assertContains(response, "per day")
 
-    @override_switch(SYNC_MEMBERSHIP_THROTTLES_SWITCH, active=True)
-    def test_switch_on_shows_override_rates(self) -> None:
+    def test_shows_override_rates(self) -> None:
         """User APIThrottle overrides replace the defaults in the listing."""
         APIThrottleFactory(
             user=self.user,
@@ -4275,7 +4869,6 @@ class ViewApiUsageTest(TestCase):
         # Default "per hour" rate should NOT appear — overrides replace it.
         self.assertNotContains(response, "per hour")
 
-    @override_switch(SYNC_MEMBERSHIP_THROTTLES_SWITCH, active=True)
     def test_blocked_user_filters_zero_rates(self) -> None:
         """A 0/min row is dropped — we don't advertise blocked as a limit."""
         APIThrottleFactory(
@@ -4287,7 +4880,6 @@ class ViewApiUsageTest(TestCase):
         # Heading still renders, but no rate rows for the blocked user.
         self.assertNotContains(response, "per minute")
 
-    @override_switch(SYNC_MEMBERSHIP_THROTTLES_SWITCH, active=True)
     @patch("cl.users.models.get_redis_interface")
     def test_total_section_shows_count_and_donate(
         self, mock_get_redis: MagicMock
@@ -4312,6 +4904,90 @@ class ViewApiUsageTest(TestCase):
         response = self.client.get(self.url)
         self.assertEqual(response.status_code, HTTPStatus.FOUND)
         self.assertIn("/sign-in/", response["Location"])
+
+
+@override_settings(WAFFLE_CACHE_PREFIX="ViewApiUsagePromoTest")
+class ViewApiUsagePromoTest(TestCase):
+    """API-usage page reflects the x2 promo per membership type."""
+
+    @classmethod
+    def setUpClass(cls) -> None:
+        super().setUpClass()
+        # Isolate this class's tiered_cache namespace so cached overrides /
+        # exclusion sets don't leak across classes. Start in setUpClass so the
+        # patched prefix is active during setUp/tearDown clear_tiered_cache().
+        patcher = mock.patch(
+            "cl.lib.decorators.get_tiered_cache_prefix",
+            new=lambda: "tiered_view_api_usage_promo_test",
+        )
+        patcher.start()
+        cls.addClassCleanup(patcher.stop)
+
+    @classmethod
+    def setUpTestData(cls) -> None:
+        cls.user = UserProfileWithParentsFactory.create().user
+        cls.user.set_password("password")
+        cls.user.save()
+        cls.url = reverse("view_api_usage")
+
+    def setUp(self) -> None:
+        clear_tiered_cache()
+        self.client.login(username=self.user.username, password="password")
+
+    def tearDown(self) -> None:
+        clear_tiered_cache()
+
+    def _add_membership(self, level: int, rate: str) -> None:
+        """Give the test user an active membership with one MEMBERSHIP rate."""
+        NeonMembershipFactory(user=self.user, level=level)
+        APIThrottleFactory(
+            user=self.user,
+            throttle_type=ThrottleType.API,
+            rate=rate,
+            source=APIThrottle.Source.MEMBERSHIP,
+        )
+
+    @override_switch(DOUBLE_API_THROTTLES_SWITCH, active=True)
+    def test_non_member_default_doubled(self) -> None:
+        """Non-member: the displayed default rate is doubled during the promo."""
+        response = self.client.get(self.url)
+        # Test settings default is 5000/day; promo shows 10,000.
+        self.assertContains(response, "<strong>10,000</strong>")
+        self.assertContains(response, "per day")
+
+    @override_switch(DOUBLE_API_THROTTLES_SWITCH, active=False)
+    def test_non_member_default_not_doubled_when_off(self) -> None:
+        """Non-member: base default rate shown when the promo is off."""
+        response = self.client.get(self.url)
+        self.assertContains(response, "<strong>5,000</strong>")
+        self.assertNotContains(response, "<strong>10,000</strong>")
+
+    @override_switch(DOUBLE_API_THROTTLES_SWITCH, active=True)
+    def test_paid_member_doubled(self) -> None:
+        """Paid member: 10/min is shown as 20/min during the promo."""
+        self._add_membership(NeonMembershipLevel.TIER_2, "10/min")
+        response = self.client.get(self.url)
+        self.assertContains(response, "<strong>20</strong>")
+        self.assertContains(response, "per minute")
+        self.assertNotContains(response, "<strong>10</strong>")
+
+    @override_switch(DOUBLE_API_THROTTLES_SWITCH, active=True)
+    def test_lso_member_doubled(self) -> None:
+        """LSO member: 10/min is shown as 20/min during the promo."""
+        self._add_membership(NeonMembershipLevel.LSO_1, "10/min")
+        response = self.client.get(self.url)
+        self.assertContains(response, "<strong>20</strong>")
+        self.assertContains(response, "per minute")
+        self.assertNotContains(response, "<strong>10</strong>")
+
+    @override_switch(DOUBLE_API_THROTTLES_SWITCH, active=True)
+    def test_edu_member_not_doubled(self) -> None:
+        """EDU member: rate shown unchanged during the promo."""
+        self._add_membership(NeonMembershipLevel.EDU, "20/hour")
+        response = self.client.get(self.url)
+        self.assertContains(response, "<strong>20</strong>")
+        self.assertContains(response, "per hour")
+        self.assertNotContains(response, "<strong>40</strong>")
 
 
 class TagZohoRecordForMembershipTest(TestCase):
@@ -4427,7 +5103,6 @@ class TagZohoRecordTest(SimpleTestCase):
         mock_contacts.add_tags.assert_not_called()
 
 
-@override_switch(SYNC_MEMBERSHIP_THROTTLES_SWITCH, active=True)
 class RefreshAPIThrottlesAdminTest(TestCase):
     def setUp(self):
         self.staff = UserFactory(is_staff=True, is_superuser=True)
@@ -4515,3 +5190,713 @@ class RefreshAPIThrottlesAdminTest(TestCase):
         )
         # Inactive user got nothing
         self.assertFalse(APIThrottle.objects.filter(user=self.target).exists())
+
+
+class AccountBuildingMixin:
+    """Builds accounts for the sign-in and password-reset tests.
+
+    Both need the same thing: an account with a known password whose active,
+    confirmed and stub flags can be set per case.
+    """
+
+    PASSWORD = "a-good-password"
+
+    def make_user(
+        self,
+        username: str,
+        email: str,
+        password: str = PASSWORD,
+        last_login: datetime | None = None,
+        is_active: bool = True,
+        email_confirmed: bool = True,
+        stub_account: bool = False,
+    ) -> User:
+        """Build an account.
+
+        :param username: The account's username.
+        :param email: The account's email address.
+        :param password: The plaintext password to set.
+        :param last_login: When the account last signed in, or None for never.
+        :param is_active: Whether the account is active.
+        :param email_confirmed: Whether its address has been confirmed.
+        :param stub_account: Whether it's a stub, as donations create.
+        :return: The new User.
+        """
+        return UserProfileWithParentsFactory.create(
+            user__username=username,
+            user__email=email,
+            user__password=make_password(password),
+            user__is_active=is_active,
+            user__last_login=last_login,
+            email_confirmed=email_confirmed,
+            stub_account=stub_account,
+        ).user
+
+
+class EmailOrUsernameSignInTest(AccountBuildingMixin, TestCase):
+    """Tests for signing in with a username or an email address.
+
+    These go through the sign-in view rather than calling the backend, so that
+    the form's own checks — the generic error, the "confirm your address"
+    message — are part of what's covered.
+    """
+
+    def sign_in(self, identifier: str, password: str) -> HttpResponse:
+        """POST the sign-in form.
+
+        :param identifier: What to put in the username field.
+        :param password: What to put in the password field.
+        :return: The view's response.
+        """
+        return self.client.post(
+            reverse("sign-in"),
+            {"username": identifier, "password": password},
+        )
+
+    def assert_signed_in_as(self, user: User) -> None:
+        """Assert the test client's session belongs to the given account.
+
+        :param user: The account the client should be signed in as.
+        :return: None
+        """
+        self.assertEqual(
+            self.client.session.get("_auth_user_id"), str(user.pk)
+        )
+
+    def assert_not_signed_in(self) -> None:
+        """Assert the test client has no session.
+
+        :return: None
+        """
+        self.assertNotIn("_auth_user_id", self.client.session)
+
+    def test_signing_in_with_an_email_address(self) -> None:
+        """Can somebody who only remembers their address sign in with it?"""
+        user = self.make_user("taylor", "Taylor@example.com")
+
+        for identifier in [
+            user.email,
+            user.email.lower(),
+            user.email.upper(),
+            user.username,
+        ]:
+            with self.subTest(identifier=identifier):
+                self.client.logout()
+                self.sign_in(identifier, self.PASSWORD)
+                self.assert_signed_in_as(user)
+
+    def test_the_password_picks_between_duplicate_accounts(self) -> None:
+        """When two accounts share an address, does the submitted password
+        decide which one the person reaches?
+        """
+        shared = "both@example.com"
+        older = self.make_user(
+            "older", shared, "older-password", last_login=now()
+        )
+        newer = self.make_user(
+            "newer", shared, "newer-password", last_login=now()
+        )
+
+        for user, password in [
+            (older, "older-password"),
+            (newer, "newer-password"),
+        ]:
+            with self.subTest(username=user.username):
+                self.client.logout()
+                self.sign_in(shared, password)
+                self.assert_signed_in_as(user)
+
+    def test_the_most_recently_used_account_wins_a_tie(self) -> None:
+        """When two accounts share an address *and* a password, does the one
+        used most recently win?
+
+        That's the account the duplicate-account merge keeps as primary, so a
+        person's experience won't change when their accounts are merged.
+        """
+        shared = "tie@example.com"
+        stale = self.make_user(
+            "stale", shared, last_login=now() - timedelta(days=365)
+        )
+        current = self.make_user("current", shared, last_login=now())
+
+        self.sign_in(shared, self.PASSWORD)
+        self.assert_signed_in_as(current)
+        self.assertNotEqual(
+            self.client.session.get("_auth_user_id"), str(stale.pk)
+        )
+
+    def test_a_confirmed_account_beats_an_unconfirmed_one(self) -> None:
+        """When both a confirmed and an unconfirmed account match, does the
+        confirmed one win, even though it was used less recently?
+
+        The confirmed account signs its owner in; the unconfirmed one can only
+        tell them to go confirm their address. Prefer the one that works.
+        """
+        shared = "mixed@example.com"
+        self.make_user(
+            "unconfirmed",
+            shared,
+            last_login=now(),
+            email_confirmed=False,
+        )
+        confirmed = self.make_user(
+            "confirmed",
+            shared,
+            last_login=now() - timedelta(days=365),
+        )
+
+        self.sign_in(shared, self.PASSWORD)
+        self.assert_signed_in_as(confirmed)
+
+    def test_an_unconfirmed_account_is_told_to_confirm(self) -> None:
+        """Does an unconfirmed account with the right password still get the
+        "validate your email address" message rather than a generic error?
+        """
+        user = self.make_user(
+            "unconfirmed", "unconfirmed@example.com", email_confirmed=False
+        )
+
+        response = self.sign_in(user.email, self.PASSWORD)
+        self.assert_not_signed_in()
+        self.assertContains(response, "validate your email address")
+
+    def test_a_shadowing_username_cannot_reach_the_address_owner(self) -> None:
+        """Can somebody who registers a username equal to another person's
+        email address get into that person's account?
+        """
+        victim = self.make_user(
+            "victim", "victim@example.com", "victim-password"
+        )
+        self.make_user(
+            "victim@example.com", "shadow@example.com", "shadow-password"
+        )
+
+        # The shadow's own password reaches the shadow's own account, not the
+        # victim's.
+        self.sign_in("victim@example.com", "shadow-password")
+        self.assertNotEqual(
+            self.client.session.get("_auth_user_id"), str(victim.pk)
+        )
+
+        # And nothing else gets in without the victim's password.
+        self.client.logout()
+        self.sign_in("victim@example.com", "a-guess")
+        self.assert_not_signed_in()
+
+    def test_a_shadowing_username_cannot_lock_the_owner_out(self) -> None:
+        """Does the person whose address was taken as somebody else's username
+        still get to sign in with that address?
+
+        This is the other half of the shadowing problem: without the
+        fall-through from a failed username match to the email candidates, the
+        shadow would silently lock this person out of email sign-in.
+        """
+        victim = self.make_user(
+            "victim", "victim@example.com", "victim-password"
+        )
+        self.make_user(
+            "victim@example.com", "shadow@example.com", "shadow-password"
+        )
+
+        self.sign_in("victim@example.com", "victim-password")
+        self.assert_signed_in_as(victim)
+
+    def test_every_failure_gives_the_same_error(self) -> None:
+        """Do all the ways of failing look alike, so the form can't be used to
+        find out whether an account exists?
+        """
+        user = self.make_user("taylor", "taylor@example.com")
+        self.make_user("shared-one", "shared@example.com")
+        self.make_user("shared-two", "shared@example.com")
+
+        attempts = [
+            ("an address with no account", "nobody@example.com", "a-guess"),
+            ("a username with no account", "nobody", "a-guess"),
+            ("a real username, wrong password", user.username, "a-guess"),
+            ("a real address, wrong password", user.email, "a-guess"),
+            (
+                "a shared address, wrong password",
+                "shared@example.com",
+                "a-guess",
+            ),
+        ]
+        errors = set()
+        for description, identifier, password in attempts:
+            with self.subTest(description):
+                response = self.sign_in(identifier, password)
+                self.assert_not_signed_in()
+                errors.add(tuple(response.context["form"].non_field_errors()))
+
+        self.assertEqual(len(errors), 1, msg=f"Got varying errors: {errors}")
+
+    def test_only_the_first_few_duplicates_are_checked(self) -> None:
+        """Is the candidate loop capped, so that piling accounts onto one
+        address can't turn a single POST into an unbounded number of password
+        hashes?
+        """
+        shared = "crowded@example.com"
+        # One more account than the cap allows, each used less recently than
+        # the last, so the final one is the one that falls off the end.
+        accounts = [
+            self.make_user(
+                f"crowd-{i}",
+                shared,
+                f"password-{i}",
+                last_login=now() - timedelta(days=i),
+            )
+            for i in range(MAX_EMAIL_CANDIDATES + 1)
+        ]
+        beyond_the_cap = accounts[-1]
+
+        self.sign_in(shared, f"password-{MAX_EMAIL_CANDIDATES}")
+        self.assert_not_signed_in()
+
+        # The account is fine, it's just past the cap: its username still works.
+        self.sign_in(
+            beyond_the_cap.username, f"password-{MAX_EMAIL_CANDIDATES}"
+        )
+        self.assert_signed_in_as(beyond_the_cap)
+
+    def test_planted_accounts_cannot_crowd_out_a_confirmed_one(self) -> None:
+        """Can somebody take away a person's email sign-in by pointing enough
+        accounts at their address?
+
+        They must not be able to. Registration doesn't yet refuse a second
+        account per address, and changing an address on the settings page
+        clears email_confirmed but leaves last_login alone — so without
+        confirmed-first ordering, MAX_EMAIL_CANDIDATES freshly-repointed
+        accounts would fill the candidate list and push the address's real
+        owner out of it.
+        """
+        shared = "target@example.com"
+        owner = self.make_user(
+            "owner", shared, last_login=now() - timedelta(days=30)
+        )
+        # Each of these was confirmed and used on an address its owner did
+        # control, then repointed at the victim's — recent last_login, but
+        # unconfirmed, because confirming needs the victim's inbox.
+        for i in range(MAX_EMAIL_CANDIDATES):
+            self.make_user(
+                f"planted-{i}",
+                shared,
+                f"planted-password-{i}",
+                last_login=now(),
+                email_confirmed=False,
+            )
+
+        self.sign_in(shared, self.PASSWORD)
+        self.assert_signed_in_as(owner)
+
+    def test_inactive_accounts_are_not_reachable_by_address(self) -> None:
+        """Are deactivated accounts kept out of the candidate list?"""
+        self.make_user("gone", "gone@example.com", is_active=False)
+
+        self.sign_in("gone@example.com", self.PASSWORD)
+        self.assert_not_signed_in()
+
+    def test_stub_accounts_are_not_reachable_by_address(self) -> None:
+        """Are stub accounts kept out of the candidate list?
+
+        Stubs are placeholders for people who never signed up, so they have no
+        usable password. This account is given one anyway, to check that
+        they're excluded outright and not just by accident.
+        """
+        self.make_user("stub", "stub@example.com", stub_account=True)
+
+        self.sign_in("stub@example.com", self.PASSWORD)
+        self.assert_not_signed_in()
+
+    def test_the_sign_in_page_asks_for_either_identifier(self) -> None:
+        """Does the page tell people they can use their address?"""
+        response = self.client.get(reverse("sign-in"))
+        self.assertContains(response, "Username or email address")
+
+
+class PasswordResetConfirmedEmailTest(AccountBuildingMixin, TestCase):
+    """Tests that reset links only ever go to confirmed addresses.
+
+    An unconfirmed address is one nobody has proven they own. Mailing a reset
+    token to one lets somebody repoint their account at an address they don't
+    control and have us deliver a working token to its owner.
+    """
+
+    def request_reset(self, email: str) -> HttpResponse:
+        """POST the password reset form.
+
+        :param email: The address to request a reset for.
+        :return: The view's response.
+        """
+        return self.client.post(reverse("password_reset"), {"email": email})
+
+    def reset_link_stem(self) -> str:
+        """Build the leading path of a reset link, minus its token.
+
+        Derived from the URLconf rather than written out, so the assertions
+        below follow the route if it ever moves.
+
+        :return: The path a reset link starts with.
+        """
+        return reverse(
+            "confirm_password",
+            kwargs={"uidb64": "UID", "token": "TOKEN"},
+        ).split("UID")[0]
+
+    def assert_reset_link_sent(self) -> None:
+        """Assert exactly one mail went out and it carries a reset token.
+
+        :return: None
+        """
+        self.assertEqual(len(mail.outbox), 1)
+        self.assertIn(self.reset_link_stem(), mail.outbox[0].body)
+
+    def assert_one_email_without_reset_link(self) -> str:
+        """Assert exactly one mail went out and carries no reset token.
+
+        :return: The body of that mail, for further assertions.
+        """
+        self.assertEqual(len(mail.outbox), 1)
+        body = mail.outbox[0].body
+        self.assertNotIn(self.reset_link_stem(), body)
+        return body
+
+    def test_confirmed_address_gets_a_reset_link(self) -> None:
+        """Does the ordinary case still work?"""
+        self.make_user("alice", "alice@example.com")
+        self.request_reset("alice@example.com")
+        self.assert_reset_link_sent()
+
+    def test_unconfirmed_address_gets_no_reset_link(self) -> None:
+        """Is an unconfirmed account pointed at confirmation instead?"""
+        self.make_user("bob", "bob@example.com", email_confirmed=False)
+        self.request_reset("bob@example.com")
+        body = self.assert_one_email_without_reset_link()
+        self.assertIn(reverse("email_confirmation_request"), body)
+
+    def test_repointed_address_cannot_be_reset(self) -> None:
+        """Can somebody mail a reset token to an address they don't own?
+
+        This is the attack the confirmed-only rule exists for: point an
+        account at a victim's address, ask for a reset, and let the victim
+        take over the account — leaving its API token in the original owner's
+        hands. Changing an address clears email_confirmed, so the request must
+        not produce a reset link.
+        """
+        attacker = self.make_user("attacker", "attacker@example.com")
+        # Repoint the address the way view_settings does.
+        attacker.email = "victim@example.com"
+        attacker.save()
+        profile = attacker.profile
+        profile.email_confirmed = False
+        profile.save()
+
+        self.request_reset("victim@example.com")
+        self.assert_one_email_without_reset_link()
+
+    def test_a_repointed_address_cannot_ride_along_with_the_owner(
+        self,
+    ) -> None:
+        """When the address's owner has an account of their own, does the
+        reset reach only theirs?
+
+        The nastier version of the attack above. Here the request does produce
+        a reset link, legitimately, for the victim's own account — so "no link
+        was sent" proves nothing, and the check has to be which account the
+        link opens. Get that wrong and the victim is handed the attacker's
+        account by way of a mail they were right to trust.
+        """
+        shared = "victim@example.com"
+        victim = self.make_user("victim", shared)
+        attacker = self.make_user("attacker", "attacker@example.com")
+        # Repoint the address the way view_settings does.
+        attacker.email = shared
+        attacker.save()
+        profile = attacker.profile
+        profile.email_confirmed = False
+        profile.save()
+
+        self.request_reset(shared)
+
+        self.assert_reset_link_sent()
+        body = mail.outbox[0].body
+        self.assertIn(urlsafe_base64_encode(force_bytes(victim.pk)), body)
+        self.assertNotIn(urlsafe_base64_encode(force_bytes(attacker.pk)), body)
+
+    def test_unknown_address_still_gets_no_account_found(self) -> None:
+        """Is the pre-existing behavior for strangers unchanged?"""
+        self.request_reset("nobody@example.com")
+        body = self.assert_one_email_without_reset_link()
+        self.assertIn(reverse("register"), body)
+
+    def test_stub_accounts_get_no_reset_link(self) -> None:
+        """Are stubs left out, as they were before?
+
+        They have no usable password, so a reset would be meaningless.
+        """
+        self.make_user("stub", "stub@example.com", stub_account=True)
+        User.objects.filter(username="stub").update(password="")
+        self.request_reset("stub@example.com")
+        self.assert_one_email_without_reset_link()
+
+    def test_matching_is_case_insensitive(self) -> None:
+        """Does a differently-cased address still find the account?
+
+        The lookup folds both sides in SQL so it can use the
+        auth_user_email_lower_idx index, so this guards the folding.
+        """
+        self.make_user("carol", "carol@example.com")
+        self.request_reset("CAROL@Example.COM")
+        self.assert_reset_link_sent()
+
+    def test_the_response_never_reveals_which_case_applied(self) -> None:
+        """Do all three outcomes look the same to the browser?
+
+        Otherwise the form becomes a way to test whether an address has an
+        account, and whether that account is confirmed.
+        """
+        self.make_user("dave", "dave@example.com")
+        self.make_user("erin", "erin@example.com", email_confirmed=False)
+        responses = []
+        for address in (
+            "dave@example.com",
+            "erin@example.com",
+            "nobody@example.com",
+        ):
+            with self.subTest(address=address):
+                mail.outbox.clear()
+                response = self.request_reset(address)
+                responses.append(
+                    (response.status_code, response.headers.get("Location"))
+                )
+                # Every case sends exactly one email, so send volume doesn't
+                # distinguish them either.
+                self.assertEqual(len(mail.outbox), 1)
+        self.assertEqual(len(set(responses)), 1)
+
+
+class PasswordConfirmFormTest(TestCase):
+    """Tests for the re-prompt guard on irreversible account operations."""
+
+    def setUp(self) -> None:
+        self.factory = RequestFactory()
+
+    def confirm(self, user: User, password: str) -> PasswordConfirmForm:
+        """Submit the guard as the given user.
+
+        :param user: The signed-in account being re-prompted.
+        :param password: The password they typed.
+        :return: The bound form.
+        """
+        request = self.factory.post("/")
+        request.user = user
+        form = PasswordConfirmForm(
+            request=request, data={"password": password}
+        )
+        form.is_valid()
+        return form
+
+    def test_the_right_password_passes(self) -> None:
+        """Does the guard still let the account's owner through?"""
+        user = UserProfileWithParentsFactory.create(
+            user__username="taylor",
+            user__password=make_password("a-good-password"),
+        ).user
+
+        self.assertTrue(self.confirm(user, "a-good-password").is_valid())
+
+    def test_the_wrong_password_fails(self) -> None:
+        """Does a wrong password still fail?"""
+        user = UserProfileWithParentsFactory.create(
+            user__username="taylor",
+            user__password=make_password("a-good-password"),
+        ).user
+
+        self.assertFalse(self.confirm(user, "a-guess").is_valid())
+
+    def test_another_persons_password_does_not_pass(self) -> None:
+        """Can somebody whose username is another person's email address clear
+        the guard with that person's password?
+
+        They must not be able to. The guard re-prompts for *this* account, so
+        it doesn't matter that authenticate() also resolves addresses.
+        """
+        UserProfileWithParentsFactory.create(
+            user__username="victim",
+            user__email="victim@example.com",
+            user__password=make_password("victim-password"),
+        )
+        shadow = UserProfileWithParentsFactory.create(
+            user__username="victim@example.com",
+            user__email="shadow@example.com",
+            user__password=make_password("shadow-password"),
+        ).user
+
+        self.assertFalse(self.confirm(shadow, "victim-password").is_valid())
+        self.assertTrue(self.confirm(shadow, "shadow-password").is_valid())
+
+
+@override_settings(
+    CACHES={
+        "default": {
+            "BACKEND": "django.core.cache.backends.locmem.LocMemCache",
+            # Unique LOCATION so this cache is its own LocMemCache instance,
+            # not shared with the default unnamed one.
+            "LOCATION": "failed-sign-in-throttle-test",
+        },
+    },
+)
+class FailedSignInThrottleTest(TestCase):
+    """Tests for the per-account throttle on failed sign-ins.
+
+    The view's decorators are no-ops under test (see cl.lib.ratelimiter), so
+    these exercise the form-level throttle, which is where the per-account
+    counting happens.
+
+    Why the cache override: the project test runner defaults to ``--parallel=N``
+    (cl/tests/runner.py), and every parallel worker shares the same Redis.
+    ``RestartRateLimitMixin.tearDownClass`` runs ``DEL :1:rl:*``, which covers
+    these counters, so a sibling worker tearing down its class mid-test would
+    reset the count out from under us. A process-local LocMemCache isolates us
+    from sibling workers.
+    """
+
+    @classmethod
+    def setUpTestData(cls) -> None:
+        cls.user = UserProfileWithParentsFactory.create(
+            user__username="throttled-user",
+            user__password=make_password("a-good-password"),
+        ).user
+        cls.other_user = UserProfileWithParentsFactory.create(
+            user__username="bystander",
+            user__password=make_password("a-good-password"),
+        ).user
+
+    def setUp(self) -> None:
+        self.sign_in_url = reverse("sign-in")
+        # The overridden cache is process-local but still outlives a single
+        # test, so start each one from an empty count.
+        django_cache.clear()
+
+    def sign_in(
+        self, identifier: str, password: str, ip: str = "192.0.2.1"
+    ) -> HttpResponse:
+        """POST the sign-in form, claiming the given IP via CloudFront's header."""
+        return self.client.post(
+            self.sign_in_url,
+            {"username": identifier, "password": password},
+            headers={"cloudfront-viewer-address": f"{ip}:12345"},
+        )
+
+    def get_failure_count(self, identifier: str) -> int:
+        """Read an identifier's current failed sign-in count.
+
+        :param identifier: The identifier to look up.
+        :return: The number of failures counted against it.
+        """
+        return get_ratelimit_cache().get(make_failed_login_key(identifier), 0)
+
+    def test_repeated_failures_throttle_the_account(self) -> None:
+        """Do repeated failures against one account get throttled, even when
+        each attempt comes from a different IP?
+        """
+        first_failure = self.sign_in(
+            self.user.username, "wrong-password", ip="198.51.100.1"
+        )
+        for i in range(FAILED_LOGIN_LIMIT - 1):
+            self.sign_in(
+                self.user.username, "wrong-password", ip=f"198.51.100.{i + 2}"
+            )
+
+        # The password is right this time, but the account is throttled, so it
+        # gets refused — and refused with the very same error a wrong password
+        # got, so nothing about the response says "you found a live account."
+        throttled = self.sign_in(
+            self.user.username, "a-good-password", ip="203.0.113.9"
+        )
+        self.assertNotIn("_auth_user_id", self.client.session)
+        self.assertEqual(throttled.status_code, first_failure.status_code)
+        self.assertEqual(
+            throttled.context["form"].errors,
+            first_failure.context["form"].errors,
+        )
+
+    def test_a_successful_sign_in_resets_the_counter(self) -> None:
+        """Does signing in wipe the slate, so that fumbling a password, getting
+        it right, then fumbling again doesn't add up to a throttle?
+        """
+        for _ in range(FAILED_LOGIN_LIMIT - 1):
+            self.sign_in(self.user.username, "wrong-password")
+        self.assertEqual(
+            self.get_failure_count(self.user.username), FAILED_LOGIN_LIMIT - 1
+        )
+
+        self.sign_in(self.user.username, "a-good-password")
+        self.assertIn("_auth_user_id", self.client.session)
+        self.assertEqual(self.get_failure_count(self.user.username), 0)
+
+        # A second run of fumbles starts from scratch rather than tipping over.
+        self.client.logout()
+        for _ in range(FAILED_LOGIN_LIMIT - 1):
+            self.sign_in(self.user.username, "wrong-password")
+        self.sign_in(self.user.username, "a-good-password")
+        self.assertIn("_auth_user_id", self.client.session)
+
+    def test_the_throttle_is_scoped_to_one_identifier(self) -> None:
+        """Does throttling one account leave everybody else alone?"""
+        for _ in range(FAILED_LOGIN_LIMIT):
+            self.sign_in(self.user.username, "wrong-password")
+
+        self.sign_in(self.other_user.username, "a-good-password")
+        self.assertIn("_auth_user_id", self.client.session)
+
+    def test_identifiers_with_no_account_are_counted(self) -> None:
+        """Are attempts against addresses that don't exist counted too?
+
+        They must be. If only real accounts were counted, getting throttled
+        would itself prove an account existed.
+        """
+        nobody = "nobody@example.com"
+        for _ in range(FAILED_LOGIN_LIMIT):
+            self.sign_in(nobody, "wrong-password")
+
+        self.assertGreaterEqual(
+            self.get_failure_count(nobody), FAILED_LOGIN_LIMIT
+        )
+
+    def test_case_and_whitespace_variants_share_a_counter(self) -> None:
+        """Can an attacker get a fresh counter by shifting the case of the
+        identifier or padding it with whitespace?
+        """
+        for _ in range(FAILED_LOGIN_LIMIT):
+            self.sign_in(self.user.username.upper(), "wrong-password")
+
+        self.assertGreaterEqual(
+            self.get_failure_count(f"  {self.user.username}  "),
+            FAILED_LOGIN_LIMIT,
+        )
+
+    def test_guessing_on_does_not_extend_the_window(self) -> None:
+        """Can somebody hold an account's owner out by continuing to guess?
+
+        They must not be able to. The window is anchored to the first attempt in
+        it, so guesses made while over the limit raise the count but leave the
+        expiry alone, and the block lifts when it always would have.
+        """
+        start = now()
+        with time_machine.travel(start, tick=False) as traveller:
+            for _ in range(FAILED_LOGIN_LIMIT):
+                self.sign_in(self.user.username, "wrong-password")
+            self.sign_in(self.user.username, "a-good-password")
+            self.assertNotIn("_auth_user_id", self.client.session)
+
+            # Keep hammering for the rest of the window.
+            for second in range(60, FAILED_LOGIN_WINDOW, 60):
+                traveller.move_to(start + timedelta(seconds=second))
+                self.sign_in(self.user.username, "wrong-password")
+
+            # The window ends where it began pointing, not where the last guess
+            # would have put it.
+            traveller.move_to(
+                start + timedelta(seconds=FAILED_LOGIN_WINDOW + 1)
+            )
+            self.sign_in(self.user.username, "a-good-password")
+            self.assertIn("_auth_user_id", self.client.session)

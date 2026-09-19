@@ -21,7 +21,7 @@
   {% with view_name=request.resolver_match.view_name %}
   <div class="col-xs-12 hidden-sm hidden-md hidden-lg flex justify-content-around v-offset-below-2">
     {% include "includes/prayers_leaderboard_button.html" %}
-    <a href="{% url "pray_and_pay_help" %}">
+    <a href="{{ WIKI_HELP_URL }}/recap/help-with-pray-and-pay-project">
       <i class="fa fa-info-circle fa-fw"></i>&nbsp;Learn More
     </a>
     {% if is_page_owner and view_name == 'user_prayers' %}
@@ -53,7 +53,7 @@
       </li>
       {% endif %}
       <li>
-        <a href="{% url "pray_and_pay_help" %}">
+        <a href="{{ WIKI_HELP_URL }}/recap/help-with-pray-and-pay-project">
           <i class="fa fa-info-circle fa-fw"></i>&nbsp;Learn More
         </a>
       </li>

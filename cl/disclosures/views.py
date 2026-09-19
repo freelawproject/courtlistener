@@ -2,6 +2,7 @@ import operator
 from functools import reduce
 
 from asgiref.sync import sync_to_async
+from django.contrib.auth.decorators import login_required
 from django.db.models import (
     Case,
     Exists,
@@ -188,6 +189,7 @@ async def disclosure_typeahead(request: HttpRequest) -> HttpResponse:
     )
 
 
+@login_required
 async def financial_disclosures_viewer(
     request: HttpRequest,
     person_pk: int,
@@ -195,6 +197,9 @@ async def financial_disclosures_viewer(
     slug: str,
 ) -> HttpResponse:
     """Show the financial disclosures for a particular person.
+
+    Financial disclosures contain sensitive details about judges, so viewing
+    them requires an account.
 
     Fetches the specific disclosure with all related data (investments, gifts,
     debts, etc.) and renders it as a static page with tables.

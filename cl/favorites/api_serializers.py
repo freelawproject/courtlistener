@@ -4,6 +4,7 @@ from asgiref.sync import async_to_sync
 from django.conf import settings
 from rest_framework import serializers
 from rest_framework.exceptions import ValidationError
+from rest_framework.permissions import SAFE_METHODS
 from rest_framework.serializers import ModelSerializer
 
 from cl.api.utils import DynamicFieldsMixin
@@ -35,7 +36,6 @@ class DocketTagSerializer(DynamicFieldsMixin, ModelSerializer):
         queryset=Docket.objects.all(), style={"base_template": "input.html"}
     )
     tag = serializers.PrimaryKeyRelatedField(
-        # Should this block other people's from being submitted?
         queryset=UserTag.objects.all(),
         style={"base_template": "input.html"},
     )
@@ -43,6 +43,20 @@ class DocketTagSerializer(DynamicFieldsMixin, ModelSerializer):
     class Meta:
         model = DocketTag
         fields = "__all__"
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        # Scope writable `tag` values to the requester's own tags
+        # (GHSA-cvh7-rv7v-wx2j-class).
+        request = self.context.get("request")
+        if (
+            request is not None
+            and request.method not in SAFE_METHODS
+            and request.user.is_authenticated
+        ):
+            self.fields["tag"].queryset = UserTag.objects.filter(
+                user=request.user
+            )
 
 
 class PrayerSerializer(DynamicFieldsMixin, serializers.ModelSerializer):

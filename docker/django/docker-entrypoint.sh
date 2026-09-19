@@ -33,7 +33,7 @@ case "$1" in
         --limit-request-line 6000 \
         --timeout 180 \
         --max-requests ${MAX_REQUESTS:-2500} \
-        --max-requests-jitter 100 \
+        --max-requests-jitter ${MAX_REQUESTS_JITTER:-100} \
         --bind 0.0.0.0:8000
     ;;
 'rss-scraper')

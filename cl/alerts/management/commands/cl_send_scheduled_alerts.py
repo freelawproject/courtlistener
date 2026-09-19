@@ -4,6 +4,7 @@ from typing import Any
 
 import pytz
 from django.conf import settings
+from django.db.models import QuerySet
 from django.utils.timezone import get_default_timezone, make_aware
 
 from cl.alerts.models import (
@@ -20,6 +21,7 @@ from cl.stats.constants import StatAlertType, StatMetric
 from cl.stats.utils import tally_stat
 
 DAYS_TO_DELETE = 90
+DELETE_BATCH_SIZE = 5_000
 
 
 def json_date_parser(dct):
@@ -115,13 +117,14 @@ def query_and_send_alerts_by_rate(rate: str) -> None:
     alerts_sent_count = 0
     now_time = datetime.now()
     # Get unique alert users with scheduled alert hits
-    user_ids = (
+    user_ids = list(
         ScheduledAlertHit.objects.filter(
             alert__rate=rate, hit_status=SCHEDULED_ALERT_HIT_STATUS.SCHEDULED
         )
         .values_list("user", flat=True)
         .distinct()
     )
+    logger.info("Processing %s alerts for %s users.", rate, len(user_ids))
 
     for user_id in user_ids:
         # Query ScheduledAlertHits for every user.
@@ -130,6 +133,10 @@ def query_and_send_alerts_by_rate(rate: str) -> None:
             alert__rate=rate,
             hit_status=SCHEDULED_ALERT_HIT_STATUS.SCHEDULED,
         ).select_related("user", "alert")
+        hits_count = scheduled_hits.count()
+        logger.info(
+            "User %s: loading %s scheduled %s hits.", user_id, hits_count, rate
+        )
 
         # Group scheduled hits by Alert and the main_doc_id
         grouped_hits: defaultdict[
@@ -179,6 +186,13 @@ def query_and_send_alerts_by_rate(rate: str) -> None:
             hits.append((alert, search_type, documents, len(documents)))
 
         if hits:
+            payload_docs = sum(n for *_, n in hits)
+            logger.info(
+                "User %s: queuing %s alert(s), %s total docs.",
+                user_id,
+                len(hits),
+                payload_docs,
+            )
             send_search_alert_emails.delay(
                 [(user_id, hits)], scheduled_alert=True
             )
@@ -216,6 +230,32 @@ def send_scheduled_alerts(rate: str) -> None:
     query_and_send_alerts_by_rate(rate)
 
 
+def delete_scheduled_hits_in_batches(
+    hits: QuerySet[ScheduledAlertHit],
+    batch_size: int = DELETE_BATCH_SIZE,
+) -> int:
+    """Delete a queryset of ScheduledAlertHit rows in bounded batches.
+
+    Deleting a very large queryset in a single call loads every matching row
+    into Django's in-memory collector, which can exhaust memory. Delete a
+    slice of primary keys at a time instead, so peak memory stays bounded by
+    ``batch_size``. Deleted rows drop out of the filter, so re-querying
+    eventually empties the queryset and ends the loop.
+
+    :param hits: The queryset of ScheduledAlertHit rows to delete.
+    :param batch_size: The maximum number of rows to delete per batch.
+    :return: The total number of rows deleted.
+    """
+
+    total_deleted = 0
+    while batch_pks := list(hits.values_list("pk", flat=True)[:batch_size]):
+        deleted, _ = ScheduledAlertHit.objects.filter(
+            pk__in=batch_pks
+        ).delete()
+        total_deleted += deleted
+    return total_deleted
+
+
 def delete_old_scheduled_alerts() -> int:
     """Delete Scheduled alerts older than DAYS_TO_DELETE days.
 
@@ -224,21 +264,26 @@ def delete_old_scheduled_alerts() -> int:
 
     # Delete SENT ScheduledAlertHits after DAYS_TO_DELETE
     sent_older_than = datetime.now() - timedelta(days=DAYS_TO_DELETE)
-    scheduled_sent_hits_to_delete = ScheduledAlertHit.objects.filter(
-        date_created__lt=sent_older_than,
-        hit_status=SCHEDULED_ALERT_HIT_STATUS.SENT,
-    ).delete()
+    logger.info("Deleting SENT hits older than %s...", sent_older_than.date())
+    sent_deleted = delete_scheduled_hits_in_batches(
+        ScheduledAlertHit.objects.filter(
+            date_created__lt=sent_older_than,
+            hit_status=SCHEDULED_ALERT_HIT_STATUS.SENT,
+        )
+    )
 
     # Delete SCHEDULED ScheduledAlertHits after 2 * DAYS_TO_DELETE
     unsent_older_than = datetime.now() - timedelta(days=2 * DAYS_TO_DELETE)
-    scheduled_unsent_hits_to_delete = ScheduledAlertHit.objects.filter(
-        date_created__lt=unsent_older_than,
-        hit_status=SCHEDULED_ALERT_HIT_STATUS.SCHEDULED,
-    ).delete()
-    deleted_items = (
-        scheduled_sent_hits_to_delete[0] + scheduled_unsent_hits_to_delete[0]
+    logger.info(
+        "Deleting SCHEDULED hits older than %s...", unsent_older_than.date()
     )
-    return deleted_items
+    unsent_deleted = delete_scheduled_hits_in_batches(
+        ScheduledAlertHit.objects.filter(
+            date_created__lt=unsent_older_than,
+            hit_status=SCHEDULED_ALERT_HIT_STATUS.SCHEDULED,
+        )
+    )
+    return sent_deleted + unsent_deleted
 
 
 class Command(VerboseCommand):

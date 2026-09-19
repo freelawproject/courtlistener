@@ -10,9 +10,7 @@ from django.test import override_settings
 from django.test.client import AsyncClient, Client
 from django.urls import reverse
 from django.utils.timezone import now
-from waffle.testutils import override_switch
 
-from cl.api.constants import SYNC_MEMBERSHIP_THROTTLES_SWITCH
 from cl.api.models import APIThrottle, ThrottleType
 from cl.donate.api_views import MembershipWebhookViewSet
 from cl.donate.factories import NeonWebhookEventFactory
@@ -699,6 +697,8 @@ class MembershipWebhookTest(TestCase):
         membership = await query.afirst()
         self.assertEqual(membership.user.email, "test@free.law")
         self.assertEqual(membership.user.profile.neon_account_id, "9524")
+        self.assertEqual(membership.user.first_name, "test")
+        self.assertEqual(membership.user.last_name, "test")
 
     @patch(
         "cl.lib.neon_utils.NeonClient.get_account_by_id",
@@ -902,17 +902,29 @@ class ProfileMembershipTest(TestCase):
                 "Should not be a member a day after termination.",
             )
 
+    def test_is_member_true_when_payment_pending(self):
+        """A member keeps benefits while their payment is still pending."""
+        NeonMembership.objects.create(
+            level=NeonMembershipLevel.LEGACY,
+            user=self.user_profile.user,
+            payment_status=MembershipPaymentStatus.PENDING,
+        )
+        self.user_profile.refresh_from_db()
+        self.assertTrue(self.user_profile.is_member)
 
-@override_settings(WAFFLE_CACHE_PREFIX="MembershipWebhookThrottleSyncTest")
-@override_switch(SYNC_MEMBERSHIP_THROTTLES_SWITCH, active=True)
+    def test_is_member_false_when_payment_failed(self):
+        """A failed/declined payment revokes membership benefits."""
+        NeonMembership.objects.create(
+            level=NeonMembershipLevel.LEGACY,
+            user=self.user_profile.user,
+            payment_status=MembershipPaymentStatus.FAILED,
+        )
+        self.user_profile.refresh_from_db()
+        self.assertFalse(self.user_profile.is_member)
+
+
 class MembershipWebhookThrottleSyncTest(TestCase):
-    """End-to-end tests that Neon webhooks sync APIThrottle rows.
-
-    Existing webhook tests in MembershipWebhookTest run with the
-    sync_membership_throttles switch off (its default), so the wire-up
-    in MembershipWebhookViewSet is a no-op there. This class flips the
-    switch on at class scope to exercise the actual sync behavior.
-    """
+    """End-to-end tests that Neon webhooks sync APIThrottle rows."""
 
     def setUp(self) -> None:
         self.async_client = AsyncClient()
@@ -1087,32 +1099,3 @@ class MembershipWebhookThrottleSyncTest(TestCase):
             ).values_list("rate", "source")
         ]
         self.assertEqual(remaining, [("0/min", APIThrottle.Source.MANUAL)])
-
-    @override_switch(SYNC_MEMBERSHIP_THROTTLES_SWITCH, active=False)
-    @patch.object(
-        MembershipWebhookViewSet,
-        "_store_webhook_payload",
-        return_value=None,
-    )
-    def test_webhook_does_not_sync_when_switch_off(
-        self, mock_store_webhook
-    ) -> None:
-        """With the switch off, webhook handlers don't touch APIThrottle."""
-        self.data["eventTrigger"] = "createMembership"
-
-        client = Client()
-        r = client.post(
-            reverse("membership-webhooks-list", kwargs={"version": "v3"}),
-            data=self.data,
-            content_type="application/json",
-        )
-
-        self.assertEqual(r.status_code, HTTPStatus.CREATED)
-        # NeonMembership row is still created (existing behavior),
-        # but no APIThrottle rows.
-        self.assertTrue(
-            NeonMembership.objects.filter(user=self.user_profile.user).exists()
-        )
-        self.assertFalse(
-            APIThrottle.objects.filter(user=self.user_profile.user).exists()
-        )

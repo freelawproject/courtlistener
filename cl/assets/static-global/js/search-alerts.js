@@ -7,8 +7,10 @@ document.addEventListener('DOMContentLoaded', function () {
   const FreeRTMsg = document.getElementById('msg-rt-free');
   const FreeQuotaMsg = document.getElementById('msg-quota-free');
   const MemberQuotaMsg = document.getElementById('msg-quota-member');
+  const LegacyMemberQuotaMsg = document.getElementById('msg-quota-member-legacy');
   const NoMemberButton = document.getElementById('no-member-button');
   const MemberButton = document.getElementById('member-button');
+  const LegacyMemberButton = document.getElementById('member-legacy-button');
 
   // Opinions and OA alerts limits logic
   function otherAlerts() {
@@ -28,6 +30,7 @@ document.addEventListener('DOMContentLoaded', function () {
     const userLevel = alertsContext.level;
     const editAlert = alertsContext.editAlert;
     const isMember = alertsContext.level !== 'free';
+    const isLegacy = alertsContext.isLegacy;
     const rateGroup = rateValue === 'rt' ? 'rt' : 'other_rates';
     const used = alertsContext.counts[rateGroup] || 0;
     const allowed =
@@ -38,8 +41,10 @@ document.addEventListener('DOMContentLoaded', function () {
     quotaWarning.classList.add('hidden');
     FreeQuotaMsg.classList.add('hidden');
     MemberQuotaMsg.classList.add('hidden');
+    LegacyMemberQuotaMsg.classList.add('hidden');
     NoMemberButton.classList.add('hidden');
     MemberButton.classList.add('hidden');
+    LegacyMemberButton.classList.add('hidden');
     FreeRTMsg.classList.add('hidden');
     saveBtn.disabled = false;
     if (rateValue === 'rt' && !(isMember || hasUnlimitedAlerts)) {
@@ -53,9 +58,15 @@ document.addEventListener('DOMContentLoaded', function () {
 
     if (!hasUnlimitedAlerts && used >= allowed && !editAlert) {
       if (isMember) {
-        // Member has reached the quota for this rate group.
-        MemberQuotaMsg.classList.remove('hidden');
-        MemberButton.classList.remove('hidden');
+        // Member has reached the quota for this rate group. Legacy members
+        // can't upgrade online, so route them to the help page instead.
+        if (isLegacy) {
+          LegacyMemberQuotaMsg.classList.remove('hidden');
+          LegacyMemberButton.classList.remove('hidden');
+        } else {
+          MemberQuotaMsg.classList.remove('hidden');
+          MemberButton.classList.remove('hidden');
+        }
       } else {
         // Free user has reached their quota for other rates.
         FreeQuotaMsg.classList.remove('hidden');

@@ -1,6 +1,7 @@
 from collections import defaultdict
 from datetime import datetime, timedelta
 from http import HTTPStatus
+from types import SimpleNamespace
 from typing import cast
 from unittest import mock
 
@@ -23,6 +24,7 @@ from selenium.webdriver.common.by import By
 from timeout_decorator import timeout_decorator
 from waffle.testutils import override_switch
 
+from cl.alerts.constants import LEGACY_MEMBERSHIP_HELP_URL
 from cl.alerts.factories import AlertFactory, DocketAlertWithParentsFactory
 from cl.alerts.forms import CreateAlertForm
 from cl.alerts.management.commands.cl_send_scheduled_alerts import (
@@ -46,6 +48,7 @@ from cl.alerts.utils import (
     InvalidDateError,
     add_document_hit_to_alert_set,
     build_alert_email_subject,
+    fetch_all_search_alerts_results,
     has_document_alert_hit_been_triggered,
     is_match_all_query,
     percolate_es_document,
@@ -90,12 +93,14 @@ from cl.search.models import (
     DocketEntry,
     RECAPDocument,
 )
+from cl.search.types import PercolatorResponses
 from cl.tests.base import SELENIUM_TIMEOUT, BaseSeleniumTest
 from cl.tests.cases import (
     APITestCase,
     ESIndexTestCase,
     MockTallyStatMixin,
     SearchAlertsAssertions,
+    SimpleTestCase,
     TestCase,
 )
 from cl.tests.utils import MockResponse, make_client
@@ -442,13 +447,26 @@ class AlertTest(SimpleUserDataMixin, ESIndexTestCase, TestCase):
         url = reverse("show_results") + f"?type={SEARCH_TYPES.RECAP}"
         r = await self.async_client.post(url, params, follow=True)
         content = r.content.decode()
+        # Legacy members can't upgrade online, so they're routed to the help
+        # page rather than the Neon upgrade flow that 404s for them (#7136).
         self.assert_form_validation_error(
-            "You've used all of the alerts included with your membership.",
+            "You've used all of the alerts included with your legacy membership.",
             content,
         )
-        neon_id = self.user_member.user.membership.neon_id
-        expected_upgrade_url = f"https://donate.free.law/constituent/memberships/upgrade/{neon_id}"
-        self.assertIn(expected_upgrade_url, content)
+        # Scope the link assertions to the validation error itself; the alert
+        # modal always renders a (JS-hidden) upgrade button on every page.
+        validation_error = cast(
+            list[HtmlElement],
+            html.fromstring(content).xpath(
+                '//p[contains(@class, "help-block")]'
+            ),
+        )
+        error_html = html.tostring(validation_error[0], encoding="unicode")
+        self.assertIn(LEGACY_MEMBERSHIP_HELP_URL, error_html)
+        self.assertNotIn(
+            "https://donate.free.law/constituent/memberships/upgrade/",
+            error_html,
+        )
 
         alerts = Alert.objects.filter(user=self.user_member.user)
         self.assertEqual(await alerts.acount(), 0)
@@ -1777,7 +1795,7 @@ class AlertAPITests(ESIndexTestCase, APITestCase):
 
     async def test_legacy_member_recap_rt_rejected(self) -> None:
         """Legacy members have a RECAP Real-Time quota of 0, so their first
-        RECAP RT alert is rejected with the membership upgrade message."""
+        RECAP RT alert is rejected with the legacy help message."""
         response = await self.make_an_alert(
             self.client_legacy_member,
             alert_query=f"q=testing_query&type={SEARCH_TYPES.RECAP}",
@@ -1786,14 +1804,17 @@ class AlertAPITests(ESIndexTestCase, APITestCase):
         )
         self.assertEqual(response.status_code, HTTPStatus.FORBIDDEN)
         detail = response.json()["detail"]
+        # Legacy members can't upgrade online, so they're routed to the help
+        # page rather than the Neon upgrade flow that 404s for them (#7136).
         self.assertIn(
-            "You've used all of the alerts included with your membership.",
+            "You've used all of the alerts included with your legacy membership.",
             detail,
         )
+        self.assertIn(LEGACY_MEMBERSHIP_HELP_URL, detail)
         neon_id = await sync_to_async(
             lambda: self.user_legacy_member.membership.neon_id
         )()
-        self.assertIn(
+        self.assertNotIn(
             f"https://donate.free.law/constituent/memberships/upgrade/{neon_id}",
             detail,
         )
@@ -4990,6 +5011,83 @@ class SearchAlertsIndexingCommandTests(ESIndexTestCase, TestCase):
         self.assertTrue(
             AudioPercolator.exists(id=valid_alert.pk),
             msg=f"Alert id: {valid_alert.pk} was not indexed.",
+        )
+
+
+class FetchAllSearchAlertsResultsTest(SimpleTestCase):
+    class FakeHits:
+        def __init__(self, total, markers):
+            self.total = SimpleNamespace(value=total)
+            self.hits = [
+                SimpleNamespace(meta=SimpleNamespace(sort=[marker]))
+                for marker in markers
+            ]
+
+        def __iter__(self):
+            return iter(self.hits)
+
+        def __getitem__(self, item):
+            return self.hits[item]
+
+    @classmethod
+    def make_response(cls, total, *markers):
+        return SimpleNamespace(hits=cls.FakeHits(total, markers))
+
+    @override_settings(ELASTICSEARCH_PAGINATION_BATCH_SIZE=1)
+    @mock.patch("cl.alerts.utils.percolate_es_document")
+    def test_paginates_dataclass_responses(self, mock_percolate):
+        initial = PercolatorResponses(
+            self.make_response(3, "main-1"),
+            self.make_response(1, "rd-1"),
+            self.make_response(1, "d-1"),
+        )
+        mock_percolate.side_effect = [
+            PercolatorResponses(
+                self.make_response(3, "main-2"),
+                self.make_response(1, "rd-2"),
+                self.make_response(1, "d-2"),
+            ),
+            PercolatorResponses(
+                self.make_response(3, "main-3"),
+                self.make_response(1, "rd-3"),
+                self.make_response(1, "d-3"),
+            ),
+        ]
+
+        main_hits, rd_hits, d_hits = fetch_all_search_alerts_results(
+            initial, "document-id", "percolator-index"
+        )
+
+        self.assertEqual(len(main_hits), 3)
+        self.assertEqual(len(rd_hits), 3)
+        self.assertEqual(len(d_hits), 3)
+        self.assertEqual(mock_percolate.call_count, 2)
+
+    @override_settings(ELASTICSEARCH_PAGINATION_BATCH_SIZE=1)
+    @mock.patch("cl.alerts.utils.percolate_es_document")
+    def test_handles_empty_auxiliary_responses(self, mock_percolate):
+        initial = PercolatorResponses(
+            self.make_response(2, "main-1"),
+            self.make_response(0),
+            self.make_response(0),
+        )
+        mock_percolate.return_value = PercolatorResponses(
+            self.make_response(2, "main-2"), None, None
+        )
+
+        main_hits, rd_hits, d_hits = fetch_all_search_alerts_results(
+            initial, "document-id", "percolator-index"
+        )
+
+        self.assertEqual(len(main_hits), 2)
+        self.assertEqual(rd_hits, [])
+        self.assertEqual(d_hits, [])
+        mock_percolate.assert_called_once_with(
+            "document-id",
+            "percolator-index",
+            main_search_after=["main-1"],
+            rd_search_after=None,
+            d_search_after=None,
         )
 
 

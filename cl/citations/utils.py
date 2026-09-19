@@ -7,7 +7,6 @@ from django.apps import (  # Must use apps.get_model() to avoid circular import 
 from django.db.models import Sum
 from django.template.defaultfilters import slugify
 from django.utils.functional import keep_lazy_text
-from django.utils.safestring import SafeString
 from eyecite.models import CitationBase, FullCaseCitation, ShortCaseCitation
 from eyecite.utils import strip_punct
 from reporters_db import EDITIONS, REPORTERS, VARIATIONS_ONLY
@@ -133,7 +132,7 @@ def make_name_param(
     return " ".join(query_words), len(query_words)
 
 
-def get_canonicals_from_reporter(reporter_or_slug: str) -> list[SafeString]:
+def get_canonicals_from_reporter(reporter_or_slug: str) -> list[str]:
     """
     Disambiguates a reporter slug using a list of variations.
 
@@ -279,7 +278,7 @@ def get_cited_clusters_ids_to_update(
     ).values_list("cited_opinion_id", flat=True)
 
     cluster_ids_to_update = {
-        o.cluster.pk
+        o.cluster_id
         for o in resolutions
         if o.pk not in currently_cited_opinions
     }

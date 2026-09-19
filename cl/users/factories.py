@@ -1,6 +1,14 @@
 from django.contrib.auth.hashers import make_password
 from django.contrib.auth.models import User
-from factory import Faker, LazyFunction, RelatedFactory, SubFactory
+from django.utils.text import slugify
+from factory import (
+    Faker,
+    LazyAttribute,
+    LazyAttributeSequence,
+    LazyFunction,
+    RelatedFactory,
+    SubFactory,
+)
 from factory.django import DjangoModelFactory
 from pytz import utc
 
@@ -11,10 +19,20 @@ class UserFactory(DjangoModelFactory):
     class Meta:
         model = User
 
-    username = Faker("user_name")
+    class Params:
+        # Faker's `user_name` and `email` providers draw from a namespace small
+        # enough (~16 bits) to repeat at our test sample sizes, which trips the
+        # unique constraint on `auth_user.username`. Derive both from the
+        # sequence counter instead: unique by construction, and computed once
+        # here so the two stay in sync. Excluded from the model's fields.
+        name_slug = LazyAttributeSequence(
+            lambda o, n: f"{slugify(o.first_name)}.{slugify(o.last_name)}.{n}"
+        )
+
+    username = LazyAttribute(lambda o: o.name_slug)
     first_name = Faker("first_name")
     last_name = Faker("last_name")
-    email = Faker("email")
+    email = LazyAttribute(lambda o: f"{o.name_slug}@example.com")
     # If you override this, be sure to use make_password or else you'll just
     # put your string password into the DB without hashing and salting it and
     # you'll wonder why it doesn't work.

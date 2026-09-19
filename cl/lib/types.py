@@ -301,3 +301,7 @@ class ApiPositionMapping(BasePositionMapping):
     def get_db_to_dataclass_map(self):
         parent_map = super().get_db_to_dataclass_map()
         return parent_map | self.__db_to_dataclass_map
+
+
+# https://www.aazuspan.dev/blog/type-safety-and-non-empty-tuples-in-python/
+type NonEmptyTuple[T] = tuple[T, *tuple[T, ...]]

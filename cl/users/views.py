@@ -35,10 +35,8 @@ from django.views.decorators.debug import (
 from django.views.decorators.http import require_http_methods
 from rest_framework.authtoken.models import Token
 from rest_framework.renderers import JSONRenderer
-from waffle import switch_is_active
 
 from cl.alerts.models import DocketAlert
-from cl.api.constants import SYNC_MEMBERSHIP_THROTTLES_SWITCH
 from cl.api.models import (
     WEBHOOK_EVENT_STATUS,
     ThrottleType,
@@ -46,22 +44,25 @@ from cl.api.models import (
     WebhookEventType,
 )
 from cl.api.utils import (
-    LEGACY_USER_DEFAULT_RATE,
-    USE_NEW_THROTTLE_DEFAULTS_SWITCH,
+    double_rate,
     get_all_throttle_overrides,
     get_recent_api_request_count,
+    promo_doubling_applies,
 )
 from cl.api.views import parse_throttle_rate_for_template
 from cl.custom_filters.decorators import check_honeypot
 from cl.favorites.forms import NoteForm
-from cl.lib.crypto import sha1_activation_key
+from cl.lib.auth import filter_by_email
+from cl.lib.crypto import generate_activation_key
 from cl.lib.ratelimiter import (
+    ratelimiter_all_2_per_m,
     ratelimiter_unsafe_10_per_m,
     ratelimiter_unsafe_2000_per_h,
 )
 from cl.lib.types import AuthenticatedHttpRequest, EmailType
 from cl.lib.url_utils import get_redirect_or_abort
 from cl.search.models import SEARCH_TYPES
+from cl.simple_pages.tasks import create_zoho_desk_ticket
 from cl.stats.metrics import accounts_deleted_total
 from cl.users.forms import (
     CustomPasswordChangeForm,
@@ -74,7 +75,12 @@ from cl.users.forms import (
     UserForm,
 )
 from cl.users.models import UserProfile
-from cl.users.tasks import create_neon_account, update_neon_account
+from cl.users.tasks import (
+    create_neon_account,
+    notify_existing_account_holder,
+    send_new_account_emails,
+    update_neon_account,
+)
 from cl.users.utils import (
     convert_to_stub_account,
     delete_user_assets,
@@ -313,33 +319,26 @@ def reset_api_token(request: AuthenticatedHttpRequest) -> HttpResponse:
 @login_required
 @never_cache
 def view_api_usage(request: AuthenticatedHttpRequest) -> HttpResponse:
-    show_membership_features = switch_is_active(
-        SYNC_MEMBERSHIP_THROTTLES_SWITCH
-    )
-
-    throttle_rates: list[tuple[int, str]] = []
-    if show_membership_features:
-        overrides = get_all_throttle_overrides(ThrottleType.API)
-        user_rates = overrides.get(request.user.username) or []
-        if not user_rates:
-            if switch_is_active(USE_NEW_THROTTLE_DEFAULTS_SWITCH):
-                raw_default = settings.REST_FRAMEWORK[
-                    "DEFAULT_THROTTLE_RATES"
-                ]["user"]
-                user_rates = (
-                    [raw_default]
-                    if isinstance(raw_default, str)
-                    else list(raw_default)
-                )
-            else:
-                user_rates = [LEGACY_USER_DEFAULT_RATE]
-        # Drop "0/..." rates — those mean blocked, not a throughput limit.
-        throttle_rates = [
-            parsed
-            for r in user_rates
-            if not r.startswith("0/")
-            and (parsed := parse_throttle_rate_for_template(r)) is not None
-        ]
+    overrides = get_all_throttle_overrides(ThrottleType.API)
+    user_rates = overrides.get(request.user.username) or []
+    if not user_rates:
+        raw_default = settings.REST_FRAMEWORK["DEFAULT_THROTTLE_RATES"]["user"]
+        user_rates = (
+            [raw_default]
+            if isinstance(raw_default, str)
+            else list(raw_default)
+        )
+    # Reflect the membership-promotion x2 boost so the displayed limits match
+    # what the throttle actually enforces.
+    if promo_doubling_applies(request.user):
+        user_rates = [double_rate(r) for r in user_rates]
+    # Drop "0/..." rates — those mean blocked, not a throughput limit.
+    throttle_rates = [
+        parsed
+        for r in user_rates
+        if not r.startswith("0/")
+        and (parsed := parse_throttle_rate_for_template(r)) is not None
+    ]
 
     return TemplateResponse(
         request,
@@ -348,7 +347,6 @@ def view_api_usage(request: AuthenticatedHttpRequest) -> HttpResponse:
             "private": True,
             "page": "api_usage",
             "page_title": "API Usage",
-            "show_membership_features": show_membership_features,
             "throttle_rates": throttle_rates,
         },
     )
@@ -375,7 +373,7 @@ def view_settings(request: AuthenticatedHttpRequest) -> HttpResponse:
         changed_email = old_email != new_email
         if changed_email:
             # Email was changed.
-            up.activation_key = sha1_activation_key(user.username)
+            up.activation_key = generate_activation_key()
             up.key_expires = now() + timedelta(5)
             up.email_confirmed = False
 
@@ -483,12 +481,23 @@ async def delete_profile_done(request: HttpRequest) -> HttpResponse:
 @login_required
 def take_out(request: AuthenticatedHttpRequest) -> HttpResponse:
     if request.method == "POST":
-        email: EmailType = emails["take_out_requested"]
-        send_mail(
-            email["subject"],
-            email["body"] % (request.user, request.user.email),
-            email["from_email"],
-            email["to"],
+        user = request.user
+        confirmed = "Yes" if user.profile.email_confirmed else "No"
+        description = (
+            "A user has requested an export of their data in accordance "
+            "with the GDPR/CCPA. Their account details are:<br><br>"
+            f"Logged In As: {user.username} ({user.email})<br>"
+            f"Email Confirmed: {confirmed}"
+        )
+        create_zoho_desk_ticket.delay(
+            subject="User data export request",
+            name=user.get_full_name() or user.username,
+            email=user.email,
+            description=description,
+            request_type="Data Export Request",
+            assignee_id=settings.ZOHO_DESK_AGENT_ASSIGNMENTS.get(
+                "data_export", ""
+            ),
         )
 
         return HttpResponseRedirect(reverse("take_out_done"))
@@ -522,12 +531,25 @@ async def take_out_done(request: HttpRequest) -> HttpResponse:
 def register(request: HttpRequest) -> HttpResponse:
     """allow only an anonymous user to register"""
     redirect_to = get_redirect_or_abort(request, "next")
+    # Every successful-looking outcome below, including a refused duplicate,
+    # must produce this exact redirect. Anything that differs between the
+    # outcomes tells an observer whether the address already had an account.
+    # The address is stripped to match what the form's EmailField cleans, so
+    # the URL is what register_success expects to validate.
+    email = request.POST.get("email", "").strip()
+    success_url = (
+        reverse("register_success")
+        + f"?next={urlencode(redirect_to)}&email={urlencode(email)}"
+    )
     if request.user.is_anonymous:
         if request.method == "POST":
             try:
-                stub_account = User.objects.filter(
-                    profile__stub_account=True,
-                ).get(email__iexact=request.POST.get("email"))
+                # Use the same stripped address the form will clean, so a
+                # stub found here is the same account the form's duplicate
+                # check sees, and vice versa.
+                stub_account = filter_by_email(
+                    User.objects.filter(profile__stub_account=True), email
+                ).get()
             except User.DoesNotExist:
                 stub_account = False
 
@@ -541,6 +563,23 @@ def register(request: HttpRequest) -> HttpResponse:
             consent_form = OptInConsentForm(request.POST)
             if form.is_valid() and consent_form.is_valid():
                 cd = form.cleaned_data
+                if form.email_taken:
+                    # Somebody already holds this address. Create nothing, and
+                    # tell only the address owner, by email, which nobody else
+                    # can read. Mail goes through the same async path as the
+                    # real signup so the response takes the same shape.
+                    #
+                    # The real signup below also hashes the password when it
+                    # creates the user, and that hash dwarfs everything else
+                    # in the request. Hash here too, so the response time
+                    # doesn't say which path ran. This is Django's own idiom,
+                    # from ModelBackend.authenticate(); the User is never
+                    # saved, so there is no stored password to validate.
+                    # nosemgrep: python.django.security.audit.unvalidated-password.unvalidated-password
+                    User().set_password(cd["password1"])
+                    notify_existing_account_holder.delay(cd["email"])
+                    return HttpResponseRedirect(success_url)
+
                 try:
                     if not stub_account:
                         # make a new user that is active, but has not confirmed
@@ -565,18 +604,15 @@ def register(request: HttpRequest) -> HttpResponse:
                     user.save()
 
                     # Build and assign the activation key
-                    up.activation_key = sha1_activation_key(user.username)
+                    up.activation_key = generate_activation_key()
                     up.key_expires = now() + timedelta(days=5)
                     up.save()
 
                 except IntegrityError as e:
                     # Redirect to success if user already exists
                     try:
-                        user = User.objects.get(username=cd["username"])
-                        get_str = f"?next={urlencode(redirect_to)}&email={urlencode(user.email)}"
-                        return HttpResponseRedirect(
-                            reverse("register_success") + get_str
-                        )
+                        User.objects.get(username=cd["username"])
+                        return HttpResponseRedirect(success_url)
 
                     # Else, display generic error message and rerender form
                     except User.DoesNotExist:
@@ -601,28 +637,8 @@ def register(request: HttpRequest) -> HttpResponse:
                         )
 
                 # Only reached if user creation succeeded
-                email: EmailType = emails["confirm_your_new_account"]
-                send_mail(
-                    email["subject"],
-                    email["body"] % (user.username, up.activation_key),
-                    email["from_email"],
-                    [user.email],
-                )
-                email: EmailType = emails["new_account_created"]
-                send_mail(
-                    email["subject"] % up.user.username,
-                    email["body"]
-                    % (
-                        up.user.get_full_name() or "Not provided",
-                        up.user.email,
-                    ),
-                    email["from_email"],
-                    email["to"],
-                )
-                get_str = f"?next={urlencode(redirect_to)}&email={urlencode(user.email)}"
-                return HttpResponseRedirect(
-                    reverse("register_success") + get_str
-                )
+                send_new_account_emails.delay(user.pk)
+                return HttpResponseRedirect(success_url)
         else:
             form = UserCreationFormExtended()
             consent_form = OptInConsentForm()
@@ -662,6 +678,7 @@ def register_success(request: HttpRequest) -> HttpResponse:
     )
 
 
+@ratelimiter_all_2_per_m
 @sensitive_variables("activation_key")
 @never_cache
 def confirm_email(request, activation_key):
@@ -669,6 +686,9 @@ def confirm_email(request, activation_key):
 
     Checks if a hash in a confirmation link is valid, and if so sets the user's
     email address as valid.
+
+    Rate limited per IP (GHSA-638g-xf9h-6qcg) since this view has no other
+    protection against brute-forcing activation_key.
     """
     ups = UserProfile.objects.filter(activation_key=activation_key)
     if not len(ups):
@@ -704,6 +724,10 @@ def confirm_email(request, activation_key):
     # Tests pass; Save the profile
     for up in ups:
         up.email_confirmed = True
+        # Invalidate the key so it's single-use (GHSA-638g-xf9h-6qcg): once
+        # spent, it shouldn't still work as a lookup value if it ever leaks
+        # (server logs, browser history, a referrer header) or gets reused.
+        up.activation_key = ""
         up.save()
         if not settings.DEVELOPMENT:
             if up.neon_account_id:
@@ -730,7 +754,7 @@ def request_email_confirmation(request: HttpRequest) -> HttpResponse:
         form = EmailConfirmationForm(request.POST)
         if form.is_valid():
             cd = form.cleaned_data
-            users = User.objects.filter(email__iexact=cd["email"])
+            users = filter_by_email(User.objects.all(), cd["email"])
             if not len(users):
                 # Normally, we'd throw an error here, but instead we pretend it
                 # was a success. Meanwhile, we send an email saying that a
@@ -749,23 +773,28 @@ def request_email_confirmation(request: HttpRequest) -> HttpResponse:
                 )
                 return HttpResponseRedirect(reverse("email_confirm_success"))
 
-            activation_key = sha1_activation_key(cd["email"])
             key_expires = now() + timedelta(days=5)
+            email: EmailType = emails["confirm_existing_account"]
 
             for user in users:
+                # Generate one activation key per user. This prevents an
+                # attacker from creating and gaining access to an account in
+                # between when a victim creates their account and when they
+                # confirm it. See: https://github.com/freelawproject/courtlistener-ghsa-638g-xf9h-6qcg/pull/1
+                activation_key = generate_activation_key()
+
                 # associate it with the user's accounts.
                 up = user.profile
                 up.activation_key = activation_key
                 up.key_expires = key_expires
                 up.save()
 
-            email: EmailType = emails["confirm_existing_account"]
-            send_mail(
-                email["subject"],
-                email["body"] % activation_key,
-                email["from_email"],
-                [user.email],
-            )
+                send_mail(
+                    email["subject"],
+                    email["body"] % activation_key,
+                    email["from_email"],
+                    [user.email],
+                )
             return HttpResponseRedirect(reverse("email_confirm_success"))
     else:
         form = EmailConfirmationForm()

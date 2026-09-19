@@ -1290,6 +1290,14 @@ class PartyType(models.Model):
     (It made sense at the time.)
     """
 
+    PRO_SE_UNKNOWN = 0
+    PRO_SE_YES = 1
+    PRO_SE_NO = 2
+    PRO_SE_STATUSES = (
+        (PRO_SE_UNKNOWN, "Unknown"),
+        (PRO_SE_YES, "Yes"),
+        (PRO_SE_NO, "No"),
+    )
     docket = models.ForeignKey(
         "search.Docket",
         related_name="party_types",
@@ -1325,6 +1333,12 @@ class PartyType(models.Model):
         help_text="In a criminal case, the highest offense level at the end "
         "of the case.",
         blank=True,
+    )
+    pro_se = models.SmallIntegerField(
+        help_text="Whether the party is representing themselves (pro se) in "
+        "this docket.",
+        choices=PRO_SE_STATUSES,
+        default=PRO_SE_UNKNOWN,
     )
 
     class Meta:

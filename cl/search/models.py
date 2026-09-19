@@ -1,7 +1,9 @@
 import logging
 import re
 from datetime import datetime
-from typing import Literal, TypeVar
+from pathlib import Path
+from typing import TYPE_CHECKING, Literal, TypeVar
+from urllib.parse import quote
 
 import nh3
 import pghistory
@@ -36,7 +38,18 @@ from localflavor.us.models import USPostalCodeField, USZipCodeField
 from localflavor.us.us_states import OBSOLETE_STATES, USPS_CHOICES
 from model_utils import FieldTracker
 
-from cl.citations.utils import get_citation_depth_between_clusters
+from cl.corpus_importer.state.florida.utils import (
+    is_florida_court,
+)
+from cl.corpus_importer.state.florida.utils import (
+    make_docket_number_core as make_florida_docket_number_core,
+)
+from cl.corpus_importer.state.new_york.utils import (
+    is_nycoa_court,
+)
+from cl.corpus_importer.state.new_york.utils import (
+    make_docket_number_core as make_nycoa_docket_number_core,
+)
 from cl.custom_filters.templatetags.text_filters import best_case_name
 from cl.lib import fields
 from cl.lib.decorators import document_model
@@ -53,12 +66,23 @@ from cl.lib.model_helpers import (
     normalize_texas_appellate_docket_number,
 )
 from cl.lib.models import AbstractDateTimeModel, AbstractPDF, s3_warning_note
+from cl.lib.recap_utils import (
+    format_path_date,
+    get_bucket_name,
+    make_recap_style_path,
+    scotus_document_number_segments,
+)
 from cl.lib.storage import IncrementingAWSMediaStorage, S3PrivateUUIDStorage
 from cl.lib.string_utils import get_token_count_from_string, trunc
 from cl.search.cluster_sources import ClusterSources
 from cl.search.docket_sources import DocketSources
+from cl.search.state.florida.models import *
+from cl.search.state.new_york.models import *
 from cl.search.state.texas.models import *
 from cl.users.models import User
+
+if TYPE_CHECKING:
+    from cl.opinion_page.docket_entry_sources import DocketEntrySource
 
 HYPERSCAN_TOKENIZER = HyperscanTokenizer(cache_dir=".hyperscan")
 
@@ -703,6 +727,14 @@ class Docket(AbstractDateTimeModel, DocketSources):
                 self.docket_number_core = make_texas_docket_number_core(
                     self.docket_number_raw
                 )
+            elif is_florida_court(self.court_id):
+                self.docket_number_core = make_florida_docket_number_core(
+                    self.docket_number_raw, court_id=self.court_id
+                )
+            elif is_nycoa_court(self.court_id):
+                self.docket_number_core = make_nycoa_docket_number_core(
+                    self.docket_number_raw
+                )
             else:
                 self.docket_number_core = make_docket_number_core(
                     self.docket_number_raw
@@ -861,7 +893,13 @@ class Docket(AbstractDateTimeModel, DocketSources):
         )
 
     @property
-    def pacer_docket_url(self):
+    def pacer_docket_url(self) -> str | None:
+        """Return the PACER docket report URL, or None if the docket isn't in PACER."""
+        from cl.opinion_page import docket_entry_sources
+
+        if self.get_entry_source() is not docket_entry_sources.RECAP:
+            return None
+
         if self.court.jurisdiction == Court.FEDERAL_APPELLATE:
             if self.court.pk in ["ca5", "ca7", "ca11"]:
                 path = "/cmecf/servlet/TransportRoom?"
@@ -876,6 +914,25 @@ class Docket(AbstractDateTimeModel, DocketSources):
                 return self.pacer_appellate_url_with_caseId(path)
         else:
             return self.pacer_district_url("DktRpt.pl")
+
+    @property
+    def scotus_docket_url(self) -> str:
+        if not self.docket_number:
+            return ""
+        return (
+            "https://www.supremecourt.gov/search.aspx"
+            f"?filename=/docket/docketfiles/html/public/{quote(self.docket_number)}.html"
+        )
+
+    def get_entry_source(self) -> "DocketEntrySource":
+        """Return the DocketEntrySource config for this docket's court -
+        RECAP/PACER by default, with per-court overrides.
+        """
+        from cl.opinion_page import docket_entry_sources
+
+        return docket_entry_sources.BY_COURT_ID.get(
+            self.court_id, docket_entry_sources.RECAP
+        )
 
     @property
     def pacer_alias_url(self):
@@ -1270,6 +1327,16 @@ class RECAPDocument(
 
     def __str__(self) -> str:
         return f"{self.pk}: Docket_{self.docket_entry.docket.docket_number} , document_number_{self.document_number} , attachment_number_{self.attachment_number}"
+
+    def get_pdf_path(self, filename: str, thumbs: bool = False) -> str:
+        """Store PACER documents under the RECAP bucket layout, which the
+        original RECAP server also used, so paths stay compatible."""
+        root = "recap-thumbnails" if thumbs else "recap"
+        bucket = get_bucket_name(
+            self.docket_entry.docket.court_id,
+            self.docket_entry.docket.pacer_case_id,
+        )
+        return str(Path(root) / bucket / filename)
 
     def get_absolute_url(self) -> str:
         if not self.document_number:
@@ -1788,6 +1855,15 @@ class ClaimHistory(AbstractPacerDocument, AbstractPDF, AbstractDateTimeModel):
     class Meta:
         verbose_name_plural = "Claim History Entries"
 
+    def get_pdf_path(self, filename: str, thumbs: bool = False) -> str:
+        """Store claim documents under the claim bucket layout, keyed on the
+        claim's docket rather than the document's own docket entry."""
+        root = "claim-thumbnails" if thumbs else "claim"
+        bucket = get_bucket_name(
+            self.claim.docket.court_id, self.pacer_case_id
+        )
+        return str(Path(root) / bucket / filename)
+
 
 class FederalCourtsQuerySet(models.QuerySet):
     def all(self) -> models.QuerySet:
@@ -1864,7 +1940,7 @@ class Court(models.Model):
 
     Note that a Courthouse object should be created alongside each new Court.
     Even if this is not enforced by the data model, there is some logic tied
-    to that relation. Examples in `find_citations` and `coverage_utils`
+    to that relation. Examples in `find_citations`.
     """
 
     # Note that spaces cannot be used in the keys, or else the SearchForm won't
@@ -2654,64 +2730,31 @@ class OpinionCluster(AbstractDateTimeModel):
         return ", ".join(str(c) for c in citations)
 
     @property
-    def authorities(self):
+    def authorities(self) -> QuerySet["OpinionCluster"]:
         """Returns a queryset that can be used for querying and caching
         authorities.
+
+        Citation relationships connect individual opinions, but an authority
+        is displayed at the cluster level. Traverse and aggregate those
+        relationships in the database so the number of queries does not grow
+        with the number of sub-opinions or authorities.
         """
-        # All clusters that have sub_opinions cited by the sub_opinions of
-        # the current cluster, ordered by citation count, descending.
-        # Note that:
-        #  - sum()'ing an empty list with a nested one, flattens the nested
-        #    list.
-        #  - QuerySets are lazy by default, so we need to call list() on the
-        #    queryset object to evaluate it here and now.
-        #  - We explicitly exclude self (self.pk) from the results to avoid
-        #    a cluster being listed as its own authority.
         return (
             OpinionCluster.objects.filter(
-                sub_opinions__in=sum(
-                    [
-                        list(sub_opinion.opinions_cited.all().only("pk"))
-                        for sub_opinion in self.sub_opinions.all()
-                    ],
-                    [],
-                )
+                sub_opinions__citing_opinions__citing_opinion__cluster_id=self.pk
             )
             .exclude(pk=self.pk)
+            .annotate(
+                citation_depth=Sum("sub_opinions__citing_opinions__depth")
+            )
             .order_by("-citation_count", "-date_filed")
         )
 
-    async def aauthorities(self):
+    async def aauthorities(self) -> QuerySet["OpinionCluster"]:
         """Returns a queryset that can be used for querying and caching
         authorities.
         """
-        # All clusters that have sub_opinions cited by the sub_opinions of
-        # the current cluster, ordered by citation count, descending.
-        # Note that:
-        #  - sum()'ing an empty list with a nested one, flattens the nested
-        #    list.
-        #  - QuerySets are lazy by default, so we need to call list() on the
-        #    queryset object to evaluate it here and now.
-        #  - We explicitly exclude self (self.pk) from the results to avoid
-        #    a cluster being listed as its own authority.
-        return (
-            OpinionCluster.objects.filter(
-                sub_opinions__in=sum(
-                    [
-                        [
-                            i
-                            async for i in sub_opinion.opinions_cited.all().only(
-                                "pk"
-                            )
-                        ]
-                        async for sub_opinion in self.sub_opinions.all()
-                    ],
-                    [],
-                )
-            )
-            .exclude(pk=self.pk)
-            .order_by("-citation_count", "-date_filed")
-        )
+        return self.authorities
 
     @property
     def parentheticals(self):
@@ -2758,31 +2801,39 @@ class OpinionCluster(AbstractDateTimeModel):
             self._has_private_authority = private
         return self._has_private_authority
 
-    async def aauthorities_with_data(self):
-        """Returns a list of this cluster's authorities with an extra field
-        appended related to citation counts, for eventual injection into a
-        view template.
-        The returned list is sorted by that citation count field.
-        """
-        authorities_with_data = []
-        authorities_base = await self.aauthorities()
-        authorities_qs = (
-            authorities_base.prefetch_related("citations")
-            .select_related("docket__court")
-            .order_by("-citation_count", "-date_filed")
-        )
-        async for authority in authorities_qs:
-            authority.citation_depth = (
-                await get_citation_depth_between_clusters(
-                    citing_cluster_pk=self.pk, cited_cluster_pk=authority.pk
-                )
+    @property
+    def authorities_with_data(self) -> QuerySet["OpinionCluster"]:
+        """Return authorities with their total citation depth and display data."""
+        return (
+            self.authorities.defer(
+                "arguments",
+                "attorneys",
+                "correction",
+                "cross_reference",
+                "disposition",
+                "headmatter",
+                "headnotes",
+                "history",
+                "judges",
+                "nature_of_suit",
+                "other_dates",
+                "posture",
+                "procedural_history",
+                "summary",
+                "syllabus",
             )
-            authorities_with_data.append(authority)
-
-        authorities_with_data.sort(
-            key=lambda x: x.citation_depth, reverse=True
+            .prefetch_related("citations")
+            .select_related("docket__court")
+            .order_by("-citation_depth", "-citation_count", "-date_filed")
         )
-        return authorities_with_data
+
+    async def aauthorities_with_data(self) -> list["OpinionCluster"]:
+        """Returns a list of this cluster's authorities with an extra field
+        appended related to citation depth, for eventual injection into a
+        view template.
+        The returned list is sorted by that citation depth field.
+        """
+        return [authority async for authority in self.authorities_with_data]
 
     def top_visualizations(self):
         return self.visualizations.filter(
@@ -2812,6 +2863,26 @@ class OpinionCluster(AbstractDateTimeModel):
 
         # If there's only one or no sub-opinions, return the main opinion
         return sub_opinions
+
+    @cached_property
+    def opinion_main_version(self) -> QuerySet["Opinion"]:
+        """Fetch the main (non-versioned) sub-opinions of the cluster.
+
+        Despite the singular name, a cluster can have several main-version
+        opinions (e.g. Lead Opinion, Concurrence, Dissent), so this returns
+        a queryset that may contain many opinions.
+
+        :return: A queryset of the cluster's main-version sub-opinions.
+        :rtype: QuerySet[Opinion]
+        """
+        return self.sub_opinions.filter(main_version__isnull=True)
+
+    @cached_property
+    def opinions_versions(self):
+        # Fetch all sub-opinions versions from cluster, limit to 10 versions
+        return self.sub_opinions.filter(main_version__isnull=False).order_by(
+            "-date_created"
+        )[:10]
 
     def save(
         self,
@@ -3960,6 +4031,25 @@ class ScotusDocketMetadata(AbstractDateTimeModel):
         verbose_name = "SCOTUS Docket Metadata"
         verbose_name_plural = "SCOTUS Docket Metadata"
 
+    def get_pdf_path(self, filename: str, thumbs: bool = False) -> str:
+        """Store the questions-presented PDF alongside the docket's documents
+        in the RECAP layout, using the docket's filing date and a `qp` marker:
+
+            recap/gov.uscourts.scotus.<docket_id>/gov.uscourts.scotus.<docket_id>.<date_filed>.qp.pdf
+
+        This model is not itself a document -- the PDF hangs off the docket
+        metadata -- so it satisfies `SupportsPdfPath` without subclassing
+        `AbstractPDF`. Only the extension of `filename` is used.
+        """
+        docket = self.docket
+        return make_recap_style_path(
+            docket.court_id,
+            docket.pk,
+            [format_path_date(docket.date_filed), "qp"],
+            Path(filename).suffix or ".pdf",
+            thumbs=thumbs,
+        )
+
 
 @pghistory.track()
 @document_model
@@ -4071,7 +4161,9 @@ class CaseTransfer(AbstractDateTimeModel):
             court = getattr(transfer, f"{side}_court")
             docket_number = getattr(transfer, f"{side}_docket_number")
 
-            if court.jurisdiction == Court.STATE_APPELLATE:
+            if court.jurisdiction == Court.STATE_APPELLATE and is_texas_court(
+                court.id
+            ):
                 docket_number = normalize_texas_appellate_docket_number(
                     docket_number
                 )
@@ -4214,6 +4306,59 @@ class SCOTUSDocument(AbstractDateTimeModel, AbstractPDF):
 
     def __str__(self) -> str:
         return f"{self.pk}: Docket_{self.docket_entry.docket.docket_number} , document_number_{self.document_number} , attachment_number_{self.attachment_number}"
+
+    def get_pdf_path(self, filename: str, thumbs: bool = False) -> str:
+        """Store SCOTUS documents in the RECAP layout, with the CourtListener
+        docket id in place of the PACER case id since SCOTUS isn't in PACER:
+
+            recap/gov.uscourts.scotus.<docket_id>/gov.uscourts.scotus.<docket_id>.<date_filed>.<document_number>.<attachment_number>.pdf
+
+        Only the extension of `filename` is used; the name itself is derived
+        from the document's fields. Undated entries use `undated` as the date.
+        """
+        entry = self.docket_entry
+        return make_recap_style_path(
+            entry.docket.court_id,
+            entry.docket_id,
+            [
+                format_path_date(entry.date_filed),
+                *scotus_document_number_segments(
+                    self.document_number, self.attachment_number, self.pk
+                ),
+            ],
+            Path(filename).suffix or ".pdf",
+            thumbs=thumbs,
+        )
+
+    def get_absolute_url(self) -> str:
+        if not self.document_number:
+            return ""
+        if self.attachment_number is None:
+            return reverse(
+                "view_recap_document",
+                kwargs={
+                    "docket_id": self.docket_entry.docket_id,
+                    "doc_num": self.document_number,
+                    "slug": self.docket_entry.docket.slug,
+                },
+            )
+        return reverse(
+            "view_recap_attachment",
+            kwargs={
+                "docket_id": self.docket_entry.docket_id,
+                "doc_num": self.document_number,
+                "att_num": self.attachment_number,
+                "slug": self.docket_entry.docket.slug,
+            },
+        )
+
+    @property
+    def is_available(self) -> bool:
+        return bool(self.filepath_local)
+
+    @property
+    def has_valid_pdf(self) -> bool:
+        return self.is_available
 
     @property
     def needs_extraction(self):

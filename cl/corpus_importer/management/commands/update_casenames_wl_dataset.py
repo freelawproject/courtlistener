@@ -278,7 +278,7 @@ def process_csv(
 
     if start_row:
         # Update rows index to reflect the original csv row numbers
-        df.index = range(start_row, start_row + len(df))
+        df.index = pd.RangeIndex(start_row, start_row + len(df))
 
     for row in df.itertuples():
         index, case_name, court, date_str, cite1, cite2, docket, _ = row

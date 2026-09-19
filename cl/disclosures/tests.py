@@ -32,6 +32,7 @@ from cl.people_db.factories import PersonWithChildrenFactory
 from cl.people_db.models import Person
 from cl.tests.base import SELENIUM_TIMEOUT, BaseSeleniumTest
 from cl.tests.cases import TestCase
+from cl.users.factories import UserProfileWithParentsFactory
 
 
 class DisclosureIngestionTest(TestCase):
@@ -269,6 +270,49 @@ class DisclosureAPITest(TestCase):
         self.q = {"creditor_name__istartswith": "JP Morgan"}
         r = await self.async_client.get(self.path, self.q)
         self.assertEqual(r.json()["count"], 1, msg="Failed Debt filter")
+
+
+class DisclosureViewerLoginRequiredTest(TestCase):
+    """Viewing a financial disclosure requires an account."""
+
+    @classmethod
+    def setUpTestData(cls) -> None:
+        cls.profile = UserProfileWithParentsFactory.create()
+        judge = PersonWithChildrenFactory.create()
+        cls.disclosure = FinancialDisclosureFactory.create(
+            person=judge,
+            filepath="financial-disclosures/test-disclosure.pdf",
+        )
+
+    async def test_anonymous_user_is_redirected_to_login(self) -> None:
+        """Are anonymous users redirected to the sign-in page?"""
+        path = reverse(
+            "financial_disclosures_viewer",
+            args=(
+                self.disclosure.person_id,
+                self.disclosure.pk,
+                self.disclosure.person.slug,
+            ),
+        )
+        r = await self.async_client.get(path)
+        self.assertEqual(r.status_code, 302)
+        self.assertEqual(r.url, f"{reverse('sign-in')}?next={path}")
+
+    async def test_authenticated_user_can_view_disclosure(self) -> None:
+        """Can logged-in users view the disclosure page?"""
+        await self.async_client.alogin(
+            username=self.profile.user.username, password="password"
+        )
+        path = reverse(
+            "financial_disclosures_viewer",
+            args=(
+                self.disclosure.person_id,
+                self.disclosure.pk,
+                self.disclosure.person.slug,
+            ),
+        )
+        r = await self.async_client.get(path)
+        self.assertEqual(r.status_code, 200)
 
 
 class DisclosurePageTest(BaseSeleniumTest):

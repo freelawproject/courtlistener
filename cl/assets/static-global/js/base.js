@@ -121,7 +121,8 @@ $(document).ready(function () {
 
   function readStoredTheme() {
     try {
-      return window.localStorage.getItem(COLOR_MODE_STORAGE_KEY);
+      const storedTheme = window.localStorage.getItem(COLOR_MODE_STORAGE_KEY);
+      return storedTheme === 'dark' || storedTheme === 'light' ? storedTheme : null;
     } catch (error) {
       return null;
     }
@@ -148,15 +149,15 @@ $(document).ready(function () {
       const label = toggle.find('.dark-mode-toggle__label');
       if (label.length) {
         label.text(isDark ? 'Light Mode' : 'Dark Mode');
+      } else {
+        toggle.attr('aria-label', isDark ? 'Use light mode' : 'Use dark mode');
       }
     });
   }
 
   function applyTheme(theme, persist) {
     const isDark = theme === 'dark';
-    $('body').toggleClass('dark-mode', isDark);
     document.documentElement.dataset.colorMode = theme;
-    document.documentElement.style.colorScheme = isDark ? 'dark' : 'light';
     syncToggleState(isDark);
     if (persist) {
       storeThemePreference(theme);
@@ -166,7 +167,7 @@ $(document).ready(function () {
   if (themeToggleElements.length) {
     const prefersDarkQuery = window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)');
     const storedTheme = readStoredTheme();
-    const initialTheme = storedTheme || (prefersDarkQuery && prefersDarkQuery.matches ? 'dark' : 'light');
+    const initialTheme = storedTheme || document.documentElement.dataset.colorMode;
 
     applyTheme(initialTheme, false);
 
@@ -186,15 +187,16 @@ $(document).ready(function () {
 
     themeToggleElements.on('click', function (event) {
       event.preventDefault();
-      const nextTheme = $('body').hasClass('dark-mode') ? 'light' : 'dark';
+      const nextTheme = document.documentElement.dataset.colorMode === 'dark' ? 'light' : 'dark';
       applyTheme(nextTheme, true);
     });
 
-    themeToggleElements.on('keydown', function (event) {
-      if (event.key === ' ' || event.key === 'Spacebar') {
-        event.preventDefault();
-        const nextTheme = $('body').hasClass('dark-mode') ? 'light' : 'dark';
-        applyTheme(nextTheme, true);
+    window.addEventListener('storage', function (event) {
+      if (event.key === COLOR_MODE_STORAGE_KEY) {
+        const storedTheme = readStoredTheme();
+        if (storedTheme) {
+          applyTheme(storedTheme, false);
+        }
       }
     });
   }

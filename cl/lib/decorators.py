@@ -309,10 +309,18 @@ def document_model(model: type[models.Model]) -> type[models.Model]:
     return model
 
 
-def time_call(fn_logger: logging.Logger) -> Callable:
-    def decorator(f: Callable) -> Callable:
+def time_call[**ParamType, ReturnType](
+    fn_logger: logging.Logger,
+) -> Callable[
+    [Callable[ParamType, ReturnType]], Callable[ParamType, ReturnType]
+]:
+    def decorator(
+        f: Callable[ParamType, ReturnType],
+    ) -> Callable[ParamType, ReturnType]:
         @wraps(f)
-        def wrapper(*args: Any, **kwargs: Any) -> Any:
+        def wrapper(
+            *args: ParamType.args, **kwargs: ParamType.kwargs
+        ) -> ReturnType:
             start = time.perf_counter_ns()
             result = f(*args, **kwargs)
             elapsed = time.perf_counter_ns() - start

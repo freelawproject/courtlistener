@@ -8,8 +8,9 @@ from django.utils.html import format_html
 from hcaptcha.fields import hCaptchaField
 
 SEALING_KEYWORDS_REGEX = re.compile(
-    r"urgent|seal(ing|ed)?|redact(ed)?|pseudonym|anonymi(ty|ze)|"
-    r"press[\.\s]?coverage|time[\.\s]?sensitive",
+    r"urgent|seal(ing|ed)?|redact(ed)?|\bstruck\b|\bstricken\b|"
+    r"pseudonym|anonymi(ty|ze)|press[\.\s]?coverage|"
+    r"time[\.\s]?sensitive",
     re.I,
 )
 
@@ -18,7 +19,9 @@ class ContactForm(forms.Form):
     SUPPORT_REQUEST = "support"
     PARTNERSHIPS = "partnerships"
     API_HELP = "api"
+    MCP = "mcp"
     DATA_QUALITY = "data_quality"
+    DMCA_COMPLAINT = "dmca_complaint"
     RECAP_BUG = "recap"
     REMOVAL_REQUEST = "removal"
     MEMBERSHIPS = "memberships"
@@ -28,7 +31,9 @@ class ContactForm(forms.Form):
         (SUPPORT_REQUEST, "General Support"),
         (PARTNERSHIPS, "Partnership Inquiry"),
         (API_HELP, "Data or API Support"),
+        (MCP, "MCP Server"),
         (DATA_QUALITY, "Report Data Quality Problem"),
+        (DMCA_COMPLAINT, "DMCA Complaint"),
         (RECAP_BUG, "RECAP Extension Bug"),
         (REMOVAL_REQUEST, "Case Removal Request"),
         (MEMBERSHIPS, "Memberships or Donations"),
@@ -36,8 +41,8 @@ class ContactForm(forms.Form):
     ]
 
     VALID_ISSUE_TYPES = [choice[0] for choice in ISSUE_TYPE_CHOICES]
-    TECH_ISSUE_TYPES = {API_HELP, RECAP_BUG}
-    DOCUMENTATION_CHECK_TYPES = {SUPPORT_REQUEST, API_HELP, RECAP_BUG}
+    TECH_ISSUE_TYPES = {API_HELP, MCP, RECAP_BUG}
+    DOCUMENTATION_CHECK_TYPES = {SUPPORT_REQUEST, API_HELP, MCP, RECAP_BUG}
 
     name = forms.CharField(
         widget=forms.TextInput(attrs={"class": "form-control"})

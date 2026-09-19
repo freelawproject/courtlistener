@@ -101,7 +101,11 @@ class UserProfile(models.Model):
         default=False,
     )
     activation_key = models.CharField(
+        help_text="A single-use key emailed to the user to confirm their "
+        "email address. Blanked once it is spent (GHSA-638g-xf9h-6qcg), so "
+        "it is empty for most accounts.",
         max_length=40,
+        blank=True,
     )
     key_expires = models.DateTimeField(
         help_text="The time and date when the user's activation_key expires",

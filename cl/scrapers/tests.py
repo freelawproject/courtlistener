@@ -14,7 +14,9 @@ from django.conf import settings
 from django.contrib.auth.models import User
 from django.core.exceptions import ValidationError
 from django.core.files.base import ContentFile
+from django.db import connection
 from django.test import SimpleTestCase
+from django.utils.encoding import force_bytes
 from django.utils.timezone import now
 from juriscraper.AbstractSite import logger
 from juriscraper.lib.exceptions import UnexpectedContentTypeError
@@ -35,6 +37,7 @@ from cl.citations.models import UnmatchedCitation
 from cl.corpus_importer.tasks import (
     merge_scotus_docket as real_merge_scotus_docket,
 )
+from cl.lib.crypto import sha1
 from cl.lib.exceptions import ScrapeFailed
 from cl.lib.juriscraper_utils import get_module_by_court_id
 from cl.lib.microservice_utils import microservice
@@ -460,6 +463,58 @@ class ScraperIngestionTest(ESIndexTestCase, TestCase):
         self.assertEqual(opinions.count(), 2)
 
 
+class MakeObjectsContentEncodingTest(TestCase):
+    """Regression for #7504.
+
+    Non-ASCII opinion text (a ``str`` from ``site.download_content()``) must be
+    stored as its UTF-8 bytes, not truncated to its character count. The old
+    ``ContentFile(content)`` reported ``.size`` as the character count, which
+    django-storages sent to S3 as ``x-amz-decoded-content-length`` while the
+    body serialized to more UTF-8 bytes -> S3 ``500 InternalError``.
+    """
+
+    @classmethod
+    def setUpTestData(cls):
+        cls.court = CourtFactory(id="test", jurisdiction="F")
+
+    @mock.patch(
+        "cl.scrapers.management.commands.cl_scrape_opinions.get_extension",
+        return_value=".html",
+    )
+    def test_non_ascii_str_content_stored_as_utf8_bytes(self, mock_ext):
+        # em-dash, curly quote, section sign -> char count != UTF-8 byte count
+        content = "<html>" + "—“§" * 500 + "</html>"
+        self.assertNotEqual(len(content), len(content.encode("utf-8")))
+
+        item = {
+            "case_names": "Tëst v. Alaska",
+            "case_dates": date(2026, 6, 24),
+            "date_filed_is_approximate": False,
+            "blocked_statuses": False,
+            "precedential_statuses": "Published",
+        }
+        opinions_content = [
+            (
+                {"download_urls": "https://example.com/x"},
+                content,
+                sha1(force_bytes(content)),
+            )
+        ]
+
+        _, opinions, _, _, _ = cl_scrape_opinions.make_objects(
+            item, self.court, opinions_content
+        )
+        opinion = opinions[0]
+        self.addCleanup(opinion.local_path.delete, save=False)
+
+        opinion.local_path.open("rb")
+        stored = opinion.local_path.read()
+        opinion.local_path.close()
+
+        self.assertEqual(stored, content.encode("utf-8"))
+        self.assertEqual(opinion.local_path.size, len(content.encode("utf-8")))
+
+
 class IngestionTest(TestCase):
     @classmethod
     def setUpTestData(cls) -> None:
@@ -603,6 +658,50 @@ class ExtractFormattedTextSanitizationTest(TestCase):
         self.assertIn("Hello", texas_document.plain_text)
         self.assertIn("world", texas_document.plain_text)
         self.assertIn("Courtlistener", texas_document.plain_text)
+
+
+class ExtractFormattedTextReleasesConnectionTest(TransactionTestCase):
+    """Tests that extract_formatted_text_document_base doesn't hold a
+    database connection open while it waits on Doctor. Idle connections get
+    dropped during long extractions and the final save then fails.
+
+    A TransactionTestCase is needed because inside a test transaction the
+    release is deliberately a no-op.
+    """
+
+    @mock.patch("cl.scrapers.tasks.microservice", new_callable=mock.AsyncMock)
+    def test_db_connection_is_released_before_calling_doctor(
+        self, microservice_mock
+    ) -> None:
+        """Is the DB connection closed when Doctor is called, and reopened
+        for the save afterwards?"""
+        texas_document = TexasDocumentFactory.create()
+        connection_open_during_doctor_call: list[bool] = []
+
+        async def fake_doctor(*args, **kwargs) -> httpx.Response:
+            # Connections are thread-local, so inspect the one owned by the
+            # thread the task's DB calls run on, not the event loop's thread.
+            connection_open_during_doctor_call.append(
+                await sync_to_async(
+                    lambda: connection.connection is not None
+                )()
+            )
+            return httpx.Response(
+                200, json={"content": "Hello", "extracted_by_ocr": False}
+            )
+
+        microservice_mock.side_effect = fake_doctor
+
+        async_to_sync(extract_formatted_text_document_base)(
+            texas_document.pk,
+            check_if_needed=False,
+            ocr_available=False,
+            model_name="search.TexasDocument",
+        )
+
+        self.assertEqual(connection_open_during_doctor_call, [False])
+        texas_document.refresh_from_db()
+        self.assertEqual(texas_document.plain_text, "Hello")
 
 
 class ExtensionIdentificationTest(SimpleTestCase):

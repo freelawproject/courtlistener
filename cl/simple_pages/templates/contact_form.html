@@ -6,11 +6,8 @@
 {% block sidebar %}{% endblock %}
 
 {% block head %}
-  {# Fetch issue types and terms URL #}
   {{ form.TECH_ISSUE_TYPES|uniq|json_script:"tech-types" }}
   {{ form.DOCUMENTATION_CHECK_TYPES|uniq|json_script:"requires-check-types" }}
-  {% url "terms" as terms_url %}
-  {{ terms_url|add:"#removal"|json_script:"terms-url" }}
 
   <style>
     [x-cloak]{ display: none !important } /* Prevent "blip" on first load */
@@ -29,11 +26,11 @@
 {% endblock %}
 
 {% block footer-scripts %}
-  <script src="{% static 'js/alpine/components/contact_form.js' %}" nonce="{{ request.csp_nonce }}"></script>
+  <script src="{% static 'js/alpine/components/contact_form.js' %}" nonce="{{ csp_nonce }}"></script>
   {% if DEBUG %}
-  <script src="{% static 'js/alpine/alpinejscsp.js' %}" defer nonce="{{ request.csp_nonce }}"></script>
+  <script src="{% static 'js/alpine/alpinejscsp.js' %}" defer nonce="{{ csp_nonce }}"></script>
   {% else %}
-  <script src="{% static 'js/alpine/alpinejscsp.min.js' %}" defer nonce="{{ request.csp_nonce }}"></script>
+  <script src="{% static 'js/alpine/alpinejscsp.min.js' %}" defer nonce="{{ csp_nonce }}"></script>
   {% endif %}
 {% endblock %}
 
@@ -60,8 +57,8 @@
           </p>
         {% endif %}
 
-        {#   Hint based on issue type (see contact_form.js)   #}
-        <div x-show="hint" x-html="hint" style="margin-top: 8px"></div>
+        {#   Hint based on issue type   #}
+        {% include "includes/contact_form_hint.html" only %}
       </div>
 
       <div x-show="issue.isValidType">

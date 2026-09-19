@@ -3,10 +3,12 @@ from contextvars import Token
 from django.contrib.auth.models import AbstractBaseUser, AnonymousUser
 from django.http import HttpRequest
 from oauth2_provider.contrib.rest_framework import OAuth2Authentication
+from rest_framework import exceptions
 from rest_framework.authentication import (
     BasicAuthentication,
     SessionAuthentication,
     TokenAuthentication,
+    get_authorization_header,
 )
 from rest_framework.request import Request
 from waffle import flag_is_active
@@ -94,7 +96,13 @@ class ReplicaRoutingOAuth2Authentication(OAuth2Authentication):
         result = super().authenticate(request)
         if result is not None:
             _activate_replica_routing(request, result[0])
-        return result
+            return result
+        auth = get_authorization_header(request).split()
+        if auth and auth[0].lower() == b"bearer":
+            raise exceptions.AuthenticationFailed(
+                "Invalid or expired bearer token."
+            )
+        return None
 
 
 class ReplicaRoutingSessionAuthentication(SessionAuthentication):

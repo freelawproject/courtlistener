@@ -1,6 +1,7 @@
 from datetime import timedelta
 from unittest.mock import patch
 
+from django import forms
 from django.db import connection
 from django.test import AsyncClient, override_settings
 from django.urls import reverse
@@ -8,6 +9,7 @@ from django.utils import timezone
 from lxml import html as lhtml
 from waffle.testutils import override_flag
 
+from cl.lib import widgets
 from cl.lib.test_helpers import (
     CourtTestCase,
     PeopleTestCase,
@@ -15,6 +17,7 @@ from cl.lib.test_helpers import (
     SearchTestCase,
     SimpleUserDataMixin,
 )
+from cl.search.forms import CorpusSearchForm
 from cl.search.models import Docket, Opinion, RECAPDocument
 from cl.search.utils import get_v2_homepage_stats
 from cl.stats.models import Stat
@@ -182,6 +185,41 @@ class HomepageStructureTest(SimpleUserDataMixin, TestCase):
                 self.assertIn(label, html, f"Not found in template: {label}")
 
 
+class CorpusSearchFormWidgetTest(TestCase):
+    """Tests enforcing shared widget usage in CorpusSearchForm."""
+
+    @staticmethod
+    def _get_offending_fields(form: forms.Form) -> dict[str, str]:
+        """Return text/select fields that do not use shared CL widgets."""
+        built_in_widget_families = (forms.TextInput, forms.Select)
+        approved_widgets = (widgets.TextInput, widgets.Select)
+        return {
+            field_name: (
+                f"{type(field.widget).__module__}."
+                f"{type(field.widget).__qualname__}"
+            )
+            for field_name, field in form.fields.items()
+            if isinstance(field.widget, built_in_widget_families)
+            and not isinstance(field.widget, approved_widgets)
+        }
+
+    def test_uses_custom_text_and_select_widgets(self) -> None:
+        """Prevent fields from reverting to built-in widgets with CL alternatives."""
+        offending_fields = self._get_offending_fields(CorpusSearchForm())
+
+        self.assertEqual(offending_fields, {})
+
+    def test_rejects_builtin_date_input(self) -> None:
+        """Catch a date field that falls back to Django's DateInput."""
+        form = CorpusSearchForm()
+        form.fields["filed_after"].widget = forms.DateInput()
+
+        self.assertEqual(
+            self._get_offending_fields(form),
+            {"filed_after": "django.forms.widgets.DateInput"},
+        )
+
+
 @override_flag("use_new_design", True)
 @override_settings(WAFFLE_CACHE_PREFIX="test_corpus_search_form_waffle")
 class CorpusSearchFormTest(SimpleUserDataMixin, TestCase):
@@ -297,6 +335,42 @@ class CorpusSearchFormTest(SimpleUserDataMixin, TestCase):
             len(before_inputs),
             1,
             "Expected at least one input with name='filed_before'",
+        )
+
+    def test_corpus_search_tabs_are_server_rendered(self):
+        """Corpus search tab labels appear in HTML before Alpine runs.
+
+        Regression for #7035: tabs used Alpine x-for, so labels were missing
+        from the initial HTML and flashed in after JavaScript loaded.
+        """
+        expected_labels = [
+            "Case Law",
+            "RECAP Archive",
+            "Oral Arguments",
+            "Judges",
+        ]
+        tablist = self.tree.xpath(
+            '//*[@role="tablist" and @aria-label="Select the scope of your search"]'
+        )
+        self.assertEqual(
+            len(tablist),
+            1,
+            "Expected one corpus search tablist on the homepage",
+        )
+        tab_labels = [
+            "".join(tab.itertext()).strip()
+            for tab in tablist[0].xpath('.//*[@role="tab"]')
+        ]
+        for label in expected_labels:
+            with self.subTest(label=label):
+                self.assertTrue(
+                    any(label in tab_label for tab_label in tab_labels),
+                    f"Tab label {label!r} missing from server-rendered HTML; "
+                    f"found {tab_labels!r}",
+                )
+        self.assertFalse(
+            tablist[0].xpath(".//template[@x-for]"),
+            "Homepage tablist should not use Alpine x-for for initial render",
         )
 
 

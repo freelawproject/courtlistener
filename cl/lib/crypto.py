@@ -1,7 +1,7 @@
 # File roughly ordered by quality of hashing algo. Better ones further down.
 import hashlib
 import json
-import random
+import secrets
 import uuid
 
 
@@ -78,15 +78,12 @@ def sha1_of_json_data(d):
     return sha1(json_without_spaces.encode())
 
 
-def sha1_activation_key(s):
-    """Make an activation key for a user
+def generate_activation_key() -> str:
+    """Make an unguessable activation key for confirming a user's email
 
-    :param s: The data to use with the salt to make the activation key
-    :return: A SHA1 activation key
+    :return: A 40-character unguessable hex token.
     """
-    salt = hashlib.sha1(str(random.random()).encode()).hexdigest()[:5]
-    activation_key = hashlib.sha1((salt + s).encode()).hexdigest()
-    return activation_key
+    return secrets.token_hex(20)
 
 
 def sha256(s):

@@ -1,5 +1,5 @@
 from cl.lib.command_utils import VerboseCommand
-from cl.search.utils import delete_from_ia
+from cl.search.deletion_utils import delete_from_ia
 
 
 class Command(VerboseCommand):

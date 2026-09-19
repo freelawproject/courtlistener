@@ -8,12 +8,12 @@
             <i class="fa fa-envelope-o fa-lg gray"></i>
         </a>&nbsp;
         <a href="https://www.facebook.com/share.php?u={% get_full_host %}{{ request.path }}&t={{ title }} at CourtListener.com"
-           target="_blank"
+           target="_blank" rel="noopener noreferrer"
            title="Share on Facebook">
             <i class="fa fa-facebook-square fa-lg gray"></i>
         </a>&nbsp;
         <a
-          target="_blank"
+          target="_blank" rel="noopener noreferrer"
           title="Share on Bluesky"
           class="gray"
           href="https://bsky.app/intent/compose?text={% get_full_host %}{{ request.path }}"

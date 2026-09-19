@@ -5,7 +5,6 @@ from abc import ABC, abstractmethod
 from collections.abc import Iterable
 from datetime import date
 from itertools import islice
-from typing import final
 
 from celery import chain
 from django.conf import settings
@@ -65,7 +64,6 @@ class CorpusImporterCommand(VerboseCommand, ABC):
 
     compose_redis_key: str
 
-    @final
     def add_arguments(self, parser):
         parser.add_argument(
             "--inventory-file",

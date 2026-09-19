@@ -8,6 +8,7 @@ from hcaptcha.fields import hCaptchaField
 
 from cl.alerts.constants import (
     FLP_MEMBERSHIP_URL,
+    LEGACY_MEMBERSHIP_HELP_URL,
     MEMBERSHIP_UPGRADE_BASE_URL,
 )
 from cl.alerts.models import Alert
@@ -16,6 +17,7 @@ from cl.alerts.utils import (
     check_alert_limits,
     is_match_all_query,
 )
+from cl.donate.models import NeonMembershipLevel
 from cl.search.models import SEARCH_TYPES
 
 
@@ -77,9 +79,22 @@ class CreateAlertForm(ModelForm):
                     )
                 )
             case AlertLimitViolation.MEMBER_QUOTA_EXCEEDED:
-                neon_id = self.user.membership.neon_id
+                membership = self.user.membership
+                if membership.level == NeonMembershipLevel.LEGACY:
+                    # Legacy memberships can't be upgraded online, so point
+                    # them at the help page instead of the Neon upgrade flow.
+                    raise ValidationError(
+                        format_html(
+                            "You've used all of the alerts included with your legacy membership. "
+                            "Legacy memberships can't be upgraded online, but "
+                            "<a href='{}' target='_blank'>here's how to get more features</a>, or "
+                            "<a href='{}'>disable a RECAP Alert</a>.",
+                            LEGACY_MEMBERSHIP_HELP_URL,
+                            reverse("profile_search_alerts"),
+                        )
+                    )
                 upgrade_flp_membership = (
-                    f"{MEMBERSHIP_UPGRADE_BASE_URL}{neon_id}"
+                    f"{MEMBERSHIP_UPGRADE_BASE_URL}{membership.neon_id}"
                 )
                 raise ValidationError(
                     format_html(

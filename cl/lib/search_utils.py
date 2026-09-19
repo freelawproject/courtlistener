@@ -155,31 +155,24 @@ def merge_form_with_courts(
     """
     # Are any of the checkboxes checked?
 
-    checked_statuses = [
-        field.value()
+    court_field_values = {
+        field.html_name.removeprefix("court_"): field.value()
         for field in search_form
         if field.html_name.startswith("court_")
-    ]
+    }
+    checked_statuses = list(court_field_values.values())
     no_facets_selected = not any(checked_statuses)
     all_facets_selected = all(checked_statuses)
-    court_count = str(
-        len([status for status in checked_statuses if status is True])
-    )
+    court_count = str(sum(status is True for status in checked_statuses))
     court_count_human = court_count
     if all_facets_selected:
         court_count_human = "All"
 
-    for field in search_form:
+    for court in courts:
         if no_facets_selected:
-            for court in courts:
-                court.checked = True
-        else:
-            for court in courts:
-                # We're merging two lists, so we have to do a nested loop
-                # to find the right value.
-                if f"court_{court.pk}" == field.html_name:
-                    court.checked = field.value()
-                    break
+            court.checked = True
+        elif court.pk in court_field_values:
+            court.checked = court_field_values[court.pk]
 
     # Build the dict with jurisdiction keys and arrange courts into tabs
     court_tabs: dict[str, list] = {
@@ -231,7 +224,7 @@ def merge_form_with_courts(
 
 async def add_depth_counts(
     search_data: dict[str, Any],
-    search_results: Page,
+    search_results: Page | list,
 ) -> OpinionCluster | None:
     """If the search data contains a single "cites" term (e.g., "cites:(123)"),
     calculate and append the citation depth information between each ES
@@ -256,7 +249,13 @@ async def add_depth_counts(
         except OpinionCluster.DoesNotExist:
             return None
         else:
-            for result in search_results.object_list:
+            # On ES errors the results are an (empty) list, not a Page.
+            results = (
+                search_results.object_list
+                if isinstance(search_results, Page)
+                else search_results
+            )
+            for result in results:
                 result[
                     "citation_depth"
                 ] = await get_citation_depth_between_clusters(
@@ -925,25 +924,25 @@ def fetch_es_results_for_csv(
         return csv_rows, True
 
     results = search["results"]
+    max_results = settings.MAX_SEARCH_RESULTS_EXPORTED
     match search_type:
         case SEARCH_TYPES.OPINION | SEARCH_TYPES.RECAP | SEARCH_TYPES.DOCKETS:
-            flat_results = []
             for result in results.object_list:
                 parent_dict = result.to_dict(skip_empty=False)
                 child_docs = parent_dict.get("child_docs")
                 if child_docs:
-                    flat_results.extend(
-                        [
-                            doc["_source"].to_dict() | parent_dict
-                            for doc in child_docs
-                        ]
-                    )
+                    for doc in child_docs:
+                        csv_rows.append(doc["_source"].to_dict() | parent_dict)
+                        if len(csv_rows) >= max_results:
+                            return csv_rows, False
                 else:
-                    flat_results.extend([parent_dict])
+                    csv_rows.append(parent_dict)
+                    if len(csv_rows) >= max_results:
+                        return csv_rows, False
         case _:
-            flat_results = [
-                result.to_dict(skip_empty=False)
-                for result in results.object_list
-            ]
+            for result in results.object_list:
+                csv_rows.append(result.to_dict(skip_empty=False))
+                if len(csv_rows) >= max_results:
+                    return csv_rows, False
 
-    return flat_results[: settings.MAX_SEARCH_RESULTS_EXPORTED], False
+    return csv_rows, False
