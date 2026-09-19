@@ -1386,18 +1386,22 @@ class CitationObjectTest(ESIndexTestCase, TestCase):
         """Resolve to corrected reporter"""
         cite_str = "8 B. 415"
         citation = get_citations(cite_str, tokenizer=HYPERSCAN_TOKENIZER)[0]
-        citation.citing_opinion = Opinion.objects.all()[0]
-        results = resolve_fullcase_citation(citation)
         opinion12 = Opinion.objects.get(cluster__pk=self.citation12.cluster_id)
+        citation.citing_opinion = (
+            Opinion.objects.exclude(pk=opinion12.pk).order_by("pk").first()
+        )
+        results = resolve_fullcase_citation(citation)
         self.assertEqual(results.pk, opinion12.pk, msg=results)
 
     def test_citation_resolve_to_pincite(self) -> None:
         """Resolve to corrected reporter and pin cite inside xml harvard?"""
         cite_str = "8 B. 416"
         citation = get_citations(cite_str, tokenizer=HYPERSCAN_TOKENIZER)[0]
-        citation.citing_opinion = Opinion.objects.all()[0]
-        results = resolve_fullcase_citation(citation)
         opinion12 = Opinion.objects.get(cluster__pk=self.citation12.cluster_id)
+        citation.citing_opinion = (
+            Opinion.objects.exclude(pk=opinion12.pk).order_by("pk").first()
+        )
+        results = resolve_fullcase_citation(citation)
         self.assertEqual(results.pk, opinion12.pk, msg=results)
 
     def test_citation_multiple_matches(self) -> None:
@@ -3232,11 +3236,9 @@ class UnmatchedCitationTest(TransactionTestCase):
     cluster = None
     opinion: Opinion
 
-    @classmethod
-    def setUpClass(cls):
-        cls.cluster = OpinionClusterWithChildrenAndParentsFactory()
-        cls.opinion = cls.cluster.sub_opinions.first()
-        UnmatchedCitation.objects.all().delete()
+    def setUp(self) -> None:
+        self.cluster = OpinionClusterWithChildrenAndParentsFactory()
+        self.opinion = self.cluster.sub_opinions.first()
 
     def test_1st_creation(self) -> None:
         """Can we save unmatched citations?"""
