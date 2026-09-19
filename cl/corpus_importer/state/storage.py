@@ -66,28 +66,19 @@ def copy_file(
             MetadataDirective="REPLACE",
             **params,
         )
-    except ClientError as error:
-        _log_failure(source_bucket, source_key, published_key)
-        code = str(error.response.get("Error", {}).get("Code", ""))
-        if code in ABSENT_SOURCE:
-            return PublishOutcome.MISSING
-        return PublishOutcome.FAILED
-    except BotoCoreError:
-        _log_failure(source_bucket, source_key, published_key)
+    except (BotoCoreError, ClientError) as error:
+        logger.exception(
+            "Could not publish %s/%s to %s.",
+            source_bucket,
+            source_key,
+            published_key,
+        )
+        if isinstance(error, ClientError):
+            code = str(error.response.get("Error", {}).get("Code", ""))
+            if code in ABSENT_SOURCE:
+                return PublishOutcome.MISSING
         return PublishOutcome.FAILED
     return PublishOutcome.PUBLISHED
-
-
-def _log_failure(
-    source_bucket: str, source_key: str, published_key: str
-) -> None:
-    """Log the copy that just raised, with the exception being handled."""
-    logger.exception(
-        "Could not publish %s/%s to %s.",
-        source_bucket,
-        source_key,
-        published_key,
-    )
 
 
 def delete_file(bucket: str, key: str) -> None:
