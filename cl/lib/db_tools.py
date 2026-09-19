@@ -1,6 +1,6 @@
 from datetime import UTC, datetime
 
-from django.db import connection
+from django.db import connection, connections
 
 from cl.lib.command_utils import logger
 
@@ -82,3 +82,26 @@ def log_db_connection_info(model_name: str, instance_id: int) -> None:
         model_name,
         instance_id,
     )
+
+
+def release_db_connection() -> None:
+    """Close this thread's database connections so they don't sit idle while
+    the caller waits on something slow, such as a Doctor extraction.
+
+    Idle connections get dropped by network and server idle timeouts, after
+    which the next query fails with "SSL connection has been closed
+    unexpectedly". Django reopens a connection lazily on the next query, so
+    callers need not do anything afterwards. Any session state (temp tables,
+    advisory locks, server-side cursors) is lost with the connection.
+
+    A connection inside a transaction is left alone, since it must be held
+    until the block ends. That also covers Celery tasks run eagerly inside
+    test transactions.
+
+    Connections are thread-local, so call this from the thread that owns
+    them; from async code wrap it in a thread-sensitive `sync_to_async`.
+    """
+    for conn in connections.all(initialized_only=True):
+        if conn.in_atomic_block:
+            continue
+        conn.close()
