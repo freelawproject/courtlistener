@@ -138,7 +138,5 @@ class TexasDocument(AbstractDateTimeModel, AbstractStateDocument):
         unique_together = [["docket_entry", "media_id"]]
 
     def get_pdf_path(self, filename: str, thumbs: bool = False) -> str:
-        """Store TAMES documents under the shared state layout."""
-        return self.state_pdf_path(
-            "tx", self.docket_entry.docket.court_id, filename, thumbs
-        )
+        """Store TAMES documents in the shared RECAP-style state layout."""
+        return self.state_pdf_path(filename, thumbs)
