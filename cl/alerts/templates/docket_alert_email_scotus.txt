@@ -1,0 +1,2 @@
+{% load text_filters %}
+{{ count }} New Entr{{ count|pluralize:"y,ies" }} in {{ docket|best_case_name|safe }}
