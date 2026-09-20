@@ -63,6 +63,7 @@
     x-on:click="openScopeMenu"
     x-bind:aria-controls="menuId"
     aria-haspopup="menu"
+    aria-expanded="false"
     x-bind:aria-expanded="scopeMenuExpanded"
     class="h-[--corpus-search-height] justify-between rounded-xl border-greyscale-200 {{ class }}"
     aria-label="Open menu to select the scope of your search"
@@ -118,8 +119,8 @@
           x-on:click="selectScope"
           data-scope="{{ scope.label }}"
           x-on:keydown.shift.tab.stop.prevent="closeScopeMenuBack"
-          x-bind:aria-selected="isActiveScope"
-          role="menuitem"
+          x-bind:aria-checked="isActiveScope"
+          role="menuitemradio"
         >
           <span>{{ scope.label }}</span>
           {% if forloop.first %}

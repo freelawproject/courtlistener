@@ -382,7 +382,7 @@ class CorpusSearchFormTest(SimpleUserDataMixin, TestCase):
         after JavaScript loaded.
         """
         # 1. Verify mobile trigger buttons (inline and dialog) contain label
-        # and description
+        # and description, and initial aria-expanded="false"
         trigger_buttons = self.tree.xpath(
             '//button[@aria-haspopup="menu" and @aria-label="Open menu to select the scope of your search"]'
         )
@@ -392,6 +392,11 @@ class CorpusSearchFormTest(SimpleUserDataMixin, TestCase):
             "Expected two corpus search scope menu trigger buttons on the homepage (inline and dialog)",
         )
         for trigger_button in trigger_buttons:
+            self.assertEqual(
+                trigger_button.get("aria-expanded"),
+                "false",
+                "Expected initial aria-expanded='false' on scope menu trigger",
+            )
             trigger_text = "".join(trigger_button.itertext()).strip()
             self.assertIn(
                 "Case Law",
@@ -426,7 +431,7 @@ class CorpusSearchFormTest(SimpleUserDataMixin, TestCase):
                 menu.xpath(".//template[@x-for]"),
                 "Scope menu should not use Alpine x-for for initial render",
             )
-            menu_items = menu.xpath('.//*[@role="menuitem"]')
+            menu_items = menu.xpath('.//*[@role="menuitemradio"]')
             self.assertEqual(
                 len(menu_items),
                 len(expected_labels),
@@ -442,6 +447,18 @@ class CorpusSearchFormTest(SimpleUserDataMixin, TestCase):
                         f"Menu item {label!r} missing from server-rendered HTML; "
                         f"found {item_labels!r}",
                     )
+
+            # Verify checkmark display states (only the first item visible initially)
+            first_svg = menu_items[0].xpath(".//svg")
+            self.assertTrue(
+                first_svg, "Expected checkmark SVG on first menu item"
+            )
+            self.assertNotIn("display: none", first_svg[0].get("style", ""))
+
+            for item in menu_items[1:]:
+                svg = item.xpath(".//svg")
+                self.assertTrue(svg, "Expected checkmark SVG on menu item")
+                self.assertIn("display: none", svg[0].get("style", ""))
 
 
 @override_flag("use_new_design", True)
