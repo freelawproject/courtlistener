@@ -1,5 +1,5 @@
 {% extends "new_base.html" %}
-{% load extras component_tags %}
+{% load extras component_tags svg_tags %}
 
 {% block title %}{{ title }} – CourtListener.com{% endblock %}
 {% block og_title %}{{ title }} - CourtListener.com{% endblock %}
@@ -9,7 +9,7 @@
 
 {% block content_wrapper %}
 <div class="bg-greyscale-100">
-  <div class="max-w-content mx-auto pt-4 md:pt-20 pb-35">
+  <div class="capped-width px-4 lg:px-10 xl:px-0 pt-4 md:pt-20 pb-35">
     <c-docket-page
       :docket="docket"
       :docket_source="docket_source"
@@ -19,31 +19,20 @@
       :has_alert="has_alert"
       :note_form="note_form"
     >
-      {# CSV export #}
-      {% if user.is_authenticated %}
-        <div class="flex justify-end py-2">
-          <c-button
-            variant="outline"
-            class="text-sm"
-            hx-get="{% url 'view_download_docket' docket.id %}"
-            hx-swap="none"
-          >
-            Export CSV
-          </c-button>
-        </div>
-      {% endif %}
-
       <c-docket-filter
         :docket="docket"
-        :docket_source="docket_source"
         :form="form"
         :page_obj="docket_entries"
         :sort_order_asc="sort_order_asc"
-        class="mb-4"
+        class="mb-10"
       />
 
       {# Docket entry rows #}
-      <c-docket-entry-rows :docket_entries="docket_entries" :docket_source="docket_source" />
+      <c-docket-entry-rows
+        :docket_entries="docket_entries"
+        :docket_source="docket_source"
+        :filters_applied="filters_applied"
+      />
 
       <c-pagination
         :page_obj="docket_entries"
@@ -53,6 +42,11 @@
         show_next
         show_last
       />
+
+      <p class="text-sm text-greyscale-500 mt-6">
+        {% svg "circle_question_mark" class="w-4 h-4 inline" aria_hidden="true" %}
+        <c-docket-source-attribution :docket_source="docket_source" />
+      </p>
     </c-docket-page>
   </div>
 </div>

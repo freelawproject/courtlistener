@@ -8,6 +8,7 @@
 {#   - suffix_text (optional): rendered after value in parentheses #}
 {#   - suffix_url (optional): renders suffix_text as a link #}
 {#   - suffix_nofollow / suffix_is_external / suffix_aria_label (optional): same semantics as the value-link variants #}
+{#   - is_copyable (optional bool): makes the value a one-click selection for copying #}
 <c-vars
   items=""
   title=""
@@ -22,7 +23,7 @@
     {% for item in items %}
       <c-description-item>
         <c-description-term>{{ item.label }}</c-description-term>
-        <c-description-details>
+        <c-description-details class="{% if item.is_copyable %}select-all cursor-text{% endif %}">
           {% if item.url %}
             <a
               class="{% if item.is_external %}links-external{% else %}links{% endif %}"

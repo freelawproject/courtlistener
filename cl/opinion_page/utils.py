@@ -439,13 +439,16 @@ def build_docket_tabs(
 ) -> list[dict[str, str]]:
     """Build the tab navigation items for the docket page.
 
-    Each item is a dict with 'label', 'url', and 'key'.
+    Each item is a dict with 'label', 'url', 'key' and 'icon'. 'icon' names a
+    file in cl/assets/static-global/svg/ for the {% svg %} tag; the mobile
+    dropdown ignores it.
     """
     tabs = [
         {
             "label": "Docket Entries",
             "url": docket.get_absolute_url(),
             "key": "entries",
+            "icon": "file_text",
         }
     ]
 
@@ -461,6 +464,7 @@ def build_docket_tabs(
                     },
                 ),
                 "key": "parties",
+                "icon": "group",
             }
         )
 
@@ -476,6 +480,7 @@ def build_docket_tabs(
                     },
                 ),
                 "key": "idb",
+                "icon": "circle_question_mark",
             }
         )
 
@@ -491,6 +496,7 @@ def build_docket_tabs(
                     },
                 ),
                 "key": "authorities",
+                "icon": "court",
             }
         )
 

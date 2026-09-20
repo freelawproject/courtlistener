@@ -65,11 +65,24 @@ class CitationRedirectorForm(forms.Form):
 
 
 class DocketEntryFilterForm(forms.Form):
+    """Filters and sorts the entries shown on a docket page, bound to the
+    request's GET params."""
+
     ASCENDING = "asc"
     DESCENDING = "desc"
     DOCKET_ORDER_BY_CHOICES = (
         (ASCENDING, "Ascending"),
         (DESCENDING, "Descending"),
+    )
+    # The params that narrow the entry list. Sorting and pagination are left
+    # out on purpose: they reorder or page the same set, so an empty page
+    # under them alone means the docket has no entries at all.
+    NARROWING_PARAMS = (
+        "entry_gte",
+        "entry_lte",
+        "filed_after",
+        "filed_before",
+        "q",
     )
     entry_gte = forms.IntegerField(
         required=False,
@@ -118,6 +131,16 @@ class DocketEntryFilterForm(forms.Form):
     def __init__(self, *args, **kwargs):
         self.request = kwargs.pop("request", None)
         super().__init__(*args, **kwargs)
+
+    def has_filters(self) -> bool:
+        """Whether the bound data carries any filter or search param.
+
+        Checks the raw data rather than cleaned_data so an invalid value
+        (say, a non-numeric entry number) still counts: the user asked for a
+        filter either way. The docket page uses this to pick between the
+        "no entries yet" and the "nothing matches your filters" empty state.
+        """
+        return any(self.data.get(name) for name in self.NARROWING_PARAMS)
 
     def clean_order_by(self):
         data = self.cleaned_data["order_by"]
