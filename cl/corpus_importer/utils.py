@@ -1199,7 +1199,7 @@ def compute_binary_probe_jitter(
     """
 
     if max_probe is None:
-        max_probe = settings.IQUERY_MAX_PROBE
+        max_probe = cast(int, settings.IQUERY_MAX_PROBE)
     # The jitter will be a random value between 1 and half of max_probe.
     return random.randint(1, round(max_probe * 0.5)) if not testing else 0
 
@@ -1234,7 +1234,7 @@ def compute_next_binary_probe(
     # the detection of new cases once courts catch up.
     jitter = 0 if iteration == 1 else jitter
     if max_probe is None:
-        max_probe = settings.IQUERY_MAX_PROBE
+        max_probe = cast(int, settings.IQUERY_MAX_PROBE)
     cap_iteration = int(math.log2(max_probe)) + 1
     if iteration < cap_iteration:
         offset = 2 ** (iteration - 1)

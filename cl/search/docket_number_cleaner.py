@@ -4,6 +4,7 @@ from collections import defaultdict
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from datetime import datetime
 from functools import partial
+from typing import cast
 
 import environ
 from django.conf import settings
@@ -329,7 +330,7 @@ def extract_with_llm(
         return None
 
     records = {}
-    for item in llm_response.docket_numbers:
+    for item in cast(CleanDocketNumber, llm_response).docket_numbers:
         docket_id = item.unique_id
         docket_num = [s.upper() for s in sorted(list(set(item.cleaned_nums)))]
         records[int(docket_id)] = "; ".join(docket_num)
