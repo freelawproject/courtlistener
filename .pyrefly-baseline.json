@@ -661,18 +661,6 @@
       "severity": "error"
     },
     {
-      "line": 190,
-      "column": 12,
-      "stop_line": 190,
-      "stop_column": 64,
-      "path": "cl/corpus_importer/management/commands/harvard_opinions.py",
-      "code": -2,
-      "name": "bad-return",
-      "description": "Returned type `Unknown | None` is not assignable to declared return type `str`\n  The declared type does not allow `None`. Consider narrowing the value with an `is not None` check or changing the declared type to `str | None`.",
-      "concise_description": "Returned type `Unknown | None` is not assignable to declared return type `str`",
-      "severity": "error"
-    },
-    {
       "line": 323,
       "column": 38,
       "stop_line": 323,
@@ -826,18 +814,6 @@
       "name": "bad-index",
       "description": "Cannot index into `spmatrix`\n  Object of class `spmatrix` has no attribute `__getitem__`",
       "concise_description": "Cannot index into `spmatrix`",
-      "severity": "error"
-    },
-    {
-      "line": 365,
-      "column": 12,
-      "stop_line": 365,
-      "stop_column": 18,
-      "path": "cl/corpus_importer/utils.py",
-      "code": -2,
-      "name": "bad-return",
-      "description": "Returned type `ndarray` is not assignable to declared return type `list[list[float]]`",
-      "concise_description": "Returned type `ndarray` is not assignable to declared return type `list[list[float]]`",
       "severity": "error"
     },
     {

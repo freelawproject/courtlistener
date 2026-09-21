@@ -9,7 +9,7 @@ from collections.abc import Generator, Iterator, Mapping, Sequence
 from dataclasses import dataclass
 from datetime import date
 from difflib import SequenceMatcher
-from typing import Any, cast
+from typing import TYPE_CHECKING, Any, cast
 from urllib.parse import urlparse
 
 from asgiref.sync import async_to_sync
@@ -42,6 +42,10 @@ from cl.people_db.lookup_utils import (
 )
 from cl.people_db.models import Person
 from cl.search.models import Citation, Court, Docket, Opinion, OpinionCluster
+
+if TYPE_CHECKING:
+    import numpy as np
+    from numpy import NDArray
 
 HYPERSCAN_TOKENIZER = HyperscanTokenizer(cache_dir=".hyperscan")
 
@@ -336,7 +340,7 @@ def compare_documents(file_characters: str, cl_characters: str) -> int:
 
 def similarity_scores(
     texts_to_compare_1: list[str], texts_to_compare_2: list[str]
-) -> list[list[float]]:
+) -> NDArray[np.float64]:
     """Get similarity scores between two sets of lists
 
     Using TF-IDF/Term Frequency-Inverse Document Frequency
