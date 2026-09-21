@@ -199,6 +199,17 @@ class BasicAPIPageTest(ESIndexTestCase, TestCase):
         r = await self.async_client.get(reverse("court_index"))
         self.assertEqual(r.status_code, 200)
 
+    async def test_drf_login_redirects_to_sign_in(self) -> None:
+        """Is DRF's browsable-API login page pointed at our own?
+
+        Its own login view skips the ratelimiting, redirect sanitizing and
+        confirmed-email check that /sign-in/ has.
+        """
+        r = await self.async_client.get(reverse("drf_login_redirect"))
+        self.assertRedirects(
+            r, reverse("sign-in"), fetch_redirect_response=False
+        )
+
     async def test_wiki_data_endpoint(self) -> None:
         """Does the wiki data endpoint return the expected JSON structure?"""
         await caches["default"].adelete("wiki-data")
@@ -840,8 +851,9 @@ class ApiEventCreationTestCase(TestCase):
     # run in parallel do not affect this one.
     @mock.patch(
         "cl.api.utils.get_logging_prefix",
-        side_effect=lambda *args,
-        **kwargs: f"{get_logging_prefix(*args, **kwargs)}-Test",
+        side_effect=lambda *args, **kwargs: (
+            f"{get_logging_prefix(*args, **kwargs)}-Test"
+        ),
     )
     async def test_api_logged_correctly(self, mock_logging_prefix) -> None:
         # Global stats
@@ -873,8 +885,9 @@ class ApiEventCreationTestCase(TestCase):
     @mock.patch("cl.api.utils.create_or_update_zoho_account")
     @mock.patch(
         "cl.api.utils.get_logging_prefix",
-        side_effect=lambda *args,
-        **kwargs: f"{get_logging_prefix(*args, **kwargs)}-Test",
+        side_effect=lambda *args, **kwargs: (
+            f"{get_logging_prefix(*args, **kwargs)}-Test"
+        ),
     )
     async def test_api_logged_correctly_v4(
         self, mock_logging_prefix, mock_zoho_task

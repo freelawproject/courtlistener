@@ -1183,7 +1183,7 @@ def build_has_child_query(
     if child_type == "opinion":
         fields_to_exclude.append("embeddings")
 
-    inner_hits = {
+    inner_hits: dict[str, Any] = {
         "name": f"filter_query_inner_{child_type}",
         "size": child_hits_limit,
         "_source": {
