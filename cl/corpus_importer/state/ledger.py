@@ -161,15 +161,52 @@ class LoadLedger:
             logger.exception("Could not read the ledger at %s", self.key)
         return None
 
-    def dispatched(self, row: int, label: str, retrying: bool = False) -> None:
-        """Record that `row` has gone to the merge queue.
+    def dispatched(self, row: int, label: str) -> None:
+        """Record that `row` has gone to the merge queue for the first time.
 
         :param row: The row's position in the run database's query.
         :param label: Something to recognise the row by, such as its docket
             number, so the report can name it without a second lookup.
-        :param retrying: Whether the row is going back after an error that was
-            counted against the run.
         """
+        self._pend(row, label)
+        self._count(dispatched=1)
+
+    def redispatched(self, row: int, label: str, errored: bool) -> None:
+        """Record that a retry has put `row` back on the merge queue.
+
+        The row was counted as dispatched when it first went, so it is not
+        counted again.
+
+        :param row: The row's position in the run database's query.
+        :param label: Something to recognise the row by. See `dispatched`.
+        :param errored: Whether the row is going back after an error that was
+            counted against the run, which this takes back. Its retried merge
+            counts it again if it fails again.
+        """
+        self._pend(row, label)
+        if errored:
+            self._count(errored=-1)
+
+    def withdrawn(self, errored: int, lost: int) -> None:
+        """Take back the counts of rows a retry read and will not dispatch.
+
+        A row held for retry that has stopped being usable, or that the run
+        database no longer has, is no longer retryable, so leaving it counted
+        as dispatched or errored would have every later verification alert on
+        work nothing can finish. The retry reports those rows itself.
+
+        :param errored: Rows held after an error, now withdrawn.
+        :param lost: Rows celery lost, now withdrawn.
+        """
+        counts: dict[str, int] = {}
+        if errored or lost:
+            counts["dispatched"] = -(errored + lost)
+        if errored:
+            counts["errored"] = -errored
+        self._count(**counts)
+
+    def _pend(self, row: int, label: str) -> None:
+        """Write `row` into the pending hash, where it waits for an outcome."""
         try:
             name = self._name("pending")
             pipeline = self._redis.pipeline()
@@ -178,10 +215,6 @@ class LoadLedger:
             pipeline.execute()
         except Exception:
             logger.exception("Could not dispatch row %s to %s", row, self.key)
-        counts = {"dispatched": 1}
-        if retrying:
-            counts["errored"] = -1
-        self._count(**counts)
 
     def merged(self, row: int, result: MergeResult[Any]) -> None:
         """Record that `row` merged cleanly, and what its merge wrote.

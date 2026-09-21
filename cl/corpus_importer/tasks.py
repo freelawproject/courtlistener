@@ -3888,7 +3888,11 @@ def download_scotus_document_pdf(self: Task, doc_pk: int) -> int | None:
         to update the attachment for.
     """
     try:
-        doc = SCOTUSDocument.objects.get(pk=doc_pk)
+        # The document's storage path is built from its docket, so fetch that
+        # with it rather than going back for it a query at a time.
+        doc = SCOTUSDocument.objects.select_related(
+            "docket_entry__docket"
+        ).get(pk=doc_pk)
     except SCOTUSDocument.DoesNotExist:
         logger.warning(
             "SCOTUS document PDF download: SCOTUSDocument %s does not exist; skipping.",

@@ -8,9 +8,10 @@ from io import StringIO
 from pathlib import Path
 from tempfile import TemporaryDirectory
 from typing import Any, ClassVar, ParamSpec, TypeVar
-from unittest.mock import Mock, call, patch
+from unittest.mock import MagicMock, Mock, call, patch
 
-from botocore.exceptions import ClientError
+from botocore.exceptions import BotoCoreError, ClientError
+from django.conf import settings
 from django.core.management import call_command
 from django.core.management.base import CommandError
 from django.db import DatabaseError, connection
@@ -56,6 +57,11 @@ from cl.corpus_importer.state.run_db import (
     RunDatabaseUnavailable,
     downloaded_run_database,
     scrape_bucket_storage,
+)
+from cl.corpus_importer.state.storage import (
+    PublishOutcome,
+    copy_file,
+    delete_file,
 )
 from cl.corpus_importer.state.utils import FileTally, MergeResult
 from cl.corpus_importer.tasks import merge_state_scrape_row
@@ -1788,6 +1794,113 @@ class JKentScrapeLoaderExtractionTest(LoaderTestCase):
         )
 
 
+class StateStorageTest(SimpleTestCase):
+    """Tests for the server-side copies and deletes publishing is built on.
+
+    The loader and merger tests stand in for this module, so this is where the
+    S3 calls it makes are pinned down.
+    """
+
+    SOURCE_KEY = "responses/dockets/ny/abc123.pdf"
+    PUBLISHED_KEY = "recap/gov.uscourts.ny.1/gov.uscourts.ny.1.undated.2.pdf"
+
+    def setUp(self) -> None:
+        super().setUp()
+        self.storage = MagicMock()
+        self.storage.get_object_parameters.return_value = {
+            "CacheControl": "max-age=315360000"
+        }
+        self.client = self.storage.connection.meta.client
+        patcher = patch(
+            "cl.corpus_importer.state.storage.AWSMediaStorage",
+            return_value=self.storage,
+        )
+        patcher.start()
+        self.addCleanup(patcher.stop)
+
+    def copy(self, content_type: str = "") -> PublishOutcome:
+        """Copy `SOURCE_KEY` out of the private bucket to `PUBLISHED_KEY`."""
+        return copy_file(
+            settings.AWS_PRIVATE_STORAGE_BUCKET_NAME,
+            self.SOURCE_KEY,
+            self.PUBLISHED_KEY,
+            content_type,
+        )
+
+    @staticmethod
+    def error(code: str) -> ClientError:
+        return ClientError(
+            {"Error": {"Code": code, "Message": "nope"}}, "CopyObject"
+        )
+
+    def test_copy_describes_how_the_file_should_be_served(self) -> None:
+        """Does the copy land in the public bucket with the ACL, cache headers
+        and content type a file served from there needs?"""
+        self.assertIs(self.copy("application/pdf"), PublishOutcome.PUBLISHED)
+
+        self.client.copy_object.assert_called_once_with(
+            Bucket=settings.AWS_STORAGE_BUCKET_NAME,
+            Key=self.PUBLISHED_KEY,
+            CopySource={
+                "Bucket": settings.AWS_PRIVATE_STORAGE_BUCKET_NAME,
+                "Key": self.SOURCE_KEY,
+            },
+            MetadataDirective="REPLACE",
+            CacheControl="max-age=315360000",
+            ACL=settings.AWS_DEFAULT_ACL,
+            ContentType="application/pdf",
+        )
+
+    def test_copy_leaves_the_original_alone(self) -> None:
+        """The loader deletes the original only once the document points at
+        the copy. Does copying alone delete nothing?"""
+        self.copy()
+
+        self.client.delete_object.assert_not_called()
+
+    def test_copy_without_a_content_type_leaves_it_to_s3(self) -> None:
+        """A scrape does not always state a MIME type. Is the argument left
+        off rather than sent empty, which would serve the file as nothing?"""
+        self.copy()
+
+        self.assertNotIn(
+            "ContentType", self.client.copy_object.call_args.kwargs
+        )
+
+    def test_copy_reports_how_it_failed(self) -> None:
+        """A source that is not there will not appear on a re-run, unlike a
+        refusal, so the two are reported apart. A `BotoCoreError` never got an
+        answer out of S3, so it counts as the retriable kind. Is each read off
+        the error the copy raised, without asking the bucket again?"""
+        for error, expected in (
+            (self.error("AccessDenied"), PublishOutcome.FAILED),
+            (self.error("NoSuchKey"), PublishOutcome.MISSING),
+            (BotoCoreError(), PublishOutcome.FAILED),
+        ):
+            with self.subTest(expected=expected):
+                self.client.copy_object.side_effect = error
+
+                self.assertIs(self.copy(), expected)
+        self.client.head_object.assert_not_called()
+
+    def test_delete_names_the_bucket(self) -> None:
+        """Files are deleted from both buckets. Does the delete go to the one
+        it was asked to?"""
+        delete_file(settings.AWS_PRIVATE_STORAGE_BUCKET_NAME, self.SOURCE_KEY)
+
+        self.client.delete_object.assert_called_once_with(
+            Bucket=settings.AWS_PRIVATE_STORAGE_BUCKET_NAME,
+            Key=self.SOURCE_KEY,
+        )
+
+    def test_delete_swallows_a_refusal(self) -> None:
+        """The document is settled by the time this runs, so a file left
+        behind must not fail the load."""
+        self.client.delete_object.side_effect = self.error("AccessDenied")
+
+        delete_file(settings.AWS_STORAGE_BUCKET_NAME, self.PUBLISHED_KEY)
+
+
 class PreflightCheckTest(SimpleTestCase):
     """Tests for the checks themselves, apart from any load that runs them."""
 
@@ -2466,11 +2579,30 @@ class JKentScrapeLoaderRetryTest(LoaderTestCase):
             self.merge_retry(), {"1"}, "And is still there to be retried."
         )
 
-    def test_a_row_the_retry_cannot_use_keeps_its_error(self) -> None:
-        """The error is taken back where the row is dispatched rather than
-        where it is read, because a row the retry finds it can no longer use
-        never goes back on the queue and is still a failure. Does one that
-        never reaches the queue keep its error counted against the run?"""
+    def test_a_retry_does_not_count_its_rows_as_dispatched_again(
+        self,
+    ) -> None:
+        """A row a retry puts back was counted as dispatched when it first
+        went. Does the run's total stay at the number of rows it has?"""
+        failing = {"A-2"}
+        _run_database(
+            self.database, [{"docket_number": f"A-{n}"} for n in (1, 2)]
+        )
+        loader_class = self.failing_loader(failing)
+        with patch.object(merge_state_scrape_row, "max_retries", 0):
+            self.loader(loader_class).load()
+        failing.clear()
+
+        report = self.loader(loader_class).retry()
+
+        self.assertEqual(report.dispatched, 2)
+        self.assertEqual(self.ledger().totals().dispatched, 2)
+
+    def test_a_row_the_retry_cannot_use_is_withdrawn(self) -> None:
+        """A row the retry finds it can no longer use never goes back on the
+        queue, and has been drained from the retry set, so nothing will ever
+        settle it. Is its error taken back, rather than alerted on by every
+        later verification of the run?"""
         unusable: set[str] = set()
 
         class UnusableOnRetry(self.failing_loader({"A-1"})):  # type: ignore[misc, valid-type]
@@ -2491,7 +2623,12 @@ class JKentScrapeLoaderRetryTest(LoaderTestCase):
         self.assertEqual(
             report.invalid, 1, "The retry could not use the row at all."
         )
-        self.assertEqual(report.errored, 1, "So its error still stands.")
+        self.assertEqual(
+            (report.errored, report.dispatched),
+            (0, 0),
+            "So it no longer counts against the run as dispatched or errored.",
+        )
+        self.assertEqual(self.merge_retry(), set())
 
     def test_a_retry_that_cannot_find_a_row_says_so(self) -> None:
         """A row held for retry that the run database does not have means the
@@ -2513,6 +2650,19 @@ class JKentScrapeLoaderRetryTest(LoaderTestCase):
             logs.records[0].fingerprint,  # type: ignore[attr-defined]
             ["test", LoadPhase.MERGE],
         )
+
+    def test_an_errored_row_the_run_database_lacks_is_withdrawn(self) -> None:
+        """The retry says once that a held row is not in the run database and
+        drops it. Is its error dropped with it, so later verifications do not
+        keep alerting on a row nothing can retry?"""
+        _run_database(self.database, [{"docket_number": "A-1"}])
+        ledger = self.ledger()
+        ledger.dispatched(99, "A-99")
+        ledger.errored(99)
+
+        report = self.loader().retry()
+
+        self.assertEqual((report.errored, report.dispatched), (0, 0))
 
 
 class JKentScrapeLoaderExtractionRetryTest(LoaderTestCase):
