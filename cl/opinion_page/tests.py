@@ -4213,6 +4213,12 @@ class DocketFilterSearchScopeTest(DocketFilterRenderTestCase):
                     if el.get("for") == visible[0].get("id")
                 ]
                 self.assertEqual(len(labels), 1)
+                # docket_filter.js merges the terms into q on submit.
+                self.assertEqual(
+                    cast(_Attrib, search_form.attrib)["x-on:submit"],
+                    "buildScopedQueryOnSubmit($event)",
+                )
+                self.assertIn("data-search-terms", visible[0].attrib)
                 # Exactly these reach the search page, with or without JS.
                 self.assertEqual(
                     {
