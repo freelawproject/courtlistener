@@ -889,9 +889,9 @@
       "severity": "error"
     },
     {
-      "line": 82,
+      "line": 67,
       "column": 45,
-      "stop_line": 82,
+      "stop_line": 67,
       "stop_column": 59,
       "path": "cl/search/state/new_york/models.py",
       "code": -2,
