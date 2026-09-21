@@ -793,30 +793,6 @@
       "severity": "error"
     },
     {
-      "line": 363,
-      "column": 9,
-      "stop_line": 363,
-      "stop_column": 37,
-      "path": "cl/corpus_importer/utils.py",
-      "code": -2,
-      "name": "bad-index",
-      "description": "Cannot index into `spmatrix`\n  Object of class `spmatrix` has no attribute `__getitem__`",
-      "concise_description": "Cannot index into `spmatrix`",
-      "severity": "error"
-    },
-    {
-      "line": 363,
-      "column": 39,
-      "stop_line": 363,
-      "stop_column": 67,
-      "path": "cl/corpus_importer/utils.py",
-      "code": -2,
-      "name": "bad-index",
-      "description": "Cannot index into `spmatrix`\n  Object of class `spmatrix` has no attribute `__getitem__`",
-      "concise_description": "Cannot index into `spmatrix`",
-      "severity": "error"
-    },
-    {
       "line": 59,
       "column": 45,
       "stop_line": 59,

@@ -46,6 +46,7 @@ from cl.search.models import Citation, Court, Docket, Opinion, OpinionCluster
 if TYPE_CHECKING:
     import numpy as np
     from numpy import NDArray
+    from scipy.sparse import csr_matrix
 
 HYPERSCAN_TOKENIZER = HyperscanTokenizer(cache_dir=".hyperscan")
 
@@ -357,9 +358,14 @@ def similarity_scores(
     from sklearn.metrics.pairwise import cosine_similarity
 
     # Weights the word counts by a measure of how often they appear in the
-    # documents, and it returns a sparse matrix
-    X = TfidfVectorizer().fit_transform(
-        texts_to_compare_1 + texts_to_compare_2
+    # documents, and it returns a sparse matrix. TfidfVectorizer always
+    # returns a csr_matrix, but pyrefly infers the abstract spmatrix base
+    # class, which doesn't declare __getitem__.
+    X = cast(
+        "csr_matrix",
+        TfidfVectorizer().fit_transform(
+            texts_to_compare_1 + texts_to_compare_2
+        ),
     )
 
     # Calculate cosine similarity between weight of words for each text in list
