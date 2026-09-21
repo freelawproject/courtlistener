@@ -23,5 +23,17 @@ document.addEventListener("alpine:init", () => {
       const form = event.target.closest("form");
       if (form) form.requestSubmit();
     },
+    /**
+     * Merge all typed search terms into the final hidden `q` input so the search
+     * stays scoped to the docket.
+     * When navigating back, we restore the server side scope `defaultValue`
+     * avoiding wraping the scope twice.
+     */
+    buildScopedQueryOnSubmit(event) {
+      const form = event.target;
+      const scope = form.querySelector('input[name="q"]');
+      const terms = form.querySelector("[data-search-terms]").value.trim();
+      scope.value = terms ? `(${terms}) AND ${scope.defaultValue}` : scope.defaultValue;
+    },
   }));
 });

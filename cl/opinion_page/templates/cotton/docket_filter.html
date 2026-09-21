@@ -22,7 +22,7 @@
 
     <div class="flex flex-wrap items-end gap-3">
       {# Search — sibling form so Enter submits search, not filters. The docket scope travels in the hidden q; the visible input is unnamed so it can't replace it. #}
-      <form action="/" method="get" class="flex-1 max-w-xs">
+      <form action="/" method="get" class="flex-1 max-w-xs" x-on:submit="buildScopedQueryOnSubmit($event)">
         <input type="hidden" name="type" value="r" />
         <input type="hidden" name="q" value="docket_id:{{ docket.pk }}" />
         <label for="de-search-desktop" class="sr-only">Search this docket</label>
@@ -30,6 +30,7 @@
           <input
             class="input-text rounded-r-none flex-1"
             id="de-search-desktop"
+            data-search-terms
             autocomplete="off"
             type="text"
             placeholder="Search this docket"
@@ -160,7 +161,7 @@
   <div class="md:hidden">
     <div class="flex items-end gap-3">
       {# Search — own form so Enter submits search, not filters. Same hidden-scope arrangement as the desktop form above. #}
-      <form action="/" method="get" class="flex-1">
+      <form action="/" method="get" class="flex-1" x-on:submit="buildScopedQueryOnSubmit($event)">
         <input type="hidden" name="type" value="r" />
         <input type="hidden" name="q" value="docket_id:{{ docket.pk }}" />
         <label for="de-search-mobile" class="sr-only">Search this docket</label>
@@ -168,6 +169,7 @@
           <input
             class="input-text rounded-r-none flex-1"
             id="de-search-mobile"
+            data-search-terms
             autocomplete="off"
             type="text"
             placeholder="Search this docket"
