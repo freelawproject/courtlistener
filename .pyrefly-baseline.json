@@ -661,18 +661,6 @@
       "severity": "error"
     },
     {
-      "line": 323,
-      "column": 38,
-      "stop_line": 323,
-      "stop_column": 78,
-      "path": "cl/corpus_importer/management/commands/ready_mix_cases_project.py",
-      "code": -2,
-      "name": "bad-argument-type",
-      "description": "Argument `Unknown | None` is not assignable to parameter `x` with type `Buffer | SupportsIndex | SupportsInt | SupportsTrunc | str` in function `int.__new__`\n  Protocol `Buffer` requires attribute `__buffer__`\n  The declared type does not allow `None`. Consider narrowing the value with an `is not None` check.",
-      "concise_description": "Argument `Unknown | None` is not assignable to parameter `x` with type `Buffer | SupportsIndex | SupportsInt | SupportsTrunc | str` in function `int.__new__`",
-      "severity": "error"
-    },
-    {
       "line": 65,
       "column": 21,
       "stop_line": 65,
