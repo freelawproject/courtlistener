@@ -21,6 +21,9 @@ project-includes = [
     "cl/api/utils.py",
     "cl/api/views.py",
     "cl/api/webhooks.py",
+    "cl/oauth/cleanup_utils.py",
+    "cl/oauth/factories.py",
+    "cl/oauth/management/commands/clean_oauth_tables.py",
     "cl/recap/management/commands/remove_appellate_entries_with_long_numbers.py",
     "cl/recap/utils.py",
     "cl/scrapers/management/commands/back_scrape_dockets.py",
@@ -31,6 +34,7 @@ project-includes = [
     "cl/search/docket_number_cleaner.py",
     "cl/search/management/commands/cl_index_parent_and_child_docs.py",
     "cl/search/management/commands/clean_docket_number_raw.py",
+    "cl/search/management/commands/clean_sealed_document_citations.py",
     "cl/search/management/commands/generate_opinion_embeddings.py",
     "cl/search/management/commands/llm_clean_docket_number_daemon.py",
     "cl/search/management/commands/pacer_bulk_fetch.py",
@@ -104,6 +108,17 @@ ignore-missing-imports = []
 unbound-name = true
 bad-override-param-name = false
 bad-override-mutable-attribute = false
+
+[[sub-config]]
+matches = "cl/opinion_page/**"
+check-unannotated-defs = true
+infer-return-types = "checked"
+ignore-missing-imports = []
+
+[sub-config.errors]
+unbound-name = true
+bad-override-param-name = true
+bad-override-mutable-attribute = true
 
 [[sub-config]]
 matches = "cl/recap_rss/**"

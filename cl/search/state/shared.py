@@ -1,14 +1,16 @@
 import logging
+from datetime import date, datetime
 from pathlib import Path, PurePosixPath
-from typing import IO, Self
+from typing import IO, TYPE_CHECKING, Any, Self
 
 from asgiref.sync import async_to_sync
 from django.core.files import File
 from django.db import models
-from django.utils.text import slugify
+from django.db.models import Q, QuerySet
 
 from cl.lib.decorators import document_model
 from cl.lib.models import AbstractPDF
+from cl.lib.recap_utils import format_path_date, make_recap_style_path
 from cl.lib.types import NonEmptyTuple
 
 logger = logging.getLogger(__name__)
@@ -70,6 +72,12 @@ class AbstractStateDocument(AbstractPDF):
     """
     :ivar processing_error: The processing error for the document, if any."""
 
+    if TYPE_CHECKING:
+        # Every state document points at its state's docket entry model, so
+        # the FK is declared on each subclass; this only tells the type
+        # checker it exists.
+        docket_entry: Any
+
     url = models.URLField(max_length=250)
     processing_error = models.SmallIntegerField(
         choices=ProcessingError.CHOICES,
@@ -77,50 +85,52 @@ class AbstractStateDocument(AbstractPDF):
         blank=True,
     )
 
-    @classmethod
-    def state_pdf_path(
-        cls,
-        state_code: str,
-        court_id: str,
-        filename: str,
-        thumbs: bool = False,
-    ) -> str:
-        """Build the S3 path for a state court document.
+    def path_date_filed(self) -> date | None:
+        """The filing date used in this document's storage path.
 
-        Every state scraper stores its documents under the same layout, so
-        subclasses' `get_pdf_path` implementations delegate here rather than
-        each repeating it:
+        Defaults to the docket entry's `date_filed`. States whose entries
+        store timestamps rather than dates override this to pick the court's
+        local calendar day.
+        """
+        return self.docket_entry.date_filed
 
-            us/state/<state_code>/<court_id>/gov.<state_code>.<court_id>.<slug><ext>
+    def get_pdf_path(self, filename: str, thumbs: bool = False) -> str:
+        """Build the S3 path for a state court document in the RECAP layout.
 
-        Thumbnails go in a `<court_id>-thumbnails` sibling directory so they
-        cannot collide with the document they were generated from.
+        Every state's documents are filed this way, so this satisfies
+        `AbstractPDF.get_pdf_path` for all of them rather than each model
+        repeating it.
 
-        Callers pass `court_id` rather than reading it off the document because
-        each model reaches its court by a different relation.
+        State documents have no PACER document numbers, so the document's own
+        pk identifies it within the docket, and the CourtListener docket id
+        stands in for the PACER case id:
 
-        :param state_code: The two-letter USPS code for the state, lowercased.
-        :param court_id: The ID of the court the document was filed in.
+            recap/gov.uscourts.<court_id>.<docket_id>/gov.uscourts.<court_id>.<docket_id>.<date_filed>.<pk><ext>
+
+        The filing date comes from `path_date_filed`, rendered as `undated`
+        when missing. Only the extension of `filename` survives, since state
+        scrapers serve several formats (TAMES .html/.wpd/.mp3, ACIS .tiff).
+
         :param filename: The filename Django hands to the `upload_to` callback.
         :param thumbs: Whether to return the thumbnail path instead.
         :return: The path to store the document at, relative to the bucket
             root.
+        :raises ValueError: If the document hasn't been saved yet; its pk is
+            part of the name.
         """
-        slug = slugify(Path(filename).stem)
-        # Court-PASS serves oral argument playlists alongside PDFs, and TAMES
-        # serves .html and .wpd, so the original extension has to survive.
-        ext = Path(filename).suffix or ".pdf"
-        directory = f"{court_id}-thumbnails" if thumbs else court_id
-        return str(
-            Path("us/state")
-            / state_code
-            / directory
-            / f"gov.{state_code}.{court_id}.{slug}{ext}"
+        if self.pk is None:
+            raise ValueError(
+                f"{type(self).__name__} must be saved before a file can be "
+                "stored for it; its pk is part of the storage path."
+            )
+        docket = self.docket_entry.docket
+        return make_recap_style_path(
+            docket.court_id,
+            docket.pk,
+            [format_path_date(self.path_date_filed()), str(self.pk)],
+            Path(filename).suffix or ".pdf",
+            thumbs=thumbs,
         )
-
-    def make_filename(self) -> str:
-        """Create the filename to store this document's content under (no extension)."""
-        return str(hash(self.url))
 
     @classmethod
     def tmp_prefix(cls) -> str:
@@ -136,6 +146,33 @@ class AbstractStateDocument(AbstractPDF):
     def extractable_extensions(cls) -> NonEmptyTuple[str]:
         """Return the set of file extensions that can be extracted."""
         return (".pdf",)
+
+    @classmethod
+    def written_since(cls, since: datetime) -> QuerySet[Self]:
+        """Documents of this model written since `since` that carry no
+        extracted text.
+
+        :param since: The moment to count from.
+        :return: The documents still missing their text.
+        """
+        extensions = Q()
+        for extension in cls.extractable_extensions():
+            extensions |= Q(filepath_local__endswith=extension)
+        return (
+            cls._default_manager.filter(extensions, date_modified__gte=since)
+            .exclude(filepath_local="")
+            .exclude(ocr_status__in=(cls.OCR_COMPLETE, cls.OCR_UNNECESSARY))
+        )
+
+    @classmethod
+    def unextracted(cls, since: datetime) -> QuerySet[Self]:
+        """Documents that have not been OCRed but have been modified
+        since provided datetime.
+
+        :param since: The moment to count from.
+        :return: The documents nothing has yet tried and failed to read.
+        """
+        return cls.written_since(since).exclude(ocr_status=cls.OCR_FAILED)
 
     def validate_file(self, content: IO[bytes], extension: str) -> int | None:
         """Validate the file content and return the processing error if any.
@@ -154,10 +191,11 @@ class AbstractStateDocument(AbstractPDF):
             return int(response.text)
         return None
 
-    def extract(self, queue: str = "celery") -> None:
+    def extract(self, queue: str = "celery") -> bool:
         """Run the OCR extraction task for this document.
 
-        :param queue: The queue to use for the extraction task."""
+        :param queue: The queue to use for the extraction task.
+        :return: True if dispatch occured, else False."""
         from cl.scrapers.tasks import extract_formatted_text_document
 
         if (
@@ -170,7 +208,7 @@ class AbstractStateDocument(AbstractPDF):
                 self.pk,
                 self.ocr_status,
             )
-            return
+            return False
 
         if not self.filepath_local.name:
             logger.info(
@@ -178,7 +216,7 @@ class AbstractStateDocument(AbstractPDF):
                 self._meta.label,
                 self.pk,
             )
-            return
+            return False
 
         extension = PurePosixPath(self.filepath_local.name).suffix
 
@@ -189,7 +227,7 @@ class AbstractStateDocument(AbstractPDF):
                 self.pk,
                 self.filepath_local.name,
             )
-            return
+            return False
 
         strip_html = extension != ".pdf"
 
@@ -199,6 +237,7 @@ class AbstractStateDocument(AbstractPDF):
             model_name=self._meta.label,
             strip_html_tags=strip_html,
         ).set(queue=queue).apply_async()
+        return True
 
     @classmethod
     def download(
@@ -216,7 +255,11 @@ class AbstractStateDocument(AbstractPDF):
         from cl.scrapers.utils import get_extension
 
         try:
-            document = cls._default_manager.get(pk=pk)
+            # The document's storage path is built from its docket, so fetch
+            # that with it rather than going back for it a query at a time.
+            document = cls._default_manager.select_related(
+                "docket_entry__docket"
+            ).get(pk=pk)
         except cls.DoesNotExist:
             logger.warning(
                 "Document download: %s %s does not exist; skipping.",
@@ -274,7 +317,9 @@ class AbstractStateDocument(AbstractPDF):
                 document.save()
                 return None
 
-            filename = f"{document.make_filename()}{extension}"
+            # `get_pdf_path` names the file from the document itself and
+            # keeps only this name's extension, so the stem is never stored.
+            filename = f"document{extension}"
             downloaded_file = File(tmp)
             document.filepath_local.save(filename, downloaded_file, save=False)
             document.file_size = downloaded_file.size

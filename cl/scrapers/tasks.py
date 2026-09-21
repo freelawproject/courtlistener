@@ -11,7 +11,7 @@ import celery
 import httpx
 import openai
 import requests
-from asgiref.sync import async_to_sync
+from asgiref.sync import async_to_sync, sync_to_async
 from bs4 import BeautifulSoup
 from django.apps import apps
 from django.conf import settings
@@ -29,6 +29,7 @@ from cl.citations.tasks import (
 )
 from cl.custom_filters.templatetags.text_filters import best_case_name
 from cl.lib.celery_utils import throttle_task
+from cl.lib.db_tools import release_db_connection
 from cl.lib.exceptions import ScrapeFailed
 from cl.lib.juriscraper_utils import get_scraper_object_by_name
 from cl.lib.llm import call_llm_transcription
@@ -602,6 +603,13 @@ async def extract_formatted_text_document_base(
             processed.append(pk)
             continue
 
+        # Doctor can take several minutes to answer. An idle Postgres
+        # connection is dropped long before that by network/server idle
+        # timeouts, and the asave() below then fails with "SSL connection has
+        # been closed unexpectedly". Release the connection for the wait;
+        # Django reopens one on the next query.
+        await sync_to_async(release_db_connection)()
+
         response = await microservice(
             service="document-extract",
             item=rd,
@@ -611,6 +619,10 @@ async def extract_formatted_text_document_base(
 
         content = response.json()["content"]
         extracted_by_ocr = response.json()["extracted_by_ocr"]
+        if isinstance(rd, AbstractStateDocument) and (
+            pages := response.json().get("page_count")
+        ):
+            rd.page_count = pages
         if strip_html_tags and not str(rd.filepath_local).endswith(".pdf"):
             content = strip_tags(content)
         ocr_needed = needs_ocr(content, page_count=rd.page_count)
@@ -649,7 +661,7 @@ async def extract_formatted_text_document_base(
                 update_fields=["ocr_status", "plain_text"],
             )
         elif isinstance(rd, AbstractStateDocument):
-            update_fields = ["ocr_status", "plain_text"]
+            update_fields = ["ocr_status", "plain_text", "page_count"]
             if not has_content:
                 rd.processing_error = ProcessingError.EXTRACTION_FAILURE
                 update_fields.append("processing_error")

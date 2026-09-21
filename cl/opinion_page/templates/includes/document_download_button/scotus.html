@@ -1,0 +1,37 @@
+{% load extras %}
+{% with valid_url=rd.url|http_url %}
+<div class="btn-group">
+  {% if rd.is_available %}
+    <a href="{{ rd.filepath_local.url }}"
+       role="button"
+       class="btn btn-primary">Download PDF&nbsp;<i
+      class="fa fa-file-pdf-o"></i>
+    </a>
+    {% if valid_url %}
+      <button type="button"
+              class="btn btn-primary dropdown-toggle"
+              data-toggle="dropdown"
+              aria-haspopup="true"
+              aria-expanded="false">
+        <span class="caret"></span>
+        <span class="sr-only">Toggle Dropdown</span>
+      </button>
+      <ul class="dropdown-menu">
+        <li>
+          <a href="{{ rd.filepath_local.url }}">From CourtListener</a>
+        </li>
+        <li>
+          <a href="{{ valid_url }}" target="_blank" rel="nofollow noopener noreferrer">From the Supreme Court</a>
+        </li>
+      </ul>
+    {% endif %}
+  {% elif valid_url %}
+    <a href="{{ valid_url }}"
+       role="button"
+       class="btn btn-primary"
+       target="_blank"
+       rel="nofollow noopener noreferrer">View on SCOTUS&nbsp;<i class="fa fa-external-link"></i>
+    </a>
+  {% endif %}
+</div>
+{% endwith %}
