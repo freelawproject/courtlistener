@@ -73,7 +73,6 @@ replace-imports-with-any = [
     "cl.people_db", "cl.people_db.*",
     "cl.recap", "cl.recap.*",
     "cl.scrapers", "cl.scrapers.*",
-    "cl.search", "cl.search.*",
     "cl.sitemaps_infinite", "cl.sitemaps_infinite.*",
     "cl.stats", "cl.stats.*",
     "cl.tests", "cl.tests.*",
