@@ -2,7 +2,7 @@ import logging
 import pickle
 import re
 from collections.abc import Callable
-from typing import Any, TypedDict
+from typing import Any, TypedDict, cast
 from urllib.parse import parse_qs, urlencode
 
 from asgiref.sync import async_to_sync
@@ -664,7 +664,7 @@ def do_es_search(
     other location.
     """
     if courts is None:
-        courts = Court.objects.filter(in_use=True)
+        courts = cast(QuerySet[Court], Court.objects.filter(in_use=True))
     paged_results = None
     query_time: int | None = 0
     total_query_results: int | None = 0
