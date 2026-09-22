@@ -25,15 +25,17 @@ document.addEventListener("alpine:init", () => {
     },
     /**
      * Merge all typed search terms into the final hidden `q` input so the search
-     * stays scoped to the docket.
-     * When navigating back, we restore the server side scope `defaultValue`
-     * avoiding wraping the scope twice.
+     * stays scoped to the docket, in the same shape as build_docket_id_q_param.
+     * The scope is read from `data-docket-scope` rather than from the hidden
+     * input: assigning a hidden input's value rewrites its attribute, and back
+     * navigation restores that DOM, so a second submit would wrap the previous
+     * query again.
      */
     buildScopedQueryOnSubmit(event) {
       const form = event.target;
-      const scope = form.querySelector('input[name="q"]');
+      const scope = this.$root.dataset.docketScope;
       const terms = form.querySelector("[data-search-terms]").value.trim();
-      scope.value = terms ? `(${terms}) AND ${scope.defaultValue}` : scope.defaultValue;
+      form.querySelector('input[name="q"]').value = terms ? `(${terms}) AND ${scope}` : scope;
     },
   }));
 });

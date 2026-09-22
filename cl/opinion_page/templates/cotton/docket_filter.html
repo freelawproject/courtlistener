@@ -13,7 +13,7 @@
   class=""
 />
 
-<div x-data="docketFilter" class="{{ class }}">
+<div x-data="docketFilter" data-docket-scope="docket_id:{{ docket.pk }}" class="{{ class }}">
   {# DESKTOP — hidden on mobile #}
   <div class="hidden md:block">
     {% if form.errors %}

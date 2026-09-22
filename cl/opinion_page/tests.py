@@ -4194,10 +4194,20 @@ class DocketFilterSearchScopeTest(DocketFilterRenderTestCase):
         request.user = AnonymousUser()
         form = DocketEntryFilterForm(request.GET, request=request)
 
+        tree = fromstring(self._render(form))
+        # docket_filter.js reads the pristine scope from here on every
+        # submit; a hidden input's value can't serve, since assigning it
+        # rewrites the attribute and back-navigation restores the mutated DOM.
+        roots = [
+            el for el in tree.iter() if el.get("x-data") == "docketFilter"
+        ]
+        self.assertEqual(len(roots), 1)
+        self.assertEqual(
+            roots[0].get("data-docket-scope"), f"docket_id:{self.docket.pk}"
+        )
+
         search_forms = [
-            el
-            for el in fromstring(self._render(form)).iter("form")
-            if el.get("action") == "/"
+            el for el in tree.iter("form") if el.get("action") == "/"
         ]
         self.assertEqual(len(search_forms), 2, "expected desktop and mobile")
         for layout, search_form in zip(("desktop", "mobile"), search_forms):
