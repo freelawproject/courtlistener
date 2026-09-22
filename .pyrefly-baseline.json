@@ -1,6 +1,13 @@
 {
   "errors": [
     {
+      "column": 16,
+      "path": "cl/alerts/management/commands/cl_send_recap_alerts.py",
+      "name": "bad-return",
+      "concise_description": "Returned type `ObjectApiResponse[Any]` is not assignable to declared return type `dict[str, Any]`",
+      "severity": "error"
+    },
+    {
       "column": 52,
       "path": "cl/alerts/management/commands/cl_send_recap_alerts.py",
       "name": "bad-argument-type",
@@ -61,6 +68,34 @@
       "path": "cl/alerts/tests/tests_opinion_alerts.py",
       "name": "missing-attribute",
       "concise_description": "Object of class `str` has no attribute `rate`",
+      "severity": "error"
+    },
+    {
+      "column": 21,
+      "path": "cl/alerts/utils.py",
+      "name": "bad-argument-type",
+      "concise_description": "Argument `Query | None` is not assignable to parameter `final_query` with type `Query` in function `create_percolator_search_query`",
+      "severity": "error"
+    },
+    {
+      "column": 21,
+      "path": "cl/alerts/utils.py",
+      "name": "bad-argument-type",
+      "concise_description": "Argument `Query | None` is not assignable to parameter `final_query` with type `Query` in function `create_percolator_search_query`",
+      "severity": "error"
+    },
+    {
+      "column": 25,
+      "path": "cl/alerts/utils.py",
+      "name": "missing-attribute",
+      "concise_description": "Object of class `list` has no attribute `hits`",
+      "severity": "error"
+    },
+    {
+      "column": 12,
+      "path": "cl/alerts/utils.py",
+      "name": "bad-return",
+      "concise_description": "Returned type `Query | list[Unknown]` is not assignable to declared return type `Query`",
       "severity": "error"
     },
     {
@@ -246,6 +281,76 @@
       "severity": "error"
     },
     {
+      "column": 16,
+      "path": "cl/corpus_importer/import_columbia/columbia_utils.py",
+      "name": "missing-attribute",
+      "concise_description": "Object of class `PageElement` has no attribute `name`",
+      "severity": "error"
+    },
+    {
+      "column": 32,
+      "path": "cl/corpus_importer/import_columbia/columbia_utils.py",
+      "name": "missing-attribute",
+      "concise_description": "Object of class `PageElement` has no attribute `decode_contents`",
+      "severity": "error"
+    },
+    {
+      "column": 20,
+      "path": "cl/corpus_importer/management/commands/anon_2020_import.py",
+      "name": "missing-attribute",
+      "concise_description": "Object of class `NoneType` has no attribute `decode_contents`",
+      "severity": "error"
+    },
+    {
+      "column": 52,
+      "path": "cl/corpus_importer/management/commands/columbia_merge.py",
+      "name": "bad-argument-type",
+      "concise_description": "Argument `Tag | None` is not assignable to parameter `outer_opinion` with type `BeautifulSoup` in function `cl.corpus_importer.import_columbia.columbia_utils.extract_columbia_opinions`",
+      "severity": "error"
+    },
+    {
+      "column": 20,
+      "path": "cl/corpus_importer/management/commands/harvard_merge.py",
+      "name": "missing-attribute",
+      "concise_description": "Object of class `NoneType` has no attribute `find_all`",
+      "severity": "error"
+    },
+    {
+      "column": 12,
+      "path": "cl/corpus_importer/management/commands/harvard_merge.py",
+      "name": "missing-attribute",
+      "concise_description": "Object of type `AttributeValueList | str | None` has no attribute `startswith`",
+      "severity": "error"
+    },
+    {
+      "column": 24,
+      "path": "cl/corpus_importer/management/commands/harvard_merge.py",
+      "name": "no-matching-overload",
+      "concise_description": "No matching overload found for function `bs4.element.Tag.find` called with arguments: (Literal['footnote'], dict[str, str | None])",
+      "severity": "error"
+    },
+    {
+      "column": 9,
+      "path": "cl/corpus_importer/management/commands/harvard_merge.py",
+      "name": "missing-attribute",
+      "concise_description": "Object of class `NoneType` has no attribute `append`",
+      "severity": "error"
+    },
+    {
+      "column": 9,
+      "path": "cl/corpus_importer/management/commands/harvard_merge.py",
+      "name": "missing-attribute",
+      "concise_description": "Object of class `NoneType` has no attribute `append`",
+      "severity": "error"
+    },
+    {
+      "column": 36,
+      "path": "cl/corpus_importer/management/commands/harvard_opinions.py",
+      "name": "bad-argument-type",
+      "concise_description": "Argument `AttributeValueList | str | None` is not assignable to parameter `harvard_opinion_type` with type `str` in function `map_opinion_type`",
+      "severity": "error"
+    },
+    {
       "column": 28,
       "path": "cl/corpus_importer/tasks.py",
       "name": "bad-argument-type",
@@ -257,6 +362,293 @@
       "path": "cl/corpus_importer/tasks.py",
       "name": "bad-argument-type",
       "concise_description": "Argument `str` is not assignable to parameter `pacer_doc_id` with type `int | None` in function `juriscraper.pacer.reports.BaseReport.download_pdf`",
+      "severity": "error"
+    },
+    {
+      "column": 12,
+      "path": "cl/lib/elasticsearch_utils.py",
+      "name": "bad-return",
+      "concise_description": "Returned type `list[Query]` is not assignable to declared return type `list[Range]`",
+      "severity": "error"
+    },
+    {
+      "column": 16,
+      "path": "cl/lib/elasticsearch_utils.py",
+      "name": "bad-return",
+      "concise_description": "Returned type `list[Query]` is not assignable to declared return type `list[Range]`",
+      "severity": "error"
+    },
+    {
+      "column": 16,
+      "path": "cl/lib/elasticsearch_utils.py",
+      "name": "bad-return",
+      "concise_description": "Returned type `Query` is not assignable to declared return type `QueryString | list[Unknown]`",
+      "severity": "error"
+    },
+    {
+      "column": 13,
+      "path": "cl/lib/elasticsearch_utils.py",
+      "name": "bad-assignment",
+      "concise_description": "`Query` is not assignable to variable `query` with type `QueryString | str`",
+      "severity": "error"
+    },
+    {
+      "column": 12,
+      "path": "cl/lib/elasticsearch_utils.py",
+      "name": "bad-return",
+      "concise_description": "Returned type `QueryString | str` is not assignable to declared return type `QueryString`",
+      "severity": "error"
+    },
+    {
+      "column": 13,
+      "path": "cl/lib/elasticsearch_utils.py",
+      "name": "bad-assignment",
+      "concise_description": "`Query` is not assignable to variable `query` with type `QueryString | str`",
+      "severity": "error"
+    },
+    {
+      "column": 12,
+      "path": "cl/lib/elasticsearch_utils.py",
+      "name": "bad-return",
+      "concise_description": "Returned type `QueryString | str` is not assignable to declared return type `QueryString`",
+      "severity": "error"
+    },
+    {
+      "column": 12,
+      "path": "cl/lib/elasticsearch_utils.py",
+      "name": "bad-return",
+      "concise_description": "Returned type `Query` is not assignable to declared return type `QueryString`",
+      "severity": "error"
+    },
+    {
+      "column": 20,
+      "path": "cl/lib/elasticsearch_utils.py",
+      "name": "no-matching-overload",
+      "concise_description": "No matching overload found for function `elasticsearch.dsl.query.Q` called with arguments: (Literal['bool'] | QueryString | list[Unknown])",
+      "severity": "error"
+    },
+    {
+      "column": 26,
+      "path": "cl/lib/elasticsearch_utils.py",
+      "name": "bad-argument-type",
+      "concise_description": "Argument `QueryString | list[Unknown] | None` is not assignable to parameter `string_query` with type `QueryString | list[Unknown]` in function `combine_plain_filters_and_queries`",
+      "severity": "error"
+    },
+    {
+      "column": 13,
+      "path": "cl/lib/elasticsearch_utils.py",
+      "name": "bad-argument-type",
+      "concise_description": "Argument `Query | QueryString | list[Unknown] | None` is not assignable to parameter `query` with type `Query` in function `apply_custom_score_to_main_query`",
+      "severity": "error"
+    },
+    {
+      "column": 16,
+      "path": "cl/lib/elasticsearch_utils.py",
+      "name": "bad-return",
+      "concise_description": "Returned type `Query` is not assignable to declared return type `QueryString | None`",
+      "severity": "error"
+    },
+    {
+      "column": 24,
+      "path": "cl/lib/elasticsearch_utils.py",
+      "name": "bad-return",
+      "concise_description": "Returned type `Query` is not assignable to declared return type `QueryString`",
+      "severity": "error"
+    },
+    {
+      "column": 24,
+      "path": "cl/lib/elasticsearch_utils.py",
+      "name": "bad-return",
+      "concise_description": "Returned type `Query` is not assignable to declared return type `QueryString`",
+      "severity": "error"
+    },
+    {
+      "column": 20,
+      "path": "cl/lib/elasticsearch_utils.py",
+      "name": "bad-return",
+      "concise_description": "Returned type `Query` is not assignable to declared return type `QueryString`",
+      "severity": "error"
+    },
+    {
+      "column": 12,
+      "path": "cl/lib/elasticsearch_utils.py",
+      "name": "bad-return",
+      "concise_description": "Returned type `Query` is not assignable to declared return type `QueryString`",
+      "severity": "error"
+    },
+    {
+      "column": 12,
+      "path": "cl/lib/elasticsearch_utils.py",
+      "name": "bad-return",
+      "concise_description": "Returned type `tuple[Search, QueryString | Search | None, Literal[5]]` is not assignable to declared return type `tuple[Search, Search | None, int | None]`",
+      "severity": "error"
+    },
+    {
+      "column": 20,
+      "path": "cl/lib/elasticsearch_utils.py",
+      "name": "bad-assignment",
+      "concise_description": "`elasticsearch.dsl._sync.search.Search` is not assignable to variable `search_query` with type `django_elasticsearch_dsl.search.Search`",
+      "severity": "error"
+    },
+    {
+      "column": 13,
+      "path": "cl/lib/elasticsearch_utils.py",
+      "name": "bad-argument-type",
+      "concise_description": "Argument `elasticsearch.dsl._sync.search.Search` is not assignable to parameter `count_query` with type `django_elasticsearch_dsl.search.Search` in function `build_cardinality_count`",
+      "severity": "error"
+    },
+    {
+      "column": 13,
+      "path": "cl/lib/elasticsearch_utils.py",
+      "name": "bad-argument-type",
+      "concise_description": "Argument `Query` is not assignable to parameter `query` with type `QueryString | str` in function `build_custom_function_score_for_date`",
+      "severity": "error"
+    },
+    {
+      "column": 13,
+      "path": "cl/lib/elasticsearch_utils.py",
+      "name": "bad-argument-type",
+      "concise_description": "Argument `Query` is not assignable to parameter `query` with type `QueryString | str` in function `build_custom_relevance_score`",
+      "severity": "error"
+    },
+    {
+      "column": 38,
+      "path": "cl/lib/elasticsearch_utils.py",
+      "name": "bad-argument-type",
+      "concise_description": "Argument `QueryString | None` is not assignable to parameter `object` with type `QueryString | Range` in function `list.append`",
+      "severity": "error"
+    },
+    {
+      "column": 17,
+      "path": "cl/lib/elasticsearch_utils.py",
+      "name": "bad-argument-type",
+      "concise_description": "Argument `Query | None` is not assignable to parameter `query` with type `QueryString | str` in function `build_has_child_query`",
+      "severity": "error"
+    },
+    {
+      "column": 17,
+      "path": "cl/lib/elasticsearch_utils.py",
+      "name": "bad-argument-type",
+      "concise_description": "Argument `QueryString | None` is not assignable to parameter `query` with type `QueryString | str` in function `build_has_child_query`",
+      "severity": "error"
+    },
+    {
+      "column": 29,
+      "path": "cl/lib/elasticsearch_utils.py",
+      "name": "bad-argument-type",
+      "concise_description": "Argument `Query` is not assignable to parameter `object` with type `QueryString` in function `list.append`",
+      "severity": "error"
+    },
+    {
+      "column": 26,
+      "path": "cl/lib/elasticsearch_utils.py",
+      "name": "bad-argument-type",
+      "concise_description": "Argument `Query | None` is not assignable to parameter `parent_query` with type `QueryString | None` in function `cl.lib.types.EsJoinQueries.__init__`",
+      "severity": "error"
+    },
+    {
+      "column": 25,
+      "path": "cl/lib/elasticsearch_utils.py",
+      "name": "bad-argument-type",
+      "concise_description": "Argument `Query | None` is not assignable to parameter `child_query` with type `QueryString | None` in function `cl.lib.types.EsJoinQueries.__init__`",
+      "severity": "error"
+    },
+    {
+      "column": 20,
+      "path": "cl/lib/elasticsearch_utils.py",
+      "name": "bad-argument-type",
+      "concise_description": "Argument `Query` is not assignable to parameter `main_query` with type `QueryString | list[Unknown]` in function `cl.lib.types.EsJoinQueries.__init__`",
+      "severity": "error"
+    },
+    {
+      "column": 22,
+      "path": "cl/lib/elasticsearch_utils.py",
+      "name": "bad-argument-type",
+      "concise_description": "Argument `Query | None` is not assignable to parameter `parent_query` with type `QueryString | None` in function `cl.lib.types.EsJoinQueries.__init__`",
+      "severity": "error"
+    },
+    {
+      "column": 21,
+      "path": "cl/lib/elasticsearch_utils.py",
+      "name": "bad-argument-type",
+      "concise_description": "Argument `Query | None` is not assignable to parameter `child_query` with type `QueryString | None` in function `cl.lib.types.EsJoinQueries.__init__`",
+      "severity": "error"
+    },
+    {
+      "column": 24,
+      "path": "cl/lib/elasticsearch_utils.py",
+      "name": "missing-attribute",
+      "concise_description": "Object of class `list` has no attribute `total`",
+      "severity": "error"
+    },
+    {
+      "column": 27,
+      "path": "cl/lib/elasticsearch_utils.py",
+      "name": "missing-attribute",
+      "concise_description": "Object of class `list` has no attribute `total`",
+      "severity": "error"
+    },
+    {
+      "column": 13,
+      "path": "cl/lib/elasticsearch_utils.py",
+      "name": "missing-attribute",
+      "concise_description": "Object of class `list` has no attribute `total`",
+      "severity": "error"
+    },
+    {
+      "column": 13,
+      "path": "cl/lib/elasticsearch_utils.py",
+      "name": "missing-attribute",
+      "concise_description": "Object of class `list` has no attribute `total`",
+      "severity": "error"
+    },
+    {
+      "column": 12,
+      "path": "cl/lib/elasticsearch_utils.py",
+      "name": "bad-return",
+      "concise_description": "Returned type `tuple[Response, Response | None, Response | None]` is not assignable to declared return type `tuple[list[Hit] | None, Response | None, Response | None]`",
+      "severity": "error"
+    },
+    {
+      "column": 17,
+      "path": "cl/lib/search_index_utils.py",
+      "name": "bad-argument-type",
+      "concise_description": "Argument `Literal['']` is not assignable to parameter `meta` with type `ApiResponseMeta` in function `elastic_transport._exceptions.ApiError.__init__`",
+      "severity": "error"
+    },
+    {
+      "column": 33,
+      "path": "cl/lib/search_utils.py",
+      "name": "bad-argument-type",
+      "concise_description": "Argument `Response | int | Unknown | None` is not assignable to parameter `total_query_results` with type `int | None` in function `cl.lib.paginators.ESPaginator.__init__`",
+      "severity": "error"
+    },
+    {
+      "column": 16,
+      "path": "cl/lib/search_utils.py",
+      "name": "bad-return",
+      "concise_description": "Returned type `tuple[Page[Unknown], Literal[1], Literal[False], Response | int | Unknown | None, Response | int | Unknown | None]` is not assignable to declared return type `tuple[Page[Unknown] | list[Unknown], int, bool, int | None, int | None]`",
+      "severity": "error"
+    },
+    {
+      "column": 48,
+      "path": "cl/lib/search_utils.py",
+      "name": "bad-argument-type",
+      "concise_description": "Argument `Page[Unknown] | list[Unknown]` is not assignable to parameter `results` with type `Page[Unknown] | Response` in function `cl.lib.elasticsearch_utils.merge_semantic_relevant_chunks`",
+      "severity": "error"
+    },
+    {
+      "column": 9,
+      "path": "cl/opinion_page/utils.py",
+      "name": "bad-assignment",
+      "concise_description": "`Response | list[Unknown]` is not assignable to attribute `related_clusters` with type `list[Unknown]`",
+      "severity": "error"
+    },
+    {
+      "column": 9,
+      "path": "cl/opinion_page/utils.py",
+      "name": "missing-attribute",
+      "concise_description": "Object of class `list` has no attribute `total`",
       "severity": "error"
     },
     {
