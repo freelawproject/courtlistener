@@ -1225,7 +1225,11 @@ def combine_plain_filters_and_queries(
     :return: The modified Search object based on the given conditions.
     """
 
-    final_query = Q(string_query or "bool")
+    # An empty list stands in for "no text query"; only a real Query can be
+    # used as the top-level clause.
+    final_query = (
+        string_query if isinstance(string_query, Query) else Q("bool")
+    )
     if filters:
         final_query.filter = reduce(operator.iand, filters)
     if filters and string_query:

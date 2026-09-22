@@ -515,7 +515,12 @@ def fix_footnotes(soup: BeautifulSoup) -> BeautifulSoup:
         fn["id"] = f"fn{fn.string}_ref"
         fn["class"] = "footnote"
 
-        fnl = soup.find("footnote", {"label": fn.string})
+        # bs4 treats a None attribute value as "attribute absent", which is
+        # spelled False in its typed interface.
+        fnl = soup.find(
+            "footnote",
+            {"label": fn.string if fn.string is not None else False},
+        )
         if fnl:
             obj = f'<a class="footnote" href="#fn{fn.string}_ref">{fn.string}</a>'
             fnl.name = "div"

@@ -323,13 +323,6 @@
       "severity": "error"
     },
     {
-      "column": 24,
-      "path": "cl/corpus_importer/management/commands/harvard_merge.py",
-      "name": "no-matching-overload",
-      "concise_description": "No matching overload found for function `bs4.element.Tag.find` called with arguments: (Literal['footnote'], dict[str, str | None])",
-      "severity": "error"
-    },
-    {
       "column": 9,
       "path": "cl/corpus_importer/management/commands/harvard_merge.py",
       "name": "missing-attribute",
@@ -418,13 +411,6 @@
       "path": "cl/lib/elasticsearch_utils.py",
       "name": "bad-return",
       "concise_description": "Returned type `Query` is not assignable to declared return type `QueryString`",
-      "severity": "error"
-    },
-    {
-      "column": 20,
-      "path": "cl/lib/elasticsearch_utils.py",
-      "name": "no-matching-overload",
-      "concise_description": "No matching overload found for function `elasticsearch.dsl.query.Q` called with arguments: (Literal['bool'] | QueryString | list[Unknown])",
       "severity": "error"
     },
     {
