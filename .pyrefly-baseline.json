@@ -1,13 +1,6 @@
 {
   "errors": [
     {
-      "column": 16,
-      "path": "cl/alerts/management/commands/cl_send_recap_alerts.py",
-      "name": "bad-return",
-      "concise_description": "Returned type `ObjectApiResponse[Any]` is not assignable to declared return type `dict[str, Any]`",
-      "severity": "error"
-    },
-    {
       "column": 52,
       "path": "cl/alerts/management/commands/cl_send_recap_alerts.py",
       "name": "bad-argument-type",
@@ -82,13 +75,6 @@
       "path": "cl/alerts/utils.py",
       "name": "bad-argument-type",
       "concise_description": "Argument `Query | None` is not assignable to parameter `final_query` with type `Query` in function `create_percolator_search_query`",
-      "severity": "error"
-    },
-    {
-      "column": 12,
-      "path": "cl/alerts/utils.py",
-      "name": "bad-return",
-      "concise_description": "Returned type `Query | list[Unknown]` is not assignable to declared return type `Query`",
       "severity": "error"
     },
     {
@@ -302,48 +288,6 @@
       "severity": "error"
     },
     {
-      "column": 12,
-      "path": "cl/lib/elasticsearch_utils.py",
-      "name": "bad-return",
-      "concise_description": "Returned type `list[Query]` is not assignable to declared return type `list[Range]`",
-      "severity": "error"
-    },
-    {
-      "column": 16,
-      "path": "cl/lib/elasticsearch_utils.py",
-      "name": "bad-return",
-      "concise_description": "Returned type `list[Query]` is not assignable to declared return type `list[Range]`",
-      "severity": "error"
-    },
-    {
-      "column": 16,
-      "path": "cl/lib/elasticsearch_utils.py",
-      "name": "bad-return",
-      "concise_description": "Returned type `Query` is not assignable to declared return type `QueryString | list[Unknown]`",
-      "severity": "error"
-    },
-    {
-      "column": 12,
-      "path": "cl/lib/elasticsearch_utils.py",
-      "name": "bad-return",
-      "concise_description": "Returned type `QueryString | str` is not assignable to declared return type `QueryString`",
-      "severity": "error"
-    },
-    {
-      "column": 12,
-      "path": "cl/lib/elasticsearch_utils.py",
-      "name": "bad-return",
-      "concise_description": "Returned type `QueryString | str` is not assignable to declared return type `QueryString`",
-      "severity": "error"
-    },
-    {
-      "column": 12,
-      "path": "cl/lib/elasticsearch_utils.py",
-      "name": "bad-return",
-      "concise_description": "Returned type `Query` is not assignable to declared return type `QueryString`",
-      "severity": "error"
-    },
-    {
       "column": 26,
       "path": "cl/lib/elasticsearch_utils.py",
       "name": "bad-argument-type",
@@ -355,48 +299,6 @@
       "path": "cl/lib/elasticsearch_utils.py",
       "name": "bad-argument-type",
       "concise_description": "Argument `Query | QueryString | list[Unknown] | None` is not assignable to parameter `query` with type `Query` in function `apply_custom_score_to_main_query`",
-      "severity": "error"
-    },
-    {
-      "column": 16,
-      "path": "cl/lib/elasticsearch_utils.py",
-      "name": "bad-return",
-      "concise_description": "Returned type `Query` is not assignable to declared return type `QueryString | None`",
-      "severity": "error"
-    },
-    {
-      "column": 24,
-      "path": "cl/lib/elasticsearch_utils.py",
-      "name": "bad-return",
-      "concise_description": "Returned type `Query` is not assignable to declared return type `QueryString`",
-      "severity": "error"
-    },
-    {
-      "column": 24,
-      "path": "cl/lib/elasticsearch_utils.py",
-      "name": "bad-return",
-      "concise_description": "Returned type `Query` is not assignable to declared return type `QueryString`",
-      "severity": "error"
-    },
-    {
-      "column": 20,
-      "path": "cl/lib/elasticsearch_utils.py",
-      "name": "bad-return",
-      "concise_description": "Returned type `Query` is not assignable to declared return type `QueryString`",
-      "severity": "error"
-    },
-    {
-      "column": 12,
-      "path": "cl/lib/elasticsearch_utils.py",
-      "name": "bad-return",
-      "concise_description": "Returned type `Query` is not assignable to declared return type `QueryString`",
-      "severity": "error"
-    },
-    {
-      "column": 12,
-      "path": "cl/lib/elasticsearch_utils.py",
-      "name": "bad-return",
-      "concise_description": "Returned type `tuple[Search, QueryString | Search | None, Literal[5]]` is not assignable to declared return type `tuple[Search, Search | None, int | None]`",
       "severity": "error"
     },
     {
@@ -442,13 +344,6 @@
       "severity": "error"
     },
     {
-      "column": 29,
-      "path": "cl/lib/elasticsearch_utils.py",
-      "name": "bad-argument-type",
-      "concise_description": "Argument `Query` is not assignable to parameter `object` with type `QueryString` in function `list.append`",
-      "severity": "error"
-    },
-    {
       "column": 26,
       "path": "cl/lib/elasticsearch_utils.py",
       "name": "bad-argument-type",
@@ -484,31 +379,10 @@
       "severity": "error"
     },
     {
-      "column": 12,
-      "path": "cl/lib/elasticsearch_utils.py",
-      "name": "bad-return",
-      "concise_description": "Returned type `tuple[Response, Response | None, Response | None]` is not assignable to declared return type `tuple[list[Hit] | None, Response | None, Response | None]`",
-      "severity": "error"
-    },
-    {
       "column": 17,
       "path": "cl/lib/search_index_utils.py",
       "name": "bad-argument-type",
       "concise_description": "Argument `Literal['']` is not assignable to parameter `meta` with type `ApiResponseMeta` in function `elastic_transport._exceptions.ApiError.__init__`",
-      "severity": "error"
-    },
-    {
-      "column": 33,
-      "path": "cl/lib/search_utils.py",
-      "name": "bad-argument-type",
-      "concise_description": "Argument `Response | int | Unknown | None` is not assignable to parameter `total_query_results` with type `int | None` in function `cl.lib.paginators.ESPaginator.__init__`",
-      "severity": "error"
-    },
-    {
-      "column": 16,
-      "path": "cl/lib/search_utils.py",
-      "name": "bad-return",
-      "concise_description": "Returned type `tuple[Page[Unknown], Literal[1], Literal[False], Response | int | Unknown | None, Response | int | Unknown | None]` is not assignable to declared return type `tuple[Page[Unknown] | list[Unknown], int, bool, int | None, int | None]`",
       "severity": "error"
     },
     {

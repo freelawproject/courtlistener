@@ -172,7 +172,7 @@ def build_numeric_range_query(
         )
         params["relation"] = relation
 
-    return [Q("range", **{field: params})]
+    return [Range(**{field: params})]
 
 
 def build_daterange_query(
@@ -221,7 +221,7 @@ def build_daterange_query(
         params["lte"] = lte
 
     if params:
-        return [Q("range", **{field: params})]
+        return [Range(**{field: params})]
 
     return []
 
@@ -420,7 +420,7 @@ def validate_query_syntax(value: str, query_type: QueryType) -> None:
 
 def build_fulltext_query(
     fields: list[str], value: str, only_queries=False
-) -> QueryString | list:
+) -> Query | list[Query]:
     """Given the cleaned data from a form, return a Elastic Search string query or []
     https://www.elastic.co/guide/en/elasticsearch/reference/current/full-text-queries.html
 
@@ -428,7 +428,7 @@ def build_fulltext_query(
     :param value: The string value to search for.
     :param only_queries: If True return only the queries avoiding wrapping them
     into a bool clause.
-    :return: A Elasticsearch QueryString or [] if the "value" param is empty.
+    :return: A Elasticsearch Query or [] if the "value" param is empty.
     """
     if value:
         validate_query_syntax(value, QueryType.QUERY_STRING)
@@ -1143,7 +1143,7 @@ def build_has_child_query(
     child_highlighting: bool = True,
     default_current_date: datetime.date | None = None,
     alerts: bool = False,
-) -> QueryString:
+) -> Query:
     """Build a 'has_child' query.
 
     :param query: The Elasticsearch query string or Query object.
@@ -1518,7 +1518,7 @@ def build_es_base_query(
 
 def build_has_parent_parties_query(
     parties_filters: list[QueryString],
-) -> QueryString | None:
+) -> Query | None:
     """Build a has_parent query based on the parties fields (party and attorney).
 
     This method is used where it is required to include all the RECAPDocuments
@@ -1546,7 +1546,7 @@ def build_child_docs_query(
     child_docs_query: QueryString | None,
     cd: CleanData,
     exclude_docs_for_empty_field: str = "",
-) -> QueryString:
+) -> Query:
     """Build a query for counting child documents in Elasticsearch, using the
     has_child query filters and queries. And append a match filter to only
     retrieve RECAPDocuments or OpinionDocuments. Utilized when it is required
@@ -1557,7 +1557,7 @@ def build_child_docs_query(
     :param cd: The user input CleanedData
     :param exclude_docs_for_empty_field: Field that should not be empty for a
     document to be included
-    :return: An Elasticsearch QueryString object
+    :return: An Elasticsearch Query object
     """
 
     child_query_opinion = Q("match", cluster_child="opinion")
@@ -1642,7 +1642,7 @@ def build_es_main_query(
     search_query = es_queries.search_query
     child_docs_query = es_queries.child_query
     top_hits_limit = 5
-    child_docs_count_query = None
+    child_docs_count_query: Search | None = None
     match cd["type"]:
         case SEARCH_TYPES.PARENTHETICAL:
             # Create groups aggregation, add highlight and
@@ -1658,13 +1658,11 @@ def build_es_main_query(
                 top_hits_limit,
             )
         case SEARCH_TYPES.RECAP | SEARCH_TYPES.DOCKETS:
-            child_docs_count_query = build_child_docs_query(
-                child_docs_query, cd
-            )
-            if child_docs_count_query:
+            child_count_query = build_child_docs_query(child_docs_query, cd)
+            if child_count_query:
                 # Get the total RECAP Documents count.
                 child_docs_count_query = search_query_base.query(
-                    child_docs_count_query
+                    child_count_query
                 )
         case _:
             pass
@@ -3578,7 +3576,7 @@ def do_es_sweep_alert_query(
     search_query: Search,
     child_search_query: Search,
     cd: CleanData,
-) -> tuple[list[Hit] | None, Response | None, Response | None]:
+) -> tuple[Response | None, Response | None, Response | None]:
     """Build an ES query for its use in the daily RECAP sweep index.
 
     :param search_query: Elasticsearch DSL Search object.

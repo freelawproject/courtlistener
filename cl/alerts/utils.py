@@ -560,15 +560,16 @@ def has_document_alert_hit_been_triggered(
     return r.sismember(alert_key, document_id)
 
 
-def build_plain_percolator_query(cd: CleanData) -> Query:
+def build_plain_percolator_query(cd: CleanData) -> Query | list:
     """Build a plain query based on the provided clean data for its use in the
     Percolator
 
     :param cd: The query CleanedData.
-    :return: An ES Query object representing the built query.
+    :return: An ES Query object representing the built query, or an empty
+    list for search types the Percolator does not support.
     """
 
-    plain_query = []
+    plain_query: Query | list = []
     match cd["type"]:
         case (
             SEARCH_TYPES.RECAP
