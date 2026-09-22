@@ -1,7 +1,8 @@
 import re
 from datetime import date
-from typing import Any
+from typing import Any, cast
 
+from elastic_transport import ApiResponseMeta
 from elasticsearch.dsl import connections
 from elasticsearch.exceptions import ConflictError
 from elasticsearch.helpers import BulkIndexError, bulk
@@ -170,7 +171,7 @@ def index_documents_in_bulk(documents_to_index: list[dict[str, Any]]) -> None:
         if conflict_error:
             raise ConflictError(
                 "ConflictError indexing documents in bulk.",
-                "",
+                cast(ApiResponseMeta, ""),
                 {"ids": ids},
             )
         elif raise_error:

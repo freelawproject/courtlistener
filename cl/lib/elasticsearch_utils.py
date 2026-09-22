@@ -1209,7 +1209,7 @@ def build_has_child_query(
 def combine_plain_filters_and_queries(
     cd: CleanData,
     filters: list,
-    string_query: QueryString | list,
+    string_query: Query | list[Query] | None,
     api_version: Literal["v3", "v4"] | None = None,
 ) -> Query:
     """Combine filters and query strings for plain documents, like Oral arguments
@@ -1217,7 +1217,7 @@ def combine_plain_filters_and_queries(
 
     :param cd: The query CleanedData
     :param filters: A list of filter objects to be applied.
-    :param string_query: An Elasticsearch QueryString object.
+    :param string_query: An Elasticsearch Query, a list of queries, or None.
     :param api_version: Optional, the request API version.
     :return: The modified Search object based on the given conditions.
     """
@@ -1505,7 +1505,7 @@ def build_es_base_query(
     # Apply a custom function score to the main query, useful for cursor pagination
     # in the V4 API and for date decay relevance.
     main_query = apply_custom_score_to_main_query(
-        cd, main_query, api_version, boost_mode=boost_mode
+        cd, cast(Query, main_query), api_version, boost_mode=boost_mode
     )
 
     return EsMainQueries(
@@ -1543,7 +1543,7 @@ def build_has_parent_parties_query(
 
 
 def build_child_docs_query(
-    child_docs_query: QueryString | None,
+    child_docs_query: Query | None,
     cd: CleanData,
     exclude_docs_for_empty_field: str = "",
 ) -> Query:
@@ -1553,7 +1553,7 @@ def build_child_docs_query(
     to retrieve child documents directly, such as in the Opinions Feed,
     RECAP Feed, RECAP Documents count query, and V4 RECAP_DOCUMENT Search API.
 
-    :param child_docs_query: Existing Elasticsearch QueryString object or None
+    :param child_docs_query: Existing Elasticsearch Query object or None
     :param cd: The user input CleanedData
     :param exclude_docs_for_empty_field: Field that should not be empty for a
     document to be included
@@ -1966,7 +1966,9 @@ def fill_position_mapping(
     return position_db_mapping
 
 
-def merge_semantic_relevant_chunks(results: Page | Response) -> None:
+def merge_semantic_relevant_chunks(
+    results: Page | Response | list,
+) -> None:
     """
     Updates each child document in the given results with the most semantically
     relevant chunk of text.
@@ -1977,7 +1979,8 @@ def merge_semantic_relevant_chunks(results: Page | Response) -> None:
     `embeddings` inner hit and assigns its text to the child document's
     `_source["text"]` field.
 
-    :param results: The Page or Response object containing search results.
+    :param results: The Page or Response object containing search results,
+    or an empty list.
     :return: None, the function updates the results in place.
     """
     results_list = results
@@ -2397,7 +2400,7 @@ def fetch_es_results(
     return [], 0, error, None, None
 
 
-def build_has_child_filters(cd: CleanData) -> list[QueryString | Range]:
+def build_has_child_filters(cd: CleanData) -> list[Query]:
     """Builds Elasticsearch 'has_child' filters based on the given child type
     and CleanData.
 
@@ -2839,7 +2842,7 @@ def get_query_embedding(text_query: str) -> list[float]:
 
 def build_semantic_query(
     text_query: str,
-    filters: list[QueryString | Range],
+    filters: list[Query],
     embedding: list[float] | None = None,
 ) -> tuple[str, list[Query]]:
     """
@@ -3008,7 +3011,7 @@ def build_full_join_es_queries(
                 # If party filters were provided, append a has_parent query
                 # with the party filters included to match only child documents
                 # whose parents match the party filters.
-                child_filters.append(has_parent_parties_filter)
+                child_filters.append(cast(Query, has_parent_parties_filter))
 
         if mlt_query:
             child_text_query = [mlt_query]
@@ -3058,7 +3061,7 @@ def build_full_join_es_queries(
                 (child_highlighting, cd["type"]), {}
             )
             has_child_query = build_has_child_query(
-                child_docs_query,
+                cast(Query, child_docs_query),
                 child_type,
                 query_hits_limit,
                 hl_fields,
@@ -3074,7 +3077,7 @@ def build_full_join_es_queries(
             # has_parent_parties_filter to match only child documents whose
             # parents match the party filters.
             has_child_query = build_has_child_query(
-                has_parent_parties_filter,
+                cast(Query, has_parent_parties_filter),
                 "recap_document",
                 query_hits_limit,
                 SEARCH_RECAP_CHILD_HL_FIELDS,
@@ -3421,7 +3424,9 @@ def do_es_api_query(
     return main_query, child_docs_query
 
 
-def build_cardinality_count(count_query: Search, unique_field: str) -> Search:
+def build_cardinality_count(
+    count_query: SearchDSL, unique_field: str
+) -> SearchDSL:
     """Build an Elasticsearch cardinality aggregation.
     This aggregation estimates the count of unique documents based on the
     specified unique field. The precision_threshold, set by

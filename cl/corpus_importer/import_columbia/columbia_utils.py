@@ -213,7 +213,7 @@ def add_floating_opinion(
 
 
 def extract_columbia_opinions(
-    outer_opinion: BeautifulSoup,
+    outer_opinion: Tag,
 ) -> list[dict | None]:
     """Get the opinions of the soup object
 

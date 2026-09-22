@@ -64,20 +64,6 @@
       "severity": "error"
     },
     {
-      "column": 21,
-      "path": "cl/alerts/utils.py",
-      "name": "bad-argument-type",
-      "concise_description": "Argument `Query | None` is not assignable to parameter `final_query` with type `Query` in function `create_percolator_search_query`",
-      "severity": "error"
-    },
-    {
-      "column": 21,
-      "path": "cl/alerts/utils.py",
-      "name": "bad-argument-type",
-      "concise_description": "Argument `Query | None` is not assignable to parameter `final_query` with type `Query` in function `create_percolator_search_query`",
-      "severity": "error"
-    },
-    {
       "column": 36,
       "path": "cl/api/api_permissions.py",
       "name": "bad-argument-type",
@@ -260,20 +246,6 @@
       "severity": "error"
     },
     {
-      "column": 52,
-      "path": "cl/corpus_importer/management/commands/columbia_merge.py",
-      "name": "bad-argument-type",
-      "concise_description": "Argument `Tag | None` is not assignable to parameter `outer_opinion` with type `BeautifulSoup` in function `cl.corpus_importer.import_columbia.columbia_utils.extract_columbia_opinions`",
-      "severity": "error"
-    },
-    {
-      "column": 36,
-      "path": "cl/corpus_importer/management/commands/harvard_opinions.py",
-      "name": "bad-argument-type",
-      "concise_description": "Argument `AttributeValueList | str | None` is not assignable to parameter `harvard_opinion_type` with type `str` in function `map_opinion_type`",
-      "severity": "error"
-    },
-    {
       "column": 28,
       "path": "cl/corpus_importer/tasks.py",
       "name": "bad-argument-type",
@@ -285,111 +257,6 @@
       "path": "cl/corpus_importer/tasks.py",
       "name": "bad-argument-type",
       "concise_description": "Argument `str` is not assignable to parameter `pacer_doc_id` with type `int | None` in function `juriscraper.pacer.reports.BaseReport.download_pdf`",
-      "severity": "error"
-    },
-    {
-      "column": 26,
-      "path": "cl/lib/elasticsearch_utils.py",
-      "name": "bad-argument-type",
-      "concise_description": "Argument `QueryString | list[Unknown] | None` is not assignable to parameter `string_query` with type `QueryString | list[Unknown]` in function `combine_plain_filters_and_queries`",
-      "severity": "error"
-    },
-    {
-      "column": 13,
-      "path": "cl/lib/elasticsearch_utils.py",
-      "name": "bad-argument-type",
-      "concise_description": "Argument `Query | QueryString | list[Unknown] | None` is not assignable to parameter `query` with type `Query` in function `apply_custom_score_to_main_query`",
-      "severity": "error"
-    },
-    {
-      "column": 13,
-      "path": "cl/lib/elasticsearch_utils.py",
-      "name": "bad-argument-type",
-      "concise_description": "Argument `elasticsearch.dsl._sync.search.Search` is not assignable to parameter `count_query` with type `django_elasticsearch_dsl.search.Search` in function `build_cardinality_count`",
-      "severity": "error"
-    },
-    {
-      "column": 13,
-      "path": "cl/lib/elasticsearch_utils.py",
-      "name": "bad-argument-type",
-      "concise_description": "Argument `Query` is not assignable to parameter `query` with type `QueryString | str` in function `build_custom_function_score_for_date`",
-      "severity": "error"
-    },
-    {
-      "column": 13,
-      "path": "cl/lib/elasticsearch_utils.py",
-      "name": "bad-argument-type",
-      "concise_description": "Argument `Query` is not assignable to parameter `query` with type `QueryString | str` in function `build_custom_relevance_score`",
-      "severity": "error"
-    },
-    {
-      "column": 38,
-      "path": "cl/lib/elasticsearch_utils.py",
-      "name": "bad-argument-type",
-      "concise_description": "Argument `QueryString | None` is not assignable to parameter `object` with type `QueryString | Range` in function `list.append`",
-      "severity": "error"
-    },
-    {
-      "column": 17,
-      "path": "cl/lib/elasticsearch_utils.py",
-      "name": "bad-argument-type",
-      "concise_description": "Argument `Query | None` is not assignable to parameter `query` with type `QueryString | str` in function `build_has_child_query`",
-      "severity": "error"
-    },
-    {
-      "column": 17,
-      "path": "cl/lib/elasticsearch_utils.py",
-      "name": "bad-argument-type",
-      "concise_description": "Argument `QueryString | None` is not assignable to parameter `query` with type `QueryString | str` in function `build_has_child_query`",
-      "severity": "error"
-    },
-    {
-      "column": 26,
-      "path": "cl/lib/elasticsearch_utils.py",
-      "name": "bad-argument-type",
-      "concise_description": "Argument `Query | None` is not assignable to parameter `parent_query` with type `QueryString | None` in function `cl.lib.types.EsJoinQueries.__init__`",
-      "severity": "error"
-    },
-    {
-      "column": 25,
-      "path": "cl/lib/elasticsearch_utils.py",
-      "name": "bad-argument-type",
-      "concise_description": "Argument `Query | None` is not assignable to parameter `child_query` with type `QueryString | None` in function `cl.lib.types.EsJoinQueries.__init__`",
-      "severity": "error"
-    },
-    {
-      "column": 20,
-      "path": "cl/lib/elasticsearch_utils.py",
-      "name": "bad-argument-type",
-      "concise_description": "Argument `Query` is not assignable to parameter `main_query` with type `QueryString | list[Unknown]` in function `cl.lib.types.EsJoinQueries.__init__`",
-      "severity": "error"
-    },
-    {
-      "column": 22,
-      "path": "cl/lib/elasticsearch_utils.py",
-      "name": "bad-argument-type",
-      "concise_description": "Argument `Query | None` is not assignable to parameter `parent_query` with type `QueryString | None` in function `cl.lib.types.EsJoinQueries.__init__`",
-      "severity": "error"
-    },
-    {
-      "column": 21,
-      "path": "cl/lib/elasticsearch_utils.py",
-      "name": "bad-argument-type",
-      "concise_description": "Argument `Query | None` is not assignable to parameter `child_query` with type `QueryString | None` in function `cl.lib.types.EsJoinQueries.__init__`",
-      "severity": "error"
-    },
-    {
-      "column": 17,
-      "path": "cl/lib/search_index_utils.py",
-      "name": "bad-argument-type",
-      "concise_description": "Argument `Literal['']` is not assignable to parameter `meta` with type `ApiResponseMeta` in function `elastic_transport._exceptions.ApiError.__init__`",
-      "severity": "error"
-    },
-    {
-      "column": 48,
-      "path": "cl/lib/search_utils.py",
-      "name": "bad-argument-type",
-      "concise_description": "Argument `Page[Unknown] | list[Unknown]` is not assignable to parameter `results` with type `Page[Unknown] | Response` in function `cl.lib.elasticsearch_utils.merge_semantic_relevant_chunks`",
       "severity": "error"
     },
     {

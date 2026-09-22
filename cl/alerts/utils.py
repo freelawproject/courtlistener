@@ -129,12 +129,14 @@ class InvalidDateError(Exception):
 
 
 def create_percolator_search_query(
-    index_name: str, final_query: Query, search_after: int | None = None
+    index_name: str,
+    final_query: Query | None,
+    search_after: int | None = None,
 ):
     """Create an Elasticsearch search query with pagination.
 
     :param index_name: The name of the Elasticsearch index to search.
-    :param final_query: Elasticsearch DSL Query object.
+    :param final_query: Elasticsearch DSL Query object, or None.
     :param search_after: An optional parameter for search_after pagination.
     :return: An Elasticsearch search object with the specified query and pagination settings.
     """
