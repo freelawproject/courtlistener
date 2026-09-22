@@ -925,11 +925,11 @@ def get_ms_current_time(default_current_date: datetime.date) -> int:
 
 
 def build_custom_function_score_for_date(
-    query: QueryString | str,
+    query: Query | str,
     order_by: tuple[str, str],
     default_score: int,
     default_current_date: datetime.date | None = None,
-) -> QueryString:
+) -> Query:
     """Build a custom function score query for sorting based on a date field.
 
     Define the function score for sorting, based on the child sort_field. When
@@ -946,14 +946,14 @@ def build_custom_function_score_for_date(
     This approach allows for handling dates in our system both before and
     after January 1, 1970 (epoch time), within a positive scoring range.
 
-    :param query: The Elasticsearch query string or QueryString object.
+    :param query: The Elasticsearch query string or Query object.
     :param order_by: If provided the field to use to compute score for sorting
     results based on a child document field.
     :param default_score: The default score to return when the document lacks
     the sort field.
     :param default_current_date: The default current date to use for computing
      a stable date score across pagination in the V4 Search API.
-    :return: The modified QueryString object with applied function score.
+    :return: The modified Query object with applied function score.
     """
 
     default_current_time = (
@@ -962,7 +962,7 @@ def build_custom_function_score_for_date(
         else None
     )
     sort_field, order = order_by
-    query = Q(
+    return Q(
         "function_score",
         query=query,
         script_score={
@@ -1011,11 +1011,9 @@ def build_custom_function_score_for_date(
         boost_mode="replace",
     )
 
-    return query
-
 
 def build_custom_relevance_score(
-    query: QueryString | str,
+    query: Query | str,
     date_field: str,
     scale: int,
     decay: float,
@@ -1024,7 +1022,7 @@ def build_custom_relevance_score(
     min_score: float = 0.0,
     default_current_date: datetime.date | None = None,
     jurisdiction_relevancy: bool = False,
-) -> QueryString:
+) -> Query:
     """
     Build a custom relevance score query for Elasticsearch that adjusts
     document relevance based on two criteria:
@@ -1033,7 +1031,7 @@ def build_custom_relevance_score(
      Court jurisdiction hierarchy, according to multiplier factors defined in
      jurisdiction_relevance_multipliers.
 
-    :param query: The Elasticsearch query string or QueryString object.
+    :param query: The Elasticsearch query string or Query object.
     :param date_field: The date field used to compute the relevance decay.
     :param scale: The scale (in years) that determines the rate of decay.
     :param decay: The decay factor.
@@ -1046,7 +1044,7 @@ def build_custom_relevance_score(
      a stable decay relevance score across pagination in the V4 Search API.
     :param jurisdiction_relevancy: Whether to apply jurisdiction relevance,
     which is currently supported only for Case Law Search.
-    :return:  The modified QueryString object with applied function score.
+    :return: The modified Query object with applied function score.
     """
 
     default_current_time = (
@@ -1055,7 +1053,7 @@ def build_custom_relevance_score(
         else None
     )
 
-    query = Q(
+    return Q(
         "function_score",
         query=query,
         script_score={
@@ -1134,11 +1132,10 @@ def build_custom_relevance_score(
         },
         boost_mode=boost_mode,
     )
-    return query
 
 
 def build_has_child_query(
-    query: QueryString | str,
+    query: Query | str,
     child_type: str,
     child_hits_limit: int,
     highlighting_fields: dict[str, int] | None = None,
@@ -1149,7 +1146,7 @@ def build_has_child_query(
 ) -> QueryString:
     """Build a 'has_child' query.
 
-    :param query: The Elasticsearch query string or QueryString object.
+    :param query: The Elasticsearch query string or Query object.
     :param child_type: The type of the child document.
     :param child_hits_limit: The maximum number of child hits to be returned.
     :param highlighting_fields: List of fields to highlight in child docs.
@@ -2303,9 +2300,8 @@ def clean_count_query(search_query: Search) -> SearchDSL:
     # Select only the query and omit other elements like sorting, highlighting, etc
     parent_total_query_dict = parent_total_query_dict["query"]
     # Generate a new Search object from scratch
-    search_query = SearchDSL(index=search_query._index)
-    search_query = search_query.query(Q(parent_total_query_dict))
-    return search_query
+    count_query = SearchDSL(index=search_query._index)
+    return count_query.query(Q(parent_total_query_dict))
 
 
 def fetch_es_results(

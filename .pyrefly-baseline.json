@@ -379,24 +379,10 @@
       "severity": "error"
     },
     {
-      "column": 13,
-      "path": "cl/lib/elasticsearch_utils.py",
-      "name": "bad-assignment",
-      "concise_description": "`Query` is not assignable to variable `query` with type `QueryString | str`",
-      "severity": "error"
-    },
-    {
       "column": 12,
       "path": "cl/lib/elasticsearch_utils.py",
       "name": "bad-return",
       "concise_description": "Returned type `QueryString | str` is not assignable to declared return type `QueryString`",
-      "severity": "error"
-    },
-    {
-      "column": 13,
-      "path": "cl/lib/elasticsearch_utils.py",
-      "name": "bad-assignment",
-      "concise_description": "`Query` is not assignable to variable `query` with type `QueryString | str`",
       "severity": "error"
     },
     {
@@ -467,13 +453,6 @@
       "path": "cl/lib/elasticsearch_utils.py",
       "name": "bad-return",
       "concise_description": "Returned type `tuple[Search, QueryString | Search | None, Literal[5]]` is not assignable to declared return type `tuple[Search, Search | None, int | None]`",
-      "severity": "error"
-    },
-    {
-      "column": 20,
-      "path": "cl/lib/elasticsearch_utils.py",
-      "name": "bad-assignment",
-      "concise_description": "`elasticsearch.dsl._sync.search.Search` is not assignable to variable `search_query` with type `django_elasticsearch_dsl.search.Search`",
       "severity": "error"
     },
     {
@@ -621,13 +600,6 @@
       "path": "cl/lib/search_utils.py",
       "name": "bad-argument-type",
       "concise_description": "Argument `Page[Unknown] | list[Unknown]` is not assignable to parameter `results` with type `Page[Unknown] | Response` in function `cl.lib.elasticsearch_utils.merge_semantic_relevant_chunks`",
-      "severity": "error"
-    },
-    {
-      "column": 9,
-      "path": "cl/opinion_page/utils.py",
-      "name": "bad-assignment",
-      "concise_description": "`Response | list[Unknown]` is not assignable to attribute `related_clusters` with type `list[Unknown]`",
       "severity": "error"
     },
     {

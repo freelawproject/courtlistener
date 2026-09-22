@@ -21,6 +21,7 @@ from django.utils.safestring import mark_safe
 from django.utils.timezone import localtime
 from django_elasticsearch_dsl.search import Search
 from elasticsearch.dsl import Q
+from elasticsearch.dsl.response import Response
 from elasticsearch.exceptions import ApiError, ConnectionTimeout, RequestError
 
 from cl.alerts.models import DocketAlert
@@ -774,7 +775,7 @@ class RelatedCitingResults:
 
 @dataclass
 class RelatedClusterResults:
-    related_clusters: list[OpinionClusterDocument] = field(
+    related_clusters: Response | list[OpinionClusterDocument] = field(
         default_factory=list
     )
     sub_opinion_pks: list[int] = field(default_factory=list)
