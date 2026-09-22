@@ -11,7 +11,7 @@ from pathlib import Path
 from typing import Any
 
 import requests
-from django.core.management.base import CommandError
+from django.core.management.base import CommandError, CommandParser
 from django.db.models import Q
 from django.utils import timezone
 
@@ -98,6 +98,27 @@ BARE_CHARS = 3000
 TEX_LABELLED = re.compile(
     r"\bCase\b[^0-9]{0,20}?(\d{2}[-\u2013]\d{4})(?![\d-])", re.I
 )
+# A consolidated caption lists a second number after "consolidated with"
+# or "and": "No. 01-0057 ... - consolidated with - No. 01-0058 ...". Such a
+# companion belongs to the same document, so a record carrying it holds the
+# file rightly. Only the caption is read, and only numbers introduced that
+# way, so a cited case further down is not taken for a companion.
+CAPTION_CHARS = 3000
+TEX_COMPANION = re.compile(
+    r"(?:consolidated\s+with|\band)\s*[-\u2013\u2014]*\s*"
+    r"N\s*[Oo]\s*[Ss]?\s*\.?\s*(\d{2}[-\u2013]\d{4})(?![\d-])",
+    re.I,
+)
+ND_COMPANION = re.compile(
+    r"(?:consolidated\s+with|\band)\s*[-\u2013\u2014]*\s*"
+    r"N\s*[Oo]\s*[Ss]?\s*\.?\s*(?:Civil\s+)?(\d{6,8})(?!\d)",
+    re.I,
+)
+# A Texas multidistrict-litigation panel opinion is captioned "MDL 10-0376"
+# or "MDL No. 10-0376", and the first "No." further down is a cited case.
+TEX_MDL = re.compile(
+    r"\bMDL\s*(?:N\s*[Oo]\s*\.?\s*)?(\d{2}[-\u2013]\d{4})(?![\d-])"
+)
 
 ALIGNED = "aligned"
 MISATTACHED = "misattached"
@@ -117,6 +138,8 @@ BY_FILING_DATE = "filing_date"
 # author: "Justice Medina delivered the opinion of the Court", "PER CURIAM",
 # or, for a separate opinion, "Justice O'Neill, joined by ..., concurring".
 BY_DELIVERED = "delivered_date"
+# Identical copies of one consolidated opinion, given distinct owners.
+BY_COPY = "duplicate_copy"
 DELIVERED = re.compile(
     r"OPINION\s+DELIVERED[:\s]+([A-Z][a-z]+)\.?\s+(\d{1,2}),\s+(\d{4})", re.I
 )
@@ -368,17 +391,39 @@ def docket_from_url(download_url: str | None) -> str | None:
     return match.group(1) if match else None
 
 
-def docket_from_body(body: str, pattern: re.Pattern) -> str | None:
+def docket_from_body(
+    body: str, pattern: re.Pattern, mdl: bool = False
+) -> str | None:
     """Read the first docket number printed in a normalised document body.
 
     Caveat: this takes the first match. In documents that reproduce a lower
     court record or bundle companion cases, the first number is not always the
-    document's own, which is why no single source is trusted alone.
+    document's own, which is why no single source is trusted alone. With
+    `mdl`, an "MDL 10-0376" caption wins over any later "No.".
     """
     if not body:
         return None
+    if mdl and (match := TEX_MDL.search(body[:CAPTION_CHARS])):
+        return match.group(1).replace(EN_DASH, "-")
     match = pattern.search(body)
     return match.group(1).replace(EN_DASH, "-") if match else None
+
+
+def companion_numbers(body: str, profile: CourtProfile) -> set[str]:
+    """Docket numbers a consolidated caption lists besides the first.
+
+    :param body: the normalised document text
+    :param profile: the court's reading rules
+    :return: the companions as comparison keys
+    """
+    if not body:
+        return set()
+    pattern = TEX_COMPANION if profile.bare_number_fallback else ND_COMPANION
+    return {
+        k
+        for n in pattern.findall(body[:CAPTION_CHARS])
+        if (k := docket_key(n.replace(EN_DASH, "-"), profile))
+    }
 
 
 def pdf_text(content: bytes) -> str:
@@ -486,8 +531,9 @@ def collect_sources(
     sources: dict[str, str | None] = {}
     if profile.read_download_url:
         sources[BY_URL] = docket_from_url(row["download_url"])
-    sources[BY_HTML] = docket_from_body(markup, profile.docket_re)
-    sources[BY_TEXT] = docket_from_body(text, profile.docket_re)
+    mdl = profile.bare_number_fallback
+    sources[BY_HTML] = docket_from_body(markup, profile.docket_re, mdl)
+    sources[BY_TEXT] = docket_from_body(text, profile.docket_re, mdl)
     if storage_url and not any(sources.values()):
         body = stored_file_text(row.get("local_path"), storage_url)
         row["_stored_text"] = body
@@ -643,9 +689,11 @@ def pick_by_delivered_date(
     majority opinion may land on any fileless record of that day, the
     oldest first, since a combined record and a lead record of one case
     hold the same text. A concurrence or dissent may land only on a record
-    of that type; an order is left for a person. A record whose case name
-    is absent from the file is never chosen. A record holding any file
-    column, even a dead pointer, is never written to.
+    of that type. An order has no author line, so it is placed like a
+    majority opinion: on a combined, unanimous, lead or plurality record of
+    its date, the oldest first. A record whose case name is absent from the
+    file is never chosen. A record holding any file column, even a dead
+    pointer, is never written to.
 
     :param delivered: the date the file says it was delivered
     :param kind: majority, concurrence, dissent or order
@@ -655,15 +703,17 @@ def pick_by_delivered_date(
     """
     if not delivered:
         return None, "no delivered date printed"
-    if kind == ORDER:
-        return None, "file is an order, not an opinion"
     on_date = [c for c in candidates if c["cluster__date_filed"] == delivered]
     if not on_date:
         return None, f"no candidate filed on {delivered.isoformat()}"
     empty = [c for c in on_date if not c["holds_file"]]
     if not empty:
         return None, f"candidates on {delivered.isoformat()} all hold a file"
-    typed = [c for c in empty if c["type"] in KIND_TYPES[kind]]
+    typed = [
+        c
+        for c in empty
+        if c["type"] in KIND_TYPES[MAJORITY if kind == ORDER else kind]
+    ]
     if not typed:
         return None, f"no fileless {kind} record on {delivered.isoformat()}"
     named = [
@@ -780,13 +830,16 @@ def judge(
     sources: dict[str, str | None],
     on_record: str,
     profile: CourtProfile | None = None,
+    companions: set[str] | None = None,
 ) -> tuple[str, str | None, str | None]:
     """Decide what the sources say about one record.
 
     Agreement between two or more independent sources is treated as high
     confidence, a lone source as medium, and disagreement as a conflict for a
     person to settle. Calibration against undamaged records shows no single
-    source is better than 99%, so corroboration matters.
+    source is better than 99%, so corroboration matters. A consolidated
+    caption's companion numbers count for the record's own docket only: a
+    file whose caption names the record's number is where it belongs.
 
     :return: status, the docket number the file claims, confidence
     """
@@ -795,6 +848,7 @@ def judge(
     if not found:
         return UNDETERMINED, None, None
 
+    own = docket_numbers(on_record, profile)
     keys = {docket_key(v, profile) for v in found}
     if len(keys) > 1:
         # A consolidated case is filed under several numbers. The URL can
@@ -803,17 +857,14 @@ def judge(
         # the same numbers would be a duplicate of the same case, and the
         # file is already on one of them. Records this branch never
         # reaches are settled in resolve_conflicts.
-        if keys <= docket_numbers(on_record, profile):
+        if keys <= own:
             return ALIGNED, found[0], HIGH
         return CONFLICTED, None, None
 
     claimed = found[0]
     confidence = HIGH if len(found) > 1 else MEDIUM
-    status = (
-        ALIGNED
-        if docket_key(claimed, profile) in docket_numbers(on_record, profile)
-        else MISATTACHED
-    )
+    named = {docket_key(claimed, profile)} | (companions or set())
+    status = ALIGNED if named & own else MISATTACHED
     return status, claimed, confidence
 
 
@@ -909,9 +960,12 @@ def audit_court(
     for row in queryset.iterator(chunk_size=500):
         on_record = row["cluster__docket__docket_number"]
         sources = collect_sources(row, profile, storage_url)
-        status, claimed, confidence = judge(sources, on_record, profile)
-
         body = document_body(row)
+        companions = companion_numbers(body, profile)
+        status, claimed, confidence = judge(
+            sources, on_record, profile, companions
+        )
+
         name_match = name_in_document(row["cluster__case_name"], body)
         confidence = upgrade_confidence(status, confidence, name_match)
         delivered, kind = (
@@ -932,13 +986,15 @@ def audit_court(
                 "docket_number_on_record": on_record,
                 "docket_number_in_file": claimed,
                 # Every distinct number the sources read, as comparison
-                # keys. More than one means the sources disagreed.
+                # keys, plus the companions a consolidated caption lists.
+                # Several from the sources alone means they disagreed.
                 "numbers_in_file": sorted(
                     {
                         k
                         for v in sources.values()
                         if (k := docket_key(v, profile))
                     }
+                    | companions
                 ),
                 "sources": sources,
                 "agreeing_sources": len([v for v in sources.values() if v]),
@@ -1177,10 +1233,91 @@ def resolve_targets(
             else f"{len(candidates)} opinions share docket {wanted}"
         )
 
+    split_duplicate_copies(records, group, profile, in_run)
     names = {
         r["opinion_id"]: r["case_name"] for r in [*records, *(peers or [])]
     }
     resolve_conflicts(records, group, profile, in_run, names)
+
+
+def split_duplicate_copies(
+    records: list[dict[str, Any]],
+    group: tuple[str, ...],
+    profile: CourtProfile,
+    in_run: dict[str, list[int]],
+) -> None:
+    """Give identical copies of a consolidated opinion distinct owners.
+
+    Two records can hold the same document, an opinion captioned with two
+    docket numbers, and both resolve to the owner of the first number, so
+    the planner refuses both as contested. When the copies are the same
+    text and the caption names at least as many numbers as there are
+    copies, each number's sole owner takes one copy: the lowest opinion id
+    keeps the owner already resolved, the next takes the next number's
+    owner. Sets `target_method` = `duplicate_copy`. Anything short of that,
+    a number with no owner or with several, is left as it was.
+
+    :param records: audit rows, modified in place
+    :param group: court ids to search outside the run
+    :param profile: the court's comparison rules
+    :param in_run: docket key to the audited opinion ids covering it
+    :return: None
+    """
+    claimants: dict[int, list[dict[str, Any]]] = {}
+    for record in records:
+        if record["status"] == MISATTACHED and record["target_opinion_id"]:
+            claimants.setdefault(record["target_opinion_id"], []).append(
+                record
+            )
+
+    groups: list[tuple[list[dict[str, Any]], list[str]]] = []
+    wanted: set[str] = set()
+    for rows in claimants.values():
+        rows = sorted(rows, key=lambda r: r["opinion_id"])
+        if len(rows) < 2 or not all(r.get("_body") for r in rows):
+            continue
+        base = shingles(rows[0]["_body"])
+        if not base or any(
+            containment(base, shingles(r["_body"])) < MATCH_FLOOR
+            for r in rows[1:]
+        ):
+            continue
+        # The number already resolved first, then the rest as the caption
+        # lists them.
+        numbers = [docket_key(rows[0]["docket_number_in_file"], profile)]
+        for r in rows:
+            for n in r.get("numbers_in_file") or []:
+                if n not in numbers:
+                    numbers.append(n)
+        numbers = [n for n in numbers if n]
+        if len(numbers) < len(rows):
+            continue
+        groups.append((rows, numbers[: len(rows)]))
+        wanted |= {n for n in numbers[: len(rows)] if n not in in_run}
+    if not groups:
+        return
+
+    outside = lookup_destinations(group, wanted, profile) if wanted else {}
+    for rows, numbers in groups:
+        ids = {r["opinion_id"] for r in rows}
+        owners = []
+        for n in numbers:
+            inside = [i for i in in_run.get(n, []) if i not in ids]
+            beyond = (
+                []
+                if inside
+                else [i for i in outside.get(n, []) if i not in ids]
+            )
+            found = inside or beyond
+            if len(found) != 1:
+                break
+            owners.append((found[0], "in_run" if inside else "outside_run"))
+        if len(owners) != len(rows):
+            continue
+        for record, (owner, scope) in zip(rows, owners):
+            record["target_opinion_id"] = owner
+            record["target_scope"] = scope
+            record["target_method"] = BY_COPY
 
 
 def covering(numbers: list[str], found: dict[str, list[int]]) -> set[int]:
@@ -1650,14 +1787,32 @@ def plan_cycles(
     }
 
 
+def read_report(path: Path) -> list[dict[str, Any]]:
+    """The records of a saved audit report.
+
+    :param path: the report file
+    :return: its records
+    :raises CommandError: when the file is missing or is not a report
+    """
+    if not path.is_file():
+        raise CommandError(f"No such report: {path}")
+    try:
+        return json.loads(path.read_text())["records"]
+    except (json.JSONDecodeError, KeyError, TypeError) as error:
+        raise CommandError(f"Not an audit report: {path} ({error})") from error
+
+
 class Command(VerboseCommand):
     help = (
         "Audit opinions whose file was attached to the wrong record by the "
         "juriscraper DeferringList sorting bug. Read only; writes a JSON "
-        "report naming the opinion each misattached file belongs on."
+        "report naming the opinion each misattached file belongs on. With "
+        "--plan, also groups the resolved moves into a fix plan; with "
+        "--from-reports, builds that plan from saved reports and touches no "
+        "database."
     )
 
-    def add_arguments(self, parser):
+    def add_arguments(self, parser: CommandParser) -> None:
         """Register the audit's arguments.
 
         :param parser: the command's argument parser
@@ -1690,7 +1845,10 @@ class Command(VerboseCommand):
         )
         parser.add_argument(
             "--output",
-            help="Path to write the JSON report to. Required unless --from-reports.",
+            help=(
+                "Path to write the JSON report to. Required unless "
+                "--from-reports."
+            ),
         )
         parser.add_argument(
             "--plan",
@@ -1749,12 +1907,14 @@ class Command(VerboseCommand):
             ),
         )
 
-    def handle(self, *args, **options):
-        """Audit each court and write the JSON report.
+    def handle(self, *args: Any, **options: Any) -> None:
+        """Audit each court and write the JSON report, and the plan if asked.
 
         Reads only. Narrow --created-after and --created-before to a single
         scrape run when auditing one back scrape, since the permutation
         happened inside a run and target resolution prefers in-run matches.
+        With --from-reports nothing is audited: the plan is built from the
+        saved reports, and the audit options are refused.
 
         :return: None
         """
@@ -1763,12 +1923,13 @@ class Command(VerboseCommand):
         if options["from_reports"]:
             if not options["plan"]:
                 raise CommandError("--from-reports needs --plan.")
+            if options["output"]:
+                raise CommandError(
+                    "--from-reports does not write a report; drop --output."
+                )
             records = []
             for name in options["from_reports"]:
-                path = Path(name)
-                if not path.is_file():
-                    raise CommandError(f"No such report: {path}")
-                records.extend(json.loads(path.read_text())["records"])
+                records.extend(read_report(Path(name)))
             self.write_plan(records, options["from_reports"], options)
             return
         if not options["output"]:
@@ -1882,10 +2043,11 @@ class Command(VerboseCommand):
         :param options: the command options
         :return: None
         """
-        seen = {r["opinion_id"] for r in records}
-        if len(seen) != len(records):
+        counts = Counter(r["opinion_id"] for r in records)
+        if repeated := sorted(i for i, n in counts.items() if n > 1):
             raise CommandError(
-                "The reports overlap; the same opinion appears twice."
+                f"The reports overlap on {len(repeated)} opinion ids, the "
+                f"first: {repeated[:5]}"
             )
         plan = plan_cycles(records, options["min_confidence"])
         plan["generated_at"] = timezone.now().isoformat()
