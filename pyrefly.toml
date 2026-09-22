@@ -110,6 +110,13 @@ bad-override-param-name = false
 bad-override-mutable-attribute = false
 
 [[sub-config]]
+matches = "cl/corpus_importer/**"
+check-unannotated-defs = false
+infer-return-types = "checked"
+ignore-missing-imports = []
+strict-callable-subtyping = false
+
+[[sub-config]]
 matches = "cl/opinion_page/**"
 check-unannotated-defs = true
 infer-return-types = "checked"
