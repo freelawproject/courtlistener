@@ -11,7 +11,7 @@ from collections.abc import Callable
 from copy import deepcopy
 from dataclasses import fields
 from functools import reduce, wraps
-from typing import Any, Literal
+from typing import Any, Literal, cast
 
 from asgiref.sync import async_to_sync
 from django.conf import settings
@@ -3557,10 +3557,10 @@ def do_es_alert_estimation_query(
             multi_search = multi_search.add(rd_case_only_query)
 
         responses = multi_search.execute()
-        parent_total = responses[0].hits.total.value
+        parent_total = cast(Any, responses[0].hits).total.value
         if child_docs_count_query:
             child_doc_count_response = responses[1]
-            child_total = child_doc_count_response.hits.total.value
+            child_total = cast(Any, child_doc_count_response.hits).total.value
 
             # Case only count
             child_doc_count_response_case_only = responses[2]
@@ -3645,7 +3645,7 @@ def do_es_sweep_alert_query(
     # result sets.
     should_repeat_parent_query = (
         docket_results
-        and docket_results.hits.total.value
+        and cast(Any, docket_results.hits).total.value
         >= settings.ELASTICSEARCH_MAX_RESULT_COUNT
     )
     if should_repeat_parent_query and parent_query:
@@ -3666,7 +3666,7 @@ def do_es_sweep_alert_query(
     # Finally, it re-executes the child search.
     should_repeat_child_query = (
         rd_results
-        and rd_results.hits.total.value
+        and cast(Any, rd_results.hits).total.value
         >= settings.ELASTICSEARCH_MAX_RESULT_COUNT
     )
     if should_repeat_child_query and child_query and not query_with_parties:

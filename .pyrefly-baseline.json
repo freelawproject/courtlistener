@@ -85,13 +85,6 @@
       "severity": "error"
     },
     {
-      "column": 25,
-      "path": "cl/alerts/utils.py",
-      "name": "missing-attribute",
-      "concise_description": "Object of class `list` has no attribute `hits`",
-      "severity": "error"
-    },
-    {
       "column": 12,
       "path": "cl/alerts/utils.py",
       "name": "bad-return",
@@ -281,59 +274,10 @@
       "severity": "error"
     },
     {
-      "column": 16,
-      "path": "cl/corpus_importer/import_columbia/columbia_utils.py",
-      "name": "missing-attribute",
-      "concise_description": "Object of class `PageElement` has no attribute `name`",
-      "severity": "error"
-    },
-    {
-      "column": 32,
-      "path": "cl/corpus_importer/import_columbia/columbia_utils.py",
-      "name": "missing-attribute",
-      "concise_description": "Object of class `PageElement` has no attribute `decode_contents`",
-      "severity": "error"
-    },
-    {
-      "column": 20,
-      "path": "cl/corpus_importer/management/commands/anon_2020_import.py",
-      "name": "missing-attribute",
-      "concise_description": "Object of class `NoneType` has no attribute `decode_contents`",
-      "severity": "error"
-    },
-    {
       "column": 52,
       "path": "cl/corpus_importer/management/commands/columbia_merge.py",
       "name": "bad-argument-type",
       "concise_description": "Argument `Tag | None` is not assignable to parameter `outer_opinion` with type `BeautifulSoup` in function `cl.corpus_importer.import_columbia.columbia_utils.extract_columbia_opinions`",
-      "severity": "error"
-    },
-    {
-      "column": 20,
-      "path": "cl/corpus_importer/management/commands/harvard_merge.py",
-      "name": "missing-attribute",
-      "concise_description": "Object of class `NoneType` has no attribute `find_all`",
-      "severity": "error"
-    },
-    {
-      "column": 12,
-      "path": "cl/corpus_importer/management/commands/harvard_merge.py",
-      "name": "missing-attribute",
-      "concise_description": "Object of type `AttributeValueList | str | None` has no attribute `startswith`",
-      "severity": "error"
-    },
-    {
-      "column": 9,
-      "path": "cl/corpus_importer/management/commands/harvard_merge.py",
-      "name": "missing-attribute",
-      "concise_description": "Object of class `NoneType` has no attribute `append`",
-      "severity": "error"
-    },
-    {
-      "column": 9,
-      "path": "cl/corpus_importer/management/commands/harvard_merge.py",
-      "name": "missing-attribute",
-      "concise_description": "Object of class `NoneType` has no attribute `append`",
       "severity": "error"
     },
     {
@@ -540,34 +484,6 @@
       "severity": "error"
     },
     {
-      "column": 24,
-      "path": "cl/lib/elasticsearch_utils.py",
-      "name": "missing-attribute",
-      "concise_description": "Object of class `list` has no attribute `total`",
-      "severity": "error"
-    },
-    {
-      "column": 27,
-      "path": "cl/lib/elasticsearch_utils.py",
-      "name": "missing-attribute",
-      "concise_description": "Object of class `list` has no attribute `total`",
-      "severity": "error"
-    },
-    {
-      "column": 13,
-      "path": "cl/lib/elasticsearch_utils.py",
-      "name": "missing-attribute",
-      "concise_description": "Object of class `list` has no attribute `total`",
-      "severity": "error"
-    },
-    {
-      "column": 13,
-      "path": "cl/lib/elasticsearch_utils.py",
-      "name": "missing-attribute",
-      "concise_description": "Object of class `list` has no attribute `total`",
-      "severity": "error"
-    },
-    {
       "column": 12,
       "path": "cl/lib/elasticsearch_utils.py",
       "name": "bad-return",
@@ -600,13 +516,6 @@
       "path": "cl/lib/search_utils.py",
       "name": "bad-argument-type",
       "concise_description": "Argument `Page[Unknown] | list[Unknown]` is not assignable to parameter `results` with type `Page[Unknown] | Response` in function `cl.lib.elasticsearch_utils.merge_semantic_relevant_chunks`",
-      "severity": "error"
-    },
-    {
-      "column": 9,
-      "path": "cl/opinion_page/utils.py",
-      "name": "missing-attribute",
-      "concise_description": "Object of class `list` has no attribute `total`",
       "severity": "error"
     },
     {

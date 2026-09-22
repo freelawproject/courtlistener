@@ -3,7 +3,7 @@ import logging
 import traceback
 from dataclasses import dataclass, field
 from io import StringIO
-from typing import cast
+from typing import Any, cast
 from zoneinfo import ZoneInfo
 
 import waffle
@@ -966,7 +966,7 @@ async def es_get_cited_clusters_with_cache(
     citing_clusters = list(response) if response is not None else []
     cluster_results.citing_clusters = citing_clusters
     cluster_results.citing_cluster_count = (
-        response.hits.total.value if response is not None else 0
+        cast(Any, response.hits).total.value if response is not None else 0
     )
     cluster_results.timeout = False if citing_clusters else timeout_cited
     if not cluster_results.timeout:

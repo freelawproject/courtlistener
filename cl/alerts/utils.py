@@ -2,7 +2,7 @@ import copy
 from dataclasses import dataclass
 from datetime import date, datetime
 from enum import Enum, auto
-from typing import Any
+from typing import Any, cast
 from urllib.parse import parse_qs
 
 from django.apps import apps
@@ -329,7 +329,9 @@ def fetch_all_search_alerts_results(
     """
 
     def get_search_after(response: Response | None) -> Any:
-        if response and response.hits.hits:
+        # Response.hits is annotated upstream as a plain list, but at runtime
+        # it is an AttrList that also exposes the raw `hits` payload.
+        if response and cast(Any, response.hits).hits:
             return response.hits[-1].meta.sort
         return None
 
