@@ -1670,6 +1670,7 @@ Sample code here.
   <section class="max-w-full w-full border-t-2 border-greyscale-200" x-intersect.margin.-100px="show" id="docket-filter">
     <h2 class="mt-6 mb-3">Docket filter</h2>
     <p>Page-specific filter toolbar for docket entries. Includes search, date range (Flatpickr), document number range, sort toggle, and prev/next navigation. On mobile, filter fields move into a <code>&lt;c-filter-drawer&gt;</code> with an "Apply" button.</p>
+    <p>The search box is its own GET form to the RECAP search page, separate from the filters. The docket scope travels in a hidden <code>q</code> seeded with <code>docket_id:N</code>, and the visible input is unnamed, so the scope is never shown and clearing the box can't widen the search. On submit, <code>docket_filter.js</code> merges the typed terms into the hidden <code>q</code> as <code>(terms) AND docket_id:N</code> . An empty box, or a browser without JavaScript, submits the term-less docket search.</p>
 
     <h4 class="mt-3">Demo</h4>
     <p class="text-sm text-greyscale-600 mb-2">Desktop toolbar shown below. Resize below <code>md</code> breakpoint (768px) to see the mobile layout with search, prev/next, and filter drawer trigger.</p>
