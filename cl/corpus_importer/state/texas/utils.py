@@ -1,3 +1,5 @@
+from typing import cast
+
 from lxml import html
 from lxml.html import HtmlElement
 
@@ -15,4 +17,6 @@ def is_missing_file_page(html_string: str | bytes) -> bool:
     element = results[0]
     if not isinstance(element, HtmlElement):
         return False
-    return element.text_content().strip() == "File not found."
+    return (
+        cast(HtmlElement, element).text_content().strip() == "File not found."
+    )
