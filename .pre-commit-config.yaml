@@ -41,7 +41,7 @@ repos:
     hooks:
       - id: pyrefly
         name: pyrefly
-        entry: uv run pyrefly check
+        entry: uv run pyrefly check --prune-baseline
         language: system
         pass_filenames: false
         files: '(\.py$|^pyrefly\.toml$|^\.pyrefly-baseline\.json$)'

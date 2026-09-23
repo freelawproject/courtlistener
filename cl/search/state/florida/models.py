@@ -1,3 +1,6 @@
+from datetime import date, datetime
+from zoneinfo import ZoneInfo
+
 import pghistory
 from django.db import models
 
@@ -11,6 +14,24 @@ from cl.search.state.shared import (
 )
 
 __all__ = ["FloridaDocketEntry", "FloridaDocument"]
+
+# Florida ACIS timestamps are stored in UTC; filing dates in storage paths
+# should reflect the court's local calendar day.
+# The Florida Supreme Court and all six appellate courts are located in cities
+# that use Eastern Time as of 09/17/2026
+FLORIDA_TIMEZONE = ZoneInfo("America/New_York")
+
+
+def florida_local_date(value: datetime | None) -> date | None:
+    """Convert a Florida ACIS timestamp to the court's local filing date.
+
+    :param value: A timezone-aware datetime as stored on FloridaDocketEntry,
+        or None when the entry is undated.
+    :return: The date in Florida's timezone, or None.
+    """
+    if value is None:
+        return None
+    return value.astimezone(FLORIDA_TIMEZONE).date()
 
 
 @pghistory.track()
@@ -111,10 +132,6 @@ class FloridaDocument(AbstractDateTimeModel, AbstractStateDocument):
     document_type = models.TextField(blank=True)
     link_uuid = models.UUIDField()
 
-    def make_filename(self) -> str:
-        """Build the stored filename from the document name and link UUID."""
-        return f"{self.document_name}-{self.link_uuid}"
-
     @classmethod
     def tmp_prefix(cls) -> str:
         """Prefix for temporary download files."""
@@ -153,8 +170,7 @@ class FloridaDocument(AbstractDateTimeModel, AbstractStateDocument):
             )
         ]
 
-    def get_pdf_path(self, filename: str, thumbs: bool = False) -> str:
-        """Store Florida ACIS documents under the shared state layout."""
-        return self.state_pdf_path(
-            "fl", self.docket_entry.docket.court_id, filename, thumbs
-        )
+    def path_date_filed(self) -> date | None:
+        """ACIS entry timestamps are stored in UTC, so convert to Florida's
+        local calendar day before it goes into the storage path."""
+        return florida_local_date(self.docket_entry.date_filed)

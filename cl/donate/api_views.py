@@ -26,6 +26,7 @@ from cl.donate.models import (
     NeonMembershipLevel,
     NeonWebhookEvent,
 )
+from cl.lib.auth import filter_by_email
 from cl.lib.crypto import generate_activation_key
 from cl.lib.neon_utils import NeonClient
 from cl.lib.types import EmailType
@@ -152,8 +153,8 @@ class MembershipWebhookViewSet(
                 users = User.objects.filter(id=user_id)
             else:
                 contact_data = neon_account["primaryContact"]
-                users = User.objects.filter(
-                    email__iexact=contact_data["email1"]
+                users = filter_by_email(
+                    User.objects.all(), contact_data["email1"]
                 ).order_by(F("last_login").desc(nulls_last=True))
             if not users.exists():
                 address = self._get_address_from_neon_response(
