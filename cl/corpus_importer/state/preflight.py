@@ -212,8 +212,8 @@ class InvalidRows(PreflightCheck):
 class UnhashedFiles(PreflightCheck):
     """Downloaded files the archive recorded no content hash for.
 
-    A merge will not publish a file it cannot name by content, so each of
-    these becomes a document with no file.
+    A merge will not store a file with no hash, so each of these becomes a
+    document with no file.
     """
 
     description = "downloaded files with no content hash"

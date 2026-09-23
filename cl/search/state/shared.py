@@ -106,8 +106,12 @@ class AbstractStateDocument(AbstractPDF):
         """
         return self.docket_entry.date_filed
 
-    def state_pdf_path(self, filename: str, thumbs: bool = False) -> str:
+    def get_pdf_path(self, filename: str, thumbs: bool = False) -> str:
         """Build the S3 path for a state court document in the RECAP layout.
+
+        Every state's documents are filed this way, so this satisfies
+        `AbstractPDF.get_pdf_path` for all of them rather than each model
+        repeating it.
 
         State documents have no PACER document numbers, so the document's own
         pk identifies it within the docket, and the CourtListener docket id
@@ -139,10 +143,6 @@ class AbstractStateDocument(AbstractPDF):
             Path(filename).suffix or ".pdf",
             thumbs=thumbs,
         )
-
-    def make_filename(self) -> str:
-        """Create the filename to store this document's content under (no extension)."""
-        return str(hash(self.url))
 
     @classmethod
     def tmp_prefix(cls) -> str:
@@ -266,7 +266,11 @@ class AbstractStateDocument(AbstractPDF):
         from cl.corpus_importer.tasks import download_document_in_stream
 
         try:
-            document = cls._default_manager.get(pk=pk)
+            # The document's storage path is built from its docket, so fetch
+            # that with it rather than going back for it a query at a time.
+            document = cls._default_manager.select_related(
+                "docket_entry__docket"
+            ).get(pk=pk)
         except cls.DoesNotExist:
             logger.warning(
                 "Document download: %s %s does not exist; skipping.",
@@ -378,7 +382,9 @@ class AbstractStateDocument(AbstractPDF):
             document.save()
             return None
 
-        filename = f"{document.make_filename()}{extension}"
+        # `get_pdf_path` names the file from the document itself and keeps
+        # only this name's extension, so the stem is never stored.
+        filename = f"document{extension}"
         downloaded_file = File(tmp)
         document.filepath_local.save(filename, downloaded_file, save=False)
         document.file_size = downloaded_file.size

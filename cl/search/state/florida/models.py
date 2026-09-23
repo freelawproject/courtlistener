@@ -348,10 +348,6 @@ class FloridaDocument(AbstractDateTimeModel, AbstractStateDocument):
             )
         )
 
-    def make_filename(self) -> str:
-        """Build the stored filename from the document name and link UUID."""
-        return f"{self.document_name}-{self.link_uuid}"
-
     @classmethod
     def tmp_prefix(cls) -> str:
         """Prefix for temporary download files."""
@@ -394,8 +390,3 @@ class FloridaDocument(AbstractDateTimeModel, AbstractStateDocument):
         """ACIS entry timestamps are stored in UTC, so convert to Florida's
         local calendar day before it goes into the storage path."""
         return florida_local_date(self.docket_entry.date_filed)
-
-    def get_pdf_path(self, filename: str, thumbs: bool = False) -> str:
-        """Store Florida ACIS documents in the shared RECAP-style state
-        layout."""
-        return self.state_pdf_path(filename, thumbs)
