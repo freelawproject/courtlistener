@@ -310,8 +310,12 @@ class JurisdictionsV2TemplateTest(TestCase):
 
     @classmethod
     def setUpTestData(cls) -> None:
-        cls.with_url = CourtFactory(id="v2withurl", url="https://example.com/")
-        cls.without_url = CourtFactory(id="v2nourl", url="")
+        # Pin the jurisdiction: make_court_variable() drops TESTING_COURT rows,
+        # and the factory's random choice would otherwise hit it sometimes.
+        cls.with_url = CourtFactory(
+            id="v2withurl", jurisdiction="F", url="https://example.com/"
+        )
+        cls.without_url = CourtFactory(id="v2nourl", jurisdiction="F", url="")
 
     async def test_row_links(self) -> None:
         """Does every court link to its search, and only courts with a URL to a homepage?"""
