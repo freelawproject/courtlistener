@@ -2297,13 +2297,17 @@ class RECAPAlertsSweepIndexTest(
         v2_webhook_event = WebhookEvent.objects.filter(
             webhook=webhook_2_1
         ).first()
+        assert v1_webhook_event is not None  # for the type checker
+        assert v2_webhook_event is not None  # for the type checker
+        v1_content = v1_webhook_event.content
+        v2_content = v2_webhook_event.content
+        assert v1_content is not None  # for the type checker
+        assert v2_content is not None  # for the type checker
         self.assertEqual(
-            v1_webhook_event.content["webhook"]["deprecation_date"],
+            v1_content["webhook"]["deprecation_date"],
             get_webhook_deprecation_date(settings.WEBHOOK_V1_DEPRECATION_DATE),
         )
-        self.assertEqual(
-            v2_webhook_event.content["webhook"]["deprecation_date"], None
-        )
+        self.assertEqual(v2_content["webhook"]["deprecation_date"], None)
 
         self.assertEqual(
             mail.outbox[1].subject,
