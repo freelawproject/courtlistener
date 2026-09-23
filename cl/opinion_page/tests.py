@@ -2472,7 +2472,7 @@ class UploadPublication(TestCase):
         self.async_client = AsyncClient()
 
         qs = Person.objects.filter(positions__court_id="tennworkcompapp")
-        self.work_comp_app_data = {
+        self.work_comp_app_data: dict[str, str | int | date | None] = {
             "case_title": "A Sample Case",
             "lead_author": qs[0].id,
             "second_judge": qs[1].id,

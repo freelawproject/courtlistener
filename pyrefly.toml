@@ -59,7 +59,6 @@ permissive-ignores = true
 # (py.typed) rather than stubs; the codebase has never been checked against
 # them, so their types stay hidden until someone fixes the fallout.
 replace-imports-with-any = [
-    "cl.people_db", "cl.people_db.*",
     "cl.recap", "cl.recap.*",
     "cl.scrapers", "cl.scrapers.*",
     "cl.search", "cl.search.*",
