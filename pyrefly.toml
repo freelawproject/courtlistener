@@ -77,7 +77,6 @@ baseline = ".pyrefly-baseline.json"
 # Checks the codebase was never previously held to.
 [errors]
 unbound-name = false
-bad-override-mutable-attribute = false
 
 # Modules to hold to a stricter standard. Ideally the whole codebase will be held to these standards eventually.
 [[sub-config]]
@@ -86,7 +85,6 @@ check-unannotated-defs = true
 
 [sub-config.errors]
 unbound-name = true
-bad-override-mutable-attribute = false
 
 [[sub-config]]
 matches = "cl/corpus_importer/**"
@@ -99,7 +97,6 @@ check-unannotated-defs = true
 
 [sub-config.errors]
 unbound-name = true
-bad-override-mutable-attribute = true
 
 [[sub-config]]
 matches = "cl/recap_rss/**"
@@ -107,7 +104,6 @@ check-unannotated-defs = true
 
 [sub-config.errors]
 unbound-name = true
-bad-override-mutable-attribute = true
 
 [[sub-config]]
 matches = "cl/simple_pages/**"
@@ -115,4 +111,3 @@ check-unannotated-defs = true
 
 [sub-config.errors]
 unbound-name = true
-bad-override-mutable-attribute = true

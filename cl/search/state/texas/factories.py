@@ -4,7 +4,7 @@ import random
 
 import factory
 from factory import DictFactory, Faker, List, SubFactory
-from factory.declarations import LazyAttribute
+from factory.declarations import BaseDeclaration, LazyAttribute
 from factory.django import DjangoModelFactory
 from juriscraper.state.texas.common import CourtID, CourtType
 
@@ -53,7 +53,7 @@ class TexasCasePartyDictFactory(DictFactory):
 
 class TexasOriginatingCourtDictFactory(DictFactory):
     name = Faker("court_name")
-    court_type = Faker(
+    court_type: BaseDeclaration | str = Faker(
         "random_element",
         elements=(
             CourtType.PROBATE.value,
@@ -104,7 +104,7 @@ class TexasCommonDataDictFactory(DictFactory):
             CourtID.COURT_OF_CRIMINAL_APPEALS.value,
         ),
     )
-    court_type = Faker(
+    court_type: BaseDeclaration | str = Faker(
         "random_element",
         elements=(CourtType.APPELLATE.value, CourtType.SUPREME.value),
     )
