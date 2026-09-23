@@ -8,12 +8,11 @@ ALTER TABLE "favorites_note" ADD COLUMN "content_type_id" integer NULL CONSTRAIN
 --
 ALTER TABLE "favorites_note" ADD COLUMN "object_id" integer NULL CHECK ("object_id" >= 0);
 --
--- Add field content_type to noteevent
+-- Custom state/database change combination
 --
 ALTER TABLE "favorites_noteevent" ADD COLUMN "content_type_id" integer NULL;
 --
 -- Add field object_id to noteevent
 --
 ALTER TABLE "favorites_noteevent" ADD COLUMN "object_id" integer NULL CHECK ("object_id" >= 0);
-CREATE INDEX "favorites_noteevent_content_type_id_16687302" ON "favorites_noteevent" ("content_type_id");
 COMMIT;

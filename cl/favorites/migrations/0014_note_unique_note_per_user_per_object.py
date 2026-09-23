@@ -34,4 +34,13 @@ class Migration(migrations.Migration):
                 ),
             ],
         ),
+        migrations.RunSQL(
+            sql=(
+                'CREATE INDEX CONCURRENTLY "favorites_noteevent_content_type_id_16687302" '
+                'ON "favorites_noteevent" ("content_type_id");'
+            ),
+            reverse_sql=(
+                'DROP INDEX CONCURRENTLY IF EXISTS "favorites_noteevent_content_type_id_16687302";'
+            ),
+        ),
     ]

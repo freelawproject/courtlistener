@@ -32,10 +32,21 @@ class Migration(migrations.Migration):
             name='object_id',
             field=models.PositiveIntegerField(blank=True, null=True, verbose_name='the ID of the item saved'),
         ),
-        migrations.AddField(
-            model_name='noteevent',
-            name='content_type',
-            field=models.ForeignKey(blank=True, db_constraint=False, null=True, on_delete=django.db.models.deletion.DO_NOTHING, related_name='+', related_query_name='+', to='contenttypes.contenttype', verbose_name='the content type of the item saved'),
+        migrations.SeparateDatabaseAndState(
+            state_operations=[
+                migrations.AddField(
+                    model_name='noteevent',
+                    name='content_type',
+                    field=models.ForeignKey(blank=True, db_constraint=False, null=True, on_delete=django.db.models.deletion.DO_NOTHING, related_name='+', related_query_name='+', to='contenttypes.contenttype', verbose_name='the content type of the item saved'),
+                ),
+            ],
+            database_operations=[
+                migrations.AddField(
+                    model_name='noteevent',
+                    name='content_type',
+                    field=models.ForeignKey(blank=True, db_constraint=False, db_index=False, null=True, on_delete=django.db.models.deletion.DO_NOTHING, related_name='+', related_query_name='+', to='contenttypes.contenttype', verbose_name='the content type of the item saved'),
+                ),
+            ],
         ),
         migrations.AddField(
             model_name='noteevent',
