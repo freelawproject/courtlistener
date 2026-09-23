@@ -431,7 +431,7 @@ async def view_docket(
         if user.is_authenticated:
             # Check prayer existence in bulk.
             existing_prayers = await get_existing_prayers_in_bulk(
-                user, page_documents
+                cast(User, user), page_documents
             )
 
         # Merge counts and existing prayer status onto the documents.
@@ -828,7 +828,9 @@ async def recap_document_context(
         user = await request.auser()
         if user.is_authenticated:
             # Check prayer existence.
-            existing_prayers = await get_existing_prayers_in_bulk(user, [rd])
+            existing_prayers = await get_existing_prayers_in_bulk(
+                cast(User, user), [rd]
+            )
 
     # Merge counts and existing prayer status to RECAPDocuments.
     rd.prayer_count = prayer_counts.get(rd.id, 0)
