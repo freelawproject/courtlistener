@@ -51,15 +51,15 @@
       <td>{{ court.count|intcomma }}</td>
       <td>{{ court.get_jurisdiction_display|nbsp  }}</td>
       <td class="whitespace-nowrap">
-        {% with escaped_url=court.url|http_url %}
-        {% if court.url %}
+        {% with court_http_url=court.url|http_url %}
+        {% if court_http_url %}
           <a
             class="links-external"
-            title="{{ escaped_url }}"
-            aria-label="{{ escaped_url }} (opens in new tab)"
-            href="{{ escaped_url }}" target="_blank" rel="noopener noreferrer"
+            title="{{ court_http_url }}"
+            aria-label="{{ court_http_url }} (opens in new tab)"
+            href="{{ court_http_url }}" target="_blank" rel="noopener noreferrer"
           >
-          {{ escaped_url|slice:"20" }}{% if escaped_url|length > 20 %}&hellip;{% endif %}
+          {{ court_http_url|slice:"20" }}{% if court_http_url|length > 20 %}&hellip;{% endif %}
           </a>
         {% endif %}
         {% endwith %}

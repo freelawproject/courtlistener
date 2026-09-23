@@ -316,15 +316,19 @@ class JurisdictionsV2TemplateTest(TestCase):
             id="v2withurl", jurisdiction="F", url="https://example.com/"
         )
         cls.without_url = CourtFactory(id="v2nourl", jurisdiction="F", url="")
+        cls.unsafe_url = CourtFactory(
+            id="v2badurl", jurisdiction="F", url="javascript:alert(1)"
+        )
 
     async def test_row_links(self) -> None:
-        """Does every court link to its search, and only courts with a URL to a homepage?"""
+        """Does every court link to its search, and only courts with an http(s) URL to a homepage?"""
         r = await self.async_client.get(reverse("court_index"))
         tbody = lhtml.fromstring(r.content).findall(".//tbody")[0]
         search_url = reverse("show_results")
         expected = (
             (self.with_url, [self.with_url.url]),
             (self.without_url, []),
+            (self.unsafe_url, []),
         )
         for court, homepage_links in expected:
             with self.subTest(court=court.pk):
