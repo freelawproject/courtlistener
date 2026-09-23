@@ -62,28 +62,16 @@ ignore-missing-imports = ["*"]
 # (py.typed) rather than stubs; the codebase has never been checked against
 # them, so their types stay hidden until someone fixes the fallout.
 replace-imports-with-any = [
-    "cl.ai", "cl.ai.*",
     "cl.api", "cl.api.*",
-    "cl.custom_filters", "cl.custom_filters.*",
     "cl.disclosures", "cl.disclosures.*",
-    "cl.donate", "cl.donate.*",
     "cl.favorites", "cl.favorites.*",
-    "cl.lasc", "cl.lasc.*",
-    "cl.oauth", "cl.oauth.*",
     "cl.people_db", "cl.people_db.*",
     "cl.recap", "cl.recap.*",
     "cl.scrapers", "cl.scrapers.*",
     "cl.search", "cl.search.*",
-    "cl.sitemaps_infinite", "cl.sitemaps_infinite.*",
-    "cl.stats", "cl.stats.*",
     "cl.tests", "cl.tests.*",
     "cl.users", "cl.users.*",
     "cl.visualizations", "cl.visualizations.*",
-    "cl.asgi",
-    "cl.celery_init",
-    "cl.sitemap",
-    "cl.urls",
-    "cl.workers",
     "eyecite", "eyecite.*",
 ]
 # Pre-existing errors are grandfathered here; only new errors fail the check.
