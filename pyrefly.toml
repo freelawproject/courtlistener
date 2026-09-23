@@ -82,7 +82,6 @@ check-unannotated-defs = true
 [[sub-config]]
 matches = "cl/corpus_importer/**"
 check-unannotated-defs = false
-strict-callable-subtyping = false
 
 [[sub-config]]
 matches = "cl/opinion_page/**"
