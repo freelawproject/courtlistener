@@ -25,6 +25,10 @@ from cl.search.models import (
     SCOTUSDocument,
 )
 
+# The entry and document models a DocketEntrySource can serve.
+type SourceDocketEntry = DocketEntry | SCOTUSDocketEntry
+type SourceDocument = RECAPDocument | SCOTUSDocument
+
 
 class MetadataItem(TypedDict):
     """Shape of a single item in a metadata description list. Rendered by
@@ -191,12 +195,14 @@ class DocketEntrySource:
     wrap them in ``sync_to_async``.
     """
 
-    entries_queryset: Callable[[Docket], QuerySet]
+    entries_queryset: Callable[[Docket], QuerySet[SourceDocketEntry]]
     documents_for_entry: Callable[[Any], Iterable]
     order_by_asc: tuple[str, ...]
     order_by_desc: tuple[str, ...]
     # Single-document lookup, for the document detail page.
-    documents_for_docket_and_number: Callable[[int, str], QuerySet]
+    documents_for_docket_and_number: Callable[
+        [int, str], QuerySet[SourceDocument]
+    ]
     get_document_for_render: Callable[[int], Awaitable[Any]]
     document_is_attachment: Callable[[Any], bool]
     document_label: Callable[[Any], str]
@@ -235,7 +241,7 @@ def attach_display_fields(source: DocketEntrySource, document: Any) -> None:
 # RECAP
 
 
-def _recap_entries(docket: Docket) -> QuerySet:
+def _recap_entries(docket: Docket) -> QuerySet[DocketEntry]:
     """Return this docket's DocketEntry queryset, with recap_documents
     prefetched for the docket page's entry list."""
     return docket.docket_entries.all().prefetch_related(
@@ -246,7 +252,7 @@ def _recap_entries(docket: Docket) -> QuerySet:
     )
 
 
-def _recap_documents_for_entry(de: DocketEntry) -> QuerySet:
+def _recap_documents_for_entry(de: DocketEntry) -> QuerySet[RECAPDocument]:
     """Return the RECAPDocuments attached to this docket entry."""
     return de.recap_documents.all()
 
@@ -313,7 +319,7 @@ def _recap_metadata_sections(docket: Docket) -> list[MetadataSection]:
 
 def _recap_documents_for_docket_and_number(
     docket_id: int, doc_num: str
-) -> QuerySet:
+) -> QuerySet[RECAPDocument]:
     """Look up RECAPDocuments by docket and document_number, for the
     document detail page."""
     return RECAPDocument.objects.filter(
@@ -340,7 +346,7 @@ async def _get_recap_document_for_render(pk: int) -> RECAPDocument:
     )
 
 
-RECAP = DocketEntrySource(
+RECAP: DocketEntrySource = DocketEntrySource(
     entries_queryset=_recap_entries,
     documents_for_entry=_recap_documents_for_entry,
     order_by_asc=("recap_sequence_number", "entry_number"),
@@ -359,7 +365,7 @@ RECAP = DocketEntrySource(
 
 
 # SCOTUS
-def _scotus_entries(docket: Docket) -> QuerySet:
+def _scotus_entries(docket: Docket) -> QuerySet[SCOTUSDocketEntry]:
     """Return this docket's SCOTUSDocketEntry queryset, with
     scotusdocument_set prefetched for the docket page's entry list."""
     return docket.scotusdocketentry_set.all().prefetch_related(
@@ -370,14 +376,16 @@ def _scotus_entries(docket: Docket) -> QuerySet:
     )
 
 
-def _scotus_documents_for_entry(de: SCOTUSDocketEntry) -> QuerySet:
+def _scotus_documents_for_entry(
+    de: SCOTUSDocketEntry,
+) -> QuerySet[SCOTUSDocument]:
     """Return the SCOTUSDocuments attached to this docket entry."""
     return de.scotusdocument_set.all()
 
 
 def _scotus_documents_for_docket_and_number(
     docket_id: int, doc_num: str
-) -> QuerySet:
+) -> QuerySet[SCOTUSDocument]:
     """Look up SCOTUSDocuments by docket and document_number, for the
     document detail page."""
     return SCOTUSDocument.objects.filter(
@@ -456,7 +464,7 @@ def _scotus_docket_url(docket: Docket) -> str | None:
     return docket.scotus_docket_url or None
 
 
-SCOTUS = DocketEntrySource(
+SCOTUS: DocketEntrySource = DocketEntrySource(
     entries_queryset=_scotus_entries,
     documents_for_entry=_scotus_documents_for_entry,
     order_by_asc=("sequence_number",),
