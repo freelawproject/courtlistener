@@ -77,7 +77,6 @@ baseline = ".pyrefly-baseline.json"
 # Checks the codebase was never previously held to.
 [errors]
 unbound-name = false
-bad-override-param-name = false
 bad-override-mutable-attribute = false
 
 # Modules to hold to a stricter standard. Ideally the whole codebase will be held to these standards eventually.
@@ -87,7 +86,6 @@ check-unannotated-defs = true
 
 [sub-config.errors]
 unbound-name = true
-bad-override-param-name = false
 bad-override-mutable-attribute = false
 
 [[sub-config]]
@@ -101,7 +99,6 @@ check-unannotated-defs = true
 
 [sub-config.errors]
 unbound-name = true
-bad-override-param-name = true
 bad-override-mutable-attribute = true
 
 [[sub-config]]
@@ -110,7 +107,6 @@ check-unannotated-defs = true
 
 [sub-config.errors]
 unbound-name = true
-bad-override-param-name = true
 bad-override-mutable-attribute = true
 
 [[sub-config]]
@@ -119,5 +115,4 @@ check-unannotated-defs = true
 
 [sub-config.errors]
 unbound-name = true
-bad-override-param-name = true
 bad-override-mutable-attribute = true
