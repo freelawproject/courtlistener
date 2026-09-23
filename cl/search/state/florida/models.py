@@ -306,6 +306,12 @@ class FloridaDocument(AbstractDateTimeModel, AbstractStateDocument):
         if challenge is None:
             return self.url
         solution = challenge.solve()
+        if solution is None:
+            logger.error(
+                "Failed to solve Florida challenge within time limit for %s",
+                self.url,
+            )
+            return None
 
         if solution.time > SLOW_SOLVE_THRESHOLD_MS:
             logger.warning(
@@ -324,12 +330,6 @@ class FloridaDocument(AbstractDateTimeModel, AbstractStateDocument):
                 solution.time,
             )
 
-        if solution is None:
-            logger.error(
-                "Failed to solve Florida challenge within time limit for %s",
-                self.url,
-            )
-            return None
         token = AltchaChallengeResponse(
             challenge=challenge, solution=solution
         ).encode()
