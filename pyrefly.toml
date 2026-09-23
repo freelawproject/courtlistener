@@ -50,12 +50,10 @@ project-includes = [
 ]
 project-excludes = ["**/migrations/**"]
 # Leniency for the mostly-untyped codebase: don't check bodies of unannotated
-# functions, treat their return types as Any, honor `# type: ignore` comments,
-# and treat unresolvable imports as Any.
+# functions, treat their return types as Any, and honor `# type: ignore` comments.
 check-unannotated-defs = false
 infer-return-types = "never"
 permissive-ignores = true
-ignore-missing-imports = ["*"]
 # Modules whose types are not yet visible to the checker (imports from them
 # resolve to Any). Remove first-party modules from this list as they become
 # type-ready. The third-party packages listed ship their types as source
@@ -88,7 +86,6 @@ bad-override-mutable-attribute = false
 matches = "cl/audio/**"
 check-unannotated-defs = true
 infer-return-types = "checked"
-ignore-missing-imports = []
 
 [sub-config.errors]
 unbound-name = true
@@ -99,14 +96,12 @@ bad-override-mutable-attribute = false
 matches = "cl/corpus_importer/**"
 check-unannotated-defs = false
 infer-return-types = "checked"
-ignore-missing-imports = []
 strict-callable-subtyping = false
 
 [[sub-config]]
 matches = "cl/opinion_page/**"
 check-unannotated-defs = true
 infer-return-types = "checked"
-ignore-missing-imports = []
 
 [sub-config.errors]
 unbound-name = true
@@ -117,7 +112,6 @@ bad-override-mutable-attribute = true
 matches = "cl/recap_rss/**"
 check-unannotated-defs = true
 infer-return-types = "checked"
-ignore-missing-imports = []
 
 [sub-config.errors]
 unbound-name = true
@@ -128,7 +122,6 @@ bad-override-mutable-attribute = true
 matches = "cl/simple_pages/**"
 check-unannotated-defs = true
 infer-return-types = "checked"
-ignore-missing-imports = []
 
 [sub-config.errors]
 unbound-name = true
