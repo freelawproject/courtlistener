@@ -1815,7 +1815,7 @@ class AlertAPITests(ESIndexTestCase, APITestCase):
         )
         self.assertIn(LEGACY_MEMBERSHIP_HELP_URL, detail)
         neon_id = await sync_to_async(
-            lambda: self.user_legacy_member.membership.neon_id
+            lambda: self.user_legacy_member.membership.neon_id  # pyrefly:ignore[missing-attribute]
         )()
         self.assertNotIn(
             f"https://donate.free.law/constituent/memberships/upgrade/{neon_id}",

@@ -62,7 +62,6 @@ replace-imports-with-any = [
     "cl.recap", "cl.recap.*",
     "cl.search", "cl.search.*",
     "cl.tests", "cl.tests.*",
-    "cl.users", "cl.users.*",
     "cl.visualizations", "cl.visualizations.*",
     "eyecite", "eyecite.*",
 ]

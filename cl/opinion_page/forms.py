@@ -36,7 +36,6 @@ from cl.search.models import (
     OpinionCluster,
     OriginatingCourtInformation,
 )
-from cl.users.models import UserProfile
 
 
 class CitationRedirectorForm(forms.Form):
@@ -131,7 +130,8 @@ class DocketEntryFilterForm(forms.Form):
             return data
         if self.request is None or not self.request.user.is_authenticated:
             return data
-        user: UserProfile.user = self.request.user
+        user = self.request.user
+        # pyrefly:ignore[missing-attribute]
         if user.profile.docket_default_order_desc:
             return DocketEntryFilterForm.DESCENDING
         return data
