@@ -1,0 +1,16 @@
+{% load extras %}
+<div class="flex flex-column flex-sm-row row-gap-3 alert-danger alert justify-content-between">
+  <div class="col-sm-12">
+    <p class="bottom">
+      <i class="fa fa-ban"></i> This document is unavailable because it was likely sealed or removed from the source.
+    </p>
+  </div>
+  {% if rd.url|http_url %}
+    <div class="col-sm-12 flex flex-row gap-2 justify-content-end">
+      <a class="btn btn-primary btn-sm"
+         href="{{ rd.url|http_url }}"
+         rel="nofollow noopener noreferrer"
+         target="_blank">View on SCOTUS</a>
+    </div>
+  {% endif %}
+</div>

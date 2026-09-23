@@ -7,11 +7,13 @@ import threading
 from datetime import date
 from http import HTTPStatus
 from itertools import product
+from typing import TYPE_CHECKING, Any, cast
 from unittest import mock
 from unittest.mock import AsyncMock, MagicMock, PropertyMock, patch
 from urllib.parse import parse_qs, urlencode, urlparse
 
 from asgiref.sync import async_to_sync, sync_to_async
+from django import forms
 from django.conf import settings
 from django.contrib.auth.hashers import make_password
 from django.contrib.auth.models import AnonymousUser, Group, Permission, User
@@ -22,6 +24,7 @@ from django.db import connection
 from django.http import HttpResponse
 from django.template import TemplateDoesNotExist, engines
 from django.template.loader import get_template
+from django.template.response import TemplateResponse
 from django.test import (
     AsyncRequestFactory,
     RequestFactory,
@@ -32,9 +35,13 @@ from django.test.utils import CaptureQueriesContext
 from django.urls import reverse
 from django_cotton.compiler_regex import CottonCompiler
 from factory import RelatedFactory
+from lxml.etree import _Attrib, _Element
 from lxml.html import fromstring
 from waffle.models import Flag
 from waffle.testutils import override_flag
+
+if TYPE_CHECKING:
+    from django.test.client import _MonkeyPatchedASGIResponse
 
 from cl.citations.utils import slugify_reporter
 from cl.favorites.models import GenericCount
@@ -55,7 +62,9 @@ from cl.lib.test_helpers import (
 from cl.opinion_page import docket_entry_sources
 from cl.opinion_page.docket_entry_sources import (
     _recap_document_detail_url,
+    _scotus_document_detail_url,
     build_scotus_metadata,
+    document_url,
 )
 from cl.opinion_page.forms import (
     DocketEntryFilterForm,
@@ -212,7 +221,7 @@ class UpdateOpinionTabsTest(TestCase):
         both_started = asyncio.Event()
         started_count = 0
 
-        async def wait_for_other_count(result: int, *_args) -> int:
+        async def wait_for_other_count(result: int, *_args: Any) -> int:
             nonlocal started_count
             started_count += 1
             if started_count == 2:
@@ -220,10 +229,10 @@ class UpdateOpinionTabsTest(TestCase):
             await asyncio.wait_for(both_started.wait(), timeout=1)
             return result
 
-        async def get_cited_count(*args) -> int:
+        async def get_cited_count(*args: Any) -> int:
             return await wait_for_other_count(3, *args)
 
-        async def get_related_count(*args) -> int:
+        async def get_related_count(*args: Any) -> int:
             return await wait_for_other_count(7, *args)
 
         cited_count = AsyncMock(side_effect=get_cited_count)
@@ -278,7 +287,7 @@ class ESCountAsyncTest(SimpleTestCase):
         query = MagicMock()
         search.query.return_value = query
 
-        def execute_search():
+        def execute_search() -> MagicMock:
             nonlocal execute_thread
             execute_thread = threading.get_ident()
             return response
@@ -425,7 +434,7 @@ class OpinionPageLoadTest(
     TestCase,
 ):
     @classmethod
-    def setUpTestData(cls):
+    def setUpTestData(cls) -> None:
         cls.o_cluster_1 = OpinionClusterWithParentsFactory.create(
             precedential_status=PRECEDENTIAL_STATUS.PUBLISHED,
             citation_count=1,
@@ -503,10 +512,15 @@ class ViewRecapDocumentTest(TestCase):
     """
 
     @classmethod
-    def setUpTestData(cls):
+    def setUpTestData(cls) -> None:
         cls.docket = DocketFactory()
 
-    async def get(self, follow=False, params=None, **kwargs):
+    async def get(
+        self,
+        follow: bool = False,
+        params: dict | None = None,
+        **kwargs: int | str,
+    ) -> "_MonkeyPatchedASGIResponse":
         kwargs["slug"] = ""
         if "att_num" in kwargs:
             path = reverse(
@@ -616,7 +630,9 @@ class ViewRecapDocumentTest(TestCase):
                 params={"redirect_to_download": True},
             )
             self.assertEqual(r.status_code, HTTPStatus.FOUND)
-            self.assertEqual(r["Location"], rd.filepath_local.url)
+            self.assertEqual(
+                r["Location"], cast(RECAPDocument, rd).filepath_local.url
+            )
 
         with self.subTest("Check redirect_or_modal download"):
             r = await self.get(
@@ -625,7 +641,9 @@ class ViewRecapDocumentTest(TestCase):
                 params={"redirect_or_modal": True},
             )
             self.assertEqual(r.status_code, HTTPStatus.FOUND)
-            self.assertEqual(r["Location"], rd.filepath_local.url)
+            self.assertEqual(
+                r["Location"], cast(RECAPDocument, rd).filepath_local.url
+            )
 
         rd.is_available = False
         await sync_to_async(rd.save)()
@@ -665,7 +683,8 @@ class ViewRecapDocumentTest(TestCase):
             req, self.docket.id, rd.document_number, is_og_bot=True
         )
         self.assertEqual(r.status_code, HTTPStatus.OK)
-        c = r.context_data
+        c = cast(TemplateResponse, r).context_data
+        self.assertIsNotNone(c)
         self.assertEqual(rd, c["rd"])
         self.assertIsNotNone(c["og_file_path"])
 
@@ -714,13 +733,233 @@ class ViewRecapDocumentTest(TestCase):
         self.assertEqual(r.status_code, HTTPStatus.OK)
 
 
+@override_settings(WAFFLE_CACHE_PREFIX="test_scotus_document_page_waffle")
+@override_flag("scotus_docket_page", active=True)
+class ViewSCOTUSDocumentTest(TestCase):
+    "Tests for view_recap_document rendering SCOTUSDocument records"
+
+    @classmethod
+    def setUpTestData(cls) -> None:
+        cls.court = CourtFactory(id="scotus", jurisdiction="F")
+        cls.docket = DocketFactory(court=cls.court, source=Docket.SCRAPER)
+
+    async def get(
+        self, follow: bool = False, **kwargs: int | str
+    ) -> "_MonkeyPatchedASGIResponse":
+        kwargs.setdefault("slug", self.docket.slug)
+        if "att_num" in kwargs:
+            path = reverse("view_recap_attachment", kwargs=kwargs)
+        else:
+            path = reverse("view_recap_document", kwargs=kwargs)
+        return await self.async_client.get(path, follow=follow)
+
+    async def test_invalid_docket(self) -> None:
+        r = await self.get(docket_id=0, doc_num=0)
+        self.assertEqual(r.status_code, HTTPStatus.NOT_FOUND)
+
+    async def test_invalid_document(self) -> None:
+        r = await self.get(docket_id=self.docket.id, doc_num=0)
+        self.assertEqual(r.status_code, HTTPStatus.NOT_FOUND)
+
+    async def test_non_numeric_doc_num_returns_404(self) -> None:
+        """SCOTUSDocument.document_number is an IntegerField,
+        so a non-numeric doc_num used to raise an uncaught
+        ValueError instead of the usual 404.
+        """
+        r = await self.get(docket_id=self.docket.id, doc_num="abc")
+        self.assertEqual(r.status_code, HTTPStatus.NOT_FOUND)
+
+    async def test_valid_document_with_local_file(self) -> None:
+        entry = await sync_to_async(SCOTUSDocketEntryFactory)(
+            docket=self.docket
+        )
+        document = await sync_to_async(SCOTUSDocumentFactory)(
+            docket_entry=entry,
+            attachment_number=1,
+            filepath_local="recap_documents/test.pdf",
+        )
+        r = await self.get(
+            docket_id=self.docket.id,
+            doc_num=document.document_number,
+            att_num=document.attachment_number,
+        )
+        self.assertEqual(r.status_code, HTTPStatus.OK)
+        c = r.context
+        self.assertEqual(document, c["rd"])
+        self.assertIs(c["docket_source"], docket_entry_sources.SCOTUS)
+        self.assertFalse(c["authorities"])
+        self.assertContains(r, "Download PDF")
+        self.assertNotIn("pray_and_pay.js", r.content.decode())
+
+    async def test_get_absolute_url_builds_main_document_url_without_attachment_number(
+        self,
+    ) -> None:
+        """A SCOTUSDocument with a document_number but no attachment_number
+        is still served at the main view_recap_document URL by
+        recap_document_context()."""
+        entry = await sync_to_async(SCOTUSDocketEntryFactory)(
+            docket=self.docket
+        )
+        document = await sync_to_async(SCOTUSDocumentFactory)(
+            docket_entry=entry, document_number=7, attachment_number=None
+        )
+        self.assertEqual(
+            document.get_absolute_url(),
+            reverse(
+                "view_recap_document",
+                kwargs={
+                    "docket_id": self.docket.pk,
+                    "doc_num": 7,
+                    "slug": self.docket.slug,
+                },
+            ),
+        )
+        r = await self.get(docket_id=self.docket.id, doc_num=7)
+        self.assertEqual(r.status_code, HTTPStatus.OK)
+        self.assertEqual(r.context["rd"], document)
+
+    async def test_download_dropdown_excludes_ia_and_pacer(self) -> None:
+        entry = await sync_to_async(SCOTUSDocketEntryFactory)(
+            docket=self.docket
+        )
+        document = await sync_to_async(SCOTUSDocumentFactory)(
+            docket_entry=entry,
+            attachment_number=1,
+            filepath_local="recap_documents/test.pdf",
+            url="https://www.supremecourt.gov/DocketPDF/test.pdf",
+        )
+        r = await self.get(
+            docket_id=self.docket.id,
+            doc_num=document.document_number,
+            att_num=document.attachment_number,
+        )
+        content = r.content.decode()
+        self.assertNotIn("Internet Archive", content)
+        self.assertNotIn("Buy on PACER", content)
+        self.assertIn("From the Supreme Court", content)
+
+    async def test_admin_toolbar_links_to_scotus_admin_pages(self) -> None:
+        entry = await sync_to_async(SCOTUSDocketEntryFactory)(
+            docket=self.docket
+        )
+        document = await sync_to_async(SCOTUSDocumentFactory)(
+            docket_entry=entry, attachment_number=1
+        )
+        staff_user = await sync_to_async(UserFactory)(
+            is_staff=True, is_superuser=True
+        )
+        await self.async_client.aforce_login(staff_user)
+        r = await self.get(
+            docket_id=self.docket.id,
+            doc_num=document.document_number,
+            att_num=document.attachment_number,
+        )
+        content = r.content.decode()
+        self.assertIn(
+            reverse("admin:search_scotusdocketentry_change", args=[entry.pk]),
+            content,
+        )
+        self.assertIn(
+            reverse("admin:search_scotusdocument_change", args=[document.pk]),
+            content,
+        )
+        self.assertNotIn("search_docketentry_change", content)
+        self.assertNotIn("search_recapdocument_change", content)
+
+    async def test_entry_row_links_to_document_page(self) -> None:
+        entry = await sync_to_async(SCOTUSDocketEntryFactory)(
+            docket=self.docket
+        )
+        document = await sync_to_async(SCOTUSDocumentFactory)(
+            docket_entry=entry,
+            attachment_number=1,
+            filepath_local="recap_documents/test.pdf",
+        )
+        r = await self.async_client.get(
+            reverse("view_docket", args=[self.docket.pk, self.docket.slug])
+        )
+        self.assertEqual(r.status_code, HTTPStatus.OK)
+        self.assertContains(r, document.get_absolute_url())
+
+    def test_scotus_document_detail_urls_are_internal(self) -> None:
+        """Mirrors DocketEntryRowsV2Test.test_document_detail_urls_are_internal
+        for SCOTUS: _scotus_document_detail_url returns the document's own
+        CourtListener page when we have the file, and None otherwise --
+        never an externally-sourced URL."""
+        entry = SCOTUSDocketEntryFactory(docket=self.docket)
+        with_file = SCOTUSDocumentFactory(
+            docket_entry=entry,
+            attachment_number=1,
+            filepath_local="recap_documents/test.pdf",
+        )
+        without_file = SCOTUSDocumentFactory(
+            docket_entry=entry, attachment_number=2, filepath_local=""
+        )
+        self.assertEqual(
+            _scotus_document_detail_url(with_file),
+            with_file.get_absolute_url(),
+        )
+        self.assertIsNone(_scotus_document_detail_url(without_file))
+
+
+@override_settings(WAFFLE_CACHE_PREFIX="test_scotus_document_flag_waffle")
+@override_flag("scotus_docket_page", active=False)
+class ScotusDocumentFlagDisabledTest(TestCase):
+    "With the flag off, a SCOTUS document page must 404"
+
+    @classmethod
+    def setUpTestData(cls) -> None:
+        cls.court = CourtFactory(id="scotus", jurisdiction="F")
+        cls.docket = DocketFactory(court=cls.court, source=Docket.RECAP)
+        cls.entry = SCOTUSDocketEntryFactory(docket=cls.docket)
+        cls.document = SCOTUSDocumentFactory(
+            docket_entry=cls.entry, attachment_number=None
+        )
+        cls.other_court = CourtFactory(id="cadc", jurisdiction="F")
+        cls.other_docket = DocketFactory(
+            court=cls.other_court, source=Docket.RECAP
+        )
+        cls.other_entry = DocketEntryFactory(docket=cls.other_docket)
+        cls.other_document = RECAPDocumentFactory(docket_entry=cls.other_entry)
+
+    async def test_scotus_document_returns_404_when_flag_disabled(
+        self,
+    ) -> None:
+        r = await self.async_client.get(
+            reverse(
+                "view_recap_document",
+                kwargs={
+                    "docket_id": self.docket.pk,
+                    "doc_num": self.document.document_number,
+                    "slug": self.docket.slug,
+                },
+            )
+        )
+        self.assertEqual(r.status_code, HTTPStatus.NOT_FOUND)
+
+    async def test_other_court_document_unaffected_by_scotus_flag(
+        self,
+    ) -> None:
+        r = await self.async_client.get(
+            reverse(
+                "view_recap_document",
+                kwargs={
+                    "docket_id": self.other_docket.pk,
+                    "doc_num": self.other_document.document_number,
+                    "slug": self.other_docket.slug,
+                },
+            )
+        )
+        self.assertEqual(r.status_code, HTTPStatus.OK)
+
+
 class CitationRedirectorTest(TestCase):
     """Tests to make sure that the basic citation redirector is working."""
 
     fixtures = ["test_objects_search.json", "judge_judy.json"]
     citation = {"reporter": "F.2d", "volume": "56", "page": "9"}
 
-    def assertStatus(self, r, status):
+    def assertStatus(self, r: HttpResponse, status: HTTPStatus) -> None:
         self.assertEqual(
             r.status_code,
             status,
@@ -1249,7 +1488,7 @@ class CitationRedirectorTest(TestCase):
         )
         self.assertStatus(r, HTTPStatus.NOT_FOUND)
 
-    async def test_can_handle_text_with_slashes(self):
+    async def test_can_handle_text_with_slashes(self) -> None:
         r = await self.async_client.post(
             reverse("citation_homepage"),
             {"reporter": "ARB/11/20/"},
@@ -1270,7 +1509,7 @@ class CitationRedirectorTest(TestCase):
         self.assertIn("No Citations Detected", r.content.decode())
         self.assertEqual(r.status_code, HTTPStatus.BAD_REQUEST)
 
-    async def test_can_filter_out_non_case_law_citation(self):
+    async def test_can_filter_out_non_case_law_citation(self) -> None:
         chests_of_tea = await sync_to_async(CitationWithParentsFactory.create)(
             volume="22", reporter="U.S.", page="444", type=1
         )
@@ -1286,7 +1525,7 @@ class CitationRedirectorTest(TestCase):
         self.assertTemplateUsed(r, "opinions.html")
         self.assertIn(str(chests_of_tea), r.content.decode())
 
-    async def test_show_error_for_non_opinion_citations(self):
+    async def test_show_error_for_non_opinion_citations(self) -> None:
         r = await self.async_client.post(
             reverse("citation_homepage"),
             {"reporter": "44 Vand. L. Rev. 1041"},
@@ -1296,7 +1535,9 @@ class CitationRedirectorTest(TestCase):
         self.assertIn("No Citations Detected", r.content.decode())
         self.assertEqual(r.status_code, HTTPStatus.BAD_REQUEST)
 
-    async def test_disambiguated_reporter_variants_redirect_properly(self):
+    async def test_disambiguated_reporter_variants_redirect_properly(
+        self,
+    ) -> None:
         """Can we resolve correctly some reporter variants with collisions to slug?"""
 
         test_pairs = [
@@ -1343,7 +1584,7 @@ class CitationRedirectorTest(TestCase):
                     msg=f"Expected path: {expected_path} is different from the obtained path: {path}",
                 )
 
-    async def test_too_ambiguous_reporter_variations(self):
+    async def test_too_ambiguous_reporter_variations(self) -> None:
         """Some abbreviations are too ambiguous to resolve safely"""
 
         test_pairs = [
@@ -1380,7 +1621,7 @@ class CitationRedirectorTest(TestCase):
 
 class ViewRecapDocketTest(TestCase):
     @classmethod
-    def setUpTestData(cls):
+    def setUpTestData(cls) -> None:
         cls.court = CourtFactory(id="canb", jurisdiction="FB")
         cls.docket = DocketFactory(
             court=cls.court,
@@ -1422,6 +1663,14 @@ class ViewRecapDocketTest(TestCase):
         )
         self.assertEqual(r.status_code, HTTPStatus.OK)
 
+    async def test_pray_and_pay_script_present_for_recap_docket(self) -> None:
+        """pray_and_pay.js has to load for a RECAP dockets."""
+        r = await self.async_client.get(
+            reverse("view_docket", args=[self.docket.pk, self.docket.slug])
+        )
+        self.assertEqual(r.status_code, HTTPStatus.OK)
+        self.assertIn("pray_and_pay.js", r.content.decode())
+
     async def test_appellate_docket_with_appeal_from_loads(self) -> None:
         """Regression for #7306: appellate docket loads in async view."""
         r = await self.async_client.get(
@@ -1448,7 +1697,9 @@ class ViewRecapDocketTest(TestCase):
         )
         self.assertEqual(r.redirect_chain[0][1], HTTPStatus.FOUND)
 
-    async def test_pagination_returns_last_page_if_page_out_of_range(self):
+    async def test_pagination_returns_last_page_if_page_out_of_range(
+        self,
+    ) -> None:
         """
         Verify that the Docket view handles out-of-range page requests by returning
         the last valid page.
@@ -1541,6 +1792,48 @@ class DocketEntrySourceTest(TestCase):
         documents = list(source.documents_for_entry(entry))
         self.assertIn(document, documents)
 
+    def test_scotus_source_document_callables_execute_without_raising(
+        self,
+    ) -> None:
+        entry = SCOTUSDocketEntryFactory(docket=self.scotus_docket)
+        document = SCOTUSDocumentFactory(
+            docket_entry=entry, attachment_number=None
+        )
+        source = self.scotus_docket.get_entry_source()
+        documents = list(
+            source.documents_for_docket_and_number(
+                self.scotus_docket.pk, document.document_number
+            )
+        )
+        self.assertIn(document.pk, [d.pk for d in documents])
+        rendered = async_to_sync(source.get_document_for_render)(document.pk)
+        self.assertEqual(rendered.pk, document.pk)
+
+    def test_recap_source_document_callables_execute_without_raising(
+        self,
+    ) -> None:
+        entry = DocketEntryFactory(docket=self.recap_docket)
+        document = RECAPDocumentFactory(docket_entry=entry)
+        source = self.recap_docket.get_entry_source()
+        documents = list(
+            source.documents_for_docket_and_number(
+                self.recap_docket.pk, document.document_number
+            )
+        )
+        self.assertIn(document.pk, [d.pk for d in documents])
+        rendered = async_to_sync(source.get_document_for_render)(document.pk)
+        self.assertEqual(rendered.pk, document.pk)
+
+
+class DocumentUrlTest(SimpleTestCase):
+    def test_builds_main_document_url(self) -> None:
+        url = document_url(1, "some-slug", "3", None)
+        self.assertEqual(url, "/docket/1/3/some-slug/")
+
+    def test_builds_attachment_url(self) -> None:
+        url = document_url(1, "some-slug", "3", 2)
+        self.assertEqual(url, "/docket/1/3/2/some-slug/")
+
 
 class DocketSourceComponentTest(SimpleTestCase):
     """Every DocketEntrySource needs a file in each per-source component
@@ -1561,6 +1854,8 @@ class DocketSourceComponentTest(SimpleTestCase):
             "docket_empty_message",
             "docket_empty_cta",
             "docket_source_li",
+            "document_download_button",
+            "document_unavailable_message",
         ),
     }
 
@@ -1722,6 +2017,7 @@ class ScotusDocketFlagEnabledTest(TestCase):
         self.assertNotIn("Buy Docket on PACER", content)
         self.assertIn("Get Alerts", content)
         self.assertNotIn("prayer-button", content)
+        self.assertNotIn("pray_and_pay.js", content)
         self.assertIn("View in SCOTUS", content)
         self.assertNotIn(
             'sourced from <a href="https://www.pacer.gov">PACER</a>',
@@ -2255,7 +2551,7 @@ class UploadPublication(TestCase):
             shutil.rmtree(os.path.join(settings.MEDIA_ROOT, "pdf/2019/"))
         Docket.objects.all().delete()
 
-    async def test_access_upload_page(self, mock) -> None:
+    async def test_access_upload_page(self, mock: MagicMock) -> None:
         """Can we successfully access upload page with access?"""
         await self.async_client.alogin(username="learned", password="password")
         response = await self.async_client.get(
@@ -2263,7 +2559,7 @@ class UploadPublication(TestCase):
         )
         self.assertEqual(response.status_code, 200)
 
-    async def test_redirect_without_access(self, mock) -> None:
+    async def test_redirect_without_access(self, mock: MagicMock) -> None:
         """Can we successfully redirect individuals without proper access?"""
         await self.async_client.alogin(
             username="test_user", password="password"
@@ -2273,14 +2569,16 @@ class UploadPublication(TestCase):
         )
         self.assertEqual(response.status_code, 302)
 
-    def test_pdf_upload(self, mock) -> None:
+    def test_pdf_upload(self, mock: MagicMock) -> None:
         """Can we upload a PDF and form?"""
         form = TennWorkCompClUploadForm(
             self.work_comp_data,
             pk="tennworkcompcl",
             files={"pdf_upload": self.pdf},
         )
-        form.fields["lead_author"].queryset = Person.objects.filter(
+        cast(
+            forms.ModelChoiceField, form.fields["lead_author"]
+        ).queryset = Person.objects.filter(
             positions__court_id="tennworkcompcl"
         )
 
@@ -2313,14 +2611,16 @@ class UploadPublication(TestCase):
             msg=f"The citation count should be zero not {cite_count}",
         )
 
-    def test_pdf_validation_failure(self, mock) -> None:
+    def test_pdf_validation_failure(self, mock: MagicMock) -> None:
         """Can we fail upload documents that are not PDFs?"""
         form = TennWorkCompClUploadForm(
             self.work_comp_data,
             pk="tennworkcompcl",
             files={"pdf_upload": self.png},
         )
-        form.fields["lead_author"].queryset = Person.objects.filter(
+        cast(
+            forms.ModelChoiceField, form.fields["lead_author"]
+        ).queryset = Person.objects.filter(
             positions__court_id="tennworkcompcl"
         )
         self.assertFalse(form.is_valid(), form.errors)
@@ -2332,7 +2632,7 @@ class UploadPublication(TestCase):
             ],
         )
 
-    def test_pdf_content_validation_failure(self, mock) -> None:
+    def test_pdf_content_validation_failure(self, mock: MagicMock) -> None:
         """Can we fail files that only claim to be PDFs?
 
         The extension validator trusts the uploader's filename, so a file
@@ -2346,13 +2646,15 @@ class UploadPublication(TestCase):
             pk="tennworkcompcl",
             files={"pdf_upload": disguised_png},
         )
-        form.fields["lead_author"].queryset = Person.objects.filter(
+        cast(
+            forms.ModelChoiceField, form.fields["lead_author"]
+        ).queryset = Person.objects.filter(
             positions__court_id="tennworkcompcl"
         )
         self.assertFalse(form.is_valid(), form.errors)
         self.assertEqual(form.errors["pdf_upload"], [NOT_A_PDF_MESSAGE])
 
-    def test_pdf_size_validation_failure(self, mock) -> None:
+    def test_pdf_size_validation_failure(self, mock: MagicMock) -> None:
         """Can we fail uploads that are over the size limit?
 
         The limit is patched down rather than tested at its real value, so
@@ -2363,7 +2665,9 @@ class UploadPublication(TestCase):
             pk="tennworkcompcl",
             files={"pdf_upload": self.pdf},
         )
-        form.fields["lead_author"].queryset = Person.objects.filter(
+        cast(
+            forms.ModelChoiceField, form.fields["lead_author"]
+        ).queryset = Person.objects.filter(
             positions__court_id="tennworkcompcl"
         )
         with patch("cl.lib.file_validation.MAX_UPLOAD_SIZE", 10):
@@ -2373,7 +2677,7 @@ class UploadPublication(TestCase):
                 form.errors["pdf_upload"], [file_too_large_message()]
             )
 
-    def test_tn_wc_app_upload(self, mock) -> None:
+    def test_tn_wc_app_upload(self, mock: MagicMock) -> None:
         """Can we test appellate uploading?"""
         form = TennWorkCompAppUploadForm(
             self.work_comp_app_data,
@@ -2381,9 +2685,9 @@ class UploadPublication(TestCase):
             files={"pdf_upload": self.pdf},
         )
         qs = Person.objects.filter(positions__court_id="tennworkcompapp")
-        form.fields["lead_author"].queryset = qs
-        form.fields["second_judge"].queryset = qs
-        form.fields["third_judge"].queryset = qs
+        cast(forms.ModelChoiceField, form.fields["lead_author"]).queryset = qs
+        cast(forms.ModelChoiceField, form.fields["second_judge"]).queryset = qs
+        cast(forms.ModelChoiceField, form.fields["third_judge"]).queryset = qs
 
         # Check no citations exist before upload
         count = OpinionCluster.objects.all().count()
@@ -2413,7 +2717,7 @@ class UploadPublication(TestCase):
             msg=f"The citation count should be zero not {cite_count}",
         )
 
-    def test_required_case_title(self, mock) -> None:
+    def test_required_case_title(self, mock: MagicMock) -> None:
         """Can we validate required testing field case title?"""
         self.work_comp_app_data.pop("case_title")
 
@@ -2423,15 +2727,15 @@ class UploadPublication(TestCase):
             files={"pdf_upload": self.pdf},
         )
         qs = Person.objects.filter(positions__court_id="tennworkcompapp")
-        form.fields["lead_author"].queryset = qs
-        form.fields["second_judge"].queryset = qs
-        form.fields["third_judge"].queryset = qs
+        cast(forms.ModelChoiceField, form.fields["lead_author"]).queryset = qs
+        cast(forms.ModelChoiceField, form.fields["second_judge"]).queryset = qs
+        cast(forms.ModelChoiceField, form.fields["third_judge"]).queryset = qs
         form.is_valid()
         self.assertEqual(
             form.errors["case_title"], ["This field is required."]
         )
 
-    def test_form_save(self, mock) -> None:
+    def test_form_save(self, mock: MagicMock) -> None:
         """Can we save successfully to db?"""
 
         pre_count = Opinion.objects.all().count()
@@ -2442,9 +2746,9 @@ class UploadPublication(TestCase):
             files={"pdf_upload": self.pdf},
         )
         qs = Person.objects.filter(positions__court_id="tennworkcompapp")
-        form.fields["lead_author"].queryset = qs
-        form.fields["second_judge"].queryset = qs
-        form.fields["third_judge"].queryset = qs
+        cast(forms.ModelChoiceField, form.fields["lead_author"]).queryset = qs
+        cast(forms.ModelChoiceField, form.fields["second_judge"]).queryset = qs
+        cast(forms.ModelChoiceField, form.fields["third_judge"]).queryset = qs
 
         self.assertEqual(form.is_valid(), True, msg=form.errors)
 
@@ -2453,7 +2757,7 @@ class UploadPublication(TestCase):
 
         self.assertEqual(pre_count + 1, Opinion.objects.all().count())
 
-    def test_me_form_save(self, mock) -> None:
+    def test_me_form_save(self, mock: MagicMock) -> None:
         """Can we save maine form successfully to db?"""
 
         pre_count = Opinion.objects.all().count()
@@ -2471,7 +2775,7 @@ class UploadPublication(TestCase):
 
         self.assertEqual(pre_count + 1, Opinion.objects.all().count())
 
-    def test_mo_form_save(self, mock) -> None:
+    def test_mo_form_save(self, mock: MagicMock) -> None:
         """Can we save missouri form successfully to db?"""
 
         pre_count = Opinion.objects.filter(
@@ -2494,7 +2798,7 @@ class UploadPublication(TestCase):
         ).count()
         self.assertEqual(pre_count + 1, post_save_count)
 
-    def test_miss_form_save(self, mock) -> None:
+    def test_miss_form_save(self, mock: MagicMock) -> None:
         """Can we save mississippi form successfully to db?"""
 
         pre_count = Opinion.objects.filter(
@@ -2518,7 +2822,7 @@ class UploadPublication(TestCase):
         self.assertEqual(pre_count + 1, post_save_count)
 
     def test_court_upload_strips_html_from_free_text_fields(
-        self, mock
+        self, mock: MagicMock
     ) -> None:
         """Are case_title/disposition/summary stripped of HTML on upload
         (GHSA-cvh7-rv7v-wx2j-class)?
@@ -2541,7 +2845,7 @@ class UploadPublication(TestCase):
         self.assertNotIn("<script>", cluster.summary)
         self.assertNotIn("<script>", cluster.docket.case_name)
 
-    def test_form_two_judges_2042(self, mock) -> None:
+    def test_form_two_judges_2042(self, mock: MagicMock) -> None:
         """Can we still save if there's only one or two judges on the panel?"""
         pre_count = Opinion.objects.all().count()
 
@@ -2554,8 +2858,8 @@ class UploadPublication(TestCase):
             files={"pdf_upload": self.pdf},
         )
         qs = Person.objects.filter(positions__court_id="tennworkcompapp")
-        form.fields["lead_author"].queryset = qs
-        form.fields["second_judge"].queryset = qs
+        cast(forms.ModelChoiceField, form.fields["lead_author"]).queryset = qs
+        cast(forms.ModelChoiceField, form.fields["second_judge"]).queryset = qs
         # form.fields["third_judge"].queryset = qs
 
         if form.is_valid():
@@ -2563,7 +2867,7 @@ class UploadPublication(TestCase):
 
         self.assertEqual(pre_count + 1, Opinion.objects.all().count())
 
-    def test_handle_duplicate_pdf(self, mock) -> None:
+    def test_handle_duplicate_pdf(self, mock: MagicMock) -> None:
         """Can we validate PDF not in system?"""
         d = Docket.objects.create(
             source=Docket.DIRECT_INPUT,
@@ -2589,7 +2893,9 @@ class UploadPublication(TestCase):
             pk="tennworkcompcl",
             files={"pdf_upload": self.pdf},
         )
-        form2.fields["lead_author"].queryset = Person.objects.filter(
+        cast(
+            forms.ModelChoiceField, form2.fields["lead_author"]
+        ).queryset = Person.objects.filter(
             positions__court_id="tennworkcompcl"
         )
         if form2.is_valid():
@@ -2602,7 +2908,7 @@ class UploadPublication(TestCase):
 
 class TestBlockSearchItemAjax(TestCase):
     @classmethod
-    def setUpTestData(cls):
+    def setUpTestData(cls) -> None:
         # User admin (superuser)
         cls.admin = UserProfileWithParentsFactory.create(
             user__username="admin",
@@ -2743,7 +3049,7 @@ class TestAdminButtonsVisibility(TestCase):
     across the opinion, docket, and RECAP document pages."""
 
     @classmethod
-    def setUpTestData(cls):
+    def setUpTestData(cls) -> None:
         court = CourtFactory(id="ca3")
         cls.docket = DocketFactory(
             court=court, source=Docket.RECAP, case_name="Foo v. Bar"
@@ -2806,19 +3112,19 @@ class TestAdminButtonsVisibility(TestCase):
         )
         cls.docket_only.user.user_permissions.add(*docket_perms)
 
-    def _get_opinion_url(self):
+    def _get_opinion_url(self) -> str:
         return reverse(
             "view_case",
             args=[self.cluster.pk, self.cluster.slug],
         )
 
-    def _get_docket_url(self):
+    def _get_docket_url(self) -> str:
         return reverse(
             "view_docket",
             args=[self.docket.pk, self.docket.slug],
         )
 
-    def _get_recap_doc_url(self):
+    def _get_recap_doc_url(self) -> str:
         return reverse(
             "view_recap_document",
             kwargs={
@@ -2828,7 +3134,7 @@ class TestAdminButtonsVisibility(TestCase):
             },
         )
 
-    def _admin_url(self, route, pk):
+    def _admin_url(self, route: str, pk: int) -> str:
         """Build a resolved admin URL for assertion checks."""
         return reverse(f"admin:{route}", args=[pk])
 
@@ -2950,7 +3256,7 @@ class TestAdminButtonsVisibility(TestCase):
 class DocketEntryFileDownload(TestCase):
     """Test Docket entries File Download and required functions."""
 
-    def setUp(self):
+    def setUp(self) -> None:
         court = CourtFactory(id="ca5", jurisdiction="F")
         # Main docket to test
         docket = DocketFactory(
@@ -3042,7 +3348,7 @@ class DocketEntryFileDownload(TestCase):
         )
         self.request.auser = AsyncMock(return_value=self.user)
 
-    def tearDown(self):
+    def tearDown(self) -> None:
         # Clear all test data
         Docket.objects.all().delete()
         DocketEntry.objects.all().delete()
@@ -3096,9 +3402,9 @@ class DocketEntryFileDownload(TestCase):
     @mock.patch("cl.opinion_page.utils.generate_docket_entries_csv_data")
     def test_view_download_docket_entries_csv(
         self,
-        mock_download_function,
-        mock_core_docket_data,
-        mock_user_has_alert,
+        mock_download_function: MagicMock,
+        mock_core_docket_data: MagicMock,
+        mock_user_has_alert: MagicMock,
     ) -> None:
         """Test download_docket_entries_csv returns csv content"""
 
@@ -3128,7 +3434,7 @@ class DocketEntryFileDownload(TestCase):
         )
         self.assertEqual(response["Content-Type"], "text/csv")
 
-    def test_redirect_anonymous_users(self):
+    def test_redirect_anonymous_users(self) -> None:
         download_path = reverse(
             "view_download_docket", kwargs={"docket_id": self.mocked_docket.id}
         )
@@ -3187,7 +3493,7 @@ class CachePageIgnoreParamsTest(TestCase):
     """Test the cache_page_ignore_params decorator."""
 
     @classmethod
-    def setUpTestData(cls):
+    def setUpTestData(cls) -> None:
         court = CourtFactory(id="ca5", jurisdiction="F")
         cls.docket = DocketFactory(
             court=court,
@@ -3196,7 +3502,7 @@ class CachePageIgnoreParamsTest(TestCase):
             pacer_case_id="12345",
         )
 
-    def setUp(self):
+    def setUp(self) -> None:
         r = get_redis_interface("CACHE")
         keys_to_delete = r.keys(":1:custom.views.decorator.cache*")
         if keys_to_delete:
@@ -3247,7 +3553,7 @@ class CachePageIgnoreParamsTest(TestCase):
 
 class ClusterRedirectionTest(TestCase):
     @classmethod
-    def setUpTestData(cls):
+    def setUpTestData(cls) -> None:
         cls.deleted_cluster_id = 99999999
         cls.redirected_cluster = OpinionClusterWithParentsFactory.create(
             precedential_status=PRECEDENTIAL_STATUS.PUBLISHED,
@@ -3260,7 +3566,7 @@ class ClusterRedirectionTest(TestCase):
             reason=ClusterRedirection.DUPLICATE,
         )
 
-    def test_cluster_redirection(self):
+    def test_cluster_redirection(self) -> None:
         """Can we permanently redirect a deleted cluster to an existing one?"""
         deleted_cluster_url = reverse(
             "view_case", kwargs={"pk": self.deleted_cluster_id, "_": "test"}
@@ -3375,7 +3681,7 @@ class BuildOriginatingCourtMetadataTest(TestCase):
         # The displayed value is the lower court name only — no embedded HTML.
         self.assertEqual(appealed_from["label"], "Appealed From")
         self.assertEqual(appealed_from["value"], self.lower_court.short_name)
-        self.assertNotIn("<", str(appealed_from["value"]))
+        self.assertNotIn("<", appealed_from["value"])
 
         # The lower-court docket number travels as data, not as HTML.
         self.assertEqual(appealed_from["suffix_text"], "1:23-cv-456")
@@ -3458,6 +3764,21 @@ class BuildScotusMetadataTest(TestCase):
         qp = next(i for i in items if i["label"] == "Questions Presented")
         self.assertEqual(qp["url"], "https://example.com/qp.pdf")
         self.assertTrue(qp["is_external"])
+        # The label itself is the link -- no separate "View" text.
+        self.assertTrue(qp.get("is_label_link"))
+
+    def test_renders_questions_presented_file_as_internal_link(self) -> None:
+        scotus_metadata = ScotusDocketMetadataFactory(
+            docket=self.docket,
+            questions_presented_file=SimpleUploadedFile(
+                "qp.pdf", b"%PDF-1.4", content_type="application/pdf"
+            ),
+        )
+        items = build_scotus_metadata(scotus_metadata)
+        qp = next(i for i in items if i["label"] == "Questions Presented")
+        self.assertTrue(qp["url"])
+        self.assertTrue(qp.get("is_label_link"))
+        self.assertNotIn("is_external", qp)
 
     def test_omits_questions_presented_url_with_unsafe_scheme(self) -> None:
         """questions_presented_url is ingested straight
@@ -3765,9 +4086,8 @@ class DocketEntryRowsV2Test(TestCase):
         """Detail URLs must be CourtListener paths, since the template renders
         them unfiltered into an href.
 
-        SCOTUS is deliberately left out: _scotus_document_detail_url returns
-        None only until the SCOTUS document detail page exists, so asserting
-        on it would pin a placeholder rather than the contract.
+        SCOTUS is covered separately, in ViewSCOTUSDocumentTest's
+        test_scotus_document_detail_urls_are_internal.
         """
         documents = [
             self.rd_has_pdf,
@@ -3827,14 +4147,14 @@ class DocketFilterDrawerAttrPropagationTest(TestCase):
             }
         )
 
-    def _find_drawer(self, html: str):
+    def _find_drawer(self, html: str) -> _Element | None:
         """Return the element with `x-on:open-filter-drawer` (the drawer root).
 
         Done element-wise instead of XPath because `:` in attribute names
         isn't first-class in XPath.
         """
         for el in fromstring(html).iter():
-            if "x-on:open-filter-drawer" in el.attrib:
+            if "x-on:open-filter-drawer" in cast(_Attrib, el.attrib):
                 return el
         return None
 
@@ -3856,7 +4176,9 @@ class DocketFilterDrawerAttrPropagationTest(TestCase):
             "for open-filter-drawer — otherwise docket_filter.js can't "
             "find the drawer to dispatch the open event",
         )
-        self.assertEqual(drawer.attrib["x-on:open-filter-drawer"], "open")
+        self.assertEqual(
+            cast(_Attrib, drawer.attrib)["x-on:open-filter-drawer"], "open"
+        )
 
     def test_no_data_has_errors_when_form_is_clean(self) -> None:
         request = RequestFactory().get("/")
@@ -3888,7 +4210,7 @@ class DocketFilterPaginationWiringTest(TestCase):
         DocketEntry.objects.bulk_create(
             [
                 DocketEntry(
-                    docket=cls.docket,  # type: ignore[misc]
+                    docket=cls.docket,
                     entry_number=n,
                     date_filed=date(2024, 1, n),
                 )
@@ -3898,7 +4220,7 @@ class DocketFilterPaginationWiringTest(TestCase):
 
     async def _get_docket_and_verify_v2(
         self, data: dict | None = None
-    ) -> HttpResponse:
+    ) -> TemplateResponse:
         """Fetch the docket page, assert that v2 actually rendered, and
         return the response.
         """
@@ -3916,7 +4238,7 @@ class DocketFilterPaginationWiringTest(TestCase):
         )
         self.assertEqual(r.status_code, HTTPStatus.OK)
         self.assertTemplateUsed(r, "v2_docket.html")
-        return r  # type: ignore[return-value]
+        return r
 
     async def test_filter_form_fields_render(self) -> None:
         """Every named filter input must be in the rendered page so users
@@ -3939,7 +4261,7 @@ class DocketFilterPaginationWiringTest(TestCase):
         `docket_entries` queryset — proves the filter form is actually
         wired to the view, not just rendered."""
         r = await self._get_docket_and_verify_v2(data={"entry_gte": "3"})
-        numbers = sorted(e.entry_number for e in r.context["docket_entries"])
+        numbers = sorted(e.entry_number for e in r.context["docket_entries"])  # type:ignore[attr-defined] Django inserts the context attribute in test envs
         self.assertEqual(numbers, [3, 4, 5])
 
     async def test_pagination_nav_renders_with_multiple_pages(self) -> None:
