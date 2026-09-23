@@ -76,7 +76,7 @@ def get_court_id_from_fetch_queue(fq: PacerFetchQueue | dict[str, Any]) -> str:
     elif attrs.get("docket"):
         court_id = (
             fq.docket.court_id
-            if isinstance(fq, PacerFetchQueue)
+            if isinstance(fq, PacerFetchQueue) and fq.docket
             else attrs["docket"].court_id
         )
     else:

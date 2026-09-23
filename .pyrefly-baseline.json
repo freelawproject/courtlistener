@@ -246,6 +246,20 @@
       "severity": "error"
     },
     {
+      "column": 30,
+      "path": "cl/corpus_importer/management/commands/import_patent.py",
+      "name": "missing-attribute",
+      "concise_description": "Object of class `FjcIntegratedDatabase` has no attribute `district_id`",
+      "severity": "error"
+    },
+    {
+      "column": 30,
+      "path": "cl/corpus_importer/management/commands/import_patent.py",
+      "name": "missing-attribute",
+      "concise_description": "Object of class `FjcIntegratedDatabase` has no attribute `district_id`",
+      "severity": "error"
+    },
+    {
       "column": 28,
       "path": "cl/corpus_importer/tasks.py",
       "name": "bad-argument-type",
@@ -257,6 +271,20 @@
       "path": "cl/corpus_importer/tasks.py",
       "name": "bad-argument-type",
       "concise_description": "Argument `str` is not assignable to parameter `pacer_doc_id` with type `int | None` in function `juriscraper.pacer.reports.BaseReport.download_pdf`",
+      "severity": "error"
+    },
+    {
+      "column": 13,
+      "path": "cl/recap/utils.py",
+      "name": "missing-attribute",
+      "concise_description": "Object of class `PacerFetchQueue` has no attribute `recap_document_id`",
+      "severity": "error"
+    },
+    {
+      "column": 13,
+      "path": "cl/recap/utils.py",
+      "name": "missing-attribute",
+      "concise_description": "Object of class `PacerFetchQueue` has no attribute `court_id`",
       "severity": "error"
     },
     {
@@ -334,6 +362,13 @@
       "path": "cl/scrapers/management/commands/tames_poller.py",
       "name": "missing-attribute",
       "concise_description": "Object of class `EllipsisType` has no attribute `strip`",
+      "severity": "error"
+    },
+    {
+      "column": 17,
+      "path": "cl/search/management/commands/pacer_bulk_fetch.py",
+      "name": "missing-attribute",
+      "concise_description": "Object of class `PacerFetchQueue` has no attribute `recap_document_id`",
       "severity": "error"
     },
     {

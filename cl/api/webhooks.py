@@ -137,6 +137,7 @@ def send_recap_fetch_webhooks(fq: PacerFetchQueue) -> None:
         PROCESSING_STATUS.INVALID_CONTENT,
         PROCESSING_STATUS.NEEDS_INFO,
     ]:
+        # pyrefly:ignore[missing-attribute]
         user_webhooks = fq.user.webhooks.filter(
             event_type=WebhookEventType.RECAP_FETCH, enabled=True
         )

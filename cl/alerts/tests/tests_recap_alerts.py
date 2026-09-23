@@ -1,4 +1,5 @@
 import datetime
+from typing import Any, cast
 from unittest import mock
 
 import time_machine
@@ -4450,10 +4451,13 @@ class RECAPAlertsPercolatorTest(
                 source=Docket.RECAP,
                 pacer_case_id="999555",
             )
-            docket_data = DocketWithBankruptcyDataFactory(
-                court_id=docket.court_id,
-                case_name=docket.case_name,
-                chapter=7,
+            docket_data = cast(
+                dict[str, Any],
+                DocketWithBankruptcyDataFactory(
+                    court_id=docket.court_id,
+                    case_name=docket.case_name,
+                    chapter=7,
+                ),
             )
             set_skip_percolation_if_bankruptcy_data(docket_data, docket)
             docket.save()
@@ -4487,10 +4491,13 @@ class RECAPAlertsPercolatorTest(
             self.captureOnCommitCallbacks(execute=True),
         ):
             docket.docket_number = "1:21-bk-1235"
-            docket_data = DocketWithBankruptcyDataFactory(
-                court_id=docket.court_id,
-                case_name=docket.case_name,
-                chapter=8,
+            docket_data = cast(
+                dict[str, Any],
+                DocketWithBankruptcyDataFactory(
+                    court_id=docket.court_id,
+                    case_name=docket.case_name,
+                    chapter=8,
+                ),
             )
             set_skip_percolation_if_bankruptcy_data(docket_data, docket)
             docket.save()
