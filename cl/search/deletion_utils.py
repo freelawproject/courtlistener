@@ -17,6 +17,7 @@ check lives alongside the delete it protects rather than in the admin.
 """
 
 import time
+from collections.abc import Callable
 from typing import Any
 from urllib import parse
 
@@ -219,7 +220,7 @@ def delete_cluster_files(cluster: OpinionCluster, delete_docket: bool) -> None:
 
 
 # nosemgrep: python.lang.bad-return-outside-function
-SEAL_BLOCKERS_MAP = {
+SEAL_BLOCKERS_MAP: dict[str, Callable[[OpinionCluster], Any]] = {
     # These prevent cluster deletion
     "favorites.UserTag": lambda cluster: cluster.docket.user_tags,
     "favorites.Note": lambda cluster: cluster.docket.note_set.all().union(
