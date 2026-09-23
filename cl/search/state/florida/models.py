@@ -22,6 +22,7 @@ from cl.search.state.shared import (
     AbstractStateDocument,
     DocketEntryType,
 )
+from cl.settings import COURT_REQUEST_USER_AGENT
 
 logger = logging.getLogger(__name__)
 
@@ -48,6 +49,7 @@ def florida_local_date(value: datetime | None) -> date | None:
 
 CHALLENGE_URL: str = urljoin(FLORIDA_API_BASE, "/altcha/challenge")
 CHALLENGE_TIMEOUT: float = 30.0
+SLOW_SOLVE_THRESHOLD_MS: float = 5_000
 
 
 class AltchaData(BaseModel):
@@ -61,8 +63,8 @@ class AltchaData(BaseModel):
     @retry(
         (httpx.ConnectError, httpx.TimeoutException),
         tries=3,
-        delay=0.25,
-        backoff=1,
+        delay=1,
+        backoff=2,
         logger=logger,
     )
     def fetch(self) -> "AltchaChallenge | None":
@@ -73,13 +75,13 @@ class AltchaData(BaseModel):
         response = httpx.get(
             CHALLENGE_URL,
             params={"resource": self.resource},
-            headers={"User-Agent": "Courtlistener (Free Law Project)"},
+            headers={"User-Agent": COURT_REQUEST_USER_AGENT},
             timeout=CHALLENGE_TIMEOUT,
         )
 
         response.raise_for_status()
 
-        if response.status_code == 204:
+        if response.status_code == HTTPStatus.NO_CONTENT:
             return None
 
         return AltchaChallenge.model_validate_json(response.text)
@@ -304,6 +306,24 @@ class FloridaDocument(AbstractDateTimeModel, AbstractStateDocument):
         if challenge is None:
             return self.url
         solution = challenge.solve()
+
+        if solution.time > SLOW_SOLVE_THRESHOLD_MS:
+            logger.warning(
+                "Slow Florida challenge for %s: counter=%d cost=%d took %.0f ms",
+                self.pk,
+                solution.counter,
+                challenge.parameters.cost,
+                solution.time,
+            )
+        else:
+            logger.info(
+                "Solved Florida challenge for %s: counter=%d cost=%d in %.0f ms",
+                self.pk,
+                solution.counter,
+                challenge.parameters.cost,
+                solution.time,
+            )
+
         if solution is None:
             logger.error(
                 "Failed to solve Florida challenge within time limit for %s",

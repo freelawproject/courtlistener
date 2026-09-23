@@ -229,6 +229,7 @@ from cl.search.state.texas.models import (
     TexasDocketEntry,
     TexasDocument,
 )
+from cl.settings import COURT_REQUEST_USER_AGENT
 
 HYPERSCAN_TOKENIZER = HyperscanTokenizer(cache_dir=".hyperscan")
 
@@ -3374,8 +3375,8 @@ def download_document_in_stream(
     @retry(
         (ConnectionError, Timeout),
         tries=3,
-        delay=0.25,
-        backoff=1,
+        delay=1,
+        backoff=2,
     )
     def download_to_file(tmp_file):
         tmp_file.seek(0)
@@ -3386,7 +3387,7 @@ def download_document_in_stream(
             url,
             stream=True,
             timeout=60,
-            headers={"User-Agent": "Free Law Project"},
+            headers={"User-Agent": COURT_REQUEST_USER_AGENT},
         ) as response:
             response.raise_for_status()
             if require_pdf and not is_pdf(response):
