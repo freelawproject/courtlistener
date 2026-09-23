@@ -15,6 +15,7 @@ from django.contrib.auth.models import User
 from django.contrib.contenttypes.models import ContentType
 from django.core.exceptions import ValidationError
 from django.core.files.base import ContentFile
+from django.db import connection
 from django.test import SimpleTestCase
 from django.utils.encoding import force_bytes
 from django.utils.timezone import now
@@ -663,6 +664,50 @@ class ExtractFormattedTextSanitizationTest(TestCase):
         self.assertIn("Hello", texas_document.plain_text)
         self.assertIn("world", texas_document.plain_text)
         self.assertIn("Courtlistener", texas_document.plain_text)
+
+
+class ExtractFormattedTextReleasesConnectionTest(TransactionTestCase):
+    """Tests that extract_formatted_text_document_base doesn't hold a
+    database connection open while it waits on Doctor. Idle connections get
+    dropped during long extractions and the final save then fails.
+
+    A TransactionTestCase is needed because inside a test transaction the
+    release is deliberately a no-op.
+    """
+
+    @mock.patch("cl.scrapers.tasks.microservice", new_callable=mock.AsyncMock)
+    def test_db_connection_is_released_before_calling_doctor(
+        self, microservice_mock
+    ) -> None:
+        """Is the DB connection closed when Doctor is called, and reopened
+        for the save afterwards?"""
+        texas_document = TexasDocumentFactory.create()
+        connection_open_during_doctor_call: list[bool] = []
+
+        async def fake_doctor(*args, **kwargs) -> httpx.Response:
+            # Connections are thread-local, so inspect the one owned by the
+            # thread the task's DB calls run on, not the event loop's thread.
+            connection_open_during_doctor_call.append(
+                await sync_to_async(
+                    lambda: connection.connection is not None
+                )()
+            )
+            return httpx.Response(
+                200, json={"content": "Hello", "extracted_by_ocr": False}
+            )
+
+        microservice_mock.side_effect = fake_doctor
+
+        async_to_sync(extract_formatted_text_document_base)(
+            texas_document.pk,
+            check_if_needed=False,
+            ocr_available=False,
+            model_name="search.TexasDocument",
+        )
+
+        self.assertEqual(connection_open_during_doctor_call, [False])
+        texas_document.refresh_from_db()
+        self.assertEqual(texas_document.plain_text, "Hello")
 
 
 class ExtensionIdentificationTest(SimpleTestCase):

@@ -3,14 +3,16 @@ import logging
 import traceback
 from dataclasses import dataclass, field
 from io import StringIO
+from typing import cast
 from zoneinfo import ZoneInfo
 
 import waffle
 from asgiref.sync import sync_to_async
 from django.conf import settings
 from django.contrib.auth.models import AnonymousUser, User
+from django.db.models import QuerySet
 from django.http import Http404, HttpRequest
-from django.shortcuts import aget_object_or_404  # type: ignore[attr-defined]
+from django.shortcuts import aget_object_or_404
 from django.urls import reverse
 from django.utils.formats import date_format
 from django.utils.http import urlencode
@@ -37,6 +39,7 @@ from cl.opinion_page.docket_entry_sources import (
     DocketEntrySource,
     MetadataItem,
     MetadataSection,
+    SourceDocketEntry,
 )
 from cl.people_db.models import Person
 from cl.recap.constants import COURT_TIMEZONES
@@ -52,7 +55,7 @@ from cl.search.models import (
     SCOTUSDocketEntry,
 )
 
-logger = logging.getLogger(__name__)
+logger: logging.Logger = logging.getLogger(__name__)
 
 
 def _person_item(
@@ -567,7 +570,9 @@ async def core_docket_data(
         trunc(best_case_name(docket), 100, ellipsis="..."),
     )
 
-    has_alert = await user_has_alert(await request.auser(), docket)  # type: ignore[arg-type]
+    has_alert = await user_has_alert(
+        cast(User | AnonymousUser, await request.auser()), docket
+    )
 
     timezone_str = COURT_TIMEZONES.get(docket.court_id, "US/Eastern")
     docket_source = docket.get_entry_source()
@@ -627,7 +632,9 @@ async def user_has_alert(user: AnonymousUser | User, docket: Docket) -> bool:
     return has_alert
 
 
-def generate_docket_entries_csv_data(docket_entries):
+def generate_docket_entries_csv_data(
+    docket_entries: QuerySet[SourceDocketEntry] | list[SourceDocketEntry],
+) -> str:
     """Get str representing in memory file from docket_entries.
 
     :param docket_entries: List of DocketEntry that implements CSVExportMixin.
@@ -943,7 +950,7 @@ async def es_get_cited_clusters_with_cache(
         response = None
         timeout_cited = True
 
-    citing_clusters = list(response) if not timeout_cited else []
+    citing_clusters = list(response) if response is not None else []
     cluster_results.citing_clusters = citing_clusters
     cluster_results.citing_cluster_count = (
         response.hits.total.value if response is not None else 0
@@ -1005,7 +1012,9 @@ async def es_cited_case_count(
     return cited_by_count
 
 
-async def es_related_case_count(cluster_id, sub_opinion_pks: list[str]) -> int:
+async def es_related_case_count(
+    cluster_id: int, sub_opinion_pks: list[str]
+) -> int:
     """Elastic quick related cases count
 
     :param cluster_id: The cluster id of the object
