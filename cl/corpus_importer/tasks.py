@@ -661,7 +661,7 @@ def process_free_opinion_result(
                     is_free_on_pacer=True,
                 )
                 rd_created = True
-            elif rd_count > 0:
+            else:
                 # Could be one item (great!) or more than one (not great).
                 # Choose the earliest item and upgrade it.
                 rd = rds.earliest("date_created")
@@ -2722,26 +2722,28 @@ def get_pacer_doc_by_rd_and_description(
     rd = RECAPDocument.objects.get(pk=rd_pk)
     att_report = get_attachment_page_by_rd(self, rd_pk, session_data)
 
-    att_found = None
-    for attachment in att_report.data.get("attachments", []):
-        if description_re.search(attachment["description"]):
-            att_found = attachment.copy()
-            document_type = RECAPDocument.ATTACHMENT
-            break
-
-    if not att_found:
-        if fallback_to_main_doc:
-            logger.info(
-                "Falling back to main document for pacer_doc_id: %s",
-                rd.pacer_doc_id,
-            )
-            att_found = att_report.data
-            document_type = RECAPDocument.PACER_DOCUMENT
-        else:
-            msg = f"Aborting. Did not find civil cover sheet for {rd}."
-            logger.error(msg)
-            self.request.chain = None
-            return None
+    att_found = next(
+        (
+            attachment.copy()
+            for attachment in att_report.data.get("attachments", [])
+            if description_re.search(attachment["description"])
+        ),
+        None,
+    )
+    if att_found:
+        document_type = RECAPDocument.ATTACHMENT
+    elif fallback_to_main_doc:
+        logger.info(
+            "Falling back to main document for pacer_doc_id: %s",
+            rd.pacer_doc_id,
+        )
+        att_found = att_report.data
+        document_type = RECAPDocument.PACER_DOCUMENT
+    else:
+        msg = f"Aborting. Did not find civil cover sheet for {rd}."
+        logger.error(msg)
+        self.request.chain = None
+        return None
     if not att_found.get("pacer_doc_id"):
         logger.warning("No pacer_doc_id for document (is it sealed?)")
         self.request.chain = None

@@ -74,17 +74,10 @@ replace-imports-with-any = [
 # Pre-existing errors are grandfathered here; only new errors fail the check.
 baseline = ".pyrefly-baseline.json"
 
-# Checks the codebase was never previously held to.
-[errors]
-unbound-name = false
-
 # Modules to hold to a stricter standard. Ideally the whole codebase will be held to these standards eventually.
 [[sub-config]]
 matches = "cl/audio/**"
 check-unannotated-defs = true
-
-[sub-config.errors]
-unbound-name = true
 
 [[sub-config]]
 matches = "cl/corpus_importer/**"
@@ -95,19 +88,10 @@ strict-callable-subtyping = false
 matches = "cl/opinion_page/**"
 check-unannotated-defs = true
 
-[sub-config.errors]
-unbound-name = true
-
 [[sub-config]]
 matches = "cl/recap_rss/**"
 check-unannotated-defs = true
 
-[sub-config.errors]
-unbound-name = true
-
 [[sub-config]]
 matches = "cl/simple_pages/**"
 check-unannotated-defs = true
-
-[sub-config.errors]
-unbound-name = true

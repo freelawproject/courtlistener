@@ -727,10 +727,9 @@ def do_es_search(
     if search_form.is_valid() and document_type:
         # Copy cleaned_data to preserve the original data when displaying the form
         cd = search_form.cleaned_data.copy()
+        # Create necessary filters to execute ES query
+        search_query = document_type.search()
         try:
-            # Create necessary filters to execute ES query
-            search_query = document_type.search()
-
             if cd["type"] in [
                 SEARCH_TYPES.OPINION,
                 SEARCH_TYPES.RECAP,
