@@ -16,6 +16,7 @@ from django.http.request import QueryDict
 from django_elasticsearch_dsl.search import Search
 from elasticsearch.dsl import A
 from elasticsearch.dsl.response import Response
+from elasticsearch.dsl.response.hit import Hit
 from eyecite.models import FullCaseCitation
 from eyecite.tokenizers import HyperscanTokenizer
 from waffle import flag_is_active
@@ -641,6 +642,26 @@ def remove_missing_citations(
     return missing_citations_str, suggested_query
 
 
+class ESSearchResult(TypedDict):
+    results: Page | list
+    results_details: list[int | None]
+    search_form: Any
+    search_summary_str: str
+    search_summary_dict: dict
+    error: bool
+    courts: dict[str, list]
+    court_count_human: str
+    court_count: str
+    query_citation: Hit | None
+    cited_cluster: Any
+    related_cluster: Any
+    facet_fields: list
+    error_message: str
+    suggested_query: str
+    estimated_count_threshold: int
+    missing_citations: list[str]
+
+
 def do_es_search(
     get_params: QueryDict,
     rows: int = settings.SEARCH_PAGE_SIZE,
@@ -649,7 +670,7 @@ def do_es_search(
     is_csv_export: bool = False,
     courts: QuerySet[Court] | None = None,
     is_semantic_frontend_active: bool = False,
-):
+) -> ESSearchResult:
     """Run Elasticsearch searching and filtering and prepare data to display
 
     :param get_params: The request.GET params sent by user.
@@ -823,7 +844,7 @@ def do_es_search(
     ]
 
     return {
-        "results": paged_results,
+        "results": paged_results if paged_results else [],
         "results_details": results_details,
         "search_form": search_form,
         "search_summary_str": search_summary_str,
@@ -926,6 +947,8 @@ def fetch_es_results_for_csv(
         return csv_rows, True
 
     results = search["results"]
+    if isinstance(results, list):
+        return [], True
     max_results = settings.MAX_SEARCH_RESULTS_EXPORTED
     match search_type:
         case SEARCH_TYPES.OPINION | SEARCH_TYPES.RECAP | SEARCH_TYPES.DOCKETS:

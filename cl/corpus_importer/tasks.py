@@ -14,7 +14,7 @@ from io import BytesIO
 from pyexpat import ExpatError
 from re import Pattern
 from tempfile import NamedTemporaryFile
-from typing import IO, Any, TypeIs
+from typing import IO, Any, TypeIs, cast
 from urllib.parse import urljoin
 
 import botocore.exceptions
@@ -962,21 +962,24 @@ def upload_to_ia(
     )
     try:
         item = ia_session.get_item(identifier)
-        responses = item.upload(
-            files=files,
-            metadata={
-                "title": title,
-                "collection": collection,
-                "contributor": '<a href="https://free.law">Free Law Project</a>',
-                "court": court_id,
-                "source_url": source_url,
-                "language": "eng",
-                "mediatype": media_type,
-                "description": description,
-                "licenseurl": "https://www.usa.gov/government-works",
-            },
-            queue_derive=False,
-            verify=True,
+        responses = cast(
+            list[Response],
+            item.upload(
+                files=files,
+                metadata={
+                    "title": title,
+                    "collection": collection,
+                    "contributor": '<a href="https://free.law">Free Law Project</a>',
+                    "court": court_id,
+                    "source_url": source_url,
+                    "language": "eng",
+                    "mediatype": media_type,
+                    "description": description,
+                    "licenseurl": "https://www.usa.gov/government-works",
+                },
+                queue_derive=False,
+                verify=True,
+            ),
         )
     except ExpatError as exc:
         # ExpatError: The syntax of the XML file that's supposed to be returned
