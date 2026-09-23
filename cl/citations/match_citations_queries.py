@@ -149,8 +149,10 @@ def es_search_db_for_full_citation(
      no hits and a boolean indicating whether the citation was found.
     """
 
-    if not hasattr(full_citation, "citing_opinion"):
-        full_citation.citing_opinion = None
+    # do_resolve_citations attaches the citing Opinion to FullCaseCitations
+    citing_opinion: Opinion | None = getattr(
+        full_citation, "citing_opinion", None
+    )
     search_query = OpinionDocument.search()
     filters = [
         # Q(
@@ -160,22 +162,19 @@ def es_search_db_for_full_citation(
     ]
 
     must_not = []
-    if full_citation.citing_opinion is not None:
+    if citing_opinion is not None:
         # Eliminate self-cites.
-        must_not.append(Q("match", id=full_citation.citing_opinion.pk))
+        must_not.append(Q("match", id=citing_opinion.pk))
 
     # Set up filter parameters
     if full_citation.year:
         start_year = end_year = full_citation.year
     else:
         start_year, end_year = get_years_from_reporter(full_citation)
-        if (
-            full_citation.citing_opinion is not None
-            and full_citation.citing_opinion.cluster.date_filed
-        ):
+        if citing_opinion is not None and citing_opinion.cluster.date_filed:
             end_year = min(
                 end_year,
-                full_citation.citing_opinion.cluster.date_filed.year,
+                citing_opinion.cluster.date_filed.year,
             )
 
     filters.append(
@@ -213,7 +212,7 @@ def es_search_db_for_full_citation(
             results = es_case_name_query(
                 query,
                 full_citation,
-                full_citation.citing_opinion,
+                citing_opinion,
             )
 
     # Return all possible results

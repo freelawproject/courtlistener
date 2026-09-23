@@ -1721,7 +1721,7 @@ async def citation_homepage(request: HttpRequest) -> HttpResponse:
                 )
             citation_groups = case_law_citations[0].groups
             citation_dict = {
-                "reporter": citation_groups.get("reporter"),
+                "reporter": cast(str, citation_groups.get("reporter")),
                 "volume": citation_groups.get("volume", None),
                 "page": citation_groups.get("page", None),
             }

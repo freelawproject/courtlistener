@@ -204,20 +204,6 @@
       "severity": "error"
     },
     {
-      "column": 21,
-      "path": "cl/citations/api_views.py",
-      "name": "bad-argument-type",
-      "concise_description": "Argument `dict[str, list[Unknown] | object | Unknown]` is not assignable to parameter `object` with type `dict[str, HTTPStatus | list[Unknown] | str]` in function `list.append`",
-      "severity": "error"
-    },
-    {
-      "column": 17,
-      "path": "cl/citations/api_views.py",
-      "name": "bad-argument-type",
-      "concise_description": "Argument `dict[str, int | object | Unknown]` is not assignable to parameter `object` with type `dict[str, HTTPStatus | list[Unknown] | str]` in function `list.append`",
-      "severity": "error"
-    },
-    {
       "column": 45,
       "path": "cl/citations/api_views.py",
       "name": "bad-argument-type",

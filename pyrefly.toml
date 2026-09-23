@@ -61,7 +61,6 @@ permissive-ignores = true
 replace-imports-with-any = [
     "cl.search", "cl.search.*",
     "cl.tests", "cl.tests.*",
-    "eyecite", "eyecite.*",
 ]
 # Pre-existing errors are grandfathered here; only new errors fail the check.
 baseline = ".pyrefly-baseline.json"

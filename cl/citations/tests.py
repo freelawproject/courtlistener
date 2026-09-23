@@ -19,6 +19,7 @@ from django.test import SimpleTestCase, override_settings
 from django.urls import reverse
 from elasticsearch import NotFoundError
 from eyecite import get_citations
+from eyecite.models import CitationBase, FullCaseCitation
 from eyecite.test_factories import (
     case_citation,
     id_citation,
@@ -60,6 +61,7 @@ from cl.citations.tasks import (
     store_opinion_citations_and_update_parentheticals,
     store_recap_citations,
 )
+from cl.citations.types import MatchedResourceType
 from cl.citations.unmatched_citations_utils import (
     handle_unmatched_citations,
     update_unmatched_citations_status,
@@ -243,7 +245,9 @@ class CitationTextTest(TestCase):
                 # to receive.
                 if not citations:
                     continue
-                citation_resolutions = {NO_MATCH_RESOURCE: citations}
+                citation_resolutions: dict[
+                    MatchedResourceType, list[CitationBase]
+                ] = {NO_MATCH_RESOURCE: citations}
 
                 created_html = create_cited_html(citation_resolutions, {})
                 self.assertEqual(
@@ -384,7 +388,9 @@ class CitationTextTest(TestCase):
                 # purpose of this test is not to test that. We just need
                 # something that looks like what create_cited_html() expects
                 # to receive.
-                citation_resolutions = {NO_MATCH_RESOURCE: citations}
+                citation_resolutions: dict[
+                    MatchedResourceType, list[CitationBase]
+                ] = {NO_MATCH_RESOURCE: citations}
 
                 created_html = create_cited_html(
                     citation_resolutions, get_citations_kwargs
@@ -512,7 +518,9 @@ class CitationTextTest(TestCase):
                 # purpose of this test is not to test that. We just need
                 # something that looks like what create_cited_html() expects
                 # to receive.
-                citation_resolutions = {NO_MATCH_RESOURCE: citations}
+                citation_resolutions: dict[
+                    MatchedResourceType, list[CitationBase]
+                ] = {NO_MATCH_RESOURCE: citations}
 
                 created_html = create_cited_html(
                     citation_resolutions, get_citations_kwargs
@@ -1379,6 +1387,7 @@ class CitationObjectTest(ESIndexTestCase, TestCase):
         citation = get_citations(citation_str, tokenizer=HYPERSCAN_TOKENIZER)[
             0
         ]
+        assert isinstance(citation, FullCaseCitation)  # for the type checker
         results = resolve_fullcase_citation(citation)
         self.assertEqual(NO_MATCH_RESOURCE, results)
 
@@ -1386,7 +1395,8 @@ class CitationObjectTest(ESIndexTestCase, TestCase):
         """Resolve to corrected reporter"""
         cite_str = "8 B. 415"
         citation = get_citations(cite_str, tokenizer=HYPERSCAN_TOKENIZER)[0]
-        citation.citing_opinion = Opinion.objects.all()[0]
+        assert isinstance(citation, FullCaseCitation)  # for the type checker
+        setattr(citation, "citing_opinion", Opinion.objects.all()[0])
         results = resolve_fullcase_citation(citation)
         opinion12 = Opinion.objects.get(cluster__pk=self.citation12.cluster_id)
         self.assertEqual(results.pk, opinion12.pk, msg=results)
@@ -1395,7 +1405,8 @@ class CitationObjectTest(ESIndexTestCase, TestCase):
         """Resolve to corrected reporter and pin cite inside xml harvard?"""
         cite_str = "8 B. 416"
         citation = get_citations(cite_str, tokenizer=HYPERSCAN_TOKENIZER)[0]
-        citation.citing_opinion = Opinion.objects.all()[0]
+        assert isinstance(citation, FullCaseCitation)  # for the type checker
+        setattr(citation, "citing_opinion", Opinion.objects.all()[0])
         results = resolve_fullcase_citation(citation)
         opinion12 = Opinion.objects.get(cluster__pk=self.citation12.cluster_id)
         self.assertEqual(results.pk, opinion12.pk, msg=results)
@@ -1406,6 +1417,7 @@ class CitationObjectTest(ESIndexTestCase, TestCase):
         citation = get_citations(citation_str, tokenizer=HYPERSCAN_TOKENIZER)[
             0
         ]
+        assert isinstance(citation, FullCaseCitation)  # for the type checker
         results = resolve_fullcase_citation(citation)
         self.assertEqual(MULTIPLE_MATCHES_RESOURCE, results)
 
