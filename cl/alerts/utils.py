@@ -331,7 +331,7 @@ def fetch_all_search_alerts_results(
     """
 
     def get_search_after(response: Response | None) -> Any:
-        # Response.hits is annotated upstream as a plain list, but at runtime
+        # TODO: Response.hits is annotated upstream as a plain list, but at runtime
         # it is an AttrList that also exposes the raw `hits` payload.
         if response and cast(Any, response.hits).hits:
             return response.hits[-1].meta.sort
@@ -562,16 +562,15 @@ def has_document_alert_hit_been_triggered(
     return r.sismember(alert_key, document_id)
 
 
-def build_plain_percolator_query(cd: CleanData) -> Query | list:
+def build_plain_percolator_query(cd: CleanData) -> Query | None:
     """Build a plain query based on the provided clean data for its use in the
     Percolator
 
     :param cd: The query CleanedData.
-    :return: An ES Query object representing the built query, or an empty
-    list for search types the Percolator does not support.
+    :return: An ES Query object representing the built query, or None for search
+    types the Percolator does not support.
     """
 
-    plain_query: Query | list = []
     match cd["type"]:
         case (
             SEARCH_TYPES.RECAP
@@ -609,25 +608,25 @@ def build_plain_percolator_query(cd: CleanData) -> Query | list:
                         "Indexing match-all queries is not supported."
                     )
                 case [[], _]:
-                    plain_query = Q(
+                    return Q(
                         "bool",
                         should=string_query,
                         minimum_should_match=1,
                     )
                 case [_, []]:
-                    plain_query = Q(
+                    return Q(
                         "bool",
                         filter=parent_filters,
                     )
                 case [_, _]:
-                    plain_query = Q(
+                    return Q(
                         "bool",
                         filter=parent_filters,
                         should=string_query,
                         minimum_should_match=1,
                     )
 
-    return plain_query
+    return None
 
 
 def transform_percolator_child_document(
