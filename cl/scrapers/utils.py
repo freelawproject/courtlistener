@@ -9,8 +9,7 @@ from django.core.files.base import ContentFile
 from django.db.models import Q
 from eyecite.find import get_citations
 from eyecite.tokenizers import HyperscanTokenizer
-from juriscraper import AbstractSite
-from juriscraper.AbstractSite import logger
+from juriscraper.AbstractSite import AbstractSite, logger
 from reporters_db import REPORTERS
 
 from cl.citations.utils import map_reporter_db_cite_type

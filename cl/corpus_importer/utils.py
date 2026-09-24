@@ -9,7 +9,7 @@ from collections.abc import Generator, Iterator, Mapping, Sequence
 from dataclasses import dataclass
 from datetime import date
 from difflib import SequenceMatcher
-from typing import Any, cast
+from typing import TYPE_CHECKING, Any, cast
 from urllib.parse import urlparse
 
 from asgiref.sync import async_to_sync
@@ -42,6 +42,11 @@ from cl.people_db.lookup_utils import (
 )
 from cl.people_db.models import Person
 from cl.search.models import Citation, Court, Docket, Opinion, OpinionCluster
+
+if TYPE_CHECKING:
+    import numpy as np
+    from numpy import NDArray
+    from scipy.sparse import csr_matrix
 
 HYPERSCAN_TOKENIZER = HyperscanTokenizer(cache_dir=".hyperscan")
 
@@ -336,7 +341,7 @@ def compare_documents(file_characters: str, cl_characters: str) -> int:
 
 def similarity_scores(
     texts_to_compare_1: list[str], texts_to_compare_2: list[str]
-) -> list[list[float]]:
+) -> NDArray[np.float64]:
     """Get similarity scores between two sets of lists
 
     Using TF-IDF/Term Frequency-Inverse Document Frequency
@@ -353,9 +358,14 @@ def similarity_scores(
     from sklearn.metrics.pairwise import cosine_similarity
 
     # Weights the word counts by a measure of how often they appear in the
-    # documents, and it returns a sparse matrix
-    X = TfidfVectorizer().fit_transform(
-        texts_to_compare_1 + texts_to_compare_2
+    # documents, and it returns a sparse matrix. TfidfVectorizer always
+    # returns a csr_matrix, but pyrefly infers the abstract spmatrix base
+    # class, which doesn't declare __getitem__.
+    X = cast(
+        "csr_matrix",
+        TfidfVectorizer().fit_transform(
+            texts_to_compare_1 + texts_to_compare_2
+        ),
     )
 
     # Calculate cosine similarity between weight of words for each text in list
@@ -1189,7 +1199,7 @@ def compute_binary_probe_jitter(
     """
 
     if max_probe is None:
-        max_probe = settings.IQUERY_MAX_PROBE
+        max_probe = cast(int, settings.IQUERY_MAX_PROBE)
     # The jitter will be a random value between 1 and half of max_probe.
     return random.randint(1, round(max_probe * 0.5)) if not testing else 0
 
@@ -1224,7 +1234,7 @@ def compute_next_binary_probe(
     # the detection of new cases once courts catch up.
     jitter = 0 if iteration == 1 else jitter
     if max_probe is None:
-        max_probe = settings.IQUERY_MAX_PROBE
+        max_probe = cast(int, settings.IQUERY_MAX_PROBE)
     cap_iteration = int(math.log2(max_probe)) + 1
     if iteration < cap_iteration:
         offset = 2 ** (iteration - 1)
