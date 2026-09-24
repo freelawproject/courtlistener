@@ -1,7 +1,10 @@
+import logging
+
 import environ
-from django.core.exceptions import ImproperlyConfigured
 
 from ..project.testing import TESTING
+
+logger = logging.getLogger(__name__)
 
 env = environ.FileAwareEnv()
 DEVELOPMENT = env.bool("DEVELOPMENT", default=True)
@@ -13,8 +16,8 @@ OIDC_RSA_PRIVATE_KEY = env("OIDC_RSA_PRIVATE_KEY", default="").replace(
 OAUTH2_DCR_RATELIMIT = env("OAUTH2_DCR_RATELIMIT", default="20000/h")
 
 if not OIDC_RSA_PRIVATE_KEY and not DEVELOPMENT and not TESTING:
-    raise ImproperlyConfigured(
-        "OIDC_RSA_PRIVATE_KEY must be set in production. Generate one "
+    logger.warning(
+        "OIDC_RSA_PRIVATE_KEY should be set in production. Generate one "
         "with 'openssl genrsa 4096' and store the PEM in the env var."
     )
 
