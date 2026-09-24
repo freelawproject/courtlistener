@@ -2734,10 +2734,16 @@ class TieredCacheTest(SimpleTestCase):
 class IncrementalNewTemplateMiddlewareTest(TestCase):
     """Template swapping for pages that are mid-redesign."""
 
-    def process(self, template_name: str) -> TemplateResponse:
-        """Runs an unrendered TemplateResponse through the middleware."""
+    def process(
+        self, template_name: str, headers: dict[str, str] | None = None
+    ) -> TemplateResponse:
+        """Runs an unrendered TemplateResponse through the middleware.
+
+        :param template_name: The template the view would have rendered.
+        :param headers: Extra request headers, as the client would send them.
+        """
         middleware = IncrementalNewTemplateMiddleware(lambda request: None)
-        request = RequestFactory().get("/")
+        request = RequestFactory().get("/", headers=headers or {})
         response = TemplateResponse(request, template_name, {})
         return middleware.process_template_response(request, response)
 
@@ -2761,6 +2767,21 @@ class IncrementalNewTemplateMiddlewareTest(TestCase):
         """A v2-only template is served even with the flag off."""
         response = self.process("components.html")
         self.assertEqual(response.template_name, "v2_components.html")
+
+    def test_swapped_page_gets_the_search_form(self) -> None:
+        """A swapped full page receives the header's search form."""
+        response = self.process("components.html")
+        self.assertIn("search_form", response.context_data)
+
+    def test_htmx_fragment_skips_the_search_form(self) -> None:
+        """A swapped htmx fragment is not handed the search form.
+
+        Fragments never render the header, so building the form for them
+        is wasted work.
+        """
+        response = self.process("components.html", {"HX-Request": "true"})
+        self.assertEqual(response.template_name, "v2_components.html")
+        self.assertNotIn("search_form", response.context_data)
 
 
 class FilterByEmailTest(TestCase):

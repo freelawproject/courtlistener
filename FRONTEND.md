@@ -28,6 +28,8 @@ CourtListener is migrating from Bootstrap 3 / jQuery to Tailwind v3 / Alpine.js 
 
 `IncrementalNewTemplateMiddleware` swaps templates by prepending `v2_` to the view's template name when the `use_new_design` waffle flag is active. New templates MUST be named accordingly (e.g., `v2_help/index.html`).
 
+Partials a view returns on their own, such as htmx fragments, follow the same rule and live under `v2_includes/` (e.g., `includes/foo/button.html` → `v2_includes/foo/button.html`). They are swapped like any other template, but the checks that only make sense for full pages (extending `new_base.html`, registering in `V2PagesRegisterTest`) do not apply to them.
+
 ### Base template
 
 New templates MUST extend `new_base.html` (or another `v2_` template). Only `new_base.html` loads Tailwind, Alpine, and Cotton.
