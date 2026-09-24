@@ -3070,7 +3070,9 @@ def build_full_join_es_queries(
             # has_parent_parties_filter to match only child documents whose
             # parents match the party filters.
             has_child_query = build_has_child_query(
-                cast(Query, has_parent_parties_filter),
+                cast(
+                    Query, has_parent_parties_filter
+                ),  # TODO: Type `has_parent_parties_filter` correctly so we don't need this cast
                 "recap_document",
                 query_hits_limit,
                 SEARCH_RECAP_CHILD_HL_FIELDS,
