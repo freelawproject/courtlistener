@@ -22,13 +22,17 @@ V2_TEMPLATE_BODY = '{% extends "new_base.html" %}'
 
 
 def _run_checks_on(
-    files: dict[str, str], changed: dict[str, str] | None = None
+    files: dict[str, str],
+    changed: dict[str, str] | None = None,
+    linted: list[str] | None = None,
 ) -> list[tuple[str, int, str]]:
     """Lint a temp repo containing ``files`` (``{repo-relative path: content}``).
 
-    ``changed`` is the ``{path: git status}`` diff to lint, simulating
+    ``changed`` is the ``{path: git status}`` diff, simulating
     ``git diff --name-status``; it defaults to every file as modified. A path
     in ``changed`` that is missing from ``files`` stands for a deleted file.
+    ``linted`` is the subset of ``changed`` handed to the checks, the way
+    ``main()`` only hands over HTML and input.css; it defaults to all of it.
     Returns ``(file, line, check)`` per finding, in report order.
     """
     changed = changed or dict.fromkeys(files, "M")
@@ -40,7 +44,9 @@ def _run_checks_on(
             path.write_text(
                 textwrap.dedent(content).lstrip("\n"), encoding="utf-8"
             )
-        findings = frontend_checks.run_checks(list(changed), root, changed)
+        findings = frontend_checks.run_checks(
+            linted if linted is not None else list(changed), root, changed
+        )
     return [(f.file, f.line, f.check) for f in findings]
 
 
@@ -188,6 +194,40 @@ class LegacyTemplateDeletedTest(unittest.TestCase):
         findings = _run_checks_on(
             {LEGACY_TEMPLATE_FILE: "behind the use_new_design waffle flag."},
             changed={V2_TEMPLATE_FILE: "D"},
+        )
+        self.assertEqual(findings, [])
+
+
+class V2RegisterTest(unittest.TestCase):
+    """A new v2 template must be registered in V2PagesRegisterTest."""
+
+    def test_new_v2_template_without_register_change_warns(self) -> None:
+        """An added v2 template with no change to the register test is reported."""
+        findings = _run_checks_on(
+            {V2_TEMPLATE_FILE: V2_TEMPLATE_BODY},
+            changed={V2_TEMPLATE_FILE: "A"},
+        )
+        self.assertEqual(
+            findings, [(V2_TEMPLATE_FILE, 1, "check_v2_register")]
+        )
+
+    def test_register_test_is_seen_even_though_it_is_not_linted(self) -> None:
+        """main() only lints HTML and CSS, so the Python file is found via statuses."""
+        findings = _run_checks_on(
+            {V2_TEMPLATE_FILE: V2_TEMPLATE_BODY},
+            changed={
+                V2_TEMPLATE_FILE: "A",
+                frontend_checks.V2_REGISTER_TEST_FILE: "M",
+            },
+            linted=[V2_TEMPLATE_FILE],
+        )
+        self.assertEqual(findings, [])
+
+    def test_modified_v2_template_needs_no_registration(self) -> None:
+        """Only additions and copies of v2 templates ask for registration."""
+        findings = _run_checks_on(
+            {V2_TEMPLATE_FILE: V2_TEMPLATE_BODY},
+            changed={V2_TEMPLATE_FILE: "M"},
         )
         self.assertEqual(findings, [])
 

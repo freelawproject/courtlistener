@@ -17,7 +17,9 @@
             {% else %}
               text-start
             {% endif %}
-        ">
+          "
+          {% if column.title %}title="{{ column.title }}"{% endif %}
+        >
           {{ column.label }}
         </th>
       {% endfor %}
