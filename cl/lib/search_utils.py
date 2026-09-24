@@ -547,13 +547,15 @@ def fetch_and_paginate_results(
             if use_es_items
             else results_dict["hits"]  # type: ignore[typeddict-item]
         )
+        # The search view only caches the integer estimate under these keys;
+        # the Response variant is written by the API micro-cache.
         main_total = (
-            results_dict["cardinality_count_response"]
+            cast(int | None, results_dict["cardinality_count_response"])
             if use_es_items
             else results_dict["main_total"]  # type: ignore[typeddict-item]
         )
         child_total = (
-            results_dict["child_cardinality_count_response"]
+            cast(int | None, results_dict["child_cardinality_count_response"])
             if use_es_items
             else results_dict["child_total"]  # type: ignore[typeddict-item]
         )
