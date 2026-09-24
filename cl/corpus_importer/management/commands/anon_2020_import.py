@@ -396,7 +396,9 @@ def import_anon_2020_db(
         court_id = find_court_id(data["court"])
         date_argued, date_filed = process_dates(data)
         docket_number = do_docket_number(data)
-        html_str = soup.find("div", {"class": "container"}).decode_contents()
+        container = soup.find("div", {"class": "container"})
+        assert container is not None
+        html_str = container.decode_contents()
         found_cites = find_cites(data)
         status = check_publication_status(found_cites)
 

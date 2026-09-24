@@ -11,7 +11,7 @@ from collections.abc import Callable
 from copy import deepcopy
 from dataclasses import fields
 from functools import reduce, wraps
-from typing import Any, Literal
+from typing import Any, Literal, cast
 
 from asgiref.sync import async_to_sync
 from django.conf import settings
@@ -172,7 +172,7 @@ def build_numeric_range_query(
         )
         params["relation"] = relation
 
-    return [Q("range", **{field: params})]
+    return [Range(**{field: params})]
 
 
 def build_daterange_query(
@@ -221,7 +221,7 @@ def build_daterange_query(
         params["lte"] = lte
 
     if params:
-        return [Q("range", **{field: params})]
+        return [Range(**{field: params})]
 
     return []
 
@@ -420,7 +420,7 @@ def validate_query_syntax(value: str, query_type: QueryType) -> None:
 
 def build_fulltext_query(
     fields: list[str], value: str, only_queries=False
-) -> QueryString | list:
+) -> Query | list[Query]:
     """Given the cleaned data from a form, return a Elastic Search string query or []
     https://www.elastic.co/guide/en/elasticsearch/reference/current/full-text-queries.html
 
@@ -428,7 +428,7 @@ def build_fulltext_query(
     :param value: The string value to search for.
     :param only_queries: If True return only the queries avoiding wrapping them
     into a bool clause.
-    :return: A Elasticsearch QueryString or [] if the "value" param is empty.
+    :return: A Elasticsearch Query or [] if the "value" param is empty.
     """
     if value:
         validate_query_syntax(value, QueryType.QUERY_STRING)
@@ -925,11 +925,11 @@ def get_ms_current_time(default_current_date: datetime.date) -> int:
 
 
 def build_custom_function_score_for_date(
-    query: QueryString | str,
+    query: Query | str,
     order_by: tuple[str, str],
     default_score: int,
     default_current_date: datetime.date | None = None,
-) -> QueryString:
+) -> Query:
     """Build a custom function score query for sorting based on a date field.
 
     Define the function score for sorting, based on the child sort_field. When
@@ -946,14 +946,14 @@ def build_custom_function_score_for_date(
     This approach allows for handling dates in our system both before and
     after January 1, 1970 (epoch time), within a positive scoring range.
 
-    :param query: The Elasticsearch query string or QueryString object.
+    :param query: The Elasticsearch query string or Query object.
     :param order_by: If provided the field to use to compute score for sorting
     results based on a child document field.
     :param default_score: The default score to return when the document lacks
     the sort field.
     :param default_current_date: The default current date to use for computing
      a stable date score across pagination in the V4 Search API.
-    :return: The modified QueryString object with applied function score.
+    :return: The modified Query object with applied function score.
     """
 
     default_current_time = (
@@ -962,7 +962,7 @@ def build_custom_function_score_for_date(
         else None
     )
     sort_field, order = order_by
-    query = Q(
+    return Q(
         "function_score",
         query=query,
         script_score={
@@ -1011,11 +1011,9 @@ def build_custom_function_score_for_date(
         boost_mode="replace",
     )
 
-    return query
-
 
 def build_custom_relevance_score(
-    query: QueryString | str,
+    query: Query | str,
     date_field: str,
     scale: int,
     decay: float,
@@ -1024,7 +1022,7 @@ def build_custom_relevance_score(
     min_score: float = 0.0,
     default_current_date: datetime.date | None = None,
     jurisdiction_relevancy: bool = False,
-) -> QueryString:
+) -> Query:
     """
     Build a custom relevance score query for Elasticsearch that adjusts
     document relevance based on two criteria:
@@ -1033,7 +1031,7 @@ def build_custom_relevance_score(
      Court jurisdiction hierarchy, according to multiplier factors defined in
      jurisdiction_relevance_multipliers.
 
-    :param query: The Elasticsearch query string or QueryString object.
+    :param query: The Elasticsearch query string or Query object.
     :param date_field: The date field used to compute the relevance decay.
     :param scale: The scale (in years) that determines the rate of decay.
     :param decay: The decay factor.
@@ -1046,7 +1044,7 @@ def build_custom_relevance_score(
      a stable decay relevance score across pagination in the V4 Search API.
     :param jurisdiction_relevancy: Whether to apply jurisdiction relevance,
     which is currently supported only for Case Law Search.
-    :return:  The modified QueryString object with applied function score.
+    :return: The modified Query object with applied function score.
     """
 
     default_current_time = (
@@ -1055,7 +1053,7 @@ def build_custom_relevance_score(
         else None
     )
 
-    query = Q(
+    return Q(
         "function_score",
         query=query,
         script_score={
@@ -1134,11 +1132,10 @@ def build_custom_relevance_score(
         },
         boost_mode=boost_mode,
     )
-    return query
 
 
 def build_has_child_query(
-    query: QueryString | str,
+    query: Query | str,
     child_type: str,
     child_hits_limit: int,
     highlighting_fields: dict[str, int] | None = None,
@@ -1146,10 +1143,10 @@ def build_has_child_query(
     child_highlighting: bool = True,
     default_current_date: datetime.date | None = None,
     alerts: bool = False,
-) -> QueryString:
+) -> Query:
     """Build a 'has_child' query.
 
-    :param query: The Elasticsearch query string or QueryString object.
+    :param query: The Elasticsearch query string or Query object.
     :param child_type: The type of the child document.
     :param child_hits_limit: The maximum number of child hits to be returned.
     :param highlighting_fields: List of fields to highlight in child docs.
@@ -1212,7 +1209,7 @@ def build_has_child_query(
 def combine_plain_filters_and_queries(
     cd: CleanData,
     filters: list,
-    string_query: QueryString | list,
+    string_query: Query | list[Query] | None,
     api_version: Literal["v3", "v4"] | None = None,
 ) -> Query:
     """Combine filters and query strings for plain documents, like Oral arguments
@@ -1220,12 +1217,16 @@ def combine_plain_filters_and_queries(
 
     :param cd: The query CleanedData
     :param filters: A list of filter objects to be applied.
-    :param string_query: An Elasticsearch QueryString object.
+    :param string_query: An Elasticsearch Query, a list of queries, or None.
     :param api_version: Optional, the request API version.
     :return: The modified Search object based on the given conditions.
     """
 
-    final_query = Q(string_query or "bool")
+    # An empty list stands in for "no text query"; only a real Query can be
+    # used as the top-level clause.
+    final_query = (
+        string_query if isinstance(string_query, Query) else Q("bool")
+    )
     if filters:
         final_query.filter = reduce(operator.iand, filters)
     if filters and string_query:
@@ -1504,7 +1505,7 @@ def build_es_base_query(
     # Apply a custom function score to the main query, useful for cursor pagination
     # in the V4 API and for date decay relevance.
     main_query = apply_custom_score_to_main_query(
-        cd, main_query, api_version, boost_mode=boost_mode
+        cd, cast(Query, main_query), api_version, boost_mode=boost_mode
     )
 
     return EsMainQueries(
@@ -1517,7 +1518,7 @@ def build_es_base_query(
 
 def build_has_parent_parties_query(
     parties_filters: list[QueryString],
-) -> QueryString | None:
+) -> Query | None:
     """Build a has_parent query based on the parties fields (party and attorney).
 
     This method is used where it is required to include all the RECAPDocuments
@@ -1542,21 +1543,21 @@ def build_has_parent_parties_query(
 
 
 def build_child_docs_query(
-    child_docs_query: QueryString | None,
+    child_docs_query: Query | None,
     cd: CleanData,
     exclude_docs_for_empty_field: str = "",
-) -> QueryString:
+) -> Query:
     """Build a query for counting child documents in Elasticsearch, using the
     has_child query filters and queries. And append a match filter to only
     retrieve RECAPDocuments or OpinionDocuments. Utilized when it is required
     to retrieve child documents directly, such as in the Opinions Feed,
     RECAP Feed, RECAP Documents count query, and V4 RECAP_DOCUMENT Search API.
 
-    :param child_docs_query: Existing Elasticsearch QueryString object or None
+    :param child_docs_query: Existing Elasticsearch Query object or None
     :param cd: The user input CleanedData
     :param exclude_docs_for_empty_field: Field that should not be empty for a
     document to be included
-    :return: An Elasticsearch QueryString object
+    :return: An Elasticsearch Query object
     """
 
     child_query_opinion = Q("match", cluster_child="opinion")
@@ -1641,7 +1642,7 @@ def build_es_main_query(
     search_query = es_queries.search_query
     child_docs_query = es_queries.child_query
     top_hits_limit = 5
-    child_docs_count_query = None
+    child_docs_count_query: Search | None = None
     match cd["type"]:
         case SEARCH_TYPES.PARENTHETICAL:
             # Create groups aggregation, add highlight and
@@ -1657,13 +1658,11 @@ def build_es_main_query(
                 top_hits_limit,
             )
         case SEARCH_TYPES.RECAP | SEARCH_TYPES.DOCKETS:
-            child_docs_count_query = build_child_docs_query(
-                child_docs_query, cd
-            )
-            if child_docs_count_query:
+            child_count_query = build_child_docs_query(child_docs_query, cd)
+            if child_count_query:
                 # Get the total RECAP Documents count.
                 child_docs_count_query = search_query_base.query(
-                    child_docs_count_query
+                    child_count_query
                 )
         case _:
             pass
@@ -1967,7 +1966,9 @@ def fill_position_mapping(
     return position_db_mapping
 
 
-def merge_semantic_relevant_chunks(results: Page | Response) -> None:
+def merge_semantic_relevant_chunks(
+    results: Page | Response | list,
+) -> None:
     """
     Updates each child document in the given results with the most semantically
     relevant chunk of text.
@@ -1978,7 +1979,8 @@ def merge_semantic_relevant_chunks(results: Page | Response) -> None:
     `embeddings` inner hit and assigns its text to the child document's
     `_source["text"]` field.
 
-    :param results: The Page or Response object containing search results.
+    :param results: The Page or Response object containing search results,
+    or an empty list.
     :return: None, the function updates the results in place.
     """
     results_list = results
@@ -2299,9 +2301,8 @@ def clean_count_query(search_query: Search) -> SearchDSL:
     # Select only the query and omit other elements like sorting, highlighting, etc
     parent_total_query_dict = parent_total_query_dict["query"]
     # Generate a new Search object from scratch
-    search_query = SearchDSL(index=search_query._index)
-    search_query = search_query.query(Q(parent_total_query_dict))
-    return search_query
+    count_query = SearchDSL(index=search_query._index)
+    return count_query.query(Q(parent_total_query_dict))
 
 
 def fetch_es_results(
@@ -2399,7 +2400,7 @@ def fetch_es_results(
     return [], 0, error, None, None
 
 
-def build_has_child_filters(cd: CleanData) -> list[QueryString | Range]:
+def build_has_child_filters(cd: CleanData) -> list[Query]:
     """Builds Elasticsearch 'has_child' filters based on the given child type
     and CleanData.
 
@@ -2841,7 +2842,7 @@ def get_query_embedding(text_query: str) -> list[float]:
 
 def build_semantic_query(
     text_query: str,
-    filters: list[QueryString | Range],
+    filters: list[Query],
     embedding: list[float] | None = None,
 ) -> tuple[str, list[Query]]:
     """
@@ -3010,7 +3011,7 @@ def build_full_join_es_queries(
                 # If party filters were provided, append a has_parent query
                 # with the party filters included to match only child documents
                 # whose parents match the party filters.
-                child_filters.append(has_parent_parties_filter)
+                child_filters.append(cast(Query, has_parent_parties_filter))
 
         if mlt_query:
             child_text_query = [mlt_query]
@@ -3060,7 +3061,7 @@ def build_full_join_es_queries(
                 (child_highlighting, cd["type"]), {}
             )
             has_child_query = build_has_child_query(
-                child_docs_query,
+                cast(Query, child_docs_query),
                 child_type,
                 query_hits_limit,
                 hl_fields,
@@ -3076,7 +3077,9 @@ def build_full_join_es_queries(
             # has_parent_parties_filter to match only child documents whose
             # parents match the party filters.
             has_child_query = build_has_child_query(
-                has_parent_parties_filter,
+                cast(
+                    Query, has_parent_parties_filter
+                ),  # TODO: Type `has_parent_parties_filter` correctly so we don't need this cast
                 "recap_document",
                 query_hits_limit,
                 SEARCH_RECAP_CHILD_HL_FIELDS,
@@ -3423,7 +3426,9 @@ def do_es_api_query(
     return main_query, child_docs_query
 
 
-def build_cardinality_count(count_query: Search, unique_field: str) -> Search:
+def build_cardinality_count(
+    count_query: SearchDSL, unique_field: str
+) -> SearchDSL:
     """Build an Elasticsearch cardinality aggregation.
     This aggregation estimates the count of unique documents based on the
     specified unique field. The precision_threshold, set by
@@ -3557,10 +3562,10 @@ def do_es_alert_estimation_query(
             multi_search = multi_search.add(rd_case_only_query)
 
         responses = multi_search.execute()
-        parent_total = responses[0].hits.total.value
+        parent_total = cast(Any, responses[0].hits).total.value
         if child_docs_count_query:
             child_doc_count_response = responses[1]
-            child_total = child_doc_count_response.hits.total.value
+            child_total = cast(Any, child_doc_count_response.hits).total.value
 
             # Case only count
             child_doc_count_response_case_only = responses[2]
@@ -3578,7 +3583,7 @@ def do_es_sweep_alert_query(
     search_query: Search,
     child_search_query: Search,
     cd: CleanData,
-) -> tuple[list[Hit] | None, Response | None, Response | None]:
+) -> tuple[Response | None, Response | None, Response | None]:
     """Build an ES query for its use in the daily RECAP sweep index.
 
     :param search_query: Elasticsearch DSL Search object.
@@ -3645,7 +3650,7 @@ def do_es_sweep_alert_query(
     # result sets.
     should_repeat_parent_query = (
         docket_results
-        and docket_results.hits.total.value
+        and cast(Any, docket_results.hits).total.value
         >= settings.ELASTICSEARCH_MAX_RESULT_COUNT
     )
     if should_repeat_parent_query and parent_query:
@@ -3666,7 +3671,7 @@ def do_es_sweep_alert_query(
     # Finally, it re-executes the child search.
     should_repeat_child_query = (
         rd_results
-        and rd_results.hits.total.value
+        and cast(Any, rd_results.hits).total.value
         >= settings.ELASTICSEARCH_MAX_RESULT_COUNT
     )
     if should_repeat_child_query and child_query and not query_with_parties:

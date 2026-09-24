@@ -10,6 +10,7 @@ from django.contrib.auth.models import User
 from django.contrib.contenttypes.models import ContentType
 from django.http import QueryDict
 from django.utils import timezone
+from elastic_transport import ObjectApiResponse
 from elasticsearch import Elasticsearch
 from elasticsearch.dsl import connections
 from elasticsearch.dsl.response import Hit, Response
@@ -66,7 +67,7 @@ class AlertHitsToProcess:
     :param case_only_alert: Boolean flag indicating if this is a case-only alert.
     """
 
-    results: list[Hit]
+    results: Response
     parent_results: Response | None
     child_results: Response | None
     alert_id: int
@@ -74,7 +75,9 @@ class AlertHitsToProcess:
     case_only_alert: bool
 
 
-def get_task_status(task_id: str, es: Elasticsearch) -> dict[str, Any]:
+def get_task_status(
+    task_id: str, es: Elasticsearch
+) -> ObjectApiResponse[Any] | dict[str, Any]:
     """Fetch the status of a task from Elasticsearch.
 
     :param task_id: The ID of the task to fetch the status for.
@@ -129,7 +132,9 @@ def compute_estimated_remaining_time(
     return estimated_time_remaining
 
 
-def retrieve_task_info(task_info: dict[str, Any]) -> TaskCompletionStatus:
+def retrieve_task_info(
+    task_info: ObjectApiResponse[Any] | dict[str, Any],
+) -> TaskCompletionStatus:
     """Retrieve task information from the given task dict.
 
     :param task_info: A dictionary containing the task status information.
@@ -477,7 +482,7 @@ def filter_rd_alert_hits(
 
 def query_alerts(
     search_params: QueryDict,
-) -> tuple[list[Hit] | None, Response | None, Response | None]:
+) -> tuple[Response | None, Response | None, Response | None]:
     try:
         search_query = RECAPSweepDocument.search()
         child_search_query = ESRECAPSweepDocument.search()

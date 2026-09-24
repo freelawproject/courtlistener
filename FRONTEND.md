@@ -150,7 +150,7 @@ Examples:
 - Internal links: `text-primary-600`
 - External links: `underline`
 - `target="_blank"` MUST include `rel="noopener"` or `rel="noreferrer"` (`noreferrer` alone is sufficient — it implies `noopener`)
-- Do NOT add `nofollow` to editorial links — `nofollow` is only for user-generated content
+- Do NOT add `nofollow` to editorial links — `nofollow` is for user-generated content and for links into pages we don't want crawled: `noindex` pages (search results, anything rendered with `private=True`) and file downloads, e.g. the per-court search links on the jurisdictions page or the document links in docket entries
 
 ## Accessibility
 

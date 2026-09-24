@@ -85,8 +85,6 @@ replace-imports-with-any = [
     "cl.urls",
     "cl.workers",
     "eyecite", "eyecite.*",
-    "elasticsearch", "elasticsearch.*",
-    "bs4", "bs4.*",
 ]
 # Pre-existing errors are grandfathered here; only new errors fail the check.
 baseline = ".pyrefly-baseline.json"
