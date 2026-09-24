@@ -6,9 +6,9 @@
 <c-vars class="" menu_class="" item_class="" variant="menu" verbose></c-vars>
 
 <div class="relative">
+{% corpus_search_scopes as search_scopes %}
 
 {% if variant == "tabs" %}
-{% corpus_search_scopes as search_scopes %}
 
   <div
     data-title="{{ title }}"
@@ -63,17 +63,18 @@
     x-on:click="openScopeMenu"
     x-bind:aria-controls="menuId"
     aria-haspopup="menu"
+    aria-expanded="false"
     x-bind:aria-expanded="scopeMenuExpanded"
     class="h-[--corpus-search-height] justify-between rounded-xl border-greyscale-200 {{ class }}"
     aria-label="Open menu to select the scope of your search"
   >
     {% if verbose %}
     <span class="flex flex-col items-start">
-      <span x-text="selectedScope.label" class="font-semibold text-greyscale-900"></span>
-      <span x-text="selectedScope.shortDescription" class="text-xs text-greyscale-500"></span>
+      <span x-text="selectedScope.label" class="font-semibold text-greyscale-900">{{ search_scopes.0.label }}</span>
+      <span x-text="selectedScope.shortDescription" class="text-xs text-greyscale-500">{{ search_scopes.0.short_description }}</span>
     </span>
     {% else %}
-      <span x-text="selectedScope.label" class="text-sm"></span>
+      <span x-text="selectedScope.label" class="text-sm">{{ search_scopes.0.label }}</span>
     {% endif %}
     <span
       x-bind:class="scopeCaretClass"
@@ -106,9 +107,8 @@
     role="menu"
     aria-label="Select the scope of your search"
   >
-    <template x-for="scope in searchScopes">
+    {% for scope in search_scopes %}
       <li
-        x-bind:key="scope.label"
         class="{{ item_class }} px-4 flex hover:bg-greyscale-50"
         role="none"
         x-on:keydown.tab="closeScopeMenu"
@@ -117,17 +117,20 @@
           type="button"
           class="flex justify-between w-full"
           x-on:click="selectScope"
-          x-bind:data-scope="scope.label"
-          x-bind:id="scope.label"
+          data-scope="{{ scope.label }}"
           x-on:keydown.shift.tab.stop.prevent="closeScopeMenuBack"
-          x-bind:aria-selected="isActiveScope"
-          role="menuitem"
+          x-bind:aria-checked="isActiveScope"
+          role="menuitemradio"
         >
-          <span x-text="scope.label"></span>
-          {% svg "check" x_show="isActiveScope" x_bind__data_scope="scope.label" class="text-primary-600" aria_hidden="true" %}
+          <span>{{ scope.label }}</span>
+          {% if forloop.first %}
+            {% svg "check" x_show="isActiveScope" data_scope=scope.label class="text-primary-600" aria_hidden="true" %}
+          {% else %}
+            {% svg "check" x_show="isActiveScope" data_scope=scope.label style="display: none" class="text-primary-600" aria_hidden="true" %}
+          {% endif %}
         </button>
       </li>
-    </template>
+    {% endfor %}
   </menu>
 
 {% endif %}

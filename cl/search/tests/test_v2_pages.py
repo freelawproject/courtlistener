@@ -373,6 +373,93 @@ class CorpusSearchFormTest(SimpleUserDataMixin, TestCase):
             "Homepage tablist should not use Alpine x-for for initial render",
         )
 
+    def test_corpus_search_menu_is_server_rendered(self):
+        """Corpus search menu trigger and options appear in HTML before Alpine
+        runs.
+
+        Regression for #7827: menu trigger and options used Alpine x-text and
+        x-for, so content was missing from the initial HTML and flashed in
+        after JavaScript loaded.
+        """
+        # 1. Verify mobile trigger buttons (inline and dialog) contain label
+        # and description, and initial aria-expanded="false"
+        trigger_buttons = self.tree.xpath(
+            '//button[@aria-haspopup="menu" and @aria-label="Open menu to select the scope of your search"]'
+        )
+        self.assertEqual(
+            len(trigger_buttons),
+            2,
+            "Expected two corpus search scope menu trigger buttons on the homepage (inline and dialog)",
+        )
+        for trigger_button in trigger_buttons:
+            self.assertEqual(
+                trigger_button.get("aria-expanded"),
+                "false",
+                "Expected initial aria-expanded='false' on scope menu trigger",
+            )
+            trigger_text = "".join(trigger_button.itertext()).strip()
+            self.assertIn(
+                "Case Law",
+                trigger_text,
+                f"Trigger label 'Case Law' missing from server-rendered HTML; found {trigger_text!r}",
+            )
+            self.assertIn(
+                "10M+ Opinions",
+                trigger_text,
+                f"Trigger description '10M+ Opinions' missing from server-rendered HTML; found {trigger_text!r}",
+            )
+
+        # 2. Verify menus (inline and dialog) exist and do not use Alpine x-for
+        # for initial render
+        menus = self.tree.xpath(
+            '//menu[@role="menu" and @aria-label="Select the scope of your search"]'
+        )
+        self.assertEqual(
+            len(menus),
+            2,
+            "Expected two corpus search scope menus on the homepage (inline and dialog)",
+        )
+
+        expected_labels = [
+            "Case Law",
+            "RECAP Archive",
+            "Oral Arguments",
+            "Judges",
+        ]
+        for menu in menus:
+            self.assertFalse(
+                menu.xpath(".//template[@x-for]"),
+                "Scope menu should not use Alpine x-for for initial render",
+            )
+            menu_items = menu.xpath('.//*[@role="menuitemradio"]')
+            self.assertEqual(
+                len(menu_items),
+                len(expected_labels),
+                f"Expected {len(expected_labels)} menu items, found {len(menu_items)}",
+            )
+            item_labels = [
+                "".join(item.itertext()).strip() for item in menu_items
+            ]
+            for label in expected_labels:
+                with self.subTest(label=label):
+                    self.assertTrue(
+                        any(label in item_label for item_label in item_labels),
+                        f"Menu item {label!r} missing from server-rendered HTML; "
+                        f"found {item_labels!r}",
+                    )
+
+            # Verify checkmark display states (only the first item visible initially)
+            first_svg = menu_items[0].xpath(".//svg")
+            self.assertTrue(
+                first_svg, "Expected checkmark SVG on first menu item"
+            )
+            self.assertNotIn("display: none", first_svg[0].get("style", ""))
+
+            for item in menu_items[1:]:
+                svg = item.xpath(".//svg")
+                self.assertTrue(svg, "Expected checkmark SVG on menu item")
+                self.assertIn("display: none", svg[0].get("style", ""))
+
 
 @override_flag("use_new_design", True)
 @patch("cl.search.utils.get_redis_interface")
