@@ -11,6 +11,7 @@ from cl.corpus_importer.state.loader import JKentScrapeLoader, UnusableScrape
 from cl.corpus_importer.state.merger import Merger
 from cl.corpus_importer.state.new_york.mergers import NYCoADocketMerger
 from cl.corpus_importer.state.new_york.nycourts_gov import NYCoACase
+from cl.corpus_importer.state.new_york.storage import PRIVATE_PREFIX
 from cl.search.state.new_york.models import NYCoADocument
 
 logger = logging.getLogger(__name__)
@@ -310,6 +311,7 @@ class NYCoACourtPassLoader(JKentScrapeLoader[NYCoACase]):
     scrape_model = NYCoACase
     merger: type[Merger[NYCoACase, None, Model]] = NYCoADocketMerger
     document_model = NYCoADocument
+    private_prefix = PRIVATE_PREFIX
 
     @staticmethod
     def _refuse_unread_file_list(

@@ -229,6 +229,7 @@ from cl.search.state.texas.models import (
     TexasDocketEntry,
     TexasDocument,
 )
+from cl.settings import COURT_REQUEST_USER_AGENT
 
 HYPERSCAN_TOKENIZER = HyperscanTokenizer(cache_dir=".hyperscan")
 
@@ -3374,8 +3375,8 @@ def download_document_in_stream(
     @retry(
         (ConnectionError, Timeout),
         tries=3,
-        delay=0.25,
-        backoff=1,
+        delay=1,
+        backoff=2,
     )
     def download_to_file(tmp_file):
         tmp_file.seek(0)
@@ -3386,7 +3387,7 @@ def download_document_in_stream(
             url,
             stream=True,
             timeout=60,
-            headers={"User-Agent": "Free Law Project"},
+            headers={"User-Agent": COURT_REQUEST_USER_AGENT},
         ) as response:
             response.raise_for_status()
             if require_pdf and not is_pdf(response):
@@ -3900,7 +3901,11 @@ def download_scotus_document_pdf(self: Task, doc_pk: int) -> int | None:
         to update the attachment for.
     """
     try:
-        doc = SCOTUSDocument.objects.get(pk=doc_pk)
+        # The document's storage path is built from its docket, so fetch that
+        # with it rather than going back for it a query at a time.
+        doc = SCOTUSDocument.objects.select_related(
+            "docket_entry__docket"
+        ).get(pk=doc_pk)
     except SCOTUSDocument.DoesNotExist:
         logger.warning(
             "SCOTUS document PDF download: SCOTUSDocument %s does not exist; skipping.",
