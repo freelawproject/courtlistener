@@ -413,6 +413,7 @@ def process_cluster(
         return
 
     outer_opinion = soup.find("opinion")
+    assert outer_opinion is not None
     extracted_opinions = extract_columbia_opinions(outer_opinion)
     opinions = process_extracted_opinions(extracted_opinions)
     map_opinion_types(opinions)
