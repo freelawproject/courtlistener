@@ -12,10 +12,10 @@ class FileTally:
     every `MergeResult` without any of them owning mutable state. `NO_FILES` is
     the shared empty one, so a merge that touched no file allocates nothing.
 
-    :ivar moved: Files now in the public bucket because this merge put them
-        there.
-    :ivar missing: Files that were not there to move -- a path in neither
-        bucket's layout, or a key the private bucket does not hold. Re-running
+    :ivar moved: Files now at their published key because this merge's
+        publish put them there.
+    :ivar missing: Files that were not there to move -- a path outside the
+        scrape's layout, or a key the bucket does not hold. Re-running
         the load will not conjure these; the scrape has to be run again.
     :ivar failed: Files the storage backend refused to copy for some other
         reason. These are worth re-running the load over.

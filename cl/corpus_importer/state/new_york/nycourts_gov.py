@@ -139,17 +139,15 @@ class NYCoAFile(Document):
     :ivar volume: Volume number, for a record or appendix spanning volumes.
     :ivar part: Part number, for a volume that is itself split.
     :ivar local_path: Where the scraper stored the downloaded file, as a key in
-        the same bucket `NYCoADocument.filepath_local` is stored in. Empty for a
-        file the scraper did not fetch, a sealed one among them. Court-PASS
-        serves a document only to the scraper, so this is the only way
-        CourtListener learns where the file is; the merge points
-        `filepath_local` straight at it, since it is already in the right
-        bucket and needs no fetching.
+        the private bucket. Empty for a file the scraper did not fetch, a
+        sealed one among them. Court-PASS serves a document only to the
+        scraper, so this is the only way CourtListener learns where the file
+        is; the merge stores it and the load then copies the file to its
+        published key, so it needs no fetching.
     :ivar content_hash: SHA-256 of the file, as the scraper hashed it on the
         way to storage. Empty on the same terms as `local_path`, since it is
         the download that produces it. This is how a merge tells a file the
-        Court has corrected from the one already published; see
-        `NYCoADocument.make_filename`.
+        Court has corrected from the one already published.
     :ivar file_size: Size of the downloaded file in bytes, or ``None`` when the
         scraper did not fetch it.
     """

@@ -175,7 +175,7 @@ def map_opinion_type(harvard_opinion_type: str) -> str:
     :param harvard_opinion_type: The type field of the Harvard opinion
     :return: The type field from our schema
     """
-    type_map = {
+    type_map: dict[str, str] = {
         "unanimous": Opinion.UNANIMOUS,
         "majority": Opinion.LEAD,
         "plurality": Opinion.PLURALITY,
