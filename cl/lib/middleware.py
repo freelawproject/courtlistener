@@ -129,6 +129,10 @@ class IncrementalNewTemplateMiddleware:
             return response
 
         response.template_name = new_template_name
-        response.context_data["search_form"] = CorpusSearchForm()
+
+        # htmx fragments never render the header, so the search form it
+        # needs would only be wasted work for them.
+        if not request.headers.get("HX-Request"):
+            response.context_data["search_form"] = CorpusSearchForm()
 
         return response
