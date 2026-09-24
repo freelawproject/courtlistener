@@ -1,10 +1,20 @@
+import base64
+import hashlib
+import logging
+import struct
+import time
 from datetime import date, datetime
+from http import HTTPStatus
+from urllib.parse import parse_qs, urlencode, urljoin, urlparse, urlunparse
 from zoneinfo import ZoneInfo
 
+import httpx
 import pghistory
 from django.db import models
+from juriscraper.state.florida.scraper import FLORIDA_API_BASE
+from pydantic import BaseModel, Field
 
-from cl.lib.decorators import document_model
+from cl.lib.decorators import document_model, retry
 from cl.lib.model_helpers import CSVExportMixin
 from cl.lib.models import AbstractDateTimeModel
 from cl.lib.types import NonEmptyTuple
@@ -12,6 +22,9 @@ from cl.search.state.shared import (
     AbstractStateDocument,
     DocketEntryType,
 )
+from cl.settings import COURT_REQUEST_USER_AGENT
+
+logger = logging.getLogger(__name__)
 
 __all__ = ["FloridaDocketEntry", "FloridaDocument"]
 
@@ -32,6 +45,147 @@ def florida_local_date(value: datetime | None) -> date | None:
     if value is None:
         return None
     return value.astimezone(FLORIDA_TIMEZONE).date()
+
+
+CHALLENGE_URL: str = urljoin(FLORIDA_API_BASE, "/altcha/challenge")
+CHALLENGE_TIMEOUT: float = 30.0
+SLOW_SOLVE_THRESHOLD_MS: float = 5_000
+
+
+class AltchaData(BaseModel):
+    """The API path of the document being requested. A solved token is only accepted for
+    this path.
+
+    :ivar resource: The URL path of the document, without host or query."""
+
+    resource: str
+
+    @retry(
+        (httpx.ConnectError, httpx.TimeoutException),
+        tries=3,
+        delay=1,
+        backoff=2,
+        logger=logger,
+    )
+    def fetch(self) -> "AltchaChallenge | None":
+        """Request a fresh challenge for `resource` from ACIS.
+
+        Returns `None` when the endpoint answers 204, which means the gate is
+        switched off and the document can be fetched with its bare URL."""
+        response = httpx.get(
+            CHALLENGE_URL,
+            params={"resource": self.resource},
+            headers={"User-Agent": COURT_REQUEST_USER_AGENT},
+            timeout=CHALLENGE_TIMEOUT,
+        )
+
+        response.raise_for_status()
+
+        if response.status_code == HTTPStatus.NO_CONTENT:
+            return None
+
+        return AltchaChallenge.model_validate_json(response.text)
+
+
+class AltchaChallengeSolution(BaseModel):
+    """The solution to an altcha proof-of-work challenge.
+
+    :ivar counter: The counter value whose derived key matched the prefix.
+    :ivar derived_key: The full derived key for that counter, hex encoded.
+    :ivar time: How long solving took, in milliseconds."""
+
+    counter: int
+    derived_key: str = Field(alias="derivedKey")
+    time: float
+
+
+class AltchaChallengeParameters(BaseModel):
+    """Parameters of a proof-of-work challenge as issued by the ACIS API.
+
+    Fields are declared in the order the server serializes them. The server's
+    signature covers this object, so the token we send back has to reproduce
+    it byte for byte."""
+
+    algorithm: str
+    cost: int
+    data: AltchaData
+    expiry: int = Field(alias="expiresAt")
+    key_length: int = Field(alias="keyLength")
+    key_prefix: str = Field(alias="keyPrefix")
+    key_signature: str = Field(alias="keySignature")
+    nonce: str
+    salt: str
+
+
+MAX_ATTEMPT_TIME: float = 30.0
+
+
+class AltchaChallenge(BaseModel):
+    """A proof-of-work challenge as returned by the ACIS challenge endpoint.
+
+    :ivar parameters: The challenge to solve.
+    :ivar signature: The server's signature over `parameters`, echoed back
+        unchanged in the token."""
+
+    parameters: AltchaChallengeParameters
+    signature: str
+
+    def solve(self) -> AltchaChallengeSolution | None:
+        """Brute-force the counter whose PBKDF2 key starts with the challenge's
+        key prefix, the way the ACIS frontend does.
+
+        The server chose the counter, so there is no bound to search up to;
+        the loop gives up after `MAX_ATTEMPT_TIME` seconds and returns `None`.
+        Only `PBKDF2/SHA-256` is supported; any other algorithm raises
+        `NotImplementedError`."""
+        if self.parameters.algorithm != "PBKDF2/SHA-256":
+            raise NotImplementedError
+        nonce_bytes = bytes.fromhex(self.parameters.nonce)
+        salt_bytes = bytes.fromhex(self.parameters.salt)
+        prefix_bytes = bytes.fromhex(self.parameters.key_prefix)
+        start = time.monotonic()
+        solution = None
+        i = 0
+        while time.monotonic() - start < MAX_ATTEMPT_TIME:
+            candidate = hashlib.pbkdf2_hmac(
+                "sha256",
+                nonce_bytes + struct.pack(">I", i),
+                salt_bytes,
+                self.parameters.cost,
+                self.parameters.key_length,
+            )
+            if candidate.startswith(prefix_bytes):
+                solution = candidate
+                break
+            i += 1
+
+        if solution is None:
+            return None
+
+        return AltchaChallengeSolution(
+            counter=i,
+            derivedKey=solution.hex(),
+            time=(time.monotonic() - start) * 1_000,
+        )
+
+
+class AltchaChallengeResponse(BaseModel):
+    """A solved challenge, ready to be encoded into the `altcha` query
+    parameter of a document URL.
+
+    :ivar challenge: The challenge as received from the server.
+    :ivar solution: Our answer to it."""
+
+    challenge: AltchaChallenge
+    solution: AltchaChallengeSolution
+
+    def encode(self) -> str:
+        """Serialize to the token the server expects: base64 of the compact
+        JSON, using the server's own key names and key order so its signature
+        over the challenge parameters still verifies."""
+        return base64.b64encode(
+            self.model_dump_json(by_alias=True).encode()
+        ).decode()
 
 
 @pghistory.track()
@@ -131,6 +285,68 @@ class FloridaDocument(AbstractDateTimeModel, AbstractStateDocument):
     document_name = models.TextField(blank=True)
     document_type = models.TextField(blank=True)
     link_uuid = models.UUIDField()
+
+    def build_url(self) -> str | None:
+        """Requests parameters for and computes the altcha proof-of-work token for Florida documents, returning the URL
+        with the token appended."""
+
+        scheme, netloc, path, params, query, fragment = urlparse(self.url)
+
+        try:
+            challenge = AltchaData(resource=path).fetch()
+        except httpx.HTTPStatusError as exc:
+            if exc.response.status_code != HTTPStatus.FORBIDDEN:
+                raise
+            logger.error(
+                "Florida refused proof-of-work parameter fetch for %s at %s (403)",
+                self.pk,
+                exc.request.url,
+            )
+            return None
+        if challenge is None:
+            return self.url
+        solution = challenge.solve()
+        if solution is None:
+            logger.error(
+                "Failed to solve Florida challenge within time limit for %s",
+                self.url,
+            )
+            return None
+
+        if solution.time > SLOW_SOLVE_THRESHOLD_MS:
+            logger.warning(
+                "Slow Florida challenge for %s: counter=%d cost=%d took %.0f ms",
+                self.pk,
+                solution.counter,
+                challenge.parameters.cost,
+                solution.time,
+            )
+        else:
+            logger.info(
+                "Solved Florida challenge for %s: counter=%d cost=%d in %.0f ms",
+                self.pk,
+                solution.counter,
+                challenge.parameters.cost,
+                solution.time,
+            )
+
+        token = AltchaChallengeResponse(
+            challenge=challenge, solution=solution
+        ).encode()
+
+        query_dict = parse_qs(query)
+        query_dict["altcha"] = [token]
+
+        return urlunparse(
+            (
+                scheme,
+                netloc,
+                path,
+                params,
+                urlencode(query_dict, doseq=True),
+                fragment,
+            )
+        )
 
     @classmethod
     def tmp_prefix(cls) -> str:

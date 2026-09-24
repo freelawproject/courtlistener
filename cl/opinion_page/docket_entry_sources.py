@@ -45,6 +45,9 @@ class MetadataItem(TypedDict):
     url: NotRequired[str]
     nofollow: NotRequired[bool]
     is_external: NotRequired[bool]
+    # When set with url, the label itself is the link (no separate
+    # value text) -- e.g. "Questions Presented".
+    is_label_link: NotRequired[bool]
     aria_label: NotRequired[str]
     suffix_text: NotRequired[str]
     suffix_url: NotRequired[str]
@@ -100,17 +103,19 @@ def build_scotus_metadata(
         items.append(
             {
                 "label": "Questions Presented",
-                "value": "View",
+                "value": "Questions Presented",
                 "url": scotus_metadata.questions_presented_file.url,
+                "is_label_link": True,
             }
         )
     elif http_url(scotus_metadata.questions_presented_url):
         items.append(
             {
                 "label": "Questions Presented",
-                "value": "View",
+                "value": "Questions Presented",
                 "url": scotus_metadata.questions_presented_url,
                 "is_external": True,
+                "is_label_link": True,
             }
         )
 
