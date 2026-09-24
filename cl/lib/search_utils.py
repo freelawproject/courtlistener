@@ -947,7 +947,7 @@ def fetch_es_results_for_csv(
 
     results = search["results"]
     if isinstance(results, list):
-        return [], True
+        return [], False
     max_results = settings.MAX_SEARCH_RESULTS_EXPORTED
     match search_type:
         case SEARCH_TYPES.OPINION | SEARCH_TYPES.RECAP | SEARCH_TYPES.DOCKETS:
