@@ -37,7 +37,9 @@ from functools import lru_cache
 from math import ceil
 
 from datasketch import MinHash, MinHashLSH
-from Stemmer import Stemmer
+from Stemmer import (  # type:ignore[missing-import] Stemmer has no associated py or pyi file
+    Stemmer,
+)
 
 from cl.lib.stop_words import STOP_WORDS
 from cl.search.models import Parenthetical

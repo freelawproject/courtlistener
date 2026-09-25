@@ -1677,12 +1677,12 @@ def build_es_main_query(
     )
 
 
-def add_es_highlighting(
-    search_query: Search,
+def add_es_highlighting[S: (Search, SearchDSL)](
+    search_query: S,
     cd: CleanData,
     alerts: bool = False,
     highlighting: bool = True,
-) -> Search:
+) -> S:
     """Add elasticsearch highlighting to the main search query.
 
     :param search_query: The Elasticsearch search query object.
@@ -1947,12 +1947,9 @@ def fill_position_mapping(
 
             for db_field, position_field in value.items():
                 mapping_dict = getattr(position_db_mapping, position_field)
-                for key, attr in enumerate(db_field.split("__")):
-                    field_value = (
-                        getattr(position, attr)
-                        if not key
-                        else getattr(field_value, attr)  # type: ignore
-                    )
+                field_value = position
+                for attr in db_field.split("__"):
+                    field_value = getattr(field_value, attr)
 
                 if callable(field_value):
                     field_value = field_value()
@@ -2677,6 +2674,7 @@ def do_es_feed_query(
     :return: The Elasticsearch DSL response.
     """
 
+    cache_key: str | None = None
     # Check micro-cache if enabled
     if settings.ELASTICSEARCH_FEED_MICRO_CACHE_ENABLED:
         # Create cache parameters from cleaned data
@@ -2690,13 +2688,12 @@ def do_es_feed_query(
         sorted_params = dict(sorted(cache_params.items()))
         params_hash = sha256(pickle.dumps(sorted_params))
 
-        cache = get_s3_cache("default")
         cache_key = make_s3_cache_key(
             f"search_feed_cache:{params_hash}",
             settings.SEARCH_RESULTS_MICRO_CACHE,
         )
         # Try to retrieve from cache
-        cached_results = cache.get(cache_key)
+        cached_results = get_s3_cache("default").get(cache_key)
         if cached_results:
             response = pickle.loads(cached_results)
             # Process cached results
@@ -2711,9 +2708,9 @@ def do_es_feed_query(
     response = s.extra(from_=0, size=rows).execute()
 
     # Cache the raw response before processing if caching is enabled
-    if settings.ELASTICSEARCH_FEED_MICRO_CACHE_ENABLED:
+    if cache_key is not None:
         serialized_data = pickle.dumps(response)
-        cache.set(
+        get_s3_cache("default").set(
             cache_key,
             serialized_data,
             settings.SEARCH_RESULTS_MICRO_CACHE,
@@ -2966,16 +2963,12 @@ def build_full_join_es_queries(
             child_type = "opinion"
         case SEARCH_TYPES.PEOPLE:
             child_type = "position"
+        case _:
+            child_type = None
 
     child_docs_query = None
     parent_query = None
-    if cd["type"] in [
-        SEARCH_TYPES.RECAP,
-        SEARCH_TYPES.DOCKETS,
-        SEARCH_TYPES.RECAP_DOCUMENT,
-        SEARCH_TYPES.OPINION,
-        SEARCH_TYPES.PEOPLE,
-    ]:
+    if child_type is not None:
         # Build child filters.
         child_filters = build_has_child_filters(cd)
         # Copy the original child_filters before appending parent fields.

@@ -3,9 +3,9 @@ import random
 from collections.abc import Sequence
 from datetime import datetime, timedelta
 from email import message
-from email.contentmanager import (  # type: ignore[attr-defined]
+from email.contentmanager import (
     raw_data_manager,
-    set_text_content,
+    set_text_content,  # type:ignore[missing-module-attribute] This is not in typeshed, but it does exist
 )
 from email.policy import SMTPUTF8
 from email.utils import parseaddr
