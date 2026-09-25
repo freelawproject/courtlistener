@@ -4,7 +4,7 @@ from datetime import UTC, datetime, timedelta
 from pathlib import Path
 from typing import ClassVar
 
-from asgiref.sync import async_to_sync
+from asgiref.sync import async_to_sync, sync_to_async
 from django.core.management import CommandParser
 from juriscraper.state.florida import FloridaScraper
 from juriscraper.state.florida.cases import FloridaCase, FloridaCourtID
@@ -16,7 +16,9 @@ from juriscraper.state.florida.scraper import CourtMetadata, PaginationFailed
 from pydantic import AliasPath, BaseModel, ConfigDict, Field
 from pydantic.types import UUID4
 
+from cl.corpus_importer.state.florida.utils import FLORIDA_COURT_IDS
 from cl.corpus_importer.tasks import fl_ingest_docket_task
+from cl.lasc.models import Docket
 from cl.lib.celery_utils import CeleryThrottle
 from cl.lib.command_utils import logger
 from cl.scrapers.management.commands.back_scrape_fl_dockets import (
@@ -27,6 +29,7 @@ from cl.scrapers.management.utils import (
     ScraperCheckpointTracker,
     StatePollCommand,
 )
+from cl.search.state.florida.models import FloridaDocument
 
 
 class FloridaUpdate(BaseModel):
@@ -41,6 +44,10 @@ class FloridaUpdate(BaseModel):
     )
 
 
+class FloridaDocumentUpdate(FloridaUpdate):
+    link_uuid: UUID4 = Field(validation_alias="documentLinkUUID")
+
+
 S3_BASE = Path("responses/dockets/florida")
 
 DE_DOC_ENDPOINT = (
@@ -49,9 +56,20 @@ DE_DOC_ENDPOINT = (
 DOCKET_ENDPOINT = "https://acis-api.flcourts.gov/courts/cms/cases"
 
 
-class FloridaDocumentPollParser(FloridaPaginatedResultsParser[FloridaUpdate]):
+class FloridaCasePollParser(FloridaPaginatedResultsParser[FloridaUpdate]):
     def parse_full(self, i: str) -> FloridaPaginatedResults[FloridaUpdate]:
         return FloridaPaginatedResults[FloridaUpdate].model_validate_json(i)
+
+
+class FloridaDocumentPollParser(
+    FloridaPaginatedResultsParser[FloridaDocumentUpdate]
+):
+    def parse_full(
+        self, i: str
+    ) -> FloridaPaginatedResults[FloridaDocumentUpdate]:
+        return FloridaPaginatedResults[
+            FloridaDocumentUpdate
+        ].model_validate_json(i)
 
 
 class Command(FLScrapeCommand, StatePollCommand):
@@ -129,6 +147,7 @@ class Command(FLScrapeCommand, StatePollCommand):
             throttle,
             scraper,
             court_ids,
+            case_backfill_days,
             polling_delay,
             start,
             queue,
@@ -155,6 +174,7 @@ class Command(FLScrapeCommand, StatePollCommand):
         throttle: CeleryThrottle,
         scraper: FloridaScraper,
         courts: list[FloridaCourtID],
+        case_backfill_days: int,
         polling_delay: int,
         start: datetime,
         queue_name: str,
@@ -176,7 +196,10 @@ class Command(FLScrapeCommand, StatePollCommand):
             )
             seen = set()
             async for update in self.gather_all(
-                scraper, scraper_courts, courts, last_polled
+                scraper,
+                scraper_courts,
+                courts,
+                last_polled - timedelta(days=case_backfill_days),
             ):
                 logger.info("Got update: %s", update)
                 if update in seen:
@@ -191,22 +214,25 @@ class Command(FLScrapeCommand, StatePollCommand):
                     )
                 except Exception:
                     logger.exception(
-                        "Failed to fetch case data for %s",
+                        "Failed to fetch case data for %s in court %r",
                         update.case_uuid,
+                        court_id,
                     )
                     continue
                 if isinstance(maybe_case, Exception):
                     logger.error(
-                        "Failed to fetch case data for %s: %r",
+                        "Failed to fetch case data for %s in court %r: %r",
                         update.case_uuid,
+                        court_id,
                         maybe_case,
                     )
                     continue
                 case, errors = maybe_case
                 if errors:
                     logger.error(
-                        "Failed to fetch case data for %s: %r",
+                        "Failed to fetch case data for %s in court %r: %r",
                         update.case_uuid,
+                        court_id,
                         errors,
                     )
                     continue
@@ -252,7 +278,7 @@ class Command(FLScrapeCommand, StatePollCommand):
     ) -> AsyncGenerator[FloridaUpdate]:
         logger.info("Checking for cases since %s", start)
         for court_id in courts:
-            parser = FloridaDocumentPollParser(court_id=court_id.value)
+            parser = FloridaCasePollParser(court_id=court_id.value)
             async for page in scraper._enumerate_pages(
                 DOCKET_ENDPOINT,
                 parser,
@@ -268,10 +294,21 @@ class Command(FLScrapeCommand, StatePollCommand):
             ):
                 match page:
                     case PaginationFailed() as e:
-                        logger.error("Failed to get page: %r", e)
+                        logger.error(
+                            "Failed to get page in court %r: %r", court_id, e
+                        )
                     case FloridaPaginatedResults(results=results):
+                        known = await sync_to_async(set)(
+                            Docket.objects.filter(
+                                court_id__in=FLORIDA_COURT_IDS,
+                                pacer_case_id__in=[
+                                    str(u.case_uuid) for u in results
+                                ],
+                            ).values_list("pacer_case_id", flat=True)
+                        )
                         for result in results:
-                            yield result
+                            if str(result.case_uuid) not in known:
+                                yield result
 
     async def gather_updated(
         self,
@@ -303,5 +340,11 @@ class Command(FLScrapeCommand, StatePollCommand):
                     case PaginationFailed() as e:
                         logger.error("Failed to get page: %r", e)
                     case FloridaPaginatedResults(results=results):
+                        known = await sync_to_async(set)(
+                            FloridaDocument.objects.filter(
+                                link_uuid__in=[r.link_uuid for r in results]
+                            ).values_list("link_uuid", flat=True)
+                        )
                         for result in results:
-                            yield result
+                            if str(result.link_uuid) not in known:
+                                yield result
