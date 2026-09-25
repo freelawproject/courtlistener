@@ -6,7 +6,8 @@ from collections.abc import Callable, Sequence
 from inspect import iscoroutinefunction
 from typing import Any
 
-from asgiref.sync import iscoroutinefunction, sync_to_async
+import ipaddress
+from asgiref.sync import sync_to_async
 from django.conf import settings
 from django.core.cache import BaseCache, caches
 from django.http import HttpRequest
@@ -46,7 +47,30 @@ def get_user_ip_from_cloudfront_headers(request: HttpRequest) -> str:
         development, where callers need their own fallback.
     """
     header = get_header(request, "CloudFront-Viewer-Address")
-    return header.rsplit(":", 1)[0]
+    if not header:
+        return ""
+
+    # CloudFront always sends IP:port, with IPv6 unbracketed, so the
+    # port is always the last colon-separated field. That said, strip brackets
+    # just in case, to be defensive.
+    address = header.rsplit(":", 1)[0].strip("[]")
+
+    try:
+        ip = ipaddress.ip_address(address)
+    except ValueError:
+        return ""
+
+    if ip.version == 6 and ip.ipv4_mapped:
+        ip = ip.ipv4_mapped
+    if ip.version == 4:
+        return str(ip)
+    return str(
+        ipaddress.ip_network(
+            f"{ip}/64",
+            strict=False,
+        ).network_address
+    )
+
 
 
 def get_ip_for_ratelimiter(group: str, request: HttpRequest) -> str:
