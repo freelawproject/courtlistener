@@ -4000,8 +4000,8 @@ class DocketPageV2TemplateTest(TestCase):
             ):
                 self.assertIn("cursor-text", span.get("class") or "")
 
-    def test_metadata_section_honors_is_copyable(self) -> None:
-        """Only items flagged is_copyable get the select-all treatment."""
+    def test_metadata_section_honors_one_click_select(self) -> None:
+        """Only items flagged one_click_select get the select-all treatment."""
         # Rendered through a wrapper string so the component's own c-vars
         # don't shadow the context, as DocketFilterDrawerAttrPropagationTest
         # explains.
@@ -4018,7 +4018,7 @@ class DocketPageV2TemplateTest(TestCase):
                         {
                             "label": "Citation",
                             "value": "601 U.S. 416",
-                            "is_copyable": True,
+                            "one_click_select": True,
                         },
                     ]
                 }

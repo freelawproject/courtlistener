@@ -187,7 +187,7 @@ def build_docket_metadata(
             "label": "Citation",
             "value": build_citation_string(docket),
             # Matches the select-all convenience old citation.html had.
-            "is_copyable": True,
+            "one_click_select": True,
         }
     )
 

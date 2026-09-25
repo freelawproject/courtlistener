@@ -35,7 +35,7 @@ class MetadataItem(TypedDict):
     both the c-metadata-section cotton component and
     includes/metadata_section.html.
 
-    is_copyable/has_tooltip/tooltip_message are flags + plain content,
+    one_click_select/has_tooltip/tooltip_message are flags + plain content,
     -- each stack decides its own concrete styling/mechanism.
     tooltip_message may contain HTML; the caller must mark_safe it.
     """
@@ -56,7 +56,7 @@ class MetadataItem(TypedDict):
     suffix_aria_label: NotRequired[str]
     suffix_has_tooltip: NotRequired[bool]
     suffix_tooltip_message: NotRequired[str]
-    is_copyable: NotRequired[bool]
+    one_click_select: NotRequired[bool]
     has_tooltip: NotRequired[bool]
     tooltip_message: NotRequired[str]
 

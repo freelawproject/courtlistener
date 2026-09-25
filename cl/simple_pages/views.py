@@ -374,7 +374,7 @@ async def components(request: HttpRequest) -> HttpResponse:
                 {
                     "label": "Citation",
                     "value": "601 U.S. 416",
-                    "is_copyable": True,
+                    "one_click_select": True,
                 },
             ],
         },
