@@ -1186,7 +1186,7 @@ class TagRateThrottle(UserRateThrottle):
     scope = "tags"
 
 
-class EventCounterThrottle(UserRateThrottle):
+class EventCounterThrottle(CloudFrontIdentMixin, UserRateThrottle):
     """Throttles increment-event"""
 
     scope = "events"
