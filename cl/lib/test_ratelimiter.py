@@ -7,6 +7,7 @@ decorated view directly would pass either way.
 """
 
 import asyncio
+import socket
 from http import HTTPStatus
 from unittest import mock
 
@@ -21,9 +22,11 @@ from cl.lib import ratelimiter
 from cl.lib.ratelimiter import (
     View,
     get_ip_for_ratelimiter,
+    host_is_approved,
     is_allowlisted,
     make_ratelimiter,
     ratelimit_deny_list,
+    verify_ip_address,
 )
 from cl.tests.cases import SimpleTestCase
 
@@ -182,6 +185,54 @@ class AllowlistTest(SimpleTestCase):
         verify.assert_not_called()
 
 
+class CrawlerVerificationTest(SimpleTestCase):
+    """Does the reverse-then-forward DNS check accept only real crawlers?"""
+
+    def test_only_approved_domains_and_their_subdomains_match(self) -> None:
+        """A look-alike domain must not pass for an approved one.
+
+        The forward lookup only proves the requester controls the zone the
+        PTR record names, so whoever registers "notgooglebot.com" controls
+        that zone and would sail through a plain suffix match.
+        """
+        cases = {
+            "crawl-66-249-66-1.googlebot.com": True,
+            "googlebot.com": True,
+            "rate-limited-proxy-66-249-90-77.google.com": True,
+            "msnbot-157-55-39-1.search.msn.com": True,
+            "CRAWL-1.GOOGLEBOT.COM.": True,
+            "notgooglebot.com": False,
+            "crawl.notgooglebot.com": False,
+            "evilgoogle.com": False,
+            "googlebot.com.evil.example": False,
+            "notlocalhost": False,
+        }
+        for host, expected in cases.items():
+            with self.subTest(host=host):
+                self.assertEqual(host_is_approved(host), expected)
+
+    def test_a_failed_forward_lookup_is_not_approved(self) -> None:
+        """Is a DNS error on the forward lookup a "no" rather than a crash?
+
+        socket.gethostbyname raises gaierror on NXDOMAIN, SERVFAIL or a
+        timeout, and UnicodeError for a label over 63 characters, which
+        whoever controls the PTR record can hand us.
+        """
+        for error in (socket.gaierror, UnicodeError):
+            with (
+                self.subTest(error=error.__name__),
+                mock.patch.object(
+                    ratelimiter,
+                    "get_host_from_IP",
+                    return_value="crawl-66-249-66-1.googlebot.com",
+                ),
+                mock.patch.object(
+                    ratelimiter, "get_ip_from_host", side_effect=error
+                ),
+            ):
+                self.assertFalse(verify_ip_address("66.249.66.1"))
+
+
 @override_settings(
     CACHES={
         "default": {
@@ -264,6 +315,26 @@ class DenyListTest(SimpleTestCase):
             ratelimiter, "is_allowlisted", side_effect=ConnectionError
         ):
             self.assertEqual(wrapped(self.request).status_code, HTTPStatus.OK)
+
+    def test_a_dns_failure_during_the_allowlist_check_is_not_a_500(
+        self,
+    ) -> None:
+        """Does a broken forward lookup get the request refused, not crashed?"""
+        wrapped = self._decorate(lambda request: HttpResponse("ok"))
+
+        self.assertEqual(wrapped(self.request).status_code, HTTPStatus.OK)
+        with (
+            mock.patch.object(
+                ratelimiter,
+                "get_host_from_IP",
+                return_value="crawl-66-249-66-1.googlebot.com",
+            ),
+            mock.patch.object(
+                ratelimiter, "get_ip_from_host", side_effect=socket.gaierror
+            ),
+            self.assertRaises(Ratelimited),
+        ):
+            wrapped(self.request)
 
     async def test_a_dead_cache_is_not_a_500_on_an_async_view(self) -> None:
         async def view(request: HttpRequest) -> HttpResponse:

@@ -295,25 +295,52 @@ def get_ip_from_host(host: str) -> str:
 
 
 def host_is_approved(host: str) -> bool:
-    """Check whether the domain is in our approved allowlist."""
+    """Check whether the domain is in our approved allowlist.
+
+    Matches the approved domain itself or any subdomain of it, never a name
+    that merely ends in the same letters: "notgooglebot.com" is not
+    "googlebot.com". The forward lookup in verify_ip_address only proves the
+    requester controls the zone the PTR record names, so a loose suffix match
+    would let anyone who registers such a look-alike domain allowlist
+    themselves.
+
+    :param host: The hostname from a reverse DNS lookup.
+    :return: True if the host is an approved domain or one of its subdomains.
+    """
+    host = host.lower().rstrip(".")
     return any(
-        host.endswith(approved_domain) for approved_domain in APPROVED_DOMAINS
+        host == domain or host.endswith(f".{domain}")
+        for domain in APPROVED_DOMAINS
     )
 
 
 def verify_ip_address(ip_address: str) -> bool:
-    """Do authentication checks for the IP address requesting the page."""
+    """Do authentication checks for the IP address requesting the page.
+
+    A failed or malformed DNS answer counts as "not approved" rather than
+    raising: this runs for requests already over their limit, and a lookup
+    error there should get a 429, not a 500.
+
+    :param ip_address: The address to check.
+    :return: True if the address belongs to an approved crawler.
+    """
     # First we do a rDNS lookup of the IP.
     host = get_host_from_IP(ip_address)
 
     #  Then we check the returned host to ensure it's an approved crawler
-    if host_is_approved(host):
-        # If it's approved, do a forward DNS lookup to get the IP from the host.
-        # If that matches the original IP, we're good.
-        if ip_address == get_ip_from_host(host):
-            # Everything checks out!
-            return True
-    return False
+    if not host_is_approved(host):
+        return False
+
+    # If it's approved, do a forward DNS lookup to get the IP from the host.
+    # If that matches the original IP, we're good.
+    try:
+        forward_ip = get_ip_from_host(host)
+    except (OSError, UnicodeError):
+        # OSError covers socket.gaierror (NXDOMAIN, SERVFAIL, timeouts).
+        # UnicodeError is what the idna codec raises for a label over 63
+        # characters, which whoever controls the PTR record can supply.
+        return False
+    return ip_address == forward_ip
 
 
 def get_ratelimit_cache() -> BaseCache:
