@@ -24,6 +24,7 @@ from django.core.mail import (
     get_connection,
     send_mail,
 )
+from django.db.models import QuerySet
 from django.http import HttpResponse
 from django.test import AsyncClient, RequestFactory
 from django.test.client import Client
@@ -4774,6 +4775,104 @@ class DuplicateEmailSettingsTest(TestCase):
         await self.up.user.arefresh_from_db()
         self.assertEqual(self.up.user.first_name, "Still")
         self.assertEqual(self.up.user.email, self.email)
+
+
+class UserAdminEmailSearchTest(TestCase):
+    """Admin user search must use the LOWER(email) index for addresses.
+
+    Django's default `icontains` lookup compiles to UPPER() LIKE and cannot
+    use auth_user_email_lower_idx. Address-shaped terms go through
+    filter_by_email instead. See #7983.
+    """
+
+    @classmethod
+    def setUpTestData(cls) -> None:
+        cls.user = UserFactory.create(
+            username="admin-search",
+            first_name="Ada",
+            last_name="Lovelace",
+            email="Matcher@Example.com",
+        )
+        cls.other = UserFactory.create(
+            username="other-user",
+            first_name="Other",
+            last_name="Person",
+            email="other@example.org",
+        )
+
+    def setUp(self) -> None:
+        self.user_admin = UserAdmin(model=User, admin_site=admin.site)
+        self.request = RequestFactory().get(
+            reverse("admin:auth_user_changelist")
+        )
+
+    def search(self, term: str) -> QuerySet[User]:
+        """Run the User admin changelist search.
+
+        :param term: The string typed into the admin search box.
+        :return: The filtered queryset.
+        """
+        results, _use_distinct = self.user_admin.get_search_results(
+            self.request, User.objects.all(), term
+        )
+        return results
+
+    def test_email_search_finds_the_account_regardless_of_case(self) -> None:
+        """Does a differently-cased address still find the account?"""
+        for email in [
+            "Matcher@Example.com",
+            "matcher@example.com",
+            "MATCHER@EXAMPLE.COM",
+        ]:
+            with self.subTest(email=email):
+                self.assertEqual(
+                    list(
+                        self.search(email).values_list("username", flat=True)
+                    ),
+                    ["admin-search"],
+                )
+
+    def test_a_different_address_does_not_match(self) -> None:
+        """Is the match exact, once case is set aside?"""
+        self.assertEqual(
+            list(
+                self.search("nobody@example.com").values_list("pk", flat=True)
+            ),
+            [],
+        )
+
+    def test_email_search_folds_case_in_sql(self) -> None:
+        """Is the comparison done with LOWER(), matching the index?
+
+        Both sides have to fold under the same rules, and LOWER(email) is
+        what auth_user_email_lower_idx is built on. UPPER() / LIKE would
+        seq-scan the table.
+        """
+        sql = str(self.search("matcher@example.com").query)
+        self.assertIn("LOWER", sql.upper())
+        self.assertNotIn("UPPER", sql.upper())
+        self.assertNotIn("LIKE", sql.upper())
+
+    def test_username_search_still_works(self) -> None:
+        """Does a non-address term still search username and name?"""
+        self.assertEqual(
+            list(
+                self.search("admin-search").values_list("username", flat=True)
+            ),
+            ["admin-search"],
+        )
+        self.assertEqual(
+            list(self.search("Lovelace").values_list("username", flat=True)),
+            ["admin-search"],
+        )
+
+    def test_empty_search_returns_everyone(self) -> None:
+        """Does an empty term leave the queryset unfiltered?"""
+        results, use_distinct = self.user_admin.get_search_results(
+            self.request, User.objects.all(), ""
+        )
+        self.assertEqual(results.count(), User.objects.count())
+        self.assertFalse(use_distinct)
 
 
 class UserAdminApiCallsCountTest(TestCase):

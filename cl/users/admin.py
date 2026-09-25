@@ -4,7 +4,8 @@ from django.apps import apps
 from django.contrib import admin, messages
 from django.contrib.auth.forms import UserChangeForm
 from django.contrib.auth.models import Permission, User
-from django.db.models import Model
+from django.db.models import Model, QuerySet
+from django.http import HttpRequest
 from rest_framework.authtoken.models import Token
 
 from cl.alerts.admin import AlertInline, DocketAlertInline
@@ -23,6 +24,7 @@ from cl.lib.admin import (
     AdminTweaksMixin,
     generate_admin_links,
 )
+from cl.lib.auth import filter_by_email
 from cl.search.models import SearchQuery
 from cl.users.models import (
     BarMembership,
@@ -102,6 +104,32 @@ class UserAdmin(admin.ModelAdmin, AdminTweaksMixin):
         "pk",
     )
     actions = ["refresh_api_throttles"]
+
+    def get_search_results(
+        self,
+        request: HttpRequest,
+        queryset: QuerySet[User],
+        search_term: str,
+    ) -> tuple[QuerySet[User], bool]:
+        """Filter the changelist, using the LOWER(email) index for addresses.
+
+        Django's default `search_fields` lookup is `icontains`, which compiles
+        to `UPPER(email) LIKE UPPER('%term%')` and cannot use
+        `auth_user_email_lower_idx`. An address-shaped term is matched through
+        `filter_by_email` instead — the same LOWER() comparison sign-in uses —
+        so Postgres can take that index. Other terms keep the admin's usual
+        username / name / pk search.
+
+        :param request: The current HTTP request.
+        :param queryset: The changelist queryset to filter.
+        :param search_term: The raw string typed into the search box.
+        :return: Two-tuple of the filtered queryset and whether the caller
+            needs to de-duplicate the results.
+        """
+        term = search_term.strip()
+        if "@" in term and " " not in term:
+            return filter_by_email(queryset, term), False
+        return super().get_search_results(request, queryset, search_term)
 
     @admin.action(
         description="Refresh API throttles from active Neon membership"
