@@ -34,7 +34,7 @@
     </div>
 
     {#  SEARCH TABS  #}
-    <div class="md:p-10 px-4 py-5">
+    <div class="capped-width py-5 md:py-10">
       {#   MOBILE SEARCH   #}
       <div class="md:hidden bg-white rounded-2xl flex flex-col">
         <c-corpus-search class="p-4 pt-2 w-full !flex-col" only>
@@ -68,7 +68,7 @@
       </div>
 
       {#   DESKTOP SEARCH   #}
-      <c-corpus-search class="capped-width max-md:hidden !flex-col" only>
+      <c-corpus-search class="max-md:hidden !flex-col" only>
         {# Scope selector tabs #}
         <c-corpus-search.scope
           class="text-greyscale-600 hidden md:flex"
@@ -209,7 +209,7 @@
   </div>
 
   {# BANNER #}
-  <section class="capped-width flex flex-col gap-y-5 md:flex-row gap-x-5 md:px-10 px-4 py-6 md:py-10">
+  <section class="capped-width flex flex-col gap-y-5 md:flex-row gap-x-5 py-6 md:py-10">
       <c-banner
           size="basis-1/2"
           eyebrow_text="RECAP Suite"
@@ -269,7 +269,7 @@
   {# PRODUCT STATS #}
   <section
     aria-labelledby="stats-title"
-    class="flex flex-row flex-wrap gap-5 capped-width md:px-10 px-4 py-11 justify-center"
+    class="flex flex-row flex-wrap gap-5 capped-width py-11 justify-center"
   >
     <h2 id="stats-title" class="sr-only">CourtListener Statistics</h2>
     <dl class="flex flex-col md:gap-5 gap-2.5 md:flex-row">
