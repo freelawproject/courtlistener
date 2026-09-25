@@ -1,0 +1,5 @@
+--
+-- No-op: django-oauth-toolkit's 0021 only changes verbose_name labels on the
+-- oauth2_provider models. Every operation renders as "-- (no-op)" and there is
+-- no schema change to apply.
+--

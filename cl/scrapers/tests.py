@@ -12,6 +12,7 @@ import responses
 from asgiref.sync import async_to_sync, sync_to_async
 from django.conf import settings
 from django.contrib.auth.models import User
+from django.contrib.contenttypes.models import ContentType
 from django.core.exceptions import ValidationError
 from django.core.files.base import ContentFile
 from django.db import connection
@@ -37,6 +38,7 @@ from cl.citations.models import UnmatchedCitation
 from cl.corpus_importer.tasks import (
     merge_scotus_docket as real_merge_scotus_docket,
 )
+from cl.favorites.factories import NoteFactory
 from cl.lib.crypto import sha1
 from cl.lib.exceptions import ScrapeFailed
 from cl.lib.juriscraper_utils import get_module_by_court_id
@@ -67,6 +69,7 @@ from cl.scrapers.management.commands.merge_opinion_versions import (
     merge_judge_names,
     merge_versions_by_download_url,
     passes_length_ratio_check,
+    update_referencing_objects,
 )
 from cl.scrapers.models import AccountSubscription, Scraper, UrlHash
 from cl.scrapers.tasks import (
@@ -133,7 +136,10 @@ from cl.tests.cases import (
 )
 from cl.tests.fixtures import ONE_SECOND_MP3_BYTES, SMALL_WAV_BYTES
 from cl.tests.utils import AsyncAPIClient
-from cl.users.factories import UserProfileWithParentsFactory
+from cl.users.factories import (
+    UserProfileWithParentsFactory,
+    UserWithChildProfileFactory,
+)
 
 
 class ScraperIngestionTest(ESIndexTestCase, TestCase):
@@ -2186,6 +2192,62 @@ class DeleteVersionRelatedObjectsTest(TestCase):
 
         cited_cluster.refresh_from_db()
         self.assertEqual(cited_cluster.citation_count, 0)
+
+
+class UpdateReferencingObjectsNotesTest(TestCase):
+    """Tests for Note repointing in update_referencing_objects (#7725).
+
+    Note can't go through the generic single-FK-field handling that the
+    rest of update_referencing_objects()'s referencing_models use, since a
+    Note may be in either the legacy or the GenericForeignKey shape
+    (dual-read) - see repoint_notes() in cl.favorites.utils.
+    """
+
+    def test_repoints_both_note_shapes(self):
+        """A legacy-shaped and a GFK-shaped Note on the version docket are
+        both moved onto the main docket, instead of being left behind to
+        be lost when the version docket is deleted.
+        """
+        main_docket = DocketFactory.create()
+        version_docket = DocketFactory.create()
+
+        legacy_note = NoteFactory(cluster_id=None, docket_id=version_docket)
+        gfk_note = NoteFactory.for_object(version_docket)
+
+        update_referencing_objects(main_docket, version_docket)
+
+        legacy_note.refresh_from_db()
+        gfk_note.refresh_from_db()
+
+        docket_content_type = ContentType.objects.get_for_model(Docket)
+        for note in (legacy_note, gfk_note):
+            # repoint_notes() always writes the new shape, even when the
+            # Note started as legacy.
+            self.assertIsNone(note.docket_id_id)
+            self.assertEqual(note.object_id, main_docket.pk)
+            self.assertEqual(note.content_type, docket_content_type)
+
+    def test_leaves_version_note_when_main_already_has_one(self):
+        """If the same user already has a Note on the main docket, the
+        version docket's Note (in either shape) is left where it is.
+        """
+        main_docket = DocketFactory.create()
+        version_docket = DocketFactory.create()
+        user = UserWithChildProfileFactory.create()
+
+        NoteFactory.for_object(main_docket, user=user)
+        version_gfk_note = NoteFactory.for_object(version_docket, user=user)
+        version_legacy_note = NoteFactory(
+            cluster_id=None, docket_id=version_docket, user=user
+        )
+
+        update_referencing_objects(main_docket, version_docket)
+
+        version_gfk_note.refresh_from_db()
+        version_legacy_note.refresh_from_db()
+
+        self.assertEqual(version_gfk_note.object_id, version_docket.pk)
+        self.assertEqual(version_legacy_note.docket_id_id, version_docket.pk)
 
 
 class DeleteDuplicatesTest(TestCase):
