@@ -7,6 +7,8 @@
   <meta http-equiv="Content-Language" content="en"/>
   <meta name="language" content="en_us"/>
   <meta name="viewport" content="width=device-width,initial-scale=1"/>
+  {# Hardened htmx config: pages load htmx per page through the footer-scripts block. #}
+  <meta name="htmx-config" content='{"allowEval": false, "allowScriptTags": false}'/>
 
   {% block meta %}
   <meta name="description" content="{% block description %}Create alerts, search for and browse the latest case law, PACER documents, judges, and oral arguments. Updated automatically with the latest court documents. An initiative of Free Law Project.{% endblock %}"/>
