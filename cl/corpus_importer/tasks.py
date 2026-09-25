@@ -157,6 +157,7 @@ from cl.lib.pacer import (
     is_pacer_court_accessible,
     lookup_and_save,
     map_cl_to_pacer_id,
+    map_pacer_to_cl_id,
 )
 from cl.lib.pacer_session import (
     ProxyPacerSession,
@@ -587,7 +588,15 @@ def process_free_opinion_result(
         self.request.chain = None
         return None
 
+    # TODO: Come up with some way to do this that satisfies the type checker
+    result.court = Court.objects.get(
+        pk=map_pacer_to_cl_id(result.court_id)
+    )  # pyrefly:ignore[missing-attribute]
     result.case_name = harmonize(result.case_name)
+    result.case_name_short = cnt.make_case_name_short(
+        result.case_name
+    )  # pyrefly:ignore[missing-attribute]
+
     row_copy = copy.copy(result)
     # If we don't do this, the doc's date_filed becomes the docket's
     # date_filed. Bad.

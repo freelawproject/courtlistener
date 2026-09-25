@@ -153,6 +153,9 @@ def es_search_db_for_full_citation(
     citing_opinion: Opinion | None = getattr(
         full_citation, "citing_opinion", None
     )
+    # TODO: This is here to preserve an odd (and probably incorrect) behavior from before the type fix pass and should be removed eventually
+    if citing_opinion is None:
+        setattr(full_citation, "citing_opinion", None)
     search_query = OpinionDocument.search()
     filters = [
         # Q(
