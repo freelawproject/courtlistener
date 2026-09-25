@@ -1940,7 +1940,9 @@ def fill_position_mapping(
     for position in positions:
         # Add data to the mapping using the judge ID as a key.
         # API and Frontend
-        person_id = position.person.pk
+        person_id = position.person_id
+        if person_id is None:
+            continue
         for validation, value in db_to_dataclass_map.items():
             if not getattr(position, validation, None):
                 continue

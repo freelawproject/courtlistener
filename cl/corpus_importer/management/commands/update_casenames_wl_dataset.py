@@ -2,13 +2,18 @@ import logging
 import re
 import time
 from datetime import date, datetime
+from typing import cast
 
 import pandas as pd
 from django.core.management.base import BaseCommand, CommandError
 from django.db import transaction
 from django.db.models import Q, QuerySet
 from eyecite import get_citations
-from eyecite.models import FullCaseCitation, FullJournalCitation
+from eyecite.models import (
+    FullCaseCitation,
+    FullJournalCitation,
+    ResourceCitation,
+)
 from eyecite.tokenizers import HyperscanTokenizer
 from juriscraper.lib.string_utils import harmonize
 
@@ -144,7 +149,8 @@ def parse_citations(citation_strings: list[str]) -> list[dict]:
         if not found_cites:
             logger.info("Unable to parse %s", cite_str)
             continue
-        citation = found_cites[0]
+        # all_editions is only defined on ResourceCitation
+        citation = cast(ResourceCitation, found_cites[0])
         if len(citation.all_editions) > 1:
             # In case we have two editions which could have different types
             logger.info("Unable to disambiguate citation: %s", cite_str)

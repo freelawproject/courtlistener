@@ -12,7 +12,11 @@ import requests
 from django.core.files.base import ContentFile
 from django.core.management.base import CommandError
 from juriscraper.lib.importer import build_module_list
-from juriscraper.state.BaseStateScraper import BaseStateScraper
+from juriscraper.state.BaseStateScraper import (
+    BaseStateScraper,
+    ResponseCallback,
+    ScraperRequestManager,
+)
 
 from cl.lib.command_utils import logger
 from cl.lib.storage import (
@@ -29,7 +33,7 @@ from cl.scrapers.management.utils import (
 CHECKPOINT_TRACKER = ScraperCheckpointTracker("TAMES")
 
 
-class RateLimitedRequestManager:
+class RateLimitedRequestManager(ScraperRequestManager):
     """Request manager with rate limiting and 403 retry with exponential backoff.
 
     This wraps HTTP request handling with:
@@ -49,7 +53,7 @@ class RateLimitedRequestManager:
         requests_per_second: float = 1.0,
         max_backoff_seconds: int = 300,
         session: requests.Session | None = None,
-        all_response_fn=None,
+        all_response_fn: ResponseCallback | None = None,
     ) -> None:
         """Initialize the rate-limited request manager.
 
@@ -62,6 +66,7 @@ class RateLimitedRequestManager:
                 HTTP response. Receives the request manager and response.
         """
         if session is not None:
+            # pyrefly:ignore[bad-override-mutable-attribute]
             self.session: requests.Session | None = session
         else:
             self.session = requests.Session()
@@ -221,7 +226,7 @@ class RateLimitedRequestManager:
         response = self._request_with_retry(method, url, **kwargs)
 
         if self.all_response_fn:
-            self.all_response_fn(response)
+            self.all_response_fn(self, response)
 
         return response
 
@@ -566,7 +571,9 @@ class Command(StateBackScrapeCommand):
             case_count = 0
             current_batch: list[dict] = []
 
-            for case in scraper.backfill(courts, (start_date, end_date)):
+            for case in scraper.backfill(
+                courts, (start_date, end_date)
+            ):  # pyrefly:ignore[bad-argument-type] The Juriscraper type hint is incorrect
                 if not case.get("case_url"):
                     logger.warning("Case without case_url: %s", case)
                     continue

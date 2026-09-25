@@ -1,15 +1,16 @@
 import html
 import re
+from collections.abc import Mapping, Sequence
 
 from django.urls import reverse
 from eyecite import annotate_citations
-from eyecite.models import IdCitation, SupraCitation
+from eyecite.models import CitationBase, IdCitation, SupraCitation
 
 from cl.citations.match_citations import (
     MULTIPLE_MATCHES_RESOURCE,
     NO_MATCH_RESOURCE,
 )
-from cl.citations.types import MatchedResourceType, SupportedCitationType
+from cl.citations.types import MatchedResourceType
 from cl.custom_filters.templatetags.text_filters import best_case_name
 from cl.lib.string_utils import trunc
 
@@ -17,9 +18,7 @@ type Annotation = tuple[tuple[int, int], str, str]
 
 
 def generate_annotations(
-    citation_resolutions: dict[
-        MatchedResourceType, list[SupportedCitationType]
-    ],
+    citation_resolutions: Mapping[MatchedResourceType, Sequence[CitationBase]],
 ) -> list[Annotation]:
     """Generate the string annotations to insert into the opinion text
 
@@ -95,9 +94,7 @@ def generate_annotations(
 
 
 def create_cited_html(
-    citation_resolutions: dict[
-        MatchedResourceType, list[SupportedCitationType]
-    ],
+    citation_resolutions: Mapping[MatchedResourceType, Sequence[CitationBase]],
     get_citations_kwargs: dict[str, str],
     single_doc: bool = True,
 ) -> str:
@@ -126,6 +123,8 @@ def create_cited_html(
         return new_html
 
     document = list(citation_resolutions.values())[0][0].document
+    # eyecite.get_citations attaches the Document to every citation it returns
+    assert document is not None
 
     if document.markup_text:  # If opinion was originally HTML...
         new_html = annotate_citations(

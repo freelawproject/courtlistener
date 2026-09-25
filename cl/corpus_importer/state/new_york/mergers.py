@@ -14,7 +14,7 @@ from typing import Any, ClassVar, cast, override
 
 from asgiref.sync import async_to_sync
 from django.conf import settings
-from django.db import transaction
+from django.db import models, transaction
 from django.db.models import Model, QuerySet
 from django.db.models.fields.files import FieldFile
 from juriscraper.state.new_york.nycourts_gov.vocabularies import (
@@ -83,7 +83,9 @@ from cl.search.state.new_york.vocabularies import (
 
 logger = logging.getLogger(__name__)
 
-PHONE_MAX_LENGTH: int = Attorney._meta.get_field("phone").max_length or 20
+PHONE_MAX_LENGTH: int = (
+    cast(models.CharField, Attorney._meta.get_field("phone")).max_length or 20
+)
 """How much of a phone number `Attorney` can store."""
 
 SMALLINT_MAX = 32767

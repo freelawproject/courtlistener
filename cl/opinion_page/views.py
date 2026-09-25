@@ -430,7 +430,7 @@ async def view_docket(
         if user.is_authenticated:
             # Check prayer existence in bulk.
             existing_prayers = await get_existing_prayers_in_bulk(
-                user, page_documents
+                cast(User, user), page_documents
             )
 
         # Merge counts and existing prayer status onto the documents.
@@ -817,7 +817,9 @@ async def recap_document_context(
         user = await request.auser()
         if user.is_authenticated:
             # Check prayer existence.
-            existing_prayers = await get_existing_prayers_in_bulk(user, [rd])
+            existing_prayers = await get_existing_prayers_in_bulk(
+                cast(User, user), [rd]
+            )
 
     # Merge counts and existing prayer status to RECAPDocuments.
     rd.prayer_count = prayer_counts.get(rd.id, 0)
@@ -1698,7 +1700,7 @@ async def citation_homepage(request: HttpRequest) -> HttpResponse:
                 )
             citation_groups = case_law_citations[0].groups
             citation_dict = {
-                "reporter": citation_groups.get("reporter"),
+                "reporter": cast(str, citation_groups.get("reporter")),
                 "volume": citation_groups.get("volume", None),
                 "page": citation_groups.get("page", None),
             }

@@ -1028,14 +1028,17 @@ class DocketAlertTest(TestCase):
 
         # Does the webhook was triggered?
         self.assertEqual(webhook_triggered.count(), 1)
-        content = webhook_triggered.first().content
+        webhook_event = webhook_triggered.first()
+        assert webhook_event is not None  # for the type checker
+        content = webhook_event.content
+        assert content is not None  # for the type checker
         # Compare the content of the webhook to the recap document
         pacer_doc_id = content["payload"]["results"][0]["recap_documents"][0][
             "pacer_doc_id"
         ]
         self.assertEqual("232322332", pacer_doc_id)
         self.assertEqual(
-            webhook_triggered.first().event_status,
+            webhook_event.event_status,
             WEBHOOK_EVENT_STATUS.SUCCESSFUL,
         )
 
@@ -1812,7 +1815,7 @@ class AlertAPITests(ESIndexTestCase, APITestCase):
         )
         self.assertIn(LEGACY_MEMBERSHIP_HELP_URL, detail)
         neon_id = await sync_to_async(
-            lambda: self.user_legacy_member.membership.neon_id
+            lambda: self.user_legacy_member.membership.neon_id  # pyrefly:ignore[missing-attribute]
         )()
         self.assertNotIn(
             f"https://donate.free.law/constituent/memberships/upgrade/{neon_id}",
