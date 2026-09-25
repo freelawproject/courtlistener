@@ -3,6 +3,7 @@ import hashlib
 import socket
 import sys
 from collections.abc import Callable, Sequence
+from inspect import iscoroutinefunction
 from typing import Any
 
 from asgiref.sync import iscoroutinefunction, sync_to_async

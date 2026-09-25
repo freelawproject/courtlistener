@@ -5,11 +5,12 @@ import time
 from collections.abc import Callable
 from functools import wraps
 from hashlib import md5
+from inspect import iscoroutinefunction
 from math import ceil
 from typing import Any, TypeVar
 from urllib.parse import urlparse
 
-from asgiref.sync import iscoroutinefunction, sync_to_async
+from asgiref.sync import sync_to_async
 from django.conf import settings
 from django.core.cache import caches
 from django.core.cache.backends.base import InvalidCacheBackendError

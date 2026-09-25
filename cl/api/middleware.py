@@ -1,6 +1,6 @@
 from collections.abc import Awaitable
+from inspect import iscoroutinefunction
 
-from asgiref.sync import iscoroutinefunction
 from django.http import HttpRequest, HttpResponseBase
 from waffle import flag_is_active
 
