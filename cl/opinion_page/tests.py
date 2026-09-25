@@ -3894,6 +3894,18 @@ class DocketPageV2TemplateTest(TestCase):
         self.assertTrue(len(r.context["metadata_sections"]) > 0)
         self.assertTrue(len(r.context["tabs"]) > 0)
 
+    async def test_v2_docket_page_loads_htmx(self) -> None:
+        """The page loads the vendored htmx under the hardened config."""
+        r = await self.async_client.get(
+            reverse(
+                "view_docket",
+                args=[self.docket.pk, self.docket.slug],
+            )
+        )
+        self.assertTemplateUsed(r, "v2_docket.html")
+        self.assertContains(r, 'name="htmx-config"')
+        self.assertContains(r, "js/third_party/htmx")
+
 
 @override_settings(WAFFLE_CACHE_PREFIX="test_docket_entry_rows_v2_waffle")
 @override_flag("use_new_design", active=True)
