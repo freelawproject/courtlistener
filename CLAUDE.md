@@ -32,11 +32,11 @@ you're working in and MUST read `FRONTEND.md` for stack-specific rules. Do not m
    url = "/some/hardcoded/path/1/"
    ```
 
-2. **Type Hints**: New code MUST include type hints and pass pyrefly. MUST add new files
-   to the `project-includes` section of pyrefly.toml as you go.
+2. **Type Hints**: New code MUST include type hints and pass pyrefly.
     - Pre-existing type errors are grandfathered in `.pyrefly-baseline.json`. Fixed errors
       linger there until pruned by pre-commit hooks. MUST NOT update the baseline to silence errors in new or changed code —
       fix the code instead.
+    - SHOULD fix baselined type errors in modified code when it does not dilute the focus of your work.
 
 3. **Unused Code**: MUST delete unused code created during a task.
 
