@@ -54,15 +54,6 @@ project-excludes = ["**/migrations/**"]
 # functions and honor `# type: ignore` comments.
 check-unannotated-defs = false
 permissive-ignores = true
-# Modules whose types are not yet visible to the checker (imports from them
-# resolve to Any). Remove first-party modules from this list as they become
-# type-ready. The third-party packages listed ship their types as source
-# (py.typed) rather than stubs; the codebase has never been checked against
-# them, so their types stay hidden until someone fixes the fallout.
-replace-imports-with-any = [
-    "cl.search", "cl.search.*",
-    "cl.tests", "cl.tests.*",
-]
 # Pre-existing errors are grandfathered here; only new errors fail the check.
 baseline = ".pyrefly-baseline.json"
 
