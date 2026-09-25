@@ -4,6 +4,8 @@ from django.apps import apps
 from django.contrib import admin, messages
 from django.contrib.auth.forms import UserChangeForm
 from django.contrib.auth.models import Permission, User
+from django.core.exceptions import ValidationError
+from django.core.validators import validate_email
 from django.db.models import Model, QuerySet
 from django.http import HttpRequest
 from rest_framework.authtoken.models import Token
@@ -40,6 +42,15 @@ UserProxyEvent: type[Model] = cast(
 UserProfileEvent: type[Model] = cast(
     type[Model], apps.get_model("users", "UserProfileEvent")
 )
+
+
+def _is_complete_email(value: str) -> bool:
+    """Return True if value is a syntactically complete email address."""
+    try:
+        validate_email(value)
+    except ValidationError:
+        return False
+    return True
 
 
 class TokenInline(admin.StackedInline):
@@ -111,14 +122,9 @@ class UserAdmin(admin.ModelAdmin, AdminTweaksMixin):
         queryset: QuerySet[User],
         search_term: str,
     ) -> tuple[QuerySet[User], bool]:
-        """Filter the changelist, using the LOWER(email) index for addresses.
+        """Filter the changelist, using the LOWER(email) index for complete addresses.
 
-        Django's default `search_fields` lookup is `icontains`, which compiles
-        to `UPPER(email) LIKE UPPER('%term%')` and cannot use
-        `auth_user_email_lower_idx`. An address-shaped term is matched through
-        `filter_by_email` instead — the same LOWER() comparison sign-in uses —
-        so Postgres can take that index. Other terms keep the admin's usual
-        username / name / pk search.
+        Domain or partial terms keep the default icontains search.
 
         :param request: The current HTTP request.
         :param queryset: The changelist queryset to filter.
@@ -127,7 +133,7 @@ class UserAdmin(admin.ModelAdmin, AdminTweaksMixin):
             needs to de-duplicate the results.
         """
         term = search_term.strip()
-        if "@" in term and " " not in term:
+        if _is_complete_email(term):
             return filter_by_email(queryset, term), False
         return super().get_search_results(request, queryset, search_term)
 

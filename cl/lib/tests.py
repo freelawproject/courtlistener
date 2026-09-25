@@ -2766,9 +2766,9 @@ class IncrementalNewTemplateMiddlewareTest(TestCase):
 class FilterByEmailTest(TestCase):
     """Tests for the shared address matcher.
 
-    Sign-in, registration, email confirmation, password reset and the User
-    admin search all match addresses through this, so what counts as "the
-    same address" is settled here once rather than in each caller.
+    Sign-in, registration, email confirmation and password reset all match
+    addresses through this, so what counts as "the same address" is settled
+    here once rather than four times.
     """
 
     @classmethod

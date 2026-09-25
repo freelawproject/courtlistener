@@ -4778,12 +4778,7 @@ class DuplicateEmailSettingsTest(TestCase):
 
 
 class UserAdminEmailSearchTest(TestCase):
-    """Admin user search must use the LOWER(email) index for addresses.
-
-    Django's default `icontains` lookup compiles to UPPER() LIKE and cannot
-    use auth_user_email_lower_idx. Address-shaped terms go through
-    filter_by_email instead. See #7983.
-    """
+    """Admin user search uses the LOWER(email) index for complete addresses."""
 
     @classmethod
     def setUpTestData(cls) -> None:
@@ -4807,18 +4802,14 @@ class UserAdminEmailSearchTest(TestCase):
         )
 
     def search(self, term: str) -> QuerySet[User]:
-        """Run the User admin changelist search.
-
-        :param term: The string typed into the admin search box.
-        :return: The filtered queryset.
-        """
+        """Run the User admin changelist search and return the queryset."""
         results, _use_distinct = self.user_admin.get_search_results(
             self.request, User.objects.all(), term
         )
         return results
 
     def test_email_search_finds_the_account_regardless_of_case(self) -> None:
-        """Does a differently-cased address still find the account?"""
+        """Does a differently-cased complete address still find the account?"""
         for email in [
             "Matcher@Example.com",
             "matcher@example.com",
@@ -4833,7 +4824,7 @@ class UserAdminEmailSearchTest(TestCase):
                 )
 
     def test_a_different_address_does_not_match(self) -> None:
-        """Is the match exact, once case is set aside?"""
+        """Is a complete address match exact, once case is set aside?"""
         self.assertEqual(
             list(
                 self.search("nobody@example.com").values_list("pk", flat=True)
@@ -4841,13 +4832,22 @@ class UserAdminEmailSearchTest(TestCase):
             [],
         )
 
-    def test_email_search_folds_case_in_sql(self) -> None:
-        """Is the comparison done with LOWER(), matching the index?
+    def test_partial_email_search_still_matches(self) -> None:
+        """Do domain and partial-address terms still use substring search?"""
+        cases = (
+            ("@example.com", "admin-search"),
+            ("Matcher@", "admin-search"),
+            ("@example.org", "other-user"),
+        )
+        for term, username in cases:
+            with self.subTest(term=term):
+                self.assertEqual(
+                    list(self.search(term).values_list("username", flat=True)),
+                    [username],
+                )
 
-        Both sides have to fold under the same rules, and LOWER(email) is
-        what auth_user_email_lower_idx is built on. UPPER() / LIKE would
-        seq-scan the table.
-        """
+    def test_email_search_folds_case_in_sql(self) -> None:
+        """Does a complete address compile to LOWER() rather than UPPER()/LIKE?"""
         sql = str(self.search("matcher@example.com").query)
         self.assertIn("LOWER", sql.upper())
         self.assertNotIn("UPPER", sql.upper())

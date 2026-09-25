@@ -8,8 +8,8 @@ def filter_by_email(queryset: QuerySet[User], email: str) -> QuerySet[User]:
     """Narrow a queryset of users to those holding an email address.
 
     The one place that decides when two addresses are the same address. Sign
-    in, registration, email confirmation, password reset and the User admin
-    search all have to agree on that, so they all come through here.
+    in, registration, email confirmation and password reset all have to agree
+    on that, so they all come through here.
 
     Prefer this to ``email__iexact``, which compiles to ``UPPER()`` and so
     can't use the auth_user_email_lower_idx index, and which folds case in
