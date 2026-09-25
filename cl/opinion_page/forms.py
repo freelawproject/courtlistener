@@ -75,16 +75,6 @@ class DocketEntryFilterForm(forms.Form):
         (ASCENDING, "Ascending"),
         (DESCENDING, "Descending"),
     )
-    # The params that narrow the entry list. Sorting and pagination are left
-    # out on purpose: they reorder or page the same set, so an empty page
-    # under them alone means the docket has no entries at all.
-    NARROWING_PARAMS = (
-        "entry_gte",
-        "entry_lte",
-        "filed_after",
-        "filed_before",
-        "q",
-    )
     entry_gte = forms.IntegerField(
         required=False,
         min_value=0,
@@ -146,7 +136,11 @@ class DocketEntryFilterForm(forms.Form):
         filter either way. The docket page uses this to pick between the
         "no entries yet" and the "nothing matches your filters" empty state.
         """
-        return any(self.data.get(name) for name in self.NARROWING_PARAMS)
+        # order_by only reorders the same entries, so an empty docket
+        # sorted either way still gets the "no entries yet" copy.
+        return any(
+            self.data.get(name) for name in self.fields if name != "order_by"
+        )
 
     def clean_order_by(self) -> str:
         data = self.cleaned_data["order_by"]

@@ -3828,7 +3828,9 @@ class DocketEntryFilterFormHasFiltersTest(SimpleTestCase):
             "entry_lte=10": True,
             "filed_after=01/01/2024": True,
             "filed_before=01/01/2024": True,
-            "q=motion": True,
+            # q is not a docket filter: the docket's search boxes submit to
+            # the search page.
+            "q=motion": False,
             # An invalid value still counts: the user asked for a filter.
             "entry_gte=abc": True,
             "order_by=desc&page=2&filed_after=01/01/2024": True,
