@@ -1,9 +1,11 @@
 import datetime
 import os
+from http import HTTPStatus
 from math import ceil
 from unittest import mock
 
 import openai
+from asgiref.sync import sync_to_async
 from django.core.management import call_command
 from django.test import override_settings
 from django.urls import reverse
@@ -18,12 +20,14 @@ from cl.audio.management.commands.transcribe import (
 from cl.audio.models import Audio, AudioTranscriptionMetadata
 from cl.audio.tasks import transcribe_from_open_ai_api
 from cl.audio.utils import transcription_was_hallucinated
+from cl.favorites.factories import NoteFactory
 from cl.lib.test_helpers import SitemapTest
 from cl.search.factories import CourtFactory, DocketFactory
 from cl.search.models import SEARCH_TYPES
 from cl.tests.cases import ESIndexTestCase, TestCase
 from cl.tests.fixtures import ONE_SECOND_MP3_BYTES, SMALL_WAV_BYTES
 from cl.tests.utils import MockResponse
+from cl.users.factories import UserFactory
 
 
 class PodcastTest(ESIndexTestCase, TestCase):
@@ -889,3 +893,47 @@ class ReenqueueDaemonTest(TestCase):
         }
         eligible_pks = {a.pk for a in eligible}
         self.assertTrue(called_pks.issubset(eligible_pks))
+
+
+class ViewAudioFileNoteTest(TestCase):
+    """Regression coverage for view_audio_file's `name` callable
+    (#7725): the suggested note name needs the parent Docket, fetched
+    only when actually needed -- i.e. when the Audio has no Note yet.
+    """
+
+    @classmethod
+    def setUpTestData(cls) -> None:
+        cls.user = UserFactory()
+        cls.audio = AudioWithParentsFactory(
+            local_path_mp3__data=SMALL_WAV_BYTES,
+            local_path_original_file__data=SMALL_WAV_BYTES,
+        )
+
+    async def test_docket_not_fetched_when_note_already_exists(self) -> None:
+        await sync_to_async(NoteFactory.for_object)(self.audio, user=self.user)
+        await self.async_client.aforce_login(self.user)
+
+        with mock.patch(
+            "cl.search.models.Docket.objects.aget",
+            new_callable=mock.AsyncMock,
+        ) as mock_aget:
+            r = await self.async_client.get(
+                reverse("view_audio_file", args=[self.audio.pk, ""])
+            )
+
+        self.assertEqual(r.status_code, HTTPStatus.OK)
+        mock_aget.assert_not_called()
+
+    async def test_note_form_prefilled_with_docket_name_when_no_note(
+        self,
+    ) -> None:
+        await self.async_client.aforce_login(self.user)
+
+        r = await self.async_client.get(
+            reverse("view_audio_file", args=[self.audio.pk, ""])
+        )
+
+        self.assertEqual(r.status_code, HTTPStatus.OK)
+        note_form = r.context["note_form"]
+        self.assertIsNone(note_form.instance.pk)
+        self.assertTrue(note_form.initial["name"])

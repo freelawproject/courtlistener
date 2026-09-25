@@ -116,6 +116,7 @@ class DynamicClientRegistrationView(APIView):
             redirect_uris=" ".join(data["redirect_uris"]),
             algorithm=Application.RS256_ALGORITHM,
             skip_authorization=False,
+            registration_source=Application.RegistrationSource.DCR,
         )
         # Capture the plaintext BEFORE save() hashes it in place.
         client_secret_plaintext = app.client_secret
@@ -178,6 +179,11 @@ class OAuthMetadataView(APIView):
                     ALLOWED_TOKEN_AUTH_METHODS
                 ),
                 "code_challenge_methods_supported": ["S256"],
+                "authorization_response_iss_parameter_supported": bool(
+                    settings.OAUTH2_PROVIDER.get(
+                        "COMPLIANT_BCP_RFC9700_AUTHZ_RESPONSE_ISS"
+                    )
+                ),
                 "scopes_supported": scopes_supported,
                 "service_documentation": f"{settings.WIKI_API_BASE_URL}/rest/v4/overview",
             }
