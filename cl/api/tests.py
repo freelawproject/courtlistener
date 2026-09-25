@@ -54,9 +54,11 @@ from cl.api.pagination import VersionBasedPagination
 from cl.api.utils import (
     DOUBLE_API_THROTTLES_SWITCH,
     CloudFrontAnonRateThrottle,
+    EventCounterThrottle,
     ExceptionalUserRateThrottle,
     FetchRateThrottle,
     LoggingMixin,
+    TagRateThrottle,
     apply_membership_throttles,
     clear_membership_throttles,
     detect_unknown_filter_params,
@@ -5525,9 +5527,10 @@ class AnonThrottleIdentTest(TestCase):
 
         DRF's UserRateThrottle falls back to the ident for a request with no
         user, which is why an anonymous client can see the user scope's
-        "5/min" message. That key has to be stable for the same reason.
+        "5/min" message. That key has to be stable for the same reason, and
+        for every other UserRateThrottle an anonymous client can reach: the
+        event counter and the read-only tag endpoints.
         """
-        throttle = ExceptionalUserRateThrottle()
         first = self._anon_request(
             HTTP_CLOUDFRONT_VIEWER_ADDRESS="96.23.39.106:51396",
             REMOTE_ADDR="10.0.0.1",
@@ -5537,10 +5540,17 @@ class AnonThrottleIdentTest(TestCase):
             REMOTE_ADDR="10.0.0.2",
         )
 
-        self.assertEqual(
-            throttle.get_cache_key(first, view=None),
-            throttle.get_cache_key(second, view=None),
-        )
+        for throttle_class in (
+            ExceptionalUserRateThrottle,
+            EventCounterThrottle,
+            TagRateThrottle,
+        ):
+            with self.subTest(throttle=throttle_class.__name__):
+                throttle = throttle_class()
+                self.assertEqual(
+                    throttle.get_cache_key(first, view=None),
+                    throttle.get_cache_key(second, view=None),
+                )
 
 
 @override_settings(

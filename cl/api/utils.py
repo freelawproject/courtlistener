@@ -1180,7 +1180,7 @@ class CloudFrontAnonRateThrottle(CloudFrontIdentMixin, AnonRateThrottle):
     """The anonymous rate limit, keyed on the viewer's real address."""
 
 
-class TagRateThrottle(UserRateThrottle):
+class TagRateThrottle(CloudFrontIdentMixin, UserRateThrottle):
     """Higher dedicated rate limit for the tag endpoints."""
 
     scope = "tags"
