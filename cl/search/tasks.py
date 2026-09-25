@@ -10,7 +10,7 @@ from datetime import UTC, date, datetime
 from importlib import import_module
 from pathlib import PurePosixPath
 from random import randint
-from typing import Any
+from typing import Any, NoReturn
 
 from botocore import exceptions as botocore_exception
 from celery import Task
@@ -26,6 +26,7 @@ from django.db.models import Prefetch, QuerySet
 from django.http import QueryDict
 from django.template import loader
 from elasticsearch.dsl import Document, Q, UpdateByQuery, connections
+from elasticsearch.dsl.response import UpdateByQueryResponse
 from elasticsearch.exceptions import (
     ApiError,
     ConflictError,
@@ -701,9 +702,12 @@ def handle_ubq_retries(
         | ApiError
     ),
     count_query=QuerySet | None,
-) -> None:
+) -> NoReturn:
     """Handles the retry logic for update_children_docs_by_query task based on
     the exception received and number of documents to update.
+
+    This function never returns: it either schedules a retry or re-raises the
+    exception it was given, so callers can treat it as terminating the branch.
 
     :param self: The celery task
     :param exc: The exception that triggered the retry.
@@ -712,14 +716,19 @@ def handle_ubq_retries(
     :return: None
     """
 
-    # If this is an ApiError exception, confirm the error type is
-    # search_context_missing_exception, so it can be retried. Otherwise, raise
-    # the error.
-    if isinstance(exc, ApiError) and not (
-        exc.info.get("error", {}).get("type", {})
-        == "search_context_missing_exception"
+    # ConflictError and NotFoundError are ApiError subclasses that this task
+    # always retries, so they must be matched before the generic ApiError case
+    # below. Any other ApiError is only worth retrying when it is a
+    # search_context_missing_exception; otherwise raise it.
+    if isinstance(exc, ApiError) and not isinstance(
+        exc, ConflictError | NotFoundError
     ):
-        raise exc
+        error_info = exc.info if isinstance(exc.info, dict) else {}
+        if (
+            error_info.get("error", {}).get("type")
+            != "search_context_missing_exception"
+        ):
+            raise exc
 
     retry_count = self.request.retries
     if retry_count >= self.max_retries:
@@ -743,6 +752,112 @@ def handle_ubq_retries(
         )
 
     raise self.retry(exc=exc, countdown=countdown_sec)
+
+
+def get_parent_fields_for_children(
+    parent_doc_class: ESDocumentClassType,
+    parent_instance: ESModelType,
+    fields_to_update: list[str],
+    fields_map: dict[str, list[str]] | None = None,
+) -> dict[str, Any]:
+    """Resolve the Elasticsearch field values a parent should push onto its
+    child documents.
+
+    Child documents denormalize a subset of their parent's fields so they can be
+    matched without a join. This returns the values those fields should hold,
+    keyed by Elasticsearch field name, so both the live update path and the
+    `sync_child_docs` repair command agree on what "in sync" means.
+
+    :param parent_doc_class: The parent Elasticsearch Document class, used to
+    resolve fields that are computed rather than copied verbatim.
+    :param parent_instance: The parent model instance to read values from.
+    :param fields_to_update: The parent model field names to resolve.
+    :param fields_map: A mapping from model field names to the Elasticsearch
+    field names they feed. When omitted, names are assumed to match.
+    :return: A dict of Elasticsearch field name to the value it should hold.
+    """
+
+    parent_doc = parent_doc_class()
+    fields: dict[str, Any] = {}
+    for field_to_update in fields_to_update:
+        field_list = (
+            ["timestamp"]
+            if field_to_update == "timestamp"
+            else (
+                fields_map[field_to_update]
+                if fields_map
+                else [field_to_update]
+            )
+        )
+        for field_name in field_list:
+            prepare_method = getattr(parent_doc, f"prepare_{field_name}", None)
+            # Some ES fields are computed from the parent instance instead of
+            # being copied from a model field of the same name. This works for
+            # DE but might not work for other types or fields that require some
+            # processing.
+            fields[field_name] = (
+                prepare_method(parent_instance)
+                if prepare_method
+                else getattr(parent_instance, field_to_update)
+            )
+    return fields
+
+
+def handle_incomplete_ubq_update(
+    self: Task,
+    response: UpdateByQueryResponse,
+    expected_doc_count: int,
+    es_document_name: ESDocumentNameType,
+    parent_instance_id: int,
+) -> None:
+    """Retry an UpdateByQuery that didn't reach every child document.
+
+    An UpdateByQuery selects its targets with a search, so it only touches
+    children that are already searchable. Children whose indexing task is still
+    queued, or whose write hasn't been refreshed yet, are silently skipped and
+    keep stale copies of their parent's fields, which makes them match queries
+    the parent doesn't (notably negations, see #7965). Version conflicts leave
+    the same kind of gap. Retrying gives the stragglers time to show up.
+
+    This is deliberately best effort. It schedules a single retry, which is all
+    the race needs, and it never raises on exhaustion. A shortfall that outlives
+    that retry means the database holds children that aren't in the index at all
+    rather than children that are merely slow to appear, and failing the task
+    doesn't repair those; the `sync_child_docs` command does.
+
+    :param self: The celery task
+    :param response: The UpdateByQuery response to check.
+    :param expected_doc_count: The number of child documents that should have
+    been matched, according to the database.
+    :param es_document_name: The Elasticsearch Document type being updated.
+    :param parent_instance_id: The parent instance ID whose children were
+    updated.
+    :return: None
+    """
+
+    missing_doc_count = expected_doc_count - response.total
+    if not any(
+        [missing_doc_count > 0, response.version_conflicts, response.failures]
+    ):
+        return
+
+    logger.warning(
+        "Incomplete UBQ update of %s children for parent ID %s: matched %s of "
+        "%s documents, %s version conflicts, %s failures.",
+        es_document_name,
+        parent_instance_id,
+        response.total,
+        expected_doc_count,
+        response.version_conflicts,
+        len(response.failures),
+    )
+    if self.request.retries:
+        # Only one retry: it's long enough for pending writes to become
+        # searchable, and repeating a full UBQ pass buys nothing once the gap
+        # has stopped being a timing problem.
+        return
+
+    raise self.retry(countdown=randint(10, 25))
 
 
 @app.task(
@@ -821,7 +936,11 @@ def update_children_docs_by_query(
         main_doc = parent_doc_class.exists(parent_instance_id)
         if not parent_instance:
             return
-        count_query = Opinion.objects.filter(cluster_id=parent_instance_id)
+        # Opinion versions are linked to a main opinion and are deliberately
+        # kept out of ES, so they must not be counted as documents to update.
+        count_query = Opinion.objects.filter(
+            cluster_id=parent_instance_id, main_version__isnull=True
+        )
 
     else:
         # Abort UBQ update for a not supported document
@@ -835,43 +954,34 @@ def update_children_docs_by_query(
     ubq = (
         UpdateByQuery(using=client, index=es_document._index._name)
         .query(s.to_dict()["query"])
-        .params(timeout=f"{settings.ELASTICSEARCH_TIMEOUT}s")
+        .params(
+            timeout=f"{settings.ELASTICSEARCH_TIMEOUT}s",
+            # Don't abort the whole pass on the first version conflict. Aborting
+            # leaves every document after the conflicting one untouched, and
+            # each retry stops at the same busy document, so the tail can stay
+            # stale indefinitely. Proceeding updates everything it can, and
+            # handle_incomplete_ubq_update() below retries for the stragglers.
+            conflicts="proceed",
+        )
     )
 
     # Build the UpdateByQuery script and execute it
-    script_lines = []
-    params = {}
     if fields_to_update:
-        # If there are fields to update include the timestamp field too.
-        fields_to_update.append("timestamp")
-    for field_to_update in fields_to_update:
-        field_list = (
-            ["timestamp"]
-            if field_to_update == "timestamp"
-            else (
-                fields_map[field_to_update]
-                if fields_map
-                else [field_to_update]
-            )
-        )
-        for field_name in field_list:
-            script_lines.append(
-                f"ctx._source.{field_name} = params.{field_name};"
-            )
-            prepare_method = getattr(
-                parent_doc_class(), f"prepare_{field_name}", None
-            )
-            if prepare_method:
-                # This work for DE but might not work for other types or fields that
-                # require some processing.
-                params[field_name] = prepare_method(parent_instance)
-            else:
-                params[field_name] = getattr(parent_instance, field_to_update)
-    script_source = "\n".join(script_lines)
+        # If there are fields to update include the timestamp field too. Build a
+        # new list so a caller reusing its own list across calls doesn't
+        # accumulate duplicated entries.
+        fields_to_update = [*fields_to_update, "timestamp"]
+    params = get_parent_fields_for_children(
+        parent_doc_class, parent_instance, fields_to_update, fields_map
+    )
+    script_source = "\n".join(
+        f"ctx._source.{field_name} = params.{field_name};"
+        for field_name in params
+    )
 
     ubq = ubq.script(source=script_source, params=params)
     try:
-        ubq.execute()
+        response = ubq.execute()
     except (
         ConnectionError,
         ConflictError,
@@ -879,11 +989,22 @@ def update_children_docs_by_query(
         NotFoundError,
         ApiError,
     ) as exc:
+        # handle_ubq_retries() always raises, either to schedule a retry or to
+        # surface the original exception.
         handle_ubq_retries(self, exc, count_query=count_query)
 
     if settings.ELASTICSEARCH_DSL_AUTO_REFRESH:
         # Set auto-refresh, used for testing.
         es_document._index.refresh()
+
+    # Checked last, because it can raise to schedule a retry.
+    handle_incomplete_ubq_update(
+        self,
+        response,
+        count_query.count(),
+        es_document_name,
+        parent_instance_id,
+    )
 
 
 @app.task(
