@@ -401,7 +401,7 @@ async def view_docket(
     def paginate_docket_entries(
         docket_entries: QuerySet[SourceDocketEntry], docket_page: str
     ) -> Page:
-        return Paginator(docket_entries, 200, orphans=10).get_page(docket_page)
+        return Paginator(docket_entries, 100, orphans=10).get_page(docket_page)
 
     paginated_entries = await paginate_docket_entries(de_list, page)
 
