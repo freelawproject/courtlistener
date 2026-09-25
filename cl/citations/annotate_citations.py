@@ -18,9 +18,7 @@ type Annotation = tuple[tuple[int, int], str, str]
 
 
 def generate_annotations(
-    citation_resolutions: dict[
-        MatchedResourceType, list[SupportedCitationType]
-    ],
+    citation_resolutions: Mapping[MatchedResourceType, Sequence[CitationBase]],
 ) -> list[Annotation]:
     """Generate the string annotations to insert into the opinion text
 
