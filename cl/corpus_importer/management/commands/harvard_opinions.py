@@ -6,7 +6,7 @@ import os
 import re
 from datetime import date, datetime, timedelta
 from glob import glob
-from typing import Any, TypedDict
+from typing import Any, TypedDict, cast
 
 import requests
 from bs4 import BeautifulSoup
@@ -175,7 +175,7 @@ def map_opinion_type(harvard_opinion_type: str) -> str:
     :param harvard_opinion_type: The type field of the Harvard opinion
     :return: The type field from our schema
     """
-    type_map = {
+    type_map: dict[str, str] = {
         "unanimous": Opinion.UNANIMOUS,
         "majority": Opinion.LEAD,
         "plurality": Opinion.PLURALITY,
@@ -206,8 +206,10 @@ def parse_extra_fields(soup, fields, long_field=False) -> dict:
         elements = []
         # We look for the matching tag name or matching data-type attribute
         for elem in soup.find_all(
-            lambda tag: (tag.name == field and tag.get("data-type") is None)
-            or tag.get("data-type") == field
+            lambda tag: (
+                (tag.name == field and tag.get("data-type") is None)
+                or tag.get("data-type") == field
+            )
         ):
             [x.extract() for x in elem.find_all("page-number")]
             if long_field:
@@ -457,15 +459,19 @@ def add_new_case(
     judge_list = [
         extract_judge_last_name(x.text)
         for x in soup.find_all(
-            lambda tag: (tag.name == "judges" and tag.get("data-type") is None)
-            or tag.get("data-type") == "judges"
+            lambda tag: (
+                (tag.name == "judges" and tag.get("data-type") is None)
+                or tag.get("data-type") == "judges"
+            )
         )
     ]
     author_list = [
         extract_judge_last_name(x.text)
         for x in soup.find_all(
-            lambda tag: (tag.name == "author" and tag.get("data-type") is None)
-            or tag.get("data-type") == "author"
+            lambda tag: (
+                (tag.name == "author" and tag.get("data-type") is None)
+                or tag.get("data-type") == "author"
+            )
         )
     ]
     # Flatten and dedupe list of judges
@@ -569,8 +575,10 @@ def add_opinions(
     new_op_pks = []
     # We look for opinion tags without data-type or tags with data-type == "opinion"
     for op in soup.find_all(
-        lambda tag: (tag.name == "opinion" and tag.get("data-type") is None)
-        or tag.get("data-type") == "opinion"
+        lambda tag: (
+            (tag.name == "opinion" and tag.get("data-type") is None)
+            or tag.get("data-type") == "opinion"
+        )
     ):
         # This code cleans author tags for processing.
         # It is particularly useful for identifying Per curiam
@@ -593,7 +601,7 @@ def add_opinions(
         if per_curiam:
             author_str = "Per Curiam"
 
-        op_type = map_opinion_type(op.get("type"))
+        op_type = map_opinion_type(cast(str, op.get("type")))
         opinion_xml = str(op)
         logger.info("Adding opinion for: %s", citation.corrected_citation())
         op = Opinion(

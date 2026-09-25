@@ -58,9 +58,11 @@ class NYCoADocketEntryFactory(DjangoModelFactory):
     party_name = Faker("name")
     date_filed = Faker("date_object")
     date_due = LazyAttribute(
-        lambda d: d.date_filed + timedelta(days=random.randint(7, 60))
-        if d.date_filed
-        else None
+        lambda d: (
+            d.date_filed + timedelta(days=random.randint(7, 60))
+            if d.date_filed
+            else None
+        )
     )
 
     @post_generation
@@ -80,20 +82,22 @@ class NYCoADocumentFactory(DjangoModelFactory):
     docket_entry = SubFactory(NYCoADocketEntryFactory)
     file_name = Sequence(lambda n: f"SmithvJones-app-Smith-brf-{n + 1}.pdf")
     content_type = "application/pdf"
-    available = Faker("boolean", chance_of_getting_true=75)
     doc_role = Faker("word")
     doc_party = Faker("name")
     doc_type = Faker("word")
     page_count = Faker("pyint")
+    sha256 = Faker("sha256")
     # Not a column; assigning the constant exercises the model's setter.
     url = COURT_PASS_DOCUMENT_URL
     volume = LazyAttribute(
         lambda d: random.randint(1, 5) if random.random() < 0.2 else None
     )
     part = LazyAttribute(
-        lambda d: random.randint(1, 3)
-        if d.volume and random.random() < 0.5
-        else None
+        lambda d: (
+            random.randint(1, 3)
+            if d.volume and random.random() < 0.5
+            else None
+        )
     )
 
     class Meta:

@@ -18,11 +18,11 @@ jobs:
   frontend-lint:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v7
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
         with:
           fetch-depth: 0
 
-      - uses: actions/setup-python@v7
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7
         with:
           python-version: "3.13"
 
@@ -43,6 +43,9 @@ jobs:
 
       - name: Minimize previous bot comments
         if: always()
+        # Fork PRs get a read-only GITHUB_TOKEN, so this step 403s there. Tolerate
+        # that without hiding real failures on same-repo PRs. See #7847.
+        continue-on-error: ${{ github.event.pull_request.head.repo.full_name != github.repository }}
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
@@ -64,6 +67,9 @@ jobs:
 
       - name: Post PR comment
         if: always() && hashFiles('summary.md') != ''
+        # Fork PRs get a read-only GITHUB_TOKEN, so this step 403s there. Tolerate
+        # that without hiding real failures on same-repo PRs. See #7847.
+        continue-on-error: ${{ github.event.pull_request.head.repo.full_name != github.repository }}
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |

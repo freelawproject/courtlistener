@@ -128,6 +128,7 @@ from cl.recap.mergers import (
     update_docket_metadata,
 )
 from cl.recap.models import (
+    PROCESSING_QUEUE_SOURCE,
     PROCESSING_STATUS,
     REQUEST_TYPE,
     UPLOAD_TYPE,
@@ -652,6 +653,7 @@ async def process_recap_zip(pk: int) -> dict[str, list[int] | list[Task]]:
                     status=PROCESSING_STATUS.ENQUEUED,
                     upload_type=UPLOAD_TYPE.PDF,
                     debug=pq.debug,
+                    source=pq.source,
                 )
                 new_pqs.append(new_pq.pk)
                 await process_recap_pdf(new_pq.pk)
@@ -877,6 +879,7 @@ async def find_subdocket_att_page_rds(
                 filepath_local=ContentFile(
                     original_file_content, name=original_file_name
                 ),
+                source=PROCESSING_QUEUE_SOURCE.REPLICATION,
             )
         )
 
@@ -952,6 +955,7 @@ async def find_subdocket_pdf_rds(
                 filepath_local=ContentFile(
                     pdf_binary_content, name=pq.filepath_local.name
                 ),
+                source=PROCESSING_QUEUE_SOURCE.REPLICATION,
             )
         )
 
@@ -3085,6 +3089,7 @@ def download_pacer_pdf_and_save_to_pq(
             court_id=court_id,
             upload_type=UPLOAD_TYPE.PDF,
             date_created__gt=cutoff_date,
+            defaults={"source": PROCESSING_QUEUE_SOURCE.EMAIL},
         )
         if created and magic_number and not is_bankr_short_doc_id:
             response, r_msg = download_pdf_by_magic_number(

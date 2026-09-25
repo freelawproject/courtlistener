@@ -1,0 +1,40 @@
+{% load pacer svg_tags %}
+
+<c-vars
+  document=""
+  variant="button"
+/>
+
+{% if variant == "menu_item" %}
+  <c-menu-button.divider />
+  <c-menu-button.item
+    href="{{ document.external_url }}"
+    target="_blank"
+    rel="nofollow noreferrer noopener"
+    aria-label="{% if document.is_free_on_pacer %}From PACER{% else %}Buy on PACER{% endif %}{% if document.page_count %} (${{ document|price }}){% endif %} (opens in new tab)"
+  >
+    {% if document.is_free_on_pacer %}From PACER{% else %}Buy on PACER{% endif %}{% if document.page_count %} (${{ document|price }}){% endif %}
+  </c-menu-button.item>
+{% elif variant == "check_availability" %}
+  <c-button
+    variant="ghost"
+    href="{{ document.external_url }}"
+    target="_blank"
+    rel="nofollow noreferrer noopener"
+    class="text-sm px-3 py-1.5"
+    aria-label="Check availability on PACER (opens in new tab)"
+  >
+    {% svg "external" class="w-4 h-4" aria_hidden="true" %}
+  </c-button>
+{% elif variant == "button" %}
+  <c-button
+    variant="outline"
+    href="{{ document.external_url }}"
+    target="_blank"
+    rel="nofollow noreferrer noopener"
+    class="text-sm px-3 py-1.5"
+    aria-label="Buy on PACER{% if document.page_count %} (${{ document|price }}){% endif %} (opens in new tab)"
+  >
+    Buy on PACER{% if document.page_count %} (${{ document|price }}){% endif %}
+  </c-button>
+{% endif %}

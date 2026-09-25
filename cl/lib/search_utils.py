@@ -2,7 +2,7 @@ import logging
 import pickle
 import re
 from collections.abc import Callable
-from typing import Any, TypedDict
+from typing import Any, TypedDict, cast
 from urllib.parse import parse_qs, urlencode
 
 from asgiref.sync import async_to_sync
@@ -224,7 +224,7 @@ def merge_form_with_courts(
 
 async def add_depth_counts(
     search_data: dict[str, Any],
-    search_results: Page,
+    search_results: Page | list,
 ) -> OpinionCluster | None:
     """If the search data contains a single "cites" term (e.g., "cites:(123)"),
     calculate and append the citation depth information between each ES
@@ -249,7 +249,13 @@ async def add_depth_counts(
         except OpinionCluster.DoesNotExist:
             return None
         else:
-            for result in search_results.object_list:
+            # On ES errors the results are an (empty) list, not a Page.
+            results = (
+                search_results.object_list
+                if isinstance(search_results, Page)
+                else search_results
+            )
+            for result in results:
                 result[
                     "citation_depth"
                 ] = await get_citation_depth_between_clusters(
@@ -541,13 +547,15 @@ def fetch_and_paginate_results(
             if use_es_items
             else results_dict["hits"]  # type: ignore[typeddict-item]
         )
+        # The search view only caches the integer estimate under these keys;
+        # the Response variant is written by the API micro-cache.
         main_total = (
-            results_dict["cardinality_count_response"]
+            cast(int | None, results_dict["cardinality_count_response"])
             if use_es_items
             else results_dict["main_total"]  # type: ignore[typeddict-item]
         )
         child_total = (
-            results_dict["child_cardinality_count_response"]
+            cast(int | None, results_dict["child_cardinality_count_response"])
             if use_es_items
             else results_dict["child_total"]  # type: ignore[typeddict-item]
         )
@@ -658,7 +666,7 @@ def do_es_search(
     other location.
     """
     if courts is None:
-        courts = Court.objects.filter(in_use=True)
+        courts = cast(QuerySet[Court], Court.objects.filter(in_use=True))
     paged_results = None
     query_time: int | None = 0
     total_query_results: int | None = 0

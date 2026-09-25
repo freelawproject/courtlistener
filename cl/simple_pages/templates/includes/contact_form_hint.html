@@ -1,3 +1,7 @@
+<p class="help-block" x-cloak x-show="showHint" id="no_ai">
+  While AI can be powerful, we prefer communicating with humans, not
+  AI. Please do not use AI to generate your message to us.
+</p>
 <div style="margin-top: 8px" x-cloak x-show="showHint" id="support"><strong>Need a hand with CourtListener?</strong> This option goes to our general inbox. Doublecheck the other options in the dropdown above to make sure your question gets to the right team. Then, tell us what you’re trying to do and include the exact page link(s).<br><br>{% include "includes/contact_form_discussions_link.html" only %}</div>
 <div style="margin-top: 8px" x-cloak x-show="showHint" id="api"><a href="https://free.law">Free Law Project</a> makes it possible for you and your team to access our data.<br><br>{% include "includes/contact_form_discussions_link.html" only %}</div>
 <div style="margin-top: 8px" x-cloak x-show="showHint" id="mcp"><strong>Need help with our <a href="{% url "mcp_help" %}">MCP server</a>?</strong> Tell us which client you're using, what you were trying to do, and include any error messages you saw.<br><br>{% include "includes/contact_form_discussions_link.html" only %}</div>
