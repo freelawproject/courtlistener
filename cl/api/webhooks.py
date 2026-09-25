@@ -184,6 +184,8 @@ def send_search_alert_webhook(
                 results,
                 many=True,
             ).data
+        case _:
+            raise ValueError(f"Unsupported webhook version: {webhook.version}")
 
     post_content = {
         "webhook": generate_webhook_key_content(webhook),
