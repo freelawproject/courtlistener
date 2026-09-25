@@ -1,12 +1,12 @@
 import functools
 import hashlib
+import ipaddress
 import socket
 import sys
 from collections.abc import Callable, Sequence
 from inspect import iscoroutinefunction
 from typing import Any
 
-import ipaddress
 from asgiref.sync import sync_to_async
 from django.conf import settings
 from django.core.cache import BaseCache, caches
@@ -70,7 +70,6 @@ def get_user_ip_from_cloudfront_headers(request: HttpRequest) -> str:
             strict=False,
         ).network_address
     )
-
 
 
 def get_ip_for_ratelimiter(group: str, request: HttpRequest) -> str:
