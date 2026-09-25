@@ -349,6 +349,7 @@ async def fetch_docket_entries(docket):
 
 
 @track_view_counter(tracks="docket", label_format="d.%s:view")
+@ratelimit_deny_list
 async def view_docket(
     request: HttpRequest, pk: int, slug: str
 ) -> HttpResponse:
@@ -557,6 +558,7 @@ async def docket_idb_data(
     return TemplateResponse(request, "docket_idb_data.html", context)
 
 
+@ratelimit_deny_list
 async def docket_authorities(
     request: HttpRequest,
     docket_id: int,
