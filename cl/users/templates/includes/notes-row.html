@@ -1,49 +1,36 @@
 {% load text_filters %}
 
-
+{# target is the noted object, resolved dual-read (get_noted_object())   #}
+{# and passed in with note_form as a (form, target) tuple from            #}
+{# view_notes(). type (e.g. "Opinions") comes from profile/notes.html.    #}
 <tr id="note-row-{{ note_form.instance.id }}">
   <td id="name-{{ note_form.instance.id }}">
-    {% if note_form.instance.cluster_id %}
-      {% with instance=note_form.instance.cluster_id %}
-        <i class="fa-book fa gray mr-2" title="{{ type }}"></i>
-        <a href="{% url 'view_case' instance.pk instance.slug %}">
-          {{note_form.instance.name }}
-        </a>
-      {% endwith %}
-    {% elif note_form.instance.audio_id %}
-      {% with instance=note_form.instance.audio_id %}
-        <i class="fa-volume-up fa grey mr-2" title="{{ type }}"></i>
-        <a href="{% url 'view_audio_file' instance.pk instance.docket.slug %}">
-          {{ note_form.instance.name }}
-        </a>
-      {% endwith %}
-    {% elif note_form.instance.docket_id %}
-      {% with instance=note_form.instance.docket_id %}
-        <i class="fa-list fa grey mr-2"
-           title="{{ type }}"></i>
-        <a href="{% url 'view_docket' instance.pk instance.slug %}?order_by=desc">
-          {{ note_form.instance.name }}
-        </a>
-      {% endwith %}
-    {% elif note_form.instance.recap_doc_id %}
-      {% with instance=note_form.instance.recap_doc_id %}
-        <i class="fa-file-text-o fa grey mr-2"
-           title="{{ type }}"></i>
-        <a href="{% url 'view_recap_document' instance.docket_entry.docket.pk instance.document_number instance.docket_entry.docket.slug %}">
-          {{ note_form.instance.name }}
-        </a>
-      {% endwith %}
+    {% if type == "Opinions" %}
+      <i class="fa-book fa gray mr-2" title="{{ type }}"></i>
+    {% elif type == "Oral Arguments" %}
+      <i class="fa-volume-up fa grey mr-2" title="{{ type }}"></i>
+    {% elif type == "Dockets" %}
+      <i class="fa-list fa grey mr-2" title="{{ type }}"></i>
+    {% elif type == "Documents" %}
+      <i class="fa-file-text-o fa grey mr-2" title="{{ type }}"></i>
+    {% endif %}
+    {% if target.get_absolute_url %}
+      <a href="{{ target.get_absolute_url }}{% if type == "Dockets" %}?order_by=desc{% endif %}">
+        {{ note_form.instance.name }}
+      </a>
+    {% else %}
+      {{ note_form.instance.name }}
     {% endif %}
   </td>
   {% if type == "Dockets" %}
-    <td id="date_last_filing-{{ note_form.instance.id }}" data-text="{{  note_form.instance.docket_id.date_last_filing|date:"Ymd" }}">
-      {{ note_form.instance.docket_id.date_last_filing|date:"M j, Y"|default:"(none)"|nbsp }}
+    <td id="date_last_filing-{{ note_form.instance.id }}" data-text="{{ target.date_last_filing|date:"Ymd" }}">
+      {{ target.date_last_filing|date:"M j, Y"|default:"(none)"|nbsp }}
     </td>
     <td id="docket-number-{{ note_form.instance.id }}">
-      {{ note_form.instance.docket_id.docket_number }}
+      {{ target.docket_number }}
     </td>
     <td id="court-{{ note_form.instance.id }}">
-      {{ note_form.instance.docket_id.court.citation_string }}
+      {{ target.court.citation_string }}
     </td>
   {% endif %}
   <td id="notes-{{ note_form.instance.id }}">
@@ -56,12 +43,13 @@
          data-id="{{ note_form.instance.id }}"><i class="fa fa-pencil"></i> Edit / Delete
       </a>
 
+      {# content_type/object_id come from the form (not the instance     #}
+      {# directly) so a legacy-shaped Note's prefilled values (see       #}
+      {# NoteForm.__init__) are what gets sent back on save, not nulls.  #}
       <div id="data-store-{{ note_form.instance.id }}"
            class="hidden"
-           data-cluster_id="{{ note_form.instance.cluster_id.pk|default_if_none:"" }}"
-           data-audio_id="{{ note_form.instance.audio_id.pk|default_if_none:"" }}"
-           data-docket_id="{{ note_form.instance.docket_id.pk|default_if_none:"" }}"
-           data-recap_doc_id="{{ note_form.instance.recap_doc_id.pk|default_if_none:"" }}"
+           data-content_type="{{ note_form.content_type.value|default_if_none:"" }}"
+           data-object_id="{{ note_form.object_id.value|default_if_none:"" }}"
            data-name="{{ note_form.instance.name|default_if_none:"" }}"
            data-notes="{{ note_form.instance.notes|default_if_none:"" }}">
       </div>

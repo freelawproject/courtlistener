@@ -40,6 +40,7 @@ from cl.search.models import (
     ScotusDocketMetadata,
     SCOTUSDocument,
 )
+from cl.settings import COURT_REQUEST_USER_AGENT
 from cl.tests.cases import TestCase as CLTestCase
 
 
@@ -199,7 +200,14 @@ class ScotusDocketMergeTest(TestCase):
         ).first()
 
         self.assertEqual(rd_att_1.url, att_1["document_url"])
-        self.assertTrue(rd_att_1.filepath_local)
+        bucket = f"gov.uscourts.{self.court.pk}.{docket.pk}"
+        self.assertEqual(
+            rd_att_1.filepath_local.name,
+            f"recap/{bucket}/{bucket}.2015-08-19."
+            f"{rd_att_1.document_number}.{rd_att_1.attachment_number or 0}.pdf",
+            "Filed in its docket's directory, named for the day its entry was "
+            "filed and for its document and attachment numbers.",
+        )
         self.assertEqual(rd_att_1.page_count, 1)
         self.assertIsNotNone(rd_att_1.sha1)
         self.assertIn("UNITED", rd_att_1.plain_text)
@@ -574,37 +582,43 @@ class ScotusDocketMergeTest(TestCase):
         mock_get,
         mock_is_pdf,
     ) -> None:
-        """Confirm the SCOTUS QP PDF is downloaded and stored."""
-
-        docket = DocketFactory.create(court=self.court)
-        scotus_meta = ScotusDocketMetadata.objects.create(
-            docket=docket,
-            questions_presented_url="https://www.supremecourt.gov/qp.pdf",
-        )
-        self.assertFalse(scotus_meta.questions_presented_file)
-
+        """Confirm the SCOTUS QP PDF is downloaded and stored in its docket's
+        directory, named for the docket's filing date or as undated."""
         # Mock the response from requests.get
         mock_response = mock.Mock()
         mock_response.iter_content.return_value = [b"fake pdf content"]
         mock_response.raise_for_status.return_value = None
         mock_get.return_value.__enter__.return_value = mock_response
 
-        download_qp_scotus_pdf.delay(docket.id)
+        for date_filed, stamp in (
+            (datetime.date(2024, 7, 30), "2024-07-30"),
+            (None, "undated"),
+        ):
+            with self.subTest(stamp=stamp):
+                mock_get.reset_mock()
+                docket = DocketFactory.create(
+                    court=self.court, date_filed=date_filed
+                )
+                scotus_meta = ScotusDocketMetadata.objects.create(
+                    docket=docket,
+                    questions_presented_url="https://www.supremecourt.gov/qp.pdf",
+                )
+                self.assertFalse(scotus_meta.questions_presented_file)
 
-        mock_get.assert_called_once_with(
-            scotus_meta.questions_presented_url,
-            stream=True,
-            timeout=60,
-            headers={"User-Agent": "Free Law Project"},
-        )
+                download_qp_scotus_pdf.delay(docket.id)
 
-        scotus_meta.refresh_from_db()
-
-        # Confirm the file was stored
-        self.assertTrue(scotus_meta.questions_presented_file)
-        self.assertTrue(
-            scotus_meta.questions_presented_file.name.endswith("-qp.pdf")
-        )
+                mock_get.assert_called_once_with(
+                    scotus_meta.questions_presented_url,
+                    stream=True,
+                    timeout=60,
+                    headers={"User-Agent": COURT_REQUEST_USER_AGENT},
+                )
+                scotus_meta.refresh_from_db()
+                bucket = f"gov.uscourts.{self.court.pk}.{docket.pk}"
+                self.assertEqual(
+                    scotus_meta.questions_presented_file.name,
+                    f"recap/{bucket}/{bucket}.{stamp}.qp.pdf",
+                )
 
     def test_merge_scotus_docket_resolves_relative_qp_url(self) -> None:
         """Confirm relative questions_presented URLs (e.g.

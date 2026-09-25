@@ -6,7 +6,7 @@ from django.contrib.auth.models import User
 from django.http import HttpResponse
 from django.template.loader import TemplateDoesNotExist, get_template
 from django.test import override_settings
-from django.urls import reverse
+from django.urls import resolve, reverse
 from lxml.html import fromstring
 from waffle.testutils import override_flag
 
@@ -15,6 +15,23 @@ from cl.simple_pages.forms import ContactForm
 from cl.simple_pages.sitemap import SimpleSitemap
 from cl.tests.cases import SimpleTestCase, TestCase
 from cl.tests.utils import parse_csp
+
+
+class ChangePasswordWellKnownTests(SimpleTestCase):
+    """Ensure password managers can discover the password-change page."""
+
+    def test_change_password(self) -> None:
+        """The standard URL temporarily redirects to a real password page."""
+        response = self.client.get(reverse("well_known_change_password"))
+
+        self.assertRedirects(
+            response,
+            reverse("password_change"),
+            fetch_redirect_response=False,
+        )
+        self.assertEqual(
+            resolve(response["Location"]).url_name, "password_change"
+        )
 
 
 # Mock the hcaptcha thing so that we're sure it validates during tests
@@ -387,6 +404,8 @@ class V2PagesRegisterTest(PageLoadTestMixin, SimpleUserDataMixin, TestCase):
         ({"viewname": "help_home"}, "v2_help/index.html"),
         # Info pages
         ({"viewname": "components"}, "v2_components.html"),
+        # API pages
+        ({"viewname": "court_index"}, "v2_jurisdictions.html"),
     ]
 
     @staticmethod

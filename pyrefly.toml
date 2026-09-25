@@ -21,6 +21,10 @@ project-includes = [
     "cl/api/utils.py",
     "cl/api/views.py",
     "cl/api/webhooks.py",
+    "cl/oauth/cleanup_utils.py",
+    "cl/oauth/factories.py",
+    "cl/oauth/management/commands/clean_oauth_tables.py",
+    "cl/oauth/migrations/0001_backfill_registration_source.py",
     "cl/recap/management/commands/remove_appellate_entries_with_long_numbers.py",
     "cl/recap/utils.py",
     "cl/scrapers/management/commands/back_scrape_dockets.py",
@@ -82,8 +86,6 @@ replace-imports-with-any = [
     "cl.urls",
     "cl.workers",
     "eyecite", "eyecite.*",
-    "elasticsearch", "elasticsearch.*",
-    "bs4", "bs4.*",
 ]
 # Pre-existing errors are grandfathered here; only new errors fail the check.
 baseline = ".pyrefly-baseline.json"
@@ -105,6 +107,24 @@ ignore-missing-imports = []
 unbound-name = true
 bad-override-param-name = false
 bad-override-mutable-attribute = false
+
+[[sub-config]]
+matches = "cl/corpus_importer/**"
+check-unannotated-defs = false
+infer-return-types = "checked"
+ignore-missing-imports = []
+strict-callable-subtyping = false
+
+[[sub-config]]
+matches = "cl/opinion_page/**"
+check-unannotated-defs = true
+infer-return-types = "checked"
+ignore-missing-imports = []
+
+[sub-config.errors]
+unbound-name = true
+bad-override-param-name = true
+bad-override-mutable-attribute = true
 
 [[sub-config]]
 matches = "cl/recap_rss/**"
