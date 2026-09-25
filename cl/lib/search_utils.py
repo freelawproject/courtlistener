@@ -688,7 +688,7 @@ def do_es_search(
     """
     if courts is None:
         courts = cast(QuerySet[Court], Court.objects.filter(in_use=True))
-    paged_results = None
+    paged_results: Page | list = []
     query_time: int | None = 0
     total_query_results: int | None = 0
     top_hits_limit: int | None = 5
@@ -843,7 +843,7 @@ def do_es_search(
     ]
 
     return {
-        "results": paged_results if paged_results else [],
+        "results": paged_results,
         "results_details": results_details,
         "search_form": search_form,
         "search_summary_str": search_summary_str,
@@ -947,7 +947,10 @@ def fetch_es_results_for_csv(
 
     results = search["results"]
     if isinstance(results, list):
-        return [], True
+        return (
+            [],
+            True,
+        )  # results is only ever a list if error is True so this is unreachable in practice, but the type checker doesn't know that
     max_results = settings.MAX_SEARCH_RESULTS_EXPORTED
     match search_type:
         case SEARCH_TYPES.OPINION | SEARCH_TYPES.RECAP | SEARCH_TYPES.DOCKETS:

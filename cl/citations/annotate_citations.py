@@ -18,7 +18,9 @@ type Annotation = tuple[tuple[int, int], str, str]
 
 
 def generate_annotations(
-    citation_resolutions: Mapping[MatchedResourceType, Sequence[CitationBase]],
+    citation_resolutions: dict[
+        MatchedResourceType, list[SupportedCitationType]
+    ],
 ) -> list[Annotation]:
     """Generate the string annotations to insert into the opinion text
 
@@ -30,12 +32,17 @@ def generate_annotations(
     annotations: list[Annotation] = []
     for opinion, citations in citation_resolutions.items():
         if opinion is NO_MATCH_RESOURCE:  # If unsuccessfully matched...
-            annotation = (
+            annotation_pre, annotation_post = (
                 '<span class="citation no-link">',
                 "</span>",
             )
             # Annotate all unmatched citations
-            annotations.extend([(c.span(), *annotation) for c in citations])
+            annotations.extend(
+                [
+                    (c.span(), annotation_pre, annotation_post)
+                    for c in citations
+                ]
+            )
         elif opinion is MULTIPLE_MATCHES_RESOURCE:
             # Multiple matches, can't disambiguate
             for c in citations:
@@ -50,12 +57,12 @@ def generate_annotations(
                     c.groups.get("page"),
                 )
                 citation_url = reverse("citation_redirector", kwargs=kwargs)
-                annotation = (
+                annotation_pre, annotation_post = (
                     '<span class="citation multiple-matches">'
                     f'<a href="{html.escape(citation_url)}">',
                     "</a></span>",
                 )
-                annotations.append((c.span(), *annotation))
+                annotations.append((c.span(), annotation_pre, annotation_post))
         else:
             # Successfully matched citations
             for citation in citations:
@@ -68,7 +75,7 @@ def generate_annotations(
                     match = re.search(r"\d+", citation.metadata.pin_cite)
                     if match:
                         opinion_url = f"{opinion_url}#{match.group()}"
-                annotation = (
+                annotation_pre, annotation_post = (
                     f'<span class="citation" data-id="{opinion.pk}">'
                     f'<a href="{opinion_url}"'
                     f' aria-description="Citation for case: {safe_case_name}"'
@@ -82,7 +89,9 @@ def generate_annotations(
                 else:
                     annotation_span = citation.span_with_pincite()
 
-                annotations.append((annotation_span, *annotation))
+                annotations.append(
+                    (annotation_span, annotation_pre, annotation_post)
+                )
     return annotations
 
 
@@ -135,8 +144,10 @@ def create_cited_html(
         new_html = annotate_citations(
             plain_text=document.plain_text,
             annotations=[
-                (a[0], f"</pre>{a[1]}", f'{a[2]}<pre class="inline">')
-                for a in generate_annotations(citation_resolutions)
+                (span, f"</pre>{pre}", f'{post}<pre class="inline">')
+                for span, pre, post in generate_annotations(
+                    citation_resolutions
+                )
             ],
             source_text=source_text,
         )

@@ -3379,11 +3379,7 @@ class Opinion(AbstractDateTimeModel):
                 {"ordering_key": "Ordering key cannot be zero or negative"}
             )
 
-    def save(
-        self,
-        *args: list,
-        **kwargs: dict,
-    ) -> None:
+    def save(self, *args, **kwargs) -> None:
         self.clean()
         super().save(*args, **kwargs)
 

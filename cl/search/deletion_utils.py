@@ -29,6 +29,8 @@ from django.db.models import FileField, Q, QuerySet
 from django.urls import reverse
 from requests import Response
 
+from cl.favorites.models import Note
+from cl.favorites.utils import get_notes_for
 from cl.lib.cloud_front import invalidate_cloudfront
 from cl.lib.decorators import retry
 from cl.lib.models import THUMBNAIL_STATUSES
@@ -219,13 +221,24 @@ def delete_cluster_files(cluster: OpinionCluster, delete_docket: bool) -> None:
     invalidate_cloudfront([f"/{path}" for path in deleted_filepaths])
 
 
+def _note_blockers_for_cluster(cluster: OpinionCluster) -> QuerySet[Note]:
+    """Notes blocking cluster/docket deletion, dual-read aware (#7725).
+
+    Checks both the cluster and its docket -- a Note can be attached to
+    either. Replaces .note_set, which is blind to Notes in the new
+    content_type/object_id shape.
+
+    :param cluster: The OpinionCluster being considered for sealing.
+    :return: A queryset of Notes attached to the cluster or its docket.
+    """
+    return get_notes_for(cluster).union(get_notes_for(cluster.docket))
+
+
 # nosemgrep: python.lang.bad-return-outside-function
 SEAL_BLOCKERS_MAP: dict[str, Callable[[OpinionCluster], Any]] = {
     # These prevent cluster deletion
     "favorites.UserTag": lambda cluster: cluster.docket.user_tags,
-    "favorites.Note": lambda cluster: cluster.docket.note_set.all().union(
-        cluster.note_set.all()
-    ),
+    "favorites.Note": _note_blockers_for_cluster,
     "alerts.DocketAlert": lambda cluster: cluster.docket.alerts,
     "visualizations.SCOTUSMap": lambda cluster: SCOTUSMap.objects.filter(
         Q(cluster_start=cluster)

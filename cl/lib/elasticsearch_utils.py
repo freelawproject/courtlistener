@@ -11,7 +11,7 @@ from collections.abc import Callable
 from copy import deepcopy
 from dataclasses import fields
 from functools import reduce, wraps
-from typing import Any, Literal, cast, overload
+from typing import Any, Literal, cast
 
 from asgiref.sync import async_to_sync
 from django.conf import settings
@@ -1677,26 +1677,12 @@ def build_es_main_query(
     )
 
 
-@overload
-def add_es_highlighting(
-    search_query: Search,
+def add_es_highlighting[S: (Search, SearchDSL)](
+    search_query: S,
     cd: CleanData,
     alerts: bool = False,
     highlighting: bool = True,
-) -> Search: ...
-@overload
-def add_es_highlighting(
-    search_query: SearchDSL,
-    cd: CleanData,
-    alerts: bool = False,
-    highlighting: bool = True,
-) -> SearchDSL: ...
-def add_es_highlighting(
-    search_query: Search | SearchDSL,
-    cd: CleanData,
-    alerts: bool = False,
-    highlighting: bool = True,
-) -> Search | SearchDSL:
+) -> S:
     """Add elasticsearch highlighting to the main search query.
 
     :param search_query: The Elasticsearch search query object.
@@ -3086,7 +3072,9 @@ def build_full_join_es_queries(
             # has_parent_parties_filter to match only child documents whose
             # parents match the party filters.
             has_child_query = build_has_child_query(
-                cast(Query, has_parent_parties_filter),
+                cast(
+                    Query, has_parent_parties_filter
+                ),  # TODO: Type `has_parent_parties_filter` correctly so we don't need this cast
                 "recap_document",
                 query_hits_limit,
                 SEARCH_RECAP_CHILD_HL_FIELDS,

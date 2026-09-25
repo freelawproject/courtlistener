@@ -171,7 +171,9 @@ def index_documents_in_bulk(documents_to_index: list[dict[str, Any]]) -> None:
         if conflict_error:
             raise ConflictError(
                 "ConflictError indexing documents in bulk.",
-                cast(ApiResponseMeta, ""),
+                cast(
+                    ApiResponseMeta, ""
+                ),  # TODO: Exception requires an ApiResponseMeta object, but we don't have one here
                 {"ids": ids},
             )
         elif raise_error:
