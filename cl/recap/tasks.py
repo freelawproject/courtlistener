@@ -2675,14 +2675,13 @@ async def purchase_appellate_docket_by_docket_number(
         )
 
     pacer_court_id = map_cl_to_pacer_id(court_id)
-    report_class = ACMSDocketReport if acms_case_id else AppellateDocketReport
-    report = report_class(pacer_court_id, session)
-
     if acms_case_id:
         # ACMSDocketReport only accepts the case ID; filters are not currently
         # supported for ACMS docket reports.
+        report = ACMSDocketReport(pacer_court_id, session)
         await report.query(acms_case_id)
     else:
+        report = AppellateDocketReport(pacer_court_id, session)
         await report.query(docket_number, **kwargs)
 
     docket_data = report.data
