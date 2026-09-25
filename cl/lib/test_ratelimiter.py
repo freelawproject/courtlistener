@@ -202,11 +202,11 @@ class DenyListTest(SimpleTestCase):
     def _decorate(view: View) -> View:
         """Wrap a view in a deny list whose limiter really counts.
 
-        ratelimiter_all_250_per_h no-ops under test, which would leave nothing
+        ratelimiter_all_1000_per_h no-ops under test, which would leave nothing
         for the allowlist to be asked about.
         """
         with mock.patch.object(
-            ratelimiter, "ratelimiter_all_250_per_h", one_per_hour
+            ratelimiter, "ratelimiter_all_1000_per_h", one_per_hour
         ):
             return ratelimit_deny_list(view)
 

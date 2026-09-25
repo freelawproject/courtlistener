@@ -168,7 +168,7 @@ def make_ratelimiter(
 # during tests or else the first test works and the rest are blocked. So,
 # check if we're doing a test and adjust the decorator accordingly.
 if "test" in sys.argv:
-    ratelimiter_all_250_per_h = lambda func: func
+    ratelimiter_all_1000_per_h = lambda func: func
     ratelimiter_all_2_per_m = lambda func: func
     ratelimiter_unsafe_3_per_m = lambda func: func
     ratelimiter_unsafe_5_per_d = lambda func: func
@@ -176,9 +176,9 @@ if "test" in sys.argv:
     ratelimiter_all_10_per_h = lambda func: func
     ratelimiter_unsafe_2000_per_h = lambda func: func
 else:
-    ratelimiter_all_250_per_h = make_ratelimiter(
+    ratelimiter_all_1000_per_h = make_ratelimiter(
         key=get_ip_for_ratelimiter,
-        rate="250/h",
+        rate="1000/h",
     )
     ratelimiter_all_2_per_m = make_ratelimiter(
         key=get_ip_for_ratelimiter,
@@ -243,7 +243,7 @@ def ratelimit_deny_list(view: View) -> View:
     DNS lookups, so on an async view it runs in a worker thread rather than on
     the event loop.
     """
-    ratelimited_view = ratelimiter_all_250_per_h(view)
+    ratelimited_view = ratelimiter_all_1000_per_h(view)
 
     if iscoroutinefunction(view):
 
