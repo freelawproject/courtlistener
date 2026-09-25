@@ -288,10 +288,17 @@
       "severity": "error"
     },
     {
+      "column": 20,
+      "path": "cl/alerts/utils.py",
+      "name": "missing-attribute",
+      "concise_description": "Object of type `type[Audio | Citation | Docket | DocketEntry | ESRECAPBaseDocument | Education | Opinion | OpinionCluster | Parenthetical | ParentheticalGroup | Person | Position | RECAPDocument]` has no attribute `_doc_type`",
+      "severity": "error"
+    },
+    {
       "column": 17,
       "path": "cl/alerts/utils.py",
       "name": "bad-argument-type",
-      "concise_description": "Argument `type[ESRECAPBaseDocument]` is not assignable to parameter `es_document_class` with type `type[AudioDocument | AudioPercolator | DocketDocument | ESRECAPDocument | OpinionClusterDocument | OpinionDocument | ParentheticalGroupDocument | PersonDocument | PositionDocument]` in function `select_es_document_fields`",
+      "concise_description": "Argument `type[DocketDocument]` is not assignable to parameter `es_document_class` with type `type[Audio | Citation | Docket | DocketEntry | ESRECAPBaseDocument | Education | Opinion | OpinionCluster | Parenthetical | ParentheticalGroup | Person | Position | RECAPDocument]` in function `select_es_document_fields`",
       "severity": "error"
     },
     {
@@ -617,13 +624,6 @@
       "severity": "error"
     },
     {
-      "column": 48,
-      "path": "cl/api/utils.py",
-      "name": "missing-attribute",
-      "concise_description": "Object of class `object` has no attribute `get_ident`",
-      "severity": "error"
-    },
-    {
       "column": 39,
       "path": "cl/api/utils.py",
       "name": "bad-argument-type",
@@ -642,6 +642,13 @@
       "path": "cl/api/utils.py",
       "name": "no-matching-overload",
       "concise_description": "No matching overload found for function `filter.__new__` called with arguments: (type[filter[_T]], None, Unknown | None)",
+      "severity": "error"
+    },
+    {
+      "column": 9,
+      "path": "cl/api/views.py",
+      "name": "missing-attribute",
+      "concise_description": "Object of class `Court` has no attribute `count`",
       "severity": "error"
     },
     {
@@ -925,6 +932,20 @@
       "severity": "error"
     },
     {
+      "column": 36,
+      "path": "cl/corpus_importer/import_columbia/columbia_utils.py",
+      "name": "bad-argument-type",
+      "concise_description": "Argument `tuple[None, date]` is not assignable to parameter `object` with type `tuple[str, date]` in function `list.append`",
+      "severity": "error"
+    },
+    {
+      "column": 12,
+      "path": "cl/corpus_importer/import_columbia/columbia_utils.py",
+      "name": "bad-return",
+      "concise_description": "Returned type `list[list[tuple[str, date]]]` is not assignable to declared return type `list[list[tuple[Any, date] | tuple[None, date]]]`",
+      "severity": "error"
+    },
+    {
       "column": 20,
       "path": "cl/corpus_importer/import_columbia/convert_columbia_html.py",
       "name": "missing-attribute",
@@ -1156,13 +1177,6 @@
       "severity": "error"
     },
     {
-      "column": 48,
-      "path": "cl/corpus_importer/import_columbia/parse_opinions.py",
-      "name": "bad-argument-type",
-      "concise_description": "Argument `Literal[True]` is not assignable to parameter `s` with type `str` in function `juriscraper.lib.string_utils.CaseNameTweaker.make_case_name_short`",
-      "severity": "error"
-    },
-    {
       "column": 13,
       "path": "cl/corpus_importer/import_columbia/parse_opinions.py",
       "name": "unsupported-operation",
@@ -1355,14 +1369,14 @@
       "column": 55,
       "path": "cl/corpus_importer/management/commands/harvard_merge.py",
       "name": "bad-argument-type",
-      "concise_description": "Argument `QuerySet[Unknown]` is not assignable to parameter `sub_opinions` with type `list[Opinion]` in function `fetch_cl_opinion_content`",
+      "concise_description": "Argument `QuerySet[Opinion, Opinion]` is not assignable to parameter `sub_opinions` with type `list[Opinion]` in function `fetch_cl_opinion_content`",
       "severity": "error"
     },
     {
       "column": 47,
       "path": "cl/corpus_importer/management/commands/harvard_merge.py",
       "name": "bad-argument-type",
-      "concise_description": "Argument `QuerySet[Unknown]` is not assignable to parameter `cluster_sub_opinions` with type `list[Unknown]` in function `update_matching_opinions`",
+      "concise_description": "Argument `QuerySet[Opinion, Opinion]` is not assignable to parameter `cluster_sub_opinions` with type `list[Unknown]` in function `update_matching_opinions`",
       "severity": "error"
     },
     {
@@ -1446,7 +1460,7 @@
       "column": 43,
       "path": "cl/corpus_importer/management/commands/update_opinions_order.py",
       "name": "bad-argument-type",
-      "concise_description": "Argument `QuerySet[Unknown, Any]` is not assignable to parameter `opinions` with type `list[Any]` in function `match_text`",
+      "concise_description": "Argument `QuerySet[Opinion, Any]` is not assignable to parameter `opinions` with type `list[Any]` in function `match_text`",
       "severity": "error"
     },
     {
@@ -1649,7 +1663,7 @@
       "column": 12,
       "path": "cl/corpus_importer/tasks.py",
       "name": "bad-return",
-      "concise_description": "Returned type `datetime | str | Unknown | None` is not assignable to declared return type `str`",
+      "concise_description": "Returned type `str | Unknown | None` is not assignable to declared return type `str`",
       "severity": "error"
     },
     {
@@ -2468,7 +2482,7 @@
       "column": 26,
       "path": "cl/favorites/tasks.py",
       "name": "bad-argument-type",
-      "concise_description": "Argument `datetime | int | str | Unknown | None` is not assignable to parameter `x` with type `Buffer | SupportsIndex | SupportsInt | SupportsTrunc | str` in function `int.__new__`",
+      "concise_description": "Argument `int | str | Unknown | None` is not assignable to parameter `x` with type `Buffer | SupportsIndex | SupportsInt | SupportsTrunc | str` in function `int.__new__`",
       "severity": "error"
     },
     {
@@ -2699,7 +2713,7 @@
       "column": 37,
       "path": "cl/lib/es_signal_processor.py",
       "name": "bad-argument-type",
-      "concise_description": "Argument `Audio | Unknown | None` is not assignable to parameter `instance` with type `Audio | Citation | Docket | DocketEntry | Education | Opinion | OpinionCluster | Parenthetical | ParentheticalGroup | Person | Position | RECAPDocument` in function `allow_es_audio_indexing`",
+      "concise_description": "Argument `Audio | Unknown | None` is not assignable to parameter `instance` with type `Audio | Citation | Docket | Education | Opinion | OpinionCluster | Parenthetical | ParentheticalGroup | Person | Position | RECAPDocument` in function `allow_es_audio_indexing`",
       "severity": "error"
     },
     {
@@ -2713,53 +2727,67 @@
       "column": 43,
       "path": "cl/lib/es_signal_processor.py",
       "name": "bad-argument-type",
-      "concise_description": "Argument `Unknown | None` is not assignable to parameter `instance` with type `Audio | Citation | Docket | DocketEntry | Education | Opinion | OpinionCluster | Parenthetical | ParentheticalGroup | Person | Position | RECAPDocument` in function `cl.lib.indexing_utils.compose_app_label`",
+      "concise_description": "Argument `Unknown | None` is not assignable to parameter `instance` with type `Audio | Citation | Docket | Education | Opinion | OpinionCluster | Parenthetical | ParentheticalGroup | Person | Position | RECAPDocument` in function `cl.lib.indexing_utils.compose_app_label`",
       "severity": "error"
     },
     {
       "column": 13,
       "path": "cl/lib/es_signal_processor.py",
       "name": "bad-argument-type",
-      "concise_description": "Argument `Audio | Unknown | None` is not assignable to parameter `instance` with type `Audio | Citation | Docket | DocketEntry | Education | Opinion | OpinionCluster | Parenthetical | ParentheticalGroup | Person | Position | RECAPDocument` in function `update_es_documents`",
+      "concise_description": "Argument `Audio | Unknown | None` is not assignable to parameter `instance` with type `Audio | Citation | Docket | Education | Opinion | OpinionCluster | Parenthetical | ParentheticalGroup | Person | Position | RECAPDocument` in function `update_es_documents`",
       "severity": "error"
     },
     {
       "column": 21,
       "path": "cl/lib/es_signal_processor.py",
       "name": "bad-argument-type",
-      "concise_description": "Argument `Unknown | None` is not assignable to parameter `instance` with type `Audio | Citation | Docket | DocketEntry | Education | Opinion | OpinionCluster | Parenthetical | ParentheticalGroup | Person | Position | RECAPDocument` in function `update_remove_m2m_documents`",
+      "concise_description": "Argument `Unknown | None` is not assignable to parameter `instance` with type `Audio | Citation | Docket | Education | Opinion | OpinionCluster | Parenthetical | ParentheticalGroup | Person | Position | RECAPDocument` in function `update_remove_m2m_documents`",
       "severity": "error"
     },
     {
       "column": 53,
       "path": "cl/lib/es_signal_processor.py",
       "name": "bad-argument-type",
-      "concise_description": "Argument `BankruptcyInformation` is not assignable to parameter `instance` with type `Audio | Citation | Docket | DocketEntry | Education | Opinion | OpinionCluster | Parenthetical | ParentheticalGroup | Person | Position | RECAPDocument` in function `updated_fields`",
+      "concise_description": "Argument `BankruptcyInformation` is not assignable to parameter `instance` with type `Audio | Citation | Docket | Education | Opinion | OpinionCluster | Parenthetical | ParentheticalGroup | Person | Position | RECAPDocument` in function `updated_fields`",
       "severity": "error"
     },
     {
       "column": 17,
       "path": "cl/lib/es_signal_processor.py",
       "name": "bad-argument-type",
-      "concise_description": "Argument `Any | None` is not assignable to parameter `instance` with type `Audio | Citation | Docket | DocketEntry | Education | Opinion | OpinionCluster | Parenthetical | ParentheticalGroup | Person | Position | RECAPDocument` in function `update_reverse_related_documents`",
+      "concise_description": "Argument `Any | None` is not assignable to parameter `instance` with type `Audio | Citation | Docket | Education | Opinion | OpinionCluster | Parenthetical | ParentheticalGroup | Person | Position | RECAPDocument` in function `update_reverse_related_documents`",
       "severity": "error"
     },
     {
       "column": 17,
       "path": "cl/lib/es_signal_processor.py",
       "name": "bad-argument-type",
-      "concise_description": "Argument `Any | None` is not assignable to parameter `instance` with type `Audio | Citation | Docket | DocketEntry | Education | Opinion | OpinionCluster | Parenthetical | ParentheticalGroup | Person | Position | RECAPDocument` in function `delete_reverse_related_documents`",
+      "concise_description": "Argument `Any | None` is not assignable to parameter `instance` with type `Audio | Citation | Docket | Education | Opinion | OpinionCluster | Parenthetical | ParentheticalGroup | Person | Position | RECAPDocument` in function `delete_reverse_related_documents`",
+      "severity": "error"
+    },
+    {
+      "column": 31,
+      "path": "cl/lib/import_lib.py",
+      "name": "missing-attribute",
+      "concise_description": "Object of class `Court` has no attribute `earliest_date`",
       "severity": "error"
     },
     {
       "column": 18,
       "path": "cl/lib/import_lib.py",
       "name": "not-iterable",
-      "concise_description": "Type `Manager[Unknown]` is not iterable",
+      "concise_description": "Type `Manager[Court]` is not iterable",
       "severity": "error"
     },
     {
-      "column": 13,
+      "column": 31,
+      "path": "cl/lib/import_lib.py",
+      "name": "missing-attribute",
+      "concise_description": "Object of class `Court` has no attribute `earliest_date`",
+      "severity": "error"
+    },
+    {
+      "column": 9,
       "path": "cl/lib/middleware.py",
       "name": "unsupported-operation",
       "concise_description": "Cannot set item in `None`",
@@ -3239,6 +3267,41 @@
       "path": "cl/opinion_page/utils.py",
       "name": "bad-assignment",
       "concise_description": "`list[Hit] | list[Unknown]` is not assignable to attribute `citing_clusters` with type `list[OpinionClusterDocument]`",
+      "severity": "error"
+    },
+    {
+      "column": 33,
+      "path": "cl/opinion_page/views.py",
+      "name": "bad-assignment",
+      "concise_description": "`str | None` is not assignable to dict key `court_seal` with type `bool | str`",
+      "severity": "error"
+    },
+    {
+      "column": 32,
+      "path": "cl/opinion_page/views.py",
+      "name": "unsupported-operation",
+      "concise_description": "Cannot set item in `dict[str, bool | str]`",
+      "severity": "error"
+    },
+    {
+      "column": 23,
+      "path": "cl/opinion_page/views.py",
+      "name": "missing-attribute",
+      "concise_description": "Object of class `NoneType` has no attribute `docket_entry`",
+      "severity": "error"
+    },
+    {
+      "column": 21,
+      "path": "cl/opinion_page/views.py",
+      "name": "missing-attribute",
+      "concise_description": "Object of class `NoneType` has no attribute `document_number`",
+      "severity": "error"
+    },
+    {
+      "column": 21,
+      "path": "cl/opinion_page/views.py",
+      "name": "missing-attribute",
+      "concise_description": "Object of class `NoneType` has no attribute `attachment_number`",
       "severity": "error"
     },
     {
@@ -3728,6 +3791,13 @@
       "column": 16,
       "path": "cl/recap/management/commands/import_idb.py",
       "name": "not-iterable",
+      "concise_description": "`in` is not supported between `Unknown` and `type[Court]`",
+      "severity": "error"
+    },
+    {
+      "column": 16,
+      "path": "cl/recap/management/commands/import_idb.py",
+      "name": "not-iterable",
       "concise_description": "`in` is not supported between `Unknown` and `type[bool]`",
       "severity": "error"
     },
@@ -3750,20 +3820,6 @@
       "path": "cl/recap/management/commands/import_idb.py",
       "name": "not-iterable",
       "concise_description": "`in` is not supported between `Unknown` and `type[str]`",
-      "severity": "error"
-    },
-    {
-      "column": 16,
-      "path": "cl/recap/management/commands/import_idb.py",
-      "name": "unsupported-operation",
-      "concise_description": "`in` is not supported between `Unknown` and `type[Court]`",
-      "severity": "error"
-    },
-    {
-      "column": 16,
-      "path": "cl/recap/management/commands/import_idb.py",
-      "name": "unsupported-operation",
-      "concise_description": "`in` is not supported between `Unknown` and `type[Court]`",
       "severity": "error"
     },
     {
@@ -4992,10 +5048,45 @@
       "severity": "error"
     },
     {
+      "column": 16,
+      "path": "cl/recap/tasks.py",
+      "name": "bad-argument-type",
+      "concise_description": "Argument `bool | DocketType | Unknown` is not assignable to parameter `obj` with type `Sized` in function `len`",
+      "severity": "error"
+    },
+    {
+      "column": 16,
+      "path": "cl/recap/tasks.py",
+      "name": "bad-index",
+      "concise_description": "Cannot index into `bool`",
+      "severity": "error"
+    },
+    {
+      "column": 32,
+      "path": "cl/recap/tasks.py",
+      "name": "bad-typed-dict-key",
+      "concise_description": "Invalid key for TypedDict `DocketType`, got `Literal[0]`",
+      "severity": "error"
+    },
+    {
+      "column": 17,
+      "path": "cl/recap/tasks.py",
+      "name": "bad-index",
+      "concise_description": "Cannot index into `bool`",
+      "severity": "error"
+    },
+    {
+      "column": 33,
+      "path": "cl/recap/tasks.py",
+      "name": "bad-typed-dict-key",
+      "concise_description": "Invalid key for TypedDict `DocketType`, got `Literal[0]`",
+      "severity": "error"
+    },
+    {
       "column": 12,
       "path": "cl/recap/tasks.py",
       "name": "bad-return",
-      "concise_description": "Returned type `tuple[dict[Unknown, Unknown] | None, bytes]` is not assignable to declared return type `tuple[dict[str, bool | list[DocketType] | str] | None, str]`",
+      "concise_description": "Returned type `tuple[dict[str, bool | DocketType | Unknown] | dict[Unknown, Unknown] | None, bytes]` is not assignable to declared return type `tuple[dict[str, bool | list[DocketType] | str] | None, str]`",
       "severity": "error"
     },
     {
@@ -5503,7 +5594,7 @@
       "severity": "error"
     },
     {
-      "column": 42,
+      "column": 17,
       "path": "cl/scrapers/management/commands/back_scrape_dockets.py",
       "name": "bad-argument-type",
       "concise_description": "Argument `list[Unknown] | None` is not assignable to parameter `courts` with type `list[str]` in function `juriscraper.state.BaseStateScraper.BaseStateScraper.backfill`",
@@ -7081,7 +7172,7 @@
       "column": 12,
       "path": "cl/search/management/commands/cl_compute_token_count.py",
       "name": "bad-return",
-      "concise_description": "Returned type `RawQuerySet[Unknown]` is not assignable to declared return type `QuerySet[Opinion, Opinion]`",
+      "concise_description": "Returned type `RawQuerySet[Opinion]` is not assignable to declared return type `QuerySet[Opinion, Opinion]`",
       "severity": "error"
     },
     {
@@ -7187,6 +7278,13 @@
       "path": "cl/search/management/commands/cl_index_parent_and_child_docs.py",
       "name": "missing-module-attribute",
       "concise_description": "Could not import `RECAPDocumentEvent` from `cl.search.models`",
+      "severity": "error"
+    },
+    {
+      "column": 17,
+      "path": "cl/search/management/commands/cl_index_parent_and_child_docs.py",
+      "name": "bad-argument-type",
+      "concise_description": "Argument `Docket | DocketEntry | RECAPDocument` is not assignable to parameter `current_instance` with type `Audio | Citation | Docket | Education | Opinion | OpinionCluster | Parenthetical | ParentheticalGroup | Person | Position | RECAPDocument` in function `cl.lib.es_signal_processor.check_fields_that_changed`",
       "severity": "error"
     },
     {
@@ -7638,17 +7736,24 @@
       "severity": "error"
     },
     {
+      "column": 16,
+      "path": "cl/search/tasks.py",
+      "name": "bad-return",
+      "concise_description": "Returned type `Audio | Citation | Docket | DocketEntry | Education | Opinion | OpinionCluster | Parenthetical | ParentheticalGroup | Person | Position | RECAPDocument | Unknown` is not assignable to declared return type `Audio | Citation | Docket | Education | Opinion | OpinionCluster | Parenthetical | ParentheticalGroup | Person | Position | RECAPDocument | None`",
+      "severity": "error"
+    },
+    {
       "column": 33,
       "path": "cl/search/tasks.py",
       "name": "missing-attribute",
-      "concise_description": "Object of type `Audio | Citation | Docket | DocketEntry | Education | Opinion | OpinionCluster | Parenthetical | ParentheticalGroup | Person | Position | RECAPDocument` has no attribute `person`",
+      "concise_description": "Object of type `Audio | Citation | Docket | Education | Opinion | OpinionCluster | Parenthetical | ParentheticalGroup | Person | Position | RECAPDocument` has no attribute `person`",
       "severity": "error"
     },
     {
       "column": 21,
       "path": "cl/search/tasks.py",
       "name": "missing-attribute",
-      "concise_description": "Object of type `Audio | Citation | Docket | DocketEntry | Education | Opinion | OpinionCluster | Parenthetical | ParentheticalGroup | Person | Position | RECAPDocument` has no attribute `person`",
+      "concise_description": "Object of type `Audio | Citation | Docket | Education | Opinion | OpinionCluster | Parenthetical | ParentheticalGroup | Person | Position | RECAPDocument` has no attribute `person`",
       "severity": "error"
     },
     {
@@ -7669,28 +7774,28 @@
       "column": 55,
       "path": "cl/search/tasks.py",
       "name": "bad-argument-type",
-      "concise_description": "Argument `Audio | Citation | Docket | DocketEntry | Education | Opinion | OpinionCluster | Parenthetical | ParentheticalGroup | Person | Position | RECAPDocument` is not assignable to parameter `position` with type `Position` in function `person_first_time_indexing`",
+      "concise_description": "Argument `Audio | Citation | Docket | Education | Opinion | OpinionCluster | Parenthetical | ParentheticalGroup | Person | Position | RECAPDocument` is not assignable to parameter `position` with type `Position` in function `person_first_time_indexing`",
       "severity": "error"
     },
     {
       "column": 20,
       "path": "cl/search/tasks.py",
       "name": "missing-attribute",
-      "concise_description": "Object of type `Audio | Citation | Docket | DocketEntry | Education | Opinion | OpinionCluster | Parenthetical | ParentheticalGroup | Person | Position | RECAPDocument` has no attribute `is_judge`",
+      "concise_description": "Object of type `Audio | Citation | Docket | Education | Opinion | OpinionCluster | Parenthetical | ParentheticalGroup | Person | Position | RECAPDocument` has no attribute `is_judge`",
       "severity": "error"
     },
     {
       "column": 33,
       "path": "cl/search/tasks.py",
       "name": "missing-attribute",
-      "concise_description": "Object of type `Audio | Citation | Docket | DocketEntry | Education | Opinion | OpinionCluster | Parenthetical | ParentheticalGroup | Person | Position | RECAPDocument` has no attribute `docket_entry`",
+      "concise_description": "Object of type `Audio | Citation | Docket | Education | Opinion | OpinionCluster | Parenthetical | ParentheticalGroup | Person | Position | RECAPDocument` has no attribute `docket_entry`",
       "severity": "error"
     },
     {
       "column": 42,
       "path": "cl/search/tasks.py",
       "name": "missing-attribute",
-      "concise_description": "Object of type `Audio | Citation | Docket | DocketEntry | Education | Opinion | OpinionCluster | Parenthetical | ParentheticalGroup | Person | Position | RECAPDocument` has no attribute `docket_entry`",
+      "concise_description": "Object of type `Audio | Citation | Docket | Education | Opinion | OpinionCluster | Parenthetical | ParentheticalGroup | Person | Position | RECAPDocument` has no attribute `docket_entry`",
       "severity": "error"
     },
     {
@@ -7704,14 +7809,14 @@
       "column": 33,
       "path": "cl/search/tasks.py",
       "name": "missing-attribute",
-      "concise_description": "Object of type `Audio | Citation | Docket | DocketEntry | Education | Opinion | OpinionCluster | Parenthetical | ParentheticalGroup | Person | Position | RECAPDocument` has no attribute `cluster`",
+      "concise_description": "Object of type `Audio | Citation | Docket | Education | Opinion | OpinionCluster | Parenthetical | ParentheticalGroup | Person | Position | RECAPDocument` has no attribute `cluster`",
       "severity": "error"
     },
     {
       "column": 43,
       "path": "cl/search/tasks.py",
       "name": "missing-attribute",
-      "concise_description": "Object of type `Audio | Citation | Docket | DocketEntry | Education | Opinion | OpinionCluster | Parenthetical | ParentheticalGroup | Person | Position | RECAPDocument` has no attribute `cluster`",
+      "concise_description": "Object of type `Audio | Citation | Docket | Education | Opinion | OpinionCluster | Parenthetical | ParentheticalGroup | Person | Position | RECAPDocument` has no attribute `cluster`",
       "severity": "error"
     },
     {
@@ -7725,28 +7830,28 @@
       "column": 32,
       "path": "cl/search/tasks.py",
       "name": "missing-attribute",
-      "concise_description": "Object of type `Audio | Citation | Docket | DocketEntry | Education | Opinion | OpinionCluster | Parenthetical | ParentheticalGroup | Person | Position | RECAPDocument` has no attribute `parties`",
+      "concise_description": "Object of type `Audio | Citation | Docket | Education | Opinion | OpinionCluster | Parenthetical | ParentheticalGroup | Person | Position | RECAPDocument` has no attribute `parties`",
       "severity": "error"
     },
     {
       "column": 37,
       "path": "cl/search/tasks.py",
       "name": "missing-attribute",
-      "concise_description": "Object of type `Audio | Citation | Docket | DocketEntry | Education | Opinion | OpinionCluster | Parenthetical | ParentheticalGroup | Person | Position | RECAPDocument` has no attribute `case_name`",
+      "concise_description": "Object of type `Audio | Citation | Docket | Education | Opinion | OpinionCluster | Parenthetical | ParentheticalGroup | Person | Position | RECAPDocument` has no attribute `case_name`",
       "severity": "error"
     },
     {
       "column": 56,
       "path": "cl/search/tasks.py",
       "name": "missing-attribute",
-      "concise_description": "Object of type `Audio | Citation | Docket | DocketEntry | Education | Opinion | OpinionCluster | Parenthetical | ParentheticalGroup | Person | Position | RECAPDocument` has no attribute `court_id`",
+      "concise_description": "Object of type `Audio | Citation | Docket | Education | Opinion | OpinionCluster | Parenthetical | ParentheticalGroup | Person | Position | RECAPDocument` has no attribute `court_id`",
       "severity": "error"
     },
     {
       "column": 37,
       "path": "cl/search/tasks.py",
       "name": "missing-attribute",
-      "concise_description": "Object of type `Audio | Citation | Docket | DocketEntry | Education | Opinion | OpinionCluster | Parenthetical | ParentheticalGroup | Person | Position | RECAPDocument` has no attribute `case_name`",
+      "concise_description": "Object of type `Audio | Citation | Docket | Education | Opinion | OpinionCluster | Parenthetical | ParentheticalGroup | Person | Position | RECAPDocument` has no attribute `case_name`",
       "severity": "error"
     },
     {
@@ -7760,7 +7865,7 @@
       "column": 29,
       "path": "cl/search/tasks.py",
       "name": "missing-attribute",
-      "concise_description": "Object of type `Audio | Citation | Docket | DocketEntry | Education | Opinion | OpinionCluster | Parenthetical | ParentheticalGroup | Person | Position | RECAPDocument` has no attribute `docket_entry`",
+      "concise_description": "Object of type `Audio | Citation | Docket | Education | Opinion | OpinionCluster | Parenthetical | ParentheticalGroup | Person | Position | RECAPDocument` has no attribute `docket_entry`",
       "severity": "error"
     },
     {
@@ -7809,7 +7914,7 @@
       "column": 32,
       "path": "cl/search/tasks.py",
       "name": "missing-attribute",
-      "concise_description": "Object of type `Audio | Citation | Docket | DocketEntry | Education | Opinion | OpinionCluster | Parenthetical | ParentheticalGroup | Person | Position | RECAPDocument` has no attribute `docket`",
+      "concise_description": "Object of type `Audio | Citation | Docket | Education | Opinion | OpinionCluster | Parenthetical | ParentheticalGroup | Person | Position | RECAPDocument` has no attribute `docket`",
       "severity": "error"
     },
     {
@@ -7998,14 +8103,14 @@
       "column": 34,
       "path": "cl/search/tasks.py",
       "name": "missing-attribute",
-      "concise_description": "Object of type `Audio | Citation | Docket | DocketEntry | Education | Opinion | OpinionCluster | Parenthetical | ParentheticalGroup | Person | Position | RECAPDocument` has no attribute `docket_entry`",
+      "concise_description": "Object of type `Audio | Citation | Docket | Education | Opinion | OpinionCluster | Parenthetical | ParentheticalGroup | Person | Position | RECAPDocument` has no attribute `docket_entry`",
       "severity": "error"
     },
     {
       "column": 34,
       "path": "cl/search/tasks.py",
       "name": "missing-attribute",
-      "concise_description": "Object of type `Audio | Citation | Docket | DocketEntry | Education | Opinion | OpinionCluster | Parenthetical | ParentheticalGroup | Person | Position | RECAPDocument` has no attribute `cluster`",
+      "concise_description": "Object of type `Audio | Citation | Docket | Education | Opinion | OpinionCluster | Parenthetical | ParentheticalGroup | Person | Position | RECAPDocument` has no attribute `cluster`",
       "severity": "error"
     },
     {
@@ -8016,6 +8121,13 @@
       "severity": "error"
     },
     {
+      "column": 49,
+      "path": "cl/search/tasks.py",
+      "name": "bad-argument-type",
+      "concise_description": "Argument `int` is not assignable to parameter `id` with type `str` in function `elasticsearch.dsl._sync.document.Document.exists`",
+      "severity": "error"
+    },
+    {
       "column": 17,
       "path": "cl/search/tasks.py",
       "name": "bad-argument-type",
@@ -8023,10 +8135,24 @@
       "severity": "error"
     },
     {
+      "column": 29,
+      "path": "cl/search/tasks.py",
+      "name": "no-matching-overload",
+      "concise_description": "No matching overload found for function `typing.MutableMapping.update` called with arguments: (dict[str, str])",
+      "severity": "error"
+    },
+    {
       "column": 21,
       "path": "cl/search/tasks.py",
       "name": "bad-argument-type",
       "concise_description": "Argument `Literal['']` is not assignable to parameter `meta` with type `ApiResponseMeta` in function `elastic_transport._exceptions.ApiError.__init__`",
+      "severity": "error"
+    },
+    {
+      "column": 40,
+      "path": "cl/search/tasks.py",
+      "name": "bad-argument-type",
+      "concise_description": "Argument `dict[str, int | str | dict[str, int]]` is not assignable to parameter `object` with type `dict[str, int | dict[str, int]]` in function `list.append`",
       "severity": "error"
     },
     {
