@@ -247,13 +247,6 @@
       "severity": "error"
     },
     {
-      "column": 12,
-      "path": "cl/alerts/utils.py",
-      "name": "bad-return",
-      "concise_description": "Returned type `tuple[str, str | None, tuple[dict[Unknown, Unknown], dict[str, Any], dict[str, Any]] | tuple[dict[Unknown, Unknown], None, None] | None]` is not assignable to declared return type `tuple[str, str | None, tuple[dict[str, Any], dict[str, Any], dict[str, Any]] | None]`",
-      "severity": "error"
-    },
-    {
       "column": 9,
       "path": "cl/alerts/utils.py",
       "name": "missing-attribute",
