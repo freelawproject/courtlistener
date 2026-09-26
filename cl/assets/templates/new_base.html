@@ -72,6 +72,9 @@
 </head>
 
 <body class="{% block body-classes %}{% endblock %}">
+  {% corpus_search_scopes as corpus_search_scopes_data %}
+  {{ corpus_search_scopes_data|json_script:"corpus-search-scopes" }}
+
   {% block header %}
     <c-header :request="request" :search_form="search_form" :csrf_token="csrf_token" only></c-header>
   {% endblock %}
