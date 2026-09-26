@@ -6532,24 +6532,10 @@
       "severity": "error"
     },
     {
-      "column": 10,
-      "path": "cl/sitemaps_infinite/base_sitemap.py",
-      "name": "not-a-type",
-      "concise_description": "Expected a type form, got instance of `GenericAlias`",
-      "severity": "error"
-    },
-    {
       "column": 13,
       "path": "cl/sitemaps_infinite/base_sitemap.py",
       "name": "bad-argument-type",
       "concise_description": "Argument `Literal[True] | str | None` is not assignable to parameter `cursor` with type `str` in function `InfinitePaginatorSitemap._urls`",
-      "severity": "error"
-    },
-    {
-      "column": 16,
-      "path": "cl/sitemaps_infinite/base_sitemap.py",
-      "name": "not-a-type",
-      "concise_description": "Expected a type form, got instance of `GenericAlias`",
       "severity": "error"
     },
     {
@@ -6605,7 +6591,7 @@
       "column": 16,
       "path": "cl/sitemaps_infinite/base_sitemap.py",
       "name": "bad-return",
-      "concise_description": "Returned type `tuple[CacheableList, str | None, bool | Unknown]` is not assignable to declared return type `tuple[Unknown, str, bool]`",
+      "concise_description": "Returned type `tuple[CacheableList[dict[str, Any]], str | None, bool | Unknown]` is not assignable to declared return type `tuple[CacheableList[dict[str, Any]], str, bool]`",
       "severity": "error"
     },
     {
