@@ -2843,13 +2843,6 @@
       "severity": "error"
     },
     {
-      "column": 41,
-      "path": "cl/people_db/lookup_utils.py",
-      "name": "invalid-annotation",
-      "concise_description": "List literal cannot be used in annotations",
-      "severity": "error"
-    },
-    {
       "column": 20,
       "path": "cl/people_db/management/commands/cl_export_recap_judge_info.py",
       "name": "missing-module-attribute",
