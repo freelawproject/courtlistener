@@ -65,10 +65,10 @@
       "severity": "error"
     },
     {
-      "column": 16,
+      "column": 24,
       "path": "cl/ai/llm_providers/google.py",
-      "name": "bad-return",
-      "concise_description": "Returned type `list[dict[str, str | Any | None]]` is not assignable to declared return type `list[ProcessedResult]`",
+      "name": "bad-assignment",
+      "concise_description": "`Unknown | None` is not assignable to TypedDict key `key` with type `str`",
       "severity": "error"
     },
     {

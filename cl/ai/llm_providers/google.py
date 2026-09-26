@@ -393,27 +393,25 @@ class GoogleGenAIBatchWrapper:
         if not jsonl_content or not jsonl_content.strip():
             return []
 
-        processed_results = []
         results = [
             json.loads(line)
             for line in jsonl_content.splitlines()
             if line.strip()
         ]
 
-        for result in results:
+        def process_result(result: dict) -> ProcessedResult:
             key = result.get("key")
             text = _ResponseValidator.get_text(result)
 
             status = "SUCCEEDED" if text else "FAILED"
-            processed_results.append(
-                {
-                    "key": key,
-                    "status": status,
-                    "content": text,
-                    "error_message": None
-                    if status == "SUCCEEDED"
-                    else _ResponseValidator.get_error(result),
-                    "raw_result": result,
-                }
-            )
-        return processed_results
+            return {
+                "key": key,
+                "status": status,
+                "content": text,
+                "error_message": None
+                if status == "SUCCEEDED"
+                else _ResponseValidator.get_error(result),
+                "raw_result": result,
+            }
+
+        return [process_result(result) for result in results]
