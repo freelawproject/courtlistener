@@ -2,7 +2,7 @@ import logging
 import re
 from datetime import datetime
 from pathlib import Path
-from typing import TYPE_CHECKING, Literal, TypeVar
+from typing import TYPE_CHECKING, Literal, Self, TypeVar
 from urllib.parse import quote
 
 import nh3
@@ -4150,7 +4150,7 @@ class CaseTransfer(AbstractDateTimeModel):
             }
         )
         total = qs.count()
-        updated_transfers: list[CaseTransfer] = []
+        updated_transfers: list[Self] = []
         total_updated = 0
 
         for transfer in qs.iterator():
