@@ -1,6 +1,7 @@
 import datetime
 import re
 from collections import OrderedDict
+from typing import Any
 
 from django import forms
 from django.conf import settings
@@ -1008,7 +1009,7 @@ class CorpusSearchForm(forms.Form):
 
 
 def clean_up_date_formats(
-    cd: dict[str, any], date_field: str, get_params: dict[str, any]
+    cd: dict[str, Any], date_field: str, get_params: dict[str, Any]
 ) -> None:
     """Clean up date formats in a given params dictionary.
 
