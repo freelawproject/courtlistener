@@ -2,7 +2,7 @@ import logging
 import pickle
 import re
 from collections.abc import Callable
-from typing import Any, TypedDict
+from typing import Any, TypedDict, cast
 from urllib.parse import parse_qs, urlencode
 
 from asgiref.sync import async_to_sync
@@ -16,6 +16,7 @@ from django.http.request import QueryDict
 from django_elasticsearch_dsl.search import Search
 from elasticsearch.dsl import A
 from elasticsearch.dsl.response import Response
+from elasticsearch.dsl.response.hit import Hit
 from eyecite.models import FullCaseCitation
 from eyecite.tokenizers import HyperscanTokenizer
 from waffle import flag_is_active
@@ -224,7 +225,7 @@ def merge_form_with_courts(
 
 async def add_depth_counts(
     search_data: dict[str, Any],
-    search_results: Page,
+    search_results: Page | list,
 ) -> OpinionCluster | None:
     """If the search data contains a single "cites" term (e.g., "cites:(123)"),
     calculate and append the citation depth information between each ES
@@ -249,7 +250,13 @@ async def add_depth_counts(
         except OpinionCluster.DoesNotExist:
             return None
         else:
-            for result in search_results.object_list:
+            # On ES errors the results are an (empty) list, not a Page.
+            results = (
+                search_results.object_list
+                if isinstance(search_results, Page)
+                else search_results
+            )
+            for result in results:
                 result[
                     "citation_depth"
                 ] = await get_citation_depth_between_clusters(
@@ -541,13 +548,15 @@ def fetch_and_paginate_results(
             if use_es_items
             else results_dict["hits"]  # type: ignore[typeddict-item]
         )
+        # The search view only caches the integer estimate under these keys;
+        # the Response variant is written by the API micro-cache.
         main_total = (
-            results_dict["cardinality_count_response"]
+            cast(int | None, results_dict["cardinality_count_response"])
             if use_es_items
             else results_dict["main_total"]  # type: ignore[typeddict-item]
         )
         child_total = (
-            results_dict["child_cardinality_count_response"]
+            cast(int | None, results_dict["child_cardinality_count_response"])
             if use_es_items
             else results_dict["child_total"]  # type: ignore[typeddict-item]
         )
@@ -633,6 +642,26 @@ def remove_missing_citations(
     return missing_citations_str, suggested_query
 
 
+class ESSearchResult(TypedDict):
+    results: Page | list
+    results_details: list[int | None]
+    search_form: Any
+    search_summary_str: str
+    search_summary_dict: dict
+    error: bool
+    courts: dict[str, list]
+    court_count_human: str
+    court_count: str
+    query_citation: Hit | None
+    cited_cluster: Any
+    related_cluster: Any
+    facet_fields: list
+    error_message: str
+    suggested_query: str
+    estimated_count_threshold: int
+    missing_citations: list[str]
+
+
 def do_es_search(
     get_params: QueryDict,
     rows: int = settings.SEARCH_PAGE_SIZE,
@@ -641,7 +670,7 @@ def do_es_search(
     is_csv_export: bool = False,
     courts: QuerySet[Court] | None = None,
     is_semantic_frontend_active: bool = False,
-):
+) -> ESSearchResult:
     """Run Elasticsearch searching and filtering and prepare data to display
 
     :param get_params: The request.GET params sent by user.
@@ -658,8 +687,8 @@ def do_es_search(
     other location.
     """
     if courts is None:
-        courts = Court.objects.filter(in_use=True)
-    paged_results = None
+        courts = cast(QuerySet[Court], Court.objects.filter(in_use=True))
+    paged_results: Page | list = []
     query_time: int | None = 0
     total_query_results: int | None = 0
     top_hits_limit: int | None = 5
@@ -698,10 +727,9 @@ def do_es_search(
     if search_form.is_valid() and document_type:
         # Copy cleaned_data to preserve the original data when displaying the form
         cd = search_form.cleaned_data.copy()
+        # Create necessary filters to execute ES query
+        search_query = document_type.search()
         try:
-            # Create necessary filters to execute ES query
-            search_query = document_type.search()
-
             if cd["type"] in [
                 SEARCH_TYPES.OPINION,
                 SEARCH_TYPES.RECAP,
@@ -918,6 +946,11 @@ def fetch_es_results_for_csv(
         return csv_rows, True
 
     results = search["results"]
+    if isinstance(results, list):
+        return (
+            [],
+            True,
+        )  # results is only ever a list if error is True so this is unreachable in practice, but the type checker doesn't know that
     max_results = settings.MAX_SEARCH_RESULTS_EXPORTED
     match search_type:
         case SEARCH_TYPES.OPINION | SEARCH_TYPES.RECAP | SEARCH_TYPES.DOCKETS:

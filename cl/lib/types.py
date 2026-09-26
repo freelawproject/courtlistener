@@ -6,7 +6,7 @@ from typing import Any, NotRequired, TypedDict
 
 from django.http import HttpRequest
 from django_elasticsearch_dsl.search import Search
-from elasticsearch.dsl.query import QueryString
+from elasticsearch.dsl.query import Query
 
 from cl.users.models import User
 
@@ -197,15 +197,15 @@ class BasePositionMapping:
 class EsMainQueries:
     search_query: Search
     boost_mode: str
-    parent_query: QueryString | None = None
-    child_query: QueryString | None = None
+    parent_query: Query | None = None
+    child_query: Query | None = None
 
 
 @dataclass
 class EsJoinQueries:
-    main_query: QueryString | list
-    parent_query: QueryString | None
-    child_query: QueryString | None
+    main_query: Query | list
+    parent_query: Query | None
+    child_query: Query | None
     has_text_query: bool
 
 

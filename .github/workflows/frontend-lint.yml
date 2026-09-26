@@ -43,6 +43,9 @@ jobs:
 
       - name: Minimize previous bot comments
         if: always()
+        # Fork PRs get a read-only GITHUB_TOKEN, so this step 403s there. Tolerate
+        # that without hiding real failures on same-repo PRs. See #7847.
+        continue-on-error: ${{ github.event.pull_request.head.repo.full_name != github.repository }}
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
@@ -64,6 +67,9 @@ jobs:
 
       - name: Post PR comment
         if: always() && hashFiles('summary.md') != ''
+        # Fork PRs get a read-only GITHUB_TOKEN, so this step 403s there. Tolerate
+        # that without hiding real failures on same-repo PRs. See #7847.
+        continue-on-error: ${{ github.event.pull_request.head.repo.full_name != github.repository }}
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |

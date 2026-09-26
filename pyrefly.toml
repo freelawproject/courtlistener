@@ -21,6 +21,10 @@ project-includes = [
     "cl/api/utils.py",
     "cl/api/views.py",
     "cl/api/webhooks.py",
+    "cl/oauth/cleanup_utils.py",
+    "cl/oauth/factories.py",
+    "cl/oauth/management/commands/clean_oauth_tables.py",
+    "cl/oauth/migrations/0001_backfill_registration_source.py",
     "cl/recap/management/commands/remove_appellate_entries_with_long_numbers.py",
     "cl/recap/utils.py",
     "cl/scrapers/management/commands/back_scrape_dockets.py",
@@ -31,6 +35,7 @@ project-includes = [
     "cl/search/docket_number_cleaner.py",
     "cl/search/management/commands/cl_index_parent_and_child_docs.py",
     "cl/search/management/commands/clean_docket_number_raw.py",
+    "cl/search/management/commands/clean_sealed_document_citations.py",
     "cl/search/management/commands/generate_opinion_embeddings.py",
     "cl/search/management/commands/llm_clean_docket_number_daemon.py",
     "cl/search/management/commands/pacer_bulk_fetch.py",
@@ -46,83 +51,47 @@ project-includes = [
 ]
 project-excludes = ["**/migrations/**"]
 # Leniency for the mostly-untyped codebase: don't check bodies of unannotated
-# functions, treat their return types as Any, honor `# type: ignore` comments,
-# and treat unresolvable imports as Any.
+# functions and honor `# type: ignore` comments.
 check-unannotated-defs = false
-infer-return-types = "never"
 permissive-ignores = true
-ignore-missing-imports = ["*"]
 # Modules whose types are not yet visible to the checker (imports from them
 # resolve to Any). Remove first-party modules from this list as they become
 # type-ready. The third-party packages listed ship their types as source
 # (py.typed) rather than stubs; the codebase has never been checked against
 # them, so their types stay hidden until someone fixes the fallout.
 replace-imports-with-any = [
-    "cl.ai", "cl.ai.*",
     "cl.api", "cl.api.*",
-    "cl.custom_filters", "cl.custom_filters.*",
     "cl.disclosures", "cl.disclosures.*",
-    "cl.donate", "cl.donate.*",
     "cl.favorites", "cl.favorites.*",
-    "cl.lasc", "cl.lasc.*",
-    "cl.oauth", "cl.oauth.*",
     "cl.people_db", "cl.people_db.*",
     "cl.recap", "cl.recap.*",
     "cl.scrapers", "cl.scrapers.*",
     "cl.search", "cl.search.*",
-    "cl.sitemaps_infinite", "cl.sitemaps_infinite.*",
-    "cl.stats", "cl.stats.*",
     "cl.tests", "cl.tests.*",
     "cl.users", "cl.users.*",
     "cl.visualizations", "cl.visualizations.*",
-    "cl.asgi",
-    "cl.celery_init",
-    "cl.sitemap",
-    "cl.urls",
-    "cl.workers",
     "eyecite", "eyecite.*",
-    "elasticsearch", "elasticsearch.*",
-    "bs4", "bs4.*",
 ]
 # Pre-existing errors are grandfathered here; only new errors fail the check.
 baseline = ".pyrefly-baseline.json"
-
-# Checks the codebase was never previously held to.
-[errors]
-unbound-name = false
-bad-override-param-name = false
-bad-override-mutable-attribute = false
 
 # Modules to hold to a stricter standard. Ideally the whole codebase will be held to these standards eventually.
 [[sub-config]]
 matches = "cl/audio/**"
 check-unannotated-defs = true
-infer-return-types = "checked"
-ignore-missing-imports = []
 
-[sub-config.errors]
-unbound-name = true
-bad-override-param-name = false
-bad-override-mutable-attribute = false
+[[sub-config]]
+matches = "cl/corpus_importer/**"
+check-unannotated-defs = false
+
+[[sub-config]]
+matches = "cl/opinion_page/**"
+check-unannotated-defs = true
 
 [[sub-config]]
 matches = "cl/recap_rss/**"
 check-unannotated-defs = true
-infer-return-types = "checked"
-ignore-missing-imports = []
-
-[sub-config.errors]
-unbound-name = true
-bad-override-param-name = true
-bad-override-mutable-attribute = true
 
 [[sub-config]]
 matches = "cl/simple_pages/**"
 check-unannotated-defs = true
-infer-return-types = "checked"
-ignore-missing-imports = []
-
-[sub-config.errors]
-unbound-name = true
-bad-override-param-name = true
-bad-override-mutable-attribute = true

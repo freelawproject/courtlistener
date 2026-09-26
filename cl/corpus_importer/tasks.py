@@ -14,7 +14,7 @@ from io import BytesIO
 from pyexpat import ExpatError
 from re import Pattern
 from tempfile import NamedTemporaryFile
-from typing import IO, Any, TypeIs
+from typing import IO, Any, TypeIs, cast
 from urllib.parse import urljoin
 
 import botocore.exceptions
@@ -41,6 +41,7 @@ from httpx import (
     RemoteProtocolError,
     TimeoutException,
 )
+from httpx import Response as HttpxResponse
 from juriscraper.lib.exceptions import PacerLoginException, ParsingException
 from juriscraper.lib.string_utils import CaseNameTweaker, harmonize
 from juriscraper.pacer import (
@@ -118,6 +119,9 @@ from cl.corpus_importer.llm_models import CaseNameExtractionResponse
 from cl.corpus_importer.management.utils import TexasDocketMeta
 from cl.corpus_importer.prompts.system import CASE_NAME_EXTRACT_SYSTEM
 from cl.corpus_importer.state.florida.mergers import FloridaDocketMerger
+from cl.corpus_importer.state.ledger import LoadLedger
+from cl.corpus_importer.state.loader import LoadPhase, fingerprint
+from cl.corpus_importer.state.registry import get_loader
 from cl.corpus_importer.state.utils import MergeResult
 from cl.corpus_importer.utils import (
     DownloadPDFResult,
@@ -190,6 +194,7 @@ from cl.recap.mergers import (
     update_docket_metadata,
 )
 from cl.recap.models import (
+    PROCESSING_QUEUE_SOURCE,
     UPLOAD_TYPE,
     FjcIntegratedDatabase,
     PacerHtmlFiles,
@@ -224,6 +229,7 @@ from cl.search.state.texas.models import (
     TexasDocketEntry,
     TexasDocument,
 )
+from cl.settings import COURT_REQUEST_USER_AGENT
 
 HYPERSCAN_TOKENIZER = HyperscanTokenizer(cache_dir=".hyperscan")
 
@@ -656,7 +662,7 @@ def process_free_opinion_result(
                     is_free_on_pacer=True,
                 )
                 rd_created = True
-            elif rd_count > 0:
+            else:
                 # Could be one item (great!) or more than one (not great).
                 # Choose the earliest item and upgrade it.
                 rd = rds.earliest("date_created")
@@ -957,21 +963,24 @@ def upload_to_ia(
     )
     try:
         item = ia_session.get_item(identifier)
-        responses = item.upload(
-            files=files,
-            metadata={
-                "title": title,
-                "collection": collection,
-                "contributor": '<a href="https://free.law">Free Law Project</a>',
-                "court": court_id,
-                "source_url": source_url,
-                "language": "eng",
-                "mediatype": media_type,
-                "description": description,
-                "licenseurl": "https://www.usa.gov/government-works",
-            },
-            queue_derive=False,
-            verify=True,
+        responses = cast(
+            list[Response],
+            item.upload(
+                files=files,
+                metadata={
+                    "title": title,
+                    "collection": collection,
+                    "contributor": '<a href="https://free.law">Free Law Project</a>',
+                    "court": court_id,
+                    "source_url": source_url,
+                    "language": "eng",
+                    "mediatype": media_type,
+                    "description": description,
+                    "licenseurl": "https://www.usa.gov/government-works",
+                },
+                queue_derive=False,
+                verify=True,
+            ),
         )
     except ExpatError as exc:
         # ExpatError: The syntax of the XML file that's supposed to be returned
@@ -1977,7 +1986,7 @@ def get_appellate_docket_by_docket_number(
 def get_att_report_by_rd(
     rd: RECAPDocument,
     session_data: SessionData,
-) -> AttachmentPage | None:
+) -> ACMSAttachmentPage | AppellateAttachmentPage | AttachmentPage | None:
     """Method to get the attachment report for the item in PACER.
 
     :param rd: The RECAPDocument object to use as a source.
@@ -2022,7 +2031,7 @@ def get_attachment_page_by_rd(
     self: Task,
     rd_pk: int,
     session_data: SessionData,
-) -> AttachmentPage | None:
+) -> ACMSAttachmentPage | AppellateAttachmentPage | AttachmentPage | None:
     """Get the attachment page for the item in PACER.
 
     :param self: The celery task
@@ -2147,6 +2156,7 @@ def get_bankr_claims_registry(
 def create_attachment_pq(
     rd_pk: int,
     user_pk: int,
+    source: int = PROCESSING_QUEUE_SOURCE.UNKNOWN,
 ) -> ProcessingQueue:
     """Create a ProcessingQueue instance for an attachment.
 
@@ -2155,6 +2165,9 @@ def create_attachment_pq(
 
     :param rd_pk: The pk of the RECAPDocument.
     :param user_pk: The pk of the User uploading the attachment.
+    :param source: The PROCESSING_QUEUE_SOURCE value to tag this PQ with.
+    Defaults to UNKNOWN since this helper is also used by internal
+    management-command scripts that don't have a more specific source.
     :return: A ProcessingQueue instance for the attachment upload.
     """
 
@@ -2166,6 +2179,7 @@ def create_attachment_pq(
         uploader=user,
         upload_type=UPLOAD_TYPE.ATTACHMENT_PAGE,
         pacer_case_id=rd.docket_entry.docket.pacer_case_id,
+        source=source,
     )
     return pq
 
@@ -2222,6 +2236,7 @@ def save_attachment_pq_from_text(
     pq = create_attachment_pq(
         rd_pk,
         user_pk,
+        source=PROCESSING_QUEUE_SOURCE.EMAIL,
     )
     pq.filepath_local.save(
         "attachment_page.html", ContentFile(att_report_text.encode())
@@ -2708,26 +2723,28 @@ def get_pacer_doc_by_rd_and_description(
     rd = RECAPDocument.objects.get(pk=rd_pk)
     att_report = get_attachment_page_by_rd(self, rd_pk, session_data)
 
-    att_found = None
-    for attachment in att_report.data.get("attachments", []):
-        if description_re.search(attachment["description"]):
-            att_found = attachment.copy()
-            document_type = RECAPDocument.ATTACHMENT
-            break
-
-    if not att_found:
-        if fallback_to_main_doc:
-            logger.info(
-                "Falling back to main document for pacer_doc_id: %s",
-                rd.pacer_doc_id,
-            )
-            att_found = att_report.data
-            document_type = RECAPDocument.PACER_DOCUMENT
-        else:
-            msg = f"Aborting. Did not find civil cover sheet for {rd}."
-            logger.error(msg)
-            self.request.chain = None
-            return None
+    att_found = next(
+        (
+            attachment.copy()
+            for attachment in att_report.data.get("attachments", [])
+            if description_re.search(attachment["description"])
+        ),
+        None,
+    )
+    if att_found:
+        document_type = RECAPDocument.ATTACHMENT
+    elif fallback_to_main_doc:
+        logger.info(
+            "Falling back to main document for pacer_doc_id: %s",
+            rd.pacer_doc_id,
+        )
+        att_found = att_report.data
+        document_type = RECAPDocument.PACER_DOCUMENT
+    else:
+        msg = f"Aborting. Did not find civil cover sheet for {rd}."
+        logger.error(msg)
+        self.request.chain = None
+        return None
     if not att_found.get("pacer_doc_id"):
         logger.warning("No pacer_doc_id for document (is it sealed?)")
         self.request.chain = None
@@ -3074,7 +3091,7 @@ def query_and_save_list_of_creditors(
     backoff=2,
     logger=logger,
 )
-def extract_recap_document_for_opinions(rd: RECAPDocument) -> Response:
+def extract_recap_document_for_opinions(rd: RECAPDocument) -> HttpxResponse:
     """Call recap-extract from doctor with retries
 
     :param rd: the recap document to extract
@@ -3363,8 +3380,8 @@ def download_document_in_stream(
     @retry(
         (ConnectionError, Timeout),
         tries=3,
-        delay=0.25,
-        backoff=1,
+        delay=1,
+        backoff=2,
     )
     def download_to_file(tmp_file):
         tmp_file.seek(0)
@@ -3375,7 +3392,7 @@ def download_document_in_stream(
             url,
             stream=True,
             timeout=60,
-            headers={"User-Agent": "Free Law Project"},
+            headers={"User-Agent": COURT_REQUEST_USER_AGENT},
         ) as response:
             response.raise_for_status()
             if require_pdf and not is_pdf(response):
@@ -3877,7 +3894,11 @@ def download_scotus_document_pdf(self: Task, doc_pk: int) -> int | None:
         to update the attachment for.
     """
     try:
-        doc = SCOTUSDocument.objects.get(pk=doc_pk)
+        # The document's storage path is built from its docket, so fetch that
+        # with it rather than going back for it a query at a time.
+        doc = SCOTUSDocument.objects.select_related(
+            "docket_entry__docket"
+        ).get(pk=doc_pk)
     except SCOTUSDocument.DoesNotExist:
         logger.warning(
             "SCOTUS document PDF download: SCOTUSDocument %s does not exist; skipping.",
@@ -5200,3 +5221,130 @@ def download_state_document(
         pk, extract=not skip_extraction, queue=extraction_queue
     )
     return instance.pk if instance else None
+
+
+STATE_SCRAPE_MERGE_RETRIES = 3
+
+STATE_SCRAPE_MERGE_BACKOFF = 10
+
+
+@app.task(
+    bind=True, max_retries=STATE_SCRAPE_MERGE_RETRIES, ignore_result=True
+)
+def merge_state_scrape_row(
+    self: Task,
+    loader: str,
+    row: int,
+    payload: str,
+    run_key: str,
+    extract: bool,
+    extraction_queue: str,
+) -> None:
+    """Merge one docket of a jkent scrape run, and extract what it wrote.
+
+    Every path out of this task writes the row's outcome to the run's ledger,
+    including the one where the retries run out -- otherwise a docket the
+    database refused five times would be indistinguishable from one that
+    merged, and a load's verification pass exists precisely to tell those
+    apart. A merge that ran and would not have the scrape is recorded as
+    rejected; one that never reached a verdict is recorded as errored, since
+    only the latter is worth re-running the load over.
+
+    :param loader: The name the docket's loader is registered under in
+        `cl.corpus_importer.state.registry`.
+    :param row: The docket's row number in the run database's query, which is
+        what the ledger and the load's report name it by.
+    :param payload: The scrape, as the loader's `scrape_model` serialized it.
+    :param run_key: The Redis key the run's ledger hangs off.
+    :param extract: Whether to dispatch text extraction for the documents the
+        merge writes.
+    :param extraction_queue: The celery queue to extract on.
+    """
+    ledger = LoadLedger(run_key)
+    try:
+        loader_class = get_loader(loader)
+    except KeyError:
+        logger.error(
+            "Cannot merge row %s: no state scrape loader named %r.",
+            row,
+            loader,
+            extra=fingerprint(loader, LoadPhase.MERGE),
+        )
+        ledger.errored(row)
+        return
+
+    try:
+        label, result = loader_class.merge_payload(payload)
+    except ValidationError as error:
+        logger.error(
+            "Row %s of the %s run no longer validates for %s: %s",
+            row,
+            loader,
+            loader_class.__name__,
+            error,
+            extra=fingerprint(loader, LoadPhase.MERGE),
+        )
+        ledger.errored(row)
+        return
+    except (DatabaseError, ValueError) as error:
+        if self.request.retries < self.max_retries:
+            logger.warning(
+                "Merge of row %s of the %s run failed (attempt %s): %s",
+                row,
+                loader,
+                self.request.retries + 1,
+                error,
+            )
+            raise self.retry(
+                exc=error,
+                countdown=STATE_SCRAPE_MERGE_BACKOFF * 2**self.request.retries,
+            )
+        logger.exception(
+            "Merge of row %s of the %s run failed %s times; giving up: %s",
+            row,
+            loader,
+            self.max_retries + 1,
+            error,
+            extra=fingerprint(loader, LoadPhase.MERGE),
+        )
+        ledger.errored(row)
+        return
+    except Exception as error:
+        logger.exception(
+            "Merge of row %s of the %s run raised %s: %s",
+            row,
+            loader,
+            type(error).__name__,
+            error,
+            extra=fingerprint(loader, LoadPhase.MERGE),
+        )
+        ledger.errored(row)
+        return
+
+    if result.success:
+        logger.info("Merged row %s of the %s run (%s)", row, loader, label)
+        ledger.merged(row, result)
+    else:
+        logger.error(
+            "Merge of row %s of the %s run (%s) reported failures: %s",
+            row,
+            loader,
+            label,
+            result.failures,
+            extra=fingerprint(loader, LoadPhase.MERGE),
+        )
+        ledger.rejected(row, result)
+
+    if not extract:
+        return
+    try:
+        dispatched = loader_class.dispatch_extraction(result, extraction_queue)
+    except Exception:
+        logger.exception(
+            "Could not dispatch extraction for row %s of the %s run",
+            row,
+            loader,
+            extra=fingerprint(loader, LoadPhase.EXTRACTION),
+        )
+        return
+    ledger.extracting(len(dispatched))
