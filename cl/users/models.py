@@ -147,6 +147,10 @@ class UserProfile(models.Model):
         help_text="If enabled, the user's pending document prayers will be viewable by the public",
         default=False,
     )
+    save_query_history = models.BooleanField(
+        help_text="If disabled, the user's search queries will not be saved.",
+        default=True,
+    )
 
     @property
     def is_member(self) -> bool:
