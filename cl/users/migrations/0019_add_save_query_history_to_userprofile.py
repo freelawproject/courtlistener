@@ -25,7 +25,7 @@ class Migration(migrations.Migration):
             name="save_query_history",
             field=models.BooleanField(
                 default=True,
-                help_text="If disabled, the user's search queries will not be saved.",
+                help_text="Should the user's search query history be saved?",
             ),
         ),
         migrations.AddField(
@@ -33,7 +33,7 @@ class Migration(migrations.Migration):
             name="save_query_history",
             field=models.BooleanField(
                 default=True,
-                help_text="If disabled, the user's search queries will not be saved.",
+                help_text="Should the user's search query history be saved?",
             ),
         ),
         pgtrigger.migrations.AddTrigger(

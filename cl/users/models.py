@@ -148,7 +148,7 @@ class UserProfile(models.Model):
         default=False,
     )
     save_query_history = models.BooleanField(
-        help_text="If disabled, the user's search queries will not be saved.",
+        help_text="Should the user's search query history be saved?",
         default=True,
     )
 

@@ -404,7 +404,7 @@ message_dict = {
 
 
 @tiered_cache(timeout=60 * 5)
-def get_save_query_history(user_pk: int) -> bool:
+def is_search_history_on_cached(user_pk: int) -> bool:
     """Return whether the user wants their search queries saved.
 
     Cached for five minutes, so changes may take that long to apply. Intended
