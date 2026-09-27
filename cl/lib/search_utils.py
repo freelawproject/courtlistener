@@ -73,6 +73,8 @@ from cl.search.models import (
 )
 from cl.stats.constants import StatMethod, StatMetric, StatQueryType
 from cl.stats.utils import tally_stat
+from cl.users.models import UserProfile
+from cl.users.utils import get_save_query_history
 
 HYPERSCAN_TOKENIZER = HyperscanTokenizer(cache_dir=".hyperscan")
 
@@ -281,6 +283,10 @@ def store_search_query(request: HttpRequest, search_results: dict) -> None:
 
     if is_bot(request):
         return
+    if request.user.is_authenticated and not UserProfile.objects.values_list(
+        "save_query_history", flat=True
+    ).get(user_id=request.user.pk):
+        return
     is_error = search_results.get("error")
     is_semantic = has_semantic_params(request.GET)
     search_query = SearchQuery(
@@ -336,6 +342,11 @@ def store_search_api_query(
 
     if not flag_is_active(request, "store-search-api-queries"):
         # Do not store search queries in the DB
+        return
+
+    if request.user.is_authenticated and not get_save_query_history(
+        request.user.pk
+    ):
         return
 
     SearchQuery.objects.create(
