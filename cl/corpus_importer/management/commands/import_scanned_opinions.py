@@ -46,6 +46,8 @@ HYPERSCAN_TOKENIZER = HyperscanTokenizer(cache_dir=".hyperscan")
 
 cnt = CaseNameTweaker()
 
+PER_CURIAM_RE = re.compile(r"per\s+curiam", re.IGNORECASE)
+
 # Words that should stay lowercase in case names when printed in caps.
 LOWERCASE_CASE_NAME_WORDS = {
     "a",
@@ -357,14 +359,16 @@ def make_opinion(op: Tag, cluster_id: int) -> Opinion:
     """
     opinion_xml = str(op)
     author_str = ""
+    per_curiam = False
     if author := op.select_one("author"):
         for page_number in author.select("page-number"):
             page_number.extract()
-        author_tag_str = titlecase(author.get_text(" ", strip=True).strip(":"))
+        author_text = author.get_text(" ", strip=True)
+        # Check the raw text: extract_judge_last_name drops "Per Curiam"
+        per_curiam = bool(PER_CURIAM_RE.search(author_text))
         author_str = titlecase(
-            "".join(extract_judge_last_name(author_tag_str))
+            "".join(extract_judge_last_name(titlecase(author_text.strip(":"))))
         )
-    per_curiam = "per curiam" in author_str.lower()
     op_type = op.get("type")
     return Opinion(
         cluster_id=cluster_id,

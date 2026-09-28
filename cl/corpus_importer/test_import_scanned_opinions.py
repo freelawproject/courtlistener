@@ -8,6 +8,7 @@ from django.core.management import call_command
 from cl.corpus_importer.management.commands.import_scanned_opinions import (
     get_citation_strings,
     get_date_filed,
+    make_opinion,
     normalize_case_name_caps,
 )
 from cl.search.cluster_sources import ClusterSources
@@ -79,6 +80,51 @@ class ScanXmlHelpersTest(SimpleTestCase):
                 self.assertEqual(
                     get_citation_strings(make_soup(xml)), expected
                 )
+
+    def test_make_opinion(self) -> None:
+        """Are the author, per curiam and type read from the opinion?"""
+        cases = [
+            (
+                "<opinion><author>Gerber, J.</author></opinion>",
+                "Gerber",
+                False,
+                Opinion.COMBINED,
+            ),
+            (
+                "<opinion><author>PER CURIAM.</author></opinion>",
+                "Per Curiam",
+                True,
+                Opinion.COMBINED,
+            ),
+            (
+                "<opinion><author>Per Curiam:</author></opinion>",
+                "Per Curiam",
+                True,
+                Opinion.COMBINED,
+            ),
+            (
+                '<opinion type="dissent"><author>WARNER, J.</author></opinion>',
+                "Warner",
+                False,
+                Opinion.DISSENT,
+            ),
+            (
+                "<opinion><p>No author.</p></opinion>",
+                "",
+                False,
+                Opinion.COMBINED,
+            ),
+        ]
+        for xml, author_str, per_curiam, op_type in cases:
+            with self.subTest(xml=xml):
+                op = make_soup(xml).select_one("opinion")
+                if op is None:
+                    self.fail(f"No opinion in {xml}")
+                opinion = make_opinion(op, cluster_id=1)
+                self.assertEqual(opinion.author_str, author_str)
+                self.assertEqual(opinion.per_curiam, per_curiam)
+                self.assertEqual(opinion.type, op_type)
+                self.assertEqual(opinion.xml_scan, xml)
 
 
 class ImportScannedOpinionsTest(TestCase):
