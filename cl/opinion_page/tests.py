@@ -34,6 +34,7 @@ from django.test import (
 from django.test.client import AsyncClient
 from django.test.utils import CaptureQueriesContext
 from django.urls import reverse
+from django.utils.html import escape
 from django_cotton.compiler_regex import CottonCompiler
 from factory import RelatedFactory
 from lxml.etree import _Attrib, _Element
@@ -1847,13 +1848,11 @@ class DocketSourceComponentTest(SimpleTestCase):
             "docket_source_button",
             "docket_source_attribution",
             "document_source_link",
-            "docket_empty_message",
         ),
         "includes": (
             "docket_source_button",
             "docket_source_attribution",
             "document_source_link",
-            "docket_empty_message",
             "docket_empty_cta",
             "docket_source_li",
             "document_download_button",
@@ -1878,6 +1877,21 @@ class DocketSourceComponentTest(SimpleTestCase):
                             f"{path}. A component needs a file in each of "
                             f"{', '.join(folders)} under {prefix}/."
                         )
+
+
+class DocketSourceEmptyMessageTest(SimpleTestCase):
+    """Every DocketEntrySource must write its empty-state sentence. The
+    field is required, but an empty string would still render a blank
+    paragraph."""
+
+    def test_every_source_has_an_empty_message(self) -> None:
+        sources = {
+            docket_entry_sources.RECAP,
+            *docket_entry_sources.BY_COURT_ID.values(),
+        }
+        for source in sources:
+            with self.subTest(component=source.component):
+                self.assertTrue(source.empty_message.strip())
 
 
 @override_settings(WAFFLE_CACHE_PREFIX="test_scotus_docket_disabled_waffle")
@@ -2151,12 +2165,11 @@ class ScotusDocketV2ContentRenderTest(TestCase):
 
         self.assertEqual(r.status_code, HTTPStatus.OK)
         self.assertTemplateUsed(r, "v2_docket.html")
-        self.assertIn("There are no entries for this docket yet.", content)
-        # The site chrome links to the RECAP Archive on every page, so the
-        # negative check targets RECAP's empty-state sentence specifically.
+        self.assertIn(
+            escape(docket_entry_sources.SCOTUS.empty_message), content
+        )
         self.assertNotIn(
-            "There are no entries for this docket in the RECAP Archive",
-            content,
+            escape(docket_entry_sources.RECAP.empty_message), content
         )
 
 
@@ -4209,8 +4222,7 @@ class DocketEntryRowsV2Test(TestCase):
         the source has no entries yet, and the filter bar stays visible."""
         content = await self._get_empty_docket_page()
         self.assertIn(
-            "There are no entries for this docket in the RECAP Archive",
-            content,
+            escape(docket_entry_sources.RECAP.empty_message), content
         )
         self.assertNotIn("No docket entries match your filters", content)
         self.assertIn("Search this docket", content)
@@ -4223,7 +4235,10 @@ class DocketEntryRowsV2Test(TestCase):
             with self.subTest(query=query):
                 content = await self._get_empty_docket_page(query)
                 self.assertIn("No docket entries match your filters", content)
-                self.assertNotIn("RECAP Archive. Please download", content)
+                self.assertNotIn(
+                    escape(docket_entry_sources.RECAP.empty_message),
+                    content,
+                )
                 self.assertIn("Search this docket", content)
 
     async def test_sort_and_page_params_are_not_filters(self) -> None:
@@ -4231,8 +4246,7 @@ class DocketEntryRowsV2Test(TestCase):
         still gets the "no entries yet" copy."""
         content = await self._get_empty_docket_page("?order_by=desc&page=1")
         self.assertIn(
-            "There are no entries for this docket in the RECAP Archive",
-            content,
+            escape(docket_entry_sources.RECAP.empty_message), content
         )
 
     async def test_filters_that_exclude_every_entry_use_filter_copy(
@@ -4250,7 +4264,9 @@ class DocketEntryRowsV2Test(TestCase):
         self.assertTemplateUsed(r, "v2_docket.html")
         content = r.content.decode()
         self.assertIn("No docket entries match your filters", content)
-        self.assertNotIn("RECAP Archive. Please download", content)
+        self.assertNotIn(
+            escape(docket_entry_sources.RECAP.empty_message), content
+        )
 
     async def test_csv_export_for_authenticated_user(self) -> None:
         """CSV export button should render for authenticated users."""

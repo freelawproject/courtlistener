@@ -156,7 +156,7 @@
     {% if filters_applied %}
       <p>No docket entries match your filters.</p>
     {% else %}
-      <p><c-docket-empty-message :docket_source="docket_source" /></p>
+      <p>{{ docket_source.empty_message }}</p>
     {% endif %}
   </div>
 {% endif %}
