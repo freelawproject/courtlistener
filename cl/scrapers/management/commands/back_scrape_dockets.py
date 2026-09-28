@@ -571,9 +571,7 @@ class Command(StateBackScrapeCommand):
             case_count = 0
             current_batch: list[dict] = []
 
-            for case in scraper.backfill(
-                courts, (start_date, end_date)
-            ):  # pyrefly:ignore[bad-argument-type] The Juriscraper type hint is incorrect
+            for case in scraper.backfill(courts, (start_date, end_date)):
                 if not case.get("case_url"):
                     logger.warning("Case without case_url: %s", case)
                     continue

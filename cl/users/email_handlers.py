@@ -10,7 +10,6 @@ from email.contentmanager import (
 from email.policy import SMTPUTF8
 from email.utils import parseaddr
 from typing import cast
-from uuid import UUID
 
 from django.conf import settings
 from django.contrib.auth.models import User
@@ -135,11 +134,19 @@ def handle_soft_bounce(
             )
             email_banned = False
             if not created:
+                retry_counter = backoff_event.retry_counter
+                next_retry_date = backoff_event.next_retry_date
                 # If a previous backoff event exists. Backoff flags are always
                 # created with both retry fields set; only BAN flags leave
                 # them null.
-                retry_counter = cast(int, backoff_event.retry_counter)
-                next_retry_date = cast(datetime, backoff_event.next_retry_date)
+                if retry_counter is None:
+                    raise ValueError(
+                        "Backoff event found but retry_counter was None"
+                    )
+                if next_retry_date is None:
+                    raise ValueError(
+                        "Backoff event found but next_retry_date was None"
+                    )
 
                 backoff_threshold = next_retry_date + timedelta(
                     hours=settings.BACKOFF_THRESHOLD  # type: ignore
@@ -314,7 +321,7 @@ def set_surrogateescape_clean_text_content(
     )
 
 
-def store_message(message: EmailMessage | EmailMultiAlternatives) -> UUID:
+def store_message(message: EmailMessage | EmailMultiAlternatives) -> str:
     """Stores an email message and returns its message_id
 
     :param message: The multipart message to store
@@ -355,7 +362,7 @@ def store_message(message: EmailMessage | EmailMultiAlternatives) -> UUID:
         html_message=html_body,
         headers=headers,
     )
-    return email_stored.message_id
+    return str(email_stored.message_id)
 
 
 def under_backoff_waiting_period(email_address: str) -> bool:
@@ -433,6 +440,9 @@ def get_next_retry_date(recipient: str) -> datetime:
         return now()
 
     if backoff_event.under_waiting_period:
+        # If a previous backoff event exists. Backoff flags are always
+        # created with both retry fields set; only BAN flags leave
+        # them null.
         # Return backoff event next_retry_date and add an extra minute
         return cast(datetime, backoff_event.next_retry_date) + timedelta(
             minutes=1
@@ -443,7 +453,7 @@ def get_next_retry_date(recipient: str) -> datetime:
     return now()
 
 
-def is_message_stored(message_id: str | UUID) -> tuple[bool, int | None]:
+def is_message_stored(message_id: str) -> tuple[bool, int | None]:
     """Returns True if the message is stored in database.
 
     :param message_id: The message unique identifier.
@@ -478,7 +488,7 @@ def schedule_failed_email(recipient_email: str) -> None:
         fail_message.save()
 
 
-def enqueue_email(recipients: list[str], message_id: str | UUID) -> None:
+def enqueue_email(recipients: list[str], message_id: str) -> None:
     """Enqueue a message for a list of recipients, due to a soft bounce or if
     the recipient is under a backoff event waiting period.
 
