@@ -71,9 +71,14 @@ LOWERCASE_CASE_NAME_WORDS = {
     "in",
     "of",
     "on",
+    "re",
     "the",
     "to",
 }
+# Acronyms with vowels that should stay in caps. Words without vowels, like
+# "LLC", are always taken as acronyms.
+CASE_NAME_ACRONYMS = {"USA", "IV", "NA", "PA", "UAW", "AFL", "CIO"}
+
 
 # Cluster fields that come from the head matter of the XML. When merging
 # into an existing cluster, only empty values are filled from the scan.
@@ -176,6 +181,19 @@ def get_docket_number(soup: BeautifulSoup) -> str:
     return "; ".join(n for n in numbers if n)
 
 
+def _capitalize_caps_word(word: str) -> str:
+    """Capitalize a word printed in caps, keeping its punctuation.
+
+    e.g. "O'BRIEN" -> "O'Brien", "SMITH-JONES," -> "Smith-Jones,",
+    "STATE'S" -> "State's"
+
+    :param word: A word in capital letters.
+    :return: The capitalized word.
+    """
+    word = re.sub(r"[A-Za-z]+", lambda m: m.group().capitalize(), word)
+    return re.sub(r"'S\b", "'s", word)
+
+
 def normalize_case_name_caps(case_name: str) -> str:
     """Titlecase the words a reporter printed in capital letters.
 
@@ -183,8 +201,9 @@ def normalize_case_name_caps(case_name: str) -> str:
     "Larry B. MERRITT v. STATE of Florida". `titlecase` treats all-caps words
     as acronyms and keeps them, so they are fixed here first.
 
-    Caveat: words of three letters or less are kept as they are because
-    they are usually acronyms (LLC, USA); longer acronyms are titlecased.
+    Caveat: an all-caps word is kept as an acronym only when it has no
+    vowels (LLC) or is in CASE_NAME_ACRONYMS, so other acronyms like "ABC"
+    become "Abc".
 
     :param case_name: The case name.
     :return: The case name with normalized capitalization.
@@ -192,10 +211,19 @@ def normalize_case_name_caps(case_name: str) -> str:
     words = []
     for word in case_name.split():
         letters = re.sub(r"[^A-Za-z]", "", word)
-        if letters.isupper() and letters.lower() in LOWERCASE_CASE_NAME_WORDS:
-            word = word.lower()
-        elif letters.isupper() and len(letters) > 3:
-            word = word.capitalize()
+        if mc_name := re.fullmatch(r"(Mc|Mac)([A-Z]{2,})", letters):
+            # e.g. McDONALD
+            word = word.replace(
+                mc_name.group(2), mc_name.group(2).capitalize(), 1
+            )
+        elif letters.isupper():
+            is_acronym = letters in CASE_NAME_ACRONYMS or not re.search(
+                r"[AEIOUY]", letters
+            )
+            if letters.lower() in LOWERCASE_CASE_NAME_WORDS:
+                word = word.lower()
+            elif not is_acronym:
+                word = _capitalize_caps_word(word)
         words.append(word)
     # titlecase capitalizes "re", but CL uses "In re"
     return re.sub(r"\bIn Re\b", "In re", titlecase(" ".join(words)))

@@ -40,14 +40,25 @@ class ScanXmlHelpersTest(SimpleTestCase):
     """Tests for the scanning project final XML parsing helpers."""
 
     def test_normalize_case_name_caps(self) -> None:
-        """Are words printed in caps titlecased, keeping short acronyms?"""
+        """Are words printed in caps titlecased, keeping acronyms?"""
         cases = [
             (
                 "Larry B. MERRITT v. STATE of Florida",
                 "Larry B. Merritt v. State of Florida",
             ),
             ("In re ESTATE OF John SMITH", "In re Estate of John Smith"),
-            ("ACME LLC v. John ROBERTS", "Acme LLC v. John Roberts"),
+            ("IN RE ESTATE OF John SMITH", "In re Estate of John Smith"),
+            ("Robert LEE v. Bobby COX", "Robert Lee v. Bobby Cox"),
+            ("ACME LLC v. John DOE", "Acme LLC v. John Doe"),
+            ("USA v. ONE 1990 FORD", "USA v. One 1990 Ford"),
+            (
+                "Mary O'BRIEN v. STATE'S ATTORNEY",
+                "Mary O'Brien v. State's Attorney",
+            ),
+            (
+                "Ann SMITH-JONES v. John McDONALD",
+                "Ann Smith-Jones v. John McDonald",
+            ),
             ("Jane Roe v. Richard Roe", "Jane Roe v. Richard Roe"),
         ]
         for case_name, expected in cases:
