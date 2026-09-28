@@ -1,6 +1,7 @@
 import tempfile
 from datetime import date
 from pathlib import Path
+from unittest import mock
 
 from bs4 import BeautifulSoup
 from django.core.management import call_command
@@ -22,6 +23,9 @@ from cl.search.factories import (
 from cl.search.models import Citation, Court, Docket, Opinion, OpinionCluster
 from cl.tests.cases import SimpleTestCase, TestCase
 
+COMMAND_MODULE = (
+    "cl.corpus_importer.management.commands.import_scanned_opinions"
+)
 SCAN_XML_PATH = str(
     Path(__file__).parent / "test_assets" / "scanned_opinion.xml"
 )
@@ -270,6 +274,21 @@ class ImportScannedOpinionsTest(TestCase):
         docket.refresh_from_db()
         self.assertEqual(docket.source, Docket.SCRAPER_AND_SCANNING_PROJECT)
         self.assertEqual(OpinionCluster.objects.get().docket_id, docket.pk)
+
+    def test_scan_from_another_reporter_is_not_duplicated(self) -> None:
+        """Is a scan of a case already imported from a scan detected by text?"""
+        self.import_scan()
+        with open(SCAN_XML_PATH, encoding="utf-8") as f:
+            xml = f.read().replace("388 So. 3d 1", "49 Fla. L. Weekly D1100")
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            Path(tmp_dir, "parallel.xml").write_text(xml, encoding="utf-8")
+            with mock.patch(f"{COMMAND_MODULE}.logger") as mock_logger:
+                self.import_scan(path=tmp_dir)
+
+        self.assertEqual(OpinionCluster.objects.count(), 1)
+        self.assertIn(
+            "which already has scan XML", mock_logger.warning.call_args[0][0]
+        )
 
     def test_court_lookup(self) -> None:
         """Is the court found from the court element when not given?"""
