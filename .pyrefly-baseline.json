@@ -5594,7 +5594,7 @@
       "severity": "error"
     },
     {
-      "column": 17,
+      "column": 42,
       "path": "cl/scrapers/management/commands/back_scrape_dockets.py",
       "name": "bad-argument-type",
       "concise_description": "Argument `list[Unknown] | None` is not assignable to parameter `courts` with type `list[str]` in function `juriscraper.state.BaseStateScraper.BaseStateScraper.backfill`",
