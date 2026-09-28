@@ -5,6 +5,7 @@ from unittest import mock
 
 from bs4 import BeautifulSoup
 from django.core.management import call_command
+from django.db.models.fields.files import FieldFile
 
 from cl.corpus_importer.management.commands.import_scanned_opinions import (
     get_citation_strings,
@@ -353,6 +354,40 @@ class ImportScannedOpinionsTest(TestCase):
                 cluster=new_cluster, volume="388", reporter="So. 3d", page="1"
             ).exists()
         )
+
+    def test_failed_import_is_rolled_back(self) -> None:
+        """Is a failed import rolled back without uploading the XML?"""
+        with (
+            mock.patch(
+                f"{COMMAND_MODULE}.make_opinion",
+                side_effect=ValueError("boom"),
+            ),
+            mock.patch(f"{COMMAND_MODULE}.logger") as mock_logger,
+            mock.patch.object(FieldFile, "save") as mock_file_save,
+        ):
+            self.import_scan()
+
+        self.assertEqual(OpinionCluster.objects.count(), 0)
+        self.assertEqual(Docket.objects.count(), 0)
+        mock_file_save.assert_not_called()
+        mock_logger.exception.assert_called_once()
+
+    def test_failed_file_does_not_stop_the_run(self) -> None:
+        """Does the command continue with the next file after a failure?"""
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            for name in ["1.xml", "2.xml"]:
+                Path(tmp_dir, name).write_text("<casebody/>", encoding="utf-8")
+            with (
+                mock.patch(
+                    f"{COMMAND_MODULE}.parse_scan_xml",
+                    side_effect=[ValueError("boom"), None],
+                ) as mock_parse,
+                mock.patch(f"{COMMAND_MODULE}.logger") as mock_logger,
+            ):
+                self.import_scan(path=tmp_dir)
+
+        self.assertEqual(mock_parse.call_count, 2)
+        mock_logger.exception.assert_called_once()
 
     def test_court_lookup(self) -> None:
         """Is the court found from the court element when not given?"""

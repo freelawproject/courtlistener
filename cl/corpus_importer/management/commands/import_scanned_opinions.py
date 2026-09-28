@@ -457,6 +457,24 @@ def make_opinion(op: Tag, cluster_id: int) -> Opinion:
     )
 
 
+def store_scan_xml(cluster: OpinionCluster, scan_case: ScanCase) -> None:
+    """Upload the scanned XML to the cluster's `filepath_xml_scan`.
+
+    Call it as the last step of the import transaction, so a failed database
+    write rolls back before the file is uploaded and no orphan is left.
+
+    :param cluster: The saved cluster.
+    :param scan_case: The parsed scanned opinion.
+    :return: None
+    """
+    cluster.filepath_xml_scan.save(
+        scan_case.file_name,
+        ContentFile(scan_case.xml.encode()),
+        save=False,
+    )
+    cluster.save(update_fields=["filepath_xml_scan"])
+
+
 def merge_into_cluster(cluster: OpinionCluster, scan_case: ScanCase) -> None:
     """Merge a scanned opinion into an existing cluster.
 
@@ -484,11 +502,6 @@ def merge_into_cluster(cluster: OpinionCluster, scan_case: ScanCase) -> None:
         cluster.source = ClusterSources.merge_sources(
             cluster.source, ClusterSources.SCANNING_PROJECT
         )
-        cluster.filepath_xml_scan.save(
-            scan_case.file_name,
-            ContentFile(scan_case.xml.encode()),
-            save=False,
-        )
         cluster.save()
 
         docket = cluster.docket
@@ -498,7 +511,11 @@ def merge_into_cluster(cluster: OpinionCluster, scan_case: ScanCase) -> None:
         docket.save(update_fields=["source"])
 
         cl_opinions = list(cluster.sub_opinions.all())
-        if len(cl_opinions) != 1 or len(scan_case.opinions) != 1:
+        if len(cl_opinions) == 1 and len(scan_case.opinions) == 1:
+            opinion = cl_opinions[0]
+            opinion.xml_scan = str(scan_case.opinions[0])
+            opinion.save(update_fields=["xml_scan"])
+        else:
             logger.warning(
                 "Cluster %s has %s opinions and the scan of %s has %s. "
                 "Opinion content was not merged.",
@@ -507,10 +524,8 @@ def merge_into_cluster(cluster: OpinionCluster, scan_case: ScanCase) -> None:
                 scan_case.citation.corrected_citation(),
                 len(scan_case.opinions),
             )
-            return
-        opinion = cl_opinions[0]
-        opinion.xml_scan = str(scan_case.opinions[0])
-        opinion.save(update_fields=["xml_scan"])
+
+        store_scan_xml(cluster, scan_case)
 
 
 def add_new_case(scan_case: ScanCase) -> OpinionCluster:
@@ -548,15 +563,11 @@ def add_new_case(scan_case: ScanCase) -> OpinionCluster:
             judges=scan_case.judges,
             **scan_case.cluster_fields,
         )
-        cluster.filepath_xml_scan.save(
-            scan_case.file_name,
-            ContentFile(scan_case.xml.encode()),
-            save=False,
-        )
         cluster.save()
         add_citations_to_cluster(scan_case.citations, cluster.id)
         for op in scan_case.opinions:
             make_opinion(op, cluster.id).save()
+        store_scan_xml(cluster, scan_case)
     return cluster
 
 
