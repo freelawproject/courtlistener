@@ -1031,14 +1031,17 @@ class DocketAlertTest(TestCase):
 
         # Does the webhook was triggered?
         self.assertEqual(webhook_triggered.count(), 1)
-        content = webhook_triggered.first().content
+        webhook_event = webhook_triggered.first()
+        assert webhook_event is not None  # for the type checker
+        content = webhook_event.content
+        assert content is not None  # for the type checker
         # Compare the content of the webhook to the recap document
         pacer_doc_id = content["payload"]["results"][0]["recap_documents"][0][
             "pacer_doc_id"
         ]
         self.assertEqual("232322332", pacer_doc_id)
         self.assertEqual(
-            webhook_triggered.first().event_status,
+            webhook_event.event_status,
             WEBHOOK_EVENT_STATUS.SUCCESSFUL,
         )
 
@@ -1815,7 +1818,7 @@ class AlertAPITests(ESIndexTestCase, APITestCase):
         )
         self.assertIn(LEGACY_MEMBERSHIP_HELP_URL, detail)
         neon_id = await sync_to_async(
-            lambda: self.user_legacy_member.membership.neon_id
+            lambda: self.user_legacy_member.membership.neon_id  # pyrefly:ignore[missing-attribute]
         )()
         self.assertNotIn(
             f"https://donate.free.law/constituent/memberships/upgrade/{neon_id}",
@@ -3474,10 +3477,19 @@ class DocketAlertGetNotesTagsTests(TestCase):
         cls.docket_3 = DocketFactory(
             court=cls.court,
         )
+        cls.docket_4 = DocketFactory(
+            court=cls.court,
+        )
         cls.note_docket_1_user_1 = NoteFactory(
             user=cls.user_1,
             docket_id=cls.docket_1,
             notes="Note 1 Test",
+        )
+        # GFK-shaped note (#7725) -- proves the lookup isn't legacy-only.
+        cls.note_docket_4_user_1 = NoteFactory.for_object(
+            cls.docket_4,
+            user=cls.user_1,
+            notes="Note 4 Test",
         )
         cls.note_docket_2_user_1 = NoteFactory(
             user=cls.user_1,
@@ -3538,6 +3550,14 @@ class DocketAlertGetNotesTagsTests(TestCase):
         ) = get_docket_notes_and_tags_by_user(self.docket_3.pk, self.user_1.pk)
         self.assertEqual(notes_docket_3_user_1, None)
         self.assertEqual(tags_docket_3_user_1, [])
+
+        # GFK-shaped note (#7725) -- must be found too, not just legacy ones.
+        (
+            notes_docket_4_user_1,
+            tags_docket_4_user_1,
+        ) = get_docket_notes_and_tags_by_user(self.docket_4.pk, self.user_1.pk)
+        self.assertEqual(notes_docket_4_user_1, "Note 4 Test")
+        self.assertEqual(tags_docket_4_user_1, [])
 
 
 @mock.patch("cl.search.tasks.percolator_alerts_models_supported", new=[Audio])

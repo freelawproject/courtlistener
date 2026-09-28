@@ -26,6 +26,7 @@ from cl.lib.ratelimiter import ratelimiter_unsafe_3_per_m
 from cl.lib.types import AuthenticatedHttpRequest
 from cl.opinion_page.utils import make_docket_title, user_has_alert
 from cl.search.models import Docket
+from cl.users.models import UserProfile
 
 
 @login_required
@@ -240,7 +241,7 @@ def _toggle_docket_alert_htmx(
         alert.save()
         has_alert = False
         message = "Alert disabled successfully"
-    elif not request.user.profile.can_make_another_alert:
+    elif not UserProfile.objects.get(user=request.user).can_make_another_alert:
         has_alert = False
         message = "You have reached your docket alert limit."
     else:

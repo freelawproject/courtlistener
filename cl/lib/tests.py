@@ -2771,7 +2771,7 @@ class IncrementalNewTemplateMiddlewareTest(TestCase):
     def test_swapped_page_gets_the_search_form(self) -> None:
         """A swapped full page receives the header's search form."""
         response = self.process("components.html")
-        self.assertIn("search_form", response.context_data)
+        self.assertIn("search_form", response.context_data or {})
 
     def test_htmx_fragment_skips_the_search_form(self) -> None:
         """A swapped htmx fragment is not handed the search form.
@@ -2781,7 +2781,7 @@ class IncrementalNewTemplateMiddlewareTest(TestCase):
         """
         response = self.process("components.html", {"HX-Request": "true"})
         self.assertEqual(response.template_name, "v2_components.html")
-        self.assertNotIn("search_form", response.context_data)
+        self.assertNotIn("search_form", response.context_data or {})
 
 
 class FilterByEmailTest(TestCase):
