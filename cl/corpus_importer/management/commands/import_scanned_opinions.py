@@ -1,0 +1,569 @@
+import itertools
+import os
+import re
+from dataclasses import dataclass, field
+from datetime import date
+from glob import glob
+
+from bs4 import BeautifulSoup, Tag
+from django.core.files.base import ContentFile
+from django.db import transaction
+from django.utils.text import slugify
+from eyecite.find import get_citations
+from eyecite.models import FullCaseCitation
+from eyecite.tokenizers import HyperscanTokenizer
+from juriscraper.lib.string_utils import (
+    CaseNameTweaker,
+    convert_date_string,
+    harmonize,
+    titlecase,
+)
+
+from cl.corpus_importer.management.commands.harvard_opinions import (
+    find_previously_imported_cases,
+    map_opinion_type,
+    parse_extra_fields,
+)
+from cl.corpus_importer.utils import (
+    add_citations_to_cluster,
+    clean_body_content,
+    get_court_id,
+)
+from cl.lib.command_utils import VerboseCommand, logger
+from cl.lib.utils import human_sort
+from cl.people_db.lookup_utils import extract_judge_last_name
+from cl.scrapers.utils import update_or_create_docket
+from cl.search.cluster_sources import ClusterSources
+from cl.search.models import (
+    PRECEDENTIAL_STATUS,
+    Court,
+    Docket,
+    Opinion,
+    OpinionCluster,
+)
+
+HYPERSCAN_TOKENIZER = HyperscanTokenizer(cache_dir=".hyperscan")
+
+cnt = CaseNameTweaker()
+
+# Words that should stay lowercase in case names when printed in caps.
+LOWERCASE_CASE_NAME_WORDS = {
+    "a",
+    "an",
+    "and",
+    "for",
+    "in",
+    "of",
+    "on",
+    "the",
+    "to",
+}
+
+# Cluster fields that come from the head matter of the XML. When merging
+# into an existing cluster, only empty values are filled from the scan.
+SHORT_FIELDS = {
+    "attorneys": "attorneys",
+    "disposition": "disposition",
+    "otherdate": "other_dates",
+}
+LONG_FIELDS = {
+    "syllabus": "syllabus",
+    "summary": "summary",
+    "history": "history",
+    "headnotes": "headnotes",
+}
+
+
+@dataclass
+class ScanCase:
+    """Metadata and opinions parsed from a scanning project final XML."""
+
+    xml: str
+    case_name: str
+    case_name_short: str
+    case_name_full: str
+    docket_number: str
+    court_id: str
+    date_filed: date
+    citations: list[str]
+    parsed_citations: list[FullCaseCitation]
+    judges: str
+    body_characters: str
+    cluster_fields: dict[str, str] = field(default_factory=dict)
+    opinions: list[Tag] = field(default_factory=list)
+
+    @property
+    def citation(self) -> FullCaseCitation:
+        """The first citation of the scanned opinion."""
+        return self.parsed_citations[0]
+
+    @property
+    def file_name(self) -> str:
+        """The name used to store the XML in `filepath_xml_scan`.
+
+        e.g. "388-so-3d-1.xml" for 388 So. 3d 1
+        """
+        return f"{slugify(self.citation.corrected_citation())}.xml"
+
+
+def xml_file_paths(path: str) -> list[str]:
+    """List the XML files to import, sorted the way humans expect.
+
+    :param path: A single XML file, or a directory searched recursively.
+    :return: A list of XML file paths.
+    """
+    if os.path.isfile(path):
+        return [path]
+    return human_sort(glob(os.path.join(path, "**", "*.xml"), recursive=True))
+
+
+def get_citation_strings(soup: BeautifulSoup) -> list[str]:
+    """Get the citations of a scanned opinion from its `<citation>` elements.
+
+    :param soup: The parsed XML.
+    :return: A list of citation strings.
+    """
+    return [
+        cite
+        for element in soup.select("citation")
+        if (cite := element.get_text(" ", strip=True))
+    ]
+
+
+def get_element_text(soup: BeautifulSoup, selector: str, sep: str) -> str:
+    """Join the text of all elements matching a selector.
+
+    :param soup: The parsed XML.
+    :param selector: CSS selector of the elements.
+    :param sep: The separator used to join the texts of multiple elements.
+    :return: The joined text, or an empty string.
+    """
+    texts = [e.get_text(" ", strip=True) for e in soup.select(selector)]
+    return sep.join(t for t in texts if t)
+
+
+def normalize_case_name_caps(case_name: str) -> str:
+    """Titlecase the words a reporter printed in capital letters.
+
+    Reporters print party names in small caps, so the OCR text looks like
+    "Larry B. MERRITT v. STATE of Florida". `titlecase` treats all-caps words
+    as acronyms and keeps them, so they are fixed here first.
+
+    Caveat: words of three letters or less are kept as they are because
+    they are usually acronyms (LLC, USA); longer acronyms are titlecased.
+
+    :param case_name: The case name.
+    :return: The case name with normalized capitalization.
+    """
+    words = []
+    for word in case_name.split():
+        letters = re.sub(r"[^A-Za-z]", "", word)
+        if letters.isupper() and letters.lower() in LOWERCASE_CASE_NAME_WORDS:
+            word = word.lower()
+        elif letters.isupper() and len(letters) > 3:
+            word = word.capitalize()
+        words.append(word)
+    # titlecase capitalizes "re", but CL uses "In re"
+    return re.sub(r"\bIn Re\b", "In re", titlecase(" ".join(words)))
+
+
+def get_date_filed(soup: BeautifulSoup) -> date | None:
+    """Parse the decision date of the scanned opinion.
+
+    Books sometimes print the date in brackets, e.g. "[May 22, 2024]", or
+    with a prefix, e.g. "Decided Dec. 18, 2009."
+
+    :param soup: The parsed XML.
+    :return: The decision date, or None if it can't be parsed.
+    """
+    date_text = get_element_text(soup, "decisiondate", " ").strip("[]. ")
+    if not date_text:
+        return None
+    try:
+        return convert_date_string(date_text, fuzzy=True)
+    except (ValueError, OverflowError):
+        return None
+
+
+def get_judges(soup: BeautifulSoup) -> str:
+    """Get the judges names from the `judges` and `author` elements.
+
+    :param soup: The parsed XML.
+    :return: A comma separated, deduplicated and sorted list of last names.
+    """
+    names = [
+        extract_judge_last_name(e.get_text(" ", strip=True))
+        for e in soup.select("judges, author")
+    ]
+    return titlecase(
+        ", ".join(sorted(set(itertools.chain.from_iterable(names))))
+    )
+
+
+def parse_scan_xml(
+    xml: str,
+    file_path: str,
+    court_id: str | None,
+) -> ScanCase | None:
+    """Parse a scanning project final XML into a ScanCase.
+
+    Logs a warning and returns None when the XML lacks data required to
+    import it: opinion, parties, date, court or citation.
+
+    :param xml: The XML content.
+    :param file_path: The path of the XML file, used for logging.
+    :param court_id: The CL court id. When None, it is looked up with
+        courts-db from the `court` element.
+    :return: A ScanCase, or None if the file can't be imported.
+    """
+    soup = BeautifulSoup(xml, "lxml-xml")
+
+    # Store the opinion XML before `parse_extra_fields` mutates the soup
+    opinion_elements = soup.select("opinion")
+    if not opinion_elements:
+        logger.warning("No opinion found in %s", file_path)
+        return None
+    opinions = [
+        BeautifulSoup(str(op), "lxml-xml").select_one("opinion")
+        for op in opinion_elements
+    ]
+
+    parties = get_element_text(soup, "parties", " ")
+    if not parties:
+        logger.warning("No parties found in %s", file_path)
+        return None
+    case_name = normalize_case_name_caps(harmonize(parties))
+    case_name_full = normalize_case_name_caps(parties.strip(". "))
+
+    if not (date_filed := get_date_filed(soup)):
+        logger.warning(
+            "Can't parse date '%s' in %s",
+            get_element_text(soup, "decisiondate", " "),
+            file_path,
+        )
+        return None
+
+    if not court_id:
+        court_text = get_element_text(soup, "court", " ")
+        found_courts = get_court_id(court_text)
+        if len(found_courts) != 1:
+            logger.warning(
+                "Court not found for '%s' in %s. Found: %s",
+                court_text,
+                file_path,
+                found_courts,
+            )
+            return None
+        court_id = found_courts[0]
+    if not Court.objects.filter(id=court_id).exists():
+        logger.warning("Court not found in CourtListener: %s", court_id)
+        return None
+
+    cite_strings = get_citation_strings(soup)
+    cites = [
+        cite
+        for cite_str in cite_strings
+        for cite in get_citations(
+            re.sub(r"\s+", " ", cite_str), tokenizer=HYPERSCAN_TOKENIZER
+        )
+        if isinstance(cite, FullCaseCitation)
+    ]
+    if not cites:
+        logger.warning("No valid citation %s in %s", cite_strings, file_path)
+        return None
+
+    short_data = parse_extra_fields(soup, list(SHORT_FIELDS), False)
+    long_data = parse_extra_fields(soup, list(LONG_FIELDS), True)
+    cluster_fields = {
+        SHORT_FIELDS.get(name) or LONG_FIELDS[name]: value
+        for name, value in {**short_data, **long_data}.items()
+        if value
+    }
+
+    return ScanCase(
+        xml=xml,
+        case_name=case_name,
+        case_name_short=cnt.make_case_name_short(case_name),
+        case_name_full=case_name_full,
+        docket_number=get_element_text(soup, "docketnumber", "; ").strip("."),
+        court_id=court_id,
+        date_filed=date_filed,
+        citations=cite_strings,
+        parsed_citations=cites,
+        judges=get_judges(soup),
+        body_characters=clean_body_content(
+            str(soup.select_one("casebody") or ""), harvard_file=True
+        ),
+        cluster_fields=cluster_fields,
+        opinions=[op for op in opinions if op is not None],
+    )
+
+
+def find_imported_scan(scan_case: ScanCase) -> OpinionCluster | None:
+    """Find the cluster this scanned opinion was already imported into.
+
+    A cluster with one of the opinion's citations and a scan XML is
+    considered the same scanned opinion.
+
+    :param scan_case: The parsed scanned opinion.
+    :return: The cluster, or None if it was not imported yet.
+    """
+    for cite in scan_case.parsed_citations:
+        cluster = (
+            OpinionCluster.objects.filter(
+                citations__volume=cite.groups["volume"],
+                citations__reporter=cite.corrected_reporter(),
+                citations__page=cite.groups["page"],
+            )
+            .exclude(filepath_xml_scan="")
+            .first()
+        )
+        if cluster:
+            return cluster
+    return None
+
+
+def find_existing_cluster(scan_case: ScanCase) -> OpinionCluster | None:
+    """Find a cluster from another source that matches the scanned opinion.
+
+    Uses the Harvard importer's matching: first by citation, then by court
+    and date, comparing case names, docket numbers and opinion text.
+
+    :param scan_case: The parsed scanned opinion.
+    :return: The matching cluster, or None.
+    """
+    # `find_previously_imported_cases` expects Harvard-shaped data
+    data = {
+        "citations": [{"cite": cite} for cite in scan_case.citations],
+        "docket_number": scan_case.docket_number,
+        "name_abbreviation": scan_case.case_name,
+    }
+    return find_previously_imported_cases(
+        data,
+        scan_case.court_id,
+        scan_case.date_filed,
+        scan_case.body_characters,
+        scan_case.case_name_full,
+        scan_case.citation,
+    )
+
+
+def make_opinion(op: Tag, cluster_id: int) -> Opinion:
+    """Build an unsaved Opinion from an `<opinion>` element.
+
+    :param op: The opinion element.
+    :param cluster_id: The id of the cluster the opinion belongs to.
+    :return: The unsaved Opinion.
+    """
+    opinion_xml = str(op)
+    author_str = ""
+    if author := op.select_one("author"):
+        for page_number in author.select("page-number"):
+            page_number.extract()
+        author_tag_str = titlecase(author.get_text(" ", strip=True).strip(":"))
+        author_str = titlecase(
+            "".join(extract_judge_last_name(author_tag_str))
+        )
+    per_curiam = "per curiam" in author_str.lower()
+    op_type = op.get("type")
+    return Opinion(
+        cluster_id=cluster_id,
+        type=map_opinion_type(op_type if isinstance(op_type, str) else ""),
+        author_str="Per Curiam" if per_curiam else author_str,
+        per_curiam=per_curiam,
+        xml_scan=opinion_xml,
+        extracted_by_ocr=True,
+    )
+
+
+def merge_into_cluster(cluster: OpinionCluster, scan_case: ScanCase) -> None:
+    """Merge a scanned opinion into an existing cluster.
+
+    Adds missing citations, fills empty cluster fields, stores the XML,
+    and updates the cluster and docket sources. The opinion text is only
+    stored when both the cluster and the XML have a single opinion, since
+    there is no reliable way yet to pair up multiple opinions.
+
+    :param cluster: The matching cluster.
+    :param scan_case: The parsed scanned opinion.
+    :return: None
+    """
+    with transaction.atomic():
+        add_citations_to_cluster(scan_case.citations, cluster.id)
+
+        for field_name, value in {
+            **scan_case.cluster_fields,
+            "judges": scan_case.judges,
+        }.items():
+            if value and not getattr(cluster, field_name):
+                logger.info(
+                    "Filling empty %s of cluster %s", field_name, cluster.id
+                )
+                setattr(cluster, field_name, value)
+        cluster.source = ClusterSources.merge_sources(
+            cluster.source, ClusterSources.SCANNING_PROJECT
+        )
+        cluster.filepath_xml_scan.save(
+            scan_case.file_name,
+            ContentFile(scan_case.xml.encode()),
+            save=False,
+        )
+        cluster.save()
+
+        docket = cluster.docket
+        docket.source = Docket.merge_sources(
+            docket.source, Docket.SCANNING_PROJECT
+        )
+        docket.save(update_fields=["source"])
+
+        cl_opinions = list(cluster.sub_opinions.all())
+        if len(cl_opinions) != 1 or len(scan_case.opinions) != 1:
+            logger.warning(
+                "Cluster %s has %s opinions and the scan of %s has %s. "
+                "Opinion content was not merged.",
+                cluster.id,
+                len(cl_opinions),
+                scan_case.citation.corrected_citation(),
+                len(scan_case.opinions),
+            )
+            return
+        opinion = cl_opinions[0]
+        opinion.xml_scan = str(scan_case.opinions[0])
+        opinion.save(update_fields=["xml_scan"])
+
+
+def add_new_case(scan_case: ScanCase) -> OpinionCluster:
+    """Create the docket, cluster, citations and opinions of a scanned case.
+
+    :param scan_case: The parsed scanned opinion.
+    :return: The new cluster.
+    """
+    with transaction.atomic():
+        docket = update_or_create_docket(
+            scan_case.case_name,
+            scan_case.case_name_short,
+            Court.objects.get(id=scan_case.court_id),
+            scan_case.docket_number,
+            Docket.SCANNING_PROJECT,
+            from_harvard=False,
+            case_name_full=scan_case.case_name_full,
+            ia_needs_upload=False,
+        )
+        if docket.pk:
+            logger.info("Using existing docket %s", docket.pk)
+            docket.source = Docket.merge_sources(
+                docket.source, Docket.SCANNING_PROJECT
+            )
+        docket.save()
+
+        cluster = OpinionCluster(
+            docket=docket,
+            case_name=scan_case.case_name,
+            case_name_short=scan_case.case_name_short,
+            case_name_full=scan_case.case_name_full,
+            precedential_status=PRECEDENTIAL_STATUS.PUBLISHED,
+            source=ClusterSources.SCANNING_PROJECT,
+            date_filed=scan_case.date_filed,
+            judges=scan_case.judges,
+            **scan_case.cluster_fields,
+        )
+        cluster.filepath_xml_scan.save(
+            scan_case.file_name,
+            ContentFile(scan_case.xml.encode()),
+            save=False,
+        )
+        cluster.save()
+        add_citations_to_cluster(scan_case.citations, cluster.id)
+        for op in scan_case.opinions:
+            make_opinion(op, cluster.id).save()
+    return cluster
+
+
+def import_scanned_opinion(file_path: str, court_id: str | None) -> None:
+    """Import a scanning project final XML into CourtListener.
+
+    Skips opinions already imported from the scanning project. Merges into
+    a matching cluster from another source when one exists; otherwise
+    creates a new docket, cluster, citations and opinions.
+
+    :param file_path: The path of the XML file.
+    :param court_id: The CL court id, or None to look it up in the XML.
+    :return: None
+    """
+    logger.info("Processing %s", file_path)
+    with open(file_path, encoding="utf-8") as f:
+        xml = f.read()
+
+    if not (scan_case := parse_scan_xml(xml, file_path, court_id)):
+        return
+    citation = scan_case.citation.corrected_citation()
+
+    if cluster := find_imported_scan(scan_case):
+        logger.info(
+            "Skipping %s (%s), already imported in cluster %s",
+            file_path,
+            citation,
+            cluster.id,
+        )
+        return
+
+    if cluster := find_existing_cluster(scan_case):
+        if cluster.filepath_xml_scan:
+            # Two scanned opinions matched the same cluster; needs review
+            logger.warning(
+                "%s (%s) matched cluster %s, which already has scan XML %s",
+                file_path,
+                citation,
+                cluster.id,
+                cluster.filepath_xml_scan.name,
+            )
+            return
+        logger.info(
+            "Merging %s (%s) into cluster %s: %s",
+            file_path,
+            citation,
+            cluster.id,
+            cluster.get_absolute_url(),
+        )
+        merge_into_cluster(cluster, scan_case)
+        return
+
+    cluster = add_new_case(scan_case)
+    logger.info(
+        "Added %s (%s) as cluster %s: %s",
+        scan_case.case_name,
+        citation,
+        cluster.id,
+        cluster.get_absolute_url(),
+    )
+
+
+class Command(VerboseCommand):
+    help = (
+        "Import opinions from the scanning project final XML files, merging "
+        "them into existing clusters when possible."
+    )
+
+    def add_arguments(self, parser):
+        parser.add_argument(
+            "--path",
+            type=str,
+            required=True,
+            help="An XML file, or a directory searched recursively for XML "
+            "files.",
+        )
+        parser.add_argument(
+            "--court-id",
+            type=str,
+            help="The CL court id. If not given, it is looked up from the "
+            "court element of each XML.",
+        )
+
+    def handle(self, *args, **options):
+        super().handle(*args, **options)
+        for file_path in xml_file_paths(options["path"]):
+            try:
+                import_scanned_opinion(file_path, options["court_id"])
+            except Exception:
+                # Keep going; one bad file shouldn't stop a volume import
+                logger.exception("Failed to import %s", file_path)
