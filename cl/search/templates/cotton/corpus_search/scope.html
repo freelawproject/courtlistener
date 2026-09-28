@@ -30,13 +30,13 @@
         x-bind:aria-selected="isActiveScope"
         type="button"
         role="tab"
-        class="min-w-41 h-[58px] text-sm font-normal rounded-t-2xl text-greyscale-600 flex justify-center items-center {% if forloop.first %}bg-white{% else %}bg-greyscale-50{% endif %}"
+        class="min-w-41 h-[58px] text-sm font-normal rounded-t-2xl text-greyscale-600 flex justify-center items-center bg-greyscale-50"
         x-bind:class="scopeTabClass"
       >
         <span class="flex flex-col items-start">
           <span
             data-scope="{{ scope.label }}"
-            class="{% if forloop.first %}font-semibold text-greyscale-900{% else %}font-medium text-greyscale-700{% endif %}"
+            class="font-medium text-greyscale-700"
             x-bind:class="scopeTabTitleClass"
           >{{ scope.label }}</span>
           <span
