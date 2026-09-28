@@ -32,7 +32,10 @@ from cl.corpus_importer.utils import (
 from cl.lib.command_utils import VerboseCommand, logger
 from cl.lib.utils import human_sort
 from cl.people_db.lookup_utils import extract_judge_last_name
-from cl.scrapers.utils import update_or_create_docket
+from cl.scrapers.utils import (
+    case_names_are_too_different,
+    update_or_create_docket,
+)
 from cl.search.cluster_sources import ClusterSources
 from cl.search.models import (
     PRECEDENTIAL_STATUS,
@@ -326,24 +329,35 @@ def parse_scan_xml(
 def find_imported_scan(scan_case: ScanCase) -> OpinionCluster | None:
     """Find the cluster this scanned opinion was already imported into.
 
-    A cluster with one of the opinion's citations and a scan XML is
-    considered the same scanned opinion.
+    A cluster with one of the opinion's citations and a scan XML is the same
+    scanned opinion when its docket number and case name also match. Short
+    opinions often share a page, and so a citation, with other opinions.
 
     :param scan_case: The parsed scanned opinion.
     :return: The cluster, or None if it was not imported yet.
     """
     for cite in scan_case.parsed_citations:
-        cluster = (
+        clusters = (
             OpinionCluster.objects.filter(
                 citations__volume=cite.groups["volume"],
                 citations__reporter=cite.corrected_reporter(),
                 citations__page=cite.groups["page"],
             )
             .exclude(filepath_xml_scan="")
-            .first()
+            .select_related("docket")
         )
-        if cluster:
-            return cluster
+        for cluster in clusters:
+            if cluster.docket.docket_number == scan_case.docket_number and (
+                not case_names_are_too_different(
+                    cluster.case_name, scan_case.case_name
+                )
+            ):
+                return cluster
+            logger.info(
+                "Cluster %s shares citation %s but is a different case",
+                cluster.id,
+                cite.corrected_citation(),
+            )
     return None
 
 

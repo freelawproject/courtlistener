@@ -290,6 +290,36 @@ class ImportScannedOpinionsTest(TestCase):
             "which already has scan XML", mock_logger.warning.call_args[0][0]
         )
 
+    def test_other_opinion_on_same_page_is_imported(self) -> None:
+        """Is a different case with the same citation imported?"""
+        self.import_scan()
+        xml = """<?xml version="1.0" encoding="utf-8"?>
+<casebody firstpage="1" lastpage="1">
+  <citation>388 So. 3d 1</citation>
+  <parties><party>John DOEWELL, Appellant,</party> <separator>v.</separator>
+  <party>STATE of Florida, Appellee.</party></parties>
+  <docketnumber>No. 4D2023-9999</docketnumber>
+  <court>District Court of Appeal of Florida, Fourth District.</court>
+  <decisiondate>[May 22, 2024]</decisiondate>
+  <opinion><author>PER CURIAM.</author><p>Affirmed.</p></opinion>
+</casebody>"""
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            Path(tmp_dir, "same_page.xml").write_text(xml, encoding="utf-8")
+            self.import_scan(path=tmp_dir)
+
+        self.assertEqual(OpinionCluster.objects.count(), 2)
+        new_cluster = OpinionCluster.objects.get(
+            docket__docket_number="4D2023-9999"
+        )
+        self.assertEqual(
+            new_cluster.case_name, "John Doewell v. State of Florida"
+        )
+        self.assertTrue(
+            Citation.objects.filter(
+                cluster=new_cluster, volume="388", reporter="So. 3d", page="1"
+            ).exists()
+        )
+
     def test_court_lookup(self) -> None:
         """Is the court found from the court element when not given?"""
         self.import_scan(court_id=None)
