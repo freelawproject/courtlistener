@@ -50,6 +50,13 @@ HYPERSCAN_TOKENIZER = HyperscanTokenizer(cache_dir=".hyperscan")
 cnt = CaseNameTweaker()
 
 PER_CURIAM_RE = re.compile(r"per\s+curiam", re.IGNORECASE)
+# A complete date as printed in reporters: "May 22, 2024", "Dec. 18, 2009",
+# "Sept. 3, 2024" or "5/22/2024"
+FULL_DATE_RE = re.compile(
+    r"\b(?:(?:jan|feb|mar|apr|may|jun|jul|aug|sep|oct|nov|dec)[a-z]*\.?"
+    r"\s+\d{1,2},?\s+\d{4}|\d{1,2}/\d{1,2}/\d{4})\b",
+    re.IGNORECASE,
+)
 # The "No." or "Case No." printed before docket numbers
 DOCKET_NUMBER_PREFIX_RE = re.compile(
     r"^(?:case\s+)?nos?(?:\.\s*|\s+)", re.IGNORECASE
@@ -197,19 +204,25 @@ def normalize_case_name_caps(case_name: str) -> str:
 def get_date_filed(soup: BeautifulSoup) -> date | None:
     """Parse the decision date of the scanned opinion.
 
-    Books sometimes print the date in brackets, e.g. "[May 22, 2024]", or
-    with a prefix, e.g. "Decided Dec. 18, 2009."
+    Uses the first complete date of the first `<decisiondate>` that has one.
+    Books print it in brackets, e.g. "[May 22, 2024]", or with other text,
+    e.g. "Decided Dec. 18, 2009. Rehearing Denied Jan. 5, 2010." Partial
+    dates like "May 2024" are rejected instead of guessing the missing day.
 
     :param soup: The parsed XML.
     :return: The decision date, or None if it can't be parsed.
     """
-    date_text = get_element_text(soup, "decisiondate", " ").strip("[]. ")
-    if not date_text:
-        return None
-    try:
-        return convert_date_string(date_text, fuzzy=True)
-    except (ValueError, OverflowError):
-        return None
+    for element in soup.select("decisiondate"):
+        if not (match := FULL_DATE_RE.search(element.get_text(" "))):
+            continue
+        # Normalize "Sept." since dateutil only knows "Sep"
+        date_text = re.sub(r"(?i)\bsept\b", "Sep", match.group())
+        try:
+            return convert_date_string(date_text)
+        except (ValueError, OverflowError):
+            # e.g. an OCR error like "Feb. 30, 2024"
+            continue
+    return None
 
 
 def get_judges(soup: BeautifulSoup) -> str:

@@ -55,13 +55,36 @@ class ScanXmlHelpersTest(SimpleTestCase):
                 self.assertEqual(normalize_case_name_caps(case_name), expected)
 
     def test_get_date_filed(self) -> None:
-        """Can we parse bracketed, prefixed and missing decision dates?"""
+        """Can we parse complete decision dates and reject partial ones?"""
         cases = [
             ("<decisiondate>[May 22, 2024]</decisiondate>", date(2024, 5, 22)),
             (
                 "<decisiondate>Decided Dec. 18, 2009.</decisiondate>",
                 date(2009, 12, 18),
             ),
+            (
+                "<decisiondate>Opinion filed Sept. 3, 2024</decisiondate>",
+                date(2024, 9, 3),
+            ),
+            ("<decisiondate>5/22/2024</decisiondate>", date(2024, 5, 22)),
+            (
+                "<decisiondate>May 22, 2024. Rehearing Denied "
+                "June 30, 2024.</decisiondate>",
+                date(2024, 5, 22),
+            ),
+            (
+                "<casebody><decisiondate>[May 22, 2024]</decisiondate>"
+                "<decisiondate>[June 30, 2024]</decisiondate></casebody>",
+                date(2024, 5, 22),
+            ),
+            (
+                "<casebody><decisiondate>Undated</decisiondate>"
+                "<decisiondate>June 30, 2024</decisiondate></casebody>",
+                date(2024, 6, 30),
+            ),
+            ("<decisiondate>May 2024</decisiondate>", None),
+            ("<decisiondate>2024</decisiondate>", None),
+            ("<decisiondate>Feb. 30, 2024</decisiondate>", None),
             ("<decisiondate>Not a date</decisiondate>", None),
             ("<court>No date here</court>", None),
         ]
