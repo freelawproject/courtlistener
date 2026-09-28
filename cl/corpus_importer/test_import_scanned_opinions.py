@@ -1,3 +1,4 @@
+import re
 import tempfile
 from datetime import date
 from pathlib import Path
@@ -201,11 +202,50 @@ class ImportScannedOpinionsTest(TestCase):
         if opinion is None:
             raise ValueError("The test XML must have an opinion")
         cls.opinion_text = opinion.get_text(" ")
+        with open(SCAN_XML_PATH, encoding="utf-8") as f:
+            cls.scan_xml = f.read()
 
-    def import_scan(self, **kwargs) -> None:
+    def import_scan(self, **kwargs: str | None) -> None:
         """Run the command over the test XML."""
         options = {"court_id": self.court.pk, "path": SCAN_XML_PATH} | kwargs
         call_command("import_scanned_opinions", **options)
+
+    def import_xml(self, xml: str, **kwargs: str | None) -> None:
+        """Run the command over an XML written to a temporary directory."""
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            Path(tmp_dir, "scan.xml").write_text(xml, encoding="utf-8")
+            self.import_scan(path=tmp_dir, **kwargs)
+
+    def make_matching_cluster(self, opinion_count: int = 1) -> OpinionCluster:
+        """Make a court website cluster that matches the test XML."""
+        docket = DocketFactory.create(
+            court=self.court,
+            source=Docket.SCRAPER,
+            docket_number="4D2023-2459",
+            case_name="Merritt v. State",
+        )
+        cluster = OpinionClusterFactory.create(
+            docket=docket,
+            case_name="Merritt v. State",
+            date_filed=date(2024, 5, 22),
+            source=ClusterSources.COURT_WEBSITE,
+            attorneys="",
+            judges="",
+        )
+        Citation.objects.create(
+            cluster=cluster,
+            volume=388,
+            reporter="So. 3d",
+            page="1",
+            type=Citation.STATE_REGIONAL,
+        )
+        OpinionFactory.create_batch(
+            opinion_count,
+            cluster=cluster,
+            plain_text=self.opinion_text,
+            html="",
+        )
+        return cluster
 
     def test_import_new_case(self) -> None:
         """Does a new scanned opinion create its docket, cluster and opinion?"""
@@ -253,45 +293,63 @@ class ImportScannedOpinionsTest(TestCase):
 
     def test_merge_into_existing_cluster(self) -> None:
         """Is a scanned opinion merged into a matching cluster?"""
-        docket = DocketFactory.create(
-            court=self.court,
-            source=Docket.SCRAPER,
-            docket_number="4D2023-2459",
-            case_name="Merritt v. State",
-        )
-        cluster = OpinionClusterFactory.create(
-            docket=docket,
-            case_name="Merritt v. State",
-            date_filed=date(2024, 5, 22),
-            source=ClusterSources.COURT_WEBSITE,
-            attorneys="",
-        )
-        Citation.objects.create(
-            cluster=cluster,
-            volume=388,
-            reporter="So. 3d",
-            page="1",
-            type=Citation.STATE_REGIONAL,
-        )
-        opinion = OpinionFactory.create(
-            cluster=cluster, plain_text=self.opinion_text, html=""
-        )
+        cluster = self.make_matching_cluster()
 
         self.import_scan()
 
         self.assertEqual(OpinionCluster.objects.count(), 1)
         self.assertEqual(Opinion.objects.count(), 1)
+        self.assertEqual(Citation.objects.count(), 1)
         cluster.refresh_from_db()
-        docket.refresh_from_db()
-        opinion.refresh_from_db()
-        self.assertEqual(cluster.source, "CS")
+        self.assertEqual(
+            cluster.source,
+            ClusterSources.merge_sources(
+                ClusterSources.COURT_WEBSITE, ClusterSources.SCANNING_PROJECT
+            ),
+        )
         self.assertIn("pro se", cluster.attorneys)
+        self.assertIn("Gerber", cluster.judges)
         self.assertRegex(
             cluster.filepath_xml_scan.name,
             r"/388-so-3d-1(_[A-Za-z0-9]+)?\.xml$",
         )
-        self.assertEqual(docket.source, Docket.SCRAPER_AND_SCANNING_PROJECT)
-        self.assertIn("confession of error", opinion.xml_scan)
+        self.assertEqual(
+            cluster.docket.source, Docket.SCRAPER_AND_SCANNING_PROJECT
+        )
+        self.assertIn(
+            "confession of error", cluster.sub_opinions.get().xml_scan
+        )
+
+    def test_merge_skips_opinions_when_counts_differ(self) -> None:
+        """Is the opinion text left alone when opinions can't be paired?"""
+        cluster = self.make_matching_cluster(opinion_count=2)
+
+        with mock.patch(f"{COMMAND_MODULE}.logger") as mock_logger:
+            self.import_scan()
+
+        cluster.refresh_from_db()
+        self.assertTrue(cluster.filepath_xml_scan)
+        self.assertFalse(cluster.sub_opinions.exclude(xml_scan="").exists())
+        self.assertIn(
+            "Opinion content was not merged",
+            mock_logger.warning.call_args[0][0],
+        )
+
+    def test_import_multiple_opinions(self) -> None:
+        """Is each opinion element imported as an opinion with its type?"""
+        xml = self.scan_xml.replace(
+            "</opinion>",
+            '</opinion><opinion type="dissent"><author>WARNER, J.</author>'
+            "<p>I respectfully dissent.</p></opinion>",
+        )
+
+        self.import_xml(xml)
+
+        opinions = Opinion.objects.order_by("pk")
+        self.assertEqual(
+            [(o.type, o.author_str) for o in opinions],
+            [(Opinion.COMBINED, "Gerber"), (Opinion.DISSENT, "Warner")],
+        )
 
     def test_reuse_existing_docket(self) -> None:
         """Is an existing docket without a matching cluster reused?"""
@@ -313,12 +371,9 @@ class ImportScannedOpinionsTest(TestCase):
     def test_scan_from_another_reporter_is_not_duplicated(self) -> None:
         """Is a scan of a case already imported from a scan detected by text?"""
         self.import_scan()
-        with open(SCAN_XML_PATH, encoding="utf-8") as f:
-            xml = f.read().replace("388 So. 3d 1", "49 Fla. L. Weekly D1100")
-        with tempfile.TemporaryDirectory() as tmp_dir:
-            Path(tmp_dir, "parallel.xml").write_text(xml, encoding="utf-8")
-            with mock.patch(f"{COMMAND_MODULE}.logger") as mock_logger:
-                self.import_scan(path=tmp_dir)
+        xml = self.scan_xml.replace("388 So. 3d 1", "49 Fla. L. Weekly D1100")
+        with mock.patch(f"{COMMAND_MODULE}.logger") as mock_logger:
+            self.import_xml(xml)
 
         self.assertEqual(OpinionCluster.objects.count(), 1)
         self.assertIn(
@@ -338,9 +393,7 @@ class ImportScannedOpinionsTest(TestCase):
   <decisiondate>[May 22, 2024]</decisiondate>
   <opinion><author>PER CURIAM.</author><p>Affirmed.</p></opinion>
 </casebody>"""
-        with tempfile.TemporaryDirectory() as tmp_dir:
-            Path(tmp_dir, "same_page.xml").write_text(xml, encoding="utf-8")
-            self.import_scan(path=tmp_dir)
+        self.import_xml(xml)
 
         self.assertEqual(OpinionCluster.objects.count(), 2)
         new_cluster = OpinionCluster.objects.get(
@@ -396,11 +449,42 @@ class ImportScannedOpinionsTest(TestCase):
             OpinionCluster.objects.get().docket.court_id, self.court.pk
         )
 
-    def test_skip_without_citation(self) -> None:
-        """Is a scanned opinion without citation skipped?"""
-        with open(SCAN_XML_PATH, encoding="utf-8") as f:
-            xml = f.read().replace("<citation>388 So. 3d 1</citation>", "")
-        with tempfile.TemporaryDirectory() as tmp_dir:
-            Path(tmp_dir, "no_citation.xml").write_text(xml, encoding="utf-8")
-            self.import_scan(path=tmp_dir)
-        self.assertEqual(OpinionCluster.objects.count(), 0)
+    def test_skip_invalid_files(self) -> None:
+        """Are files lacking required data skipped with a warning?"""
+        cases = [
+            (
+                "No valid citation",
+                self.scan_xml.replace("<citation>388 So. 3d 1</citation>", ""),
+                self.court.pk,
+            ),
+            (
+                "No parties",
+                re.sub(r"<parties>.*?</parties>", "", self.scan_xml),
+                self.court.pk,
+            ),
+            (
+                "No opinion",
+                re.sub(
+                    r"<opinion>.*</opinion>", "", self.scan_xml, flags=re.S
+                ),
+                self.court.pk,
+            ),
+            (
+                "Can't parse date",
+                self.scan_xml.replace("[May 22, 2024]", "Undated"),
+                self.court.pk,
+            ),
+            (
+                "Court not found",
+                self.scan_xml.replace("Fourth District", "Tenth Circuit"),
+                None,
+            ),
+        ]
+        for message, xml, court_id in cases:
+            with (
+                self.subTest(message=message),
+                mock.patch(f"{COMMAND_MODULE}.logger") as mock_logger,
+            ):
+                self.import_xml(xml, court_id=court_id)
+                self.assertEqual(OpinionCluster.objects.count(), 0)
+                self.assertIn(message, mock_logger.warning.call_args[0][0])
