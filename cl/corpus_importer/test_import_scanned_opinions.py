@@ -8,6 +8,7 @@ from django.core.management import call_command
 from cl.corpus_importer.management.commands.import_scanned_opinions import (
     get_citation_strings,
     get_date_filed,
+    get_docket_number,
     make_opinion,
     normalize_case_name_caps,
 )
@@ -80,6 +81,27 @@ class ScanXmlHelpersTest(SimpleTestCase):
                 self.assertEqual(
                     get_citation_strings(make_soup(xml)), expected
                 )
+
+    def test_get_docket_number(self) -> None:
+        """Is the printed "No." prefix removed from docket numbers?"""
+        cases = [
+            ("<docketnumber>No. 4D2023-2459.</docketnumber>", "4D2023-2459"),
+            (
+                "<docketnumber>Nos. 1D22-1, 1D22-2</docketnumber>",
+                "1D22-1, 1D22-2",
+            ),
+            ("<docketnumber>Case No. SC2024-1</docketnumber>", "SC2024-1"),
+            ("<docketnumber>NOV-123</docketnumber>", "NOV-123"),
+            (
+                "<casebody><docketnumber>No. 1</docketnumber>"
+                "<docketnumber>No. 2</docketnumber></casebody>",
+                "1; 2",
+            ),
+            ("<casebody/>", ""),
+        ]
+        for xml, expected in cases:
+            with self.subTest(xml=xml):
+                self.assertEqual(get_docket_number(make_soup(xml)), expected)
 
     def test_make_opinion(self) -> None:
         """Are the author, per curiam and type read from the opinion?"""
@@ -168,7 +190,7 @@ class ImportScannedOpinionsTest(TestCase):
         docket = cluster.docket
         self.assertEqual(docket.source, Docket.SCANNING_PROJECT)
         self.assertEqual(docket.court_id, self.court.pk)
-        self.assertEqual(docket.docket_number, "No. 4D2023-2459")
+        self.assertEqual(docket.docket_number, "4D2023-2459")
 
         citation = Citation.objects.get(cluster=cluster)
         self.assertEqual(
@@ -231,6 +253,23 @@ class ImportScannedOpinionsTest(TestCase):
         )
         self.assertEqual(docket.source, Docket.SCRAPER_AND_SCANNING_PROJECT)
         self.assertIn("confession of error", opinion.xml_scan)
+
+    def test_reuse_existing_docket(self) -> None:
+        """Is an existing docket without a matching cluster reused?"""
+        docket = DocketFactory.create(
+            court=self.court,
+            source=Docket.SCRAPER,
+            docket_number="4D2023-2459",
+            docket_number_raw="4D2023-2459",
+            case_name="Merritt v. State",
+        )
+
+        self.import_scan()
+
+        self.assertEqual(Docket.objects.count(), 1)
+        docket.refresh_from_db()
+        self.assertEqual(docket.source, Docket.SCRAPER_AND_SCANNING_PROJECT)
+        self.assertEqual(OpinionCluster.objects.get().docket_id, docket.pk)
 
     def test_court_lookup(self) -> None:
         """Is the court found from the court element when not given?"""

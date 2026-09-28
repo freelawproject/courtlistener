@@ -47,6 +47,10 @@ HYPERSCAN_TOKENIZER = HyperscanTokenizer(cache_dir=".hyperscan")
 cnt = CaseNameTweaker()
 
 PER_CURIAM_RE = re.compile(r"per\s+curiam", re.IGNORECASE)
+# The "No." or "Case No." printed before docket numbers
+DOCKET_NUMBER_PREFIX_RE = re.compile(
+    r"^(?:case\s+)?nos?(?:\.\s*|\s+)", re.IGNORECASE
+)
 
 # Words that should stay lowercase in case names when printed in caps.
 LOWERCASE_CASE_NAME_WORDS = {
@@ -142,6 +146,24 @@ def get_element_text(soup: BeautifulSoup, selector: str, sep: str) -> str:
     """
     texts = [e.get_text(" ", strip=True) for e in soup.select(selector)]
     return sep.join(t for t in texts if t)
+
+
+def get_docket_number(soup: BeautifulSoup) -> str:
+    """Get the docket number without the printed prefix.
+
+    e.g. "No. 4D2023-2459." becomes "4D2023-2459", which is the format
+    scrapers store, so existing dockets can be found.
+
+    :param soup: The parsed XML.
+    :return: The docket numbers joined by "; ", or an empty string.
+    """
+    numbers = [
+        DOCKET_NUMBER_PREFIX_RE.sub("", e.get_text(" ", strip=True)).strip(
+            " ."
+        )
+        for e in soup.select("docketnumber")
+    ]
+    return "; ".join(n for n in numbers if n)
 
 
 def normalize_case_name_caps(case_name: str) -> str:
@@ -287,7 +309,7 @@ def parse_scan_xml(
         case_name=case_name,
         case_name_short=cnt.make_case_name_short(case_name),
         case_name_full=case_name_full,
-        docket_number=get_element_text(soup, "docketnumber", "; ").strip("."),
+        docket_number=get_docket_number(soup),
         court_id=court_id,
         date_filed=date_filed,
         citations=cite_strings,
