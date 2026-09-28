@@ -4,9 +4,11 @@ import re
 from dataclasses import dataclass, field
 from datetime import date
 from glob import glob
+from typing import Any
 
 from bs4 import BeautifulSoup, Tag
 from django.core.files.base import ContentFile
+from django.core.management import CommandParser
 from django.db import transaction
 from django.utils.text import slugify
 from eyecite.find import get_citations
@@ -631,12 +633,19 @@ def import_scanned_opinion(file_path: str, court_id: str | None) -> None:
 
 
 class Command(VerboseCommand):
+    """Import scanning project final XML files into CourtListener."""
+
     help = (
         "Import opinions from the scanning project final XML files, merging "
         "them into existing clusters when possible."
     )
 
-    def add_arguments(self, parser):
+    def add_arguments(self, parser: CommandParser) -> None:
+        """Add the command arguments.
+
+        :param parser: The command parser.
+        :return: None
+        """
         parser.add_argument(
             "--path",
             type=str,
@@ -651,7 +660,11 @@ class Command(VerboseCommand):
             "court element of each XML.",
         )
 
-    def handle(self, *args, **options):
+    def handle(self, *args: Any, **options: Any) -> None:
+        """Import every XML file found in the given path.
+
+        :return: None
+        """
         super().handle(*args, **options)
         for file_path in xml_file_paths(options["path"]):
             try:
