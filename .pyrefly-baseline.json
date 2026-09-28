@@ -1541,38 +1541,10 @@
       "severity": "error"
     },
     {
-      "column": 5,
-      "path": "cl/corpus_importer/tasks.py",
-      "name": "missing-attribute",
-      "concise_description": "Object of class `NoneType` has no attribute `add_recap_source`",
-      "severity": "error"
-    },
-    {
-      "column": 43,
-      "path": "cl/corpus_importer/tasks.py",
-      "name": "bad-argument-type",
-      "concise_description": "Argument `Docket | None` is not assignable to parameter `d` with type `Docket`",
-      "severity": "error"
-    },
-    {
-      "column": 5,
-      "path": "cl/corpus_importer/tasks.py",
-      "name": "missing-attribute",
-      "concise_description": "Object of class `NoneType` has no attribute `save`",
-      "severity": "error"
-    },
-    {
       "column": 21,
       "path": "cl/corpus_importer/tasks.py",
       "name": "missing-attribute",
       "concise_description": "Object of class `NoneType` has no attribute `text`",
-      "severity": "error"
-    },
-    {
-      "column": 22,
-      "path": "cl/corpus_importer/tasks.py",
-      "name": "missing-attribute",
-      "concise_description": "Object of class `NoneType` has no attribute `pk`",
       "severity": "error"
     },
     {
@@ -1583,45 +1555,10 @@
       "severity": "error"
     },
     {
-      "column": 5,
-      "path": "cl/corpus_importer/tasks.py",
-      "name": "missing-attribute",
-      "concise_description": "Object of class `NoneType` has no attribute `pacer_case_id`",
-      "severity": "error"
-    },
-    {
       "column": 23,
       "path": "cl/corpus_importer/tasks.py",
       "name": "bad-assignment",
       "concise_description": "`int` is not assignable to attribute `pacer_case_id` with type `str | None`",
-      "severity": "error"
-    },
-    {
-      "column": 5,
-      "path": "cl/corpus_importer/tasks.py",
-      "name": "missing-attribute",
-      "concise_description": "Object of class `NoneType` has no attribute `add_recap_source`",
-      "severity": "error"
-    },
-    {
-      "column": 9,
-      "path": "cl/corpus_importer/tasks.py",
-      "name": "bad-argument-type",
-      "concise_description": "Argument `Docket | None` is not assignable to parameter `d` with type `Docket` in function `cl.recap.mergers.save_iquery_to_docket`",
-      "severity": "error"
-    },
-    {
-      "column": 22,
-      "path": "cl/corpus_importer/tasks.py",
-      "name": "missing-attribute",
-      "concise_description": "Object of class `NoneType` has no attribute `pk`",
-      "severity": "error"
-    },
-    {
-      "column": 22,
-      "path": "cl/corpus_importer/tasks.py",
-      "name": "missing-attribute",
-      "concise_description": "Object of class `NoneType` has no attribute `pk`",
       "severity": "error"
     },
     {
@@ -1730,132 +1667,6 @@
       "severity": "error"
     },
     {
-      "column": 12,
-      "path": "cl/corpus_importer/tasks.py",
-      "name": "missing-attribute",
-      "concise_description": "Object of class `NoneType` has no attribute `pk`",
-      "severity": "error"
-    },
-    {
-      "column": 13,
-      "path": "cl/corpus_importer/tasks.py",
-      "name": "missing-attribute",
-      "concise_description": "Object of class `NoneType` has no attribute `add_scraper_source`",
-      "severity": "error"
-    },
-    {
-      "column": 13,
-      "path": "cl/corpus_importer/tasks.py",
-      "name": "missing-attribute",
-      "concise_description": "Object of class `NoneType` has no attribute `source`",
-      "severity": "error"
-    },
-    {
-      "column": 9,
-      "path": "cl/corpus_importer/tasks.py",
-      "name": "missing-attribute",
-      "concise_description": "Object of class `NoneType` has no attribute `docket_number`",
-      "severity": "error"
-    },
-    {
-      "column": 9,
-      "path": "cl/corpus_importer/tasks.py",
-      "name": "missing-attribute",
-      "concise_description": "Object of class `NoneType` has no attribute `docket_number_raw`",
-      "severity": "error"
-    },
-    {
-      "column": 9,
-      "path": "cl/corpus_importer/tasks.py",
-      "name": "missing-attribute",
-      "concise_description": "Object of class `NoneType` has no attribute `case_name`",
-      "severity": "error"
-    },
-    {
-      "column": 51,
-      "path": "cl/corpus_importer/tasks.py",
-      "name": "missing-attribute",
-      "concise_description": "Object of class `NoneType` has no attribute `case_name`",
-      "severity": "error"
-    },
-    {
-      "column": 9,
-      "path": "cl/corpus_importer/tasks.py",
-      "name": "missing-attribute",
-      "concise_description": "Object of class `NoneType` has no attribute `date_filed`",
-      "severity": "error"
-    },
-    {
-      "column": 54,
-      "path": "cl/corpus_importer/tasks.py",
-      "name": "missing-attribute",
-      "concise_description": "Object of class `NoneType` has no attribute `date_filed`",
-      "severity": "error"
-    },
-    {
-      "column": 9,
-      "path": "cl/corpus_importer/tasks.py",
-      "name": "missing-attribute",
-      "concise_description": "Object of class `NoneType` has no attribute `appeal_from_str`",
-      "severity": "error"
-    },
-    {
-      "column": 55,
-      "path": "cl/corpus_importer/tasks.py",
-      "name": "missing-attribute",
-      "concise_description": "Object of class `NoneType` has no attribute `appeal_from_str`",
-      "severity": "error"
-    },
-    {
-      "column": 13,
-      "path": "cl/corpus_importer/tasks.py",
-      "name": "missing-attribute",
-      "concise_description": "Object of class `NoneType` has no attribute `appeal_from`",
-      "severity": "error"
-    },
-    {
-      "column": 61,
-      "path": "cl/corpus_importer/tasks.py",
-      "name": "missing-attribute",
-      "concise_description": "Object of class `NoneType` has no attribute `appeal_from`",
-      "severity": "error"
-    },
-    {
-      "column": 19,
-      "path": "cl/corpus_importer/tasks.py",
-      "name": "missing-attribute",
-      "concise_description": "Object of class `NoneType` has no attribute `originating_court_information`",
-      "severity": "error"
-    },
-    {
-      "column": 13,
-      "path": "cl/corpus_importer/tasks.py",
-      "name": "missing-attribute",
-      "concise_description": "Object of class `NoneType` has no attribute `originating_court_information`",
-      "severity": "error"
-    },
-    {
-      "column": 9,
-      "path": "cl/corpus_importer/tasks.py",
-      "name": "missing-attribute",
-      "concise_description": "Object of class `NoneType` has no attribute `save`",
-      "severity": "error"
-    },
-    {
-      "column": 9,
-      "path": "cl/corpus_importer/tasks.py",
-      "name": "bad-argument-type",
-      "concise_description": "Argument `Docket | None` is not assignable to parameter `docket` with type `Docket` in function `add_scotus_docket_entries`",
-      "severity": "error"
-    },
-    {
-      "column": 12,
-      "path": "cl/corpus_importer/tasks.py",
-      "name": "bad-return",
-      "concise_description": "Returned type `tuple[Docket | None, bool, list[int]]` is not assignable to declared return type `tuple[Docket, bool, list[int]]`",
-      "severity": "error"
-    },
-    {
       "column": 43,
       "path": "cl/corpus_importer/tasks.py",
       "name": "bad-assignment",
@@ -1867,139 +1678,6 @@
       "path": "cl/corpus_importer/tasks.py",
       "name": "bad-assignment",
       "concise_description": "`object | str` is not assignable to attribute `remarks` with type `str`",
-      "severity": "error"
-    },
-    {
-      "column": 26,
-      "path": "cl/corpus_importer/tasks.py",
-      "name": "missing-attribute",
-      "concise_description": "Object of class `NoneType` has no attribute `pk`",
-      "severity": "error"
-    },
-    {
-      "column": 9,
-      "path": "cl/corpus_importer/tasks.py",
-      "name": "missing-attribute",
-      "concise_description": "Object of class `NoneType` has no attribute `add_scraper_source`",
-      "severity": "error"
-    },
-    {
-      "column": 9,
-      "path": "cl/corpus_importer/tasks.py",
-      "name": "missing-attribute",
-      "concise_description": "Object of class `NoneType` has no attribute `docket_number`",
-      "severity": "error"
-    },
-    {
-      "column": 9,
-      "path": "cl/corpus_importer/tasks.py",
-      "name": "missing-attribute",
-      "concise_description": "Object of class `NoneType` has no attribute `docket_number_core`",
-      "severity": "error"
-    },
-    {
-      "column": 9,
-      "path": "cl/corpus_importer/tasks.py",
-      "name": "missing-attribute",
-      "concise_description": "Object of class `NoneType` has no attribute `date_filed`",
-      "severity": "error"
-    },
-    {
-      "column": 9,
-      "path": "cl/corpus_importer/tasks.py",
-      "name": "missing-attribute",
-      "concise_description": "Object of class `NoneType` has no attribute `cause`",
-      "severity": "error"
-    },
-    {
-      "column": 9,
-      "path": "cl/corpus_importer/tasks.py",
-      "name": "missing-attribute",
-      "concise_description": "Object of class `NoneType` has no attribute `case_name`",
-      "severity": "error"
-    },
-    {
-      "column": 9,
-      "path": "cl/corpus_importer/tasks.py",
-      "name": "missing-attribute",
-      "concise_description": "Object of class `NoneType` has no attribute `case_name_full`",
-      "severity": "error"
-    },
-    {
-      "column": 9,
-      "path": "cl/corpus_importer/tasks.py",
-      "name": "missing-attribute",
-      "concise_description": "Object of class `NoneType` has no attribute `docket_number_raw`",
-      "severity": "error"
-    },
-    {
-      "column": 13,
-      "path": "cl/corpus_importer/tasks.py",
-      "name": "bad-argument-type",
-      "concise_description": "Argument `Docket | None` is not assignable to parameter `docket` with type `Docket` in function `merge_texas_docket_originating_court`",
-      "severity": "error"
-    },
-    {
-      "column": 17,
-      "path": "cl/corpus_importer/tasks.py",
-      "name": "missing-attribute",
-      "concise_description": "Object of class `NoneType` has no attribute `appeal_from`",
-      "severity": "error"
-    },
-    {
-      "column": 9,
-      "path": "cl/corpus_importer/tasks.py",
-      "name": "missing-attribute",
-      "concise_description": "Object of class `NoneType` has no attribute `appeal_from_str`",
-      "severity": "error"
-    },
-    {
-      "column": 9,
-      "path": "cl/corpus_importer/tasks.py",
-      "name": "missing-attribute",
-      "concise_description": "Object of class `NoneType` has no attribute `save`",
-      "severity": "error"
-    },
-    {
-      "column": 59,
-      "path": "cl/corpus_importer/tasks.py",
-      "name": "bad-argument-type",
-      "concise_description": "Argument `Docket | None` is not assignable to parameter `docket` with type `Docket` in function `merge_texas_trial_court_data`",
-      "severity": "error"
-    },
-    {
-      "column": 46,
-      "path": "cl/corpus_importer/tasks.py",
-      "name": "bad-argument-type",
-      "concise_description": "Argument `Docket | None` is not assignable to parameter `docket` with type `Docket` in function `merge_texas_parties`",
-      "severity": "error"
-    },
-    {
-      "column": 9,
-      "path": "cl/corpus_importer/tasks.py",
-      "name": "bad-argument-type",
-      "concise_description": "Argument `Docket | None` is not assignable to parameter `docket` with type `Docket` in function `merge_texas_docket_entries`",
-      "severity": "error"
-    },
-    {
-      "column": 9,
-      "path": "cl/corpus_importer/tasks.py",
-      "name": "bad-argument-type",
-      "concise_description": "Argument `Docket | None` is not assignable to parameter `docket` with type `Docket` in function `merge_texas_case_transfers`",
-      "severity": "error"
-    },
-    {
-      "column": 44,
-      "path": "cl/corpus_importer/tasks.py",
-      "name": "missing-attribute",
-      "concise_description": "Object of class `NoneType` has no attribute `pk`",
-      "severity": "error"
-    },
-    {
-      "column": 13,
-      "path": "cl/corpus_importer/tasks.py",
-      "name": "missing-attribute",
-      "concise_description": "Object of class `NoneType` has no attribute `pk`",
       "severity": "error"
     },
     {
@@ -4299,31 +3977,10 @@
       "severity": "error"
     },
     {
-      "column": 5,
-      "path": "cl/recap/mergers.py",
-      "name": "missing-attribute",
-      "concise_description": "Object of class `NoneType` has no attribute `pacer_case_id`",
-      "severity": "error"
-    },
-    {
       "column": 23,
       "path": "cl/recap/mergers.py",
       "name": "bad-assignment",
       "concise_description": "`int` is not assignable to attribute `pacer_case_id` with type `str | None`",
-      "severity": "error"
-    },
-    {
-      "column": 5,
-      "path": "cl/recap/mergers.py",
-      "name": "missing-attribute",
-      "concise_description": "Object of class `NoneType` has no attribute `add_recap_source`",
-      "severity": "error"
-    },
-    {
-      "column": 47,
-      "path": "cl/recap/mergers.py",
-      "name": "bad-argument-type",
-      "concise_description": "Argument `Docket | None` is not assignable to parameter `d` with type `Docket`",
       "severity": "error"
     },
     {
@@ -4355,69 +4012,6 @@
       "severity": "error"
     },
     {
-      "column": 5,
-      "path": "cl/recap/tasks.py",
-      "name": "missing-attribute",
-      "concise_description": "Object of class `NoneType` has no attribute `add_recap_source`",
-      "severity": "error"
-    },
-    {
-      "column": 34,
-      "path": "cl/recap/tasks.py",
-      "name": "bad-argument-type",
-      "concise_description": "Argument `Docket | None` is not assignable to parameter `d` with type `Docket` in function `cl.recap.mergers.update_docket_metadata`",
-      "severity": "error"
-    },
-    {
-      "column": 12,
-      "path": "cl/recap/tasks.py",
-      "name": "missing-attribute",
-      "concise_description": "Object of class `NoneType` has no attribute `pacer_case_id`",
-      "severity": "error"
-    },
-    {
-      "column": 9,
-      "path": "cl/recap/tasks.py",
-      "name": "missing-attribute",
-      "concise_description": "Object of class `NoneType` has no attribute `pacer_case_id`",
-      "severity": "error"
-    },
-    {
-      "column": 52,
-      "path": "cl/recap/tasks.py",
-      "name": "missing-attribute",
-      "concise_description": "Object of class `NoneType` has no attribute `pk`",
-      "severity": "error"
-    },
-    {
-      "column": 30,
-      "path": "cl/recap/tasks.py",
-      "name": "missing-attribute",
-      "concise_description": "Object of class `NoneType` has no attribute `pk`",
-      "severity": "error"
-    },
-    {
-      "column": 26,
-      "path": "cl/recap/tasks.py",
-      "name": "bad-argument-type",
-      "concise_description": "Argument `Docket | None` is not assignable to parameter `d` with type `Docket` in function `cl.alerts.utils.set_skip_percolation_if_parties_data`",
-      "severity": "error"
-    },
-    {
-      "column": 11,
-      "path": "cl/recap/tasks.py",
-      "name": "missing-attribute",
-      "concise_description": "Object of class `NoneType` has no attribute `asave`",
-      "severity": "error"
-    },
-    {
-      "column": 9,
-      "path": "cl/recap/tasks.py",
-      "name": "bad-argument-type",
-      "concise_description": "Argument `Docket | None` is not assignable to parameter `d` with type `Docket` in function `cl.recap.mergers.add_docket_entries`",
-      "severity": "error"
-    },
-    {
       "column": 49,
       "path": "cl/recap/tasks.py",
       "name": "bad-argument-type",
@@ -4427,29 +4021,8 @@
     {
       "column": 62,
       "path": "cl/recap/tasks.py",
-      "name": "missing-attribute",
-      "concise_description": "Object of class `NoneType` has no attribute `date_filed`",
-      "severity": "error"
-    },
-    {
-      "column": 47,
-      "path": "cl/recap/tasks.py",
-      "name": "missing-attribute",
-      "concise_description": "Object of class `NoneType` has no attribute `pk`",
-      "severity": "error"
-    },
-    {
-      "column": 48,
-      "path": "cl/recap/tasks.py",
-      "name": "missing-attribute",
-      "concise_description": "Object of class `NoneType` has no attribute `pk`",
-      "severity": "error"
-    },
-    {
-      "column": 22,
-      "path": "cl/recap/tasks.py",
-      "name": "missing-attribute",
-      "concise_description": "Object of class `NoneType` has no attribute `pk`",
+      "name": "bad-argument-type",
+      "concise_description": "Argument `date | None` is not assignable to parameter `docket_date` with type `date` in function `cl.recap.mergers.process_orphan_documents`",
       "severity": "error"
     },
     {
@@ -4474,97 +4047,6 @@
       "severity": "error"
     },
     {
-      "column": 5,
-      "path": "cl/recap/tasks.py",
-      "name": "missing-attribute",
-      "concise_description": "Object of class `NoneType` has no attribute `add_recap_source`",
-      "severity": "error"
-    },
-    {
-      "column": 34,
-      "path": "cl/recap/tasks.py",
-      "name": "bad-argument-type",
-      "concise_description": "Argument `Docket | None` is not assignable to parameter `d` with type `Docket` in function `cl.recap.mergers.update_docket_metadata`",
-      "severity": "error"
-    },
-    {
-      "column": 51,
-      "path": "cl/recap/tasks.py",
-      "name": "bad-argument-type",
-      "concise_description": "Argument `Docket | None` is not assignable to parameter `d` with type `Docket` in function `cl.alerts.utils.set_skip_percolation_if_bankruptcy_data`",
-      "severity": "error"
-    },
-    {
-      "column": 19,
-      "path": "cl/recap/tasks.py",
-      "name": "missing-attribute",
-      "concise_description": "Object of class `NoneType` has no attribute `asave`",
-      "severity": "error"
-    },
-    {
-      "column": 56,
-      "path": "cl/recap/tasks.py",
-      "name": "bad-argument-type",
-      "concise_description": "Argument `Docket | None` is not assignable to parameter `d` with type `Docket`",
-      "severity": "error"
-    },
-    {
-      "column": 48,
-      "path": "cl/recap/tasks.py",
-      "name": "missing-attribute",
-      "concise_description": "Object of class `NoneType` has no attribute `pk`",
-      "severity": "error"
-    },
-    {
-      "column": 26,
-      "path": "cl/recap/tasks.py",
-      "name": "missing-attribute",
-      "concise_description": "Object of class `NoneType` has no attribute `pk`",
-      "severity": "error"
-    },
-    {
-      "column": 5,
-      "path": "cl/recap/tasks.py",
-      "name": "missing-attribute",
-      "concise_description": "Object of class `NoneType` has no attribute `add_recap_source`",
-      "severity": "error"
-    },
-    {
-      "column": 34,
-      "path": "cl/recap/tasks.py",
-      "name": "bad-argument-type",
-      "concise_description": "Argument `Docket | None` is not assignable to parameter `d` with type `Docket` in function `cl.recap.mergers.update_docket_metadata`",
-      "severity": "error"
-    },
-    {
-      "column": 52,
-      "path": "cl/recap/tasks.py",
-      "name": "missing-attribute",
-      "concise_description": "Object of class `NoneType` has no attribute `pk`",
-      "severity": "error"
-    },
-    {
-      "column": 30,
-      "path": "cl/recap/tasks.py",
-      "name": "missing-attribute",
-      "concise_description": "Object of class `NoneType` has no attribute `pk`",
-      "severity": "error"
-    },
-    {
-      "column": 19,
-      "path": "cl/recap/tasks.py",
-      "name": "missing-attribute",
-      "concise_description": "Object of class `NoneType` has no attribute `asave`",
-      "severity": "error"
-    },
-    {
-      "column": 9,
-      "path": "cl/recap/tasks.py",
-      "name": "bad-argument-type",
-      "concise_description": "Argument `Docket | None` is not assignable to parameter `d` with type `Docket` in function `cl.recap.mergers.add_docket_entries`",
-      "severity": "error"
-    },
-    {
       "column": 49,
       "path": "cl/recap/tasks.py",
       "name": "bad-argument-type",
@@ -4574,134 +4056,8 @@
     {
       "column": 62,
       "path": "cl/recap/tasks.py",
-      "name": "missing-attribute",
-      "concise_description": "Object of class `NoneType` has no attribute `date_filed`",
-      "severity": "error"
-    },
-    {
-      "column": 47,
-      "path": "cl/recap/tasks.py",
-      "name": "missing-attribute",
-      "concise_description": "Object of class `NoneType` has no attribute `pk`",
-      "severity": "error"
-    },
-    {
-      "column": 48,
-      "path": "cl/recap/tasks.py",
-      "name": "missing-attribute",
-      "concise_description": "Object of class `NoneType` has no attribute `pk`",
-      "severity": "error"
-    },
-    {
-      "column": 22,
-      "path": "cl/recap/tasks.py",
-      "name": "missing-attribute",
-      "concise_description": "Object of class `NoneType` has no attribute `pk`",
-      "severity": "error"
-    },
-    {
-      "column": 25,
-      "path": "cl/recap/tasks.py",
-      "name": "missing-attribute",
-      "concise_description": "Object of class `NoneType` has no attribute `case_name`",
-      "severity": "error"
-    },
-    {
-      "column": 5,
-      "path": "cl/recap/tasks.py",
-      "name": "missing-attribute",
-      "concise_description": "Object of class `NoneType` has no attribute `add_recap_source`",
-      "severity": "error"
-    },
-    {
-      "column": 34,
-      "path": "cl/recap/tasks.py",
       "name": "bad-argument-type",
-      "concise_description": "Argument `Docket | None` is not assignable to parameter `d` with type `Docket` in function `cl.recap.mergers.update_docket_metadata`",
-      "severity": "error"
-    },
-    {
-      "column": 29,
-      "path": "cl/recap/tasks.py",
-      "name": "missing-attribute",
-      "concise_description": "Object of class `NoneType` has no attribute `case_name`",
-      "severity": "error"
-    },
-    {
-      "column": 45,
-      "path": "cl/recap/tasks.py",
-      "name": "missing-attribute",
-      "concise_description": "Object of class `NoneType` has no attribute `pk`",
-      "severity": "error"
-    },
-    {
-      "column": 18,
-      "path": "cl/recap/tasks.py",
-      "name": "missing-attribute",
-      "concise_description": "Object of class `NoneType` has no attribute `docket_entries`",
-      "severity": "error"
-    },
-    {
-      "column": 52,
-      "path": "cl/recap/tasks.py",
-      "name": "missing-attribute",
-      "concise_description": "Object of class `NoneType` has no attribute `pk`",
-      "severity": "error"
-    },
-    {
-      "column": 30,
-      "path": "cl/recap/tasks.py",
-      "name": "missing-attribute",
-      "concise_description": "Object of class `NoneType` has no attribute `pk`",
-      "severity": "error"
-    },
-    {
-      "column": 51,
-      "path": "cl/recap/tasks.py",
-      "name": "bad-argument-type",
-      "concise_description": "Argument `Docket | None` is not assignable to parameter `d` with type `Docket` in function `cl.alerts.utils.set_skip_percolation_if_bankruptcy_data`",
-      "severity": "error"
-    },
-    {
-      "column": 19,
-      "path": "cl/recap/tasks.py",
-      "name": "missing-attribute",
-      "concise_description": "Object of class `NoneType` has no attribute `asave`",
-      "severity": "error"
-    },
-    {
-      "column": 64,
-      "path": "cl/recap/tasks.py",
-      "name": "bad-argument-type",
-      "concise_description": "Argument `Docket | None` is not assignable to parameter `d` with type `Docket`",
-      "severity": "error"
-    },
-    {
-      "column": 48,
-      "path": "cl/recap/tasks.py",
-      "name": "missing-attribute",
-      "concise_description": "Object of class `NoneType` has no attribute `pk`",
-      "severity": "error"
-    },
-    {
-      "column": 22,
-      "path": "cl/recap/tasks.py",
-      "name": "missing-attribute",
-      "concise_description": "Object of class `NoneType` has no attribute `pk`",
-      "severity": "error"
-    },
-    {
-      "column": 5,
-      "path": "cl/recap/tasks.py",
-      "name": "missing-attribute",
-      "concise_description": "Object of class `NoneType` has no attribute `add_recap_source`",
-      "severity": "error"
-    },
-    {
-      "column": 34,
-      "path": "cl/recap/tasks.py",
-      "name": "bad-argument-type",
-      "concise_description": "Argument `Docket | None` is not assignable to parameter `d` with type `Docket` in function `cl.recap.mergers.update_docket_metadata`",
+      "concise_description": "Argument `date | None` is not assignable to parameter `docket_date` with type `date` in function `cl.recap.mergers.process_orphan_documents`",
       "severity": "error"
     },
     {
@@ -4709,20 +4065,6 @@
       "path": "cl/recap/tasks.py",
       "name": "bad-argument-type",
       "concise_description": "Argument `str` is not assignable to parameter `court_id` with type `int` in function `cl.recap.mergers.process_orphan_documents`",
-      "severity": "error"
-    },
-    {
-      "column": 5,
-      "path": "cl/recap/tasks.py",
-      "name": "missing-attribute",
-      "concise_description": "Object of class `NoneType` has no attribute `add_recap_source`",
-      "severity": "error"
-    },
-    {
-      "column": 34,
-      "path": "cl/recap/tasks.py",
-      "name": "bad-argument-type",
-      "concise_description": "Argument `Docket | None` is not assignable to parameter `d` with type `Docket` in function `cl.recap.mergers.update_docket_metadata`",
       "severity": "error"
     },
     {
@@ -4924,8 +4266,8 @@
     {
       "column": 22,
       "path": "cl/recap/tasks.py",
-      "name": "missing-attribute",
-      "concise_description": "Object of class `NoneType` has no attribute `pk`",
+      "name": "bad-assignment",
+      "concise_description": "`int` is not assignable to dict value type `bool | str`",
       "severity": "error"
     },
     {
@@ -5307,20 +4649,6 @@
       "severity": "error"
     },
     {
-      "column": 13,
-      "path": "cl/recap/tasks.py",
-      "name": "missing-attribute",
-      "concise_description": "Object of class `NoneType` has no attribute `add_recap_source`",
-      "severity": "error"
-    },
-    {
-      "column": 51,
-      "path": "cl/recap/tasks.py",
-      "name": "bad-argument-type",
-      "concise_description": "Argument `Docket | None` is not assignable to parameter `d` with type `Docket`",
-      "severity": "error"
-    },
-    {
       "column": 59,
       "path": "cl/recap/tasks.py",
       "name": "bad-argument-type",
@@ -5328,45 +4656,10 @@
       "severity": "error"
     },
     {
-      "column": 20,
-      "path": "cl/recap/tasks.py",
-      "name": "missing-attribute",
-      "concise_description": "Object of class `NoneType` has no attribute `pacer_case_id`",
-      "severity": "error"
-    },
-    {
-      "column": 17,
-      "path": "cl/recap/tasks.py",
-      "name": "missing-attribute",
-      "concise_description": "Object of class `NoneType` has no attribute `pacer_case_id`",
-      "severity": "error"
-    },
-    {
-      "column": 13,
-      "path": "cl/recap/tasks.py",
-      "name": "missing-attribute",
-      "concise_description": "Object of class `NoneType` has no attribute `save`",
-      "severity": "error"
-    },
-    {
-      "column": 36,
-      "path": "cl/recap/tasks.py",
-      "name": "missing-attribute",
-      "concise_description": "Object of class `NoneType` has no attribute `pacer_case_id`",
-      "severity": "error"
-    },
-    {
       "column": 27,
       "path": "cl/recap/tasks.py",
       "name": "bad-index",
       "concise_description": "Cannot index into `str`",
-      "severity": "error"
-    },
-    {
-      "column": 17,
-      "path": "cl/recap/tasks.py",
-      "name": "bad-argument-type",
-      "concise_description": "Argument `Docket | None` is not assignable to parameter `d` with type `Docket`",
       "severity": "error"
     },
     {
@@ -5384,13 +4677,6 @@
       "severity": "error"
     },
     {
-      "column": 24,
-      "path": "cl/recap/tasks.py",
-      "name": "bad-argument-type",
-      "concise_description": "Argument `Docket | None` is not assignable to parameter `docket` with type `Docket` in function `DocketUpdatedData.__init__`",
-      "severity": "error"
-    },
-    {
       "column": 17,
       "path": "cl/recap/tasks.py",
       "name": "bad-argument-type",
@@ -5402,6 +4688,13 @@
       "path": "cl/recap/tasks.py",
       "name": "bad-argument-type",
       "concise_description": "Argument `str | Unknown | None` is not assignable to parameter `pacer_case_id` with type `str` in function `get_and_copy_recap_attachment_docs`",
+      "severity": "error"
+    },
+    {
+      "column": 13,
+      "path": "cl/recap/tasks.py",
+      "name": "bad-argument-type",
+      "concise_description": "Argument `list[str | Unknown | None]` is not assignable to parameter `unique_case_ids` with type `list[str]` in function `replicate_recap_email_to_subdockets`",
       "severity": "error"
     },
     {
@@ -5507,76 +4800,6 @@
       "path": "cl/recap_rss/tasks.py",
       "name": "missing-attribute",
       "concise_description": "Object of class `list` has no attribute `description`",
-      "severity": "error"
-    },
-    {
-      "column": 13,
-      "path": "cl/recap_rss/tasks.py",
-      "name": "missing-attribute",
-      "concise_description": "Object of class `NoneType` has no attribute `add_recap_source`",
-      "severity": "error"
-    },
-    {
-      "column": 51,
-      "path": "cl/recap_rss/tasks.py",
-      "name": "bad-argument-type",
-      "concise_description": "Argument `Docket | None` is not assignable to parameter `d` with type `Docket`",
-      "severity": "error"
-    },
-    {
-      "column": 20,
-      "path": "cl/recap_rss/tasks.py",
-      "name": "missing-attribute",
-      "concise_description": "Object of class `NoneType` has no attribute `pacer_case_id`",
-      "severity": "error"
-    },
-    {
-      "column": 17,
-      "path": "cl/recap_rss/tasks.py",
-      "name": "missing-attribute",
-      "concise_description": "Object of class `NoneType` has no attribute `pacer_case_id`",
-      "severity": "error"
-    },
-    {
-      "column": 61,
-      "path": "cl/recap_rss/tasks.py",
-      "name": "bad-argument-type",
-      "concise_description": "Argument `Docket | None` is not assignable to parameter `d` with type `Docket` in function `cl.alerts.utils.set_skip_percolation_if_bankruptcy_data`",
-      "severity": "error"
-    },
-    {
-      "column": 17,
-      "path": "cl/recap_rss/tasks.py",
-      "name": "missing-attribute",
-      "concise_description": "Object of class `NoneType` has no attribute `save`",
-      "severity": "error"
-    },
-    {
-      "column": 47,
-      "path": "cl/recap_rss/tasks.py",
-      "name": "bad-argument-type",
-      "concise_description": "Argument `Docket | None` is not assignable to parameter `d` with type `Docket` in function `cl.recap.mergers.add_bankruptcy_data_to_docket`",
-      "severity": "error"
-    },
-    {
-      "column": 15,
-      "path": "cl/recap_rss/tasks.py",
-      "name": "bad-argument-type",
-      "concise_description": "Argument `Docket | None` is not assignable to parameter `d` with type `Docket`",
-      "severity": "error"
-    },
-    {
-      "column": 51,
-      "path": "cl/recap_rss/tasks.py",
-      "name": "missing-attribute",
-      "concise_description": "Object of class `NoneType` has no attribute `pk`",
-      "severity": "error"
-    },
-    {
-      "column": 40,
-      "path": "cl/recap_rss/tasks.py",
-      "name": "missing-attribute",
-      "concise_description": "Object of class `NoneType` has no attribute `pk`",
       "severity": "error"
     },
     {
