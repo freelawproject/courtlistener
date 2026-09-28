@@ -47,22 +47,61 @@
     Tags
   </c-button>
   {% if docket_source_url %}
-  {# TODO: Wire up alert toggle interactivity (auth checks, AJAX toggle, state change). #}
   <c-menu-button
     button_variant="outline"
     widget_aria_label="Docket alerts menu"
-    trigger_aria_label="Get Alerts"
     menu_aria_label="Alert options"
   >
     <c-slot name="button_content">
-      {% svg "bell" class="w-4 h-4" aria_hidden="true" %}
-      Get Alerts
+      {# Swap target: the toggle response replaces this span's contents. #}
+      <span id="docket-alert-label-{{ docket.pk }}" class="contents">
+        {% if has_alert %}
+          {% svg "bell_slash" class="w-4 h-4" aria_hidden="true" %}
+          Disable Alerts
+        {% else %}
+          {% svg "bell" class="w-4 h-4" aria_hidden="true" %}
+          Get Alerts
+        {% endif %}
+      </span>
       <span
         class="transition-transform duration-200 group-aria-[expanded=true]:rotate-180 flex justify-center items-center w-4 h-4"
         aria-hidden="true"
       >{% svg "chevron" class="w-full h-full text-greyscale-400" %}</span>
     </c-slot>
     <c-slot name="menu_content">
+      {% if user.is_authenticated %}
+        {% if has_alert or user.profile.can_make_another_alert %}
+          <c-menu-button.item
+            tag="button"
+            icon="bell"
+            icon_class="w-4 h-4 text-greyscale-500"
+            hx-post="{% url 'toggle_docket_alert' %}"
+            hx-vals='{"id": "{{ docket.pk }}"}'
+            hx-headers='{"X-CSRFToken": "{{ csrf_token }}"}'
+            hx-swap="none"
+          >
+            <span id="docket-alert-toggle-{{ docket.pk }}">{% if has_alert %}Disable Alerts{% else %}Get Alerts{% endif %}</span>
+          </c-menu-button.item>
+        {% else %}
+          <c-menu-button.item
+            tag="button"
+            icon="bell"
+            icon_class="w-4 h-4 text-greyscale-500"
+            disabled
+          >
+            Get Alerts
+          </c-menu-button.item>
+        {% endif %}
+      {% else %}
+        <c-menu-button.item
+          href="{% url 'sign-in' %}?next={{ request.get_full_path|urlencode }}"
+          icon="bell"
+          icon_class="w-4 h-4 text-greyscale-500"
+          rel="nofollow"
+        >
+          Get Alerts
+        </c-menu-button.item>
+      {% endif %}
       <c-menu-button.item
         href="{% url 'docket_feed' docket.pk %}"
         icon="rss"
@@ -88,6 +127,8 @@
       </c-menu-button.item>
     </c-slot>
   </c-menu-button>
+  {# Announces the toggle's outcome; the response swaps its contents. #}
+  <span id="docket-alert-status-{{ docket.pk }}" role="status" class="sr-only"></span>
   {% endif %}
   <c-docket-source-button :docket="docket" :docket_source="docket_source" />
 </div>

@@ -23,7 +23,7 @@ from django.core.paginator import Paginator
 from django.db import connection
 from django.http import HttpResponse
 from django.template import TemplateDoesNotExist, engines
-from django.template.loader import get_template
+from django.template.loader import get_template, render_to_string
 from django.template.response import TemplateResponse
 from django.test import (
     AsyncRequestFactory,
@@ -43,6 +43,8 @@ from waffle.testutils import override_flag
 if TYPE_CHECKING:
     from django.test.client import _MonkeyPatchedASGIResponse
 
+from cl.alerts.factories import DocketAlertFactory
+from cl.alerts.models import DocketAlert
 from cl.citations.utils import slugify_reporter
 from cl.favorites.models import GenericCount
 from cl.lib.file_validation import (
@@ -3914,6 +3916,141 @@ class DocketPageV2TemplateTest(TestCase):
         self.assertTemplateUsed(r, "v2_docket.html")
         self.assertContains(r, 'name="htmx-config"')
         self.assertContains(r, "js/third_party/htmx")
+
+
+@override_settings(WAFFLE_CACHE_PREFIX="test_docket_alert_toggle_v2_waffle")
+@override_flag("use_new_design", active=True)
+class DocketAlertToggleV2Test(TestCase):
+    """The alerts menu of the v2 docket page, for every user state.
+
+    `WAFFLE_CACHE_PREFIX` isolates this class's flag cache namespace from
+    parallel test workers, as DocketPageV2TemplateTest explains.
+    """
+
+    FRAGMENT = "v2_includes/docket_alerts_htmx/toggle.html"
+
+    @classmethod
+    def setUpTestData(cls) -> None:
+        cls.court = CourtFactory(id="cand", jurisdiction="FD")
+        cls.docket = DocketFactory(court=cls.court, source=Docket.RECAP)
+        cls.profile = UserProfileWithParentsFactory(
+            user__password=make_password("password")
+        )
+
+    async def login(self) -> None:
+        """Signs the fixture user in on the async client."""
+        self.assertTrue(
+            await self.async_client.alogin(
+                username=self.profile.user.username, password="password"
+            )
+        )
+
+    async def page(self) -> "_MonkeyPatchedASGIResponse":
+        """Loads the v2 docket page."""
+        return await self.async_client.get(
+            reverse("view_docket", args=[self.docket.pk, self.docket.slug])
+        )
+
+    def menu(self, html: str) -> str:
+        """The alerts menu markup, from the trigger label to the status region."""
+        start = html.index(f'id="docket-alert-label-{self.docket.pk}"')
+        end = html.index(f'id="docket-alert-status-{self.docket.pk}"')
+        return html[start:end]
+
+    def label(self, html: str) -> str:
+        """The trigger label's inner markup, whitespace-normalised."""
+        match = re.search(
+            rf'<span id="docket-alert-label-{self.docket.pk}"[^>]*>(.*?)</span>',
+            html,
+            re.S,
+        )
+        self.assertIsNotNone(match)
+        return " ".join(match.group(1).split())
+
+    async def test_logged_out_item_links_to_sign_in(self) -> None:
+        """A visitor gets a plain link back to this docket after signing in."""
+        r = await self.page()
+        menu = self.menu(r.content.decode())
+        docket_path = reverse(
+            "view_docket", args=[self.docket.pk, self.docket.slug]
+        )
+        self.assertIn(f'href="{reverse("sign-in")}?next={docket_path}"', menu)
+        self.assertNotIn("hx-post", menu)
+
+    async def test_under_quota_item_posts_through_htmx(self) -> None:
+        """A user who can make an alert gets the htmx toggle."""
+        await self.login()
+        r = await self.page()
+        self.assertFalse(r.context["has_alert"])
+        menu = self.menu(r.content.decode())
+        self.assertIn(f'hx-post="{reverse("toggle_docket_alert")}"', menu)
+        self.assertIn(f'id="docket-alert-toggle-{self.docket.pk}"', menu)
+
+    @override_settings(MAX_FREE_DOCKET_ALERTS=0)
+    async def test_subscribed_user_can_always_disable(self) -> None:
+        """An existing alert shows as subscribed and stays removable at quota."""
+        await sync_to_async(DocketAlertFactory)(
+            docket=self.docket,
+            user=self.profile.user,
+            alert_type=DocketAlert.SUBSCRIPTION,
+        )
+        await self.login()
+        r = await self.page()
+        self.assertTrue(r.context["has_alert"])
+        self.assertIn(
+            f'hx-post="{reverse("toggle_docket_alert")}"',
+            self.menu(r.content.decode()),
+        )
+
+    @override_settings(MAX_FREE_DOCKET_ALERTS=0)
+    async def test_at_quota_item_never_posts(self) -> None:
+        """A user at quota with no alert is not offered the htmx toggle."""
+        await self.login()
+        r = await self.page()
+        self.assertFalse(r.context["has_alert"])
+        self.assertNotIn("hx-post", self.menu(r.content.decode()))
+
+    async def test_trigger_has_no_aria_label(self) -> None:
+        """The visible label is the trigger's accessible name.
+
+        An aria-label would replace it and could not follow the swap. The
+        page's other menus keep theirs, so the component change is scoped.
+        """
+        await self.login()
+        r = await self.page()
+        html = r.content.decode()
+        triggers = re.findall(r"<button[^>]*x-menu:button[^>]*>", html)
+        label_at = html.index(f'id="docket-alert-label-{self.docket.pk}"')
+        ours = [t for t in triggers if html.index(t) < label_at][-1]
+        self.assertNotIn("aria-label", ours)
+        others = [t for t in triggers if t != ours]
+        self.assertTrue(others)
+        for trigger in others:
+            self.assertIn("aria-label=", trigger)
+
+    async def test_label_matches_the_fragment(self) -> None:
+        """The page and the fragment render the same label for a state."""
+        await self.login()
+        for has_alert in (False, True):
+            with self.subTest(has_alert=has_alert):
+                if has_alert:
+                    await sync_to_async(DocketAlertFactory)(
+                        docket=self.docket,
+                        user=self.profile.user,
+                        alert_type=DocketAlert.SUBSCRIPTION,
+                    )
+                r = await self.page()
+                fragment = await sync_to_async(render_to_string)(
+                    self.FRAGMENT,
+                    {
+                        "docket": self.docket,
+                        "has_alert": has_alert,
+                        "message": "",
+                    },
+                )
+                self.assertEqual(
+                    self.label(r.content.decode()), self.label(fragment)
+                )
 
 
 @override_settings(WAFFLE_CACHE_PREFIX="test_docket_entry_rows_v2_waffle")
