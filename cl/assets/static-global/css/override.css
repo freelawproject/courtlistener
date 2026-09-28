@@ -1964,6 +1964,11 @@ div.subopinion-content img {
   background-color: #f5f5f5;
 }
 
+.muted-link a {
+  color: inherit;
+  text-decoration: underline;
+}
+
 /* Search alerts validation links */
 .link-red a {
   color: #8a1f11;
