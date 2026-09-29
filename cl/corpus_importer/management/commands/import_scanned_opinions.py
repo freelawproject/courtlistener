@@ -561,7 +561,10 @@ def merge_into_cluster(cluster: OpinionCluster, scan_case: ScanCase) -> None:
         )
         docket.save(update_fields=["source"])
 
-        cl_opinions = list(cluster.sub_opinions.all())
+        # Versions of an opinion are kept in its cluster; skip them
+        cl_opinions = list(
+            cluster.sub_opinions.filter(main_version__isnull=True)
+        )
         if len(cl_opinions) == 1 and len(scan_case.opinions) == 1:
             opinion = cl_opinions[0]
             opinion.xml_scan = str(scan_case.opinions[0])

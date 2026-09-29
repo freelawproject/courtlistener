@@ -337,6 +337,28 @@ class ImportScannedOpinionsTest(TestCase):
         self.assertEqual(content.content, opinion.xml_scan)
         self.assertTrue(content.is_main_version)
 
+    def test_merge_ignores_opinion_versions(self) -> None:
+        """Is the scan merged into the main opinion, ignoring its versions?"""
+        cluster = self.make_matching_cluster()
+        main_opinion = cluster.sub_opinions.get()
+        version = OpinionFactory.create(
+            cluster=cluster,
+            plain_text=self.opinion_text,
+            html="",
+            main_version=main_opinion,
+        )
+
+        self.import_scan()
+
+        main_opinion.refresh_from_db()
+        version.refresh_from_db()
+        self.assertIn("confession of error", main_opinion.xml_scan)
+        self.assertEqual(version.xml_scan, "")
+        self.assertEqual(
+            list(OpinionContent.objects.values_list("opinion_id", flat=True)),
+            [main_opinion.pk],
+        )
+
     def test_merge_skips_opinions_when_counts_differ(self) -> None:
         """Is the opinion text left alone when opinions can't be paired?"""
         cluster = self.make_matching_cluster(opinion_count=2)
