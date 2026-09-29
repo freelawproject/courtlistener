@@ -599,7 +599,7 @@ def convert_columbia_html(text: str, opinion_index: int) -> str:
 
 def parse_dates(
     raw_dates: list[str],
-) -> list[list[tuple[Any, date] | tuple[None, date]]]:
+) -> list[list[tuple[str | None, date]]]:
     """Parses the dates from a list of string.
 
     :param raw_dates: A list of (probably) date-containing strings
@@ -617,7 +617,7 @@ def parse_dates(
         raw_parts = re.split(r"(?<=[0-9][0-9][0-9][0-9])(\s|.)", raw_date)
 
         # index over split line and add dates
-        inner_dates = []
+        inner_dates: list[tuple[str | None, date]] = []
         for raw_part in raw_parts:
             # consider any string without either a month or year not a date
             no_month = False
