@@ -35,6 +35,9 @@ from cl.tests.cases import SimpleTestCase, TestCase
 COMMAND_MODULE = (
     "cl.corpus_importer.management.commands.import_scanned_opinions"
 )
+CITATIONS_TASK = (
+    f"{COMMAND_MODULE}.find_citations_and_parentheticals_for_opinion_by_pks"
+)
 SCAN_XML_PATH = str(
     Path(__file__).parent / "test_assets" / "scanned_opinion.xml"
 )
@@ -448,6 +451,34 @@ class ImportScannedOpinionsTest(TestCase):
             ).exists()
         )
 
+    def test_citation_finding_is_queued(self) -> None:
+        """Are citations found for new and merged opinions after commit?"""
+        cluster = self.make_matching_cluster()
+        merged_opinion = cluster.sub_opinions.get()
+        new_case_xml = (
+            self.scan_xml.replace("388 So. 3d 1", "390 So. 3d 5")
+            .replace("MERRITT", "HOLLOWAY")
+            .replace("4D2023-2459", "4D2023-1")
+        )
+        cases = [
+            ("merged opinion", self.scan_xml, lambda: [merged_opinion.pk]),
+            (
+                "new case",
+                new_case_xml,
+                lambda: [
+                    Opinion.objects.get(cluster__citations__volume="390").pk
+                ],
+            ),
+        ]
+        for label, xml, expected_pks in cases:
+            with (
+                self.subTest(label),
+                mock.patch(f"{CITATIONS_TASK}.delay") as mock_find_citations,
+                self.captureOnCommitCallbacks(execute=True),
+            ):
+                self.import_xml(xml)
+            mock_find_citations.assert_called_once_with(expected_pks())
+
     def test_failed_import_is_rolled_back(self) -> None:
         """Is a failed import rolled back without uploading the XML?"""
         with (
@@ -457,12 +488,15 @@ class ImportScannedOpinionsTest(TestCase):
             ),
             mock.patch(f"{COMMAND_MODULE}.logger") as mock_logger,
             mock.patch.object(FieldFile, "save") as mock_file_save,
+            mock.patch(f"{CITATIONS_TASK}.delay") as mock_find_citations,
+            self.captureOnCommitCallbacks(execute=True),
         ):
             self.import_scan()
 
         self.assertEqual(OpinionCluster.objects.count(), 0)
         self.assertEqual(Docket.objects.count(), 0)
         mock_file_save.assert_not_called()
+        mock_find_citations.assert_not_called()
         mock_logger.exception.assert_called_once()
 
     def test_failed_file_does_not_stop_the_run(self) -> None:
