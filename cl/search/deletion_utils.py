@@ -191,7 +191,9 @@ def delete_cluster_files(cluster: OpinionCluster, delete_docket: bool) -> None:
         # OpinionContent rows are cascade deleted with their opinion
         field_files = [opinion.local_path] + [
             content.local_path
-            for content in opinion.contents.exclude(local_path="")
+            for content in opinion.contents.exclude(local_path="").only(
+                "local_path"
+            )
         ]
         for field_file in field_files:
             if not field_file:

@@ -36,6 +36,7 @@ from cl.search.factories import (
     DocketFactory,
     OpinionClusterFactory,
     OpinionClusterWithParentsFactory,
+    OpinionContentFactory,
     OpinionFactory,
     OpinionsCitedByRECAPDocumentFactory,
     OpinionWithParentsFactory,
@@ -49,7 +50,6 @@ from cl.search.models import (
     Docket,
     Opinion,
     OpinionCluster,
-    OpinionContent,
     OpinionsCitedByRECAPDocument,
     RECAPDocument,
     ScotusDocketMetadata,
@@ -486,12 +486,8 @@ class OpinionClusterSealFileCleanupTest(TestCase):
         opinion = OpinionFactory(
             cluster=cluster, local_path="opinions/opinion.pdf"
         )
-        OpinionContent.objects.create(
-            opinion=opinion,
-            source=OpinionContent.FLP_SCANNING,
-            extraction_type=OpinionContent.LLM,
-            is_main_version=True,
-            local_path="contents/opinion.xml",
+        OpinionContentFactory(
+            opinion=opinion, local_path="contents/opinion.xml"
         )
 
         seal_cluster(cluster, delete_docket=True)
