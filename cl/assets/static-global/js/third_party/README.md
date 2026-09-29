@@ -11,11 +11,11 @@ and any customizations should be in the form of overrides in Tailwind's input fi
 
 ## htmx
 
-Current version: **2.0.10**
+Current version: **2.0.11**
 
 | File | CDN URL |
 |------|---------|
-| `htmx.js` | https://cdn.jsdelivr.net/npm/htmx.org@2.0.10/dist/htmx.js |
-| `htmx.min.js` | https://cdn.jsdelivr.net/npm/htmx.org@2.0.10/dist/htmx.min.js |
+| `htmx.js` | https://cdn.jsdelivr.net/npm/htmx.org@2.0.11/dist/htmx.js |
+| `htmx.min.js` | https://cdn.jsdelivr.net/npm/htmx.org@2.0.11/dist/htmx.min.js |
 
 Legacy templates run htmx 1.7.0 from `/js/` and are not to be upgraded; that copy retires with legacy.
