@@ -1154,6 +1154,21 @@ class OpinionClusterAPIScanFieldsTest(TestCase):
             "xml/2024/05/22/388-so-3d-1.xml",
         )
 
+    def test_private_scan_pdf_is_not_requestable(self) -> None:
+        """Can the private scan PDF be requested with fields or omit?"""
+        path = reverse(
+            "opinioncluster-detail",
+            kwargs={"version": "v4", "pk": self.cluster.pk},
+        )
+        for params in [
+            {"fields": "id,filepath_pdf_scan"},
+            {"omit": "filepath_xml_scan"},
+        ]:
+            with self.subTest(params=params):
+                response = self.client.get(path, params)
+                self.assertEqual(response.status_code, HTTPStatus.OK)
+                self.assertNotIn("filepath_pdf_scan", response.json())
+
 
 class DRFOrderingTests(TestCase):
     """Does ordering work generally and specifically?"""
