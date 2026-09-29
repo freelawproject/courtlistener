@@ -1124,6 +1124,37 @@ class BlockV3APITests(TestCase):
         self.assertEqual(response.status_code, HTTPStatus.UNAUTHORIZED)
 
 
+class OpinionClusterAPIScanFieldsTest(TestCase):
+    """Are the scanning project files of clusters exposed correctly?"""
+
+    @classmethod
+    def setUpTestData(cls) -> None:
+        cls.user = UserFactory()
+        cls.cluster = OpinionClusterWithParentsFactory.create(
+            filepath_xml_scan="xml/2024/05/22/388-so-3d-1.xml",
+            filepath_pdf_scan="pdf/2024/05/22/redacted.pdf",
+        )
+
+    def setUp(self) -> None:
+        self.client.force_login(self.user)
+
+    def test_private_scan_pdf_is_not_exposed(self) -> None:
+        """Is the private scan PDF left out while the scan XML is shown?"""
+        path = reverse(
+            "opinioncluster-detail",
+            kwargs={"version": "v4", "pk": self.cluster.pk},
+        )
+        response = self.client.get(path)
+
+        self.assertEqual(response.status_code, HTTPStatus.OK)
+        data = response.json()
+        self.assertNotIn("filepath_pdf_scan", data)
+        self.assertEqual(
+            data["filepath_xml_scan"],
+            "xml/2024/05/22/388-so-3d-1.xml",
+        )
+
+
 class DRFOrderingTests(TestCase):
     """Does ordering work generally and specifically?"""
 
