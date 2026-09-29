@@ -525,6 +525,10 @@ a.button:active {
   text-decoration: none;
 }
 
+.underline {
+  text-decoration: underline;
+}
+
 a.black-link,
 a.black-link:hover,
 a.black-link:active,
@@ -1962,11 +1966,6 @@ div.subopinion-content img {
 
 .relative-options-list li:hover {
   background-color: #f5f5f5;
-}
-
-.muted-link a {
-  color: inherit;
-  text-decoration: underline;
 }
 
 /* Search alerts validation links */

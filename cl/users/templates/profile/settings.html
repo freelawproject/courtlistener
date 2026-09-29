@@ -176,7 +176,7 @@
                 <label for="id_save_query_history">
                     {{ profile_form.save_query_history }}
                     Save my search history</label>
-                <p class="text-muted small muted-link">Search queries are used according to our <a href="{{ WIKI_TERMS_URL }}#privacy-policy">privacy policy</a> to make the search engine more accurate.</p>
+                <p class="text-muted small">Search queries are used according to our <a class="gray underline" href="{{ WIKI_TERMS_URL }}#privacy-policy">privacy policy</a> to make the search engine more accurate.</p>
                 {% if profile_form.save_query_history.errors %}
                     <p class="help-block">
                         {% for error in profile_form.save_query_history.errors %}
