@@ -1124,6 +1124,51 @@ class BlockV3APITests(TestCase):
         self.assertEqual(response.status_code, HTTPStatus.UNAUTHORIZED)
 
 
+class JudgeAndDisclosureAPIAuthTest(TestCase):
+    """Judge and financial disclosure endpoints require an account."""
+
+    endpoints = [
+        "person-list",
+        "position-list",
+        "retentionevent-list",
+        "education-list",
+        "school-list",
+        "politicalaffiliation-list",
+        "source-list",
+        "abarating-list",
+        "agreement-list",
+        "debt-list",
+        "financialdisclosure-list",
+        "gift-list",
+        "investment-list",
+        "noninvestmentincome-list",
+        "disclosureposition-list",
+        "reimbursement-list",
+        "spouseincome-list",
+    ]
+
+    @classmethod
+    def setUpTestData(cls) -> None:
+        cls.user = UserFactory()
+
+    async def test_anonymous_users_are_rejected(self) -> None:
+        """Do anonymous requests get a 401?"""
+        for endpoint in self.endpoints:
+            with self.subTest(endpoint=endpoint):
+                path = reverse(endpoint, kwargs={"version": "v4"})
+                r = await self.async_client.get(path)
+                self.assertEqual(r.status_code, HTTPStatus.UNAUTHORIZED)
+
+    async def test_authenticated_users_can_read(self) -> None:
+        """Can logged-in users without model permissions still read?"""
+        await self.async_client.aforce_login(self.user)
+        for endpoint in self.endpoints:
+            with self.subTest(endpoint=endpoint):
+                path = reverse(endpoint, kwargs={"version": "v4"})
+                r = await self.async_client.get(path)
+                self.assertEqual(r.status_code, HTTPStatus.OK)
+
+
 class DRFOrderingTests(TestCase):
     """Does ordering work generally and specifically?"""
 
