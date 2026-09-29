@@ -7,7 +7,7 @@ import dateutil.parser as dparser
 from bs4 import (
     BeautifulSoup,
     NavigableString,
-    Tag,  # noqa: F401
+    Tag,
 )
 from juriscraper.lib.string_utils import clean_string, harmonize, titlecase
 
@@ -213,7 +213,7 @@ def add_floating_opinion(
 
 
 def extract_columbia_opinions(
-    outer_opinion: BeautifulSoup,
+    outer_opinion: Tag,
 ) -> list[dict | None]:
     """Get the opinions of the soup object
 
@@ -229,11 +229,11 @@ def extract_columbia_opinions(
     order = 1
 
     # We iterate all content to look for all possible opinions
-    for i, content in enumerate(outer_opinion):  # type: int, Tag
+    for i, content in enumerate(outer_opinion):
         if isinstance(content, NavigableString):
             # We found a raw string, store it
             floating_content.append(str(content))
-        else:
+        elif isinstance(content, Tag):
             if content.name in SIMPLE_TAGS + [
                 "citation_line",
                 "opinion_byline",

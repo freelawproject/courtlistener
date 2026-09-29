@@ -26,9 +26,9 @@ jobs:
       - name: Install dependencies
         run: uv sync
 
-      # Also runs pyrefly via the local hook in .pre-commit-config.yaml, which
-      # needs the dependencies installed above.
       - uses: pre-commit/action@2c7b3805fd2a0fd8c1884dcaebf91fc102a13ecd # v3.0.1
+        env:
+          SKIP: pyrefly
 
       - name: Debug paths
         run: |
@@ -40,6 +40,4 @@ jobs:
       # Pre-existing errors are grandfathered in .pyrefly-baseline.json; only
       # new errors fail the check.
       - name: pyrefly Static Type Checker
-        run: uv run pyrefly check
-
-
+        run: uv run pyrefly check --error-stale-baseline --output-format full-text-with-github

@@ -658,7 +658,7 @@ def remove_non_judge_person_and_positions_from_index(
     :return: None
     """
     try:
-        if instance.person.is_judge:
+        if (person := instance.person) is None or person.is_judge:
             # The Person is still a Judge, return.
             return
 
