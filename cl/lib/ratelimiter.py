@@ -1,3 +1,4 @@
+import contextlib
 import functools
 import hashlib
 import ipaddress
@@ -22,78 +23,54 @@ type RatelimitMethod = str | Sequence[str | None]
 type View = Callable[..., Any]
 
 
-def get_viewer_address(
-    request: HttpRequest,
-) -> ipaddress.IPv4Address | ipaddress.IPv6Address | None:
-    """Get the viewer's full IP address from CloudFront's header.
+def get_viewer_ip(request: HttpRequest) -> str:
+    """Get the viewer's exact IP address from CloudFront's header.
 
-    CloudFront sends the address with a port that seems to be random, so it
-    is stripped. The port is split off the right-hand side because an IPv6
-    address is colon-separated itself: splitting on the first colon would
-    truncate 2600:1f18::1234:51396 to "2600".
-
-    This is the exact address, which is what crawler verification needs. To
-    count requests, use get_user_ip_from_cloudfront_headers instead, which
-    widens an IPv6 address to its /64.
+    CloudFront sends "IP:port", where the port seems to be random, so it is
+    stripped: 96.23.39.106:51396 becomes 96.23.39.106. Use this when you need
+    the address itself, as crawler verification does. To count requests, use
+    get_ratelimit_ident instead.
 
     :param request: The HTTP request from the user
-    :return: The address, with an IPv4-mapped IPv6 address unwrapped to plain
-        IPv4. None when CloudFront didn't send the header, as in local
-        development, or sent something that isn't an address.
+    :return: The address, normalized, with an IPv4-mapped IPv6 address
+        unwrapped to plain IPv4. The empty string when CloudFront didn't send
+        the header, as in local development, or sent something that isn't an
+        address.
     """
     header = get_header(request, "CloudFront-Viewer-Address")
     if not header:
-        return None
+        return ""
 
-    # CloudFront always sends IP:port, with IPv6 unbracketed, so the
-    # port is always the last colon-separated field. That said, strip brackets
-    # just in case, to be defensive.
+    # The port is split off the right because an IPv6 address is itself
+    # colon-separated: CloudFront sends it unbracketed, as in
+    # 2600:1f18::1234:51396. Brackets are stripped just in case.
     address = header.rsplit(":", 1)[0].strip("[]")
-
     try:
         ip = ipaddress.ip_address(address)
     except ValueError:
-        return None
+        return ""
 
     if isinstance(ip, ipaddress.IPv6Address) and ip.ipv4_mapped:
-        return ip.ipv4_mapped
-    return ip
+        ip = ip.ipv4_mapped
+    return str(ip)
 
 
-def get_user_ip_from_cloudfront_headers(request: HttpRequest) -> str:
-    """Make a good key to use for caching the request's IP
+def get_ratelimit_ident(request: HttpRequest) -> str:
+    """Get the key to count the viewer's requests under.
 
-    CloudFront provides a header that returns the user's IP and port. Weirdly,
-    the port seems to be random, so we need to strip it to make the user's IP
-    a consistent key.
-
-    So we go from something like:
-
-        96.23.39.106:51396
-
-    To:
-
-        96.23.39.106
-
-    An IPv6 address is widened to its /64, the smallest block a client is
-    normally assigned, since a client can rotate through the addresses in it
-    at will.
+    This is the viewer's address, except that an IPv6 address is widened to
+    its /64, the smallest block a client is normally assigned. Otherwise a
+    client could rotate through the addresses in its block to dodge a limit.
 
     :param request: The HTTP request from the user
-    :return: A simple key that can be used to throttle the user if needed. The
-        empty string when CloudFront didn't send the header, as in local
-        development, where callers need their own fallback.
+    :return: The key, or the empty string when there's no viewer address, as
+        in local development, where callers need their own fallback.
     """
-    if (ip := get_viewer_address(request)) is None:
+    if not (ip := get_viewer_ip(request)):
         return ""
-    if ip.version == 4:
-        return str(ip)
-    return str(
-        ipaddress.ip_network(
-            f"{ip}/64",
-            strict=False,
-        ).network_address
-    )
+    if ipaddress.ip_address(ip).version == 4:
+        return ip
+    return str(ipaddress.ip_network(f"{ip}/64", strict=False).network_address)
 
 
 def get_ip_for_ratelimiter(group: str, request: HttpRequest) -> str:
@@ -103,7 +80,7 @@ def get_ip_for_ratelimiter(group: str, request: HttpRequest) -> str:
     :param request: The HTTP request from the user
     :return: A simple key that can be used to throttle the user if needed.
     """
-    return get_user_ip_from_cloudfront_headers(request)
+    return get_ratelimit_ident(request)
 
 
 def get_path_to_make_key(group: str, request: HttpRequest) -> str:
@@ -242,22 +219,6 @@ APPROVED_DOMAINS = [
 ]
 
 
-def should_bypass_ratelimit(request: HttpRequest) -> bool:
-    """Should a request that hit its limit be let through anyway?
-
-    True for an approved crawler, and also when the cache can't be reached to
-    find out: a Redis outage shouldn't turn the allowlist into a 500, so it
-    fails open exactly like the rate-limit check itself does.
-
-    :param request: The HTTP request from the user
-    :return: True when the view should run despite the limit, else False.
-    """
-    try:
-        return is_allowlisted(request)
-    except ConnectionError:
-        return True
-
-
 def ratelimit_deny_list(view: View) -> View:
     """A wrapper for the ratelimit function that adds an allowlist for approved
     crawlers.
@@ -306,38 +267,12 @@ def ratelimit_deny_list(view: View) -> View:
     return wrapper
 
 
-def get_host_from_IP(ip_address: str) -> str:
-    """Get the host for an IP address by doing a reverse DNS lookup. Return
-    the value as a string.
-    """
-    return socket.getfqdn(ip_address)
-
-
-def get_ips_from_host(
-    host: str,
-) -> set[ipaddress.IPv4Address | ipaddress.IPv6Address]:
-    """Do a forward DNS lookup of the host found in step one.
-
-    Returns every address the host resolves to, IPv4 and IPv6 alike, as
-    parsed addresses so that equal addresses compare equal however they're
-    written. May raise OSError or UnicodeError on a failed lookup.
-    """
-    # getaddrinfo rather than gethostbyname, which only knows about A records
-    # and so could never confirm an IPv6 crawler.
-    return {
-        ipaddress.ip_address(str(sockaddr[0]))
-        for *_, sockaddr in socket.getaddrinfo(
-            host, None, type=socket.SOCK_STREAM
-        )
-    }
-
-
 def host_is_approved(host: str) -> bool:
     """Check whether the domain is in our approved allowlist.
 
     Matches the approved domain itself or any subdomain of it, never a name
     that merely ends in the same letters: "notgooglebot.com" is not
-    "googlebot.com". The forward lookup in verify_ip_address only proves the
+    "googlebot.com". The forward lookup in is_verified_crawler only proves the
     requester controls the zone the PTR record names, so a loose suffix match
     would let anyone who registers such a look-alike domain allowlist
     themselves.
@@ -352,37 +287,6 @@ def host_is_approved(host: str) -> bool:
     )
 
 
-def verify_ip_address(ip_address: str) -> bool:
-    """Do authentication checks for the IP address requesting the page.
-
-    A failed or malformed DNS answer counts as "not approved" rather than
-    raising: this runs for requests already over their limit, and a lookup
-    error there should get a 429, not a 500.
-
-    :param ip_address: The address to check. It must be the viewer's exact
-        address, not the /64 an IPv6 address is counted under, or the forward
-        lookup can never match.
-    :return: True if the address belongs to an approved crawler.
-    """
-    # First we do a rDNS lookup of the IP.
-    host = get_host_from_IP(ip_address)
-
-    #  Then we check the returned host to ensure it's an approved crawler
-    if not host_is_approved(host):
-        return False
-
-    # If it's approved, do a forward DNS lookup to get the IP from the host.
-    # If that matches the original IP, we're good.
-    try:
-        forward_ips = get_ips_from_host(host)
-    except (OSError, UnicodeError):
-        # OSError covers socket.gaierror (NXDOMAIN, SERVFAIL, timeouts).
-        # UnicodeError is what the idna codec raises for a label over 63
-        # characters, which whoever controls the PTR record can supply.
-        return False
-    return ipaddress.ip_address(ip_address) in forward_ips
-
-
 def get_ratelimit_cache() -> BaseCache:
     """Return the cache backend that the rate limiters count in.
 
@@ -393,55 +297,75 @@ def get_ratelimit_cache() -> BaseCache:
     return caches[cache_name]
 
 
-def is_allowlisted(request: HttpRequest) -> bool:
-    """Checks if the IP address is allowlisted due to belonging to an approved
-    crawler.
+def is_verified_crawler(ip: str) -> bool:
+    """Check whether an address belongs to an approved crawler.
 
-    Both answers are cached, not just the "yes". Callers reach this only for
-    an address that is already over its limit, so a "no" that wasn't stored
-    would mean a fresh pair of blocking DNS lookups on every request from
-    whoever is hammering us. The "no" gets a much shorter life than the "yes",
-    so a crawler that moves to a new address is picked up soon after.
+    A reverse DNS lookup must name an approved domain, and a forward lookup of
+    that name must lead back to the address. A failed or malformed DNS answer
+    counts as "no" rather than raising: this runs for requests already over
+    their limit, and a lookup error there should get a 429, not a 500.
 
-    For IPv6, a "yes" covers only the exact address that proved itself, while
-    a "no" covers its whole /64, the block it is counted under.
+    :param ip: The viewer's exact address, as from get_viewer_ip. A /64 from
+        get_ratelimit_ident has no PTR record and would never match.
+    :return: True if the address belongs to an approved crawler.
+    """
+    try:
+        host = socket.getfqdn(ip)
+        if not host_is_approved(host):
+            return False
+        # getaddrinfo rather than gethostbyname, which only returns A records
+        # and so could never confirm an IPv6 crawler.
+        forward_ips = {
+            ipaddress.ip_address(str(sockaddr[0]))
+            for *_, sockaddr in socket.getaddrinfo(
+                host, None, type=socket.SOCK_STREAM
+            )
+        }
+    except (OSError, UnicodeError):
+        # OSError covers socket.gaierror (NXDOMAIN, SERVFAIL, timeouts).
+        # UnicodeError is what the idna codec raises for a label over 63
+        # characters, which whoever controls the PTR record can supply.
+        return False
+    # Parsed, so that equal addresses match however they're written.
+    return ipaddress.ip_address(ip) in forward_ips
 
-    May raise ``redis.ConnectionError`` when the cache is unreachable; callers
-    that must not 500 should go through ``should_bypass_ratelimit`` instead.
+
+def should_bypass_ratelimit(request: HttpRequest) -> bool:
+    """Should a request that hit its limit be let through anyway?
+
+    True for an approved crawler. Both answers are cached, so that whoever is
+    hammering us doesn't cost a fresh pair of DNS lookups on every request. A
+    "no" is kept for an hour rather than a week, so a crawler that moves to a
+    new address is picked up soon after.
+
+    Also True when the cache can't be reached: a Redis outage shouldn't turn
+    the allowlist into a 500, so it fails open like the rate limit itself.
 
     :param request: The HTTP request from the user
-    :return: True when the request comes from an approved crawler, else False.
+    :return: True when the view should run despite the limit, else False.
     """
-    cache = get_ratelimit_cache()
-    if (ip := get_viewer_address(request)) is None:
+    if not (ip := get_viewer_ip(request)):
         # No CloudFront header, as in local development. There's nothing to
         # look up, and getfqdn("") would answer for this host instead.
         return False
 
-    # A "no" is stored against the /64, or a client could rotate through its
-    # addresses to force a fresh pair of DNS lookups on every request. A "yes"
-    # can't be: hosts sometimes carve one /64 up among customers, so a
-    # neighbor of a real crawler would be let through too. For IPv4 both keys
-    # are the same.
-    yes_key = f"rl:allowlist:{ip}"
-    no_key = f"rl:allowlist:{get_user_ip_from_cloudfront_headers(request)}"
-
+    cache = get_ratelimit_cache()
+    key = f"rl:allowlist:{ip}"
+    try:
+        cached = cache.get(key)
+    except ConnectionError:
+        return True
     # bool() rather than truthiness on the entry itself: a False is a real
     # cached answer, and entries written before this stored the IP string.
-    for key in dict.fromkeys((yes_key, no_key)):
-        if (cached := cache.get(key)) is not None:
-            return bool(cached)
+    if cached is not None:
+        return bool(cached)
 
-    approved_crawler = verify_ip_address(str(ip))
+    verified = is_verified_crawler(ip)
     a_week = 60 * 60 * 24 * 7
     an_hour = 60 * 60
-    cache.set(
-        yes_key if approved_crawler else no_key,
-        approved_crawler,
-        a_week if approved_crawler else an_hour,
-    )
-
-    return approved_crawler
+    with contextlib.suppress(ConnectionError):
+        cache.set(key, verified, a_week if verified else an_hour)
+    return verified
 
 
 def parse_rate(rate: str) -> tuple[int, int]:

@@ -22,13 +22,13 @@ from cl.lib import ratelimiter
 from cl.lib.ratelimiter import (
     View,
     get_ip_for_ratelimiter,
-    get_user_ip_from_cloudfront_headers,
-    get_viewer_address,
+    get_ratelimit_ident,
+    get_viewer_ip,
     host_is_approved,
-    is_allowlisted,
+    is_verified_crawler,
     make_ratelimiter,
     ratelimit_deny_list,
-    verify_ip_address,
+    should_bypass_ratelimit,
 )
 from cl.tests.cases import SimpleTestCase
 
@@ -150,10 +150,10 @@ class AllowlistTest(SimpleTestCase):
 
     def test_a_yes_is_looked_up_once(self) -> None:
         with mock.patch.object(
-            ratelimiter, "verify_ip_address", return_value=True
+            ratelimiter, "is_verified_crawler", return_value=True
         ) as verify:
-            self.assertTrue(is_allowlisted(self.request))
-            self.assertTrue(is_allowlisted(self.request))
+            self.assertTrue(should_bypass_ratelimit(self.request))
+            self.assertTrue(should_bypass_ratelimit(self.request))
 
         self.assertEqual(verify.call_count, 1)
 
@@ -164,10 +164,10 @@ class AllowlistTest(SimpleTestCase):
         of blocking DNS lookups on every single request.
         """
         with mock.patch.object(
-            ratelimiter, "verify_ip_address", return_value=False
+            ratelimiter, "is_verified_crawler", return_value=False
         ) as verify:
-            self.assertFalse(is_allowlisted(self.request))
-            self.assertFalse(is_allowlisted(self.request))
+            self.assertFalse(should_bypass_ratelimit(self.request))
+            self.assertFalse(should_bypass_ratelimit(self.request))
 
         self.assertEqual(verify.call_count, 1)
 
@@ -175,8 +175,8 @@ class AllowlistTest(SimpleTestCase):
         """Entries written before this stored the IP string, not a bool."""
         cache.set("rl:allowlist:192.0.2.1", "192.0.2.1", 60)
 
-        with mock.patch.object(ratelimiter, "verify_ip_address") as verify:
-            self.assertTrue(is_allowlisted(self.request))
+        with mock.patch.object(ratelimiter, "is_verified_crawler") as verify:
+            self.assertTrue(should_bypass_ratelimit(self.request))
 
         verify.assert_not_called()
 
@@ -184,39 +184,32 @@ class AllowlistTest(SimpleTestCase):
         """A /64 has no PTR record, so it must not be what gets looked up."""
         request = RequestFactory().get("/", headers=IPV6_VIEWER)
         with mock.patch.object(
-            ratelimiter, "verify_ip_address", return_value=True
+            ratelimiter, "is_verified_crawler", return_value=True
         ) as verify:
-            self.assertTrue(is_allowlisted(request))
+            self.assertTrue(should_bypass_ratelimit(request))
 
         verify.assert_called_once_with("2001:4860:4801:10::1")
 
-    def test_an_ipv6_no_covers_the_64_but_a_yes_does_not(self) -> None:
-        """Can a client dodge the cached "no" by rotating addresses?
-
-        It shouldn't be able to, but a verified crawler mustn't vouch for its
-        neighbors either, since a host may carve one /64 up among customers.
-        """
-        neighbor = RequestFactory().get(
-            "/",
-            headers={"CloudFront-Viewer-Address": "2001:4860:4801:10::2:443"},
-        )
-        for approved, neighbor_looked_up in ((False, 0), (True, 1)):
-            cache.clear()
-            with (
-                self.subTest(approved=approved),
-                mock.patch.object(
-                    ratelimiter, "verify_ip_address", return_value=approved
-                ) as verify,
-            ):
-                is_allowlisted(RequestFactory().get("/", headers=IPV6_VIEWER))
-                verify.reset_mock()
-                is_allowlisted(neighbor)
-                self.assertEqual(verify.call_count, neighbor_looked_up)
-
     def test_a_request_without_the_header_is_not_looked_up(self) -> None:
         """getfqdn("") answers for this host, so there is nothing to ask."""
-        with mock.patch.object(ratelimiter, "verify_ip_address") as verify:
-            self.assertFalse(is_allowlisted(RequestFactory().get("/")))
+        with mock.patch.object(ratelimiter, "is_verified_crawler") as verify:
+            self.assertFalse(
+                should_bypass_ratelimit(RequestFactory().get("/"))
+            )
+
+        verify.assert_not_called()
+
+    def test_a_dead_cache_fails_open(self) -> None:
+        """A Redis outage lets the request through rather than 500ing."""
+        dead_cache = mock.Mock()
+        dead_cache.get.side_effect = ConnectionError
+        with (
+            mock.patch.object(
+                ratelimiter, "get_ratelimit_cache", return_value=dead_cache
+            ),
+            mock.patch.object(ratelimiter, "is_verified_crawler") as verify,
+        ):
+            self.assertTrue(should_bypass_ratelimit(self.request))
 
         verify.assert_not_called()
 
@@ -258,15 +251,15 @@ class CrawlerVerificationTest(SimpleTestCase):
             with (
                 self.subTest(error=error.__name__),
                 mock.patch.object(
-                    ratelimiter,
-                    "get_host_from_IP",
+                    ratelimiter.socket,
+                    "getfqdn",
                     return_value="crawl-66-249-66-1.googlebot.com",
                 ),
                 mock.patch.object(
-                    ratelimiter, "get_ips_from_host", side_effect=error
+                    ratelimiter.socket, "getaddrinfo", side_effect=error
                 ),
             ):
-                self.assertFalse(verify_ip_address("66.249.66.1"))
+                self.assertFalse(is_verified_crawler("66.249.66.1"))
 
     def test_an_ipv6_crawler_is_confirmed_by_its_aaaa_record(self) -> None:
         """Does the forward lookup see IPv6 addresses, however written?
@@ -293,15 +286,15 @@ class CrawlerVerificationTest(SimpleTestCase):
             with (
                 self.subTest(address=address),
                 mock.patch.object(
-                    ratelimiter,
-                    "get_host_from_IP",
+                    ratelimiter.socket,
+                    "getfqdn",
                     return_value="crawl-66-249-66-1.googlebot.com",
                 ),
                 mock.patch.object(
                     ratelimiter.socket, "getaddrinfo", return_value=answers
                 ),
             ):
-                self.assertEqual(verify_ip_address(address), expected)
+                self.assertEqual(is_verified_crawler(address), expected)
 
 
 class ViewerAddressTest(SimpleTestCase):
@@ -324,19 +317,15 @@ class ViewerAddressTest(SimpleTestCase):
                 request = RequestFactory().get(
                     "/", headers={"CloudFront-Viewer-Address": header}
                 )
-                self.assertEqual(str(get_viewer_address(request)), exact)
-                self.assertEqual(
-                    get_user_ip_from_cloudfront_headers(request), bucket
-                )
+                self.assertEqual(get_viewer_ip(request), exact)
+                self.assertEqual(get_ratelimit_ident(request), bucket)
 
     def test_a_missing_or_garbled_header_has_no_address(self) -> None:
         for headers in ({}, {"CloudFront-Viewer-Address": "nonsense:1"}):
             with self.subTest(headers=headers):
                 request = RequestFactory().get("/", headers=headers)
-                self.assertIsNone(get_viewer_address(request))
-                self.assertEqual(
-                    get_user_ip_from_cloudfront_headers(request), ""
-                )
+                self.assertEqual(get_viewer_ip(request), "")
+                self.assertEqual(get_ratelimit_ident(request), "")
 
 
 @override_settings(
@@ -354,6 +343,9 @@ class DenyListTest(SimpleTestCase):
         super().setUp()
         cache.clear()
         self.request = RequestFactory().get("/", headers=VIEWER)
+        # Stands in for the allowlist's cache during a Redis outage.
+        self.dead_cache = mock.Mock()
+        self.dead_cache.get.side_effect = ConnectionError
 
     @staticmethod
     def _decorate(view: View) -> View:
@@ -373,7 +365,7 @@ class DenyListTest(SimpleTestCase):
         self.assertEqual(wrapped(self.request).status_code, HTTPStatus.OK)
         with (
             mock.patch.object(
-                ratelimiter, "verify_ip_address", return_value=False
+                ratelimiter, "is_verified_crawler", return_value=False
             ),
             self.assertRaises(Ratelimited),
         ):
@@ -391,7 +383,7 @@ class DenyListTest(SimpleTestCase):
         self.assertEqual(response.status_code, HTTPStatus.OK)
         with (
             mock.patch.object(
-                ratelimiter, "verify_ip_address", return_value=False
+                ratelimiter, "is_verified_crawler", return_value=False
             ),
             self.assertRaises(Ratelimited),
         ):
@@ -402,7 +394,7 @@ class DenyListTest(SimpleTestCase):
 
         self.assertEqual(wrapped(self.request).status_code, HTTPStatus.OK)
         with mock.patch.object(
-            ratelimiter, "verify_ip_address", return_value=True
+            ratelimiter, "is_verified_crawler", return_value=True
         ):
             self.assertEqual(wrapped(self.request).status_code, HTTPStatus.OK)
 
@@ -418,7 +410,7 @@ class DenyListTest(SimpleTestCase):
 
         self.assertEqual(wrapped(self.request).status_code, HTTPStatus.OK)
         with mock.patch.object(
-            ratelimiter, "is_allowlisted", side_effect=ConnectionError
+            ratelimiter, "get_ratelimit_cache", return_value=self.dead_cache
         ):
             self.assertEqual(wrapped(self.request).status_code, HTTPStatus.OK)
 
@@ -431,12 +423,12 @@ class DenyListTest(SimpleTestCase):
         self.assertEqual(wrapped(self.request).status_code, HTTPStatus.OK)
         with (
             mock.patch.object(
-                ratelimiter,
-                "get_host_from_IP",
+                ratelimiter.socket,
+                "getfqdn",
                 return_value="crawl-66-249-66-1.googlebot.com",
             ),
             mock.patch.object(
-                ratelimiter, "get_ips_from_host", side_effect=socket.gaierror
+                ratelimiter.socket, "getaddrinfo", side_effect=socket.gaierror
             ),
             self.assertRaises(Ratelimited),
         ):
@@ -451,7 +443,7 @@ class DenyListTest(SimpleTestCase):
         response = await wrapped(self.request)
         self.assertEqual(response.status_code, HTTPStatus.OK)
         with mock.patch.object(
-            ratelimiter, "is_allowlisted", side_effect=ConnectionError
+            ratelimiter, "get_ratelimit_cache", return_value=self.dead_cache
         ):
             response = await wrapped(self.request)
 

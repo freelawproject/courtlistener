@@ -58,7 +58,7 @@ from cl.donate.models import (
 )
 from cl.lib.decorators import clear_tiered_cache, tiered_cache
 from cl.lib.ratelimiter import (
-    get_user_ip_from_cloudfront_headers,
+    get_ratelimit_ident,
     parse_rate,
 )
 from cl.lib.redis_utils import get_redis_interface
@@ -549,7 +549,7 @@ class LoggingMixin:
     def _log_request(self, request):
         d = date.today().isoformat()
         user = request.user
-        client_ip = get_user_ip_from_cloudfront_headers(request)
+        client_ip = get_ratelimit_ident(request)
         endpoint = resolve(request.path_info).url_name
         response_ms = self._get_response_ms()
 
@@ -1171,9 +1171,7 @@ class CloudFrontIdentMixin:
     """
 
     def get_ident(self, request):
-        return get_user_ip_from_cloudfront_headers(
-            request
-        ) or super().get_ident(request)
+        return get_ratelimit_ident(request) or super().get_ident(request)
 
 
 class CloudFrontAnonRateThrottle(CloudFrontIdentMixin, AnonRateThrottle):
