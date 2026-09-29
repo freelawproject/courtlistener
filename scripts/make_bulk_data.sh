@@ -103,7 +103,8 @@ opinioncluster_fields='(
        nature_of_suit, posture, syllabus, headnotes, summary, disposition,
        history, other_dates, cross_reference, correction, citation_count,
        precedential_status, date_blocked, blocked, filepath_json_harvard,
-	       filepath_pdf_harvard, docket_id, arguments, headmatter
+	       filepath_pdf_harvard, filepath_xml_scan, docket_id, arguments,
+	       headmatter
    )'
 opinioncluster_csv_filename="opinion-clusters-$(date -I).csv"
 
@@ -121,6 +122,14 @@ opinion_fields='(
 	       html_with_citations, extracted_by_ocr, author_id, cluster_id
 	   )'
 opinions_csv_filename="opinions-$(date -I).csv"
+
+# search_opinioncontent
+opinioncontent_fields='(
+	       id, date_created, date_modified, content, source, extraction_type,
+	       is_main_version, sha1, page_count, download_url, local_path,
+	       opinion_id
+	   )'
+opinioncontent_csv_filename="opinion-contents-$(date -I).csv"
 
 # search_opinionscited
 opinionscited_fields='(
@@ -303,7 +312,7 @@ unmatchedcitations_fields='(
 unmatchedcitations_csv_filename="unmatched-citations-$(date -I).csv"
 
 # If you add or remove a table, you need to update this number
-NUM_TABLES=33
+NUM_TABLES=34
 
 # Every new table added to bulk script should be added as an associative array
 # This ordering is important. Tables with foreign key constraints must be loaded in order.
@@ -344,6 +353,9 @@ declare -a t_31=("disclosures_gift" "$disclosures_gift_fields" "$disclosures_gif
 declare -a t_32=("disclosures_debt" "$disclosures_debt_fields" "$disclosures_debt_csv_filename")
 
 declare -a t_33=("citations_unmatchedcitation" "$unmatchedcitations_fields" "$unmatchedcitations_csv_filename")
+
+# After search_opinion (t_12), which its opinion_id references
+declare -a t_34=("search_opinioncontent" "$opinioncontent_fields" "$opinioncontent_csv_filename")
 
 # Create a new array with the data of each associative array
 declare -a listOfLists
