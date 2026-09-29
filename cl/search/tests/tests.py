@@ -76,6 +76,9 @@ from cl.search.factories import (
 from cl.search.forms import SearchForm
 from cl.search.llm_models import CleanDocketNumber, DocketItem
 from cl.search.management.commands import populate_docket_number_raw
+from cl.search.management.commands.cl_compute_token_count import (
+    get_clean_opinion_text,
+)
 from cl.search.management.commands.cl_index_parent_and_child_docs import (
     get_unique_oldest_history_rows,
 )
@@ -3638,8 +3641,13 @@ class OpinionQuerySetWithBestTextTest(TestCase):
         self.assertEqual(o_plain_text.best_text_source, "plain_text")
 
 
-class OpinionDocumentPrepareTextTest(SimpleTestCase):
-    """Tests for the text indexed for opinions in Elasticsearch."""
+class OpinionScanTextTest(SimpleTestCase):
+    """Tests for the text taken from scanned opinion XML."""
+
+    def test_token_count_text_from_xml_scan(self) -> None:
+        """Is the scanned XML used as the opinion text for token counts?"""
+        opinion = Opinion(xml_scan="<opinion><p>Scanned text</p></opinion>")
+        self.assertEqual(get_clean_opinion_text(opinion), "Scanned text")
 
     def test_prepare_text_from_xml_scan(self) -> None:
         """Is the scanned XML indexed as plain text?"""

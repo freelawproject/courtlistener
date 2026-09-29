@@ -98,7 +98,8 @@ async def get_clusters_from_citation_str(
             clusters = OpinionCluster.objects.filter(
                 Q(id=possible_match.id),
                 Q(sub_opinions__html_with_citations__contains=f"*{page}")
-                | Q(sub_opinions__xml_harvard__contains=f"*{page}"),
+                | Q(sub_opinions__xml_harvard__contains=f"*{page}")
+                | Q(sub_opinions__xml_scan__contains=f"*{page}"),
             ).select_related("docket__court")
             cluster_count = 1 if await clusters.aexists() else 0
 
