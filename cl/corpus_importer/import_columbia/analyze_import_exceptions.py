@@ -10,6 +10,7 @@ from collections import Counter, defaultdict
 
 os.chdir("/home/elliott/freelawmachine/flp/columbia_data/logs/2")
 currfile = ""
+court = ""
 courtid_tab: Counter = Counter()
 cite_tab: Counter = Counter()
 court_cite_tab: Counter = Counter()

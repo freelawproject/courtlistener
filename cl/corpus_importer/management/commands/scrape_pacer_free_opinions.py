@@ -31,7 +31,6 @@ from cl.lib.argparse_types import valid_date
 from cl.lib.celery_utils import CeleryThrottle
 from cl.lib.command_utils import VerboseCommand, logger
 from cl.lib.pacer import map_cl_to_pacer_id, map_pacer_to_cl_id
-from cl.lib.types import OptionsType
 from cl.scrapers.models import PACERFreeDocumentLog, PACERFreeDocumentRow
 from cl.scrapers.tasks import extract_pdf_document
 from cl.search.models import Court, RECAPDocument
@@ -754,7 +753,7 @@ class Command(VerboseCommand):
             ),
         )
 
-    def handle(self, *args: list[str], **options: OptionsType) -> None:
+    def handle(self, *args, **options) -> None:
         super().handle(*args, **options)
 
         if not self.validate_date_args(options):

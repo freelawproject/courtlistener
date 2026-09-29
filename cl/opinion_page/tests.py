@@ -697,25 +697,31 @@ class ViewRecapDocumentTest(TestCase):
         docket = await sync_to_async(DocketFactory)(
             court=court, source=Docket.RECAP, pacer_case_id="104490"
         )
-        de_data = await sync_to_async(DocketEntriesDataFactory)(
-            docket_entries=[
-                DocketEntryDataFactory(
-                    pacer_doc_id="288651",
-                    document_number=1,
-                )
-            ],
+        de_data = cast(
+            dict[str, Any],
+            await sync_to_async(DocketEntriesDataFactory)(
+                docket_entries=[
+                    DocketEntryDataFactory(
+                        pacer_doc_id="288651",
+                        document_number=1,
+                    )
+                ],
+            ),
         )
         await add_docket_entries(docket, de_data["docket_entries"])
 
-        att_data = await sync_to_async(AppellateAttachmentPageFactory)(
-            attachments=[
-                AppellateAttachmentFactory(
-                    attachment_number=1, pacer_doc_id="288651"
-                ),
-                AppellateAttachmentFactory(),
-            ],
-            pacer_doc_id="288651",
-            pacer_case_id="104490",
+        att_data = cast(
+            dict[str, Any],
+            await sync_to_async(AppellateAttachmentPageFactory)(
+                attachments=[
+                    AppellateAttachmentFactory(
+                        attachment_number=1, pacer_doc_id="288651"
+                    ),
+                    AppellateAttachmentFactory(),
+                ],
+                pacer_doc_id="288651",
+                pacer_case_id="104490",
+            ),
         )
         await merge_attachment_page_data(
             court,
@@ -1704,8 +1710,11 @@ class ViewRecapDocketTest(TestCase):
         Verify that the Docket view handles out-of-range page requests by returning
         the last valid page.
         """
-        entries = DocketEntriesDataFactory(
-            docket_entries=DocketEntryDataFactory.create_batch(50)
+        entries = cast(
+            dict[str, Any],
+            DocketEntriesDataFactory(
+                docket_entries=DocketEntryDataFactory.create_batch(50)
+            ),
         )
         await add_docket_entries(self.docket, entries["docket_entries"])
         response = await self.async_client.get(
@@ -2472,7 +2481,7 @@ class UploadPublication(TestCase):
         self.async_client = AsyncClient()
 
         qs = Person.objects.filter(positions__court_id="tennworkcompapp")
-        self.work_comp_app_data = {
+        self.work_comp_app_data: dict[str, str | int | date | None] = {
             "case_title": "A Sample Case",
             "lead_author": qs[0].id,
             "second_judge": qs[1].id,
@@ -4118,7 +4127,7 @@ class DocketFilterDrawerAttrPropagationTest(TestCase):
     def setUpTestData(cls) -> None:
         cls.court = CourtFactory(id="canb", jurisdiction="FB")
         cls.docket = DocketFactory(court=cls.court, source=Docket.RECAP)
-        cls.empty_page = Paginator([], 200).get_page(1)
+        cls.empty_page = Paginator([], 100).get_page(1)
 
     def _render(self, form: DocketEntryFilterForm) -> str:
         # Render via a wrapper template that invokes <c-docket-filter> as a
@@ -4314,4 +4323,92 @@ class DocketFilterPaginationWiringTest(TestCase):
         self.assertTrue(
             page_two_with_filter,
             f"no pagination link carries entry_gte forward; hrefs={hrefs}",
+        )
+
+    async def test_filter_form_has_no_page_submit_control(self) -> None:
+        """Pressing Enter in a filter field triggers implicit submission,
+        which uses the first submit button in tree order as the submitter.
+        If the desktop Prev/Next controls were submit buttons named `page`,
+        every filter change made via Enter would carry the current page
+        number along with the new filter values and land on a stale page.
+        Assert that no submit control anywhere on the page carries `page`,
+        and that Prev/Next are plain links instead."""
+        # Enough entries that page 2 has both a previous and a next page
+        # regardless of the paginator's page size.
+        await sync_to_async(DocketEntry.objects.bulk_create)(
+            [
+                DocketEntry(
+                    docket=self.docket,
+                    entry_number=n,
+                    date_filed=date(2024, 6, 1),
+                    description=f"bulk entry {n}",
+                )
+                for n in range(100, 511)
+            ]
+        )
+        r = await self._get_docket_and_verify_v2(data={"page": "2"})
+        tree = fromstring(r.content.decode())
+
+        page_controls = [
+            el
+            for el in tree.iter("button", "input")
+            if el.get("name") == "page"
+        ]
+        self.assertEqual(
+            page_controls,
+            [],
+            "form controls named `page` would be sent as a submitter value "
+            "on implicit submission, carrying a stale page number along "
+            "with the new filter values",
+        )
+
+        prev_hrefs = [
+            a.get("href", "")
+            for a in tree.iter("a")
+            if a.get("title") == "Previous page"
+        ]
+        next_hrefs = [
+            a.get("href", "")
+            for a in tree.iter("a")
+            if a.get("title") == "Next page"
+        ]
+        self.assertTrue(prev_hrefs, "no Previous page links rendered")
+        self.assertTrue(next_hrefs, "no Next page links rendered")
+        for href in prev_hrefs:
+            with self.subTest(href=href):
+                self.assertIn("page=1", href)
+        for href in next_hrefs:
+            with self.subTest(href=href):
+                self.assertIn("page=3", href)
+
+    async def test_pagination_shows_entry_range(self) -> None:
+        """The bottom pagination shows "start–end of total" for the current
+        page. The paginator uses `orphans=10`, so the last page can hold more
+        than the page size; the range must come from the page object's
+        start/end index, not from `number * per_page`. Fill the docket so the
+        last page absorbs the orphans and check its range."""
+        # 5 existing + 205 bulk = 210 entries. At 100 per page with
+        # orphans=10 that is two pages: 1–100 and 101–210.
+        await sync_to_async(DocketEntry.objects.bulk_create)(
+            [
+                DocketEntry(
+                    docket=self.docket,
+                    entry_number=n,
+                    date_filed=date(2024, 6, 1),
+                    description=f"bulk entry {n}",
+                )
+                for n in range(100, 305)
+            ]
+        )
+        r = await self._get_docket_and_verify_v2(data={"page": "2"})
+        tree = fromstring(r.content.decode())
+        nav = tree.find('.//nav[@aria-label="Pagination"]')
+        self.assertIsNotNone(nav, "pagination nav missing")
+        # lxml types itertext() as Iterator[_AnyStr]; stringify for str.join.
+        nav_text = " ".join(str(t) for t in nav.itertext()).split()
+        self.assertIn("101–210", nav_text)
+        self.assertEqual(
+            nav_text[nav_text.index("101–210") + 2],
+            "210",
+            f"range total should be the paginator count; nav text={nav_text}",
         )
