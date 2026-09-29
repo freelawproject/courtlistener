@@ -409,6 +409,35 @@ class ESClusterSearchAsyncTest(TestCase):
         self.assertNotEqual(execute_thread, event_loop_thread)
 
 
+class ScannedOpinionPageTest(TestCase):
+    """Is the text of scanned opinions displayed?"""
+
+    @classmethod
+    def setUpTestData(cls) -> None:
+        cls.cluster = OpinionClusterWithParentsFactory.create(
+            precedential_status=PRECEDENTIAL_STATUS.PUBLISHED,
+        )
+        cls.opinion = OpinionFactory.create(
+            cluster=cls.cluster,
+            type=Opinion.COMBINED,
+            plain_text="",
+            xml_scan="<opinion><p>Text from the scanned reporter</p></opinion>",
+        )
+
+    def test_scanned_opinion_text_is_displayed(self) -> None:
+        """Is the opinion XML shown when the opinion only has xml_scan?"""
+        path = reverse("view_case", args=[self.cluster.pk, self.cluster.slug])
+        response = self.client.get(path)
+
+        self.assertEqual(response.status_code, HTTPStatus.OK)
+        self.assertContains(
+            response,
+            '<div class="serif-text harvard"><opinion><p>Text from the '
+            "scanned reporter</p></opinion></div>",
+            html=False,
+        )
+
+
 class SimpleLoadTest(TestCase):
     fixtures = [
         "test_objects_search.json",
