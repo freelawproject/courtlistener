@@ -22,7 +22,14 @@ from cl.search.factories import (
     OpinionClusterFactory,
     OpinionFactory,
 )
-from cl.search.models import Citation, Court, Docket, Opinion, OpinionCluster
+from cl.search.models import (
+    Citation,
+    Court,
+    Docket,
+    Opinion,
+    OpinionCluster,
+    OpinionContent,
+)
 from cl.tests.cases import SimpleTestCase, TestCase
 
 COMMAND_MODULE = (
@@ -284,6 +291,14 @@ class ImportScannedOpinionsTest(TestCase):
         self.assertEqual(opinion.type, Opinion.COMBINED)
         self.assertTrue(opinion.extracted_by_ocr)
 
+        content = OpinionContent.objects.get(opinion=opinion)
+        self.assertEqual(content.content, opinion.xml_scan)
+        self.assertEqual(content.source, OpinionContent.FLP_SCANNING)
+        self.assertEqual(content.extraction_type, OpinionContent.LLM)
+        self.assertTrue(content.is_main_version)
+        self.assertEqual(len(content.sha1), 40)
+        self.assertEqual(content.page_count, 4)
+
     def test_reimport_is_skipped(self) -> None:
         """Is an already imported scanned opinion skipped?"""
         self.import_scan()
@@ -316,9 +331,11 @@ class ImportScannedOpinionsTest(TestCase):
         self.assertEqual(
             cluster.docket.source, Docket.SCRAPER_AND_SCANNING_PROJECT
         )
-        self.assertIn(
-            "confession of error", cluster.sub_opinions.get().xml_scan
-        )
+        opinion = cluster.sub_opinions.get()
+        self.assertIn("confession of error", opinion.xml_scan)
+        content = OpinionContent.objects.get(opinion=opinion)
+        self.assertEqual(content.content, opinion.xml_scan)
+        self.assertTrue(content.is_main_version)
 
     def test_merge_skips_opinions_when_counts_differ(self) -> None:
         """Is the opinion text left alone when opinions can't be paired?"""
@@ -330,6 +347,7 @@ class ImportScannedOpinionsTest(TestCase):
         cluster.refresh_from_db()
         self.assertTrue(cluster.filepath_xml_scan)
         self.assertFalse(cluster.sub_opinions.exclude(xml_scan="").exists())
+        self.assertFalse(OpinionContent.objects.exists())
         self.assertIn(
             "Opinion content was not merged",
             mock_logger.warning.call_args[0][0],

@@ -32,6 +32,7 @@ from cl.corpus_importer.utils import (
     get_court_id,
 )
 from cl.lib.command_utils import VerboseCommand, logger
+from cl.lib.crypto import sha1
 from cl.lib.utils import human_sort
 from cl.people_db.lookup_utils import extract_judge_last_name
 from cl.scrapers.utils import (
@@ -45,6 +46,7 @@ from cl.search.models import (
     Docket,
     Opinion,
     OpinionCluster,
+    OpinionContent,
 )
 
 HYPERSCAN_TOKENIZER = HyperscanTokenizer(cache_dir=".hyperscan")
@@ -112,6 +114,7 @@ class ScanCase:
     parsed_citations: list[FullCaseCitation]
     judges: str
     body_characters: str
+    page_count: int | None = None
     cluster_fields: dict[str, str] = field(default_factory=dict)
     opinions: list[Tag] = field(default_factory=list)
 
@@ -255,6 +258,26 @@ def get_date_filed(soup: BeautifulSoup) -> date | None:
     return None
 
 
+def get_page_count(soup: BeautifulSoup) -> int | None:
+    """Get the number of printed pages of the casebody.
+
+    :param soup: The parsed XML.
+    :return: The page count, or None if the page attributes are missing.
+    """
+    casebody = soup.select_one("casebody")
+    if not casebody:
+        return None
+    first_page, last_page = casebody.get("firstpage"), casebody.get("lastpage")
+    if not (
+        isinstance(first_page, str)
+        and isinstance(last_page, str)
+        and first_page.isdigit()
+        and last_page.isdigit()
+    ):
+        return None
+    return int(last_page) - int(first_page) + 1
+
+
 def get_judges(soup: BeautifulSoup) -> str:
     """Get the judges names from the `judges` and `author` elements.
 
@@ -361,6 +384,7 @@ def parse_scan_xml(
         citations=cite_strings,
         parsed_citations=cites,
         judges=get_judges(soup),
+        page_count=get_page_count(soup),
         body_characters=clean_body_content(
             str(soup.select_one("casebody") or ""), harvard_file=True
         ),
@@ -477,6 +501,31 @@ def store_scan_xml(cluster: OpinionCluster, scan_case: ScanCase) -> None:
     cluster.save(update_fields=["filepath_xml_scan"])
 
 
+def add_opinion_content(
+    opinion: Opinion, scan_case: ScanCase, is_main_version: bool
+) -> OpinionContent:
+    """Store the opinion XML in OpinionContent.
+
+    The XML is also kept in `Opinion.xml_scan` until the site reads from
+    OpinionContent.
+
+    :param opinion: The saved opinion.
+    :param scan_case: The parsed scanned opinion.
+    :param is_main_version: Whether this is the main version of the
+        opinion's content.
+    :return: The new OpinionContent.
+    """
+    return OpinionContent.objects.create(
+        opinion=opinion,
+        content=opinion.xml_scan,
+        source=OpinionContent.FLP_SCANNING,
+        extraction_type=OpinionContent.LLM,
+        is_main_version=is_main_version,
+        sha1=sha1(opinion.xml_scan),
+        page_count=scan_case.page_count,
+    )
+
+
 def merge_into_cluster(cluster: OpinionCluster, scan_case: ScanCase) -> None:
     """Merge a scanned opinion into an existing cluster.
 
@@ -517,6 +566,13 @@ def merge_into_cluster(cluster: OpinionCluster, scan_case: ScanCase) -> None:
             opinion = cl_opinions[0]
             opinion.xml_scan = str(scan_case.opinions[0])
             opinion.save(update_fields=["xml_scan"])
+            add_opinion_content(
+                opinion,
+                scan_case,
+                is_main_version=not opinion.contents.filter(
+                    is_main_version=True
+                ).exists(),
+            )
         else:
             logger.warning(
                 "Cluster %s has %s opinions and the scan of %s has %s. "
@@ -568,7 +624,9 @@ def add_new_case(scan_case: ScanCase) -> OpinionCluster:
         cluster.save()
         add_citations_to_cluster(scan_case.citations, cluster.id)
         for op in scan_case.opinions:
-            make_opinion(op, cluster.id).save()
+            opinion = make_opinion(op, cluster.id)
+            opinion.save()
+            add_opinion_content(opinion, scan_case, is_main_version=True)
         store_scan_xml(cluster, scan_case)
     return cluster
 
