@@ -22,6 +22,8 @@ from cl.lib import ratelimiter
 from cl.lib.ratelimiter import (
     View,
     get_ip_for_ratelimiter,
+    get_user_ip_from_cloudfront_headers,
+    get_viewer_address,
     host_is_approved,
     is_allowlisted,
     make_ratelimiter,
@@ -66,6 +68,7 @@ urlpatterns = [
 ]
 
 VIEWER = {"CloudFront-Viewer-Address": "192.0.2.1:51396"}
+IPV6_VIEWER = {"CloudFront-Viewer-Address": "2001:4860:4801:10::1:51396"}
 
 
 @override_settings(
@@ -177,6 +180,39 @@ class AllowlistTest(SimpleTestCase):
 
         verify.assert_not_called()
 
+    def test_ipv6_is_verified_by_its_exact_address(self) -> None:
+        """A /64 has no PTR record, so it must not be what gets looked up."""
+        request = RequestFactory().get("/", headers=IPV6_VIEWER)
+        with mock.patch.object(
+            ratelimiter, "verify_ip_address", return_value=True
+        ) as verify:
+            self.assertTrue(is_allowlisted(request))
+
+        verify.assert_called_once_with("2001:4860:4801:10::1")
+
+    def test_an_ipv6_no_covers_the_64_but_a_yes_does_not(self) -> None:
+        """Can a client dodge the cached "no" by rotating addresses?
+
+        It shouldn't be able to, but a verified crawler mustn't vouch for its
+        neighbors either, since a host may carve one /64 up among customers.
+        """
+        neighbor = RequestFactory().get(
+            "/",
+            headers={"CloudFront-Viewer-Address": "2001:4860:4801:10::2:443"},
+        )
+        for approved, neighbor_looked_up in ((False, 0), (True, 1)):
+            cache.clear()
+            with (
+                self.subTest(approved=approved),
+                mock.patch.object(
+                    ratelimiter, "verify_ip_address", return_value=approved
+                ) as verify,
+            ):
+                is_allowlisted(RequestFactory().get("/", headers=IPV6_VIEWER))
+                verify.reset_mock()
+                is_allowlisted(neighbor)
+                self.assertEqual(verify.call_count, neighbor_looked_up)
+
     def test_a_request_without_the_header_is_not_looked_up(self) -> None:
         """getfqdn("") answers for this host, so there is nothing to ask."""
         with mock.patch.object(ratelimiter, "verify_ip_address") as verify:
@@ -214,7 +250,7 @@ class CrawlerVerificationTest(SimpleTestCase):
     def test_a_failed_forward_lookup_is_not_approved(self) -> None:
         """Is a DNS error on the forward lookup a "no" rather than a crash?
 
-        socket.gethostbyname raises gaierror on NXDOMAIN, SERVFAIL or a
+        socket.getaddrinfo raises gaierror on NXDOMAIN, SERVFAIL or a
         timeout, and UnicodeError for a label over 63 characters, which
         whoever controls the PTR record can hand us.
         """
@@ -227,10 +263,80 @@ class CrawlerVerificationTest(SimpleTestCase):
                     return_value="crawl-66-249-66-1.googlebot.com",
                 ),
                 mock.patch.object(
-                    ratelimiter, "get_ip_from_host", side_effect=error
+                    ratelimiter, "get_ips_from_host", side_effect=error
                 ),
             ):
                 self.assertFalse(verify_ip_address("66.249.66.1"))
+
+    def test_an_ipv6_crawler_is_confirmed_by_its_aaaa_record(self) -> None:
+        """Does the forward lookup see IPv6 addresses, however written?
+
+        gethostbyname only returns A records, so it could never confirm an
+        IPv6 crawler.
+        """
+        answers = [
+            (
+                socket.AF_INET6,
+                socket.SOCK_STREAM,
+                6,
+                "",
+                ("2001:4860:4801:0010:0000:0000:0000:0001", 0, 0, 0),
+            ),
+            (socket.AF_INET, socket.SOCK_STREAM, 6, "", ("66.249.66.1", 0)),
+        ]
+        cases = {
+            "2001:4860:4801:10::1": True,
+            "66.249.66.1": True,
+            "2001:4860:4801:10::2": False,
+        }
+        for address, expected in cases.items():
+            with (
+                self.subTest(address=address),
+                mock.patch.object(
+                    ratelimiter,
+                    "get_host_from_IP",
+                    return_value="crawl-66-249-66-1.googlebot.com",
+                ),
+                mock.patch.object(
+                    ratelimiter.socket, "getaddrinfo", return_value=answers
+                ),
+            ):
+                self.assertEqual(verify_ip_address(address), expected)
+
+
+class ViewerAddressTest(SimpleTestCase):
+    """Is CloudFront's header read into the right address and bucket?"""
+
+    def test_ipv6_is_exact_for_verification_but_a_64_for_counting(
+        self,
+    ) -> None:
+        cases = {
+            "192.0.2.1:51396": ("192.0.2.1", "192.0.2.1"),
+            "2001:db8:1:2:3:4:5:6:51396": (
+                "2001:db8:1:2:3:4:5:6",
+                "2001:db8:1:2::",
+            ),
+            "[2001:db8:1:2::6]:51396": ("2001:db8:1:2::6", "2001:db8:1:2::"),
+            "::ffff:192.0.2.1:51396": ("192.0.2.1", "192.0.2.1"),
+        }
+        for header, (exact, bucket) in cases.items():
+            with self.subTest(header=header):
+                request = RequestFactory().get(
+                    "/", headers={"CloudFront-Viewer-Address": header}
+                )
+                self.assertEqual(str(get_viewer_address(request)), exact)
+                self.assertEqual(
+                    get_user_ip_from_cloudfront_headers(request), bucket
+                )
+
+    def test_a_missing_or_garbled_header_has_no_address(self) -> None:
+        for headers in ({}, {"CloudFront-Viewer-Address": "nonsense:1"}):
+            with self.subTest(headers=headers):
+                request = RequestFactory().get("/", headers=headers)
+                self.assertIsNone(get_viewer_address(request))
+                self.assertEqual(
+                    get_user_ip_from_cloudfront_headers(request), ""
+                )
 
 
 @override_settings(
@@ -330,7 +436,7 @@ class DenyListTest(SimpleTestCase):
                 return_value="crawl-66-249-66-1.googlebot.com",
             ),
             mock.patch.object(
-                ratelimiter, "get_ip_from_host", side_effect=socket.gaierror
+                ratelimiter, "get_ips_from_host", side_effect=socket.gaierror
             ),
             self.assertRaises(Ratelimited),
         ):
