@@ -11,7 +11,7 @@ from urllib.parse import parse_qs, urlparse
 import time_machine
 from asgiref.sync import async_to_sync, sync_to_async
 from django.contrib.auth.hashers import make_password
-from django.contrib.auth.models import AnonymousUser, Permission, User
+from django.contrib.auth.models import Permission, User
 from django.contrib.contenttypes.models import ContentType
 from django.contrib.humanize.templatetags.humanize import intcomma, ordinal
 from django.contrib.sites.models import Site
@@ -33,6 +33,7 @@ from rest_framework.pagination import Cursor, CursorPagination
 from rest_framework.request import Request
 from rest_framework.response import Response
 from rest_framework.test import APIRequestFactory
+from rest_framework.views import APIView
 from rest_framework_xml.renderers import XMLRenderer
 from waffle.testutils import override_flag, override_switch
 
@@ -5496,49 +5497,49 @@ class AnonThrottleIdentTest(TestCase):
     def setUp(self) -> None:
         caches["default"].clear()
         self.factory = RequestFactory()
+        self.view = APIView()
 
-    def _anon_request(self, **headers):
-        request = self.factory.get("/", **headers)
-        request.user = AnonymousUser()
-        return request
+    def _request(self, **headers) -> Request:
+        """Build the DRF request a throttle sees, anonymous until given a user."""
+        return Request(self.factory.get("/", **headers))
 
     def test_the_viewer_address_decides_the_key(self) -> None:
         """One viewer behind two proxy paths gets one key, not two."""
         throttle = CloudFrontAnonRateThrottle()
-        first = self._anon_request(
+        first = self._request(
             HTTP_CLOUDFRONT_VIEWER_ADDRESS="96.23.39.106:51396",
             HTTP_X_FORWARDED_FOR="10.0.0.1",
             REMOTE_ADDR="10.0.0.1",
         )
-        second = self._anon_request(
+        second = self._request(
             HTTP_CLOUDFRONT_VIEWER_ADDRESS="96.23.39.106:22222",
             HTTP_X_FORWARDED_FOR="10.0.0.2",
             REMOTE_ADDR="10.0.0.2",
         )
 
         self.assertEqual(
-            throttle.get_cache_key(first, view=None),
-            throttle.get_cache_key(second, view=None),
+            throttle.get_cache_key(first, view=self.view),
+            throttle.get_cache_key(second, view=self.view),
         )
 
     def test_two_viewers_are_counted_separately(self) -> None:
         throttle = CloudFrontAnonRateThrottle()
-        one = self._anon_request(
+        one = self._request(
             HTTP_CLOUDFRONT_VIEWER_ADDRESS="96.23.39.106:51396"
         )
-        two = self._anon_request(
+        two = self._request(
             HTTP_CLOUDFRONT_VIEWER_ADDRESS="96.23.39.107:51396"
         )
 
         self.assertNotEqual(
-            throttle.get_cache_key(one, view=None),
-            throttle.get_cache_key(two, view=None),
+            throttle.get_cache_key(one, view=self.view),
+            throttle.get_cache_key(two, view=self.view),
         )
 
     def test_it_falls_back_without_the_header(self) -> None:
         """Local development and tests see no CloudFront header."""
         throttle = CloudFrontAnonRateThrottle()
-        request = self._anon_request(REMOTE_ADDR="10.0.0.1")
+        request = self._request(REMOTE_ADDR="10.0.0.1")
 
         self.assertEqual(throttle.get_ident(request), "10.0.0.1")
 
@@ -5550,17 +5551,17 @@ class AnonThrottleIdentTest(TestCase):
         """
         user = UserFactory()
         throttle = ExceptionalUserRateThrottle()
-        first = self.factory.get(
-            "/", HTTP_CLOUDFRONT_VIEWER_ADDRESS="96.23.39.106:51396"
+        first = self._request(
+            HTTP_CLOUDFRONT_VIEWER_ADDRESS="96.23.39.106:51396"
         )
         first.user = user
-        second = self.factory.get(
-            "/", HTTP_CLOUDFRONT_VIEWER_ADDRESS="203.0.113.9:22222"
+        second = self._request(
+            HTTP_CLOUDFRONT_VIEWER_ADDRESS="203.0.113.9:22222"
         )
         second.user = user
 
-        key = throttle.get_cache_key(first, view=None)
-        self.assertEqual(key, throttle.get_cache_key(second, view=None))
+        key = throttle.get_cache_key(first, view=self.view)
+        self.assertEqual(key, throttle.get_cache_key(second, view=self.view))
         self.assertIn(str(user.pk), key)
 
     def test_two_authenticated_clients_are_counted_separately(self) -> None:
@@ -5568,26 +5569,26 @@ class AnonThrottleIdentTest(TestCase):
         throttle = ExceptionalUserRateThrottle()
         requests = []
         for _ in range(2):
-            request = self.factory.get(
-                "/", HTTP_CLOUDFRONT_VIEWER_ADDRESS="96.23.39.106:51396"
+            request = self._request(
+                HTTP_CLOUDFRONT_VIEWER_ADDRESS="96.23.39.106:51396"
             )
             request.user = UserFactory()
             requests.append(request)
 
         self.assertNotEqual(
-            throttle.get_cache_key(requests[0], view=None),
-            throttle.get_cache_key(requests[1], view=None),
+            throttle.get_cache_key(requests[0], view=self.view),
+            throttle.get_cache_key(requests[1], view=self.view),
         )
 
     def test_the_anon_throttle_skips_authenticated_clients(self) -> None:
         """It returns no key at all for them, as DRF's does."""
         throttle = CloudFrontAnonRateThrottle()
-        request = self.factory.get(
-            "/", HTTP_CLOUDFRONT_VIEWER_ADDRESS="96.23.39.106:51396"
+        request = self._request(
+            HTTP_CLOUDFRONT_VIEWER_ADDRESS="96.23.39.106:51396"
         )
         request.user = UserFactory()
 
-        self.assertIsNone(throttle.get_cache_key(request, view=None))
+        self.assertIsNone(throttle.get_cache_key(request, view=self.view))
 
     def test_the_user_scope_keys_anonymous_clients_the_same_way(self) -> None:
         """Anonymous requests are counted in the user scope too.
@@ -5598,11 +5599,11 @@ class AnonThrottleIdentTest(TestCase):
         for every other UserRateThrottle an anonymous client can reach: the
         event counter and the read-only tag endpoints.
         """
-        first = self._anon_request(
+        first = self._request(
             HTTP_CLOUDFRONT_VIEWER_ADDRESS="96.23.39.106:51396",
             REMOTE_ADDR="10.0.0.1",
         )
-        second = self._anon_request(
+        second = self._request(
             HTTP_CLOUDFRONT_VIEWER_ADDRESS="96.23.39.106:22222",
             REMOTE_ADDR="10.0.0.2",
         )
@@ -5615,8 +5616,8 @@ class AnonThrottleIdentTest(TestCase):
             with self.subTest(throttle=throttle_class.__name__):
                 throttle = throttle_class()
                 self.assertEqual(
-                    throttle.get_cache_key(first, view=None),
-                    throttle.get_cache_key(second, view=None),
+                    throttle.get_cache_key(first, view=self.view),
+                    throttle.get_cache_key(second, view=self.view),
                 )
 
 
