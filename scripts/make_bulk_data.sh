@@ -445,6 +445,13 @@ export PGPASSWORD=\$BULK_DB_PASSWORD
 echo "Loading schema to database: $schema_filename"
 psql -f "\$BULK_DIR"/$schema_filename --host "\$BULK_DB_HOST" --username "\$BULK_DB_USER" --dbname "\$BULK_DB_NAME"
 
+# filepath_pdf_scan is not exported since it points to private files, but its
+# column is NOT NULL without a default, so loading the clusters would fail
+psql --command "ALTER TABLE public.search_opinioncluster ALTER COLUMN filepath_pdf_scan SET DEFAULT ''" \
+--host "\$BULK_DB_HOST" \
+--username "\$BULK_DB_USER" \
+--dbname "\$BULK_DB_NAME"
+
 EOF
 
 # Start adding the code to the script to load the tables
