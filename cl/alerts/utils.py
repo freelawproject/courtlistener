@@ -2,7 +2,7 @@ import copy
 from dataclasses import dataclass
 from datetime import date, datetime
 from enum import Enum, auto
-from typing import Any
+from typing import Any, cast
 from urllib.parse import parse_qs
 
 from django.apps import apps
@@ -129,12 +129,14 @@ class InvalidDateError(Exception):
 
 
 def create_percolator_search_query(
-    index_name: str, final_query: Query, search_after: int | None = None
+    index_name: str,
+    final_query: Query | None,
+    search_after: int | None = None,
 ):
     """Create an Elasticsearch search query with pagination.
 
     :param index_name: The name of the Elasticsearch index to search.
-    :param final_query: Elasticsearch DSL Query object.
+    :param final_query: Elasticsearch DSL Query object, or None.
     :param search_after: An optional parameter for search_after pagination.
     :return: An Elasticsearch search object with the specified query and pagination settings.
     """
@@ -329,7 +331,9 @@ def fetch_all_search_alerts_results(
     """
 
     def get_search_after(response: Response | None) -> Any:
-        if response and response.hits.hits:
+        # TODO: Response.hits is annotated upstream as a plain list, but at runtime
+        # it is an AttrList that also exposes the raw `hits` payload.
+        if response and cast(Any, response.hits).hits:
             return response.hits[-1].meta.sort
         return None
 
@@ -558,15 +562,15 @@ def has_document_alert_hit_been_triggered(
     return r.sismember(alert_key, document_id)
 
 
-def build_plain_percolator_query(cd: CleanData) -> Query:
+def build_plain_percolator_query(cd: CleanData) -> Query | None:
     """Build a plain query based on the provided clean data for its use in the
     Percolator
 
     :param cd: The query CleanedData.
-    :return: An ES Query object representing the built query.
+    :return: An ES Query object representing the built query, or None for search
+    types the Percolator does not support.
     """
 
-    plain_query = []
     match cd["type"]:
         case (
             SEARCH_TYPES.RECAP
@@ -604,25 +608,25 @@ def build_plain_percolator_query(cd: CleanData) -> Query:
                         "Indexing match-all queries is not supported."
                     )
                 case [[], _]:
-                    plain_query = Q(
+                    return Q(
                         "bool",
                         should=string_query,
                         minimum_should_match=1,
                     )
                 case [_, []]:
-                    plain_query = Q(
+                    return Q(
                         "bool",
                         filter=parent_filters,
                     )
                 case [_, _]:
-                    plain_query = Q(
+                    return Q(
                         "bool",
                         filter=parent_filters,
                         should=string_query,
                         minimum_should_match=1,
                     )
 
-    return plain_query
+    return None
 
 
 def transform_percolator_child_document(

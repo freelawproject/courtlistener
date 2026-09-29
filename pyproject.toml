@@ -116,7 +116,7 @@ dependencies = [
   "zohocrmsdk8-0==7.0.0",
   "django-prometheus>=2.5.0",
   "google-genai>=2.18.1",
-  "django-oauth-toolkit[jwcrypto]==3.2.0",
+  "django-oauth-toolkit==3.4.1",
 ]
 
 [dependency-groups]
@@ -136,7 +136,7 @@ dev = [
   "django-debug-toolbar>=7.1.1",
   "django-tailwind[reload]~=4.5.0",
   "responses>=0.26.3",
-  "pyrefly>=1.2.0",
+  "pyrefly>=1.3.0",
   "pandas-stubs~=3.0.5",
   "unittest-xml-reporting>=4.0.0",
 ]

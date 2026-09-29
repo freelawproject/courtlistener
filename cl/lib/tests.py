@@ -1,21 +1,27 @@
 import datetime
 import pickle
+from http import HTTPStatus
 from typing import TypedDict, cast
 from unittest import mock
 from unittest.mock import MagicMock, patch
 
 from asgiref.sync import async_to_sync
-from django.contrib.auth.models import AnonymousUser
+from django.contrib.auth.models import AnonymousUser, User
 from django.core.cache import cache
 from django.core.exceptions import ValidationError
 from django.core.files.base import ContentFile
 from django.core.files.uploadedfile import SimpleUploadedFile
+from django.http import HttpResponse
 from django.template.response import TemplateResponse
 from django.test import RequestFactory, SimpleTestCase, override_settings
+from django.urls import ResolverMatch, reverse
 from django.utils.functional import SimpleLazyObject
+from django_ratelimit.exceptions import Ratelimited
+from django_ratelimit.middleware import RatelimitMiddleware
 from requests.cookies import RequestsCookieJar
 from waffle.testutils import override_flag
 
+from cl.lib.auth import filter_by_email
 from cl.lib.courts import (
     get_active_court_from_cache,
     get_minimal_list_of_courts,
@@ -1179,9 +1185,9 @@ class TestPACERPartyParsing(SimpleTestCase):
         ]
         for i, pair in enumerate(pairs):
             print(f"Normalizing address {i}...", end="")
-            result = normalize_attorney_contact(pair["q"])  # type: ignore
+            result = normalize_attorney_contact(pair["q"])
             self.maxDiff = None
-            self.assertEqual(result, pair["a"])  # type: ignore
+            self.assertEqual(result, pair["a"])
             print("✓")
 
     def test_making_a_lookup_key(self) -> None:
@@ -1483,7 +1489,7 @@ class TestElasticsearchUtils(SimpleTestCase):
             },
         ]
         for test in tests:
-            output = check_for_proximity_tokens(test["input_str"])  # type: ignore
+            output = check_for_proximity_tokens(cast(str, test["input_str"]))
             self.assertEqual(output, test["output"])
 
         # Check for Unbalanced parentheses.
@@ -1520,11 +1526,13 @@ class TestElasticsearchUtils(SimpleTestCase):
             },
         ]
         for test in tests:
-            output = check_unbalanced_parenthesis(test["input_str"])  # type: ignore
+            output = check_unbalanced_parenthesis(cast(str, test["input_str"]))
             self.assertEqual(output, test["output"])
 
         for test in tests:
-            output = sanitize_unbalanced_parenthesis(test["input_str"])  # type: ignore
+            output = sanitize_unbalanced_parenthesis(
+                cast(str, test["input_str"])
+            )
             self.assertEqual(output, test["sanitized"])
 
         # Check for Unbalanced quotes.
@@ -1571,11 +1579,11 @@ class TestElasticsearchUtils(SimpleTestCase):
             },
         ]
         for test in tests:
-            output = check_unbalanced_quotes(test["input_str"])  # type: ignore
+            output = check_unbalanced_quotes(cast(str, test["input_str"]))
             self.assertEqual(output, test["output"])
 
         for test in tests:
-            output = sanitize_unbalanced_quotes(test["input_str"])  # type: ignore
+            output = sanitize_unbalanced_quotes(cast(str, test["input_str"]))
             self.assertEqual(output, test["sanitized"])
 
     def test_can_get_parties_from_bankruptcy_case_name(self) -> None:
@@ -1922,7 +1930,9 @@ class TestQueryWrapper(TestCase):
     def test_get_context_without_user(self) -> None:
         """Does get_context return None user_id when request has no user?"""
         request = self.request_factory.get("/test/path/")
-        request.resolver_match = self.MockResolverMatch("test-view")
+        request.resolver_match = cast(
+            ResolverMatch, self.MockResolverMatch("test-view")
+        )
 
         wrapper = QueryWrapper(request)
         result = wrapper.get_context()
@@ -1935,7 +1945,9 @@ class TestQueryWrapper(TestCase):
         """Does get_context return user_id and url for authenticated user?"""
         request = self.request_factory.get("/test/path/")
         request.user = self.user
-        request.resolver_match = self.MockResolverMatch("test-view")
+        request.resolver_match = cast(
+            ResolverMatch, self.MockResolverMatch("test-view")
+        )
 
         wrapper = QueryWrapper(request)
         result = wrapper.get_context()
@@ -1950,7 +1962,9 @@ class TestQueryWrapper(TestCase):
         """Does get_context handle anonymous user correctly?"""
         request = self.request_factory.get("/anonymous/path/")
         request.user = AnonymousUser()
-        request.resolver_match = self.MockResolverMatch("anon-view")
+        request.resolver_match = cast(
+            ResolverMatch, self.MockResolverMatch("anon-view")
+        )
 
         wrapper = QueryWrapper(request)
         result = wrapper.get_context()
@@ -1963,7 +1977,9 @@ class TestQueryWrapper(TestCase):
     def test_get_context_truncates_path(self):
         request = self.request_factory.get("/very/long/path/")
         request.user = self.user
-        request.resolver_match = self.MockResolverMatch(view_name="test-view")
+        request.resolver_match = cast(
+            ResolverMatch, self.MockResolverMatch(view_name="test-view")
+        )
 
         wrapper = QueryWrapper(request)
         result = wrapper.get_context()
@@ -1980,8 +1996,10 @@ class TestQueryWrapper(TestCase):
         """
         request = self.request_factory.get("/lazy/user/path/")
         # Create an unevaluated SimpleLazyObject (simulating Django's lazy user)
-        request.user = SimpleLazyObject(lambda: self.user)
-        request.resolver_match = self.MockResolverMatch("lazy-view")
+        request.user = cast(User, SimpleLazyObject(lambda: self.user))
+        request.resolver_match = cast(
+            ResolverMatch, self.MockResolverMatch("lazy-view")
+        )
 
         wrapper = QueryWrapper(request)
         result = wrapper.get_context()
@@ -1996,9 +2014,11 @@ class TestQueryWrapper(TestCase):
         request = self.request_factory.get("/lazy/user/path/")
         lazy_user = SimpleLazyObject(lambda: self.user)
         # Force evaluation of the lazy object
-        _ = lazy_user.pk  # type: ignore[attr-defined]
-        request.user = lazy_user
-        request.resolver_match = self.MockResolverMatch("lazy-view")
+        _ = lazy_user.pk
+        request.user = cast(User, lazy_user)
+        request.resolver_match = cast(
+            ResolverMatch, self.MockResolverMatch("lazy-view")
+        )
 
         wrapper = QueryWrapper(request)
         result = wrapper.get_context()
@@ -2741,3 +2761,104 @@ class IncrementalNewTemplateMiddlewareTest(TestCase):
         """A v2-only template is served even with the flag off."""
         response = self.process("components.html")
         self.assertEqual(response.template_name, "v2_components.html")
+
+
+class FilterByEmailTest(TestCase):
+    """Tests for the shared address matcher.
+
+    Sign-in, registration, email confirmation and password reset all match
+    addresses through this, so what counts as "the same address" is settled
+    here once rather than four times.
+    """
+
+    @classmethod
+    def setUpTestData(cls) -> None:
+        cls.user = UserFactory.create(
+            username="matcher", email="Matcher@Example.com"
+        )
+        cls.blank = UserFactory.create(username="blank", email="")
+
+    def matched(self, email: str) -> list[str]:
+        """Run the matcher and report who it found.
+
+        :param email: The address to match.
+        :return: The usernames of the matching accounts.
+        """
+        return list(
+            filter_by_email(User.objects.all(), email).values_list(
+                "username", flat=True
+            )
+        )
+
+    def test_case_is_ignored(self) -> None:
+        """Does a differently-cased address still find the account?"""
+        for email in [
+            "Matcher@Example.com",
+            "matcher@example.com",
+            "MATCHER@EXAMPLE.COM",
+        ]:
+            with self.subTest(email=email):
+                self.assertEqual(self.matched(email), ["matcher"])
+
+    def test_an_empty_address_matches_nothing(self) -> None:
+        """Does an empty address match nothing at all?
+
+        It must. Accounts are allowed a blank email, so matching "" against
+        the column would hand back every one of them — and callers reach here
+        straight from submitted form data.
+        """
+        self.assertEqual(self.matched(""), [])
+
+    def test_a_different_address_does_not_match(self) -> None:
+        """Is the match exact, once case is set aside?"""
+        self.assertEqual(self.matched("matcher@example.org"), [])
+
+    def test_the_incoming_queryset_still_narrows(self) -> None:
+        """Does the caller's own filtering survive?
+
+        Callers each want a different slice — registration wants stubs,
+        confirmation wants everybody — so this must only settle the address.
+        """
+        self.assertEqual(
+            list(
+                filter_by_email(
+                    User.objects.filter(username="somebody-else"),
+                    "matcher@example.com",
+                ).values_list("username", flat=True)
+            ),
+            [],
+        )
+
+    def test_the_query_folds_case_in_sql(self) -> None:
+        """Is the comparison done in Postgres rather than in Python?
+
+        Both sides have to fold under the same rules, and LOWER(email) is
+        what the auth_user_email_lower_idx index is built on.
+        """
+        sql = str(
+            filter_by_email(User.objects.all(), "matcher@example.com").query
+        )
+        self.assertIn("LOWER", sql.upper())
+        self.assertNotIn("UPPER", sql.upper())
+
+
+class RatelimitedViewTest(SimpleTestCase):
+    """Does the throttled-request handler return a real 429 page?
+
+    django-ratelimit hands the request to RATELIMIT_VIEW from
+    RatelimitMiddleware.process_exception, which Django only ever calls
+    synchronously. A coroutine returned from there never gets awaited, so the
+    user sees a 500 instead of the 429 we meant to show them.
+    """
+
+    def test_the_middleware_gets_a_response_not_a_coroutine(self) -> None:
+        request = RequestFactory().get(reverse("sign-in"))
+        middleware = RatelimitMiddleware(lambda r: HttpResponse())
+
+        response = middleware.process_exception(request, Ratelimited())
+
+        self.assertIsInstance(response, HttpResponse)
+        self.assertEqual(
+            cast(HttpResponse, response).status_code,
+            HTTPStatus.TOO_MANY_REQUESTS,
+        )

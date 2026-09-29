@@ -98,6 +98,14 @@
         {% endif %}
       {% endif %}
     {% endflag %}
+    <!-- ChatGPT Launch Banner -->
+    {% flag "chatgpt_launch_banner" %}
+      {# Promo auto-hides after the end date (inclusive Y-m-d), even while the flag stays on. Enable the flag to launch. #}
+      {% now "Y-m-d" as today %}
+      {% if today <= "2026-10-01" %}
+        {% include 'includes/dismissible_nav_banner.html' with request=request link="https://free.law/2026/09/17/grounded-legal-research-in-chatgpt/" cookie_name="chatgpt_launch_banner" button_text="Read the Announcement" text="🚀 <strong>CourtListener is now available in ChatGPT!</strong> Now through <strong>October 1</strong>, API rate limits are doubled for everyone — research case law, verify citations, and track dockets right inside ChatGPT. <a href='https://wiki.free.law/c/courtlistener/help/api/mcp/using-the-courtlistener-mcp-in-claude-chatgpt-and-other-ai-assistants'>Set it up</a> in minutes." only %}
+      {% endif %}
+    {% endflag %}
     <!-- Broken Email Banner -->
     {% if EMAIL_BAN_REASON %}
       <div class="navbar navbar-default subnav  alert-danger alert-dismissible broken-email-banner" role="navigation">

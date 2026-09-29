@@ -887,7 +887,6 @@ class NYCoADocumentAdmin(CursorPaginatorAdmin):
         "get_pk",
         "file_name",
         "doc_type",
-        "available",
     )
     raw_id_fields = ("docket_entry",)
     readonly_fields = (

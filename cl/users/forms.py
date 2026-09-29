@@ -1,4 +1,5 @@
 import re
+from collections.abc import Iterator
 
 from disposable_email_domains import blocklist
 from django import forms
@@ -21,6 +22,8 @@ from localflavor.us.forms import USStateField, USZipCodeField
 from localflavor.us.us_states import STATE_CHOICES
 
 from cl.api.models import Webhook, WebhookEventType, WebhookVersions
+from cl.lib.auth import filter_by_email
+from cl.lib.AuthenticationBackend import LOOKS_LIKE_EMAIL, accounts_for_email
 from cl.lib.types import EmailType
 from cl.users.models import UserProfile
 from cl.users.utils import emails
@@ -137,17 +140,62 @@ class UserForm(ModelForm, CleanEmailMixin):
         }
 
 
+def validate_username_is_not_an_email(value: str) -> None:
+    """Reject usernames shaped like an email address.
+
+    ASCIIUsernameValidator permits "@" and ".", which makes somebody else's
+    email address a registerable username. That interferes with signing in by
+    email, and there is no non-revealing way to refuse only the addresses that
+    have accounts: "that username is taken" would tell the registrant the
+    address exists here. Refusing everything email-shaped is a flat rule about
+    the format, so the response says nothing about what is in the database.
+
+    The shape test is the same one the sign-in backend uses to decide whether
+    an identifier is an address, so a username this accepts can never be
+    mistaken for an address at sign-in. Something like "mal@ory" is fine; it
+    has no domain.
+
+    :param value: The submitted username.
+    :return: None
+    """
+    if LOOKS_LIKE_EMAIL.match(value):
+        raise ValidationError(
+            "Usernames cannot be email addresses.",
+            code="username_looks_like_email",
+        )
+
+
 class UserCreationFormExtended(UserCreationForm, CleanEmailMixin):
     """A bit of an unusual form because instead of creating it ourselves,
     we are overriding the one from Django. Thus, instead of declaring
     everything explicitly like we normally do, we just override the
     specific parts we want to, after calling the super class's __init__().
+
+    Only one account may hold an email address, but the form never reports
+    that an address is taken: "this email is already in use" would let anyone
+    test whether an address has an account here. Instead the form validates
+    normally and records the collision in ``email_taken``, and the view is
+    expected to respond exactly as it would for a successful signup while
+    emailing the address owner. Usernames get no such protection because they
+    are already public in tag and prayer URLs, so username collisions are
+    reported as errors like any other. What usernames may not do is look like
+    an email address: see validate_username_is_not_an_email.
+
+    This check belongs on the registration form only. UserForm, which shares
+    CleanEmailMixin, must not get it until existing duplicate accounts have
+    been cleaned up, or those users could no longer save their settings page.
     """
+
+    email_taken: bool
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
-        # Protect against homoglyph attacks
-        self.fields["username"].validators = [ASCIIUsernameValidator()]
+        self.email_taken = False
+        self.fields["username"].validators = [
+            # Protect against homoglyph attacks
+            ASCIIUsernameValidator(),
+            validate_username_is_not_an_email,
+        ]
 
         self.fields["username"].label = "User Name*"
         self.fields["email"].label = "Email Address*"
@@ -194,6 +242,38 @@ class UserCreationFormExtended(UserCreationForm, CleanEmailMixin):
             # them, so a plain CharField keeps them rejected instead.
             "username": forms.CharField,
         }
+
+    def _email_is_taken(self, value: str) -> bool:
+        """Report whether an account other than the bound instance holds
+        `value` as its email address.
+
+        Address matching goes through filter_by_email, the one definition of
+        "same address" that sign-in, confirmation and password reset share, so
+        a duplicate this misses can't be one the LOWER(email) index or the
+        sign-in backend would catch.
+
+        The bound instance is excluded so that claiming a stub account, where
+        the form is bound to the stub that already holds the address, is not
+        mistaken for a duplicate.
+
+        :param value: The string to compare against the email column.
+        :return: True if some other account already has that address.
+        """
+        users = filter_by_email(User.objects.all(), value)
+        if self.instance.pk:
+            users = users.exclude(pk=self.instance.pk)
+        return users.exists()
+
+    def clean_email(self) -> str:
+        """Run the shared email checks, then record whether another account
+        already holds this address in ``email_taken``.
+
+        A taken address is deliberately not a validation error. See the class
+        docstring for why.
+        """
+        email = super().clean_email()
+        self.email_taken = self._email_is_taken(email)
+        return email
 
     def clean_first_name(self):
         first_name = self.cleaned_data.get("first_name")
@@ -257,10 +337,18 @@ class PasswordConfirmForm(forms.Form):
         password = self.cleaned_data["password"]
 
         if password:
+            # Pass the username, not the User, and check what comes back:
+            # authenticate() also resolves email addresses, and this is a
+            # re-prompt for *this* account, not an identity lookup. Without the
+            # identity check, somebody whose username happened to be another
+            # person's email address could clear this guard with that person's
+            # password.
             user = authenticate(
-                self.request, username=self.request.user, password=password
+                self.request,
+                username=self.request.user.get_username(),
+                password=password,
             )
-            if user is None:
+            if user is None or user.pk != self.request.user.pk:
                 raise ValidationError(
                     "Your password was invalid. Please try again."
                 )
@@ -305,6 +393,10 @@ class CustomPasswordResetForm(PasswordResetForm):
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
+        # Set by accounts_at_address(), which is asked the same question more
+        # than once per request.
+        self._accounts: list[User] = []
+        self._accounts_at: str | None = None
 
         self.fields["email"].widget.attrs.update(
             {
@@ -314,20 +406,101 @@ class CustomPasswordResetForm(PasswordResetForm):
             }
         )
 
+    def accounts_at_address(self, email: str) -> list[User]:
+        """Find the accounts a reset request for an address could act on.
+
+        The accounts Django would consider — active, with a usable password —
+        minus stubs, which have no usable password anyway. Includes accounts
+        whose address nobody has proven they own, so it answers "is there an
+        account here?" rather than "may this address have a reset link?". Use
+        ``get_users()`` for the latter.
+
+        Cached, because Django's ``save()`` calls ``get_users()`` again after
+        we have already asked, and this is an unauthenticated endpoint that
+        shouldn't run the same query three times per request.
+
+        :param email: The submitted address.
+        :return: The matching accounts, each with its profile loaded.
+        """
+        if self._accounts_at != email:
+            self._accounts = [
+                user
+                for user in accounts_for_email(email).select_related("profile")
+                if user.has_usable_password()
+            ]
+            self._accounts_at = email
+        return self._accounts
+
+    def confirmed_accounts_at_address(self, email: str) -> list[User]:
+        """Narrow ``accounts_at_address()`` to the ones that confirmed it.
+
+        The only place that reads ``profile``. Kept beside the fetch that
+        select-relates it, so the two can't drift apart and turn this into a
+        query per account.
+
+        :param email: The submitted address.
+        :return: The accounts at that address that have confirmed it.
+        """
+        return [
+            user
+            for user in self.accounts_at_address(email)
+            if user.profile.email_confirmed  # type: ignore
+        ]
+
+    def get_users(self, email: str) -> Iterator[User]:
+        """Return the accounts allowed to receive a reset link.
+
+        Narrower than Django's version, which mails any active account with a
+        usable password: we also require the address to be confirmed.
+
+        Without that, somebody can point their own account at an address they
+        don't control and have us mail a reset token to whoever reads it. The
+        owner, primed by a phishing message, resets that password and starts
+        using the account believing it's theirs — while the person who set it
+        up keeps the account's API token and quota. Changing an address clears
+        ``email_confirmed`` (see ``cl.users.views.view_settings``), so this
+        check bites the moment the address is repointed.
+
+        :param email: The submitted address.
+        :return: The accounts to mail a reset link to.
+        """
+        return iter(self.confirmed_accounts_at_address(email))
+
     def save(self, *args, **kwargs) -> None:
-        """Override the usual password form to send a message if we don't find
-        any accounts
+        """Send whichever of three emails fits the submitted address.
+
+        The response is the same either way, so this can't be used to test
+        whether an address has an account; only the inbox's owner learns
+        anything, and only about their own address.
+
+        - A confirmed account: the usual reset link.
+        - Only unconfirmed accounts: a note pointing at the confirmation page.
+          They can't have a reset link (see ``get_users()``), and confirming
+          is what unblocks both signing in and resetting, so this is a way out
+          rather than a dead end. Deliberately a plain link to the form and
+          not a live activation key: minting one here would let an
+          unauthenticated request rotate an account's pending key at will,
+          and would put a working token in an inbox nobody has yet proven
+          they own.
+        - Nothing at all: the "no account found" note we've always sent.
         """
         recipient_addr = self.cleaned_data["email"]
-        users = self.get_users(recipient_addr)
-        if not len(list(users)):
-            email: EmailType = emails["no_account_found"]
-            body = email["body"] % ("password reset", reverse("register"))
-            send_mail(
-                email["subject"], body, email["from_email"], [recipient_addr]
-            )
-        else:
+        accounts = self.accounts_at_address(recipient_addr)
+        if len(self.confirmed_accounts_at_address(recipient_addr)) > 0:
             super().save(*args, **kwargs)
+            return
+
+        email: EmailType
+        if len(accounts) > 0:
+            # Every match is unconfirmed, or the branch above would have run.
+            email = emails["reset_needs_confirmation"]
+            body = email["body"] % reverse("email_confirmation_request")
+        else:
+            email = emails["no_account_found"]
+            body = email["body"] % ("password reset", reverse("register"))
+        send_mail(
+            email["subject"], body, email["from_email"], [recipient_addr]
+        )
 
 
 class CustomSetPasswordForm(SetPasswordForm):

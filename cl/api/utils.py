@@ -1878,7 +1878,9 @@ def check_webhook_failure_count_and_notify(
     if not webhook.enabled or webhook_event.debug:
         return
 
-    webhook.failure_count = F("failure_count") + 1
+    # pyrefly types Django fields by their read type, so it rejects F()
+    # expressions, which Django accepts on assignment.
+    webhook.failure_count = F("failure_count") + 1  # type: ignore[bad-assignment]
     update_fields = ["failure_count"]
 
     current_try_counter = webhook_event.retry_counter
@@ -1958,14 +1960,14 @@ def update_webhook_event_after_request(
         if webhook_event.retry_counter >= WEBHOOK_MAX_RETRY_COUNTER:
             # If the webhook has reached the max retry counter, mark as failed
             webhook_event.event_status = WEBHOOK_EVENT_STATUS.FAILED
-            webhook_event.retry_counter = F("retry_counter") + 1
+            webhook_event.retry_counter = F("retry_counter") + 1  # type: ignore[bad-assignment]
             webhook_event.save()
             return
 
         webhook_event.next_retry_date = get_next_webhook_retry_date(
             webhook_event.retry_counter
         )
-        webhook_event.retry_counter = F("retry_counter") + 1
+        webhook_event.retry_counter = F("retry_counter") + 1  # type: ignore[bad-assignment]
         webhook_event.event_status = WEBHOOK_EVENT_STATUS.ENQUEUED_RETRY
         if webhook_event.debug:
             # Test events are not enqueued for retry.

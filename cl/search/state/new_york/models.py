@@ -1,6 +1,5 @@
 """Models unique to New York Court of Appeals (Court-PASS) dockets."""
 
-from pathlib import Path
 from typing import Self
 
 import pghistory
@@ -28,8 +27,6 @@ __all__ = [
 ]
 
 COURT_PASS_DOCUMENT_URL = "https://courtpass.nycourts.gov/Docket"
-"""The endpoint Court-PASS serves every document from. See
-`NYCoADocument.url`."""
 
 
 @pghistory.track()
@@ -240,9 +237,6 @@ class NYCoADocument(AbstractDateTimeModel, AbstractStateDocument):
     party role, party name, and document type.
     :ivar content_type: The MIME type of the file. Court-PASS publishes PDFs
     along with playlist files for oral argument recordings.
-    :ivar available: Whether the file can be downloaded. False for sealed
-    files and files the site lists but does not serve, and the default, so a
-    document is not presumed downloadable until a scrape says it is.
     :ivar doc_role: The party role encoded in the file name, e.g. "appellant".
     Blank when the file name does not follow the naming convention.
     :ivar doc_party: The party name encoded in the file name. Blank when the
@@ -254,6 +248,7 @@ class NYCoADocument(AbstractDateTimeModel, AbstractStateDocument):
     :ivar volume: The volume number, for a record or appendix published in
     several volumes.
     :ivar part: The part number, for a volume that is itself split into parts.
+    :ivar sha256: Hex digest of the file.
     """
 
     docket_entry = models.ForeignKey(
@@ -263,12 +258,12 @@ class NYCoADocument(AbstractDateTimeModel, AbstractStateDocument):
     )
     file_name = models.TextField()
     content_type = models.CharField(max_length=255, blank=True)
-    available = models.BooleanField(default=False)
     doc_role = models.TextField(blank=True)
     doc_party = models.TextField(blank=True)
     doc_type = models.TextField(blank=True)
     volume = models.SmallIntegerField(null=True, blank=True)
     part = models.SmallIntegerField(null=True, blank=True)
+    sha256 = models.CharField(max_length=64, blank=True)
 
     @property  # type: ignore[override]
     def url(self) -> str:
@@ -299,16 +294,6 @@ class NYCoADocument(AbstractDateTimeModel, AbstractStateDocument):
                 f"NYCoADocument.url is always {COURT_PASS_DOCUMENT_URL}; "
                 f"got {value!r}"
             )
-
-    def make_filename(self) -> str:
-        """Build the stored filename from the docket entry and file name.
-
-        Overridden because the base implementation derives the name from
-        `url`, which is one shared POST endpoint for all of Court-PASS and so
-        would name every document identically. The entry plus file name is the
-        document's natural key, so it is unique and stable across scrapes.
-        """
-        return f"{self.docket_entry_id}-{Path(self.file_name).stem}"
 
     @classmethod
     def tmp_prefix(cls) -> str:
@@ -354,9 +339,3 @@ class NYCoADocument(AbstractDateTimeModel, AbstractStateDocument):
                 name="unique_nycoa_file_name_per_docket_entry",
             )
         ]
-
-    def get_pdf_path(self, filename: str, thumbs: bool = False) -> str:
-        """Store Court-PASS documents under the shared state layout."""
-        return self.state_pdf_path(
-            "ny", self.docket_entry.docket.court_id, filename, thumbs
-        )

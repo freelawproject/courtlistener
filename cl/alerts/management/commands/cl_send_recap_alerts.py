@@ -10,6 +10,7 @@ from django.contrib.auth.models import User
 from django.contrib.contenttypes.models import ContentType
 from django.http import QueryDict
 from django.utils import timezone
+from elastic_transport import ObjectApiResponse
 from elasticsearch import Elasticsearch
 from elasticsearch.dsl import connections
 from elasticsearch.dsl.response import Hit, Response
@@ -51,7 +52,6 @@ from cl.search.exception import (
 from cl.search.models import SEARCH_TYPES, Docket
 from cl.stats.constants import StatAlertType, StatMetric
 from cl.stats.utils import tally_stat
-from cl.users.models import UserProfile
 
 
 @dataclass
@@ -66,7 +66,7 @@ class AlertHitsToProcess:
     :param case_only_alert: Boolean flag indicating if this is a case-only alert.
     """
 
-    results: list[Hit]
+    results: Response
     parent_results: Response | None
     child_results: Response | None
     alert_id: int
@@ -74,7 +74,9 @@ class AlertHitsToProcess:
     case_only_alert: bool
 
 
-def get_task_status(task_id: str, es: Elasticsearch) -> dict[str, Any]:
+def get_task_status(
+    task_id: str, es: Elasticsearch
+) -> ObjectApiResponse[Any] | dict[str, Any]:
     """Fetch the status of a task from Elasticsearch.
 
     :param task_id: The ID of the task to fetch the status for.
@@ -129,7 +131,9 @@ def compute_estimated_remaining_time(
     return estimated_time_remaining
 
 
-def retrieve_task_info(task_info: dict[str, Any]) -> TaskCompletionStatus:
+def retrieve_task_info(
+    task_info: ObjectApiResponse[Any] | dict[str, Any],
+) -> TaskCompletionStatus:
     """Retrieve task information from the given task dict.
 
     :param task_info: A dictionary containing the task status information.
@@ -477,7 +481,7 @@ def filter_rd_alert_hits(
 
 def query_alerts(
     search_params: QueryDict,
-) -> tuple[list[Hit] | None, Response | None, Response | None]:
+) -> tuple[Response | None, Response | None, Response | None]:
     try:
         search_query = RECAPSweepDocument.search()
         child_search_query = ESRECAPSweepDocument.search()
@@ -602,7 +606,7 @@ def process_alert_hits(
 
 
 def send_search_alert_webhooks(
-    user: UserProfile.user, results_to_send: list[Hit], alert_id: int
+    user: User, results_to_send: list[Hit], alert_id: int
 ) -> None:
     """Send webhook events for search alerts if the user has SEARCH_ALERT
     endpoints enabled.
@@ -612,7 +616,7 @@ def send_search_alert_webhooks(
     results to be sent.
     :param alert_id: The Alert ID to be sent in the webhook.
     """
-    user_webhooks = user.webhooks.filter(
+    user_webhooks = user.webhooks.filter(  # pyrefly:ignore[missing-attribute]
         event_type=WebhookEventType.SEARCH_ALERT, enabled=True
     )
     for user_webhook in user_webhooks:
@@ -636,7 +640,7 @@ def query_and_send_alerts(
     :param custom_date: If true, send alerts on a custom date.
     :return: None.
     """
-    alert_users: UserProfile.user = User.objects.filter(
+    alert_users = User.objects.filter(
         alerts__rate=rate,
         alerts__alert_type__in=[SEARCH_TYPES.RECAP, SEARCH_TYPES.DOCKETS],
     ).distinct()
@@ -645,9 +649,10 @@ def query_and_send_alerts(
     for user in alert_users:
         if (
             rate == Alert.REAL_TIME
-            and not user.profile.is_eligible_for_rt_search_alerts
+            and not user.profile.is_eligible_for_rt_search_alerts  # pyrefly:ignore[missing-attribute]
         ):
             continue
+        # pyrefly:ignore[missing-attribute]
         alerts = user.alerts.filter(
             rate=rate,
             alert_type__in=[SEARCH_TYPES.RECAP, SEARCH_TYPES.DOCKETS],

@@ -61,7 +61,7 @@ async def get_coverage_data_fds(bust_cache: bool = False) -> dict[str, int]:
     coverage_key = "coverage-data.fd3"
     coverage_data = None if bust_cache else await cache.aget(coverage_key)
     if coverage_data is None:
-        coverage_data = {
+        models = {
             "disclosures": FinancialDisclosure,
             "investments": Investment,
             "positions": Position,
@@ -72,10 +72,10 @@ async def get_coverage_data_fds(bust_cache: bool = False) -> dict[str, int]:
             "gifts": Gift,
             "debts": Debt,
         }
-        # Populate the models
-        for k, model in coverage_data.items():
-            coverage_data[k] = await model.objects.all().acount()
-
+        coverage_data = {
+            k: await model.objects.all().acount()
+            for k, model in models.items()
+        }
         coverage_data["private"] = False
         one_week_minutes = 60 * 60 * 24 * 7
         await cache.aset(coverage_key, coverage_data, one_week_minutes)
@@ -302,9 +302,13 @@ async def components(request: HttpRequest) -> HttpResponse:
         ),
     ]
 
-    # Mock page object for component library demos
+    # Mock page object for component library demos. Mirrors the parts of
+    # django.core.paginator.Page/Paginator that <c-pagination> reads;
+    # `per_page` only feeds the start/end index math below.
     class MockPaginator:
         num_pages = 10
+        per_page = 100
+        count = 973
 
     class MockPageObj:
         number = 3
@@ -318,6 +322,12 @@ async def components(request: HttpRequest) -> HttpResponse:
 
         def next_page_number(self) -> int:
             return self.number + 1
+
+        def start_index(self) -> int:
+            return (self.number - 1) * self.paginator.per_page + 1
+
+        def end_index(self) -> int:
+            return self.number * self.paginator.per_page
 
     class MockFieldValue:
         value = None
@@ -376,9 +386,13 @@ async def components(request: HttpRequest) -> HttpResponse:
     )
 
 
-async def ratelimited(
-    request: HttpRequest, exception: Exception
-) -> HttpResponse:
+def ratelimited(request: HttpRequest, exception: Exception) -> HttpResponse:
+    """Show the 429 page to a request that tripped a rate limit.
+
+    django-ratelimit dispatches here from RatelimitMiddleware.process_exception,
+    which Django only calls synchronously, so this MUST stay sync. As a
+    coroutine it is never awaited and the user gets a 500 instead of the 429.
+    """
     return TemplateResponse(
         request,
         "429.html",
