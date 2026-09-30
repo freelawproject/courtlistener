@@ -4126,8 +4126,9 @@ class DocketFilterRenderTestCase(TestCase):
 
     def _render(self, form: DocketEntryFilterForm) -> str:
         # Render via a wrapper template that invokes <c-docket-filter> as a
-        # child component, instead of rendering cotton/docket_filter.html
-        # directly — the latter declares `form` and `docket` as c-vars, which
+        # child component, instead of rendering
+        # cotton/docket_filter/index.html directly — the latter declares
+        # `form` and `docket` as c-vars, which
         # would shadow the context values, defeating the whole point.
         request = RequestFactory().get("/")
         request.user = AnonymousUser()
@@ -4231,7 +4232,9 @@ class DocketFilterSearchScopeTest(DocketFilterRenderTestCase):
         )
 
         search_forms = [
-            el for el in tree.iter("form") if el.get("action") == "/"
+            el
+            for el in tree.iter("form")
+            if el.get("action") == reverse("show_results")
         ]
         self.assertEqual(len(search_forms), 2, "expected desktop and mobile")
         for layout, search_form in zip(("desktop", "mobile"), search_forms):
@@ -4252,7 +4255,9 @@ class DocketFilterSearchScopeTest(DocketFilterRenderTestCase):
                     cast(_Attrib, search_form.attrib)["x-on:submit"],
                     "buildScopedQueryOnSubmit($event)",
                 )
-                self.assertIn("data-search-terms", visible[0].attrib)
+                self.assertIn(
+                    "data-search-terms", cast(_Attrib, visible[0].attrib)
+                )
                 # Exactly these reach the search page, with or without JS.
                 self.assertEqual(
                     {
