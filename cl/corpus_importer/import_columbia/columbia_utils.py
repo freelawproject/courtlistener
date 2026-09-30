@@ -1,7 +1,6 @@
 import itertools
 import re
 from datetime import date
-from typing import Any
 
 import dateutil.parser as dparser
 from bs4 import (
