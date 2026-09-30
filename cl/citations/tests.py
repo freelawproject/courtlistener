@@ -3254,7 +3254,7 @@ class UnmatchedCitationTest(TransactionTestCase):
 
     def setUp(self) -> None:
         self.cluster = OpinionClusterWithChildrenAndParentsFactory()
-        self.opinion = self.cluster.sub_opinions.first()
+        self.opinion = self.cluster.sub_opinions.all()[0]
 
     def test_1st_creation(self) -> None:
         """Can we save unmatched citations?"""
