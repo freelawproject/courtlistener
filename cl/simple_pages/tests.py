@@ -4,8 +4,9 @@ from unittest.mock import MagicMock, patch
 
 from django.contrib.auth.models import User
 from django.http import HttpResponse
+from django.template import engines
 from django.template.loader import TemplateDoesNotExist, get_template
-from django.test import override_settings
+from django.test import RequestFactory, override_settings
 from django.urls import resolve, reverse
 from lxml.html import fromstring
 from waffle.testutils import override_flag
@@ -696,3 +697,36 @@ class ContentSecurityPolicyTest(TestCase):
         # A script left with an empty nonce would be refused by the browser,
         # and the assertion above would still pass on the other scripts.
         self.assertNotIn('nonce=""', html)
+
+
+class DialogComponentTest(SimpleTestCase):
+    """The c-dialog component's two ways of being opened."""
+
+    def render(self, source: str) -> str:
+        """Renders Cotton's compiled form of a template snippet."""
+        template = engines["django"].from_string(source)
+        return template.render({"request": RequestFactory().get("/")})
+
+    def test_trigger_slot_opens_it_by_default(self) -> None:
+        """Without initially_open, the dialog renders its own trigger button."""
+        html = self.render(
+            "{% cotton dialog %}{% cotton:slot button_content %}Open"
+            "{% endcotton:slot %}{% cotton:slot panel %}Body"
+            "{% endcotton:slot %}{% endcotton %}"
+        )
+        self.assertIn('aria-haspopup="dialog"', html)
+        self.assertNotIn('x-init="open"', html)
+
+    def test_initially_open_renders_it_open_without_a_trigger(self) -> None:
+        """With initially_open, the dialog opens as soon as Alpine initialises it.
+
+        This is how markup inserted after page load, such as an htmx response,
+        shows a dialog: there is no trigger to click, so none is rendered.
+        """
+        html = self.render(
+            "{% cotton dialog initially_open %}{% cotton:slot panel %}Body"
+            "{% endcotton:slot %}{% endcotton %}"
+        )
+        self.assertIn('x-init="open"', html)
+        self.assertNotIn('aria-haspopup="dialog"', html)
+        self.assertIn("Body", html)

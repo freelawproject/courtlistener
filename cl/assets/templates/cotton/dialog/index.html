@@ -5,13 +5,18 @@
 {% require_script "js/alpine/plugins/focus" defer=True %}
 {% require_script "js/alpine/plugins/ui" defer=True %}
 
-<c-vars request dialog_class="" panel_class="" class=""></c-vars>
+<c-vars request dialog_class="" panel_class="" class="" initially_open=False></c-vars>
 
-<div x-data="dialog" x-id="dialogIdGroup" class="flex justify-center {{ class }}">
-  <!-- Trigger -->
+<div
+  x-data="dialog"
+  x-id="dialogIdGroup"
+  {% if initially_open %}x-init="open"{% endif %}
+  class="flex justify-center {{ class }}"
+>
+  <!-- Trigger: omitted when the dialog is opened by other means, e.g. initially_open -->
   {% if trigger_button %}
     {{ trigger_button }}
-  {% else %}
+  {% elif button_content %}
     <c-dialog.trigger-button>
       {{ button_content }}
     </c-dialog.trigger-button>
