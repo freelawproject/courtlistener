@@ -4137,7 +4137,7 @@ class DocketFilterRenderTestCase(TestCase):
             "cl",
             "opinion_page",
             "test_assets",
-            "docket_filter_attr_propagation.html",
+            "docket_filter_wrapper.html",
         )
         with open(template_path, encoding="utf-8") as f:
             compiled = CottonCompiler().process(f.read())
@@ -4215,6 +4215,8 @@ class DocketFilterSearchScopeTest(DocketFilterRenderTestCase):
     """
 
     def test_scope_is_hidden_and_visible_input_is_unnamed(self) -> None:
+        """Both layouts render the hidden scope, the unnamed empty input, and
+        the submit hook that merges them."""
         request = RequestFactory().get("/")
         request.user = AnonymousUser()
         form = DocketEntryFilterForm(request.GET, request=request)
