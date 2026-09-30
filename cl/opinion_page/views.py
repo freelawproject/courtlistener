@@ -57,8 +57,7 @@ from cl.citations.utils import (
 )
 from cl.custom_filters.templatetags.text_filters import best_case_name
 from cl.favorites.decorators import track_view_counter
-from cl.favorites.forms import NoteForm
-from cl.favorites.models import Note
+from cl.favorites.forms import get_note_form_for
 from cl.favorites.utils import (
     get_existing_prayers_in_bulk,
     get_prayer_counts_in_bulk,
@@ -402,7 +401,7 @@ async def view_docket(
     def paginate_docket_entries(
         docket_entries: QuerySet[SourceDocketEntry], docket_page: str
     ) -> Page:
-        return Paginator(docket_entries, 200, orphans=10).get_page(docket_page)
+        return Paginator(docket_entries, 100, orphans=10).get_page(docket_page)
 
     paginated_entries = await paginate_docket_entries(de_list, page)
 
@@ -431,7 +430,7 @@ async def view_docket(
         if user.is_authenticated:
             # Check prayer existence in bulk.
             existing_prayers = await get_existing_prayers_in_bulk(
-                user, page_documents
+                cast(User, user), page_documents
             )
 
         # Merge counts and existing prayer status onto the documents.
@@ -802,21 +801,11 @@ async def recap_document_context(
         )
         await rd.arefresh_from_db(fields=["thumbnail_status", "thumbnail"])
 
-    try:
-        note = await Note.objects.aget(
-            recap_doc_id=rd.pk,
-            user=await request.auser(),
-        )
-    except (ObjectDoesNotExist, TypeError):
-        # Not saved in notes or anonymous user
-        note_form = NoteForm(
-            initial={
-                "recap_doc_id": rd.pk,
-                "name": trunc(title, 100, ellipsis="..."),
-            }
-        )
-    else:
-        note_form = NoteForm(instance=note)
+    note_form = await get_note_form_for(
+        rd,
+        await request.auser(),  # type: ignore[attr-defined]
+        trunc(title, 100, ellipsis="..."),
+    )
 
     # Override the og:url if we're serving a request to an OG crawler bot
     og_file_path_override = f"/{rd.filepath_local}" if is_og_bot else None
@@ -828,7 +817,9 @@ async def recap_document_context(
         user = await request.auser()
         if user.is_authenticated:
             # Check prayer existence.
-            existing_prayers = await get_existing_prayers_in_bulk(user, [rd])
+            existing_prayers = await get_existing_prayers_in_bulk(
+                cast(User, user), [rd]
+            )
 
     # Merge counts and existing prayer status to RECAPDocuments.
     rd.prayer_count = prayer_counts.get(rd.id, 0)
@@ -1006,21 +997,11 @@ async def setup_opinion_context(
 
     get_string = make_get_string(request)
 
-    try:
-        note = await Note.objects.aget(
-            cluster_id=cluster.pk,
-            user=await request.auser(),
-        )
-    except (ObjectDoesNotExist, TypeError):
-        # Not note or anonymous user
-        note_form = NoteForm(
-            initial={
-                "cluster_id": cluster.pk,
-                "name": trunc(best_case_name(cluster), 100, ellipsis="..."),
-            }
-        )
-    else:
-        note_form = NoteForm(instance=note)
+    note_form = await get_note_form_for(
+        cluster,
+        await request.auser(),  # type: ignore[attr-defined]
+        trunc(best_case_name(cluster), 100, ellipsis="..."),
+    )
 
     # Identify opinions updated/added in partnership with v|lex for 3 years
     three_years_ago = (
@@ -1719,7 +1700,7 @@ async def citation_homepage(request: HttpRequest) -> HttpResponse:
                 )
             citation_groups = case_law_citations[0].groups
             citation_dict = {
-                "reporter": citation_groups.get("reporter"),
+                "reporter": cast(str, citation_groups.get("reporter")),
                 "volume": citation_groups.get("volume", None),
                 "page": citation_groups.get("page", None),
             }

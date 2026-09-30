@@ -1,13 +1,12 @@
 import itertools
 import re
 from datetime import date
-from typing import Any
 
 import dateutil.parser as dparser
 from bs4 import (
     BeautifulSoup,
     NavigableString,
-    Tag,  # noqa: F401
+    Tag,
 )
 from juriscraper.lib.string_utils import clean_string, harmonize, titlecase
 
@@ -213,7 +212,7 @@ def add_floating_opinion(
 
 
 def extract_columbia_opinions(
-    outer_opinion: BeautifulSoup,
+    outer_opinion: Tag,
 ) -> list[dict | None]:
     """Get the opinions of the soup object
 
@@ -229,11 +228,11 @@ def extract_columbia_opinions(
     order = 1
 
     # We iterate all content to look for all possible opinions
-    for i, content in enumerate(outer_opinion):  # type: int, Tag
+    for i, content in enumerate(outer_opinion):
         if isinstance(content, NavigableString):
             # We found a raw string, store it
             floating_content.append(str(content))
-        else:
+        elif isinstance(content, Tag):
             if content.name in SIMPLE_TAGS + [
                 "citation_line",
                 "opinion_byline",
@@ -599,7 +598,7 @@ def convert_columbia_html(text: str, opinion_index: int) -> str:
 
 def parse_dates(
     raw_dates: list[str],
-) -> list[list[tuple[Any, date] | tuple[None, date]]]:
+) -> list[list[tuple[str | None, date]]]:
     """Parses the dates from a list of string.
 
     :param raw_dates: A list of (probably) date-containing strings
@@ -617,7 +616,7 @@ def parse_dates(
         raw_parts = re.split(r"(?<=[0-9][0-9][0-9][0-9])(\s|.)", raw_date)
 
         # index over split line and add dates
-        inner_dates = []
+        inner_dates: list[tuple[str | None, date]] = []
         for raw_part in raw_parts:
             # consider any string without either a month or year not a date
             no_month = False
