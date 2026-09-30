@@ -79,6 +79,7 @@
             hx-vals='{"id": "{{ docket.pk }}"}'
             hx-headers='{"X-CSRFToken": "{{ csrf_token }}"}'
             hx-swap="none"
+            hx-disabled-elt="this"
           >
             <span id="docket-alert-toggle-{{ docket.pk }}">{% if has_alert %}Disable Alerts{% else %}Get Alerts{% endif %}</span>
           </c-menu-button.item>

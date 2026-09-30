@@ -3985,6 +3985,7 @@ class DocketAlertToggleV2Test(TestCase):
         menu = self.menu(r.content.decode())
         self.assertIn(f'hx-post="{reverse("toggle_docket_alert")}"', menu)
         self.assertIn(f'id="docket-alert-toggle-{self.docket.pk}"', menu)
+        self.assertIn('hx-disabled-elt="this"', menu)
 
     @override_settings(MAX_FREE_DOCKET_ALERTS=0)
     async def test_subscribed_user_can_always_disable(self) -> None:
