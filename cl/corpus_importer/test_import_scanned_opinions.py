@@ -485,6 +485,25 @@ class ImportScannedOpinionsTest(TestCase):
                 self.import_xml(xml)
             mock_find_citations.assert_called_once_with(expected_pks())
 
+    def test_failed_citation_queue_keeps_the_import(self) -> None:
+        """Is an import kept and not reported failed when queuing fails?"""
+        with (
+            mock.patch(
+                f"{CITATIONS_TASK}.delay", side_effect=ValueError("boom")
+            ),
+            mock.patch(f"{COMMAND_MODULE}.logger") as mock_logger,
+            mock.patch.object(FieldFile, "save"),
+            self.captureOnCommitCallbacks(execute=True),
+        ):
+            self.import_scan()
+
+        self.assertEqual(OpinionCluster.objects.count(), 1)
+        mock_logger.exception.assert_called_once()
+        self.assertEqual(
+            mock_logger.exception.call_args.args[0],
+            "Could not queue citation finding for opinions %s",
+        )
+
     def test_failed_import_is_rolled_back(self) -> None:
         """Is a failed import rolled back without uploading the XML?"""
         with (

@@ -495,14 +495,25 @@ def queue_citation_finding(opinion_pks: list[int]) -> None:
     This builds `html_with_citations` from the scanned XML, replacing the
     one of a merged opinion, which came from the court's text.
 
+    The import is committed when the task is queued, so a failure to queue
+    it is logged with the opinion ids instead of failing the import.
+
     :param opinion_pks: The ids of the imported opinions.
     :return: None
     """
-    transaction.on_commit(
-        lambda: find_citations_and_parentheticals_for_opinion_by_pks.delay(
-            opinion_pks
-        )
-    )
+
+    def queue() -> None:
+        try:
+            find_citations_and_parentheticals_for_opinion_by_pks.delay(
+                opinion_pks
+            )
+        except Exception:
+            logger.exception(
+                "Could not queue citation finding for opinions %s",
+                opinion_pks,
+            )
+
+    transaction.on_commit(queue)
 
 
 def store_scan_xml(cluster: OpinionCluster, scan_case: ScanCase) -> None:
