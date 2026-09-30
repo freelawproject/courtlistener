@@ -21,14 +21,24 @@
 >
   {# trigger button #}
   {# An aria-label replaces the visible content as the accessible name, so it is only set when the content is not the name. #}
-  <c-button
-    variant="{{ button_variant }}"
-    x-menu:button
-    :attrs="{% if trigger_aria_label %}{'aria-label': '{{ trigger_aria_label }}'}{% else %}{}{% endif %}"
-    class="group {{ button_class }}"
-  >
-    {{ button_content }}
-  </c-button>
+  {% if trigger_aria_label %}
+    <c-button
+      variant="{{ button_variant }}"
+      x-menu:button
+      aria-label="{{ trigger_aria_label }}"
+      class="group {{ button_class }}"
+    >
+      {{ button_content }}
+    </c-button>
+  {% else %}
+    <c-button
+      variant="{{ button_variant }}"
+      x-menu:button
+      class="group {{ button_class }}"
+    >
+      {{ button_content }}
+    </c-button>
+  {% endif %}
 
   {# menu #}
   <menu

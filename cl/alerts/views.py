@@ -4,6 +4,7 @@ from asgiref.sync import sync_to_async
 from django.conf import settings
 from django.contrib import messages
 from django.contrib.auth.decorators import login_required
+from django.db import transaction
 from django.http import (
     HttpRequest,
     HttpResponse,
@@ -228,30 +229,36 @@ def _toggle_docket_alert_htmx(
     if request.method != "POST":
         return HttpResponseNotAllowed(permitted_methods={"POST"})
     docket_pk = request.POST.get("id", "")
-    if not docket_pk.isdigit():
+    if not docket_pk.isdecimal():
         return HttpResponseBadRequest(
             "Unable to alter alert. Please provide ID attribute"
         )
     docket = get_object_or_404(Docket, pk=docket_pk)
-    alert = DocketAlert.objects.filter(
-        user=request.user, docket=docket
-    ).first()
-    if alert and alert.alert_type == DocketAlert.SUBSCRIPTION:
-        alert.alert_type = DocketAlert.UNSUBSCRIPTION
-        alert.save()
-        has_alert = False
-        message = "Alert disabled successfully"
-    elif not UserProfile.objects.get(user=request.user).can_make_another_alert:
-        has_alert = False
-        message = "You have reached your docket alert limit."
-    else:
-        if alert:
-            alert.alert_type = DocketAlert.SUBSCRIPTION
+    # Locking the profile serialises the user's toggles, so two concurrent
+    # requests cannot both pass the quota check or both create the alert.
+    with transaction.atomic():
+        profile = UserProfile.objects.select_for_update().get(
+            user=request.user
+        )
+        alert = DocketAlert.objects.filter(
+            user=request.user, docket=docket
+        ).first()
+        if alert and alert.alert_type == DocketAlert.SUBSCRIPTION:
+            alert.alert_type = DocketAlert.UNSUBSCRIPTION
             alert.save()
+            has_alert = False
+            message = "Alert disabled successfully"
+        elif not profile.can_make_another_alert:
+            has_alert = False
+            message = "You have reached your docket alert limit."
         else:
-            DocketAlert.objects.create(docket=docket, user=request.user)
-        has_alert = True
-        message = "Alerts are now enabled for this docket"
+            if alert:
+                alert.alert_type = DocketAlert.SUBSCRIPTION
+                alert.save()
+            else:
+                DocketAlert.objects.create(docket=docket, user=request.user)
+            has_alert = True
+            message = "Alerts are now enabled for this docket"
     return TemplateResponse(
         request,
         "v2_includes/docket_alerts_htmx/toggle.html",

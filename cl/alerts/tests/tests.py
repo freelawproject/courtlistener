@@ -3200,11 +3200,28 @@ class ToggleDocketAlertHtmxTest(TestCase):
         self.assertFalse(r.context["has_alert"])
 
     def test_htmx_without_id_is_a_bad_request(self) -> None:
-        """A missing docket id is the caller's error."""
+        """A missing or malformed docket id is the caller's error.
+
+        Superscript two passes str.isdigit() but int() rejects it, so a
+        looser check would let it through to a 500 in the query.
+        """
+        for data in ({}, {"id": "abc"}, {"id": "²"}):
+            with self.subTest(data=data):
+                r = self.client.post(
+                    reverse("toggle_docket_alert"),
+                    data,
+                    headers={"HX-Request": "true"},
+                )
+                self.assertEqual(r.status_code, HTTPStatus.BAD_REQUEST)
+
+    def test_htmx_unknown_docket_is_not_found(self) -> None:
+        """A well-formed id for a docket that does not exist is a 404."""
         r = self.client.post(
-            reverse("toggle_docket_alert"), headers={"HX-Request": "true"}
+            reverse("toggle_docket_alert"),
+            {"id": self.docket.pk + 100000},
+            headers={"HX-Request": "true"},
         )
-        self.assertEqual(r.status_code, HTTPStatus.BAD_REQUEST)
+        self.assertEqual(r.status_code, HTTPStatus.NOT_FOUND)
 
     def test_htmx_from_a_logged_out_user_redirects_to_login(self) -> None:
         """Logged-out users are sent to sign in, never handed a fragment."""
