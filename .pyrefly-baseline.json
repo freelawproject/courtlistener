@@ -2570,27 +2570,6 @@
       "severity": "error"
     },
     {
-      "column": 23,
-      "path": "cl/opinion_page/views.py",
-      "name": "missing-attribute",
-      "concise_description": "Object of class `NoneType` has no attribute `docket_entry`",
-      "severity": "error"
-    },
-    {
-      "column": 21,
-      "path": "cl/opinion_page/views.py",
-      "name": "missing-attribute",
-      "concise_description": "Object of class `NoneType` has no attribute `document_number`",
-      "severity": "error"
-    },
-    {
-      "column": 21,
-      "path": "cl/opinion_page/views.py",
-      "name": "missing-attribute",
-      "concise_description": "Object of class `NoneType` has no attribute `attachment_number`",
-      "severity": "error"
-    },
-    {
       "column": 25,
       "path": "cl/opinion_page/views.py",
       "name": "missing-attribute",
