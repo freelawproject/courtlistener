@@ -35,6 +35,21 @@ class SessionData:
             self.proxy_address = settings.EGRESS_PROXY_HOSTS[0]
 
 
+class InsecureCookieJar(RequestsCookieJar):
+    """Cookie jar that stores every cookie as non-secure.
+
+    ProxyPacerSession sends requests over http:// to the egress proxy, which
+    then opens the TLS connection to PACER. requests never sends Secure cookies
+    over http, so cookies that PACER sets or refreshes with the Secure flag
+    would otherwise be dropped from later requests, logging the session out.
+    """
+
+    def set_cookie(self, cookie: Cookie, *args, **kwargs) -> None:
+        """Store the cookie with its Secure flag cleared."""
+        cookie.secure = False
+        super().set_cookie(cookie, *args, **kwargs)
+
+
 class ProxyPacerSession(PacerSession):
     """
     This class overrides the _prepare_login_request and post methods of the
@@ -68,6 +83,11 @@ class ProxyPacerSession(PacerSession):
             "http": self.proxy_address,
         }
         self.headers["X-WhSentry-TLS"] = "true"
+        # Re-add every cookie through InsecureCookieJar so both the provided
+        # cookies and any set by later responses can be sent over the proxy.
+        jar = InsecureCookieJar()
+        jar.update(self.cookies)
+        self.cookies = jar
 
     def send(self, request, **kwargs):
         """Send a given PreparedRequest."""
