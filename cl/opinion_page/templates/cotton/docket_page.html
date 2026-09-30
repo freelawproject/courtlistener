@@ -73,15 +73,21 @@
         {% if has_alert or user.profile.can_make_another_alert %}
           <c-menu-button.item
             tag="button"
-            icon="bell"
-            icon_class="w-4 h-4 text-greyscale-500"
             hx-post="{% url 'toggle_docket_alert' %}"
             hx-vals='{"id": "{{ docket.pk }}"}'
             hx-headers='{"X-CSRFToken": "{{ csrf_token }}"}'
             hx-swap="none"
             hx-disabled-elt="this"
           >
-            <span id="docket-alert-toggle-{{ docket.pk }}">{% if has_alert %}Disable Alerts{% else %}Get Alerts{% endif %}</span>
+            <span id="docket-alert-toggle-{{ docket.pk }}" class="contents">
+              {% if has_alert %}
+                {% svg "bell_slash" class="w-4 h-4 text-greyscale-500" aria_hidden="true" %}
+                Disable Alerts
+              {% else %}
+                {% svg "bell" class="w-4 h-4 text-greyscale-500" aria_hidden="true" %}
+                Get Alerts
+              {% endif %}
+            </span>
           </c-menu-button.item>
         {% else %}
           <c-menu-button.item

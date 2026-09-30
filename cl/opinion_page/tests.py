@@ -3957,10 +3957,10 @@ class DocketAlertToggleV2Test(TestCase):
         end = html.index(f'id="docket-alert-status-{self.docket.pk}"')
         return html[start:end]
 
-    def label(self, html: str) -> str:
-        """The trigger label's inner markup, whitespace-normalised."""
+    def swap_target(self, html: str, name: str) -> str:
+        """The inner markup of a swap target ("label" or "toggle"), whitespace-normalised."""
         match = re.search(
-            rf'<span id="docket-alert-label-{self.docket.pk}"[^>]*>(.*?)</span>',
+            rf'<span id="docket-alert-{name}-{self.docket.pk}"[^>]*>(.*?)</span>',
             html,
             re.S,
         )
@@ -4029,8 +4029,8 @@ class DocketAlertToggleV2Test(TestCase):
         for trigger in others:
             self.assertIn("aria-label=", trigger)
 
-    async def test_label_matches_the_fragment(self) -> None:
-        """The page and the fragment render the same label for a state."""
+    async def test_swap_targets_match_the_fragment(self) -> None:
+        """The page and the fragment render the same label and item for a state."""
         await self.login()
         for has_alert in (False, True):
             with self.subTest(has_alert=has_alert):
@@ -4049,9 +4049,12 @@ class DocketAlertToggleV2Test(TestCase):
                         "message": "",
                     },
                 )
-                self.assertEqual(
-                    self.label(r.content.decode()), self.label(fragment)
-                )
+                page = r.content.decode()
+                for target in ("label", "toggle"):
+                    self.assertEqual(
+                        self.swap_target(page, target),
+                        self.swap_target(fragment, target),
+                    )
 
 
 @override_settings(WAFFLE_CACHE_PREFIX="test_docket_entry_rows_v2_waffle")
