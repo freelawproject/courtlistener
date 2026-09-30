@@ -932,20 +932,6 @@
       "severity": "error"
     },
     {
-      "column": 36,
-      "path": "cl/corpus_importer/import_columbia/columbia_utils.py",
-      "name": "bad-argument-type",
-      "concise_description": "Argument `tuple[None, date]` is not assignable to parameter `object` with type `tuple[str, date]` in function `list.append`",
-      "severity": "error"
-    },
-    {
-      "column": 12,
-      "path": "cl/corpus_importer/import_columbia/columbia_utils.py",
-      "name": "bad-return",
-      "concise_description": "Returned type `list[list[tuple[str, date]]]` is not assignable to declared return type `list[list[tuple[Any, date] | tuple[None, date]]]`",
-      "severity": "error"
-    },
-    {
       "column": 20,
       "path": "cl/corpus_importer/import_columbia/convert_columbia_html.py",
       "name": "missing-attribute",
@@ -1174,6 +1160,13 @@
       "path": "cl/corpus_importer/import_columbia/parse_opinions.py",
       "name": "unsupported-operation",
       "concise_description": "Cannot set item in `dict[str, bool]`",
+      "severity": "error"
+    },
+    {
+      "column": 48,
+      "path": "cl/corpus_importer/import_columbia/parse_opinions.py",
+      "name": "bad-argument-type",
+      "concise_description": "Argument `Literal[True]` is not assignable to parameter `s` with type `str` in function `juriscraper.lib.string_utils.CaseNameTweaker.make_case_name_short`",
       "severity": "error"
     },
     {
@@ -1663,7 +1656,7 @@
       "column": 12,
       "path": "cl/corpus_importer/tasks.py",
       "name": "bad-return",
-      "concise_description": "Returned type `str | Unknown | None` is not assignable to declared return type `str`",
+      "concise_description": "Returned type `datetime | str | Unknown | None` is not assignable to declared return type `str`",
       "severity": "error"
     },
     {
@@ -2482,7 +2475,7 @@
       "column": 26,
       "path": "cl/favorites/tasks.py",
       "name": "bad-argument-type",
-      "concise_description": "Argument `int | str | Unknown | None` is not assignable to parameter `x` with type `Buffer | SupportsIndex | SupportsInt | SupportsTrunc | str` in function `int.__new__`",
+      "concise_description": "Argument `datetime | int | str | Unknown | None` is not assignable to parameter `x` with type `Buffer | SupportsIndex | SupportsInt | SupportsTrunc | str` in function `int.__new__`",
       "severity": "error"
     },
     {
@@ -5048,45 +5041,10 @@
       "severity": "error"
     },
     {
-      "column": 16,
-      "path": "cl/recap/tasks.py",
-      "name": "bad-argument-type",
-      "concise_description": "Argument `bool | DocketType | Unknown` is not assignable to parameter `obj` with type `Sized` in function `len`",
-      "severity": "error"
-    },
-    {
-      "column": 16,
-      "path": "cl/recap/tasks.py",
-      "name": "bad-index",
-      "concise_description": "Cannot index into `bool`",
-      "severity": "error"
-    },
-    {
-      "column": 32,
-      "path": "cl/recap/tasks.py",
-      "name": "bad-typed-dict-key",
-      "concise_description": "Invalid key for TypedDict `DocketType`, got `Literal[0]`",
-      "severity": "error"
-    },
-    {
-      "column": 17,
-      "path": "cl/recap/tasks.py",
-      "name": "bad-index",
-      "concise_description": "Cannot index into `bool`",
-      "severity": "error"
-    },
-    {
-      "column": 33,
-      "path": "cl/recap/tasks.py",
-      "name": "bad-typed-dict-key",
-      "concise_description": "Invalid key for TypedDict `DocketType`, got `Literal[0]`",
-      "severity": "error"
-    },
-    {
       "column": 12,
       "path": "cl/recap/tasks.py",
       "name": "bad-return",
-      "concise_description": "Returned type `tuple[dict[str, bool | DocketType | Unknown] | dict[Unknown, Unknown] | None, bytes]` is not assignable to declared return type `tuple[dict[str, bool | list[DocketType] | str] | None, str]`",
+      "concise_description": "Returned type `tuple[dict[Unknown, Unknown] | None, bytes]` is not assignable to declared return type `tuple[dict[str, bool | list[DocketType] | str] | None, str]`",
       "severity": "error"
     },
     {
