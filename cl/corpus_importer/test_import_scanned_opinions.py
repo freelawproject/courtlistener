@@ -178,6 +178,12 @@ class ScanXmlHelpersTest(SimpleTestCase):
                 Opinion.DISSENT,
             ),
             (
+                "<opinion><author>Klein and Stone, JJ.</author></opinion>",
+                "Klein, Stone",
+                False,
+                Opinion.COMBINED,
+            ),
+            (
                 "<opinion><p>No author.</p></opinion>",
                 "",
                 False,
@@ -463,6 +469,33 @@ class ImportScannedOpinionsTest(TestCase):
         self.assertEqual(OpinionCluster.objects.count(), 0)
         self.assertEqual(Docket.objects.count(), 0)
         mock_file_save.assert_not_called()
+        mock_logger.exception.assert_called_once()
+
+    def test_failed_xml_path_save_deletes_the_upload(self) -> None:
+        """Is the uploaded XML deleted when saving its path fails?"""
+        cluster_save = OpinionCluster.save
+
+        def fail_path_save(cluster, *args, **kwargs):
+            if kwargs.get("update_fields") == ["filepath_xml_scan"]:
+                raise ValueError("boom")
+            return cluster_save(cluster, *args, **kwargs)
+
+        with (
+            mock.patch.object(
+                OpinionCluster,
+                "save",
+                autospec=True,
+                side_effect=fail_path_save,
+            ),
+            mock.patch(f"{COMMAND_MODULE}.logger") as mock_logger,
+            mock.patch.object(FieldFile, "save") as mock_file_save,
+            mock.patch.object(FieldFile, "delete") as mock_file_delete,
+        ):
+            self.import_scan()
+
+        self.assertEqual(OpinionCluster.objects.count(), 0)
+        mock_file_save.assert_called_once()
+        mock_file_delete.assert_called_once_with(save=False)
         mock_logger.exception.assert_called_once()
 
     def test_failed_file_does_not_stop_the_run(self) -> None:

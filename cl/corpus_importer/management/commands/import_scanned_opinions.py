@@ -469,8 +469,11 @@ def make_opinion(op: Tag, cluster_id: int) -> Opinion:
         author_text = author.get_text(" ", strip=True)
         # Check the raw text: extract_judge_last_name drops "Per Curiam"
         per_curiam = bool(PER_CURIAM_RE.search(author_text))
+        # A byline can name several judges ("Klein and Stone, JJ.")
         author_str = titlecase(
-            "".join(extract_judge_last_name(titlecase(author_text.strip(":"))))
+            ", ".join(
+                extract_judge_last_name(titlecase(author_text.strip(":")))
+            )
         )
     op_type = op.get("type")
     return Opinion(
@@ -487,7 +490,9 @@ def store_scan_xml(cluster: OpinionCluster, scan_case: ScanCase) -> None:
     """Upload the scanned XML to the cluster's `filepath_xml_scan`.
 
     Call it as the last step of the import transaction, so a failed database
-    write rolls back before the file is uploaded and no orphan is left.
+    write rolls back before the file is uploaded. The upload comes before the
+    cluster save that stores its path, so the file is deleted if that save
+    fails, and no orphan is left.
 
     :param cluster: The saved cluster.
     :param scan_case: The parsed scanned opinion.
@@ -498,7 +503,11 @@ def store_scan_xml(cluster: OpinionCluster, scan_case: ScanCase) -> None:
         ContentFile(scan_case.xml.encode()),
         save=False,
     )
-    cluster.save(update_fields=["filepath_xml_scan"])
+    try:
+        cluster.save(update_fields=["filepath_xml_scan"])
+    except Exception:
+        cluster.filepath_xml_scan.delete(save=False)
+        raise
 
 
 def add_opinion_content(
