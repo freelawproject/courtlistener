@@ -137,6 +137,7 @@ def send_recap_fetch_webhooks(fq: PacerFetchQueue) -> None:
         PROCESSING_STATUS.INVALID_CONTENT,
         PROCESSING_STATUS.NEEDS_INFO,
     ]:
+        # pyrefly:ignore[missing-attribute]
         user_webhooks = fq.user.webhooks.filter(
             event_type=WebhookEventType.RECAP_FETCH, enabled=True
         )
@@ -184,6 +185,8 @@ def send_search_alert_webhook(
                 results,
                 many=True,
             ).data
+        case _:
+            raise ValueError(f"Unsupported webhook version: {webhook.version}")
 
     post_content = {
         "webhook": generate_webhook_key_content(webhook),

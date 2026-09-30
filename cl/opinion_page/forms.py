@@ -1,7 +1,7 @@
 import logging
 from collections.abc import MutableMapping
 from datetime import datetime
-from typing import Any
+from typing import Any, cast
 
 from django import forms
 from django.core.exceptions import ValidationError
@@ -36,7 +36,6 @@ from cl.search.models import (
     OpinionCluster,
     OriginatingCourtInformation,
 )
-from cl.users.models import UserProfile
 
 
 class CitationRedirectorForm(forms.Form):
@@ -131,7 +130,8 @@ class DocketEntryFilterForm(forms.Form):
             return data
         if self.request is None or not self.request.user.is_authenticated:
             return data
-        user: UserProfile.user = self.request.user
+        user = self.request.user
+        # pyrefly:ignore[missing-attribute]
         if user.profile.docket_default_order_desc:
             return DocketEntryFilterForm.DESCENDING
         return data
@@ -525,14 +525,15 @@ class BaseCourtUploadForm(forms.Form):
 
         sha1_hash = sha1(force_bytes(self.cleaned_data.get("pdf_upload")))
         court = Court.objects.get(pk=self.cleaned_data.get("court_str"))
+        cleaned_item = cast(dict[str, Any], self.cleaned_data.get("item"))
 
         docket, opinions, cluster, citations, _ = make_objects(
-            self.cleaned_data.get("item"),
+            cleaned_item,
             court,
             [
                 (
-                    self.cleaned_data.get("item"),
-                    self.cleaned_data.get("pdf_upload"),
+                    cleaned_item,
+                    cast(bytes, self.cleaned_data.get("pdf_upload")),
                     sha1_hash,
                 )
             ],

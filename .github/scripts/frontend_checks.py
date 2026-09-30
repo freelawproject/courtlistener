@@ -791,7 +791,12 @@ def run_checks(
     repo_root: Path,
     file_statuses: dict[str, str],
 ) -> list[Finding]:
-    """Run all applicable checks on the given files."""
+    """Run all applicable checks on the given files.
+
+    ``changed_files`` is the subset of the diff to lint (HTML and input.css);
+    ``file_statuses`` maps every path in the diff to its git status, so checks
+    that depend on non-frontend files must look there.
+    """
     findings: list[Finding] = []
 
     # Collect v2_ templates changed in this PR (for sync notice check)
@@ -801,7 +806,8 @@ def run_checks(
     components_library_modified = any(
         f.endswith("v2_components.html") for f in changed_files
     )
-    v2_register_test_modified = V2_REGISTER_TEST_FILE in changed_files
+    # The register test is a Python file, so it is never in changed_files.
+    v2_register_test_modified = V2_REGISTER_TEST_FILE in file_statuses
 
     for filepath in changed_files:
         abs_path = repo_root / filepath

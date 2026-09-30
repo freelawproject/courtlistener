@@ -490,7 +490,7 @@ requires-dist = [
     { name = "django-markdown-deux", specifier = ">=1.0.6" },
     { name = "django-mathfilters" },
     { name = "django-model-utils", specifier = ">=5.0.0" },
-    { name = "django-oauth-toolkit", extras = ["jwcrypto"], specifier = "==3.2.0" },
+    { name = "django-oauth-toolkit", specifier = "==3.4.1" },
     { name = "django-override-storage", specifier = ">=0.3.2" },
     { name = "django-permissions-policy", specifier = ">=4.33.0" },
     { name = "django-pghistory", specifier = ">=3.9.1" },
@@ -983,17 +983,18 @@ wheels = [
 
 [[package]]
 name = "django-oauth-toolkit"
-version = "3.2.0"
+version = "3.4.1"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "django" },
     { name = "jwcrypto" },
     { name = "oauthlib" },
     { name = "requests" },
+    { name = "urllib3" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/a7/95/efd83b35c34b86eb2249d2b54c5eaf383c48f3f19034aa6f3807e37471b6/django_oauth_toolkit-3.2.0.tar.gz", hash = "sha256:c36761ae6810083d95a652e9c820046cde0d45a2e2a5574bbe7202656ec20bb6", size = 114211, upload-time = "2026-01-08T22:03:13.311Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/66/42/b3c6a5d7e204011a702cc02ababb756d10538645dfd188ea441e4c65a082/django_oauth_toolkit-3.4.1.tar.gz", hash = "sha256:c4de73c0765eed55a99ea0fa8433b20664dcc1f43930149cff569abed166c5c2", size = 256139, upload-time = "2026-08-21T03:45:36.538Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/ae/cc/f27a784c0ecd13335abd9ef85ebb80dbc04945f919da5f496f56e3562751/django_oauth_toolkit-3.2.0-py3-none-any.whl", hash = "sha256:bd2cd2719b010231a2f370f927dbcc740454fb1d0dd7e7f4138f36227363dc26", size = 87077, upload-time = "2026-01-08T22:03:12.123Z" },
+    { url = "https://files.pythonhosted.org/packages/c4/16/11cf2eacd7ac1c32908288b6d56fadef5676071a4ac0af7e626fd1abd3ef/django_oauth_toolkit-3.4.1-py3-none-any.whl", hash = "sha256:c47f2a70e83bade0a47a5e9b20e86030d8ed9c0a8f10ec4ed30446cad7291f2d", size = 163957, upload-time = "2026-08-21T03:45:34.904Z" },
 ]
 
 [[package]]
@@ -1831,7 +1832,7 @@ wheels = [
 
 [[package]]
 name = "juriscraper"
-version = "3.0.41"
+version = "3.0.44"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "certifi" },
@@ -1848,12 +1849,11 @@ dependencies = [
     { name = "pydantic" },
     { name = "python-dateutil" },
     { name = "requests" },
-    { name = "selenium" },
     { name = "tldextract" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/62/18/db7e82c99677172474e823a4b59b7b2e891df0f469b934a2e867da9a0d5a/juriscraper-3.0.41.tar.gz", hash = "sha256:a48ee93e7365bdf68f5b38c874a4158b07436193953c0f0587c5b3a86faafca3", size = 469083, upload-time = "2026-09-14T17:14:48.438Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/06/3c/12b4d6d1d1aedc021d6e766b3b34918650d93628bb3edcd2de8dc470aa26/juriscraper-3.0.44.tar.gz", hash = "sha256:6ac021dabb9f7a03be97bc15086b1138f7d32e6a16c680f5e0cc82a18f753167", size = 471543, upload-time = "2026-09-30T17:14:11.475Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/87/f2/b488737bd5233874084ac23930ba72ced10771fb4ccb458bef9c76466513/juriscraper-3.0.41-py3-none-any.whl", hash = "sha256:6e2190c8d046ee3623868ff2682e3c584857fcdb25759c7ebe47facfe7fe88ff", size = 706629, upload-time = "2026-09-14T17:14:46.731Z" },
+    { url = "https://files.pythonhosted.org/packages/ce/7a/232f9a8a37c0d8fa8f46dbf7a3271d49e36856c6ce45f9d757fce3027a87/juriscraper-3.0.44-py3-none-any.whl", hash = "sha256:0dc9ce9bc5098937903416c451adeb21934a74b8fd1220b9d4b5b5fa89a3fa46", size = 709004, upload-time = "2026-09-30T17:14:09.805Z" },
 ]
 
 [[package]]
@@ -3556,11 +3556,11 @@ wheels = [
 
 [[package]]
 name = "urllib3"
-version = "2.7.0"
+version = "2.8.0"
 source = { registry = "https://pypi.org/simple" }
-sdist = { url = "https://files.pythonhosted.org/packages/53/0c/06f8b233b8fd13b9e5ee11424ef85419ba0d8ba0b3138bf360be2ff56953/urllib3-2.7.0.tar.gz", hash = "sha256:231e0ec3b63ceb14667c67be60f2f2c40a518cb38b03af60abc813da26505f4c", size = 433602, upload-time = "2026-05-07T16:13:18.596Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/e3/05/b17359e1cefb4f909b5e40b1b90a496d987258916dbbf88e842c729f510e/urllib3-2.8.0.tar.gz", hash = "sha256:63bf2ead4c879426ebf22ef2a781eeb4aa3b4ae798a0435506f8687fd5bb9b63", size = 458972, upload-time = "2026-09-15T19:29:36.253Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/7f/3e/5db95bcf282c52709639744ca2a8b149baccf648e39c8cc87553df9eae0c/urllib3-2.7.0-py3-none-any.whl", hash = "sha256:9fb4c81ebbb1ce9531cce37674bbc6f1360472bc18ca9a553ede278ef7276897", size = 131087, upload-time = "2026-05-07T16:13:17.151Z" },
+    { url = "https://files.pythonhosted.org/packages/92/9d/c4e665119135114480843e7ab388fa94d8480650450e6f8e26b70d323a4c/urllib3-2.8.0-py3-none-any.whl", hash = "sha256:0cf3cae568d36aa9576b28dfb35f11328f1cb974ca7647d9475ebb86c75ac6e3", size = 135717, upload-time = "2026-09-15T19:29:34.577Z" },
 ]
 
 [package.optional-dependencies]
