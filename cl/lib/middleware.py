@@ -130,9 +130,11 @@ class IncrementalNewTemplateMiddleware:
 
         response.template_name = new_template_name
 
-        # htmx fragments never render the header, so the search form it
-        # needs would only be wasted work for them.
-        if not request.headers.get("HX-Request"):
+        # Partials (v2_includes/) never render the header, so the search
+        # form it needs would only be wasted work for them. The name decides,
+        # not the HX-Request header: the server knows what it renders, and a
+        # boosted full-page request must still get the form.
+        if not new_template_name.startswith("v2_includes/"):
             response.context_data["search_form"] = CorpusSearchForm()
 
         return response

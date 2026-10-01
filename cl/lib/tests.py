@@ -2734,16 +2734,13 @@ class TieredCacheTest(SimpleTestCase):
 class IncrementalNewTemplateMiddlewareTest(TestCase):
     """Template swapping for pages that are mid-redesign."""
 
-    def process(
-        self, template_name: str, headers: dict[str, str] | None = None
-    ) -> TemplateResponse:
+    def process(self, template_name: str) -> TemplateResponse:
         """Runs an unrendered TemplateResponse through the middleware.
 
         :param template_name: The template the view would have rendered.
-        :param headers: Extra request headers, as the client would send them.
         """
         middleware = IncrementalNewTemplateMiddleware(lambda request: None)
-        request = RequestFactory().get("/", headers=headers or {})
+        request = RequestFactory().get("/")
         response = TemplateResponse(request, template_name, {})
         return middleware.process_template_response(request, response)
 
@@ -2773,14 +2770,21 @@ class IncrementalNewTemplateMiddlewareTest(TestCase):
         response = self.process("components.html")
         self.assertIn("search_form", response.context_data or {})
 
-    def test_htmx_fragment_skips_the_search_form(self) -> None:
-        """A swapped htmx fragment is not handed the search form.
+    def test_swapped_partial_skips_the_search_form(self) -> None:
+        """A swapped partial under v2_includes/ is not handed the search form.
 
-        Fragments never render the header, so building the form for them
-        is wasted work.
+        Partials never render the header, so building the form for them is
+        wasted work. The decision rests on the template name alone, with no
+        htmx header on the request. No legacy/v2 partial pair exists in the
+        repo yet, so the template lookup is stubbed to make one.
         """
-        response = self.process("components.html", {"HX-Request": "true"})
-        self.assertEqual(response.template_name, "v2_components.html")
+        with patch.object(
+            IncrementalNewTemplateMiddleware,
+            "template_exists",
+            return_value=True,
+        ):
+            response = self.process("includes/foo/button.html")
+        self.assertEqual(response.template_name, "v2_includes/foo/button.html")
         self.assertNotIn("search_form", response.context_data or {})
 
 
