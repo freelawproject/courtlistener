@@ -25,6 +25,10 @@ class SessionData:
     Handles default values for the `proxy` attribute when not explicitly
     provided, indicating session data was not generated using the
     `ProxyPacerSession` class.
+
+    Cookies are always stored as a plain `RequestsCookieJar`, even when a
+    subclass such as `InsecureCookieJar` is passed in. Reassigning `cookies`
+    after construction bypasses this conversion.
     """
 
     cookies: RequestsCookieJar
@@ -33,6 +37,17 @@ class SessionData:
     def __post_init__(self):
         if not self.proxy_address:
             self.proxy_address = settings.EGRESS_PROXY_HOSTS[0]
+        # SessionData is pickled into the Redis cookie cache and into Celery
+        # task arguments. Store only requests' own jar class so pods running
+        # code without InsecureCookieJar (mid-rollout or after a rollback) can
+        # still unpickle it. ProxyPacerSession re-wraps it in InsecureCookieJar.
+        if (
+            self.cookies is not None
+            and type(self.cookies) is not RequestsCookieJar
+        ):
+            plain = RequestsCookieJar()
+            plain.update(self.cookies)
+            self.cookies = plain
 
 
 class InsecureCookieJar(RequestsCookieJar):
