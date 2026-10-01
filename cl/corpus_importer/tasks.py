@@ -5188,9 +5188,17 @@ def fl_ingest_docket_task(
             result.failures,
         )
     if download_attachments:
-        attachment_pks = result.creates.get(
+        merged_pks = result.creates.get(
             FloridaDocument.__name__, set()
         ) | result.updates.get(FloridaDocument.__name__, set())
+        # An update to a document that already has a file only changed its
+        # metadata (a new link UUID creates a new document), so it needs no
+        # download.
+        attachment_pks = list(
+            FloridaDocument.objects.filter(
+                pk__in=merged_pks, filepath_local=""
+            ).values_list("pk", flat=True)
+        )
         logger.info("Downloading FloridaDocuments: %r", attachment_pks)
         for pk in attachment_pks:
             download_fl_document.si(pk).apply_async()

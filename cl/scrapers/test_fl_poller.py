@@ -1,10 +1,10 @@
 """Tests for the Florida ACIS poller management command."""
 
 import json
-from collections.abc import AsyncGenerator, Mapping
+from collections.abc import AsyncGenerator, Mapping, Sequence
 from datetime import UTC, date, datetime, timedelta
 from unittest import mock
-from uuid import uuid4
+from uuid import UUID, uuid4
 
 import time_machine
 from asgiref.sync import async_to_sync
@@ -22,10 +22,13 @@ from cl.scrapers.management.commands.fl_poller import (
     DOCKET_ENDPOINT,
     Command,
     FloridaDocumentPollParser,
+    FloridaDocumentUpdate,
     FloridaUpdate,
 )
 from cl.scrapers.management.utils import ScraperCheckpointTracker
-from cl.tests.cases import SimpleTestCase
+from cl.search.factories import CourtFactory, DocketFactory
+from cl.search.state.florida.factories import FloridaDocumentFactory
+from cl.tests.cases import SimpleTestCase, TestCase
 
 DATE_PARAM_FMT = "%Y-%m-%dT%H:%M:%S.000Z"
 FROZEN_NOW = datetime(2026, 8, 20, 12, tzinfo=UTC)
@@ -54,19 +57,26 @@ def make_court_metadata(external_id: int) -> CourtMetadata:
     )
 
 
-def make_update(
-    court_external_id: int = 2, date_filed: datetime | None = None
-) -> FloridaUpdate:
+def make_update(court_external_id: int = 2) -> FloridaUpdate:
     """Build a FloridaUpdate for a fresh case UUID in the given court."""
     return FloridaUpdate.model_construct(
+        case_uuid=uuid4(), court_external_id=court_external_id
+    )
+
+
+def make_document_update(
+    court_external_id: int = 2, link_uuid: UUID | None = None
+) -> FloridaDocumentUpdate:
+    """Build a FloridaDocumentUpdate for a fresh case UUID in the given court."""
+    return FloridaDocumentUpdate.model_construct(
         case_uuid=uuid4(),
         court_external_id=court_external_id,
-        date_filed=date_filed or START,
+        link_uuid=link_uuid or uuid4(),
     )
 
 
 def make_page(
-    updates: list[FloridaUpdate],
+    updates: Sequence[FloridaUpdate],
 ) -> FloridaPaginatedResults[FloridaUpdate]:
     """Wrap updates in one page of paginated results."""
     return FloridaPaginatedResults[FloridaUpdate].model_construct(
@@ -136,9 +146,11 @@ class FloridaDocumentPollParserTest(SimpleTestCase):
     """Unit test for the poll-endpoint results parser."""
 
     def test_parse_full_extracts_case_identifiers(self):
-        """The parser must pull the case UUID, court external ID, and filing
-        date out of each result's caseHeader."""
+        """The parser must pull the case UUID and court external ID out of
+        each result's caseHeader and the document link UUID out of the
+        result."""
         case_uuid = uuid4()
+        link_uuid = uuid4()
         payload = json.dumps(
             {
                 "_embedded": {
@@ -147,8 +159,8 @@ class FloridaDocumentPollParserTest(SimpleTestCase):
                             "caseHeader": {
                                 "caseInstanceUUID": str(case_uuid),
                                 "courtID": 2,
-                                "filedDate": "2026-08-19T12:00:00Z",
-                            }
+                            },
+                            "documentLinkUUID": str(link_uuid),
                         }
                     ]
                 },
@@ -166,10 +178,10 @@ class FloridaDocumentPollParserTest(SimpleTestCase):
         self.assertEqual(
             parsed.results,
             [
-                FloridaUpdate.model_construct(
+                FloridaDocumentUpdate.model_construct(
                     case_uuid=case_uuid,
                     court_external_id=2,
-                    date_filed=datetime(2026, 8, 19, 12, tzinfo=UTC),
+                    link_uuid=link_uuid,
                 )
             ],
         )
@@ -177,7 +189,7 @@ class FloridaDocumentPollParserTest(SimpleTestCase):
 
 @time_machine.travel(FROZEN_NOW, tick=False)
 @mock.patch.object(Command, "checkpoint_tracker", POLL_TRACKER)
-class FlPollerPollTest(SimpleTestCase):
+class FlPollerPollTest(TestCase):
     """Coverage for Command.poll against a fake scraper.
 
     The checkpoint tracker is patched so tests operate on an isolated Redis
@@ -210,6 +222,7 @@ class FlPollerPollTest(SimpleTestCase):
         *,
         iterations: int = 1,
         download_attachments: bool = True,
+        case_backfill_days: int = 0,
     ) -> None:
         """Run poll for the given number of cycles. The inter-cycle sleep is
         mocked to raise after the last cycle since the loop has no other
@@ -225,6 +238,7 @@ class FlPollerPollTest(SimpleTestCase):
                 self.throttle,
                 scraper,
                 [FloridaCourtID.FIRST_COA],
+                case_backfill_days,
                 0,
                 START,
                 "test_queue",
@@ -233,12 +247,11 @@ class FlPollerPollTest(SimpleTestCase):
 
     def test_new_cases_are_archived_and_dispatched(self):
         """Every discovered case must be archived to S3, handed to the Celery
-        ingestion task on the requested queue, and move the checkpoint to the
-        earliest update date seen."""
+        ingestion task on the requested queue."""
         case_a = FloridaCaseFactory()
         case_b = FloridaCaseFactory()
-        update_a = make_update(date_filed=FROZEN_NOW - timedelta(days=2))
-        update_b = make_update(date_filed=FROZEN_NOW - timedelta(days=1))
+        update_a = make_update()
+        update_b = make_update()
         scraper = FakeFloridaScraper(
             self.courts,
             pages={DOCKET_ENDPOINT: [make_page([update_a, update_b])]},
@@ -297,24 +310,33 @@ class FlPollerPollTest(SimpleTestCase):
         )
 
     def test_duplicate_updates_are_ingested_once(self):
-        """An update surfaced by both the docket-entry and new-case endpoints
-        must be fetched and ingested only once per cycle."""
+        """A case surfaced more than once in a cycle, whether by both
+        endpoints or by several of its documents, must be fetched and
+        ingested only once."""
         case = FloridaCaseFactory()
-        update = make_update()
+        case_update = make_update()
+        document_updates = [
+            FloridaDocumentUpdate.model_construct(
+                case_uuid=case_update.case_uuid,
+                court_external_id=case_update.court_external_id,
+                link_uuid=uuid4(),
+            )
+            for _ in range(2)
+        ]
         scraper = FakeFloridaScraper(
             self.courts,
             pages={
-                DE_DOC_ENDPOINT: [make_page([update])],
-                DOCKET_ENDPOINT: [make_page([update])],
+                DE_DOC_ENDPOINT: [make_page(document_updates)],
+                DOCKET_ENDPOINT: [make_page([case_update])],
             },
-            case_results={str(update.case_uuid): (case, [])},
+            case_results={str(case_update.case_uuid): (case, [])},
         )
 
         self.run_poll(scraper)
 
         self.assertEqual(
             scraper.case_requests,
-            [(str(update.case_uuid), FloridaCourtID.FIRST_COA.value)],
+            [(str(case_update.case_uuid), FloridaCourtID.FIRST_COA.value)],
         )
         self.mock_ingest.si.assert_called_once_with(
             (
@@ -436,6 +458,77 @@ class FlPollerPollTest(SimpleTestCase):
             overlap_param,
         )
 
+    def test_checkpoint_advances_after_each_cycle(self):
+        """The checkpoint must be saved once a cycle finishes, at the date of
+        that cycle's poll time."""
+        scraper = FakeFloridaScraper(self.courts)
+
+        self.run_poll(scraper)
+
+        self.assertEqual(
+            POLL_TRACKER.get(), (FROZEN_NOW - timedelta(minutes=1)).date()
+        )
+
+    def test_case_backfill_days_widens_query_window(self):
+        """Both endpoints must be queried from --case-backfill-days before the
+        start of the cycle, so late-arriving updates aren't missed."""
+        scraper = FakeFloridaScraper(self.courts)
+
+        self.run_poll(scraper, case_backfill_days=2)
+
+        expected = (START - timedelta(days=2)).strftime(DATE_PARAM_FMT)
+        for endpoint, params in scraper.page_requests:
+            with self.subTest(endpoint=endpoint):
+                date_param = (
+                    params["caseHeader.filedDateFrom"]
+                    if endpoint == DOCKET_ENDPOINT
+                    else params["docketEntryHeader.docketEntryFiledDateFrom"]
+                )
+                self.assertEqual(date_param, expected)
+
+    def test_known_dockets_are_skipped(self):
+        """A new-case result whose docket is already stored must not be
+        fetched or ingested again, while an unknown one still is."""
+        court = CourtFactory(id="fla")
+        known = make_update()
+        DocketFactory(court=court, pacer_case_id=str(known.case_uuid))
+        unknown = make_update()
+        case = FloridaCaseFactory()
+        scraper = FakeFloridaScraper(
+            self.courts,
+            pages={DOCKET_ENDPOINT: [make_page([known, unknown])]},
+            case_results={str(unknown.case_uuid): (case, [])},
+        )
+
+        self.run_poll(scraper)
+
+        self.assertEqual(
+            scraper.case_requests,
+            [(str(unknown.case_uuid), FloridaCourtID.FIRST_COA.value)],
+        )
+        self.mock_ingest.si.assert_called_once()
+
+    def test_known_documents_are_skipped(self):
+        """A docket-entry document whose link UUID is already stored must not
+        trigger a refetch of its case, while an unknown one does."""
+        known = make_document_update()
+        FloridaDocumentFactory(link_uuid=known.link_uuid)
+        unknown = make_document_update()
+        case = FloridaCaseFactory()
+        scraper = FakeFloridaScraper(
+            self.courts,
+            pages={DE_DOC_ENDPOINT: [make_page([known, unknown])]},
+            case_results={str(unknown.case_uuid): (case, [])},
+        )
+
+        self.run_poll(scraper)
+
+        self.assertEqual(
+            scraper.case_requests,
+            [(str(unknown.case_uuid), FloridaCourtID.FIRST_COA.value)],
+        )
+        self.mock_ingest.si.assert_called_once()
+
     def test_download_attachments_flag_reaches_ingestion_task(self):
         """The download_attachments flag must be forwarded to the ingestion
         task."""
@@ -484,12 +577,14 @@ class FlPollerCommandTest(SimpleTestCase):
             _throttle,
             _scraper,
             court_ids,
-            polling_delay,
+            case_backfill_days,
+            _polling_delay,
             start,
             queue,
             download_attachments,
         ) = mock_poll.call_args.args
         self.assertEqual(court_ids, [FloridaCourtID.SUPREME_COURT])
+        self.assertEqual(case_backfill_days, 3)
         self.assertEqual(start, FROZEN_NOW - timedelta(days=3))
         self.assertEqual(queue, "batch1")
         self.assertTrue(download_attachments)
@@ -501,7 +596,7 @@ class FlPollerCommandTest(SimpleTestCase):
 
         call_command("fl_poller", auto_resume=True)
 
-        self.assertEqual(mock_poll.call_args.args[4], datetime(2026, 8, 1))
+        self.assertEqual(mock_poll.call_args.args[5], datetime(2026, 8, 1))
 
     def test_auto_resume_without_checkpoint_falls_back(self, mock_poll):
         """With --auto-resume but no stored checkpoint, the command must warn
@@ -514,12 +609,34 @@ class FlPollerCommandTest(SimpleTestCase):
             2,
         )
         self.assertEqual(
-            mock_poll.call_args.args[4], FROZEN_NOW - timedelta(days=2)
+            mock_poll.call_args.args[5], FROZEN_NOW - timedelta(days=2)
         )
+
+    def test_use_cache_and_archive_responses_reach_cache_handler(
+        self, mock_poll
+    ):
+        """--use-cache and --archive-responses must be forwarded to the S3
+        cache handler, and the cache must be off by default so updates aren't
+        served stale."""
+        for options, expected in (
+            ({}, (False, False)),
+            ({"use_cache": True}, (True, False)),
+            ({"archive_responses": True}, (False, True)),
+        ):
+            with self.subTest(options=options):
+                with mock.patch.object(
+                    Command,
+                    "throttle_scraper_and_cache",
+                    return_value=(mock.Mock(), mock.Mock(), mock.Mock()),
+                ) as mock_build:
+                    call_command("fl_poller", **options)
+
+                use_cache, archive_responses = mock_build.call_args.args[4:6]
+                self.assertEqual((use_cache, archive_responses), expected)
 
     def test_no_download_attachments_option(self, mock_poll):
         """--no-download-attachments must disable attachment downloads in the
         dispatched ingestion tasks."""
         call_command("fl_poller", no_download_attachments=True)
 
-        self.assertFalse(mock_poll.call_args.args[6])
+        self.assertFalse(mock_poll.call_args.args[7])

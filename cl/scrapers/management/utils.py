@@ -200,6 +200,11 @@ class FLScrapeCommand(BaseCommand):
             help="If set the scraper will archive responses to S3.",
         )
         parser.add_argument(
+            "--use-cache",
+            action="store_true",
+            help="If set the scraper will load responses archived in S3 instead of re-requesting them. Useful when re-ingesting after a parsing fix or running a second pass with the --full-scrape option.",
+        )
+        parser.add_argument(
             "--queue",
             default="batch1",
             help="The celery queue to dispatch S3 archive tasks to.",

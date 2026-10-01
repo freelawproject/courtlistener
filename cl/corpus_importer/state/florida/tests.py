@@ -1447,6 +1447,26 @@ class FloridaIngestTaskTest(TestCase):
         download_mock.assert_not_called()
 
     @mock.patch("cl.corpus_importer.tasks.download_fl_document.si")
+    def test_reingest_metadata_update_with_stored_file_skips_download(
+        self, download_mock: mock.Mock
+    ) -> None:
+        """Does a rescrape that only updates a document's metadata skip
+        downloading a file that's already stored for the same link UUID?"""
+        case = self._make_case()
+        fl_ingest_docket_task((case, "bucket", "key"))
+        document = FloridaDocument.objects.get()
+        document.filepath_local = "florida/stored-file.pdf"
+        document.save()
+        download_mock.reset_mock()
+
+        case.entries[0].attachments[0].document_name = "Renamed document"
+        result = fl_ingest_docket_task((case, "bucket", "key"))
+
+        self.assertTrue(result.success)
+        self.assertEqual(result.updates["FloridaDocument"], {document.pk})
+        download_mock.assert_not_called()
+
+    @mock.patch("cl.corpus_importer.tasks.download_fl_document.si")
     def test_reingest_missing_file_downloads_again(
         self, download_mock: mock.Mock
     ) -> None:

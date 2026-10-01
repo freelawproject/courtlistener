@@ -1,7 +1,6 @@
 import asyncio
 from collections.abc import AsyncGenerator
 from datetime import UTC, datetime, timedelta
-from pathlib import Path
 from typing import ClassVar
 
 from asgiref.sync import async_to_sync, sync_to_async
@@ -18,10 +17,10 @@ from pydantic.types import UUID4
 
 from cl.corpus_importer.state.florida.utils import FLORIDA_COURT_IDS
 from cl.corpus_importer.tasks import fl_ingest_docket_task
-from cl.lasc.models import Docket
 from cl.lib.celery_utils import CeleryThrottle
 from cl.lib.command_utils import logger
 from cl.scrapers.management.commands.back_scrape_fl_dockets import (
+    S3_BASE,
     save_case_to_s3,
 )
 from cl.scrapers.management.utils import (
@@ -29,6 +28,7 @@ from cl.scrapers.management.utils import (
     ScraperCheckpointTracker,
     StatePollCommand,
 )
+from cl.search.models import Docket
 from cl.search.state.florida.models import FloridaDocument
 
 
@@ -47,8 +47,6 @@ class FloridaUpdate(BaseModel):
 class FloridaDocumentUpdate(FloridaUpdate):
     link_uuid: UUID4 = Field(validation_alias="documentLinkUUID")
 
-
-S3_BASE = Path("responses/dockets/florida")
 
 DE_DOC_ENDPOINT = (
     "https://acis-api.flcourts.gov/courts/cms/docketentrydocuments"
@@ -100,6 +98,7 @@ class Command(FLScrapeCommand, StatePollCommand):
         max_retries: int,
         backoff: float,
         backoff_growth: float,
+        use_cache: bool,
         archive_responses: bool,
         queue: str,
         throttle_min_items: int,
@@ -117,9 +116,10 @@ class Command(FLScrapeCommand, StatePollCommand):
             max_retries,
             backoff,
             backoff_growth,
-            # Since we're fetching updates, pulling from the cache would be counterproductive
-            False,
-            # But we still want to save responses in case there's a parsing failure
+            # Cached responses are stale by definition when looking for updates, so loading from the cache is
+            # opt-in and only useful when replaying archived responses.
+            use_cache,
+            # Saving responses in case there's a parsing failure
             archive_responses,
             queue,
             throttle_min_items,
@@ -194,7 +194,6 @@ class Command(FLScrapeCommand, StatePollCommand):
                 last_polled,
                 now,
             )
-            seen = set()
             async for update in self.gather_all(
                 scraper,
                 scraper_courts,
@@ -202,10 +201,6 @@ class Command(FLScrapeCommand, StatePollCommand):
                 last_polled - timedelta(days=case_backfill_days),
             ):
                 logger.info("Got update: %s", update)
-                if update in seen:
-                    logger.info("Duplicate update. Skipping.")
-                    continue
-                seen.add(update)
                 court_id = external_id_map[update.court_external_id]
                 try:
                     maybe_case = await scraper.fetch_case_data(
@@ -260,13 +255,28 @@ class Command(FLScrapeCommand, StatePollCommand):
         courts: list[FloridaCourtID],
         start: datetime,
     ) -> AsyncGenerator[FloridaUpdate]:
+        """Yield updated and new cases since `start`, at most once per case.
+
+        A case can surface from both endpoints, and from several documents on
+        the document endpoint, but refetching it would be redundant since each
+        fetch returns the whole case.
+        """
+        seen: set[UUID4] = set()
         async for update in self.gather_updated(
             scraper, scraper_courts, courts, start
         ):
+            if update.case_uuid in seen:
+                logger.info("Duplicate update. Skipping.")
+                continue
+            seen.add(update.case_uuid)
             yield update
         async for update in self.gather_new(
             scraper, scraper_courts, courts, start
         ):
+            if update.case_uuid in seen:
+                logger.info("Duplicate update. Skipping.")
+                continue
+            seen.add(update.case_uuid)
             yield update
 
     async def gather_new(
@@ -346,5 +356,5 @@ class Command(FLScrapeCommand, StatePollCommand):
                             ).values_list("link_uuid", flat=True)
                         )
                         for result in results:
-                            if str(result.link_uuid) not in known:
+                            if result.link_uuid not in known:
                                 yield result

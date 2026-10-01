@@ -172,11 +172,6 @@ class Command(StateBackScrapeCommand, FLScrapeCommand):
             help="If set the scraper will fetch all docket metadata in addition to the list of dockets.",
         )
         parser.add_argument(
-            "--use-cache",
-            action="store_true",
-            help="If set the scraper will use the cache to avoid re-downloading files. Useful when running a second pass with the --full-scrape option.",
-        )
-        parser.add_argument(
             "--skip-parsed",
             dest="skip_parsed",
             action="store_true",
