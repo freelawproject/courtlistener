@@ -89,10 +89,10 @@ class QueryWrapper:
                 # Access _wrapped to check if lazy object has been evaluated.
                 # Once evaluated, it proxies to the User model.
                 if (
-                    user_obj._wrapped is not empty  # type: ignore[attr-defined]
-                    and user_obj.is_authenticated  # type: ignore[attr-defined]
+                    user_obj._wrapped is not empty
+                    and user_obj.is_authenticated
                 ):
-                    user = user_obj.pk  # type: ignore[attr-defined]
+                    user = user_obj.pk
             elif user_obj.is_authenticated:
                 user = user_obj.pk
 

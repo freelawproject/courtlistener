@@ -1,13 +1,17 @@
 import base64
 import hashlib
+import importlib
 from datetime import timedelta
+from types import SimpleNamespace
 from unittest.mock import patch
 
 import time_machine
+from django.apps import apps
 from django.conf import settings
 from django.core.cache import cache
-from django.core.exceptions import ImproperlyConfigured, ValidationError
+from django.core.exceptions import ValidationError
 from django.core.management import call_command
+from django.db import connection
 from django.test import override_settings
 from django.urls import reverse
 from django.utils.timezone import now
@@ -17,16 +21,16 @@ from oauth2_provider.models import (
     get_grant_model,
     get_id_token_model,
     get_refresh_token_model,
+    set_token_value,
 )
 
 from cl.oauth.cleanup_utils import (
     delete_unconfirmed_applications,
-    refresh_token_lifetime,
     run_cleanup_pass,
     unconfirmed_applications,
 )
 from cl.oauth.factories import ApplicationFactory
-from cl.tests.cases import APITestCase, SimpleTestCase, TestCase
+from cl.tests.cases import APITestCase, TestCase
 from cl.tests.utils import parse_csp
 from cl.users.factories import UserFactory
 
@@ -75,9 +79,12 @@ class DynamicClientRegistrationTest(APITestCase):
         self.assertEqual(
             body["token_endpoint_auth_method"], "client_secret_basic"
         )
-        # The app was persisted with the right type.
+        # The app was persisted with the right type and provenance.
         app = Application.objects.get(client_id=body["client_id"])
         self.assertEqual(app.client_type, Application.CLIENT_CONFIDENTIAL)
+        self.assertEqual(
+            app.registration_source, Application.RegistrationSource.DCR
+        )
 
     def test_public_client_registration_has_no_secret(self):
         """token_endpoint_auth_method=none yields a public client."""
@@ -247,6 +254,10 @@ class OAuthMetadataTest(APITestCase):
         self.assertIn("S256", body["code_challenge_methods_supported"])
         self.assertIn("authorization_code", body["grant_types_supported"])
         self.assertEqual(body["response_types_supported"], ["code"])
+        # RFC 9207: we append ``iss`` to authorization responses, so say so.
+        self.assertIs(
+            body["authorization_response_iss_parameter_supported"], True
+        )
         # Endpoints should be absolute URLs that share an origin with
         # the issuer.
         self.assertTrue(
@@ -303,55 +314,121 @@ class ApplicationRedirectUriPolicyTest(TestCase):
             self._make_app("javascript:alert(1)").save()
 
 
-class PKCEMethodEnforcementTest(SimpleTestCase):
-    """The RFC 8414 metadata advertises S256-only PKCE, but oauthlib
-    3.3.1 defaults an absent ``code_challenge_method`` to ``"plain"`` and
-    django-oauth-toolkit 3.2 has no setting to restrict which method is
-    accepted. ``cl.oauth.apps.OAuthConfig.ready`` narrows oauthlib's
-    method dict to S256 only; these tests confirm the patch took effect.
+def s256_challenge(verifier: str) -> str:
+    """Return the RFC 7636 S256 code_challenge for ``verifier``."""
+    return (
+        base64.urlsafe_b64encode(hashlib.sha256(verifier.encode()).digest())
+        .decode()
+        .rstrip("=")
+    )
+
+
+class PKCEMethodEnforcementTest(TestCase):
+    """Only S256 PKCE is accepted, as the RFC 8414 metadata promises.
+
+    oauthlib defaults an absent ``code_challenge_method`` to ``"plain"``, so
+    an omitted method has to be refused as well as an explicit ``plain``.
+    django-oauth-toolkit enforces this through the RFC 9700
+    ``COMPLIANT_BCP_RFC9700_PKCE_METHOD`` gate when the authorization code
+    is minted, so the consent screen renders but approving it fails.
     """
 
-    def _grant(self):
-        from oauthlib.oauth2.rfc6749.grant_types.authorization_code import (
-            AuthorizationCodeGrant,
+    REDIRECT_URI = "https://mcp.example.com/callback"
+
+    @classmethod
+    def setUpTestData(cls) -> None:
+        cls.user = UserFactory()
+        cls.application = ApplicationFactory(
+            client_type=Application.CLIENT_PUBLIC,
+            redirect_uris=cls.REDIRECT_URI,
         )
 
-        return AuthorizationCodeGrant(request_validator=None)
+    def setUp(self) -> None:
+        super().setUp()
+        self.client.force_login(self.user)
 
-    def test_only_s256_registered(self):
-        from oauthlib.oauth2.rfc6749.grant_types.authorization_code import (
-            AuthorizationCodeGrant,
+    def _approve(self, code_challenge_method: str | None):
+        """Run the consent screen for a client using ``code_challenge_method``.
+
+        Returns the response to the approval POST. ``None`` omits the
+        parameter entirely.
+        """
+        verifier = "a" * 64
+        params = {
+            "response_type": "code",
+            "client_id": self.application.client_id,
+            "redirect_uri": self.REDIRECT_URI,
+            "scope": "api",
+            "state": "xyz",
+            "code_challenge": (
+                s256_challenge(verifier)
+                if code_challenge_method == "S256"
+                else verifier
+            ),
+        }
+        if code_challenge_method is not None:
+            params["code_challenge_method"] = code_challenge_method
+        url = reverse("oauth2_provider:authorize")
+        consent = self.client.get(url, params)
+        self.assertEqual(consent.status_code, 200, consent.content)
+        return self.client.post(url, {**params, "allow": "Authorize"})
+
+    def test_s256_is_accepted(self):
+        r = self._approve("S256")
+        self.assertEqual(r.status_code, 302)
+        self.assertIn("code=", r["Location"])
+        self.assertEqual(Grant.objects.count(), 1)
+
+    def test_weak_methods_are_rejected(self):
+        for method in ("plain", None):
+            with self.subTest(code_challenge_method=method):
+                r = self._approve(method)
+                self.assertEqual(r.status_code, 302)
+                self.assertTrue(r["Location"].startswith(self.REDIRECT_URI))
+                self.assertIn("error=invalid_request", r["Location"])
+                self.assertNotIn("code=", r["Location"])
+                self.assertEqual(Grant.objects.count(), 0)
+
+
+class AudienceBoundTokenTest(APITestCase):
+    """The REST API honors audience-bound tokens, whatever the audience.
+
+    ``RESOURCE_SERVER_TOKEN_RESOURCE_VALIDATOR`` is ``None`` so the MCP
+    server keeps working: the client binds its token to the MCP server's URL
+    and the MCP server forwards it here. This guards against the toolkit's
+    default validator being restored by accident.
+    """
+
+    @classmethod
+    def setUpTestData(cls) -> None:
+        cls.user = UserFactory()
+        cls.application = ApplicationFactory()
+
+    def _token(self, resource: list[str]) -> str:
+        raw = f"tok-{len(resource)}-{'-'.join(resource)}"
+        token = AccessToken(
+            user=self.user,
+            application=self.application,
+            scope="api",
+            expires=now() + timedelta(hours=1),
+            resource=resource,
         )
+        set_token_value(token, raw)
+        token.save()
+        return raw
 
-        self.assertEqual(
-            set(AuthorizationCodeGrant._code_challenge_methods),
-            {"S256"},
-        )
-
-    def test_plain_verification_rejected(self):
-        # With plain removed, oauthlib refuses to run the weak transform.
-        # In the actual HTTP flow this manifests as an
-        # UnsupportedCodeChallengeMethodError earlier in
-        # validate_authorization_request; here we drive the leaf
-        # function directly to prove the method isn't registered.
-        with self.assertRaises(NotImplementedError):
-            self._grant().validate_code_challenge("abc", "plain", "abc")
-
-    def test_s256_verification_still_works(self):
-        import base64
-        import hashlib
-
-        verifier = "abc"
-        challenge = (
-            base64.urlsafe_b64encode(
-                hashlib.sha256(verifier.encode()).digest()
-            )
-            .decode()
-            .rstrip("=")
-        )
-        self.assertTrue(
-            self._grant().validate_code_challenge(challenge, "S256", verifier)
-        )
+    def test_audiences(self):
+        url = reverse("alert-list", kwargs={"version": "v4"})
+        for label, resource in (
+            ("unrestricted", []),
+            ("hosted MCP server", ["https://mcp.courtlistener.com/"]),
+            ("self-hosted MCP server", ["https://mcp.example.org/"]),
+        ):
+            with self.subTest(label):
+                r = self.client.get(
+                    url, HTTP_AUTHORIZATION=f"Bearer {self._token(resource)}"
+                )
+                self.assertEqual(r.status_code, 200, r.content)
 
 
 class AuthorizeViewCSPTest(TestCase):
@@ -547,37 +624,6 @@ class UnconfirmedApplicationCleanupTest(TestCase):
         self.assertIn("no application", mock_logger.warning.call_args.args[0])
 
 
-class RefreshTokenLifetimeTest(SimpleTestCase):
-    """The cap the cleanup uses tracks the toolkit's own refresh window."""
-
-    def test_normalizes_supported_configurations(self):
-        """Both spellings of the window resolve, and an unset one is None."""
-        # django-oauth-toolkit accepts a timedelta or a number of seconds, and
-        # treats a falsy value as "never clear refresh tokens".
-        cases = [
-            (60 * 60 * 24 * 30, timedelta(days=30)),
-            (timedelta(days=30), timedelta(days=30)),
-            (None, None),
-            (0, None),
-        ]
-        for configured, expected in cases:
-            with self.subTest(configured=configured):
-                with override_settings(
-                    OAUTH2_PROVIDER={
-                        "REFRESH_TOKEN_EXPIRE_SECONDS": configured
-                    }
-                ):
-                    self.assertEqual(refresh_token_lifetime(), expected)
-
-    def test_rejects_an_unusable_window(self):
-        """An uninterpretable window fails before anything is deleted."""
-        with override_settings(
-            OAUTH2_PROVIDER={"REFRESH_TOKEN_EXPIRE_SECONDS": "30 days"}
-        ):
-            with self.assertRaises(ImproperlyConfigured):
-                refresh_token_lifetime()
-
-
 @override_settings(OAUTH_CLEANUP_UNCONFIRMED_APP_MIN_AGE_HOURS=24)
 class CleanupPassTest(TestCase):
     """A full pass deletes applications and then clears expired tokens."""
@@ -602,7 +648,7 @@ class CleanupPassTest(TestCase):
         mock_clear_expired.assert_not_called()
         self.assertTrue(Application.objects.filter(pk=self.stale.pk).exists())
 
-    @patch("cl.oauth.cleanup_utils.refresh_token_lifetime")
+    @patch("cl.oauth.cleanup_utils.refresh_token_expire_timedelta")
     def test_pass_caps_candidates_at_the_refresh_token_lifetime(
         self, mock_lifetime
     ):
@@ -648,3 +694,31 @@ class CleanOAuthTablesCommandTest(TestCase):
     def test_dry_run_deletes_nothing(self):
         call_command("clean_oauth_tables", "--dry-run")
         self.assertTrue(Application.objects.filter(pk=self.stale.pk).exists())
+
+
+class RegistrationSourceBackfillTest(TestCase):
+    """Our data migration labels pre-3.4 DCR applications as ``dcr``."""
+
+    def test_only_ownerless_consent_requiring_apps_are_relabeled(self):
+        manual = Application.RegistrationSource.MANUAL
+        dcr = ApplicationFactory(registration_source=manual)
+        owned = ApplicationFactory(
+            user=UserFactory(), registration_source=manual
+        )
+        in_house = ApplicationFactory(
+            skip_authorization=True, registration_source=manual
+        )
+        migration = importlib.import_module(
+            "cl.oauth.migrations.0001_backfill_registration_source"
+        )
+        migration.label_dcr_applications(
+            apps, SimpleNamespace(connection=connection)
+        )
+        for app, expected in (
+            (dcr, Application.RegistrationSource.DCR),
+            (owned, manual),
+            (in_house, manual),
+        ):
+            with self.subTest(app=app.name):
+                app.refresh_from_db()
+                self.assertEqual(app.registration_source, expected)

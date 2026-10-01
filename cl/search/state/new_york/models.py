@@ -1,6 +1,5 @@
 """Models unique to New York Court of Appeals (Court-PASS) dockets."""
 
-from pathlib import PurePosixPath
 from typing import Self
 
 import pghistory
@@ -21,27 +20,13 @@ from cl.search.state.shared import AbstractStateDocument
 
 __all__ = [
     "COURT_PASS_DOCUMENT_URL",
-    "RECAP_ROOT",
-    "RECAP_THUMBNAIL_ROOT",
-    "SHA256_NAME_LENGTH",
     "NYCoADocketEntry",
     "NYCoADocketIssue",
     "NYCoADocketMetadata",
     "NYCoADocument",
 ]
 
-RECAP_ROOT = "recap"
-"""The directory RECAP files a case's documents under, which Court-PASS
-documents share so that state and PACER documents are addressed alike. See
-`NYCoADocument.get_pdf_path`."""
-
-RECAP_THUMBNAIL_ROOT = "recap-thumbnails"
-"""The `RECAP_ROOT` sibling thumbnails go in, so a thumbnail cannot collide
-with the document it was generated from."""
-
 COURT_PASS_DOCUMENT_URL = "https://courtpass.nycourts.gov/Docket"
-
-SHA256_NAME_LENGTH = 16
 
 
 @pghistory.track()
@@ -310,68 +295,6 @@ class NYCoADocument(AbstractDateTimeModel, AbstractStateDocument):
                 f"got {value!r}"
             )
 
-    def bucket(self) -> str:
-        """The name this document's case is filed under.
-
-        Named the way RECAP names a PACER case, so that a state document sits
-        somewhere a reader of RECAP paths already knows how to read: the court
-        the case is in, then the case itself. RECAP has PACER's own case id to
-        put last and Court-PASS has no equivalent, so the Court's docket number
-        stands there instead.
-
-        :return: The bucket, which is both the directory a case's documents
-            are filed in and the prefix each of their names carries.
-        """
-        docket = self.docket_entry.docket
-        return f"gov.uscourts.{docket.court_id}.{docket.docket_number}"
-
-    def make_filename(self) -> str:
-        """The name to store this document's content under.
-
-        Overridden because the base implementation derives the name from
-        `url`, which is one shared POST endpoint for all of Court-PASS and so
-        would name every document identically.
-
-        The name is the case's `bucket`, then the name the scraper stored the
-        file under, then a prefix of `sha256`, dot-separated the way RECAP
-        separates a document's number from its attachment's. The scraper's
-        name stands where RECAP puts those numbers because Court-PASS numbers
-        neither its filings nor the files within one; the scraper's name is
-        unique to the file and stable across scrapes, which is what the path
-        actually needs of it.
-
-        The scraper prefixes the docket number to every name it stores, and
-        `bucket` has just stated it, so that prefix comes back off rather than
-        being said twice. It is dropped only when it is actually there, which
-        leaves a file the scraper named some other way whole and still
-        distinct.
-
-        The hash is what keeps a corrected file from being published on top of
-        the one it replaces. Court-PASS reissues a document under the name it
-        first used, so every other part of this name would be unchanged by the
-        correction, and the merge would find the document already published
-        there and leave the superseded copy in place. Naming by content
-        instead means replacing the file renames it, which the merge sees as a
-        file to publish and `NYCoADocketMerger` sees as a published file
-        nothing points at any more, so the old copy is withdrawn as the new
-        one lands. A prefix rather than the whole digest, because it only has
-        to separate one document's revisions from each other rather than name
-        a file globally.
-
-        Every part is joined with dots and none may contain one, which holds
-        because the scraper slugifies the name it stores a file under.
-
-        :return: The base name of the stored path with file type suffix.
-        """
-        stored = PurePosixPath(self.filepath_local.name or "")
-        docket_number = self.docket_entry.docket.docket_number
-        parts = (
-            self.bucket(),
-            stored.stem.removeprefix(f"{docket_number}_"),
-            self.sha256[:SHA256_NAME_LENGTH],
-        )
-        return f"{'.'.join(part for part in parts if part)}{stored.suffix}"
-
     @classmethod
     def tmp_prefix(cls) -> str:
         """Prefix for temporary download files."""
@@ -416,21 +339,3 @@ class NYCoADocument(AbstractDateTimeModel, AbstractStateDocument):
                 name="unique_nycoa_file_name_per_docket_entry",
             )
         ]
-
-    def get_pdf_path(self, filename: str, thumbs: bool = False) -> str:
-        """Store Court-PASS documents under the RECAP bucket layout.
-
-        Deliberately not `state_pdf_path`, which the other states use: that
-        layout files a whole court's documents in one flat directory under a
-        slugified name, and slugifying would flatten the dots this name is
-        built out of. Following RECAP instead keeps state documents addressed
-        the same way PACER documents are, a case to a directory; see `bucket`.
-
-        :param filename: The name to file the document under, which for
-            Court-PASS is `make_filename`'s.
-        :param thumbs: Whether to return the thumbnail path instead.
-        :return: The path to store the document at, relative to the bucket
-            root.
-        """
-        root = RECAP_THUMBNAIL_ROOT if thumbs else RECAP_ROOT
-        return str(PurePosixPath(root) / self.bucket() / filename)

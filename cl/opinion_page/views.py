@@ -11,8 +11,14 @@ import waffle
 from asgiref.sync import async_to_sync, sync_to_async
 from django.contrib import messages
 from django.contrib.auth.decorators import login_required
+from django.contrib.auth.models import AnonymousUser, User
 from django.core.exceptions import ObjectDoesNotExist, PermissionDenied
-from django.core.paginator import EmptyPage, PageNotAnInteger, Paginator
+from django.core.paginator import (
+    EmptyPage,
+    Page,
+    PageNotAnInteger,
+    Paginator,
+)
 from django.db.models import Prefetch, QuerySet
 from django.http import (
     HttpRequest,
@@ -24,7 +30,7 @@ from django.http.response import (
     HttpResponseBadRequest,
     HttpResponseNotAllowed,
 )
-from django.shortcuts import (  # type: ignore[attr-defined]
+from django.shortcuts import (
     aget_object_or_404,
     render,
 )
@@ -51,8 +57,7 @@ from cl.citations.utils import (
 )
 from cl.custom_filters.templatetags.text_filters import best_case_name
 from cl.favorites.decorators import track_view_counter
-from cl.favorites.forms import NoteForm
-from cl.favorites.models import Note
+from cl.favorites.forms import get_note_form_for
 from cl.favorites.utils import (
     get_existing_prayers_in_bulk,
     get_prayer_counts_in_bulk,
@@ -63,7 +68,10 @@ from cl.lib.decorators import cache_page_ignore_params
 from cl.lib.http import is_ajax
 from cl.lib.model_helpers import choices_to_csv
 from cl.lib.models import THUMBNAIL_STATUSES
-from cl.lib.ratelimiter import ratelimiter_all_10_per_h
+from cl.lib.ratelimiter import (
+    ratelimit_deny_list,
+    ratelimiter_all_10_per_h,
+)
 from cl.lib.search_utils import do_es_search, make_get_string
 from cl.lib.string_utils import trunc
 from cl.lib.thumbnails import make_png_thumbnail_for_instance
@@ -72,6 +80,7 @@ from cl.lib.utils import human_sort
 from cl.opinion_page import docket_entry_sources
 from cl.opinion_page.decorators import handle_cluster_redirection
 from cl.opinion_page.docket_entry_sources import (
+    SourceDocketEntry,
     attach_display_fields,
     document_url,
 )
@@ -94,7 +103,12 @@ from cl.opinion_page.utils import (
     es_related_case_count,
     generate_docket_entries_csv_data,
 )
-from cl.people_db.models import AttorneyOrganization, CriminalCount, Role
+from cl.people_db.models import (
+    AttorneyOrganization,
+    CriminalCount,
+    PartyType,
+    Role,
+)
 from cl.recap.constants import COURT_TIMEZONES
 from cl.recap.models import FjcIntegratedDatabase
 from cl.search.models import (
@@ -111,7 +125,9 @@ from cl.search.models import (
 )
 from cl.search.selectors import get_clusters_from_citation_str
 
-HYPERSCAN_TOKENIZER = HyperscanTokenizer(cache_dir=".hyperscan")
+HYPERSCAN_TOKENIZER: HyperscanTokenizer = HyperscanTokenizer(
+    cache_dir=".hyperscan"
+)
 
 
 async def court_homepage(request: HttpRequest, pk: str) -> HttpResponse:
@@ -164,13 +180,13 @@ async def court_homepage(request: HttpRequest, pk: str) -> HttpResponse:
 
         mutable_GET = request.GET.copy()
         # Do es search
-        mutable_GET.update(
+        mutable_GET.update(  # type:ignore[no-matching-overload] This is a correct usage for QueryDict.update, but pyrefly thinks we're using MutableMapping.update
             {
                 "order_by": "dateFiled desc",
                 "type": SEARCH_TYPES.OPINION,
                 "court": court,
                 "filed_after": (
-                    datetime.datetime.today() - datetime.timedelta(days=28)  # type: ignore
+                    datetime.datetime.today() - datetime.timedelta(days=28)
                 ),
             }
         )
@@ -218,9 +234,11 @@ async def court_publish_page(request: HttpRequest, pk: str) -> HttpResponse:
             "Mississippi Supreme Court and Mississippi Court of Appeals."
         )
     # Validate the user has permission
-    user = await request.auser()
-    if not user.is_staff and not user.is_superuser:  # type: ignore[union-attr]
-        if not await user.groups.filter(  # type: ignore
+    # auser() is typed as AbstractBaseUser | AnonymousUser; the default user
+    # model makes this exact.
+    user = cast(User | AnonymousUser, await request.auser())
+    if not user.is_staff and not user.is_superuser:
+        if not await user.groups.filter(
             name__in=[f"uploaders_{pk}"]
         ).aexists():
             raise PermissionDenied(
@@ -332,7 +350,9 @@ async def redirect_docket_recap(
     )
 
 
-async def fetch_docket_entries(docket):
+async def fetch_docket_entries(
+    docket: Docket,
+) -> QuerySet[SourceDocketEntry]:
     """Fetch docket entries associated with a docket.
 
     Uses the source-appropriate model for the docket's court (see
@@ -346,6 +366,7 @@ async def fetch_docket_entries(docket):
 
 
 @track_view_counter(tracks="docket", label_format="d.%s:view")
+@ratelimit_deny_list
 async def view_docket(
     request: HttpRequest, pk: int, slug: str
 ) -> HttpResponse:
@@ -381,8 +402,10 @@ async def view_docket(
     page = request.GET.get("page", "1")
 
     @sync_to_async
-    def paginate_docket_entries(docket_entries, docket_page):
-        return Paginator(docket_entries, 200, orphans=10).get_page(docket_page)
+    def paginate_docket_entries(
+        docket_entries: QuerySet[SourceDocketEntry], docket_page: str
+    ) -> Page:
+        return Paginator(docket_entries, 100, orphans=10).get_page(docket_page)
 
     paginated_entries = await paginate_docket_entries(de_list, page)
 
@@ -411,7 +434,7 @@ async def view_docket(
         if user.is_authenticated:
             # Check prayer existence in bulk.
             existing_prayers = await get_existing_prayers_in_bulk(
-                user, page_documents
+                cast(User, user), page_documents
             )
 
         # Merge counts and existing prayer status onto the documents.
@@ -446,6 +469,7 @@ async def view_docket_feed(
     return await sync_to_async(DocketFeed())(request, docket_id=docket_id)
 
 
+@ratelimit_deny_list
 async def view_parties(
     request: HttpRequest,
     docket_id: int,
@@ -487,7 +511,9 @@ async def view_parties(
     )
 
     @sync_to_async
-    def paginate_parties(party_queryset, parties_page):
+    def paginate_parties(
+        party_queryset: QuerySet[PartyType], parties_page: int | str
+    ) -> Page:
         paginator = Paginator(party_queryset, 1000)
         try:
             return paginator.page(parties_page)
@@ -498,7 +524,11 @@ async def view_parties(
 
     party_types_paginator = await paginate_parties(party_types, page)
     parties: dict[str, list] = {}
-    async for party_type in party_types_paginator.object_list:
+    # Page.object_list is typed as _SupportsPagination, but here it is the
+    # sliced QuerySet, which supports async iteration.
+    async for party_type in cast(
+        QuerySet[PartyType], party_types_paginator.object_list
+    ):
         if party_type.name not in parties:
             parties[party_type.name] = []
         parties[party_type.name].append(party_type)
@@ -513,6 +543,7 @@ async def view_parties(
     return TemplateResponse(request, "docket_parties.html", context)
 
 
+@ratelimit_deny_list
 async def docket_idb_data(
     request: HttpRequest,
     docket_id: int,
@@ -552,6 +583,7 @@ async def docket_idb_data(
     return TemplateResponse(request, "docket_idb_data.html", context)
 
 
+@ratelimit_deny_list
 async def docket_authorities(
     request: HttpRequest,
     docket_id: int,
@@ -626,10 +658,11 @@ def download_docket_entries_csv(
     return response
 
 
+@ratelimit_deny_list
 async def view_recap_document(
     request: HttpRequest,
-    docket_id: int | None = None,
-    doc_num: str | None = None,
+    docket_id: int,
+    doc_num: str,
     att_num: int | None = None,
     slug: str = "",
     is_og_bot: bool = False,
@@ -650,8 +683,8 @@ async def view_recap_document(
 
 async def view_recap_authorities(
     request: HttpRequest,
-    docket_id: int | None = None,
-    doc_num: str | None = None,
+    docket_id: int,
+    doc_num: str,
     att_num: int | None = None,
     slug: str = "",
     is_og_bot: bool = False,
@@ -678,8 +711,8 @@ async def view_recap_authorities(
 
 async def recap_document_context(
     request: HttpRequest,
-    docket_id: int | None = None,
-    doc_num: str | None = None,
+    docket_id: int,
+    doc_num: str,
     att_num: int | None = None,
     slug: str = "",
     is_og_bot: bool = False,
@@ -704,8 +737,8 @@ async def recap_document_context(
         rd_values = [
             x
             async for x in source.documents_for_docket_and_number(
-                docket_id,  # type: ignore[arg-type]
-                doc_num,  # type: ignore[arg-type]
+                docket_id,
+                doc_num,
             )
             .order_by("pk")
             .values_list("pk", "attachment_number", "description")
@@ -735,9 +768,9 @@ async def recap_document_context(
             # Get the URL to the attachment page and use the querystring
             # if the request included one
             attachment_page = document_url(
-                docket_id,  # type: ignore[arg-type]
+                docket_id,
                 slug,
-                doc_num,  # type: ignore[arg-type]
+                doc_num,
                 1,
             )
             if request.GET.urlencode():
@@ -776,21 +809,11 @@ async def recap_document_context(
         )
         await rd.arefresh_from_db(fields=["thumbnail_status", "thumbnail"])
 
-    try:
-        note = await Note.objects.aget(
-            recap_doc_id=rd.pk,
-            user=await request.auser(),  # type: ignore[attr-defined]
-        )
-    except (ObjectDoesNotExist, TypeError):
-        # Not saved in notes or anonymous user
-        note_form = NoteForm(
-            initial={
-                "recap_doc_id": rd.pk,
-                "name": trunc(title, 100, ellipsis="..."),
-            }
-        )
-    else:
-        note_form = NoteForm(instance=note)
+    note_form = await get_note_form_for(
+        rd,
+        await request.auser(),  # type: ignore[attr-defined]
+        trunc(title, 100, ellipsis="..."),
+    )
 
     # Override the og:url if we're serving a request to an OG crawler bot
     og_file_path_override = f"/{rd.filepath_local}" if is_og_bot else None
@@ -802,11 +825,13 @@ async def recap_document_context(
         user = await request.auser()
         if user.is_authenticated:
             # Check prayer existence.
-            existing_prayers = await get_existing_prayers_in_bulk(user, [rd])
+            existing_prayers = await get_existing_prayers_in_bulk(
+                cast(User, user), [rd]
+            )
 
     # Merge counts and existing prayer status to RECAPDocuments.
-    rd.prayer_count = prayer_counts.get(rd.id, 0)  # type: ignore[attr-defined]
-    rd.prayer_exists = existing_prayers.get(rd.id, False)  # type: ignore[attr-defined]
+    rd.prayer_count = prayer_counts.get(rd.id, 0)
+    rd.prayer_exists = existing_prayers.get(rd.id, False)
 
     court_id = docket.court_id
 
@@ -816,9 +841,9 @@ async def recap_document_context(
     attachments = get_attachment_values(
         rd,
         rd_values,
-        docket_id,  # type: ignore[arg-type]
+        docket_id,
         docket.slug,
-        doc_num,  # type: ignore[arg-type]
+        doc_num,
     )
 
     return TemplateResponse(
@@ -855,7 +880,7 @@ def get_attachment_values(
     max_displayed = 20
     # How many of those should be previous docs
     max_before = 3  # includes current doc
-    attachments = []
+    attachments: list[dict[str, str | int | None]] = []
     if (doc_len := len(rd_values)) > 1:
         if doc_len <= max_displayed + 2:
             # Add two because there is no point having summaries like "plus one
@@ -874,7 +899,7 @@ def get_attachment_values(
                 max_before -= under_max  # under_max is negative
             if rd_index - max_before <= 1:
                 start = 0
-            elif rd_index > max_before:
+            else:
                 # Add a description-only with the number of additional
                 # documents before
                 attachments.append(
@@ -892,7 +917,7 @@ def get_attachment_values(
         for rdv in rd_values[start:end]:
             attachments.append(
                 {
-                    "attachment_number": rdv[1],  # type: ignore[dict-item]
+                    "attachment_number": rdv[1],
                     "url": document_url(docket_id, slug, doc_num, rdv[1]),
                     "description": rdv[2],
                 }
@@ -906,7 +931,7 @@ def get_attachment_values(
                     "description": f"...and {doc_len - end} more",
                 }
             )
-    return attachments  # type: ignore[return-value]
+    return attachments
 
 
 async def get_downloads_context(cluster: OpinionCluster) -> dict[str, Any]:
@@ -980,22 +1005,11 @@ async def setup_opinion_context(
 
     get_string = make_get_string(request)
 
-    try:
-        note = await Note.objects.aget(
-            cluster_id=cluster.pk,
-            user=await request.auser(),  # type: ignore[attr-defined]
-            # type: ignore[attr-defined]
-        )
-    except (ObjectDoesNotExist, TypeError):
-        # Not note or anonymous user
-        note_form = NoteForm(
-            initial={
-                "cluster_id": cluster.pk,
-                "name": trunc(best_case_name(cluster), 100, ellipsis="..."),
-            }
-        )
-    else:
-        note_form = NoteForm(instance=note)
+    note_form = await get_note_form_for(
+        cluster,
+        await request.auser(),  # type: ignore[attr-defined]
+        trunc(best_case_name(cluster), 100, ellipsis="..."),
+    )
 
     # Identify opinions updated/added in partnership with v|lex for 3 years
     three_years_ago = (
@@ -1027,7 +1041,9 @@ async def setup_opinion_context(
     return context
 
 
-async def get_opinions_queryset(sub_opinions_prefetch: str) -> QuerySet:
+async def get_opinions_queryset(
+    sub_opinions_prefetch: str,
+) -> QuerySet[OpinionCluster]:
     """Prepare a cluster queryset with common prefetchs to prevent extra
     queries
 
@@ -1050,7 +1066,7 @@ async def get_opinions_queryset(sub_opinions_prefetch: str) -> QuerySet:
             ),
         )
     else:
-        prefetch = Prefetch(sub_opinions_prefetch)  # type: ignore[arg-type]
+        prefetch = Prefetch(sub_opinions_prefetch)
 
     return OpinionCluster.objects.prefetch_related(
         prefetch, "citations"
@@ -1083,7 +1099,7 @@ async def render_opinion_view(
     )
 
 
-async def update_opinion_tabs(request: HttpRequest, pk: int):
+async def update_opinion_tabs(request: HttpRequest, pk: int) -> HttpResponse:
     """Generate opinions tab dinamically
 
     :param request: The HTTP request from the user
@@ -1155,6 +1171,7 @@ async def update_opinion_tabs(request: HttpRequest, pk: int):
 @never_cache
 @handle_cluster_redirection
 @track_view_counter(tracks="cluster", label_format="o.%s:view")
+@ratelimit_deny_list
 async def view_opinion(request: HttpRequest, pk: int, _: str) -> HttpResponse:
     """View Opinions
 
@@ -1170,6 +1187,7 @@ async def view_opinion(request: HttpRequest, pk: int, _: str) -> HttpResponse:
 
 
 @handle_cluster_redirection
+@ratelimit_deny_list
 async def view_opinion_pdf(
     request: HttpRequest, pk: int, _: str
 ) -> HttpResponse:
@@ -1187,6 +1205,7 @@ async def view_opinion_pdf(
 
 
 @handle_cluster_redirection
+@ratelimit_deny_list
 async def view_opinion_authorities(
     request: HttpRequest, pk: int, _: str
 ) -> HttpResponse:
@@ -1211,6 +1230,7 @@ async def view_opinion_authorities(
 
 
 @handle_cluster_redirection
+@ratelimit_deny_list
 async def view_opinion_cited_by(
     request: HttpRequest, pk: int, _: str
 ) -> HttpResponse:
@@ -1235,6 +1255,7 @@ async def view_opinion_cited_by(
 
 
 @handle_cluster_redirection
+@ratelimit_deny_list
 async def view_opinion_summaries(
     request: HttpRequest, pk: int, _: str
 ) -> HttpResponse:
@@ -1274,6 +1295,7 @@ async def view_opinion_summaries(
 
 
 @handle_cluster_redirection
+@ratelimit_deny_list
 async def view_opinion_related_cases(
     request: HttpRequest, pk: int, _: str
 ) -> HttpResponse:
@@ -1430,7 +1452,9 @@ async def reporter_or_volume_handler(
     page = request.GET.get("page", 1)
 
     @sync_to_async
-    def paginate_volumes(volumes, volume_page):
+    def paginate_volumes(
+        volumes: QuerySet[OpinionCluster], volume_page: int | str
+    ) -> Page:
         paginator = Paginator(volumes, 100, orphans=10)
         try:
             return paginator.page(volume_page)
@@ -1690,7 +1714,7 @@ async def citation_homepage(request: HttpRequest) -> HttpResponse:
                 )
             citation_groups = case_law_citations[0].groups
             citation_dict = {
-                "reporter": citation_groups.get("reporter"),
+                "reporter": cast(str, citation_groups.get("reporter")),
                 "volume": citation_groups.get("volume", None),
                 "page": citation_groups.get("page", None),
             }
@@ -1728,7 +1752,9 @@ async def block_item(request: HttpRequest) -> HttpResponse:
             permitted_methods=["POST"], content="Not an ajax request"
         )
 
-    user = await request.auser()  # type: ignore[attr-defined]
+    # auser() is typed as AbstractBaseUser | AnonymousUser; the default user
+    # model makes this exact.
+    user = cast(User | AnonymousUser, await request.auser())
     obj_type = request.POST["type"]
     pk = request.POST["id"]
 
@@ -1737,14 +1763,14 @@ async def block_item(request: HttpRequest) -> HttpResponse:
             "This view can not handle the provided type"
         )
 
-    has_change_docket = await sync_to_async(user.has_perm)(  # type: ignore[union-attr]
+    has_change_docket = await sync_to_async(user.has_perm)(
         "search.change_docket"
     )
     if not has_change_docket:
         raise PermissionDenied("You lack permission to block this item.")
 
     if obj_type == "cluster":
-        has_change_cluster = await sync_to_async(user.has_perm)(  # type: ignore[union-attr]
+        has_change_cluster = await sync_to_async(user.has_perm)(
             "search.change_opinioncluster"
         )
         if not has_change_cluster:

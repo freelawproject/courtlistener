@@ -791,7 +791,12 @@ def run_checks(
     repo_root: Path,
     file_statuses: dict[str, str],
 ) -> list[Finding]:
-    """Run all applicable checks on the given files."""
+    """Run all applicable checks on the given files.
+
+    ``changed_files`` is the subset of the diff to lint (HTML and input.css);
+    ``file_statuses`` maps every path in the diff to its git status, so checks
+    that depend on non-frontend files must look there.
+    """
     findings: list[Finding] = []
 
     # Collect v2_ templates changed in this PR (for sync notice check)
@@ -801,7 +806,8 @@ def run_checks(
     components_library_modified = any(
         f.endswith("v2_components.html") for f in changed_files
     )
-    v2_register_test_modified = V2_REGISTER_TEST_FILE in changed_files
+    # The register test is a Python file, so it is never in changed_files.
+    v2_register_test_modified = V2_REGISTER_TEST_FILE in file_statuses
 
     for filepath in changed_files:
         abs_path = repo_root / filepath
@@ -913,6 +919,28 @@ def run_checks(
                 f"Legacy template with sync notice was modified but "
                 f"v2_ counterpart ({v2_path}) was not — ensure both "
                 f"templates stay in sync",
+            )
+        )
+
+    # Deletion check: IncrementalNewTemplateMiddleware serves a v2_ template
+    # to everyone once its legacy counterpart is gone, so deleting the legacy
+    # file is a release, not a cleanup. Warning-level because v2-only pages
+    # can be intentional.
+    for legacy_path in changed_legacy_templates:
+        if file_statuses.get(legacy_path) != "D":
+            continue
+        v2_path = _swap_template_prefix(legacy_path, add_v2=True)
+        if v2_path is None or not (repo_root / v2_path).is_file():
+            continue
+        findings.append(
+            Finding(
+                legacy_path,
+                1,
+                "check_legacy_template_deleted",
+                WARN,
+                f"Legacy template deleted but its v2_ counterpart ({v2_path}) "
+                "exists; deleting it makes the v2 page live for everyone. "
+                "Confirm if this is intentional.",
             )
         )
 
