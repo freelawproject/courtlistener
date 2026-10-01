@@ -98,11 +98,26 @@ class ProxyPacerSession(PacerSession):
             "http": self.proxy_address,
         }
         self.headers["X-WhSentry-TLS"] = "true"
-        # Re-add every cookie through InsecureCookieJar so both the provided
-        # cookies and any set by later responses can be sent over the proxy.
-        jar = InsecureCookieJar()
-        jar.update(self.cookies)
-        self.cookies = jar
+
+    @property
+    def cookies(self) -> InsecureCookieJar:
+        """The session's cookie jar, always an InsecureCookieJar."""
+        return self._cookies
+
+    @cookies.setter
+    def cookies(self, jar: RequestsCookieJar) -> None:
+        """Store `jar` as an InsecureCookieJar, copying it if needed.
+
+        requests, juriscraper's PacerSession.__init__ and PacerSession.login()
+        all replace the jar wholesale with a plain RequestsCookieJar. Wrapping
+        on every assignment keeps cookies that PACER later refreshes with the
+        Secure flag sendable over the proxy.
+        """
+        if not isinstance(jar, InsecureCookieJar):
+            insecure = InsecureCookieJar()
+            insecure.update(jar)
+            jar = insecure
+        self._cookies = jar
 
     def send(self, request, **kwargs):
         """Send a given PreparedRequest."""

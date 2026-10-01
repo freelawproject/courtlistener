@@ -316,6 +316,30 @@ class TestPacerSessionUtils(TestCase):
         )
         self.assertIn("NextGenCSO=refreshed", request.headers["Cookie"])
 
+    @patch.object(ProxyPacerSession, "_prepare_login_request")
+    def test_proxy_session_keeps_insecure_jar_after_login(
+        self, mock_login_request
+    ):
+        """Does login() keep the InsecureCookieJar it replaces?"""
+        mock_login_request.return_value = MagicMock(
+            status_code=HTTPStatus.OK,
+            json=lambda: {"loginResult": "0", "nextGenCSO": "token"},
+        )
+        session = ProxyPacerSession(
+            username="test", password="password", proxy="http://proxy_1:9090"
+        )
+        # juriscraper's login() assigns a brand-new plain RequestsCookieJar.
+        session.login()
+        self.assertIs(type(session.cookies), InsecureCookieJar)
+
+        session.cookies.set(
+            "NextGenCSO", "refreshed", domain=".uscourts.gov", secure=True
+        )
+        request = session.prepare_request(
+            Request("POST", "http://ecf.miwd.uscourts.gov/doc1/1")
+        )
+        self.assertIn("NextGenCSO=refreshed", request.headers["Cookie"])
+
     def test_session_data_pickles_without_project_classes(self):
         """Does SessionData pickle without referencing InsecureCookieJar?"""
         jar = InsecureCookieJar()
