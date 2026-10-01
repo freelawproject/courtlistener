@@ -31,7 +31,7 @@ dependencies = [
   "certifi>=2026.7.22",
   "courts-db",
   "disposable-email-domains",
-  "Django>=6.0.8, <6.1",
+  "Django>=6.1.1, <6.2",
   "django-cache-memoize",
   "django-cors-headers>=4.9.0",
   "django-extensions>=4.1",
