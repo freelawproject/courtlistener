@@ -31,7 +31,7 @@ dependencies = [
   "certifi>=2026.7.22",
   "courts-db",
   "disposable-email-domains",
-  "Django>=6.1.1, <6.2",
+  "Django>=6.0.8, <6.1",
   "django-cache-memoize",
   "django-cors-headers>=4.9.0",
   "django-extensions>=4.1",
@@ -114,7 +114,7 @@ dependencies = [
   "instructor>=1.17.0",
   "django-s3-express-cache>=0.2.0",
   "zohocrmsdk8-0==7.0.0",
-  "django-prometheus>=2.6.0.dev22",
+  "django-prometheus>=2.5.0",
   "google-genai>=2.25.0",
   "django-oauth-toolkit==3.4.1",
 ]
