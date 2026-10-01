@@ -6,12 +6,14 @@ document.addEventListener('alpine:init', () => {
       }
       return this.$el.dataset.itemClass;
     },
-    openDialog(event) {
-      // Close the menu first so focus returns to the trigger before the
-      // dialog traps it; on dialog close, focus then lands on a visible element.
-      const dialogName = event.currentTarget.dataset.dialog;
+    /**
+     * Closes the menu and focuses its trigger synchronously.
+     * The plugin's `__close` focuses the trigger on the next tick, too late
+     * when a focus trap (e.g. a dialog) may activate before then.
+     */
+    closeAndFocusTrigger() {
       this.$data.__close();
-      this.$nextTick(() => this.$dispatch(dialogName));
+      this.$refs.__button.focus();
     },
   }));
 });

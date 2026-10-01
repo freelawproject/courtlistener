@@ -1,5 +1,10 @@
 {% load component_tags extras humanize svg_tags text_filters tz %}
 {% require_script "js/alpine/components/docket_page.js" %}
+{# Dialog dependencies loaded for quota limit reached warning #}
+{% require_script "js/alpine/composables/utils.js" %}
+{% require_script "js/alpine/composables/dialog.js" %}
+{% require_script "js/alpine/plugins/focus" defer=True %}
+{% require_script "js/alpine/plugins/ui" defer=True %}
 
 <c-vars
   docket=""
@@ -70,35 +75,26 @@
     </c-slot>
     <c-slot name="menu_content">
       {% if user.is_authenticated %}
-        {% if has_alert or user.profile.can_make_another_alert %}
-          <c-menu-button.item
-            tag="button"
-            hx-post="{% url 'toggle_docket_alert' %}"
-            hx-vals='{"id": "{{ docket.pk }}"}'
-            hx-headers='{"X-CSRFToken": "{{ csrf_token }}"}'
-            hx-swap="none"
-            hx-disabled-elt="this"
-          >
-            <span id="docket-alert-toggle-{{ docket.pk }}" class="contents">
-              {% if has_alert %}
-                {% svg "bell_slash" class="w-4 h-4 text-greyscale-500" aria_hidden="true" %}
-                Disable Alerts
-              {% else %}
-                {% svg "bell" class="w-4 h-4 text-greyscale-500" aria_hidden="true" %}
-                Get Alerts
-              {% endif %}
-            </span>
-          </c-menu-button.item>
-        {% else %}
-          <c-menu-button.item
-            tag="button"
-            icon="bell"
-            icon_class="w-4 h-4 text-greyscale-500"
-            disabled
-          >
-            Get Alerts
-          </c-menu-button.item>
-        {% endif %}
+        {# If quota limit is reached, hx response puts an initially_open c-dialog into element id 'docket-alert-quota-dialog-{{ docket.pk }}' #}
+        <c-menu-button.item
+          tag="button"
+          hx-post="{% url 'toggle_docket_alert' %}"
+          hx-vals='{"id": "{{ docket.pk }}"}'
+          hx-headers='{"X-CSRFToken": "{{ csrf_token }}"}'
+          hx-swap="none"
+          hx-disabled-elt="this"
+          x-on:docket-alert-quota-reached="closeAndFocusTrigger"
+        >
+          <span id="docket-alert-toggle-{{ docket.pk }}" class="contents">
+            {% if has_alert %}
+              {% svg "bell_slash" class="w-4 h-4 text-greyscale-500" aria_hidden="true" %}
+              Disable Alerts
+            {% else %}
+              {% svg "bell" class="w-4 h-4 text-greyscale-500" aria_hidden="true" %}
+              Get Alerts
+            {% endif %}
+          </span>
+        </c-menu-button.item>
       {% else %}
         <c-menu-button.item
           href="{% url 'sign-in' %}?next={{ request.get_full_path|urlencode }}"
@@ -139,6 +135,10 @@
   {% endif %}
   <c-docket-source-button :docket="docket" :docket_source="docket_source" />
 </div>
+{% if docket_source_url and user.is_authenticated %}
+  {# HX OOB Swap target: a refused toggle replaces this with the quota dialog. #}
+  <div id="docket-alert-quota-dialog-{{ docket.pk }}"></div>
+{% endif %}
 
 {# A section with no items renders nothing. #}
 {% for section in metadata_sections %}
