@@ -223,9 +223,9 @@ def _toggle_docket_alert_htmx(
 
     A user at their quota is refused a new or re-enabled subscription. The
     refusal is still a 200: htmx does not swap error responses, and the
-    fragment carries the quota dialog, which the page shows in place of the
-    status message. The `HX-Trigger` header lets the menu close before the
-    dialog takes focus.
+    fragment carries the quota dialog alongside the status message, which
+    remains the fallback if the dialog cannot be placed. The `HX-Trigger`
+    header lets the menu close before the dialog takes focus.
     """
     if request.method != "POST":
         return HttpResponseNotAllowed(permitted_methods={"POST"})
@@ -245,6 +245,7 @@ def _toggle_docket_alert_htmx(
             user=request.user, docket=docket
         ).first()
         quota_reached = False
+        subscription_count = 0
         headers = {}
         if alert and alert.alert_type == DocketAlert.SUBSCRIPTION:
             alert.alert_type = DocketAlert.UNSUBSCRIPTION
@@ -254,7 +255,10 @@ def _toggle_docket_alert_htmx(
         elif not profile.can_make_another_alert:
             has_alert = False
             quota_reached = True
-            message = ""
+            subscription_count = DocketAlert.objects.filter(
+                user=request.user, alert_type=DocketAlert.SUBSCRIPTION
+            ).count()
+            message = "You have reached your docket alert limit."
             headers["HX-Trigger"] = "docket-alert-quota-reached"
         else:
             if alert:
@@ -272,6 +276,7 @@ def _toggle_docket_alert_htmx(
             "has_alert": has_alert,
             "message": message,
             "quota_reached": quota_reached,
+            "subscription_count": subscription_count,
         },
         headers=headers,
     )

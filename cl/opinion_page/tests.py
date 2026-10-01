@@ -4020,7 +4020,9 @@ class DocketAlertToggleV2Test(TestCase):
         self.assertFalse(r.context["has_alert"])
         self.assertIn("hx-post", self.menu(r.content.decode()))
 
-    async def test_quota_dialog_placeholder_matches_the_fragment(self) -> None:
+    async def test_quota_dialog_placeholder_and_scripts_are_on_the_page(
+        self,
+    ) -> None:
         """The page holds the empty swap target the refusal fragment replaces.
 
         The dialog's scripts must come from the page too: a fragment cannot
@@ -4030,17 +4032,16 @@ class DocketAlertToggleV2Test(TestCase):
         r = await self.page()
         page = r.content.decode()
         self.assertIn(self.dialog_id(), page)
-        self.assertIn("js/alpine/composables/dialog.js", page)
-        fragment = await sync_to_async(render_to_string)(
-            self.FRAGMENT,
-            {
-                "docket": self.docket,
-                "has_alert": False,
-                "message": "",
-                "quota_reached": True,
-            },
-        )
-        self.assertIn(f'{self.dialog_id()} hx-swap-oob="outerHTML"', fragment)
+        # Plugins are required without an extension, so the page carries
+        # either the .js or the .min.js build depending on DEBUG.
+        for script in (
+            "js/alpine/composables/utils.js",
+            "js/alpine/composables/dialog.js",
+            "js/alpine/plugins/focus",
+            "js/alpine/plugins/ui",
+        ):
+            with self.subTest(script=script):
+                self.assertIn(script, page)
 
     async def test_trigger_has_no_aria_label(self) -> None:
         """The visible label is the trigger's accessible name.

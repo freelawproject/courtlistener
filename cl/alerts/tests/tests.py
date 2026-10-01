@@ -3202,6 +3202,9 @@ class ToggleDocketAlertHtmxTest(TestCase):
         self.assertEqual(self.subscriptions(), 0)
         self.assertFalse(r.context["has_alert"])
         self.assertTrue(r.context["quota_reached"])
+        self.assertEqual(r.context["subscription_count"], 0)
+        self.assertEqual(r.context["MAX_FREE_DOCKET_ALERTS"], 0)
+        self.assertIn("DOCKET_ALERT_RECAP_BONUS", r.context)
         self.assertEqual(r["HX-Trigger"], "docket-alert-quota-reached")
         self.assertContains(r, f'{self.dialog_id()} hx-swap-oob="outerHTML"')
 
@@ -3213,6 +3216,16 @@ class ToggleDocketAlertHtmxTest(TestCase):
         self.assertEqual(self.subscriptions(), 0)
         self.assertFalse(r.context["has_alert"])
         self.assertFalse(r.context["quota_reached"])
+
+    @override_settings(MAX_FREE_DOCKET_ALERTS=1)
+    def test_quota_dialog_reports_the_current_count(self) -> None:
+        """The dialog's count is the user's live subscription total."""
+        DocketAlert.objects.create(
+            user=self.profile.user, docket=DocketFactory(source=Docket.RECAP)
+        )
+        r = self.toggle()
+        self.assertTrue(r.context["quota_reached"])
+        self.assertEqual(r.context["subscription_count"], 1)
 
     def test_htmx_without_id_is_a_bad_request(self) -> None:
         """A missing or malformed docket id is the caller's error.

@@ -12,7 +12,7 @@ document.addEventListener('alpine:init', () => {
      * when a focus trap (e.g. a dialog) may activate before then.
      */
     closeAndFocusTrigger() {
-      this.$data.__close();
+      this.$data.__close(false);
       this.$refs.__button.focus();
     },
   }));

@@ -29,7 +29,7 @@
       <c-slot name="panel">
         <h2 x-dialog:title class="text-display-xs font-semibold text-greyscale-900">Please Become a Member or Install RECAP to Make More Alerts</h2>
         <p x-dialog:description class="text-sm text-greyscale-800">Docket alerts are an advanced feature of CourtListener. Members can create unlimited docket alerts. If you are not a member, we allow <strong>{{ MAX_FREE_DOCKET_ALERTS|apnumber }}</strong> alerts and give a bonus of <strong>{{ DOCKET_ALERT_RECAP_BONUS|apnumber }}</strong> alerts to anybody with the RECAP Extension installed.</p>
-        <p class="text-sm text-greyscale-800">You currently have <strong>{{ user.docket_alerts.subscriptions.count|apnumber }}</strong> alerts. To create additional alerts, please install the RECAP Extension or become a Member.</p>
+        <p class="text-sm text-greyscale-800">You currently have <strong>{{ subscription_count|apnumber }}</strong> alerts. To create additional alerts, please install the RECAP Extension or become a Member.</p>
         <p class="text-sm text-greyscale-800">We can sometimes provide need-based exceptions to these rules. If you might need an exception, <a href="{% url 'contact' %}" class="text-primary-600">please let us know</a>.</p>
         <div class="flex flex-row flex-wrap justify-end gap-2">
           <c-button variant="outline" x-on:click="close">Close</c-button>
