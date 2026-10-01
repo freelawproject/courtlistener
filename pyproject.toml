@@ -54,7 +54,7 @@ dependencies = [
   "markdown2>=2.5.4",
   "natsort>=8.4.0",
   "ndg-httpsclient>=0.5.1",
-  "networkx>=3.6.1",
+  "networkx>=3.7",
   "nose",
   "pandas>=3.0.5",
   "pillow",
