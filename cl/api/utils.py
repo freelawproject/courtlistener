@@ -2160,6 +2160,7 @@ class DynamicFieldsMixin:
             allowed = set(filter(None, filter_fields))
 
         # omit fields in the `omit` argument.
+        # TODO: Typing this correctly involves going through a long chain of things that probably also need to be typed
         omitted = set(filter(None, omit_fields))
 
         for field in existing:
