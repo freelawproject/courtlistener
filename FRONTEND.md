@@ -115,6 +115,8 @@ tag warns in the runserver console while you're on the page, and
 
 Plugins MUST be deferred (`defer=True`).
 
+The tag MUST be called from the component or block that needs the script, never from `footer-scripts`: `new_base.html` prints the registry before that block, and a `require_script` after the registry has printed raises.
+
 ### File organization
 
 | Type | Location |
