@@ -82,6 +82,7 @@ from cl.search.state.texas.models import *
 from cl.users.models import User
 
 if TYPE_CHECKING:
+    from cl.alerts.docket_alert_sources import DocketAlertSource
     from cl.opinion_page.docket_entry_sources import DocketEntrySource
 
 HYPERSCAN_TOKENIZER = HyperscanTokenizer(cache_dir=".hyperscan")
@@ -932,6 +933,19 @@ class Docket(AbstractDateTimeModel, DocketSources):
 
         return docket_entry_sources.BY_COURT_ID.get(
             self.court_id, docket_entry_sources.RECAP
+        )
+
+    def get_alert_source(self) -> "DocketAlertSource":
+        """Return the DocketAlertSource config for this docket's court -
+        RECAP/PACER by default, with per-court overrides.
+        """
+        from cl.alerts.docket_alert_sources import (
+            _ALERT_SOURCES_BY_COURT_ID,
+            RECAP_ALERT_SOURCE,
+        )
+
+        return _ALERT_SOURCES_BY_COURT_ID.get(
+            self.court_id, RECAP_ALERT_SOURCE
         )
 
     @property
