@@ -28,7 +28,7 @@ CourtListener is migrating from Bootstrap 3 / jQuery to Tailwind v3 / Alpine.js 
 
 `IncrementalNewTemplateMiddleware` swaps templates by prepending `v2_` to the view's template name when the `use_new_design` waffle flag is active. New templates MUST be named accordingly (e.g., `v2_help/index.html`).
 
-Partials a view returns on their own, such as htmx fragments, follow the same rule and live under `v2_includes/` (e.g., `includes/foo/button.html` → `v2_includes/foo/button.html`). They are swapped like any other template, but the checks that only make sense for full pages (extending `new_base.html`, registering in `V2PagesRegisterTest`) do not apply to them.
+Partials a view returns on their own, such as htmx responses, follow the same rule and live under `v2_includes/` (e.g., `includes/foo/button.html` → `v2_includes/foo/button.html`). They are swapped like any other template, but the checks that only make sense for full pages (extending `new_base.html`, registering in `V2PagesRegisterTest`) do not apply to them.
 
 ### Base template
 
@@ -115,6 +115,8 @@ tag warns in the runserver console while you're on the page, and
 
 Plugins MUST be deferred (`defer=True`).
 
+The tag MUST be called from the component or block that needs the script, never from `footer-scripts`: `new_base.html` prints the registry before that block, and a `require_script` after the registry has printed raises.
+
 ### File organization
 
 | Type | Location |
@@ -133,6 +135,29 @@ Component JS files match their Cotton template name: `cotton/my_component.html` 
 Examples:
 - Allowed: `x-data="components.filters"`, `x-on:click="filters.apply"`
 - Not allowed: `x-data="{ open: true }"`, `x-on:click="count++"`
+
+## htmx
+
+v2 uses htmx 2.0.11 from `js/third_party/` (legacy keeps 1.7.0). `new_base.html` does not load it; the component that uses `hx-*` attributes MUST require it at its top, like any other script dependency:
+
+```html
+{% require_script "js/third_party/htmx" defer=True %}
+```
+
+Swapped partials live under `v2_includes/` (see [Naming & middleware](#naming--middleware)).
+
+`<body>` in `new_base.html` carries `hx-headers` with the CSRF token, and htmx elements inherit it: an `hx-post` MUST NOT repeat the header.
+
+### Disabled features
+
+`new_base.html` sets `allowEval` and `allowScriptTags` to `false` for every page, so markup cannot run arbitrary JavaScript:
+
+- `hx-on:*` does not run. Use Alpine `x-on:`; an `HX-Trigger` header dispatches its event on the requesting element.
+- `hx-trigger` filters such as `click[ctrlKey]` are ignored.
+- `js:` / `javascript:` values in `hx-vals` and `hx-headers` are not evaluated. Pass literal JSON.
+- `<script>` tags in a response are removed. Partials MUST NOT ship scripts.
+
+A blocked evaluation fires `htmx:evalDisallowedError` on the element. Reference: https://htmx.org/reference/#config
 
 ## Icons
 

@@ -35,6 +35,7 @@ from cl.search.models import (
 ESModelType = (
     Citation
     | Docket
+    | DocketEntry
     | Opinion
     | OpinionCluster
     | Parenthetical

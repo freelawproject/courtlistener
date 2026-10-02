@@ -393,13 +393,6 @@
       "severity": "error"
     },
     {
-      "column": 20,
-      "path": "cl/alerts/utils.py",
-      "name": "missing-attribute",
-      "concise_description": "Object of type `type[Audio | Citation | Docket | DocketEntry | ESRECAPBaseDocument | Education | Opinion | OpinionCluster | Parenthetical | ParentheticalGroup | Person | Position | RECAPDocument]` has no attribute `_doc_type`",
-      "severity": "error"
-    },
-    {
       "column": 17,
       "path": "cl/alerts/utils.py",
       "name": "bad-argument-type",
@@ -768,13 +761,6 @@
       "path": "cl/api/utils.py",
       "name": "missing-attribute",
       "concise_description": "Object of class `FilterSet` has no attribute `_clean_join_table_key`",
-      "severity": "error"
-    },
-    {
-      "column": 9,
-      "path": "cl/api/views.py",
-      "name": "missing-attribute",
-      "concise_description": "Object of class `Court` has no attribute `count`",
       "severity": "error"
     },
     {
@@ -2556,41 +2542,6 @@
       "severity": "error"
     },
     {
-      "column": 33,
-      "path": "cl/opinion_page/views.py",
-      "name": "bad-assignment",
-      "concise_description": "`str | None` is not assignable to dict key `court_seal` with type `bool | str`",
-      "severity": "error"
-    },
-    {
-      "column": 32,
-      "path": "cl/opinion_page/views.py",
-      "name": "unsupported-operation",
-      "concise_description": "Cannot set item in `dict[str, bool | str]`",
-      "severity": "error"
-    },
-    {
-      "column": 23,
-      "path": "cl/opinion_page/views.py",
-      "name": "missing-attribute",
-      "concise_description": "Object of class `NoneType` has no attribute `docket_entry`",
-      "severity": "error"
-    },
-    {
-      "column": 21,
-      "path": "cl/opinion_page/views.py",
-      "name": "missing-attribute",
-      "concise_description": "Object of class `NoneType` has no attribute `document_number`",
-      "severity": "error"
-    },
-    {
-      "column": 21,
-      "path": "cl/opinion_page/views.py",
-      "name": "missing-attribute",
-      "concise_description": "Object of class `NoneType` has no attribute `attachment_number`",
-      "severity": "error"
-    },
-    {
       "column": 25,
       "path": "cl/opinion_page/views.py",
       "name": "missing-attribute",
@@ -2819,13 +2770,6 @@
       "path": "cl/search/management/commands/cl_index_parent_and_child_docs.py",
       "name": "missing-module-attribute",
       "concise_description": "Could not import `RECAPDocumentEvent` from `cl.search.models`",
-      "severity": "error"
-    },
-    {
-      "column": 17,
-      "path": "cl/search/management/commands/cl_index_parent_and_child_docs.py",
-      "name": "bad-argument-type",
-      "concise_description": "Argument `Docket | DocketEntry | RECAPDocument` is not assignable to parameter `current_instance` with type `Audio | Citation | Docket | Education | Opinion | OpinionCluster | Parenthetical | ParentheticalGroup | Person | Position | RECAPDocument` in function `cl.lib.es_signal_processor.check_fields_that_changed`",
       "severity": "error"
     },
     {

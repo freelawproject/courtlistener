@@ -7,7 +7,7 @@
   <meta http-equiv="Content-Language" content="en"/>
   <meta name="language" content="en_us"/>
   <meta name="viewport" content="width=device-width,initial-scale=1"/>
-  {# Hardened htmx config: pages load htmx per page through the footer-scripts block. #}
+  {# htmx is not loaded here. Components that use hx-* attributes require it with require_script and inherit this hardened config. #}
   <meta name="htmx-config" content='{"allowEval": false, "allowScriptTags": false}'/>
 
   {% block meta %}
@@ -73,7 +73,8 @@
   {% block canonical %}{% endblock %}
 </head>
 
-<body class="{% block body-classes %}{% endblock %}">
+{# htmx elements inherit hx-headers, so every hx-post on a v2 page carries the CSRF token without repeating it. #}
+<body class="{% block body-classes %}{% endblock %}" hx-headers='{"X-CSRFToken": "{{ csrf_token }}"}'>
   {% block header %}
     <c-header :request="request" :search_form="search_form" :csrf_token="csrf_token" only></c-header>
   {% endblock %}
