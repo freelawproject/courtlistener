@@ -1,6 +1,7 @@
 from collections.abc import Awaitable, Callable
+from inspect import iscoroutinefunction
 
-from asgiref.sync import iscoroutinefunction, markcoroutinefunction
+from asgiref.sync import markcoroutinefunction
 from django.http import HttpRequest, HttpResponseBase
 from django.template import TemplateDoesNotExist
 from django.template.loader import get_template
