@@ -231,9 +231,10 @@ def transcribe_from_open_ai_api(self, audio_pk: int, dont_retry: bool = False):
                 audio.stt_status = Audio.STT_COMPLETE
 
             audio.save()
+            transcript_dict = transcript.to_dict()
             metadata = {
-                "segments": transcript.segments,
-                "words": transcript.words,
+                "segments": transcript_dict["segments"],
+                "words": transcript_dict["words"],
             }
             AudioTranscriptionMetadata.objects.create(
                 audio=audio, metadata=metadata
