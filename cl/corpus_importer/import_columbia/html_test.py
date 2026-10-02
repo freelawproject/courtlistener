@@ -5,6 +5,7 @@ import xml.etree.ElementTree as ET
 from collections import Counter
 from glob import glob
 from random import shuffle
+from typing import NotRequired, TypedDict
 
 import dateutil.parser as dparser
 
@@ -47,7 +48,7 @@ def file_generator(dir_path, random_order=False, limit=None):
 
 
 # tags for which content will be condensed into plain text
-SIMPLE_TAGS = [
+SIMPLE_TAGS = (
     "reporter_caption",
     "citation",
     "caption",
@@ -58,7 +59,7 @@ SIMPLE_TAGS = [
     "hearing_date",
     "panel",
     "attorneys",
-]
+)
 
 # regex that will be applied when condensing SIMPLE_TAGS content
 STRIP_REGEX = [r"</?citation.*>", r"</?page_number.*>"]
@@ -541,18 +542,39 @@ def parse_file(file_path, court_fallback=""):
     return info
 
 
-def get_text(file_path):
+class _RawInfoDict(TypedDict):
+    type: NotRequired[str | None]
+    name: NotRequired[str | None]
+    unpublished: bool
+    opinions: NotRequired[list[dict]]
+    reporter_caption: NotRequired[list[str]]
+    citation: NotRequired[list[str]]
+    caption: NotRequired[list[str]]
+    court: NotRequired[list[str]]
+    docket: NotRequired[list[str]]
+    posture: NotRequired[list[str]]
+    date: NotRequired[list[str]]
+    hearing_date: NotRequired[list[str]]
+    panel: NotRequired[list[str]]
+    attorneys: NotRequired[list[str]]
+
+
+class _RawInfoByline(TypedDict):
+    type: str | None
+    name: str | None
+
+
+def get_text(file_path: str) -> _RawInfoDict | None:
     """Reads a file and returns a dictionary of grabbed text.
 
     :param file_path: A path the file to be parsed.
     """
     with open(file_path) as f:
         file_string = f.read()
-    raw_info = {}
+    raw_info: _RawInfoDict = {"unpublished": False}
     # used when associating a byline of an opinion with the opinion's text
-    current_byline = {"type": None, "name": None}
+    current_byline: _RawInfoByline = {"type": None, "name": None}
     # if this is an unpublished opinion, note this down and remove all <unpublished> tags
-    raw_info["unpublished"] = False
     if "<opinion unpublished=true>" in file_string:
         file_string = file_string.replace(
             "<opinion unpublished=true>", "<opinion>"
