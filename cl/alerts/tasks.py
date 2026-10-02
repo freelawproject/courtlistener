@@ -553,10 +553,14 @@ def create_schedule_alerts_hits_in_bulk(
 ) -> int:
     """Create ScheduledAlertHit records in bulk.
 
+    Hits whose Alert no longer exists are dropped, since a user can delete an
+    alert between the moment it is matched and the moment its hits are written,
+    which would otherwise raise an FK IntegrityError for the whole batch.
+
     Rows are inserted in batches of settings.SCHEDULED_ALERT_HIT_BATCH_SIZE to
-    bound the memory psycopg uses while building each INSERT, and the whole set
-    is written in one transaction so that the IntegrityError retry cannot
-    re-insert batches that already committed.
+    bound the memory psycopg uses while building each INSERT. bulk_create wraps
+    a multi-batch insert in its own transaction, so the IntegrityError retry
+    cannot re-insert batches that already committed.
 
     :param scheduled_hits: A list of ScheduledAlertHit instances to be created.
     :return: The number of ScheduledAlertHit records created.
@@ -575,10 +579,9 @@ def create_schedule_alerts_hits_in_bulk(
     if not hits_to_create:
         return 0
 
-    with transaction.atomic():
-        ScheduledAlertHit.objects.bulk_create(
-            hits_to_create, batch_size=settings.SCHEDULED_ALERT_HIT_BATCH_SIZE
-        )
+    ScheduledAlertHit.objects.bulk_create(
+        hits_to_create, batch_size=settings.SCHEDULED_ALERT_HIT_BATCH_SIZE
+    )
     return len(hits_to_create)
 
 
