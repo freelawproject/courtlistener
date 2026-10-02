@@ -15,7 +15,6 @@ from django.urls import reverse
 from django.utils.timezone import now
 from elasticsearch.exceptions import ConnectionError
 from redis import ConnectionError as RedisConnectionError
-from waffle import switch_is_active
 
 from cl.alerts.models import Alert, DocketAlert, ScheduledAlertHit
 from cl.alerts.utils import (
@@ -39,6 +38,7 @@ from cl.api.tasks import (
 from cl.celery_init import app
 from cl.custom_filters.templatetags.text_filters import best_case_name
 from cl.favorites.models import Note, UserTag
+from cl.favorites.utils import build_dual_read_query
 from cl.lib.command_utils import logger
 from cl.lib.decorators import retry
 from cl.lib.redis_utils import (
@@ -189,7 +189,9 @@ def get_docket_notes_and_tags_by_user(
 
     notes = None
     note = (
-        Note.objects.filter(docket_id=d_pk, user_id=user_pk)
+        Note.objects.filter(
+            build_dual_read_query(Docket, d_pk), user_id=user_pk
+        )
         .only("notes")
         .first()
     )
@@ -229,7 +231,6 @@ def make_alert_messages(
         "docket": d,
         "docket_alert_secret_key": None,
         "timezone": COURT_TIMEZONES.get(d.court_id, "US/Eastern"),
-        "recap_alerts_banner": switch_is_active("recap-alerts-email-banner"),
         # Emails render without request context processors, so the wiki URL
         # must be injected here for the tag/note help links.
         "WIKI_HELP_URL": settings.WIKI_HELP_BASE_URL,
@@ -458,7 +459,7 @@ def send_recap_email_user_not_found(recap_email_recipients: list[str]) -> None:
 
 
 def send_webhook_alert_hits(
-    alert_user: UserProfile.user, hits: list[SearchAlertHitType]
+    alert_user: User, hits: list[SearchAlertHitType]
 ) -> bool:
     """Send webhook alerts for search hits.
     :param alert_user: The user profile object associated with the webhooks.
@@ -469,6 +470,7 @@ def send_webhook_alert_hits(
 
     webhook_sent = False
     for alert, search_type, documents, num_docs in hits:
+        # pyrefly:ignore[missing-attribute]
         user_webhooks = alert_user.webhooks.filter(
             event_type=WebhookEventType.SEARCH_ALERT, enabled=True
         )
@@ -507,14 +509,11 @@ def send_search_alert_emails(
             continue
 
         subject = build_alert_email_subject(hits)
-        alert_user: UserProfile.user = User.objects.get(pk=user_id)
+        alert_user = User.objects.get(pk=user_id)
         context = {
             "hits": hits,
             "hits_limit": settings.SCHEDULED_ALERT_HITS_LIMIT,
             "scheduled_alert": scheduled_alert,
-            "recap_alerts_banner": switch_is_active(
-                "recap-alerts-email-banner"
-            ),
         }
         headers = {}
         query_string = ""
@@ -634,7 +633,7 @@ def percolator_response_processing(response: SendAlertsResponse) -> None:
             # Ignore it.
             continue
 
-        alert_user: UserProfile.user = alert_triggered.user
+        alert_user = alert_triggered.user
         # The (document_type, document_id) pairs to record in the alert_hits
         # Redis sets if this hit ends up being delivered or scheduled.
         alert_set_writes: list[tuple[str, int]] = []
@@ -720,7 +719,7 @@ def percolator_response_processing(response: SendAlertsResponse) -> None:
         webhook_sent = send_webhook_alert_hits(alert_user, hits)
         schedule_alert = not (
             alert_triggered.rate == Alert.REAL_TIME
-            and not alert_user.profile.is_eligible_for_rt_search_alerts
+            and not alert_user.profile.is_eligible_for_rt_search_alerts  # pyrefly:ignore[missing-attribute]
         )
         # Only record the hit in the alert_hits Redis sets if the alert was
         # actually delivered (webhook) or will be scheduled (email).

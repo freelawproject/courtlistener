@@ -1,9 +1,11 @@
 from dataclasses import dataclass
 
 from django.conf import settings
-from django.contrib.auth.models import User
+from django.contrib.auth.models import AnonymousUser, User
+from django.contrib.contenttypes.models import ContentType
 from django.core.cache import cache
 from django.core.mail import EmailMultiAlternatives, get_connection
+from django.db import models
 from django.db.models import (
     Case,
     CharField,
@@ -23,10 +25,180 @@ from django.template import loader
 
 from cl.api.models import Webhook, WebhookEventType
 from cl.api.tasks import send_pray_and_pay_webhooks
+from cl.audio.models import Audio
 from cl.custom_filters.templatetags.pacer import price
-from cl.favorites.models import GenericCount, Prayer, PrayerAvailability
+from cl.favorites.models import GenericCount, Note, Prayer, PrayerAvailability
 from cl.favorites.selectors import prayer_eligible
-from cl.search.models import RECAPDocument
+from cl.search.models import (
+    Docket,
+    OpinionCluster,
+    RECAPDocument,
+    SCOTUSDocument,
+)
+
+# Models that can have a Note attached, mapped to the bucket label the
+# profile Notes page groups them under (cl.users.views.view_notes()).
+NOTEABLE_MODELS: dict[type[models.Model], str] = {
+    Docket: "Dockets",
+    OpinionCluster: "Opinions",
+    Audio: "Oral Arguments",
+    RECAPDocument: "Documents",
+    SCOTUSDocument: "Documents",
+}
+
+# Legacy per-type FK field name for each model that had one before the
+# GenericForeignKey migration (#7725). Lets get_notes_for() fall back to
+# it for notes not yet migrated to content_type/object_id.
+LEGACY_NOTE_FIELDS: dict[type[models.Model], str] = {
+    Docket: "docket_id",
+    OpinionCluster: "cluster_id",
+    Audio: "audio_id",
+    RECAPDocument: "recap_doc_id",
+}
+
+
+def build_dual_read_query(
+    model_class: type[models.Model], object_id: int | str
+) -> Q:
+    """Build a Q object matching a Note on either the new GenericForeignKey
+    shape or the legacy per-type FK shape, for the given noted model.
+    Shared by get_notes_for() and get_note_for_target().
+
+    :param model_class: The model class object_id belongs to.
+    :param object_id: The pk of the noted object.
+    :return: A Q object suitable for Note.objects.filter(...).
+    """
+    content_type = ContentType.objects.get_for_model(model_class)
+    query = Q(content_type=content_type, object_id=object_id)
+
+    legacy_field = LEGACY_NOTE_FIELDS.get(model_class)
+    if legacy_field:
+        query |= Q(**{legacy_field: object_id})
+
+    return query
+
+
+def _find_legacy_target(
+    note: Note,
+) -> tuple[type[models.Model], str] | None:
+    """Find which of Note's 4 legacy per-type FKs is set, if any.
+
+    Shared by resolve_legacy_object() and get_noted_object().
+
+    :param note: A Note instance.
+    :return: (model, field_name) for the one legacy FK that's set, or
+        None if the Note is already in the new content_type/object_id
+        shape (or points nowhere).
+    """
+    for model, field_name in LEGACY_NOTE_FIELDS.items():
+        if getattr(note, f"{field_name}_id") is not None:
+            return model, field_name
+    return None
+
+
+def resolve_legacy_object(note: Note) -> tuple[ContentType, int] | None:
+    """For a Note still in the legacy per-type-FK shape (content_type is
+    null), find which legacy FK is set and return the equivalent
+    (content_type, object_id) pair.
+
+    :param note: A Note instance.
+    :return: (content_type, object_id) if a legacy FK is set, else None.
+    """
+    found = _find_legacy_target(note)
+    if found is None:
+        return None
+
+    model, field_name = found
+    return ContentType.objects.get_for_model(model), getattr(
+        note, f"{field_name}_id"
+    )
+
+
+def get_noted_object(note: Note) -> models.Model | None:
+    """Return the object a Note points to, dual-read aware (#7725).
+
+    :param note: A Note instance.
+    :return: The noted model instance, or None if it points to nothing.
+    """
+    if note.content_object is not None:
+        return note.content_object
+
+    found = _find_legacy_target(note)
+    if found is None:
+        return None
+    return getattr(note, found[1])
+
+
+def get_notes_for(obj: models.Model) -> QuerySet[Note]:
+    """Return the Notes attached to a given object, across all users.
+
+    Results include notes not yet migrated to content_type/object_id.
+
+    :param obj: A noteable model instance (see NOTEABLE_MODELS).
+    :return: A queryset of matching Note rows.
+    """
+    if obj.pk is None:
+        return Note.objects.none()
+
+    return Note.objects.filter(build_dual_read_query(type(obj), obj.pk))
+
+
+def repoint_notes(
+    main_object: models.Model, version_object: models.Model
+) -> None:
+    """Repoint Notes from version_object onto main_object (#7725).
+
+    For use when merging two noteable rows into one (e.g.
+    merge_opinion_versions): a Note may be in either shape (dual-read), so
+    the FK-based repointing used for other related models can't be reused
+    as-is here.
+
+    A user who already has a Note on main_object keeps that one; the
+    version's Note is left pointed at version_object, to be cleaned up by
+    delete_orphaned_notes when it's deleted - same dedup behavior already
+    used for the legacy-shaped case elsewhere.
+
+    :param main_object: The noteable object absorbing version_object's
+        Notes.
+    :param version_object: The noteable object about to be deleted.
+    :return: None
+    """
+    existing_user_ids = get_notes_for(main_object).values_list(
+        "user_id", flat=True
+    )
+    content_type = ContentType.objects.get_for_model(type(main_object))
+    # Clear the legacy FKs too, even for a Note that arrives here already
+    # in the new shape: version_object is about to be deleted, and its
+    # own on_delete=CASCADE would otherwise take a moved Note down with
+    # it if that FK were left pointed at it.
+    get_notes_for(version_object).exclude(
+        user_id__in=existing_user_ids
+    ).update(
+        content_type=content_type,
+        object_id=main_object.pk,
+        **{field: None for field in LEGACY_NOTE_FIELDS.values()},
+    )
+
+
+def get_note_for_target(
+    model_class: type[models.Model],
+    object_id: int | str,
+    user: AnonymousUser | User,
+) -> Note | None:
+    """Return the given user's Note for a noted object, identified by its
+    model class and pk, if any.
+
+    :param model_class: The model class object_id belongs to.
+    :param object_id: The pk of the noted object.
+    :param user: The user requesting their Note, possibly anonymous.
+    :return: The user's Note for the object, or None if anonymous or not
+        found.
+    """
+    if not user.is_authenticated:
+        return None
+
+    query = build_dual_read_query(model_class, object_id)
+    return Note.objects.filter(query, user=user).first()
 
 
 async def create_prayer(

@@ -244,12 +244,10 @@ jobs:
   # Orchestration job to ensure all deployments complete
   complete-deploy:
     needs:
-      [
-        deploy-python,
-        deploy-celery,
-        deploy-daemons,
-        deploy-cronjobs,
-      ]
+      - deploy-python
+      - deploy-celery
+      - deploy-daemons
+      - deploy-cronjobs
     runs-on: ubuntu-latest
     concurrency: production
     # Ensure this job runs even if the needs are skipped, to ensure only one deployment

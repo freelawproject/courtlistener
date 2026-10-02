@@ -66,7 +66,12 @@ from cl.lib.model_helpers import (
     normalize_texas_appellate_docket_number,
 )
 from cl.lib.models import AbstractDateTimeModel, AbstractPDF, s3_warning_note
-from cl.lib.recap_utils import get_bucket_name
+from cl.lib.recap_utils import (
+    format_path_date,
+    get_bucket_name,
+    make_recap_style_path,
+    scotus_document_number_segments,
+)
 from cl.lib.storage import IncrementingAWSMediaStorage, S3PrivateUUIDStorage
 from cl.lib.string_utils import get_token_count_from_string, trunc
 from cl.search.cluster_sources import ClusterSources
@@ -77,7 +82,7 @@ from cl.search.state.texas.models import *
 from cl.users.models import User
 
 if TYPE_CHECKING:
-    from cl.opinion_page.docket_sources_utils import DocketEntrySource
+    from cl.opinion_page.docket_entry_sources import DocketEntrySource
 
 HYPERSCAN_TOKENIZER = HyperscanTokenizer(cache_dir=".hyperscan")
 
@@ -890,9 +895,9 @@ class Docket(AbstractDateTimeModel, DocketSources):
     @property
     def pacer_docket_url(self) -> str | None:
         """Return the PACER docket report URL, or None if the docket isn't in PACER."""
-        from cl.opinion_page.docket_sources_utils import RECAP_SOURCE
+        from cl.opinion_page import docket_entry_sources
 
-        if self.get_entry_source() is not RECAP_SOURCE:
+        if self.get_entry_source() is not docket_entry_sources.RECAP:
             return None
 
         if self.court.jurisdiction == Court.FEDERAL_APPELLATE:
@@ -923,12 +928,11 @@ class Docket(AbstractDateTimeModel, DocketSources):
         """Return the DocketEntrySource config for this docket's court -
         RECAP/PACER by default, with per-court overrides.
         """
-        from cl.opinion_page.docket_sources_utils import (
-            _SOURCES_BY_COURT_ID,
-            RECAP_SOURCE,
-        )
+        from cl.opinion_page import docket_entry_sources
 
-        return _SOURCES_BY_COURT_ID.get(self.court_id, RECAP_SOURCE)
+        return docket_entry_sources.BY_COURT_ID.get(
+            self.court_id, docket_entry_sources.RECAP
+        )
 
     @property
     def pacer_alias_url(self):
@@ -3375,11 +3379,7 @@ class Opinion(AbstractDateTimeModel):
                 {"ordering_key": "Ordering key cannot be zero or negative"}
             )
 
-    def save(
-        self,
-        *args: list,
-        **kwargs: dict,
-    ) -> None:
+    def save(self, *args, **kwargs) -> None:
         self.clean()
         super().save(*args, **kwargs)
 
@@ -4028,15 +4028,23 @@ class ScotusDocketMetadata(AbstractDateTimeModel):
         verbose_name_plural = "SCOTUS Docket Metadata"
 
     def get_pdf_path(self, filename: str, thumbs: bool = False) -> str:
-        """Store the questions-presented PDF under the SCOTUS `qp` directory.
+        """Store the questions-presented PDF alongside the docket's documents
+        in the RECAP layout, using the docket's filing date and a `qp` marker:
+
+            recap/gov.uscourts.scotus.<docket_id>/gov.uscourts.scotus.<docket_id>.<date_filed>.qp.pdf
 
         This model is not itself a document -- the PDF hangs off the docket
         metadata -- so it satisfies `SupportsPdfPath` without subclassing
-        `AbstractPDF`.
+        `AbstractPDF`. Only the extension of `filename` is used.
         """
-        slug = slugify(Path(filename).stem)
-        root = Path("scotus") / ("qp-thumbnails" if thumbs else "qp")
-        return str(root / f"gov.scotus.{slug}.pdf")
+        docket = self.docket
+        return make_recap_style_path(
+            docket.court_id,
+            docket.pk,
+            [format_path_date(docket.date_filed), "qp"],
+            Path(filename).suffix or ".pdf",
+            thumbs=thumbs,
+        )
 
 
 @pghistory.track()
@@ -4296,12 +4304,57 @@ class SCOTUSDocument(AbstractDateTimeModel, AbstractPDF):
         return f"{self.pk}: Docket_{self.docket_entry.docket.docket_number} , document_number_{self.document_number} , attachment_number_{self.attachment_number}"
 
     def get_pdf_path(self, filename: str, thumbs: bool = False) -> str:
-        """Store SCOTUS documents under the SCOTUS `documents` directory."""
-        slug = slugify(Path(filename).stem)
-        root = Path("scotus") / (
-            "documents-thumbnails" if thumbs else "documents"
+        """Store SCOTUS documents in the RECAP layout, with the CourtListener
+        docket id in place of the PACER case id since SCOTUS isn't in PACER:
+
+            recap/gov.uscourts.scotus.<docket_id>/gov.uscourts.scotus.<docket_id>.<date_filed>.<document_number>.<attachment_number>.pdf
+
+        Only the extension of `filename` is used; the name itself is derived
+        from the document's fields. Undated entries use `undated` as the date.
+        """
+        entry = self.docket_entry
+        return make_recap_style_path(
+            entry.docket.court_id,
+            entry.docket_id,
+            [
+                format_path_date(entry.date_filed),
+                *scotus_document_number_segments(
+                    self.document_number, self.attachment_number, self.pk
+                ),
+            ],
+            Path(filename).suffix or ".pdf",
+            thumbs=thumbs,
         )
-        return str(root / f"gov.scotus.{slug}.pdf")
+
+    def get_absolute_url(self) -> str:
+        if not self.document_number:
+            return ""
+        if self.attachment_number is None:
+            return reverse(
+                "view_recap_document",
+                kwargs={
+                    "docket_id": self.docket_entry.docket_id,
+                    "doc_num": self.document_number,
+                    "slug": self.docket_entry.docket.slug,
+                },
+            )
+        return reverse(
+            "view_recap_attachment",
+            kwargs={
+                "docket_id": self.docket_entry.docket_id,
+                "doc_num": self.document_number,
+                "att_num": self.attachment_number,
+                "slug": self.docket_entry.docket.slug,
+            },
+        )
+
+    @property
+    def is_available(self) -> bool:
+        return bool(self.filepath_local)
+
+    @property
+    def has_valid_pdf(self) -> bool:
+        return self.is_available
 
     @property
     def needs_extraction(self):

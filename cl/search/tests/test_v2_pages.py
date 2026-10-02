@@ -1,6 +1,7 @@
 from datetime import timedelta
 from unittest.mock import patch
 
+from django import forms
 from django.db import connection
 from django.test import AsyncClient, override_settings
 from django.urls import reverse
@@ -8,6 +9,7 @@ from django.utils import timezone
 from lxml import html as lhtml
 from waffle.testutils import override_flag
 
+from cl.lib import widgets
 from cl.lib.test_helpers import (
     CourtTestCase,
     PeopleTestCase,
@@ -15,6 +17,7 @@ from cl.lib.test_helpers import (
     SearchTestCase,
     SimpleUserDataMixin,
 )
+from cl.search.forms import CorpusSearchForm
 from cl.search.models import Docket, Opinion, RECAPDocument
 from cl.search.utils import get_v2_homepage_stats
 from cl.stats.models import Stat
@@ -180,6 +183,41 @@ class HomepageStructureTest(SimpleUserDataMixin, TestCase):
         for label in expected_labels:
             with self.subTest(label=label):
                 self.assertIn(label, html, f"Not found in template: {label}")
+
+
+class CorpusSearchFormWidgetTest(TestCase):
+    """Tests enforcing shared widget usage in CorpusSearchForm."""
+
+    @staticmethod
+    def _get_offending_fields(form: forms.Form) -> dict[str, str]:
+        """Return text/select fields that do not use shared CL widgets."""
+        built_in_widget_families = (forms.TextInput, forms.Select)
+        approved_widgets = (widgets.TextInput, widgets.Select)
+        return {
+            field_name: (
+                f"{type(field.widget).__module__}."
+                f"{type(field.widget).__qualname__}"
+            )
+            for field_name, field in form.fields.items()
+            if isinstance(field.widget, built_in_widget_families)
+            and not isinstance(field.widget, approved_widgets)
+        }
+
+    def test_uses_custom_text_and_select_widgets(self) -> None:
+        """Prevent fields from reverting to built-in widgets with CL alternatives."""
+        offending_fields = self._get_offending_fields(CorpusSearchForm())
+
+        self.assertEqual(offending_fields, {})
+
+    def test_rejects_builtin_date_input(self) -> None:
+        """Catch a date field that falls back to Django's DateInput."""
+        form = CorpusSearchForm()
+        form.fields["filed_after"].widget = forms.DateInput()
+
+        self.assertEqual(
+            self._get_offending_fields(form),
+            {"filed_after": "django.forms.widgets.DateInput"},
+        )
 
 
 @override_flag("use_new_design", True)

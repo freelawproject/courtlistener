@@ -3266,7 +3266,9 @@ class TexasMergerTest(TestCase):
     ):
         """Can we successfully download a PDF for a TexasDocument?"""
         self.download_document_patch.stop()
-        texas_document = TexasDocumentFactory.create()
+        texas_document = TexasDocumentFactory.create(
+            docket_entry__date_filed=date(2024, 3, 1)
+        )
 
         def get_test_pdf(
             request: requests.Request,
@@ -3286,7 +3288,14 @@ class TexasMergerTest(TestCase):
 
         self.assertIsNotNone(result)
         texas_document.refresh_from_db()
-        self.assertIsNotNone(texas_document.filepath_local)
+        docket = texas_document.docket_entry.docket
+        bucket = f"gov.uscourts.{docket.court_id}.{docket.pk}"
+        self.assertEqual(
+            texas_document.filepath_local.name,
+            f"recap/{bucket}/{bucket}.2024-03-01.{texas_document.pk}.pdf",
+            "Filed in its docket's directory, named for the day it was filed "
+            "and for the document itself.",
+        )
         self.assertEqual(texas_document.page_count, 1)
         self.assertIsNone(texas_document.processing_error)
         self.assertEqual(pdf_response.call_count, 1)

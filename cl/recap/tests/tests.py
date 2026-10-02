@@ -29,6 +29,7 @@ from django.test.utils import CaptureQueriesContext
 from django.urls import reverse
 from django.utils.timezone import now
 from juriscraper.pacer import PacerRssFeed
+from waffle.testutils import override_switch
 
 from cl.alerts.factories import DocketAlertFactory
 from cl.api.factories import (
@@ -100,6 +101,7 @@ from cl.recap.management.commands.reprocess_recap_dockets import (
     extract_unextracted_rds,
 )
 from cl.recap.mergers import (
+    PROCESS_ORPHAN_DOCUMENTS_SWITCH,
     add_attorney,
     add_docket_entries,
     add_parties_and_attorneys,
@@ -5576,6 +5578,8 @@ class DescriptionCleanupTest(SimpleTestCase):
         self.assertEqual(docket_entry["description"], desc)
 
 
+@override_switch(PROCESS_ORPHAN_DOCUMENTS_SWITCH, active=True)
+@override_settings(WAFFLE_CACHE_PREFIX="RecapDocketTaskTest")
 class RecapDocketTaskTest(TestCase):
     @classmethod
     def setUpTestData(cls) -> None:
@@ -6018,6 +6022,27 @@ class RecapDocketTaskTest(TestCase):
         async_to_sync(process_recap_docket)(self.pq.pk)
         pq.refresh_from_db()
         self.assertEqual(pq.status, PROCESSING_STATUS.SUCCESSFUL)
+
+    @override_switch(PROCESS_ORPHAN_DOCUMENTS_SWITCH, active=False)
+    def test_orphan_documents_skipped_when_switch_is_off(self) -> None:
+        """Failed PDF PQs must be left untouched when the orphan-documents
+        switch is disabled.
+        """
+        pq = ProcessingQueue.objects.create(
+            court_id="scotus",
+            uploader=self.user,
+            pacer_case_id="asdf",
+            pacer_doc_id="03504231050",
+            document_number="1",
+            filepath_local=SimpleUploadedFile(
+                "file.pdf", b"file content more content"
+            ),
+            upload_type=UPLOAD_TYPE.PDF,
+            status=PROCESSING_STATUS.FAILED,
+        )
+        async_to_sync(process_recap_docket)(self.pq.pk)
+        pq.refresh_from_db()
+        self.assertEqual(pq.status, PROCESSING_STATUS.FAILED)
 
     def test_avoid_overwriting_nature_of_suit_in_free_opinions(self) -> None:
         """Test avoid updating the nature_of_suit from FreeOpinionReport if

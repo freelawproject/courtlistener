@@ -460,6 +460,19 @@ def get_attr(obj, attr_name):
     return getattr(obj, attr_name, "")
 
 
+@register.filter
+def has_any_perm(perms_for_app, model_name: str) -> bool:
+    """Return True if the user has view, change, or delete permission for
+    the given model name within an app, e.g.
+    ``perms.search|has_any_perm:"docketentry"``. Lets templates check the
+    view/change/delete permission for diferents models.
+    """
+    return any(
+        perms_for_app[f"{action}_{model_name}"]
+        for action in ("view", "change", "delete")
+    )
+
+
 @register.simple_tag
 def get_request_value(request_get, field_name):
     """Simple tag to get value from request.GET given a field name"""

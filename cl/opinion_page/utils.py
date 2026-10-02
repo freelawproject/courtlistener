@@ -3,15 +3,16 @@ import logging
 import traceback
 from dataclasses import dataclass, field
 from io import StringIO
+from typing import Any, cast
 from zoneinfo import ZoneInfo
 
 import waffle
 from asgiref.sync import sync_to_async
 from django.conf import settings
 from django.contrib.auth.models import AnonymousUser, User
-from django.core.exceptions import ObjectDoesNotExist
+from django.db.models import QuerySet
 from django.http import Http404, HttpRequest
-from django.shortcuts import aget_object_or_404  # type: ignore[attr-defined]
+from django.shortcuts import aget_object_or_404
 from django.urls import reverse
 from django.utils.formats import date_format
 from django.utils.http import urlencode
@@ -19,12 +20,12 @@ from django.utils.safestring import mark_safe
 from django.utils.timezone import localtime
 from django_elasticsearch_dsl.search import Search
 from elasticsearch.dsl import Q
+from elasticsearch.dsl.response import Response
 from elasticsearch.exceptions import ApiError, ConnectionTimeout, RequestError
 
 from cl.alerts.models import DocketAlert
 from cl.custom_filters.templatetags.text_filters import best_case_name
-from cl.favorites.forms import NoteForm
-from cl.favorites.models import Note
+from cl.favorites.forms import NoteForm, get_note_form_for
 from cl.lib.bot_detector import is_bot
 from cl.lib.elasticsearch_utils import (
     build_cardinality_count,
@@ -34,10 +35,12 @@ from cl.lib.elasticsearch_utils import (
 from cl.lib.s3_cache import get_s3_cache, make_s3_cache_key
 from cl.lib.string_utils import trunc
 from cl.lib.types import CleanData
-from cl.opinion_page.docket_sources_utils import (
+from cl.opinion_page import docket_entry_sources
+from cl.opinion_page.docket_entry_sources import (
     DocketEntrySource,
     MetadataItem,
     MetadataSection,
+    SourceDocketEntry,
 )
 from cl.people_db.models import Person
 from cl.recap.constants import COURT_TIMEZONES
@@ -50,9 +53,10 @@ from cl.search.models import (
     DocketEntry,
     OpinionCluster,
     OriginatingCourtInformation,
+    SCOTUSDocketEntry,
 )
 
-logger = logging.getLogger(__name__)
+logger: logging.Logger = logging.getLogger(__name__)
 
 
 def _person_item(
@@ -81,7 +85,9 @@ def _person_item(
     return None
 
 
-def build_citation_string(obj: Docket | DocketEntry) -> str:
+def build_citation_string(
+    obj: Docket | DocketEntry | SCOTUSDocketEntry,
+) -> str:
     """Build a Bluebook-style citation string for a docket or docket entry.
 
     For dockets: name, docket_number, (court)
@@ -91,7 +97,7 @@ def build_citation_string(obj: Docket | DocketEntry) -> str:
         docket = obj
         date_of_interest = None
         ecf = ""
-    elif isinstance(obj, DocketEntry):
+    elif isinstance(obj, DocketEntry | SCOTUSDocketEntry):
         docket = obj.docket
         date_of_interest = obj.date_filed
         ecf = obj.entry_number
@@ -546,34 +552,28 @@ async def core_docket_data(
 ]:
     """Gather the core data for a docket, party, or IDB page."""
     docket: Docket = await aget_object_or_404(Docket, pk=pk)
+    source = docket.get_entry_source()
+    is_scotus = source is docket_entry_sources.SCOTUS
 
     # SCOTUS content is made available using a waffle flag:
     # every docket-related view shares this helper, so access
     # control resides here.
-    if docket.court_id == "scotus" and not await sync_to_async(
-        waffle.flag_is_active
-    )(request, "scotus_docket_page"):
+    if is_scotus and not await sync_to_async(waffle.flag_is_active)(
+        request, "scotus_docket_page"
+    ):
         raise Http404("Docket not found.")
 
     title = make_docket_title(docket)
 
-    try:
-        note = await Note.objects.aget(
-            docket_id=docket.pk,
-            user=await request.auser(),  # type: ignore[attr-defined]
-        )
-    except (ObjectDoesNotExist, TypeError):
-        # Not saved in notes or anonymous user
-        note_form = NoteForm(
-            initial={
-                "docket_id": docket.pk,
-                "name": trunc(best_case_name(docket), 100, ellipsis="..."),
-            }
-        )
-    else:
-        note_form = NoteForm(instance=note)
+    note_form = await get_note_form_for(
+        docket,
+        await request.auser(),  # type: ignore[arg-type]
+        trunc(best_case_name(docket), 100, ellipsis="..."),
+    )
 
-    has_alert = await user_has_alert(await request.auser(), docket)  # type: ignore[arg-type]
+    has_alert = await user_has_alert(
+        cast(User | AnonymousUser, await request.auser()), docket
+    )
 
     timezone_str = COURT_TIMEZONES.get(docket.court_id, "US/Eastern")
     docket_source = docket.get_entry_source()
@@ -613,7 +613,6 @@ async def core_docket_data(
             "has_alert": has_alert,
             "timezone": timezone_str,
             "private": docket.blocked,
-            "is_scotus": docket.court_id == "scotus",
             "docket_source": docket_source,
             # Resolved here because templates can't call the single-arg
             # source callable; gates the docket toolbar on every tab.
@@ -634,7 +633,9 @@ async def user_has_alert(user: AnonymousUser | User, docket: Docket) -> bool:
     return has_alert
 
 
-def generate_docket_entries_csv_data(docket_entries):
+def generate_docket_entries_csv_data(
+    docket_entries: QuerySet[SourceDocketEntry] | list[SourceDocketEntry],
+) -> str:
     """Get str representing in memory file from docket_entries.
 
     :param docket_entries: List of DocketEntry that implements CSVExportMixin.
@@ -762,7 +763,7 @@ class RelatedCitingResults:
 
 @dataclass
 class RelatedClusterResults:
-    related_clusters: list[OpinionClusterDocument] = field(
+    related_clusters: Response | list[OpinionClusterDocument] = field(
         default_factory=list
     )
     sub_opinion_pks: list[int] = field(default_factory=list)
@@ -950,10 +951,10 @@ async def es_get_cited_clusters_with_cache(
         response = None
         timeout_cited = True
 
-    citing_clusters = list(response) if not timeout_cited else []
+    citing_clusters = list(response) if response is not None else []
     cluster_results.citing_clusters = citing_clusters
     cluster_results.citing_cluster_count = (
-        response.hits.total.value if response is not None else 0
+        cast(Any, response.hits).total.value if response is not None else 0
     )
     cluster_results.timeout = False if citing_clusters else timeout_cited
     if not cluster_results.timeout:
@@ -1012,7 +1013,9 @@ async def es_cited_case_count(
     return cited_by_count
 
 
-async def es_related_case_count(cluster_id, sub_opinion_pks: list[str]) -> int:
+async def es_related_case_count(
+    cluster_id: int, sub_opinion_pks: list[str]
+) -> int:
     """Elastic quick related cases count
 
     :param cluster_id: The cluster id of the object

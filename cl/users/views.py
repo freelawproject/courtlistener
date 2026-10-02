@@ -13,7 +13,7 @@ from django.contrib.auth.views import PasswordResetView
 from django.core.exceptions import SuspiciousOperation, ValidationError
 from django.core.mail import send_mail
 from django.core.validators import validate_email
-from django.db import IntegrityError, transaction
+from django.db import IntegrityError, models, transaction
 from django.db.models import F
 from django.http import (
     HttpRequest,
@@ -52,6 +52,8 @@ from cl.api.utils import (
 from cl.api.views import parse_throttle_rate_for_template
 from cl.custom_filters.decorators import check_honeypot
 from cl.favorites.forms import NoteForm
+from cl.favorites.utils import NOTEABLE_MODELS, get_noted_object
+from cl.lib.auth import filter_by_email
 from cl.lib.crypto import generate_activation_key
 from cl.lib.ratelimiter import (
     ratelimiter_all_2_per_m,
@@ -60,7 +62,7 @@ from cl.lib.ratelimiter import (
 )
 from cl.lib.types import AuthenticatedHttpRequest, EmailType
 from cl.lib.url_utils import get_redirect_or_abort
-from cl.search.models import SEARCH_TYPES
+from cl.search.models import SEARCH_TYPES, RECAPDocument
 from cl.simple_pages.tasks import create_zoho_desk_ticket
 from cl.stats.metrics import accounts_deleted_total
 from cl.users.forms import (
@@ -74,7 +76,12 @@ from cl.users.forms import (
     UserForm,
 )
 from cl.users.models import UserProfile
-from cl.users.tasks import create_neon_account, update_neon_account
+from cl.users.tasks import (
+    create_neon_account,
+    notify_existing_account_holder,
+    send_new_account_emails,
+    update_neon_account,
+)
 from cl.users.utils import (
     convert_to_stub_account,
     delete_user_assets,
@@ -181,49 +188,48 @@ def view_docket_alerts(request: AuthenticatedHttpRequest) -> HttpResponse:
 @login_required
 @never_cache
 def view_notes(request: AuthenticatedHttpRequest) -> HttpResponse:
+    """Show the logged-in user's notes, grouped by the kind of object
+    each is attached to (docket, opinion, oral argument, or RECAP
+    document).
+    """
     notes = request.user.notes.all().order_by("pk")
-    note_forms = OrderedDict()
-    note_forms["Dockets"] = []
-    note_forms["RECAP Documents"] = []
-    note_forms["Opinions"] = []
-    note_forms["Oral Arguments"] = []
+    note_forms: OrderedDict[str, list[tuple[NoteForm, models.Model]]] = (
+        OrderedDict((label, []) for label in NOTEABLE_MODELS.values())
+    )
     for note in notes:
-        if note.cluster_id:
-            key = "Opinions"
-        elif note.audio_id:
-            key = "Oral Arguments"
-        elif note.recap_doc_id:
-            key = "RECAP Documents"
-        elif note.docket_id:
-            key = "Dockets"
-        note_forms[key].append(NoteForm(instance=note))
+        target = get_noted_object(note)
+        if target is None:
+            continue
+        bucket = NOTEABLE_MODELS.get(type(target))
+        if bucket is None:
+            continue
+        # Carried alongside the form so the template can build a link/
+        # icon without knowing which storage shape this Note is in.
+        note_forms[bucket].append((NoteForm(instance=note), target))
     docket_search_url = (
         "/?type=r&q=xxx AND docket_id:("
-        + " OR ".join(
-            str(a.instance.docket_id.pk) for a in note_forms["Dockets"]
-        )
+        + " OR ".join(str(target.pk) for _, target in note_forms["Dockets"])
         + ")"
     )
     oral_search_url = (
         "/?type=oa&q=xxx AND id:("
         + " OR ".join(
-            str(a.instance.audio_id.pk) for a in note_forms["Oral Arguments"]
+            str(target.pk) for _, target in note_forms["Oral Arguments"]
         )
         + ")"
     )
     recap_search_url = (
         "/?type=r&q=xxx AND docket_entry_id:("
         + " OR ".join(
-            str(a.instance.recap_doc_id.pk)
-            for a in note_forms["RECAP Documents"]
+            str(target.pk)
+            for _, target in note_forms["Documents"]
+            if isinstance(target, RECAPDocument)
         )
         + ")"
     )
     opinion_search_url = (
         "/?q=xxx AND cluster_id:("
-        + " OR ".join(
-            str(a.instance.cluster_id.pk) for a in note_forms["Opinions"]
-        )
+        + " OR ".join(str(target.pk) for _, target in note_forms["Opinions"])
         + ")&stat_Precedential=on&stat_Non-Precedential=on&stat_Errata=on&stat_Separate%20Opinion=on&stat_In-chambers=on&stat_Relating-to%20orders=on&stat_Unknown%20Status=on"
     )
     return TemplateResponse(
@@ -525,12 +531,25 @@ async def take_out_done(request: HttpRequest) -> HttpResponse:
 def register(request: HttpRequest) -> HttpResponse:
     """allow only an anonymous user to register"""
     redirect_to = get_redirect_or_abort(request, "next")
+    # Every successful-looking outcome below, including a refused duplicate,
+    # must produce this exact redirect. Anything that differs between the
+    # outcomes tells an observer whether the address already had an account.
+    # The address is stripped to match what the form's EmailField cleans, so
+    # the URL is what register_success expects to validate.
+    email = request.POST.get("email", "").strip()
+    success_url = (
+        reverse("register_success")
+        + f"?next={urlencode(redirect_to)}&email={urlencode(email)}"
+    )
     if request.user.is_anonymous:
         if request.method == "POST":
             try:
-                stub_account = User.objects.filter(
-                    profile__stub_account=True,
-                ).get(email__iexact=request.POST.get("email"))
+                # Use the same stripped address the form will clean, so a
+                # stub found here is the same account the form's duplicate
+                # check sees, and vice versa.
+                stub_account = filter_by_email(
+                    User.objects.filter(profile__stub_account=True), email
+                ).get()
             except User.DoesNotExist:
                 stub_account = False
 
@@ -544,6 +563,23 @@ def register(request: HttpRequest) -> HttpResponse:
             consent_form = OptInConsentForm(request.POST)
             if form.is_valid() and consent_form.is_valid():
                 cd = form.cleaned_data
+                if form.email_taken:
+                    # Somebody already holds this address. Create nothing, and
+                    # tell only the address owner, by email, which nobody else
+                    # can read. Mail goes through the same async path as the
+                    # real signup so the response takes the same shape.
+                    #
+                    # The real signup below also hashes the password when it
+                    # creates the user, and that hash dwarfs everything else
+                    # in the request. Hash here too, so the response time
+                    # doesn't say which path ran. This is Django's own idiom,
+                    # from ModelBackend.authenticate(); the User is never
+                    # saved, so there is no stored password to validate.
+                    # nosemgrep: python.django.security.audit.unvalidated-password.unvalidated-password
+                    User().set_password(cd["password1"])
+                    notify_existing_account_holder.delay(cd["email"])
+                    return HttpResponseRedirect(success_url)
+
                 try:
                     if not stub_account:
                         # make a new user that is active, but has not confirmed
@@ -575,11 +611,8 @@ def register(request: HttpRequest) -> HttpResponse:
                 except IntegrityError as e:
                     # Redirect to success if user already exists
                     try:
-                        user = User.objects.get(username=cd["username"])
-                        get_str = f"?next={urlencode(redirect_to)}&email={urlencode(user.email)}"
-                        return HttpResponseRedirect(
-                            reverse("register_success") + get_str
-                        )
+                        User.objects.get(username=cd["username"])
+                        return HttpResponseRedirect(success_url)
 
                     # Else, display generic error message and rerender form
                     except User.DoesNotExist:
@@ -604,28 +637,8 @@ def register(request: HttpRequest) -> HttpResponse:
                         )
 
                 # Only reached if user creation succeeded
-                email: EmailType = emails["confirm_your_new_account"]
-                send_mail(
-                    email["subject"],
-                    email["body"] % (user.username, up.activation_key),
-                    email["from_email"],
-                    [user.email],
-                )
-                email: EmailType = emails["new_account_created"]
-                send_mail(
-                    email["subject"] % up.user.username,
-                    email["body"]
-                    % (
-                        up.user.get_full_name() or "Not provided",
-                        up.user.email,
-                    ),
-                    email["from_email"],
-                    email["to"],
-                )
-                get_str = f"?next={urlencode(redirect_to)}&email={urlencode(user.email)}"
-                return HttpResponseRedirect(
-                    reverse("register_success") + get_str
-                )
+                send_new_account_emails.delay(user.pk)
+                return HttpResponseRedirect(success_url)
         else:
             form = UserCreationFormExtended()
             consent_form = OptInConsentForm()
@@ -741,7 +754,7 @@ def request_email_confirmation(request: HttpRequest) -> HttpResponse:
         form = EmailConfirmationForm(request.POST)
         if form.is_valid():
             cd = form.cleaned_data
-            users = User.objects.filter(email__iexact=cd["email"])
+            users = filter_by_email(User.objects.all(), cd["email"])
             if not len(users):
                 # Normally, we'd throw an error here, but instead we pretend it
                 # was a success. Meanwhile, we send an email saying that a
