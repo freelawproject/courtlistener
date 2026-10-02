@@ -136,6 +136,29 @@ Examples:
 - Allowed: `x-data="components.filters"`, `x-on:click="filters.apply"`
 - Not allowed: `x-data="{ open: true }"`, `x-on:click="count++"`
 
+## htmx
+
+v2 uses htmx 2.0.11 from `js/third_party/` (legacy keeps 1.7.0). `new_base.html` does not load it; a page with `hx-*` attributes MUST require it from its `footer-scripts` block:
+
+```html
+{% require_script "js/third_party/htmx" defer=True %}
+```
+
+Swapped partials live under `v2_includes/` (see [Naming & middleware](#naming--middleware)).
+
+`<body>` in `new_base.html` carries `hx-headers` with the CSRF token, and htmx elements inherit it: an `hx-post` MUST NOT repeat the header.
+
+### Disabled features
+
+`new_base.html` sets `allowEval` and `allowScriptTags` to `false` for every page, so markup cannot run arbitrary JavaScript:
+
+- `hx-on:*` does not run. Use Alpine `x-on:`; an `HX-Trigger` header dispatches its event on the requesting element.
+- `hx-trigger` filters such as `click[ctrlKey]` are ignored.
+- `js:` / `javascript:` values in `hx-vals` and `hx-headers` are not evaluated. Pass literal JSON.
+- `<script>` tags in a response are removed. Partials MUST NOT ship scripts.
+
+A blocked evaluation fires `htmx:evalDisallowedError` on the element. Reference: https://htmx.org/reference/#config
+
 ## Icons
 
 - Use the `{% svg %}` template tag (defined in `cl/custom_filters/templatetags/svg_tags.py`)
