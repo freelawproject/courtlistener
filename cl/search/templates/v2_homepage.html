@@ -46,12 +46,14 @@
                 x-on:click="open"
                 x-bind:aria-controls="dialogId"
                 x-bind:aria-expanded="isOpen"
+                x-bind:aria-label="filtersButtonAriaLabel"
                 x-init="openAdvancedFilters"
                 aria-haspopup="dialog"
                 class="w-full bg-white h-12 justify-center text-md text-greyscale-600 gap-2"
               >
-                {% svg "funnel" class="h-5 w-5 text-greyscale-400" %}
+                {% svg "funnel" class="h-5 w-5 text-greyscale-400" aria_hidden="true" %}
                 Filters
+                <c-corpus-search.active-filter-badge />
               </c-button>
             </c-slot>
           </c-corpus-search.mobile.dialog>
