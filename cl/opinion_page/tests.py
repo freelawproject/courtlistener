@@ -22,6 +22,7 @@ from django.core.management import call_command
 from django.core.paginator import Paginator
 from django.db import connection
 from django.http import HttpResponse
+from django.middleware.csrf import CSRF_TOKEN_LENGTH
 from django.template import TemplateDoesNotExist, engines
 from django.template.loader import get_template, render_to_string
 from django.template.response import TemplateResponse
@@ -3915,7 +3916,31 @@ class DocketPageV2TemplateTest(TestCase):
         )
         self.assertTemplateUsed(r, "v2_docket.html")
         self.assertContains(r, 'name="htmx-config"')
-        self.assertContains(r, "js/third_party/htmx")
+        # require_script emits the build for the current DEBUG setting, with
+        # the nonce and the defer flag it was registered with.
+        tag = re.search(
+            r'<script[^>]*src="[^"]*js/third_party/htmx(\.min)?\.js"[^>]*>',
+            r.content.decode(),
+        )
+        self.assertIsNotNone(tag)
+        self.assertIn(" defer", tag.group(0))
+        self.assertIn('nonce="', tag.group(0))
+
+    async def test_v2_body_carries_the_csrf_header_for_htmx(self) -> None:
+        """Every hx-post inherits the CSRF token from the body's hx-headers."""
+        r = await self.async_client.get(
+            reverse("view_docket", args=[self.docket.pk, self.docket.slug])
+        )
+        body = re.search(r"<body[^>]*>", r.content.decode())
+        self.assertIsNotNone(body)
+        header = re.search(
+            r'hx-headers=\'\{"X-CSRFToken": "([^"]*)"\}\'', body.group(0)
+        )
+        self.assertIsNotNone(header)
+        # The length rules out Django's NOTPROVIDED placeholder.
+        token = header.group(1)
+        self.assertEqual(len(token), CSRF_TOKEN_LENGTH)
+        self.assertTrue(token.isalnum())
 
 
 @override_settings(WAFFLE_CACHE_PREFIX="test_docket_alert_toggle_v2_waffle")

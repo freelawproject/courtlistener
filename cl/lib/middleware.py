@@ -1,6 +1,7 @@
 from collections.abc import Awaitable, Callable
+from inspect import iscoroutinefunction
 
-from asgiref.sync import iscoroutinefunction, markcoroutinefunction
+from asgiref.sync import markcoroutinefunction
 from django.http import HttpRequest, HttpResponseBase
 from django.template import TemplateDoesNotExist
 from django.template.loader import get_template
@@ -8,6 +9,10 @@ from django.template.response import TemplateResponse
 from waffle import flag_is_active
 
 from cl.search.forms import CorpusSearchForm
+
+# Templates a view returns on their own (htmx partials) live under this
+# prefix. .github/scripts/frontend_checks.py mirrors it in is_v2_partial.
+V2_PARTIALS_PREFIX = "v2_includes/"
 
 
 class RobotsHeaderMiddleware:
@@ -130,9 +135,11 @@ class IncrementalNewTemplateMiddleware:
 
         response.template_name = new_template_name
 
-        # htmx fragments never render the header, so the search form it
-        # needs would only be wasted work for them.
-        if not request.headers.get("HX-Request"):
+        # Partials never render the header, so the search form it needs would
+        # only be wasted work for them. The name decides, not the HX-Request
+        # header: the server knows what it renders, and a boosted full-page
+        # request must still get the form.
+        if not new_template_name.startswith(V2_PARTIALS_PREFIX):
             response.context_data["search_form"] = CorpusSearchForm()
 
         return response

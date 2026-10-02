@@ -90,11 +90,12 @@ def is_v2_template(path: str) -> bool:
     return "templates/v2_" in path and path.endswith(".html")
 
 
-def is_v2_fragment(path: str) -> bool:
+def is_v2_partial(path: str) -> bool:
     """A v2 partial rendered on its own, such as an htmx response.
 
-    Fragments have no page URL and no base template, so the page-only
+    Partials have no page URL and no base template, so the page-only
     checks do not apply to them. Everything else about v2 templates does.
+    The prefix mirrors V2_PARTIALS_PREFIX in cl/lib/middleware.py.
     """
     return is_v2_template(path) and "templates/v2_includes/" in path
 
@@ -755,7 +756,7 @@ V2_CHECKS = [
     (check_xdata_without_require_script, WARN),
 ]
 
-# Only full pages extend a base template; fragments (v2_includes/) don't.
+# Only full pages extend a base template; partials (v2_includes/) don't.
 V2_PAGE_CHECKS = [
     (check_extends_new_base, FAIL),
 ]
@@ -838,7 +839,7 @@ def run_checks(
         if is_v2_template(filepath):
             _apply_checks(V2_CHECKS, lines, filepath, findings)
 
-        if is_v2_template(filepath) and not is_v2_fragment(filepath):
+        if is_v2_template(filepath) and not is_v2_partial(filepath):
             _apply_checks(V2_PAGE_CHECKS, lines, filepath, findings)
 
             status = file_statuses.get(filepath, "")

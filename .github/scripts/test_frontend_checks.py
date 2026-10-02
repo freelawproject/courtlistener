@@ -19,7 +19,7 @@ CSS_FILE = "cl/assets/tailwind/input.css"
 V2_TEMPLATE_FILE = "cl/foo/templates/v2_help/index.html"
 LEGACY_TEMPLATE_FILE = "cl/foo/templates/help/index.html"
 V2_TEMPLATE_BODY = '{% extends "new_base.html" %}'
-V2_FRAGMENT_FILE = "cl/foo/templates/v2_includes/help/button.html"
+V2_PARTIAL_FILE = "cl/foo/templates/v2_includes/help/button.html"
 
 
 def _run_checks_on(
@@ -199,14 +199,14 @@ class LegacyTemplateDeletedTest(unittest.TestCase):
         self.assertEqual(findings, [])
 
 
-class V2FragmentTest(unittest.TestCase):
+class V2PartialTest(unittest.TestCase):
     """Partials under v2_includes/ are v2 templates but not pages."""
 
-    def test_added_fragment_skips_the_page_only_checks(self) -> None:
-        """No base template and no page URL is expected of a fragment."""
+    def test_added_partial_skips_the_page_only_checks(self) -> None:
+        """No base template and no page URL is expected of a partial."""
         findings = _run_checks_on(
-            {V2_FRAGMENT_FILE: "<c-button>Pray</c-button>"},
-            changed={V2_FRAGMENT_FILE: "A"},
+            {V2_PARTIAL_FILE: "<c-button>Pray</c-button>"},
+            changed={V2_PARTIAL_FILE: "A"},
         )
         self.assertEqual(findings, [])
 
@@ -224,12 +224,12 @@ class V2FragmentTest(unittest.TestCase):
             ],
         )
 
-    def test_fragment_keeps_the_other_v2_checks(self) -> None:
-        """A fragment is still held to the new stack's rules."""
+    def test_partial_keeps_the_other_v2_checks(self) -> None:
+        """A partial is still held to the new stack's rules."""
         findings = _run_checks_on(
-            {V2_FRAGMENT_FILE: "<script>$('.pray').click();</script>"}
+            {V2_PARTIAL_FILE: "<script>$('.pray').click();</script>"}
         )
-        self.assertEqual(findings, [(V2_FRAGMENT_FILE, 1, "check_jquery")])
+        self.assertEqual(findings, [(V2_PARTIAL_FILE, 1, "check_jquery")])
 
 
 class V2RegisterTest(unittest.TestCase):
