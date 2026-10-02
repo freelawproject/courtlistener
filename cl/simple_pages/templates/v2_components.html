@@ -34,6 +34,7 @@
         {'href': '#docket-page', 'text': 'Docket page'},
         {'href': '#docket-source-button', 'text': 'Docket source button'},
         {'href': '#docket-source-attribution', 'text': 'Docket source attribution'},
+        {'href': '#docket-alert-label', 'text': 'Docket alert label'},
         {'href': '#docket-entry-rows', 'text': 'Docket entry rows'},
         {'href': '#document-source-link', 'text': 'Document source link'},
         {'href': '#docket-filter', 'text': 'Docket filter'},
@@ -1306,7 +1307,7 @@ Sample code here.
       </c-library.item>
       <c-library.item optional only>
         <c-slot name="label"><code>trigger_aria_label</code></c-slot>
-        <c-slot name="description">Aria label for the trigger button.</c-slot>
+        <c-slot name="description">Accessible name of the trigger button. Leave it out when the button's visible content already is the name: an <code>aria-label</code> replaces the content for assistive technology.</c-slot>
       </c-library.item>
       <c-library.item optional only>
         <c-slot name="label"><code>menu_aria_label</code></c-slot>
@@ -1592,6 +1593,39 @@ Sample code here.
     <c-expansion-panel title="Code">
       <c-code>
 &lt;c-docket-source-attribution :docket_source="docket_source" /&gt;
+      </c-code>
+    </c-expansion-panel>
+  </section>
+
+  {# DOCKET ALERT LABEL #}
+  <section class="max-w-full w-full border-t-2 border-greyscale-200" x-intersect.margin.-100px="show" id="docket-alert-label">
+    <h2 class="mt-6 mb-3">Docket alert label</h2>
+    <p>The icon and text of the docket alert toggle for one state. The docket page renders it in the alerts menu trigger and item, and the toggle response renders it again into both, so the four copies cannot drift.</p>
+
+    <h4 class="mt-3">Demo</h4>
+    <div class="my-4 flex flex-row gap-6 rounded-lg border border-greyscale-200 p-4 text-sm">
+      <span class="flex items-center gap-1"><c-docket-alert-label :has_alert="False" /></span>
+      <span class="flex items-center gap-1"><c-docket-alert-label :has_alert="True" icon_class="w-4 h-4 text-greyscale-500" /></span>
+    </div>
+
+    <c-library.list title="Props" only>
+      <c-library.item only>
+        <c-slot name="label"><code>:has_alert</code></c-slot>
+        <c-slot name="description">Whether the user is subscribed to the docket. Picks the bell or slashed bell and the matching text.</c-slot>
+      </c-library.item>
+      <c-library.item optional only>
+        <c-slot name="label"><code>icon_class</code></c-slot>
+        <c-slot name="description">CSS classes for the icon. Defaults to <code>w-4 h-4</code>.</c-slot>
+      </c-library.item>
+    </c-library.list>
+
+    <c-library.list title="Slots" only>
+      <p>No slots</p>
+    </c-library.list>
+
+    <c-expansion-panel title="Code">
+      <c-code>
+&lt;c-docket-alert-label :has_alert="has_alert" icon_class="w-4 h-4 text-greyscale-500" /&gt;
       </c-code>
     </c-expansion-panel>
   </section>
