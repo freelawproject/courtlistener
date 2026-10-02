@@ -4336,6 +4336,33 @@ class NeonAccountUpdateTest(TestCase):
         update_account_mock.delay.assert_not_called()
 
 
+@patch("cl.users.views.create_neon_account")
+@patch("cl.users.views.update_neon_account")
+class SaveQueryHistorySettingTest(TestCase):
+    """Can users change whether their search queries are saved?"""
+
+    def test_can_disable_save_query_history(
+        self, update_account_mock, create_account_mock
+    ) -> None:
+        """Does unchecking the box on the settings page disable it?"""
+        up = UserProfileWithParentsFactory.create()
+        self.assertTrue(up.save_query_history)
+        self.client.force_login(up.user)
+        r = self.client.post(
+            reverse("view_settings"),
+            {
+                "first_name": "test_name",
+                "last_name": "test_last_name",
+                "email": up.user.email,
+            },
+            follow=True,
+        )
+
+        self.assertEqual(r.status_code, HTTPStatus.OK)
+        up.refresh_from_db()
+        self.assertFalse(up.save_query_history)
+
+
 @patch("cl.users.views.OptInConsentForm.is_valid", new=lambda self: True)
 @patch(
     "cl.custom_filters.decorators.verify_honeypot_value",

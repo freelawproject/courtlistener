@@ -165,6 +165,10 @@ class DisclosureAPITest(TestCase):
         ReimbursementFactory.create_batch(
             10, financial_disclosure=fd, redacted=False
         )
+        cls.user = UserProfileWithParentsFactory.create().user
+
+    def setUp(self) -> None:
+        self.async_client.force_login(self.user)
 
     async def test_disclosure_position_api(self) -> None:
         """Can we query the financial disclosure position API?"""

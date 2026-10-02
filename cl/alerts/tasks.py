@@ -459,7 +459,7 @@ def send_recap_email_user_not_found(recap_email_recipients: list[str]) -> None:
 
 
 def send_webhook_alert_hits(
-    alert_user: UserProfile.user, hits: list[SearchAlertHitType]
+    alert_user: User, hits: list[SearchAlertHitType]
 ) -> bool:
     """Send webhook alerts for search hits.
     :param alert_user: The user profile object associated with the webhooks.
@@ -470,6 +470,7 @@ def send_webhook_alert_hits(
 
     webhook_sent = False
     for alert, search_type, documents, num_docs in hits:
+        # pyrefly:ignore[missing-attribute]
         user_webhooks = alert_user.webhooks.filter(
             event_type=WebhookEventType.SEARCH_ALERT, enabled=True
         )
@@ -508,7 +509,7 @@ def send_search_alert_emails(
             continue
 
         subject = build_alert_email_subject(hits)
-        alert_user: UserProfile.user = User.objects.get(pk=user_id)
+        alert_user = User.objects.get(pk=user_id)
         context = {
             "hits": hits,
             "hits_limit": settings.SCHEDULED_ALERT_HITS_LIMIT,
@@ -613,7 +614,7 @@ def percolator_response_processing(response: SendAlertsResponse) -> None:
             # Ignore it.
             continue
 
-        alert_user: UserProfile.user = alert_triggered.user
+        alert_user = alert_triggered.user
         # The (document_type, document_id) pairs to record in the alert_hits
         # Redis sets if this hit ends up being delivered or scheduled.
         alert_set_writes: list[tuple[str, int]] = []
@@ -699,7 +700,7 @@ def percolator_response_processing(response: SendAlertsResponse) -> None:
         webhook_sent = send_webhook_alert_hits(alert_user, hits)
         schedule_alert = not (
             alert_triggered.rate == Alert.REAL_TIME
-            and not alert_user.profile.is_eligible_for_rt_search_alerts
+            and not alert_user.profile.is_eligible_for_rt_search_alerts  # pyrefly:ignore[missing-attribute]
         )
         # Only record the hit in the alert_hits Redis sets if the alert was
         # actually delivered (webhook) or will be scheduled (email).

@@ -61,7 +61,7 @@ async def get_coverage_data_fds(bust_cache: bool = False) -> dict[str, int]:
     coverage_key = "coverage-data.fd3"
     coverage_data = None if bust_cache else await cache.aget(coverage_key)
     if coverage_data is None:
-        coverage_data = {
+        models = {
             "disclosures": FinancialDisclosure,
             "investments": Investment,
             "positions": Position,
@@ -72,10 +72,10 @@ async def get_coverage_data_fds(bust_cache: bool = False) -> dict[str, int]:
             "gifts": Gift,
             "debts": Debt,
         }
-        # Populate the models
-        for k, model in coverage_data.items():
-            coverage_data[k] = await model.objects.all().acount()
-
+        coverage_data = {
+            k: await model.objects.all().acount()
+            for k, model in models.items()
+        }
         coverage_data["private"] = False
         one_week_minutes = 60 * 60 * 24 * 7
         await cache.aset(coverage_key, coverage_data, one_week_minutes)

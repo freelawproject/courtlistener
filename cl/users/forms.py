@@ -62,6 +62,7 @@ class ProfileForm(ModelForm):
             "docket_default_order_desc",
             "barmembership",
             "plaintext_preferred",
+            "save_query_history",
         )
         widgets = {
             "employer": forms.TextInput(

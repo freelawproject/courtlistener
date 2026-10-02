@@ -201,6 +201,8 @@ class NYCoDocketEntry(DocketEntry[NYCoAFile]):
         ``UNASSIGNED`` on the same terms as ``entry_role``.
     """
 
+    # Court-PASS leaves some filings undated; the base's `date` assumes one.
+    # pyrefly: ignore[bad-override-mutable-attribute]
     date_filed: date | None = None
     docket_entry_id: str
     entry_index: int
@@ -308,6 +310,8 @@ class NYCoACase(Docket[DocketTransfer, NYCoDocketEntry, NYCoAParty]):
         empty. Present because the standard docket format requires it.
     """
 
+    # Undated when no filing carries a date; the base's `date` assumes one.
+    # pyrefly: ignore[bad-override-mutable-attribute]
     date_filed: date | None = None
     argument_date: date | None = None
     decision_date: date | None = None

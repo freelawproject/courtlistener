@@ -1,3 +1,6 @@
+from typing import cast
+
+from django.contrib.auth.models import AnonymousUser, User
 from django.http import HttpRequest, HttpResponse
 from django.shortcuts import aget_object_or_404  # type: ignore[attr-defined]
 from django.template.response import TemplateResponse
@@ -47,7 +50,9 @@ async def view_audio_file(
 
     # --- End transcript metadata fetch ---
 
-    user = await request.auser()  # type: ignore[attr-defined]
+    # auser() is typed as AbstractBaseUser | AnonymousUser; the default user
+    # model makes this exact.
+    user = cast(User | AnonymousUser, await request.auser())
 
     async def get_name() -> str:
         # Only fetched if af turns out to have no Note yet.
