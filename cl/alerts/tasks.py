@@ -551,16 +551,36 @@ def send_search_alert_emails(
 @retry(IntegrityError, tries=3, delay=0.5, backoff=1)
 def create_schedule_alerts_hits_in_bulk(
     scheduled_hits: list[ScheduledAlertHit],
-) -> None:
+) -> int:
     """Create ScheduledAlertHit records in bulk.
 
+    Rows are inserted in batches of settings.SCHEDULED_ALERT_HIT_BATCH_SIZE to
+    bound the memory psycopg uses while building each INSERT, and the whole set
+    is written in one transaction so that the IntegrityError retry cannot
+    re-insert batches that already committed.
+
     :param scheduled_hits: A list of ScheduledAlertHit instances to be created.
-    :return: None
+    :return: The number of ScheduledAlertHit records created.
     """
+    if not scheduled_hits:
+        return 0
+
+    existing_alert_ids = set(
+        Alert.objects.filter(
+            pk__in={hit.alert_id for hit in scheduled_hits}
+        ).values_list("pk", flat=True)
+    )
+    hits_to_create = [
+        hit for hit in scheduled_hits if hit.alert_id in existing_alert_ids
+    ]
+    if not hits_to_create:
+        return 0
+
     with transaction.atomic():
         ScheduledAlertHit.objects.bulk_create(
-            scheduled_hits, batch_size=settings.SCHEDULED_ALERT_HIT_BATCH_SIZE
+            hits_to_create, batch_size=settings.SCHEDULED_ALERT_HIT_BATCH_SIZE
         )
+    return len(hits_to_create)
 
 
 @app.task(ignore_result=True)
@@ -590,7 +610,6 @@ def percolator_response_processing(response: SendAlertsResponse) -> None:
     r = get_redis_interface("CACHE")
     recap_document_hits = [hit.id for hit in rd_alerts_triggered]
     docket_hits = [hit.id for hit in d_alerts_triggered]
-    alerts_triggered_ids = []
     for hit in main_alerts_triggered:
         # Create a deep copy of the original 'document_content' to allow
         # independent highlighting for each alert triggered.
@@ -736,22 +755,9 @@ def percolator_response_processing(response: SendAlertsResponse) -> None:
                 object_id=object_id,
             )
         )
-        alerts_triggered_ids.append(alert_triggered_id)
 
-    # Filter out scheduled_hits_to_create by alerts that still exist in the
-    # database to prevent an IntegrityError caused by a race condition when
-    # an alert is deleted.
-    existing_ids = set(
-        Alert.objects.filter(pk__in=alerts_triggered_ids).values_list(
-            "pk", flat=True
-        )
-    )
-    scheduled_hits_to_create_filtered = [
-        hit for hit in scheduled_hits_to_create if hit.alert_id in existing_ids
-    ]
     # Create scheduled RT, DAILY, WEEKLY and MONTHLY Alerts in bulk.
-    if scheduled_hits_to_create_filtered:
-        create_schedule_alerts_hits_in_bulk(scheduled_hits_to_create_filtered)
+    create_schedule_alerts_hits_in_bulk(scheduled_hits_to_create)
 
 
 @app.task(

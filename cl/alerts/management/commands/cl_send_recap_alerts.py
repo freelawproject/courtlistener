@@ -808,29 +808,15 @@ def query_and_schedule_alerts(
                 # Send webhooks
                 send_search_alert_webhooks(user, results_to_send, alert.pk)
 
-        if not scheduled_hits_to_create:
-            continue
-
-        # Filter out scheduled_hits_to_create by alerts that still exist in
-        existing_ids = set(
-            Alert.objects.filter(
-                pk__in={hit.alert_id for hit in scheduled_hits_to_create}
-            ).values_list("pk", flat=True)
-        )
-        scheduled_hits_to_create_filtered = [
-            hit
-            for hit in scheduled_hits_to_create
-            if hit.alert_id in existing_ids
-        ]
         # Create scheduled WEEKLY and MONTHLY Alerts in bulk. Shares the
-        # percolator's helper to get the same batching and atomic retries.
-        if scheduled_hits_to_create_filtered:
-            create_schedule_alerts_hits_in_bulk(
-                scheduled_hits_to_create_filtered
-            )
+        # percolator's helper to get the same filtering of deleted alerts,
+        # batching and atomic retries.
+        if scheduled_hits_created := create_schedule_alerts_hits_in_bulk(
+            scheduled_hits_to_create
+        ):
             logger.info(
                 "Scheduled %s '%s' alerts for user '%s'",
-                len(scheduled_hits_to_create_filtered),
+                scheduled_hits_created,
                 rate,
                 user,
             )
