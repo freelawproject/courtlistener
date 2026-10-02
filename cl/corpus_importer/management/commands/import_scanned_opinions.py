@@ -3,12 +3,13 @@ import os
 import re
 from dataclasses import dataclass, field
 from datetime import date
+from functools import partial
 from glob import glob
 from typing import Any
 
 from bs4 import BeautifulSoup, Tag
 from django.core.files.base import ContentFile
-from django.core.management import CommandParser
+from django.core.management import CommandError, CommandParser
 from django.db import transaction
 from django.utils.text import slugify
 from eyecite.find import get_citations
@@ -33,6 +34,7 @@ from cl.corpus_importer.utils import (
 )
 from cl.lib.command_utils import VerboseCommand, logger
 from cl.lib.crypto import sha1
+from cl.lib.storage import ScanningFinalXmlStorage
 from cl.lib.utils import human_sort
 from cl.people_db.lookup_utils import extract_judge_last_name
 from cl.scrapers.utils import (
@@ -52,6 +54,13 @@ from cl.search.models import (
 HYPERSCAN_TOKENIZER = HyperscanTokenizer(cache_dir=".hyperscan")
 
 cnt = CaseNameTweaker()
+
+# The scanning portal stores one XML per approved opinion at
+# final-xml/{scan id}/{opinion id}.xml in its private bucket
+FINAL_XML_PREFIX = "final-xml/"
+# The `schema` attribute values of `<casebody>` this command knows how to
+# read. The portal raises it when its output changes shape.
+SUPPORTED_SCHEMAS = {"1"}
 
 PER_CURIAM_RE = re.compile(r"per\s+curiam", re.IGNORECASE)
 # A complete date as printed in reporters: "May 22, 2024", "Dec. 18, 2009",
@@ -141,6 +150,55 @@ def xml_file_paths(path: str) -> list[str]:
     if os.path.isfile(path):
         return [path]
     return human_sort(glob(os.path.join(path, "**", "*.xml"), recursive=True))
+
+
+def s3_xml_keys(
+    storage: ScanningFinalXmlStorage,
+    scan_ids: list[str] | None,
+    opinion_id: str | None = None,
+) -> list[str]:
+    """List the keys of the final XML files to import from the bucket.
+
+    :param storage: The scanning portal's bucket.
+    :param scan_ids: The scans to import. When empty, every scan with an
+        exported XML.
+    :param opinion_id: A single opinion of the only scan in `scan_ids`.
+    :return: A list of S3 keys, e.g. "final-xml/15343/3.xml".
+    """
+    if opinion_id:
+        return [f"{FINAL_XML_PREFIX}{scan_ids[0]}/{opinion_id}.xml"]
+    if not scan_ids:
+        scan_ids, _ = storage.listdir(FINAL_XML_PREFIX)
+    keys = []
+    for scan_id in human_sort(scan_ids):
+        _, file_names = storage.listdir(f"{FINAL_XML_PREFIX}{scan_id}/")
+        keys.extend(
+            f"{FINAL_XML_PREFIX}{scan_id}/{name}"
+            for name in human_sort(file_names)
+            if name.endswith(".xml")
+        )
+    return keys
+
+
+def read_s3_xml(storage: ScanningFinalXmlStorage, key: str) -> str:
+    """Read a final XML file from the scanning portal's bucket.
+
+    :param storage: The scanning portal's bucket.
+    :param key: The S3 key of the file.
+    :return: The XML content.
+    """
+    with storage.open(key) as f:
+        return f.read().decode("utf-8")
+
+
+def read_local_xml(file_path: str) -> str:
+    """Read a final XML file from the local disk.
+
+    :param file_path: The path of the file.
+    :return: The XML content.
+    """
+    with open(file_path, encoding="utf-8") as f:
+        return f.read()
 
 
 def get_citation_strings(soup: BeautifulSoup) -> list[str]:
@@ -310,6 +368,17 @@ def parse_scan_xml(
     :return: A ScanCase, or None if the file can't be imported.
     """
     soup = BeautifulSoup(xml, "lxml-xml")
+
+    casebody = soup.select_one("casebody")
+    schema = casebody.get("schema") if casebody else None
+    if schema not in SUPPORTED_SCHEMAS:
+        logger.warning(
+            "Unsupported schema %s in %s. Supported: %s",
+            schema,
+            file_path,
+            sorted(SUPPORTED_SCHEMAS),
+        )
+        return None
 
     # Store the opinion XML before `parse_extra_fields` mutates the soup
     opinion_elements = soup.select("opinion")
@@ -643,21 +712,22 @@ def add_new_case(scan_case: ScanCase) -> OpinionCluster:
     return cluster
 
 
-def import_scanned_opinion(file_path: str, court_id: str | None) -> None:
+def import_scanned_opinion(
+    xml: str, file_path: str, court_id: str | None
+) -> None:
     """Import a scanning project final XML into CourtListener.
 
     Skips opinions already imported from the scanning project. Merges into
     a matching cluster from another source when one exists; otherwise
     creates a new docket, cluster, citations and opinions.
 
-    :param file_path: The path of the XML file.
+    :param xml: The XML content.
+    :param file_path: The local path or the S3 key of the XML, used for
+        logging.
     :param court_id: The CL court id, or None to look it up in the XML.
     :return: None
     """
     logger.info("Processing %s", file_path)
-    with open(file_path, encoding="utf-8") as f:
-        xml = f.read()
-
     if not (scan_case := parse_scan_xml(xml, file_path, court_id)):
         return
     citation = scan_case.citation.corrected_citation()
@@ -716,12 +786,29 @@ class Command(VerboseCommand):
         :param parser: The command parser.
         :return: None
         """
-        parser.add_argument(
+        source = parser.add_mutually_exclusive_group(required=True)
+        source.add_argument(
             "--path",
             type=str,
-            required=True,
             help="An XML file, or a directory searched recursively for XML "
             "files.",
+        )
+        source.add_argument(
+            "--scan-id",
+            nargs="+",
+            type=str,
+            help="Import the XML files of these scans from the scanning "
+            "portal's bucket.",
+        )
+        source.add_argument(
+            "--all",
+            action="store_true",
+            help="Import every XML file in the scanning portal's bucket.",
+        )
+        parser.add_argument(
+            "--opinion-id",
+            type=str,
+            help="Import a single opinion of the scan given in --scan-id.",
         )
         parser.add_argument(
             "--court-id",
@@ -736,9 +823,24 @@ class Command(VerboseCommand):
         :return: None
         """
         super().handle(*args, **options)
-        for file_path in xml_file_paths(options["path"]):
+        scan_ids, opinion_id = options["scan_id"], options["opinion_id"]
+        if opinion_id and (not scan_ids or len(scan_ids) != 1):
+            raise CommandError("--opinion-id needs a single --scan-id.")
+
+        if options["path"]:
+            file_paths = xml_file_paths(options["path"])
+            read = read_local_xml
+        else:
+            storage = ScanningFinalXmlStorage()
+            file_paths = s3_xml_keys(storage, scan_ids, opinion_id)
+            read = partial(read_s3_xml, storage)
+        logger.info("Found %s XML files to import", len(file_paths))
+
+        for file_path in file_paths:
             try:
-                import_scanned_opinion(file_path, options["court_id"])
+                import_scanned_opinion(
+                    read(file_path), file_path, options["court_id"]
+                )
             except Exception:
                 # Keep going; one bad file shouldn't stop a volume import
                 logger.exception("Failed to import %s", file_path)

@@ -1,3 +1,4 @@
+import io
 import re
 import tempfile
 from datetime import date
@@ -5,7 +6,7 @@ from pathlib import Path
 from unittest import mock
 
 from bs4 import BeautifulSoup
-from django.core.management import call_command
+from django.core.management import CommandError, call_command
 from django.db.models.fields.files import FieldFile
 
 from cl.corpus_importer.management.commands.import_scanned_opinions import (
@@ -14,6 +15,7 @@ from cl.corpus_importer.management.commands.import_scanned_opinions import (
     get_docket_number,
     make_opinion,
     normalize_case_name_caps,
+    s3_xml_keys,
 )
 from cl.search.cluster_sources import ClusterSources
 from cl.search.factories import (
@@ -430,7 +432,7 @@ class ImportScannedOpinionsTest(TestCase):
         """Is a different case with the same citation imported?"""
         self.import_scan()
         xml = """<?xml version="1.0" encoding="utf-8"?>
-<casebody firstpage="1" lastpage="1">
+<casebody firstpage="1" lastpage="1" schema="1">
   <citation>388 So. 3d 1</citation>
   <parties><party>John DOEWELL, Appellant,</party> <separator>v.</separator>
   <party>STATE of Florida, Appellee.</party></parties>
@@ -552,6 +554,16 @@ class ImportScannedOpinionsTest(TestCase):
                 self.scan_xml.replace("Fourth District", "Tenth Circuit"),
                 None,
             ),
+            (
+                "Unsupported schema",
+                self.scan_xml.replace('schema="1"', 'schema="99"'),
+                self.court.pk,
+            ),
+            (
+                "Unsupported schema",
+                self.scan_xml.replace(' schema="1"', ""),
+                self.court.pk,
+            ),
         ]
         for message, xml, court_id in cases:
             with (
@@ -561,3 +573,141 @@ class ImportScannedOpinionsTest(TestCase):
                 self.import_xml(xml, court_id=court_id)
                 self.assertEqual(OpinionCluster.objects.count(), 0)
                 self.assertIn(message, mock_logger.warning.call_args[0][0])
+
+
+class FakeScanningStorage:
+    """An in-memory stand-in for the scanning portal's bucket."""
+
+    def __init__(self, files: dict[str, str]) -> None:
+        self.files = files
+
+    def listdir(self, path: str) -> tuple[list[str], list[str]]:
+        dirs, names = set(), []
+        for key in self.files:
+            if not key.startswith(path):
+                continue
+            rest = key[len(path) :]
+            if "/" in rest:
+                dirs.add(rest.split("/", 1)[0])
+            else:
+                names.append(rest)
+        return sorted(dirs), names
+
+    def open(self, key: str):
+        if key not in self.files:
+            raise FileNotFoundError(key)
+        return io.BytesIO(self.files[key].encode())
+
+
+class ScanningBucketKeysTest(SimpleTestCase):
+    """Tests for listing the final XML keys of the scanning bucket."""
+
+    storage = FakeScanningStorage(
+        {
+            "final-xml/15343/3.xml": "",
+            "final-xml/15343/10.xml": "",
+            "final-xml/15343/notes.txt": "",
+            "final-xml/9/1.xml": "",
+        }
+    )
+
+    def test_keys_of_scans(self) -> None:
+        """Are the XML keys of the given scans listed in human order?"""
+        self.assertEqual(
+            s3_xml_keys(self.storage, ["15343"]),
+            ["final-xml/15343/3.xml", "final-xml/15343/10.xml"],
+        )
+
+    def test_keys_of_every_scan(self) -> None:
+        """Are the keys of every scan listed when no scan is given?"""
+        self.assertEqual(
+            s3_xml_keys(self.storage, None),
+            [
+                "final-xml/9/1.xml",
+                "final-xml/15343/3.xml",
+                "final-xml/15343/10.xml",
+            ],
+        )
+
+    def test_key_of_one_opinion(self) -> None:
+        """Is a single opinion's key built from the two ids?"""
+        self.assertEqual(
+            s3_xml_keys(self.storage, ["15343"], "3"),
+            ["final-xml/15343/3.xml"],
+        )
+
+
+class ImportFromScanningBucketTest(TestCase):
+    """Tests for importing the final XML from the scanning bucket."""
+
+    @classmethod
+    def setUpTestData(cls) -> None:
+        cls.court = CourtFactory.create(
+            id="fladistctapp4", jurisdiction=Court.STATE_APPELLATE
+        )
+        with open(SCAN_XML_PATH, encoding="utf-8") as f:
+            cls.scan_xml = f.read()
+
+    def import_from_bucket(
+        self, files: dict[str, str], **options: object
+    ) -> None:
+        """Run the command over a fake scanning bucket."""
+        with mock.patch(
+            f"{COMMAND_MODULE}.ScanningFinalXmlStorage",
+            return_value=FakeScanningStorage(files),
+        ):
+            call_command(
+                "import_scanned_opinions", court_id=self.court.pk, **options
+            )
+
+    def test_import_scan(self) -> None:
+        """Is the XML of a scan imported from the bucket?"""
+        self.import_from_bucket(
+            {"final-xml/3593/12.xml": self.scan_xml}, scan_id=["3593"]
+        )
+        cluster = OpinionCluster.objects.get()
+        self.assertEqual(cluster.case_name, "Larry B. Merritt v. State of Florida")
+        self.assertEqual(cluster.sub_opinions.count(), 1)
+
+    def test_import_every_scan(self) -> None:
+        """Does --all import the XML of every scan?"""
+        self.import_from_bucket(
+            {"final-xml/3593/12.xml": self.scan_xml}, all=True
+        )
+        self.assertEqual(OpinionCluster.objects.count(), 1)
+
+    def test_import_one_opinion(self) -> None:
+        """Does --opinion-id import that opinion alone?"""
+        other = self.scan_xml.replace("388 So. 3d 1<", "388 So. 3d 9<")
+        self.import_from_bucket(
+            {
+                "final-xml/3593/12.xml": self.scan_xml,
+                "final-xml/3593/13.xml": other,
+            },
+            scan_id=["3593"],
+            opinion_id="12",
+        )
+        self.assertEqual(
+            OpinionCluster.objects.get().citations.get().page, "1"
+        )
+
+    def test_opinion_id_needs_one_scan(self) -> None:
+        """Is --opinion-id refused without exactly one --scan-id?"""
+        for options in [
+            {"all": True, "opinion_id": "12"},
+            {"scan_id": ["1", "2"], "opinion_id": "12"},
+        ]:
+            with self.subTest(options=options):
+                with self.assertRaises(CommandError):
+                    self.import_from_bucket({}, **options)
+
+    def test_failed_read_does_not_stop_the_run(self) -> None:
+        """Does a missing key log the failure and leave the run going?"""
+        with mock.patch(f"{COMMAND_MODULE}.logger") as mock_logger:
+            self.import_from_bucket(
+                {"final-xml/3593/13.xml": self.scan_xml},
+                scan_id=["3593"],
+                opinion_id="12",
+            )
+        mock_logger.exception.assert_called_once()
+        self.assertEqual(OpinionCluster.objects.count(), 0)

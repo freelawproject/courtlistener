@@ -106,6 +106,28 @@ class TexasEmailSESStorage(S3Storage):
     bucket_name = "texas-email"
 
 
+class ScanningFinalXmlStorage(S3Storage):
+    """Read-only S3 storage for the scanning portal's private bucket.
+
+    import_scanned_opinions reads the final XML of the approved opinions
+    from it, at final-xml/{scan id}/{opinion id}.xml. The bucket belongs to
+    the scanning portal, so it can have a read-only user of its own.
+    """
+
+    default_acl = "private"
+    bucket_name = settings.SCANNING_BUCKET_NAME
+    region_name = settings.SCANNING_BUCKET_REGION
+    querystring_auth = True
+
+    def __init__(self, **kwargs):
+        if settings.SCANNING_AWS_ACCESS_KEY_ID:
+            kwargs.setdefault("access_key", settings.SCANNING_AWS_ACCESS_KEY_ID)
+            kwargs.setdefault(
+                "secret_key", settings.SCANNING_AWS_SECRET_ACCESS_KEY
+            )
+        super().__init__(**kwargs)
+
+
 class S3PrivateLLMStorage(S3Storage):
     """Private S3 storage for LLM-related files (inputs, responses, batch
     results). Uses private ACL to keep internal processing files
