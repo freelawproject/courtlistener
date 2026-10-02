@@ -23,11 +23,15 @@ Example:
 
 document.addEventListener('alpine:init', () => {
   Alpine.data('copy', () => ({
-    copyToClipboard() {
+    async copyToClipboard() {
       const raw = JSON.parse(`"${this.$el.dataset?.textToCopy}"`);
       const textToCopy = document.createElement('textarea');
       textToCopy.innerHTML = raw;
-      navigator.clipboard.writeText(textToCopy.value.trim());
+      try {
+        await navigator.clipboard.writeText(textToCopy.value.trim());
+      } catch (err) {
+        console.error('Failed to copy to clipboard:', err);
+      }
     },
   }));
 });
