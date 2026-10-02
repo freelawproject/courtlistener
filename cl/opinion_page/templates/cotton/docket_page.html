@@ -56,13 +56,7 @@
     <c-slot name="button_content">
       {# Swap target: the toggle response replaces this span's contents. #}
       <span id="docket-alert-label-{{ docket.pk }}" class="contents">
-        {% if has_alert %}
-          {% svg "bell_slash" class="w-4 h-4" aria_hidden="true" %}
-          Disable Alerts
-        {% else %}
-          {% svg "bell" class="w-4 h-4" aria_hidden="true" %}
-          Get Alerts
-        {% endif %}
+        <c-docket-alert-label :has_alert="has_alert" />
       </span>
       <span
         class="transition-transform duration-200 group-aria-[expanded=true]:rotate-180 flex justify-center items-center w-4 h-4"
@@ -76,18 +70,11 @@
             tag="button"
             hx-post="{% url 'toggle_docket_alert' %}"
             hx-vals='{"id": "{{ docket.pk }}"}'
-            hx-headers='{"X-CSRFToken": "{{ csrf_token }}"}'
             hx-swap="none"
             hx-disabled-elt="this"
           >
             <span id="docket-alert-toggle-{{ docket.pk }}" class="contents">
-              {% if has_alert %}
-                {% svg "bell_slash" class="w-4 h-4 text-greyscale-500" aria_hidden="true" %}
-                Disable Alerts
-              {% else %}
-                {% svg "bell" class="w-4 h-4 text-greyscale-500" aria_hidden="true" %}
-                Get Alerts
-              {% endif %}
+              <c-docket-alert-label :has_alert="has_alert" icon_class="w-4 h-4 text-greyscale-500" />
             </span>
           </c-menu-button.item>
         {% else %}
