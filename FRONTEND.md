@@ -115,8 +115,6 @@ tag warns in the runserver console while you're on the page, and
 
 Plugins MUST be deferred (`defer=True`).
 
-Page-level scripts (a library one page needs, such as htmx) MUST be required from the page's `footer-scripts` block. `new_base.html` renders that block right before it prints the registry, ahead of Alpine, so a `require_script` anywhere later in the base raises instead of silently emitting nothing. Raw `<script>` tags MUST NOT be written in the block: `require_script` already handles the build, the nonce and `defer`.
-
 ### File organization
 
 | Type | Location |

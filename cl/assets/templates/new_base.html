@@ -7,7 +7,7 @@
   <meta http-equiv="Content-Language" content="en"/>
   <meta name="language" content="en_us"/>
   <meta name="viewport" content="width=device-width,initial-scale=1"/>
-  {# htmx is not loaded here. Pages that need it require it from their footer-scripts block and inherit this hardened config. #}
+  {# Hardened htmx config: pages load htmx per page through the footer-scripts block. #}
   <meta name="htmx-config" content='{"allowEval": false, "allowScriptTags": false}'/>
 
   {% block meta %}
@@ -93,17 +93,16 @@
     <c-footer></c-footer>
   {% endblock %}
 
-  {# Allows your own scripts in the footer. #}
-  {% block footer-scripts %}{% endblock %}
-
   {% render_required_scripts %}
-  {# A require_script call after this line raises: the registry is already printed. #}
 
   {% if DEBUG %}
   <script src="{% static 'js/alpine/alpinejscsp.js' %}" defer nonce="{{ csp_nonce }}"></script>
   {% else %}
   <script src="{% static 'js/alpine/alpinejscsp.min.js' %}" defer nonce="{{ csp_nonce }}"></script>
   {% endif %}
+
+  {# Allows your own scripts in the footer. #}
+  {% block footer-scripts %}{% endblock %}
 
   {# Record stats for non-superusers 1/10 times to save money #}
   {% if not user.is_superuser  %}

@@ -122,19 +122,9 @@ def require_script(context, script_path, **kwargs):
         TemplateSyntaxError:
             - If the same script is required twice with different defer flags.
             - If an invalid value is passed to the defer flag.
-            - If called after render_required_scripts already printed the
-              registry for this request, since the script would be dropped
-              silently. In new_base.html that means any block rendered
-              after footer-scripts.
     """
     if "request" not in context:
         return ""
-
-    if getattr(context["request"], "_required_scripts_rendered", False):
-        raise TemplateSyntaxError(
-            f"Script '{script_path}' was required after render_required_scripts "
-            "already ran. Require it from the footer-scripts block or earlier."
-        )
 
     if not script_path.endswith(".js"):
         _extensionless_registry_for(context["request"]).add(script_path)
@@ -158,15 +148,11 @@ def require_script(context, script_path, **kwargs):
 def render_required_scripts(context):
     """
     Renders the required scripts for this request right before the Alpine script.
-
-    Marks the request as rendered: a require_script after this point raises
-    instead of registering a script that would never be emitted.
     """
     if "request" not in context:
         return ""
 
     _warn_about_unusable_scripts(context["request"])
-    context["request"]._required_scripts_rendered = True
 
     registry = getattr(context["request"], "_required_component_scripts", None)
     if not registry:
