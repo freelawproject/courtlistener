@@ -697,25 +697,31 @@ class ViewRecapDocumentTest(TestCase):
         docket = await sync_to_async(DocketFactory)(
             court=court, source=Docket.RECAP, pacer_case_id="104490"
         )
-        de_data = await sync_to_async(DocketEntriesDataFactory)(
-            docket_entries=[
-                DocketEntryDataFactory(
-                    pacer_doc_id="288651",
-                    document_number=1,
-                )
-            ],
+        de_data = cast(
+            dict[str, Any],
+            await sync_to_async(DocketEntriesDataFactory)(
+                docket_entries=[
+                    DocketEntryDataFactory(
+                        pacer_doc_id="288651",
+                        document_number=1,
+                    )
+                ],
+            ),
         )
         await add_docket_entries(docket, de_data["docket_entries"])
 
-        att_data = await sync_to_async(AppellateAttachmentPageFactory)(
-            attachments=[
-                AppellateAttachmentFactory(
-                    attachment_number=1, pacer_doc_id="288651"
-                ),
-                AppellateAttachmentFactory(),
-            ],
-            pacer_doc_id="288651",
-            pacer_case_id="104490",
+        att_data = cast(
+            dict[str, Any],
+            await sync_to_async(AppellateAttachmentPageFactory)(
+                attachments=[
+                    AppellateAttachmentFactory(
+                        attachment_number=1, pacer_doc_id="288651"
+                    ),
+                    AppellateAttachmentFactory(),
+                ],
+                pacer_doc_id="288651",
+                pacer_case_id="104490",
+            ),
         )
         await merge_attachment_page_data(
             court,
@@ -1704,8 +1710,11 @@ class ViewRecapDocketTest(TestCase):
         Verify that the Docket view handles out-of-range page requests by returning
         the last valid page.
         """
-        entries = DocketEntriesDataFactory(
-            docket_entries=DocketEntryDataFactory.create_batch(50)
+        entries = cast(
+            dict[str, Any],
+            DocketEntriesDataFactory(
+                docket_entries=DocketEntryDataFactory.create_batch(50)
+            ),
         )
         await add_docket_entries(self.docket, entries["docket_entries"])
         response = await self.async_client.get(
@@ -2472,7 +2481,7 @@ class UploadPublication(TestCase):
         self.async_client = AsyncClient()
 
         qs = Person.objects.filter(positions__court_id="tennworkcompapp")
-        self.work_comp_app_data = {
+        self.work_comp_app_data: dict[str, str | int | date | None] = {
             "case_title": "A Sample Case",
             "lead_author": qs[0].id,
             "second_judge": qs[1].id,
