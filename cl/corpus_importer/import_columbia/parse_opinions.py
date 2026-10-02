@@ -2,6 +2,8 @@
 import os
 import re
 import xml.etree.ElementTree as ET
+from datetime import date
+from typing import NotRequired, TypedDict
 
 import dateutil.parser as dparser
 from juriscraper.lib.string_utils import (
@@ -22,7 +24,7 @@ from .regexes_columbia import FOLDER_DICT, SPECIAL_REGEXES
 CASE_NAME_TWEAKER = CaseNameTweaker()
 
 # tags for which content will be condensed into plain text
-SIMPLE_TAGS = [
+SIMPLE_TAGS = (
     "reporter_caption",
     "citation",
     "caption",
@@ -33,7 +35,7 @@ SIMPLE_TAGS = [
     "hearing_date",
     "panel",
     "attorneys",
-]
+)
 
 # regex that will be applied when condensing SIMPLE_TAGS content
 STRIP_REGEX = [r"</?citation.*>", r"</?page_number.*>"]
@@ -43,7 +45,40 @@ STRIP_REGEX = [r"</?citation.*>", r"</?page_number.*>"]
 OPINION_TYPES = ["opinion", "dissent", "concurrence"]
 
 
-def parse_file(file_path):
+class _BasicOpinionDict(TypedDict):
+    type: str
+    byline: str | None
+    opinion: str
+
+
+class _FullOpinionDict(_BasicOpinionDict):
+    opinion_texts: list[str]
+    author: str | None
+    joining: list[str]
+    per_curiam: bool
+    sha1: str
+    local_path: str
+
+
+class _InfoDict(TypedDict):
+    unpublished: bool
+    file: str
+    docket: str | None
+    citations: list
+    attorneys: str | None
+    posture: str | None
+    court_id: str | None
+    panel: list[str]
+    case_name_full: str
+    case_name: str
+    case_name_short: str
+    dates: list[list[tuple[str | None, date]]]
+    per_curiam: bool
+    opinions: list[_FullOpinionDict]
+    judges: NotRequired[str]
+
+
+def parse_file(file_path: str) -> _InfoDict:
     """Parses a file, turning it into a correctly formatted dictionary, ready to
     be used by a populate script.
 
@@ -52,59 +87,57 @@ def parse_file(file_path):
     object. The regexes associated to its value in special_regexes will be used.
     """
     raw_info = get_text(file_path)
-    info = {}
     # get basic info
-    info["unpublished"] = raw_info["unpublished"]
-    info["file"] = os.path.splitext(os.path.basename(file_path))[0]
-    info["docket"] = "".join(raw_info.get("docket", [])) or None
-    info["citations"] = raw_info.get("citation", [])
-    info["attorneys"] = "".join(raw_info.get("attorneys", [])) or None
-    info["posture"] = "".join(raw_info.get("posture", [])) or None
-    info["court_id"] = (
+    court_id = (
         get_state_court_object("".join(raw_info.get("court", [])), file_path)
         or None
     )
-    if not info["court_id"]:
+
+    if not court_id:
         raise Exception(
             f'Failed to find a court ID for "{"".join(raw_info.get("court", []))}".'
         )
 
-    # get the full panel text and extract judges from it
-    panel_text = "".join(raw_info.get("panel", []))
-    # if panel_text:
-    #    judge_info.append(('Panel\n-----', panel_text))
-    info["panel"] = extract_judge_last_name(panel_text) or []
-
-    # get case names
-    info["case_name_full"] = (
+    case_name_full = (
         format_case_name("".join(raw_info.get("caption", []))) or ""
     )
     case_name = (
         format_case_name("".join(raw_info.get("reporter_caption", []))) or ""
-    )
-    if case_name:
-        info["case_name"] = case_name
-    else:
-        if info["case_name_full"]:
-            # Sometimes the <caption> node has values and the <reporter_caption>
-            # node does not. Fall back to <caption> in this case.
-            info["case_name"] = info["case_name_full"]
-    if not info["case_name"]:
+    ) or case_name_full
+
+    if not case_name:
         raise Exception(
             "Failed to find case_name, even after falling back to "
             "case_name_full value."
         )
-    info["case_name_short"] = (
-        CASE_NAME_TWEAKER.make_case_name_short(info["case_name"]) or ""
-    )
 
     # get dates
     dates = raw_info.get("date", []) + raw_info.get("hearing_date", [])
-    info["dates"] = parse_dates(dates)
+
+    info: _InfoDict = {
+        "unpublished": raw_info["unpublished"],
+        "file": os.path.splitext(os.path.basename(file_path))[0],
+        "docket": "".join(raw_info.get("docket", [])) or None,
+        "citations": raw_info.get("citation", []),
+        "attorneys": "".join(raw_info.get("attorneys", [])) or None,
+        "posture": "".join(raw_info.get("posture", [])) or None,
+        "court_id": court_id,
+        # get the full panel text and extract judges from it
+        "panel": extract_judge_last_name("".join(raw_info.get("panel", [])))
+        or [],
+        # get case names
+        "case_name_full": case_name_full,
+        "case_name": case_name,
+        "case_name_short": (
+            CASE_NAME_TWEAKER.make_case_name_short(case_name) or ""
+        ),
+        "dates": parse_dates(dates),
+        "per_curiam": False,
+        "opinions": [],
+    }
 
     # figure out if this case was heard per curiam by checking the first chunk
     # of text in fields in which this is usually indicated
-    info["per_curiam"] = False
     first_chunk = 1000
     for opinion in raw_info.get("opinions", []):
         if "per curiam" in opinion["opinion"][:first_chunk].lower():
@@ -117,9 +150,12 @@ def parse_file(file_path):
             info["per_curiam"] = True
             break
 
+    # Add the same sha1 and path values to every opinion (multiple opinions
+    # can come from a single XML file).
+    sha1 = sha1_of_file(file_path)
+
     # condense opinion texts if there isn't an associated byline
     # print a warning whenever we're appending multiple texts together
-    info["opinions"] = []
     for current_type in OPINION_TYPES:
         last_texts = []
         for opinion in raw_info.get("opinions", []):
@@ -141,6 +177,9 @@ def parse_file(file_path):
                         "author": judges[0] if judges else None,
                         "joining": judges[1:] if len(judges) > 0 else [],
                         "byline": opinion["byline"],
+                        "per_curiam": False,
+                        "sha1": sha1,
+                        "local_path": file_path,
                     }
                 )
                 last_texts = []
@@ -165,6 +204,9 @@ def parse_file(file_path):
                         "author": None,
                         "joining": [],
                         "byline": "",
+                        "per_curiam": False,
+                        "sha1": sha1,
+                        "local_path": file_path,
                     }
                 )
 
@@ -172,49 +214,62 @@ def parse_file(file_path):
     # text in the byline or in any of its associated opinion texts indicate this
     for opinion in info["opinions"]:
         # if there's already an identified author, it's not per curiam
-        if opinion["author"] > 0:
-            opinion["per_curiam"] = False
+        if opinion["author"] is not None:
             continue
         # otherwise, search through chunks of text for the phrase 'per curiam'
-        per_curiam = False
         first_chunk = 1000
-        if "per curiam" in opinion["byline"][:first_chunk].lower():
-            per_curiam = True
+        if (
+            byline := opinion["byline"]
+        ) is not None and "per curiam" in byline[:first_chunk].lower():
+            opinion["per_curiam"] = True
         else:
             for text in opinion["opinion_texts"]:
                 if "per curiam" in text[:first_chunk].lower():
-                    per_curiam = True
+                    opinion["per_curiam"] = True
                     break
-        opinion["per_curiam"] = per_curiam
 
     # construct the plain text info['judges'] from collected judge data
     # info['judges'] = '\n\n'.join('%s\n%s' % i for i in judge_info)
 
-    # Add the same sha1 and path values to every opinion (multiple opinions
-    # can come from a single XML file).
-    sha1 = sha1_of_file(file_path)
-    for opinion in info["opinions"]:
-        opinion["sha1"] = sha1
-        opinion["local_path"] = file_path
-
     return info
 
 
-def get_text(file_path):
+class _RawInfoDict(TypedDict):
+    type: NotRequired[str | None]
+    name: NotRequired[str | None]
+    unpublished: bool
+    opinions: NotRequired[list[_BasicOpinionDict]]
+    reporter_caption: NotRequired[list[str]]
+    citation: NotRequired[list[str]]
+    caption: NotRequired[list[str]]
+    court: NotRequired[list[str]]
+    docket: NotRequired[list[str]]
+    posture: NotRequired[list[str]]
+    date: NotRequired[list[str]]
+    hearing_date: NotRequired[list[str]]
+    panel: NotRequired[list[str]]
+    attorneys: NotRequired[list[str]]
+
+
+class _RawInfoByline(TypedDict):
+    type: str | None
+    name: str | None
+
+
+def get_text(file_path: str) -> _RawInfoDict:
     """Reads a file and returns a dictionary of grabbed text.
 
     :param file_path: A path the file to be parsed.
     """
     with open(file_path) as f:
         file_string = f.read()
-    raw_info = {}
+    raw_info: _RawInfoDict = {"unpublished": False}
 
     # used when associating a byline of an opinion with the opinion's text
     current_byline = {"type": None, "name": None}
 
     # if this is an unpublished opinion, note this down and remove all
     # <unpublished> tags
-    raw_info["unpublished"] = False
     if "<opinion unpublished=true>" in file_string:
         file_string = file_string.replace(
             "<opinion unpublished=true>", "<opinion>"
@@ -306,18 +361,18 @@ def get_text(file_path):
     return raw_info
 
 
-def get_xml_string(e):
+def get_xml_string(e) -> str:
     """Returns a normalized string of the text in <element>.
 
     :param e: An XML element.
     """
     inner_string = re.sub(
-        rf"(^<{e.tag}\b.*?>|</{e.tag}\b.*?>$)", "", ET.tostring(e)
+        rf"(^<{e.tag}\b.*?>|</{e.tag}\b.*?>$)".encode(), b"", ET.tostring(e)
     )
     return inner_string.decode().strip()
 
 
-def parse_dates(raw_dates):
+def parse_dates(raw_dates: list[str]) -> list[list[tuple[str | None, date]]]:
     """Parses the dates from a list of string.
 
     Returns a list of lists of (string, datetime) tuples if there is a string
@@ -336,7 +391,7 @@ def parse_dates(raw_dates):
         raw_parts = re.split(r"(?<=[0-9][0-9][0-9][0-9])(\s|.)", raw_date)
 
         # index over split line and add dates
-        inner_dates = []
+        inner_dates: list[tuple[str | None, date]] = []
         for raw_part in raw_parts:
             # consider any string without either a month or year not a date
             no_month = False
