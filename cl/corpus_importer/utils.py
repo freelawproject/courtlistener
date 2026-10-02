@@ -851,6 +851,8 @@ def get_opinion_text(cluster: OpinionCluster) -> str:
             opinions.append(op.html)
         elif len(op.xml_harvard) > 1:
             opinions.append(op.xml_harvard)
+        elif len(op.xml_scan) > 1:
+            opinions.append(op.xml_scan)
     op = " ".join(opinions)
     soup = BeautifulSoup(op, features="html.parser")
     return soup.getText(separator=" ", strip=True)
