@@ -326,8 +326,6 @@ class ESCursorPagination(BasePagination):
 
         base_response = {
             "count": self.get_results_count(),
-        }
-        remaining_fields = {
             "next": self.get_next_link(cached_response),
             "previous": self.get_previous_link(cached_response),
             "results": data,
@@ -338,7 +336,6 @@ class ESCursorPagination(BasePagination):
             base_response.update(
                 {"document_count": self.get_child_results_count()}
             )
-        base_response.update(remaining_fields)
         return Response(base_response)
 
     def get_next_link(self, cached_response: bool) -> str | None:
