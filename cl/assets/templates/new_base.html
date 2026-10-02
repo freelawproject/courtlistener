@@ -73,7 +73,8 @@
   {% block canonical %}{% endblock %}
 </head>
 
-<body class="{% block body-classes %}{% endblock %}">
+{# htmx elements inherit hx-headers, so every hx-post on a v2 page carries the CSRF token without repeating it. #}
+<body class="{% block body-classes %}{% endblock %}" hx-headers='{"X-CSRFToken": "{{ csrf_token }}"}'>
   {% block header %}
     <c-header :request="request" :search_form="search_form" :csrf_token="csrf_token" only></c-header>
   {% endblock %}

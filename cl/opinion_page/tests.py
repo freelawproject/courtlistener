@@ -3923,6 +3923,17 @@ class DocketPageV2TemplateTest(TestCase):
         self.assertIn(" defer", tag.group(0))
         self.assertIn('nonce="', tag.group(0))
 
+    async def test_v2_body_carries_the_csrf_header_for_htmx(self) -> None:
+        """Every hx-post inherits the CSRF token from the body's hx-headers."""
+        r = await self.async_client.get(
+            reverse("view_docket", args=[self.docket.pk, self.docket.slug])
+        )
+        body = re.search(r"<body[^>]*>", r.content.decode())
+        self.assertIsNotNone(body)
+        self.assertRegex(
+            body.group(0), r'hx-headers=\'\{"X-CSRFToken": "[A-Za-z0-9]+"\}\''
+        )
+
 
 @override_settings(WAFFLE_CACHE_PREFIX="test_docket_entry_rows_v2_waffle")
 @override_flag("use_new_design", active=True)
