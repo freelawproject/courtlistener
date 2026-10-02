@@ -1028,7 +1028,7 @@ Sample code here.
   {# DIALOG #}
   <c-layout-with-navigation.section class="border-t-2 border-greyscale-200" id="dialog">
     <h2 class="mt-6 mb-3">Dialog</h2>
-    <p>Renders a button that opens a dialog with an overlay. This component uses named slots.</p>
+    <p>Renders a button that opens a dialog with an overlay. This component uses named slots. Set <code>initially_open</code> to render the dialog already open and without a trigger, for markup that arrives after page load (e.g. an htmx response).</p>
     <h4 class="mt-3">Demo</h4>
     <c-dialog panel_class="p-5 banner max-w-70" dialog_class="items-center z-20">
       <c-slot name="button_content">Click me!</c-slot>
@@ -1048,6 +1048,10 @@ Sample code here.
       <c-library.item only>
         <c-slot name="label"><code>panel_class</code></c-slot>
         <c-slot name="description">CSS classes added to the panel itself.</c-slot>
+      </c-library.item>
+      <c-library.item optional only>
+        <c-slot name="label"><code>initially_open</code></c-slot>
+        <c-slot name="description">Opens the dialog as soon as Alpine initialises it. When set and no trigger slot is given, no trigger button is rendered. Meant for a dialog inserted by an htmx response: the server decides to show it, the markup opens itself on arrival.</c-slot>
       </c-library.item>
     </c-library.list>
 
