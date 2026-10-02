@@ -76,7 +76,7 @@ from cl.search.forms import SearchForm
 from cl.search.models import SEARCH_TYPES, Docket
 from cl.search.types import (
     ESDictDocument,
-    ESModelClassType,
+    ESDocumentClassType,
     PercolatorResponses,
     SearchAlertHitType,
 )
@@ -690,7 +690,7 @@ def get_field_names(mapping_dict):
 
 
 def select_es_document_fields(
-    es_document_class: ESModelClassType,
+    es_document_class: ESDocumentClassType,
     main_document: ESDictDocument,
     fields_to_ignore: set[str],
 ) -> ESDictDocument:
