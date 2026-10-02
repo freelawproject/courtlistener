@@ -136,7 +136,7 @@ Examples:
 
 ## htmx
 
-v2 uses htmx 2.0.11 from `js/third_party/` (legacy keeps 1.7.0). `new_base.html` does not load it; a page with `hx-*` attributes MUST require it from its `footer-scripts` block:
+v2 uses htmx 2.0.11 from `js/third_party/` (legacy keeps 1.7.0). `new_base.html` does not load it; the component that uses `hx-*` attributes MUST require it at its top, like any other script dependency:
 
 ```html
 {% require_script "js/third_party/htmx" defer=True %}
