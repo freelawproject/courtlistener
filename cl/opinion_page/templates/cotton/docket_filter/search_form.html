@@ -1,0 +1,27 @@
+{% load svg_tags %}
+
+<c-vars
+  docket=""
+  input_id=""
+  class=""
+/>
+
+{# Sibling of the filter form so Enter submits a search, not the filters. The docket scope travels in the hidden q; the visible input is unnamed so it can't replace it. Must render inside the docketFilter root: buildScopedQueryOnSubmit reads data-docket-scope from there. #}
+<form action="{% url 'show_results' %}" method="get" class="{{ class }}" x-on:submit="buildScopedQueryOnSubmit($event)">
+  <input type="hidden" name="type" value="r" />
+  <input type="hidden" name="q" value="docket_id:{{ docket.pk }}" />
+  <label for="{{ input_id }}" class="sr-only">Search this docket</label>
+  <div class="flex">
+    <input
+      class="input-text rounded-r-none flex-1"
+      id="{{ input_id }}"
+      data-search-terms
+      autocomplete="off"
+      type="text"
+      placeholder="Search this docket"
+    />
+    <c-button variant="primary" type="submit" class="rounded-l-none px-3" title="Search" aria-label="Search">
+      {% svg "magnifier" class="w-4 h-4" aria_hidden="true" %}
+    </c-button>
+  </div>
+</form>
