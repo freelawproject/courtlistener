@@ -1,5 +1,5 @@
 {% extends "new_base.html" %}
-{% load static extras component_tags %}
+{% load extras component_tags %}
 
 {% block title %}{{ title }} – CourtListener.com{% endblock %}
 {% block og_title %}{{ title }} - CourtListener.com{% endblock %}
@@ -60,9 +60,5 @@
 {% endblock %}
 
 {% block footer-scripts %}
-  {% if DEBUG %}
-    <script src="{% static 'js/third_party/htmx.js' %}" defer nonce="{{ csp_nonce }}"></script>
-  {% else %}
-    <script src="{% static 'js/third_party/htmx.min.js' %}" defer nonce="{{ csp_nonce }}"></script>
-  {% endif %}
+  {% require_script "js/third_party/htmx" defer=True %}
 {% endblock footer-scripts %}

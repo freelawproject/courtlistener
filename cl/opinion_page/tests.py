@@ -3913,7 +3913,15 @@ class DocketPageV2TemplateTest(TestCase):
         )
         self.assertTemplateUsed(r, "v2_docket.html")
         self.assertContains(r, 'name="htmx-config"')
-        self.assertContains(r, "js/third_party/htmx")
+        # require_script emits the build for the current DEBUG setting, with
+        # the nonce and the defer flag it was registered with.
+        tag = re.search(
+            r'<script[^>]*src="[^"]*js/third_party/htmx(\.min)?\.js"[^>]*>',
+            r.content.decode(),
+        )
+        self.assertIsNotNone(tag)
+        self.assertIn(" defer", tag.group(0))
+        self.assertIn('nonce="', tag.group(0))
 
 
 @override_settings(WAFFLE_CACHE_PREFIX="test_docket_entry_rows_v2_waffle")
