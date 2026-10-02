@@ -90,6 +90,16 @@ def is_v2_template(path: str) -> bool:
     return "templates/v2_" in path and path.endswith(".html")
 
 
+def is_v2_partial(path: str) -> bool:
+    """A v2 partial rendered on its own, such as an htmx response.
+
+    Partials have no page URL and no base template, so the page-only
+    checks do not apply to them. Everything else about v2 templates does.
+    The prefix mirrors V2_PARTIALS_PREFIX in cl/lib/middleware.py.
+    """
+    return is_v2_template(path) and "templates/v2_includes/" in path
+
+
 def is_cotton_component(path: str) -> bool:
     return "templates/cotton/" in path and path.endswith(".html")
 
@@ -741,10 +751,14 @@ V2_CHECKS = [
     (check_alpine_shortcuts, FAIL),
     (check_font_awesome, FAIL),
     (check_inline_xdata, FAIL),
-    (check_extends_new_base, FAIL),
     (check_bare_links, FAIL),
     (check_include_in_v2, WARN),
     (check_xdata_without_require_script, WARN),
+]
+
+# Only full pages extend a base template; partials (v2_includes/) don't.
+V2_PAGE_CHECKS = [
+    (check_extends_new_base, FAIL),
 ]
 
 COTTON_CHECKS = [
@@ -824,6 +838,9 @@ def run_checks(
 
         if is_v2_template(filepath):
             _apply_checks(V2_CHECKS, lines, filepath, findings)
+
+        if is_v2_template(filepath) and not is_v2_partial(filepath):
+            _apply_checks(V2_PAGE_CHECKS, lines, filepath, findings)
 
             status = file_statuses.get(filepath, "")
             if (

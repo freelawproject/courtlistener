@@ -38,7 +38,10 @@ from cl.lib.file_validation import (
     validate_file_size,
 )
 from cl.lib.filesizes import convert_size_to_bytes
-from cl.lib.middleware import IncrementalNewTemplateMiddleware
+from cl.lib.middleware import (
+    V2_PARTIALS_PREFIX,
+    IncrementalNewTemplateMiddleware,
+)
 from cl.lib.mime_types import lookup_mime_type
 from cl.lib.model_helpers import (
     clean_docket_number,
@@ -2796,7 +2799,10 @@ class IncrementalNewTemplateMiddlewareTest(TestCase):
     """Template swapping for pages that are mid-redesign."""
 
     def process(self, template_name: str) -> TemplateResponse:
-        """Runs an unrendered TemplateResponse through the middleware."""
+        """Runs an unrendered TemplateResponse through the middleware.
+
+        :param template_name: The template the view would have rendered.
+        """
         middleware = IncrementalNewTemplateMiddleware(lambda request: None)
         request = RequestFactory().get("/")
         response = TemplateResponse(request, template_name, {})
@@ -2822,6 +2828,30 @@ class IncrementalNewTemplateMiddlewareTest(TestCase):
         """A v2-only template is served even with the flag off."""
         response = self.process("components.html")
         self.assertEqual(response.template_name, "v2_components.html")
+
+    def test_swapped_page_gets_the_search_form(self) -> None:
+        """A swapped full page receives the header's search form."""
+        response = self.process("components.html")
+        self.assertIn("search_form", response.context_data or {})
+
+    def test_swapped_partial_skips_the_search_form(self) -> None:
+        """A swapped partial under v2_includes/ is not handed the search form.
+
+        Partials never render the header, so building the form for them is
+        wasted work. The decision rests on the template name alone, with no
+        htmx header on the request. No legacy/v2 partial pair exists in the
+        repo yet, so the template lookup is stubbed to make one.
+        """
+        with patch.object(
+            IncrementalNewTemplateMiddleware,
+            "template_exists",
+            return_value=True,
+        ):
+            response = self.process("includes/foo/button.html")
+        self.assertEqual(
+            response.template_name, f"{V2_PARTIALS_PREFIX}foo/button.html"
+        )
+        self.assertNotIn("search_form", response.context_data or {})
 
 
 class FilterByEmailTest(TestCase):
