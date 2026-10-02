@@ -165,7 +165,7 @@ def s3_xml_keys(
     :param opinion_id: A single opinion of the only scan in `scan_ids`.
     :return: A list of S3 keys, e.g. "final-xml/15343/3.xml".
     """
-    if opinion_id:
+    if opinion_id and scan_ids:
         return [f"{FINAL_XML_PREFIX}{scan_ids[0]}/{opinion_id}.xml"]
     if not scan_ids:
         scan_ids, _ = storage.listdir(FINAL_XML_PREFIX)

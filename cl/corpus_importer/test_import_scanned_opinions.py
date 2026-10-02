@@ -3,6 +3,7 @@ import re
 import tempfile
 from datetime import date
 from pathlib import Path
+from typing import cast
 from unittest import mock
 
 from bs4 import BeautifulSoup
@@ -17,6 +18,7 @@ from cl.corpus_importer.management.commands.import_scanned_opinions import (
     normalize_case_name_caps,
     s3_xml_keys,
 )
+from cl.lib.storage import ScanningFinalXmlStorage
 from cl.search.cluster_sources import ClusterSources
 from cl.search.factories import (
     CourtFactory,
@@ -602,13 +604,16 @@ class FakeScanningStorage:
 class ScanningBucketKeysTest(SimpleTestCase):
     """Tests for listing the final XML keys of the scanning bucket."""
 
-    storage = FakeScanningStorage(
-        {
-            "final-xml/15343/3.xml": "",
-            "final-xml/15343/10.xml": "",
-            "final-xml/15343/notes.txt": "",
-            "final-xml/9/1.xml": "",
-        }
+    storage = cast(
+        ScanningFinalXmlStorage,
+        FakeScanningStorage(
+            {
+                "final-xml/15343/3.xml": "",
+                "final-xml/15343/10.xml": "",
+                "final-xml/15343/notes.txt": "",
+                "final-xml/9/1.xml": "",
+            }
+        ),
     )
 
     def test_keys_of_scans(self) -> None:
