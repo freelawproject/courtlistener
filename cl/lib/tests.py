@@ -38,7 +38,10 @@ from cl.lib.file_validation import (
     validate_file_size,
 )
 from cl.lib.filesizes import convert_size_to_bytes
-from cl.lib.middleware import IncrementalNewTemplateMiddleware
+from cl.lib.middleware import (
+    V2_PARTIALS_PREFIX,
+    IncrementalNewTemplateMiddleware,
+)
 from cl.lib.mime_types import lookup_mime_type
 from cl.lib.model_helpers import (
     clean_docket_number,
@@ -2845,7 +2848,9 @@ class IncrementalNewTemplateMiddlewareTest(TestCase):
             return_value=True,
         ):
             response = self.process("includes/foo/button.html")
-        self.assertEqual(response.template_name, "v2_includes/foo/button.html")
+        self.assertEqual(
+            response.template_name, f"{V2_PARTIALS_PREFIX}foo/button.html"
+        )
         self.assertNotIn("search_form", response.context_data or {})
 
 

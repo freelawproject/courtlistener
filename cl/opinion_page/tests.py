@@ -22,6 +22,7 @@ from django.core.management import call_command
 from django.core.paginator import Paginator
 from django.db import connection
 from django.http import HttpResponse
+from django.middleware.csrf import CSRF_TOKEN_LENGTH
 from django.template import TemplateDoesNotExist, engines
 from django.template.loader import get_template
 from django.template.response import TemplateResponse
@@ -3930,9 +3931,14 @@ class DocketPageV2TemplateTest(TestCase):
         )
         body = re.search(r"<body[^>]*>", r.content.decode())
         self.assertIsNotNone(body)
-        self.assertRegex(
-            body.group(0), r'hx-headers=\'\{"X-CSRFToken": "[A-Za-z0-9]+"\}\''
+        header = re.search(
+            r'hx-headers=\'\{"X-CSRFToken": "([^"]*)"\}\'', body.group(0)
         )
+        self.assertIsNotNone(header)
+        # The length rules out Django's NOTPROVIDED placeholder.
+        token = header.group(1)
+        self.assertEqual(len(token), CSRF_TOKEN_LENGTH)
+        self.assertTrue(token.isalnum())
 
 
 @override_settings(WAFFLE_CACHE_PREFIX="test_docket_entry_rows_v2_waffle")

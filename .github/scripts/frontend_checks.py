@@ -95,6 +95,7 @@ def is_v2_partial(path: str) -> bool:
 
     Partials have no page URL and no base template, so the page-only
     checks do not apply to them. Everything else about v2 templates does.
+    The prefix mirrors V2_PARTIALS_PREFIX in cl/lib/middleware.py.
     """
     return is_v2_template(path) and "templates/v2_includes/" in path
 
