@@ -3926,6 +3926,16 @@ class EsOpinionsIndexingTest(
         es_doc = OpinionDocument.get(ES_CHILD_ID(opinion.pk).OPINION)
         self.assertEqual(es_doc.text, "This is a test")
 
+        # Update the scanned XML the way the scanned opinions importer does
+        opinion.xml_scan = "<opinion><p>Scanned &amp; indexed</p></opinion>"
+        opinion.save(update_fields=["xml_scan"])
+
+        es_doc = OpinionDocument.get(ES_CHILD_ID(opinion.pk).OPINION)
+        self.assertEqual(es_doc.text, "Scanned & indexed")
+
+        opinion.xml_scan = ""
+        opinion.save(update_fields=["xml_scan"])
+
         # Update cites field in the opinion record.
         person_2 = PersonFactory.create(
             gender="f",

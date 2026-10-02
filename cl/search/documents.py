@@ -2100,6 +2100,10 @@ class OpinionDocument(CSVSerializableDocumentMixin, OpinionBaseDocument):
             return html_decode(
                 strip_tags(instance.xml_harvard.translate(null_map))
             )
+        elif instance.xml_scan:
+            return html_decode(
+                strip_tags(instance.xml_scan.translate(null_map))
+            )
         elif instance.html_anon_2020:
             return html_decode(
                 strip_tags(instance.html_anon_2020.translate(null_map))
