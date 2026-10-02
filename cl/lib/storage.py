@@ -121,7 +121,9 @@ class ScanningFinalXmlStorage(S3Storage):
 
     def __init__(self, **kwargs):
         if settings.SCANNING_AWS_ACCESS_KEY_ID:
-            kwargs.setdefault("access_key", settings.SCANNING_AWS_ACCESS_KEY_ID)
+            kwargs.setdefault(
+                "access_key", settings.SCANNING_AWS_ACCESS_KEY_ID
+            )
             kwargs.setdefault(
                 "secret_key", settings.SCANNING_AWS_SECRET_ACCESS_KEY
             )

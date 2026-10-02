@@ -666,7 +666,9 @@ class ImportFromScanningBucketTest(TestCase):
             {"final-xml/3593/12.xml": self.scan_xml}, scan_id=["3593"]
         )
         cluster = OpinionCluster.objects.get()
-        self.assertEqual(cluster.case_name, "Larry B. Merritt v. State of Florida")
+        self.assertEqual(
+            cluster.case_name, "Larry B. Merritt v. State of Florida"
+        )
         self.assertEqual(cluster.sub_opinions.count(), 1)
 
     def test_import_every_scan(self) -> None:
