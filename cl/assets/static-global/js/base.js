@@ -115,6 +115,92 @@ $(document).ready(function () {
     $('#show-all-statuses').addClass('hidden');
   });
 
+  // Dark mode toggle
+  const COLOR_MODE_STORAGE_KEY = 'cl-color-mode';
+  const themeToggleElements = $('[data-theme-toggle]');
+
+  function readStoredTheme() {
+    try {
+      const storedTheme = window.localStorage.getItem(COLOR_MODE_STORAGE_KEY);
+      return storedTheme === 'dark' || storedTheme === 'light' ? storedTheme : null;
+    } catch (error) {
+      return null;
+    }
+  }
+
+  function storeThemePreference(theme) {
+    try {
+      window.localStorage.setItem(COLOR_MODE_STORAGE_KEY, theme);
+    } catch (error) {
+      // Ignore storage errors (e.g., private browsing restrictions)
+    }
+  }
+
+  function syncToggleState(isDark) {
+    themeToggleElements.each(function () {
+      const toggle = $(this);
+      toggle.attr('aria-pressed', isDark ? 'true' : 'false');
+      toggle.toggleClass('dark-mode-toggle--active', isDark);
+
+      const icon = toggle.find('.fa').first();
+      icon.toggleClass('fa-moon-o', !isDark);
+      icon.toggleClass('fa-sun-o', isDark);
+
+      const label = toggle.find('.dark-mode-toggle__label');
+      if (label.length) {
+        label.text(isDark ? 'Light Mode' : 'Dark Mode');
+      } else {
+        toggle.attr('aria-label', isDark ? 'Use light mode' : 'Use dark mode');
+      }
+    });
+  }
+
+  function applyTheme(theme, persist) {
+    const isDark = theme === 'dark';
+    document.documentElement.dataset.colorMode = theme;
+    syncToggleState(isDark);
+    if (persist) {
+      storeThemePreference(theme);
+    }
+  }
+
+  if (themeToggleElements.length) {
+    const prefersDarkQuery = window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)');
+    const storedTheme = readStoredTheme();
+    const initialTheme = storedTheme || document.documentElement.dataset.colorMode;
+
+    applyTheme(initialTheme, false);
+
+    if (prefersDarkQuery) {
+      const handlePreferenceChange = function (event) {
+        if (!readStoredTheme()) {
+          applyTheme(event.matches ? 'dark' : 'light', false);
+        }
+      };
+
+      if (typeof prefersDarkQuery.addEventListener === 'function') {
+        prefersDarkQuery.addEventListener('change', handlePreferenceChange);
+      } else if (typeof prefersDarkQuery.addListener === 'function') {
+        prefersDarkQuery.addListener(handlePreferenceChange);
+      }
+    }
+
+    themeToggleElements.on('click', function (event) {
+      event.preventDefault();
+      const nextTheme = document.documentElement.dataset.colorMode === 'dark' ? 'light' : 'dark';
+      applyTheme(nextTheme, true);
+    });
+
+    window.addEventListener('storage', function (event) {
+      if (event.key === COLOR_MODE_STORAGE_KEY) {
+        const storedTheme = readStoredTheme();
+        if (storedTheme) {
+          applyTheme(storedTheme, false);
+        }
+      }
+    });
+  }
+
   ///////////////////////
   // Search submission //
   ///////////////////////
@@ -355,7 +441,6 @@ if (form && button) {
     button.disabled = true;
   });
 }
-
 /*
   Keyword / Semantic search-mode toggle icon.
   See cl/search/templates/includes/search_mode_icon.html.
@@ -401,4 +486,3 @@ $(function () {
   // localStorage restore is handled by an inline script in
   // search_mode_icon.html to avoid a visual flash.
 });
-
