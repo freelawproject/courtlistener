@@ -856,13 +856,6 @@
       "severity": "error"
     },
     {
-      "column": 19,
-      "path": "cl/corpus_importer/management/commands/import_patent.py",
-      "name": "bad-raise",
-      "concise_description": "Expression `\"This is for a client. Do not use FLP credentials\"` has type `Literal['This is for a client. Do not use FLP credentials']`, expected `BaseException`",
-      "severity": "error"
-    },
-    {
       "column": 39,
       "path": "cl/corpus_importer/management/commands/list_of_creditors_project.py",
       "name": "bad-argument-type",
