@@ -857,8 +857,8 @@ def get_promo_excluded_usernames() -> set[str]:
 def promo_switch_is_active() -> bool:
     """Whether the promo switch is on.
 
-    Cached via tiered_cache so we avoid a waffle lookup on every API 
-    request. A flip takes up to the redis tier timeout to take 
+    Cached via tiered_cache so we avoid a waffle lookup on every API
+    request. A flip takes up to the redis tier timeout to take
     effect, which is acceptable for enabling/disabling the promotion.
     """
     return switch_is_active(DOUBLE_API_THROTTLES_SWITCH)
