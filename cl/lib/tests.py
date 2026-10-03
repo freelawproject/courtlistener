@@ -20,6 +20,7 @@ from django.urls import ResolverMatch, reverse
 from django.utils.functional import SimpleLazyObject
 from django_ratelimit.exceptions import Ratelimited
 from django_ratelimit.middleware import RatelimitMiddleware
+from requests import Request
 from requests.cookies import RequestsCookieJar
 from waffle.testutils import override_flag
 
@@ -62,6 +63,7 @@ from cl.lib.pacer import (
     normalize_us_state,
 )
 from cl.lib.pacer_session import (
+    InsecureCookieJar,
     ProxyPacerSession,
     SessionData,
     get_or_cache_pacer_cookies,
@@ -298,6 +300,65 @@ class TestPacerSessionUtils(TestCase):
         self.assertIsInstance(session_data, SessionData)
         self.assertEqual(mock_log_into_pacer.call_count, 1)
         self.assertEqual(session_data.proxy_address, "http://proxy_2:9090")
+
+    def test_proxy_session_keeps_secure_cookies_set_by_responses(self):
+        """Does ProxyPacerSession keep sending cookies PACER marks Secure?"""
+        session = ProxyPacerSession(
+            cookies=self.test_cookies, proxy="http://proxy_1:9090"
+        )
+        self.assertIs(type(session.cookies), InsecureCookieJar)
+
+        # PACER refreshes its session cookie with the Secure flag. Simulate
+        # that, then check it's still sent on the next http:// request.
+        session.cookies.set(
+            "NextGenCSO", "refreshed", domain=".uscourts.gov", secure=True
+        )
+        request = session.prepare_request(
+            Request("POST", "http://ecf.miwd.uscourts.gov/doc1/1")
+        )
+        self.assertIn("NextGenCSO=refreshed", request.headers["Cookie"])
+
+    @patch.object(ProxyPacerSession, "_prepare_login_request")
+    def test_proxy_session_keeps_insecure_jar_after_login(
+        self, mock_login_request
+    ):
+        """Does login() keep the InsecureCookieJar it replaces?"""
+        mock_login_request.return_value = MagicMock(
+            status_code=HTTPStatus.OK,
+            json=lambda: {"loginResult": "0", "nextGenCSO": "token"},
+        )
+        session = ProxyPacerSession(
+            username="test", password="password", proxy="http://proxy_1:9090"
+        )
+        # juriscraper's login() assigns a brand-new plain RequestsCookieJar.
+        session.login()
+        self.assertIs(type(session.cookies), InsecureCookieJar)
+
+        session.cookies.set(
+            "NextGenCSO", "refreshed", domain=".uscourts.gov", secure=True
+        )
+        request = session.prepare_request(
+            Request("POST", "http://ecf.miwd.uscourts.gov/doc1/1")
+        )
+        self.assertIn("NextGenCSO=refreshed", request.headers["Cookie"])
+
+    def test_session_data_pickles_without_project_classes(self):
+        """Does SessionData pickle without referencing InsecureCookieJar?"""
+        jar = InsecureCookieJar()
+        jar.set("NextGenCSO", "x", domain=".uscourts.gov", secure=True)
+        session_data = SessionData(jar, "http://proxy_1:9090")
+
+        self.assertIs(type(session_data.cookies), RequestsCookieJar)
+        self.assertNotIn(b"InsecureCookieJar", pickle.dumps(session_data))
+        cookie = next(iter(session_data.cookies))
+        self.assertEqual(cookie.value, "x")
+        self.assertFalse(cookie.secure)
+
+    def test_session_data_accepts_missing_cookies(self):
+        """Can SessionData still be built without cookies?"""
+        session_data = SessionData(None, None)
+        self.assertIsNone(session_data.cookies)
+        self.assertEqual(session_data.proxy_address, "http://proxy_1:9090")
 
 
 class TestStringUtils(SimpleTestCase):
