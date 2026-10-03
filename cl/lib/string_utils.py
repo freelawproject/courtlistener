@@ -135,6 +135,107 @@ def normalize_dashes(text: str) -> str:
     )
 
 
+# Characters that strongly indicate the latin-1/CP1252 mojibake described in
+# GitHub issue #410. The C1 control block (U+0080-U+009F) is undefined in
+# ISO-8859-1 and essentially never appears as intentional content in legal
+# text; the replacement character (U+FFFD) is what lxml inserts when it
+# cannot map a byte at all. See:
+#   https://github.com/freelawproject/courtlistener/issues/410
+_CP1252_CORRUPTION_CODEPOINTS = (
+    set(range(0x80, 0xA0))  # C1 control block, undefined in ISO-8859-1
+    | {0xFFFD}  # REPLACEMENT CHARACTER
+)
+
+
+def looks_like_lawbox_cp1252_corruption(s: str) -> bool:
+    """Heuristically detect CP1252 mojibake of the kind described in issue #410.
+
+    The Lawbox importer (removed in commit 805877a36) decoded the corpus's
+    HTML files under the files' self-declared ``ISO-8859-1`` charset. Bytes in
+    the ``0x80-0x9F`` range are actually CP1252 code points (em-dash ``0x97``,
+    ellipsis ``0x85``, Euro ``0x80``, smart quotes, etc.), so they were either
+    mapped to the C1 control characters (U+0080-U+009F) or to the replacement
+    character (U+FFFD). This predicate reports whether ``s`` contains any of
+    those markers.
+
+    A ``True`` result is a strong *signal* of corruption, not a proof; combine
+    with :func:`repair_lawbox_cp1252` (which is itself safe-by-construction)
+    before mutating stored data.
+
+    :param s: The string to inspect.
+    :return: ``True`` if any likely-corruption codepoint is present.
+    """
+    if not isinstance(s, str):
+        return False
+    return any(ord(ch) in _CP1252_CORRUPTION_CODEPOINTS for ch in s)
+
+
+def repair_lawbox_cp1252(s: str) -> str:
+    """Repair CP1252-mis-decoded text of the kind described in issue #410.
+
+    The repair is only attempted when
+    :func:`looks_like_lawbox_cp1252_corruption` flags ``s``. The remembered
+    original bytes are gone (the importer is deleted and the DB stores the
+    decoded text), so we attempt the inverse of the wrong decode: encode the
+    text back to latin-1 bytes and re-decode those bytes as CP1252. This is
+    the standard idiom for this class of mojibake and is length-preserving.
+
+    The round-trip is **only safe** when ``s`` contains no codepoint above
+    U+00FF that is *not* itself a corruption marker: a genuine high-codepoint
+    character (for example a correctly-encoded em-dash U+2014, a smart quote,
+    or any non-Latin character) would be destroyed by ``encode("latin-1")``.
+    When such characters are present alongside the corruption markers, the
+    string is a mixed-content document and we leave it **unchanged** rather
+    than risk silent data loss. The caller (e.g. the
+    ``repair_lawbox_encoding`` management command) should log these skipped
+    rows for manual review.
+
+    When the round-trip raises ``UnicodeEncodeError`` (mixed content with
+    high codepoints) the input is returned unchanged. When the round-trip
+    succeeds but yields a string identical to the input, the input is
+    returned unchanged (idempotent / no-op).
+
+    :param s: The possibly-corrupted string.
+    :return: The repaired string, or the original if it is not safe to repair
+        (no corruption detected, mixed-content, or a round-trip no-op).
+    """
+    if not isinstance(s, str) or not s:
+        return s
+    if not looks_like_lawbox_cp1252_corruption(s):
+        return s
+
+    # Reject mixed content: any codepoint above U+00FF that is NOT itself one
+    # of the corruption markers would be lost by the latin-1 encode below.
+    for ch in s:
+        cp = ord(ch)
+        if cp > 0xFF and cp not in _CP1252_CORRUPTION_CODEPOINTS:
+            return s
+
+    try:
+        repaired = s.encode("latin-1").decode("cp1252")
+    except (UnicodeEncodeError, UnicodeDecodeError):
+        # Defensive: should not happen given the checks above, but never
+        # silently mangle data.
+        return s
+
+    if repaired == s:
+        # The round-trip did nothing (e.g. the corruption markers were
+        # already correct under both codecs). Don't return a fresh object.
+        return s
+    return repaired
+
+
+def repair_lawbox_content_if_needed(s: str) -> tuple[str, bool]:
+    """Convenience wrapper for :func:`repair_lawbox_cp1252`.
+
+    :param s: The possibly-corrupted string.
+    :return: A ``(repaired, changed)`` tuple where ``changed`` is True iff the
+        returned string differs from the input.
+    """
+    repaired = repair_lawbox_cp1252(s)
+    return repaired, repaired != s
+
+
 def get_token_count_from_string(string: str) -> int:
     """Returns the number of tokens in a text string."""
     encoding = tiktoken.get_encoding("cl100k_base")
