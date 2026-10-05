@@ -190,6 +190,40 @@ class CleanDuplicateAppellateEmailEntriesTest(TestCase):
         self.assertFalse(DocketEntry.objects.filter(pk=entry_a.pk).exists())
         self.assertTrue(DocketEntry.objects.filter(pk=entry_b.pk).exists())
 
+    def test_tie_break_multiple_pdfs_never_picks_a_copy_without_one(self):
+        """Two copies have a PDF and one doesn't. Even though the
+        PDF-less copy has a non-null ocr_status and the most recent
+        date_modified - which would otherwise win the tie-break - the
+        keeper must come from the copies that have a PDF, so the
+        surviving copy never loses its PDF."""
+        docket = DocketFactory(court=self.court)
+        older = now() - timedelta(days=5)
+        newer = now() - timedelta(days=1)
+        newest = now()
+        entry_a, doc_a, entry_b, doc_b = self.make_duplicate_pair(
+            pacer_doc_id="002189877411",
+            first_has_pdf=True,
+            second_has_pdf=True,
+            first_date_modified=older,
+            second_date_modified=newer,
+            docket=docket,
+        )
+        entry_c = DocketEntryFactory(docket=docket)
+        doc_c = RECAPDocumentFactory(
+            docket_entry=entry_c,
+            pacer_doc_id="002189877411",
+            document_type=RECAPDocument.PACER_DOCUMENT,
+            filepath_local="",
+            ocr_status=RECAPDocument.OCR_COMPLETE,
+        )
+        RECAPDocument.objects.filter(pk=doc_c.pk).update(date_modified=newest)
+
+        clean_duplicate_appellate_email_entries([self.court.pk], clean=True)
+
+        self.assertFalse(DocketEntry.objects.filter(pk=entry_a.pk).exists())
+        self.assertTrue(DocketEntry.objects.filter(pk=entry_b.pk).exists())
+        self.assertFalse(DocketEntry.objects.filter(pk=entry_c.pk).exists())
+
     def test_loser_with_unrelated_extra_document_skips_the_group(self):
         """A losing DocketEntry that also holds a document outside this
         duplicate group (e.g. an attachment) is left untouched."""
