@@ -1,8 +1,8 @@
 {% load svg_tags %}
 
 <c-vars
-  docket=""
-  input_id=""
+  docket
+  input_id
   class=""
 />
 
@@ -17,7 +17,7 @@
       id="{{ input_id }}"
       data-search-terms
       autocomplete="off"
-      type="text"
+      type="search"
       placeholder="Search this docket"
     />
     <c-button variant="primary" type="submit" class="rounded-l-none px-3" title="Search" aria-label="Search">

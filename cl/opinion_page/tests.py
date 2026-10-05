@@ -4242,7 +4242,7 @@ class DocketFilterSearchScopeTest(DocketFilterRenderTestCase):
         for layout, search_form in zip(("desktop", "mobile"), search_forms):
             with self.subTest(layout=layout):
                 inputs = list(search_form.iter("input"))
-                visible = [el for el in inputs if el.get("type") == "text"]
+                visible = [el for el in inputs if el.get("type") == "search"]
                 self.assertEqual(len(visible), 1)
                 self.assertIsNone(visible[0].get("name"))
                 self.assertFalse(visible[0].get("value"))

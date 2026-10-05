@@ -1714,12 +1714,28 @@ Sample code here.
     <c-library.list title="Sub-components">
       <c-library.item only>
         <c-slot name="label"><code>c-docket-filter.search-form</code></c-slot>
-        <c-slot name="description">The "Search this docket" form described above, rendered once per layout. Props: <code>:docket</code>, <code>input_id</code> (id of the text input, unique per layout), <code>class</code> (forwarded to the <code>&lt;form&gt;</code>). Must sit inside the <code>docketFilter</code> root, which supplies the submit handler and the scope.</c-slot>
+        <c-slot name="description">The "Search this docket" form described above, rendered once per layout. Must sit inside the <code>docketFilter</code> root, which supplies the submit handler and the scope.</c-slot>
+      </c-library.item>
+    </c-library.list>
+
+    <c-library.list title="c-docket-filter.search-form props" only>
+      <c-library.item only>
+        <c-slot name="label"><code>:docket</code></c-slot>
+        <c-slot name="description">The docket whose <code>pk</code> seeds the hidden <code>q</code>.</c-slot>
+      </c-library.item>
+      <c-library.item only>
+        <c-slot name="label"><code>input_id</code></c-slot>
+        <c-slot name="description">Id of the search input, unique per layout so each label points at its own field.</c-slot>
+      </c-library.item>
+      <c-library.item optional only>
+        <c-slot name="label"><code>class</code></c-slot>
+        <c-slot name="description">CSS classes forwarded to the <code>&lt;form&gt;</code>.</c-slot>
       </c-library.item>
     </c-library.list>
 
     <c-expansion-panel title="Code">
       <c-code>
+{% templatetag opencomment %} In the page template: the whole filter bar {% templatetag closecomment %}
 &lt;c-docket-filter
   :docket="docket"
   :docket_source="docket_source"
@@ -1727,6 +1743,13 @@ Sample code here.
   :page_obj="docket_entries"
   :sort_order_asc="sort_order_asc"
 /&gt;
+
+{% templatetag opencomment %} Inside cotton/docket_filter/index.html: one search form per layout, within the docketFilter root that supplies the scope and the submit handler {% templatetag closecomment %}
+&lt;div x-data="docketFilter" data-docket-scope="docket_id:{% templatetag openvariable %} docket.pk {% templatetag closevariable %}"&gt;
+  &lt;c-docket-filter.search-form :docket="docket" input_id="de-search-desktop" class="flex-1 max-w-xs" /&gt;
+  ...
+  &lt;c-docket-filter.search-form :docket="docket" input_id="de-search-mobile" class="flex-1" /&gt;
+&lt;/div&gt;
       </c-code>
     </c-expansion-panel>
   </section>
