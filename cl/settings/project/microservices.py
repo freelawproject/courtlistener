@@ -41,6 +41,10 @@ MICROSERVICE_URLS = {
         "url": f"{DOCTOR_HOST}/extract/recap/text/",
         "timeout": 60 * 90,
     },
+    "opinion-structured": {
+        "url": f"{DOCTOR_HOST}/extract/opinion/structured/",
+        "timeout": 60 * 5,
+    },
     # Utils Endpoints
     "page-count": {
         "url": f"{DOCTOR_HOST}/utils/page-count/pdf/",

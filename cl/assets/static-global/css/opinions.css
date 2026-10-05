@@ -16,6 +16,66 @@
     line-height: 2.3em;
   }
 
+  /* Opinions installed from centralia's structured extraction. The cover
+     (cluster.headmatter) is inline-styled by centralia itself; these rules
+     cover the writings' semantic markup only. */
+  .centralia p {
+    margin: 0 0 1em;
+    text-align: justify;
+    text-indent: 2em;
+  }
+  .centralia p.noindent {
+    text-indent: 0;
+  }
+  .centralia blockquote {
+    margin: 1em 2.5em;
+  }
+  .centralia .byline {
+    font-weight: bold;
+    margin: 1.2em 0;
+  }
+  .centralia h3.bhead {
+    text-align: center;
+    font-weight: bold;
+    font-size: 1em;
+    margin: 1.2em 0;
+  }
+  .centralia .sig {
+    margin-top: 1.5em;
+    font-style: italic;
+  }
+  .centralia .pg,
+  .centralia .pgbreak {
+    color: #999;
+    font-size: 0.85em;
+  }
+  .centralia .pgbreak {
+    margin: 0.6em 0;
+  }
+  .centralia sup.fnmark a {
+    font-weight: bold;
+    text-decoration: none;
+  }
+  .centralia .fns {
+    border-top: 1px dotted #999;
+    margin-top: 1.5em;
+    padding-top: 0.8em;
+    font-size: 0.9em;
+  }
+  .centralia .fn {
+    position: relative;
+    padding-left: 2.2em;
+    margin-bottom: 0.6em;
+  }
+  .centralia .fn .lbl {
+    position: absolute;
+    left: 0;
+  }
+  .centralia .fn:target,
+  .centralia sup.fnmark:target {
+    background-color: #fff8d5;
+  }
+
   #headmatter > parties {
     text-align: center;
     font-style: initial;
