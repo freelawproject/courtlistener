@@ -11,7 +11,7 @@ import celery
 import httpx
 import openai
 import requests
-from asgiref.sync import async_to_sync
+from asgiref.sync import async_to_sync, sync_to_async
 from bs4 import BeautifulSoup
 from django.apps import apps
 from django.conf import settings
@@ -29,6 +29,7 @@ from cl.citations.tasks import (
 )
 from cl.custom_filters.templatetags.text_filters import best_case_name
 from cl.lib.celery_utils import throttle_task
+from cl.lib.db_tools import release_db_connection
 from cl.lib.exceptions import ScrapeFailed
 from cl.lib.juriscraper_utils import get_scraper_object_by_name
 from cl.lib.llm import call_llm_transcription
@@ -601,6 +602,13 @@ async def extract_formatted_text_document_base(
             # hasn't disabled early abortion.
             processed.append(pk)
             continue
+
+        # Doctor can take several minutes to answer. An idle Postgres
+        # connection is dropped long before that by network/server idle
+        # timeouts, and the asave() below then fails with "SSL connection has
+        # been closed unexpectedly". Release the connection for the wait;
+        # Django reopens one on the next query.
+        await sync_to_async(release_db_connection)()
 
         response = await microservice(
             service="document-extract",

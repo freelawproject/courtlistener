@@ -196,8 +196,9 @@ class FloridaDocketEntryMerger[ParamType](
     key: ClassVar[Iterable[str]] = ["docket_entry_uuid"]
 
     # Florida's CL field is a DateTimeField, so override the base's
-    # date-only mapping with the scrape's full timestamp.
-    date_filed: datetime = Attribute(
+    # date-only mapping with the scrape's full timestamp. Annotated as the
+    # base's `date` because an override can't narrow the declared type.
+    date_filed: date = Attribute(
         lambda e, params: e.datetime_filed, strategy=overwrite
     )
     date_submitted: datetime = Attribute(
