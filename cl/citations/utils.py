@@ -232,6 +232,7 @@ def make_get_citations_kwargs(
     segments = []
     for attr in [
         "xml_harvard",
+        "xml_scan",
         "html_anon_2020",
         "html_columbia",
         "html_lawbox",

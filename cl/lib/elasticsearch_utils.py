@@ -2209,6 +2209,12 @@ def merge_unavailable_fields_on_parent_document(
                             ),
                         ),
                         When(
+                            ~QObject(xml_scan=""),
+                            then=Substr(
+                                "xml_scan", 1, settings.NO_MATCH_HL_SIZE
+                            ),
+                        ),
+                        When(
                             ~QObject(html_anon_2020=""),
                             then=Substr(
                                 "html_anon_2020", 1, settings.NO_MATCH_HL_SIZE

@@ -410,6 +410,57 @@ class ESClusterSearchAsyncTest(TestCase):
         self.assertNotEqual(execute_thread, event_loop_thread)
 
 
+class ScannedOpinionPageTest(TestCase):
+    """Is the text of scanned opinions displayed?"""
+
+    @classmethod
+    def setUpTestData(cls) -> None:
+        cls.cluster = OpinionClusterWithParentsFactory.create(
+            precedential_status=PRECEDENTIAL_STATUS.PUBLISHED,
+        )
+        cls.opinion = OpinionFactory.create(
+            cluster=cls.cluster,
+            type=Opinion.COMBINED,
+            plain_text="",
+            html_with_citations="",
+            xml_scan=(
+                "<opinion><p>Text from the scanned reporter"
+                '<page-number label="3">*3</page-number> continues</p>'
+                "</opinion>"
+            ),
+        )
+        CitationWithParentsFactory.create(
+            cluster=cls.cluster,
+            volume="388",
+            reporter="So. 3d",
+            page="1",
+            type=Citation.STATE_REGIONAL,
+        )
+
+    def test_scanned_opinion_text_is_displayed(self) -> None:
+        """Is the opinion XML shown when the opinion only has xml_scan?"""
+        path = reverse("view_case", args=[self.cluster.pk, self.cluster.slug])
+        response = self.client.get(path)
+
+        self.assertEqual(response.status_code, HTTPStatus.OK)
+        self.assertContains(
+            response,
+            '<div class="serif-text harvard"><opinion><p>Text from the '
+            "scanned reporter",
+            html=False,
+        )
+
+    async def test_link_to_page_in_scanned_opinion(self) -> None:
+        """Is a citation to an inner page found by its star pagination?"""
+        response = await self.async_client.get(
+            reverse(
+                "citation_redirector",
+                kwargs={"reporter": "so-3d", "volume": "388", "page": "3"},
+            )
+        )
+        self.assertEqual(response.url, self.cluster.get_absolute_url())
+
+
 class SimpleLoadTest(TestCase):
     fixtures = [
         "test_objects_search.json",

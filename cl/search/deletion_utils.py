@@ -188,14 +188,22 @@ def delete_cluster_files(cluster: OpinionCluster, delete_docket: bool) -> None:
     deleted_filepaths = []
 
     for opinion in cluster.sub_opinions.all():
-        if not opinion.local_path:
-            continue
-        path = opinion.local_path.name
-        # save=False: the Opinion row is about to be deleted by the
-        # caller's cascade anyway, so there's no point writing this
-        # change back to a row that won't exist a moment later.
-        opinion.local_path.delete(save=False)
-        deleted_filepaths.append(path)
+        # OpinionContent rows are cascade deleted with their opinion
+        field_files = [opinion.local_path] + [
+            content.local_path
+            for content in opinion.contents.exclude(local_path="").only(
+                "local_path"
+            )
+        ]
+        for field_file in field_files:
+            if not field_file:
+                continue
+            path = field_file.name
+            # save=False: the rows are about to be deleted by the caller's
+            # cascade anyway, so there's no point writing this change back
+            # to a row that won't exist a moment later.
+            field_file.delete(save=False)
+            deleted_filepaths.append(path)
 
     cluster_file_fields = [
         field.name

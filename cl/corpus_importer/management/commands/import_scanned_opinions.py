@@ -22,6 +22,9 @@ from juriscraper.lib.string_utils import (
     titlecase,
 )
 
+from cl.citations.tasks import (
+    find_citations_and_parentheticals_for_opinion_by_pks,
+)
 from cl.corpus_importer.management.commands.harvard_opinions import (
     find_previously_imported_cases,
     map_opinion_type,
@@ -555,6 +558,33 @@ def make_opinion(op: Tag, cluster_id: int) -> Opinion:
     )
 
 
+def queue_citation_finding(opinion_pks: list[int]) -> None:
+    """Find the citations of the opinions once the import is committed.
+
+    This builds `html_with_citations` from the scanned XML, replacing the
+    one of a merged opinion, which came from the court's text.
+
+    The import is committed when the task is queued, so a failure to queue
+    it is logged with the opinion ids instead of failing the import.
+
+    :param opinion_pks: The ids of the imported opinions.
+    :return: None
+    """
+
+    def queue() -> None:
+        try:
+            find_citations_and_parentheticals_for_opinion_by_pks.delay(
+                opinion_pks
+            )
+        except Exception:
+            logger.exception(
+                "Could not queue citation finding for opinions %s",
+                opinion_pks,
+            )
+
+    transaction.on_commit(queue)
+
+
 def store_scan_xml(cluster: OpinionCluster, scan_case: ScanCase) -> None:
     """Upload the scanned XML to the cluster's `filepath_xml_scan`.
 
@@ -654,6 +684,7 @@ def merge_into_cluster(cluster: OpinionCluster, scan_case: ScanCase) -> None:
                     is_main_version=True
                 ).exists(),
             )
+            queue_citation_finding([opinion.pk])
         else:
             logger.warning(
                 "Cluster %s has %s opinions and the scan of %s has %s. "
@@ -704,11 +735,14 @@ def add_new_case(scan_case: ScanCase) -> OpinionCluster:
         )
         cluster.save()
         add_citations_to_cluster(scan_case.citations, cluster.id)
+        opinion_pks = []
         for op in scan_case.opinions:
             opinion = make_opinion(op, cluster.id)
             opinion.save()
             add_opinion_content(opinion, scan_case, is_main_version=True)
+            opinion_pks.append(opinion.pk)
         store_scan_xml(cluster, scan_case)
+        queue_citation_finding(opinion_pks)
     return cluster
 
 

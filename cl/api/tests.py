@@ -1173,6 +1173,52 @@ class JudgeAndDisclosureAPIAuthTest(TestCase):
                 self.assertEqual(r.status_code, HTTPStatus.OK)
 
 
+class OpinionClusterAPIScanFieldsTest(TestCase):
+    """Are the scanning project files of clusters exposed correctly?"""
+
+    @classmethod
+    def setUpTestData(cls) -> None:
+        cls.user = UserFactory()
+        cls.cluster = OpinionClusterWithParentsFactory.create(
+            filepath_xml_scan="xml/2024/05/22/388-so-3d-1.xml",
+            filepath_pdf_scan="pdf/2024/05/22/redacted.pdf",
+        )
+
+    def setUp(self) -> None:
+        self.client.force_login(self.user)
+
+    def test_private_scan_pdf_is_not_exposed(self) -> None:
+        """Is the private scan PDF left out while the scan XML is shown?"""
+        path = reverse(
+            "opinioncluster-detail",
+            kwargs={"version": "v4", "pk": self.cluster.pk},
+        )
+        response = self.client.get(path)
+
+        self.assertEqual(response.status_code, HTTPStatus.OK)
+        data = response.json()
+        self.assertNotIn("filepath_pdf_scan", data)
+        self.assertEqual(
+            data["filepath_xml_scan"],
+            "xml/2024/05/22/388-so-3d-1.xml",
+        )
+
+    def test_private_scan_pdf_is_not_requestable(self) -> None:
+        """Can the private scan PDF be requested with fields or omit?"""
+        path = reverse(
+            "opinioncluster-detail",
+            kwargs={"version": "v4", "pk": self.cluster.pk},
+        )
+        for params in [
+            {"fields": "id,filepath_pdf_scan"},
+            {"omit": "filepath_xml_scan"},
+        ]:
+            with self.subTest(params=params):
+                response = self.client.get(path, params)
+                self.assertEqual(response.status_code, HTTPStatus.OK)
+                self.assertNotIn("filepath_pdf_scan", response.json())
+
+
 class DRFOrderingTests(TestCase):
     """Does ordering work generally and specifically?"""
 
