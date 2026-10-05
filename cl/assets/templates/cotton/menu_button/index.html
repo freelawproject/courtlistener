@@ -9,8 +9,8 @@
   menu_class="z-20 w-55 border border-greyscale-200 shadow-lg rounded-lg bg-white py-2"
   position="bottom-start"
   widget_aria_label="Dropdown menu with trigger button"
-  trigger_aria_label=""
   menu_aria_label="Dropdown menu panel"
+  trigger_aria_label
 />
 
 <article
@@ -20,26 +20,15 @@
   aria-label="{{ widget_aria_label }}"
 >
   {# trigger button #}
-  {# An aria-label replaces the visible content as the accessible name, so it is only set when the content is not the name. #}
-  {% if trigger_aria_label %}
-    <c-button
-      variant="{{ button_variant }}"
-      x-menu:button
-      aria-label="{{ trigger_aria_label }}"
-      class="group {{ button_class }}"
-    >
-      {{ button_content }}
-    </c-button>
-  {% else %}
-    <c-button
-      variant="{{ button_variant }}"
-      x-menu:button
-      class="group {{ button_class }}"
-    >
-      {{ button_content }}
-    </c-button>
-  {% endif %}
-
+  {# Empty arial label defaults to the element contents by design #}
+  <c-button
+    variant="{{ button_variant }}"
+    x-menu:button
+    :aria-label="trigger_aria_label"
+    class="group {{ button_class }}"
+  >
+    {{ button_content }}
+  </c-button>
   {# menu #}
   <menu
     x-menu:items

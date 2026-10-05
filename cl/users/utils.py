@@ -403,7 +403,7 @@ message_dict = {
 }
 
 
-@tiered_cache(timeout=60 * 5)
+@tiered_cache(memory_timeout=60, redis_timeout=60 * 5)
 def is_search_history_on_cached(user_pk: int) -> bool:
     """Return whether the user wants their search queries saved.
 

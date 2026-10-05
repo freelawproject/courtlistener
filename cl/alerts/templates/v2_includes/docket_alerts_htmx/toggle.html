@@ -1,22 +1,10 @@
 {% load humanize svg_tags %}
 {# Out-of-band response to the alert toggle. It replaces only the contents of three nodes already on the docket page, never the nodes themselves, so focus and the live region survive the swap. A refused toggle also replaces the page's empty dialog placeholder with the quota dialog, which opens on arrival. #}
 <span id="docket-alert-label-{{ docket.pk }}" hx-swap-oob="innerHTML">
-  {% if has_alert %}
-    {% svg "bell_slash" class="w-4 h-4" aria_hidden="true" %}
-    Disable Alerts
-  {% else %}
-    {% svg "bell" class="w-4 h-4" aria_hidden="true" %}
-    Get Alerts
-  {% endif %}
+  <c-docket-alert-label :has_alert="has_alert" />
 </span>
 <span id="docket-alert-toggle-{{ docket.pk }}" hx-swap-oob="innerHTML">
-  {% if has_alert %}
-    {% svg "bell_slash" class="w-4 h-4 text-greyscale-500" aria_hidden="true" %}
-    Disable Alerts
-  {% else %}
-    {% svg "bell" class="w-4 h-4 text-greyscale-500" aria_hidden="true" %}
-    Get Alerts
-  {% endif %}
+  <c-docket-alert-label :has_alert="has_alert" icon_class="w-4 h-4 text-greyscale-500" />
 </span>
 <span id="docket-alert-status-{{ docket.pk }}" hx-swap-oob="innerHTML">{{ message }}</span>
 {% if quota_reached %}
