@@ -30,6 +30,12 @@ class CourtListenerOAuth2Validator(OAuth2Validator):
     def get_oidc_claims(
         self, token: Any, token_handler: Any, request: Any
     ) -> dict[str, Any]:
-        """Scope-filtered claims with empty values omitted."""
+        """Scope-filtered claims with empty values omitted.
+
+        ``email_verified`` is only released alongside ``email``.
+        """
         claims = super().get_oidc_claims(token, token_handler, request)
-        return {k: v for k, v in claims.items() if v not in (None, "")}
+        claims = {k: v for k, v in claims.items() if v not in (None, "")}
+        if "email" not in claims:
+            claims.pop("email_verified", None)
+        return claims
