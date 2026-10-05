@@ -1054,6 +1054,38 @@ class ProfileTest(SimpleUserDataMixin, TestCase):
                     else:
                         self.assertEqual(vals["direction"], "up")
 
+    def test_recap_search_url_uses_document_id_not_docket_entry_id(
+        self,
+    ) -> None:
+        """Does the "Search Notes" link for RECAP documents key off the
+        document's own id, not its parent DocketEntry's? RECAPDocument and
+        DocketEntry have independent pk sequences, so using the wrong field
+        would silently pull results from the wrong docket whenever the two
+        happen to collide.
+        """
+        note_shapes = {
+            "legacy": lambda user, rd: NoteFactory(
+                user=user, cluster_id=None, recap_doc_id=rd
+            ),
+            "generic": lambda user, rd: NoteFactory.for_object(rd, user=user),
+        }
+        for shape, make_note in note_shapes.items():
+            with self.subTest(shape=shape):
+                profile = UserProfileWithParentsFactory()
+                rd = RECAPDocumentFactory()
+                make_note(profile.user, rd)
+
+                self.assertTrue(
+                    self.client.login(
+                        username=profile.user.username, password="password"
+                    )
+                )
+                r = self.client.get(reverse("profile_notes"))
+                self.assertEqual(
+                    r.context["recap_search_url"],
+                    f"/?type=r&q=xxx AND id:({rd.pk})",
+                )
+
 
 class NotesPageDeadLinkTest(TestCase):
     """A noted object with no page of its own yet must not render as a
