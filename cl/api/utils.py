@@ -27,7 +27,6 @@ from django.utils.functional import cached_property
 from django.utils.timezone import now
 from django.views.decorators.cache import cache_page
 from django.views.decorators.vary import vary_on_headers
-from django_ratelimit.core import get_header
 from eyecite.tokenizers import HyperscanTokenizer
 from requests import Response
 from rest_framework import serializers
@@ -36,7 +35,7 @@ from rest_framework.metadata import SimpleMetadata
 from rest_framework.permissions import DjangoModelPermissions
 from rest_framework.request import clone_request
 from rest_framework.response import Response as DRFResponse
-from rest_framework.throttling import UserRateThrottle
+from rest_framework.throttling import AnonRateThrottle, UserRateThrottle
 from rest_framework_filters import FilterSet, RelatedFilter
 from rest_framework_filters.backends import RestFrameworkFilterBackend
 from rest_framework_filters.filterset import related
@@ -58,7 +57,10 @@ from cl.donate.models import (
     NeonMembershipLevel,
 )
 from cl.lib.decorators import clear_tiered_cache, tiered_cache
-from cl.lib.ratelimiter import parse_rate
+from cl.lib.ratelimiter import (
+    get_ratelimit_ident,
+    parse_rate,
+)
 from cl.lib.redis_utils import get_redis_interface
 from cl.stats.constants import StatMetric, StatWebhookEventType
 from cl.stats.models import Event
@@ -547,9 +549,7 @@ class LoggingMixin:
     def _log_request(self, request):
         d = date.today().isoformat()
         user = request.user
-        client_ip = get_header(request, "CloudFront-Viewer-Address").split(
-            ":"
-        )[0]
+        client_ip = get_ratelimit_ident(request)
         endpoint = resolve(request.path_info).url_name
         response_ms = self._get_response_ms()
 
@@ -743,11 +743,15 @@ class NoFilterCacheListMixin:
         return response
 
 
-@tiered_cache(timeout=300)  # 5 minute cache
+@tiered_cache(memory_timeout=60, redis_timeout=300)
 def get_all_throttle_overrides(
     throttle_type: int,
 ) -> dict[str, list[str]]:
-    """Get all throttle overrides of a given type, cached for 5 minutes.
+    """Get all throttle overrides of a given type, cached in both tiers.
+
+    Overrides are cached for 5 minutes in Redis and 1 minute in memory, so an
+    override change made in one process reaches the others within a minute of
+    the Redis entry being refreshed.
 
     Throttle rates are composed from two sources:
 
@@ -816,7 +820,7 @@ def double_rate(rate: str) -> str:
     return f"{int(num) * 2}/{period}"
 
 
-@tiered_cache(timeout=300)  # 5 minute cache
+@tiered_cache(memory_timeout=60, redis_timeout=300)
 def get_promo_excluded_usernames() -> set[str]:
     """Return usernames excluded from the x2 API promotion.
 
@@ -849,13 +853,13 @@ def get_promo_excluded_usernames() -> set[str]:
     return manual_users | edu_members
 
 
-@tiered_cache(timeout=600)  # 10 minutes
+@tiered_cache(memory_timeout=60, redis_timeout=600)
 def promo_switch_is_active() -> bool:
     """Whether the promo switch is on.
 
-    Cached via tiered_cache (memory tier) so we avoid a waffle (Redis) lookup
-    on every API request. A flip takes up to the cache timeout to take effect,
-    which is acceptable for enabling/disabling the promotion.
+    Cached via tiered_cache so we avoid a waffle lookup on every API
+    request. A flip takes up to the redis tier timeout to take
+    effect, which is acceptable for enabling/disabling the promotion.
     """
     return switch_is_active(DOUBLE_API_THROTTLES_SWITCH)
 
@@ -1156,13 +1160,35 @@ def get_current_throttle_usage(user: User) -> list[ThrottleUsageRow]:
     return usage_rows
 
 
-class TagRateThrottle(UserRateThrottle):
+class CloudFrontIdentMixin:
+    """Identify anonymous clients by the address CloudFront saw.
+
+    DRF identifies an anonymous client from X-Forwarded-For or REMOTE_ADDR.
+    Neither is stable behind our CDN: the same client arrives with a different
+    ident from request to request, so its requests scatter across throttle
+    buckets and the limit stops holding — some requests sail through while
+    others are refused, with wildly different retry times (#7655).
+
+    CloudFront-Viewer-Address carries the viewer's real address, which is what
+    the rest of the codebase already counts by. Requests without the header
+    (local development, tests) fall back to DRF's behavior.
+    """
+
+    def get_ident(self, request):
+        return get_ratelimit_ident(request) or super().get_ident(request)
+
+
+class CloudFrontAnonRateThrottle(CloudFrontIdentMixin, AnonRateThrottle):
+    """The anonymous rate limit, keyed on the viewer's real address."""
+
+
+class TagRateThrottle(CloudFrontIdentMixin, UserRateThrottle):
     """Higher dedicated rate limit for the tag endpoints."""
 
     scope = "tags"
 
 
-class EventCounterThrottle(UserRateThrottle):
+class EventCounterThrottle(CloudFrontIdentMixin, UserRateThrottle):
     """Throttles increment-event"""
 
     scope = "events"
@@ -1182,7 +1208,7 @@ def has_throttle_override(user: User, throttle_type: int) -> bool:
     return user.username in get_all_throttle_overrides(throttle_type)
 
 
-class ExceptionalUserRateThrottle(UserRateThrottle):
+class ExceptionalUserRateThrottle(CloudFrontIdentMixin, UserRateThrottle):
     """User rate throttle that supports multiple simultaneous rate limits.
 
     Reads per-user overrides from the APIThrottle table. Blocking is expressed

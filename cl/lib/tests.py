@@ -1,10 +1,12 @@
 import datetime
 import pickle
+import time
 from http import HTTPStatus
 from typing import TypedDict, cast
 from unittest import mock
 from unittest.mock import MagicMock, patch
 
+import time_machine
 from asgiref.sync import async_to_sync
 from django.contrib.auth.models import AnonymousUser, User
 from django.core.cache import cache
@@ -18,6 +20,7 @@ from django.urls import ResolverMatch, reverse
 from django.utils.functional import SimpleLazyObject
 from django_ratelimit.exceptions import Ratelimited
 from django_ratelimit.middleware import RatelimitMiddleware
+from requests import Request
 from requests.cookies import RequestsCookieJar
 from waffle.testutils import override_flag
 
@@ -60,6 +63,7 @@ from cl.lib.pacer import (
     normalize_us_state,
 )
 from cl.lib.pacer_session import (
+    InsecureCookieJar,
     ProxyPacerSession,
     SessionData,
     get_or_cache_pacer_cookies,
@@ -296,6 +300,65 @@ class TestPacerSessionUtils(TestCase):
         self.assertIsInstance(session_data, SessionData)
         self.assertEqual(mock_log_into_pacer.call_count, 1)
         self.assertEqual(session_data.proxy_address, "http://proxy_2:9090")
+
+    def test_proxy_session_keeps_secure_cookies_set_by_responses(self):
+        """Does ProxyPacerSession keep sending cookies PACER marks Secure?"""
+        session = ProxyPacerSession(
+            cookies=self.test_cookies, proxy="http://proxy_1:9090"
+        )
+        self.assertIs(type(session.cookies), InsecureCookieJar)
+
+        # PACER refreshes its session cookie with the Secure flag. Simulate
+        # that, then check it's still sent on the next http:// request.
+        session.cookies.set(
+            "NextGenCSO", "refreshed", domain=".uscourts.gov", secure=True
+        )
+        request = session.prepare_request(
+            Request("POST", "http://ecf.miwd.uscourts.gov/doc1/1")
+        )
+        self.assertIn("NextGenCSO=refreshed", request.headers["Cookie"])
+
+    @patch.object(ProxyPacerSession, "_prepare_login_request")
+    def test_proxy_session_keeps_insecure_jar_after_login(
+        self, mock_login_request
+    ):
+        """Does login() keep the InsecureCookieJar it replaces?"""
+        mock_login_request.return_value = MagicMock(
+            status_code=HTTPStatus.OK,
+            json=lambda: {"loginResult": "0", "nextGenCSO": "token"},
+        )
+        session = ProxyPacerSession(
+            username="test", password="password", proxy="http://proxy_1:9090"
+        )
+        # juriscraper's login() assigns a brand-new plain RequestsCookieJar.
+        session.login()
+        self.assertIs(type(session.cookies), InsecureCookieJar)
+
+        session.cookies.set(
+            "NextGenCSO", "refreshed", domain=".uscourts.gov", secure=True
+        )
+        request = session.prepare_request(
+            Request("POST", "http://ecf.miwd.uscourts.gov/doc1/1")
+        )
+        self.assertIn("NextGenCSO=refreshed", request.headers["Cookie"])
+
+    def test_session_data_pickles_without_project_classes(self):
+        """Does SessionData pickle without referencing InsecureCookieJar?"""
+        jar = InsecureCookieJar()
+        jar.set("NextGenCSO", "x", domain=".uscourts.gov", secure=True)
+        session_data = SessionData(jar, "http://proxy_1:9090")
+
+        self.assertIs(type(session_data.cookies), RequestsCookieJar)
+        self.assertNotIn(b"InsecureCookieJar", pickle.dumps(session_data))
+        cookie = next(iter(session_data.cookies))
+        self.assertEqual(cookie.value, "x")
+        self.assertFalse(cookie.secure)
+
+    def test_session_data_accepts_missing_cookies(self):
+        """Can SessionData still be built without cookies?"""
+        session_data = SessionData(None, None)
+        self.assertIsNone(session_data.cookies)
+        self.assertEqual(session_data.proxy_address, "http://proxy_1:9090")
 
 
 class TestStringUtils(SimpleTestCase):
@@ -2625,7 +2688,7 @@ class TieredCacheTest(SimpleTestCase):
     def test_caches_result(self) -> None:
         """Test that tiered_cache caches the result of a function."""
 
-        @tiered_cache(timeout=60)
+        @tiered_cache(memory_timeout=60, redis_timeout=60)
         def expensive_function(x: int) -> int:
             self.call_count += 1
             return x * 2
@@ -2643,7 +2706,7 @@ class TieredCacheTest(SimpleTestCase):
     def test_different_args_produce_different_cache_keys(self) -> None:
         """Test that different arguments produce different cache entries."""
 
-        @tiered_cache(timeout=60)
+        @tiered_cache(memory_timeout=60, redis_timeout=60)
         def multiply(x: int, y: int) -> int:
             self.call_count += 1
             return x * y
@@ -2666,7 +2729,7 @@ class TieredCacheTest(SimpleTestCase):
     def test_memory_cache_is_checked_before_redis(self) -> None:
         """Test that memory cache is checked before Redis cache."""
 
-        @tiered_cache(timeout=60)
+        @tiered_cache(memory_timeout=60, redis_timeout=60)
         def get_value() -> str:
             self.call_count += 1
             return "value"
@@ -2690,7 +2753,7 @@ class TieredCacheTest(SimpleTestCase):
     def test_redis_cache_populates_memory_cache(self) -> None:
         """Test that reading from Redis cache also populates memory cache."""
 
-        @tiered_cache(timeout=60)
+        @tiered_cache(memory_timeout=60, redis_timeout=60)
         def get_data() -> dict:
             self.call_count += 1
             return {"key": "value"}
@@ -2711,7 +2774,7 @@ class TieredCacheTest(SimpleTestCase):
     def test_kwargs_affect_cache_key(self) -> None:
         """Test that keyword arguments are included in cache key."""
 
-        @tiered_cache(timeout=60)
+        @tiered_cache(memory_timeout=60, redis_timeout=60)
         def greet(name: str, greeting: str = "Hello") -> str:
             self.call_count += 1
             return f"{greeting}, {name}!"
@@ -2727,6 +2790,125 @@ class TieredCacheTest(SimpleTestCase):
         result3 = greet("Alice", greeting="Hello")
         self.assertEqual(result3, "Hello, Alice!")
         self.assertEqual(self.call_count, 2)  # Cached
+
+    def test_rejects_memory_tier_outliving_redis_tier(self) -> None:
+        """A memory timeout longer than the Redis one must not be allowed."""
+        with self.assertRaises(ValueError) as cm:
+            tiered_cache(memory_timeout=301, redis_timeout=300)
+        self.assertIn("must not exceed redis_timeout", str(cm.exception))
+
+    def test_rejects_timeouts_under_a_second(self) -> None:
+        """Each tier must be given a usable, positive timeout."""
+        for memory_timeout, redis_timeout in [(0, 60), (60, 0), (-1, -1)]:
+            with self.subTest(memory=memory_timeout, redis=redis_timeout):
+                with self.assertRaises(ValueError) as cm:
+                    tiered_cache(
+                        memory_timeout=memory_timeout,
+                        redis_timeout=redis_timeout,
+                    )
+                self.assertIn("at least 1 second", str(cm.exception))
+
+    def test_allows_equal_timeouts(self) -> None:
+        """Equal timeouts keep the memory tier within the Redis tier."""
+
+        @tiered_cache(memory_timeout=60, redis_timeout=60)
+        def get_value() -> str:
+            self.call_count += 1
+            return "value"
+
+        self.assertEqual(get_value(), "value")
+        self.assertEqual(self.call_count, 1)
+
+    def test_each_tier_uses_its_own_timeout(self) -> None:
+        """The two tiers expire on their own schedules, not a shared one."""
+
+        @tiered_cache(memory_timeout=60, redis_timeout=600)
+        def get_value() -> str:
+            self.call_count += 1
+            return "value"
+
+        start = time.time()
+        self.assertEqual(get_value(), "value")
+
+        self.assertEqual(len(_memory_cache), 1)
+        cache_key, (expiry, _) = next(iter(_memory_cache.items()))
+        self.assertAlmostEqual(expiry - start, 60, delta=5)
+
+        r = get_redis_interface("CACHE")
+        self.assertAlmostEqual(r.ttl(f":1:{cache_key}"), 600, delta=5)
+
+    def test_memory_tier_is_clamped_to_the_redis_expiry(self) -> None:
+        """A memory entry must never outlive the Redis entry that filled it.
+
+        Filling memory from a nearly-expired Redis entry with a full
+        memory_timeout would stretch the effective cache duration to
+        redis_timeout + memory_timeout.
+        """
+
+        @tiered_cache(memory_timeout=60, redis_timeout=300)
+        def get_value() -> str:
+            self.call_count += 1
+            return "value"
+
+        self.assertEqual(get_value(), "value")
+        cache_key = next(iter(_memory_cache))
+        redis_expiry, _ = cache.get(cache_key)
+
+        # Drop the memory tier and come back 20 seconds shy of the Redis
+        # expiry, where an unclamped memory entry would run 40 seconds past it.
+        _memory_cache.clear()
+        with time_machine.travel(
+            datetime.datetime.now(datetime.UTC)
+            + datetime.timedelta(seconds=280),
+            tick=False,
+        ):
+            self.assertEqual(get_value(), "value")
+            self.assertEqual(self.call_count, 1)
+            expiry, _ = _memory_cache[cache_key]
+            self.assertAlmostEqual(expiry, redis_expiry, delta=1)
+
+    def test_none_return_value_is_cached(self) -> None:
+        """None is a real value here, not a stand-in for a cache miss."""
+
+        @tiered_cache(memory_timeout=60, redis_timeout=60)
+        def get_nothing() -> None:
+            self.call_count += 1
+            return None
+
+        self.assertIsNone(get_nothing())
+        self.assertEqual(self.call_count, 1)
+
+        # Served from memory.
+        self.assertIsNone(get_nothing())
+        self.assertEqual(self.call_count, 1)
+
+        # And from Redis once the memory tier is gone.
+        _memory_cache.clear()
+        self.assertIsNone(get_nothing())
+        self.assertEqual(self.call_count, 1)
+
+    def test_expired_memory_tier_is_refilled_from_redis(self) -> None:
+        """When only the memory tier expires, Redis answers and refills it."""
+
+        @tiered_cache(memory_timeout=60, redis_timeout=600)
+        def get_value() -> str:
+            self.call_count += 1
+            return "value"
+
+        self.assertEqual(get_value(), "value")
+        self.assertEqual(self.call_count, 1)
+
+        # Move past the memory timeout but well within the Redis one. Redis
+        # expiry is server-side, so the entry there is untouched by the trip.
+        with time_machine.travel(
+            datetime.datetime.now(datetime.UTC)
+            + datetime.timedelta(seconds=120),
+            tick=False,
+        ):
+            self.assertEqual(get_value(), "value")
+            # Served from Redis, not by rerunning the function.
+            self.assertEqual(self.call_count, 1)
+            self.assertEqual(len(_memory_cache), 1)
 
 
 @override_flag("use_new_design", True)
