@@ -5190,7 +5190,13 @@ def fl_ingest_docket_task(
             de_total,
             de_unique,
         )
-    merger = FloridaDocketMerger(scrape=case, params=None)
+    uuids = {
+        attachment.document_link_uuid
+        for entry in case.entries
+        for attachment in entry.attachments
+    }
+
+    merger = FloridaDocketMerger(scrape=case, params=uuids)
     result = merger.merge()
     if result.failures:
         logger.error(

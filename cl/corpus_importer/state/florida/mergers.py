@@ -126,8 +126,10 @@ def _content_type(document: ScrapeFloridaDocument, params: Any) -> str:
     return mime
 
 
-class FloridaDocumentMerger[ParamType](
-    DocumentMerger[ScrapeFloridaDocument, ParamType, FloridaDocument]
+class FloridaDocumentMerger(
+    DocumentMerger[
+        ScrapeFloridaDocument, RelatedParams[set[UUID]], FloridaDocument
+    ]
 ):
     model: ClassVar[type[Model]] = FloridaDocument
     key: ClassVar[Iterable[str]] = ["link_uuid"]
@@ -142,6 +144,23 @@ class FloridaDocumentMerger[ParamType](
     link_uuid: UUID = Attribute(
         lambda doc, params: doc.document_link_uuid, strategy=overwrite
     )
+
+    @override
+    def query(self) -> QuerySet[FloridaDocument]:
+        qs: QuerySet[FloridaDocument] = self.manager.filter(
+            document_name=self.scrape.document_name
+        )
+        try:
+            existing = qs.get()
+        except (
+            FloridaDocument.MultipleObjectsReturned,
+            FloridaDocument.DoesNotExist,
+        ):
+            ...
+        else:
+            if existing.link_uuid not in self.params.params.params:
+                return qs
+        return self.manager.filter(link_uuid=self.transformed["link_uuid"])
 
 
 # Retrieved 2026-07-29
@@ -185,10 +204,10 @@ def _submitted_by_id(
     )
 
 
-class FloridaDocketEntryMerger[ParamType](
+class FloridaDocketEntryMerger(
     DocketEntryMerger[
         ScrapeFloridaDocketEntry,
-        ParamType,
+        set[UUID],
         FloridaDocketEntry,
     ]
 ):
@@ -252,7 +271,7 @@ def _appeal_from_str(docket_data: FloridaCase, params: None) -> str | None:
 class FloridaOriginatingCourtInformationMerger(
     Merger[
         FloridaOriginatingCase,
-        RelatedParams[None],
+        RelatedParams[set[UUID]],
         OriginatingCourtInformation,
     ]
 ):
@@ -324,7 +343,7 @@ def _florida_transfers(
     return transferable
 
 
-class FloridaDocketMerger(DocketMerger[FloridaCase, None]):
+class FloridaDocketMerger(DocketMerger[FloridaCase, set[UUID]]):
     model: ClassVar[type[Model]] = Docket
 
     atomic = True
