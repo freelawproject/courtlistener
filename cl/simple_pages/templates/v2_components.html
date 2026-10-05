@@ -460,13 +460,13 @@ Sample code here.
 
     <c-expansion-panel title="Code">
       <c-code>
-{# Single column (default) #}
+{% templatetag opencomment %} Single column (default) {% templatetag closecomment %}
 &lt;c-description-list&gt;
   &lt;c-description-term&gt;Term&lt;/c-description-term&gt;
   &lt;c-description-details&gt;Description.&lt;/c-description-details&gt;
 &lt;/c-description-list&gt;
 
-{# Responsive multi-column grid: 1 col mobile, 2 tablet, 4 desktop #}
+{% templatetag opencomment %} Responsive multi-column grid: 1 col mobile, 2 tablet, 4 desktop {% templatetag closecomment %}
 &lt;c-description-list class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4"&gt;
   &lt;c-description-item&gt;
     &lt;c-description-term&gt;Term&lt;/c-description-term&gt;
@@ -478,7 +478,7 @@ Sample code here.
   &lt;/c-description-item&gt;
 &lt;/c-description-list&gt;
 
-{# With class overrides #}
+{% templatetag opencomment %} With class overrides {% templatetag closecomment %}
 &lt;c-description-list class="grid grid-cols-1 md:grid-cols-2 gap-4"&gt;
   &lt;c-description-item&gt;
     &lt;c-description-term class="text-primary-600"&gt;Styled term&lt;/c-description-term&gt;
