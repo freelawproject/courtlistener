@@ -823,3 +823,45 @@ class OIDCClaimsTest(APITestCase):
         for scope in ("api", "wiki", "openid", "email", "profile"):
             with self.subTest(scope=scope):
                 self.assertIn(scope, body["scopes_supported"])
+
+
+class IntrospectionSubTest(APITestCase):
+    """Introspection includes ``sub`` matching the OIDC subject."""
+
+    @classmethod
+    def setUpTestData(cls) -> None:
+        cls.user = UserFactory()
+        cls.application = ApplicationFactory(client_secret="wiki-secret")
+        cls.url = reverse("oauth2_provider:introspect")
+
+    def _introspect(self, token_value: str) -> dict:
+        creds = base64.b64encode(
+            f"{self.application.client_id}:wiki-secret".encode()
+        ).decode()
+        resp = self.client.post(
+            self.url,
+            {"token": token_value},
+            HTTP_AUTHORIZATION=f"Basic {creds}",
+        )
+        self.assertEqual(resp.status_code, 200, resp.content)
+        return resp.json()
+
+    def test_active_token_includes_sub(self):
+        token = AccessToken(
+            user=self.user,
+            application=self.application,
+            scope="openid api wiki",
+            expires=now() + timedelta(hours=1),
+            resource=["https://wiki.free.law/"],
+        )
+        set_token_value(token, "introspect-me")
+        token.save()
+        data = self._introspect("introspect-me")
+        self.assertIs(data["active"], True)
+        self.assertEqual(data["sub"], str(self.user.pk))
+        self.assertEqual(data["username"], self.user.username)
+        self.assertEqual(data["scope"], "openid api wiki")
+        self.assertEqual(data["aud"], ["https://wiki.free.law/"])
+
+    def test_inactive_token_has_no_sub(self):
+        self.assertEqual(self._introspect("nope"), {"active": False})

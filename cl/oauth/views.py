@@ -11,15 +11,19 @@ discovery, JWKS). They add:
   discover our endpoints.
 """
 
+import json
 import uuid
 from typing import Any
 
 from django.conf import settings
+from django.contrib.auth.models import User
+from django.http import JsonResponse
 from django.urls import reverse
 from django.utils import timezone
 from django.utils.decorators import method_decorator
 from django_ratelimit.decorators import ratelimit
 from django_ratelimit.exceptions import Ratelimited
+from oauth2_provider import views as oauth2_views
 from oauth2_provider.models import get_application_model
 from rest_framework import status
 from rest_framework.request import Request
@@ -135,6 +139,28 @@ class DynamicClientRegistrationView(APIView):
             response_data["client_secret"] = client_secret_plaintext
             response_data["client_secret_expires_at"] = 0
         return Response(response_data, status=status.HTTP_201_CREATED)
+
+
+class IntrospectTokenView(oauth2_views.IntrospectTokenView):
+    """RFC 7662 introspection with the optional ``sub`` field.
+
+    Resource servers that link accounts by OIDC ``sub`` need it here too,
+    and the toolkit only returns ``username``.
+    """
+
+    @staticmethod
+    def get_token_response(token_value: str | None = None) -> JsonResponse:
+        response = oauth2_views.IntrospectTokenView.get_token_response(
+            token_value
+        )
+        data = json.loads(response.content)
+        if not data.get("active") or "username" not in data:
+            return response
+        pk = User.objects.values_list("pk", flat=True).get(
+            username=data["username"]
+        )
+        data["sub"] = str(pk)
+        return JsonResponse(data)
 
 
 class OAuthMetadataView(APIView):
