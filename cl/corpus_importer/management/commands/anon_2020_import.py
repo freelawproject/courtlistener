@@ -2,14 +2,14 @@ import json
 import re
 from datetime import date, datetime
 from glob import iglob
-from typing import Any
+from typing import Any, cast
 
 from bs4 import BeautifulSoup as bs4
 from django.db import transaction
+from eyecite.clean import clean_text
 from eyecite.find import get_citations
-from eyecite.models import CitationBase as FoundCitation
+from eyecite.models import ResourceCitation as FoundCitation
 from eyecite.tokenizers import HyperscanTokenizer
-from eyecite.utils import clean_text
 from juriscraper.lib.string_utils import CaseNameTweaker, harmonize
 from reporters_db import REPORTERS
 
@@ -30,7 +30,7 @@ def find_cites(case_data: dict[str, str]) -> list[FoundCitation]:
     :param case_data: Case information from the anon 2020 db.
     :return: Citation objects found in the raw string.
     """
-    found_citations = []
+    found_citations: list[FoundCitation] = []
     cites = re.findall(
         r"\"(.*?)\"", case_data["lexis_ids_normalized"], re.DOTALL
     )
@@ -40,7 +40,8 @@ def find_cites(case_data: dict[str, str]) -> list[FoundCitation]:
             tokenizer=HYPERSCAN_TOKENIZER,
         )
         if len(fc) > 0:
-            found_citations.append(fc[0])
+            # Callers read reporter fields that only ResourceCitation has
+            found_citations.append(cast(FoundCitation, fc[0]))
     return found_citations
 
 
@@ -396,7 +397,9 @@ def import_anon_2020_db(
         court_id = find_court_id(data["court"])
         date_argued, date_filed = process_dates(data)
         docket_number = do_docket_number(data)
-        html_str = soup.find("div", {"class": "container"}).decode_contents()
+        container = soup.find("div", {"class": "container"})
+        assert container is not None
+        html_str = container.decode_contents()
         found_cites = find_cites(data)
         status = check_publication_status(found_cites)
 
