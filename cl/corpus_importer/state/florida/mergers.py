@@ -50,6 +50,7 @@ from cl.corpus_importer.state.florida.utils import (
 )
 from cl.corpus_importer.state.merger import (
     Attribute,
+    ManyStrategy,
     Merger,
     OneToOneRelation,
     RelatedParams,
@@ -241,7 +242,7 @@ class FloridaDocketEntryMerger(
         lambda e, params: e.docket_entry_uuid, strategy=overwrite
     )
     documents: list[FloridaDocument] = AttachmentRelation(
-        FloridaDocumentMerger
+        FloridaDocumentMerger, strategy=ManyStrategy.REPLACE
     )
 
 

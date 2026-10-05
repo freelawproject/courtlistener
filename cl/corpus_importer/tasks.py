@@ -5209,8 +5209,8 @@ def fl_ingest_docket_task(
             FloridaDocument.__name__, set()
         ) | result.updates.get(FloridaDocument.__name__, set())
         # An update to a document that already has a file only changed its
-        # metadata (a new link UUID creates a new document), so it needs no
-        # download.
+        # metadata (a changed link UUID is matched back to the same document
+        # by title), so it needs no download.
         attachment_pks = list(
             FloridaDocument.objects.filter(
                 pk__in=merged_pks, filepath_local=""

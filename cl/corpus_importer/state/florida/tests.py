@@ -3,6 +3,7 @@
 from datetime import date, datetime
 from tempfile import NamedTemporaryFile
 from unittest import mock
+from uuid import uuid4
 
 import httpx
 from juriscraper.state.docket import (
@@ -979,7 +980,7 @@ class FloridaDocumentMergerTest(TestCase):
             entries=[entry],
         )
 
-    @merger_test(expected_query_count=19)
+    @merger_test(expected_query_count=20)
     def test_merge_creates_documents(self):
         """Does merging a case create its entries' documents with the
         scrape's field values?"""
@@ -1007,7 +1008,7 @@ class FloridaDocumentMergerTest(TestCase):
         assert merged.file_size == 34567
         assert merged.url == "https://acis.flcourts.gov/docs/1"
 
-    @merger_test(expected_query_count=19)
+    @merger_test(expected_query_count=20)
     def test_merge_document_without_type_is_blank(self):
         """Is a scrape document with no document type merged with a blank
         string instead of None?"""
@@ -1020,7 +1021,7 @@ class FloridaDocumentMergerTest(TestCase):
         merged = FloridaDocument.objects.get()
         assert merged.document_type == ""
 
-    @merger_test(expected_query_count=19)
+    @merger_test(expected_query_count=20)
     def test_merge_document_without_content_type_is_blank(self):
         """Is a scrape document with no content type merged with a blank
         string instead of None?"""
@@ -1033,7 +1034,7 @@ class FloridaDocumentMergerTest(TestCase):
         merged = FloridaDocument.objects.get()
         self.assertEqual(merged.content_type, "")
 
-    @merger_test(expected_query_count=32)
+    @merger_test(expected_query_count=34)
     def test_remerge_documents_is_idempotent(self):
         """Does merging the same case twice avoid duplicating documents?"""
         document = FloridaDocumentFactory.create()
@@ -1047,18 +1048,27 @@ class FloridaDocumentMergerTest(TestCase):
         assert "FloridaDocument" not in second.creates
         assert FloridaDocument.objects.count() == 1
 
-    @merger_test(expected_query_count=33)
-    def test_merge_keeps_documents_missing_from_scrape(self):
-        """Are DB documents kept when a later scrape doesn't include them?"""
+    @merger_test(expected_query_count=36)
+    def test_merge_removes_documents_missing_from_scrape(self):
+        """Are DB documents deleted when a later scrape doesn't include
+        them?"""
         document = FloridaDocumentFactory.create()
         docket_data = self._make_case(document)
         FloridaDocketMerger(docket_data, params=set()).merge()
+        stale = FloridaDocument.objects.get()
 
-        docket_data.entries[0].attachments = [FloridaDocumentFactory.create()]
-        result = FloridaDocketMerger(docket_data, params=set()).merge()
+        replacement = FloridaDocumentFactory.create()
+        docket_data.entries[0].attachments = [replacement]
+        result = FloridaDocketMerger(
+            docket_data, params={replacement.document_link_uuid}
+        ).merge()
 
-        assert result.success is True
-        assert FloridaDocument.objects.count() == 2
+        self.assertTrue(result.success)
+        self.assertEqual(
+            list(FloridaDocument.objects.values_list("link_uuid", flat=True)),
+            [replacement.document_link_uuid],
+        )
+        self.assertFalse(FloridaDocument.objects.filter(pk=stale.pk).exists())
 
     def _merge_downloaded_bad_url_document(self):
         """Merge a case, then flag its document as downloaded with a bad URL.
@@ -1078,7 +1088,7 @@ class FloridaDocumentMergerTest(TestCase):
         merged.save()
         return document, docket_data, merged
 
-    @merger_test(expected_query_count=33)
+    @merger_test(expected_query_count=35)
     def test_remerge_changed_url_resets_download_state(self):
         """Does updating a document clear its bad-URL flag, stored file, and
         OCR status so it gets downloaded again?"""
@@ -1097,7 +1107,7 @@ class FloridaDocumentMergerTest(TestCase):
         self.assertFalse(merged.filepath_local)
         self.assertIsNone(merged.ocr_status)
 
-    @merger_test(expected_query_count=32)
+    @merger_test(expected_query_count=34)
     def test_remerge_missing_file_is_update(self):
         """Is an unchanged document with no stored file and no processing
         error reported as updated, so a re-ingest retries its failed
@@ -1112,7 +1122,7 @@ class FloridaDocumentMergerTest(TestCase):
         self.assertTrue(result.success)
         self.assertIn(merged.pk, result.updates["FloridaDocument"])
 
-    @merger_test(expected_query_count=32)
+    @merger_test(expected_query_count=34)
     def test_remerge_unchanged_document_keeps_download_state(self):
         """Is download state (bad-URL flag, stored file, OCR status) left
         alone when the rescraped document is unchanged?"""
@@ -1128,6 +1138,66 @@ class FloridaDocumentMergerTest(TestCase):
         self.assertEqual(merged.processing_error, ProcessingError.BAD_URL)
         self.assertEqual(merged.filepath_local, "florida/old-file.pdf")
         self.assertEqual(merged.ocr_status, FloridaDocument.OCR_UNNECESSARY)
+
+    def test_remerge_changed_link_uuid_updates_document_in_place(self):
+        """Is a document whose link UUID changed between scrapes matched on
+        its title and updated, rather than duplicated?"""
+        document = FloridaDocumentFactory.create()
+        docket_data = self._make_case(document)
+        FloridaDocketMerger(
+            docket_data, params={document.document_link_uuid}
+        ).merge()
+        merged = FloridaDocument.objects.get()
+
+        document.document_link_uuid = uuid4()
+        result = FloridaDocketMerger(
+            docket_data, params={document.document_link_uuid}
+        ).merge()
+
+        self.assertTrue(result.success)
+        self.assertNotIn("FloridaDocument", result.creates)
+        self.assertEqual(result.updates["FloridaDocument"], {merged.pk})
+        merged.refresh_from_db()
+        self.assertEqual(merged.link_uuid, document.document_link_uuid)
+        self.assertEqual(FloridaDocument.objects.count(), 1)
+
+    def test_merge_same_title_distinct_link_uuids_stay_separate(self):
+        """Are documents sharing a title kept apart when the scrape lists
+        each of their link UUIDs?"""
+        first = FloridaDocumentFactory.create(document_name="Brief")
+        second = FloridaDocumentFactory.create(document_name="Brief")
+        docket_data = self._make_case(first, second)
+        params = {first.document_link_uuid, second.document_link_uuid}
+
+        FloridaDocketMerger(docket_data, params=params).merge()
+        result = FloridaDocketMerger(docket_data, params=params).merge()
+
+        self.assertTrue(result.success)
+        self.assertNotIn("FloridaDocument", result.creates)
+        self.assertEqual(
+            set(FloridaDocument.objects.values_list("link_uuid", flat=True)),
+            params,
+        )
+
+    def test_merge_new_link_uuid_with_new_title_creates_document(self):
+        """Is a document with an unseen title and link UUID created even
+        though the entry already has another document?"""
+        first = FloridaDocumentFactory.create(document_name="Brief")
+        docket_data = self._make_case(first)
+        FloridaDocketMerger(
+            docket_data, params={first.document_link_uuid}
+        ).merge()
+
+        second = FloridaDocumentFactory.create(document_name="Reply")
+        docket_data.entries[0].attachments = [first, second]
+        result = FloridaDocketMerger(
+            docket_data,
+            params={first.document_link_uuid, second.document_link_uuid},
+        ).merge()
+
+        self.assertTrue(result.success)
+        self.assertEqual(FloridaDocument.objects.count(), 2)
+        self.assertEqual(len(result.creates["FloridaDocument"]), 1)
 
 
 class FloridaCaseTransferMergerTest(TestCase):
@@ -1463,6 +1533,30 @@ class FloridaIngestTaskTest(TestCase):
 
         self.assertTrue(result.success)
         self.assertEqual(result.updates["FloridaDocument"], {document.pk})
+        download_mock.assert_not_called()
+
+    @mock.patch("cl.corpus_importer.tasks.download_fl_document.si")
+    def test_reingest_changed_link_uuid_with_stored_file_skips_download(
+        self, download_mock: mock.Mock
+    ) -> None:
+        """Does a rescrape that changes a document's link UUID update the
+        existing document and skip downloading its already stored file?"""
+        case = self._make_case()
+        fl_ingest_docket_task((case, "bucket", "key"))
+        document = FloridaDocument.objects.get()
+        document.filepath_local = "florida/stored-file.pdf"
+        document.save()
+        download_mock.reset_mock()
+
+        new_uuid = uuid4()
+        case.entries[0].attachments[0].document_link_uuid = new_uuid
+        result = fl_ingest_docket_task((case, "bucket", "key"))
+
+        self.assertTrue(result.success)
+        self.assertNotIn("FloridaDocument", result.creates)
+        self.assertEqual(result.updates["FloridaDocument"], {document.pk})
+        document.refresh_from_db()
+        self.assertEqual(document.link_uuid, new_uuid)
         download_mock.assert_not_called()
 
     @mock.patch("cl.corpus_importer.tasks.download_fl_document.si")
