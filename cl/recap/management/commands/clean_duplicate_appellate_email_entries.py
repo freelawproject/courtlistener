@@ -96,7 +96,7 @@ def process_duplicate_group(
 
     Groups that fail a safety check are logged and skipped entirely
     rather than partially processed, they need a manual review.
-    
+
     :param pacer_doc_id: The shared pacer_doc_id for this group, used only
         for logging.
     :param duplicate_group: The RECAPDocuments sharing that pacer_doc_id,
@@ -131,13 +131,15 @@ def process_duplicate_group(
         .count()
     )
     if extra_docs_count:
-        warning = (f"losing DocketEntry(s) {sorted(loser_entry_ids)} also contain "
-                f"{extra_docs_count} document(s) that aren't part of this "
-                "duplicate group (attachments or unrelated main documents) - "
-                "skipping for manual review instead of destroying them.")
+        warning = (
+            f"losing DocketEntry(s) {sorted(loser_entry_ids)} also contain "
+            f"{extra_docs_count} document(s) that aren't part of this "
+            "duplicate group (attachments or unrelated main documents) - "
+            "skipping for manual review instead of destroying them."
+        )
         logger.warning(
-                    "Duplicate group pacer_doc_id=%s: %s", pacer_doc_id, warning
-                )
+            "Duplicate group pacer_doc_id=%s: %s", pacer_doc_id, warning
+        )
         return
 
     if not (len(pacer_doc_id) >= 9 and pacer_doc_id.isdigit()):
@@ -192,15 +194,19 @@ def process_duplicate_group(
                 )
             )
             extra_docs_count = (
-                RECAPDocument.objects.filter(docket_entry_id__in=loser_entry_ids)
+                RECAPDocument.objects.filter(
+                    docket_entry_id__in=loser_entry_ids
+                )
                 .exclude(pk__in=loser_pks)
                 .count()
             )
             if extra_docs_count:
-                recheck_warning = (f"losing DocketEntry(s) {sorted(loser_entry_ids)} also contain "
-                                f"{extra_docs_count} document(s) that aren't part of this "
-                                "duplicate group (attachments or unrelated main documents) - "
-                                "skipping for manual review instead of destroying them.")
+                recheck_warning = (
+                    f"losing DocketEntry(s) {sorted(loser_entry_ids)} also contain "
+                    f"{extra_docs_count} document(s) that aren't part of this "
+                    "duplicate group (attachments or unrelated main documents) - "
+                    "skipping for manual review instead of destroying them."
+                )
                 logger.warning(
                     "Duplicate group pacer_doc_id=%s: %s.",
                     pacer_doc_id,
@@ -226,10 +232,10 @@ def process_duplicate_group(
 def clean_duplicate_appellate_email_entries(
     courts: list[str], clean: bool
 ) -> None:
-    """Clean up duplicate docket entries: recap.email and 
+    """Clean up duplicate docket entries: recap.email and
     extension ingestion used to derive different document_number/
-    entry_number values for the same PACER document, creating two 
-    DocketEntry/RECAPDocument pairs where there should be one. 
+    entry_number values for the same PACER document, creating two
+    DocketEntry/RECAPDocument pairs where there should be one.
     #7079 fixed the derivation going forward; this cleans
     up the historical duplicates.
 
@@ -240,11 +246,9 @@ def clean_duplicate_appellate_email_entries(
     """
     docket_ids = (
         EmailProcessingQueue.objects.filter(court_id__in=courts)
-            .filter(recap_documents__isnull=False)
-            .values_list(
-                "recap_documents__docket_entry__docket_id", flat=True
-            )
-            .distinct()
+        .filter(recap_documents__isnull=False)
+        .values_list("recap_documents__docket_entry__docket_id", flat=True)
+        .distinct()
     )
     logger.info(
         "Found %d candidate docket(s) in %s with email-sourced documents. "
