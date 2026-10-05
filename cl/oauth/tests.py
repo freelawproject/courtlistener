@@ -32,7 +32,7 @@ from cl.oauth.cleanup_utils import (
 from cl.oauth.factories import ApplicationFactory
 from cl.tests.cases import APITestCase, TestCase
 from cl.tests.utils import parse_csp
-from cl.users.factories import UserFactory
+from cl.users.factories import UserFactory, UserProfileWithParentsFactory
 
 Application = get_application_model()
 Grant = get_grant_model()
@@ -723,3 +723,96 @@ class RegistrationSourceBackfillTest(TestCase):
             with self.subTest(app=app.name):
                 app.refresh_from_db()
                 self.assertEqual(app.registration_source, expected)
+
+
+@override_settings(
+    OAUTH2_PROVIDER={**settings.OAUTH2_PROVIDER, "OIDC_ENABLED": True}
+)
+class OIDCClaimsTest(APITestCase):
+    """Userinfo and discovery expose the validator's claims by scope."""
+
+    @classmethod
+    def setUpTestData(cls) -> None:
+        cls.profile = UserProfileWithParentsFactory(
+            user__first_name="Ada", user__last_name="Lovelace"
+        )
+        cls.user = cls.profile.user
+        cls.application = ApplicationFactory()
+
+    def _userinfo(self, user, scope: str) -> dict:
+        """Mint a token with *scope* for *user* and fetch their claims."""
+        raw = f"tok-{user.pk}-{scope.replace(' ', '-')}"
+        token = AccessToken(
+            user=user,
+            application=self.application,
+            scope=scope,
+            expires=now() + timedelta(hours=1),
+        )
+        set_token_value(token, raw)
+        token.save()
+        resp = self.client.get(
+            reverse("oauth2_provider:user-info"),
+            HTTP_AUTHORIZATION=f"Bearer {raw}",
+        )
+        self.assertEqual(resp.status_code, 200, resp.content)
+        return resp.json()
+
+    def test_claims_follow_granted_scopes(self):
+        profile_claims = {"name", "given_name", "family_name"}
+        email_claims = {"email", "email_verified"}
+        for scope, expected in (
+            ("openid", set()),
+            ("openid email", email_claims),
+            ("openid profile", profile_claims),
+            ("openid email profile", email_claims | profile_claims),
+            ("openid api wiki", set()),
+        ):
+            with self.subTest(scope=scope):
+                claims = self._userinfo(self.user, scope)
+                self.assertEqual(set(claims), {"sub"} | expected)
+
+    def test_claim_values(self):
+        claims = self._userinfo(self.user, "openid email profile")
+        self.assertEqual(claims["sub"], str(self.user.pk))
+        self.assertEqual(claims["email"], self.user.email)
+        self.assertIs(claims["email_verified"], True)
+        self.assertEqual(claims["name"], "Ada Lovelace")
+        self.assertEqual(claims["given_name"], "Ada")
+        self.assertEqual(claims["family_name"], "Lovelace")
+
+    def test_unconfirmed_email_is_not_verified(self):
+        profile = UserProfileWithParentsFactory(email_confirmed=False)
+        claims = self._userinfo(profile.user, "openid email")
+        self.assertEqual(claims["email"], profile.user.email)
+        self.assertIs(claims["email_verified"], False)
+
+    def test_user_without_profile_is_not_verified(self):
+        claims = self._userinfo(UserFactory(), "openid email")
+        self.assertIs(claims["email_verified"], False)
+
+    def test_empty_name_claims_are_omitted(self):
+        profile = UserProfileWithParentsFactory(
+            user__first_name="", user__last_name=""
+        )
+        claims = self._userinfo(profile.user, "openid profile")
+        self.assertEqual(set(claims), {"sub"})
+
+    def test_discovery_advertises_claims_and_scopes(self):
+        resp = self.client.get(
+            reverse("oauth2_provider:oidc-connect-discovery-info")
+        )
+        self.assertEqual(resp.status_code, 200, resp.content)
+        body = resp.json()
+        for claim in (
+            "sub",
+            "email",
+            "email_verified",
+            "name",
+            "given_name",
+            "family_name",
+        ):
+            with self.subTest(claim=claim):
+                self.assertIn(claim, body["claims_supported"])
+        for scope in ("api", "wiki", "openid", "email", "profile"):
+            with self.subTest(scope=scope):
+                self.assertIn(scope, body["scopes_supported"])

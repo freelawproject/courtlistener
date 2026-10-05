@@ -29,6 +29,9 @@ OAUTH2_PROVIDER = {
         "profile": "View your name",
     },
     "DEFAULT_SCOPES": ["api"],
+    "OAUTH2_VALIDATOR_CLASS": (
+        "cl.oauth.validators.CourtListenerOAuth2Validator"
+    ),
     "PKCE_REQUIRED": True,
     "ACCESS_TOKEN_EXPIRE_SECONDS": 60 * 60,  # 1 hour
     "REFRESH_TOKEN_EXPIRE_SECONDS": 60 * 60 * 24 * 30,  # 30 days
