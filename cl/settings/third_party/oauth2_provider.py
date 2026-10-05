@@ -18,10 +18,15 @@ if not OIDC_RSA_PRIVATE_KEY and not DEVELOPMENT and not TESTING:
         "with 'openssl genrsa 4096' and store the PEM in the env var."
     )
 
+OIDC_SCOPES = ("openid", "email", "profile")
+
 OAUTH2_PROVIDER = {
     "SCOPES": {
         "api": "Access the CourtListener API on your behalf",
+        "wiki": "Read Free Law Project wiki pages you have access to",
         "openid": "OpenID Connect identity",
+        "email": "View your email address and whether it is confirmed",
+        "profile": "View your name",
     },
     "DEFAULT_SCOPES": ["api"],
     "PKCE_REQUIRED": True,

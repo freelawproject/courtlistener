@@ -156,9 +156,12 @@ class OAuthMetadataView(APIView):
 
     def get(self, request: Request) -> Response:
         base = request.build_absolute_uri("/").rstrip("/")
-        scopes_supported = ["api"]
-        if settings.OAUTH2_PROVIDER.get("OIDC_ENABLED"):
-            scopes_supported.append("openid")
+        oidc_enabled = settings.OAUTH2_PROVIDER.get("OIDC_ENABLED")
+        scopes_supported = [
+            scope
+            for scope in settings.OAUTH2_PROVIDER["SCOPES"]
+            if oidc_enabled or scope not in settings.OIDC_SCOPES
+        ]
         return Response(
             {
                 "issuer": base,

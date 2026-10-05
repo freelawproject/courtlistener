@@ -270,17 +270,18 @@ class OAuthMetadataTest(APITestCase):
         # The registration endpoint must point at our DCR view.
         self.assertTrue(body["registration_endpoint"].endswith("/o/register/"))
 
-    def test_scopes_supported_excludes_openid_when_oidc_disabled(self):
+    def test_scopes_supported_excludes_oidc_scopes_when_oidc_disabled(self):
         with patch.dict(settings.OAUTH2_PROVIDER, {"OIDC_ENABLED": False}):
             resp = self.client.get(self.url)
-        self.assertEqual(resp.json()["scopes_supported"], ["api"])
+        self.assertEqual(resp.json()["scopes_supported"], ["api", "wiki"])
 
-    def test_scopes_supported_includes_openid_when_oidc_enabled(self):
+    def test_scopes_supported_includes_oidc_scopes_when_oidc_enabled(self):
         with patch.dict(settings.OAUTH2_PROVIDER, {"OIDC_ENABLED": True}):
             resp = self.client.get(self.url)
         scopes = resp.json()["scopes_supported"]
-        self.assertIn("api", scopes)
-        self.assertIn("openid", scopes)
+        for scope in ("api", "wiki", "openid", "email", "profile"):
+            with self.subTest(scope=scope):
+                self.assertIn(scope, scopes)
 
 
 class ApplicationRedirectUriPolicyTest(TestCase):
