@@ -90,6 +90,16 @@ def is_v2_template(path: str) -> bool:
     return "templates/v2_" in path and path.endswith(".html")
 
 
+def is_v2_partial(path: str) -> bool:
+    """A v2 partial rendered on its own, such as an htmx response.
+
+    Partials have no page URL and no base template, so the page-only
+    checks do not apply to them. Everything else about v2 templates does.
+    The prefix mirrors V2_PARTIALS_PREFIX in cl/lib/middleware.py.
+    """
+    return is_v2_template(path) and "templates/v2_includes/" in path
+
+
 def is_cotton_component(path: str) -> bool:
     return "templates/cotton/" in path and path.endswith(".html")
 
@@ -741,10 +751,14 @@ V2_CHECKS = [
     (check_alpine_shortcuts, FAIL),
     (check_font_awesome, FAIL),
     (check_inline_xdata, FAIL),
-    (check_extends_new_base, FAIL),
     (check_bare_links, FAIL),
     (check_include_in_v2, WARN),
     (check_xdata_without_require_script, WARN),
+]
+
+# Only full pages extend a base template; partials (v2_includes/) don't.
+V2_PAGE_CHECKS = [
+    (check_extends_new_base, FAIL),
 ]
 
 COTTON_CHECKS = [
@@ -791,7 +805,12 @@ def run_checks(
     repo_root: Path,
     file_statuses: dict[str, str],
 ) -> list[Finding]:
-    """Run all applicable checks on the given files."""
+    """Run all applicable checks on the given files.
+
+    ``changed_files`` is the subset of the diff to lint (HTML and input.css);
+    ``file_statuses`` maps every path in the diff to its git status, so checks
+    that depend on non-frontend files must look there.
+    """
     findings: list[Finding] = []
 
     # Collect v2_ templates changed in this PR (for sync notice check)
@@ -801,7 +820,8 @@ def run_checks(
     components_library_modified = any(
         f.endswith("v2_components.html") for f in changed_files
     )
-    v2_register_test_modified = V2_REGISTER_TEST_FILE in changed_files
+    # The register test is a Python file, so it is never in changed_files.
+    v2_register_test_modified = V2_REGISTER_TEST_FILE in file_statuses
 
     for filepath in changed_files:
         abs_path = repo_root / filepath
@@ -818,6 +838,9 @@ def run_checks(
 
         if is_v2_template(filepath):
             _apply_checks(V2_CHECKS, lines, filepath, findings)
+
+        if is_v2_template(filepath) and not is_v2_partial(filepath):
+            _apply_checks(V2_PAGE_CHECKS, lines, filepath, findings)
 
             status = file_statuses.get(filepath, "")
             if (
@@ -913,6 +936,28 @@ def run_checks(
                 f"Legacy template with sync notice was modified but "
                 f"v2_ counterpart ({v2_path}) was not — ensure both "
                 f"templates stay in sync",
+            )
+        )
+
+    # Deletion check: IncrementalNewTemplateMiddleware serves a v2_ template
+    # to everyone once its legacy counterpart is gone, so deleting the legacy
+    # file is a release, not a cleanup. Warning-level because v2-only pages
+    # can be intentional.
+    for legacy_path in changed_legacy_templates:
+        if file_statuses.get(legacy_path) != "D":
+            continue
+        v2_path = _swap_template_prefix(legacy_path, add_v2=True)
+        if v2_path is None or not (repo_root / v2_path).is_file():
+            continue
+        findings.append(
+            Finding(
+                legacy_path,
+                1,
+                "check_legacy_template_deleted",
+                WARN,
+                f"Legacy template deleted but its v2_ counterpart ({v2_path}) "
+                "exists; deleting it makes the v2 page live for everyone. "
+                "Confirm if this is intentional.",
             )
         )
 

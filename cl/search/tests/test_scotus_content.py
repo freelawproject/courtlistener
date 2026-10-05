@@ -40,6 +40,7 @@ from cl.search.models import (
     ScotusDocketMetadata,
     SCOTUSDocument,
 )
+from cl.settings import COURT_REQUEST_USER_AGENT
 from cl.tests.cases import TestCase as CLTestCase
 
 
@@ -610,7 +611,7 @@ class ScotusDocketMergeTest(TestCase):
                     scotus_meta.questions_presented_url,
                     stream=True,
                     timeout=60,
-                    headers={"User-Agent": "Free Law Project"},
+                    headers={"User-Agent": COURT_REQUEST_USER_AGENT},
                 )
                 scotus_meta.refresh_from_db()
                 bucket = f"gov.uscourts.{self.court.pk}.{docket.pk}"

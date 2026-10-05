@@ -7,7 +7,7 @@ from contextlib import closing, contextmanager
 from io import StringIO
 from pathlib import Path
 from tempfile import TemporaryDirectory
-from typing import Any, ClassVar, ParamSpec, TypeVar
+from typing import Any, ClassVar, ParamSpec, TypeVar, cast
 from unittest.mock import MagicMock, Mock, call, patch
 
 from botocore.exceptions import BotoCoreError, ClientError
@@ -130,13 +130,13 @@ def merger_test(
                     # It's okay if the query count is below the expect amount, but we still assert it isn't to force
                     # the expectation to be updated whenever performance is improved.
                     if isinstance(expected_query_count, int):
-                        args[0].assertEqual(
+                        cast(TestCase, args[0]).assertEqual(
                             counts["merger"],
                             expected_query_count,
                             "Merger query count should be equal to expectation.",
                         )
                     elif isinstance(expected_query_count, range):
-                        args[0].assertIn(
+                        cast(TestCase, args[0]).assertIn(
                             counts["merger"],
                             expected_query_count,
                             "Merger query count should be in expected range.",

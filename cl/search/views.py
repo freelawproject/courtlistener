@@ -21,7 +21,10 @@ from cl.alerts.forms import CreateAlertForm
 from cl.alerts.models import Alert
 from cl.donate.models import NeonMembershipLevel
 from cl.lib.bot_detector import is_bot
-from cl.lib.ratelimiter import ratelimiter_unsafe_5_per_d
+from cl.lib.ratelimiter import (
+    ratelimit_deny_list,
+    ratelimiter_unsafe_5_per_d,
+)
 from cl.lib.search_utils import (
     do_es_search,
     make_get_string,
@@ -100,6 +103,7 @@ def home_router(request: HttpRequest) -> HttpResponse:
 
 
 @never_cache
+@ratelimit_deny_list
 def show_results(request: HttpRequest) -> HttpResponse:
     """
     This view can vary significantly, depending on how it is called:
