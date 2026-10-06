@@ -2,7 +2,7 @@
 
 <c-vars request search_form form_prefix/>
 
-<fieldset x-bind:id="fieldsetIds.recap" class="contents" x-show="isActiveScope" x-cloak data-scope="RECAP Archive">
+<fieldset x-bind:id="fieldsetId" class="contents" x-show="isActiveScope" x-cloak data-scope="RECAP Archive">
   <legend class="sr-only">RECAP Archive filters</legend>
 
   <c-corpus-search.filters.input :search_form="search_form" field_name="case_name" namespace="recap" :form_prefix="form_prefix" only/>
