@@ -169,7 +169,9 @@ To display the count, bind to the store from any Alpine root. The store only exi
 {% if track_events %}<span x-text="$store.viewCount.value"></span>{% endif %}
 ```
 
-`value` is `null` until the response arrives and stays `null` when the request fails. Failures are logged to the console and never shown to the user.
+`value` is `null` until the response arrives and stays `null` when the request fails. Failures are logged to the console and never shown to the user. The endpoint returns the count before the current view, and 0 for recognized bots, so `value` excludes the view being recorded.
+
+Cotton components rendered with `only` do not see the page context, so `track_events` is false inside them: pass it explicitly (`:track_events="track_events"`) or render the element from the page template.
 
 Label prefixes are validated by `EventCountSerializer` (`cl/favorites/api_serializers.py`). Tracking a new object type needs a new pattern there, otherwise every request fails with a 400 that only the console reports.
 
