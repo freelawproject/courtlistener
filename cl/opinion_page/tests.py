@@ -17,11 +17,13 @@ from django import forms
 from django.conf import settings
 from django.contrib.auth.hashers import make_password
 from django.contrib.auth.models import AnonymousUser, Group, Permission, User
+from django.contrib.staticfiles.finders import find
 from django.core.files.uploadedfile import SimpleUploadedFile
 from django.core.management import call_command
 from django.core.paginator import Paginator
 from django.db import connection
-from django.http import HttpResponse
+from django.http import HttpResponse, QueryDict
+from django.middleware.csrf import CSRF_TOKEN_LENGTH
 from django.template import TemplateDoesNotExist, engines
 from django.template.loader import get_template
 from django.template.response import TemplateResponse
@@ -33,6 +35,7 @@ from django.test import (
 from django.test.client import AsyncClient
 from django.test.utils import CaptureQueriesContext
 from django.urls import reverse
+from django.utils.html import escape
 from django_cotton.compiler_regex import CottonCompiler
 from factory import RelatedFactory
 from lxml.etree import _Attrib, _Element
@@ -1860,7 +1863,6 @@ class DocketSourceComponentTest(SimpleTestCase):
             "docket_source_button",
             "docket_source_attribution",
             "document_source_link",
-            "docket_empty_message",
             "docket_empty_cta",
             "docket_source_li",
             "document_download_button",
@@ -1885,6 +1887,21 @@ class DocketSourceComponentTest(SimpleTestCase):
                             f"{path}. A component needs a file in each of "
                             f"{', '.join(folders)} under {prefix}/."
                         )
+
+
+class DocketSourceEmptyMessageTest(SimpleTestCase):
+    """Every DocketEntrySource must write its empty-state sentence. The
+    field is required, but an empty string would still render a blank
+    paragraph."""
+
+    def test_every_source_has_an_empty_message(self) -> None:
+        sources = {
+            docket_entry_sources.RECAP,
+            *docket_entry_sources.BY_COURT_ID.values(),
+        }
+        for source in sources:
+            with self.subTest(component=source.component):
+                self.assertTrue(source.empty_message.strip())
 
 
 @override_settings(WAFFLE_CACHE_PREFIX="test_scotus_docket_disabled_waffle")
@@ -2139,7 +2156,7 @@ class ScotusDocketV2ContentRenderTest(TestCase):
         self.assertIn("Petition for certiorari", content)
         self.assertIn("Capital Case", content)
         self.assertIn("No. 23-999", content)
-        self.assertIn("Export CSV", content)
+        self.assertIn("Export entries CSV", content)
         self.assertNotIn("Buy on PACER", content)
         self.assertIn("Get Alerts", content)
         self.assertIn("View in SCOTUS", content)
@@ -2147,6 +2164,23 @@ class ScotusDocketV2ContentRenderTest(TestCase):
             "sourced from the Supreme Court of the United States", content
         )
         self.assertIn(settings.WIKI_COVERAGE_SCOTUS_URL, content)
+
+    async def test_scotus_empty_state_uses_scotus_copy_in_v2(self) -> None:
+        """An unfiltered SCOTUS docket with no entries gets SCOTUS's own
+        "no entries yet" sentence, not RECAP's."""
+        r = await self.async_client.get(
+            reverse("view_docket", args=[self.docket.pk, self.docket.slug])
+        )
+        content = r.content.decode()
+
+        self.assertEqual(r.status_code, HTTPStatus.OK)
+        self.assertTemplateUsed(r, "v2_docket.html")
+        self.assertIn(
+            escape(docket_entry_sources.SCOTUS.empty_message), content
+        )
+        self.assertNotIn(
+            escape(docket_entry_sources.RECAP.empty_message), content
+        )
 
 
 class OgRedirectLookupViewTest(TestCase):
@@ -3804,6 +3838,32 @@ class BuildScotusMetadataTest(TestCase):
         )
 
 
+class DocketEntryFilterFormHasFiltersTest(SimpleTestCase):
+    """has_filters() tells narrowing params apart from sorting and paging."""
+
+    def test_has_filters(self) -> None:
+        cases = {
+            "": False,
+            "order_by=desc": False,
+            "page=2": False,
+            "entry_gte=": False,
+            "entry_gte=1": True,
+            "entry_lte=10": True,
+            "filed_after=01/01/2024": True,
+            "filed_before=01/01/2024": True,
+            # q is not a docket filter: the docket's search boxes submit to
+            # the search page.
+            "q=motion": False,
+            # An invalid value still counts: the user asked for a filter.
+            "entry_gte=abc": True,
+            "order_by=desc&page=2&filed_after=01/01/2024": True,
+        }
+        for query, expected in cases.items():
+            with self.subTest(query=query):
+                form = DocketEntryFilterForm(QueryDict(query))
+                self.assertEqual(form.has_filters(), expected)
+
+
 class BuildDocketTabsTest(SimpleTestCase):
     """Test the build_docket_tabs helper function."""
 
@@ -3828,6 +3888,31 @@ class BuildDocketTabsTest(SimpleTestCase):
         tabs = build_docket_tabs(docket, True, True, True)
         keys = [t["key"] for t in tabs]
         self.assertEqual(keys, ["entries", "parties", "idb", "authorities"])
+
+    def test_every_tab_has_an_existing_icon(self) -> None:
+        """Each tab names an SVG the {% svg %} tag can find, mapped by key."""
+        docket = MagicMock()
+        docket.get_absolute_url.return_value = "/docket/1/test/"
+        docket.pk = 1
+        docket.slug = "test"
+
+        tabs = build_docket_tabs(docket, True, True, True)
+        icons = {t["key"]: t["icon"] for t in tabs}
+        self.assertEqual(
+            icons,
+            {
+                "entries": "file_text",
+                "parties": "group",
+                "idb": "circle_question_mark",
+                "authorities": "court",
+            },
+        )
+        for key, icon in icons.items():
+            with self.subTest(tab=key):
+                self.assertIsNotNone(
+                    find(f"svg/{icon}.svg"),
+                    msg=f"svg/{icon}.svg is not a static file.",
+                )
 
     def test_conditional_tabs(self) -> None:
         """Only tabs with data should appear."""
@@ -3902,6 +3987,112 @@ class DocketPageV2TemplateTest(TestCase):
         self.assertIn("tabs", r.context)
         self.assertTrue(len(r.context["metadata_sections"]) > 0)
         self.assertTrue(len(r.context["tabs"]) > 0)
+
+    async def test_title_values_are_single_click_selectable(self) -> None:
+        """The case name and docket number each get their own select-all span,
+        so one click selects exactly one value for copying, as on the legacy
+        page."""
+        r = await self.async_client.get(
+            reverse(
+                "view_docket",
+                args=[self.docket.pk, self.docket.slug],
+            )
+        )
+        self.assertTemplateUsed(r, "v2_docket.html")
+        # Walked with iter() rather than xpath(): xpath() is typed as a
+        # union of every result kind, so pyrefly rejects element calls on it.
+        headings = [
+            el
+            for el in fromstring(r.content.decode()).iter("h1")
+            if el.get("data-type") == "search.Docket"
+        ]
+        self.assertEqual(len(headings), 1)
+        selectable = [
+            span
+            for span in headings[0].iter("span")
+            if "select-all" in (span.get("class") or "")
+        ]
+        self.assertEqual(len(selectable), 2)
+        self.assertEqual(
+            "".join(str(t) for t in selectable[1].itertext()).strip(),
+            self.docket.docket_number,
+        )
+        for span in selectable:
+            with self.subTest(
+                value="".join(str(t) for t in span.itertext()).strip()
+            ):
+                self.assertIn("cursor-text", span.get("class") or "")
+
+    def test_metadata_section_honors_one_click_select(self) -> None:
+        """Only items flagged one_click_select get the select-all treatment."""
+        # Rendered through a wrapper string so the component's own c-vars
+        # don't shadow the context, as DocketFilterDrawerAttrPropagationTest
+        # explains.
+        compiled = CottonCompiler().process(
+            '<c-metadata-section :items="items" />'
+        )
+        html = (
+            engines["django"]
+            .from_string(compiled)
+            .render(
+                {
+                    "items": [
+                        {"label": "Cause", "value": "28:1331"},
+                        {
+                            "label": "Citation",
+                            "value": "601 U.S. 416",
+                            "one_click_select": True,
+                        },
+                    ]
+                }
+            )
+        )
+        details = list(fromstring(html).iter("dd"))
+        self.assertEqual(len(details), 2)
+        plain, copyable = details
+        self.assertNotIn("select-all", plain.get("class") or "")
+        self.assertIn("select-all", copyable.get("class") or "")
+        self.assertIn("cursor-text", copyable.get("class") or "")
+        self.assertEqual(
+            "".join(str(t) for t in copyable.itertext()).strip(),
+            "601 U.S. 416",
+        )
+
+    async def test_v2_docket_page_loads_htmx(self) -> None:
+        """The page loads the vendored htmx under the hardened config."""
+        r = await self.async_client.get(
+            reverse(
+                "view_docket",
+                args=[self.docket.pk, self.docket.slug],
+            )
+        )
+        self.assertTemplateUsed(r, "v2_docket.html")
+        self.assertContains(r, 'name="htmx-config"')
+        # require_script emits the build for the current DEBUG setting, with
+        # the nonce and the defer flag it was registered with.
+        tag = re.search(
+            r'<script[^>]*src="[^"]*js/third_party/htmx(\.min)?\.js"[^>]*>',
+            r.content.decode(),
+        )
+        self.assertIsNotNone(tag)
+        self.assertIn(" defer", tag.group(0))
+        self.assertIn('nonce="', tag.group(0))
+
+    async def test_v2_body_carries_the_csrf_header_for_htmx(self) -> None:
+        """Every hx-post inherits the CSRF token from the body's hx-headers."""
+        r = await self.async_client.get(
+            reverse("view_docket", args=[self.docket.pk, self.docket.slug])
+        )
+        body = re.search(r"<body[^>]*>", r.content.decode())
+        self.assertIsNotNone(body)
+        header = re.search(
+            r'hx-headers=\'\{"X-CSRFToken": "([^"]*)"\}\'', body.group(0)
+        )
+        self.assertIsNotNone(header)
+        # The length rules out Django's NOTPROVIDED placeholder.
+        token = header.group(1)
+        self.assertEqual(len(token), CSRF_TOKEN_LENGTH)
+        self.assertTrue(token.isalnum())
 
 
 @override_settings(WAFFLE_CACHE_PREFIX="test_docket_entry_rows_v2_waffle")
@@ -4054,8 +4245,9 @@ class DocketEntryRowsV2Test(TestCase):
         content = await self._get_docket_page()
         self.assertIn(self.rd_numberless.description, content)
 
-    async def test_empty_state(self) -> None:
-        """Empty state message should show when no entries exist."""
+    async def _get_empty_docket_page(self, query: str = "") -> str:
+        """Render a docket that has no entries at all, with the given query
+        string, and return its HTML."""
         empty_docket = await sync_to_async(DocketFactory)(
             court=self.court,
             source=Docket.RECAP,
@@ -4065,17 +4257,69 @@ class DocketEntryRowsV2Test(TestCase):
                 "view_docket",
                 args=[empty_docket.pk, empty_docket.slug],
             )
+            + query
+        )
+        self.assertEqual(r.status_code, HTTPStatus.OK)
+        self.assertTemplateUsed(r, "v2_docket.html")
+        return r.content.decode()
+
+    async def test_empty_state_without_filters_uses_source_copy(self) -> None:
+        """With no filter or search params, an empty docket explains that
+        the source has no entries yet, and the filter bar stays visible."""
+        content = await self._get_empty_docket_page()
+        self.assertIn(
+            escape(docket_entry_sources.RECAP.empty_message), content
+        )
+        self.assertNotIn("No docket entries match your filters", content)
+        self.assertIn("Search this docket", content)
+
+    async def test_empty_state_with_filters_uses_filter_copy(self) -> None:
+        """With a filter param present, an empty page blames the filters
+        rather than the source, and the filter bar stays visible so they can
+        be changed."""
+        for query in ("?entry_gte=5", "?filed_after=01/01/2030"):
+            with self.subTest(query=query):
+                content = await self._get_empty_docket_page(query)
+                self.assertIn("No docket entries match your filters", content)
+                self.assertNotIn(
+                    escape(docket_entry_sources.RECAP.empty_message),
+                    content,
+                )
+                self.assertIn("Search this docket", content)
+
+    async def test_sort_and_page_params_are_not_filters(self) -> None:
+        """Sorting and paging narrow nothing, so an empty docket under them
+        still gets the "no entries yet" copy."""
+        content = await self._get_empty_docket_page("?order_by=desc&page=1")
+        self.assertIn(
+            escape(docket_entry_sources.RECAP.empty_message), content
+        )
+
+    async def test_filters_that_exclude_every_entry_use_filter_copy(
+        self,
+    ) -> None:
+        """A docket with entries that the filters all exclude gets the
+        filter copy, not the "no entries yet" one."""
+        r = await self.async_client.get(
+            reverse(
+                "view_docket",
+                args=[self.docket.pk, self.docket.slug],
+            )
+            + "?entry_gte=999"
         )
         self.assertTemplateUsed(r, "v2_docket.html")
         content = r.content.decode()
-        self.assertIn("No docket entries", content)
+        self.assertIn("No docket entries match your filters", content)
+        self.assertNotIn(
+            escape(docket_entry_sources.RECAP.empty_message), content
+        )
 
     async def test_csv_export_for_authenticated_user(self) -> None:
         """CSV export button should render for authenticated users."""
         user = await sync_to_async(UserWithChildProfileFactory)()
         await sync_to_async(self.async_client.force_login)(user)
         content = await self._get_docket_page()
-        self.assertIn("Export CSV", content)
+        self.assertIn("Export entries CSV", content)
 
     async def test_entries_use_option_d_semantic_markup(self) -> None:
         """Entries render as an <ol> of <li>, with <dl> for metadata and a nested <ul> for RECAP documents."""
@@ -4114,14 +4358,9 @@ class DocketEntryRowsV2Test(TestCase):
                     )
 
 
-class DocketFilterDrawerAttrPropagationTest(TestCase):
-    """The mobile filter drawer auto-opens when a filter submission fails
-    validation, so users can see the error messages inside it. That depends
-    on two pieces of plumbing — `data-has-errors` reaching the drawer's root
-    element via Cotton's `{{ attrs }}` passthrough, and the
-    `x-on:open-filter-drawer` listener being wired up on the same element so
-    `docket_filter.js` can dispatch the open event. Lock both in.
-    """
+class DocketFilterRenderTestCase(TestCase):
+    """Renders `<c-docket-filter>` for a RECAP docket with no entries, so
+    subclasses can assert on the toolbar's markup."""
 
     @classmethod
     def setUpTestData(cls) -> None:
@@ -4131,8 +4370,9 @@ class DocketFilterDrawerAttrPropagationTest(TestCase):
 
     def _render(self, form: DocketEntryFilterForm) -> str:
         # Render via a wrapper template that invokes <c-docket-filter> as a
-        # child component, instead of rendering cotton/docket_filter.html
-        # directly — the latter declares `form` and `docket` as c-vars, which
+        # child component, instead of rendering
+        # cotton/docket_filter/index.html directly — the latter declares
+        # `form` and `docket` as c-vars, which
         # would shadow the context values, defeating the whole point.
         request = RequestFactory().get("/")
         request.user = AnonymousUser()
@@ -4141,7 +4381,7 @@ class DocketFilterDrawerAttrPropagationTest(TestCase):
             "cl",
             "opinion_page",
             "test_assets",
-            "docket_filter_attr_propagation.html",
+            "docket_filter_wrapper.html",
         )
         with open(template_path, encoding="utf-8") as f:
             compiled = CottonCompiler().process(f.read())
@@ -4155,6 +4395,16 @@ class DocketFilterDrawerAttrPropagationTest(TestCase):
                 "request": request,
             }
         )
+
+
+class DocketFilterDrawerAttrPropagationTest(DocketFilterRenderTestCase):
+    """The mobile filter drawer auto-opens when a filter submission fails
+    validation, so users can see the error messages inside it. That depends
+    on two pieces of plumbing — `data-has-errors` reaching the drawer's root
+    element via Cotton's `{{ attrs }}` passthrough, and the
+    `x-on:open-filter-drawer` listener being wired up on the same element so
+    `docket_filter.js` can dispatch the open event. Lock both in.
+    """
 
     def _find_drawer(self, html: str) -> _Element | None:
         """Return the element with `x-on:open-filter-drawer` (the drawer root).
@@ -4199,6 +4449,73 @@ class DocketFilterDrawerAttrPropagationTest(TestCase):
 
         self.assertIsNotNone(drawer)
         self.assertNotIn("data-has-errors", drawer.attrib)
+
+
+class DocketFilterSearchScopeTest(DocketFilterRenderTestCase):
+    """The "Search this docket" forms carry the docket scope in a hidden `q`
+    and keep the visible input unnamed and empty, so the scope never shows
+    and clearing the box can't widen the search to the whole corpus. Without
+    JavaScript the form still submits a scoped, term-less search.
+    """
+
+    def test_scope_is_hidden_and_visible_input_is_unnamed(self) -> None:
+        """Both layouts render the hidden scope, the unnamed empty input, and
+        the submit hook that merges them."""
+        request = RequestFactory().get("/")
+        request.user = AnonymousUser()
+        form = DocketEntryFilterForm(request.GET, request=request)
+
+        tree = fromstring(self._render(form))
+        # docket_filter.js reads the pristine scope from here on every
+        # submit; a hidden input's value can't serve, since assigning it
+        # rewrites the attribute and back-navigation restores the mutated DOM.
+        roots = [
+            el for el in tree.iter() if el.get("x-data") == "docketFilter"
+        ]
+        self.assertEqual(len(roots), 1)
+        self.assertEqual(
+            roots[0].get("data-docket-scope"), f"docket_id:{self.docket.pk}"
+        )
+
+        search_forms = [
+            el
+            for el in tree.iter("form")
+            if el.get("action") == reverse("show_results")
+        ]
+        self.assertEqual(len(search_forms), 2, "expected desktop and mobile")
+        for layout, search_form in zip(("desktop", "mobile"), search_forms):
+            with self.subTest(layout=layout):
+                inputs = list(search_form.iter("input"))
+                visible = [el for el in inputs if el.get("type") == "search"]
+                self.assertEqual(len(visible), 1)
+                self.assertIsNone(visible[0].get("name"))
+                self.assertFalse(visible[0].get("value"))
+                labels = [
+                    el
+                    for el in search_form.iter("label")
+                    if el.get("for") == visible[0].get("id")
+                ]
+                self.assertEqual(len(labels), 1)
+                # docket_filter.js merges the terms into q on submit.
+                self.assertEqual(
+                    cast(_Attrib, search_form.attrib)["x-on:submit"],
+                    "buildScopedQueryOnSubmit($event)",
+                )
+                self.assertIn(
+                    "data-search-terms", cast(_Attrib, visible[0].attrib)
+                )
+                # Exactly these reach the search page, with or without JS.
+                self.assertEqual(
+                    {
+                        el.get("name"): (el.get("type"), el.get("value"))
+                        for el in inputs
+                        if el.get("name")
+                    },
+                    {
+                        "type": ("hidden", "r"),
+                        "q": ("hidden", f"docket_id:{self.docket.pk}"),
+                    },
+                )
 
 
 @override_settings(WAFFLE_CACHE_PREFIX="test_docket_filter_pagination_waffle")
