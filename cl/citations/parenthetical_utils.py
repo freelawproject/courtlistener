@@ -45,7 +45,7 @@ def create_parenthetical_groups(cluster: OpinionCluster) -> None:
     cluster.parenthetical_groups.delete()
     for cg in computed_groups:
         group_to_create = ParentheticalGroup(
-            opinion=cg.representative.described_opinion,
+            opinion_id=cg.representative.described_opinion_id,
             representative=cg.representative,
             score=cg.score,
             size=cg.size,
