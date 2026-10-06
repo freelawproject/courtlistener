@@ -8,6 +8,7 @@
 {#   - suffix_text (optional): rendered after value in parentheses #}
 {#   - suffix_url (optional): renders suffix_text as a link #}
 {#   - suffix_nofollow / suffix_is_external / suffix_aria_label (optional): same semantics as the value-link variants #}
+{#   - one_click_select (optional bool): makes the value a one-click selection for copying #}
 {#   - is_label_link (optional bool, needs url): the label itself is the link, value is not rendered #}
 <c-vars
   items=""
@@ -41,7 +42,7 @@
           <c-description-details></c-description-details>
         {% else %}
           <c-description-term>{{ item.label }}</c-description-term>
-          <c-description-details>
+          <c-description-details class="{% if item.one_click_select %}select-all cursor-text{% endif %}">
             {% if item.url %}
               <a
                 class="{% if item.is_external %}links-external{% else %}links{% endif %}"
