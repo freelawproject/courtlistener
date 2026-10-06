@@ -43,6 +43,9 @@ from cl.citations.group_parentheticals import (
     get_parenthetical_tokens,
     get_representative_parenthetical,
 )
+from cl.citations.management.commands.find_citations import (
+    Command as FindCitationsCommand,
+)
 from cl.citations.match_citations import (
     MULTIPLE_MATCHES_FLAG,
     MULTIPLE_MATCHES_RESOURCE,
@@ -3442,7 +3445,13 @@ class TasksTest(TestCase):
         # Call the task once, it should raise Retry
         with self.assertRaises(Retry):
             find_citations_and_parentheticals_for_opinion_by_pks.apply(
-                args=([self.opinion_1.id, self.opinion_2.id], False, False),
+                args=(
+                    [self.opinion_1.id, self.opinion_2.id],
+                    False,
+                    False,
+                    False,
+                    "batch2",
+                ),
                 throw=True,
             )
 
@@ -3456,6 +3465,7 @@ class TasksTest(TestCase):
             sorted([self.opinion_1.id, self.opinion_2.id]),
         )
         self.assertEqual(retry_args["args"][1:], (False, False))
+        self.assertEqual(retry_args["kwargs"], {"embedding_queue": "batch2"})
 
         self.assertEqual(retry_args["countdown"], 5)
 
@@ -3488,6 +3498,8 @@ class TasksTest(TestCase):
                     [self.opinion_1.id, self.opinion_2.id, self.opinion_3.id],
                     False,
                     False,
+                    False,
+                    "batch3",
                 ),
                 throw=True,
             )
@@ -3500,6 +3512,68 @@ class TasksTest(TestCase):
             set(called_args["args"][0]),
             {self.opinion_2.id, self.opinion_3.id},
             "Should retry only failed opinion IDs",
+        )
+        self.assertEqual(called_args["kwargs"], {"embedding_queue": "batch3"})
+
+    @patch(
+        "cl.citations.tasks.store_opinion_citations_and_update_parentheticals"
+    )
+    def test_embedding_queue_is_attached_to_opinion(self, mock_store) -> None:
+        """The queue override is runtime metadata on each saved opinion."""
+        find_citations_and_parentheticals_for_opinion_by_pks(
+            [self.opinion_1.pk], embedding_queue="batch2"
+        )
+
+        opinion = mock_store.call_args.args[0]
+        self.assertEqual(getattr(opinion, "embedding_queue", None), "batch2")
+
+    @patch("celery.app.task.Task.retry", side_effect=Retry())
+    @patch(
+        "cl.citations.tasks.store_opinion_citations_and_update_parentheticals",
+        side_effect=ValueError("citation failure"),
+    )
+    def test_embedding_queue_survives_remaining_opinions_retry(
+        self, mock_store, mock_retry
+    ) -> None:
+        """The retry for unprocessed opinions retains the queue override."""
+        with self.assertRaises(Retry):
+            find_citations_and_parentheticals_for_opinion_by_pks.apply(
+                args=(
+                    [self.opinion_1.pk, self.opinion_2.pk],
+                    False,
+                    False,
+                    True,
+                    "batch2",
+                ),
+                throw=True,
+            )
+
+        retry_args = mock_retry.call_args.kwargs
+        self.assertEqual(
+            retry_args["args"], ([self.opinion_2.pk], False, False)
+        )
+        self.assertEqual(retry_args["kwargs"], {"embedding_queue": "batch2"})
+        mock_store.assert_called_once()
+
+    @patch("cl.citations.management.commands.find_citations.CeleryThrottle")
+    @patch(
+        "cl.citations.management.commands.find_citations."
+        "find_citations_and_parentheticals_for_opinion_by_pks.apply_async"
+    )
+    def test_find_citations_propagates_embedding_queue(
+        self, mock_apply_async, _mock_throttle
+    ) -> None:
+        """The bulk command reuses its task queue for embedding work."""
+        command = FindCitationsCommand()
+        command.count = 1
+
+        with patch.object(command, "log_progress"):
+            command.update_documents([self.opinion_1.pk], "batch2")
+
+        mock_apply_async.assert_called_once_with(
+            args=([self.opinion_1.pk], False, False),
+            kwargs={"embedding_queue": "batch2"},
+            queue="batch2",
         )
 
 

@@ -30,6 +30,7 @@ from waffle.testutils import override_flag
 
 from cl.custom_filters.templatetags.text_filters import html_decode
 from cl.lib.elasticsearch_utils import build_es_base_query, do_es_api_query
+from cl.lib.es_signal_processor import update_es_documents
 from cl.lib.redis_utils import get_redis_interface
 from cl.lib.test_helpers import (
     CourtTestCase,
@@ -85,6 +86,7 @@ from cl.search.tests.test_generate_opinion_embeddings import (
 from cl.tests.cases import (
     CountESTasksTestCase,
     ESIndexTestCase,
+    SimpleTestCase,
     TestCase,
     TransactionTestCase,
     V4SearchAPIAssertions,
@@ -3673,6 +3675,81 @@ class IndexOpinionDocumentsCommandTest(
         )
         es_doc = OpinionDocument.get(ES_CHILD_ID(opinion.pk).OPINION)
         self.assertEqual(es_doc.ordering_key, opinion.ordering_key)
+
+
+@override_settings(ENABLE_EMBEDDING_COMPUTATION=True)
+class OpinionEmbeddingQueueRoutingTest(SimpleTestCase):
+    """Test queue routing for embedding work triggered by opinion saves."""
+
+    def test_embedding_queue_override_applies_only_to_embedding(self) -> None:
+        """Only the embedding signature receives the runtime queue override."""
+        opinion = Opinion(pk=123)
+        setattr(opinion, "embedding_queue", "batch2")
+        embedding_signature = MagicMock()
+        update_signature = MagicMock()
+
+        with (
+            mock.patch(
+                "cl.lib.es_signal_processor.updated_fields",
+                return_value=["html_with_citations"],
+            ),
+            mock.patch(
+                "cl.lib.es_signal_processor.compute_single_opinion_embeddings.si",
+                return_value=embedding_signature,
+            ) as mock_compute,
+            mock.patch(
+                "cl.lib.es_signal_processor.update_es_document.si",
+                return_value=update_signature,
+            ),
+            mock.patch("cl.lib.es_signal_processor.chain"),
+            mock.patch("cl.lib.es_signal_processor.transaction.on_commit"),
+        ):
+            update_es_documents(
+                Opinion,
+                OpinionDocument,
+                opinion,
+                False,
+                {"self": {"html_with_citations": ["text"]}},
+            )
+
+        mock_compute.assert_called_once_with(opinion.pk)
+        embedding_signature.set.assert_called_once_with(queue="batch2")
+        update_signature.set.assert_not_called()
+
+    def test_no_embedding_queue_override_preserves_routing(self) -> None:
+        """A None override leaves the embedding signature routing untouched."""
+        opinion = Opinion(pk=123)
+        setattr(opinion, "embedding_queue", None)
+        embedding_signature = MagicMock()
+        update_signature = MagicMock()
+
+        with (
+            mock.patch(
+                "cl.lib.es_signal_processor.updated_fields",
+                return_value=["html_with_citations"],
+            ),
+            mock.patch(
+                "cl.lib.es_signal_processor.compute_single_opinion_embeddings.si",
+                return_value=embedding_signature,
+            ) as mock_compute,
+            mock.patch(
+                "cl.lib.es_signal_processor.update_es_document.si",
+                return_value=update_signature,
+            ),
+            mock.patch("cl.lib.es_signal_processor.chain"),
+            mock.patch("cl.lib.es_signal_processor.transaction.on_commit"),
+        ):
+            update_es_documents(
+                Opinion,
+                OpinionDocument,
+                opinion,
+                False,
+                {"self": {"html_with_citations": ["text"]}},
+            )
+
+        mock_compute.assert_called_once_with(opinion.pk)
+        embedding_signature.set.assert_not_called()
+        update_signature.set.assert_not_called()
 
 
 @override_settings(ENABLE_EMBEDDING_COMPUTATION=True)
