@@ -904,55 +904,6 @@
       "severity": "error"
     },
     {
-      "column": 20,
-      "path": "cl/corpus_importer/import_columbia/convert_columbia_html.py",
-      "name": "missing-attribute",
-      "concise_description": "Object of class `NoneType` has no attribute `group`",
-      "severity": "error"
-    },
-    {
-      "column": 20,
-      "path": "cl/corpus_importer/import_columbia/convert_columbia_html.py",
-      "name": "missing-attribute",
-      "concise_description": "Object of class `NoneType` has no attribute `group`",
-      "severity": "error"
-    },
-    {
-      "column": 20,
-      "path": "cl/corpus_importer/import_columbia/convert_columbia_html.py",
-      "name": "missing-attribute",
-      "concise_description": "Object of class `NoneType` has no attribute `group`",
-      "severity": "error"
-    },
-    {
-      "column": 20,
-      "path": "cl/corpus_importer/import_columbia/convert_columbia_html.py",
-      "name": "missing-attribute",
-      "concise_description": "Object of class `NoneType` has no attribute `group`",
-      "severity": "error"
-    },
-    {
-      "column": 36,
-      "path": "cl/corpus_importer/import_columbia/html_test.py",
-      "name": "bad-argument-type",
-      "concise_description": "Argument `tuple[None, date]` is not assignable to parameter `object` with type `tuple[str, date]` in function `list.append`",
-      "severity": "error"
-    },
-    {
-      "column": 18,
-      "path": "cl/corpus_importer/import_columbia/parse_opinions.py",
-      "name": "unbound-name",
-      "concise_description": "`root` may be uninitialized",
-      "severity": "error"
-    },
-    {
-      "column": 28,
-      "path": "cl/corpus_importer/import_columbia/parse_opinions.py",
-      "name": "unbound-name",
-      "concise_description": "`direct_descendant_text` may be uninitialized",
-      "severity": "error"
-    },
-    {
       "column": 45,
       "path": "cl/corpus_importer/management/commands/760_project.py",
       "name": "missing-argument",
