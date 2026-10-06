@@ -113,6 +113,19 @@ jobs:
           docker exec -e SELENIUM_DEBUG=1 -e SELENIUM_TIMEOUT=30 cl-django
           ./manage.py test
           cl --verbosity=2 ${{ matrix.tag_flags }} --parallel --xml-output /tmp/test-results
+      - name: Show container status and logs on failure
+        # The startup logs above are captured right after `up -d`, before the
+        # entrypoint has run migrate and imported the project, so a crash
+        # during startup (an import error, say) never appears there. The step
+        # that notices such a crash instead gets exit code 137 when the dead
+        # container tears down its `docker exec`, which looks like an OOM
+        # kill. Dump the state of the containers we built from this repo so
+        # the real traceback is visible.
+        if: failure()
+        working-directory: courtlistener/docker/courtlistener
+        run: |
+          docker ps -a --no-trunc
+          docker compose logs cl-django cl-celery
       - name: Export selenium results from docker to host
         if: failure()
         run: |
