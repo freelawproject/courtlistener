@@ -3,6 +3,7 @@ from collections.abc import Iterable
 from typing import no_type_check
 
 from asgiref.sync import async_to_sync
+from django.db.models import QuerySet
 from elasticsearch.dsl.response import Hit
 from eyecite import resolve_citations
 from eyecite.models import (
@@ -39,6 +40,39 @@ MULTIPLE_MATCHES_RESOURCE = Resource(
 # to be used when storing unmatched citations
 MULTIPLE_MATCHES_FLAG = "is_ambiguous"
 
+# The only fields that resolution, annotation, and storage read from a
+# matched opinion. A citing opinion can resolve hundreds of citations, each to
+# its own copy of the cited row, so loading opinion or cluster text here costs
+# hundreds of MiB per task.
+RESOLVED_OPINION_FIELDS = (
+    "id",
+    "cluster_id",
+    "cluster__id",
+    "cluster__slug",
+    "cluster__case_name",
+    "cluster__case_name_full",
+    "cluster__case_name_short",
+)
+
+
+def slim_resolved_opinions(
+    queryset: QuerySet[Opinion, Opinion],
+) -> QuerySet[Opinion, Opinion]:
+    """Limit an Opinion queryset to what citation resolution needs.
+
+    The returned opinions carry their cluster's names, slug, and citations,
+    but no opinion or cluster text. Reading any other field triggers an extra
+    query per opinion, so callers that need more should not use this.
+
+    :param queryset: An Opinion queryset to restrict
+    :return: The restricted queryset
+    """
+    return (
+        queryset.select_related("cluster")
+        .only(*RESOLVED_OPINION_FIELDS)
+        .prefetch_related("cluster__citations")
+    )
+
 
 def filter_by_matching_antecedent(
     opinion_candidates: Iterable[Opinion],
@@ -61,7 +95,7 @@ def filter_by_matching_antecedent(
 
 def resolve_fullcase_citation(
     full_citation: FullCaseCitation,
-) -> MatchedResourceType:
+) -> MatchedResourceType | None:
     # Case 1: FullCaseCitation
     if type(full_citation) is FullCaseCitation:
         db_search_results: list[Hit]
@@ -83,7 +117,7 @@ def resolve_fullcase_citation(
                     get_clusters_from_citation_str
                 )(volume=volume, reporter=reporter, page=page)
 
-                if _count == 0:
+                if clusters is None or _count == 0:
                     return NO_MATCH_RESOURCE
 
                 # exclude self links
@@ -98,7 +132,9 @@ def resolve_fullcase_citation(
 
                 if _count == 1:
                     # return the first item by ordering key
-                    return clusters[0].ordered_opinions.first()
+                    return slim_resolved_opinions(
+                        clusters[0].ordered_opinions
+                    ).first()
                 elif _count >= 2:
                     # set an attribute to differentiate 0-match and
                     # more-than-one-match citations
@@ -114,7 +150,9 @@ def resolve_fullcase_citation(
         if len(db_search_results) == 1:
             result_id = db_search_results[0]["id"]
             try:
-                return Opinion.objects.get(pk=result_id)
+                return slim_resolved_opinions(Opinion.objects.all()).get(
+                    pk=result_id
+                )
             except (Opinion.DoesNotExist, Opinion.MultipleObjectsReturned):
                 pass
 

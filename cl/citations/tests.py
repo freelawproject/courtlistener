@@ -1411,6 +1411,40 @@ class CitationObjectTest(ESIndexTestCase, TestCase):
         opinion12 = Opinion.objects.get(cluster__pk=self.citation12.cluster_id)
         self.assertEqual(results.pk, opinion12.pk, msg=results)
 
+    def test_resolved_opinion_skips_text(self) -> None:
+        """Resolved opinions load no text, but carry what annotation and
+        short-cite resolution read without further queries."""
+        # Cite from a third cluster: resolution drops self-citations.
+        citing_opinion = Opinion.objects.get(
+            cluster__pk=self.citation1.cluster_id
+        )
+        for cite_str, cluster_id in (
+            ("2 F.3d 2 (1st Cir. 2000)", self.citation2.cluster_id),  # ES hit
+            ("8 B. 416", self.citation12.cluster_id),  # DB pincite fallback
+        ):
+            with self.subTest(cite_str=cite_str):
+                citation = get_citations(
+                    cite_str, tokenizer=HYPERSCAN_TOKENIZER
+                )[0]
+                assert isinstance(citation, FullCaseCitation)
+                setattr(citation, "citing_opinion", citing_opinion)
+                opinion = resolve_fullcase_citation(citation)
+                assert isinstance(opinion, Opinion)
+                self.assertEqual(opinion.cluster_id, cluster_id)
+                self.assertTrue(
+                    {"plain_text", "html_with_citations", "xml_harvard"}
+                    <= opinion.get_deferred_fields()
+                )
+                self.assertIn(
+                    "headnotes", opinion.cluster.get_deferred_fields()
+                )
+                with self.assertNumQueries(0):
+                    opinion.cluster.get_absolute_url()
+                    opinion.cluster.case_name
+                    opinion.cluster.case_name_full
+                    opinion.cluster.case_name_short
+                    list(opinion.cluster.citations.all())
+
     def test_citation_multiple_matches(self) -> None:
         """Make sure that we can identify multiple matches for a single citation"""
         citation_str = "114 F.3d 1182"

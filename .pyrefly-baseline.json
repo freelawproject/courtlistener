@@ -806,48 +806,6 @@
       "severity": "error"
     },
     {
-      "column": 35,
-      "path": "cl/citations/management/commands/reindex_es_cite_fields.py",
-      "name": "unbound-name",
-      "concise_description": "`qs` may be uninitialized",
-      "severity": "error"
-    },
-    {
-      "column": 39,
-      "path": "cl/citations/management/commands/reindex_es_cite_fields.py",
-      "name": "unbound-name",
-      "concise_description": "`update_fn` may be uninitialized",
-      "severity": "error"
-    },
-    {
-      "column": 33,
-      "path": "cl/citations/management/commands/reindex_es_cite_fields.py",
-      "name": "bad-argument-type",
-      "concise_description": "Argument `list[_CiteCountUpdateDict]` is not assignable to parameter `documents_to_index` with type `list[dict[str, Any]]` in function `cl.lib.search_index_utils.index_documents_in_bulk`",
-      "severity": "error"
-    },
-    {
-      "column": 40,
-      "path": "cl/citations/match_citations.py",
-      "name": "not-iterable",
-      "concise_description": "Type `None` is not iterable",
-      "severity": "error"
-    },
-    {
-      "column": 28,
-      "path": "cl/citations/match_citations.py",
-      "name": "unsupported-operation",
-      "concise_description": "`None` is not subscriptable",
-      "severity": "error"
-    },
-    {
-      "column": 28,
-      "path": "cl/citations/match_citations.py",
-      "name": "bad-return",
-      "concise_description": "Returned type `Opinion | Unknown | None` is not assignable to declared return type `Opinion | Resource`",
-      "severity": "error"
-    },
-    {
       "column": 34,
       "path": "cl/citations/recap_citations.py",
       "name": "missing-attribute",
