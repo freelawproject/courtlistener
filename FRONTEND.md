@@ -159,6 +159,20 @@ Swapped partials live under `v2_includes/` (see [Naming & middleware](#naming--m
 
 A blocked evaluation fires `htmx:evalDisallowedError` on the element. Reference: https://htmx.org/reference/#config
 
+## View counting
+
+`new_base.html` counts a page view for any view decorated with `track_view_counter` (`cl/favorites/decorators.py`). The decorator sets `track_events` and `event_label` in the context; the base template puts the label and the `increment-event` endpoint on `<body>` as data attributes and requires `js/alpine/composables/view_count.js`, whose `viewCount` store POSTs the label once per page load. A new v2 page needs nothing beyond the decorator on its view. Counting is per page load and per the one object the view names in `tracks`; this mechanism does not count components or secondary objects.
+
+To display the count, bind to the store from any Alpine root. The store only exists on tracked pages, so the element MUST be rendered under `track_events`:
+
+```html
+{% if track_events %}<span x-text="$store.viewCount.value"></span>{% endif %}
+```
+
+`value` is `null` until the response arrives and stays `null` when the request fails. Failures are logged to the console and never shown to the user.
+
+Label prefixes are validated by `EventCountSerializer` (`cl/favorites/api_serializers.py`). Tracking a new object type needs a new pattern there, otherwise every request fails with a 400 that only the console reports.
+
 ## Icons
 
 - Use the `{% svg %}` template tag (defined in `cl/custom_filters/templatetags/svg_tags.py`)
