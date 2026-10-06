@@ -124,9 +124,6 @@ def delete_user_assets(user: User) -> None:
     user_tags = user.user_tags.all()
     user_tags_ids = [user_tag.pk for user_tag in user_tags]
 
-    # The API token and throttle overrides go too: the stub account can't log
-    # in, but they would otherwise linger. Throttle overrides are cached; the
-    # cached copy expires on its own shortly after this.
     user.alerts.all().delete()
     user.api_throttles.all().delete()
     user.docket_alerts.all().delete()
