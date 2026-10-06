@@ -124,38 +124,37 @@ def delete_user_assets(user: User) -> None:
     user_tags = user.user_tags.all()
     user_tags_ids = [user_tag.pk for user_tag in user_tags]
 
+    # The API token and throttle overrides go too: the stub account can't log
+    # in, but they would otherwise linger. Throttle overrides are cached; the
+    # cached copy expires on its own shortly after this.
     user.alerts.all().delete()
-    user.webhooks.all().delete()
+    user.api_throttles.all().delete()
     user.docket_alerts.all().delete()
-    user.notes.all().delete()
-    user_tags.delete()
-    user.prayers.all().delete()
-    user.search_queries.all().delete()
     user.emails.all().delete()
-    user.scotus_maps.all().delete()
     user.events.all().delete()
+    user.notes.all().delete()
+    user.prayers.all().delete()
+    user.scotus_maps.all().delete()
+    user.search_queries.all().delete()
+    Token.objects.filter(user=user).delete()
+    user_tags.delete()
+    user.webhooks.all().delete()
     # Donations are financial records we need to keep, so disable the
     # recurring ones rather than deleting them.
     user.monthly_donations.all().update(enabled=False)
 
-    # Revoke API access. The stub account can't log in, but its token and any
-    # per-user rate limit overrides would otherwise linger. Throttle overrides
-    # are cached; the cached copy expires on its own shortly after this.
-    Token.objects.filter(user=user).delete()
-    user.api_throttles.all().delete()
-
     # After deleting user-related objects, nuke history objects related to the
     # user so that events generated due to delete() are also removed.
-    DocketAlertEvent.objects.filter(user_id=user.pk).delete()
     AlertEvent.objects.filter(user_id=user.pk).delete()
-    NoteEvent.objects.filter(user_id=user.pk).delete()
-    UserTagEvent.objects.filter(user_id=user.pk).delete()
-    DocketTagEvent.objects.filter(tag__id__in=user_tags_ids).delete()
-    PrayerEvent.objects.filter(user_id=user.pk).delete()
-    WebhookHistoryEvent.objects.filter(user_id=user.pk).delete()
     APIThrottleEvent.objects.filter(user_id=user.pk).delete()
+    DocketAlertEvent.objects.filter(user_id=user.pk).delete()
+    DocketTagEvent.objects.filter(tag__id__in=user_tags_ids).delete()
+    NoteEvent.objects.filter(user_id=user.pk).delete()
+    PrayerEvent.objects.filter(user_id=user.pk).delete()
     UserGroupsEvent.objects.filter(user_id=user.pk).delete()
     UserPermissionsEvent.objects.filter(user_id=user.pk).delete()
+    UserTagEvent.objects.filter(user_id=user.pk).delete()
+    WebhookHistoryEvent.objects.filter(user_id=user.pk).delete()
 
 
 emails: dict[str, EmailType] = {
