@@ -461,13 +461,13 @@ Sample code here.
 
     <c-expansion-panel title="Code">
       <c-code>
-{# Single column (default) #}
+{% templatetag opencomment %} Single column (default) {% templatetag closecomment %}
 &lt;c-description-list&gt;
   &lt;c-description-term&gt;Term&lt;/c-description-term&gt;
   &lt;c-description-details&gt;Description.&lt;/c-description-details&gt;
 &lt;/c-description-list&gt;
 
-{# Responsive multi-column grid: 1 col mobile, 2 tablet, 4 desktop #}
+{% templatetag opencomment %} Responsive multi-column grid: 1 col mobile, 2 tablet, 4 desktop {% templatetag closecomment %}
 &lt;c-description-list class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4"&gt;
   &lt;c-description-item&gt;
     &lt;c-description-term&gt;Term&lt;/c-description-term&gt;
@@ -479,7 +479,7 @@ Sample code here.
   &lt;/c-description-item&gt;
 &lt;/c-description-list&gt;
 
-{# With class overrides #}
+{% templatetag opencomment %} With class overrides {% templatetag closecomment %}
 &lt;c-description-list class="grid grid-cols-1 md:grid-cols-2 gap-4"&gt;
   &lt;c-description-item&gt;
     &lt;c-description-term class="text-primary-600"&gt;Styled term&lt;/c-description-term&gt;
@@ -1493,7 +1493,7 @@ Sample code here.
       </c-library.item>
       <c-library.item only>
         <c-slot name="label"><code>tabs</code></c-slot>
-        <c-slot name="description">List of <code>{label, url, key}</code> dicts for the tab nav. If only one tab is provided, the nav is hidden.</c-slot>
+        <c-slot name="description">List of <code>{label, url, key, icon}</code> dicts for the tab nav, as built by <code>build_docket_tabs</code>. <code>icon</code> names an SVG in <code>cl/assets/static-global/svg/</code>, rendered before the label on desktop and skipped in the mobile dropdown. If only one tab is provided, the nav is hidden.</c-slot>
       </c-library.item>
       <c-library.item only>
         <c-slot name="label"><code>has_alert</code></c-slot>
@@ -1536,7 +1536,7 @@ Sample code here.
   {# DOCKET SOURCE BUTTON #}
   <section class="max-w-full w-full border-t-2 border-greyscale-200" x-intersect.margin.-100px="show" id="docket-source-button">
     <h2 class="mt-6 mb-3">Docket source button</h2>
-    <p>The control that sends a reader to this docket on the site it came from — "View on PACER" for a RECAP docket, "View in SCOTUS" for a SCOTUS one. It dispatches to <code>cotton/docket_source_button/&lt;component&gt;.html</code>, where <code>component</code> comes from <code>DocketEntrySource</code>, so <code>&lt;c-docket-page&gt;</code> stays source-agnostic and <code>DocketEntrySource</code> never carries user-facing strings. Adding a source means adding one file to that folder. Its per-document counterpart is <code>&lt;c-document-source-link&gt;</code>, and the sentence naming the source is <code>&lt;c-docket-source-attribution&gt;</code>.</p>
+    <p>The control that sends a reader to this docket on the site it came from — "View on PACER" for a RECAP docket, "View in SCOTUS" for a SCOTUS one. It dispatches to <code>cotton/docket_source_button/&lt;component&gt;.html</code>, where <code>component</code> comes from <code>DocketEntrySource</code>, so <code>&lt;c-docket-page&gt;</code> stays source-agnostic. Plain-text per-source copy is a field on <code>DocketEntrySource</code>, while copy that needs markup lives in dispatch folders like this one. Adding a source means adding one file to that folder. Its per-document counterpart is <code>&lt;c-document-source-link&gt;</code>, and the sentence naming the source is <code>&lt;c-docket-source-attribution&gt;</code>.</p>
 
     <h4 class="mt-3">Demo</h4>
     <p class="text-sm text-greyscale-600 mb-2">A RECAP docket at a district court, so the menu shows the district-only reports as well as the docket report. An appellate docket shows the docket report alone.</p>
@@ -1648,7 +1648,11 @@ Sample code here.
       </c-library.item>
       <c-library.item only>
         <c-slot name="label"><code>:docket_source</code></c-slot>
-        <c-slot name="description">The <code>DocketEntrySource</code> the view put in the context. Supplies <code>has_pay_and_pray</code> here and is forwarded to the nested <code>&lt;c-document-source-link&gt;</code> for its <code>component</code>.</c-slot>
+        <c-slot name="description">The <code>DocketEntrySource</code> the view put in the context. Supplies <code>has_pay_and_pray</code> and <code>empty_message</code> here, and is forwarded to the nested <code>&lt;c-document-source-link&gt;</code> for its <code>component</code>.</c-slot>
+      </c-library.item>
+      <c-library.item only>
+        <c-slot name="label"><code>:filters_applied</code></c-slot>
+        <c-slot name="description">Bool — whether the request carried any filter or search param (<code>DocketEntryFilterForm.has_filters()</code>). Picks the empty state: "No docket entries match your filters." when true, the source's own "no entries yet" sentence, <code>docket_source.empty_message</code>, when false.</c-slot>
       </c-library.item>
     </c-library.list>
 
@@ -1658,7 +1662,11 @@ Sample code here.
 
     <c-expansion-panel title="Code">
       <c-code>
-&lt;c-docket-entry-rows :docket_entries="docket_entries" :docket_source="docket_source" /&gt;
+&lt;c-docket-entry-rows
+  :docket_entries="docket_entries"
+  :docket_source="docket_source"
+  :filters_applied="filters_applied"
+/&gt;
       </c-code>
     </c-expansion-panel>
   </section>
@@ -1666,7 +1674,7 @@ Sample code here.
   {# DOCUMENT SOURCE LINK #}
   <section class="max-w-full w-full border-t-2 border-greyscale-200" x-intersect.margin.-100px="show" id="document-source-link">
     <h2 class="mt-6 mb-3">Document source link</h2>
-    <p>Links a document back to the site it came from, in that site's own wording — "Buy on PACER" for a RECAP docket, "View on SCOTUS" for a SCOTUS one. It dispatches to <code>cotton/document_source_link/&lt;component&gt;.html</code>, where <code>component</code> comes from <code>DocketEntrySource</code>, so <code>&lt;c-docket-entry-rows&gt;</code> stays source-agnostic and <code>DocketEntrySource</code> never carries user-facing strings. Adding a source means adding one file to that folder. Renders nothing when the document has no external URL, so callers don't have to guard it.</p>
+    <p>Links a document back to the site it came from, in that site's own wording — "Buy on PACER" for a RECAP docket, "View on SCOTUS" for a SCOTUS one. It dispatches to <code>cotton/document_source_link/&lt;component&gt;.html</code>, where <code>component</code> comes from <code>DocketEntrySource</code>, so <code>&lt;c-docket-entry-rows&gt;</code> stays source-agnostic. Plain-text per-source copy is a field on <code>DocketEntrySource</code>, while copy that needs markup lives in dispatch folders like this one. Adding a source means adding one file to that folder. Renders nothing when the document has no external URL, so callers don't have to guard it.</p>
 
     <h4 class="mt-3">Demo</h4>
     <p class="text-sm text-greyscale-600 mb-2">A RECAP document we don't host, so the price suffix shows. The <code>menu_item</code> variant is not shown here because it only renders inside a <code>&lt;c-menu-button&gt;</code> menu.</p>
@@ -1707,12 +1715,12 @@ Sample code here.
   <section class="max-w-full w-full border-t-2 border-greyscale-200" x-intersect.margin.-100px="show" id="docket-filter">
     <h2 class="mt-6 mb-3">Docket filter</h2>
     <p>Page-specific filter toolbar for docket entries. Includes search, date range (Flatpickr), document number range, sort toggle, and prev/next navigation. On mobile, filter fields move into a <code>&lt;c-filter-drawer&gt;</code> with an "Apply" button.</p>
+    <p>The search box is its own GET form to the RECAP search page, separate from the filters. The docket scope travels in a hidden <code>q</code> seeded with <code>docket_id:N</code>, and the visible input is unnamed, so the scope is never shown and clearing the box can't widen the search. On submit, <code>docket_filter.js</code> merges the typed terms into the hidden <code>q</code> as <code>(terms) AND docket_id:N</code>. An empty box, or a browser without JavaScript, submits the term-less docket search.</p>
 
     <h4 class="mt-3">Demo</h4>
     <p class="text-sm text-greyscale-600 mb-2">Desktop toolbar shown below. Resize below <code>md</code> breakpoint (768px) to see the mobile layout with search, prev/next, and filter drawer trigger.</p>
     <c-docket-filter
       :docket="demo_docket"
-      :docket_source="docket_source"
       :form="demo_filter_form"
       :page_obj="demo_page_obj"
     />
@@ -1721,10 +1729,6 @@ Sample code here.
       <c-library.item only>
         <c-slot name="label"><code>:docket</code></c-slot>
         <c-slot name="description">The Docket model instance (required).</c-slot>
-      </c-library.item>
-      <c-library.item only>
-        <c-slot name="label"><code>:docket_source</code></c-slot>
-        <c-slot name="description">The <code>DocketEntrySource</code> from the view context, forwarded to the nested <code>&lt;c-docket-source-attribution&gt;</code> that renders the source-attribution sentence below the toolbar.</c-slot>
       </c-library.item>
       <c-library.item only>
         <c-slot name="label"><code>:form</code></c-slot>
@@ -1744,15 +1748,44 @@ Sample code here.
       <p>No slots</p>
     </c-library.list>
 
+    <c-library.list title="Sub-components">
+      <c-library.item only>
+        <c-slot name="label"><code>c-docket-filter.search-form</code></c-slot>
+        <c-slot name="description">The "Search this docket" form described above, rendered once per layout. Must sit inside the <code>docketFilter</code> root, which supplies the submit handler and the scope.</c-slot>
+      </c-library.item>
+    </c-library.list>
+
+    <c-library.list title="c-docket-filter.search-form props" only>
+      <c-library.item only>
+        <c-slot name="label"><code>:docket</code></c-slot>
+        <c-slot name="description">The docket whose <code>pk</code> seeds the hidden <code>q</code>.</c-slot>
+      </c-library.item>
+      <c-library.item only>
+        <c-slot name="label"><code>input_id</code></c-slot>
+        <c-slot name="description">Id of the search input, unique per layout so each label points at its own field.</c-slot>
+      </c-library.item>
+      <c-library.item optional only>
+        <c-slot name="label"><code>class</code></c-slot>
+        <c-slot name="description">CSS classes forwarded to the <code>&lt;form&gt;</code>.</c-slot>
+      </c-library.item>
+    </c-library.list>
+
     <c-expansion-panel title="Code">
       <c-code>
+{% templatetag opencomment %} In the page template: the whole filter bar {% templatetag closecomment %}
 &lt;c-docket-filter
   :docket="docket"
-  :docket_source="docket_source"
   :form="form"
   :page_obj="docket_entries"
   :sort_order_asc="sort_order_asc"
 /&gt;
+
+{% templatetag opencomment %} Inside cotton/docket_filter/index.html: one search form per layout, within the docketFilter root that supplies the scope and the submit handler {% templatetag closecomment %}
+&lt;div x-data="docketFilter" data-docket-scope="docket_id:{% templatetag openvariable %} docket.pk {% templatetag closevariable %}"&gt;
+  &lt;c-docket-filter.search-form :docket="docket" input_id="de-search-desktop" class="flex-1 max-w-xs" /&gt;
+  ...
+  &lt;c-docket-filter.search-form :docket="docket" input_id="de-search-mobile" class="flex-1" /&gt;
+&lt;/div&gt;
       </c-code>
     </c-expansion-panel>
   </section>
@@ -1763,7 +1796,7 @@ Sample code here.
     <p>Renders an optional <code>&lt;h2&gt;</code> heading followed by a <code>c-description-list</code> built from a list of item dicts. <code>c-docket-page</code> renders one per entry in its <code>metadata_sections</code> prop, which is how a docket's source adds sections of its own.</p>
 
     <h4 class="mt-3">Demo</h4>
-    <p class="text-sm text-greyscale-600 mb-2">One item of each shape: plain, linked out, and carrying a suffix link after the value.</p>
+    <p class="text-sm text-greyscale-600 mb-2">One item of each shape: plain, linked out, carrying a suffix link after the value, and copyable with a single click.</p>
     <div class="my-4 rounded-lg border border-greyscale-200 p-4">
       <c-metadata-section
         :items="demo_metadata_items"
@@ -1775,7 +1808,7 @@ Sample code here.
     <c-library.list title="Props" only>
       <c-library.item only>
         <c-slot name="label"><code>items</code></c-slot>
-        <c-slot name="description">List of dicts with at least <code>label</code> and <code>value</code>. Optional keys: <code>url</code>, <code>nofollow</code>, <code>is_external</code>, <code>aria_label</code>, <code>suffix_text</code>, <code>suffix_url</code>, <code>suffix_nofollow</code>, <code>suffix_is_external</code>, <code>suffix_aria_label</code>. The section renders nothing if <code>items</code> is empty.</c-slot>
+        <c-slot name="description">List of dicts with at least <code>label</code> and <code>value</code>. Optional keys: <code>url</code>, <code>nofollow</code>, <code>is_external</code>, <code>aria_label</code>, <code>suffix_text</code>, <code>suffix_url</code>, <code>suffix_nofollow</code>, <code>suffix_is_external</code>, <code>suffix_aria_label</code>, <code>one_click_select</code> (a single click selects the whole value for copying). The section renders nothing if <code>items</code> is empty.</c-slot>
       </c-library.item>
       <c-library.item only>
         <c-slot name="label"><code>title</code></c-slot>
