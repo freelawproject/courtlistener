@@ -13,7 +13,7 @@ from cl.favorites.models import (
     UserTagEvent,
 )
 from cl.lib.crypto import md5
-from cl.lib.decorators import clear_tiered_cache, tiered_cache
+from cl.lib.decorators import tiered_cache
 from cl.lib.types import EmailType
 from cl.users.models import (
     UserGroupsEvent,
@@ -140,10 +140,9 @@ def delete_user_assets(user: User) -> None:
 
     # Revoke API access. The stub account can't log in, but its token and any
     # per-user rate limit overrides would otherwise linger. Throttle overrides
-    # are cached, so clear the cache to make the removal take effect at once.
+    # are cached; the cached copy expires on its own shortly after this.
     Token.objects.filter(user=user).delete()
     user.api_throttles.all().delete()
-    clear_tiered_cache()
 
     # After deleting user-related objects, nuke history objects related to the
     # user so that events generated due to delete() are also removed.
