@@ -14,7 +14,7 @@ from io import BytesIO
 from pyexpat import ExpatError
 from re import Pattern
 from tempfile import NamedTemporaryFile
-from typing import IO, Any, TypeIs
+from typing import IO, Any, TypeIs, cast
 from urllib.parse import urljoin
 
 import botocore.exceptions
@@ -229,6 +229,7 @@ from cl.search.state.texas.models import (
     TexasDocketEntry,
     TexasDocument,
 )
+from cl.settings import COURT_REQUEST_USER_AGENT
 
 HYPERSCAN_TOKENIZER = HyperscanTokenizer(cache_dir=".hyperscan")
 
@@ -496,7 +497,7 @@ def get_and_save_free_document_report(
 
         if self.request.retries == self.max_retries:
             logger.error(f"{msg} at %s (%s to %s).", court_id, start, end)  # noqa: G004
-            return PACERFreeDocumentLog.SCRAPE_FAILED
+            return PACERFreeDocumentLog.SCRAPE_FAILED, 0
         logger.info(f"{msg} Retrying.", court_id, start, end)  # noqa: G004
         raise self.retry(exc=exc, countdown=5)
 
@@ -506,7 +507,7 @@ def get_and_save_free_document_report(
         # IndexError: When the page isn't downloaded properly.
         # HTTPError: raise_for_status in parse hit bad status.
         if self.request.retries == self.max_retries:
-            return PACERFreeDocumentLog.SCRAPE_FAILED
+            return PACERFreeDocumentLog.SCRAPE_FAILED, 0
         raise self.retry(exc=exc, countdown=5)
 
     if log_id and not settings.DEVELOPMENT:
@@ -587,9 +588,15 @@ def process_free_opinion_result(
         self.request.chain = None
         return None
 
-    result.court = Court.objects.get(pk=map_pacer_to_cl_id(result.court_id))
+    # TODO: Come up with some way to do this that satisfies the type checker
+    result.court = Court.objects.get(
+        pk=map_pacer_to_cl_id(result.court_id)
+    )  # pyrefly:ignore[missing-attribute]
     result.case_name = harmonize(result.case_name)
-    result.case_name_short = cnt.make_case_name_short(result.case_name)
+    result.case_name_short = cnt.make_case_name_short(
+        result.case_name
+    )  # pyrefly:ignore[missing-attribute]
+
     row_copy = copy.copy(result)
     # If we don't do this, the doc's date_filed becomes the docket's
     # date_filed. Bad.
@@ -661,7 +668,7 @@ def process_free_opinion_result(
                     is_free_on_pacer=True,
                 )
                 rd_created = True
-            elif rd_count > 0:
+            else:
                 # Could be one item (great!) or more than one (not great).
                 # Choose the earliest item and upgrade it.
                 rd = rds.earliest("date_created")
@@ -962,21 +969,24 @@ def upload_to_ia(
     )
     try:
         item = ia_session.get_item(identifier)
-        responses = item.upload(
-            files=files,
-            metadata={
-                "title": title,
-                "collection": collection,
-                "contributor": '<a href="https://free.law">Free Law Project</a>',
-                "court": court_id,
-                "source_url": source_url,
-                "language": "eng",
-                "mediatype": media_type,
-                "description": description,
-                "licenseurl": "https://www.usa.gov/government-works",
-            },
-            queue_derive=False,
-            verify=True,
+        responses = cast(
+            list[Response],
+            item.upload(
+                files=files,
+                metadata={
+                    "title": title,
+                    "collection": collection,
+                    "contributor": '<a href="https://free.law">Free Law Project</a>',
+                    "court": court_id,
+                    "source_url": source_url,
+                    "language": "eng",
+                    "mediatype": media_type,
+                    "description": description,
+                    "licenseurl": "https://www.usa.gov/government-works",
+                },
+                queue_derive=False,
+                verify=True,
+            ),
         )
     except ExpatError as exc:
         # ExpatError: The syntax of the XML file that's supposed to be returned
@@ -2719,26 +2729,28 @@ def get_pacer_doc_by_rd_and_description(
     rd = RECAPDocument.objects.get(pk=rd_pk)
     att_report = get_attachment_page_by_rd(self, rd_pk, session_data)
 
-    att_found = None
-    for attachment in att_report.data.get("attachments", []):
-        if description_re.search(attachment["description"]):
-            att_found = attachment.copy()
-            document_type = RECAPDocument.ATTACHMENT
-            break
-
-    if not att_found:
-        if fallback_to_main_doc:
-            logger.info(
-                "Falling back to main document for pacer_doc_id: %s",
-                rd.pacer_doc_id,
-            )
-            att_found = att_report.data
-            document_type = RECAPDocument.PACER_DOCUMENT
-        else:
-            msg = f"Aborting. Did not find civil cover sheet for {rd}."
-            logger.error(msg)
-            self.request.chain = None
-            return None
+    att_found = next(
+        (
+            attachment.copy()
+            for attachment in att_report.data.get("attachments", [])
+            if description_re.search(attachment["description"])
+        ),
+        None,
+    )
+    if att_found:
+        document_type = RECAPDocument.ATTACHMENT
+    elif fallback_to_main_doc:
+        logger.info(
+            "Falling back to main document for pacer_doc_id: %s",
+            rd.pacer_doc_id,
+        )
+        att_found = att_report.data
+        document_type = RECAPDocument.PACER_DOCUMENT
+    else:
+        msg = f"Aborting. Did not find civil cover sheet for {rd}."
+        logger.error(msg)
+        self.request.chain = None
+        return None
     if not att_found.get("pacer_doc_id"):
         logger.warning("No pacer_doc_id for document (is it sealed?)")
         self.request.chain = None
@@ -3374,8 +3386,8 @@ def download_document_in_stream(
     @retry(
         (ConnectionError, Timeout),
         tries=3,
-        delay=0.25,
-        backoff=1,
+        delay=1,
+        backoff=2,
     )
     def download_to_file(tmp_file):
         tmp_file.seek(0)
@@ -3386,7 +3398,7 @@ def download_document_in_stream(
             url,
             stream=True,
             timeout=60,
-            headers={"User-Agent": "Free Law Project"},
+            headers={"User-Agent": COURT_REQUEST_USER_AGENT},
         ) as response:
             response.raise_for_status()
             if require_pdf and not is_pdf(response):
@@ -3888,7 +3900,11 @@ def download_scotus_document_pdf(self: Task, doc_pk: int) -> int | None:
         to update the attachment for.
     """
     try:
-        doc = SCOTUSDocument.objects.get(pk=doc_pk)
+        # The document's storage path is built from its docket, so fetch that
+        # with it rather than going back for it a query at a time.
+        doc = SCOTUSDocument.objects.select_related(
+            "docket_entry__docket"
+        ).get(pk=doc_pk)
     except SCOTUSDocument.DoesNotExist:
         logger.warning(
             "SCOTUS document PDF download: SCOTUSDocument %s does not exist; skipping.",

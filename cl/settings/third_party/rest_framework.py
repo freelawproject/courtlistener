@@ -20,7 +20,9 @@ REST_FRAMEWORK = {
     "ALLOWED_VERSIONS": {"v3", "v4"},
     # Throttles
     "DEFAULT_THROTTLE_CLASSES": (
-        "rest_framework.throttling.AnonRateThrottle",
+        # Override DRF's throttle classes to ensure we get the correct
+        # IP from CloudFront's header. See #7655.
+        "cl.api.utils.CloudFrontAnonRateThrottle",
         "cl.api.utils.ExceptionalUserRateThrottle",
     ),
     "DEFAULT_THROTTLE_RATES": {

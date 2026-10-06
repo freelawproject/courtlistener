@@ -91,10 +91,6 @@ class TexasDocument(AbstractDateTimeModel, AbstractStateDocument):
     media_id = models.UUIDField()
     media_version_id = models.UUIDField()
 
-    def make_filename(self) -> str:
-        """Build the stored filename from the media ID and version ID."""
-        return f"{self.media_id}-{self.media_version_id}"
-
     @classmethod
     def tmp_prefix(cls) -> str:
         """Prefix for temporary download files."""
@@ -136,7 +132,3 @@ class TexasDocument(AbstractDateTimeModel, AbstractStateDocument):
             models.Index(fields=["filepath_local"]),
         ]
         unique_together = [["docket_entry", "media_id"]]
-
-    def get_pdf_path(self, filename: str, thumbs: bool = False) -> str:
-        """Store TAMES documents in the shared RECAP-style state layout."""
-        return self.state_pdf_path(filename, thumbs)

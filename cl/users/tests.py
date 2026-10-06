@@ -24,6 +24,7 @@ from django.core.mail import (
     get_connection,
     send_mail,
 )
+from django.db.models import QuerySet
 from django.http import HttpResponse
 from django.test import AsyncClient, RequestFactory
 from django.test.client import Client
@@ -67,10 +68,12 @@ from cl.donate.models import (
     NeonMembership,
     NeonMembershipLevel,
 )
-from cl.favorites.factories import UserTagFactory
+from cl.favorites.factories import NoteFactory, UserTagFactory
 from cl.favorites.models import (
     DocketTag,
     DocketTagEvent,
+    Note,
+    NoteEvent,
     UserTag,
     UserTagEvent,
 )
@@ -88,8 +91,14 @@ from cl.lib.test_helpers import (
     SimpleUserDataMixin,
     UserProfileWithParentsFactory,
 )
-from cl.search.factories import DocketFactory
-from cl.search.models import SearchQuery
+from cl.search.factories import (
+    CourtFactory,
+    DocketFactory,
+    RECAPDocumentFactory,
+    SCOTUSDocketEntryFactory,
+    SCOTUSDocumentFactory,
+)
+from cl.search.models import Docket, SearchQuery
 from cl.tests.base import SELENIUM_TIMEOUT, BaseSeleniumTest
 from cl.tests.cases import (
     APITestCase,
@@ -790,6 +799,15 @@ class ProfileTest(SimpleUserDataMixin, TestCase):
                 stripe_customer_id="cus_test",
             )
 
+            legacy_note = NoteFactory(user=profile.user)
+            legacy_note.notes = "edited"
+            legacy_note.save()
+            gfk_note = NoteFactory.for_object(
+                RECAPDocumentFactory(), user=profile.user
+            )
+            gfk_note.notes = "edited"
+            gfk_note.save()
+
         # Sanity check: the victim's history and assets exist before deletion.
         self.assertTrue(
             UserProxyEvent.objects.filter(pgh_obj_id=victim.user.pk).exists()
@@ -801,6 +819,10 @@ class ProfileTest(SimpleUserDataMixin, TestCase):
             UserProfileBarMembershipEvent.objects.filter(
                 userprofile_id=victim.pk
             ).exists()
+        )
+        self.assertEqual(Note.objects.filter(user=victim.user).count(), 2)
+        self.assertTrue(
+            NoteEvent.objects.filter(user_id=victim.user.pk).exists()
         )
 
         # Delete the victim's account.
@@ -819,6 +841,7 @@ class ProfileTest(SimpleUserDataMixin, TestCase):
         self.assertFalse(SearchQuery.objects.filter(user=victim.user).exists())
         self.assertFalse(EmailSent.objects.filter(user=victim.user).exists())
         self.assertFalse(SCOTUSMap.objects.filter(user=victim.user).exists())
+        self.assertFalse(Note.objects.filter(user=victim.user).exists())
 
         # The PII left behind in the event tables is purged.
         self.assertFalse(
@@ -831,6 +854,9 @@ class ProfileTest(SimpleUserDataMixin, TestCase):
             UserProfileBarMembershipEvent.objects.filter(
                 userprofile_id=victim.pk
             ).exists()
+        )
+        self.assertFalse(
+            NoteEvent.objects.filter(user_id=victim.user.pk).exists()
         )
 
         # Donations are financial records: kept, but disabled.
@@ -856,6 +882,10 @@ class ProfileTest(SimpleUserDataMixin, TestCase):
             UserProfileBarMembershipEvent.objects.filter(
                 userprofile_id=bystander.pk
             ).exists()
+        )
+        self.assertEqual(Note.objects.filter(user=bystander.user).count(), 2)
+        self.assertTrue(
+            NoteEvent.objects.filter(user_id=bystander.user.pk).exists()
         )
         self.assertTrue(
             MonthlyDonation.objects.get(donor=bystander.user).enabled
@@ -1024,6 +1054,36 @@ class ProfileTest(SimpleUserDataMixin, TestCase):
                         self.assertEqual(vals["direction"], "down")
                     else:
                         self.assertEqual(vals["direction"], "up")
+
+
+class NotesPageDeadLinkTest(TestCase):
+    """A noted object with no page of its own yet must not render as a
+    dead link on the profile Notes page.
+    """
+
+    def test_note_with_no_absolute_url_renders_without_a_dead_link(
+        self,
+    ) -> None:
+        user = UserProfileWithParentsFactory()
+        court = CourtFactory(id="scotus", jurisdiction="F")
+        docket = DocketFactory(court=court, source=Docket.SCRAPER)
+        entry = SCOTUSDocketEntryFactory(docket=docket, entry_number=None)
+        document = SCOTUSDocumentFactory(
+            docket_entry=entry, attachment_number=None
+        )
+        self.assertEqual(document.get_absolute_url(), "")
+        note = NoteFactory.for_object(
+            document, user=user.user, name="edge case note"
+        )
+
+        self.assertTrue(
+            self.client.login(username=user.user.username, password="password")
+        )
+        r = self.client.get(reverse("profile_notes"))
+        self.assertEqual(r.status_code, HTTPStatus.OK)
+        content = r.content.decode()
+        self.assertIn(note.name, content)
+        self.assertNotIn('href=""', content)
 
 
 class DisposableEmailTest(SimpleUserDataMixin, TestCase):
@@ -4277,6 +4337,33 @@ class NeonAccountUpdateTest(TestCase):
         update_account_mock.delay.assert_not_called()
 
 
+@patch("cl.users.views.create_neon_account")
+@patch("cl.users.views.update_neon_account")
+class SaveQueryHistorySettingTest(TestCase):
+    """Can users change whether their search queries are saved?"""
+
+    def test_can_disable_save_query_history(
+        self, update_account_mock, create_account_mock
+    ) -> None:
+        """Does unchecking the box on the settings page disable it?"""
+        up = UserProfileWithParentsFactory.create()
+        self.assertTrue(up.save_query_history)
+        self.client.force_login(up.user)
+        r = self.client.post(
+            reverse("view_settings"),
+            {
+                "first_name": "test_name",
+                "last_name": "test_last_name",
+                "email": up.user.email,
+            },
+            follow=True,
+        )
+
+        self.assertEqual(r.status_code, HTTPStatus.OK)
+        up.refresh_from_db()
+        self.assertFalse(up.save_query_history)
+
+
 @patch("cl.users.views.OptInConsentForm.is_valid", new=lambda self: True)
 @patch(
     "cl.custom_filters.decorators.verify_honeypot_value",
@@ -4715,6 +4802,104 @@ class DuplicateEmailSettingsTest(TestCase):
         await self.up.user.arefresh_from_db()
         self.assertEqual(self.up.user.first_name, "Still")
         self.assertEqual(self.up.user.email, self.email)
+
+
+class UserAdminEmailSearchTest(TestCase):
+    """Admin user search uses the LOWER(email) index for complete addresses."""
+
+    @classmethod
+    def setUpTestData(cls) -> None:
+        cls.user = UserFactory.create(
+            username="admin-search",
+            first_name="Ada",
+            last_name="Lovelace",
+            email="Matcher@Example.com",
+        )
+        cls.other = UserFactory.create(
+            username="other-user",
+            first_name="Other",
+            last_name="Person",
+            email="other@example.org",
+        )
+
+    def setUp(self) -> None:
+        self.user_admin = UserAdmin(model=User, admin_site=admin.site)
+        self.request = RequestFactory().get(
+            reverse("admin:auth_user_changelist")
+        )
+
+    def search(self, term: str) -> QuerySet[User]:
+        """Run the User admin changelist search and return the queryset."""
+        results, _use_distinct = self.user_admin.get_search_results(
+            self.request, User.objects.all(), term
+        )
+        return results
+
+    def test_email_search_finds_the_account_regardless_of_case(self) -> None:
+        """Does a differently-cased complete address still find the account?"""
+        for email in [
+            "Matcher@Example.com",
+            "matcher@example.com",
+            "MATCHER@EXAMPLE.COM",
+        ]:
+            with self.subTest(email=email):
+                self.assertEqual(
+                    list(
+                        self.search(email).values_list("username", flat=True)
+                    ),
+                    ["admin-search"],
+                )
+
+    def test_a_different_address_does_not_match(self) -> None:
+        """Is a complete address match exact, once case is set aside?"""
+        self.assertEqual(
+            list(
+                self.search("nobody@example.com").values_list("pk", flat=True)
+            ),
+            [],
+        )
+
+    def test_partial_email_search_still_matches(self) -> None:
+        """Do domain and partial-address terms still use substring search?"""
+        cases = (
+            ("@example.com", "admin-search"),
+            ("Matcher@", "admin-search"),
+            ("@example.org", "other-user"),
+        )
+        for term, username in cases:
+            with self.subTest(term=term):
+                self.assertEqual(
+                    list(self.search(term).values_list("username", flat=True)),
+                    [username],
+                )
+
+    def test_email_search_folds_case_in_sql(self) -> None:
+        """Does a complete address compile to LOWER() rather than UPPER()/LIKE?"""
+        sql = str(self.search("matcher@example.com").query)
+        self.assertIn("LOWER", sql.upper())
+        self.assertNotIn("UPPER", sql.upper())
+        self.assertNotIn("LIKE", sql.upper())
+
+    def test_username_search_still_works(self) -> None:
+        """Does a non-address term still search username and name?"""
+        self.assertEqual(
+            list(
+                self.search("admin-search").values_list("username", flat=True)
+            ),
+            ["admin-search"],
+        )
+        self.assertEqual(
+            list(self.search("Lovelace").values_list("username", flat=True)),
+            ["admin-search"],
+        )
+
+    def test_empty_search_returns_everyone(self) -> None:
+        """Does an empty term leave the queryset unfiltered?"""
+        results, use_distinct = self.user_admin.get_search_results(
+            self.request, User.objects.all(), ""
+        )
+        self.assertEqual(results.count(), User.objects.count())
+        self.assertFalse(use_distinct)
 
 
 class UserAdminApiCallsCountTest(TestCase):

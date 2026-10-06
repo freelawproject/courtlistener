@@ -26,7 +26,7 @@ class DocketFeed(Feed):
     def title(self, obj: Docket) -> str:
         return f"Docket updates for {make_docket_title(obj)}"
 
-    def get_object(self, request: HttpRequest, docket_id: int) -> Docket:  # type: ignore
+    def get_object(self, request: HttpRequest, docket_id: int) -> Docket:
         try:
             d = Docket.objects.only(
                 "case_name",
@@ -39,7 +39,7 @@ class DocketFeed(Feed):
         else:
             return d
 
-    def items(self, obj: Docket) -> QuerySet:
+    def items(self, obj: Docket) -> QuerySet[DocketEntry]:
         # Get the items with prefetched main-docs
         main_docs_query = (
             RECAPDocument.objects.filter(

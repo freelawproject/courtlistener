@@ -31,10 +31,8 @@ from cl.corpus_importer.state.loader import (
     WaitOutcome,
 )
 from cl.corpus_importer.state.new_york.loader import NYCoACourtPassLoader
-from cl.corpus_importer.state.new_york.storage import (
-    PRIVATE_PREFIX,
-    PublishOutcome,
-)
+from cl.corpus_importer.state.new_york.storage import PRIVATE_PREFIX
+from cl.corpus_importer.state.storage import PublishOutcome
 from cl.corpus_importer.state.utils import FileTally
 from cl.lib.redis_utils import get_redis_interface
 from cl.people_db.models import Party
@@ -182,8 +180,9 @@ FILE = {
 class NYCoALoaderTest(TestCase):
     """Tests for turning a Court-PASS run database into merged dockets.
 
-    Stands in for S3 as well as for the extraction queue: a merge moves each
-    file it writes a document for out of the private bucket, so a load run
+    Stands in for S3 as well as for the extraction queue: each merge is
+    followed by moving the files it wrote documents for out of the private
+    bucket, so a load run
     against a real storage backend would reach for the network once per file.
     `publish_outcome` makes the copy report whichever way of failing a test is
     after.
@@ -210,15 +209,22 @@ class NYCoALoaderTest(TestCase):
         self.addCleanup(self.clear_run_keys)
 
     def stub_storage(self) -> None:
-        """Keep the merges' file moves off the network."""
-        for name, double in (
-            ("copy_file", lambda *_args, **_kw: self.publish_outcome),
-            ("discard_private_file", lambda *_args: None),
-            ("withdraw_file", lambda *_args: None),
+        """Keep the file moves each merge is followed by off the network."""
+        for target, double in (
+            (
+                "cl.corpus_importer.state.loader.copy_file",
+                lambda *_args, **_kw: self.publish_outcome,
+            ),
+            (
+                "cl.corpus_importer.state.loader.delete_file",
+                lambda *_args: None,
+            ),
+            (
+                "cl.corpus_importer.state.new_york.mergers.delete_file",
+                lambda *_args: None,
+            ),
         ):
-            patcher = patch(
-                f"cl.corpus_importer.state.new_york.mergers.{name}", double
-            )
+            patcher = patch(target, double)
             patcher.start()
             self.addCleanup(patcher.stop)
 
