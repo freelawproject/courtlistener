@@ -4096,6 +4096,37 @@ class DocketPageV2TemplateTest(TestCase):
         self.assertEqual(len(token), CSRF_TOKEN_LENGTH)
         self.assertTrue(token.isalnum())
 
+    async def test_v2_docket_page_counts_views(self) -> None:
+        """A view decorated with track_view_counter hands the body the event
+        label and the increment endpoint, and loads the viewCount store that
+        POSTs them once per page load."""
+        r = await self.async_client.get(
+            reverse("view_docket", args=[self.docket.pk, self.docket.slug])
+        )
+        self.assertTemplateUsed(r, "new_base.html")
+        body = next(fromstring(r.content.decode()).iter("body"))
+        self.assertEqual(
+            body.get("data-view-count-label"), f"d.{self.docket.pk}:view"
+        )
+        self.assertEqual(
+            body.get("data-view-count-url"),
+            reverse("increment-event-list", kwargs={"version": "v4"}),
+        )
+        self.assertRegex(
+            r.content.decode(),
+            r'<script[^>]*src="[^"]*js/alpine/composables/view_count\.js"',
+        )
+
+    async def test_v2_page_without_tracking_sends_no_view_count(self) -> None:
+        """A v2 page whose view is not decorated carries no label, no endpoint
+        and no store, so the browser makes no request."""
+        r = await self.async_client.get(reverse("help_home"))
+        self.assertTemplateUsed(r, "new_base.html")
+        body = next(fromstring(r.content.decode()).iter("body"))
+        self.assertIsNone(body.get("data-view-count-label"))
+        self.assertIsNone(body.get("data-view-count-url"))
+        self.assertNotIn("view_count.js", r.content.decode())
+
 
 @override_settings(WAFFLE_CACHE_PREFIX="test_docket_alert_toggle_v2_waffle")
 @override_flag("use_new_design", active=True)
