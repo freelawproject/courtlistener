@@ -74,7 +74,8 @@
 </head>
 
 {# htmx elements inherit hx-headers, so every hx-post on a v2 page carries the CSRF token without repeating it. #}
-<body class="{% block body-classes %}{% endblock %}" hx-headers='{"X-CSRFToken": "{{ csrf_token }}"}'>
+<body class="{% block body-classes %}{% endblock %}" hx-headers='{"X-CSRFToken": "{{ csrf_token }}"}'{% if track_events %} data-view-count-label="{{ event_label }}" data-view-count-url="{% url 'increment-event-list' version='v4' %}"{% endif %}>
+  {% if track_events %}{% require_script "js/alpine/composables/view_count.js" %}{% endif %}
   {% corpus_search_scopes as corpus_search_scopes_data %}
   {{ corpus_search_scopes_data|json_script:"corpus-search-scopes" }}
   {% block header %}
