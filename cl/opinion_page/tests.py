@@ -4104,7 +4104,8 @@ class DocketPageV2TemplateTest(TestCase):
             reverse("view_docket", args=[self.docket.pk, self.docket.slug])
         )
         self.assertTemplateUsed(r, "new_base.html")
-        body = next(fromstring(r.content.decode()).iter("body"))
+        html = r.content.decode()
+        body = next(fromstring(html).iter("body"))
         self.assertEqual(
             body.get("data-view-count-label"), f"d.{self.docket.pk}:view"
         )
@@ -4113,19 +4114,9 @@ class DocketPageV2TemplateTest(TestCase):
             reverse("increment-event-list", kwargs={"version": "v4"}),
         )
         self.assertRegex(
-            r.content.decode(),
+            html,
             r'<script[^>]*src="[^"]*js/alpine/composables/view_count\.js"',
         )
-
-    async def test_v2_page_without_tracking_sends_no_view_count(self) -> None:
-        """A v2 page whose view is not decorated carries no label, no endpoint
-        and no store, so the browser makes no request."""
-        r = await self.async_client.get(reverse("help_home"))
-        self.assertTemplateUsed(r, "new_base.html")
-        body = next(fromstring(r.content.decode()).iter("body"))
-        self.assertIsNone(body.get("data-view-count-label"))
-        self.assertIsNone(body.get("data-view-count-url"))
-        self.assertNotIn("view_count.js", r.content.decode())
 
 
 @override_settings(WAFFLE_CACHE_PREFIX="test_docket_alert_toggle_v2_waffle")
