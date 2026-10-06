@@ -1967,7 +1967,9 @@ def get_data_from_appellate_att_report(
     return att_data
 
 
-async def add_tags_to_objs(tag_names: list[str], objs: Any) -> list[Tag]:
+async def add_tags_to_objs(
+    tag_names: list[str] | None, objs: Any
+) -> list[Tag]:
     """Add tags by name to objects
 
     :param tag_names: A list of tag name strings

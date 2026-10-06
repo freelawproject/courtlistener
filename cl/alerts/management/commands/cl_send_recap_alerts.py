@@ -22,7 +22,10 @@ from cl.alerts.management.commands.cl_send_scheduled_alerts import (
     get_cut_off_date,
 )
 from cl.alerts.models import Alert, ScheduledAlertHit
-from cl.alerts.tasks import send_search_alert_emails
+from cl.alerts.tasks import (
+    create_schedule_alerts_hits_in_bulk,
+    send_search_alert_emails,
+)
 from cl.alerts.utils import (
     TaskCompletionStatus,
     add_document_hit_to_alert_set,
@@ -52,7 +55,6 @@ from cl.search.exception import (
 from cl.search.models import SEARCH_TYPES, Docket
 from cl.stats.constants import StatAlertType, StatMetric
 from cl.stats.utils import tally_stat
-from cl.users.models import UserProfile
 
 
 @dataclass
@@ -607,7 +609,7 @@ def process_alert_hits(
 
 
 def send_search_alert_webhooks(
-    user: UserProfile.user, results_to_send: list[Hit], alert_id: int
+    user: User, results_to_send: list[Hit], alert_id: int
 ) -> None:
     """Send webhook events for search alerts if the user has SEARCH_ALERT
     endpoints enabled.
@@ -617,7 +619,7 @@ def send_search_alert_webhooks(
     results to be sent.
     :param alert_id: The Alert ID to be sent in the webhook.
     """
-    user_webhooks = user.webhooks.filter(
+    user_webhooks = user.webhooks.filter(  # pyrefly:ignore[missing-attribute]
         event_type=WebhookEventType.SEARCH_ALERT, enabled=True
     )
     for user_webhook in user_webhooks:
@@ -641,7 +643,7 @@ def query_and_send_alerts(
     :param custom_date: If true, send alerts on a custom date.
     :return: None.
     """
-    alert_users: UserProfile.user = User.objects.filter(
+    alert_users = User.objects.filter(
         alerts__rate=rate,
         alerts__alert_type__in=[SEARCH_TYPES.RECAP, SEARCH_TYPES.DOCKETS],
     ).distinct()
@@ -650,9 +652,10 @@ def query_and_send_alerts(
     for user in alert_users:
         if (
             rate == Alert.REAL_TIME
-            and not user.profile.is_eligible_for_rt_search_alerts
+            and not user.profile.is_eligible_for_rt_search_alerts  # pyrefly:ignore[missing-attribute]
         ):
             continue
+        # pyrefly:ignore[missing-attribute]
         alerts = user.alerts.filter(
             rate=rate,
             alert_type__in=[SEARCH_TYPES.RECAP, SEARCH_TYPES.DOCKETS],
@@ -810,12 +813,15 @@ def query_and_schedule_alerts(
                 # Send webhooks
                 send_search_alert_webhooks(user, results_to_send, alert.pk)
 
-        # Create scheduled WEEKLY and MONTHLY Alerts in bulk.
-        if scheduled_hits_to_create:
-            ScheduledAlertHit.objects.bulk_create(scheduled_hits_to_create)
+        # Create scheduled WEEKLY and MONTHLY Alerts in bulk. Shares the
+        # percolator's helper to get the same filtering of deleted alerts,
+        # batching and atomic retries.
+        if scheduled_hits_created := create_schedule_alerts_hits_in_bulk(
+            scheduled_hits_to_create
+        ):
             logger.info(
                 "Scheduled %s '%s' alerts for user '%s'",
-                len(scheduled_hits_to_create),
+                scheduled_hits_created,
                 rate,
                 user,
             )

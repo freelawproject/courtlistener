@@ -497,7 +497,7 @@ def get_and_save_free_document_report(
 
         if self.request.retries == self.max_retries:
             logger.error(f"{msg} at %s (%s to %s).", court_id, start, end)  # noqa: G004
-            return PACERFreeDocumentLog.SCRAPE_FAILED
+            return PACERFreeDocumentLog.SCRAPE_FAILED, 0
         logger.info(f"{msg} Retrying.", court_id, start, end)  # noqa: G004
         raise self.retry(exc=exc, countdown=5)
 
@@ -507,7 +507,7 @@ def get_and_save_free_document_report(
         # IndexError: When the page isn't downloaded properly.
         # HTTPError: raise_for_status in parse hit bad status.
         if self.request.retries == self.max_retries:
-            return PACERFreeDocumentLog.SCRAPE_FAILED
+            return PACERFreeDocumentLog.SCRAPE_FAILED, 0
         raise self.retry(exc=exc, countdown=5)
 
     if log_id and not settings.DEVELOPMENT:
@@ -588,9 +588,15 @@ def process_free_opinion_result(
         self.request.chain = None
         return None
 
-    result.court = Court.objects.get(pk=map_pacer_to_cl_id(result.court_id))
+    # TODO: Come up with some way to do this that satisfies the type checker
+    result.court = Court.objects.get(
+        pk=map_pacer_to_cl_id(result.court_id)
+    )  # pyrefly:ignore[missing-attribute]
     result.case_name = harmonize(result.case_name)
-    result.case_name_short = cnt.make_case_name_short(result.case_name)
+    result.case_name_short = cnt.make_case_name_short(
+        result.case_name
+    )  # pyrefly:ignore[missing-attribute]
+
     row_copy = copy.copy(result)
     # If we don't do this, the doc's date_filed becomes the docket's
     # date_filed. Bad.

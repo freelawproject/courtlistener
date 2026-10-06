@@ -1,3 +1,6 @@
+from typing import cast
+
+from django.contrib.auth.models import User
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.throttling import BaseThrottle
 from rest_framework.viewsets import ModelViewSet
@@ -53,8 +56,9 @@ class SearchAlertViewSet(LoggingMixin, ModelViewSet):
         back to the standard global throttles.
         """
         user = self.request.user
+        # is_authenticated rules out AnonymousUser at runtime.
         is_commercial = user.is_authenticated and has_throttle_override(
-            user, ThrottleType.ALERTS
+            cast(User, user), ThrottleType.ALERTS
         )
         if is_commercial and self.request.method in ALERT_WRITE_METHODS:
             return [AlertThrottle()]
