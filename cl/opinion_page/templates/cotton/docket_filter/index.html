@@ -11,7 +11,7 @@
   class=""
 />
 
-<div x-data="docketFilter" class="{{ class }}">
+<div x-data="docketFilter" data-docket-scope="docket_id:{{ docket.pk }}" class="{{ class }}">
   {# DESKTOP — hidden on mobile #}
   <div class="hidden md:block">
     {% if form.errors %}
@@ -19,25 +19,7 @@
     {% endif %}
 
     <div class="flex flex-wrap items-end gap-3">
-      {# Search — sibling form so Enter submits search, not filters #}
-      <form action="/" method="get" class="flex-1 max-w-xs">
-        <input type="hidden" name="type" value="r" />
-        <label for="de-search-desktop" class="sr-only">Search this docket</label>
-        <div class="flex">
-          <input
-            class="input-text rounded-r-none flex-1"
-            id="de-search-desktop"
-            name="q"
-            value="docket_id:{{ docket.pk }}"
-            autocomplete="off"
-            type="text"
-            placeholder="Search this docket"
-          />
-          <c-button variant="primary" type="submit" class="rounded-l-none px-3" title="Search" aria-label="Search">
-            {% svg "magnifier" class="w-4 h-4" aria_hidden="true" %}
-          </c-button>
-        </div>
-      </form>
+      <c-docket-filter.search-form :docket="docket" input_id="de-search-desktop" class="flex-1 max-w-xs" />
 
       {# Filter form — uses `contents` so children join the parent flex layout #}
       <form action="" method="get" class="contents">
@@ -153,25 +135,7 @@
   {# MOBILE — search + prev/next + filter drawer #}
   <div class="md:hidden">
     <div class="flex items-end gap-3">
-      {# Search — own form so Enter submits search, not filters #}
-      <form action="/" method="get" class="flex-1">
-        <input type="hidden" name="type" value="r" />
-        <label for="de-search-mobile" class="sr-only">Search this docket</label>
-        <div class="flex">
-          <input
-            class="input-text rounded-r-none flex-1"
-            id="de-search-mobile"
-            name="q"
-            value="docket_id:{{ docket.pk }}"
-            autocomplete="off"
-            type="text"
-            placeholder="Search this docket"
-          />
-          <c-button variant="primary" type="submit" class="rounded-l-none px-3" title="Search" aria-label="Search">
-            {% svg "magnifier" class="w-4 h-4" aria_hidden="true" %}
-          </c-button>
-        </div>
-      </form>
+      <c-docket-filter.search-form :docket="docket" input_id="de-search-mobile" class="flex-1" />
 
       {# Prev/Next — standalone links on mobile #}
       <div class="flex items-end gap-1">

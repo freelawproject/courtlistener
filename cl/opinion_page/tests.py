@@ -4358,14 +4358,9 @@ class DocketEntryRowsV2Test(TestCase):
                     )
 
 
-class DocketFilterDrawerAttrPropagationTest(TestCase):
-    """The mobile filter drawer auto-opens when a filter submission fails
-    validation, so users can see the error messages inside it. That depends
-    on two pieces of plumbing — `data-has-errors` reaching the drawer's root
-    element via Cotton's `{{ attrs }}` passthrough, and the
-    `x-on:open-filter-drawer` listener being wired up on the same element so
-    `docket_filter.js` can dispatch the open event. Lock both in.
-    """
+class DocketFilterRenderTestCase(TestCase):
+    """Renders `<c-docket-filter>` for a RECAP docket with no entries, so
+    subclasses can assert on the toolbar's markup."""
 
     @classmethod
     def setUpTestData(cls) -> None:
@@ -4375,8 +4370,9 @@ class DocketFilterDrawerAttrPropagationTest(TestCase):
 
     def _render(self, form: DocketEntryFilterForm) -> str:
         # Render via a wrapper template that invokes <c-docket-filter> as a
-        # child component, instead of rendering cotton/docket_filter.html
-        # directly — the latter declares `form` and `docket` as c-vars, which
+        # child component, instead of rendering
+        # cotton/docket_filter/index.html directly — the latter declares
+        # `form` and `docket` as c-vars, which
         # would shadow the context values, defeating the whole point.
         request = RequestFactory().get("/")
         request.user = AnonymousUser()
@@ -4385,7 +4381,7 @@ class DocketFilterDrawerAttrPropagationTest(TestCase):
             "cl",
             "opinion_page",
             "test_assets",
-            "docket_filter_attr_propagation.html",
+            "docket_filter_wrapper.html",
         )
         with open(template_path, encoding="utf-8") as f:
             compiled = CottonCompiler().process(f.read())
@@ -4399,6 +4395,16 @@ class DocketFilterDrawerAttrPropagationTest(TestCase):
                 "request": request,
             }
         )
+
+
+class DocketFilterDrawerAttrPropagationTest(DocketFilterRenderTestCase):
+    """The mobile filter drawer auto-opens when a filter submission fails
+    validation, so users can see the error messages inside it. That depends
+    on two pieces of plumbing — `data-has-errors` reaching the drawer's root
+    element via Cotton's `{{ attrs }}` passthrough, and the
+    `x-on:open-filter-drawer` listener being wired up on the same element so
+    `docket_filter.js` can dispatch the open event. Lock both in.
+    """
 
     def _find_drawer(self, html: str) -> _Element | None:
         """Return the element with `x-on:open-filter-drawer` (the drawer root).
@@ -4443,6 +4449,73 @@ class DocketFilterDrawerAttrPropagationTest(TestCase):
 
         self.assertIsNotNone(drawer)
         self.assertNotIn("data-has-errors", drawer.attrib)
+
+
+class DocketFilterSearchScopeTest(DocketFilterRenderTestCase):
+    """The "Search this docket" forms carry the docket scope in a hidden `q`
+    and keep the visible input unnamed and empty, so the scope never shows
+    and clearing the box can't widen the search to the whole corpus. Without
+    JavaScript the form still submits a scoped, term-less search.
+    """
+
+    def test_scope_is_hidden_and_visible_input_is_unnamed(self) -> None:
+        """Both layouts render the hidden scope, the unnamed empty input, and
+        the submit hook that merges them."""
+        request = RequestFactory().get("/")
+        request.user = AnonymousUser()
+        form = DocketEntryFilterForm(request.GET, request=request)
+
+        tree = fromstring(self._render(form))
+        # docket_filter.js reads the pristine scope from here on every
+        # submit; a hidden input's value can't serve, since assigning it
+        # rewrites the attribute and back-navigation restores the mutated DOM.
+        roots = [
+            el for el in tree.iter() if el.get("x-data") == "docketFilter"
+        ]
+        self.assertEqual(len(roots), 1)
+        self.assertEqual(
+            roots[0].get("data-docket-scope"), f"docket_id:{self.docket.pk}"
+        )
+
+        search_forms = [
+            el
+            for el in tree.iter("form")
+            if el.get("action") == reverse("show_results")
+        ]
+        self.assertEqual(len(search_forms), 2, "expected desktop and mobile")
+        for layout, search_form in zip(("desktop", "mobile"), search_forms):
+            with self.subTest(layout=layout):
+                inputs = list(search_form.iter("input"))
+                visible = [el for el in inputs if el.get("type") == "search"]
+                self.assertEqual(len(visible), 1)
+                self.assertIsNone(visible[0].get("name"))
+                self.assertFalse(visible[0].get("value"))
+                labels = [
+                    el
+                    for el in search_form.iter("label")
+                    if el.get("for") == visible[0].get("id")
+                ]
+                self.assertEqual(len(labels), 1)
+                # docket_filter.js merges the terms into q on submit.
+                self.assertEqual(
+                    cast(_Attrib, search_form.attrib)["x-on:submit"],
+                    "buildScopedQueryOnSubmit($event)",
+                )
+                self.assertIn(
+                    "data-search-terms", cast(_Attrib, visible[0].attrib)
+                )
+                # Exactly these reach the search page, with or without JS.
+                self.assertEqual(
+                    {
+                        el.get("name"): (el.get("type"), el.get("value"))
+                        for el in inputs
+                        if el.get("name")
+                    },
+                    {
+                        "type": ("hidden", "r"),
+                        "q": ("hidden", f"docket_id:{self.docket.pk}"),
+                    },
+                )
 
 
 @override_settings(WAFFLE_CACHE_PREFIX="test_docket_filter_pagination_waffle")
