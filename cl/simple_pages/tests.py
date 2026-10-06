@@ -445,6 +445,28 @@ class V2PagesRegisterTest(PageLoadTestMixin, SimpleUserDataMixin, TestCase):
                 )
 
 
+@override_flag("use_new_design", True)
+@override_settings(WAFFLE_CACHE_PREFIX="test_new_base_view_count_waffle")
+class NewBaseViewCountTest(TestCase):
+    """new_base.html only wires view counting for decorated views.
+
+    The tracked side is covered on the docket page in
+    cl/opinion_page/tests.py; this checks the untracked side on a page
+    whose view has no track_view_counter.
+    """
+
+    async def test_untracked_page_sends_no_view_count(self) -> None:
+        """A v2 page whose view is not decorated carries no label, no endpoint
+        and no store, so the browser makes no request."""
+        r = await self.async_client.get(reverse("help_home"))
+        self.assertTemplateUsed(r, "new_base.html")
+        html = r.content.decode()
+        body = next(fromstring(html).iter("body"))
+        self.assertIsNone(body.get("data-view-count-label"))
+        self.assertIsNone(body.get("data-view-count-url"))
+        self.assertNotIn("view_count.js", html)
+
+
 @patch("hcaptcha.fields.hCaptchaField.validate", return_value=True)
 class SealingOrderDetectionTest(SimpleTestCase):
     def _make_form(
