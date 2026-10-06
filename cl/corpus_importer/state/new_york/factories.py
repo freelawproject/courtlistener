@@ -144,13 +144,17 @@ class NYCoAFileFactory(Factory):
     doc_party = "Smith"
     doc_type = FilingDocType.BRIEF
     local_path = Sequence(
-        lambda n: f"{PRIVATE_PREFIX}nycourts_gov/"
-        f"APL-2024-00177_smithvjones-app-smith{n}-brf_1.pdf"
+        lambda n: (
+            f"{PRIVATE_PREFIX}nycourts_gov/"
+            f"APL-2024-00177_smithvjones-app-smith{n}-brf_1.pdf"
+        )
     )
     content_hash = LazyAttribute(
-        lambda f: hashlib.sha256(f.local_path.encode()).hexdigest()
-        if f.local_path
-        else ""
+        lambda f: (
+            hashlib.sha256(f.local_path.encode()).hexdigest()
+            if f.local_path
+            else ""
+        )
     )
     file_size = LazyAttribute(lambda f: len(f.local_path) * 1000 or None)
 

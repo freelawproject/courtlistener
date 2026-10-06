@@ -589,13 +589,9 @@ def process_free_opinion_result(
         return None
 
     # TODO: Come up with some way to do this that satisfies the type checker
-    result.court = Court.objects.get(
-        pk=map_pacer_to_cl_id(result.court_id)
-    )  # pyrefly:ignore[missing-attribute]
+    result.court = Court.objects.get(pk=map_pacer_to_cl_id(result.court_id))  # pyrefly:ignore[missing-attribute]
     result.case_name = harmonize(result.case_name)
-    result.case_name_short = cnt.make_case_name_short(
-        result.case_name
-    )  # pyrefly:ignore[missing-attribute]
+    result.case_name_short = cnt.make_case_name_short(result.case_name)  # pyrefly:ignore[missing-attribute]
 
     row_copy = copy.copy(result)
     # If we don't do this, the doc's date_filed becomes the docket's

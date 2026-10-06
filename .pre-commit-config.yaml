@@ -28,7 +28,7 @@ repos:
         exclude: '^cl/recap/test_assets/.*\.html$'
 
   - repo: https://github.com/astral-sh/ruff-pre-commit
-    rev: v0.14.11
+    rev: v0.16.10
     hooks:
       - id: ruff
         args: [ --fix ]

@@ -26,6 +26,7 @@ you're working in and MUST read `FRONTEND.md` for stack-specific rules. Do not m
    ```python
    # Good
    from django.urls import reverse
+
    url = reverse("some_view_name", kwargs={"pk": 1})
 
    # Bad
@@ -59,12 +60,12 @@ you're working in and MUST read `FRONTEND.md` for stack-specific rules. Do not m
     ```python
     # Good
     if not some_condition:
-       # Condition failed. Exit the function.
-       return
+        # Condition failed. Exit the function.
+        return
 
     # Bad
     if some_condition:
-       do_something()
+        do_something()
     ```
 
 3. MUST include docstrings for all methods, classes, functions, and types.
@@ -104,16 +105,19 @@ from cl.tests.cases import SimpleTestCase, TestCase, APITestCase
 
 class MySimpleTest(SimpleTestCase):
     """No database access needed"""
+
     pass
 
 
 class MyDBTest(TestCase):
     """Needs database access"""
+
     pass
 
 
 class MyAPITest(APITestCase):
     """For REST API tests"""
+
     pass
 ```
 
