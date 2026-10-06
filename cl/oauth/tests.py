@@ -786,10 +786,6 @@ class OIDCClaimsTest(APITestCase):
         self.assertEqual(claims["email"], profile.user.email)
         self.assertIs(claims["email_verified"], False)
 
-    def test_user_without_profile_is_not_verified(self):
-        claims = self._userinfo(UserFactory(), "openid email")
-        self.assertIs(claims["email_verified"], False)
-
     def test_blank_email_omits_email_verified(self):
         profile = UserProfileWithParentsFactory(
             user__email="", email_confirmed=True

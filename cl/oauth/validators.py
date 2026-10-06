@@ -1,14 +1,7 @@
 from collections.abc import Callable
 from typing import Any
 
-from django.contrib.auth.models import User
 from oauth2_provider.oauth2_validators import OAuth2Validator
-
-
-def _email_verified(user: User) -> bool:
-    """Whether the user has confirmed their email; no profile counts as no."""
-    profile = getattr(user, "profile", None)
-    return bool(profile and profile.email_confirmed)
 
 
 class CourtListenerOAuth2Validator(OAuth2Validator):
@@ -24,7 +17,7 @@ class CourtListenerOAuth2Validator(OAuth2Validator):
             "given_name": lambda r: r.user.first_name,
             "family_name": lambda r: r.user.last_name,
             "email": lambda r: r.user.email,
-            "email_verified": lambda r: _email_verified(r.user),
+            "email_verified": lambda r: r.user.profile.email_confirmed,
         }
 
     def get_oidc_claims(
