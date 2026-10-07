@@ -14,11 +14,12 @@ from cl.corpus_importer.tasks import (
     save_attachment_pq_object,
 )
 from cl.lib.celery_utils import CeleryThrottle
+from cl.lib.pacer_session import SessionData
 from cl.recap.tasks import process_recap_attachment
 
 
 def get_docket_and_claims(
-    docket_number, court, case_name, cookies_data, tags, q
+    docket_number, court, case_name, session_data: SessionData, tags: list[str], q
 ):
     """
     Get the docket report, claims history report, and save it all to the DB
@@ -28,13 +29,13 @@ def get_docket_and_claims(
             pass_through=None,
             docket_number=docket_number,
             court_id=court,
-            session_data=cookies_data,
+            session_data=session_data,
             case_name=case_name,
             docket_number_letters="bk",
         ).set(queue=q),
         get_docket_by_pacer_case_id.s(
             court_id=court,
-            session_data=cookies_data,
+            session_data=session_data,
             tag_names=tags,
             **{
                 "show_parties_and_counsel": True,
@@ -43,12 +44,12 @@ def get_docket_and_claims(
             },
         ).set(queue=q),
         get_bankr_claims_registry.s(
-            session_data=cookies_data, tag_names=tags
+            session_data=session_data, tag_names=tags
         ).set(queue=q),
     ).apply_async()
 
 
-def get_district_attachment_pages(options, rd_pks, tag_names, session):
+def get_district_attachment_pages(options, rd_pks, tag_names: list[str], session_data: SessionData):
     """Get the attachment page information for all of the items selected
 
     :param options: The options returned by argparse. Should have the following
@@ -59,7 +60,7 @@ def get_district_attachment_pages(options, rd_pks, tag_names, session):
     :param rd_pks: A list or ValuesList of RECAPDocument PKs to get attachment
     pages for.
     :param tag_names: A list of tags to associate with the downloaded items.
-    :param session: A PACER logged-in PacerSession object
+    :param session_data: A SessionData object containing the session's cookies
     :return None
     """
     q = options["queue"]
@@ -72,7 +73,7 @@ def get_district_attachment_pages(options, rd_pks, tag_names, session):
             break
         throttle.maybe_wait()
         chain(
-            get_attachment_page_by_rd.s(rd_pk, session).set(queue=q),
+            get_attachment_page_by_rd.s(rd_pk, session_data).set(queue=q),
             save_attachment_pq_object.s(rd_pk, recap_user.pk).set(queue=q),
             process_recap_attachment.s(tag_names=tag_names).set(queue=q),
         ).apply_async()

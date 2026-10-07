@@ -102,8 +102,9 @@ def get_att_pages(options):
         username=PACER_USERNAME, password=PACER_PASSWORD
     )
     session.login()
+    session_data = SessionData(session.cookies, session.proxy_address)
     get_district_attachment_pages(
-        options=options, rd_pks=rd_pks, tag_names=[TAG], session=session
+        options=options, rd_pks=rd_pks, tag_names=[TAG], session_data=session_data
     )
 
 
