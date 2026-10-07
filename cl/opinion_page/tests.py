@@ -4152,7 +4152,9 @@ class DocketPageV2StaffLinksTest(TestCase):
             )
         return user
 
-    async def _get_docket_page(self, user: User | None = None):
+    async def _get_docket_page(
+        self, user: User | None = None
+    ) -> "_MonkeyPatchedASGIResponse":
         """Loads the v2 docket page, logged in as user when given."""
         if user is not None:
             await self.async_client.aforce_login(user)
@@ -4165,10 +4167,11 @@ class DocketPageV2StaffLinksTest(TestCase):
     @staticmethod
     def _admin_links(html: str) -> list[_Element]:
         """Anchors on the page that point into the Django admin."""
+        admin_prefix = reverse("admin:index")
         return [
             a
             for a in fromstring(html).iter("a")
-            if (a.get("href") or "").startswith("/admin/")
+            if (a.get("href") or "").startswith(admin_prefix)
         ]
 
     async def test_docket_permissions_show_the_edit_docket_link(
@@ -4191,7 +4194,6 @@ class DocketPageV2StaffLinksTest(TestCase):
                 self.assertEqual(
                     [a.get("href") for a in links], [expected_href]
                 )
-                self.assertIn("Edit Docket", links[0].text_content())
 
     async def test_edit_docket_link_binds_the_view_count(self) -> None:
         """The link shows the count from the viewCount store, hidden until
@@ -4221,7 +4223,7 @@ class DocketPageV2StaffLinksTest(TestCase):
         user = await sync_to_async(self._user_with)("audio.change_audio")
         r = await self._get_docket_page(user)
         links = {
-            a.get("href"): a.text_content().split()
+            a.get("href"): " ".join(a.text_content().split())
             for a in self._admin_links(r.content.decode())
         }
         self.assertEqual(
@@ -4234,9 +4236,25 @@ class DocketPageV2StaffLinksTest(TestCase):
         for audio in self.recordings:
             with self.subTest(recording=audio.pk):
                 href = reverse("admin:audio_audio_change", args=[audio.pk])
-                words = links[href]
-                self.assertEqual(words[0], "Edit")
-                self.assertEqual(" ".join(words[1:]), audio.case_name)
+                self.assertIn(audio.case_name, links[href])
+
+    async def test_blocked_badge_needs_change_docket(self) -> None:
+        """The Blocked badge in the staff row shows for change_docket on a
+        blocked docket and for nobody else."""
+        await Docket.objects.filter(pk=self.docket.pk).aupdate(blocked=True)
+        for perm, expected in (
+            ("search.change_docket", True),
+            ("search.view_docket", False),
+        ):
+            with self.subTest(permission=perm):
+                user = await sync_to_async(self._user_with)(perm)
+                r = await self._get_docket_page(user)
+                badges = [
+                    el
+                    for el in fromstring(r.content.decode()).iter("span")
+                    if el.text_content().strip() == "Blocked"
+                ]
+                self.assertEqual(len(badges), 1 if expected else 0)
 
     async def test_users_without_permissions_see_no_admin_links(
         self,

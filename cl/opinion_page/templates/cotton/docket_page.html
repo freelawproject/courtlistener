@@ -14,7 +14,8 @@
 />
 
 <div>
-{# Eyebrow line: filed date on the left, staff actions row on the right. #}
+{# Eyebrow line: filed date on the left, staff actions row on the right. Rendered only when either exists. #}
+{% if docket.date_filed or perms.search.view_docket or perms.search.change_docket or perms.search.delete_docket %}
 <div class="flex flex-wrap items-center gap-2 mb-2">
   {% if docket.date_filed %}
     <c-eyebrow>Filed: {{ docket.date_filed }}</c-eyebrow>
@@ -35,6 +36,7 @@
   </div>
   {% endif %}
 </div>
+{% endif %}
 
 {# Title and court #}
 <hgroup>
@@ -126,10 +128,11 @@
 {% endfor %}
 
 {# ORAL ARGUMENT RECORDINGS #}
-{% if docket.audio_files.count %}
+{% with recordings=docket.audio_files.all %}
+{% if recordings %}
   <h2 class="mt-6">Oral Argument Recordings</h2>
   <ul>
-    {% for af in docket.audio_files.all %}
+    {% for af in recordings %}
       <li>
         <div class="flex items-start gap-3">
           {% if perms.audio.change_audio %}
@@ -139,13 +142,14 @@
             <a class="links" href="{{ af.get_absolute_url }}{% querystring %}">
               {{ af|best_case_name|safe|v_wrapper }}
             </a>
-            <div>{{ af.docket.date_argued|default_if_none:"" }}</div>
+            <div>{{ docket.date_argued|default_if_none:"" }}</div>
           </div>
         </div>
       </li>
     {% endfor %}
   </ul>
 {% endif %}
+{% endwith %}
 
 </div>
 
