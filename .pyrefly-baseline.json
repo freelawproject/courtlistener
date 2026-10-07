@@ -6588,13 +6588,6 @@
       "severity": "error"
     },
     {
-      "column": 16,
-      "path": "cl/sitemaps_infinite/base_sitemap.py",
-      "name": "bad-return",
-      "concise_description": "Returned type `tuple[CacheableList[dict[str, Any]], str | None, bool | Unknown]` is not assignable to declared return type `tuple[CacheableList[dict[str, Any]], str, bool]`",
-      "severity": "error"
-    },
-    {
       "column": 20,
       "path": "cl/sitemaps_infinite/sitemap_generator.py",
       "name": "bad-assignment",

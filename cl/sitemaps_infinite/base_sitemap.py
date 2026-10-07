@@ -177,7 +177,7 @@ class InfinitePaginatorSitemap(sitemaps.Sitemap):
 
     def _urls(
         self, cursor: str, protocol: str, domain: str
-    ) -> tuple[CacheableList[dict[str, Any]], str, bool]:
+    ) -> tuple[CacheableList[dict[str, Any]], str | None, bool]:
         urls: CacheableList[dict[str, Any]] = CacheableList()
         # keep the `current_cursor` with the list as cached metadata, can be used later to re-fetch the list
         urls.current_cursor = cursor
