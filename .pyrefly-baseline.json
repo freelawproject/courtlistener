@@ -2143,34 +2143,6 @@
       "severity": "error"
     },
     {
-      "column": 34,
-      "path": "cl/custom_filters/templatetags/extras.py",
-      "name": "not-a-type",
-      "concise_description": "Expected a type form, got instance of `(iterable: Iterable[object], /) -> bool`",
-      "severity": "error"
-    },
-    {
-      "column": 42,
-      "path": "cl/custom_filters/templatetags/extras.py",
-      "name": "not-a-type",
-      "concise_description": "Expected a type form, got instance of `(iterable: Iterable[object], /) -> bool`",
-      "severity": "error"
-    },
-    {
-      "column": 48,
-      "path": "cl/custom_filters/templatetags/extras.py",
-      "name": "not-a-type",
-      "concise_description": "Expected a type form, got instance of `(iterable: Iterable[object], /) -> bool`",
-      "severity": "error"
-    },
-    {
-      "column": 69,
-      "path": "cl/custom_filters/templatetags/extras.py",
-      "name": "not-a-type",
-      "concise_description": "Expected a type form, got instance of `(iterable: Iterable[object], /) -> bool`",
-      "severity": "error"
-    },
-    {
       "column": 13,
       "path": "cl/custom_filters/templatetags/extras.py",
       "name": "bad-argument-type",
@@ -3820,20 +3792,6 @@
       "path": "cl/recap/mergers.py",
       "name": "unsupported-operation",
       "concise_description": "`None` is not subscriptable",
-      "severity": "error"
-    },
-    {
-      "column": 44,
-      "path": "cl/recap/mergers.py",
-      "name": "not-a-type",
-      "concise_description": "Expected a type form, got instance of `(iterable: Iterable[object], /) -> bool`",
-      "severity": "error"
-    },
-    {
-      "column": 29,
-      "path": "cl/recap/mergers.py",
-      "name": "not-a-type",
-      "concise_description": "Expected a type form, got instance of `(iterable: Iterable[object], /) -> bool`",
       "severity": "error"
     },
     {
@@ -6416,7 +6374,7 @@
       "column": 37,
       "path": "cl/search/documents.py",
       "name": "unsupported-operation",
-      "concise_description": "Cannot set item in `dict[str, (x: Unknown) -> Unknown]`",
+      "concise_description": "Cannot set item in `dict[str, (x: Unknown) -> Any]`",
       "severity": "error"
     },
     {
@@ -7005,20 +6963,6 @@
       "path": "cl/search/forms.py",
       "name": "missing-attribute",
       "concise_description": "Object of class `BooleanField` has no attribute `as_str_types`",
-      "severity": "error"
-    },
-    {
-      "column": 19,
-      "path": "cl/search/forms.py",
-      "name": "not-a-type",
-      "concise_description": "Expected a type form, got instance of `(iterable: Iterable[object], /) -> bool`",
-      "severity": "error"
-    },
-    {
-      "column": 64,
-      "path": "cl/search/forms.py",
-      "name": "not-a-type",
-      "concise_description": "Expected a type form, got instance of `(iterable: Iterable[object], /) -> bool`",
       "severity": "error"
     },
     {
