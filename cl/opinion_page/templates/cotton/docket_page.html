@@ -19,7 +19,7 @@
   {% if docket.date_filed %}
     <c-eyebrow>Filed: {{ docket.date_filed }}</c-eyebrow>
   {% endif %}
-  {# Staff row: admin links and moderation state, each gated on the permission its target requires. #}
+  {# Staff actions, admin links and moderation state, each gated on the permission its target requires. #}
   {% if perms.search.view_docket or perms.search.change_docket or perms.search.delete_docket %}
   <div class="flex flex-wrap items-center gap-2 ml-auto" x-data="docketPage">
     <c-button variant="dark" size="sm" href="{% url 'admin:search_docket_change' docket.pk %}">
