@@ -1058,13 +1058,6 @@
       "severity": "error"
     },
     {
-      "column": 22,
-      "path": "cl/corpus_importer/management/commands/recap_into_opinions.py",
-      "name": "bad-argument-type",
-      "concise_description": "Argument `list[bool | dict[@_, @_] | Any]` is not assignable to parameter `args` with type `tuple[Any, ...] | None` in function `celery.app.task.Task.apply_async`",
-      "severity": "error"
-    },
-    {
       "column": 13,
       "path": "cl/corpus_importer/management/commands/recap_into_opinions.py",
       "name": "bad-argument-type",
@@ -1538,13 +1531,6 @@
       "path": "cl/custom_filters/templatetags/text_filters.py",
       "name": "unbound-name",
       "concise_description": "`s` may be uninitialized",
-      "severity": "error"
-    },
-    {
-      "column": 44,
-      "path": "cl/disclosures/management/commands/import_financial_disclosures.py",
-      "name": "bad-argument-type",
-      "concise_description": "Argument `list[Any]` is not assignable to parameter `args` with type `tuple[Any, ...] | None` in function `celery.app.task.Task.apply_async`",
       "severity": "error"
     },
     {

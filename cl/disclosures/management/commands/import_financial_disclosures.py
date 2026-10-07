@@ -36,7 +36,7 @@ def import_financial_disclosures(
         throttle.maybe_wait()
 
         # Add disclosures to celery queue
-        import_disclosure.apply_async(args=[data], queue=queue_name)
+        import_disclosure.apply_async(args=(data,), queue=queue_name)
 
 
 class Command(VerboseCommand):
