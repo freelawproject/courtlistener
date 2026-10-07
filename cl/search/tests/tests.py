@@ -36,6 +36,7 @@ from timeout_decorator import timeout_decorator
 from waffle.testutils import override_flag
 
 from cl.audio.factories import AudioFactory
+from cl.lib.decorators import clear_tiered_cache
 from cl.lib.elasticsearch_utils import (
     build_daterange_query,
     simplify_estimated_count,
@@ -2271,6 +2272,83 @@ class SaveSearchQueryTest(TestCase):
             SearchQuery.ELASTICSEARCH,
             f"Saved wrong `engine` value, expected {SearchQuery.ELASTICSEARCH}",
         )
+
+
+@override_flag("store-search-api-queries", active=True)
+@override_flag("store-search-queries", active=True)
+@override_settings(WAFFLE_CACHE_PREFIX="test_save_query_history")
+class SaveQueryHistoryTest(TestCase):
+    """Do we honor the user's save_query_history preference?"""
+
+    @classmethod
+    def setUpClass(cls) -> None:
+        super().setUpClass()
+        patcher = mock.patch(
+            "cl.lib.decorators.get_tiered_cache_prefix",
+            new=lambda: "tiered_save_query_history_test",
+        )
+        patcher.start()
+        cls.addClassCleanup(patcher.stop)
+
+    def setUp(self) -> None:
+        clear_tiered_cache()
+        self.website_url = f"{reverse('show_results')}?q=lissner"
+        self.api_url = (
+            f"{reverse('search-list', kwargs={'version': 'v4'})}?q=lissner"
+        )
+
+    def tearDown(self) -> None:
+        clear_tiered_cache()
+
+    def test_save_query_history(self) -> None:
+        """Are queries saved only for users who want them saved?"""
+        for source, url in (
+            (SearchQuery.WEBSITE, self.website_url),
+            (SearchQuery.API, self.api_url),
+        ):
+            for save_query_history in (True, False):
+                with self.subTest(
+                    source=source, save_query_history=save_query_history
+                ):
+                    profile = UserProfileWithParentsFactory(
+                        save_query_history=save_query_history
+                    )
+                    self.client.force_login(profile.user)
+                    self.client.get(url)
+                    self.assertEqual(
+                        SearchQuery.objects.filter(
+                            user=profile.user, source=source
+                        ).exists(),
+                        save_query_history,
+                    )
+
+    def test_api_caches_save_query_history(self) -> None:
+        """Does the API use a cached preference until it expires?"""
+        profile = UserProfileWithParentsFactory(save_query_history=True)
+        self.client.force_login(profile.user)
+        queries = SearchQuery.objects.filter(
+            user=profile.user, source=SearchQuery.API
+        )
+        self.client.get(self.api_url)
+        self.assertEqual(queries.count(), 1)
+
+        profile.save_query_history = False
+        profile.save()
+        self.client.get(self.api_url)
+        self.assertEqual(queries.count(), 2, "Cached value not used.")
+
+        # The website reads the profile directly, without the cache.
+        self.client.get(self.website_url)
+        self.assertFalse(
+            SearchQuery.objects.filter(
+                user=profile.user, source=SearchQuery.WEBSITE
+            ).exists()
+        )
+
+        # Simulate the cache expiring.
+        clear_tiered_cache()
+        self.client.get(self.api_url)
+        self.assertEqual(queries.count(), 2, "Cache did not expire.")
 
 
 class CaptionTest(TestCase):

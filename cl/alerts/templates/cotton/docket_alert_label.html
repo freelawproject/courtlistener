@@ -1,0 +1,11 @@
+{% load svg_tags %}
+{# Icon and text of the docket alert toggle for the given state. Rendered on the page and again by the toggle response, so both stay identical. #}
+<c-vars has_alert="" icon_class="w-4 h-4" />
+
+{% if has_alert %}
+  {% svg "bell_slash" class=icon_class aria_hidden="true" %}
+  Disable Alerts
+{% else %}
+  {% svg "bell" class=icon_class aria_hidden="true" %}
+  Get Alerts
+{% endif %}

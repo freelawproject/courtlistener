@@ -2,6 +2,7 @@ import random
 import re
 import urllib.parse
 from datetime import UTC, datetime
+from typing import Any
 
 from django import template
 from django.core.exceptions import ValidationError
@@ -184,7 +185,7 @@ def contains_highlights(content: str, alert: bool = False) -> bool:
 
 
 @register.filter
-def render_string_or_list(value: any) -> any:
+def render_string_or_list(value: Any) -> Any:
     """Filter to render list of strings separated by commas or the original
     value.
 
@@ -251,7 +252,7 @@ def highlight_query(text: str, query: str) -> str:
 
 
 @register.filter
-def get_highlight(result: AttrDict | dict[str, any], field: str) -> any:
+def get_highlight(result: AttrDict | dict[str, Any], field: str) -> Any:
     """Returns the highlighted version of the field is present, otherwise,
     falls back to the original field value.
 

@@ -4,7 +4,10 @@ from django.apps import apps
 from django.contrib import admin, messages
 from django.contrib.auth.forms import UserChangeForm
 from django.contrib.auth.models import Permission, User
-from django.db.models import Model
+from django.core.exceptions import ValidationError
+from django.core.validators import validate_email
+from django.db.models import Model, QuerySet
+from django.http import HttpRequest
 from rest_framework.authtoken.models import Token
 
 from cl.alerts.admin import AlertInline, DocketAlertInline
@@ -23,6 +26,7 @@ from cl.lib.admin import (
     AdminTweaksMixin,
     generate_admin_links,
 )
+from cl.lib.auth import filter_by_email
 from cl.search.models import SearchQuery
 from cl.users.models import (
     BarMembership,
@@ -38,6 +42,15 @@ UserProxyEvent: type[Model] = cast(
 UserProfileEvent: type[Model] = cast(
     type[Model], apps.get_model("users", "UserProfileEvent")
 )
+
+
+def _is_complete_email(value: str) -> bool:
+    """Return True if value is a syntactically complete email address."""
+    try:
+        validate_email(value)
+    except ValidationError:
+        return False
+    return True
 
 
 class TokenInline(admin.StackedInline):
@@ -102,6 +115,27 @@ class UserAdmin(admin.ModelAdmin, AdminTweaksMixin):
         "pk",
     )
     actions = ["refresh_api_throttles"]
+
+    def get_search_results(
+        self,
+        request: HttpRequest,
+        queryset: QuerySet[User],
+        search_term: str,
+    ) -> tuple[QuerySet[User], bool]:
+        """Filter the changelist, using the LOWER(email) index for complete addresses.
+
+        Domain or partial terms keep the default icontains search.
+
+        :param request: The current HTTP request.
+        :param queryset: The changelist queryset to filter.
+        :param search_term: The raw string typed into the search box.
+        :return: Two-tuple of the filtered queryset and whether the caller
+            needs to de-duplicate the results.
+        """
+        term = search_term.strip()
+        if _is_complete_email(term):
+            return filter_by_email(queryset, term), False
+        return super().get_search_results(request, queryset, search_term)
 
     @admin.action(
         description="Refresh API throttles from active Neon membership"

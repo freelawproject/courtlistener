@@ -2,7 +2,7 @@ from collections import defaultdict
 from datetime import datetime, timedelta
 from http import HTTPStatus
 from types import SimpleNamespace
-from typing import cast
+from typing import TYPE_CHECKING, cast
 from unittest import mock
 
 import pytz
@@ -23,6 +23,9 @@ from lxml.html import HtmlElement
 from selenium.webdriver.common.by import By
 from timeout_decorator import timeout_decorator
 from waffle.testutils import override_switch
+
+if TYPE_CHECKING:
+    from django.test.client import _MonkeyPatchedWSGIResponse
 
 from cl.alerts.constants import LEGACY_MEMBERSHIP_HELP_URL
 from cl.alerts.factories import AlertFactory, DocketAlertWithParentsFactory
@@ -3120,6 +3123,111 @@ class OldDocketAlertsReportToggleTest(TestCase):
         await da.arefresh_from_db()
         self.assertEqual(da.alert_type, DocketAlert.SUBSCRIPTION)
         self.assertEqual(da.date_modified, eighty_five_days_ahead)
+
+
+class ToggleDocketAlertHtmxTest(TestCase):
+    """The docket alert toggle answers htmx requests with a v2 fragment."""
+
+    FRAGMENT = "v2_includes/docket_alerts_htmx/toggle.html"
+
+    @classmethod
+    def setUpTestData(cls) -> None:
+        cls.profile = UserProfileWithParentsFactory()
+        cls.docket = DocketFactory(source=Docket.RECAP)
+
+    def setUp(self) -> None:
+        self.client.force_login(self.profile.user)
+
+    def toggle(self) -> "_MonkeyPatchedWSGIResponse":
+        """Posts the toggle the way the v2 docket page does."""
+        return self.client.post(
+            reverse("toggle_docket_alert"),
+            {"id": self.docket.pk},
+            headers={"HX-Request": "true"},
+        )
+
+    def subscriptions(self) -> int:
+        """How many active alerts the user has on the docket."""
+        return DocketAlert.objects.filter(
+            user=self.profile.user,
+            docket=self.docket,
+            alert_type=DocketAlert.SUBSCRIPTION,
+        ).count()
+
+    def test_legacy_request_keeps_the_legacy_response(self) -> None:
+        """A non-htmx, non-ajax POST is still refused as before."""
+        r = self.client.post(
+            reverse("toggle_docket_alert"), {"id": self.docket.pk}
+        )
+        self.assertEqual(r.status_code, HTTPStatus.METHOD_NOT_ALLOWED)
+
+    def test_htmx_creates_the_alert(self) -> None:
+        """The first toggle subscribes and swaps in the subscribed state."""
+        self.assertEqual(self.subscriptions(), 0)
+        r = self.toggle()
+        self.assertEqual(r.status_code, HTTPStatus.OK)
+        self.assertTemplateUsed(r, self.FRAGMENT)
+        self.assertEqual(self.subscriptions(), 1)
+        self.assertTrue(r.context["has_alert"])
+        self.assertContains(r, f'id="docket-alert-label-{self.docket.pk}"')
+        self.assertContains(r, f'id="docket-alert-toggle-{self.docket.pk}"')
+        self.assertContains(r, f'id="docket-alert-status-{self.docket.pk}"')
+        self.assertContains(r, 'hx-swap-oob="innerHTML"', count=3)
+
+    def test_htmx_disables_the_alert(self) -> None:
+        """Toggling a subscribed docket unsubscribes it."""
+        self.toggle()
+        r = self.toggle()
+        self.assertEqual(self.subscriptions(), 0)
+        self.assertTemplateUsed(r, self.FRAGMENT)
+        self.assertFalse(r.context["has_alert"])
+
+    @override_settings(MAX_FREE_DOCKET_ALERTS=0)
+    def test_htmx_refuses_to_subscribe_over_quota(self) -> None:
+        """A user at quota gets no alert, even without the page's dialog."""
+        r = self.toggle()
+        self.assertEqual(r.status_code, HTTPStatus.OK)
+        self.assertEqual(self.subscriptions(), 0)
+        self.assertFalse(r.context["has_alert"])
+
+    @override_settings(MAX_FREE_DOCKET_ALERTS=1)
+    def test_htmx_allows_disabling_at_quota(self) -> None:
+        """Quota never blocks turning an alert off."""
+        self.toggle()
+        r = self.toggle()
+        self.assertEqual(self.subscriptions(), 0)
+        self.assertFalse(r.context["has_alert"])
+
+    def test_htmx_without_id_is_a_bad_request(self) -> None:
+        """A missing or malformed docket id is the caller's error.
+
+        Superscript two passes str.isdigit() but int() rejects it, so a
+        looser check would let it through to a 500 in the query.
+        """
+        for data in ({}, {"id": "abc"}, {"id": "²"}):
+            with self.subTest(data=data):
+                r = self.client.post(
+                    reverse("toggle_docket_alert"),
+                    data,
+                    headers={"HX-Request": "true"},
+                )
+                self.assertEqual(r.status_code, HTTPStatus.BAD_REQUEST)
+
+    def test_htmx_unknown_docket_is_not_found(self) -> None:
+        """A well-formed id for a docket that does not exist is a 404."""
+        r = self.client.post(
+            reverse("toggle_docket_alert"),
+            {"id": self.docket.pk + 100000},
+            headers={"HX-Request": "true"},
+        )
+        self.assertEqual(r.status_code, HTTPStatus.NOT_FOUND)
+
+    def test_htmx_from_a_logged_out_user_redirects_to_login(self) -> None:
+        """Logged-out users are sent to sign in, never handed a fragment."""
+        self.client.logout()
+        r = self.toggle()
+        self.assertEqual(r.status_code, HTTPStatus.FOUND)
+        self.assertIn(reverse("sign-in"), r["Location"])
 
 
 class OldDocketAlertsWebhooksTest(TestCase):
