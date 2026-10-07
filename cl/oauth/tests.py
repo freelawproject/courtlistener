@@ -473,6 +473,11 @@ class ApiScopeEnforcementTest(APITestCase):
                 )
                 self.assertEqual(r.status_code, 403, r.content)
                 self.assertIn("api scope", r.json()["detail"])
+                self.assertEqual(
+                    r["WWW-Authenticate"],
+                    'Bearer realm="api", error="insufficient_scope", '
+                    'scope="api"',
+                )
 
     def test_api_keys_are_unaffected(self):
         key, _ = Token.objects.get_or_create(user=self.user)
