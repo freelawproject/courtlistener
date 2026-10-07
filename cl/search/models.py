@@ -2289,7 +2289,7 @@ class Courthouse(models.Model):
         verbose_name_plural = "Courthouses"
 
 
-class ClusterCitationQuerySet(models.query.QuerySet):
+class ClusterCitationManager(models.Manager["OpinionCluster"]):
     """Add filtering on citation strings.
 
     Historically we had citations in the db as strings like, "22 U.S. 44". The
@@ -2305,8 +2305,8 @@ class ClusterCitationQuerySet(models.query.QuerySet):
     That makes it a lot easier to do the kinds of filtering we're used to.
     """
 
-    def filter(self, *args, **kwargs):
-        clone = self._clone()
+    def filter(self, *args, **kwargs) -> "QuerySet[OpinionCluster]":
+        qs = self.get_queryset()
         citation_str = kwargs.pop("citation", None)
         if citation_str:
             try:
@@ -2318,7 +2318,7 @@ class ClusterCitationQuerySet(models.query.QuerySet):
             except IndexError:
                 raise ValueError(f"Unable to parse citation '{citation_str}'")
             else:
-                clone.query.add_q(
+                qs.filter(
                     Q(
                         citations__volume=c.groups["volume"],
                         citations__reporter=c.corrected_reporter(),
@@ -2327,8 +2327,8 @@ class ClusterCitationQuerySet(models.query.QuerySet):
                 )
 
         # Add the rest of the args & kwargs
-        clone.query.add_q(Q(*args, **kwargs))
-        return clone
+        qs.filter(Q(*args, **kwargs))
+        return qs
 
 
 @pghistory.track()
@@ -2611,7 +2611,7 @@ class OpinionCluster(AbstractDateTimeModel):
         blank=True,
     )
 
-    objects = ClusterCitationQuerySet.as_manager()
+    objects = ClusterCitationManager()
     es_pa_field_tracker = FieldTracker(
         fields=[
             "case_name",
@@ -3127,8 +3127,11 @@ OPINION_TEXT_SOURCE_FIELDS = [
 ]
 
 
-class OpinionQuerySet(models.QuerySet):
-    def with_best_text(self):
+class OpinionManager(models.Manager):
+    def get_queryset(self) -> "models.QuerySet[Opinion]":
+        return super().get_queryset()
+
+    def with_best_text(self) -> "models.QuerySet[Opinion]":
         """Annotates an Opinion QuerySet with best_text and best_text_source.
 
         To determine the best text, we get the first non-empty value from
@@ -3363,7 +3366,7 @@ class Opinion(AbstractDateTimeModel):
         related_name="versions",
     )
 
-    objects = OpinionQuerySet.as_manager()
+    objects = OpinionManager()
 
     class Meta:
         constraints = [
