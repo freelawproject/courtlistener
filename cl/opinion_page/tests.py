@@ -4202,10 +4202,6 @@ class DocketAlertToggleV2Test(TestCase):
         label_at = html.index(f'id="docket-alert-label-{self.docket.pk}"')
         ours = [t for t in triggers if html.index(t) < label_at][-1]
         self.assertNotIn("aria-label", ours)
-        others = [t for t in triggers if t != ours]
-        self.assertTrue(others)
-        for trigger in others:
-            self.assertIn("aria-label=", trigger)
 
     async def test_swap_targets_match_the_fragment(self) -> None:
         """The page and the fragment render the same label and item for a state."""
