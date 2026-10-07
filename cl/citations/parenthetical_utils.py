@@ -1,4 +1,5 @@
 import logging
+from dataclasses import dataclass
 
 from asgiref.sync import sync_to_async
 from django.db import transaction
@@ -6,7 +7,11 @@ from django.db.models import QuerySet
 from django.db.models.signals import post_delete, post_save
 
 from cl.citations.group_parentheticals import compute_parenthetical_groups
-from cl.search.models import OpinionCluster, ParentheticalGroup
+from cl.search.models import (
+    OpinionCluster,
+    Parenthetical,
+    ParentheticalGroup,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -32,6 +37,20 @@ def atomic_create_parenthetical_groups(cluster: OpinionCluster) -> None:
     create_parenthetical_groups(cluster)
 
 
+@dataclass(frozen=True, slots=True)
+class _ParentheticalRow:
+    """The Parenthetical columns grouping needs, without a model instance.
+
+    Heavily cited cases have tens of thousands of parentheticals, and loading
+    them as models costs about three times as much memory as this.
+    """
+
+    id: int
+    text: str
+    score: float
+    described_opinion_id: int
+
+
 def create_parenthetical_groups(cluster: OpinionCluster) -> None:
     """
     Given a cluster, (re)computes the parenthetical groups for its parentheticals
@@ -39,19 +58,28 @@ def create_parenthetical_groups(cluster: OpinionCluster) -> None:
 
     :param cluster: An OpinionCluster object
     """
-    parentheticals = list(cluster.parentheticals)
+    parentheticals = [
+        _ParentheticalRow(*row)
+        for row in cluster.parentheticals.values_list(
+            "id", "text", "score", "described_opinion_id"
+        )
+    ]
     computed_groups = compute_parenthetical_groups(parentheticals)
     # Delete existing parenthetical groups for this cluster
     cluster.parenthetical_groups.delete()
     for cg in computed_groups:
         group_to_create = ParentheticalGroup(
             opinion_id=cg.representative.described_opinion_id,
-            representative=cg.representative,
+            representative_id=cg.representative.id,
             score=cg.score,
             size=cg.size,
         )
         group_to_create.save()
-        group_to_create.parentheticals.set(cg.parentheticals)
+        # The same bulk UPDATE `parentheticals.set()` issues for a new group,
+        # which sends no signals either.
+        Parenthetical.objects.filter(
+            pk__in=[par.id for par in cg.parentheticals]
+        ).update(group=group_to_create)
 
 
 def disconnect_parenthetical_group_signals() -> None:

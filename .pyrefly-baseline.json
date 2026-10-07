@@ -799,10 +799,24 @@
       "severity": "error"
     },
     {
-      "column": 37,
-      "path": "cl/citations/group_parentheticals.py",
-      "name": "unsupported-operation",
-      "concise_description": "Cannot set item in `dict[str, list[str]]`",
+      "column": 35,
+      "path": "cl/citations/management/commands/reindex_es_cite_fields.py",
+      "name": "unbound-name",
+      "concise_description": "`qs` may be uninitialized",
+      "severity": "error"
+    },
+    {
+      "column": 39,
+      "path": "cl/citations/management/commands/reindex_es_cite_fields.py",
+      "name": "unbound-name",
+      "concise_description": "`update_fn` may be uninitialized",
+      "severity": "error"
+    },
+    {
+      "column": 33,
+      "path": "cl/citations/management/commands/reindex_es_cite_fields.py",
+      "name": "bad-argument-type",
+      "concise_description": "Argument `list[_CiteCountUpdateDict]` is not assignable to parameter `documents_to_index` with type `list[dict[str, Any]]` in function `cl.lib.search_index_utils.index_documents_in_bulk`",
       "severity": "error"
     },
     {
