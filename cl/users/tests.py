@@ -4914,12 +4914,12 @@ class UserAdminNeonLinksTest(TestCase):
     def test_no_links_without_neon_ids(self) -> None:
         """Users with no Neon account or membership get no Neon links."""
         user = UserProfileWithParentsFactory.create().user
-        self.assertEqual(UserAdmin._get_neon_links(user), [])
+        self.assertEqual(UserAdmin._get_neon_links(user.pk), [])
 
     def test_account_link(self) -> None:
         """A Neon account ID produces a link to the Neon account page."""
         self.assertEqual(
-            UserAdmin._get_neon_links(self.user),
+            UserAdmin._get_neon_links(self.user.pk),
             [
                 {
                     "href": "https://donate.free.law/admin/accounts/112684/about",
@@ -4931,9 +4931,8 @@ class UserAdminNeonLinksTest(TestCase):
     def test_account_and_membership_links(self) -> None:
         """A membership with a Neon ID adds a link to the membership page."""
         NeonMembershipFactory(user=self.user, neon_id="11394")
-        user = User.objects.get(pk=self.user.pk)
         self.assertEqual(
-            [link["href"] for link in UserAdmin._get_neon_links(user)],
+            [link["href"] for link in UserAdmin._get_neon_links(self.user.pk)],
             [
                 "https://donate.free.law/admin/accounts/112684/about",
                 "https://donate.free.law/admin/memberships/11394",

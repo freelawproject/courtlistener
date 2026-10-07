@@ -225,7 +225,8 @@ class UserAdmin(admin.ModelAdmin, AdminTweaksMixin):
         ]
 
         links = generate_admin_links(custom_links)
-        links.extend(self._get_neon_links(user))
+        if user is not None:
+            links.extend(self._get_neon_links(user.pk))
         extra_context["custom_links"] = links
 
         return super().change_view(
@@ -233,19 +234,24 @@ class UserAdmin(admin.ModelAdmin, AdminTweaksMixin):
         )
 
     @staticmethod
-    def _get_neon_links(user: User) -> list[AdminLink]:
-        """Build links to the user's Neon account and membership records.
+    def _get_neon_links(user_id: int) -> list[AdminLink]:
+        """Build links to a user's Neon account and membership records.
 
         Links are only returned for records we have a Neon ID for, so users
         without a Neon account or membership get no link.
 
-        :param user: The user whose admin page is being rendered.
+        :param user_id: The pk of the user whose admin page is being rendered.
         :return: Zero, one, or two links to the Neon admin site.
         """
         base_url = settings.NEON_ADMIN_URL.rstrip("/")
         links: list[AdminLink] = []
 
-        if account_id := user.profile.neon_account_id:
+        account_id = (
+            UserProfile.objects.filter(user_id=user_id)
+            .values_list("neon_account_id", flat=True)
+            .first()
+        )
+        if account_id:
             links.append(
                 {
                     "href": f"{base_url}/accounts/{account_id}/about",
@@ -253,10 +259,11 @@ class UserAdmin(admin.ModelAdmin, AdminTweaksMixin):
                 }
             )
 
-        try:
-            membership_id = user.membership.neon_id
-        except NeonMembership.DoesNotExist:
-            membership_id = ""
+        membership_id = (
+            NeonMembership.objects.filter(user_id=user_id)
+            .values_list("neon_id", flat=True)
+            .first()
+        )
         if membership_id:
             links.append(
                 {
