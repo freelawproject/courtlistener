@@ -101,7 +101,11 @@ class UserProfile(models.Model):
         default=False,
     )
     activation_key = models.CharField(
+        help_text="A single-use key emailed to the user to confirm their "
+        "email address. Blanked once it is spent (GHSA-638g-xf9h-6qcg), so "
+        "it is empty for most accounts.",
         max_length=40,
+        blank=True,
     )
     key_expires = models.DateTimeField(
         help_text="The time and date when the user's activation_key expires",
@@ -142,6 +146,10 @@ class UserProfile(models.Model):
     prayers_public = models.BooleanField(
         help_text="If enabled, the user's pending document prayers will be viewable by the public",
         default=False,
+    )
+    save_query_history = models.BooleanField(
+        help_text="Should the user's search query history be saved?",
+        default=True,
     )
 
     @property

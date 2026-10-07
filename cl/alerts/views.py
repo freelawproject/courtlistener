@@ -1,11 +1,14 @@
 from http import HTTPStatus
 
+from asgiref.sync import sync_to_async
 from django.conf import settings
 from django.contrib import messages
 from django.contrib.auth.decorators import login_required
+from django.db import transaction
 from django.http import (
     HttpRequest,
     HttpResponse,
+    HttpResponseBadRequest,
     HttpResponseNotAllowed,
     HttpResponseNotFound,
     HttpResponseRedirect,
@@ -20,10 +23,14 @@ from cl.alerts.forms import DocketAlertConfirmForm
 from cl.alerts.models import Alert, DocketAlert
 from cl.alerts.tasks import send_unsubscription_confirmation
 from cl.lib.http import is_ajax
-from cl.lib.ratelimiter import ratelimiter_unsafe_3_per_m
+from cl.lib.ratelimiter import (
+    ratelimit_deny_list,
+    ratelimiter_unsafe_3_per_m,
+)
 from cl.lib.types import AuthenticatedHttpRequest
 from cl.opinion_page.utils import make_docket_title, user_has_alert
 from cl.search.models import Docket
+from cl.users.models import UserProfile
 
 
 @login_required
@@ -101,6 +108,7 @@ def htmx_disable_alert(request: HttpRequest, secret_key: str):
 
 
 @ratelimiter_unsafe_3_per_m
+@ratelimit_deny_list
 def disable_alert(request: HttpRequest, secret_key: str):
     """Display a confirmation or success page whenever a user
     chooses to disable their search alerts.
@@ -181,6 +189,7 @@ def disable_alert_list(request: HttpRequest):
     )
 
 
+@ratelimit_deny_list
 def enable_alert(request, secret_key):
     alert = get_object_or_404(Alert, secret_key=secret_key)
     rate = request.GET.get("rate")
@@ -202,7 +211,74 @@ def enable_alert(request, secret_key):
 
 @login_required
 def toggle_docket_alert(request: AuthenticatedHttpRequest) -> HttpResponse:
-    """Use Ajax to create or delete an alert for a user."""
+    """Creates or disables the user's alert on a docket.
+
+    Routes on the request type: htmx requests from the v2 docket page get a
+    fragment to swap in place, legacy AJAX requests get a plain text message.
+    """
+    if request.headers.get("HX-Request"):
+        return _toggle_docket_alert_htmx(request)
+    return _toggle_docket_alert_legacy(request)
+
+
+def _toggle_docket_alert_htmx(
+    request: AuthenticatedHttpRequest,
+) -> HttpResponse:
+    """Toggles the alert for an htmx POST and returns the v2 fragment.
+
+    A user at their quota is refused a new or re-enabled subscription, so the
+    limit holds even if the page's dialog is bypassed. The refusal is still a
+    200 carrying the fragment: htmx does not swap error responses, and the
+    fragment's status message is how the user learns what happened.
+    """
+    if request.method != "POST":
+        return HttpResponseNotAllowed(permitted_methods={"POST"})
+    docket_pk = request.POST.get("id", "")
+    if not docket_pk.isdecimal():
+        return HttpResponseBadRequest(
+            "Unable to alter alert. Please provide ID attribute"
+        )
+    docket = get_object_or_404(Docket, pk=docket_pk)
+    # Locking the profile serialises the user's toggles, so two concurrent
+    # requests cannot both pass the quota check or both create the alert.
+    with transaction.atomic():
+        profile = UserProfile.objects.select_for_update().get(
+            user=request.user
+        )
+        alert = DocketAlert.objects.filter(
+            user=request.user, docket=docket
+        ).first()
+        if alert and alert.alert_type == DocketAlert.SUBSCRIPTION:
+            alert.alert_type = DocketAlert.UNSUBSCRIPTION
+            alert.save()
+            has_alert = False
+            message = "Alert disabled successfully"
+        elif not profile.can_make_another_alert:
+            has_alert = False
+            message = "You have reached your docket alert limit."
+        else:
+            if alert:
+                alert.alert_type = DocketAlert.SUBSCRIPTION
+                alert.save()
+            else:
+                DocketAlert.objects.create(docket=docket, user=request.user)
+            has_alert = True
+            message = "Alerts are now enabled for this docket"
+    return TemplateResponse(
+        request,
+        "v2_includes/docket_alerts_htmx/toggle.html",
+        {"docket": docket, "has_alert": has_alert, "message": message},
+    )
+
+
+def _toggle_docket_alert_legacy(
+    request: AuthenticatedHttpRequest,
+) -> HttpResponse:
+    """Use Ajax to create or delete an alert for a user.
+
+    TODO: Remove once new design is completely rolled out, together with
+    the router in toggle_docket_alert and static-global/js/toggle_settings.js.
+    """
 
     # This could be removed and replaced using the docket-alert API.
     if request.user.is_anonymous:
@@ -278,6 +354,11 @@ async def new_docket_alert(request: AuthenticatedHttpRequest) -> HttpResponse:
 
     title = f"New Docket Alert for {make_docket_title(docket)}"
     has_alert = await user_has_alert(await request.auser(), docket)  # type: ignore[arg-type]
+    # docket_alerts_button.html gates the alerts button on the docket
+    # having a page at its source, mirroring the docket page toolbar.
+    docket_source_url = await sync_to_async(
+        docket.get_entry_source().docket_url
+    )(docket)
     return TemplateResponse(
         request,
         "docket_alert_new.html",
@@ -285,6 +366,7 @@ async def new_docket_alert(request: AuthenticatedHttpRequest) -> HttpResponse:
             "title": title,
             "has_alert": has_alert,
             "docket": docket,
+            "docket_source_url": docket_source_url,
             "private": True,
         },
     )
@@ -310,6 +392,7 @@ def set_docket_alert_state(
 
 
 @ratelimiter_unsafe_3_per_m
+@ratelimit_deny_list
 def toggle_docket_alert_confirmation(
     request: HttpRequest,
     route_prefix: str,

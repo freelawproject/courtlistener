@@ -91,6 +91,7 @@ from cl.corpus_importer.utils import (
     should_check_acms_court,
 )
 from cl.custom_filters.templatetags.text_filters import oxford_join
+from cl.lib.file_validation import content_is_pdf
 from cl.lib.filesizes import convert_size_to_bytes
 from cl.lib.microservice_utils import (
     check_redactions_service,
@@ -127,6 +128,7 @@ from cl.recap.mergers import (
     update_docket_metadata,
 )
 from cl.recap.models import (
+    PROCESSING_QUEUE_SOURCE,
     PROCESSING_STATUS,
     REQUEST_TYPE,
     UPLOAD_TYPE,
@@ -609,9 +611,19 @@ async def process_recap_zip(pk: int) -> dict[str, list[int] | list[Task]]:
             # For each document in the zip, create a new PQ
             new_pqs = []
             tasks = []
+            skipped_files = []
             for file_name in archive.namelist():
                 file_content = archive.read(file_name)
                 f = SimpleUploadedFile(file_name, file_content)
+
+                # Security: whoever built the zip named its members, and the
+                # PQs below are created directly, so they never pass through
+                # ProcessingQueueSerializer's PDF check. Confirm the contents
+                # here instead, or a member named `1-main.pdf` holding
+                # anything at all gets stored and served as a document.
+                if not content_is_pdf(f):
+                    skipped_files.append(file_name)
+                    continue
 
                 file_name = file_name.split(".pdf")[0]
                 if "-" in file_name:
@@ -641,16 +653,27 @@ async def process_recap_zip(pk: int) -> dict[str, list[int] | list[Task]]:
                     status=PROCESSING_STATUS.ENQUEUED,
                     upload_type=UPLOAD_TYPE.PDF,
                     debug=pq.debug,
+                    source=pq.source,
                 )
                 new_pqs.append(new_pq.pk)
                 await process_recap_pdf(new_pq.pk)
 
+            if skipped_files and not new_pqs:
+                await mark_pq_status(
+                    pq,
+                    f"Zip contained no PDFs. Skipped: {oxford_join(skipped_files)}.",
+                    PROCESSING_STATUS.INVALID_CONTENT,
+                )
+                return {"new_pqs": [], "tasks": []}
+
             # At the end, mark the pq as successful and return the PQ
-            await mark_pq_status(
-                pq,
-                f"Successfully created ProcessingQueue objects: {oxford_join(new_pqs)}",
-                PROCESSING_STATUS.SUCCESSFUL,
-            )
+            message = f"Successfully created ProcessingQueue objects: {oxford_join(new_pqs)}"
+            if skipped_files:
+                message += (
+                    f". Skipped files that are not PDFs: "
+                    f"{oxford_join(skipped_files)}"
+                )
+            await mark_pq_status(pq, message, PROCESSING_STATUS.SUCCESSFUL)
 
             # Returning the tasks allows tests to wait() for the PDFs to complete
             # before checking assertions.
@@ -856,6 +879,7 @@ async def find_subdocket_att_page_rds(
                 filepath_local=ContentFile(
                     original_file_content, name=original_file_name
                 ),
+                source=PROCESSING_QUEUE_SOURCE.REPLICATION,
             )
         )
 
@@ -931,6 +955,7 @@ async def find_subdocket_pdf_rds(
                 filepath_local=ContentFile(
                     pdf_binary_content, name=pq.filepath_local.name
                 ),
+                source=PROCESSING_QUEUE_SOURCE.REPLICATION,
             )
         )
 
@@ -3064,6 +3089,7 @@ def download_pacer_pdf_and_save_to_pq(
             court_id=court_id,
             upload_type=UPLOAD_TYPE.PDF,
             date_created__gt=cutoff_date,
+            defaults={"source": PROCESSING_QUEUE_SOURCE.EMAIL},
         )
         if created and magic_number and not is_bankr_short_doc_id:
             response, r_msg = download_pdf_by_magic_number(

@@ -20,6 +20,8 @@ from cl.search.factories import (
     OpinionWithParentsFactory,
     ParentheticalWithParentsFactory,
     RECAPDocumentFactory,
+    SCOTUSDocketEntryFactory,
+    SCOTUSDocumentFactory,
 )
 from cl.search.state.texas.factories import (
     TexasDocketEntryFactory,
@@ -58,6 +60,9 @@ FACTORIES = {
     # Texas
     800: TexasDocketEntryFactory,
     801: TexasDocumentFactory,
+    # SCOTUS
+    900: SCOTUSDocketEntryFactory,
+    901: SCOTUSDocumentFactory,
 }
 factories_str = "\n".join(f"{k}: {v}" for k, v in FACTORIES.items())
 

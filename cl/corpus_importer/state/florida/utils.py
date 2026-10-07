@@ -34,6 +34,18 @@ def is_florida_court(court_id: str) -> bool:
     return court_id in FLORIDA_COURT_IDS
 
 
+# Courts that can be the far side of a case transfer. Juriscraper aggregates
+# Florida's circuit and county courts into single court IDs, so they map to
+# CourtListener's aggregate courts. Administrative agencies, the Office of
+# the Judges of Compensation Claims, and federal courts have no usable
+# CourtListener mapping.
+FLORIDA_TRANSFER_COURT_ID_MAP: dict[str, str] = FLORIDA_COURT_ID_MAP | {
+    FloridaCourtID.CIRCUIT.value: "flacirct",
+    FloridaCourtID.COUNTY.value: "flactyct",
+    FloridaCourtID.DOAH.value: "fladivadminhrg",
+}
+
+
 # <District>D<Year>-<Case number>
 FLORIDA_APPELLATE_DN_RE = re.compile(r"[1-6]D\d{4}-\d{4,5}")
 # SC<Year>-<Case number>

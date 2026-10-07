@@ -1,17 +1,29 @@
 """Factories for mocking output of Florida Juriscraper modules."""
 
+from datetime import UTC
+
 from factory.base import Factory
 from factory.declarations import LazyAttribute, List, SubFactory
 from factory.faker import Faker
-from juriscraper.state.docket import DocketTransfer
+from juriscraper.state.docket import (
+    DocketEntryType,
+    DocketTransfer,
+    TransferDirection,
+    TransferReason,
+)
+from juriscraper.state.florida import FloridaPartyRepresentative
 from juriscraper.state.florida.cases import (
     FLORIDA_DOCKET_TYPE_MAP,
     FloridaCase,
     FloridaOriginatingCase,
 )
 from juriscraper.state.florida.courts import FloridaCourtID
-from juriscraper.state.florida.docket_entries import FloridaDocketEntry
-from juriscraper.state.florida.parties import FloridaParty
+from juriscraper.state.florida.docket_entries import (
+    FloridaCaseActor,
+    FloridaDocketEntry,
+)
+from juriscraper.state.florida.documents import FloridaDocument
+from juriscraper.state.florida.parties import FloridaParty, PartyType
 
 
 class _PydanticConstructFactory(Factory):
@@ -43,23 +55,102 @@ class FloridaOriginatingCaseFactory(_PydanticConstructFactory):
     case_number = Faker("federal_district_docket_number")
 
 
-# The merger does not currently read fields off these objects, so the factories
-# just produce stubs.
 class FloridaDocketTransferFactory(_PydanticConstructFactory):
     class Meta:
         model = DocketTransfer
+
+    direction = TransferDirection.INBOUND
+    reason = TransferReason.APPEAL
+    court_id = Faker(
+        "random_element",
+        elements=(
+            FloridaCourtID.CIRCUIT.value,
+            FloridaCourtID.COUNTY.value,
+        ),
+    )
+    docket_number = Faker("federal_district_docket_number")
+
+
+class FloridaRepresentativeFactory(_PydanticConstructFactory):
+    class Meta:
+        model = FloridaPartyRepresentative
+
+    party_uuid = Faker("uuid4")
+    name = Faker("name")
+    sort_name = Faker("name")
+    primary_flag = Faker("pybool")
 
 
 class FloridaCasePartyFactory(_PydanticConstructFactory):
     class Meta:
         model = FloridaParty
 
+    party_uuid = Faker("uuid4")
+    party_type_raw = Faker("text")
+    party_type = Faker("random_element", elements=PartyType)
+    party_type_id = Faker("pyint")
+    party_subtype = Faker("pystr")
+    party_subtype_id = Faker("pyint")
+    status = Faker("pystr")
+    status_id = Faker("pyint")
+    name = Faker("name")
+    sort_name = Faker("name")
+    pro_se_flag = Faker("pybool")
+    order_by = Faker("pyint")
+    representatives = List([SubFactory(FloridaRepresentativeFactory)])
+    non_public_flag = Faker("pybool")
+    party_number = Faker("pyint")
+    involvement_type_id = Faker("pyint")
+
+
+class FloridaDocumentFactory(_PydanticConstructFactory):
+    class Meta:
+        model = FloridaDocument
+
+    docket_entry_uuid = Faker("uuid4")
+    # Real UUID to match juriscraper's validated UUID4 type; a str here makes
+    # every re-merge see link_uuid as changed.
+    document_link_uuid = Faker("uuid4", cast_to=None)
+    document_name = Faker("text", max_nb_chars=50)
+    user_document_state = Faker("uuid4")
+    case_uuid = Faker("uuid4")
+    case_number = Faker("federal_district_docket_number")
+    case_title = Faker("case_name")
+    court_id = Faker("pyint")
+    document_type = Faker("pystr")
+    content_type = "application/pdf"
+    file_extension = "pdf"
+    page_count = Faker("pyint", min_value=1, max_value=500)
+    file_size = Faker("pyint", min_value=1000)
+    url = Faker("url")
+
+
+class FloridaCaseActorFactory(_PydanticConstructFactory):
+    class Meta:
+        model = FloridaCaseActor
+
+    display_name = Faker("name")
+    sort_name = Faker("name")
+
 
 class FloridaDocketEntryFactory(_PydanticConstructFactory):
     class Meta:
         model = FloridaDocketEntry
 
-    date_filed = Faker("date_object")
+    docket_entry_uuid = Faker("uuid4", cast_to=None)
+    datetime_filed = Faker("date_time", tzinfo=UTC)
+    date_filed = LazyAttribute(lambda o: o.datetime_filed.date())
+    date_submitted = Faker("date_time", tzinfo=UTC)
+    entry_type = Faker("random_element", elements=DocketEntryType)
+    entry_type_raw = Faker("text", max_nb_chars=20)
+    entry_name = Faker("text", max_nb_chars=30)
+    entry_status = Faker(
+        "random_element",
+        elements=("Docketed", "***STRICKEN***", "***VACATED***"),
+    )
+    entry_description = Faker("text")
+    submitted_by = List([])
+    attachments = List([])
 
 
 class FloridaCaseFactory(_PydanticConstructFactory):
@@ -70,6 +161,7 @@ class FloridaCaseFactory(_PydanticConstructFactory):
     docket_number = Faker("federal_district_docket_number")
     case_name = Faker("case_name")
     case_name_full = Faker("case_name", full=True)
+    case_name_short = Faker("case_name")
     case_caption = Faker("text")
     closed_flag = Faker("pybool")
     class_group_type = Faker("pystr")

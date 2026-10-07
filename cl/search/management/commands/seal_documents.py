@@ -1,8 +1,8 @@
 from django.db.models import QuerySet
 
 from cl.lib.command_utils import VerboseCommand, logger
+from cl.search.deletion_utils import seal_documents
 from cl.search.models import RECAPDocument
-from cl.search.utils import seal_documents
 
 
 class Command(VerboseCommand):

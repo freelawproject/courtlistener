@@ -2,7 +2,7 @@ import copy
 from dataclasses import dataclass
 from datetime import date, datetime
 from enum import Enum, auto
-from typing import Any
+from typing import Any, cast
 from urllib.parse import parse_qs
 
 from django.apps import apps
@@ -12,7 +12,7 @@ from django.contrib.contenttypes.models import ContentType
 from django.http import QueryDict
 from elasticsearch.dsl import MultiSearch, Q, Search
 from elasticsearch.dsl.query import Query
-from elasticsearch.dsl.response import Hit
+from elasticsearch.dsl.response import Hit, Response
 from elasticsearch.exceptions import ApiError, RequestError, TransportError
 from redis import Redis
 
@@ -76,7 +76,7 @@ from cl.search.forms import SearchForm
 from cl.search.models import SEARCH_TYPES, Docket
 from cl.search.types import (
     ESDictDocument,
-    ESModelClassType,
+    ESDocumentClassType,
     PercolatorResponses,
     SearchAlertHitType,
 )
@@ -129,12 +129,14 @@ class InvalidDateError(Exception):
 
 
 def create_percolator_search_query(
-    index_name: str, final_query: Query, search_after: int | None = None
+    index_name: str,
+    final_query: Query | None,
+    search_after: int | None = None,
 ):
     """Create an Elasticsearch search query with pagination.
 
     :param index_name: The name of the Elasticsearch index to search.
-    :param final_query: Elasticsearch DSL Query object.
+    :param final_query: Elasticsearch DSL Query object, or None.
     :param search_after: An optional parameter for search_after pagination.
     :return: An Elasticsearch search object with the specified query and pagination settings.
     """
@@ -328,6 +330,13 @@ def fetch_all_search_alerts_results(
     percolator results (if applicable).
     """
 
+    def get_search_after(response: Response | None) -> Any:
+        # TODO: Response.hits is annotated upstream as a plain list, but at runtime
+        # it is an AttrList that also exposes the raw `hits` payload.
+        if response and cast(Any, response.hits).hits:
+            return response.hits[-1].meta.sort
+        return None
+
     all_main_alert_hits = []
     all_rd_alert_hits = []
     all_d_alert_hits = []
@@ -348,9 +357,9 @@ def fetch_all_search_alerts_results(
         return all_main_alert_hits, all_rd_alert_hits, all_d_alert_hits
 
     alerts_retrieved = main_alerts_returned
-    main_search_after = main_response.hits[-1].meta.sort
-    rd_search_after = rd_response.hits[-1].meta.sort if rd_response else None
-    d_search_after = d_response.hits[-1].meta.sort if d_response else None
+    main_search_after = get_search_after(main_response)
+    rd_search_after = get_search_after(rd_response)
+    d_search_after = get_search_after(d_response)
     while True:
         search_after_params = {
             "main_search_after": main_search_after,
@@ -374,17 +383,9 @@ def fetch_all_search_alerts_results(
         if alerts_retrieved >= main_total_hits or main_alerts_returned == 0:
             break
         else:
-            main_search_after = responses.main_response.hits[-1].meta.sort
-            rd_search_after = (
-                responses.rd_response.hits[-1].meta.sort
-                if responses.rd_response and len(responses[1].hits.hits)
-                else None
-            )
-            d_search_after = (
-                responses.d_response.hits[-1].meta.sort
-                if responses.d_response and len(responses[2].hits.hits)
-                else None
-            )
+            main_search_after = get_search_after(responses.main_response)
+            rd_search_after = get_search_after(responses.rd_response)
+            d_search_after = get_search_after(responses.d_response)
 
     return all_main_alert_hits, all_rd_alert_hits, all_d_alert_hits
 
@@ -561,15 +562,15 @@ def has_document_alert_hit_been_triggered(
     return r.sismember(alert_key, document_id)
 
 
-def build_plain_percolator_query(cd: CleanData) -> Query:
+def build_plain_percolator_query(cd: CleanData) -> Query | None:
     """Build a plain query based on the provided clean data for its use in the
     Percolator
 
     :param cd: The query CleanedData.
-    :return: An ES Query object representing the built query.
+    :return: An ES Query object representing the built query, or None for search
+    types the Percolator does not support.
     """
 
-    plain_query = []
     match cd["type"]:
         case (
             SEARCH_TYPES.RECAP
@@ -607,25 +608,25 @@ def build_plain_percolator_query(cd: CleanData) -> Query:
                         "Indexing match-all queries is not supported."
                     )
                 case [[], _]:
-                    plain_query = Q(
+                    return Q(
                         "bool",
                         should=string_query,
                         minimum_should_match=1,
                     )
                 case [_, []]:
-                    plain_query = Q(
+                    return Q(
                         "bool",
                         filter=parent_filters,
                     )
                 case [_, _]:
-                    plain_query = Q(
+                    return Q(
                         "bool",
                         filter=parent_filters,
                         should=string_query,
                         minimum_should_match=1,
                     )
 
-    return plain_query
+    return None
 
 
 def transform_percolator_child_document(
@@ -689,7 +690,7 @@ def get_field_names(mapping_dict):
 
 
 def select_es_document_fields(
-    es_document_class: ESModelClassType,
+    es_document_class: ESDocumentClassType,
     main_document: ESDictDocument,
     fields_to_ignore: set[str],
 ) -> ESDictDocument:

@@ -1,6 +1,7 @@
 import pickle
 import random
 from dataclasses import dataclass
+from http.cookiejar import Cookie
 from urllib.parse import urlparse
 
 from django.conf import settings
@@ -24,6 +25,10 @@ class SessionData:
     Handles default values for the `proxy` attribute when not explicitly
     provided, indicating session data was not generated using the
     `ProxyPacerSession` class.
+
+    Cookies are always stored as a plain `RequestsCookieJar`, even when a
+    subclass such as `InsecureCookieJar` is passed in. Reassigning `cookies`
+    after construction bypasses this conversion.
     """
 
     cookies: RequestsCookieJar
@@ -32,6 +37,32 @@ class SessionData:
     def __post_init__(self):
         if not self.proxy_address:
             self.proxy_address = settings.EGRESS_PROXY_HOSTS[0]
+        # SessionData is pickled into the Redis cookie cache and into Celery
+        # task arguments. Store only requests' own jar class so pods running
+        # code without InsecureCookieJar (mid-rollout or after a rollback) can
+        # still unpickle it. ProxyPacerSession re-wraps it in InsecureCookieJar.
+        if (
+            self.cookies is not None
+            and type(self.cookies) is not RequestsCookieJar
+        ):
+            plain = RequestsCookieJar()
+            plain.update(self.cookies)
+            self.cookies = plain
+
+
+class InsecureCookieJar(RequestsCookieJar):
+    """Cookie jar that stores every cookie as non-secure.
+
+    ProxyPacerSession sends requests over http:// to the egress proxy, which
+    then opens the TLS connection to PACER. requests never sends Secure cookies
+    over http, so cookies that PACER sets or refreshes with the Secure flag
+    would otherwise be dropped from later requests, logging the session out.
+    """
+
+    def set_cookie(self, cookie: Cookie, *args, **kwargs) -> None:
+        """Store the cookie with its Secure flag cleared."""
+        cookie.secure = False
+        super().set_cookie(cookie, *args, **kwargs)
 
 
 class ProxyPacerSession(PacerSession):
@@ -67,6 +98,26 @@ class ProxyPacerSession(PacerSession):
             "http": self.proxy_address,
         }
         self.headers["X-WhSentry-TLS"] = "true"
+
+    @property
+    def cookies(self) -> InsecureCookieJar:
+        """The session's cookie jar, always an InsecureCookieJar."""
+        return self._cookies
+
+    @cookies.setter
+    def cookies(self, jar: RequestsCookieJar) -> None:
+        """Store `jar` as an InsecureCookieJar, copying it if needed.
+
+        requests, juriscraper's PacerSession.__init__ and PacerSession.login()
+        all replace the jar wholesale with a plain RequestsCookieJar. Wrapping
+        on every assignment keeps cookies that PACER later refreshes with the
+        Secure flag sendable over the proxy.
+        """
+        if not isinstance(jar, InsecureCookieJar):
+            insecure = InsecureCookieJar()
+            insecure.update(jar)
+            jar = insecure
+        self._cookies = jar
 
     def send(self, request, **kwargs):
         """Send a given PreparedRequest."""
@@ -132,6 +183,15 @@ class ProxyPacerSession(PacerSession):
         saml_credentials = super()._get_saml_auth_request_parameters(court_id)
         # Update cookies so they can be sent over non-HTTPS connections
         for cookie in self.cookies:
+            # `RequestsCookieJar` claims to be a `MutableMapping[str, str | None]`,
+            # but `__iter__` ignores override mismatch and returns an
+            # `Iterator[Cookie]`. Here we verify this behavior, clarifying things
+            # for static type checking and making sure that a future failure is
+            # more easily recognized.
+            if not isinstance(cookie, Cookie):
+                raise TypeError(
+                    f"expected Cookie, got {type(cookie).__name__}"
+                )
             cookie.secure = False
         return saml_credentials
 

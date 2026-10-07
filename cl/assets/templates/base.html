@@ -98,6 +98,14 @@
         {% endif %}
       {% endif %}
     {% endflag %}
+    <!-- ChatGPT Launch Banner -->
+    {% flag "chatgpt_launch_banner" %}
+      {# Promo auto-hides after the end date (inclusive Y-m-d), even while the flag stays on. Enable the flag to launch. #}
+      {% now "Y-m-d" as today %}
+      {% if today <= "2026-10-01" %}
+        {% include 'includes/dismissible_nav_banner.html' with request=request link="https://free.law/2026/09/17/grounded-legal-research-in-chatgpt/" cookie_name="chatgpt_launch_banner" button_text="Read the Announcement" text="🚀 <strong>CourtListener is now available in ChatGPT!</strong> Now through <strong>October 1</strong>, API rate limits are doubled for everyone — research case law, verify citations, and track dockets right inside ChatGPT. <a href='https://wiki.free.law/c/courtlistener/help/api/mcp/using-the-courtlistener-mcp-in-claude-chatgpt-and-other-ai-assistants'>Set it up</a> in minutes." only %}
+      {% endif %}
+    {% endflag %}
     <!-- Broken Email Banner -->
     {% if EMAIL_BAN_REASON %}
       <div class="navbar navbar-default subnav  alert-danger alert-dismissible broken-email-banner" role="navigation">
@@ -140,7 +148,6 @@
             {% if user.is_authenticated %}
               <ul class="nav navbar-nav navbar-right">
                 <li><a href="https://free.law/about/">About</a></li>
-                <li><a href="{% url "faq" %}">FAQ</a></li>
                 <li class="dropdown">
                   <a href="#"
                      class="dropdown-toggle"
@@ -179,7 +186,6 @@
             {% else %}
               <ul class="nav navbar-nav navbar-right">
                 <li><a href="https://free.law/about/">About</a></li>
-                <li><a href="{% url "faq" %}">FAQ</a></li>
                 <li class="visible-xs">
                   <a href="https://free.law/membership/"
                     >Become a Member</a>
@@ -226,7 +232,7 @@
                     >Look Up Citations</a>
                 </li>
                 <li>
-                  <a href="{% url "coverage_opinions" %}">About this Collection</a>
+                  <a href="{{ WIKI_COVERAGE_OPINIONS_URL }}">About this Collection</a>
                 </li>
                 <li>
                   <a href="{{ WIKI_API_URL }}/rest/v4/case-law">API</a>
@@ -253,7 +259,7 @@
                   <a href="{{ WIKI_HELP_URL }}/alerts/docket-alerts-for-pacer">Get Case Alerts</a>
                 </li>
                 <li>
-                  <a href="{% url "coverage_recap" %}">About this Collection</a>
+                  <a href="{{ WIKI_COVERAGE_RECAP_URL }}">About this Collection</a>
                 </li>
                 <li>
                   <a href="https://free.law/data-consulting/">Bulk Data Service</a>
@@ -279,7 +285,7 @@
                   <a href="{{ WIKI_HELP_URL }}/general/custom-podcasts-of-oral-argument-audio-recordings">Custom Podcasts</a>
                 </li>
                 <li>
-                  <a href="{% url "coverage_oa" %}">About this Collection</a>
+                  <a href="{{ WIKI_COVERAGE_OA_URL }}">About this Collection</a>
                 </li>
                 <li>
                   <a href="{{ WIKI_API_URL }}/rest/v4/oral-arguments">API</a>
@@ -313,7 +319,7 @@
                   <a href="{% url "financial_disclosures_home" %}">Search Financial Disclosures</a>
                 </li>
                 <li>
-                  <a href="{% url "coverage_fds" %}">About this Collection</a>
+                  <a href="{{ WIKI_COVERAGE_FDS_URL }}">About this Collection</a>
                 </li>
                 <li>
                   <a href="{{ WIKI_API_URL }}/rest/v4/financial-disclosures">API</a>
@@ -378,7 +384,7 @@
               <a href="https://free.law/about/">About</a>
             </div>
             <div class="footer-item">
-              <a href="{% url "help_home" %}">Help</a> &amp; <a href="{% url "faq" %}">FAQ</a>
+              <a href="{% url "help_home" %}">Help</a>
             </div>
             <div class="footer-item">
               <a href="https://donate.free.law/forms/supportflp">Donate</a>
@@ -387,7 +393,7 @@
 
           <div class="col-sm-6 no-gutter">
             <div class="footer-item">
-              <a href="{% url "coverage" %}">About Our Data</a>
+              <a href="{{ WIKI_COVERAGE_URL }}">About Our Data</a>
             </div>
             <div class="footer-item">
               <a href="{{ WIKI_API_URL }}">APIs &amp; Bulk Data</a>
@@ -493,7 +499,7 @@
   <script type="text/javascript" src="{% static "js/bootstrap.min.js" %}"></script>
 {% endif %}
 <script type="text/javascript" src="{% static "js/base.js" %}"></script>
-<script type="text/javascript" nonce="{{ request.csp_nonce }}">
+<script type="text/javascript" nonce="{{ csp_nonce }}">
   {# Default values are to ensure JS parsing even if 500 error thrown #}
   var isMember = {{ user.profile.is_member|yesno:"true,false" }},
       userAlertCount = {{ user.docket_alerts.subscriptions.count|default:"0" }},

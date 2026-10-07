@@ -1,6 +1,8 @@
 import random
+from typing import cast
 
 from django.conf import settings
+from django.contrib.auth.models import User
 from django.http import HttpRequest
 from django.urls import reverse
 
@@ -21,6 +23,12 @@ def inject_settings(request):
         "WIKI_HELP_URL": settings.WIKI_HELP_BASE_URL,
         "WIKI_TERMS_URL": settings.WIKI_TERMS_URL,
         "WIKI_REMOVAL_URL": settings.WIKI_REMOVAL_URL,
+        "WIKI_COVERAGE_URL": settings.WIKI_COVERAGE_URL,
+        "WIKI_COVERAGE_FDS_URL": settings.WIKI_COVERAGE_FDS_URL,
+        "WIKI_COVERAGE_OA_URL": settings.WIKI_COVERAGE_OA_URL,
+        "WIKI_COVERAGE_OPINIONS_URL": settings.WIKI_COVERAGE_OPINIONS_URL,
+        "WIKI_COVERAGE_RECAP_URL": settings.WIKI_COVERAGE_RECAP_URL,
+        "WIKI_COVERAGE_SCOTUS_URL": settings.WIKI_COVERAGE_SCOTUS_URL,
     }
 
 
@@ -51,9 +59,7 @@ info_tips = (
     ),
     'The current design of CourtListener was <a href="https://free.law/2014/11/13/check-out-courtlisteners-new-paint-and-features/">created by a volunteer</a>.',
     # Neutral Citations
-    'WestLaw currently has a monopoly on citations. This hinders legal innovation but few courts have adopted <a href="{}#explain-neutral-citations">neutral citations</a>.'.format(
-        reverse("faq")
-    ),
+    'WestLaw currently has a monopoly on citations. This hinders legal innovation but few courts have adopted <a href="https://free.law/advocacy/neutral-citations">neutral citations</a>.',
     # Features
     f'You can <a href="{settings.WIKI_HELP_BASE_URL}/alerts/search-alerts-for-case-law-and-filings">create an alert</a> for any query to receive an email if the query has new results.',
     f'There is an <a href="{settings.WIKI_HELP_BASE_URL}/general/using-atom-and-rss-feeds-for-the-latest-updates">RSS feed</a> for every query so you can easily stay up to date.',
@@ -120,8 +126,12 @@ def inject_email_ban_status(
     :param request: Contains the user for checking if their email is valid.
     return dict: The message and date for the user's email status.
     """
-    if request.user.is_authenticated:
-        email = request.user.email
+    user = request.user
+    if user.is_authenticated:
+        user = cast(
+            User, user
+        )  # Cast here since according to Django (https://docs.djangoproject.com/en/6.1/ref/request-response/) the `is_authenticated` property should act as a type guard
+        email = user.email
         email_banned = EmailFlag.objects.filter(
             email_address=email, flag_type=FLAG_TYPES.BAN
         )

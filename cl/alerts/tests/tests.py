@@ -1,7 +1,8 @@
 from collections import defaultdict
 from datetime import datetime, timedelta
 from http import HTTPStatus
-from typing import cast
+from types import SimpleNamespace
+from typing import TYPE_CHECKING, cast
 from unittest import mock
 
 import pytz
@@ -22,6 +23,9 @@ from lxml.html import HtmlElement
 from selenium.webdriver.common.by import By
 from timeout_decorator import timeout_decorator
 from waffle.testutils import override_switch
+
+if TYPE_CHECKING:
+    from django.test.client import _MonkeyPatchedWSGIResponse
 
 from cl.alerts.constants import LEGACY_MEMBERSHIP_HELP_URL
 from cl.alerts.factories import AlertFactory, DocketAlertWithParentsFactory
@@ -47,6 +51,7 @@ from cl.alerts.utils import (
     InvalidDateError,
     add_document_hit_to_alert_set,
     build_alert_email_subject,
+    fetch_all_search_alerts_results,
     has_document_alert_hit_been_triggered,
     is_match_all_query,
     percolate_es_document,
@@ -91,12 +96,14 @@ from cl.search.models import (
     DocketEntry,
     RECAPDocument,
 )
+from cl.search.types import PercolatorResponses
 from cl.tests.base import SELENIUM_TIMEOUT, BaseSeleniumTest
 from cl.tests.cases import (
     APITestCase,
     ESIndexTestCase,
     MockTallyStatMixin,
     SearchAlertsAssertions,
+    SimpleTestCase,
     TestCase,
 )
 from cl.tests.utils import MockResponse, make_client
@@ -1024,14 +1031,17 @@ class DocketAlertTest(TestCase):
 
         # Does the webhook was triggered?
         self.assertEqual(webhook_triggered.count(), 1)
-        content = webhook_triggered.first().content
+        webhook_event = webhook_triggered.first()
+        assert webhook_event is not None  # for the type checker
+        content = webhook_event.content
+        assert content is not None  # for the type checker
         # Compare the content of the webhook to the recap document
         pacer_doc_id = content["payload"]["results"][0]["recap_documents"][0][
             "pacer_doc_id"
         ]
         self.assertEqual("232322332", pacer_doc_id)
         self.assertEqual(
-            webhook_triggered.first().event_status,
+            webhook_event.event_status,
             WEBHOOK_EVENT_STATUS.SUCCESSFUL,
         )
 
@@ -1808,7 +1818,7 @@ class AlertAPITests(ESIndexTestCase, APITestCase):
         )
         self.assertIn(LEGACY_MEMBERSHIP_HELP_URL, detail)
         neon_id = await sync_to_async(
-            lambda: self.user_legacy_member.membership.neon_id
+            lambda: self.user_legacy_member.membership.neon_id  # pyrefly:ignore[missing-attribute]
         )()
         self.assertNotIn(
             f"https://donate.free.law/constituent/memberships/upgrade/{neon_id}",
@@ -3116,6 +3126,111 @@ class OldDocketAlertsReportToggleTest(TestCase):
         self.assertEqual(da.date_modified, eighty_five_days_ahead)
 
 
+class ToggleDocketAlertHtmxTest(TestCase):
+    """The docket alert toggle answers htmx requests with a v2 fragment."""
+
+    FRAGMENT = "v2_includes/docket_alerts_htmx/toggle.html"
+
+    @classmethod
+    def setUpTestData(cls) -> None:
+        cls.profile = UserProfileWithParentsFactory()
+        cls.docket = DocketFactory(source=Docket.RECAP)
+
+    def setUp(self) -> None:
+        self.client.force_login(self.profile.user)
+
+    def toggle(self) -> "_MonkeyPatchedWSGIResponse":
+        """Posts the toggle the way the v2 docket page does."""
+        return self.client.post(
+            reverse("toggle_docket_alert"),
+            {"id": self.docket.pk},
+            headers={"HX-Request": "true"},
+        )
+
+    def subscriptions(self) -> int:
+        """How many active alerts the user has on the docket."""
+        return DocketAlert.objects.filter(
+            user=self.profile.user,
+            docket=self.docket,
+            alert_type=DocketAlert.SUBSCRIPTION,
+        ).count()
+
+    def test_legacy_request_keeps_the_legacy_response(self) -> None:
+        """A non-htmx, non-ajax POST is still refused as before."""
+        r = self.client.post(
+            reverse("toggle_docket_alert"), {"id": self.docket.pk}
+        )
+        self.assertEqual(r.status_code, HTTPStatus.METHOD_NOT_ALLOWED)
+
+    def test_htmx_creates_the_alert(self) -> None:
+        """The first toggle subscribes and swaps in the subscribed state."""
+        self.assertEqual(self.subscriptions(), 0)
+        r = self.toggle()
+        self.assertEqual(r.status_code, HTTPStatus.OK)
+        self.assertTemplateUsed(r, self.FRAGMENT)
+        self.assertEqual(self.subscriptions(), 1)
+        self.assertTrue(r.context["has_alert"])
+        self.assertContains(r, f'id="docket-alert-label-{self.docket.pk}"')
+        self.assertContains(r, f'id="docket-alert-toggle-{self.docket.pk}"')
+        self.assertContains(r, f'id="docket-alert-status-{self.docket.pk}"')
+        self.assertContains(r, 'hx-swap-oob="innerHTML"', count=3)
+
+    def test_htmx_disables_the_alert(self) -> None:
+        """Toggling a subscribed docket unsubscribes it."""
+        self.toggle()
+        r = self.toggle()
+        self.assertEqual(self.subscriptions(), 0)
+        self.assertTemplateUsed(r, self.FRAGMENT)
+        self.assertFalse(r.context["has_alert"])
+
+    @override_settings(MAX_FREE_DOCKET_ALERTS=0)
+    def test_htmx_refuses_to_subscribe_over_quota(self) -> None:
+        """A user at quota gets no alert, even without the page's dialog."""
+        r = self.toggle()
+        self.assertEqual(r.status_code, HTTPStatus.OK)
+        self.assertEqual(self.subscriptions(), 0)
+        self.assertFalse(r.context["has_alert"])
+
+    @override_settings(MAX_FREE_DOCKET_ALERTS=1)
+    def test_htmx_allows_disabling_at_quota(self) -> None:
+        """Quota never blocks turning an alert off."""
+        self.toggle()
+        r = self.toggle()
+        self.assertEqual(self.subscriptions(), 0)
+        self.assertFalse(r.context["has_alert"])
+
+    def test_htmx_without_id_is_a_bad_request(self) -> None:
+        """A missing or malformed docket id is the caller's error.
+
+        Superscript two passes str.isdigit() but int() rejects it, so a
+        looser check would let it through to a 500 in the query.
+        """
+        for data in ({}, {"id": "abc"}, {"id": "²"}):
+            with self.subTest(data=data):
+                r = self.client.post(
+                    reverse("toggle_docket_alert"),
+                    data,
+                    headers={"HX-Request": "true"},
+                )
+                self.assertEqual(r.status_code, HTTPStatus.BAD_REQUEST)
+
+    def test_htmx_unknown_docket_is_not_found(self) -> None:
+        """A well-formed id for a docket that does not exist is a 404."""
+        r = self.client.post(
+            reverse("toggle_docket_alert"),
+            {"id": self.docket.pk + 100000},
+            headers={"HX-Request": "true"},
+        )
+        self.assertEqual(r.status_code, HTTPStatus.NOT_FOUND)
+
+    def test_htmx_from_a_logged_out_user_redirects_to_login(self) -> None:
+        """Logged-out users are sent to sign in, never handed a fragment."""
+        self.client.logout()
+        r = self.toggle()
+        self.assertEqual(r.status_code, HTTPStatus.FOUND)
+        self.assertIn(reverse("sign-in"), r["Location"])
+
+
 class OldDocketAlertsWebhooksTest(TestCase):
     """Test Old Docket Alerts Webhooks"""
 
@@ -3379,10 +3494,19 @@ class DocketAlertGetNotesTagsTests(TestCase):
         cls.docket_3 = DocketFactory(
             court=cls.court,
         )
+        cls.docket_4 = DocketFactory(
+            court=cls.court,
+        )
         cls.note_docket_1_user_1 = NoteFactory(
             user=cls.user_1,
             docket_id=cls.docket_1,
             notes="Note 1 Test",
+        )
+        # GFK-shaped note (#7725) -- proves the lookup isn't legacy-only.
+        cls.note_docket_4_user_1 = NoteFactory.for_object(
+            cls.docket_4,
+            user=cls.user_1,
+            notes="Note 4 Test",
         )
         cls.note_docket_2_user_1 = NoteFactory(
             user=cls.user_1,
@@ -3443,6 +3567,14 @@ class DocketAlertGetNotesTagsTests(TestCase):
         ) = get_docket_notes_and_tags_by_user(self.docket_3.pk, self.user_1.pk)
         self.assertEqual(notes_docket_3_user_1, None)
         self.assertEqual(tags_docket_3_user_1, [])
+
+        # GFK-shaped note (#7725) -- must be found too, not just legacy ones.
+        (
+            notes_docket_4_user_1,
+            tags_docket_4_user_1,
+        ) = get_docket_notes_and_tags_by_user(self.docket_4.pk, self.user_1.pk)
+        self.assertEqual(notes_docket_4_user_1, "Note 4 Test")
+        self.assertEqual(tags_docket_4_user_1, [])
 
 
 @mock.patch("cl.search.tasks.percolator_alerts_models_supported", new=[Audio])
@@ -5007,6 +5139,83 @@ class SearchAlertsIndexingCommandTests(ESIndexTestCase, TestCase):
         self.assertTrue(
             AudioPercolator.exists(id=valid_alert.pk),
             msg=f"Alert id: {valid_alert.pk} was not indexed.",
+        )
+
+
+class FetchAllSearchAlertsResultsTest(SimpleTestCase):
+    class FakeHits:
+        def __init__(self, total, markers):
+            self.total = SimpleNamespace(value=total)
+            self.hits = [
+                SimpleNamespace(meta=SimpleNamespace(sort=[marker]))
+                for marker in markers
+            ]
+
+        def __iter__(self):
+            return iter(self.hits)
+
+        def __getitem__(self, item):
+            return self.hits[item]
+
+    @classmethod
+    def make_response(cls, total, *markers):
+        return SimpleNamespace(hits=cls.FakeHits(total, markers))
+
+    @override_settings(ELASTICSEARCH_PAGINATION_BATCH_SIZE=1)
+    @mock.patch("cl.alerts.utils.percolate_es_document")
+    def test_paginates_dataclass_responses(self, mock_percolate):
+        initial = PercolatorResponses(
+            self.make_response(3, "main-1"),
+            self.make_response(1, "rd-1"),
+            self.make_response(1, "d-1"),
+        )
+        mock_percolate.side_effect = [
+            PercolatorResponses(
+                self.make_response(3, "main-2"),
+                self.make_response(1, "rd-2"),
+                self.make_response(1, "d-2"),
+            ),
+            PercolatorResponses(
+                self.make_response(3, "main-3"),
+                self.make_response(1, "rd-3"),
+                self.make_response(1, "d-3"),
+            ),
+        ]
+
+        main_hits, rd_hits, d_hits = fetch_all_search_alerts_results(
+            initial, "document-id", "percolator-index"
+        )
+
+        self.assertEqual(len(main_hits), 3)
+        self.assertEqual(len(rd_hits), 3)
+        self.assertEqual(len(d_hits), 3)
+        self.assertEqual(mock_percolate.call_count, 2)
+
+    @override_settings(ELASTICSEARCH_PAGINATION_BATCH_SIZE=1)
+    @mock.patch("cl.alerts.utils.percolate_es_document")
+    def test_handles_empty_auxiliary_responses(self, mock_percolate):
+        initial = PercolatorResponses(
+            self.make_response(2, "main-1"),
+            self.make_response(0),
+            self.make_response(0),
+        )
+        mock_percolate.return_value = PercolatorResponses(
+            self.make_response(2, "main-2"), None, None
+        )
+
+        main_hits, rd_hits, d_hits = fetch_all_search_alerts_results(
+            initial, "document-id", "percolator-index"
+        )
+
+        self.assertEqual(len(main_hits), 2)
+        self.assertEqual(rd_hits, [])
+        self.assertEqual(d_hits, [])
+        mock_percolate.assert_called_once_with(
+            "document-id",
+            "percolator-index",
+            main_search_after=["main-1"],
+            rd_search_after=None,
+            d_search_after=None,
         )
 
 

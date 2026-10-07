@@ -1,6 +1,7 @@
 import datetime
 import re
 from collections import OrderedDict
+from typing import Any
 
 from django import forms
 from django.conf import settings
@@ -9,6 +10,7 @@ from django.forms import ChoiceField, DateField
 from django.utils.datastructures import MultiValueDictKeyError
 from localflavor.us.us_states import STATE_CHOICES
 
+from cl.lib import widgets
 from cl.lib.courts import get_active_court_from_cache
 from cl.lib.model_helpers import flatten_choices
 from cl.lib.utils import get_array_of_selected_fields
@@ -762,12 +764,7 @@ class CorpusSearchForm(forms.Form):
         label="Case Name",
         label_suffix="",
         initial="",
-        widget=forms.TextInput(
-            attrs={
-                "class": "focus:ring-0 focus:outline-none w-full",
-                "autocomplete": "off",
-            }
-        ),
+        widget=widgets.TextInput(),
     )
 
     #
@@ -778,12 +775,7 @@ class CorpusSearchForm(forms.Form):
         initial="",
         label="Judge",
         label_suffix="",
-        widget=forms.TextInput(
-            attrs={
-                "class": "focus:ring-0 focus:outline-none w-full",
-                "autocomplete": "off",
-            }
-        ),
+        widget=widgets.TextInput(),
     )
     judge.as_str_types = [SEARCH_TYPES.OPINION, SEARCH_TYPES.ORAL_ARGUMENT]
 
@@ -794,13 +786,7 @@ class CorpusSearchForm(forms.Form):
         required=False,
         label="Filed After",
         label_suffix="",
-        widget=forms.TextInput(
-            attrs={
-                "placeholder": "mm/dd/yyyy",
-                "class": "focus:ring-0 focus:outline-none w-full",
-                "autocomplete": "off",
-            }
-        ),
+        widget=widgets.TextInput(attrs={"placeholder": "mm/dd/yyyy"}),
     )
     filed_after.as_str_types = [
         SEARCH_TYPES.OPINION,
@@ -811,13 +797,7 @@ class CorpusSearchForm(forms.Form):
         required=False,
         label="Filed Before",
         label_suffix="",
-        widget=forms.TextInput(
-            attrs={
-                "placeholder": "mm/dd/yyyy",
-                "class": "focus:ring-0 focus:outline-none w-full",
-                "autocomplete": "off",
-            }
-        ),
+        widget=widgets.TextInput(attrs={"placeholder": "mm/dd/yyyy"}),
     )
     filed_before.as_str_types = [
         SEARCH_TYPES.OPINION,
@@ -828,12 +808,7 @@ class CorpusSearchForm(forms.Form):
         required=False,
         label="Docket Number",
         label_suffix="",
-        widget=forms.TextInput(
-            attrs={
-                "class": "focus:ring-0 focus:outline-none w-full",
-                "autocomplete": "off",
-            }
-        ),
+        widget=widgets.TextInput(),
     )
     docket_number.as_str_types = [
         SEARCH_TYPES.OPINION,
@@ -846,12 +821,7 @@ class CorpusSearchForm(forms.Form):
         required=False,
         label="Citation",
         label_suffix="",
-        widget=forms.TextInput(
-            attrs={
-                "class": "focus:ring-0 focus:outline-none w-full",
-                "autocomplete": "off",
-            }
-        ),
+        widget=widgets.TextInput(),
     )
     citation.as_str_types = [SEARCH_TYPES.OPINION]
 
@@ -859,12 +829,7 @@ class CorpusSearchForm(forms.Form):
         required=False,
         label="Document Description",
         label_suffix="",
-        widget=forms.TextInput(
-            attrs={
-                "class": "focus:ring-0 focus:outline-none w-full",
-                "autocomplete": "off",
-            }
-        ),
+        widget=widgets.TextInput(),
     )
     description.as_str_types = [SEARCH_TYPES.RECAP]
 
@@ -872,12 +837,7 @@ class CorpusSearchForm(forms.Form):
         required=False,
         label="Document Number",
         label_suffix="",
-        widget=forms.TextInput(
-            attrs={
-                "class": "focus:ring-0 focus:outline-none w-full",
-                "autocomplete": "off",
-            }
-        ),
+        widget=widgets.TextInput(),
     )
     document_number.as_str_types = [SEARCH_TYPES.RECAP]
 
@@ -885,12 +845,7 @@ class CorpusSearchForm(forms.Form):
         required=False,
         label="Attachment Number",
         label_suffix="",
-        widget=forms.TextInput(
-            attrs={
-                "class": "focus:ring-0 focus:outline-none w-full",
-                "autocomplete": "off",
-            }
-        ),
+        widget=widgets.TextInput(),
     )
     attachment_number.as_str_types = [SEARCH_TYPES.RECAP]
 
@@ -898,12 +853,7 @@ class CorpusSearchForm(forms.Form):
         required=False,
         label="Assigned To Judge",
         label_suffix="",
-        widget=forms.TextInput(
-            attrs={
-                "class": "focus:ring-0 focus:outline-none w-full",
-                "autocomplete": "off",
-            }
-        ),
+        widget=widgets.TextInput(),
     )
     assigned_to.as_str_types = [SEARCH_TYPES.RECAP]
 
@@ -911,12 +861,7 @@ class CorpusSearchForm(forms.Form):
         required=False,
         label="Referred To Judge",
         label_suffix="",
-        widget=forms.TextInput(
-            attrs={
-                "class": "focus:ring-0 focus:outline-none w-full",
-                "autocomplete": "off",
-            }
-        ),
+        widget=widgets.TextInput(),
     )
     referred_to.as_str_types = [SEARCH_TYPES.RECAP]
 
@@ -924,13 +869,7 @@ class CorpusSearchForm(forms.Form):
         required=False,
         label="Entry Date",
         label_suffix="",
-        widget=forms.TextInput(
-            attrs={
-                "placeholder": "After",
-                "class": "focus:ring-0 focus:outline-none w-full",
-                "autocomplete": "off",
-            }
-        ),
+        widget=widgets.TextInput(attrs={"placeholder": "After"}),
     )
     entry_date_filed_after.as_str_types = [SEARCH_TYPES.RECAP]
 
@@ -938,13 +877,7 @@ class CorpusSearchForm(forms.Form):
         required=False,
         label="Entry Date",
         label_suffix="",
-        widget=forms.TextInput(
-            attrs={
-                "placeholder": "Before",
-                "class": "focus:ring-0 focus:outline-none w-full",
-                "autocomplete": "off",
-            }
-        ),
+        widget=widgets.TextInput(attrs={"placeholder": "Before"}),
     )
     entry_date_filed_before.as_str_types = [SEARCH_TYPES.RECAP]
 
@@ -952,12 +885,7 @@ class CorpusSearchForm(forms.Form):
         required=False,
         label="Nature of Suit",
         label_suffix="",
-        widget=forms.TextInput(
-            attrs={
-                "class": "focus:ring-0 focus:outline-none w-full",
-                "autocomplete": "off",
-            }
-        ),
+        widget=widgets.TextInput(),
     )
     nature_of_suit.as_str_types = [SEARCH_TYPES.RECAP]
 
@@ -965,12 +893,7 @@ class CorpusSearchForm(forms.Form):
         required=False,
         label="Party Name",
         label_suffix="",
-        widget=forms.TextInput(
-            attrs={
-                "class": "focus:ring-0 focus:outline-none w-full",
-                "autocomplete": "off",
-            }
-        ),
+        widget=widgets.TextInput(),
     )
     party_name.as_str_types = [SEARCH_TYPES.RECAP]
 
@@ -978,12 +901,7 @@ class CorpusSearchForm(forms.Form):
         required=False,
         label="Attorney Name",
         label_suffix="",
-        widget=forms.TextInput(
-            attrs={
-                "class": "focus:ring-0 focus:outline-none w-full",
-                "autocomplete": "off",
-            }
-        ),
+        widget=widgets.TextInput(),
     )
     atty_name.as_str_types = [SEARCH_TYPES.RECAP]
 
@@ -994,38 +912,21 @@ class CorpusSearchForm(forms.Form):
         required=False,
         label="Name",
         label_suffix="",
-        widget=forms.TextInput(
-            attrs={
-                "class": "focus:ring-0 focus:outline-none w-full",
-                "autocomplete": "off",
-            }
-        ),
+        widget=widgets.TextInput(),
     )
     name.as_str_types = [SEARCH_TYPES.PEOPLE]
     born_after = FloorDateOrRelativeField(
         required=False,
         label="Born After",
         label_suffix="",
-        widget=forms.TextInput(
-            attrs={
-                "placeholder": "mm/dd/yyyy",
-                "class": "focus:ring-0 focus:outline-none w-full",
-                "autocomplete": "off",
-            }
-        ),
+        widget=widgets.TextInput(attrs={"placeholder": "mm/dd/yyyy"}),
     )
     born_after.as_str_types = [SEARCH_TYPES.PEOPLE]
     born_before = CeilingDateOrRelativeField(
         required=False,
         label="Born Before",
         label_suffix="",
-        widget=forms.TextInput(
-            attrs={
-                "placeholder": "mm/dd/yyyy",
-                "class": "focus:ring-0 focus:outline-none w-full",
-                "autocomplete": "off",
-            }
-        ),
+        widget=widgets.TextInput(attrs={"placeholder": "mm/dd/yyyy"}),
     )
     born_before.as_str_types = [SEARCH_TYPES.PEOPLE]
 
@@ -1033,12 +934,7 @@ class CorpusSearchForm(forms.Form):
         required=False,
         label="Birth City",
         label_suffix="",
-        widget=forms.TextInput(
-            attrs={
-                "class": "focus:ring-0 focus:outline-none w-full",
-                "autocomplete": "off",
-            }
-        ),
+        widget=widgets.TextInput(),
     )
     dob_city.as_str_types = [SEARCH_TYPES.PEOPLE]
     dob_state = forms.ChoiceField(
@@ -1046,35 +942,21 @@ class CorpusSearchForm(forms.Form):
         required=False,
         label="Birth State",
         label_suffix="",
-        widget=forms.Select(
-            attrs={
-                "class": "focus:ring-0 focus:outline-none w-full input-text"
-            }
-        ),
+        widget=widgets.Select(input_text=True),
     )
     dob_state.as_str_types = [SEARCH_TYPES.PEOPLE]
     school = forms.CharField(
         required=False,
         label="School Attended",
         label_suffix="",
-        widget=forms.TextInput(
-            attrs={
-                "class": "focus:ring-0 focus:outline-none w-full",
-                "autocomplete": "off",
-            }
-        ),
+        widget=widgets.TextInput(),
     )
     school.as_str_types = [SEARCH_TYPES.PEOPLE]
     appointer = forms.CharField(
         required=False,
         label="Appointed By",
         label_suffix="",
-        widget=forms.TextInput(
-            attrs={
-                "class": "focus:ring-0 focus:outline-none w-full",
-                "autocomplete": "off",
-            }
-        ),
+        widget=widgets.TextInput(),
     )
     appointer.as_str_types = [SEARCH_TYPES.PEOPLE]
     selection_method = forms.ChoiceField(
@@ -1083,9 +965,7 @@ class CorpusSearchForm(forms.Form):
         label="Selection Method",
         label_suffix="",
         initial="None",
-        widget=forms.Select(
-            attrs={"class": "focus:ring-0 focus:outline-none w-full"}
-        ),
+        widget=widgets.Select(),
     )
     selection_method.as_str_types = [SEARCH_TYPES.PEOPLE]
     political_affiliation = forms.ChoiceField(
@@ -1094,49 +974,28 @@ class CorpusSearchForm(forms.Form):
         label="Political Affiliation",
         label_suffix="",
         initial="None",
-        widget=forms.Select(
-            attrs={
-                "class": "focus:ring-0 focus:outline-none w-full input-text"
-            }
-        ),
+        widget=widgets.Select(input_text=True),
     )
     political_affiliation.as_str_types = [SEARCH_TYPES.PEOPLE]
     argued_after = FloorDateOrRelativeField(
         required=False,
         label="Argued After",
         label_suffix="",
-        widget=forms.TextInput(
-            attrs={
-                "placeholder": "mm/dd/yyy",
-                "class": "focus:ring-0 focus:outline-none w-full",
-                "autocomplete": "off",
-            }
-        ),
+        widget=widgets.TextInput(attrs={"placeholder": "mm/dd/yyy"}),
     )
     argued_after.as_str_types = [SEARCH_TYPES.ORAL_ARGUMENT]
     argued_before = CeilingDateOrRelativeField(
         required=False,
         label="Argued Before",
         label_suffix="",
-        widget=forms.TextInput(
-            attrs={
-                "placeholder": "mm/dd/yyy",
-                "class": "focus:ring-0 focus:outline-none w-full",
-                "autocomplete": "off",
-            }
-        ),
+        widget=widgets.TextInput(attrs={"placeholder": "mm/dd/yyy"}),
     )
     argued_before.as_str_types = [SEARCH_TYPES.ORAL_ARGUMENT]
     cause = forms.CharField(
         required=False,
         label="Cause",
         label_suffix="",
-        widget=forms.TextInput(
-            attrs={
-                "class": "focus:ring-0 focus:outline-none w-full",
-                "autocomplete": "off",
-            }
-        ),
+        widget=widgets.TextInput(),
     )
     cause.as_str_types = [SEARCH_TYPES.RECAP]
 
@@ -1150,7 +1009,7 @@ class CorpusSearchForm(forms.Form):
 
 
 def clean_up_date_formats(
-    cd: dict[str, any], date_field: str, get_params: dict[str, any]
+    cd: dict[str, Any], date_field: str, get_params: dict[str, Any]
 ) -> None:
     """Clean up date formats in a given params dictionary.
 

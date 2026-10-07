@@ -7,6 +7,7 @@ from cl.alerts.models import AlertEvent, DocketAlertEvent
 from cl.api.models import WebhookHistoryEvent
 from cl.favorites.models import DocketTagEvent, NoteEvent, UserTagEvent
 from cl.lib.crypto import md5
+from cl.lib.decorators import tiered_cache
 from cl.lib.types import EmailType
 from cl.users.models import (
     UserProfile,
@@ -41,9 +42,9 @@ def create_stub_account(
             # to a real account with a real username.
             md5(email),
             email,
+            first_name=user_data["first_name"],
+            last_name=user_data["last_name"],
         )
-        new_user.first_name = user_data["first_name"]
-        new_user.last_name = user_data["last_name"]
 
         # Associate a profile
         profile = UserProfile.objects.create(
@@ -205,6 +206,36 @@ emails: dict[str, EmailType] = {
         "We're always happy to hear from you.",
         "from_email": settings.DEFAULT_FROM_EMAIL,
     },
+    "reset_needs_confirmation": {
+        "subject": "Confirm your email address to reset your CourtListener "
+        "password",
+        "body": "Hello,\n\n"
+        ""
+        "Somebody — probably you — has asked that we send password reset "
+        "instructions to this address. We do have an account using this "
+        "address, but the address has never been confirmed, so we can't "
+        "send a reset link to it yet.\n\n"
+        ""
+        "Confirming an address is how we know the account belongs to "
+        "whoever reads this inbox. Until that happens, anybody could point "
+        "an account at your address, so we don't send reset links to "
+        "unconfirmed addresses. To confirm yours, visit:\n\n"
+        ""
+        "    https://www.courtlistener.com%s\n\n"
+        ""
+        "Once it's confirmed you'll be able to reset your password and "
+        "sign in as usual.\n\n"
+        ""
+        "If this was not you, you can ignore this email. Nothing about the "
+        "account has changed.\n\n"
+        ""
+        "Thanks for using our site,\n\n"
+        "The Free Law Project Team\n\n"
+        "------------------\n"
+        "For questions or comments, please see our contact page, "
+        "https://www.courtlistener.com/contact/.",
+        "from_email": settings.DEFAULT_FROM_EMAIL,
+    },
     # Used both when people want to confirm an email address and when they
     # want to reset their password, with one small tweak in the wording.
     "no_account_found": {
@@ -227,6 +258,38 @@ emails: dict[str, EmailType] = {
         "That usually will fix the problem.\n\n"
         ""
         "If this was not you, you can ignore this email.\n\n"
+        ""
+        "Thanks for using our site,\n\n"
+        ""
+        "The Free Law Project Team\n\n"
+        "-------\n"
+        "For questions or comments, please visit our contact page, "
+        "https://www.courtlistener.com/contact/\n"
+        "We're always happy to hear from you.",
+        "from_email": settings.DEFAULT_FROM_EMAIL,
+    },
+    # Sent instead of creating a second account when somebody signs up with an
+    # address that already has one. The HTTP response never says the address
+    # is taken, so this email is the only place the address owner learns that.
+    "account_already_exists": {
+        "subject": "You already have an account on CourtListener.com",
+        "body": "Hello,\n\n"
+        ""
+        "Somebody — probably you — just tried to create a new CourtListener "
+        "account using this email address. An account with this address "
+        "already exists, so we did not create a second one.\n\n"
+        ""
+        "You do not need a new account. To get back into the one you already "
+        "have, sign in with this email address and your password:\n\n"
+        ""
+        "    https://www.courtlistener.com%s\n\n"
+        ""
+        "If you have forgotten your password, you can reset it here:\n\n"
+        ""
+        "    https://www.courtlistener.com%s\n\n"
+        ""
+        "If this was not you, you can ignore this email. No changes were made "
+        "to your account.\n\n"
         ""
         "Thanks for using our site,\n\n"
         ""
@@ -338,3 +401,18 @@ message_dict = {
         "message": "Your password was changed successfully",
     },
 }
+
+
+@tiered_cache(memory_timeout=60, redis_timeout=60 * 5)
+def is_search_history_on_cached(user_pk: int) -> bool:
+    """Return whether the user wants their search queries saved.
+
+    Cached for five minutes, so changes may take that long to apply. Intended
+    for the API; website requests should read the profile directly.
+
+    :param user_pk: The primary key of the user.
+    :return: True if the user's search queries should be saved.
+    """
+    return UserProfile.objects.values_list(
+        "save_query_history", flat=True
+    ).get(user_id=user_pk)

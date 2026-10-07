@@ -36,19 +36,18 @@ def make_html(options: dict[str, int]) -> None:
     ).order_by("pk")[offset:]
     total = pacer_files.count()
     pacer_file_iterator = pacer_files.iterator()
-    progress_bar = tqdm(
-        total=total,
-        dynamic_ncols=True,
-        smoothing=0,
-        initial=offset,
-    )
+    # process_map builds its own progress bar from `tqdm_class` (a tqdm class,
+    # not an instance), forwarding the display kwargs below to its constructor.
     process_map(
         _write_anon_item_to_disk,
         pacer_file_iterator,
         max_workers=options["processes"],
-        tqdm_class=progress_bar,
+        tqdm_class=tqdm,
         chunksize=500,
         total=total,
+        dynamic_ncols=True,
+        smoothing=0,
+        initial=offset,
     )
 
 

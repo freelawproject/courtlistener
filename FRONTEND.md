@@ -28,6 +28,8 @@ CourtListener is migrating from Bootstrap 3 / jQuery to Tailwind v3 / Alpine.js 
 
 `IncrementalNewTemplateMiddleware` swaps templates by prepending `v2_` to the view's template name when the `use_new_design` waffle flag is active. New templates MUST be named accordingly (e.g., `v2_help/index.html`).
 
+Partials a view returns on their own, such as htmx responses, follow the same rule and live under `v2_includes/` (e.g., `includes/foo/button.html` → `v2_includes/foo/button.html`). They are swapped like any other template, but the checks that only make sense for full pages (extending `new_base.html`, registering in `V2PagesRegisterTest`) do not apply to them.
+
 ### Base template
 
 New templates MUST extend `new_base.html` (or another `v2_` template). Only `new_base.html` loads Tailwind, Alpine, and Cotton.
@@ -37,6 +39,7 @@ New templates MUST extend `new_base.html` (or another `v2_` template). Only `new
 When a legacy template has a `v2_` counterpart:
 - The legacy template MUST have a sync-notice comment at the top referencing the waffle flag
 - Changes to either version MUST be mirrored in the other for content/behavior parity (implementation details can differ by stack)
+- Deleting the legacy template makes the `v2_` version live for everyone, regardless of the waffle flag. Only do it once the v2 page is production-ready
 
 Sync notice format:
 ```html
@@ -72,6 +75,13 @@ Sync notice format:
 - Don't create single-use utility classes — use inline Tailwind classes instead
 - Branding values (colors, spacing, fonts) go in `tailwind.config.js`, not as custom classes in `input.css`
 
+### Django form widgets
+
+- New-stack Django forms MUST use `TextInput` and `Select` from `cl.lib.widgets` for the standard new-stack widget configuration
+- Use `TextInput` for standard text-input styling and `autocomplete="off"`
+- Use `Select` for standard select styling, with `input_text=True` when the select requires the `input-text` component class
+- Keep field-specific attributes, such as `placeholder`, in the form field declaration
+
 ## Alpine.js
 
 CourtListener uses the CSP-friendly Alpine build. Nearly all Alpine documentation examples use inline JS that will NOT work here.
@@ -96,7 +106,16 @@ Omit the extension only for scripts that have minified versions (the tag resolve
 {% require_script "js/alpine/plugins/intersect" defer=True %}
 ```
 
+A stub with no extension MUST have both a `.js` and a non-empty `.min.js`:
+DEBUG loads the first, production the second. Vendored code ships both; our own
+components and composables are not minified, so they MUST be required with
+`.js`. Breaking this is invisible in development, so two guards catch it: the
+tag warns in the runserver console while you're on the page, and
+`RequireScriptAssetsTest` fails the test suite.
+
 Plugins MUST be deferred (`defer=True`).
+
+The tag MUST be called from the component or block that needs the script, never from `footer-scripts`: `new_base.html` prints the registry before that block, and a `require_script` after the registry has printed raises.
 
 ### File organization
 
@@ -117,6 +136,29 @@ Examples:
 - Allowed: `x-data="components.filters"`, `x-on:click="filters.apply"`
 - Not allowed: `x-data="{ open: true }"`, `x-on:click="count++"`
 
+## htmx
+
+v2 uses htmx 2.0.11 from `js/third_party/` (legacy keeps 1.7.0). `new_base.html` does not load it; the component that uses `hx-*` attributes MUST require it at its top, like any other script dependency:
+
+```html
+{% require_script "js/third_party/htmx" defer=True %}
+```
+
+Swapped partials live under `v2_includes/` (see [Naming & middleware](#naming--middleware)).
+
+`<body>` in `new_base.html` carries `hx-headers` with the CSRF token, and htmx elements inherit it: an `hx-post` MUST NOT repeat the header.
+
+### Disabled features
+
+`new_base.html` sets `allowEval` and `allowScriptTags` to `false` for every page, so markup cannot run arbitrary JavaScript:
+
+- `hx-on:*` does not run. Use Alpine `x-on:`; an `HX-Trigger` header dispatches its event on the requesting element.
+- `hx-trigger` filters such as `click[ctrlKey]` are ignored.
+- `js:` / `javascript:` values in `hx-vals` and `hx-headers` are not evaluated. Pass literal JSON.
+- `<script>` tags in a response are removed. Partials MUST NOT ship scripts.
+
+A blocked evaluation fires `htmx:evalDisallowedError` on the element. Reference: https://htmx.org/reference/#config
+
 ## Icons
 
 - Use the `{% svg %}` template tag (defined in `cl/custom_filters/templatetags/svg_tags.py`)
@@ -135,7 +177,7 @@ Examples:
 - Internal links: `text-primary-600`
 - External links: `underline`
 - `target="_blank"` MUST include `rel="noopener"` or `rel="noreferrer"` (`noreferrer` alone is sufficient — it implies `noopener`)
-- Do NOT add `nofollow` to editorial links — `nofollow` is only for user-generated content
+- Do NOT add `nofollow` to editorial links — `nofollow` is for user-generated content and for links into pages we don't want crawled: `noindex` pages (search results, anything rendered with `private=True`) and file downloads, e.g. the per-court search links on the jurisdictions page or the document links in docket entries
 
 ## Accessibility
 
@@ -154,3 +196,9 @@ The rules in this doc are enforced as hard errors that block merge. See `fronten
 - New cotton component without a component library entry
 - `x-data` without a corresponding `{% require_script %}`
 - Placeholder text (TODO, TBD, FIXME, Lorem ipsum)
+- Raw CSS properties in `input.css` (prefer `@apply`)
+- Legacy template deleted while its `v2_` counterpart exists (the v2 page goes live for everyone)
+
+**Skipping a check** (only the checks listed in `SKIPPABLE_CHECKS` in `frontend_checks.py`; security, accessibility and architecture checks cannot be skipped). Use the check name shown in brackets in the CI annotation, e.g. `[check_raw_css]`:
+- Whole file: `{# frontend-checks-skip: check_name, other_check #}` anywhere in a template, or `/* frontend-checks-skip: check_name */` in CSS
+- Single line: end the offending line with `{# frontend-checks-skip-line: check_name #}` in templates or `/* frontend-checks-skip-line: check_name */` in CSS, like `eslint-disable-line`

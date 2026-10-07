@@ -2,20 +2,36 @@ from http import HTTPStatus
 from typing import Any, cast
 from unittest.mock import MagicMock, patch
 
-from asgiref.sync import sync_to_async
 from django.contrib.auth.models import User
-from django.core.cache import cache
 from django.http import HttpResponse
+from django.template.loader import TemplateDoesNotExist, get_template
 from django.test import override_settings
-from django.urls import reverse
+from django.urls import resolve, reverse
 from lxml.html import fromstring
 from waffle.testutils import override_flag
 
-from cl.audio.factories import AudioWithParentsFactory
 from cl.lib.test_helpers import SimpleUserDataMixin
 from cl.simple_pages.forms import ContactForm
 from cl.simple_pages.sitemap import SimpleSitemap
 from cl.tests.cases import SimpleTestCase, TestCase
+from cl.tests.utils import parse_csp
+
+
+class ChangePasswordWellKnownTests(SimpleTestCase):
+    """Ensure password managers can discover the password-change page."""
+
+    def test_change_password(self) -> None:
+        """The standard URL temporarily redirects to a real password page."""
+        response = self.client.get(reverse("well_known_change_password"))
+
+        self.assertRedirects(
+            response,
+            reverse("password_change"),
+            fetch_redirect_response=False,
+        )
+        self.assertEqual(
+            resolve(response["Location"]).url_name, "password_change"
+        )
 
 
 # Mock the hcaptcha thing so that we're sure it validates during tests
@@ -329,13 +345,7 @@ class SimplePagesTest(PageLoadTestMixin, SimpleUserDataMixin, TestCase):
     async def test_simple_pages(self) -> None:
         """Do all the simple pages load properly?"""
         reverse_params: list[dict[str, Any]] = [
-            # Coverage
-            {"viewname": "coverage"},
-            {"viewname": "coverage_fds"},
-            {"viewname": "coverage_recap"},
-            {"viewname": "coverage_oa"},
             # Info pages
-            {"viewname": "faq"},
             {"viewname": "robots"},
             # Contact
             {"viewname": "contact"},
@@ -378,16 +388,6 @@ class SimplePagesTest(PageLoadTestMixin, SimpleUserDataMixin, TestCase):
         for reverse_param in reverse_params:
             await self.assert_page_loads_ok(reverse_param)
 
-    async def test_oa_minute_count_in_the_coverage_page(self) -> None:
-        "is the minute count rounded in the coverage page?"
-        cache.delete("coverage-data-v3")
-        await sync_to_async(AudioWithParentsFactory)(duration=250)
-        r = await self.async_client.get(reverse("coverage"))
-        self.assertIn("4 minutes of recordings.", r.content.decode())
-        self.assertIn(
-            "with 4 minutes of recordings (and counting).", r.content.decode()
-        )
-
 
 @override_flag("use_new_design", True)
 @override_settings(WAFFLE_CACHE_PREFIX="test_v2_register_waffle")
@@ -402,13 +402,21 @@ class V2PagesRegisterTest(PageLoadTestMixin, SimpleUserDataMixin, TestCase):
     V2_PAGES: list[tuple[dict[str, Any], str]] = [
         # Help pages — (reverse_param, expected v2 template)
         ({"viewname": "help_home"}, "v2_help/index.html"),
-        ({"viewname": "coverage"}, "v2_help/coverage.html"),
-        ({"viewname": "coverage_fds"}, "v2_help/coverage_fds.html"),
-        ({"viewname": "coverage_oa"}, "v2_help/coverage_oa.html"),
-        ({"viewname": "coverage_recap"}, "v2_help/coverage_recap.html"),
         # Info pages
         ({"viewname": "components"}, "v2_components.html"),
+        # API pages
+        ({"viewname": "court_index"}, "v2_jurisdictions.html"),
     ]
+
+    @staticmethod
+    def _get_legacy_counterpart(v2_template: str) -> str | None:
+        """Returns the legacy template a v2 one replaces, None otherwise."""
+        legacy = v2_template.removeprefix("v2_")
+        try:
+            get_template(legacy)
+            return legacy
+        except TemplateDoesNotExist:
+            return None
 
     async def test_v2_pages(self) -> None:
         """Do all registered v2 pages load properly with the redesign flag?"""
@@ -418,6 +426,23 @@ class V2PagesRegisterTest(PageLoadTestMixin, SimpleUserDataMixin, TestCase):
             ):
                 r = await self.assert_page_loads_ok(reverse_param)
                 self.assertTemplateUsed(r, v2_template)
+
+    def test_v2_pages_without_the_flag(self) -> None:
+        """Do registered pages still load for a visitor without the flag?
+
+        Each one falls back to its legacy template, or keeps rendering v2
+        when the redesign left no legacy template behind.
+        """
+        for reverse_param, v2_template in self.V2_PAGES:
+            with (
+                self.subTest("Checking v2 page", reverse_params=reverse_param),
+                override_flag("use_new_design", active=False),
+            ):
+                r = self.client.get(reverse(**reverse_param))
+                self.assertEqual(r.status_code, HTTPStatus.OK)
+                self.assertTemplateUsed(
+                    r, self._get_legacy_counterpart(v2_template) or v2_template
+                )
 
 
 @patch("hcaptcha.fields.hCaptchaField.validate", return_value=True)
@@ -451,6 +476,8 @@ class SealingOrderDetectionTest(SimpleTestCase):
             "sealing",
             "sealed",
             "redacted",
+            "struck",
+            "stricken",
             "pseudonym",
             "anonymity",
             "press coverage",
@@ -626,3 +653,46 @@ class ZohoRoutingTest(SimpleUserDataMixin, TestCase):
         call_kwargs = mock_task.delay.call_args.kwargs
         self.assertEqual(call_kwargs["request_type"], "Sealing Order")
         self.assertEqual(call_kwargs["assignee_id"], "")
+
+
+class ContentSecurityPolicyTest(TestCase):
+    """Tests for the site-wide CSP header configured in cl.settings."""
+
+    async def test_navigation_is_locked_to_our_own_domain(self) -> None:
+        """Do we stop third-party content from sending users elsewhere?
+
+        We publish a lot of HTML that we get from third parties, so we use CSP
+        to keep any forms or <base> tags it contains from pointing at another
+        site.
+        """
+        r = cast(
+            HttpResponse, await self.async_client.get(reverse("help_home"))
+        )
+        directives = parse_csp(r)
+        self.assertEqual(directives["form-action"], ["'self'"])
+        self.assertEqual(directives["base-uri"], ["'self'"])
+
+    async def test_script_nonce_matches_the_rendered_page(self) -> None:
+        """Does the nonce in the header match the one in the HTML?
+
+        If these ever drift apart, every inline script on the site breaks, so
+        check that the nonce plumbing between the middleware and the templates
+        is intact.
+        """
+        r = cast(
+            HttpResponse, await self.async_client.get(reverse("help_home"))
+        )
+        script_src = parse_csp(r)["script-src"]
+        nonces = [
+            value[len("'nonce-") : -len("'")]
+            for value in script_src
+            if value.startswith("'nonce-")
+        ]
+        self.assertEqual(
+            len(nonces), 1, msg=f"Expected one nonce in: {script_src}"
+        )
+        html = r.content.decode()
+        self.assertIn(f'nonce="{nonces[0]}"', html)
+        # A script left with an empty nonce would be refused by the browser,
+        # and the assertion above would still pass on the other scripts.
+        self.assertNotIn('nonce=""', html)

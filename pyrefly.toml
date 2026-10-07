@@ -1,0 +1,6 @@
+# Tests should be removed from the exclusions eventually, but for now they're just noise
+project-excludes = ["**/migrations/**", "**/tests.py", "**/tests/**", "tests/**"]
+# Honor `# type: ignore` comments.
+permissive-ignores = true
+# Pre-existing errors are grandfathered here; only new errors fail the check.
+baseline = ".pyrefly-baseline.json"

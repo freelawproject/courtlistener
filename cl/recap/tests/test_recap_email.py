@@ -27,6 +27,7 @@ from cl.recap.factories import (
     RECAPEmailNotificationDataFactory,
 )
 from cl.recap.models import (
+    PROCESSING_QUEUE_SOURCE,
     PROCESSING_STATUS,
     UPLOAD_TYPE,
     EmailProcessingQueue,
@@ -1779,7 +1780,7 @@ class RecapEmailDocketAlerts(TestCase, SearchAlertsAssertions):
         self.assertEqual(await recap_document.acount(), 1)
         recap_document_first = await recap_document.afirst()
         self.assertEqual(recap_document_first.pacer_doc_id, "009033568259")
-        self.assertEqual(recap_document_first.document_number, "009033568259")
+        self.assertEqual(recap_document_first.document_number, "9033568259")
         docket = recap_document_first.docket_entry.docket
         self.assertEqual(
             docket.case_name, "Rosemarie Vargas v. Facebook, Inc."
@@ -3467,7 +3468,7 @@ class GetDocumentNumberForAppellateDocuments(TestCase):
         self.assertEqual(await recap_document.acount(), 1)
         recap_document_first = await recap_document.afirst()
         self.assertEqual(recap_document_first.is_available, True)
-        self.assertEqual(recap_document_first.document_number, "011012443447")
+        self.assertEqual(recap_document_first.document_number, "11012443447")
         self.assertEqual(
             recap_document_first.docket_entry.entry_number, 11012443447
         )
@@ -3645,6 +3646,142 @@ class GetDocumentNumberForAppellateDocuments(TestCase):
         recap_document_first = await recap_document.afirst()
         self.assertEqual(recap_document_first.document_number, "148")
         self.assertEqual(recap_document_first.docket_entry.entry_number, 148)
+
+    @mock.patch(
+        "cl.recap.tasks.download_pdf_by_magic_number",
+        return_value=(None, "Document not available from magic link."),
+    )
+    @mock.patch(
+        "cl.corpus_importer.tasks.get_document_number_from_confirmation_page",
+        side_effect=lambda z, x: "0011345678",
+    )
+    async def test_nda_confirmation_page_merges_existing_entry_without_duplicating(
+        self,
+        mock_bucket_open,
+        mock_pacer_court_accessible,
+        mock_cookies,
+        mock_cookies_cache,
+        mock_download_pdf_by_magic_number,
+        mock_get_document_number_from_confirmation_page,
+    ):
+        """This test verifies that merging an NDA recap.email notification
+        into a Docket/DocketEntry/RECAPDocument already created by a
+        different source (e.g. the extension) updates the existing records
+        instead of creating duplicates.
+        """
+
+        email_data = RECAPEmailNotificationDataFactory(
+            contains_attachments=False,
+            appellate=True,
+            acms=False,
+            dockets=[
+                RECAPEmailDocketDataFactory(
+                    docket_entries=[
+                        RECAPEmailDocketEntryDataFactory(
+                            document_number=None,
+                            pacer_doc_id="04505578698",
+                            description="BRIEFING SCHEDULE SET AS FOLLOWS: Transcript due on or before 08/31/2026. Appendix due 09/10/2026 (...)",
+                        )
+                    ],
+                )
+            ],
+        )
+        docket_data = email_data["dockets"][0]
+        entry_data = docket_data["docket_entries"][0]
+
+        # Simulate the docket entry and RECAPDocument already created by a
+        # different source (e.g. the extension) for the same case/document,
+        # before this recap.email notification arrives.
+        docket = await sync_to_async(DocketFactory)(
+            court=self.court_ca8,
+            docket_number=docket_data["docket_number"],
+            pacer_case_id=entry_data["pacer_case_id"],
+        )
+        de = await sync_to_async(DocketEntryFactory)(
+            docket=docket,
+            entry_number=10345678,
+            description="Old description",
+        )
+        rd = await sync_to_async(RECAPDocumentFactory)(
+            docket_entry=de,
+            pacer_doc_id=entry_data["pacer_doc_id"],
+            document_number="10345678",
+            document_type=RECAPDocument.PACER_DOCUMENT,
+            is_available=False,
+        )
+
+        with mock.patch(
+            "cl.recap.tasks.open_and_validate_email_notification",
+            return_value=(email_data, "HTML"),
+        ):
+            # Trigger a new nda recap.email notification for ca8, a court
+            # that checks the confirmation page before the PDF.
+            await self.async_client.post(
+                self.path, self.data_ca8, format="json"
+            )
+
+        # No duplicated Docket, DocketEntry or RECAPDocument should be
+        # created; the existing ones must be updated instead.
+        self.assertEqual(await Docket.objects.acount(), 1)
+        self.assertEqual(await DocketEntry.objects.acount(), 1)
+        self.assertEqual(await RECAPDocument.objects.acount(), 1)
+
+        await de.arefresh_from_db()
+        await rd.arefresh_from_db()
+
+        # The confirmation page returned "0011345678". The fourth-digit-
+        # forcing logic runs first, turning it into "0010345678"; that
+        # value is then normalized through int(), stripping the leading
+        # zeros and leaving "10345678".
+        self.assertEqual(de.entry_number, 10345678)
+        self.assertEqual(rd.document_number, "10345678")
+
+        # The existing entry's description was updated from the
+        # notification, confirming it was merged rather than duplicated.
+        self.assertEqual(
+            de.description,
+            "BRIEFING SCHEDULE SET AS FOLLOWS: Transcript due on or before 08/31/2026. Appendix due 09/10/2026 (...)",
+        )
+
+    @mock.patch(
+        "cl.recap.tasks.download_pdf_by_magic_number",
+        return_value=(None, "Document not available from magic link."),
+    )
+    @mock.patch(
+        "cl.corpus_importer.tasks.get_document_number_from_confirmation_page",
+        side_effect=lambda z, x: "148",
+    )
+    @mock.patch("cl.corpus_importer.tasks.logger.error")
+    async def test_nda_confirmation_page_regular_number_triggers_alert(
+        self,
+        mock_logger_error,
+        mock_bucket_open,
+        mock_pacer_court_accessible,
+        mock_cookies,
+        mock_cookies_cache,
+        mock_download_pdf_by_magic_number,
+        mock_get_document_number_from_confirmation_page,
+    ):
+        """This test verifies that get_document_number_for_appellate logs
+        an alert when the ca8/cadc confirmation page returns a
+        regular-looking (short) document number, signaling that the court
+        may have switched to standard docket numbering and may no longer
+        need the confirmation-page-first handling.
+        """
+
+        await self.async_client.post(self.path, self.data_ca8, format="json")
+
+        email_processing = EmailProcessingQueue.objects.all()
+        self.assertEqual(await email_processing.acount(), 1)
+
+        mock_logger_error.assert_called_once_with(
+            "Court %s returned a regular-looking document number '%s' for "
+            "pacer_doc_id %s. It may no longer need special handling in "
+            "get_document_number_for_appellate.",
+            "ca8",
+            "148",
+            mock.ANY,
+        )
 
 
 def mock_method_set_rd_sealed_status(
@@ -3882,6 +4019,85 @@ class RecapEmailContentReplication(TestCase):
             # successful processing.
             with self.subTest(pq=pq):
                 self.assertFalse(pq.filepath_local)
+
+    @mock.patch(
+        "cl.recap.tasks.get_pacer_cookie_from_cache",
+        side_effect=lambda x: True,
+    )
+    @mock.patch(
+        "cl.recap.tasks.download_pdf_by_magic_number",
+        side_effect=lambda z, x, c, v, b, d, e, a: (
+            MockResponse(200, b"Hello World"),
+            "OK",
+        ),
+    )
+    @mock.patch(
+        "cl.recap.tasks.requests.get",
+        side_effect=lambda *args, **kwargs: MockResponse(200, b"Att content."),
+    )
+    async def test_source_field_set_for_email_and_replication_pqs(
+        self,
+        mock_att_request,
+        mock_download_pdf,
+        mock_cookie,
+        mock_docket_entry_sealed,
+        mock_pacer_court_accessible,
+        mock_cookies,
+        mock_bucket_open,
+        mock_enqueue_alert,
+    ):
+        """The PQ created directly from a recap.email notification
+        must be tagged EMAIL, while the PQ created for a subdocket
+        case that wasn't mentioned in the notification must be tagged
+        REPLICATION.
+        """
+        # Create a subdocket and RD not mentioned in the email notification.
+        de_1 = await sync_to_async(DocketEntryFactory)(
+            docket=await sync_to_async(DocketFactory)(
+                court=self.court_canb,
+                case_name="Subdocket 1",
+                docket_number="1:20-cv-01296",
+                pacer_case_id="1309089",
+            ),
+            entry_number=18,
+        )
+        await sync_to_async(RECAPDocumentFactory)(
+            docket_entry=de_1,
+            pacer_doc_id="85001321035",
+            document_number="18",
+            document_type=RECAPDocument.PACER_DOCUMENT,
+        )
+        email_data = RECAPEmailNotificationDataFactory(
+            contains_attachments=False,
+            appellate=False,
+            dockets=[
+                RECAPEmailDocketDataFactory(
+                    docket_entries=[
+                        RECAPEmailDocketEntryDataFactory(
+                            pacer_doc_id="85001321035",
+                            document_number="1",
+                            pacer_case_id="1309088",
+                        )
+                    ],
+                )
+            ],
+        )
+        with mock.patch(
+            "cl.recap.tasks.open_and_validate_email_notification",
+            side_effect=lambda x, y: (email_data, "HTML"),
+        ):
+            await self.async_client.post(
+                self.path, self.data_multi_canb, format="json"
+            )
+
+        main_pq = await ProcessingQueue.objects.aget(pacer_case_id="1309088")
+        replica_pq = await ProcessingQueue.objects.aget(
+            pacer_case_id="1309089"
+        )
+        self.assertEqual(main_pq.source, PROCESSING_QUEUE_SOURCE.EMAIL)
+        self.assertEqual(
+            replica_pq.source, PROCESSING_QUEUE_SOURCE.REPLICATION
+        )
 
     @mock.patch(
         "cl.recap.tasks.get_pacer_cookie_from_cache",

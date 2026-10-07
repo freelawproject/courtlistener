@@ -20,7 +20,9 @@ REST_FRAMEWORK = {
     "ALLOWED_VERSIONS": {"v3", "v4"},
     # Throttles
     "DEFAULT_THROTTLE_CLASSES": (
-        "rest_framework.throttling.AnonRateThrottle",
+        # Override DRF's throttle classes to ensure we get the correct
+        # IP from CloudFront's header. See #7655.
+        "cl.api.utils.CloudFrontAnonRateThrottle",
         "cl.api.utils.ExceptionalUserRateThrottle",
     ),
     "DEFAULT_THROTTLE_RATES": {
@@ -28,6 +30,11 @@ REST_FRAMEWORK = {
         "user": ["5/min", "50/hour", "125/day"],
         "citations": "60/min",
         "tags": "1000/hour",
+        "api_usage": ["10/min", "120/hour"],
+        # Fetch API (buying PACER documents). Deliberately much higher than
+        # the global "user" rate and not gated by membership: see #7503.
+        "fetch": "30/min",
+        "events": "60/hour",
     },
     # Auth
     "DEFAULT_AUTHENTICATION_CLASSES": (

@@ -16,6 +16,7 @@ from django.db.models import Count, Prefetch, Q, QuerySet
 from django.utils.timezone import now
 from juriscraper.lib.string_utils import CaseNameTweaker
 from juriscraper.pacer import AppellateAttachmentPage, AttachmentPage
+from waffle import switch_is_active
 
 from cl.alerts.utils import (
     set_skip_percolation_if_bankruptcy_data,
@@ -82,6 +83,11 @@ from cl.search.tasks import index_docket_parties_in_es
 
 logger = logging.getLogger(__name__)
 
+# Waffle switch controlling whether failed PDF ProcessingQueue items get retried
+# after a docket or attachment page merge. Active by default; flip it off in
+# the admin to stop the retries.
+PROCESS_ORPHAN_DOCUMENTS_SWITCH = "process-orphan-documents"
+
 cnt = CaseNameTweaker()
 
 
@@ -114,11 +120,16 @@ async def find_docket_object_query(
     federal_dn_judge_initials_referred: str | None,
     using: str = "default",
     skip_dn_core_confirmation: bool = False,
+    cheap_count: bool = True,
 ) -> QuerySet[Docket]:
     """Construct a queryset to be used by `find_docket_object` and other methods which need to use the same docket-finding
     process. Parameters have the same meaning as `find_docket_object` except `skip_dn_core_confirmation`, which tells
     the function to just return the first result with one match without doing any further verification (`True` for state
     and SCOTUS, `False` otherwise).
+
+    The `cheap_count` parameter determines whether we use `COUNT pk WHERE ... LIMIT 2` or the length of the results from
+    `SELECT * WHERE ... LIMIT 2`. The second format can allow us to save a query in subsequent methods which may need
+    the count or elements of the results.
 
     Will only ever return querysets with zero or one results."""
 
@@ -218,10 +229,14 @@ async def find_docket_object_query(
             .order_by("date_created")
             .using(using)
         )
-        # The `[:2]` slice here turns the query Django sends from `COUNT pk WHERE ...` to `COUNT pk WHERE ... LIMIT 2`,
-        # which we found in testing to have significantly better performance, presumably because Postgres can stop
-        # counting after it hits 2. This is fine since we don't actually care about the value of any count above 1.
-        count = await ds.values("pk")[:2].acount()
+        if cheap_count:
+            # The `[:2]` slice here turns the query Django sends from `COUNT pk WHERE ...` to `COUNT pk WHERE ... LIMIT 2`,
+            # which we found in testing to have significantly better performance, presumably because Postgres can stop
+            # counting after it hits 2. This is fine since we don't actually care about the value of any count above 1.
+            count = await ds.values("pk")[:2].acount()
+        else:
+            ds = ds[:2]
+            count = len(await sync_to_async(list)(ds))
         if count == 0:
             continue  # Try a looser lookup.
         if count == 1:
@@ -237,7 +252,11 @@ async def find_docket_object_query(
         # If more than one docket matches, try refining the results using
         # available docket_number components.
         dqs = ds.filter(component_query)
-        count = await dqs.values("pk")[:2].acount()
+        if cheap_count:
+            count = await dqs.values("pk")[:2].acount()
+        else:
+            dqs = dqs[:2]
+            count = len(await sync_to_async(list)(dqs))
         if count == 1:
             return dqs
 
@@ -765,7 +784,7 @@ def normalize_long_description(docket_entry):
 
 
 async def merge_unnumbered_docket_entries(
-    des: QuerySet, docket_entry: dict[str, any]
+    des: QuerySet, docket_entry: dict[str, Any]
 ) -> DocketEntry:
     """Unnumbered docket entries come from many sources, with different data.
     This sometimes results in two docket entries when there should be one. The
@@ -974,7 +993,7 @@ def add_create_docket_entry_transaction(d, docket_entry):
 
 async def get_or_make_docket_entry(
     d: Docket,
-    docket_entry: dict[str, any],
+    docket_entry: dict[str, Any],
     des_by_entry_number: dict[int, list[DocketEntry]] | None = None,
 ) -> tuple[DocketEntry, bool] | None:
     """Lookup or create a docket entry to match the one that was scraped.
@@ -1948,7 +1967,9 @@ def get_data_from_appellate_att_report(
     return att_data
 
 
-async def add_tags_to_objs(tag_names: list[str], objs: Any) -> list[Tag]:
+async def add_tags_to_objs(
+    tag_names: list[str] | None, objs: Any
+) -> list[Tag]:
     """Add tags by name to objects
 
     :param tag_names: A list of tag name strings
@@ -2481,7 +2502,14 @@ async def process_orphan_documents(
     for that docket that were lingering in our processing queue. This addresses
     the issue that arises when somebody (somehow) uploads a PDF without first
     uploading a docket.
+
+    Gated behind the PROCESS_ORPHAN_DOCUMENTS_SWITCH waffle switch.
     """
+    if not await sync_to_async(switch_is_active)(
+        PROCESS_ORPHAN_DOCUMENTS_SWITCH
+    ):
+        return None
+
     pacer_doc_ids = [rd.pacer_doc_id for rd in rds_created]
     if docket_date:
         # If we get a date from the docket, set the cutoff to 30 days prior for

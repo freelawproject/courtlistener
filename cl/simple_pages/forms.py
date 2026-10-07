@@ -8,8 +8,9 @@ from django.utils.html import format_html
 from hcaptcha.fields import hCaptchaField
 
 SEALING_KEYWORDS_REGEX = re.compile(
-    r"urgent|seal(ing|ed)?|redact(ed)?|pseudonym|anonymi(ty|ze)|"
-    r"press[\.\s]?coverage|time[\.\s]?sensitive",
+    r"urgent|seal(ing|ed)?|redact(ed)?|\bstruck\b|\bstricken\b|"
+    r"pseudonym|anonymi(ty|ze)|press[\.\s]?coverage|"
+    r"time[\.\s]?sensitive",
     re.I,
 )
 

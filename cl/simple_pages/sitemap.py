@@ -18,16 +18,9 @@ class SimpleSitemap(sitemaps.Sitemap):
     def items(self) -> list[dict[str, str | float]]:
         return [
             # Simple pages
-            make_url_dict("faq", priority=0.6),
             make_url_dict(
                 "citation_homepage", priority=0.6, changefreq="never"
             ),
-            make_url_dict("coverage", priority=0.4),
-            make_url_dict(
-                "coverage_opinions", priority=0.4, changefreq="daily"
-            ),
-            make_url_dict("coverage_fds", priority=0.4),
-            make_url_dict("coverage_recap", priority=0.4),
             make_url_dict("contact", priority=0.5),
             # Help pages
             make_url_dict("help_home", priority=0.5, changefreq="monthly"),

@@ -110,6 +110,6 @@
   </div>
 
 <p style="margin-top: 10px; margin-bottom: 0;">
-  <i class="fa fa-info-circle"></i> Items on this page are sourced from <a href="https://www.pacer.gov">PACER</a> and <a href="https://free.law/recap/">RECAP</a> and may not be up to date. <a href="{% url 'coverage_recap' %}">Learn more about our coverage</a>.
+  <i class="fa fa-info-circle"></i> {% include "includes/docket_source_attribution/index.html" with docket_source=docket_source %}
 </p>
 </div>

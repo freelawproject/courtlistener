@@ -1,6 +1,7 @@
 from collections.abc import Awaitable, Callable
+from inspect import iscoroutinefunction
 
-from asgiref.sync import iscoroutinefunction, markcoroutinefunction
+from asgiref.sync import markcoroutinefunction
 from django.http import HttpRequest, HttpResponseBase
 from django.template import TemplateDoesNotExist
 from django.template.loader import get_template
@@ -8,6 +9,10 @@ from django.template.response import TemplateResponse
 from waffle import flag_is_active
 
 from cl.search.forms import CorpusSearchForm
+
+# Templates a view returns on their own (htmx partials) live under this
+# prefix. .github/scripts/frontend_checks.py mirrors it in is_v2_partial.
+V2_PARTIALS_PREFIX = "v2_includes/"
 
 
 class RobotsHeaderMiddleware:
@@ -73,6 +78,9 @@ class IncrementalNewTemplateMiddleware:
     "help/index.html", the new template should be in "v2_help/index.html"
     and NOT in "help/v2_index.html".
 
+    v2 templates that do not have a legacy counterpart are assumed to be
+    available for **everyone**.
+
     TODO: Remove this middleware once new design is completely rolled out.
     """
 
@@ -83,13 +91,17 @@ class IncrementalNewTemplateMiddleware:
         response = self.get_response(request)
         return response
 
+    @staticmethod
+    def template_exists(template_name: str) -> bool:
+        """Check if a template is resolvable by the configured loaders."""
+        try:
+            get_template(template_name)
+        except TemplateDoesNotExist:
+            return False
+        return True
+
     def process_template_response(self, request, response):
-        # don't remove short-circuit evaluation as flag_is_active hits the db
-        if (
-            not isinstance(response, TemplateResponse)
-            or response.is_rendered
-            or not flag_is_active(request, "use_new_design")
-        ):
+        if not isinstance(response, TemplateResponse) or response.is_rendered:
             return response
 
         # {response.template_name} could return a list if TemplateView is used directly
@@ -109,15 +121,25 @@ class IncrementalNewTemplateMiddleware:
         if not isinstance(old_template, str):
             return response
 
+        # Checking flag_is_active hits the db, so be sure to short-circuit for cheaper
+        # evaluations first
+        if self.template_exists(old_template) and not flag_is_active(
+            request, "use_new_design"
+        ):
+            return response
+
         new_template_name = f"v2_{old_template}"
 
-        try:
-            # verify the new template actually exists
-            get_template(new_template_name)
-        except TemplateDoesNotExist:
+        if not self.template_exists(new_template_name):
             return response
 
         response.template_name = new_template_name
-        response.context_data["search_form"] = CorpusSearchForm()
+
+        # Partials never render the header, so the search form it needs would
+        # only be wasted work for them. The name decides, not the HX-Request
+        # header: the server knows what it renders, and a boosted full-page
+        # request must still get the form.
+        if not new_template_name.startswith(V2_PARTIALS_PREFIX):
+            response.context_data["search_form"] = CorpusSearchForm()
 
         return response
