@@ -1128,6 +1128,20 @@
       "severity": "error"
     },
     {
+      "column": 21,
+      "path": "cl/corpus_importer/management/utils.py",
+      "name": "missing-attribute",
+      "concise_description": "Object of class `NoneType` has no attribute `set`",
+      "severity": "error"
+    },
+    {
+      "column": 21,
+      "path": "cl/corpus_importer/management/utils.py",
+      "name": "missing-attribute",
+      "concise_description": "Object of class `NoneType` has no attribute `set`",
+      "severity": "error"
+    },
+    {
       "column": 38,
       "path": "cl/corpus_importer/signals.py",
       "name": "bad-argument-type",
