@@ -110,7 +110,9 @@ class CloneException(Exception):
         self.message = message
 
 
-def clean_api_data(data: dict, fields_to_remove: list[str] = None) -> dict:
+def clean_api_data(
+    data: dict, fields_to_remove: list[str] | None = None
+) -> dict:
     """Remove fields that shouldn't be saved to the db
 
     :param data: The dictionary data obtained from the CourtListener API.

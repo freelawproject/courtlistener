@@ -3042,7 +3042,7 @@ def download_pacer_pdf_and_save_to_pq(
     pacer_doc_id: str | None,
     user_pk: int,
     appellate: bool,
-    attachment_number: int = None,
+    attachment_number: int | None = None,
     de_seq_num: str | None = None,
     is_bankr_short_doc_id: bool = False,
     acms: bool = False,
