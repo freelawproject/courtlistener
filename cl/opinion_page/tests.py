@@ -4193,8 +4193,7 @@ class DocketAlertToggleV2Test(TestCase):
     async def test_trigger_has_no_aria_label(self) -> None:
         """The visible label is the trigger's accessible name.
 
-        An aria-label would replace it and could not follow the swap. The
-        page's other menus keep theirs, so the component change is scoped.
+        An aria-label would replace it and could not follow the swap.
         """
         await self.login()
         r = await self.page()
