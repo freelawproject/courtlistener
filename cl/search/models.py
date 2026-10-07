@@ -2,7 +2,7 @@ import logging
 import re
 from datetime import datetime
 from pathlib import Path
-from typing import TYPE_CHECKING, Literal, Self, TypeVar
+from typing import TYPE_CHECKING, Literal, Self
 from urllib.parse import quote
 
 import nh3
@@ -3719,7 +3719,7 @@ class ParentheticalGroup(models.Model):
         indexes = [models.Index(fields=["score"])]
 
 
-TaggableType = TypeVar("TaggableType", Docket, DocketEntry, RECAPDocument)
+type TaggableType = Docket | DocketEntry | RECAPDocument
 
 
 @pghistory.track()
