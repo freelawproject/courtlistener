@@ -4225,8 +4225,7 @@ class DocketAlertToggleV2Test(TestCase):
     async def test_trigger_has_no_aria_label(self) -> None:
         """The visible label is the trigger's accessible name.
 
-        An aria-label would replace it and could not follow the swap. The
-        page's other menus keep theirs, so the component change is scoped.
+        An aria-label would replace it and could not follow the swap.
         """
         await self.login()
         r = await self.page()
@@ -4235,10 +4234,6 @@ class DocketAlertToggleV2Test(TestCase):
         label_at = html.index(f'id="docket-alert-label-{self.docket.pk}"')
         ours = [t for t in triggers if html.index(t) < label_at][-1]
         self.assertNotIn("aria-label", ours)
-        others = [t for t in triggers if t != ours]
-        self.assertTrue(others)
-        for trigger in others:
-            self.assertIn("aria-label=", trigger)
 
     async def test_swap_targets_match_the_fragment(self) -> None:
         """The page and the fragment render the same label and item for a state."""

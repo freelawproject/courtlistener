@@ -34,9 +34,6 @@ repos:
         args: [ --fix ]
       - id: ruff-format
 
-  # Runs in the project environment (not an isolated hook environment) so the
-  # checker sees our dependencies; always checks the whole project because the
-  # checked file set is defined by project-includes in pyproject.toml.
   - repo: local
     hooks:
       - id: pyrefly
