@@ -3175,7 +3175,7 @@ def recap_document_into_opinions(
 
     try:
         citations = eyecite.get_citations(
-            r["content"], tokenizer=HYPERSCAN_TOKENIZER
+            r["content"], tokenizer=HYPERSCAN_TOKENIZER, clean_steps=["all_whitespace"]
         )
     except AttributeError:
         # Tokenizer fails with some unicode characters
@@ -3184,7 +3184,7 @@ def recap_document_into_opinions(
         logger.warning(
             "Hyperscan failed for %s, trying w/o tokenizer", recap_document
         )
-        citations = eyecite.get_citations(r["content"])
+        citations = eyecite.get_citations(r["content"], clean_steps=["all_whitespace"])
 
     case_law_citations = filter_out_non_case_law_citations(citations)
     if len(case_law_citations) == 0:
