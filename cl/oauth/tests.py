@@ -273,15 +273,12 @@ class OAuthMetadataTest(APITestCase):
     def test_scopes_supported_excludes_oidc_scopes_when_oidc_disabled(self):
         with patch.dict(settings.OAUTH2_PROVIDER, {"OIDC_ENABLED": False}):
             resp = self.client.get(self.url)
-        self.assertEqual(resp.json()["scopes_supported"], ["api", "wiki"])
+        self.assertEqual(resp.json()["scopes_supported"], ["api"])
 
-    def test_scopes_supported_includes_oidc_scopes_when_oidc_enabled(self):
+    def test_scopes_supported_lists_only_dcr_scopes_when_oidc_enabled(self):
         with patch.dict(settings.OAUTH2_PROVIDER, {"OIDC_ENABLED": True}):
             resp = self.client.get(self.url)
-        scopes = resp.json()["scopes_supported"]
-        for scope in ("api", "wiki", "openid", "email", "profile"):
-            with self.subTest(scope=scope):
-                self.assertIn(scope, scopes)
+        self.assertEqual(resp.json()["scopes_supported"], ["api", "openid"])
 
 
 class ApplicationRedirectUriPolicyTest(TestCase):

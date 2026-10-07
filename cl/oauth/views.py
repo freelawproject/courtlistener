@@ -38,6 +38,7 @@ from cl.oauth.api_serializers import (
     DynamicClientRegistrationSerializer,
     first_error_description,
 )
+from cl.oauth.validators import CourtListenerOAuth2Validator
 
 Application = get_application_model()
 
@@ -183,10 +184,13 @@ class OAuthMetadataView(APIView):
     def get(self, request: Request) -> Response:
         base = request.build_absolute_uri("/").rstrip("/")
         oidc_enabled = settings.OAUTH2_PROVIDER.get("OIDC_ENABLED")
+        # Discovery serves dynamically registered clients, so advertise
+        # only the scopes they are allowed to request.
         scopes_supported = [
             scope
             for scope in settings.OAUTH2_PROVIDER["SCOPES"]
-            if oidc_enabled or scope not in settings.OIDC_SCOPES
+            if scope in CourtListenerOAuth2Validator.DCR_SCOPES
+            and (oidc_enabled or scope not in settings.OIDC_SCOPES)
         ]
         return Response(
             {
