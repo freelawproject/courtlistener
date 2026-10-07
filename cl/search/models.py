@@ -1865,116 +1865,72 @@ class ClaimHistory(AbstractPacerDocument, AbstractPDF, AbstractDateTimeModel):
         return str(Path(root) / bucket / filename)
 
 
-class FederalCourtsManager(models.Manager):
-    def get_queryset(self) -> "models.QuerySet[Court]":
-        return (
-            super()
-            .get_queryset()
-            .filter(jurisdiction__in=Court.FEDERAL_JURISDICTIONS)
-        )
+class FederalCourtsQuerySet(models.QuerySet):
+    def all(self) -> models.QuerySet:
+        return self.filter(jurisdiction__in=Court.FEDERAL_JURISDICTIONS)
 
-    def all_pacer_courts(self) -> "models.QuerySet[Court]":
-        return (
-            self.get_queryset()
-            .filter(
-                Q(
-                    jurisdiction__in=[
-                        Court.FEDERAL_DISTRICT,
-                        Court.FEDERAL_BANKRUPTCY,
-                        Court.FEDERAL_APPELLATE,
-                    ]
-                )
-                | Q(pk__in=["cit", "jpml", "uscfc", "cavc"]),
-                end_date__isnull=True,
-                in_use=True,
+    def all_pacer_courts(self) -> models.QuerySet:
+        return self.filter(
+            Q(
+                jurisdiction__in=[
+                    Court.FEDERAL_DISTRICT,
+                    Court.FEDERAL_BANKRUPTCY,
+                    Court.FEDERAL_APPELLATE,
+                ]
             )
-            .exclude(pk="scotus")
-        )
+            | Q(pk__in=["cit", "jpml", "uscfc", "cavc"]),
+            end_date__isnull=True,
+            in_use=True,
+        ).exclude(pk="scotus")
 
-    def district_or_bankruptcy_pacer_courts(self) -> "models.QuerySet[Court]":
-        return (
-            super()
-            .get_queryset()
-            .filter(
-                Q(
-                    jurisdiction__in=[
-                        Court.FEDERAL_DISTRICT,
-                        Court.FEDERAL_BANKRUPTCY,
-                    ]
-                )
-                | Q(pk__in=["cit", "jpml", "uscfc"]),
-                end_date__isnull=True,
+    def district_or_bankruptcy_pacer_courts(self) -> models.QuerySet:
+        return self.filter(
+            Q(
+                jurisdiction__in=[
+                    Court.FEDERAL_DISTRICT,
+                    Court.FEDERAL_BANKRUPTCY,
+                ]
             )
+            | Q(pk__in=["cit", "jpml", "uscfc"]),
+            end_date__isnull=True,
         )
 
-    def appellate_courts(self) -> "models.QuerySet[Court]":
-        return (
-            super()
-            .get_queryset()
-            .filter(
-                Q(jurisdiction=Court.FEDERAL_APPELLATE)
-                |
-                # Court of Appeals for Veterans Claims uses appellate PACER
-                Q(pk__in=["cavc"]),
-                end_date__isnull=True,
-            )
+    def appellate_courts(self) -> models.QuerySet:
+        return self.filter(
+            Q(jurisdiction=Court.FEDERAL_APPELLATE)
+            |
+            # Court of Appeals for Veterans Claims uses appellate PACER
+            Q(pk__in=["cavc"]),
+            end_date__isnull=True,
         )
 
-    def bankruptcy_pacer_courts(self) -> "models.QuerySet[Court]":
-        return (
-            super()
-            .get_queryset()
-            .filter(
-                jurisdiction=Court.FEDERAL_BANKRUPTCY, end_date__isnull=True
-            )
+    def bankruptcy_pacer_courts(self) -> models.QuerySet:
+        return self.filter(
+            jurisdiction=Court.FEDERAL_BANKRUPTCY, end_date__isnull=True
         )
 
-    def district_courts(self) -> "models.QuerySet[Court]":
-        return (
-            super().get_queryset().filter(jurisdiction=Court.FEDERAL_DISTRICT)
-        )
+    def district_courts(self) -> models.QuerySet:
+        return self.filter(jurisdiction=Court.FEDERAL_DISTRICT)
 
-    def bankruptcy_courts(self) -> "models.QuerySet[Court]":
-        return (
-            super()
-            .get_queryset()
-            .filter(jurisdictions__in=Court.BANKRUPTCY_JURISDICTIONS)
-        )
+    def bankruptcy_courts(self) -> models.QuerySet:
+        return self.filter(jurisdictions__in=Court.BANKRUPTCY_JURISDICTIONS)
 
-    def appellate_courts(self) -> "models.QuerySet[Court]":
-        return (
-            super().get_queryset().filter(jurisdiction=Court.FEDERAL_APPELLATE)
-        )
+    def appellate_courts(self) -> models.QuerySet:
+        return self.filter(jurisdiction=Court.FEDERAL_APPELLATE)
 
-    def tribal_courts(self) -> "models.QuerySet[Court]":
-        return (
-            super()
-            .get_queryset()
-            .filter(jurisdictions__in=Court.TRIBAL_JURISDICTIONS)
-        )
+    def tribal_courts(self) -> models.QuerySet:
+        return self.filter(jurisdictions__in=Court.TRIBAL_JURISDICTIONS)
 
-    def territorial_courts(self) -> "models.QuerySet[Court]":
-        return (
-            super()
-            .get_queryset()
-            .filter(jurisdictions__in=Court.TERRITORY_JURISDICTIONS)
-        )
+    def territorial_courts(self) -> models.QuerySet:
+        return self.filter(jurisdictions__in=Court.TERRITORY_JURISDICTIONS)
 
-    def military_courts(self) -> "models.QuerySet[Court]":
-        return (
-            super()
-            .get_queryset()
-            .filter(jurisdictions__in=Court.MILITARY_JURISDICTIONS)
-        )
+    def military_courts(self) -> models.QuerySet:
+        return self.filter(jurisdictions__in=Court.MILITARY_JURISDICTIONS)
 
 
-class StateCourtsManager(models.Manager):
-    def get_queryset(self) -> "models.QuerySet[Court]":
-        return (
-            super()
-            .get_queryset()
-            .filter(jurisdiction__in=Court.STATE_JURISDICTIONS)
-        )
+class StateCourtsQuerySet(models.QuerySet):
+    def all(self) -> models.QuerySet:
+        return self.filter(jurisdiction__in=Court.STATE_JURISDICTIONS)
 
 
 @pghistory.track()
@@ -2202,8 +2158,8 @@ class Court(models.Model):
     )
 
     objects = models.Manager()
-    federal_courts = FederalCourtsManager()
-    state_courts = StateCourtsManager()
+    federal_courts = FederalCourtsQuerySet.as_manager()
+    state_courts = StateCourtsQuerySet.as_manager()
 
     def __str__(self) -> str:
         return f"{self.full_name}"

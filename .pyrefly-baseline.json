@@ -638,6 +638,13 @@
       "severity": "error"
     },
     {
+      "column": 20,
+      "path": "cl/api/views.py",
+      "name": "missing-attribute",
+      "concise_description": "Object of class `Manager` has no attribute `all_pacer_courts`",
+      "severity": "error"
+    },
+    {
       "column": 38,
       "path": "cl/audio/api_serializers.py",
       "name": "bad-assignment",
@@ -953,10 +960,31 @@
       "severity": "error"
     },
     {
+      "column": 9,
+      "path": "cl/corpus_importer/management/commands/bulk_iquery_project.py",
+      "name": "missing-attribute",
+      "concise_description": "Object of class `Manager` has no attribute `district_or_bankruptcy_pacer_courts`",
+      "severity": "error"
+    },
+    {
+      "column": 9,
+      "path": "cl/corpus_importer/management/commands/bulk_iquery_project.py",
+      "name": "missing-attribute",
+      "concise_description": "Object of class `Manager` has no attribute `district_or_bankruptcy_pacer_courts`",
+      "severity": "error"
+    },
+    {
       "column": 33,
       "path": "cl/corpus_importer/management/commands/bulk_iquery_project.py",
       "name": "bad-argument-type",
       "concise_description": "Argument `dict[str, Unknown]` is not assignable to parameter `options` with type `OptionsType` in function `add_all_cases_to_cl`",
+      "severity": "error"
+    },
+    {
+      "column": 13,
+      "path": "cl/corpus_importer/management/commands/claims_activity_project.py",
+      "name": "missing-attribute",
+      "concise_description": "Object of class `Manager` has no attribute `bankruptcy_pacer_courts`",
       "severity": "error"
     },
     {
@@ -971,6 +999,13 @@
       "path": "cl/corpus_importer/management/commands/dump_opinions_as_html.py",
       "name": "bad-argument-type",
       "concise_description": "Argument `bytes` is not assignable to parameter `s` with type `str` in function `_io._TextIOBase.write`",
+      "severity": "error"
+    },
+    {
+      "column": 9,
+      "path": "cl/corpus_importer/management/commands/export_control.py",
+      "name": "missing-attribute",
+      "concise_description": "Object of class `Manager` has no attribute `bankruptcy_courts`",
       "severity": "error"
     },
     {
@@ -1016,6 +1051,20 @@
       "severity": "error"
     },
     {
+      "column": 9,
+      "path": "cl/corpus_importer/management/commands/ready_mix_cases_project.py",
+      "name": "missing-attribute",
+      "concise_description": "Object of class `Manager` has no attribute `bankruptcy_pacer_courts`",
+      "severity": "error"
+    },
+    {
+      "column": 23,
+      "path": "cl/corpus_importer/management/commands/ready_mix_cases_project.py",
+      "name": "missing-attribute",
+      "concise_description": "Object of class `Manager` has no attribute `district_courts`",
+      "severity": "error"
+    },
+    {
       "column": 34,
       "path": "cl/corpus_importer/management/commands/ready_mix_cases_project.py",
       "name": "bad-argument-type",
@@ -1041,6 +1090,20 @@
       "path": "cl/corpus_importer/management/commands/recap_into_opinions.py",
       "name": "bad-argument-type",
       "concise_description": "Argument `Unknown | None` is not assignable to parameter `queue` with type `str` in function `import_opinions_from_recap`",
+      "severity": "error"
+    },
+    {
+      "column": 9,
+      "path": "cl/corpus_importer/management/commands/scrape_pacer_free_opinions.py",
+      "name": "missing-attribute",
+      "concise_description": "Object of class `Manager` has no attribute `district_or_bankruptcy_pacer_courts`",
+      "severity": "error"
+    },
+    {
+      "column": 9,
+      "path": "cl/corpus_importer/management/commands/scrape_pacer_free_opinions.py",
+      "name": "missing-attribute",
+      "concise_description": "Object of class `Manager` has no attribute `district_or_bankruptcy_pacer_courts`",
       "severity": "error"
     },
     {
@@ -1352,6 +1415,27 @@
       "severity": "error"
     },
     {
+      "column": 23,
+      "path": "cl/corpus_importer/utils.py",
+      "name": "missing-attribute",
+      "concise_description": "Object of class `Manager` has no attribute `bankruptcy_pacer_courts`",
+      "severity": "error"
+    },
+    {
+      "column": 27,
+      "path": "cl/corpus_importer/utils.py",
+      "name": "missing-attribute",
+      "concise_description": "Object of class `Manager` has no attribute `appellate_courts`",
+      "severity": "error"
+    },
+    {
+      "column": 27,
+      "path": "cl/corpus_importer/utils.py",
+      "name": "missing-attribute",
+      "concise_description": "Object of class `Manager` has no attribute `appellate_courts`",
+      "severity": "error"
+    },
+    {
       "column": 34,
       "path": "cl/corpus_importer/utils.py",
       "name": "bad-argument-type",
@@ -1377,6 +1461,13 @@
       "path": "cl/corpus_importer/utils.py",
       "name": "bad-argument-type",
       "concise_description": "Argument `str | Unknown` is not assignable to parameter `case` with type `OpinionCluster` in function `content_too_different`",
+      "severity": "error"
+    },
+    {
+      "column": 9,
+      "path": "cl/corpus_importer/utils.py",
+      "name": "missing-attribute",
+      "concise_description": "Object of class `Manager` has no attribute `district_or_bankruptcy_pacer_courts`",
       "severity": "error"
     },
     {
@@ -1888,6 +1979,13 @@
       "path": "cl/lib/document_serializer.py",
       "name": "unsupported-operation",
       "concise_description": "Cannot set item in `OrderedDict[Unknown, ListField]`",
+      "severity": "error"
+    },
+    {
+      "column": 17,
+      "path": "cl/lib/elasticsearch_utils.py",
+      "name": "missing-attribute",
+      "concise_description": "Object of class `Manager` has no attribute `appellate_courts`",
       "severity": "error"
     },
     {
@@ -2829,6 +2927,34 @@
       "severity": "error"
     },
     {
+      "column": 17,
+      "path": "cl/recap/api_serializers.py",
+      "name": "missing-attribute",
+      "concise_description": "Object of class `Manager` has no attribute `district_or_bankruptcy_pacer_courts`",
+      "severity": "error"
+    },
+    {
+      "column": 17,
+      "path": "cl/recap/api_serializers.py",
+      "name": "missing-attribute",
+      "concise_description": "Object of class `Manager` has no attribute `bankruptcy_pacer_courts`",
+      "severity": "error"
+    },
+    {
+      "column": 25,
+      "path": "cl/recap/api_serializers.py",
+      "name": "missing-attribute",
+      "concise_description": "Object of class `Manager` has no attribute `all_pacer_courts`",
+      "severity": "error"
+    },
+    {
+      "column": 27,
+      "path": "cl/recap/api_serializers.py",
+      "name": "missing-attribute",
+      "concise_description": "Object of class `Manager` has no attribute `all_pacer_courts`",
+      "severity": "error"
+    },
+    {
       "column": 20,
       "path": "cl/recap/management/commands/clean_up_docket_judges.py",
       "name": "bad-argument-type",
@@ -2854,6 +2980,27 @@
       "path": "cl/recap/management/commands/import_idb.py",
       "name": "not-iterable",
       "concise_description": "`in` is not supported between `Unknown` and `None`",
+      "severity": "error"
+    },
+    {
+      "column": 23,
+      "path": "cl/recap/management/commands/import_idb.py",
+      "name": "missing-attribute",
+      "concise_description": "Object of class `Manager` has no attribute `appellate_courts`",
+      "severity": "error"
+    },
+    {
+      "column": 27,
+      "path": "cl/recap/management/commands/import_idb.py",
+      "name": "missing-attribute",
+      "concise_description": "Object of class `Manager` has no attribute `bankruptcy_courts`",
+      "severity": "error"
+    },
+    {
+      "column": 27,
+      "path": "cl/recap/management/commands/import_idb.py",
+      "name": "missing-attribute",
+      "concise_description": "Object of class `Manager` has no attribute `district_courts`",
       "severity": "error"
     },
     {
@@ -2924,6 +3071,13 @@
       "path": "cl/recap/management/commands/merge_idb_into_dockets.py",
       "name": "unknown-name",
       "concise_description": "Could not find name `SessionData`",
+      "severity": "error"
+    },
+    {
+      "column": 18,
+      "path": "cl/recap/management/commands/monitor_pacer_websites.py",
+      "name": "missing-attribute",
+      "concise_description": "Object of class `Manager` has no attribute `all_pacer_courts`",
       "severity": "error"
     },
     {
@@ -4093,6 +4247,13 @@
       "path": "cl/recap/utils.py",
       "name": "bad-return",
       "concise_description": "Returned type `str | Unknown | None` is not assignable to declared return type `str`",
+      "severity": "error"
+    },
+    {
+      "column": 18,
+      "path": "cl/recap_rss/management/commands/scrape_rss.py",
+      "name": "missing-attribute",
+      "concise_description": "Object of class `Manager` has no attribute `all_pacer_courts`",
       "severity": "error"
     },
     {
@@ -5650,6 +5811,20 @@
       "severity": "error"
     },
     {
+      "column": 9,
+      "path": "cl/search/models.py",
+      "name": "bad-override",
+      "concise_description": "Class member `FederalCourtsQuerySet.all` overrides parent class `QuerySet` in an inconsistent manner",
+      "severity": "error"
+    },
+    {
+      "column": 9,
+      "path": "cl/search/models.py",
+      "name": "bad-override",
+      "concise_description": "Class member `StateCourtsQuerySet.all` overrides parent class `QuerySet` in an inconsistent manner",
+      "severity": "error"
+    },
+    {
       "column": 17,
       "path": "cl/search/models.py",
       "name": "missing-attribute",
@@ -6280,6 +6455,13 @@
       "severity": "error"
     },
     {
+      "column": 40,
+      "path": "cl/search/views.py",
+      "name": "missing-attribute",
+      "concise_description": "Object of class `Manager` has no attribute `all_pacer_courts`",
+      "severity": "error"
+    },
+    {
       "column": 41,
       "path": "cl/search/views.py",
       "name": "bad-argument-type",
@@ -6291,6 +6473,13 @@
       "path": "cl/search/views.py",
       "name": "bad-argument-type",
       "concise_description": "Argument `ESSearchResult` is not assignable to parameter `search_results` with type `dict[Unknown, Unknown]` in function `cl.lib.search_utils.store_search_query`",
+      "severity": "error"
+    },
+    {
+      "column": 25,
+      "path": "cl/search/views.py",
+      "name": "missing-attribute",
+      "concise_description": "Object of class `Manager` has no attribute `all_pacer_courts`",
       "severity": "error"
     },
     {
