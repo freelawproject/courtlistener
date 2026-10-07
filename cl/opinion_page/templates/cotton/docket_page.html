@@ -23,6 +23,7 @@
   {% if perms.search.view_docket or perms.search.change_docket or perms.search.delete_docket %}
   <div class="flex flex-wrap items-center gap-2 ml-auto" x-data="docketPage">
     <c-button variant="dark" size="sm" href="{% url 'admin:search_docket_change' docket.pk %}">
+      {% svg "edit" class="w-3.5 h-3.5" aria_hidden="true" %}
       Edit Docket
       {% if track_events %}
         <span x-show="$store.viewCount.loaded" x-cloak class="text-greyscale-300">(<span x-text="$store.viewCount.value"></span> views)</span>
@@ -130,11 +131,17 @@
   <ul>
     {% for af in docket.audio_files.all %}
       <li>
-        <a class="links" href="{{ af.get_absolute_url }}{% querystring %}">
-          {{ af|best_case_name|safe|v_wrapper }}
-        </a>
-        <br/>
-        {{ af.docket.date_argued|default_if_none:"" }}
+        <div class="flex items-start gap-3">
+          {% if perms.audio.change_audio %}
+            <c-button variant="dark" size="sm" href="{% url 'admin:audio_audio_change' af.pk %}">{% svg "edit" class="w-3.5 h-3.5" aria_hidden="true" %}Edit<span class="sr-only"> {{ af|best_case_name }}</span></c-button>
+          {% endif %}
+          <div>
+            <a class="links" href="{{ af.get_absolute_url }}{% querystring %}">
+              {{ af|best_case_name|safe|v_wrapper }}
+            </a>
+            <div>{{ af.docket.date_argued|default_if_none:"" }}</div>
+          </div>
+        </div>
       </li>
     {% endfor %}
   </ul>

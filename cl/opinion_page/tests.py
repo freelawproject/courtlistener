@@ -46,6 +46,7 @@ from waffle.testutils import override_flag
 if TYPE_CHECKING:
     from django.test.client import _MonkeyPatchedASGIResponse
 
+from cl.audio.factories import AudioFactory
 from cl.citations.utils import slugify_reporter
 from cl.favorites.models import GenericCount
 from cl.lib.file_validation import (
@@ -4132,6 +4133,7 @@ class DocketPageV2StaffLinksTest(TestCase):
             court=CourtFactory(id="canb", jurisdiction="FB"),
             source=Docket.RECAP,
         )
+        cls.recordings = AudioFactory.create_batch(2, docket=cls.docket)
         cls.no_perms_user = UserProfileWithParentsFactory(
             user__is_staff=True
         ).user
@@ -4209,6 +4211,32 @@ class DocketPageV2StaffLinksTest(TestCase):
             if el.get("x-show") == "$store.viewCount.loaded"
         )
         self.assertIn(count[0], list(gate.iter()))
+
+    async def test_change_audio_shows_an_edit_link_per_recording(
+        self,
+    ) -> None:
+        """change_audio shows an Edit link to each recording's admin change
+        page, and nothing else from the admin. Each link names its recording
+        for screen readers, since the visible text is the same on all of them."""
+        user = await sync_to_async(self._user_with)("audio.change_audio")
+        r = await self._get_docket_page(user)
+        links = {
+            a.get("href"): a.text_content().split()
+            for a in self._admin_links(r.content.decode())
+        }
+        self.assertEqual(
+            links.keys(),
+            {
+                reverse("admin:audio_audio_change", args=[audio.pk])
+                for audio in self.recordings
+            },
+        )
+        for audio in self.recordings:
+            with self.subTest(recording=audio.pk):
+                href = reverse("admin:audio_audio_change", args=[audio.pk])
+                words = links[href]
+                self.assertEqual(words[0], "Edit")
+                self.assertEqual(" ".join(words[1:]), audio.case_name)
 
     async def test_users_without_permissions_see_no_admin_links(
         self,
