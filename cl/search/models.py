@@ -3719,7 +3719,7 @@ class ParentheticalGroup(models.Model):
         indexes = [models.Index(fields=["score"])]
 
 
-type TaggableType = Docket | DocketEntry | RECAPDocument
+type TaggableType = Docket | DocketEntry | RECAPDocument | Claim
 
 
 @pghistory.track()
