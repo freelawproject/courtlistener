@@ -10,7 +10,7 @@ from cl.corpus_importer.tasks import (
 )
 from cl.lib.celery_utils import CeleryThrottle
 from cl.lib.command_utils import CommandUtils, VerboseCommand, logger
-from cl.lib.pacer_session import ProxyPacerSession
+from cl.lib.pacer_session import ProxyPacerSession, SessionData
 from cl.lib.utils import chunks
 from cl.recap.constants import CV_2017, CV_2020, CV_2021
 from cl.recap.models import FjcIntegratedDatabase

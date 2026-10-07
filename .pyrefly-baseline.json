@@ -3067,13 +3067,6 @@
       "severity": "error"
     },
     {
-      "column": 34,
-      "path": "cl/recap/management/commands/merge_idb_into_dockets.py",
-      "name": "unknown-name",
-      "concise_description": "Could not find name `SessionData`",
-      "severity": "error"
-    },
-    {
       "column": 18,
       "path": "cl/recap/management/commands/monitor_pacer_websites.py",
       "name": "missing-attribute",
