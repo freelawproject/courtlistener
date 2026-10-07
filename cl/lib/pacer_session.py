@@ -265,7 +265,7 @@ def get_or_cache_pacer_cookies(
 def get_pacer_cookie_from_cache(
     user_pk: str | int,
     r: Redis | None = None,
-):
+) -> SessionData | None:
     """Get the cookie for a user from the cache.
 
     :param user_pk: The ID of the user, can be a string or an ID
