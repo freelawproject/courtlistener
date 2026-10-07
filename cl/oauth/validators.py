@@ -5,7 +5,30 @@ from oauth2_provider.oauth2_validators import OAuth2Validator
 
 
 class CourtListenerOAuth2Validator(OAuth2Validator):
-    """Adds the standard OIDC ``email`` and ``profile`` claims."""
+    """Adds the standard OIDC ``email`` and ``profile`` claims and limits
+    dynamically registered applications to the ``api`` and ``openid`` scopes.
+    """
+
+    DCR_SCOPES = frozenset({"api", "openid"})
+
+    def validate_scopes(
+        self,
+        client_id: str,
+        scopes: list[str],
+        client: Any,
+        request: Any,
+        *args: Any,
+        **kwargs: Any,
+    ) -> bool:
+        """Refuse identity and wiki scopes to apps registered through DCR."""
+        if (
+            client.registration_source == client.RegistrationSource.DCR
+            and not set(scopes) <= self.DCR_SCOPES
+        ):
+            return False
+        return super().validate_scopes(
+            client_id, scopes, client, request, *args, **kwargs
+        )
 
     # Request-free signature is how DOT opts claims into discovery.
     def get_additional_claims(  # pyrefly: ignore[bad-override]
