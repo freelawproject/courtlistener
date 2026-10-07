@@ -268,6 +268,18 @@ wheels = [
 ]
 
 [[package]]
+name = "celery-types"
+version = "0.26.0"
+source = { registry = "https://pypi.org/simple" }
+dependencies = [
+    { name = "typing-extensions" },
+]
+sdist = { url = "https://files.pythonhosted.org/packages/fc/38/813dd7534e41682684d3a5c2cc4a8710e3acc51b364920b9c4d747c7b18f/celery_types-0.26.0.tar.gz", hash = "sha256:fa318136fdad83f83f1531deecd9fe664b5dfffff29f3c31e9120a46b8e3908f", size = 106210, upload-time = "2026-03-12T23:06:49.941Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/d9/e5/c5ec98f7fd7817d077c9a5a5e705d54f74d4ca08ee3f14dee881c93c0511/celery_types-0.26.0-py3-none-any.whl", hash = "sha256:eb9da76f461786091970df466ec647d9a27956399852542cb6cab9309970f950", size = 211260, upload-time = "2026-03-12T23:06:48.588Z" },
+]
+
+[[package]]
 name = "certifi"
 version = "2026.7.22"
 source = { registry = "https://pypi.org/simple" }
@@ -443,6 +455,7 @@ dependencies = [
 
 [package.dev-dependencies]
 dev = [
+    { name = "celery-types" },
     { name = "django-debug-toolbar" },
     { name = "django-stubs" },
     { name = "django-tailwind", extra = ["reload"] },
@@ -561,6 +574,7 @@ requires-dist = [
 
 [package.metadata.requires-dev]
 dev = [
+    { name = "celery-types", specifier = ">=0.26.0" },
     { name = "django-debug-toolbar", specifier = ">=8.0.0" },
     { name = "django-stubs", specifier = ">=6.1.0" },
     { name = "django-tailwind", extras = ["reload"], specifier = "~=4.5.0" },

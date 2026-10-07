@@ -211,38 +211,10 @@
       "severity": "error"
     },
     {
-      "column": 38,
-      "path": "cl/alerts/signals.py",
-      "name": "missing-attribute",
-      "concise_description": "Object of class `NoneType` has no attribute `pk`",
-      "severity": "error"
-    },
-    {
       "column": 11,
       "path": "cl/alerts/signals.py",
       "name": "missing-attribute",
       "concise_description": "Object of class `NoneType` has no attribute `alert_type`",
-      "severity": "error"
-    },
-    {
-      "column": 43,
-      "path": "cl/alerts/signals.py",
-      "name": "missing-attribute",
-      "concise_description": "Object of class `NoneType` has no attribute `pk`",
-      "severity": "error"
-    },
-    {
-      "column": 43,
-      "path": "cl/alerts/signals.py",
-      "name": "missing-attribute",
-      "concise_description": "Object of class `NoneType` has no attribute `pk`",
-      "severity": "error"
-    },
-    {
-      "column": 45,
-      "path": "cl/alerts/signals.py",
-      "name": "missing-attribute",
-      "concise_description": "Object of class `NoneType` has no attribute `pk`",
       "severity": "error"
     },
     {
@@ -656,6 +628,13 @@
       "path": "cl/audio/api_serializers.py",
       "name": "bad-assignment",
       "concise_description": "`ManyRelatedField | RelatedField[Unknown, str, Hyperlink]` is not assignable to `HyperlinkedRelatedField[Unknown]`",
+      "severity": "error"
+    },
+    {
+      "column": 23,
+      "path": "cl/audio/dispatch.py",
+      "name": "bad-argument-type",
+      "concise_description": "Argument `str | None` is not assignable to parameter `queue` with type `Queue | str` in function `celery.app.task.Task.apply_async`",
       "severity": "error"
     },
     {
@@ -1079,6 +1058,13 @@
       "severity": "error"
     },
     {
+      "column": 22,
+      "path": "cl/corpus_importer/management/commands/recap_into_opinions.py",
+      "name": "bad-argument-type",
+      "concise_description": "Argument `list[bool | dict[@_, @_] | Any]` is not assignable to parameter `args` with type `tuple[Any, ...] | None` in function `celery.app.task.Task.apply_async`",
+      "severity": "error"
+    },
+    {
       "column": 13,
       "path": "cl/corpus_importer/management/commands/recap_into_opinions.py",
       "name": "bad-argument-type",
@@ -1215,7 +1201,28 @@
       "column": 26,
       "path": "cl/corpus_importer/tasks.py",
       "name": "bad-argument-type",
+      "concise_description": "Argument `ReadTimeoutError | RequestException` is not assignable to parameter `args` with type `tuple[Any, ...] | None` in function `celery.app.task.Task.retry`",
+      "severity": "error"
+    },
+    {
+      "column": 26,
+      "path": "cl/corpus_importer/tasks.py",
+      "name": "bad-argument-type",
       "concise_description": "Argument `str | None` is not assignable to parameter `case_id` with type `str` in function `juriscraper.pacer.acms_attachment_page.ACMSAttachmentPage.query`",
+      "severity": "error"
+    },
+    {
+      "column": 30,
+      "path": "cl/corpus_importer/tasks.py",
+      "name": "bad-argument-type",
+      "concise_description": "Argument `HTTPError` is not assignable to parameter `args` with type `tuple[Any, ...] | None` in function `celery.app.task.Task.retry`",
+      "severity": "error"
+    },
+    {
+      "column": 26,
+      "path": "cl/corpus_importer/tasks.py",
+      "name": "bad-argument-type",
+      "concise_description": "Argument `ReadTimeoutError | RequestException` is not assignable to parameter `args` with type `tuple[Any, ...] | None` in function `celery.app.task.Task.retry`",
       "severity": "error"
     },
     {
@@ -1310,6 +1317,13 @@
       "severity": "error"
     },
     {
+      "column": 30,
+      "path": "cl/corpus_importer/tasks.py",
+      "name": "bad-argument-type",
+      "concise_description": "Argument `HTTPError` is not assignable to parameter `args` with type `tuple[Any, ...] | None` in function `celery.app.task.Task.retry`",
+      "severity": "error"
+    },
+    {
       "column": 24,
       "path": "cl/corpus_importer/tasks.py",
       "name": "missing-attribute",
@@ -1328,6 +1342,20 @@
       "path": "cl/corpus_importer/tasks.py",
       "name": "bad-assignment",
       "concise_description": "`object | str` is not assignable to attribute `remarks` with type `str`",
+      "severity": "error"
+    },
+    {
+      "column": 12,
+      "path": "cl/corpus_importer/tasks.py",
+      "name": "unsupported-operation",
+      "concise_description": "`<` is not supported between `int` and `None`",
+      "severity": "error"
+    },
+    {
+      "column": 13,
+      "path": "cl/corpus_importer/tasks.py",
+      "name": "unsupported-operation",
+      "concise_description": "`+` is not supported between `None` and `Literal[1]`",
       "severity": "error"
     },
     {
@@ -1510,6 +1538,13 @@
       "path": "cl/custom_filters/templatetags/text_filters.py",
       "name": "unbound-name",
       "concise_description": "`s` may be uninitialized",
+      "severity": "error"
+    },
+    {
+      "column": 44,
+      "path": "cl/disclosures/management/commands/import_financial_disclosures.py",
+      "name": "bad-argument-type",
+      "concise_description": "Argument `list[Any]` is not assignable to parameter `args` with type `tuple[Any, ...] | None` in function `celery.app.task.Task.apply_async`",
       "severity": "error"
     },
     {
@@ -1996,24 +2031,17 @@
       "severity": "error"
     },
     {
+      "column": 47,
+      "path": "cl/lib/es_signal_processor.py",
+      "name": "missing-attribute",
+      "concise_description": "Object of class `dict` has no attribute `apply_async`",
+      "severity": "error"
+    },
+    {
       "column": 37,
       "path": "cl/lib/es_signal_processor.py",
       "name": "bad-argument-type",
       "concise_description": "Argument `Audio | Unknown | None` is not assignable to parameter `instance` with type `Audio | Citation | Docket | DocketEntry | Education | Opinion | OpinionCluster | Parenthetical | ParentheticalGroup | Person | Position | RECAPDocument` in function `allow_es_audio_indexing`",
-      "severity": "error"
-    },
-    {
-      "column": 25,
-      "path": "cl/lib/es_signal_processor.py",
-      "name": "missing-attribute",
-      "concise_description": "Object of class `NoneType` has no attribute `pk`",
-      "severity": "error"
-    },
-    {
-      "column": 43,
-      "path": "cl/lib/es_signal_processor.py",
-      "name": "bad-argument-type",
-      "concise_description": "Argument `Unknown | None` is not assignable to parameter `instance` with type `Audio | Citation | Docket | DocketEntry | Education | Opinion | OpinionCluster | Parenthetical | ParentheticalGroup | Person | Position | RECAPDocument` in function `cl.lib.indexing_utils.compose_app_label`",
       "severity": "error"
     },
     {
@@ -3903,7 +3931,7 @@
       "column": 13,
       "path": "cl/recap/tasks.py",
       "name": "bad-argument-type",
-      "concise_description": "Argument `Any | None` is not assignable to parameter `session_data` with type `SessionData` in function `download_pacer_pdf_and_save_to_pq`",
+      "concise_description": "Argument `SessionData | None` is not assignable to parameter `session_data` with type `SessionData` in function `download_pacer_pdf_and_save_to_pq`",
       "severity": "error"
     },
     {
@@ -3917,7 +3945,7 @@
       "column": 52,
       "path": "cl/recap/tasks.py",
       "name": "bad-argument-type",
-      "concise_description": "Argument `Any | None` is not assignable to parameter `session_data` with type `SessionData` in function `cl.corpus_importer.tasks.get_att_report_by_rd`",
+      "concise_description": "Argument `SessionData | None` is not assignable to parameter `session_data` with type `SessionData` in function `cl.corpus_importer.tasks.get_att_report_by_rd`",
       "severity": "error"
     },
     {
@@ -4177,6 +4205,13 @@
       "path": "cl/recap/tasks.py",
       "name": "bad-argument-type",
       "concise_description": "Argument `list[str | Unknown | None]` is not assignable to parameter `unique_case_ids` with type `list[str]` in function `replicate_recap_email_to_subdockets`",
+      "severity": "error"
+    },
+    {
+      "column": 12,
+      "path": "cl/recap/tasks.py",
+      "name": "bad-return",
+      "concise_description": "Returned type `AsyncResult[Any]` is not assignable to declared return type `None`",
       "severity": "error"
     },
     {
@@ -5461,6 +5496,20 @@
       "severity": "error"
     },
     {
+      "column": 57,
+      "path": "cl/search/management/commands/cl_index_embeddings.py",
+      "name": "bad-argument-type",
+      "concise_description": "Argument `Unknown | None` is not assignable to parameter `queue` with type `Queue | str` in function `celery.canvas.Signature.set`",
+      "severity": "error"
+    },
+    {
+      "column": 48,
+      "path": "cl/search/management/commands/cl_index_embeddings.py",
+      "name": "bad-argument-type",
+      "concise_description": "Argument `Unknown | None` is not assignable to parameter `queue` with type `Queue | str` in function `celery.canvas.Signature.set`",
+      "severity": "error"
+    },
+    {
       "column": 24,
       "path": "cl/search/management/commands/cl_index_embeddings.py",
       "name": "bad-argument-type",
@@ -5573,6 +5622,13 @@
       "severity": "error"
     },
     {
+      "column": 29,
+      "path": "cl/search/management/commands/fix_rd_broken_links.py",
+      "name": "bad-argument-type",
+      "concise_description": "Argument `Unknown | None` is not assignable to parameter `queue` with type `Queue | str` in function `celery.canvas.Signature.set`",
+      "severity": "error"
+    },
+    {
       "column": 32,
       "path": "cl/search/management/commands/fix_rd_broken_links.py",
       "name": "bad-argument-type",
@@ -5678,6 +5734,13 @@
       "severity": "error"
     },
     {
+      "column": 29,
+      "path": "cl/search/management/commands/pacer_bulk_fetch.py",
+      "name": "bad-argument-type",
+      "concise_description": "Argument `Unknown | None` is not assignable to parameter `queue` with type `Queue | str` in function `celery.canvas.Signature.apply_async`",
+      "severity": "error"
+    },
+    {
       "column": 52,
       "path": "cl/search/management/commands/pacer_bulk_fetch.py",
       "name": "bad-argument-type",
@@ -5720,10 +5783,10 @@
       "severity": "error"
     },
     {
-      "column": 41,
+      "column": 27,
       "path": "cl/search/management/commands/pacer_bulk_fetch.py",
-      "name": "missing-attribute",
-      "concise_description": "Object of class `NoneType` has no attribute `pk`",
+      "name": "bad-argument-type",
+      "concise_description": "Argument `Unknown | None` is not assignable to parameter `queue` with type `Queue | str` in function `celery.canvas.Signature.apply_async`",
       "severity": "error"
     },
     {
@@ -6109,6 +6172,13 @@
       "path": "cl/search/tasks.py",
       "name": "bad-return",
       "concise_description": "Returned type `AudioDocument | AudioPercolator | DocketDocument | ESRECAPDocument | OpinionClusterDocument | OpinionDocument | ParentheticalGroupDocument | PersonDocument | PositionDocument | None` is not assignable to declared return type `AudioDocument | AudioPercolator | ESRECAPDocument | OpinionClusterDocument | OpinionDocument | ParentheticalGroupDocument | PersonDocument | PositionDocument | None`",
+      "severity": "error"
+    },
+    {
+      "column": 8,
+      "path": "cl/search/tasks.py",
+      "name": "unsupported-operation",
+      "concise_description": "`>=` is not supported between `int` and `None`",
       "severity": "error"
     },
     {
@@ -6858,20 +6928,6 @@
       "path": "cl/users/signals.py",
       "name": "missing-attribute",
       "concise_description": "Object of class `NoneType` has no attribute `save`",
-      "severity": "error"
-    },
-    {
-      "column": 45,
-      "path": "cl/users/signals.py",
-      "name": "missing-attribute",
-      "concise_description": "Object of class `NoneType` has no attribute `pk`",
-      "severity": "error"
-    },
-    {
-      "column": 45,
-      "path": "cl/users/signals.py",
-      "name": "missing-attribute",
-      "concise_description": "Object of class `NoneType` has no attribute `pk`",
       "severity": "error"
     },
     {
