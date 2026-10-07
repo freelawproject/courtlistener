@@ -1,6 +1,7 @@
 from typing import cast
 
 from django.apps import apps
+from django.conf import settings
 from django.contrib import admin, messages
 from django.contrib.auth.forms import UserChangeForm
 from django.contrib.auth.models import Permission, User
@@ -22,6 +23,7 @@ from cl.donate.models import NeonMembership
 from cl.favorites.admin import NoteInline, PrayerInline, UserTagInline
 from cl.favorites.models import UserTag
 from cl.lib.admin import (
+    AdminLink,
     AdminLinkConfig,
     AdminTweaksMixin,
     generate_admin_links,
@@ -222,11 +224,47 @@ class UserAdmin(admin.ModelAdmin, AdminTweaksMixin):
             },
         ]
 
-        extra_context["custom_links"] = generate_admin_links(custom_links)
+        links = generate_admin_links(custom_links)
+        links.extend(self._get_neon_links(user))
+        extra_context["custom_links"] = links
 
         return super().change_view(
             request, object_id, form_url, extra_context=extra_context
         )
+
+    @staticmethod
+    def _get_neon_links(user: User) -> list[AdminLink]:
+        """Build links to the user's Neon account and membership records.
+
+        Links are only returned for records we have a Neon ID for, so users
+        without a Neon account or membership get no link.
+
+        :param user: The user whose admin page is being rendered.
+        :return: Zero, one, or two links to the Neon admin site.
+        """
+        base_url = settings.NEON_ADMIN_URL.rstrip("/")
+        links: list[AdminLink] = []
+
+        if account_id := user.profile.neon_account_id:
+            links.append(
+                {
+                    "href": f"{base_url}/accounts/{account_id}/about",
+                    "label": "Neon User",
+                }
+            )
+
+        try:
+            membership_id = user.membership.neon_id
+        except NeonMembership.DoesNotExist:
+            membership_id = ""
+        if membership_id:
+            links.append(
+                {
+                    "href": f"{base_url}/memberships/{membership_id}",
+                    "label": "Neon Membership",
+                }
+            )
+        return links
 
     @admin.display(description="Email Confirmed?")
     def get_email_confirmed(self, obj):
