@@ -693,12 +693,6 @@ def process_free_opinion_result(
         self.request.chain = None
         return None
 
-    if not rd_created and rd.is_available:
-        # The item already exists and is available. Fantastic. Call it a day.
-        result.delete()
-        self.request.chain = None
-        return None
-
     if rd_created:
         newly_enqueued = enqueue_docket_alert(d.pk)
         if newly_enqueued:
@@ -708,6 +702,8 @@ def process_free_opinion_result(
         "result": result,
         "rd_pk": rd.pk,
         "pacer_court_id": result.court_id,
+        # Another source can upload the PDF before the scraper gets here.
+        "skip_pdf_download": not rd_created and bool(rd.is_available),
     }
 
 
@@ -738,7 +734,8 @@ def get_and_process_free_pdf(
     of:
         {'result': <PACERFreeDocumentRow> object,
          'rd_pk': rd.pk,
-         'pacer_court_id': result.court_id}
+         'pacer_court_id': result.court_id,
+         'skip_pdf_download': bool}
     :param row_pk: The PACERFreeDocumentRow operate on
     :param court_id: The court_id (used for throttling).
     :param citation_queue: Celery queue for the citation-extraction task the
@@ -749,6 +746,10 @@ def get_and_process_free_pdf(
         return None
     result = data["result"]
     rd = RECAPDocument.objects.get(pk=data["rd_pk"])
+
+    if data.get("skip_pdf_download"):
+        # We already have the PDF. The opinion import extracts its own text.
+        return {"result": result, "rd_pk": rd.pk}
 
     # Check court connectivity, if fails retry the task, hopefully, it'll be
     # retried in a different not blocked node
