@@ -2,7 +2,7 @@ import logging
 import re
 from datetime import datetime
 from pathlib import Path
-from typing import TYPE_CHECKING, Literal, Self
+from typing import TYPE_CHECKING, Literal, Self, assert_never
 from urllib.parse import quote
 
 import nh3
@@ -3755,25 +3755,28 @@ class Tag(AbstractDateTimeModel):
         wish to tag.
         :return: A tuple with the tag and whether a new item was created
         """
-        if isinstance(thing, Docket):
-            return self.dockets.through.objects.get_or_create(
-                docket_id=thing.pk, tag_id=self.pk
-            )
-        elif isinstance(thing, DocketEntry):
-            return self.docket_entries.through.objects.get_or_create(
-                docketentry_id=thing.pk, tag_id=self.pk
-            )
-        elif isinstance(thing, RECAPDocument):
-            return self.recap_documents.through.objects.get_or_create(
-                recapdocument_id=thing.pk, tag_id=self.pk
-            )
-        elif isinstance(thing, Claim):
-            return self.claims.through.objects.get_or_create(
-                claim_id=thing.pk, tag_id=self.pk
-            )
-        else:
-            raise NotImplementedError("Object type not supported for tagging.")
-
+        match thing:
+            case Docket():
+                return self.dockets.through.objects.get_or_create(
+                    docket_id=thing.pk, tag_id=self.pk
+                )
+            case DocketEntry():
+                return self.docket_entries.through.objects.get_or_create(
+                    docketentry_id=thing.pk, tag_id=self.pk
+                )
+            case RECAPDocument():
+                return self.recap_documents.through.objects.get_or_create(
+                    recapdocument_id=thing.pk, tag_id=self.pk
+                )
+            case Claim():
+                return self.claims.through.objects.get_or_create(
+                    claim_id=thing.pk, tag_id=self.pk
+                )
+            case _:
+                assert_never(thing)
+                raise NotImplementedError(
+                    "Object type not supported for tagging."
+                )
 
 # class AppellateReview(models.Model):
 #     REVIEW_STANDARDS = (
