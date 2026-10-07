@@ -14,10 +14,26 @@
 />
 
 <div>
-{# Filed date eyebrow #}
-{% if docket.date_filed %}
-  <c-eyebrow class="mb-2">Filed: {{ docket.date_filed }}</c-eyebrow>
-{% endif %}
+{# Eyebrow line: filed date on the left, staff actions row on the right. #}
+<div class="flex flex-wrap items-center gap-2 mb-2">
+  {% if docket.date_filed %}
+    <c-eyebrow>Filed: {{ docket.date_filed }}</c-eyebrow>
+  {% endif %}
+  {# Staff row: admin links and moderation state, each gated on the permission its target requires. #}
+  {% if perms.search.view_docket or perms.search.change_docket or perms.search.delete_docket %}
+  <div class="flex flex-wrap items-center gap-2 ml-auto" x-data="docketPage">
+    <c-button variant="dark" size="sm" href="{% url 'admin:search_docket_change' docket.pk %}">
+      Edit Docket
+      {% if track_events %}
+        <span x-show="$store.viewCount.loaded" x-cloak class="text-greyscale-300">(<span x-text="$store.viewCount.value"></span> views)</span>
+      {% endif %}
+    </c-button>
+    {% if perms.search.change_docket and docket.blocked %}
+      <span class="inline-block px-3 py-1 text-sm font-semibold text-red-700 bg-red-100 border border-red-300 rounded-lg">Blocked</span>
+    {% endif %}
+  </div>
+  {% endif %}
+</div>
 
 {# Title and court #}
 <hgroup>
@@ -32,10 +48,6 @@
     <p class="text-display-xs font-semibold text-greyscale-900">{{ docket.court }}</p>
   {% endif %}
 </hgroup>
-
-{% if perms.search.change_docket and docket.blocked %}
-  <span class="inline-block px-3 py-1 text-sm font-semibold text-red-700 bg-red-100 border border-red-300 rounded-lg">Blocked</span>
-{% endif %}
 
 {# Action buttons — Note and Tags are placeholders. #}
 {# TODO: Wire up Add a Note and Tags button interactivity. #}

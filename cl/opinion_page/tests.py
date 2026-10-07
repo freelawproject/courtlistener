@@ -4117,6 +4117,113 @@ class DocketPageV2TemplateTest(TestCase):
         )
 
 
+@override_settings(WAFFLE_CACHE_PREFIX="test_docket_staff_links_v2_waffle")
+@override_flag("use_new_design", active=True)
+class DocketPageV2StaffLinksTest(TestCase):
+    """Staff-only admin links on the v2 docket page.
+
+    Each link is gated on the permission its admin target requires, as on
+    the legacy page. See DocketPageV2TemplateTest for the cache prefix.
+    """
+
+    @classmethod
+    def setUpTestData(cls) -> None:
+        cls.docket = DocketFactory(
+            court=CourtFactory(id="canb", jurisdiction="FB"),
+            source=Docket.RECAP,
+        )
+        cls.no_perms_user = UserProfileWithParentsFactory(
+            user__is_staff=True
+        ).user
+
+    @staticmethod
+    def _user_with(*perms: str) -> User:
+        """Builds a staff user holding exactly the given permissions, named
+        as has_perm() takes them, e.g. "search.view_docket"."""
+        user = UserProfileWithParentsFactory(user__is_staff=True).user
+        for perm in perms:
+            app_label, codename = perm.split(".")
+            user.user_permissions.add(
+                Permission.objects.get(
+                    content_type__app_label=app_label, codename=codename
+                )
+            )
+        return user
+
+    async def _get_docket_page(self, user: User | None = None):
+        """Loads the v2 docket page, logged in as user when given."""
+        if user is not None:
+            await self.async_client.aforce_login(user)
+        r = await self.async_client.get(
+            reverse("view_docket", args=[self.docket.pk, self.docket.slug])
+        )
+        self.assertTemplateUsed(r, "v2_docket.html")
+        return r
+
+    @staticmethod
+    def _admin_links(html: str) -> list[_Element]:
+        """Anchors on the page that point into the Django admin."""
+        return [
+            a
+            for a in fromstring(html).iter("a")
+            if (a.get("href") or "").startswith("/admin/")
+        ]
+
+    async def test_docket_permissions_show_the_edit_docket_link(
+        self,
+    ) -> None:
+        """Any one of view, change or delete on dockets shows a link to the
+        docket's admin change page."""
+        expected_href = reverse(
+            "admin:search_docket_change", args=[self.docket.pk]
+        )
+        for perm in (
+            "search.view_docket",
+            "search.change_docket",
+            "search.delete_docket",
+        ):
+            with self.subTest(permission=perm):
+                user = await sync_to_async(self._user_with)(perm)
+                r = await self._get_docket_page(user)
+                links = self._admin_links(r.content.decode())
+                self.assertEqual(
+                    [a.get("href") for a in links], [expected_href]
+                )
+                self.assertIn("Edit Docket", links[0].text_content())
+
+    async def test_edit_docket_link_binds_the_view_count(self) -> None:
+        """The link shows the count from the viewCount store, hidden until
+        the store has a value."""
+        user = await sync_to_async(self._user_with)("search.view_docket")
+        r = await self._get_docket_page(user)
+        link = self._admin_links(r.content.decode())[0]
+        count = [
+            el
+            for el in link.iter()
+            if el.get("x-text") == "$store.viewCount.value"
+        ]
+        self.assertEqual(len(count), 1)
+        gate = next(
+            el
+            for el in link.iter()
+            if el.get("x-show") == "$store.viewCount.loaded"
+        )
+        self.assertIn(count[0], list(gate.iter()))
+
+    async def test_users_without_permissions_see_no_admin_links(
+        self,
+    ) -> None:
+        """Anonymous visitors and users without the permissions see no link
+        into the admin at all."""
+        for label, user in (
+            ("anonymous", None),
+            ("no permissions", self.no_perms_user),
+        ):
+            with self.subTest(user=label):
+                r = await self._get_docket_page(user)
+                self.assertEqual(self._admin_links(r.content.decode()), [])
+
+
 @override_settings(WAFFLE_CACHE_PREFIX="test_docket_entry_rows_v2_waffle")
 @override_flag("use_new_design", active=True)
 class DocketEntryRowsV2Test(TestCase):
