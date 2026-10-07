@@ -23,7 +23,7 @@ from django.utils import timezone
 from django.utils.timezone import now
 from eyecite.tokenizers import HyperscanTokenizer
 from factory import RelatedFactory
-from juriscraper.lib.string_utils import harmonize, titlecase
+from juriscraper.lib.string_utils import CaseNameTweaker, harmonize, titlecase
 from juriscraper.pacer.free_documents import FreeOpinionReport
 from juriscraper.state.texas import (
     TexasCaseParty,
@@ -86,6 +86,7 @@ from cl.corpus_importer.management.commands.scrape_pacer_free_opinions import (
     do_everything,
     get_and_save_free_document_reports,
     get_outstanding_failed_dates,
+    get_pdfs,
     report_free_document_scrape_stalls,
 )
 from cl.corpus_importer.management.commands.update_casenames_wl_dataset import (
@@ -102,6 +103,7 @@ from cl.corpus_importer.tasks import (
     classify_case_name_by_llm,
     download_texas_document,
     generate_ia_json,
+    get_and_process_free_pdf,
     get_and_save_free_document_report,
     is_texas_appellate_docket,
     is_texas_supreme_docket,
@@ -114,6 +116,7 @@ from cl.corpus_importer.tasks import (
     merge_texas_trial_court_data,
     normalize_texas_parties,
     probe_or_scrape_iquery_pages,
+    process_free_opinion_result,
 )
 from cl.corpus_importer.utils import (
     DocketSourceException,
@@ -896,6 +899,191 @@ class ScrapeFreeOpinionsLoopTest(TestCase):
         """do-everything self-monitors by calling the stall reporter."""
         do_everything([self.court.pk], None, None, "pacerdoc1", day_span=1)
         mock_stalls.assert_called_once_with([self.court.pk])
+
+
+class FreeOpinionAlreadyAvailableTest(TestCase):
+    """A document that RECAP already has must still reach the opinion
+    ingestion task when the free opinion report lists it later."""
+
+    @classmethod
+    def setUpTestData(cls) -> None:
+        cls.court = CourtFactory.create(
+            id="nysd",
+            jurisdiction=Court.FEDERAL_DISTRICT,
+            in_use=True,
+            end_date=None,
+        )
+        cls.docket = DocketFactory.create(
+            court=cls.court,
+            pacer_case_id="12345",
+            docket_number="1:20-cv-01234",
+            docket_number_raw="1:20-cv-01234",
+            source=Docket.RECAP,
+        )
+        cls.de = DocketEntryFactory.create(
+            docket=cls.docket,
+            entry_number=119,
+            date_filed=date(2026, 3, 20),
+        )
+        cls.rd = RECAPDocumentFactory.create(
+            docket_entry=cls.de,
+            document_number="119",
+            attachment_number=None,
+            pacer_doc_id="1234567890",
+            is_available=True,
+            sha1="0e5741e89ea3d43305f265ad80c193ae91d0075b",
+        )
+
+    def make_row(self) -> PACERFreeDocumentRow:
+        """Build the free opinion report row for the existing document.
+
+        :return: The saved PACERFreeDocumentRow.
+        """
+        return PACERFreeDocumentRow.objects.create(
+            court_id="nysd",
+            pacer_case_id="12345",
+            docket_number="1:20-cv-01234",
+            case_name="Doe v. Bank of America, NA",
+            date_filed=date(2026, 3, 20),
+            pacer_doc_id="1234567890",
+            document_number="119",
+            description="OPINION AND ORDER",
+            nature_of_suit="",
+            cause="",
+            error_msg="",
+        )
+
+    @patch("cl.corpus_importer.tasks.enqueue_docket_alert")
+    @patch(
+        "cl.corpus_importer.tasks.mark_ia_upload_needed",
+        new_callable=mock.AsyncMock,
+    )
+    @patch(
+        "cl.corpus_importer.tasks.get_blocked_status",
+        new_callable=mock.AsyncMock,
+        return_value=(False, None),
+    )
+    def test_available_document_keeps_the_chain_alive(
+        self, mock_blocked, mock_ia, mock_alert
+    ) -> None:
+        """An available document must not cancel the rest of the chain."""
+        row = self.make_row()
+        with patch(
+            "cl.corpus_importer.tasks.lookup_and_save",
+            return_value=self.docket,
+        ):
+            data = process_free_opinion_result(
+                row.pk, self.court.pk, CaseNameTweaker()
+            )
+
+        self.assertIsNotNone(data)
+        self.assertEqual(data["rd_pk"], self.rd.pk)
+        self.assertTrue(data["skip_pdf_download"])
+        # delete_pacer_row removes the row at the end of the chain instead.
+        self.assertTrue(
+            PACERFreeDocumentRow.objects.filter(pk=row.pk).exists()
+        )
+
+    @patch("cl.corpus_importer.tasks.enqueue_docket_alert")
+    @patch(
+        "cl.corpus_importer.tasks.mark_ia_upload_needed",
+        new_callable=mock.AsyncMock,
+    )
+    @patch(
+        "cl.corpus_importer.tasks.get_blocked_status",
+        new_callable=mock.AsyncMock,
+        return_value=(False, None),
+    )
+    def test_unavailable_document_still_downloads_the_pdf(
+        self, mock_blocked, mock_ia, mock_alert
+    ) -> None:
+        """A document without a PDF must still be downloaded from PACER."""
+        RECAPDocument.objects.filter(pk=self.rd.pk).update(is_available=False)
+        row = self.make_row()
+        with patch(
+            "cl.corpus_importer.tasks.lookup_and_save",
+            return_value=self.docket,
+        ):
+            data = process_free_opinion_result(
+                row.pk, self.court.pk, CaseNameTweaker()
+            )
+
+        self.assertIsNotNone(data)
+        self.assertEqual(data["rd_pk"], self.rd.pk)
+        self.assertFalse(data["skip_pdf_download"])
+
+    @patch(
+        "cl.corpus_importer.tasks.find_citations_and_parentheticals_for_opinion_by_pks"
+    )
+    @patch("cl.corpus_importer.tasks.classify_case_name_by_llm")
+    @patch("cl.corpus_importer.tasks.extract_recap_document_for_opinions")
+    @patch("cl.corpus_importer.tasks.download_pacer_pdf_by_rd")
+    @patch("cl.corpus_importer.tasks.enqueue_docket_alert")
+    @patch(
+        "cl.corpus_importer.tasks.mark_ia_upload_needed",
+        new_callable=mock.AsyncMock,
+    )
+    @patch(
+        "cl.corpus_importer.tasks.get_blocked_status",
+        new_callable=mock.AsyncMock,
+        return_value=(False, None),
+    )
+    def test_scraper_chain_imports_available_document(
+        self,
+        mock_blocked,
+        mock_ia,
+        mock_alert,
+        mock_download,
+        mock_extract,
+        mock_llm,
+        mock_find_citations,
+    ) -> None:
+        """The full get_pdfs chain must turn an available document into an
+        opinion without buying it again."""
+        mock_extract.return_value.json.return_value = {
+            "content": "See Doe v. Roe, 671 F. Supp. 3d 387 (S.D.N.Y. 2023).",
+            "extracted_by_ocr": False,
+        }
+        row = self.make_row()
+        with patch(
+            "cl.corpus_importer.tasks.lookup_and_save",
+            return_value=self.docket,
+        ):
+            get_pdfs(
+                [self.court.pk], date(2026, 3, 20), date(2026, 3, 20), "celery"
+            )
+
+        mock_download.assert_not_called()
+        self.assertTrue(
+            Opinion.objects.filter(
+                sha1=self.rd.sha1, cluster__docket=self.docket
+            ).exists()
+        )
+        self.assertFalse(
+            PACERFreeDocumentRow.objects.filter(pk=row.pk).exists()
+        )
+
+    @patch("cl.corpus_importer.tasks.download_pacer_pdf_by_rd")
+    @patch("cl.corpus_importer.tasks.get_or_cache_pacer_cookies")
+    def test_skip_flag_does_not_buy_the_document_again(
+        self, mock_cookies, mock_download
+    ) -> None:
+        """The skip flag must pass the document on without calling PACER."""
+        row = self.make_row()
+        data = get_and_process_free_pdf(
+            {
+                "result": row,
+                "rd_pk": self.rd.pk,
+                "pacer_court_id": "nysd",
+                "skip_pdf_download": True,
+            },
+            row.pk,
+            self.court.pk,
+        )
+
+        self.assertEqual(data["rd_pk"], self.rd.pk)
+        mock_cookies.assert_not_called()
+        mock_download.assert_not_called()
 
 
 class GetQuarterTest(SimpleTestCase):
