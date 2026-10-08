@@ -1,5 +1,5 @@
 from datetime import date
-from typing import Any
+from typing import Any, TypedDict
 
 from asgiref.sync import async_to_sync, sync_to_async
 from django.core.files.base import ContentFile
@@ -29,9 +29,14 @@ from cl.search.models import Court, Docket
 cnt = CaseNameTweaker()
 
 
+class _OAItemDict(TypedDict):
+    docket: Docket
+    audio_file: Audio
+
+
 @transaction.atomic
 def save_everything(
-    items: dict[str, Docket | Audio],
+    items: _OAItemDict,
     backscrape: bool = False,
 ) -> None:
     docket, af = items["docket"], items["audio_file"]

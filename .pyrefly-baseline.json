@@ -1394,20 +1394,6 @@
       "severity": "error"
     },
     {
-      "column": 14,
-      "path": "cl/disclosures/tasks.py",
-      "name": "bad-argument-type",
-      "concise_description": "Argument `bytes` is not assignable to parameter `file` with type `BufferedReader | None`",
-      "severity": "error"
-    },
-    {
-      "column": 18,
-      "path": "cl/disclosures/tasks.py",
-      "name": "bad-argument-type",
-      "concise_description": "Argument `bytes | Any` is not assignable to parameter `file` with type `BufferedReader | None`",
-      "severity": "error"
-    },
-    {
       "column": 42,
       "path": "cl/disclosures/tasks.py",
       "name": "bad-argument-type",
@@ -4012,55 +3998,6 @@
       "severity": "error"
     },
     {
-      "column": 17,
-      "path": "cl/scrapers/management/commands/cl_scrape_oral_arguments.py",
-      "name": "bad-assignment",
-      "concise_description": "`Audio | Docket` is not assignable to attribute `docket` with type `Docket`",
-      "severity": "error"
-    },
-    {
-      "column": 8,
-      "path": "cl/scrapers/management/commands/cl_scrape_oral_arguments.py",
-      "name": "missing-attribute",
-      "concise_description": "Object of class `Docket` has no attribute `docket`",
-      "severity": "error"
-    },
-    {
-      "column": 12,
-      "path": "cl/scrapers/management/commands/cl_scrape_oral_arguments.py",
-      "name": "missing-attribute",
-      "concise_description": "Object of class `Docket` has no attribute `judges`",
-      "severity": "error"
-    },
-    {
-      "column": 17,
-      "path": "cl/scrapers/management/commands/cl_scrape_oral_arguments.py",
-      "name": "bad-argument-type",
-      "concise_description": "Argument `object | str` is not assignable to parameter `s` with type `str`",
-      "severity": "error"
-    },
-    {
-      "column": 28,
-      "path": "cl/scrapers/management/commands/cl_scrape_oral_arguments.py",
-      "name": "missing-attribute",
-      "concise_description": "Object of class `Audio` has no attribute `court`",
-      "severity": "error"
-    },
-    {
-      "column": 45,
-      "path": "cl/scrapers/management/commands/cl_scrape_oral_arguments.py",
-      "name": "missing-attribute",
-      "concise_description": "Object of class `Docket` has no attribute `docket`",
-      "severity": "error"
-    },
-    {
-      "column": 46,
-      "path": "cl/scrapers/management/commands/cl_scrape_oral_arguments.py",
-      "name": "missing-attribute",
-      "concise_description": "Object of class `Docket` has no attribute `docket`",
-      "severity": "error"
-    },
-    {
       "column": 5,
       "path": "cl/scrapers/management/commands/cl_scrape_oral_arguments.py",
       "name": "missing-attribute",
@@ -4086,104 +4023,6 @@
       "path": "cl/scrapers/management/commands/clone_from_cl.py",
       "name": "bad-argument-type",
       "concise_description": "Argument `Unknown | None` is not assignable to parameter `*args` with type `PathLike[str] | str` in function `pathlib.PurePath.__new__`",
-      "severity": "error"
-    },
-    {
-      "column": 20,
-      "path": "cl/scrapers/management/commands/clone_from_cl.py",
-      "name": "bad-assignment",
-      "concise_description": "`Unknown | None` is not assignable to attribute `ids` with type `list[Unknown]`",
-      "severity": "error"
-    },
-    {
-      "column": 21,
-      "path": "cl/scrapers/management/commands/clone_from_cl.py",
-      "name": "bad-argument-type",
-      "concise_description": "Argument `Unknown | None` is not assignable to parameter `download_cluster_files` with type `bool` in function `clone_opinion_cluster`",
-      "severity": "error"
-    },
-    {
-      "column": 21,
-      "path": "cl/scrapers/management/commands/clone_from_cl.py",
-      "name": "bad-argument-type",
-      "concise_description": "Argument `Unknown | None` is not assignable to parameter `add_docket_entries` with type `bool` in function `clone_opinion_cluster`",
-      "severity": "error"
-    },
-    {
-      "column": 21,
-      "path": "cl/scrapers/management/commands/clone_from_cl.py",
-      "name": "bad-argument-type",
-      "concise_description": "Argument `Unknown | None` is not assignable to parameter `person_positions` with type `bool` in function `clone_opinion_cluster`",
-      "severity": "error"
-    },
-    {
-      "column": 21,
-      "path": "cl/scrapers/management/commands/clone_from_cl.py",
-      "name": "bad-argument-type",
-      "concise_description": "Argument `Unknown | None` is not assignable to parameter `download_opinion_files` with type `bool` in function `clone_opinion_cluster`",
-      "severity": "error"
-    },
-    {
-      "column": 21,
-      "path": "cl/scrapers/management/commands/clone_from_cl.py",
-      "name": "bad-argument-type",
-      "concise_description": "Argument `Unknown | None` is not assignable to parameter `no_update` with type `bool` in function `clone_opinion_cluster`",
-      "severity": "error"
-    },
-    {
-      "column": 21,
-      "path": "cl/scrapers/management/commands/clone_from_cl.py",
-      "name": "bad-argument-type",
-      "concise_description": "Argument `Unknown | None` is not assignable to parameter `add_docket_entries` with type `bool` in function `clone_docket`",
-      "severity": "error"
-    },
-    {
-      "column": 21,
-      "path": "cl/scrapers/management/commands/clone_from_cl.py",
-      "name": "bad-argument-type",
-      "concise_description": "Argument `Unknown | None` is not assignable to parameter `person_positions` with type `bool` in function `clone_docket`",
-      "severity": "error"
-    },
-    {
-      "column": 21,
-      "path": "cl/scrapers/management/commands/clone_from_cl.py",
-      "name": "bad-argument-type",
-      "concise_description": "Argument `Unknown | None` is not assignable to parameter `download_local_file` with type `bool` in function `clone_docket`",
-      "severity": "error"
-    },
-    {
-      "column": 21,
-      "path": "cl/scrapers/management/commands/clone_from_cl.py",
-      "name": "bad-argument-type",
-      "concise_description": "Argument `Unknown | None` is not assignable to parameter `no_update` with type `bool` in function `clone_docket`",
-      "severity": "error"
-    },
-    {
-      "column": 21,
-      "path": "cl/scrapers/management/commands/clone_from_cl.py",
-      "name": "bad-argument-type",
-      "concise_description": "Argument `Unknown | None` is not assignable to parameter `positions` with type `bool` in function `clone_person`",
-      "severity": "error"
-    },
-    {
-      "column": 21,
-      "path": "cl/scrapers/management/commands/clone_from_cl.py",
-      "name": "bad-argument-type",
-      "concise_description": "Argument `Unknown | None` is not assignable to parameter `no_update` with type `bool` in function `clone_person`",
-      "severity": "error"
-    },
-    {
-      "column": 21,
-      "path": "cl/scrapers/management/commands/clone_from_cl.py",
-      "name": "bad-argument-type",
-      "concise_description": "Argument `Unknown | None` is not assignable to parameter `no_update` with type `bool` in function `clone_court`",
-      "severity": "error"
-    },
-    {
-      "column": 21,
-      "path": "cl/scrapers/management/commands/clone_from_cl.py",
-      "name": "bad-argument-type",
-      "concise_description": "Argument `Unknown | None` is not assignable to parameter `no_update` with type `bool` in function `clone_audio_files`",
       "severity": "error"
     },
     {
@@ -4282,13 +4121,6 @@
       "path": "cl/scrapers/tasks.py",
       "name": "missing-attribute",
       "concise_description": "Object of class `RECAPDocument` has no attribute `citation_queue`",
-      "severity": "error"
-    },
-    {
-      "column": 26,
-      "path": "cl/scrapers/tasks.py",
-      "name": "bad-assignment",
-      "concise_description": "`float` is not assignable to attribute `duration` with type `int | None`",
       "severity": "error"
     },
     {
@@ -4492,13 +4324,6 @@
       "path": "cl/scrapers/utils.py",
       "name": "bad-index",
       "concise_description": "Cannot index into `tuple[Pattern[Unknown], Unknown, Unknown, Unknown, Unknown, Unknown]`",
-      "severity": "error"
-    },
-    {
-      "column": 14,
-      "path": "cl/scrapers/utils.py",
-      "name": "bad-argument-type",
-      "concise_description": "Argument `bytes` is not assignable to parameter `file` with type `BufferedReader | None`",
       "severity": "error"
     },
     {
