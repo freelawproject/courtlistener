@@ -133,8 +133,8 @@
     </c-button>
   {% endif %}
   {# Staff actions, admin links and moderation state, each gated on the permission its target requires. #}
-  {% if perms.search.view_docket or perms.search.change_docket or perms.search.delete_docket %}
-  <div class="flex flex-wrap items-center gap-2 md:ml-auto" x-data="docketPage">
+  {% if perms.search|has_any_perm:"docket" %}
+  <div class="flex flex-wrap items-center gap-2 md:ml-auto" x-data="docketStaffActions">
     <c-button variant="dark" href="{% url 'admin:search_docket_change' docket.pk %}">
       {% svg "edit" class="w-4 h-4" aria_hidden="true" %}
       Edit Docket

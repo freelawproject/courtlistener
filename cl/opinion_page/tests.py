@@ -4157,8 +4157,11 @@ class DocketPageV2StaffLinksTest(TestCase):
     async def _get_docket_page(
         self, user: User | None = None
     ) -> "_MonkeyPatchedASGIResponse":
-        """Loads the v2 docket page, logged in as user when given."""
-        if user is not None:
+        """Loads the v2 docket page, logged in as user when given and
+        anonymously otherwise, whatever the client's previous login."""
+        if user is None:
+            await self.async_client.alogout()
+        else:
             await self.async_client.aforce_login(user)
         r = await self.async_client.get(
             reverse("view_docket", args=[self.docket.pk, self.docket.slug])
