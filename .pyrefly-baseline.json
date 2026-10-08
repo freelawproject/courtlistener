@@ -2290,31 +2290,10 @@
       "severity": "error"
     },
     {
-      "column": 17,
-      "path": "cl/opinion_page/types.py",
-      "name": "bad-assignment",
-      "concise_description": "`QuerySet[OpinionsCitedByRECAPDocument, OpinionsCitedByRECAPDocument]` is not assignable to attribute `full_list_authorities` with type `list[OpinionCluster | OpinionsCitedByRECAPDocument]`",
-      "severity": "error"
-    },
-    {
-      "column": 35,
-      "path": "cl/opinion_page/types.py",
-      "name": "missing-attribute",
-      "concise_description": "Object of class `OpinionCluster` has no attribute `cited_opinion`",
-      "severity": "error"
-    },
-    {
       "column": 27,
       "path": "cl/opinion_page/types.py",
       "name": "missing-attribute",
       "concise_description": "Object of class `OpinionCluster` has no attribute `depth`",
-      "severity": "error"
-    },
-    {
-      "column": 28,
-      "path": "cl/opinion_page/types.py",
-      "name": "missing-attribute",
-      "concise_description": "Object of class `OpinionCluster` has no attribute `cited_opinion`",
       "severity": "error"
     },
     {

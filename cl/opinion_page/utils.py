@@ -21,6 +21,7 @@ from django.utils.timezone import localtime
 from django_elasticsearch_dsl.search import Search
 from elasticsearch.dsl import Q
 from elasticsearch.dsl.response import Response
+from elasticsearch.dsl.response.hit import Hit
 from elasticsearch.exceptions import ApiError, ConnectionTimeout, RequestError
 
 from cl.alerts.models import DocketAlert
@@ -957,7 +958,8 @@ async def es_get_cited_clusters_with_cache(
         response = None
         timeout_cited = True
 
-    citing_clusters = list(response) if response is not None else []
+    citing_clusters: list[Hit] = list(response) if response is not None else []
+    # TODO: Don't know what to do about this bad-assignment
     cluster_results.citing_clusters = citing_clusters
     cluster_results.citing_cluster_count = (
         cast(Any, response.hits).total.value if response is not None else 0
