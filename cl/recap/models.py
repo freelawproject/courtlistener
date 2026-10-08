@@ -453,7 +453,7 @@ class PacerFetchQueue(AbstractDateTimeModel):
     # PDF and attachment pages use this
     recap_document = models.ForeignKey(
         RECAPDocument,
-        help_text="The ID of the RECAP Document in the CourtListener database "
+        help_text="The ID of the RECAP Document in the CourtListener databae "
         "that you wish to fetch or update.",
         related_name="pacer_fetch_queue_items",
         on_delete=models.SET_NULL,
@@ -986,7 +986,7 @@ class FjcIntegratedDatabase(AbstractDateTimeModel):
     # Criminal fields
     nature_of_offense = models.CharField(
         help_text="The four digit D2 offense code associated with the filing "
-        "title/section 1. These codes were created in FY2005 to "
+        "title/secion 1. These codes were created in FY2005 to "
         "replace the AO offense codes.",
         max_length=4,
         choices=NOO_CODES,
