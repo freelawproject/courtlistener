@@ -1201,7 +1201,7 @@ class JKentScrapeLoader[ScrapeType: BaseModel, ParamType = None](ABC):
         since: datetime,
         wait: WaitOutcome,
     ) -> ExtractionReport:
-        """Get's extraction status for this model since the run started.
+        """Gets extraction status for this model since the run started.
 
         Updates the ledger accordingly.
 
