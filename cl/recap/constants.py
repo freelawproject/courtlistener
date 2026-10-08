@@ -428,7 +428,7 @@ NOS_CODES = (
     (CIVIL_RIGHTS_OTHER, "440 Civil rights other"),
     (CIVIL_RIGHTS_VOTING, "441 Civil rights voting"),
     (CIVIL_RIGHTS_JOBS, "442 Civil rights jobs"),
-    (CIVIL_RIGHTS_ACCOMMODATIONS, "443 Civil rights accomodations"),
+    (CIVIL_RIGHTS_ACCOMMODATIONS, "443 Civil rights accommodations"),
     (CIVIL_RIGHTS_WELFARE, "444 Civil rights welfare"),
     (CIVIL_RIGHTS_ADA_EMPLOYMENT, "445 Civil rights ADA employment"),
     (CIVIL_RIGHTS_ADA_OTHER, "446 Civil rights ADA other"),
