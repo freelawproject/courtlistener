@@ -1128,13 +1128,6 @@
       "severity": "error"
     },
     {
-      "column": 52,
-      "path": "cl/corpus_importer/state/new_york/loader.py",
-      "name": "bad-assignment",
-      "concise_description": "`type[NYCoADocketMerger]` is not assignable to `type[Merger[NYCoACase, None, Model]]`",
-      "severity": "error"
-    },
-    {
       "column": 26,
       "path": "cl/corpus_importer/state/new_york/test_loader.py",
       "name": "missing-attribute",
@@ -1156,20 +1149,6 @@
       "severity": "error"
     },
     {
-      "column": 5,
-      "path": "cl/corpus_importer/tasks.py",
-      "name": "missing-attribute",
-      "concise_description": "Object of class `PACERFreeDocumentRow` has no attribute `court`",
-      "severity": "error"
-    },
-    {
-      "column": 5,
-      "path": "cl/corpus_importer/tasks.py",
-      "name": "missing-attribute",
-      "concise_description": "Object of class `PACERFreeDocumentRow` has no attribute `case_name_short`",
-      "severity": "error"
-    },
-    {
       "column": 24,
       "path": "cl/corpus_importer/tasks.py",
       "name": "bad-argument-type",
@@ -1188,13 +1167,6 @@
       "path": "cl/corpus_importer/tasks.py",
       "name": "missing-attribute",
       "concise_description": "Object of class `NoneType` has no attribute `text`",
-      "severity": "error"
-    },
-    {
-      "column": 23,
-      "path": "cl/corpus_importer/tasks.py",
-      "name": "bad-assignment",
-      "concise_description": "`int` is not assignable to attribute `pacer_case_id` with type `str | None`",
       "severity": "error"
     },
     {
@@ -1300,104 +1272,6 @@
       "path": "cl/corpus_importer/tasks.py",
       "name": "missing-attribute",
       "concise_description": "Object of class `NoneType` has no attribute `text`",
-      "severity": "error"
-    },
-    {
-      "column": 43,
-      "path": "cl/corpus_importer/tasks.py",
-      "name": "bad-assignment",
-      "concise_description": "`str` is not assignable to attribute `media_version_id` with type `UUID`",
-      "severity": "error"
-    },
-    {
-      "column": 28,
-      "path": "cl/corpus_importer/tasks.py",
-      "name": "bad-assignment",
-      "concise_description": "`object | str` is not assignable to attribute `remarks` with type `str`",
-      "severity": "error"
-    },
-    {
-      "column": 23,
-      "path": "cl/corpus_importer/test_migrate_document_paths.py",
-      "name": "bad-assignment",
-      "concise_description": "`FakeS3Client` is not assignable to attribute `client` with type `Client`",
-      "severity": "error"
-    },
-    {
-      "column": 23,
-      "path": "cl/corpus_importer/test_migrate_document_paths.py",
-      "name": "bad-argument-type",
-      "concise_description": "Argument `Client | FakeS3Client` is not assignable to parameter `client` with type `FakeS3Client` in function `patch_s3`",
-      "severity": "error"
-    },
-    {
-      "column": 43,
-      "path": "cl/corpus_importer/test_migrate_document_paths.py",
-      "name": "missing-attribute",
-      "concise_description": "Object of class `Client` has no attribute `copies`",
-      "severity": "error"
-    },
-    {
-      "column": 13,
-      "path": "cl/corpus_importer/test_migrate_document_paths.py",
-      "name": "missing-attribute",
-      "concise_description": "Object of class `Client` has no attribute `copies`",
-      "severity": "error"
-    },
-    {
-      "column": 9,
-      "path": "cl/corpus_importer/test_migrate_document_paths.py",
-      "name": "missing-attribute",
-      "concise_description": "Object of class `Client` has no attribute `copies`",
-      "severity": "error"
-    },
-    {
-      "column": 26,
-      "path": "cl/corpus_importer/test_migrate_document_paths.py",
-      "name": "missing-attribute",
-      "concise_description": "Object of class `Client` has no attribute `copies`",
-      "severity": "error"
-    },
-    {
-      "column": 26,
-      "path": "cl/corpus_importer/test_migrate_document_paths.py",
-      "name": "missing-attribute",
-      "concise_description": "Object of class `Client` has no attribute `copies`",
-      "severity": "error"
-    },
-    {
-      "column": 30,
-      "path": "cl/corpus_importer/test_migrate_document_paths.py",
-      "name": "missing-attribute",
-      "concise_description": "Object of class `Client` has no attribute `copies`",
-      "severity": "error"
-    },
-    {
-      "column": 37,
-      "path": "cl/corpus_importer/test_migrate_document_paths.py",
-      "name": "missing-attribute",
-      "concise_description": "Object of class `Client` has no attribute `objects`",
-      "severity": "error"
-    },
-    {
-      "column": 9,
-      "path": "cl/corpus_importer/test_migrate_document_paths.py",
-      "name": "missing-attribute",
-      "concise_description": "Object of class `Client` has no attribute `objects`",
-      "severity": "error"
-    },
-    {
-      "column": 26,
-      "path": "cl/corpus_importer/test_migrate_document_paths.py",
-      "name": "missing-attribute",
-      "concise_description": "Object of class `Client` has no attribute `copies`",
-      "severity": "error"
-    },
-    {
-      "column": 23,
-      "path": "cl/corpus_importer/test_migrate_document_paths.py",
-      "name": "bad-argument-type",
-      "concise_description": "Argument `Client` is not assignable to parameter `client` with type `FakeS3Client` in function `patch_s3`",
       "severity": "error"
     },
     {
