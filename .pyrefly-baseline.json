@@ -2920,34 +2920,6 @@
       "severity": "error"
     },
     {
-      "column": 39,
-      "path": "cl/recap/mergers.py",
-      "name": "bad-assignment",
-      "concise_description": "`int` is not assignable to dict key `document_type` with type `DocketEntry`",
-      "severity": "error"
-    },
-    {
-      "column": 39,
-      "path": "cl/recap/mergers.py",
-      "name": "bad-assignment",
-      "concise_description": "`int` is not assignable to dict key `document_type` with type `DocketEntry`",
-      "severity": "error"
-    },
-    {
-      "column": 43,
-      "path": "cl/recap/mergers.py",
-      "name": "bad-assignment",
-      "concise_description": "`int` is not assignable to dict key `document_type` with type `DocketEntry`",
-      "severity": "error"
-    },
-    {
-      "column": 21,
-      "path": "cl/recap/mergers.py",
-      "name": "unsupported-operation",
-      "concise_description": "Cannot set item in `dict[str, DocketEntry]`",
-      "severity": "error"
-    },
-    {
       "column": 20,
       "path": "cl/recap/mergers.py",
       "name": "missing-attribute",
@@ -3018,48 +2990,6 @@
       "severity": "error"
     },
     {
-      "column": 37,
-      "path": "cl/recap/mergers.py",
-      "name": "bad-assignment",
-      "concise_description": "`int | None` is not assignable to dict key `document_number` with type `Court | int`",
-      "severity": "error"
-    },
-    {
-      "column": 62,
-      "path": "cl/recap/mergers.py",
-      "name": "bad-assignment",
-      "concise_description": "`int | None` is not assignable to dict key `docket_entry__docket__docket_number_core` with type `Court | int`",
-      "severity": "error"
-    },
-    {
-      "column": 33,
-      "path": "cl/recap/mergers.py",
-      "name": "bad-assignment",
-      "concise_description": "`str | None` is not assignable to dict key `description` with type `Court | int`",
-      "severity": "error"
-    },
-    {
-      "column": 46,
-      "path": "cl/recap/mergers.py",
-      "name": "bad-assignment",
-      "concise_description": "`int | str` is not assignable to dict key `pacer_doc_id` with type `int`",
-      "severity": "error"
-    },
-    {
-      "column": 53,
-      "path": "cl/recap/mergers.py",
-      "name": "bad-assignment",
-      "concise_description": "`int | str` is not assignable to attribute `attachment_number` with type `int | None`",
-      "severity": "error"
-    },
-    {
-      "column": 57,
-      "path": "cl/recap/mergers.py",
-      "name": "bad-assignment",
-      "concise_description": "`int | str` is not assignable to attribute `attachment_number` with type `int | None`",
-      "severity": "error"
-    },
-    {
       "column": 30,
       "path": "cl/recap/mergers.py",
       "name": "unbound-name",
@@ -3109,31 +3039,10 @@
       "severity": "error"
     },
     {
-      "column": 41,
-      "path": "cl/recap/mergers.py",
-      "name": "bad-assignment",
-      "concise_description": "`int | str` is not assignable to attribute `attachment_number` with type `int | None`",
-      "severity": "error"
-    },
-    {
       "column": 17,
       "path": "cl/recap/mergers.py",
       "name": "missing-attribute",
       "concise_description": "Object of class `NoneType` has no attribute `acms_document_guid`",
-      "severity": "error"
-    },
-    {
-      "column": 46,
-      "path": "cl/recap/mergers.py",
-      "name": "bad-assignment",
-      "concise_description": "`int | str` is not assignable to attribute `acms_document_guid` with type `str`",
-      "severity": "error"
-    },
-    {
-      "column": 48,
-      "path": "cl/recap/mergers.py",
-      "name": "bad-assignment",
-      "concise_description": "`int | str` is not assignable to attribute `attachment_number` with type `int | None`",
       "severity": "error"
     },
     {
@@ -3158,13 +3067,6 @@
       "severity": "error"
     },
     {
-      "column": 30,
-      "path": "cl/recap/mergers.py",
-      "name": "bad-assignment",
-      "concise_description": "`int | str` is not assignable to attribute `description` with type `str`",
-      "severity": "error"
-    },
-    {
       "column": 13,
       "path": "cl/recap/mergers.py",
       "name": "missing-attribute",
@@ -3172,24 +3074,10 @@
       "severity": "error"
     },
     {
-      "column": 31,
-      "path": "cl/recap/mergers.py",
-      "name": "bad-assignment",
-      "concise_description": "`int | str` is not assignable to attribute `pacer_doc_id` with type `str`",
-      "severity": "error"
-    },
-    {
       "column": 13,
       "path": "cl/recap/mergers.py",
       "name": "missing-attribute",
       "concise_description": "Object of class `NoneType` has no attribute `document_number`",
-      "severity": "error"
-    },
-    {
-      "column": 34,
-      "path": "cl/recap/mergers.py",
-      "name": "bad-assignment",
-      "concise_description": "`int` is not assignable to attribute `document_number` with type `str`",
       "severity": "error"
     },
     {
@@ -3207,24 +3095,10 @@
       "severity": "error"
     },
     {
-      "column": 29,
-      "path": "cl/recap/mergers.py",
-      "name": "bad-assignment",
-      "concise_description": "`int | str` is not assignable to attribute `page_count` with type `int | None`",
-      "severity": "error"
-    },
-    {
       "column": 13,
       "path": "cl/recap/mergers.py",
       "name": "missing-attribute",
       "concise_description": "Object of class `NoneType` has no attribute `file_size`",
-      "severity": "error"
-    },
-    {
-      "column": 28,
-      "path": "cl/recap/mergers.py",
-      "name": "bad-assignment",
-      "concise_description": "`int | str` is not assignable to attribute `file_size` with type `int | None`",
       "severity": "error"
     },
     {
@@ -3239,13 +3113,6 @@
       "path": "cl/recap/mergers.py",
       "name": "missing-attribute",
       "concise_description": "Object of class `NoneType` has no attribute `file_size`",
-      "severity": "error"
-    },
-    {
-      "column": 21,
-      "path": "cl/recap/mergers.py",
-      "name": "bad-argument-type",
-      "concise_description": "Argument `int | str` is not assignable to parameter `size_str` with type `str` in function `cl.lib.filesizes.convert_size_to_bytes`",
       "severity": "error"
     },
     {
@@ -3291,13 +3158,6 @@
       "severity": "error"
     },
     {
-      "column": 23,
-      "path": "cl/recap/mergers.py",
-      "name": "bad-assignment",
-      "concise_description": "`int` is not assignable to attribute `pacer_case_id` with type `str | None`",
-      "severity": "error"
-    },
-    {
       "column": 5,
       "path": "cl/recap/mergers.py",
       "name": "missing-attribute",
@@ -3316,13 +3176,6 @@
       "path": "cl/recap/tasks.py",
       "name": "missing-import",
       "concise_description": "Cannot find module `requests.packages.urllib3.exceptions`",
-      "severity": "error"
-    },
-    {
-      "column": 32,
-      "path": "cl/recap/tasks.py",
-      "name": "bad-assignment",
-      "concise_description": "`int | list[int] | None` is not assignable to attribute `recap_document_id` with type `int | None`",
       "severity": "error"
     },
     {
@@ -3473,13 +3326,6 @@
       "severity": "error"
     },
     {
-      "column": 13,
-      "path": "cl/recap/tasks.py",
-      "name": "bad-assignment",
-      "concise_description": "`int | None` is not assignable to variable `rd_pk` with type `int`",
-      "severity": "error"
-    },
-    {
       "column": 16,
       "path": "cl/recap/tasks.py",
       "name": "missing-attribute",
@@ -3575,13 +3421,6 @@
       "path": "cl/recap/tasks.py",
       "name": "bad-argument-type",
       "concise_description": "Argument `str | Unknown` is not assignable to parameter `attachment_dicts` with type `list[dict[str, int | str]]`",
-      "severity": "error"
-    },
-    {
-      "column": 22,
-      "path": "cl/recap/tasks.py",
-      "name": "bad-assignment",
-      "concise_description": "`int` is not assignable to dict value type `bool | str`",
       "severity": "error"
     },
     {
