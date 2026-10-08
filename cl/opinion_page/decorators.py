@@ -1,20 +1,23 @@
-from collections.abc import Callable, Coroutine
+from collections.abc import Coroutine
 from functools import wraps
 from http import HTTPStatus
-from typing import Any, Concatenate
+from typing import Any
 
 from django.http import Http404, HttpRequest, HttpResponse
 from django.shortcuts import redirect
 from django.template.response import TemplateResponse
 
+from cl.lib.types import DjangoViewType
 from cl.search.models import ClusterRedirection
 
 
-def handle_cluster_redirection[**P](
-    view_func: Callable[
-        Concatenate[HttpRequest, P], Coroutine[Any, Any, HttpResponse]
-    ],
-) -> Callable[Concatenate[HttpRequest, P], Coroutine[Any, Any, HttpResponse]]:
+def handle_cluster_redirection[
+    **P,
+    Request: HttpRequest,
+    Response: Coroutine[Any, Any, HttpResponse],
+](
+    view_func: DjangoViewType[P, Request, Response],
+) -> DjangoViewType[P, Request, Coroutine[Any, Any, HttpResponse]]:
     """
     Redirect from deleted clusters to existing clusters
 
@@ -23,7 +26,7 @@ def handle_cluster_redirection[**P](
 
     @wraps(view_func)
     async def _wrapped_view(
-        request: HttpRequest, *args: P.args, **kwargs: P.kwargs
+        request: Request, *args: P.args, **kwargs: P.kwargs
     ) -> HttpResponse:
         try:
             response = await view_func(request, *args, **kwargs)

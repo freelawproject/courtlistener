@@ -7,6 +7,7 @@ from urllib.parse import parse_qs, urlencode
 
 from asgiref.sync import async_to_sync
 from django.conf import settings
+from django.contrib.auth.models import User
 from django.core.cache import cache
 from django.core.exceptions import PermissionDenied
 from django.core.paginator import EmptyPage, Page, PageNotAnInteger, Paginator
@@ -347,7 +348,7 @@ def store_search_api_query(
         return
 
     if request.user.is_authenticated and not is_search_history_on_cached(
-        request.user.pk
+        cast(User, request.user).pk
     ):
         return
 

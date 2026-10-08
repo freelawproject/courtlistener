@@ -1499,38 +1499,10 @@
       "severity": "error"
     },
     {
-      "column": 31,
-      "path": "cl/favorites/decorators.py",
-      "name": "bad-argument-type",
-      "concise_description": "Argument `type[str] | Unknown` is not assignable to parameter `track_attribute` with type `str`",
-      "severity": "error"
-    },
-    {
-      "column": 39,
-      "path": "cl/favorites/decorators.py",
-      "name": "bad-argument-type",
-      "concise_description": "Argument `type[str] | Unknown` is not assignable to parameter `template` with type `str`",
-      "severity": "error"
-    },
-    {
       "column": 17,
       "path": "cl/favorites/decorators.py",
       "name": "missing-attribute",
       "concise_description": "Object of class `NoneType` has no attribute `update`",
-      "severity": "error"
-    },
-    {
-      "column": 52,
-      "path": "cl/favorites/decorators.py",
-      "name": "bad-argument-type",
-      "concise_description": "Argument `type[str] | Unknown` is not assignable to parameter `track_attribute` with type `str` in function `_get_label`",
-      "severity": "error"
-    },
-    {
-      "column": 60,
-      "path": "cl/favorites/decorators.py",
-      "name": "bad-argument-type",
-      "concise_description": "Argument `type[str] | Unknown` is not assignable to parameter `template` with type `str` in function `_get_label`",
       "severity": "error"
     },
     {
@@ -2266,13 +2238,6 @@
       "path": "cl/opinion_page/views.py",
       "name": "missing-attribute",
       "concise_description": "Object of class `Docket` has no attribute `idb_data_id`",
-      "severity": "error"
-    },
-    {
-      "column": 1,
-      "path": "cl/opinion_page/views.py",
-      "name": "bad-argument-type",
-      "concise_description": "Argument `((request: Unknown, *args: Unknown, **kwargs: Unknown) -> SimpleTemplateResponse | Unknown) | ((request: Unknown, *args: Unknown, **kwargs: Unknown) -> Coroutine[Unknown, Unknown, SimpleTemplateResponse | Unknown])` is not assignable to parameter `view_func` with type `(HttpRequest, *args: Unknown, **kwargs: Unknown) -> Coroutine[Any, Any, HttpResponse]` in function `cl.opinion_page.decorators.handle_cluster_redirection`",
       "severity": "error"
     },
     {

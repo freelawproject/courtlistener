@@ -125,7 +125,6 @@ from cl.corpus_importer.state.loader import LoadPhase, fingerprint
 from cl.corpus_importer.state.registry import get_loader
 from cl.corpus_importer.state.utils import MergeResult
 from cl.corpus_importer.utils import (
-    DownloadPDFResult,
     compute_binary_probe_jitter,
     compute_blocked_court_wait,
     compute_next_binary_probe,
@@ -1527,7 +1526,7 @@ def make_docket_by_iquery_sweep(
 @retry((requests.Timeout, PacerLoginException), tries=3, delay=0.25, backoff=1)
 def query_iquery_page(
     court_id: str, pacer_case_id: str
-) -> tuple[bool, None] | tuple[dict[str, Any], str]:
+) -> None | tuple[dict[str, Any], str]:
     """A small wrapper to query the iquery page for a given PACER case ID to
     support retries via the @retry decorator in case of a failure.
 
@@ -1544,7 +1543,7 @@ def query_iquery_page(
             court_id,
             pacer_case_id,
         )
-        return False, None
+        return None
     return report_data, report_text
 
 
@@ -1619,9 +1618,7 @@ def probe_or_scrape_iquery_pages(
         )
         probe_iteration += 1
         try:
-            report_data, report_text = query_iquery_page(
-                court_id, pacer_case_id_to_lookup
-            )
+            report = query_iquery_page(court_id, str(pacer_case_id_to_lookup))
         except HTTPError:
             # Set expiration accordingly and value to 2 to difference from
             # other waiting times.
@@ -1673,10 +1670,10 @@ def probe_or_scrape_iquery_pages(
             )
             break
 
-        if report_data:
+        if report is not None:
             # Find and update/store the Docket.
             reports_data.append(
-                (pacer_case_id_to_lookup, report_data, report_text)
+                (pacer_case_id_to_lookup, report[0], report[1])
             )
             latest_match = pacer_case_id_to_lookup
             found_match = True
@@ -1773,7 +1770,7 @@ def probe_or_scrape_iquery_pages(
         try:
             process_case_query_report(
                 court_id,
-                pacer_case_id=pacer_case_id,
+                pacer_case_id=str(pacer_case_id),
                 report_data=report_data,
                 report_text=report_text,
                 skip_iquery_sweep=skip_iquery_sweep,
@@ -1785,7 +1782,7 @@ def probe_or_scrape_iquery_pages(
                 "IntegrityError occurred when processing iquery page for "
                 "court: %s and pacer_case_id: %s",
                 court_id,
-                report_data[0],
+                pacer_case_id,
             )
             continue
     delete_redis_semaphore("CACHE", make_iquery_probing_key(court_id))
@@ -3393,7 +3390,7 @@ def download_document_in_stream(
         delay=1,
         backoff=2,
     )
-    def download_to_file(tmp_file):
+    def download_to_file(tmp_file: IO[bytes]) -> str | None:
         tmp_file.seek(0)
         # Clear any partial content from previous attempt
         tmp_file.truncate()
@@ -3411,18 +3408,21 @@ def download_document_in_stream(
                     identifier,
                     url,
                 )
-                return DownloadPDFResult(success=False)
+                return None
             for chunk in response.iter_content(chunk_size=8 * 1024):
                 if chunk:
                     tmp_file.write(chunk)
                     hasher.update(chunk)
             tmp_file.flush()
             tmp_file.seek(0)
-            return DownloadPDFResult(success=True, sha1=hasher.hexdigest())
+            return hasher.hexdigest()
 
     with NamedTemporaryFile(prefix=temp_prefix, suffix=".pdf") as tmp:
         result = download_to_file(tmp)
-        yield (tmp, result.sha1) if result.success else None
+        if result is None:
+            yield None
+        else:
+            yield (tmp.file, result)
 
 
 @app.task(

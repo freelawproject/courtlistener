@@ -1,10 +1,10 @@
 from collections import defaultdict
-from collections.abc import Callable
+from collections.abc import Callable, Coroutine
 from dataclasses import dataclass, field
 from datetime import datetime
-from typing import Any, NotRequired, TypedDict
+from typing import Any, Concatenate, NotRequired, TypedDict
 
-from django.http import HttpRequest
+from django.http import HttpRequest, HttpResponse, HttpResponseBase
 from django_elasticsearch_dsl.search import Search
 from elasticsearch.dsl.query import Query
 
@@ -307,3 +307,23 @@ class ApiPositionMapping(BasePositionMapping):
 
 # https://www.aazuspan.dev/blog/type-safety-and-non-empty-tuples-in-python/
 type NonEmptyTuple[T] = tuple[T, *tuple[T, ...]]
+
+type DjangoViewType[
+    **P,
+    Request: HttpRequest,
+    Response: HttpResponse
+    | Coroutine[Any, Any, HttpResponse]
+    | HttpResponseBase
+    | Coroutine[Any, Any, HttpResponseBase],
+] = Callable[Concatenate[Request, P], Response]
+type DjangoViewDecorator[
+    **P,
+    Request: HttpRequest,
+    Response: HttpResponse
+    | Coroutine[Any, Any, HttpResponse]
+    | HttpResponseBase
+    | Coroutine[Any, Any, HttpResponseBase],
+] = Callable[
+    [DjangoViewType[P, Request, Response]],
+    DjangoViewType[P, Request, Response],
+]
