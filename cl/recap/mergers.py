@@ -6,7 +6,7 @@ from collections import defaultdict
 from collections.abc import AsyncGenerator
 from copy import deepcopy
 from datetime import date, timedelta
-from typing import Any
+from typing import Any, Literal, overload
 
 from asgiref.sync import async_to_sync, sync_to_async
 from django.core.exceptions import ValidationError
@@ -275,6 +275,7 @@ async def find_docket_object_query(
     return Docket.objects.none()
 
 
+@overload
 async def find_docket_object(
     court_id: str,
     pacer_case_id: str | None,
@@ -282,6 +283,32 @@ async def find_docket_object(
     federal_defendant_number: str | None,
     federal_dn_judge_initials_assigned: str | None,
     federal_dn_judge_initials_referred: str | None,
+    *,
+    using: str = ...,
+    docket_source: int = ...,
+    allow_create: Literal[False],
+) -> Docket | None: ...
+@overload
+async def find_docket_object(
+    court_id: str,
+    pacer_case_id: str | None,
+    docket_number: str,
+    federal_defendant_number: str | None,
+    federal_dn_judge_initials_assigned: str | None,
+    federal_dn_judge_initials_referred: str | None,
+    *,
+    using: str = ...,
+    docket_source: int = ...,
+    allow_create: Literal[True] = ...,
+) -> Docket: ...
+async def find_docket_object(
+    court_id: str,
+    pacer_case_id: str | None,
+    docket_number: str,
+    federal_defendant_number: str | None,
+    federal_dn_judge_initials_assigned: str | None,
+    federal_dn_judge_initials_referred: str | None,
+    *,
     using: str = "default",
     docket_source: int = Docket.RECAP,
     allow_create: bool = True,
@@ -488,7 +515,7 @@ async def update_docket_metadata(
     await mark_ia_upload_needed(d, save_docket=False)
 
     # need to populate the docket number for tests to pass until we
-    # activate the docket_number_raw cleaning flag. This will be overriden by
+    # activate the docket_number_raw cleaning flag. This will be overridden by
     # the clean docket_number_raw value once cleaning is activated
     if not d.docket_number:
         d.docket_number = docket_data["docket_number"]

@@ -85,13 +85,6 @@
       "severity": "error"
     },
     {
-      "column": 33,
-      "path": "cl/ai/management/commands/send_gemini_file_batches.py",
-      "name": "no-matching-overload",
-      "concise_description": "No matching overload found for function `boto3.client` called with arguments: (**dict[str, str | Any])",
-      "severity": "error"
-    },
-    {
       "column": 30,
       "path": "cl/alerts/api_serializers.py",
       "name": "missing-attribute",
@@ -362,13 +355,6 @@
       "path": "cl/api/pagination.py",
       "name": "bad-override",
       "concise_description": "Class member `ESCursorPagination.get_paginated_response` overrides parent class `BasePagination` in an inconsistent manner",
-      "severity": "error"
-    },
-    {
-      "column": 29,
-      "path": "cl/api/pagination.py",
-      "name": "no-matching-overload",
-      "concise_description": "No matching overload found for function `typing.MutableMapping.update` called with arguments: (dict[str, list[dict[Unknown, Unknown]] | str | None])",
       "severity": "error"
     },
     {
@@ -757,13 +743,6 @@
       "severity": "error"
     },
     {
-      "column": 60,
-      "path": "cl/audio/tasks.py",
-      "name": "no-matching-overload",
-      "concise_description": "No matching overload found for function `openai.resources.audio.transcriptions.Transcriptions.create` called with arguments: (**dict[str, list[str] | str | tuple[str, bytes, str] | tuple[Unknown, Unknown, str]])",
-      "severity": "error"
-    },
-    {
       "column": 47,
       "path": "cl/audio/views.py",
       "name": "missing-attribute",
@@ -838,6 +817,13 @@
       "path": "cl/citations/management/commands/reindex_es_cite_fields.py",
       "name": "unbound-name",
       "concise_description": "`update_fn` may be uninitialized",
+      "severity": "error"
+    },
+    {
+      "column": 33,
+      "path": "cl/citations/management/commands/reindex_es_cite_fields.py",
+      "name": "bad-argument-type",
+      "concise_description": "Argument `list[_CiteCountUpdateDict]` is not assignable to parameter `documents_to_index` with type `list[dict[str, Any]]` in function `cl.lib.search_index_utils.index_documents_in_bulk`",
       "severity": "error"
     },
     {
@@ -922,328 +908,6 @@
       "path": "cl/citations/unmatched_citations_utils.py",
       "name": "bad-argument-type",
       "concise_description": "Argument `list[UnmatchedCitation | UnmatchedCitationFromRECAPDocument]` is not assignable to parameter `objs` with type `Iterable[UnmatchedCitationFromRECAPDocument]` in function `django.db.models.manager.Manager.bulk_create`",
-      "severity": "error"
-    },
-    {
-      "column": 20,
-      "path": "cl/corpus_importer/import_columbia/convert_columbia_html.py",
-      "name": "missing-attribute",
-      "concise_description": "Object of class `NoneType` has no attribute `group`",
-      "severity": "error"
-    },
-    {
-      "column": 20,
-      "path": "cl/corpus_importer/import_columbia/convert_columbia_html.py",
-      "name": "missing-attribute",
-      "concise_description": "Object of class `NoneType` has no attribute `group`",
-      "severity": "error"
-    },
-    {
-      "column": 20,
-      "path": "cl/corpus_importer/import_columbia/convert_columbia_html.py",
-      "name": "missing-attribute",
-      "concise_description": "Object of class `NoneType` has no attribute `group`",
-      "severity": "error"
-    },
-    {
-      "column": 20,
-      "path": "cl/corpus_importer/import_columbia/convert_columbia_html.py",
-      "name": "missing-attribute",
-      "concise_description": "Object of class `NoneType` has no attribute `group`",
-      "severity": "error"
-    },
-    {
-      "column": 26,
-      "path": "cl/corpus_importer/import_columbia/html_test.py",
-      "name": "no-matching-overload",
-      "concise_description": "No matching overload found for function `str.join` called with arguments: (bool | list[@_])",
-      "severity": "error"
-    },
-    {
-      "column": 29,
-      "path": "cl/corpus_importer/import_columbia/html_test.py",
-      "name": "no-matching-overload",
-      "concise_description": "No matching overload found for function `str.join` called with arguments: (bool | list[@_])",
-      "severity": "error"
-    },
-    {
-      "column": 27,
-      "path": "cl/corpus_importer/import_columbia/html_test.py",
-      "name": "no-matching-overload",
-      "concise_description": "No matching overload found for function `str.join` called with arguments: (bool | list[@_])",
-      "severity": "error"
-    },
-    {
-      "column": 18,
-      "path": "cl/corpus_importer/import_columbia/html_test.py",
-      "name": "not-iterable",
-      "concise_description": "Type `bool` is not iterable",
-      "severity": "error"
-    },
-    {
-      "column": 13,
-      "path": "cl/corpus_importer/import_columbia/html_test.py",
-      "name": "unsupported-operation",
-      "concise_description": "`+` is not supported between `bool` and `list[@_]`",
-      "severity": "error"
-    },
-    {
-      "column": 13,
-      "path": "cl/corpus_importer/import_columbia/html_test.py",
-      "name": "unsupported-operation",
-      "concise_description": "`+` is not supported between `list[@_]` and `bool`",
-      "severity": "error"
-    },
-    {
-      "column": 20,
-      "path": "cl/corpus_importer/import_columbia/html_test.py",
-      "name": "not-iterable",
-      "concise_description": "Type `bool` is not iterable",
-      "severity": "error"
-    },
-    {
-      "column": 24,
-      "path": "cl/corpus_importer/import_columbia/html_test.py",
-      "name": "not-iterable",
-      "concise_description": "Type `bool` is not iterable",
-      "severity": "error"
-    },
-    {
-      "column": 32,
-      "path": "cl/corpus_importer/import_columbia/html_test.py",
-      "name": "no-matching-overload",
-      "concise_description": "No matching overload found for function `typing.MutableMapping.setdefault` called with arguments: (str, list[@_])",
-      "severity": "error"
-    },
-    {
-      "column": 36,
-      "path": "cl/corpus_importer/import_columbia/html_test.py",
-      "name": "no-matching-overload",
-      "concise_description": "No matching overload found for function `typing.MutableMapping.setdefault` called with arguments: (Literal['opinions'], list[@_])",
-      "severity": "error"
-    },
-    {
-      "column": 36,
-      "path": "cl/corpus_importer/import_columbia/html_test.py",
-      "name": "bad-argument-type",
-      "concise_description": "Argument `tuple[None, date]` is not assignable to parameter `object` with type `tuple[str, date]` in function `list.append`",
-      "severity": "error"
-    },
-    {
-      "column": 22,
-      "path": "cl/corpus_importer/import_columbia/parse_opinions.py",
-      "name": "unsupported-operation",
-      "concise_description": "Cannot set item in `dict[str, bool]`",
-      "severity": "error"
-    },
-    {
-      "column": 29,
-      "path": "cl/corpus_importer/import_columbia/parse_opinions.py",
-      "name": "no-matching-overload",
-      "concise_description": "No matching overload found for function `str.join` called with arguments: (bool | list[@_])",
-      "severity": "error"
-    },
-    {
-      "column": 25,
-      "path": "cl/corpus_importer/import_columbia/parse_opinions.py",
-      "name": "unsupported-operation",
-      "concise_description": "Cannot set item in `dict[str, bool]`",
-      "severity": "error"
-    },
-    {
-      "column": 25,
-      "path": "cl/corpus_importer/import_columbia/parse_opinions.py",
-      "name": "unsupported-operation",
-      "concise_description": "Cannot set item in `dict[str, bool]`",
-      "severity": "error"
-    },
-    {
-      "column": 32,
-      "path": "cl/corpus_importer/import_columbia/parse_opinions.py",
-      "name": "no-matching-overload",
-      "concise_description": "No matching overload found for function `str.join` called with arguments: (bool | list[@_])",
-      "severity": "error"
-    },
-    {
-      "column": 23,
-      "path": "cl/corpus_importer/import_columbia/parse_opinions.py",
-      "name": "unsupported-operation",
-      "concise_description": "Cannot set item in `dict[str, bool]`",
-      "severity": "error"
-    },
-    {
-      "column": 30,
-      "path": "cl/corpus_importer/import_columbia/parse_opinions.py",
-      "name": "no-matching-overload",
-      "concise_description": "No matching overload found for function `str.join` called with arguments: (bool | list[@_])",
-      "severity": "error"
-    },
-    {
-      "column": 9,
-      "path": "cl/corpus_importer/import_columbia/parse_opinions.py",
-      "name": "unsupported-operation",
-      "concise_description": "Cannot set item in `dict[str, bool]`",
-      "severity": "error"
-    },
-    {
-      "column": 39,
-      "path": "cl/corpus_importer/import_columbia/parse_opinions.py",
-      "name": "no-matching-overload",
-      "concise_description": "No matching overload found for function `str.join` called with arguments: (bool | list[@_])",
-      "severity": "error"
-    },
-    {
-      "column": 54,
-      "path": "cl/corpus_importer/import_columbia/parse_opinions.py",
-      "name": "no-matching-overload",
-      "concise_description": "No matching overload found for function `str.join` called with arguments: (bool | list[@_])",
-      "severity": "error"
-    },
-    {
-      "column": 25,
-      "path": "cl/corpus_importer/import_columbia/parse_opinions.py",
-      "name": "no-matching-overload",
-      "concise_description": "No matching overload found for function `str.join` called with arguments: (bool | list[@_])",
-      "severity": "error"
-    },
-    {
-      "column": 21,
-      "path": "cl/corpus_importer/import_columbia/parse_opinions.py",
-      "name": "unsupported-operation",
-      "concise_description": "Cannot set item in `dict[str, bool]`",
-      "severity": "error"
-    },
-    {
-      "column": 9,
-      "path": "cl/corpus_importer/import_columbia/parse_opinions.py",
-      "name": "unsupported-operation",
-      "concise_description": "Cannot set item in `dict[str, bool]`",
-      "severity": "error"
-    },
-    {
-      "column": 33,
-      "path": "cl/corpus_importer/import_columbia/parse_opinions.py",
-      "name": "no-matching-overload",
-      "concise_description": "No matching overload found for function `str.join` called with arguments: (bool | list[@_])",
-      "severity": "error"
-    },
-    {
-      "column": 33,
-      "path": "cl/corpus_importer/import_columbia/parse_opinions.py",
-      "name": "no-matching-overload",
-      "concise_description": "No matching overload found for function `str.join` called with arguments: (bool | list[@_])",
-      "severity": "error"
-    },
-    {
-      "column": 29,
-      "path": "cl/corpus_importer/import_columbia/parse_opinions.py",
-      "name": "unsupported-operation",
-      "concise_description": "Cannot set item in `dict[str, bool]`",
-      "severity": "error"
-    },
-    {
-      "column": 33,
-      "path": "cl/corpus_importer/import_columbia/parse_opinions.py",
-      "name": "unsupported-operation",
-      "concise_description": "Cannot set item in `dict[str, bool]`",
-      "severity": "error"
-    },
-    {
-      "column": 9,
-      "path": "cl/corpus_importer/import_columbia/parse_opinions.py",
-      "name": "unsupported-operation",
-      "concise_description": "Cannot set item in `dict[str, bool]`",
-      "severity": "error"
-    },
-    {
-      "column": 48,
-      "path": "cl/corpus_importer/import_columbia/parse_opinions.py",
-      "name": "bad-argument-type",
-      "concise_description": "Argument `Literal[True]` is not assignable to parameter `s` with type `str` in function `juriscraper.lib.string_utils.CaseNameTweaker.make_case_name_short`",
-      "severity": "error"
-    },
-    {
-      "column": 13,
-      "path": "cl/corpus_importer/import_columbia/parse_opinions.py",
-      "name": "unsupported-operation",
-      "concise_description": "`+` is not supported between `bool` and `list[@_]`",
-      "severity": "error"
-    },
-    {
-      "column": 13,
-      "path": "cl/corpus_importer/import_columbia/parse_opinions.py",
-      "name": "unsupported-operation",
-      "concise_description": "`+` is not supported between `list[@_]` and `bool`",
-      "severity": "error"
-    },
-    {
-      "column": 21,
-      "path": "cl/corpus_importer/import_columbia/parse_opinions.py",
-      "name": "unsupported-operation",
-      "concise_description": "Cannot set item in `dict[str, bool]`",
-      "severity": "error"
-    },
-    {
-      "column": 20,
-      "path": "cl/corpus_importer/import_columbia/parse_opinions.py",
-      "name": "not-iterable",
-      "concise_description": "Type `bool` is not iterable",
-      "severity": "error"
-    },
-    {
-      "column": 24,
-      "path": "cl/corpus_importer/import_columbia/parse_opinions.py",
-      "name": "unsupported-operation",
-      "concise_description": "Cannot set item in `dict[str, bool]`",
-      "severity": "error"
-    },
-    {
-      "column": 24,
-      "path": "cl/corpus_importer/import_columbia/parse_opinions.py",
-      "name": "not-iterable",
-      "concise_description": "Type `bool` is not iterable",
-      "severity": "error"
-    },
-    {
-      "column": 18,
-      "path": "cl/corpus_importer/import_columbia/parse_opinions.py",
-      "name": "unbound-name",
-      "concise_description": "`root` may be uninitialized",
-      "severity": "error"
-    },
-    {
-      "column": 32,
-      "path": "cl/corpus_importer/import_columbia/parse_opinions.py",
-      "name": "no-matching-overload",
-      "concise_description": "No matching overload found for function `typing.MutableMapping.setdefault` called with arguments: (str, list[@_])",
-      "severity": "error"
-    },
-    {
-      "column": 36,
-      "path": "cl/corpus_importer/import_columbia/parse_opinions.py",
-      "name": "no-matching-overload",
-      "concise_description": "No matching overload found for function `typing.MutableMapping.setdefault` called with arguments: (Literal['opinions'], list[@_])",
-      "severity": "error"
-    },
-    {
-      "column": 28,
-      "path": "cl/corpus_importer/import_columbia/parse_opinions.py",
-      "name": "unbound-name",
-      "concise_description": "`direct_descendant_text` may be uninitialized",
-      "severity": "error"
-    },
-    {
-      "column": 26,
-      "path": "cl/corpus_importer/import_columbia/parse_opinions.py",
-      "name": "no-matching-overload",
-      "concise_description": "No matching overload found for function `re.sub` called with arguments: (str, Literal[''], bytes)",
-      "severity": "error"
-    },
-    {
-      "column": 36,
-      "path": "cl/corpus_importer/import_columbia/parse_opinions.py",
-      "name": "bad-argument-type",
-      "concise_description": "Argument `tuple[None, date]` is not assignable to parameter `object` with type `tuple[str, date]` in function `list.append`",
       "severity": "error"
     },
     {
@@ -1527,38 +1191,10 @@
       "severity": "error"
     },
     {
-      "column": 5,
-      "path": "cl/corpus_importer/tasks.py",
-      "name": "missing-attribute",
-      "concise_description": "Object of class `NoneType` has no attribute `add_recap_source`",
-      "severity": "error"
-    },
-    {
-      "column": 43,
-      "path": "cl/corpus_importer/tasks.py",
-      "name": "bad-argument-type",
-      "concise_description": "Argument `Docket | None` is not assignable to parameter `d` with type `Docket`",
-      "severity": "error"
-    },
-    {
-      "column": 5,
-      "path": "cl/corpus_importer/tasks.py",
-      "name": "missing-attribute",
-      "concise_description": "Object of class `NoneType` has no attribute `save`",
-      "severity": "error"
-    },
-    {
       "column": 21,
       "path": "cl/corpus_importer/tasks.py",
       "name": "missing-attribute",
       "concise_description": "Object of class `NoneType` has no attribute `text`",
-      "severity": "error"
-    },
-    {
-      "column": 22,
-      "path": "cl/corpus_importer/tasks.py",
-      "name": "missing-attribute",
-      "concise_description": "Object of class `NoneType` has no attribute `pk`",
       "severity": "error"
     },
     {
@@ -1569,45 +1205,10 @@
       "severity": "error"
     },
     {
-      "column": 5,
-      "path": "cl/corpus_importer/tasks.py",
-      "name": "missing-attribute",
-      "concise_description": "Object of class `NoneType` has no attribute `pacer_case_id`",
-      "severity": "error"
-    },
-    {
       "column": 23,
       "path": "cl/corpus_importer/tasks.py",
       "name": "bad-assignment",
       "concise_description": "`int` is not assignable to attribute `pacer_case_id` with type `str | None`",
-      "severity": "error"
-    },
-    {
-      "column": 5,
-      "path": "cl/corpus_importer/tasks.py",
-      "name": "missing-attribute",
-      "concise_description": "Object of class `NoneType` has no attribute `add_recap_source`",
-      "severity": "error"
-    },
-    {
-      "column": 9,
-      "path": "cl/corpus_importer/tasks.py",
-      "name": "bad-argument-type",
-      "concise_description": "Argument `Docket | None` is not assignable to parameter `d` with type `Docket` in function `cl.recap.mergers.save_iquery_to_docket`",
-      "severity": "error"
-    },
-    {
-      "column": 22,
-      "path": "cl/corpus_importer/tasks.py",
-      "name": "missing-attribute",
-      "concise_description": "Object of class `NoneType` has no attribute `pk`",
-      "severity": "error"
-    },
-    {
-      "column": 22,
-      "path": "cl/corpus_importer/tasks.py",
-      "name": "missing-attribute",
-      "concise_description": "Object of class `NoneType` has no attribute `pk`",
       "severity": "error"
     },
     {
@@ -1716,132 +1317,6 @@
       "severity": "error"
     },
     {
-      "column": 12,
-      "path": "cl/corpus_importer/tasks.py",
-      "name": "missing-attribute",
-      "concise_description": "Object of class `NoneType` has no attribute `pk`",
-      "severity": "error"
-    },
-    {
-      "column": 13,
-      "path": "cl/corpus_importer/tasks.py",
-      "name": "missing-attribute",
-      "concise_description": "Object of class `NoneType` has no attribute `add_scraper_source`",
-      "severity": "error"
-    },
-    {
-      "column": 13,
-      "path": "cl/corpus_importer/tasks.py",
-      "name": "missing-attribute",
-      "concise_description": "Object of class `NoneType` has no attribute `source`",
-      "severity": "error"
-    },
-    {
-      "column": 9,
-      "path": "cl/corpus_importer/tasks.py",
-      "name": "missing-attribute",
-      "concise_description": "Object of class `NoneType` has no attribute `docket_number`",
-      "severity": "error"
-    },
-    {
-      "column": 9,
-      "path": "cl/corpus_importer/tasks.py",
-      "name": "missing-attribute",
-      "concise_description": "Object of class `NoneType` has no attribute `docket_number_raw`",
-      "severity": "error"
-    },
-    {
-      "column": 9,
-      "path": "cl/corpus_importer/tasks.py",
-      "name": "missing-attribute",
-      "concise_description": "Object of class `NoneType` has no attribute `case_name`",
-      "severity": "error"
-    },
-    {
-      "column": 51,
-      "path": "cl/corpus_importer/tasks.py",
-      "name": "missing-attribute",
-      "concise_description": "Object of class `NoneType` has no attribute `case_name`",
-      "severity": "error"
-    },
-    {
-      "column": 9,
-      "path": "cl/corpus_importer/tasks.py",
-      "name": "missing-attribute",
-      "concise_description": "Object of class `NoneType` has no attribute `date_filed`",
-      "severity": "error"
-    },
-    {
-      "column": 54,
-      "path": "cl/corpus_importer/tasks.py",
-      "name": "missing-attribute",
-      "concise_description": "Object of class `NoneType` has no attribute `date_filed`",
-      "severity": "error"
-    },
-    {
-      "column": 9,
-      "path": "cl/corpus_importer/tasks.py",
-      "name": "missing-attribute",
-      "concise_description": "Object of class `NoneType` has no attribute `appeal_from_str`",
-      "severity": "error"
-    },
-    {
-      "column": 55,
-      "path": "cl/corpus_importer/tasks.py",
-      "name": "missing-attribute",
-      "concise_description": "Object of class `NoneType` has no attribute `appeal_from_str`",
-      "severity": "error"
-    },
-    {
-      "column": 13,
-      "path": "cl/corpus_importer/tasks.py",
-      "name": "missing-attribute",
-      "concise_description": "Object of class `NoneType` has no attribute `appeal_from`",
-      "severity": "error"
-    },
-    {
-      "column": 61,
-      "path": "cl/corpus_importer/tasks.py",
-      "name": "missing-attribute",
-      "concise_description": "Object of class `NoneType` has no attribute `appeal_from`",
-      "severity": "error"
-    },
-    {
-      "column": 19,
-      "path": "cl/corpus_importer/tasks.py",
-      "name": "missing-attribute",
-      "concise_description": "Object of class `NoneType` has no attribute `originating_court_information`",
-      "severity": "error"
-    },
-    {
-      "column": 13,
-      "path": "cl/corpus_importer/tasks.py",
-      "name": "missing-attribute",
-      "concise_description": "Object of class `NoneType` has no attribute `originating_court_information`",
-      "severity": "error"
-    },
-    {
-      "column": 9,
-      "path": "cl/corpus_importer/tasks.py",
-      "name": "missing-attribute",
-      "concise_description": "Object of class `NoneType` has no attribute `save`",
-      "severity": "error"
-    },
-    {
-      "column": 9,
-      "path": "cl/corpus_importer/tasks.py",
-      "name": "bad-argument-type",
-      "concise_description": "Argument `Docket | None` is not assignable to parameter `docket` with type `Docket` in function `add_scotus_docket_entries`",
-      "severity": "error"
-    },
-    {
-      "column": 12,
-      "path": "cl/corpus_importer/tasks.py",
-      "name": "bad-return",
-      "concise_description": "Returned type `tuple[Docket | None, bool, list[int]]` is not assignable to declared return type `tuple[Docket, bool, list[int]]`",
-      "severity": "error"
-    },
-    {
       "column": 43,
       "path": "cl/corpus_importer/tasks.py",
       "name": "bad-assignment",
@@ -1853,139 +1328,6 @@
       "path": "cl/corpus_importer/tasks.py",
       "name": "bad-assignment",
       "concise_description": "`object | str` is not assignable to attribute `remarks` with type `str`",
-      "severity": "error"
-    },
-    {
-      "column": 26,
-      "path": "cl/corpus_importer/tasks.py",
-      "name": "missing-attribute",
-      "concise_description": "Object of class `NoneType` has no attribute `pk`",
-      "severity": "error"
-    },
-    {
-      "column": 9,
-      "path": "cl/corpus_importer/tasks.py",
-      "name": "missing-attribute",
-      "concise_description": "Object of class `NoneType` has no attribute `add_scraper_source`",
-      "severity": "error"
-    },
-    {
-      "column": 9,
-      "path": "cl/corpus_importer/tasks.py",
-      "name": "missing-attribute",
-      "concise_description": "Object of class `NoneType` has no attribute `docket_number`",
-      "severity": "error"
-    },
-    {
-      "column": 9,
-      "path": "cl/corpus_importer/tasks.py",
-      "name": "missing-attribute",
-      "concise_description": "Object of class `NoneType` has no attribute `docket_number_core`",
-      "severity": "error"
-    },
-    {
-      "column": 9,
-      "path": "cl/corpus_importer/tasks.py",
-      "name": "missing-attribute",
-      "concise_description": "Object of class `NoneType` has no attribute `date_filed`",
-      "severity": "error"
-    },
-    {
-      "column": 9,
-      "path": "cl/corpus_importer/tasks.py",
-      "name": "missing-attribute",
-      "concise_description": "Object of class `NoneType` has no attribute `cause`",
-      "severity": "error"
-    },
-    {
-      "column": 9,
-      "path": "cl/corpus_importer/tasks.py",
-      "name": "missing-attribute",
-      "concise_description": "Object of class `NoneType` has no attribute `case_name`",
-      "severity": "error"
-    },
-    {
-      "column": 9,
-      "path": "cl/corpus_importer/tasks.py",
-      "name": "missing-attribute",
-      "concise_description": "Object of class `NoneType` has no attribute `case_name_full`",
-      "severity": "error"
-    },
-    {
-      "column": 9,
-      "path": "cl/corpus_importer/tasks.py",
-      "name": "missing-attribute",
-      "concise_description": "Object of class `NoneType` has no attribute `docket_number_raw`",
-      "severity": "error"
-    },
-    {
-      "column": 13,
-      "path": "cl/corpus_importer/tasks.py",
-      "name": "bad-argument-type",
-      "concise_description": "Argument `Docket | None` is not assignable to parameter `docket` with type `Docket` in function `merge_texas_docket_originating_court`",
-      "severity": "error"
-    },
-    {
-      "column": 17,
-      "path": "cl/corpus_importer/tasks.py",
-      "name": "missing-attribute",
-      "concise_description": "Object of class `NoneType` has no attribute `appeal_from`",
-      "severity": "error"
-    },
-    {
-      "column": 9,
-      "path": "cl/corpus_importer/tasks.py",
-      "name": "missing-attribute",
-      "concise_description": "Object of class `NoneType` has no attribute `appeal_from_str`",
-      "severity": "error"
-    },
-    {
-      "column": 9,
-      "path": "cl/corpus_importer/tasks.py",
-      "name": "missing-attribute",
-      "concise_description": "Object of class `NoneType` has no attribute `save`",
-      "severity": "error"
-    },
-    {
-      "column": 59,
-      "path": "cl/corpus_importer/tasks.py",
-      "name": "bad-argument-type",
-      "concise_description": "Argument `Docket | None` is not assignable to parameter `docket` with type `Docket` in function `merge_texas_trial_court_data`",
-      "severity": "error"
-    },
-    {
-      "column": 46,
-      "path": "cl/corpus_importer/tasks.py",
-      "name": "bad-argument-type",
-      "concise_description": "Argument `Docket | None` is not assignable to parameter `docket` with type `Docket` in function `merge_texas_parties`",
-      "severity": "error"
-    },
-    {
-      "column": 9,
-      "path": "cl/corpus_importer/tasks.py",
-      "name": "bad-argument-type",
-      "concise_description": "Argument `Docket | None` is not assignable to parameter `docket` with type `Docket` in function `merge_texas_docket_entries`",
-      "severity": "error"
-    },
-    {
-      "column": 9,
-      "path": "cl/corpus_importer/tasks.py",
-      "name": "bad-argument-type",
-      "concise_description": "Argument `Docket | None` is not assignable to parameter `docket` with type `Docket` in function `merge_texas_case_transfers`",
-      "severity": "error"
-    },
-    {
-      "column": 44,
-      "path": "cl/corpus_importer/tasks.py",
-      "name": "missing-attribute",
-      "concise_description": "Object of class `NoneType` has no attribute `pk`",
-      "severity": "error"
-    },
-    {
-      "column": 13,
-      "path": "cl/corpus_importer/tasks.py",
-      "name": "missing-attribute",
-      "concise_description": "Object of class `NoneType` has no attribute `pk`",
       "severity": "error"
     },
     {
@@ -3207,13 +2549,6 @@
       "severity": "error"
     },
     {
-      "column": 19,
-      "path": "cl/opinion_page/views.py",
-      "name": "no-matching-overload",
-      "concise_description": "No matching overload found for function `typing.MutableMapping.update` called with arguments: (dict[str, DocketEntryFilterForm | Page[Unknown] | bool | list[dict[str, str]] | str | Unknown])",
-      "severity": "error"
-    },
-    {
       "column": 9,
       "path": "cl/opinion_page/views.py",
       "name": "missing-attribute",
@@ -3221,24 +2556,10 @@
       "severity": "error"
     },
     {
-      "column": 19,
-      "path": "cl/opinion_page/views.py",
-      "name": "no-matching-overload",
-      "concise_description": "No matching overload found for function `typing.MutableMapping.update` called with arguments: (dict[str, Page[Unknown] | bool | dict[str, list[Unknown]]])",
-      "severity": "error"
-    },
-    {
       "column": 16,
       "path": "cl/opinion_page/views.py",
       "name": "missing-attribute",
       "concise_description": "Object of class `Docket` has no attribute `idb_data_id`",
-      "severity": "error"
-    },
-    {
-      "column": 19,
-      "path": "cl/opinion_page/views.py",
-      "name": "no-matching-overload",
-      "concise_description": "No matching overload found for function `typing.MutableMapping.update` called with arguments: (dict[str, QuerySet[Opinion, Opinion] | bool | Unknown])",
       "severity": "error"
     },
     {
@@ -4187,31 +3508,10 @@
       "severity": "error"
     },
     {
-      "column": 5,
-      "path": "cl/recap/mergers.py",
-      "name": "missing-attribute",
-      "concise_description": "Object of class `NoneType` has no attribute `pacer_case_id`",
-      "severity": "error"
-    },
-    {
       "column": 23,
       "path": "cl/recap/mergers.py",
       "name": "bad-assignment",
       "concise_description": "`int` is not assignable to attribute `pacer_case_id` with type `str | None`",
-      "severity": "error"
-    },
-    {
-      "column": 5,
-      "path": "cl/recap/mergers.py",
-      "name": "missing-attribute",
-      "concise_description": "Object of class `NoneType` has no attribute `add_recap_source`",
-      "severity": "error"
-    },
-    {
-      "column": 47,
-      "path": "cl/recap/mergers.py",
-      "name": "bad-argument-type",
-      "concise_description": "Argument `Docket | None` is not assignable to parameter `d` with type `Docket`",
       "severity": "error"
     },
     {
@@ -4243,69 +3543,6 @@
       "severity": "error"
     },
     {
-      "column": 5,
-      "path": "cl/recap/tasks.py",
-      "name": "missing-attribute",
-      "concise_description": "Object of class `NoneType` has no attribute `add_recap_source`",
-      "severity": "error"
-    },
-    {
-      "column": 34,
-      "path": "cl/recap/tasks.py",
-      "name": "bad-argument-type",
-      "concise_description": "Argument `Docket | None` is not assignable to parameter `d` with type `Docket` in function `cl.recap.mergers.update_docket_metadata`",
-      "severity": "error"
-    },
-    {
-      "column": 12,
-      "path": "cl/recap/tasks.py",
-      "name": "missing-attribute",
-      "concise_description": "Object of class `NoneType` has no attribute `pacer_case_id`",
-      "severity": "error"
-    },
-    {
-      "column": 9,
-      "path": "cl/recap/tasks.py",
-      "name": "missing-attribute",
-      "concise_description": "Object of class `NoneType` has no attribute `pacer_case_id`",
-      "severity": "error"
-    },
-    {
-      "column": 52,
-      "path": "cl/recap/tasks.py",
-      "name": "missing-attribute",
-      "concise_description": "Object of class `NoneType` has no attribute `pk`",
-      "severity": "error"
-    },
-    {
-      "column": 30,
-      "path": "cl/recap/tasks.py",
-      "name": "missing-attribute",
-      "concise_description": "Object of class `NoneType` has no attribute `pk`",
-      "severity": "error"
-    },
-    {
-      "column": 26,
-      "path": "cl/recap/tasks.py",
-      "name": "bad-argument-type",
-      "concise_description": "Argument `Docket | None` is not assignable to parameter `d` with type `Docket` in function `cl.alerts.utils.set_skip_percolation_if_parties_data`",
-      "severity": "error"
-    },
-    {
-      "column": 11,
-      "path": "cl/recap/tasks.py",
-      "name": "missing-attribute",
-      "concise_description": "Object of class `NoneType` has no attribute `asave`",
-      "severity": "error"
-    },
-    {
-      "column": 9,
-      "path": "cl/recap/tasks.py",
-      "name": "bad-argument-type",
-      "concise_description": "Argument `Docket | None` is not assignable to parameter `d` with type `Docket` in function `cl.recap.mergers.add_docket_entries`",
-      "severity": "error"
-    },
-    {
       "column": 49,
       "path": "cl/recap/tasks.py",
       "name": "bad-argument-type",
@@ -4315,29 +3552,8 @@
     {
       "column": 62,
       "path": "cl/recap/tasks.py",
-      "name": "missing-attribute",
-      "concise_description": "Object of class `NoneType` has no attribute `date_filed`",
-      "severity": "error"
-    },
-    {
-      "column": 47,
-      "path": "cl/recap/tasks.py",
-      "name": "missing-attribute",
-      "concise_description": "Object of class `NoneType` has no attribute `pk`",
-      "severity": "error"
-    },
-    {
-      "column": 48,
-      "path": "cl/recap/tasks.py",
-      "name": "missing-attribute",
-      "concise_description": "Object of class `NoneType` has no attribute `pk`",
-      "severity": "error"
-    },
-    {
-      "column": 22,
-      "path": "cl/recap/tasks.py",
-      "name": "missing-attribute",
-      "concise_description": "Object of class `NoneType` has no attribute `pk`",
+      "name": "bad-argument-type",
+      "concise_description": "Argument `date | None` is not assignable to parameter `docket_date` with type `date` in function `cl.recap.mergers.process_orphan_documents`",
       "severity": "error"
     },
     {
@@ -4362,97 +3578,6 @@
       "severity": "error"
     },
     {
-      "column": 5,
-      "path": "cl/recap/tasks.py",
-      "name": "missing-attribute",
-      "concise_description": "Object of class `NoneType` has no attribute `add_recap_source`",
-      "severity": "error"
-    },
-    {
-      "column": 34,
-      "path": "cl/recap/tasks.py",
-      "name": "bad-argument-type",
-      "concise_description": "Argument `Docket | None` is not assignable to parameter `d` with type `Docket` in function `cl.recap.mergers.update_docket_metadata`",
-      "severity": "error"
-    },
-    {
-      "column": 51,
-      "path": "cl/recap/tasks.py",
-      "name": "bad-argument-type",
-      "concise_description": "Argument `Docket | None` is not assignable to parameter `d` with type `Docket` in function `cl.alerts.utils.set_skip_percolation_if_bankruptcy_data`",
-      "severity": "error"
-    },
-    {
-      "column": 19,
-      "path": "cl/recap/tasks.py",
-      "name": "missing-attribute",
-      "concise_description": "Object of class `NoneType` has no attribute `asave`",
-      "severity": "error"
-    },
-    {
-      "column": 56,
-      "path": "cl/recap/tasks.py",
-      "name": "bad-argument-type",
-      "concise_description": "Argument `Docket | None` is not assignable to parameter `d` with type `Docket`",
-      "severity": "error"
-    },
-    {
-      "column": 48,
-      "path": "cl/recap/tasks.py",
-      "name": "missing-attribute",
-      "concise_description": "Object of class `NoneType` has no attribute `pk`",
-      "severity": "error"
-    },
-    {
-      "column": 26,
-      "path": "cl/recap/tasks.py",
-      "name": "missing-attribute",
-      "concise_description": "Object of class `NoneType` has no attribute `pk`",
-      "severity": "error"
-    },
-    {
-      "column": 5,
-      "path": "cl/recap/tasks.py",
-      "name": "missing-attribute",
-      "concise_description": "Object of class `NoneType` has no attribute `add_recap_source`",
-      "severity": "error"
-    },
-    {
-      "column": 34,
-      "path": "cl/recap/tasks.py",
-      "name": "bad-argument-type",
-      "concise_description": "Argument `Docket | None` is not assignable to parameter `d` with type `Docket` in function `cl.recap.mergers.update_docket_metadata`",
-      "severity": "error"
-    },
-    {
-      "column": 52,
-      "path": "cl/recap/tasks.py",
-      "name": "missing-attribute",
-      "concise_description": "Object of class `NoneType` has no attribute `pk`",
-      "severity": "error"
-    },
-    {
-      "column": 30,
-      "path": "cl/recap/tasks.py",
-      "name": "missing-attribute",
-      "concise_description": "Object of class `NoneType` has no attribute `pk`",
-      "severity": "error"
-    },
-    {
-      "column": 19,
-      "path": "cl/recap/tasks.py",
-      "name": "missing-attribute",
-      "concise_description": "Object of class `NoneType` has no attribute `asave`",
-      "severity": "error"
-    },
-    {
-      "column": 9,
-      "path": "cl/recap/tasks.py",
-      "name": "bad-argument-type",
-      "concise_description": "Argument `Docket | None` is not assignable to parameter `d` with type `Docket` in function `cl.recap.mergers.add_docket_entries`",
-      "severity": "error"
-    },
-    {
       "column": 49,
       "path": "cl/recap/tasks.py",
       "name": "bad-argument-type",
@@ -4462,134 +3587,8 @@
     {
       "column": 62,
       "path": "cl/recap/tasks.py",
-      "name": "missing-attribute",
-      "concise_description": "Object of class `NoneType` has no attribute `date_filed`",
-      "severity": "error"
-    },
-    {
-      "column": 47,
-      "path": "cl/recap/tasks.py",
-      "name": "missing-attribute",
-      "concise_description": "Object of class `NoneType` has no attribute `pk`",
-      "severity": "error"
-    },
-    {
-      "column": 48,
-      "path": "cl/recap/tasks.py",
-      "name": "missing-attribute",
-      "concise_description": "Object of class `NoneType` has no attribute `pk`",
-      "severity": "error"
-    },
-    {
-      "column": 22,
-      "path": "cl/recap/tasks.py",
-      "name": "missing-attribute",
-      "concise_description": "Object of class `NoneType` has no attribute `pk`",
-      "severity": "error"
-    },
-    {
-      "column": 25,
-      "path": "cl/recap/tasks.py",
-      "name": "missing-attribute",
-      "concise_description": "Object of class `NoneType` has no attribute `case_name`",
-      "severity": "error"
-    },
-    {
-      "column": 5,
-      "path": "cl/recap/tasks.py",
-      "name": "missing-attribute",
-      "concise_description": "Object of class `NoneType` has no attribute `add_recap_source`",
-      "severity": "error"
-    },
-    {
-      "column": 34,
-      "path": "cl/recap/tasks.py",
       "name": "bad-argument-type",
-      "concise_description": "Argument `Docket | None` is not assignable to parameter `d` with type `Docket` in function `cl.recap.mergers.update_docket_metadata`",
-      "severity": "error"
-    },
-    {
-      "column": 29,
-      "path": "cl/recap/tasks.py",
-      "name": "missing-attribute",
-      "concise_description": "Object of class `NoneType` has no attribute `case_name`",
-      "severity": "error"
-    },
-    {
-      "column": 45,
-      "path": "cl/recap/tasks.py",
-      "name": "missing-attribute",
-      "concise_description": "Object of class `NoneType` has no attribute `pk`",
-      "severity": "error"
-    },
-    {
-      "column": 18,
-      "path": "cl/recap/tasks.py",
-      "name": "missing-attribute",
-      "concise_description": "Object of class `NoneType` has no attribute `docket_entries`",
-      "severity": "error"
-    },
-    {
-      "column": 52,
-      "path": "cl/recap/tasks.py",
-      "name": "missing-attribute",
-      "concise_description": "Object of class `NoneType` has no attribute `pk`",
-      "severity": "error"
-    },
-    {
-      "column": 30,
-      "path": "cl/recap/tasks.py",
-      "name": "missing-attribute",
-      "concise_description": "Object of class `NoneType` has no attribute `pk`",
-      "severity": "error"
-    },
-    {
-      "column": 51,
-      "path": "cl/recap/tasks.py",
-      "name": "bad-argument-type",
-      "concise_description": "Argument `Docket | None` is not assignable to parameter `d` with type `Docket` in function `cl.alerts.utils.set_skip_percolation_if_bankruptcy_data`",
-      "severity": "error"
-    },
-    {
-      "column": 19,
-      "path": "cl/recap/tasks.py",
-      "name": "missing-attribute",
-      "concise_description": "Object of class `NoneType` has no attribute `asave`",
-      "severity": "error"
-    },
-    {
-      "column": 64,
-      "path": "cl/recap/tasks.py",
-      "name": "bad-argument-type",
-      "concise_description": "Argument `Docket | None` is not assignable to parameter `d` with type `Docket`",
-      "severity": "error"
-    },
-    {
-      "column": 48,
-      "path": "cl/recap/tasks.py",
-      "name": "missing-attribute",
-      "concise_description": "Object of class `NoneType` has no attribute `pk`",
-      "severity": "error"
-    },
-    {
-      "column": 22,
-      "path": "cl/recap/tasks.py",
-      "name": "missing-attribute",
-      "concise_description": "Object of class `NoneType` has no attribute `pk`",
-      "severity": "error"
-    },
-    {
-      "column": 5,
-      "path": "cl/recap/tasks.py",
-      "name": "missing-attribute",
-      "concise_description": "Object of class `NoneType` has no attribute `add_recap_source`",
-      "severity": "error"
-    },
-    {
-      "column": 34,
-      "path": "cl/recap/tasks.py",
-      "name": "bad-argument-type",
-      "concise_description": "Argument `Docket | None` is not assignable to parameter `d` with type `Docket` in function `cl.recap.mergers.update_docket_metadata`",
+      "concise_description": "Argument `date | None` is not assignable to parameter `docket_date` with type `date` in function `cl.recap.mergers.process_orphan_documents`",
       "severity": "error"
     },
     {
@@ -4597,20 +3596,6 @@
       "path": "cl/recap/tasks.py",
       "name": "bad-argument-type",
       "concise_description": "Argument `str` is not assignable to parameter `court_id` with type `int` in function `cl.recap.mergers.process_orphan_documents`",
-      "severity": "error"
-    },
-    {
-      "column": 5,
-      "path": "cl/recap/tasks.py",
-      "name": "missing-attribute",
-      "concise_description": "Object of class `NoneType` has no attribute `add_recap_source`",
-      "severity": "error"
-    },
-    {
-      "column": 34,
-      "path": "cl/recap/tasks.py",
-      "name": "bad-argument-type",
-      "concise_description": "Argument `Docket | None` is not assignable to parameter `d` with type `Docket` in function `cl.recap.mergers.update_docket_metadata`",
       "severity": "error"
     },
     {
@@ -4812,8 +3797,8 @@
     {
       "column": 22,
       "path": "cl/recap/tasks.py",
-      "name": "missing-attribute",
-      "concise_description": "Object of class `NoneType` has no attribute `pk`",
+      "name": "bad-assignment",
+      "concise_description": "`int` is not assignable to dict value type `bool | str`",
       "severity": "error"
     },
     {
@@ -5146,20 +4131,6 @@
       "severity": "error"
     },
     {
-      "column": 13,
-      "path": "cl/recap/tasks.py",
-      "name": "missing-attribute",
-      "concise_description": "Object of class `NoneType` has no attribute `add_recap_source`",
-      "severity": "error"
-    },
-    {
-      "column": 51,
-      "path": "cl/recap/tasks.py",
-      "name": "bad-argument-type",
-      "concise_description": "Argument `Docket | None` is not assignable to parameter `d` with type `Docket`",
-      "severity": "error"
-    },
-    {
       "column": 59,
       "path": "cl/recap/tasks.py",
       "name": "bad-argument-type",
@@ -5167,45 +4138,10 @@
       "severity": "error"
     },
     {
-      "column": 20,
-      "path": "cl/recap/tasks.py",
-      "name": "missing-attribute",
-      "concise_description": "Object of class `NoneType` has no attribute `pacer_case_id`",
-      "severity": "error"
-    },
-    {
-      "column": 17,
-      "path": "cl/recap/tasks.py",
-      "name": "missing-attribute",
-      "concise_description": "Object of class `NoneType` has no attribute `pacer_case_id`",
-      "severity": "error"
-    },
-    {
-      "column": 13,
-      "path": "cl/recap/tasks.py",
-      "name": "missing-attribute",
-      "concise_description": "Object of class `NoneType` has no attribute `save`",
-      "severity": "error"
-    },
-    {
-      "column": 36,
-      "path": "cl/recap/tasks.py",
-      "name": "missing-attribute",
-      "concise_description": "Object of class `NoneType` has no attribute `pacer_case_id`",
-      "severity": "error"
-    },
-    {
       "column": 27,
       "path": "cl/recap/tasks.py",
       "name": "bad-index",
       "concise_description": "Cannot index into `str`",
-      "severity": "error"
-    },
-    {
-      "column": 17,
-      "path": "cl/recap/tasks.py",
-      "name": "bad-argument-type",
-      "concise_description": "Argument `Docket | None` is not assignable to parameter `d` with type `Docket`",
       "severity": "error"
     },
     {
@@ -5223,13 +4159,6 @@
       "severity": "error"
     },
     {
-      "column": 24,
-      "path": "cl/recap/tasks.py",
-      "name": "bad-argument-type",
-      "concise_description": "Argument `Docket | None` is not assignable to parameter `docket` with type `Docket` in function `DocketUpdatedData.__init__`",
-      "severity": "error"
-    },
-    {
       "column": 17,
       "path": "cl/recap/tasks.py",
       "name": "bad-argument-type",
@@ -5241,6 +4170,13 @@
       "path": "cl/recap/tasks.py",
       "name": "bad-argument-type",
       "concise_description": "Argument `str | Unknown | None` is not assignable to parameter `pacer_case_id` with type `str` in function `get_and_copy_recap_attachment_docs`",
+      "severity": "error"
+    },
+    {
+      "column": 13,
+      "path": "cl/recap/tasks.py",
+      "name": "bad-argument-type",
+      "concise_description": "Argument `list[str | Unknown | None]` is not assignable to parameter `unique_case_ids` with type `list[str]` in function `replicate_recap_email_to_subdockets`",
       "severity": "error"
     },
     {
@@ -5346,76 +4282,6 @@
       "path": "cl/recap_rss/tasks.py",
       "name": "missing-attribute",
       "concise_description": "Object of class `list` has no attribute `description`",
-      "severity": "error"
-    },
-    {
-      "column": 13,
-      "path": "cl/recap_rss/tasks.py",
-      "name": "missing-attribute",
-      "concise_description": "Object of class `NoneType` has no attribute `add_recap_source`",
-      "severity": "error"
-    },
-    {
-      "column": 51,
-      "path": "cl/recap_rss/tasks.py",
-      "name": "bad-argument-type",
-      "concise_description": "Argument `Docket | None` is not assignable to parameter `d` with type `Docket`",
-      "severity": "error"
-    },
-    {
-      "column": 20,
-      "path": "cl/recap_rss/tasks.py",
-      "name": "missing-attribute",
-      "concise_description": "Object of class `NoneType` has no attribute `pacer_case_id`",
-      "severity": "error"
-    },
-    {
-      "column": 17,
-      "path": "cl/recap_rss/tasks.py",
-      "name": "missing-attribute",
-      "concise_description": "Object of class `NoneType` has no attribute `pacer_case_id`",
-      "severity": "error"
-    },
-    {
-      "column": 61,
-      "path": "cl/recap_rss/tasks.py",
-      "name": "bad-argument-type",
-      "concise_description": "Argument `Docket | None` is not assignable to parameter `d` with type `Docket` in function `cl.alerts.utils.set_skip_percolation_if_bankruptcy_data`",
-      "severity": "error"
-    },
-    {
-      "column": 17,
-      "path": "cl/recap_rss/tasks.py",
-      "name": "missing-attribute",
-      "concise_description": "Object of class `NoneType` has no attribute `save`",
-      "severity": "error"
-    },
-    {
-      "column": 47,
-      "path": "cl/recap_rss/tasks.py",
-      "name": "bad-argument-type",
-      "concise_description": "Argument `Docket | None` is not assignable to parameter `d` with type `Docket` in function `cl.recap.mergers.add_bankruptcy_data_to_docket`",
-      "severity": "error"
-    },
-    {
-      "column": 15,
-      "path": "cl/recap_rss/tasks.py",
-      "name": "bad-argument-type",
-      "concise_description": "Argument `Docket | None` is not assignable to parameter `d` with type `Docket`",
-      "severity": "error"
-    },
-    {
-      "column": 51,
-      "path": "cl/recap_rss/tasks.py",
-      "name": "missing-attribute",
-      "concise_description": "Object of class `NoneType` has no attribute `pk`",
-      "severity": "error"
-    },
-    {
-      "column": 40,
-      "path": "cl/recap_rss/tasks.py",
-      "name": "missing-attribute",
-      "concise_description": "Object of class `NoneType` has no attribute `pk`",
       "severity": "error"
     },
     {
@@ -6497,265 +5363,6 @@
       "severity": "error"
     },
     {
-      "column": 5,
-      "path": "cl/search/forms.py",
-      "name": "missing-attribute",
-      "concise_description": "Object of class `ChoiceField` has no attribute `as_str_types`",
-      "severity": "error"
-    },
-    {
-      "column": 5,
-      "path": "cl/search/forms.py",
-      "name": "missing-attribute",
-      "concise_description": "Object of class `CharField` has no attribute `as_str_types`",
-      "severity": "error"
-    },
-    {
-      "column": 5,
-      "path": "cl/search/forms.py",
-      "name": "missing-attribute",
-      "concise_description": "Object of class `CharField` has no attribute `as_str_types`",
-      "severity": "error"
-    },
-    {
-      "column": 5,
-      "path": "cl/search/forms.py",
-      "name": "missing-attribute",
-      "concise_description": "Object of class `RandomChoiceField` has no attribute `as_str_types`",
-      "severity": "error"
-    },
-    {
-      "column": 5,
-      "path": "cl/search/forms.py",
-      "name": "missing-attribute",
-      "concise_description": "Object of class `CharField` has no attribute `as_str_types`",
-      "severity": "error"
-    },
-    {
-      "column": 5,
-      "path": "cl/search/forms.py",
-      "name": "missing-attribute",
-      "concise_description": "Object of class `CharField` has no attribute `as_str_types`",
-      "severity": "error"
-    },
-    {
-      "column": 5,
-      "path": "cl/search/forms.py",
-      "name": "missing-attribute",
-      "concise_description": "Object of class `CharField` has no attribute `as_str_types`",
-      "severity": "error"
-    },
-    {
-      "column": 5,
-      "path": "cl/search/forms.py",
-      "name": "missing-attribute",
-      "concise_description": "Object of class `BooleanField` has no attribute `as_str_types`",
-      "severity": "error"
-    },
-    {
-      "column": 5,
-      "path": "cl/search/forms.py",
-      "name": "missing-attribute",
-      "concise_description": "Object of class `CharField` has no attribute `as_str_types`",
-      "severity": "error"
-    },
-    {
-      "column": 5,
-      "path": "cl/search/forms.py",
-      "name": "missing-attribute",
-      "concise_description": "Object of class `CharField` has no attribute `as_str_types`",
-      "severity": "error"
-    },
-    {
-      "column": 5,
-      "path": "cl/search/forms.py",
-      "name": "missing-attribute",
-      "concise_description": "Object of class `CharField` has no attribute `as_str_types`",
-      "severity": "error"
-    },
-    {
-      "column": 5,
-      "path": "cl/search/forms.py",
-      "name": "missing-attribute",
-      "concise_description": "Object of class `CharField` has no attribute `as_str_types`",
-      "severity": "error"
-    },
-    {
-      "column": 5,
-      "path": "cl/search/forms.py",
-      "name": "missing-attribute",
-      "concise_description": "Object of class `CharField` has no attribute `as_str_types`",
-      "severity": "error"
-    },
-    {
-      "column": 5,
-      "path": "cl/search/forms.py",
-      "name": "missing-attribute",
-      "concise_description": "Object of class `CharField` has no attribute `as_str_types`",
-      "severity": "error"
-    },
-    {
-      "column": 5,
-      "path": "cl/search/forms.py",
-      "name": "missing-attribute",
-      "concise_description": "Object of class `CharField` has no attribute `as_str_types`",
-      "severity": "error"
-    },
-    {
-      "column": 5,
-      "path": "cl/search/forms.py",
-      "name": "missing-attribute",
-      "concise_description": "Object of class `CharField` has no attribute `as_str_types`",
-      "severity": "error"
-    },
-    {
-      "column": 5,
-      "path": "cl/search/forms.py",
-      "name": "missing-attribute",
-      "concise_description": "Object of class `CharField` has no attribute `as_str_types`",
-      "severity": "error"
-    },
-    {
-      "column": 5,
-      "path": "cl/search/forms.py",
-      "name": "missing-attribute",
-      "concise_description": "Object of class `FloorDateOrRelativeField` has no attribute `as_str_types`",
-      "severity": "error"
-    },
-    {
-      "column": 5,
-      "path": "cl/search/forms.py",
-      "name": "missing-attribute",
-      "concise_description": "Object of class `CeilingDateOrRelativeField` has no attribute `as_str_types`",
-      "severity": "error"
-    },
-    {
-      "column": 5,
-      "path": "cl/search/forms.py",
-      "name": "missing-attribute",
-      "concise_description": "Object of class `FloorDateOrRelativeField` has no attribute `as_str_types`",
-      "severity": "error"
-    },
-    {
-      "column": 5,
-      "path": "cl/search/forms.py",
-      "name": "missing-attribute",
-      "concise_description": "Object of class `CeilingDateOrRelativeField` has no attribute `as_str_types`",
-      "severity": "error"
-    },
-    {
-      "column": 5,
-      "path": "cl/search/forms.py",
-      "name": "missing-attribute",
-      "concise_description": "Object of class `FloorDateOrRelativeField` has no attribute `as_str_types`",
-      "severity": "error"
-    },
-    {
-      "column": 5,
-      "path": "cl/search/forms.py",
-      "name": "missing-attribute",
-      "concise_description": "Object of class `CeilingDateOrRelativeField` has no attribute `as_str_types`",
-      "severity": "error"
-    },
-    {
-      "column": 5,
-      "path": "cl/search/forms.py",
-      "name": "missing-attribute",
-      "concise_description": "Object of class `CharField` has no attribute `as_str_types`",
-      "severity": "error"
-    },
-    {
-      "column": 5,
-      "path": "cl/search/forms.py",
-      "name": "missing-attribute",
-      "concise_description": "Object of class `CharField` has no attribute `as_str_types`",
-      "severity": "error"
-    },
-    {
-      "column": 5,
-      "path": "cl/search/forms.py",
-      "name": "missing-attribute",
-      "concise_description": "Object of class `IntegerField` has no attribute `as_str_types`",
-      "severity": "error"
-    },
-    {
-      "column": 5,
-      "path": "cl/search/forms.py",
-      "name": "missing-attribute",
-      "concise_description": "Object of class `IntegerField` has no attribute `as_str_types`",
-      "severity": "error"
-    },
-    {
-      "column": 5,
-      "path": "cl/search/forms.py",
-      "name": "missing-attribute",
-      "concise_description": "Object of class `CharField` has no attribute `as_str_types`",
-      "severity": "error"
-    },
-    {
-      "column": 5,
-      "path": "cl/search/forms.py",
-      "name": "missing-attribute",
-      "concise_description": "Object of class `FloorDateOrRelativeField` has no attribute `as_str_types`",
-      "severity": "error"
-    },
-    {
-      "column": 5,
-      "path": "cl/search/forms.py",
-      "name": "missing-attribute",
-      "concise_description": "Object of class `CeilingDateOrRelativeField` has no attribute `as_str_types`",
-      "severity": "error"
-    },
-    {
-      "column": 5,
-      "path": "cl/search/forms.py",
-      "name": "missing-attribute",
-      "concise_description": "Object of class `CharField` has no attribute `as_str_types`",
-      "severity": "error"
-    },
-    {
-      "column": 5,
-      "path": "cl/search/forms.py",
-      "name": "missing-attribute",
-      "concise_description": "Object of class `ChoiceField` has no attribute `as_str_types`",
-      "severity": "error"
-    },
-    {
-      "column": 5,
-      "path": "cl/search/forms.py",
-      "name": "missing-attribute",
-      "concise_description": "Object of class `CharField` has no attribute `as_str_types`",
-      "severity": "error"
-    },
-    {
-      "column": 5,
-      "path": "cl/search/forms.py",
-      "name": "missing-attribute",
-      "concise_description": "Object of class `CharField` has no attribute `as_str_types`",
-      "severity": "error"
-    },
-    {
-      "column": 5,
-      "path": "cl/search/forms.py",
-      "name": "missing-attribute",
-      "concise_description": "Object of class `ChoiceField` has no attribute `as_str_types`",
-      "severity": "error"
-    },
-    {
-      "column": 5,
-      "path": "cl/search/forms.py",
-      "name": "missing-attribute",
-      "concise_description": "Object of class `ChoiceField` has no attribute `as_str_types`",
-      "severity": "error"
-    },
-    {
-      "column": 13,
-      "path": "cl/search/forms.py",
-      "name": "missing-attribute",
-      "concise_description": "Object of class `BooleanField` has no attribute `as_str_types`",
-      "severity": "error"
-    },
-    {
       "column": 21,
       "path": "cl/search/forms.py",
       "name": "unsupported-operation",
@@ -6767,202 +5374,6 @@
       "path": "cl/search/forms.py",
       "name": "unsupported-operation",
       "concise_description": "Cannot set item in `OrderedDict[str, Unknown]`",
-      "severity": "error"
-    },
-    {
-      "column": 5,
-      "path": "cl/search/forms.py",
-      "name": "missing-attribute",
-      "concise_description": "Object of class `CharField` has no attribute `as_str_types`",
-      "severity": "error"
-    },
-    {
-      "column": 5,
-      "path": "cl/search/forms.py",
-      "name": "missing-attribute",
-      "concise_description": "Object of class `FloorDateOrRelativeField` has no attribute `as_str_types`",
-      "severity": "error"
-    },
-    {
-      "column": 5,
-      "path": "cl/search/forms.py",
-      "name": "missing-attribute",
-      "concise_description": "Object of class `CeilingDateOrRelativeField` has no attribute `as_str_types`",
-      "severity": "error"
-    },
-    {
-      "column": 5,
-      "path": "cl/search/forms.py",
-      "name": "missing-attribute",
-      "concise_description": "Object of class `CharField` has no attribute `as_str_types`",
-      "severity": "error"
-    },
-    {
-      "column": 5,
-      "path": "cl/search/forms.py",
-      "name": "missing-attribute",
-      "concise_description": "Object of class `CharField` has no attribute `as_str_types`",
-      "severity": "error"
-    },
-    {
-      "column": 5,
-      "path": "cl/search/forms.py",
-      "name": "missing-attribute",
-      "concise_description": "Object of class `CharField` has no attribute `as_str_types`",
-      "severity": "error"
-    },
-    {
-      "column": 5,
-      "path": "cl/search/forms.py",
-      "name": "missing-attribute",
-      "concise_description": "Object of class `CharField` has no attribute `as_str_types`",
-      "severity": "error"
-    },
-    {
-      "column": 5,
-      "path": "cl/search/forms.py",
-      "name": "missing-attribute",
-      "concise_description": "Object of class `CharField` has no attribute `as_str_types`",
-      "severity": "error"
-    },
-    {
-      "column": 5,
-      "path": "cl/search/forms.py",
-      "name": "missing-attribute",
-      "concise_description": "Object of class `CharField` has no attribute `as_str_types`",
-      "severity": "error"
-    },
-    {
-      "column": 5,
-      "path": "cl/search/forms.py",
-      "name": "missing-attribute",
-      "concise_description": "Object of class `CharField` has no attribute `as_str_types`",
-      "severity": "error"
-    },
-    {
-      "column": 5,
-      "path": "cl/search/forms.py",
-      "name": "missing-attribute",
-      "concise_description": "Object of class `FloorDateOrRelativeField` has no attribute `as_str_types`",
-      "severity": "error"
-    },
-    {
-      "column": 5,
-      "path": "cl/search/forms.py",
-      "name": "missing-attribute",
-      "concise_description": "Object of class `CeilingDateOrRelativeField` has no attribute `as_str_types`",
-      "severity": "error"
-    },
-    {
-      "column": 5,
-      "path": "cl/search/forms.py",
-      "name": "missing-attribute",
-      "concise_description": "Object of class `CharField` has no attribute `as_str_types`",
-      "severity": "error"
-    },
-    {
-      "column": 5,
-      "path": "cl/search/forms.py",
-      "name": "missing-attribute",
-      "concise_description": "Object of class `CharField` has no attribute `as_str_types`",
-      "severity": "error"
-    },
-    {
-      "column": 5,
-      "path": "cl/search/forms.py",
-      "name": "missing-attribute",
-      "concise_description": "Object of class `CharField` has no attribute `as_str_types`",
-      "severity": "error"
-    },
-    {
-      "column": 5,
-      "path": "cl/search/forms.py",
-      "name": "missing-attribute",
-      "concise_description": "Object of class `CharField` has no attribute `as_str_types`",
-      "severity": "error"
-    },
-    {
-      "column": 5,
-      "path": "cl/search/forms.py",
-      "name": "missing-attribute",
-      "concise_description": "Object of class `FloorDateOrRelativeField` has no attribute `as_str_types`",
-      "severity": "error"
-    },
-    {
-      "column": 5,
-      "path": "cl/search/forms.py",
-      "name": "missing-attribute",
-      "concise_description": "Object of class `CeilingDateOrRelativeField` has no attribute `as_str_types`",
-      "severity": "error"
-    },
-    {
-      "column": 5,
-      "path": "cl/search/forms.py",
-      "name": "missing-attribute",
-      "concise_description": "Object of class `CharField` has no attribute `as_str_types`",
-      "severity": "error"
-    },
-    {
-      "column": 5,
-      "path": "cl/search/forms.py",
-      "name": "missing-attribute",
-      "concise_description": "Object of class `ChoiceField` has no attribute `as_str_types`",
-      "severity": "error"
-    },
-    {
-      "column": 5,
-      "path": "cl/search/forms.py",
-      "name": "missing-attribute",
-      "concise_description": "Object of class `CharField` has no attribute `as_str_types`",
-      "severity": "error"
-    },
-    {
-      "column": 5,
-      "path": "cl/search/forms.py",
-      "name": "missing-attribute",
-      "concise_description": "Object of class `CharField` has no attribute `as_str_types`",
-      "severity": "error"
-    },
-    {
-      "column": 5,
-      "path": "cl/search/forms.py",
-      "name": "missing-attribute",
-      "concise_description": "Object of class `ChoiceField` has no attribute `as_str_types`",
-      "severity": "error"
-    },
-    {
-      "column": 5,
-      "path": "cl/search/forms.py",
-      "name": "missing-attribute",
-      "concise_description": "Object of class `ChoiceField` has no attribute `as_str_types`",
-      "severity": "error"
-    },
-    {
-      "column": 5,
-      "path": "cl/search/forms.py",
-      "name": "missing-attribute",
-      "concise_description": "Object of class `FloorDateOrRelativeField` has no attribute `as_str_types`",
-      "severity": "error"
-    },
-    {
-      "column": 5,
-      "path": "cl/search/forms.py",
-      "name": "missing-attribute",
-      "concise_description": "Object of class `CeilingDateOrRelativeField` has no attribute `as_str_types`",
-      "severity": "error"
-    },
-    {
-      "column": 5,
-      "path": "cl/search/forms.py",
-      "name": "missing-attribute",
-      "concise_description": "Object of class `CharField` has no attribute `as_str_types`",
-      "severity": "error"
-    },
-    {
-      "column": 5,
-      "path": "cl/search/forms.py",
-      "name": "missing-attribute",
-      "concise_description": "Object of class `BooleanField` has no attribute `as_str_types`",
       "severity": "error"
     },
     {
@@ -7939,24 +6350,10 @@
       "severity": "error"
     },
     {
-      "column": 41,
+      "column": 36,
       "path": "cl/search/tasks.py",
       "name": "bad-argument-type",
-      "concise_description": "Argument `list[int] | None` is not assignable to parameter `cluster_ids_to_update` with type `list[int]` in function `build_cite_count_update`",
-      "severity": "error"
-    },
-    {
-      "column": 39,
-      "path": "cl/search/tasks.py",
-      "name": "no-matching-overload",
-      "concise_description": "No matching overload found for function `typing.MutableMapping.update` called with arguments: (dict[str, int])",
-      "severity": "error"
-    },
-    {
-      "column": 39,
-      "path": "cl/search/tasks.py",
-      "name": "no-matching-overload",
-      "concise_description": "No matching overload found for function `typing.MutableMapping.update` called with arguments: (dict[str, int])",
+      "concise_description": "Argument `dict[str, Any] | dict[Unknown, Unknown]` is not assignable to parameter `object` with type `_CiteCountUpdateDict` in function `list.append`",
       "severity": "error"
     },
     {
@@ -8016,13 +6413,6 @@
       "severity": "error"
     },
     {
-      "column": 23,
-      "path": "cl/search/utils.py",
-      "name": "bad-index",
-      "concise_description": "Cannot index into `SafeString`",
-      "severity": "error"
-    },
-    {
       "column": 13,
       "path": "cl/search/views.py",
       "name": "missing-attribute",
@@ -8051,94 +6441,10 @@
       "severity": "error"
     },
     {
-      "column": 31,
-      "path": "cl/search/views.py",
-      "name": "no-matching-overload",
-      "concise_description": "No matching overload found for function `typing.MutableMapping.update` called with arguments: (ESSearchResult)",
-      "severity": "error"
-    },
-    {
-      "column": 31,
-      "path": "cl/search/views.py",
-      "name": "no-matching-overload",
-      "concise_description": "No matching overload found for function `typing.MutableMapping.update` called with arguments: (dict[str, CreateAlertForm | dict[Unknown, Unknown] | None])",
-      "severity": "error"
-    },
-    {
       "column": 39,
       "path": "cl/search/views.py",
       "name": "unsupported-operation",
       "concise_description": "Cannot set item in `QueryDict`",
-      "severity": "error"
-    },
-    {
-      "column": 28,
-      "path": "cl/search/views.py",
-      "name": "bad-argument-type",
-      "concise_description": "Argument `Page[Unknown] | list[Unknown]` is not assignable to parameter `results` with type `bool | str` in function `typing.MutableMapping.update`",
-      "severity": "error"
-    },
-    {
-      "column": 28,
-      "path": "cl/search/views.py",
-      "name": "bad-argument-type",
-      "concise_description": "Argument `list[int | None]` is not assignable to parameter `results_details` with type `bool | str` in function `typing.MutableMapping.update`",
-      "severity": "error"
-    },
-    {
-      "column": 28,
-      "path": "cl/search/views.py",
-      "name": "bad-argument-type",
-      "concise_description": "Argument `dict[Unknown, Unknown]` is not assignable to parameter `search_summary_dict` with type `bool | str` in function `typing.MutableMapping.update`",
-      "severity": "error"
-    },
-    {
-      "column": 28,
-      "path": "cl/search/views.py",
-      "name": "bad-argument-type",
-      "concise_description": "Argument `dict[str, list[Unknown]]` is not assignable to parameter `courts` with type `bool | str` in function `typing.MutableMapping.update`",
-      "severity": "error"
-    },
-    {
-      "column": 28,
-      "path": "cl/search/views.py",
-      "name": "bad-argument-type",
-      "concise_description": "Argument `Hit | None` is not assignable to parameter `query_citation` with type `bool | str` in function `typing.MutableMapping.update`",
-      "severity": "error"
-    },
-    {
-      "column": 28,
-      "path": "cl/search/views.py",
-      "name": "bad-argument-type",
-      "concise_description": "Argument `list[Unknown]` is not assignable to parameter `facet_fields` with type `bool | str` in function `typing.MutableMapping.update`",
-      "severity": "error"
-    },
-    {
-      "column": 28,
-      "path": "cl/search/views.py",
-      "name": "bad-argument-type",
-      "concise_description": "Argument `int` is not assignable to parameter `estimated_count_threshold` with type `bool | str` in function `typing.MutableMapping.update`",
-      "severity": "error"
-    },
-    {
-      "column": 28,
-      "path": "cl/search/views.py",
-      "name": "bad-argument-type",
-      "concise_description": "Argument `list[str]` is not assignable to parameter `missing_citations` with type `bool | str` in function `typing.MutableMapping.update`",
-      "severity": "error"
-    },
-    {
-      "column": 27,
-      "path": "cl/search/views.py",
-      "name": "no-matching-overload",
-      "concise_description": "No matching overload found for function `typing.MutableMapping.update` called with arguments: (dict[str, Page[Unknown] | list[Unknown]])",
-      "severity": "error"
-    },
-    {
-      "column": 27,
-      "path": "cl/search/views.py",
-      "name": "no-matching-overload",
-      "concise_description": "No matching overload found for function `typing.MutableMapping.update` called with arguments: (dict[str, SearchForm])",
       "severity": "error"
     },
     {
@@ -8163,13 +6469,6 @@
       "severity": "error"
     },
     {
-      "column": 23,
-      "path": "cl/search/views.py",
-      "name": "no-matching-overload",
-      "concise_description": "No matching overload found for function `typing.MutableMapping.update` called with arguments: (ESSearchResult)",
-      "severity": "error"
-    },
-    {
       "column": 33,
       "path": "cl/search/views.py",
       "name": "bad-argument-type",
@@ -8177,59 +6476,10 @@
       "severity": "error"
     },
     {
-      "column": 9,
-      "path": "cl/search/views.py",
-      "name": "bad-argument-type",
-      "concise_description": "Argument `bool | str` is not assignable to parameter `s` with type `str` in function `cl.lib.string_utils.trunc`",
-      "severity": "error"
-    },
-    {
-      "column": 23,
-      "path": "cl/search/views.py",
-      "name": "no-matching-overload",
-      "concise_description": "No matching overload found for function `typing.MutableMapping.update` called with arguments: (dict[str, CreateAlertForm | dict[Unknown, Unknown] | None])",
-      "severity": "error"
-    },
-    {
-      "column": 38,
-      "path": "cl/search/views.py",
-      "name": "bad-assignment",
-      "concise_description": "`SearchForm` is not assignable to dict key `search_form` with type `bool`",
-      "severity": "error"
-    },
-    {
-      "column": 27,
-      "path": "cl/search/views.py",
-      "name": "no-matching-overload",
-      "concise_description": "No matching overload found for function `typing.MutableMapping.update` called with arguments: (dict[str, dict[str, list[Unknown]] | list[BoundField] | str])",
-      "severity": "error"
-    },
-    {
       "column": 25,
       "path": "cl/search/views.py",
       "name": "missing-attribute",
       "concise_description": "Object of class `Manager` has no attribute `all_pacer_courts`",
-      "severity": "error"
-    },
-    {
-      "column": 23,
-      "path": "cl/search/views.py",
-      "name": "no-matching-overload",
-      "concise_description": "No matching overload found for function `typing.MutableMapping.update` called with arguments: (dict[str, SearchForm | dict[str, list[Unknown]] | str])",
-      "severity": "error"
-    },
-    {
-      "column": 23,
-      "path": "cl/search/views.py",
-      "name": "no-matching-overload",
-      "concise_description": "No matching overload found for function `typing.MutableMapping.update` called with arguments: (dict[str, str])",
-      "severity": "error"
-    },
-    {
-      "column": 23,
-      "path": "cl/search/views.py",
-      "name": "no-matching-overload",
-      "concise_description": "No matching overload found for function `typing.MutableMapping.update` called with arguments: (dict[str, SearchForm | dict[str, list[Unknown]] | str])",
       "severity": "error"
     },
     {

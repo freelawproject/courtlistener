@@ -314,7 +314,7 @@ class RECAPAttachmentFactory(RECAPDocumentFactory):
     @classmethod
     def _fixup(cls, obj):
         """
-        If an attachment_number wasn't specificed, then set it to the highest
+        If an attachment_number wasn't specified, then set it to the highest
         for the docket entry.
         """
         super()._fixup(obj)
