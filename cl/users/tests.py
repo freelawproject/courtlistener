@@ -2678,7 +2678,7 @@ class CustomBackendEmailTest(RestartSentEmailQuotaMixin, TestCase):
         returns the total number of times that add_bcc_random returned True
         """
 
-        # Test differnt BCC rates
+        # Test different BCC rates
         # No messages are BCC'ed
         zero_bcc_rate = 0
         # All messages are BCC'ed
@@ -2879,7 +2879,7 @@ class CustomBackendEmailTest(RestartSentEmailQuotaMixin, TestCase):
         # The Emergency brake error should be triggered.
         with self.assertRaisesMessage(ValueError, "Emergency brake engaged"):
             email.send()
-        # No additional messsage should be stored.
+        # No additional message should be stored.
         self.assertEqual(stored_email.count(), 5)
 
     @patch(
@@ -2926,7 +2926,7 @@ class CustomBackendEmailTest(RestartSentEmailQuotaMixin, TestCase):
             "Emergency brake engaged to prevent email quota exhaustion",
         ):
             email.send()
-        # No additional messsage should be stored.
+        # No additional message should be stored.
         self.assertEqual(stored_email.count(), 5)
 
 

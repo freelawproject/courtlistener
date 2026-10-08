@@ -2015,7 +2015,7 @@ def update_docket_from_hidden_api(data):
     d = Docket.objects.get(pk=data["pass_through"])
 
     # need to populate the docket number for tests to pass until we
-    # activate the docket_number_raw cleaning flag. This will be overriden by
+    # activate the docket_number_raw cleaning flag. This will be overridden by
     # the clean docket_number_raw value once cleaning is activated
     if not d.docket_number:
         d.docket_number = data["docket_number"]

@@ -66,7 +66,7 @@ PARENTHETICAL_REGEX_BLOCKLIST_RULES = [
 ]
 
 _SURROUNDING_CHARS = r'[.!;,"“” ]'
-_PREFIX = rf"^{_SURROUNDING_CHARS}*("  # Begin string, optional whitespace/puncutation, begin capture group
+_PREFIX = rf"^{_SURROUNDING_CHARS}*("  # Begin string, optional whitespace/punctuation, begin capture group
 _SUFFIX = rf"){_SURROUNDING_CHARS}*$"  # Close capture group, optional whitespace/punctuation, end string
 
 PARENTHETICAL_BLOCKLIST_REGEX = re.compile(
