@@ -162,20 +162,6 @@
       "severity": "error"
     },
     {
-      "column": 31,
-      "path": "cl/alerts/models.py",
-      "name": "bad-assignment",
-      "concise_description": "`str` is not assignable to attribute `secret_key` with type `Never`",
-      "severity": "error"
-    },
-    {
-      "column": 31,
-      "path": "cl/alerts/models.py",
-      "name": "bad-assignment",
-      "concise_description": "`str` is not assignable to attribute `secret_key` with type `Never`",
-      "severity": "error"
-    },
-    {
       "column": 11,
       "path": "cl/alerts/signals.py",
       "name": "missing-attribute",
@@ -631,34 +617,6 @@
       "severity": "error"
     },
     {
-      "column": 38,
-      "path": "cl/audio/api_serializers.py",
-      "name": "bad-assignment",
-      "concise_description": "`ManyRelatedField | RelatedField[Unknown, str, Hyperlink]` is not assignable to `HyperlinkedRelatedField[Unknown]`",
-      "severity": "error"
-    },
-    {
-      "column": 39,
-      "path": "cl/audio/api_serializers.py",
-      "name": "bad-assignment",
-      "concise_description": "`ManyRelatedField | RelatedField[Unknown, str, Hyperlink]` is not assignable to `HyperlinkedRelatedField[Unknown]`",
-      "severity": "error"
-    },
-    {
-      "column": 35,
-      "path": "cl/audio/factories.py",
-      "name": "bad-assignment",
-      "concise_description": "`File[bytes]` is not assignable to attribute `local_path_mp3` with type `PostGeneration`",
-      "severity": "error"
-    },
-    {
-      "column": 45,
-      "path": "cl/audio/factories.py",
-      "name": "bad-assignment",
-      "concise_description": "`File[bytes]` is not assignable to attribute `local_path_original_file` with type `PostGeneration`",
-      "severity": "error"
-    },
-    {
       "column": 9,
       "path": "cl/audio/feeds.py",
       "name": "bad-override",
@@ -698,13 +656,6 @@
       "path": "cl/audio/feeds.py",
       "name": "bad-override",
       "concise_description": "Class member `SearchPodcast.subtitle` overrides parent class `JurisdictionPodcast` in an inconsistent manner",
-      "severity": "error"
-    },
-    {
-      "column": 22,
-      "path": "cl/audio/models.py",
-      "name": "bad-assignment",
-      "concise_description": "`ForeignKey[@_, @_]` is not assignable to `Docket`",
       "severity": "error"
     },
     {
@@ -1461,13 +1412,6 @@
       "path": "cl/donate/api_views.py",
       "name": "missing-attribute",
       "concise_description": "Object of class `NoneType` has no attribute `termination_date`",
-      "severity": "error"
-    },
-    {
-      "column": 44,
-      "path": "cl/donate/api_views.py",
-      "name": "bad-assignment",
-      "concise_description": "`str` is not assignable to attribute `termination_date` with type `datetime | None`",
       "severity": "error"
     },
     {
@@ -2301,13 +2245,6 @@
       "path": "cl/opinion_page/utils.py",
       "name": "missing-attribute",
       "concise_description": "Object of class `SCOTUSDocketEntry` has no attribute `recap_documents`",
-      "severity": "error"
-    },
-    {
-      "column": 39,
-      "path": "cl/opinion_page/utils.py",
-      "name": "bad-assignment",
-      "concise_description": "`list[Hit] | list[Unknown]` is not assignable to attribute `citing_clusters` with type `list[OpinionClusterDocument]`",
       "severity": "error"
     },
     {
@@ -3179,13 +3116,6 @@
       "severity": "error"
     },
     {
-      "column": 28,
-      "path": "cl/recap/tasks.py",
-      "name": "bad-assignment",
-      "concise_description": "`str | None` is not assignable to attribute `pacer_case_id` with type `str`",
-      "severity": "error"
-    },
-    {
       "column": 29,
       "path": "cl/recap/tasks.py",
       "name": "missing-attribute",
@@ -3239,13 +3169,6 @@
       "path": "cl/recap/tasks.py",
       "name": "bad-argument-type",
       "concise_description": "Argument `str` is not assignable to parameter `pacer_case_id` with type `int` in function `cl.recap.mergers.merge_attachment_page_data`",
-      "severity": "error"
-    },
-    {
-      "column": 28,
-      "path": "cl/recap/tasks.py",
-      "name": "bad-assignment",
-      "concise_description": "`str | None` is not assignable to attribute `pacer_case_id` with type `str`",
       "severity": "error"
     },
     {
@@ -4376,20 +4299,6 @@
       "severity": "error"
     },
     {
-      "column": 44,
-      "path": "cl/scrapers/views.py",
-      "name": "bad-assignment",
-      "concise_description": "`ManyRelatedField | RelatedField[Court, Court, Any]` is not assignable to `PrimaryKeyRelatedField[Court]`",
-      "severity": "error"
-    },
-    {
-      "column": 44,
-      "path": "cl/scrapers/views.py",
-      "name": "bad-assignment",
-      "concise_description": "`ManyRelatedField | RelatedField[Court, Court, Any]` is not assignable to `PrimaryKeyRelatedField[Court]`",
-      "severity": "error"
-    },
-    {
       "column": 9,
       "path": "cl/search/api_renderers.py",
       "name": "bad-override",
@@ -4709,20 +4618,6 @@
       "path": "cl/search/documents.py",
       "name": "inconsistent-inheritance",
       "concise_description": "Field `prepare_cluster_child` has inconsistent types inherited from multiple base classes",
-      "severity": "error"
-    },
-    {
-      "column": 35,
-      "path": "cl/search/factories.py",
-      "name": "bad-assignment",
-      "concise_description": "`File[bytes]` is not assignable to attribute `filepath_local` with type `PostGeneration`",
-      "severity": "error"
-    },
-    {
-      "column": 38,
-      "path": "cl/search/factories.py",
-      "name": "missing-attribute",
-      "concise_description": "Object of class `DocketFactory` has no attribute `pk`",
       "severity": "error"
     },
     {
@@ -5325,34 +5220,6 @@
       "path": "cl/search/models.py",
       "name": "bad-argument-type",
       "concise_description": "Argument `list[CaseTransfer]` is not assignable to parameter `objs` with type `Iterable[Self@CaseTransfer]` in function `django.db.models.manager.Manager.bulk_update`",
-      "severity": "error"
-    },
-    {
-      "column": 28,
-      "path": "cl/search/state/florida/factories.py",
-      "name": "bad-assignment",
-      "concise_description": "`Party | Unknown` is not assignable to attribute `submitted_by` with type `PostGeneration`",
-      "severity": "error"
-    },
-    {
-      "column": 9,
-      "path": "cl/search/state/florida/factories.py",
-      "name": "missing-attribute",
-      "concise_description": "Object of class `FloridaDocketEntryFactory` has no attribute `save`",
-      "severity": "error"
-    },
-    {
-      "column": 21,
-      "path": "cl/search/state/new_york/factories.py",
-      "name": "bad-assignment",
-      "concise_description": "`Party | Unknown` is not assignable to attribute `party` with type `PostGeneration`",
-      "severity": "error"
-    },
-    {
-      "column": 9,
-      "path": "cl/search/state/new_york/factories.py",
-      "name": "missing-attribute",
-      "concise_description": "Object of class `NYCoADocketEntryFactory` has no attribute `save`",
       "severity": "error"
     },
     {
@@ -5993,24 +5860,10 @@
       "severity": "error"
     },
     {
-      "column": 28,
-      "path": "cl/sitemaps_infinite/base_sitemap.py",
-      "name": "bad-assignment",
-      "concise_description": "`str | None` is not assignable to attribute `next_cursor` with type `str`",
-      "severity": "error"
-    },
-    {
       "column": 16,
       "path": "cl/sitemaps_infinite/base_sitemap.py",
       "name": "bad-return",
       "concise_description": "Returned type `tuple[CacheableList, str | None, bool | Unknown]` is not assignable to declared return type `tuple[Unknown, str, bool]`",
-      "severity": "error"
-    },
-    {
-      "column": 42,
-      "path": "cl/sitemaps_infinite/sitemap_generator.py",
-      "name": "bad-assignment",
-      "concise_description": "`dict[Unknown, Unknown]` is not assignable to `TaskCursorData`",
       "severity": "error"
     },
     {
@@ -6473,13 +6326,6 @@
       "path": "cl/visualizations/api_views.py",
       "name": "bad-override",
       "concise_description": "Class member `VisualizationViewSet.perform_create` overrides parent class `ModelViewSet` in an inconsistent manner",
-      "severity": "error"
-    },
-    {
-      "column": 25,
-      "path": "cl/visualizations/models.py",
-      "name": "bad-assignment",
-      "concise_description": "`str` is not assignable to attribute `slug` with type `Never`",
       "severity": "error"
     }
   ]

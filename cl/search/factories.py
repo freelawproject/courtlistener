@@ -110,7 +110,8 @@ class DocketFactory(DjangoModelFactory):
     """
 
     @post_generation
-    def filepath_local(self, create, extracted, **kwargs):
+    # pyrefly:ignore[invalid-annotation] factory_boy passes the model instance
+    def filepath_local(self: Docket, create, extracted, **kwargs):
         """Attaches a stub file to an instance of this factory."""
         if extracted:
             self.filepath_local = extracted

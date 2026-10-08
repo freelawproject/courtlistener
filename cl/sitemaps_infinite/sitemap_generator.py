@@ -65,7 +65,7 @@ def generate_urls_chunk(force_regenerate: bool = False) -> None:
 
     cursor_data: TaskCursorData = cursor_data_default.copy()
 
-    cursor_data_cached: TaskCursorData = redis_db.hgetall(HASH_NAME)
+    cursor_data_cached = redis_db.hgetall(HASH_NAME)
     if cursor_data_cached:
         cursor_data.update(cursor_data_cached)
 

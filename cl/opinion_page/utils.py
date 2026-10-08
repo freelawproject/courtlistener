@@ -763,7 +763,7 @@ class RelatedCitingResults:
     )
     sub_opinion_pks: list[int] = field(default_factory=list)
     url_search_params: dict[str, str] = field(default_factory=dict)
-    citing_clusters: list[OpinionClusterDocument] = field(default_factory=list)
+    citing_clusters: list[Hit] = field(default_factory=list)
     citing_cluster_count: int = 0
     timeout: bool = False
 
@@ -959,7 +959,6 @@ async def es_get_cited_clusters_with_cache(
         timeout_cited = True
 
     citing_clusters: list[Hit] = list(response) if response is not None else []
-    # TODO: Don't know what to do about this bad-assignment
     cluster_results.citing_clusters = citing_clusters
     cluster_results.citing_cluster_count = (
         cast(Any, response.hits).total.value if response is not None else 0

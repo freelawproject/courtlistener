@@ -32,7 +32,7 @@ class CacheableList(list):
 
     expiration_time: datetime
     current_cursor: str
-    next_cursor: str
+    next_cursor: str | None
 
 
 class CustomCursorPaginator(CursorPaginator):

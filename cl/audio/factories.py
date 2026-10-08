@@ -24,7 +24,8 @@ class AudioFactory(DjangoModelFactory):
     """
 
     @post_generation
-    def local_path_mp3(self, create, extracted, **kwargs):
+    # pyrefly:ignore[invalid-annotation] factory_boy passes the model instance
+    def local_path_mp3(self: Audio, create, extracted, **kwargs):
         if extracted:
             self.local_path_mp3 = extracted
         elif kwargs:
@@ -37,7 +38,8 @@ class AudioFactory(DjangoModelFactory):
             self.local_path_mp3 = FileField().evaluate(None, None, kwargs)
 
     @post_generation
-    def local_path_original_file(self, create, extracted, **kwargs):
+    # pyrefly:ignore[invalid-annotation] factory_boy passes the model instance
+    def local_path_original_file(self: Audio, create, extracted, **kwargs):
         if extracted:
             self.local_path_original_file = extracted
         elif kwargs:
