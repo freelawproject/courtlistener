@@ -145,6 +145,7 @@ from cl.search.api_views import (
     OpinionViewSet,
     OriginatingCourtInformationViewSet,
     RECAPDocumentViewSet,
+    ScotusDocketMetadataViewSet,
     TagViewSet,
 )
 from cl.search.factories import (
@@ -2877,6 +2878,18 @@ class V4DRFPaginationTest(TestCase):
             secondary_cursor_key="date_modified",
             non_cursor_key="date_upload",
             viewset=RECAPDocumentViewSet,
+        )
+
+    async def test_scotus_docket_metadata_endpoint(self) -> None:
+        """Test the V4 SCOTUS docket metadata endpoint confirming that its
+        cursor pagination works properly."""
+
+        await self._base_test_for_v4_endpoints(
+            endpoint="scotusdocketmetadata-list",
+            default_ordering="-id",
+            secondary_cursor_key="date_created",
+            non_cursor_key=None,
+            viewset=ScotusDocketMetadataViewSet,
         )
 
     async def test_audio_endpoint(self):
