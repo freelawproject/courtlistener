@@ -239,13 +239,6 @@
       "severity": "error"
     },
     {
-      "column": 52,
-      "path": "cl/alerts/tasks.py",
-      "name": "bad-assignment",
-      "concise_description": "`str` is not assignable to dict key `docket_alert_secret_key` with type `None`",
-      "severity": "error"
-    },
-    {
       "column": 39,
       "path": "cl/alerts/tasks.py",
       "name": "bad-argument-type",
