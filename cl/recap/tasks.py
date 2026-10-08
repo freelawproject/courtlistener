@@ -847,7 +847,7 @@ async def get_att_data_from_pq(
         return pq, {}, None
 
     if pq.pacer_case_id in ["undefined", "null"]:
-        pq.pacer_case_id = att_data.get("pacer_case_id", "")
+        pq.pacer_case_id = att_data.get("pacer_case_id")
         await pq.asave()
 
     return pq, att_data, text

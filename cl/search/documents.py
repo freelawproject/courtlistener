@@ -1485,9 +1485,9 @@ class DocketBaseDocument(DSLDocument):
 
 class _DocketDocumentPartyDict(TypedDict):
     party_id: set
-    party: set
+    party: set[str] | list[str]
     attorney_id: set
-    attorney: set
+    attorney: set[str]
     firm_id: set
     firm: set
 
@@ -1578,9 +1578,10 @@ class DocketDocument(
         return instance.get_absolute_url()
 
     def prepare_parties(self, instance) -> _DocketDocumentPartyDict:
-        out = {
+        parties = set()
+        out: _DocketDocumentPartyDict = {
             "party_id": set(),
-            "party": set(),
+            "party": parties,
             "attorney_id": set(),
             "attorney": set(),
             "firm_id": set(),
@@ -1591,7 +1592,7 @@ class DocketDocument(
         party_values = instance.parties.values_list("pk", "name")
         for pk, name in party_values.iterator():
             out["party_id"].add(pk)
-            out["party"].add(name)
+            parties.add(name)
 
         if not out["party"]:
             # Get party from docket case_name if no normalized parties are
@@ -1602,7 +1603,7 @@ class DocketDocument(
                 else get_parties_from_case_name(instance.case_name)
             )
             out["party"] = (
-                set(party_from_case_name) if party_from_case_name else set()
+                party_from_case_name if party_from_case_name else list[str]()
             )
 
         # Extract only required attorney values.

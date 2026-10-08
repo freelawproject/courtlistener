@@ -2094,11 +2094,11 @@ def merge_pacer_docket_into_cl_docket(
 
 
 class _MergeAttachmentDict(TypedDict):
-    pacer_doc_id: str
-    attachment_number: int
+    pacer_doc_id: NotRequired[str]
+    attachment_number: NotRequired[int]
     acms_document_guid: NotRequired[str]
     description: str
-    page_count: int
+    page_count: NotRequired[int | None]
     file_size_bytes: int
     file_size_str: str
 
@@ -2157,7 +2157,7 @@ class _MergeAttachmentPageParams(TypedDict):
     pacer_doc_id: str
     docket_entry__docket__court: Court
     document_number: NotRequired[int | None]
-    docket_entry__docket__docket_number_core: NotRequired[int | None]
+    docket_entry__docket__docket_number_core: NotRequired[str | None]
     description: NotRequired[str | None]
     docket_entry__docket__pacer_case_id: NotRequired[int]
 
@@ -2172,7 +2172,7 @@ async def merge_attachment_page_data(
     debug: bool = False,
     is_acms_attachment: bool = False,
     subdocket_replication: bool = False,
-    docket_number_core: int | None = None,
+    docket_number_core: str | None = None,
     description: str | None = None,
 ) -> tuple[list[RECAPDocument], DocketEntry]:
     """Merge attachment page data into the docket
