@@ -107,7 +107,7 @@ class HighlightedField(serializers.Field):
 
 
 class SuppressHighlightsField(serializers.Field):
-    """Supress highlights from text fields."""
+    """Suppress highlights from text fields."""
 
     def to_representation(self, value):
         return strip_tags(render_string_or_list(value))

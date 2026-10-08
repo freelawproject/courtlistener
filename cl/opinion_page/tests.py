@@ -1292,7 +1292,7 @@ class CitationRedirectorTest(TestCase):
     async def test_volume_pagination(self) -> None:
         """Can we properly paginate reporter volume numbers?"""
 
-        # Create test data usign factories
+        # Create test data using factories
         test_obj = await sync_to_async(CitationWithParentsFactory.create)(
             volume="2016",
             reporter="COA",
