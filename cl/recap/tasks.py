@@ -2263,6 +2263,13 @@ def fetch_attachment_page(self: Task, fq_pk: int) -> list[tuple[int, bool]]:
 
     fq = PacerFetchQueue.objects.get(pk=fq_pk)
     rd = fq.recap_document
+    if rd is None:
+        # The RD was deleted after the FQ was created; recap_document is
+        # SET_NULL on delete, so there's nothing left to fetch.
+        msg = "Unable to get attachment page: the RECAP Document no longer exists."
+        mark_fq_status(fq, msg, PROCESSING_STATUS.FAILED)
+        self.request.chain = None
+        return []
     court_id = rd.docket_entry.docket.court_id
     pacer_case_id = rd.docket_entry.docket.pacer_case_id
     pacer_doc_id = rd.pacer_doc_id
