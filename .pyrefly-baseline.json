@@ -6476,13 +6476,6 @@
       "severity": "error"
     },
     {
-      "column": 33,
-      "path": "cl/visualizations/models.py",
-      "name": "bad-assignment",
-      "concise_description": "`list[dict[str, int | list[dict[str, dict[Unknown, dict[str, int]] | str]] | str | Unknown | None]]` is not assignable to dict key `opinion_clusters` with type `dict[str, float | str]`",
-      "severity": "error"
-    },
-    {
       "column": 25,
       "path": "cl/visualizations/models.py",
       "name": "bad-assignment",
