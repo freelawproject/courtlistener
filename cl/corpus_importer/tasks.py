@@ -590,7 +590,7 @@ def process_free_opinion_result(
         return None
 
     # TODO: Come up with some way to do this that satisfies the type checker
-    # # pyrefly:ignore[missing-attribute]
+    # pyrefly:ignore[missing-attribute]
     result.court = Court.objects.get(pk=map_pacer_to_cl_id(result.court_id))
     result.case_name = harmonize(result.case_name)
     # pyrefly:ignore[missing-attribute]

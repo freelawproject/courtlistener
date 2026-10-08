@@ -345,7 +345,7 @@ async def get_user_prayers(
 ) -> QuerySet[RECAPDocument]:
     filters = Q(prayers__user=user)
     if status is not None:
-        filters |= Q(prayers__status=status)
+        filters &= Q(prayers__status=status)
 
     documents = (
         RECAPDocument.objects.filter(filters)
