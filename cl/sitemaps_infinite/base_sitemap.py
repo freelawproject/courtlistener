@@ -89,7 +89,7 @@ class InfinitePaginatorSitemap(sitemaps.Sitemap):
         )
         return self.protocol or protocol or env_based_protocol
 
-    _cursor: str | None | bool = False
+    _cursor: str | None
     _has_next: bool = False
 
     # make cache key with p=1 by default (to simplify the handling, @see `make_cache_key` in `sitemap.py`)
@@ -161,7 +161,7 @@ class InfinitePaginatorSitemap(sitemaps.Sitemap):
         Returns:
             list[dict[str, Any]]: A list of dictionaries representing the URLs for the sitemap.
         """
-        if self._cursor is False:
+        if not hasattr(self, "_cursor"):
             raise Exception(
                 "The cursor should be set (by calling `set_cursor`) before calling `get_urls_by_cursor` method."
             )

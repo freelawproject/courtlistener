@@ -6007,31 +6007,10 @@
       "severity": "error"
     },
     {
-      "column": 20,
-      "path": "cl/sitemaps_infinite/sitemap_generator.py",
-      "name": "bad-assignment",
-      "concise_description": "`None` is not assignable to TypedDict key `section` with type `bytes | str`",
-      "severity": "error"
-    },
-    {
       "column": 42,
       "path": "cl/sitemaps_infinite/sitemap_generator.py",
       "name": "bad-assignment",
       "concise_description": "`dict[Unknown, Unknown]` is not assignable to `TaskCursorData`",
-      "severity": "error"
-    },
-    {
-      "column": 25,
-      "path": "cl/sitemaps_infinite/sitemap_generator.py",
-      "name": "bad-assignment",
-      "concise_description": "`int | str` is not assignable to `int`",
-      "severity": "error"
-    },
-    {
-      "column": 38,
-      "path": "cl/sitemaps_infinite/sitemap_generator.py",
-      "name": "bad-assignment",
-      "concise_description": "`bytes | str` is not assignable to `str | None`",
       "severity": "error"
     },
     {
@@ -6042,24 +6021,10 @@
       "severity": "error"
     },
     {
-      "column": 34,
-      "path": "cl/sitemaps_infinite/sitemap_generator.py",
-      "name": "bad-assignment",
-      "concise_description": "`bool | str | None` is not assignable to variable `current_cursor` with type `str | None`",
-      "severity": "error"
-    },
-    {
       "column": 21,
       "path": "cl/sitemaps_infinite/sitemap_generator.py",
       "name": "bad-argument-type",
       "concise_description": "Argument `TaskCursorData` is not assignable to parameter `mapping` with type `Mapping[_Key, _Value]` in function `redis.commands.core.HashCommands.hset`",
-      "severity": "error"
-    },
-    {
-      "column": 15,
-      "path": "cl/sitemaps_infinite/sitemap_generator.py",
-      "name": "bad-assignment",
-      "concise_description": "`float | None` is not assignable to variable `timeout` with type `int`",
       "severity": "error"
     },
     {
