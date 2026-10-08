@@ -29,13 +29,6 @@
       "severity": "error"
     },
     {
-      "column": 35,
-      "path": "cl/ai/llm_providers/google.py",
-      "name": "bad-assignment",
-      "concise_description": "`str` is not assignable to dict value type `dict[str, str | None]`",
-      "severity": "error"
-    },
-    {
       "column": 32,
       "path": "cl/ai/llm_providers/google.py",
       "name": "bad-argument-type",
