@@ -24,6 +24,7 @@ from django.core.mail import (
     get_connection,
     send_mail,
 )
+from django.db.models import QuerySet
 from django.http import HttpResponse
 from django.test import AsyncClient, RequestFactory
 from django.test.client import Client
@@ -4801,6 +4802,142 @@ class DuplicateEmailSettingsTest(TestCase):
         await self.up.user.arefresh_from_db()
         self.assertEqual(self.up.user.first_name, "Still")
         self.assertEqual(self.up.user.email, self.email)
+
+
+class UserAdminEmailSearchTest(TestCase):
+    """Admin user search uses the LOWER(email) index for complete addresses."""
+
+    @classmethod
+    def setUpTestData(cls) -> None:
+        cls.user = UserFactory.create(
+            username="admin-search",
+            first_name="Ada",
+            last_name="Lovelace",
+            email="Matcher@Example.com",
+        )
+        cls.other = UserFactory.create(
+            username="other-user",
+            first_name="Other",
+            last_name="Person",
+            email="other@example.org",
+        )
+
+    def setUp(self) -> None:
+        self.user_admin = UserAdmin(model=User, admin_site=admin.site)
+        self.request = RequestFactory().get(
+            reverse("admin:auth_user_changelist")
+        )
+
+    def search(self, term: str) -> QuerySet[User]:
+        """Run the User admin changelist search and return the queryset."""
+        results, _use_distinct = self.user_admin.get_search_results(
+            self.request, User.objects.all(), term
+        )
+        return results
+
+    def test_email_search_finds_the_account_regardless_of_case(self) -> None:
+        """Does a differently-cased complete address still find the account?"""
+        for email in [
+            "Matcher@Example.com",
+            "matcher@example.com",
+            "MATCHER@EXAMPLE.COM",
+        ]:
+            with self.subTest(email=email):
+                self.assertEqual(
+                    list(
+                        self.search(email).values_list("username", flat=True)
+                    ),
+                    ["admin-search"],
+                )
+
+    def test_a_different_address_does_not_match(self) -> None:
+        """Is a complete address match exact, once case is set aside?"""
+        self.assertEqual(
+            list(
+                self.search("nobody@example.com").values_list("pk", flat=True)
+            ),
+            [],
+        )
+
+    def test_partial_email_search_still_matches(self) -> None:
+        """Do domain and partial-address terms still use substring search?"""
+        cases = (
+            ("@example.com", "admin-search"),
+            ("Matcher@", "admin-search"),
+            ("@example.org", "other-user"),
+        )
+        for term, username in cases:
+            with self.subTest(term=term):
+                self.assertEqual(
+                    list(self.search(term).values_list("username", flat=True)),
+                    [username],
+                )
+
+    def test_email_search_folds_case_in_sql(self) -> None:
+        """Does a complete address compile to LOWER() rather than UPPER()/LIKE?"""
+        sql = str(self.search("matcher@example.com").query)
+        self.assertIn("LOWER", sql.upper())
+        self.assertNotIn("UPPER", sql.upper())
+        self.assertNotIn("LIKE", sql.upper())
+
+    def test_username_search_still_works(self) -> None:
+        """Does a non-address term still search username and name?"""
+        self.assertEqual(
+            list(
+                self.search("admin-search").values_list("username", flat=True)
+            ),
+            ["admin-search"],
+        )
+        self.assertEqual(
+            list(self.search("Lovelace").values_list("username", flat=True)),
+            ["admin-search"],
+        )
+
+    def test_empty_search_returns_everyone(self) -> None:
+        """Does an empty term leave the queryset unfiltered?"""
+        results, use_distinct = self.user_admin.get_search_results(
+            self.request, User.objects.all(), ""
+        )
+        self.assertEqual(results.count(), User.objects.count())
+        self.assertFalse(use_distinct)
+
+
+class UserAdminNeonLinksTest(TestCase):
+    """Tests for the Neon links shown on the user admin page."""
+
+    @classmethod
+    def setUpTestData(cls) -> None:
+        cls.user = UserProfileWithParentsFactory.create(
+            neon_account_id="112684"
+        ).user
+
+    def test_no_links_without_neon_ids(self) -> None:
+        """Users with no Neon account or membership get no Neon links."""
+        user = UserProfileWithParentsFactory.create().user
+        self.assertEqual(UserAdmin._get_neon_links(user.pk), [])
+
+    def test_account_link(self) -> None:
+        """A Neon account ID produces a link to the Neon account page."""
+        self.assertEqual(
+            UserAdmin._get_neon_links(self.user.pk),
+            [
+                {
+                    "href": "https://donate.free.law/admin/accounts/112684/about",
+                    "label": "Neon User",
+                }
+            ],
+        )
+
+    def test_account_and_membership_links(self) -> None:
+        """A membership with a Neon ID adds a link to the membership page."""
+        NeonMembershipFactory(user=self.user, neon_id="11394")
+        self.assertEqual(
+            [link["href"] for link in UserAdmin._get_neon_links(self.user.pk)],
+            [
+                "https://donate.free.law/admin/accounts/112684/about",
+                "https://donate.free.law/admin/memberships/11394",
+            ],
+        )
 
 
 class UserAdminApiCallsCountTest(TestCase):
