@@ -5886,7 +5886,7 @@ class RecapDocketTaskTest(TestCase):
         for test, method in tests.items():
             for source, expected_source in non_recap_sources.items():
                 with self.subTest(
-                    f"Testing {test} source {source} assigment.",
+                    f"Testing {test} source {source} assignment.",
                     source=source,
                     expected_source=expected_source,
                 ):
@@ -5957,7 +5957,7 @@ class RecapDocketTaskTest(TestCase):
         for test, test_assets in tests.items():
             for source, expected_source in test_assets[0].items():
                 with self.subTest(
-                    f"Testing {test} source {source} assigment.",
+                    f"Testing {test} source {source} assignment.",
                     source=source,
                     expected_source=expected_source,
                 ):

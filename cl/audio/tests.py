@@ -299,7 +299,7 @@ class PodcastTest(ESIndexTestCase, TestCase):
             )
 
     def test_catch_es_errors(self) -> None:
-        """Can we catch es errors and just render an empy podcast?"""
+        """Can we catch es errors and just render an empty podcast?"""
 
         # Bad syntax error.
         params = {
@@ -533,7 +533,7 @@ class TranscriptionTest(TestCase):
         cls.OpenAITranscriptionClass = OpenAITranscription
 
     def test_audio_file_validation(self) -> None:
-        """Can we validate audio files existance OpenAI API use?"""
+        """Can we validate audio files existence OpenAI API use?"""
         can_be_processed = audio_can_be_processed_by_open_ai_api(
             self.audio_without_local_path_mp3
         )
