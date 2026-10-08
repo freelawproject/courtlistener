@@ -28,7 +28,11 @@ if TYPE_CHECKING:
     from django.test.client import _MonkeyPatchedWSGIResponse
 
 from cl.alerts.constants import LEGACY_MEMBERSHIP_HELP_URL
-from cl.alerts.factories import AlertFactory, DocketAlertWithParentsFactory
+from cl.alerts.factories import (
+    AlertFactory,
+    DocketAlertFactory,
+    DocketAlertWithParentsFactory,
+)
 from cl.alerts.forms import CreateAlertForm
 from cl.alerts.management.commands.cl_send_scheduled_alerts import (
     DAYS_TO_DELETE,
@@ -3220,7 +3224,7 @@ class ToggleDocketAlertHtmxTest(TestCase):
     @override_settings(MAX_FREE_DOCKET_ALERTS=1)
     def test_quota_dialog_reports_the_current_count(self) -> None:
         """The dialog's count is the user's live subscription total."""
-        DocketAlert.objects.create(
+        DocketAlertFactory(
             user=self.profile.user, docket=DocketFactory(source=Docket.RECAP)
         )
         r = self.toggle()
