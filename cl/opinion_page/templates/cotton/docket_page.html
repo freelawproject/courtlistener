@@ -142,7 +142,7 @@
             <a class="links" href="{{ af.get_absolute_url }}{% querystring %}">
               {{ af|best_case_name|safe|v_wrapper }}
             </a>
-            <div>{{ docket.date_argued|default_if_none:"" }}</div>
+            <div>{{ af.docket.date_argued|default_if_none:"" }}</div>
           </div>
         </div>
       </li>
