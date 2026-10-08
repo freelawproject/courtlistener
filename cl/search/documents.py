@@ -1,7 +1,7 @@
 from collections.abc import Callable
 from datetime import datetime
 from functools import partial
-from typing import Any
+from typing import Any, TypedDict
 
 from django.conf import settings
 from django.http import QueryDict
@@ -1483,6 +1483,15 @@ class DocketBaseDocument(DSLDocument):
     )
 
 
+class _DocketDocumentPartyDict(TypedDict):
+    party_id: set
+    party: set
+    attorney_id: set
+    attorney: set
+    firm_id: set
+    firm: set
+
+
 @recap_index.document
 class DocketDocument(
     CSVSerializableDocumentMixin, DocketBaseDocument, RECAPBaseDocument
@@ -1568,7 +1577,7 @@ class DocketDocument(
     def prepare_docket_absolute_url(self, instance):
         return instance.get_absolute_url()
 
-    def prepare_parties(self, instance):
+    def prepare_parties(self, instance) -> _DocketDocumentPartyDict:
         out = {
             "party_id": set(),
             "party": set(),
@@ -1592,7 +1601,9 @@ class DocketDocument(
                 if is_bankruptcy_court(instance.court_id)
                 else get_parties_from_case_name(instance.case_name)
             )
-            out["party"] = party_from_case_name if party_from_case_name else []
+            out["party"] = (
+                set(party_from_case_name) if party_from_case_name else set()
+            )
 
         # Extract only required attorney values.
         atty_values = (
@@ -1635,7 +1646,7 @@ class DocketDocumentPlain(DocketDocument):
     control whether to include parties based on
     the MAX_ATTORNEYS_TO_PERCOLATE setting."""
 
-    def prepare_parties(self, instance: Docket) -> dict[str, set]:
+    def prepare_parties(self, instance: Docket) -> _DocketDocumentPartyDict:
         out = {
             "party_id": set(),
             "party": set(),
