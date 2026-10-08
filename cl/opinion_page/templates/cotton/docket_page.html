@@ -99,9 +99,9 @@
   {% endif %}
   {# Staff actions, admin links and moderation state, each gated on the permission its target requires. #}
   {% if perms.search.view_docket or perms.search.change_docket or perms.search.delete_docket %}
-  <div class="flex flex-wrap items-center gap-2 ml-auto" x-data="docketPage">
-    <c-button variant="dark" size="sm" href="{% url 'admin:search_docket_change' docket.pk %}">
-      {% svg "edit" class="w-3.5 h-3.5" aria_hidden="true" %}
+  <div class="flex flex-wrap items-center gap-2 md:ml-auto" x-data="docketPage">
+    <c-button variant="dark" href="{% url 'admin:search_docket_change' docket.pk %}">
+      {% svg "edit" class="w-4 h-4" aria_hidden="true" %}
       Edit Docket
       {% if track_events %}
         <span x-show="$store.viewCount.loaded" x-cloak class="text-greyscale-300">(<span x-text="$store.viewCount.value"></span> views)</span>
