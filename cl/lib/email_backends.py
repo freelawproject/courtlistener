@@ -147,7 +147,7 @@ class EmailBackend(BaseEmailBackend):
     """This is a custom email backend to handle sending an email with some
     extra functions before the email is sent.
 
-    Is neccesary to set the following settings:
+    It is necessary to set the following settings:
     BASE_BACKEND: The base email backend to use to send emails, in our case:
     django_ses.SESBackend, for testing is used:
     django.core.mail.backends.locmem.EmailBackend

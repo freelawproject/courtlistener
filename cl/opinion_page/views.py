@@ -1045,7 +1045,7 @@ async def setup_opinion_context(
 async def get_opinions_queryset(
     sub_opinions_prefetch: str,
 ) -> QuerySet[OpinionCluster]:
-    """Prepare a cluster queryset with common prefetchs to prevent extra
+    """Prepare a cluster queryset with common prefetches to prevent extra
     queries
 
     :param sub_opinions_prefetch: a plain string which identifies a prefetch
@@ -1101,7 +1101,7 @@ async def render_opinion_view(
 
 
 async def update_opinion_tabs(request: HttpRequest, pk: int) -> HttpResponse:
-    """Generate opinions tab dinamically
+    """Generate opinions tab dynamically
 
     :param request: The HTTP request from the user
     :param pk: OpinionCluster pk

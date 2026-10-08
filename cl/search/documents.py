@@ -986,7 +986,7 @@ class PersonDocument(CSVSerializableDocumentMixin, PersonBaseDocument):
             for key in (hl_fields + list_fields)
         }
 
-        # Adds tranformation for relative URL and compute human-readable values
+        # Adds transformation for relative URL and compute human-readable values
         transformations["absolute_url"] = lambda x: (
             f"https://www.courtlistener.com{x}"
         )

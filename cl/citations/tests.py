@@ -3592,7 +3592,7 @@ class ReindexESCiteFieldsTest(ESIndexTestCase, TransactionTestCase):
         doc = OpinionClusterDocument.get(id=cluster.id)
         self.assertEqual(doc.citeCount, cite_count)
 
-        # make a change that won't be catched by signals
+        # make a change that won't be caught by signals
         OpinionCluster.objects.filter(id=cluster.id).update(
             citation_count=cite_count + 1
         )
