@@ -1562,13 +1562,6 @@
       "severity": "error"
     },
     {
-      "column": 36,
-      "path": "cl/favorites/api_views.py",
-      "name": "bad-assignment",
-      "concise_description": "`CombinedExpression` is not assignable to attribute `value` with type `int`",
-      "severity": "error"
-    },
-    {
       "column": 21,
       "path": "cl/favorites/decorators.py",
       "name": "unsupported-operation",
@@ -1632,13 +1625,6 @@
       "severity": "error"
     },
     {
-      "column": 38,
-      "path": "cl/favorites/utils.py",
-      "name": "bad-assignment",
-      "concise_description": "`str` is not assignable to dict key `prayers__status` with type `User`",
-      "severity": "error"
-    },
-    {
       "column": 24,
       "path": "cl/favorites/utils.py",
       "name": "missing-attribute",
@@ -1688,13 +1674,6 @@
       "severity": "error"
     },
     {
-      "column": 22,
-      "path": "cl/favorites/views.py",
-      "name": "bad-assignment",
-      "concise_description": "`RECAPDocument` is not assignable to variable `recap_document` with type `int`",
-      "severity": "error"
-    },
-    {
       "column": 25,
       "path": "cl/favorites/views.py",
       "name": "bad-argument-type",
@@ -1702,45 +1681,10 @@
       "severity": "error"
     },
     {
-      "column": 31,
-      "path": "cl/favorites/views.py",
-      "name": "bad-argument-type",
-      "concise_description": "Argument `int` is not assignable to parameter `recap_document` with type `RECAPDocument` in function `cl.favorites.utils.create_prayer`",
-      "severity": "error"
-    },
-    {
-      "column": 32,
-      "path": "cl/favorites/views.py",
-      "name": "missing-attribute",
-      "concise_description": "Object of class `int` has no attribute `pk`",
-      "severity": "error"
-    },
-    {
-      "column": 22,
-      "path": "cl/favorites/views.py",
-      "name": "bad-assignment",
-      "concise_description": "`RECAPDocument` is not assignable to variable `recap_document` with type `int`",
-      "severity": "error"
-    },
-    {
       "column": 25,
       "path": "cl/favorites/views.py",
       "name": "bad-argument-type",
       "concise_description": "Argument `AbstractBaseUser | AnonymousUser` is not assignable to parameter `user` with type `User` in function `cl.favorites.utils.delete_prayer`",
-      "severity": "error"
-    },
-    {
-      "column": 31,
-      "path": "cl/favorites/views.py",
-      "name": "bad-argument-type",
-      "concise_description": "Argument `int` is not assignable to parameter `recap_document` with type `RECAPDocument` in function `cl.favorites.utils.delete_prayer`",
-      "severity": "error"
-    },
-    {
-      "column": 32,
-      "path": "cl/favorites/views.py",
-      "name": "missing-attribute",
-      "concise_description": "Object of class `int` has no attribute `pk`",
       "severity": "error"
     },
     {
