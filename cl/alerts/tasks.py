@@ -383,7 +383,7 @@ def send_alert_and_webhook(
     DocketAlert.objects.filter(docket=d).update(date_last_hit=now())
 
     # Send docket entries to webhook
-    send_docket_alert_webhook_events.delay(des_pks, webhook_recipients)
+    send_docket_alert_webhook_events.delay(des_pks, webhook_recipients, d.pk)
     if not recap_email_user_only:
         delete_redis_semaphore("ALERTS", make_alert_key(d_pk))
 
