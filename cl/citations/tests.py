@@ -1,5 +1,6 @@
 import itertools
 import json
+from copy import deepcopy
 from dataclasses import dataclass
 from datetime import UTC, date, datetime, timedelta
 from http import HTTPStatus
@@ -38,8 +39,11 @@ from cl.citations.filter_parentheticals import (
     is_parenthetical_descriptive,
 )
 from cl.citations.group_parentheticals import (
+    _EMPTY_MHASH,
+    _EMPTY_SIMILARITY_INDEX,
     compute_parenthetical_groups,
-    get_graph_component,
+    connected_components,
+    count_similar,
     get_parenthetical_tokens,
     get_representative_parenthetical,
 )
@@ -1411,6 +1415,40 @@ class CitationObjectTest(ESIndexTestCase, TestCase):
         opinion12 = Opinion.objects.get(cluster__pk=self.citation12.cluster_id)
         self.assertEqual(results.pk, opinion12.pk, msg=results)
 
+    def test_resolved_opinion_skips_text(self) -> None:
+        """Resolved opinions load no text, but carry what annotation and
+        short-cite resolution read without further queries."""
+        # Cite from a third cluster: resolution drops self-citations.
+        citing_opinion = Opinion.objects.get(
+            cluster__pk=self.citation1.cluster_id
+        )
+        for cite_str, cluster_id in (
+            ("2 F.3d 2 (1st Cir. 2000)", self.citation2.cluster_id),  # ES hit
+            ("8 B. 416", self.citation12.cluster_id),  # DB pincite fallback
+        ):
+            with self.subTest(cite_str=cite_str):
+                citation = get_citations(
+                    cite_str, tokenizer=HYPERSCAN_TOKENIZER
+                )[0]
+                assert isinstance(citation, FullCaseCitation)
+                setattr(citation, "citing_opinion", citing_opinion)
+                opinion = resolve_fullcase_citation(citation)
+                assert isinstance(opinion, Opinion)
+                self.assertEqual(opinion.cluster_id, cluster_id)
+                self.assertTrue(
+                    {"plain_text", "html_with_citations", "xml_harvard"}
+                    <= opinion.get_deferred_fields()
+                )
+                self.assertIn(
+                    "headnotes", opinion.cluster.get_deferred_fields()
+                )
+                with self.assertNumQueries(0):
+                    opinion.cluster.get_absolute_url()
+                    opinion.cluster.case_name
+                    opinion.cluster.case_name_full
+                    opinion.cluster.case_name_short
+                    list(opinion.cluster.citations.all())
+
     def test_citation_multiple_matches(self) -> None:
         """Make sure that we can identify multiple matches for a single citation"""
         citation_str = "114 F.3d 1182"
@@ -2393,7 +2431,8 @@ class GroupParentheticalsTest(SimpleTestCase):
             ):
                 self.assertEqual(
                     get_representative_parenthetical(
-                        parentheticals_to_test, simgraph_to_test
+                        parentheticals_to_test,
+                        lambda par, g=simgraph_to_test: len(g[str(par.id)]),
                     ),
                     representative,
                     f"Got incorrect result from get_best_parenthetical_of_group for text (expected {representative}): {(parentheticals_to_test, simgraph_to_test)}",
@@ -2448,66 +2487,87 @@ class GroupParentheticalsTest(SimpleTestCase):
                     f"Got incorrect result from get_parnethetical_tokens for text (expected {tokens}): {parenthetical_text}",
                 )
 
-    def test_get_graph_component(self):
+    def test_connected_components(self):
         """
-        Tests whether get_graph_component correctly identifies the full
-        "connected component" of a given node in the graph (i.e. a list of
-        itself plus any nodes directly or indirectly connected to it)
+        Tests whether connected_components finds every "connected component"
+        (a node plus every node linked to it directly or indirectly) when
+        links arrive as buckets of keys
         """
         test_pairs = [
-            (("1", {"1": []}, set()), ["1"]),
-            (("1", {"1": ["2"], "2": "1", "3": []}, set()), ["1", "2"]),
+            # (keys, buckets), expected components
+            ((["1"], []), [["1"]]),
+            ((["1", "2", "3"], [["1", "2"]]), [["1", "2"], ["3"]]),
+            # Linked only through "1": still one component
             (
                 (
-                    "1",
-                    {
-                        "1": ["2", "3"],
-                        "2": "1",
-                        "3": ["1"],
-                        "4": ["5"],
-                        "5": ["4"],
-                    },
-                    set(),
+                    ["1", "2", "3", "4", "5"],
+                    [["1", "2"], ["3", "1"], ["4", "5"]],
                 ),
-                ["1", "2", "3"],
+                [["1", "2", "3"], ["4", "5"]],
             ),
+            # Chains across buckets, and members keep the order of keys
             (
-                (
-                    "2",
-                    {
-                        "1": ["2", "3"],
-                        "2": "1",
-                        "3": ["1"],
-                        "4": ["5"],
-                        "5": ["4"],
-                    },
-                    set(),
-                ),
-                ["1", "2", "3"],
+                (["a", "b", "c", "d"], [["d", "c"], ["c", "b"], ["b", "a"]]),
+                [["a", "b", "c", "d"]],
             ),
-            (
-                (
-                    "3",
-                    {
-                        "1": ["2", "3"],
-                        "2": "1",
-                        "3": ["1"],
-                        "4": ["5"],
-                        "5": ["4"],
-                    },
-                    set(),
-                ),
-                ["1", "2", "3"],
-            ),
+            # Falsy keys and empty buckets
+            (([0, 1, 2], [[], [0, 2]]), [[0, 2], [1]]),
         ]
-        for i, (inputs, output) in enumerate(test_pairs):
+        for i, ((keys, buckets), output) in enumerate(test_pairs):
             with self.subTest(
-                f"Testing {inputs} connections are recognized correctly.", i=i
+                f"Testing {buckets} connections are recognized correctly.", i=i
             ):
+                self.assertEqual(connected_components(keys, buckets), output)
+
+    def test_representative_ties_break_by_input_order(self):
+        """When parentheticals tie on score and on neighbor count, the one
+        earliest in the input becomes the representative.
+
+        This is where grouping by connected components departs from the
+        similarity-graph walk it replaced. The walk ordered each group by
+        traversal order, which followed the iteration order of a set of
+        string ids and so changed with PYTHONHASHSEED: on this input it chose
+        2, 4, 5, or 6 depending on the process. Callers pass parentheticals
+        ordered by score, so ties now go to the database order instead.
+        """
+        text = "holding that counsel must object to preserve the error"
+        # One low scorer first, so the tie is not simply "the first input".
+        low = DummyParenthetical(id=1, text=text, score=0.5)
+        tied = [
+            DummyParenthetical(id=i, text=text, score=0.9) for i in range(2, 7)
+        ]
+        for name, pars, expected in (
+            ("ascending ids", [low, *tied], 2),
+            ("descending ids", [low, *reversed(tied)], 6),
+        ):
+            with self.subTest(name):
+                groups = compute_parenthetical_groups(pars)
+                self.assertEqual(len(groups), 1)
+                self.assertEqual(groups[0].representative.id, expected)
+
+    def test_count_similar_matches_lsh_query(self):
+        """count_similar agrees with MinHashLSH.query for every key"""
+        index = deepcopy(_EMPTY_SIMILARITY_INDEX)
+        minhashes = {}
+        texts = [
+            "holding that counsel was ineffective for failing to object",
+            "holding that counsel was ineffective for failing to object at trial",
+            "holding counsel ineffective for not objecting",
+            "explaining the standard for summary judgment",
+            "explaining the summary judgment standard",
+            "finding no abuse of discretion",
+        ]
+        for key, text in enumerate(texts):
+            mhash = deepcopy(_EMPTY_MHASH)
+            mhash.update_batch(
+                [t.encode() for t in get_parenthetical_tokens(text)]
+            )
+            index.insert(key, mhash)
+            minhashes[key] = mhash
+        for key, mhash in minhashes.items():
+            with self.subTest(key=key):
                 self.assertEqual(
-                    sorted(get_graph_component(*inputs)),
-                    sorted(output),
-                    f"Got incorrect result from get_graph_component for inputs (expected {output}): {inputs}",
+                    count_similar(index, key), len(index.query(mhash))
                 )
 
 

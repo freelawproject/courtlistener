@@ -30,11 +30,12 @@ https://github.com/freelawproject/courtlistener/pull/1941
 """
 
 import re
-from collections import deque
+from collections.abc import Callable, Hashable, Iterable
 from copy import deepcopy
 from dataclasses import dataclass
 from functools import lru_cache
 from math import ceil
+from typing import Any, Protocol
 
 from datasketch import MinHash, MinHashLSH
 from Stemmer import (  # type:ignore[missing-import] Stemmer has no associated py or pyi file
@@ -42,9 +43,6 @@ from Stemmer import (  # type:ignore[missing-import] Stemmer has no associated p
 )
 
 from cl.lib.stop_words import STOP_WORDS
-from cl.search.models import Parenthetical
-
-Graph = dict[str, list[str]]
 
 GERUND_WORD = re.compile(r"(?:\S+ing)", re.IGNORECASE)
 
@@ -65,18 +63,36 @@ _EMPTY_MHASH = MinHash(num_perm=64)
 stemmer = Stemmer("english")
 
 
+class GroupableParenthetical(Protocol):
+    """What grouping reads from a parenthetical.
+
+    A Parenthetical model instance satisfies this, but so does a lighter
+    object: callers grouping a heavily cited case should prefer one, since a
+    model instance costs ~1.5 KiB and a case can have tens of thousands.
+    """
+
+    @property
+    def id(self) -> int: ...
+
+    @property
+    def text(self) -> str: ...
+
+    @property
+    def score(self) -> float: ...
+
+
 @dataclass
-class ComputedParentheticalGroup:
+class ComputedParentheticalGroup[P: GroupableParenthetical]:
     # So named to avoid collision with the database model named ParentheticalGroup
-    parentheticals: list[Parenthetical]
-    representative: Parenthetical
+    parentheticals: list[P]
+    representative: P
     size: int
     score: float
 
 
-def compute_parenthetical_groups(
-    parentheticals: list[Parenthetical],
-) -> list[ComputedParentheticalGroup]:
+def compute_parenthetical_groups[P: GroupableParenthetical](
+    parentheticals: list[P],
+) -> list[ComputedParentheticalGroup[P]]:
     """
     Given a list of parentheticals for a case, cluster them based on textual
     similarity and returns a list of ComputedParentheticalGroup objects containing
@@ -100,103 +116,118 @@ def compute_parenthetical_groups(
         return []
 
     similarity_index = deepcopy(_EMPTY_SIMILARITY_INDEX)
-    parenthetical_objects: dict[str, Parenthetical] = {}
-    parenthetical_minhashes: dict[str, MinHash] = {}
+    parenthetical_objects: dict[int, P] = {}
 
     for par in parentheticals:
         mhash = deepcopy(_EMPTY_MHASH)
         tokens = get_parenthetical_tokens(par.text)
         mhash.update_batch([gram.encode("utf-8") for gram in tokens])
+        parenthetical_objects[par.id] = par
+        # The index keeps what grouping needs, so each MinHash can go now.
+        similarity_index.insert(par.id, mhash)
 
-        par_key = str(par.id)
-        parenthetical_objects[par_key] = par
-        parenthetical_minhashes[par_key] = mhash
-        similarity_index.insert(par_key, mhash)
+    def neighbor_count(par: P) -> int:
+        return count_similar(similarity_index, par.id)
 
-    similarity_graph = get_similarity_graph(
-        parenthetical_minhashes, similarity_index
-    )
-
-    parenthetical_groups: list[ComputedParentheticalGroup] = []
-    # start the visited_nodes set here to prevent recomputing components, since
-    # the same component will be found when starting from any of it's nodes
-    visited_nodes: set[str] = set()
-    for node, neighbors in similarity_graph.items():
-        if component := get_graph_component(
-            node, similarity_graph, visited_nodes
-        ):
-            parenthetical_groups.append(
-                get_group_from_component(
-                    component,
-                    parenthetical_objects,
-                    similarity_graph,
-                )
-            )
+    parenthetical_groups = [
+        get_group_from_component(
+            component, parenthetical_objects, neighbor_count
+        )
+        for component in connected_components(
+            parenthetical_objects, lsh_buckets(similarity_index)
+        )
+    ]
     return sorted(
         parenthetical_groups, key=lambda group: group.score, reverse=True
     )
 
 
-def get_similarity_graph(
-    parenthetical_minhashes: dict[str, MinHash], similarity_index: MinHashLSH
-) -> Graph:
+def lsh_buckets(similarity_index: MinHashLSH) -> Iterable[Iterable[Any]]:
+    """Yield every bucket of an LSH index as a collection of keys.
+
+    Two keys are similar exactly when some bucket holds both: that is the
+    relation `MinHashLSH.query` reports, one bucket per band.
+
+    :param similarity_index: A populated MinHashLSH index
+    :return: An iterable of buckets, each an iterable of the keys inserted
     """
-    From the MinHashLSH index, create a dictionary representation of a graph
-    where the nodes represent parentheticals and the edges represent that
-    two nodes are sufficiently similar to each other to be clustered into
-    the same group.
+    for hashtable in similarity_index.hashtables:
+        for band_hash in hashtable.keys():
+            yield hashtable.get(band_hash)
 
-    :param parenthetical_minhashes: A dictionary mapping parenthetical IDs to
-    the MinHash object corresponding to the parenthetical's text's tokens
-    :param similarity_index: The MinHashLSH data structure containing all of
-    the MinHash's that we can query
-    :return: A dictionary representation of a graph/network where the nodes/keys
-    are parenthetical IDs and the neighbors/values are the other parentheticals
-    above the defined similarity threshold.
+
+def connected_components[K: Hashable](
+    keys: Iterable[K], buckets: Iterable[Iterable[K]]
+) -> list[list[K]]:
+    """Group keys that are linked, directly or through others, by buckets.
+
+    Every key in a bucket is linked to every other key in it. This builds the
+    same components as walking a graph with an edge between each pair of keys
+    that share a bucket, without ever materializing those edges: a cluster of
+    n near-identical parentheticals has n² edges, which is what made grouping
+    a heavily cited case cost gigabytes.
+
+    :param keys: Every key, in the order components and their members should
+        follow
+    :param buckets: Collections of keys known to be linked
+    :return: The components, ordered by their earliest key; members keep the
+        order of `keys`
     """
-    similarity_graph: Graph = {}
-    for par_key, mhash in parenthetical_minhashes.items():
-        similarity_graph[par_key] = similarity_index.query(mhash)
-    return similarity_graph
+    parent: dict[K, K] = {key: key for key in keys}
+
+    def find(key: K) -> K:
+        root = key
+        while parent[root] != root:
+            root = parent[root]
+        # Point the whole path at the root so later finds are short.
+        while parent[key] != root:
+            parent[key], key = root, parent[key]
+        return root
+
+    for bucket in buckets:
+        iterator = iter(bucket)
+        if (first := next(iterator, None)) is None:
+            continue
+        root = find(first)
+        for key in iterator:
+            if (other := find(key)) != root:
+                parent[other] = root
+
+    components: dict[K, list[K]] = {}
+    for key in parent:
+        components.setdefault(find(key), []).append(key)
+    return list(components.values())
 
 
-def get_graph_component(
-    node: str, graph: Graph, visited: set[str]
-) -> list[str]:
+def count_similar(similarity_index: MinHashLSH, key: Hashable) -> int:
+    """Count the keys similar to `key` in an LSH index, including itself.
+
+    This equals `len(similarity_index.query(...))` for the key's MinHash, but
+    works from the band hashes the index already stores, so callers need not
+    keep MinHashes around.
+
+    :param similarity_index: A populated MinHashLSH index
+    :param key: A key inserted into the index
+    :return: The number of keys sharing at least one bucket with `key`
     """
-    From a given starting node, find the list of nodes connected to it either
-    directly or indirectly. In graph theory terms, this is a "connected
-    component": https://www.geeksforgeeks.org/connected-components-in-an-undirected-graph/
-
-    :param node: The starting node from which to probe the component
-    :param graph: A dictionary encoding the graph with key: node and value:
-    list of neighbors
-    :param visited: A set containing the nodes already visited in all groups
-        processing
-    :return: A list of all nodes in param :node's component
-    """
-    if node in visited:
-        return []
-
-    cluster = []
-    queue = deque([node])
-    visited.add(node)
-
-    while queue:
-        current = queue.popleft()
-        cluster.append(current)
-        for nbr in graph.get(current, []):
-            if nbr not in visited:
-                visited.add(nbr)
-                queue.append(nbr)
-    return cluster
+    band_hashes = similarity_index.keys.get(key)
+    return len(
+        set().union(
+            *(
+                hashtable.get(band_hash)
+                for band_hash, hashtable in zip(
+                    band_hashes, similarity_index.hashtables
+                )
+            )
+        )
+    )
 
 
-def get_group_from_component(
-    component: list[str],
-    parenthetical_objects: dict[str, Parenthetical],
-    similarity_graph: Graph,
-) -> ComputedParentheticalGroup:
+def get_group_from_component[P: GroupableParenthetical](
+    component: list[int],
+    parenthetical_objects: dict[int, P],
+    neighbor_count: Callable[[P], int],
+) -> ComputedParentheticalGroup[P]:
     """
     Given a list of parenthetical IDs representing a component, create a
     ComputedParentheticalGroup containing the corresponding parenthetical objects,
@@ -206,8 +237,8 @@ def get_group_from_component(
     :param component: A list of parenthetical IDs to turn into a ComputedParentheticalGroup
     :param parenthetical_objects: A dictionary mapping parenthetical IDs to the
     corresponding parenthetical objects
-    :param similarity_graph: A dictionary containing similarity relationships
-    between parentheticals
+    :param neighbor_count: Returns how many parentheticals are similar to a
+    given one, itself included
     :return: A ComputedParentheticalGroup corresponding to the given component
     """
     pars_in_group = sorted(
@@ -221,7 +252,7 @@ def get_group_from_component(
         len(pars_in_group) / len(parenthetical_objects)
     )
     representative = get_representative_parenthetical(
-        pars_in_group, similarity_graph
+        pars_in_group, neighbor_count
     )
     parenthetical_group = ComputedParentheticalGroup(
         parentheticals=pars_in_group,
@@ -235,26 +266,26 @@ def get_group_from_component(
 BEST_PARENTHETICAL_SEARCH_THRESHOLD = 0.2
 
 
-def get_representative_parenthetical(
-    parentheticals: list[Parenthetical], similarity_graph: Graph
-) -> Parenthetical:
+def get_representative_parenthetical[P: GroupableParenthetical](
+    parentheticals: list[P],
+    neighbor_count: Callable[[P], int],
+) -> P:
     """
     Takes a list of parentheticals sorted by score and returns the parenthetical
     in the top 20% of score that is most similar to the cluster as a whole
     (as determined by its number of neighbors)
 
     :param parentheticals: A list of parentheticals sorted by score, descending
-    :param similarity_graph: A dictionary encoding the graph with key: node and value:
-    list of neighbors
+    :param neighbor_count: Returns how many parentheticals are similar to a
+    given one. Called only for the top 20%, since counting can be costly in
+    large groups.
     :return: A Parenthetical object of the best parenthetical in the group
     """
     num_parentheticals_to_consider = ceil(
         len(parentheticals) * BEST_PARENTHETICAL_SEARCH_THRESHOLD
     )
     return max(
-        parentheticals[:num_parentheticals_to_consider],
-        # The number of neighbors each parenthetical has
-        key=lambda par: len(similarity_graph[str(par.id)]),
+        parentheticals[:num_parentheticals_to_consider], key=neighbor_count
     )
 
 
