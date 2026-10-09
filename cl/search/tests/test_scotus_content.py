@@ -32,6 +32,7 @@ from cl.search.factories import (
     ScotusDocketDataFactory,
     SCOTUSDocketEntryDataFactory,
     SCOTUSDocketEntryFactory,
+    SCOTUSDocumentFactory,
     SCOTUSPartyDataFactory,
 )
 from cl.search.models import (
@@ -969,3 +970,36 @@ class ScotusDocketUrlPropertyTest(CLTestCase):
             court=self.court, source=Docket.SCRAPER, docket_number=""
         )
         self.assertEqual(docket.scotus_docket_url, "")
+
+
+class ScotusRelatedNamesTest(CLTestCase):
+    """SCOTUS entries and documents are reachable through explicit
+    related names, which the API serializers and filters reference.
+    """
+
+    @classmethod
+    def setUpTestData(cls) -> None:
+        cls.court = CourtFactory(id="scotus", jurisdiction="F")
+        cls.docket = DocketFactory(court=cls.court, source=Docket.SCRAPER)
+        cls.entry = SCOTUSDocketEntryFactory(docket=cls.docket)
+        cls.document = SCOTUSDocumentFactory(docket_entry=cls.entry)
+
+    def test_reverse_accessors(self) -> None:
+        """Entries and documents are reachable from their parents."""
+        self.assertEqual(
+            list(self.docket.scotus_docket_entries.all()), [self.entry]
+        )
+        self.assertEqual(
+            list(self.entry.scotus_documents.all()), [self.document]
+        )
+
+    def test_reverse_query_lookups(self) -> None:
+        """The related names work as ORM lookups, as API filters use them."""
+        self.assertEqual(
+            list(
+                Docket.objects.filter(
+                    scotus_docket_entries__scotus_documents=self.document
+                )
+            ),
+            [self.docket],
+        )
