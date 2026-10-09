@@ -1590,31 +1590,10 @@
       "severity": "error"
     },
     {
-      "column": 45,
-      "path": "cl/lib/document_serializer.py",
-      "name": "unsupported-operation",
-      "concise_description": "Cannot set item in `OrderedDict[Unknown, ListField]`",
-      "severity": "error"
-    },
-    {
-      "column": 45,
-      "path": "cl/lib/document_serializer.py",
-      "name": "unsupported-operation",
-      "concise_description": "Cannot set item in `OrderedDict[Unknown, ListField]`",
-      "severity": "error"
-    },
-    {
       "column": 17,
       "path": "cl/lib/elasticsearch_utils.py",
       "name": "missing-attribute",
       "concise_description": "Object of class `Manager` has no attribute `appellate_courts`",
-      "severity": "error"
-    },
-    {
-      "column": 25,
-      "path": "cl/lib/elasticsearch_utils.py",
-      "name": "unsupported-operation",
-      "concise_description": "Cannot set item in `dict[int, tuple[str, None, str]]`",
       "severity": "error"
     },
     {
@@ -1678,13 +1657,6 @@
       "path": "cl/lib/import_lib.py",
       "name": "not-iterable",
       "concise_description": "Type `Manager[Unknown]` is not iterable",
-      "severity": "error"
-    },
-    {
-      "column": 13,
-      "path": "cl/lib/middleware.py",
-      "name": "unsupported-operation",
-      "concise_description": "Cannot set item in `None`",
       "severity": "error"
     },
     {
