@@ -103,6 +103,21 @@ LOWERCASE_CASE_NAME_WORDS = {
 # Acronyms with vowels that should stay in caps. Words without vowels, like
 # "LLC", are always taken as acronyms.
 CASE_NAME_ACRONYMS = {"USA", "IV", "NA", "PA", "UAW", "AFL", "CIO"}
+# Abbreviations without vowels that are not acronyms, e.g. "JR." -> "Jr."
+CASE_NAME_ABBREVIATIONS = {
+    "DR",
+    "FT",
+    "JR",
+    "LTD",
+    "MR",
+    "MRS",
+    "MS",
+    "MT",
+    "SR",
+    "ST",
+}
+# Roman numerals up to 39, e.g. "VIII". `titlecase` only keeps II and III.
+ROMAN_NUMERAL_RE = re.compile(r"(?=[IVX])X{0,3}(?:IX|IV|V?I{0,3})")
 
 
 # Cluster fields that come from the head matter of the XML. When merging
@@ -301,16 +316,20 @@ def normalize_case_name_caps(case_name: str) -> str:
                 mc_name.group(2), mc_name.group(2).capitalize(), 1
             )
         elif letters.isupper():
-            is_acronym = letters in CASE_NAME_ACRONYMS or not re.search(
-                r"[AEIOUY]", letters
+            is_acronym = (
+                letters in CASE_NAME_ACRONYMS
+                or ROMAN_NUMERAL_RE.fullmatch(letters)
+                or not re.search(r"[AEIOUY]", letters)
             )
             if letters.lower() in LOWERCASE_CASE_NAME_WORDS:
                 word = word.lower()
-            elif not is_acronym:
+            elif letters in CASE_NAME_ABBREVIATIONS or not is_acronym:
                 word = _capitalize_caps_word(word)
         words.append(word)
-    # titlecase capitalizes "re", but CL uses "In re"
-    return re.sub(r"\bIn Re\b", "In re", titlecase(" ".join(words)))
+    # titlecase capitalizes "re" and "ex rel.", but CL uses "In re" and
+    # "ex rel."
+    case_name = re.sub(r"\bIn Re\b", "In re", titlecase(" ".join(words)))
+    return re.sub(r"\bEx Rel\b", "ex rel", case_name)
 
 
 def get_date_filed(soup: BeautifulSoup) -> date | None:

@@ -73,6 +73,22 @@ class ScanXmlHelpersTest(SimpleTestCase):
                 "Ann Smith-Jones v. John McDonald",
             ),
             ("Jane Roe v. Richard Roe", "Jane Roe v. Richard Roe"),
+            ("Mary JONES, JR. v. STATE", "Mary Jones, Jr. v. State"),
+            (
+                "ST. PAUL FIRE & MARINE INS. CO. v. SMITH",
+                "St. Paul Fire & Marine Ins. Co. v. Smith",
+            ),
+            ("MRS. SMITH v. JONES", "Mrs. Smith v. Jones"),
+            ("MR. SMITH v. DR. JONES", "Mr. Smith v. Dr. Jones"),
+            ("MS. SMITH v. ACME CO., LTD.", "Ms. Smith v. Acme Co., Ltd."),
+            (
+                "CITY OF FT. LAUDERDALE v. MT. SINAI",
+                "City of Ft. Lauderdale v. Mt. Sinai",
+            ),
+            ("STATE ex rel. SMITH v. JONES", "State ex rel. Smith v. Jones"),
+            ("STATE EX REL. SMITH v. JONES", "State ex rel. Smith v. Jones"),
+            ("HENRY VIII v. John DOE", "Henry VIII v. John Doe"),
+            ("CIVIL SERVICE v. DOE", "Civil Service v. Doe"),
         ]
         for case_name, expected in cases:
             with self.subTest(case_name=case_name):
