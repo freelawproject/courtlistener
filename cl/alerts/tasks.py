@@ -225,7 +225,10 @@ def make_alert_messages(
         "count": de_count,
         "case_name": case_name,
     }
-    email_context = {
+    # TODO: Might be good as a TypedDict, but that seems like overkill for now
+    email_context: dict[
+        str, list[DocketEntry] | int | Docket | None | str | list[UserTag]
+    ] = {
         "new_des": new_des,
         "count": de_count,
         "docket": d,

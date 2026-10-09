@@ -16,6 +16,7 @@ from re import Pattern
 from tempfile import NamedTemporaryFile
 from typing import IO, Any, TypeIs, cast
 from urllib.parse import urljoin
+from uuid import UUID
 
 import botocore.exceptions
 import environ
@@ -589,13 +590,11 @@ def process_free_opinion_result(
         return None
 
     # TODO: Come up with some way to do this that satisfies the type checker
-    result.court = Court.objects.get(
-        pk=map_pacer_to_cl_id(result.court_id)
-    )  # pyrefly:ignore[missing-attribute]
+    # pyrefly:ignore[missing-attribute]
+    result.court = Court.objects.get(pk=map_pacer_to_cl_id(result.court_id))
     result.case_name = harmonize(result.case_name)
-    result.case_name_short = cnt.make_case_name_short(
-        result.case_name
-    )  # pyrefly:ignore[missing-attribute]
+    # pyrefly:ignore[missing-attribute]
+    result.case_name_short = cnt.make_case_name_short(result.case_name)
 
     row_copy = copy.copy(result)
     # If we don't do this, the doc's date_filed becomes the docket's
@@ -1331,7 +1330,7 @@ def filter_docket_by_tags(
 
 
 def query_case_query_report(
-    court_id: str, pacer_case_id: int
+    court_id: str, pacer_case_id: str
 ) -> tuple[dict[str, Any], str]:
     """Query the iquery page for a given PACER case ID.
 
@@ -1359,7 +1358,7 @@ def query_case_query_report(
 def make_docket_by_iquery_base(
     self: Task,
     court_id: str,
-    pacer_case_id: int,
+    pacer_case_id: str,
     using: str = "default",
     tag_names: list[str] | None = None,
     log_results_redis: bool = False,
@@ -1527,7 +1526,7 @@ def make_docket_by_iquery_sweep(
 
 @retry((requests.Timeout, PacerLoginException), tries=3, delay=0.25, backoff=1)
 def query_iquery_page(
-    court_id: str, pacer_case_id: int
+    court_id: str, pacer_case_id: str
 ) -> tuple[bool, None] | tuple[dict[str, Any], str]:
     """A small wrapper to query the iquery page for a given PACER case ID to
     support retries via the @retry decorator in case of a failure.
@@ -4250,7 +4249,9 @@ def merge_texas_document(
 
     if needs_update:
         texas_document.description = input_document["description"]
-        texas_document.media_version_id = input_document["media_version_id"]
+        texas_document.media_version_id = UUID(
+            input_document["media_version_id"]
+        )
         texas_document.url = input_document["document_url"]
         if texas_document.filepath_local:
             texas_document.filepath_local.delete(save=False)
@@ -4358,7 +4359,7 @@ def merge_texas_docket_entry(
         appellate_brief["description"] if appellate_brief else ""
     )
     docket_entry.disposition = case_event["disposition"]
-    docket_entry.remarks = case_event.get("remarks", "")
+    docket_entry.remarks = cast(str, case_event.get("remarks", ""))
     docket_entry.save()
 
     logger.info(

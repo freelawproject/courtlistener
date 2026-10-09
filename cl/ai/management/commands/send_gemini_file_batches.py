@@ -143,6 +143,7 @@ from django.utils.timezone import now
 
 from cl.ai.llm_providers.google import (
     SUPPORTED_GEMINI_MODELS,
+    BatchTask,
     GoogleGenAIBatchWrapper,
 )
 from cl.ai.models import (
@@ -313,7 +314,7 @@ def create_tasks_from_files(
     files: list[tuple[str, bytes, str]],
     store_files: bool,
     temp_files: list[str],
-) -> list[dict]:
+) -> list[BatchTask]:
     """Create ``LLMTask`` objects from file data and stage temp files.
 
     For each file tuple, an ``LLMTask`` is created and the file content is
@@ -331,9 +332,9 @@ def create_tasks_from_files(
     :param temp_files: Mutable list populated in-place with temporary file
         paths. This ensures the caller can clean them up even if this
         function fails partway through.
-    :returns: A list of dicts with ``llm_key`` and ``input_file_path`` keys.
+    :returns: One ``BatchTask`` per file.
     """
-    tasks_data: list[dict] = []
+    tasks_data: list[BatchTask] = []
 
     for filename, file_content, s3_key in files:
         llm_key = f"scan-batch-{llm_request.pk}-{uuid.uuid4().hex[:12]}"
@@ -372,7 +373,7 @@ def create_tasks_from_files(
 def submit_batch(
     llm_request: LLMRequest,
     wrapper: GoogleGenAIBatchWrapper,
-    tasks_data: list[dict],
+    tasks_data: list[BatchTask],
     system_prompt: Prompt,
     user_prompt: Prompt,
     cache_name: str,
@@ -388,9 +389,7 @@ def submit_batch(
 
     :param llm_request: The parent request to associate the batch with.
     :param wrapper: Pre-initialised Google GenAI batch wrapper.
-    :param tasks_data: List of dicts with ``llm_key`` and
-        ``input_file_path`` keys produced by
-        :func:`fetch_files_and_create_tasks`.
+    :param tasks_data: Tasks produced by :func:`create_tasks_from_files`.
     :param system_prompt: The system ``Prompt`` object.
     :param user_prompt: The user ``Prompt`` object.
     :param cache_name: Stable display name for the system-prompt cache.

@@ -138,6 +138,7 @@ class EventCounterViewset(CreateModelMixin, GenericViewSet):
                 )
             )
             initial_count = counter_record.value
+            # pyrefly:ignore[bad-assignment] Hopefully fixed in a future version
             counter_record.value = F("value") + 1
             counter_record.save(update_fields=["value"])
 

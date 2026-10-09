@@ -1,4 +1,5 @@
 import json
+from typing import Any
 
 import networkx
 from django.contrib.auth.models import User
@@ -271,7 +272,7 @@ class SCOTUSMap(AbstractDateTimeModel):
 
     async def to_json(self, g):
         """Make a JSON representation of a NetworkX graph of the data."""
-        j = {
+        j: dict[str, Any] = {
             "meta": {
                 "donate": "Please consider donating to support more projects "
                 "from Free Law Project",
@@ -346,6 +347,8 @@ class SCOTUSMap(AbstractDateTimeModel):
 
         if self.pk is None:
             # First time being saved.
+            # pyrefly:ignore[bad-assignment] pyrefly bug: pk is incorrectly
+            # typed as never None, so this branch is wrongly treated as unreachable
             self.slug = slugify(trunc(self.title, 75))
             # If we could, we'd add clusters and json here, but you can't do
             # that kind of thing until the first object has been saved.

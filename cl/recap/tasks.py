@@ -9,7 +9,7 @@ from datetime import datetime
 from functools import partial
 from http import HTTPStatus
 from multiprocessing import process
-from typing import Any
+from typing import Any, TypedDict, overload
 from zipfile import ZipFile
 
 import httpx
@@ -273,6 +273,22 @@ async def mark_pq_successful(pq: ProcessingQueue) -> tuple[int, str]:
     return await mark_pq_status(pq, message, PROCESSING_STATUS.SUCCESSFUL)
 
 
+@overload
+async def associate_related_instances(
+    pq: ProcessingQueue,
+    d_id: int | None = ...,
+    de_id: int | None = ...,
+    rd_id: int | None = ...,
+    model_name: str = ...,
+) -> None: ...
+@overload
+async def associate_related_instances(
+    pq: EmailProcessingQueue,
+    d_id: int | None = ...,
+    de_id: int | None = ...,
+    rd_id: int | list[int] | None = ...,
+    model_name: str = ...,
+) -> None: ...
 async def associate_related_instances(
     pq: ProcessingQueue | EmailProcessingQueue,
     d_id: int | None = None,
@@ -319,6 +335,7 @@ async def associate_related_instances(
     else:
         pq.docket_id = d_id
         pq.docket_entry_id = de_id
+        # pyrefly:ignore[bad-assignment] It's just narrowed incorrectly
         pq.recap_document_id = rd_id
         await pq.asave()
 
@@ -1780,7 +1797,7 @@ async def process_recap_appellate_attachment(
 
     if pq.pacer_case_id in ["undefined", "null"]:
         # Bad data from the client. Fix it with parsed data.
-        pq.pacer_case_id = att_data.get("pacer_case_id")
+        pq.pacer_case_id = att_data.get("pacer_case_id", "")
         await pq.asave()
 
     try:
@@ -2227,10 +2244,10 @@ def fetch_pacer_doc_by_rd_and_mark_fq_completed(
     :param omit_page_count: If true, omit requesting the page_count from doctor.
     :return: None
     """
-    rd_pk = fetch_pacer_doc_by_rd_base(
+    fetched_rd_pk = fetch_pacer_doc_by_rd_base(
         self, rd_pk, fq_pk, magic_number, omit_page_count=omit_page_count
     )
-    if rd_pk:
+    if fetched_rd_pk:
         # Mark the FQ as completed if the RD pk is returned, since in any other
         # case, fetch_pacer_doc_by_rd_base will return None.
         fq = PacerFetchQueue.objects.get(pk=fq_pk)
@@ -2523,13 +2540,18 @@ def fetch_pacer_case_id_and_title(s, fq, court_id):
     return {}
 
 
+class _CreateUpdateDocketFromFetchDict(TypedDict):
+    docket_pk: int
+    content_updated: bool
+
+
 def create_or_update_docket_data_from_fetch(
     fq: PacerFetchQueue,
     court_id: str,
     pacer_case_id: str | None,
     report: DocketReport | AppellateDocketReport | ACMSDocketReport,
     docket_data: dict[str, Any],
-) -> dict[str, str | bool]:
+) -> _CreateUpdateDocketFromFetchDict:
     """Creates or updates docket data in the database from fetched data.
 
     :param fq: The PacerFetchQueue record associated with this fetch.

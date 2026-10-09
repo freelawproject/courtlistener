@@ -12,8 +12,8 @@ The keys in this TypedDict are:
 
 
 class TaskCursorData(TypedDict):
-    section: str | bytes
-    last_page: int | str
+    section: str | None
+    last_page: int
     has_next: int
 
 
