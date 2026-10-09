@@ -1,6 +1,7 @@
 import re
 from datetime import datetime
 from os.path import join
+from typing import Any
 
 from django.conf import settings
 from juriscraper.OpinionSite import OpinionSite
@@ -65,7 +66,7 @@ class Site(OpinionSite):
         return [i.text for i in self.html.xpath(path)]
 
     def extract_from_text(self, scraped_text):
-        metadata = {}
+        metadata: dict[str, str | dict[str, Any]] = {}
         docket_regex = r"Docket Number: (?P<docket>\d+-\d+)"
         disposition_regex = r"Disposition: (?P<disposition>\w+)"
         citation_regex = r"20\d{2} VT \d+"

@@ -372,27 +372,6 @@
       "severity": "error"
     },
     {
-      "column": 27,
-      "path": "cl/api/pagination.py",
-      "name": "unsupported-operation",
-      "concise_description": "Cannot set item in `dict[str, AttrList[Unknown] | None]`",
-      "severity": "error"
-    },
-    {
-      "column": 27,
-      "path": "cl/api/pagination.py",
-      "name": "unsupported-operation",
-      "concise_description": "Cannot set item in `dict[str, AttrList[Unknown] | None]`",
-      "severity": "error"
-    },
-    {
-      "column": 27,
-      "path": "cl/api/pagination.py",
-      "name": "unsupported-operation",
-      "concise_description": "Cannot set item in `dict[str, AttrList[Unknown] | None]`",
-      "severity": "error"
-    },
-    {
       "column": 13,
       "path": "cl/api/pagination.py",
       "name": "bad-argument-type",
@@ -467,13 +446,6 @@
       "path": "cl/api/utils.py",
       "name": "missing-attribute",
       "concise_description": "Object of class `FilterSet` has no attribute `_clean_join_table_key`",
-      "severity": "error"
-    },
-    {
-      "column": 25,
-      "path": "cl/api/utils.py",
-      "name": "unsupported-operation",
-      "concise_description": "Cannot set item in `OrderedDict[str, list[Unknown]]`",
       "severity": "error"
     },
     {
@@ -729,20 +701,6 @@
       "severity": "error"
     },
     {
-      "column": 24,
-      "path": "cl/citations/api_views.py",
-      "name": "unsupported-operation",
-      "concise_description": "`|` is not supported between `QuerySet[OpinionCluster, OpinionCluster]` and `None`",
-      "severity": "error"
-    },
-    {
-      "column": 37,
-      "path": "cl/citations/group_parentheticals.py",
-      "name": "unsupported-operation",
-      "concise_description": "Cannot set item in `dict[str, list[str]]`",
-      "severity": "error"
-    },
-    {
       "column": 35,
       "path": "cl/citations/management/commands/reindex_es_cite_fields.py",
       "name": "unbound-name",
@@ -761,27 +719,6 @@
       "path": "cl/citations/management/commands/reindex_es_cite_fields.py",
       "name": "bad-argument-type",
       "concise_description": "Argument `list[_CiteCountUpdateDict]` is not assignable to parameter `documents_to_index` with type `list[dict[str, Any]]` in function `cl.lib.search_index_utils.index_documents_in_bulk`",
-      "severity": "error"
-    },
-    {
-      "column": 40,
-      "path": "cl/citations/match_citations.py",
-      "name": "not-iterable",
-      "concise_description": "Type `None` is not iterable",
-      "severity": "error"
-    },
-    {
-      "column": 28,
-      "path": "cl/citations/match_citations.py",
-      "name": "unsupported-operation",
-      "concise_description": "`None` is not subscriptable",
-      "severity": "error"
-    },
-    {
-      "column": 28,
-      "path": "cl/citations/match_citations.py",
-      "name": "bad-return",
-      "concise_description": "Returned type `Opinion | Unknown | None` is not assignable to declared return type `Opinion | Resource`",
       "severity": "error"
     },
     {
@@ -1324,20 +1261,6 @@
       "severity": "error"
     },
     {
-      "column": 13,
-      "path": "cl/disclosures/models.py",
-      "name": "unsupported-operation",
-      "concise_description": "`+=` is not supported between `int` and `None`",
-      "severity": "error"
-    },
-    {
-      "column": 13,
-      "path": "cl/disclosures/models.py",
-      "name": "unsupported-operation",
-      "concise_description": "`+=` is not supported between `int` and `None`",
-      "severity": "error"
-    },
-    {
       "column": 5,
       "path": "cl/disclosures/tasks.py",
       "name": "missing-attribute",
@@ -1489,13 +1412,6 @@
       "path": "cl/favorites/api_serializers.py",
       "name": "bad-override-param-name",
       "concise_description": "Class member `PrayerSerializer.validate` overrides parent class `ModelSerializer` in an inconsistent manner",
-      "severity": "error"
-    },
-    {
-      "column": 21,
-      "path": "cl/favorites/decorators.py",
-      "name": "unsupported-operation",
-      "concise_description": "`None` is not subscriptable",
       "severity": "error"
     },
     {
@@ -1674,31 +1590,10 @@
       "severity": "error"
     },
     {
-      "column": 45,
-      "path": "cl/lib/document_serializer.py",
-      "name": "unsupported-operation",
-      "concise_description": "Cannot set item in `OrderedDict[Unknown, ListField]`",
-      "severity": "error"
-    },
-    {
-      "column": 45,
-      "path": "cl/lib/document_serializer.py",
-      "name": "unsupported-operation",
-      "concise_description": "Cannot set item in `OrderedDict[Unknown, ListField]`",
-      "severity": "error"
-    },
-    {
       "column": 17,
       "path": "cl/lib/elasticsearch_utils.py",
       "name": "missing-attribute",
       "concise_description": "Object of class `Manager` has no attribute `appellate_courts`",
-      "severity": "error"
-    },
-    {
-      "column": 25,
-      "path": "cl/lib/elasticsearch_utils.py",
-      "name": "unsupported-operation",
-      "concise_description": "Cannot set item in `dict[int, tuple[str, None, str]]`",
       "severity": "error"
     },
     {
@@ -1762,13 +1657,6 @@
       "path": "cl/lib/import_lib.py",
       "name": "not-iterable",
       "concise_description": "Type `Manager[Unknown]` is not iterable",
-      "severity": "error"
-    },
-    {
-      "column": 13,
-      "path": "cl/lib/middleware.py",
-      "name": "unsupported-operation",
-      "concise_description": "Cannot set item in `None`",
       "severity": "error"
     },
     {
@@ -2290,17 +2178,10 @@
       "severity": "error"
     },
     {
-      "column": 16,
-      "path": "cl/people_db/import_judges/populate_fjc_judges.py",
-      "name": "bad-argument-type",
-      "concise_description": "Argument `list[str | Any] | None` is not assignable to parameter `obj` with type `Sized` in function `len`",
-      "severity": "error"
-    },
-    {
       "column": 17,
       "path": "cl/people_db/import_judges/populate_fjc_judges.py",
-      "name": "unsupported-operation",
-      "concise_description": "`None` is not subscriptable",
+      "name": "missing-attribute",
+      "concise_description": "Object of class `NoneType` has no attribute `insert`",
       "severity": "error"
     },
     {
@@ -2313,162 +2194,8 @@
     {
       "column": 17,
       "path": "cl/people_db/import_judges/populate_fjc_judges.py",
-      "name": "unsupported-operation",
-      "concise_description": "Cannot set item in `None`",
-      "severity": "error"
-    },
-    {
-      "column": 17,
-      "path": "cl/people_db/import_judges/populate_fjc_judges.py",
       "name": "missing-attribute",
       "concise_description": "Object of class `NoneType` has no attribute `insert`",
-      "severity": "error"
-    },
-    {
-      "column": 17,
-      "path": "cl/people_db/import_judges/populate_fjc_judges.py",
-      "name": "unsupported-operation",
-      "concise_description": "Cannot set item in `None`",
-      "severity": "error"
-    },
-    {
-      "column": 17,
-      "path": "cl/people_db/import_judges/populate_fjc_judges.py",
-      "name": "missing-attribute",
-      "concise_description": "Object of class `NoneType` has no attribute `insert`",
-      "severity": "error"
-    },
-    {
-      "column": 13,
-      "path": "cl/people_db/import_judges/populate_fjc_judges.py",
-      "name": "missing-attribute",
-      "concise_description": "Object of class `NoneType` has no attribute `insert`",
-      "severity": "error"
-    },
-    {
-      "column": 13,
-      "path": "cl/people_db/import_judges/populate_fjc_judges.py",
-      "name": "missing-attribute",
-      "concise_description": "Object of class `NoneType` has no attribute `insert`",
-      "severity": "error"
-    },
-    {
-      "column": 12,
-      "path": "cl/people_db/import_judges/populate_fjc_judges.py",
-      "name": "unsupported-operation",
-      "concise_description": "`None` is not subscriptable",
-      "severity": "error"
-    },
-    {
-      "column": 13,
-      "path": "cl/people_db/import_judges/populate_fjc_judges.py",
-      "name": "missing-attribute",
-      "concise_description": "Object of class `NoneType` has no attribute `insert`",
-      "severity": "error"
-    },
-    {
-      "column": 29,
-      "path": "cl/people_db/import_judges/populate_fjc_judges.py",
-      "name": "unsupported-operation",
-      "concise_description": "`None` is not subscriptable",
-      "severity": "error"
-    },
-    {
-      "column": 20,
-      "path": "cl/people_db/import_judges/populate_fjc_judges.py",
-      "name": "unsupported-operation",
-      "concise_description": "`None` is not subscriptable",
-      "severity": "error"
-    },
-    {
-      "column": 20,
-      "path": "cl/people_db/import_judges/populate_fjc_judges.py",
-      "name": "unsupported-operation",
-      "concise_description": "`None` is not subscriptable",
-      "severity": "error"
-    },
-    {
-      "column": 28,
-      "path": "cl/people_db/import_judges/populate_fjc_judges.py",
-      "name": "missing-attribute",
-      "concise_description": "Object of class `NoneType` has no attribute `pop`",
-      "severity": "error"
-    },
-    {
-      "column": 21,
-      "path": "cl/people_db/import_judges/populate_fjc_judges.py",
-      "name": "missing-attribute",
-      "concise_description": "Object of class `NoneType` has no attribute `extend`",
-      "severity": "error"
-    },
-    {
-      "column": 21,
-      "path": "cl/people_db/import_judges/populate_fjc_judges.py",
-      "name": "missing-attribute",
-      "concise_description": "Object of class `NoneType` has no attribute `extend`",
-      "severity": "error"
-    },
-    {
-      "column": 30,
-      "path": "cl/people_db/import_judges/populate_fjc_judges.py",
-      "name": "unsupported-operation",
-      "concise_description": "`None` is not subscriptable",
-      "severity": "error"
-    },
-    {
-      "column": 21,
-      "path": "cl/people_db/import_judges/populate_fjc_judges.py",
-      "name": "unsupported-operation",
-      "concise_description": "`None` is not subscriptable",
-      "severity": "error"
-    },
-    {
-      "column": 17,
-      "path": "cl/people_db/import_judges/populate_fjc_judges.py",
-      "name": "unsupported-operation",
-      "concise_description": "Cannot set item in `None`",
-      "severity": "error"
-    },
-    {
-      "column": 21,
-      "path": "cl/people_db/import_judges/populate_fjc_judges.py",
-      "name": "unsupported-operation",
-      "concise_description": "Cannot set item in `None`",
-      "severity": "error"
-    },
-    {
-      "column": 28,
-      "path": "cl/people_db/import_judges/populate_fjc_judges.py",
-      "name": "missing-attribute",
-      "concise_description": "Object of class `NoneType` has no attribute `pop`",
-      "severity": "error"
-    },
-    {
-      "column": 21,
-      "path": "cl/people_db/import_judges/populate_fjc_judges.py",
-      "name": "missing-attribute",
-      "concise_description": "Object of class `NoneType` has no attribute `extend`",
-      "severity": "error"
-    },
-    {
-      "column": 21,
-      "path": "cl/people_db/import_judges/populate_fjc_judges.py",
-      "name": "missing-attribute",
-      "concise_description": "Object of class `NoneType` has no attribute `extend`",
-      "severity": "error"
-    },
-    {
-      "column": 24,
-      "path": "cl/people_db/import_judges/populate_fjc_judges.py",
-      "name": "bad-argument-type",
-      "concise_description": "Argument `list[str | Any] | None` is not assignable to parameter `obj` with type `Sized` in function `len`",
-      "severity": "error"
-    },
-    {
-      "column": 21,
-      "path": "cl/people_db/import_judges/populate_fjc_judges.py",
-      "name": "missing-attribute",
-      "concise_description": "Object of class `NoneType` has no attribute `append`",
       "severity": "error"
     },
     {
@@ -2675,48 +2402,6 @@
       "severity": "error"
     },
     {
-      "column": 16,
-      "path": "cl/recap/management/commands/import_idb.py",
-      "name": "not-iterable",
-      "concise_description": "`in` is not supported between `Unknown` and `type[bool]`",
-      "severity": "error"
-    },
-    {
-      "column": 16,
-      "path": "cl/recap/management/commands/import_idb.py",
-      "name": "not-iterable",
-      "concise_description": "`in` is not supported between `Unknown` and `type[date]`",
-      "severity": "error"
-    },
-    {
-      "column": 16,
-      "path": "cl/recap/management/commands/import_idb.py",
-      "name": "not-iterable",
-      "concise_description": "`in` is not supported between `Unknown` and `type[int]`",
-      "severity": "error"
-    },
-    {
-      "column": 16,
-      "path": "cl/recap/management/commands/import_idb.py",
-      "name": "not-iterable",
-      "concise_description": "`in` is not supported between `Unknown` and `type[str]`",
-      "severity": "error"
-    },
-    {
-      "column": 16,
-      "path": "cl/recap/management/commands/import_idb.py",
-      "name": "unsupported-operation",
-      "concise_description": "`in` is not supported between `Unknown` and `type[Court]`",
-      "severity": "error"
-    },
-    {
-      "column": 16,
-      "path": "cl/recap/management/commands/import_idb.py",
-      "name": "unsupported-operation",
-      "concise_description": "`in` is not supported between `Unknown` and `type[Court]`",
-      "severity": "error"
-    },
-    {
       "column": 49,
       "path": "cl/recap/management/commands/merge_idb_into_dockets.py",
       "name": "bad-argument-type",
@@ -2777,13 +2462,6 @@
       "path": "cl/recap/mergers.py",
       "name": "bad-argument-type",
       "concise_description": "Argument `Any | None` is not assignable to parameter `full_name` with type `HumanName | str` in function `cl.people_db.lookup_utils.lookup_judge_by_full_name_and_set_attr`",
-      "severity": "error"
-    },
-    {
-      "column": 27,
-      "path": "cl/recap/mergers.py",
-      "name": "unsupported-operation",
-      "concise_description": "`None` is not subscriptable",
       "severity": "error"
     },
     {
@@ -3683,31 +3361,10 @@
       "severity": "error"
     },
     {
-      "column": 11,
-      "path": "cl/recap/tasks.py",
-      "name": "unsupported-operation",
-      "concise_description": "`None` is not subscriptable",
-      "severity": "error"
-    },
-    {
-      "column": 13,
-      "path": "cl/recap/tasks.py",
-      "name": "unsupported-operation",
-      "concise_description": "`None` is not subscriptable",
-      "severity": "error"
-    },
-    {
       "column": 37,
       "path": "cl/recap/tasks.py",
       "name": "bad-argument-type",
       "concise_description": "Argument `dict[str, None] | TexasCourtOfAppealsDocket | TexasCourtOfCriminalAppealsDocket | TexasSupremeCourtDocket` is not assignable to parameter `docket_data` with type `TexasCourtOfAppealsDocket | TexasCourtOfCriminalAppealsDocket | TexasSupremeCourtDocket` in function `cl.corpus_importer.tasks.merge_texas_docket`",
-      "severity": "error"
-    },
-    {
-      "column": 21,
-      "path": "cl/recap/tasks.py",
-      "name": "unsupported-operation",
-      "concise_description": "`None` is not subscriptable",
       "severity": "error"
     },
     {
@@ -4138,13 +3795,6 @@
       "severity": "error"
     },
     {
-      "column": 36,
-      "path": "cl/scrapers/test_assets/test_opinion_scraper.py",
-      "name": "unsupported-operation",
-      "concise_description": "Cannot set item in `dict[str, dict[str, str | Any]]`",
-      "severity": "error"
-    },
-    {
       "column": 24,
       "path": "cl/scrapers/test_assets/test_oral_arg_scraper.py",
       "name": "missing-attribute",
@@ -4551,13 +4201,6 @@
       "severity": "error"
     },
     {
-      "column": 37,
-      "path": "cl/search/documents.py",
-      "name": "unsupported-operation",
-      "concise_description": "Cannot set item in `dict[str, (x: Unknown) -> Any]`",
-      "severity": "error"
-    },
-    {
       "column": 7,
       "path": "cl/search/documents.py",
       "name": "inconsistent-inheritance",
@@ -4719,20 +4362,6 @@
       "severity": "error"
     },
     {
-      "column": 36,
-      "path": "cl/search/management/commands/cl_compute_token_count.py",
-      "name": "unsupported-operation",
-      "concise_description": "`/` is not supported between `int` and `None`",
-      "severity": "error"
-    },
-    {
-      "column": 40,
-      "path": "cl/search/management/commands/cl_compute_token_count.py",
-      "name": "unsupported-operation",
-      "concise_description": "`/` is not supported between `int` and `None`",
-      "severity": "error"
-    },
-    {
       "column": 52,
       "path": "cl/search/management/commands/cl_compute_token_count.py",
       "name": "bad-argument-type",
@@ -4744,13 +4373,6 @@
       "path": "cl/search/management/commands/cl_compute_token_count.py",
       "name": "bad-argument-type",
       "concise_description": "Argument `list[int]` is not assignable to parameter `array` with type `list[float]` in function `compute_avg_from_list`",
-      "severity": "error"
-    },
-    {
-      "column": 12,
-      "path": "cl/search/management/commands/cl_index_embeddings.py",
-      "name": "unsupported-operation",
-      "concise_description": "`%` is not supported between `int` and `None`",
       "severity": "error"
     },
     {
@@ -4758,13 +4380,6 @@
       "path": "cl/search/management/commands/cl_index_embeddings.py",
       "name": "missing-attribute",
       "concise_description": "Object of class `NoneType` has no attribute `maybe_wait`",
-      "severity": "error"
-    },
-    {
-      "column": 24,
-      "path": "cl/search/management/commands/cl_index_embeddings.py",
-      "name": "bad-argument-type",
-      "concise_description": "Argument `Unknown | None` is not assignable to parameter `seconds` with type `SupportsIndex | float` in function `time.sleep`",
       "severity": "error"
     },
     {
@@ -4859,13 +4474,6 @@
       "severity": "error"
     },
     {
-      "column": 16,
-      "path": "cl/search/management/commands/fix_rd_broken_links.py",
-      "name": "unsupported-operation",
-      "concise_description": "`%` is not supported between `int` and `None`",
-      "severity": "error"
-    },
-    {
       "column": 17,
       "path": "cl/search/management/commands/fix_rd_broken_links.py",
       "name": "missing-attribute",
@@ -4877,13 +4485,6 @@
       "path": "cl/search/management/commands/fix_rd_broken_links.py",
       "name": "bad-argument-type",
       "concise_description": "Argument `Unknown | None` is not assignable to parameter `seconds` with type `SupportsIndex | float` in function `time.sleep`",
-      "severity": "error"
-    },
-    {
-      "column": 16,
-      "path": "cl/search/management/commands/fix_rd_broken_links.py",
-      "name": "unsupported-operation",
-      "concise_description": "`>=` is not supported between `int` and `None`",
       "severity": "error"
     },
     {
@@ -4929,31 +4530,10 @@
       "severity": "error"
     },
     {
-      "column": 27,
-      "path": "cl/search/management/commands/pacer_bulk_fetch.py",
-      "name": "unsupported-operation",
-      "concise_description": "`None` is not subscriptable",
-      "severity": "error"
-    },
-    {
       "column": 13,
       "path": "cl/search/management/commands/pacer_bulk_fetch.py",
       "name": "missing-attribute",
       "concise_description": "Object of class `NoneType` has no attribute `pk`",
-      "severity": "error"
-    },
-    {
-      "column": 31,
-      "path": "cl/search/management/commands/pacer_bulk_fetch.py",
-      "name": "unsupported-operation",
-      "concise_description": "`None` is not subscriptable",
-      "severity": "error"
-    },
-    {
-      "column": 31,
-      "path": "cl/search/management/commands/pacer_bulk_fetch.py",
-      "name": "unsupported-operation",
-      "concise_description": "`None` is not subscriptable",
       "severity": "error"
     },
     {
@@ -5024,13 +4604,6 @@
       "path": "cl/search/management/commands/pacer_bulk_fetch.py",
       "name": "missing-attribute",
       "concise_description": "Object of class `NoneType` has no attribute `pk`",
-      "severity": "error"
-    },
-    {
-      "column": 47,
-      "path": "cl/search/management/commands/pacer_bulk_fetch.py",
-      "name": "unsupported-operation",
-      "concise_description": "`None` is not subscriptable",
       "severity": "error"
     },
     {
@@ -5902,13 +5475,6 @@
       "severity": "error"
     },
     {
-      "column": 20,
-      "path": "cl/users/admin.py",
-      "name": "unsupported-operation",
-      "concise_description": "`+` is not supported between `list[((Unknown) -> bool | str) | str]` and `tuple[Literal['email'], Literal['username']]`",
-      "severity": "error"
-    },
-    {
       "column": 9,
       "path": "cl/users/api_views.py",
       "name": "bad-override",
@@ -6256,13 +5822,6 @@
       "path": "cl/users/views.py",
       "name": "missing-attribute",
       "concise_description": "Object of class `User` has no attribute `profile`",
-      "severity": "error"
-    },
-    {
-      "column": 12,
-      "path": "cl/users/views.py",
-      "name": "unsupported-operation",
-      "concise_description": "`<` is not supported between `None` and `datetime`",
       "severity": "error"
     },
     {

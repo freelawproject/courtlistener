@@ -703,6 +703,8 @@ def confirm_email(request, activation_key):
     for up in ups:
         if up.email_confirmed:
             confirmed_accounts_count += 1
+        if up.key_expires is None:
+            raise TypeError("Found user with key with no expiration")
         if up.key_expires < now():
             expired_key_count += 1
 

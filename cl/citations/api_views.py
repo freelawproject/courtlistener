@@ -224,7 +224,7 @@ class CitationLookupViewSet(LoggingMixin, CreateModelMixin, GenericViewSet):
                 reporter, volume, page
             )
 
-            if not _count:
+            if opinions is None or not _count:
                 continue
 
             clusters = clusters | opinions if clusters else opinions

@@ -2318,7 +2318,7 @@ class OpinionClusterDocument(
     def get_csv_transformations(cls) -> dict[str, Callable[..., Any]]:
         list_fields = ["panel_names", "citation"]
         hl_fields = list(SEARCH_OPINION_HL_FIELDS.keys())
-        transformations = {
+        transformations: dict[str, Callable[..., Any]] = {
             key: lambda x: render_string_or_list(x)
             for key in (hl_fields + list_fields)
         }

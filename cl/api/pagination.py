@@ -1,6 +1,7 @@
 import datetime
 from base64 import b64decode, b64encode
 from collections import defaultdict
+from typing import Any
 from urllib.parse import parse_qs, urlencode
 
 from django.conf import settings
@@ -417,7 +418,7 @@ class ESCursorPagination(BasePagination):
 
     def encode_cursor(self, cursor: ESCursor) -> str:
         """Given a ESCursor instance, return an url with encoded cursor."""
-        tokens = {}
+        tokens: dict[str, Any] = {}
         if cursor.search_after != 0:
             tokens["s"] = cursor.search_after
         if cursor.reverse:

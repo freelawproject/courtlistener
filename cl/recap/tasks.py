@@ -9,7 +9,7 @@ from datetime import datetime
 from functools import partial
 from http import HTTPStatus
 from multiprocessing import process
-from typing import Any, TypedDict, overload
+from typing import Any, TypedDict, cast, overload
 from zipfile import ZipFile
 
 import httpx
@@ -47,6 +47,7 @@ from juriscraper.scotus import SCOTUSDocketReportHTML, SCOTUSEmail
 from juriscraper.scotus.scotus_email import (
     SCOTUSConfirmationResult,
     SCOTUSEmailType,
+    SCOTUSNotificationEmail,
 )
 from juriscraper.state.texas import (
     TexasCourtOfAppealsScraper,
@@ -3846,6 +3847,16 @@ def process_texas_email(self: Task, epq_pk: int) -> None:
     texas_email_parser._parse_text(body)
     email_data = texas_email_parser.data
 
+    if email_data is None:
+        async_to_sync(mark_pq_status)(
+            epq,
+            "Failed to parse Texas email.",
+            PROCESSING_STATUS.FAILED,
+            "status_message",
+        )
+        self.request.chain = None
+        return None
+
     match email_data["court_id"]:
         case CourtID.SUPREME_COURT.value:
             docket_parser = TexasSupremeCourtScraper()
@@ -3971,7 +3982,9 @@ def fetch_and_archive_scotus_docket_followup(
     )
     response.raise_for_status()
 
-    docket_number = parsed_email["data"]["docket_number"]
+    docket_number = cast(SCOTUSNotificationEmail, parsed_email["data"])[
+        "docket_number"
+    ]
     save_scotus_raw_to_s3(
         f"responses/dockets/scotus-email/{docket_number}.html",
         response.text,
