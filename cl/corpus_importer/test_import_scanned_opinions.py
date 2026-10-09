@@ -11,6 +11,7 @@ from django.core.management import CommandError, call_command
 from django.db.models.fields.files import FieldFile
 
 from cl.corpus_importer.management.commands.import_scanned_opinions import (
+    OPINION_TEXT_FIELDS,
     get_citation_strings,
     get_date_filed,
     get_docket_number,
@@ -351,7 +352,7 @@ class ImportScannedOpinionsTest(TestCase):
         content = OpinionContent.objects.get(opinion=opinion)
         self.assertEqual(content.content, opinion.xml_scan)
         self.assertEqual(content.source, OpinionContent.FLP_SCANNING)
-        self.assertEqual(content.extraction_type, OpinionContent.LLM)
+        self.assertEqual(content.extraction_type, OpinionContent.OCR)
         self.assertTrue(content.is_main_version)
         self.assertEqual(len(content.sha1), 40)
         self.assertEqual(content.page_count, 4)
@@ -392,7 +393,19 @@ class ImportScannedOpinionsTest(TestCase):
         self.assertIn("confession of error", opinion.xml_scan)
         content = OpinionContent.objects.get(opinion=opinion)
         self.assertEqual(content.content, opinion.xml_scan)
-        self.assertTrue(content.is_main_version)
+        # The opinion has text from the court website
+        self.assertFalse(content.is_main_version)
+
+    def test_merge_is_main_version_without_other_text(self) -> None:
+        """Is the scan the main version when the opinion has no other text?"""
+        cluster = self.make_matching_cluster()
+        with mock.patch(
+            f"{COMMAND_MODULE}.find_existing_cluster", return_value=cluster
+        ):
+            Opinion.objects.update(**dict.fromkeys(OPINION_TEXT_FIELDS, ""))
+            self.import_scan()
+
+        self.assertTrue(OpinionContent.objects.get().is_main_version)
 
     def test_merge_ignores_opinion_versions(self) -> None:
         """Is the scan merged into the main opinion, ignoring its versions?"""

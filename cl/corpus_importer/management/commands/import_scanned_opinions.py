@@ -120,6 +120,18 @@ CASE_NAME_ABBREVIATIONS = {
 ROMAN_NUMERAL_RE = re.compile(r"(?=[IVX])X{0,3}(?:IX|IV|V?I{0,3})")
 
 
+# Opinion fields with text from other sources. When one has text, the scan
+# isn't made the main version of the opinion content.
+OPINION_TEXT_FIELDS = (
+    "html",
+    "html_lawbox",
+    "html_columbia",
+    "html_anon_2020",
+    "html_with_citations",
+    "xml_harvard",
+    "plain_text",
+)
+
 # Cluster fields that come from the head matter of the XML. When merging
 # into an existing cluster, only empty values are filled from the scan.
 SHORT_FIELDS = {
@@ -683,7 +695,7 @@ def add_opinion_content(
         opinion=opinion,
         content=opinion.xml_scan,
         source=OpinionContent.FLP_SCANNING,
-        extraction_type=OpinionContent.LLM,
+        extraction_type=OpinionContent.OCR,
         is_main_version=is_main_version,
         sha1=sha1(opinion.xml_scan),
         page_count=scan_case.page_count,
@@ -736,9 +748,11 @@ def merge_into_cluster(cluster: OpinionCluster, scan_case: ScanCase) -> None:
             add_opinion_content(
                 opinion,
                 scan_case,
-                is_main_version=not opinion.contents.filter(
-                    is_main_version=True
-                ).exists(),
+                # OCR text shouldn't replace text from other sources
+                is_main_version=not (
+                    any(getattr(opinion, f) for f in OPINION_TEXT_FIELDS)
+                    or opinion.contents.filter(is_main_version=True).exists()
+                ),
             )
         else:
             logger.warning(
