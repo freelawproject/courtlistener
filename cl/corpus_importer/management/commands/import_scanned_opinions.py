@@ -686,9 +686,6 @@ def add_new_case(scan_case: ScanCase) -> OpinionCluster:
         )
         if docket.pk:
             logger.info("Using existing docket %s", docket.pk)
-            docket.source = Docket.merge_sources(
-                docket.source, Docket.SCANNING_PROJECT
-            )
         docket.save()
 
         cluster = OpinionCluster(
