@@ -8,12 +8,16 @@ from django.contrib.auth.models import Permission, User
 from django.core.exceptions import ValidationError
 from django.core.validators import validate_email
 from django.db.models import Model, QuerySet
+from django.forms import BaseInlineFormSet
 from django.http import HttpRequest
 from rest_framework.authtoken.models import Token
 
 from cl.alerts.admin import AlertInline, DocketAlertInline
 from cl.api.admin import APIThrottleInline, WebhookInline
-from cl.api.utils import apply_membership_throttles
+from cl.api.utils import (
+    apply_membership_throttles,
+    clear_membership_throttles,
+)
 from cl.donate.admin import (
     DonationInline,
     MonthlyDonationInline,
@@ -138,6 +142,59 @@ class UserAdmin(admin.ModelAdmin, AdminTweaksMixin):
         if _is_complete_email(term):
             return filter_by_email(queryset, term), False
         return super().get_search_results(request, queryset, search_term)
+
+    def save_related(
+        self,
+        request: HttpRequest,
+        form: UserChangeForm,
+        formsets: list[BaseInlineFormSet],
+        change: bool,
+    ) -> None:
+        """Save the user's inlines, then resync API throttles if the
+        membership inline was changed.
+
+        Runs after the inline formsets are saved so that the membership we
+        read reflects what the admin just submitted. MANUAL-source throttles
+        are never touched.
+
+        :param request: The current HTTP request.
+        :param form: The user form.
+        :param formsets: The inline formsets submitted with the form.
+        :param change: Whether an existing user is being changed.
+        """
+        super().save_related(request, form, formsets, change)
+
+        if not any(
+            fs.model is NeonMembership and fs.has_changed() for fs in formsets
+        ):
+            return
+
+        user = form.instance
+        try:
+            membership = NeonMembership.objects.get(user=user)
+        except NeonMembership.DoesNotExist:
+            membership = None
+
+        if not membership or not membership.is_active:
+            # Membership removed or lapsed: drop the throttles it granted,
+            # mirroring what the Neon deletion webhook does.
+            clear_membership_throttles(user)
+            return
+
+        if not apply_membership_throttles(
+            user, membership.level, clear_cache=True
+        ):
+            self.message_user(
+                request,
+                f"Could not refresh throttles (no matching membership level): {user.username}",
+                level=messages.WARNING,
+            )
+            return
+        self.message_user(
+            request,
+            f"Refreshed API throttles for {user.username}.",
+            level=messages.SUCCESS,
+        )
 
     @admin.action(
         description="Refresh API throttles from active Neon membership"
