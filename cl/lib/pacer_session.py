@@ -271,13 +271,21 @@ def get_pacer_cookie_from_cache(
     :param user_pk: The ID of the user, can be a string or an ID
     :param r: A redis interface. If not provided, a fresh one is used. This is
     a performance enhancement.
-    :return Either None if no cache cookies or the cookies if they're found.
+    :return: The cached session, or None if it is missing or invalid.
     """
     if not r:
         r = get_redis_interface("CACHE", decode_responses=False)
     pickled_cookie = r.get(session_key % user_pk)
     if pickled_cookie:
-        return pickle.loads(pickled_cookie)
+        try:
+            session_data = pickle.loads(pickled_cookie)
+            if isinstance(session_data, SessionData) and isinstance(
+                session_data.cookies, RequestsCookieJar
+            ):
+                return session_data
+        except Exception:
+            pass
+        r.delete(session_key % user_pk)
 
 
 def delete_pacer_cookie_from_cache(
