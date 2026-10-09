@@ -1,3 +1,4 @@
+import copy
 import itertools
 import os
 import re
@@ -439,15 +440,11 @@ def parse_scan_xml(
         )
         return None
 
-    # Store the opinion XML before `parse_extra_fields` mutates the soup
-    opinion_elements = soup.select("opinion")
-    if not opinion_elements:
+    # Copy the opinion XML before `parse_extra_fields` mutates the soup
+    opinions = [copy.copy(op) for op in soup.select("opinion")]
+    if not opinions:
         logger.warning("No opinion found in %s", file_path)
         return None
-    opinions = [
-        BeautifulSoup(str(op), "lxml-xml").select_one("opinion")
-        for op in opinion_elements
-    ]
 
     parties = get_element_text(soup, "parties", " ")
     if not parties:
@@ -516,7 +513,7 @@ def parse_scan_xml(
             str(soup.select_one("casebody") or ""), harvard_file=True
         ),
         cluster_fields=cluster_fields,
-        opinions=[op for op in opinions if op is not None],
+        opinions=opinions,
     )
 
 
@@ -653,16 +650,21 @@ def make_opinion(op: Tag, cluster_id: int) -> Opinion:
     )
 
 
-def store_scan_xml(cluster: OpinionCluster, scan_case: ScanCase) -> None:
-    """Upload the scanned XML to the cluster's `filepath_xml_scan`.
+def store_scan_xml(
+    cluster: OpinionCluster,
+    scan_case: ScanCase,
+    update_fields: list[str],
+) -> None:
+    """Upload the scanned XML to the cluster's `filepath_xml_scan` and save.
 
     Call it as the last step of the import transaction, so a failed database
     write rolls back before the file is uploaded. The upload comes before the
     cluster save that stores its path, so the file is deleted if that save
     fails, and no orphan is left.
 
-    :param cluster: The saved cluster.
+    :param cluster: A cluster with a pk.
     :param scan_case: The parsed scanned opinion.
+    :param update_fields: The other cluster fields to save with the path.
     :return: None
     """
     cluster.filepath_xml_scan.save(
@@ -671,7 +673,7 @@ def store_scan_xml(cluster: OpinionCluster, scan_case: ScanCase) -> None:
         save=False,
     )
     try:
-        cluster.save(update_fields=["filepath_xml_scan"])
+        cluster.save(update_fields=["filepath_xml_scan", *update_fields])
     except Exception:
         cluster.filepath_xml_scan.delete(save=False)
         raise
@@ -717,6 +719,9 @@ def merge_into_cluster(cluster: OpinionCluster, scan_case: ScanCase) -> None:
     with transaction.atomic():
         add_citations_to_cluster(scan_case.citations, cluster.id)
 
+        # Only save the changed fields, since the cluster was loaded before
+        # the slow matching and other processes may have changed it since
+        update_fields = ["source", "date_modified"]
         for field_name, value in {
             **scan_case.cluster_fields,
             "judges": scan_case.judges,
@@ -726,10 +731,10 @@ def merge_into_cluster(cluster: OpinionCluster, scan_case: ScanCase) -> None:
                     "Filling empty %s of cluster %s", field_name, cluster.id
                 )
                 setattr(cluster, field_name, value)
+                update_fields.append(field_name)
         cluster.source = ClusterSources.merge_sources(
             cluster.source, ClusterSources.SCANNING_PROJECT
         )
-        cluster.save()
 
         docket = cluster.docket
         docket.source = Docket.merge_sources(
@@ -764,7 +769,8 @@ def merge_into_cluster(cluster: OpinionCluster, scan_case: ScanCase) -> None:
                 len(scan_case.opinions),
             )
 
-        store_scan_xml(cluster, scan_case)
+        # Saves the cluster changes above too
+        store_scan_xml(cluster, scan_case, update_fields)
 
 
 def add_new_case(scan_case: ScanCase) -> OpinionCluster:
@@ -826,7 +832,7 @@ def add_new_case(scan_case: ScanCase) -> OpinionCluster:
             opinion = make_opinion(op, cluster.id)
             opinion.save()
             add_opinion_content(opinion, scan_case, is_main_version=True)
-        store_scan_xml(cluster, scan_case)
+        store_scan_xml(cluster, scan_case, update_fields=[])
     return cluster
 
 
