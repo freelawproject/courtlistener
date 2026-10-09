@@ -1,8 +1,9 @@
 """Tests for the Florida ACIS poller management command."""
 
 import json
-from collections.abc import AsyncGenerator, Mapping, Sequence
+from collections.abc import AsyncGenerator, Callable, Mapping, Sequence
 from datetime import UTC, date, datetime, timedelta
+from pathlib import Path
 from typing import cast
 from unittest import mock
 from uuid import UUID, uuid4
@@ -19,6 +20,7 @@ from juriscraper.state.florida.scraper import CourtMetadata, PaginationFailed
 from cl.corpus_importer.state.florida.factories import FloridaCaseFactory
 from cl.lib.redis_utils import get_redis_interface
 from cl.scrapers.management.commands import fl_poller as fl_cmd_module
+from cl.scrapers.management.commands.back_scrape_fl_dockets import S3_BASE
 from cl.scrapers.management.commands.fl_poller import (
     DE_DOC_ENDPOINT,
     DOCKET_ENDPOINT,
@@ -27,7 +29,7 @@ from cl.scrapers.management.commands.fl_poller import (
     FloridaDocumentUpdate,
     FloridaUpdate,
 )
-from cl.scrapers.management.utils import ScraperCheckpointTracker
+from cl.scrapers.management.utils import S3Cache, ScraperCheckpointTracker
 from cl.search.factories import CourtFactory, DocketFactory
 from cl.search.state.florida.factories import FloridaDocumentFactory
 from cl.tests.cases import SimpleTestCase, TestCase
@@ -35,6 +37,7 @@ from cl.tests.cases import SimpleTestCase, TestCase
 DATE_PARAM_FMT = "%Y-%m-%dT%H:%M:%S.000Z"
 FROZEN_NOW = datetime(2026, 8, 20, 12, tzinfo=UTC)
 START = datetime(2026, 8, 19, 12, tzinfo=UTC)
+CYCLE_BASE = S3_BASE / "2026" / "08" / "20" / "12"
 
 # Trackers with test-only keys so tests can't collide with a real poller's
 # checkpoint in Redis.
@@ -207,6 +210,7 @@ class FlPollerPollTest(TestCase):
         self.court_metadata = make_court_metadata(2)
         self.courts = {FloridaCourtID.FIRST_COA: self.court_metadata}
         self.throttle = mock.MagicMock()
+        self.cache = mock.Mock()
         self.mock_save = mock.patch.object(
             fl_cmd_module, "save_case_to_s3"
         ).start()
@@ -227,13 +231,20 @@ class FlPollerPollTest(TestCase):
         iterations: int = 1,
         download_attachments: bool = True,
         case_backfill_days: int = 0,
+        between_cycles: Callable[[], None] = lambda: None,
     ) -> None:
         """Run poll for the given number of cycles. The inter-cycle sleep is
-        mocked to raise after the last cycle since the loop has no other
-        exit."""
-        sleep = mock.AsyncMock(
-            side_effect=[None] * (iterations - 1) + [StopPolling()]
-        )
+        mocked to call `between_cycles`, then raise after the last cycle since
+        the loop has no other exit."""
+        remaining = iterations
+
+        async def sleep(_seconds: float) -> None:
+            nonlocal remaining
+            remaining -= 1
+            if not remaining:
+                raise StopPolling()
+            between_cycles()
+
         with (
             mock.patch.object(fl_cmd_module.asyncio, "sleep", sleep),
             self.assertRaises(StopPolling),
@@ -241,6 +252,7 @@ class FlPollerPollTest(TestCase):
             async_to_sync(Command().poll)(
                 self.throttle,
                 cast(FloridaScraper, scraper),
+                cast(S3Cache, self.cache),
                 [FloridaCourtID.FIRST_COA],
                 case_backfill_days,
                 0,
@@ -271,12 +283,14 @@ class FlPollerPollTest(TestCase):
             [c.args for c in self.mock_save.call_args_list],
             [
                 (
+                    CYCLE_BASE,
                     FloridaCourtID.FIRST_COA,
                     case_a,
                     self.throttle,
                     "test_queue",
                 ),
                 (
+                    CYCLE_BASE,
                     FloridaCourtID.FIRST_COA,
                     case_b,
                     self.throttle,
@@ -311,6 +325,50 @@ class FlPollerPollTest(TestCase):
         self.assertEqual(
             self.mock_ingest.si.return_value.set.return_value.apply_async.call_count,
             2,
+        )
+
+    def test_cycle_archives_under_hourly_prefix(self):
+        """Raw responses and parsed cases from a cycle must be archived under
+        a prefix for the hour the cycle started, so later cycles don't
+        overwrite them."""
+        case = FloridaCaseFactory()
+        update = make_update()
+        scraper = FakeFloridaScraper(
+            self.courts,
+            pages={DOCKET_ENDPOINT: [make_page([update])]},
+            case_results={str(update.case_uuid): (case, [])},
+        )
+
+        self.run_poll(scraper)
+
+        self.assertEqual(self.cache.base, CYCLE_BASE)
+        self.assertEqual(self.mock_save.call_args.args[0], CYCLE_BASE)
+
+    def test_each_cycle_gets_its_own_prefix(self):
+        """A cycle in a later hour must archive under that hour's prefix
+        rather than reusing the first cycle's."""
+        case = FloridaCaseFactory()
+        update = make_update()
+        scraper = FakeFloridaScraper(
+            self.courts,
+            pages={DOCKET_ENDPOINT: [make_page([update])]},
+            case_results={str(update.case_uuid): (case, [])},
+        )
+        bases: list[Path] = []
+
+        def next_hour() -> None:
+            bases.append(self.cache.base)
+            traveller.shift(timedelta(hours=1))
+
+        with time_machine.travel(FROZEN_NOW, tick=False) as traveller:
+            self.run_poll(scraper, iterations=2, between_cycles=next_hour)
+        bases.append(self.cache.base)
+
+        self.assertEqual(
+            bases, [CYCLE_BASE, S3_BASE / "2026" / "08" / "20" / "13"]
+        )
+        self.assertEqual(
+            [c.args[0] for c in self.mock_save.call_args_list], bases
         )
 
     def test_duplicate_updates_are_ingested_once(self):
@@ -580,6 +638,7 @@ class FlPollerCommandTest(SimpleTestCase):
         (
             _throttle,
             _scraper,
+            _cache,
             court_ids,
             case_backfill_days,
             _polling_delay,
@@ -600,7 +659,7 @@ class FlPollerCommandTest(SimpleTestCase):
 
         call_command("fl_poller", auto_resume=True)
 
-        self.assertEqual(mock_poll.call_args.args[5], datetime(2026, 8, 1))
+        self.assertEqual(mock_poll.call_args.args[6], datetime(2026, 8, 1))
 
     def test_auto_resume_without_checkpoint_falls_back(self, mock_poll):
         """With --auto-resume but no stored checkpoint, the command must warn
@@ -613,7 +672,7 @@ class FlPollerCommandTest(SimpleTestCase):
             2,
         )
         self.assertEqual(
-            mock_poll.call_args.args[5], FROZEN_NOW - timedelta(days=2)
+            mock_poll.call_args.args[6], FROZEN_NOW - timedelta(days=2)
         )
 
     def test_use_cache_and_archive_responses_reach_cache_handler(
@@ -643,4 +702,4 @@ class FlPollerCommandTest(SimpleTestCase):
         dispatched ingestion tasks."""
         call_command("fl_poller", no_download_attachments=True)
 
-        self.assertFalse(mock_poll.call_args.args[7])
+        self.assertFalse(mock_poll.call_args.args[8])

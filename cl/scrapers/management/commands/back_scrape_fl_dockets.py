@@ -27,24 +27,27 @@ S3_BASE = Path("responses/dockets/florida")
 
 
 def save_case_to_s3(
+    base: Path,
     court_id: FloridaCourtID,
     case: FloridaCase,
     throttle: CeleryThrottle,
     queue_name: str,
 ) -> str:
-    """Save a case to S3
+    """Save a case to S3 under the given prefix
 
     :returns: The S3 key where the case was saved. The bucket is not known until the celery task runs or we would
     return that as well."""
-    key = _make_case_key(court_id, case.docket_number)
+    key = _make_case_key(base, court_id, case.docket_number)
     content = case.model_dump_json(ensure_ascii=True).encode("utf-8")
     throttle.maybe_wait()
     save_response_to_s3.si(key, content).set(queue=queue_name).apply_async()
     return key
 
 
-def _make_case_key(court_id: FloridaCourtID, docket_number: str) -> str:
-    return f"{S3_BASE}/parsed/{court_id.value}/{_make_case_number_key(docket_number)}.json"
+def _make_case_key(
+    base: Path, court_id: FloridaCourtID, docket_number: str
+) -> str:
+    return f"{base}/parsed/{court_id.value}/{_make_case_number_key(docket_number)}.json"
 
 
 async def _get_full_case(  # type: ignore[return]
@@ -83,14 +86,7 @@ async def _backfill_targeted(
         if case is None:
             continue
 
-        content = case.model_dump_json(ensure_ascii=True).encode("utf-8")
-
-        key = _make_case_key(court_id, case.docket_number)
-
-        throttle.maybe_wait()
-        save_response_to_s3.si(key, content).set(
-            queue=queue_name
-        ).apply_async()
+        save_case_to_s3(S3_BASE, court_id, case, throttle, queue_name)
 
         if i % 10 == 0:
             logger.info(
@@ -122,7 +118,7 @@ async def _backfill(
                 court_ids=[court_id],
                 full_scrape=full_scrape_loop,
             ):
-                key = _make_case_key(court_id, case.docket_number)
+                key = _make_case_key(S3_BASE, court_id, case.docket_number)
                 if skip_parsed and cache.s3_key_exists(key):
                     continue
                 if full_scrape and skip_parsed:
@@ -133,7 +129,7 @@ async def _backfill(
                         continue
                     case = full_case
 
-                save_case_to_s3(court_id, case, throttle, queue_name)
+                save_case_to_s3(S3_BASE, court_id, case, throttle, queue_name)
 
                 i += 1
                 if i % 100 == 0:

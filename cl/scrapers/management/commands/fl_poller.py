@@ -25,6 +25,7 @@ from cl.scrapers.management.commands.back_scrape_fl_dockets import (
 )
 from cl.scrapers.management.utils import (
     FLScrapeCommand,
+    S3Cache,
     ScraperCheckpointTracker,
     StatePollCommand,
 )
@@ -111,7 +112,7 @@ class Command(FLScrapeCommand, StatePollCommand):
     ):
         court_ids = self.parse_court_ids(courts)
 
-        throttle, scraper, _ = self.throttle_scraper_and_cache(
+        throttle, scraper, cache = self.throttle_scraper_and_cache(
             rps,
             max_retries,
             backoff,
@@ -146,6 +147,7 @@ class Command(FLScrapeCommand, StatePollCommand):
         async_to_sync(self.poll)(
             throttle,
             scraper,
+            cache,
             court_ids,
             case_backfill_days,
             polling_delay,
@@ -173,6 +175,7 @@ class Command(FLScrapeCommand, StatePollCommand):
         self,
         throttle: CeleryThrottle,
         scraper: FloridaScraper,
+        cache: S3Cache,
         courts: list[FloridaCourtID],
         case_backfill_days: int,
         polling_delay: int,
@@ -187,8 +190,13 @@ class Command(FLScrapeCommand, StatePollCommand):
         }
         last_polled = start
         while True:
+            cycle_start = datetime.now(UTC)
+            # Archive each cycle under its own prefix so that responses and parsed cases from earlier cycles aren't
+            # overwritten and can be located by when they were scraped.
+            cycle_base = S3_BASE / cycle_start.strftime("%Y/%m/%d/%H")
+            cache.base = cycle_base
             # Add a little overlap between segments to make extra sure we don't miss anything
-            now = datetime.now(UTC) - timedelta(minutes=1)
+            now = cycle_start - timedelta(minutes=1)
             logger.info(
                 "Looking for new and updated cases from %s to %s",
                 last_polled,
@@ -232,6 +240,7 @@ class Command(FLScrapeCommand, StatePollCommand):
                     )
                     continue
                 key = save_case_to_s3(
+                    cycle_base,
                     court_id,
                     case,
                     throttle,
