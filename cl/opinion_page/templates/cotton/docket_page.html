@@ -33,10 +33,6 @@
   {% endif %}
 </hgroup>
 
-{% if perms.search.change_docket and docket.blocked %}
-  <span class="inline-block px-3 py-1 text-sm font-semibold text-red-700 bg-red-100 border border-red-300 rounded-lg">Blocked</span>
-{% endif %}
-
 {# Action buttons — Note and Tags are placeholders. #}
 {# TODO: Wire up Add a Note and Tags button interactivity. #}
 <div class="flex flex-wrap gap-2 mt-4">
@@ -136,6 +132,21 @@
       Export entries CSV
     </c-button>
   {% endif %}
+  {# Staff actions, admin links and moderation state, each gated on the permission its target requires. #}
+  {% if perms.search|has_any_perm:"docket" %}
+  <div class="flex flex-wrap items-center gap-2 md:ml-auto" x-data="docketStaffActions">
+    <c-button variant="dark" href="{% url 'admin:search_docket_change' docket.pk %}">
+      {% svg "edit" class="w-4 h-4" aria_hidden="true" %}
+      Edit Docket
+      {% if track_events %}
+        <span x-show="$store.viewCount.loaded" x-cloak class="text-greyscale-300">(<span x-text="$store.viewCount.value"></span> views)</span>
+      {% endif %}
+    </c-button>
+    {% if perms.search.change_docket and docket.blocked %}
+      <span class="inline-block px-3 py-1 text-sm font-semibold text-red-700 bg-red-100 border border-red-300 rounded-lg">Blocked</span>
+    {% endif %}
+  </div>
+  {% endif %}
 </div>
 
 {# A section with no items renders nothing. #}
@@ -148,20 +159,28 @@
 {% endfor %}
 
 {# ORAL ARGUMENT RECORDINGS #}
-{% if docket.audio_files.count %}
+{% with recordings=docket.audio_files.all %}
+{% if recordings %}
   <h2 class="mt-6">Oral Argument Recordings</h2>
   <ul>
-    {% for af in docket.audio_files.all %}
+    {% for af in recordings %}
       <li>
-        <a class="links" href="{{ af.get_absolute_url }}{% querystring %}">
-          {{ af|best_case_name|safe|v_wrapper }}
-        </a>
-        <br/>
-        {{ af.docket.date_argued|default_if_none:"" }}
+        <div class="flex items-start gap-3">
+          {% if perms.audio.change_audio %}
+            <c-button variant="dark" size="sm" href="{% url 'admin:audio_audio_change' af.pk %}">{% svg "edit" class="w-3.5 h-3.5" aria_hidden="true" %}Edit<span class="sr-only"> {{ af|best_case_name }}</span></c-button>
+          {% endif %}
+          <div>
+            <a class="links" href="{{ af.get_absolute_url }}{% querystring %}">
+              {{ af|best_case_name|safe|v_wrapper }}
+            </a>
+            <div>{{ af.docket.date_argued|default_if_none:"" }}</div>
+          </div>
+        </div>
       </li>
     {% endfor %}
   </ul>
 {% endif %}
+{% endwith %}
 
 </div>
 
