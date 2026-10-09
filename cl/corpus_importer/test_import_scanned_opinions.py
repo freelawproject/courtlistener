@@ -106,6 +106,37 @@ class ScanXmlHelpersTest(SimpleTestCase):
                 "<decisiondate>June 30, 2024</decisiondate></casebody>",
                 date(2024, 6, 30),
             ),
+            (
+                "<decisiondate>Argued Oct. 3, 2023. Decided May 22, "
+                "2024.</decisiondate>",
+                date(2024, 5, 22),
+            ),
+            (
+                "<decisiondate>Rehearing Denied Jan. 5, 2010. Decided "
+                "Dec. 18, 2009</decisiondate>",
+                date(2009, 12, 18),
+            ),
+            (
+                "<decisiondate>Motion for rehearing filed June 5, 2024. "
+                "Decided May 22, 2024.</decisiondate>",
+                date(2024, 5, 22),
+            ),
+            (
+                "<decisiondate>Argued Oct. 3, 2023. Decided on May 22, "
+                "2024.</decisiondate>",
+                date(2024, 5, 22),
+            ),
+            (
+                "<decisiondate>Submitted Oct. 3, 2023 - Decided - May 22, "
+                "2024</decisiondate>",
+                date(2024, 5, 22),
+            ),
+            (
+                "<casebody><decisiondate>Argued Oct. 3, 2023</decisiondate>"
+                "<decisiondate>Decided May 22, 2024</decisiondate>"
+                "</casebody>",
+                date(2024, 5, 22),
+            ),
             ("<decisiondate>May 2024</decisiondate>", None),
             ("<decisiondate>2024</decisiondate>", None),
             ("<decisiondate>Feb. 30, 2024</decisiondate>", None),

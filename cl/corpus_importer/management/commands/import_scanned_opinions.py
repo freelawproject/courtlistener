@@ -65,10 +65,22 @@ SUPPORTED_SCHEMAS = {"1"}
 PER_CURIAM_RE = re.compile(r"per\s+curiam", re.IGNORECASE)
 # A complete date as printed in reporters: "May 22, 2024", "Dec. 18, 2009",
 # "Sept. 3, 2024" or "5/22/2024"
-FULL_DATE_RE = re.compile(
+FULL_DATE_PATTERN = (
     r"\b(?:(?:jan|feb|mar|apr|may|jun|jul|aug|sep|oct|nov|dec)[a-z]*\.?"
-    r"\s+\d{1,2},?\s+\d{4}|\d{1,2}/\d{1,2}/\d{4})\b",
+    r"\s+\d{1,2},?\s+\d{4}|\d{1,2}/\d{1,2}/\d{4})\b"
+)
+FULL_DATE_RE = re.compile(FULL_DATE_PATTERN, re.IGNORECASE)
+# Dates labeled as the decision date, e.g. "Decided May 22, 2024",
+# "Decided on May 22, 2024", "Decided - May 22, 2024" or "Opinion filed
+# May 22, 2024". Other dates printed in the same element, like "Argued" or
+# "Rehearing Denied", may come before them.
+DATE_LABEL_SEPARATOR = r"[\s.:,\-\u2013\u2014]*(?:on\s+)?"
+DECIDED_DATE_RE = re.compile(
+    rf"\bdecided\b{DATE_LABEL_SEPARATOR}({FULL_DATE_PATTERN})",
     re.IGNORECASE,
+)
+FILED_DATE_RE = re.compile(
+    rf"\bfiled\b{DATE_LABEL_SEPARATOR}({FULL_DATE_PATTERN})", re.IGNORECASE
 )
 # The "No." or "Case No." printed before docket numbers
 DOCKET_NUMBER_PREFIX_RE = re.compile(
@@ -304,24 +316,31 @@ def normalize_case_name_caps(case_name: str) -> str:
 def get_date_filed(soup: BeautifulSoup) -> date | None:
     """Parse the decision date of the scanned opinion.
 
-    Uses the first complete date of the first `<decisiondate>` that has one.
-    Books print it in brackets, e.g. "[May 22, 2024]", or with other text,
-    e.g. "Decided Dec. 18, 2009. Rehearing Denied Jan. 5, 2010." Partial
-    dates like "May 2024" are rejected instead of guessing the missing day.
+    Books print it in brackets, e.g. "[May 22, 2024]", or with other dates,
+    e.g. "Argued Oct. 3, 2023. Decided May 22, 2024." Uses the first date
+    labeled "Decided" in the `<decisiondate>` elements, else the first one
+    labeled "Filed", since a motion can be filed after the decision, else
+    their first complete date. Partial dates like "May 2024" are rejected
+    instead of guessing the missing day.
 
     :param soup: The parsed XML.
     :return: The decision date, or None if it can't be parsed.
     """
-    for element in soup.select("decisiondate"):
-        if not (match := FULL_DATE_RE.search(element.get_text(" "))):
-            continue
-        # Normalize "Sept." since dateutil only knows "Sep"
-        date_text = re.sub(r"(?i)\bsept\b", "Sep", match.group())
-        try:
-            return convert_date_string(date_text)
-        except (ValueError, OverflowError):
-            # e.g. an OCR error like "Feb. 30, 2024"
-            continue
+    texts = [e.get_text(" ") for e in soup.select("decisiondate")]
+    for date_re, group in (
+        (DECIDED_DATE_RE, 1),
+        (FILED_DATE_RE, 1),
+        (FULL_DATE_RE, 0),
+    ):
+        for text in texts:
+            for match in date_re.finditer(text):
+                # Normalize "Sept." since dateutil only knows "Sep"
+                date_text = re.sub(r"(?i)\bsept\b", "Sep", match.group(group))
+                try:
+                    return convert_date_string(date_text)
+                except (ValueError, OverflowError):
+                    # e.g. an OCR error like "Feb. 30, 2024"
+                    continue
     return None
 
 
