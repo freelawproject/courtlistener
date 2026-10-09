@@ -5415,6 +5415,97 @@ class RefreshAPIThrottlesAdminTest(TestCase):
         self.assertFalse(APIThrottle.objects.filter(user=self.target).exists())
 
 
+class AutoRefreshAPIThrottlesAdminTest(TestCase):
+    """Saving a user in the admin resyncs throttles when the membership
+    inline changed."""
+
+    def setUp(self) -> None:
+        self.target = UserProfileWithParentsFactory().user
+        self.user_admin = UserAdmin(User, admin.site)
+        self.request = RequestFactory().post("/")
+
+    def _save_related(self, membership_changed: bool) -> MagicMock:
+        """Run UserAdmin.save_related with a stand-in membership formset.
+
+        :param membership_changed: Whether the membership inline reports
+            that it was changed.
+        :return: The mock standing in for ``message_user``.
+        """
+        form = MagicMock(instance=self.target)
+        formset = MagicMock(model=NeonMembership)
+        formset.has_changed.return_value = membership_changed
+        with mock.patch.object(self.user_admin, "message_user") as message:
+            self.user_admin.save_related(self.request, form, [formset], True)
+        return message
+
+    def _make_membership(self, level: int, days: int = 30) -> None:
+        NeonMembership.objects.create(
+            user=self.target,
+            neon_id="auto",
+            level=level,
+            payment_status=MembershipPaymentStatus.SUCCEEDED,
+            termination_date=now().date() + timedelta(days=days),
+        )
+
+    def _membership_rates(self) -> list[str]:
+        return sorted(
+            APIThrottle.objects.filter(
+                user=self.target, source=APIThrottle.Source.MEMBERSHIP
+            ).values_list("rate", flat=True)
+        )
+
+    def test_changed_active_membership_refreshes_throttles(self) -> None:
+        self._make_membership(NeonMembershipLevel.TIER_1)
+
+        self._save_related(membership_changed=True)
+
+        self.assertEqual(
+            self._membership_rates(), sorted(["10/min", "75/hour", "300/day"])
+        )
+
+    def test_unchanged_membership_leaves_throttles_alone(self) -> None:
+        self._make_membership(NeonMembershipLevel.TIER_1)
+
+        self._save_related(membership_changed=False)
+
+        self.assertEqual(self._membership_rates(), [])
+
+    def test_lapsed_membership_clears_membership_throttles(self) -> None:
+        self._make_membership(NeonMembershipLevel.TIER_1, days=-5)
+        APIThrottleFactory(
+            user=self.target,
+            throttle_type=ThrottleType.API,
+            rate="10/min",
+            source=APIThrottle.Source.MEMBERSHIP,
+        )
+        APIThrottleFactory(
+            user=self.target,
+            throttle_type=ThrottleType.API,
+            rate="5/min",
+            source=APIThrottle.Source.MANUAL,
+        )
+
+        self._save_related(membership_changed=True)
+
+        self.assertEqual(self._membership_rates(), [])
+        # MANUAL throttles are never touched.
+        self.assertTrue(
+            APIThrottle.objects.filter(
+                user=self.target, source=APIThrottle.Source.MANUAL
+            ).exists()
+        )
+
+    def test_unmapped_level_warns(self) -> None:
+        self._make_membership(NeonMembershipLevel.BASIC)
+
+        message = self._save_related(membership_changed=True)
+
+        self.assertEqual(self._membership_rates(), [])
+        self.assertIn(
+            "no matching membership level", message.call_args.args[1]
+        )
+
+
 class AccountBuildingMixin:
     """Builds accounts for the sign-in and password-reset tests.
 
