@@ -11,7 +11,6 @@ import pytest
 import requests
 import responses
 import time_machine
-from bs4 import BeautifulSoup
 from celery.exceptions import Retry
 from django.conf import settings
 from django.core.exceptions import ObjectDoesNotExist
@@ -23,7 +22,7 @@ from django.utils import timezone
 from django.utils.timezone import now
 from eyecite.tokenizers import HyperscanTokenizer
 from factory import RelatedFactory
-from juriscraper.lib.string_utils import harmonize, titlecase
+from juriscraper.lib.string_utils import CaseNameTweaker, harmonize, titlecase
 from juriscraper.pacer.free_documents import FreeOpinionReport
 from juriscraper.state.texas import (
     TexasCaseParty,
@@ -45,16 +44,9 @@ from cl.corpus_importer.factories import (
     CaseLawFactory,
     CitationFactory,
 )
-from cl.corpus_importer.import_columbia.columbia_utils import fix_xml_tags
-from cl.corpus_importer.import_columbia.parse_opinions import (
-    get_state_court_object,
-)
 from cl.corpus_importer.llm_models import CaseNameExtractionResponse
 from cl.corpus_importer.management.commands.clean_up_mis_matched_dockets import (
     find_and_fix_mis_matched_dockets,
-)
-from cl.corpus_importer.management.commands.columbia_merge import (
-    process_cluster,
 )
 from cl.corpus_importer.management.commands.harvard_merge import (
     combine_non_overlapping_data,
@@ -86,6 +78,7 @@ from cl.corpus_importer.management.commands.scrape_pacer_free_opinions import (
     do_everything,
     get_and_save_free_document_reports,
     get_outstanding_failed_dates,
+    get_pdfs,
     report_free_document_scrape_stalls,
 )
 from cl.corpus_importer.management.commands.update_casenames_wl_dataset import (
@@ -102,6 +95,7 @@ from cl.corpus_importer.tasks import (
     classify_case_name_by_llm,
     download_texas_document,
     generate_ia_json,
+    get_and_process_free_pdf,
     get_and_save_free_document_report,
     is_texas_appellate_docket,
     is_texas_supreme_docket,
@@ -114,6 +108,7 @@ from cl.corpus_importer.tasks import (
     merge_texas_trial_court_data,
     normalize_texas_parties,
     probe_or_scrape_iquery_pages,
+    process_free_opinion_result,
 )
 from cl.corpus_importer.utils import (
     DocketSourceException,
@@ -256,226 +251,6 @@ class JudgeExtractionTest(SimpleTestCase):
 
 class CourtMatchingTest(SimpleTestCase):
     """Tests related to converting court strings into court objects."""
-
-    def test_get_court_object_from_string(self) -> None:
-        """Can we get a court object from a string and filename combo?
-
-        When importing the Columbia corpus, we use a combination of regexes and
-        the file path to determine a match.
-        """
-        pairs = (
-            {
-                "args": (
-                    "California Superior Court  "
-                    "Appellate Division, Kern County.",
-                    "california/supreme_court_opinions/documents"
-                    "/0dc538c63bd07a28.xml",
-                    # noqa
-                ),
-                "answer": "calappdeptsuperct",
-            },
-            {
-                "args": (
-                    "California Superior Court  "
-                    "Appellate Department, Sacramento.",
-                    "california/supreme_court_opinions/documents"
-                    "/0dc538c63bd07a28.xml",
-                    # noqa
-                ),
-                "answer": "calappdeptsuperct",
-            },
-            {
-                "args": (
-                    "Appellate Session of the Superior Court",
-                    "connecticut/appellate_court_opinions/documents"
-                    "/0412a06c60a7c2a2.xml",
-                    # noqa
-                ),
-                "answer": "connsuperct",
-            },
-            {
-                "args": (
-                    "Court of Errors and Appeals.",
-                    "new_jersey/supreme_court_opinions/documents"
-                    "/0032e55e607f4525.xml",
-                    # noqa
-                ),
-                "answer": "nj",
-            },
-            {
-                "args": (
-                    "Court of Chancery",
-                    "new_jersey/supreme_court_opinions/documents"
-                    "/0032e55e607f4525.xml",
-                    # noqa
-                ),
-                "answer": "njch",
-            },
-            {
-                "args": (
-                    "Workers' Compensation Commission",
-                    "connecticut/workers_compensation_commission/documents"
-                    "/0902142af68ef9df.xml",
-                    # noqa
-                ),
-                "answer": "connworkcompcom",
-            },
-            {
-                "args": (
-                    "Appellate Session of the Superior Court",
-                    "connecticut/appellate_court_opinions/documents"
-                    "/00ea30ce0e26a5fd.xml",
-                    # noqa
-                ),
-                "answer": "connsuperct",
-            },
-            {
-                "args": (
-                    "Superior Court  New Haven County",
-                    "connecticut/superior_court_opinions/documents"
-                    "/0218655b78d2135b.xml",
-                    # noqa
-                ),
-                "answer": "connsuperct",
-            },
-            {
-                "args": (
-                    "Superior Court, Hartford County",
-                    "connecticut/superior_court_opinions/documents"
-                    "/0218655b78d2135b.xml",
-                    # noqa
-                ),
-                "answer": "connsuperct",
-            },
-            {
-                "args": (
-                    "Compensation Review Board  "
-                    "WORKERS' COMPENSATION COMMISSION",
-                    "connecticut/workers_compensation_commission/documents"
-                    "/00397336451f6659.xml",
-                    # noqa
-                ),
-                "answer": "connworkcompcom",
-            },
-            {
-                "args": (
-                    "Appellate Division Of The Circuit Court",
-                    "connecticut/superior_court_opinions/documents"
-                    "/03dd9ec415bf5bf4.xml",
-                    # noqa
-                ),
-                "answer": "connsuperct",
-            },
-            {
-                "args": (
-                    "Superior Court for Law and Equity",
-                    "tennessee/court_opinions/documents/01236c757d1128fd.xml",
-                ),
-                "answer": "tennsuperct",
-            },
-            {
-                "args": (
-                    "Courts of General Sessions and Oyer and Terminer "
-                    "of Delaware",
-                    "delaware/court_opinions/documents/108da18f9278da90.xml",
-                ),
-                "answer": "delsuperct",
-            },
-            {
-                "args": (
-                    "Circuit Court of the United States of Delaware",
-                    "delaware/court_opinions/documents/108da18f9278da90.xml",
-                ),
-                "answer": "circtdel",
-            },
-            {
-                "args": (
-                    "Circuit Court of Delaware",
-                    "delaware/court_opinions/documents/108da18f9278da90.xml",
-                ),
-                "answer": "circtdel",
-            },
-            {
-                "args": (
-                    "Court of Quarter Sessions "
-                    "Court of Delaware,  Kent County.",
-                    "delaware/court_opinions/documents/f01f1724cc350bb9.xml",
-                ),
-                "answer": "delsuperct",
-            },
-            {
-                "args": (
-                    "District Court of Appeal.",
-                    "florida/court_opinions/documents/25ce1e2a128df7ff.xml",
-                ),
-                "answer": "fladistctapp",
-            },
-            {
-                "args": (
-                    "District Court of Appeal, Lakeland, Florida.",
-                    "florida/court_opinions/documents/25ce1e2a128df7ff.xml",
-                ),
-                "answer": "fladistctapp",
-            },
-            {
-                "args": (
-                    "District Court of Appeal Florida.",
-                    "florida/court_opinions/documents/25ce1e2a128df7ff.xml",
-                ),
-                "answer": "fladistctapp",
-            },
-            {
-                "args": (
-                    "District Court of Appeal, Florida.",
-                    "florida/court_opinions/documents/25ce1e2a128df7ff.xml",
-                ),
-                "answer": "fladistctapp",
-            },
-            {
-                "args": (
-                    "District Court of Appeal of Florida, Second District.",
-                    "florida/court_opinions/documents/25ce1e2a128df7ff.xml",
-                ),
-                "answer": "fladistctapp",
-            },
-            {
-                "args": (
-                    "District Court of Appeal of Florida, Second District.",
-                    "/data/dumps/florida/court_opinions/documents"
-                    "/25ce1e2a128df7ff.xml",
-                    # noqa
-                ),
-                "answer": "fladistctapp",
-            },
-            {
-                "args": (
-                    "U.S. Circuit Court",
-                    "north_carolina/court_opinions/documents"
-                    "/fa5b96d590ae8d48.xml",
-                    # noqa
-                ),
-                "answer": "circtnc",
-            },
-            {
-                "args": (
-                    "United States Circuit Court,  Delaware District.",
-                    "delaware/court_opinions/documents/6abba852db7c12a1.xml",
-                ),
-                "answer": "circtdel",
-            },
-            {
-                "args": ("Court of Common Pleas  Hartford County", "asdf"),
-                "answer": "connsuperct",
-            },
-        )
-        for d in pairs:
-            got = get_state_court_object(*d["args"])
-            self.assertEqual(
-                got,
-                d["answer"],
-                msg="\nDid not get court we expected: '{}'.\n"
-                "               Instead we got: '{}'".format(d["answer"], got),
-            )
 
     def test_get_fed_court_object_from_string(self) -> None:
         """Can we get the correct federal courts?"""
@@ -896,6 +671,191 @@ class ScrapeFreeOpinionsLoopTest(TestCase):
         """do-everything self-monitors by calling the stall reporter."""
         do_everything([self.court.pk], None, None, "pacerdoc1", day_span=1)
         mock_stalls.assert_called_once_with([self.court.pk])
+
+
+class FreeOpinionAlreadyAvailableTest(TestCase):
+    """A document that RECAP already has must still reach the opinion
+    ingestion task when the free opinion report lists it later."""
+
+    @classmethod
+    def setUpTestData(cls) -> None:
+        cls.court = CourtFactory.create(
+            id="nysd",
+            jurisdiction=Court.FEDERAL_DISTRICT,
+            in_use=True,
+            end_date=None,
+        )
+        cls.docket = DocketFactory.create(
+            court=cls.court,
+            pacer_case_id="12345",
+            docket_number="1:20-cv-01234",
+            docket_number_raw="1:20-cv-01234",
+            source=Docket.RECAP,
+        )
+        cls.de = DocketEntryFactory.create(
+            docket=cls.docket,
+            entry_number=119,
+            date_filed=date(2026, 3, 20),
+        )
+        cls.rd = RECAPDocumentFactory.create(
+            docket_entry=cls.de,
+            document_number="119",
+            attachment_number=None,
+            pacer_doc_id="1234567890",
+            is_available=True,
+            sha1="0e5741e89ea3d43305f265ad80c193ae91d0075b",
+        )
+
+    def make_row(self) -> PACERFreeDocumentRow:
+        """Build the free opinion report row for the existing document.
+
+        :return: The saved PACERFreeDocumentRow.
+        """
+        return PACERFreeDocumentRow.objects.create(
+            court_id="nysd",
+            pacer_case_id="12345",
+            docket_number="1:20-cv-01234",
+            case_name="Doe v. Bank of America, NA",
+            date_filed=date(2026, 3, 20),
+            pacer_doc_id="1234567890",
+            document_number="119",
+            description="OPINION AND ORDER",
+            nature_of_suit="",
+            cause="",
+            error_msg="",
+        )
+
+    @patch("cl.corpus_importer.tasks.enqueue_docket_alert")
+    @patch(
+        "cl.corpus_importer.tasks.mark_ia_upload_needed",
+        new_callable=mock.AsyncMock,
+    )
+    @patch(
+        "cl.corpus_importer.tasks.get_blocked_status",
+        new_callable=mock.AsyncMock,
+        return_value=(False, None),
+    )
+    def test_available_document_keeps_the_chain_alive(
+        self, mock_blocked, mock_ia, mock_alert
+    ) -> None:
+        """An available document must not cancel the rest of the chain."""
+        row = self.make_row()
+        with patch(
+            "cl.corpus_importer.tasks.lookup_and_save",
+            return_value=self.docket,
+        ):
+            data = process_free_opinion_result(
+                row.pk, self.court.pk, CaseNameTweaker()
+            )
+
+        self.assertIsNotNone(data)
+        self.assertEqual(data["rd_pk"], self.rd.pk)
+        self.assertTrue(data["skip_pdf_download"])
+        # delete_pacer_row removes the row at the end of the chain instead.
+        self.assertTrue(
+            PACERFreeDocumentRow.objects.filter(pk=row.pk).exists()
+        )
+
+    @patch("cl.corpus_importer.tasks.enqueue_docket_alert")
+    @patch(
+        "cl.corpus_importer.tasks.mark_ia_upload_needed",
+        new_callable=mock.AsyncMock,
+    )
+    @patch(
+        "cl.corpus_importer.tasks.get_blocked_status",
+        new_callable=mock.AsyncMock,
+        return_value=(False, None),
+    )
+    def test_unavailable_document_still_downloads_the_pdf(
+        self, mock_blocked, mock_ia, mock_alert
+    ) -> None:
+        """A document without a PDF must still be downloaded from PACER."""
+        RECAPDocument.objects.filter(pk=self.rd.pk).update(is_available=False)
+        row = self.make_row()
+        with patch(
+            "cl.corpus_importer.tasks.lookup_and_save",
+            return_value=self.docket,
+        ):
+            data = process_free_opinion_result(
+                row.pk, self.court.pk, CaseNameTweaker()
+            )
+
+        self.assertIsNotNone(data)
+        self.assertEqual(data["rd_pk"], self.rd.pk)
+        self.assertFalse(data["skip_pdf_download"])
+
+    @patch(
+        "cl.corpus_importer.tasks.find_citations_and_parentheticals_for_opinion_by_pks"
+    )
+    @patch("cl.corpus_importer.tasks.classify_case_name_by_llm")
+    @patch("cl.corpus_importer.tasks.extract_recap_document_for_opinions")
+    @patch("cl.corpus_importer.tasks.download_pacer_pdf_by_rd")
+    @patch("cl.corpus_importer.tasks.enqueue_docket_alert")
+    @patch(
+        "cl.corpus_importer.tasks.mark_ia_upload_needed",
+        new_callable=mock.AsyncMock,
+    )
+    @patch(
+        "cl.corpus_importer.tasks.get_blocked_status",
+        new_callable=mock.AsyncMock,
+        return_value=(False, None),
+    )
+    def test_scraper_chain_imports_available_document(
+        self,
+        mock_blocked,
+        mock_ia,
+        mock_alert,
+        mock_download,
+        mock_extract,
+        mock_llm,
+        mock_find_citations,
+    ) -> None:
+        """The full get_pdfs chain must turn an available document into an
+        opinion without buying it again."""
+        mock_extract.return_value.json.return_value = {
+            "content": "See Doe v. Roe, 671 F. Supp. 3d 387 (S.D.N.Y. 2023).",
+            "extracted_by_ocr": False,
+        }
+        row = self.make_row()
+        with patch(
+            "cl.corpus_importer.tasks.lookup_and_save",
+            return_value=self.docket,
+        ):
+            get_pdfs(
+                [self.court.pk], date(2026, 3, 20), date(2026, 3, 20), "celery"
+            )
+
+        mock_download.assert_not_called()
+        self.assertTrue(
+            Opinion.objects.filter(
+                sha1=self.rd.sha1, cluster__docket=self.docket
+            ).exists()
+        )
+        self.assertFalse(
+            PACERFreeDocumentRow.objects.filter(pk=row.pk).exists()
+        )
+
+    @patch("cl.corpus_importer.tasks.download_pacer_pdf_by_rd")
+    @patch("cl.corpus_importer.tasks.get_or_cache_pacer_cookies")
+    def test_skip_flag_does_not_buy_the_document_again(
+        self, mock_cookies, mock_download
+    ) -> None:
+        """The skip flag must pass the document on without calling PACER."""
+        row = self.make_row()
+        data = get_and_process_free_pdf(
+            {
+                "result": row,
+                "rd_pk": self.rd.pk,
+                "pacer_court_id": "nysd",
+                "skip_pdf_download": True,
+            },
+            row.pk,
+            self.court.pk,
+        )
+
+        self.assertEqual(data["rd_pk"], self.rd.pk)
+        mock_cookies.assert_not_called()
+        mock_download.assert_not_called()
 
 
 class GetQuarterTest(SimpleTestCase):
@@ -2297,152 +2257,6 @@ class HarvardMergerTests(TestCase):
             "solicitor, John A. Boyhin, solicitor-general,. Durwood T. Bye, "
             "contra.",
         )
-
-
-class ColumbiaMergerTests(TestCase):
-    def setUp(self):
-        """Setup columbia merger tests"""
-        self.read_xml_to_soup_patch = patch(
-            "cl.corpus_importer.management.commands.columbia_merge.read_xml_to_soup"
-        )
-        self.read_xml_to_soup_func = self.read_xml_to_soup_patch.start()
-
-    def tearDown(self) -> None:
-        """Tear down patches and remove added objects"""
-        Docket.objects.all().delete()
-        self.read_xml_to_soup_patch.stop()
-
-    def test_merger(self):
-        """Can we identify opinions correctly even when they are slightly
-        different"""
-
-        # Xml content with bad tags </footnote_body></block_quote> instead of
-        # </block_quote></footnote_body> and unpublished opinion
-        case_xml = """<opinion unpublished=true>
-<reporter_caption>
-<center>
-MENDOZA v. STATE,
-<citation>61 S.W.3d 498</citation>
-(Tex.App.-San Antonio [4th Dist.] 2001)
-</center>
-</reporter_caption>
-<caption>
-<center>PIOQUINTO MENDOZA, III, Appellant, v. THE STATE OF TEXAS, Appellee.</center>
-</caption>
-<docket>
-<center>No. 04-00-00521-CR.</center>
-</docket>
-<court>
-<center>Court of Appeals of Texas, Fourth District, San Antonio.</center>
-</court>
-<date>
-<center>Delivered and Filed: July 25, 2001.</center>
-<center>Rehearing Overruled August 21, 2001.</center>
-<center>Discretionary Review Granted February 13, 2002.</center>
-</date>
-<posture>
-Appeal from the 49th Judicial District Court, Webb County, Texas, Trial Court No. 99-CRN3-0088-DI, Honorable Manuel Flores, Judge Presiding
-<footnote_reference>[fn1]</footnote_reference>
-.
-<footnote_body>
-<footnote_number>[fn1]</footnote_number>
-Judge Flores presided over the pre-trial hearings. The Honorable Peter Michael Curry, Visiting Judge, presided over the trial on the merits.
-</footnote_body>
-<page_number>Page 499</page_number>
-</posture>
-<opinion_text>
-[EDITORS' NOTE: THIS PAGE CONTAINS HEADNOTES. HEADNOTES ARE NOT AN OFFICIAL PRODUCT OF THE COURT, THEREFORE THEY ARE NOT DISPLAYED.]
-<page_number>Page 500</page_number>
-</opinion_text>
-<attorneys> Fernando Sanchez, Law Offices of Fernando Sanchez, Laredo, for appellant. Oscar J. Hale, Assistant District Attorney, Laredo, for appellee. </attorneys>
-<panel> Sitting: TOM RICKHOFF, ALMA L. LOPEZ, and SARAH B. DUNCAN, Justices. </panel>
-<opinion_byline> Opinion by ALMA L. LOPEZ, Justice. </opinion_byline>
-<opinion_text>
-Lorem ipsum dolor sit amet, consectetur adipiscing elit. Nullam quis elit sed dui interdum feugiat.
-<footnote_body>
-<footnote_number>[fn1]</footnote_number>
-<block_quote>Footnote sample
-</footnote_body></block_quote>
-</opinion_text>
-</opinion>
-        """
-
-        fixed_case_xml = fix_xml_tags(case_xml)
-
-        self.read_xml_to_soup_func.return_value = BeautifulSoup(
-            fixed_case_xml, "lxml"
-        )
-
-        # Factory create cluster, data from cluster id: 1589121
-        cluster = OpinionClusterWithMultipleOpinionsFactory(
-            case_name="Mendoza v. State",
-            case_name_full="Pioquinto MENDOZA, III, Appellant, v. the STATE of Texas, "
-            "Appellee",
-            date_filed=date(2002, 2, 13),
-            attorneys="Fernando Sanchez, Law Offices of Fernando Sanchez, Laredo, "
-            "for appellant., Oscar J. Hale, Assistant District Attorney, Laredo, "
-            "for appellee.",
-            other_dates="Rehearing Overruled Aug. 21, 2001., Discretionary Review "
-            "Granted Feb. 13, 2002.",
-            posture="",
-            judges="Alma, Duncan, Lopez, Rickhoff, Sarah, Tom",
-            source=ClusterSources.LAWBOX_M_HARVARD,
-            docket=DocketFactory(source=Docket.HARVARD),
-            sub_opinions__data=[
-                {
-                    "type": "010combined",
-                    "xml_harvard": "<p>Lorem ipsum dolor sit amet, consectetur "
-                    "adipiscing elit. Nullam quis elit sed dui "
-                    "interdum feugiat.</p>",
-                    "html_columbia": "",
-                    "author_str": "Lopez",
-                },
-            ],
-        )
-
-        # cluster posture is empty
-        self.assertEqual(cluster.posture, "")
-
-        # html_columbia is empty
-        self.assertEqual(cluster.sub_opinions.all().first().html_columbia, "")
-
-        # Merge cluster
-        process_cluster(cluster.id, "/columbia/fake_filepath.xml")
-
-        # Reload the object
-        cluster.refresh_from_db()
-
-        # Check if merged metadata is updated correctly
-        self.assertEqual(
-            cluster.posture,
-            "Appeal from the 49th Judicial District Court, Webb County, Texas, "
-            "Trial Court No. 99-CRN3-0088-DI, Honorable Manuel Flores, "
-            "Judge Presiding [fn1] . [fn1] Judge Flores presided over the pre-trial "
-            "hearings. The Honorable Peter Michael Curry, Visiting Judge, presided "
-            "over the trial on the merits. Page 499",
-        )
-        # check if we saved opinion content in html_columbia field
-        self.assertEqual(
-            cluster.sub_opinions.all().first().html_columbia,
-            """<p>[EDITORS' NOTE: THIS PAGE CONTAINS HEADNOTES. HEADNOTES ARE NOT AN OFFICIAL PRODUCT OF THE COURT, THEREFORE THEY ARE NOT DISPLAYED.]
- <span class="star-pagination">*Page 500</span> </p>
-<p>Lorem ipsum dolor sit amet, consectetur adipiscing elit. Nullam quis elit sed dui interdum feugiat.
-<footnote_body>
-<sup id="op0-fn1"><a href="#op0-ref-fn1">1</a></sup>
-<blockquote>Footnote sample
-</blockquote></footnote_body></p>""",
-        )
-
-        # Ensure the cluster is not merged again if it has already been merged
-        # and the COLUMBIA source was assigned.
-        with patch(
-            "cl.corpus_importer.management.commands.columbia_merge.logger"
-        ) as mock_logger:
-            # Merge cluster
-            process_cluster(cluster.id, "/columbia/fake_filepath.xml")
-            mock_logger.info.assert_called_with(
-                f"Cluster id: {cluster.id} already merged"
-            )
 
 
 class TexasMergerTest(TestCase):

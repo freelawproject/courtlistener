@@ -316,7 +316,7 @@ class ScraperIngestionTest(ESIndexTestCase, TestCase):
             source_to_assign,
         ) in source_assigment_tests:
             with self.subTest(
-                f"Testing {source_to_assign} source assigment.",
+                f"Testing {source_to_assign} source assignment.",
                 expected_sources=expected_sources,
                 non_sources=non_sources,
                 source_to_assign=source_to_assign,
@@ -328,7 +328,7 @@ class ScraperIngestionTest(ESIndexTestCase, TestCase):
                 )
                 for source, expected_source in expected_sources.items():
                     with self.subTest(
-                        f"Testing source {source} assigment.",
+                        f"Testing source {source} assignment.",
                         source=source,
                         expected_source=expected_source,
                     ):
@@ -859,7 +859,7 @@ class DupcheckerPressOnTest(TestCase):
         self.dc_not_full_crawl.press_on(*self.press_on_args[:-1], "not a dup")
 
     def test_press_on_with_a_dup_found(self) -> None:
-        """Do we raise the appropiate exceptions when a dup is found?"""
+        """Do we raise the appropriate exceptions when a dup is found?"""
         # First duplicate
         try:
             self.dc_full_crawl.press_on(*self.press_on_args)
@@ -899,7 +899,7 @@ class DupcheckerPressOnTest(TestCase):
             pass  # expected behavior
 
     def test_press_on_with_dup_found_and_older_date(self) -> None:
-        """Do we raise the appropiate exception when a duplicate is found
+        """Do we raise the appropriate exception when a duplicate is found
         and we account for case dates?
         """
         self.dc_not_full_crawl.reset()
