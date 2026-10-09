@@ -67,6 +67,8 @@ def track_view_counter[
             Returns:
                 A formatted tracking label.
             """
+            # pyrefly:ignore[unsupported-operation] This appears to be incorrect based on https://docs.djangoproject.com/en/6.1/ref/template-response/
+            # "The context data to be used when rendering the template. It must be a dict."
             model = response.context_data[track_attribute]
             label = template % (model.id)
             return label
