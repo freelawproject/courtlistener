@@ -1,14 +1,17 @@
 from collections import defaultdict
-from collections.abc import Callable
+from collections.abc import Callable, Coroutine
 from dataclasses import dataclass, field
 from datetime import datetime
-from typing import Any, NotRequired, TypedDict
+from typing import TYPE_CHECKING, Any, Concatenate, NotRequired, TypedDict
 
-from django.http import HttpRequest
+from django.http import HttpRequest, HttpResponse, HttpResponseBase
 from django_elasticsearch_dsl.search import Search
 from elasticsearch.dsl.query import Query
 
-from cl.users.models import User
+# This module is imported while Django settings load (via cl.celery_init), so
+# importing models at runtime raises AppRegistryNotReady.
+if TYPE_CHECKING:
+    from cl.users.models import User
 
 CleanData = dict[str, Any]
 TaskData = dict[str, Any]
@@ -17,7 +20,7 @@ TaskData = dict[str, Any]
 class AuthenticatedHttpRequest(HttpRequest):
     # Narrowing `user` is the purpose of this class; views that take it are
     # only reachable once authentication has run.
-    user: User  # pyrefly:ignore[bad-override-mutable-attribute]
+    user: "User"  # pyrefly:ignore[bad-override-mutable-attribute]
 
 
 class EmailType(TypedDict, total=False):
@@ -307,3 +310,23 @@ class ApiPositionMapping(BasePositionMapping):
 
 # https://www.aazuspan.dev/blog/type-safety-and-non-empty-tuples-in-python/
 type NonEmptyTuple[T] = tuple[T, *tuple[T, ...]]
+
+type DjangoViewType[
+    **P,
+    Request: HttpRequest,
+    Response: HttpResponse
+    | Coroutine[Any, Any, HttpResponse]
+    | HttpResponseBase
+    | Coroutine[Any, Any, HttpResponseBase],
+] = Callable[Concatenate[Request, P], Response]
+type DjangoViewDecorator[
+    **P,
+    Request: HttpRequest,
+    Response: HttpResponse
+    | Coroutine[Any, Any, HttpResponse]
+    | HttpResponseBase
+    | Coroutine[Any, Any, HttpResponseBase],
+] = Callable[
+    [DjangoViewType[P, Request, Response]],
+    DjangoViewType[P, Request, Response],
+]

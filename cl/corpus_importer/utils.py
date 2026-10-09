@@ -6,7 +6,6 @@ import random
 import re
 from collections import defaultdict
 from collections.abc import Generator, Iterator, Mapping, Sequence
-from dataclasses import dataclass
 from datetime import date
 from difflib import SequenceMatcher
 from typing import TYPE_CHECKING, Any, cast
@@ -1374,14 +1373,6 @@ def create_docket_entry_sequence_numbers(
         date_counts[entry_date] = i + 1
 
     return sequence_numbers
-
-
-@dataclass
-class DownloadPDFResult:
-    """Result of a PDF download operation."""
-
-    success: bool
-    sha1: str | None = None
 
 
 def texas_js_court_id_to_court_id(js_court_id: str) -> str | None:

@@ -2,12 +2,12 @@ import asyncio
 import logging
 import re
 import time
-from collections.abc import Callable
+from collections.abc import Callable, Coroutine
 from functools import wraps
 from hashlib import md5
 from inspect import iscoroutinefunction
 from math import ceil
-from typing import Any, TypeVar
+from typing import Any, cast
 from urllib.parse import urlparse
 
 from asgiref.sync import sync_to_async
@@ -15,9 +15,13 @@ from django.conf import settings
 from django.core.cache import caches
 from django.core.cache.backends.base import InvalidCacheBackendError
 from django.db import models
+from django.http import HttpResponse
+from django.http.request import HttpRequest
+from django.template.response import SimpleTemplateResponse
 from django.utils.cache import patch_response_headers
 
 from cl.lib.redis_utils import get_redis_interface
+from cl.lib.types import DjangoViewType
 
 logger = logging.getLogger(__name__)
 
@@ -29,8 +33,6 @@ logger = logging.getLogger(__name__)
 #   outlive the Redis entry it came from
 # - cached_value: the return value of the decorated function
 _memory_cache: dict[str, tuple[float, Any]] = {}
-
-T = TypeVar("T")
 
 
 def get_tiered_cache_prefix() -> str:
@@ -45,11 +47,11 @@ def get_tiered_cache_prefix() -> str:
     return "tiered:v2"
 
 
-def tiered_cache(
+def tiered_cache[**P, R](
     *,
     memory_timeout: int,
     redis_timeout: int,
-) -> Callable[[Callable[..., T]], Callable[..., T]]:
+) -> Callable[[Callable[P, R]], Callable[P, R]]:
     """Two-tier caching decorator: memory -> Django cache (Redis) -> function.
 
     The tiers are:
@@ -98,9 +100,9 @@ def tiered_cache(
             "values."
         )
 
-    def decorator(func: Callable[..., T]) -> Callable[..., T]:
+    def decorator(func: Callable[P, R]) -> Callable[P, R]:
         @wraps(func)
-        def wrapper(*args: Any, **kwargs: Any) -> T:
+        def wrapper(*args: P.args, **kwargs: P.kwargs) -> R:
             # Build cache key from function name and arguments
             key_parts = [func.__module__, func.__name__]
             key_parts.extend(str(arg) for arg in args)
@@ -160,13 +162,13 @@ def clear_tiered_cache() -> None:
         r.delete(*keys)
 
 
-def retry(
+def retry[**P, R](
     ExceptionToCheck: type[Exception] | tuple[type[Exception], ...],
     tries: int = 4,
     delay: float = 3,
     backoff: float = 2,
     logger: logging.Logger | None = None,
-) -> Callable:
+) -> Callable[[Callable[P, R]], Callable[P, R]]:
     """Retry calling the decorated function using an exponential backoff.
 
     https://www.saltycrane.com/blog/2009/11/trying-out-retry-decorator-python/
@@ -194,11 +196,13 @@ def retry(
         else:
             print(msg % params)
 
-    def deco_retry(f: Callable) -> Callable:
+    def deco_retry(
+        f: Callable[P, R],
+    ) -> Callable[P, R]:
         if iscoroutinefunction(f):
 
             @wraps(f)
-            async def f_retry(*args, **kwargs):
+            async def f_retry(*args: P.args, **kwargs: P.kwargs) -> R:
                 mtries, mdelay = tries, delay
                 while mtries > 1:
                     try:
@@ -210,11 +214,11 @@ def retry(
                         mdelay *= backoff
                 return await f(*args, **kwargs)
 
-            return f_retry  # true decorator
+            return cast(Callable[P, R], f_retry)  # true decorator
         else:
 
             @wraps(f)
-            def f_retry(*args, **kwargs):
+            def f_retry(*args: P.args, **kwargs: P.kwargs) -> R:
                 mtries, mdelay = tries, delay
                 while mtries > 1:
                     try:
@@ -231,7 +235,16 @@ def retry(
     return deco_retry
 
 
-def cache_page_ignore_params(timeout: int, cache_alias: str = "default"):
+def cache_page_ignore_params[
+    **P,
+    Request: HttpRequest,
+    Response: Coroutine[Any, Any, HttpResponse],
+](
+    timeout: int, cache_alias: str = "default"
+) -> Callable[
+    [DjangoViewType[P, Request, Response]],
+    DjangoViewType[P, Request, Coroutine[Any, Any, HttpResponse]],
+]:
     """Cache the result of a view while ignoring URL query parameters.
     Ensuring that the cache is consistent for different requests with varying
     query strings.
@@ -248,9 +261,13 @@ def cache_page_ignore_params(timeout: int, cache_alias: str = "default"):
     :return: The decorated view function, caching its response.
     """
 
-    def decorator(view_func):
+    def decorator(
+        view_func: DjangoViewType[P, Request, Response],
+    ) -> DjangoViewType[P, Request, Coroutine[Any, Any, HttpResponse]]:
         @wraps(view_func)
-        async def _wrapped_view(request, *args, **kwargs):
+        async def _wrapped_view(
+            request: Request, *args: P.args, **kwargs: P.kwargs
+        ) -> HttpResponse:
             url_path = urlparse(request.build_absolute_uri()).path
             hash_key = md5(url_path.encode("ascii"), usedforsecurity=False)
 
@@ -287,7 +304,7 @@ def cache_page_ignore_params(timeout: int, cache_alias: str = "default"):
             await sync_to_async(patch_response_headers)(
                 response, cache_timeout=timeout
             )
-            if hasattr(response, "render") and callable(response.render):
+            if isinstance(response, SimpleTemplateResponse):
                 # Render the response before caching it.
                 # Required for TemplateResponse views.
                 response.add_post_render_callback(
@@ -311,7 +328,7 @@ FIELD_DOCSTRING_EXTRACTION_RE = re.compile(
 _SPACES_RE = re.compile(r"\s+")
 
 
-def document_model(model: type[models.Model]) -> type[models.Model]:
+def document_model[M: models.Model](model: type[M]) -> type[M]:
     """
     Decorator for Django models to use docstrings to populate unset
     help_text and db_comment field attributes.
