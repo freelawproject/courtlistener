@@ -700,33 +700,27 @@ class ContentSecurityPolicyTest(TestCase):
 
 
 class DialogComponentTest(SimpleTestCase):
-    """The c-dialog component's two ways of being opened."""
+    """The c-dialog component renders a trigger only when given one."""
 
     def render(self, source: str) -> str:
         """Renders Cotton's compiled form of a template snippet."""
         template = engines["django"].from_string(source)
         return template.render({"request": RequestFactory().get("/")})
 
-    def test_trigger_slot_opens_it_by_default(self) -> None:
-        """Without initially_open, the dialog renders its own trigger button."""
+    def test_trigger_slot_renders_a_trigger(self) -> None:
+        """Trigger content renders the default trigger button."""
         html = self.render(
             "{% cotton dialog %}{% cotton:slot button_content %}Open"
             "{% endcotton:slot %}{% cotton:slot panel %}Body"
             "{% endcotton:slot %}{% endcotton %}"
         )
         self.assertIn('aria-haspopup="dialog"', html)
-        self.assertNotIn('x-init="open"', html)
 
-    def test_initially_open_renders_it_open_without_a_trigger(self) -> None:
-        """With initially_open, the dialog opens as soon as Alpine initialises it.
-
-        This is how markup inserted after page load, such as an htmx response,
-        shows a dialog: there is no trigger to click, so none is rendered.
-        """
+    def test_without_a_trigger_slot_no_trigger_is_rendered(self) -> None:
+        """A dialog opened by other means, such as an event listener, has no trigger button."""
         html = self.render(
-            "{% cotton dialog initially_open %}{% cotton:slot panel %}Body"
+            "{% cotton dialog %}{% cotton:slot panel %}Body"
             "{% endcotton:slot %}{% endcotton %}"
         )
-        self.assertIn('x-init="open"', html)
         self.assertNotIn('aria-haspopup="dialog"', html)
         self.assertIn("Body", html)

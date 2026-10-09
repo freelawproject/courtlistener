@@ -1,5 +1,5 @@
 {% load humanize %}
-{# Out-of-band response to the alert toggle. It replaces only the contents of three nodes already on the docket page, never the nodes themselves, so focus and the live region survive the swap. A refused toggle also replaces the page's empty dialog placeholder with the quota dialog, which opens on arrival. #}
+{# Out-of-band response to the alert toggle. It replaces only the contents of nodes already on the docket page, never the nodes themselves, so focus and the live region survive the swap. A refused toggle also fills the alert count of the page's quota dialog, which the HX-Trigger header opens. #}
 <span id="docket-alert-label-{{ docket.pk }}" hx-swap-oob="innerHTML">
   <c-docket-alert-label :has_alert="has_alert" />
 </span>
@@ -8,23 +8,5 @@
 </span>
 <span id="docket-alert-status-{{ docket.pk }}" hx-swap-oob="innerHTML">{{ message }}</span>
 {% if quota_reached %}
-  <div id="docket-alert-quota-dialog-{{ docket.pk }}" hx-swap-oob="outerHTML">
-    <c-dialog
-      initially_open
-      panel_class="p-6 rounded-2xl max-w-[706px] gap-6 max-md:absolute max-md:bottom-0 max-md:rounded-b-none max-md:max-w-full"
-      dialog_class="items-center z-20"
-    >
-      <c-slot name="panel">
-        <h2 x-dialog:title class="text-display-xs font-semibold text-greyscale-900">Please Become a Member or Install RECAP to Make More Alerts</h2>
-        <p x-dialog:description class="text-sm text-greyscale-800">Docket alerts are an advanced feature of CourtListener. Members can create unlimited docket alerts. If you are not a member, we allow <strong>{{ MAX_FREE_DOCKET_ALERTS|apnumber }}</strong> alerts and give a bonus of <strong>{{ DOCKET_ALERT_RECAP_BONUS|apnumber }}</strong> alerts to anybody with the RECAP Extension installed.</p>
-        <p class="text-sm text-greyscale-800">You currently have <strong>{{ subscription_count|apnumber }}</strong> alerts. To create additional alerts, please install the RECAP Extension or become a Member.</p>
-        <p class="text-sm text-greyscale-800">We can sometimes provide need-based exceptions to these rules. If you might need an exception, <a href="{% url 'contact' %}" class="text-primary-600">please let us know</a>.</p>
-        <div class="flex flex-row flex-wrap justify-end gap-2">
-          <c-button variant="outline" x-on:click="close">Close</c-button>
-          <c-button variant="outline" href="https://free.law/recap/">Install RECAP</c-button>
-          <c-button variant="primary" href="https://free.law/membership/">Become a Member</c-button>
-        </div>
-      </c-slot>
-    </c-dialog>
-  </div>
+  <span id="docket-alert-quota-count-{{ docket.pk }}" hx-swap-oob="innerHTML">{{ subscription_count|apnumber }}</span>
 {% endif %}

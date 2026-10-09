@@ -3151,9 +3151,9 @@ class ToggleDocketAlertHtmxTest(TestCase):
             headers={"HX-Request": "true"},
         )
 
-    def dialog_id(self) -> str:
-        """The id attribute of the quota dialog placeholder on the docket page."""
-        return f'id="docket-alert-quota-dialog-{self.docket.pk}"'
+    def count_id(self) -> str:
+        """The id attribute of the quota dialog's alert count on the docket page."""
+        return f'id="docket-alert-quota-count-{self.docket.pk}"'
 
     def subscriptions(self) -> int:
         """How many active alerts the user has on the docket."""
@@ -3184,7 +3184,7 @@ class ToggleDocketAlertHtmxTest(TestCase):
         self.assertContains(r, f'id="docket-alert-toggle-{self.docket.pk}"')
         self.assertContains(r, f'id="docket-alert-status-{self.docket.pk}"')
         self.assertContains(r, 'hx-swap-oob="innerHTML"', count=3)
-        self.assertNotContains(r, self.dialog_id())
+        self.assertNotContains(r, self.count_id())
 
     def test_htmx_disables_the_alert(self) -> None:
         """Toggling a subscribed docket unsubscribes it."""
@@ -3198,8 +3198,8 @@ class ToggleDocketAlertHtmxTest(TestCase):
     def test_htmx_refuses_to_subscribe_over_quota(self) -> None:
         """A user at quota gets the quota dialog instead of an alert.
 
-        The dialog replaces the page's placeholder out of band, and the
-        header lets the page react before the swap lands.
+        The partial fills the dialog's alert count out of band, and the
+        header is what opens the dialog on the page.
         """
         r = self.toggle()
         self.assertEqual(r.status_code, HTTPStatus.OK)
@@ -3210,7 +3210,7 @@ class ToggleDocketAlertHtmxTest(TestCase):
         self.assertEqual(r.context["MAX_FREE_DOCKET_ALERTS"], 0)
         self.assertIn("DOCKET_ALERT_RECAP_BONUS", r.context)
         self.assertEqual(r["HX-Trigger"], "docket-alert-quota-reached")
-        self.assertContains(r, f'{self.dialog_id()} hx-swap-oob="outerHTML"')
+        self.assertContains(r, f'{self.count_id()} hx-swap-oob="innerHTML"')
 
     @override_settings(MAX_FREE_DOCKET_ALERTS=1)
     def test_htmx_allows_disabling_at_quota(self) -> None:

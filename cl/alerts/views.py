@@ -228,9 +228,9 @@ def _toggle_docket_alert_htmx(
 
     A user at their quota is refused a new or re-enabled subscription. The
     refusal is still a 200: htmx does not swap error responses, and the
-    fragment carries the quota dialog alongside the status message, which
-    remains the fallback if the dialog cannot be placed. The `HX-Trigger`
-    header lets the menu close before the dialog takes focus.
+    partial carries the status message plus the live alert count for the
+    page's quota dialog. The `HX-Trigger` header is what opens that dialog,
+    once the menu has closed and refocused its trigger.
     """
     if request.method != "POST":
         return HttpResponseNotAllowed(permitted_methods={"POST"})

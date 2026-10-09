@@ -1,10 +1,5 @@
 {% load component_tags extras humanize svg_tags text_filters tz %}
 {% require_script "js/alpine/components/docket_page.js" %}
-{# Dialog dependencies loaded for quota limit reached warning #}
-{% require_script "js/alpine/composables/utils.js" %}
-{% require_script "js/alpine/composables/dialog.js" %}
-{% require_script "js/alpine/plugins/focus" defer=True %}
-{% require_script "js/alpine/plugins/ui" defer=True %}
 {% require_script "js/third_party/htmx" defer=True %}
 
 <c-vars
@@ -71,7 +66,7 @@
     </c-slot>
     <c-slot name="menu_content">
       {% if user.is_authenticated %}
-        {# If quota limit is reached, hx response puts an initially_open c-dialog into element id 'docket-alert-quota-dialog-{{ docket.pk }}' #}
+        {# A refused toggle fires docket-alert-quota-reached: the item closes the menu and the quota dialog below opens. #}
         <c-menu-button.item
           tag="button"
           hx-post="{% url 'toggle_docket_alert' %}"
@@ -134,8 +129,25 @@
   {% endif %}
 </div>
 {% if docket_source_url and user.is_authenticated %}
-  {# HX OOB Swap target: a refused toggle replaces this with the quota dialog. #}
-  <div id="docket-alert-quota-dialog-{{ docket.pk }}"></div>
+  {# Quota dialog, rendered closed. A refused toggle fires docket-alert-quota-reached, which opens it, and fills the alert count out of band. #}
+  <c-dialog
+    x-on:docket-alert-quota-reached.window="open"
+    panel_class="p-6 rounded-2xl max-w-[706px] gap-6 max-md:absolute max-md:bottom-0 max-md:rounded-b-none max-md:max-w-full"
+    dialog_class="items-center z-20"
+  >
+    <c-slot name="panel">
+      <h2 x-dialog:title class="text-display-xs font-semibold text-greyscale-900">Please Become a Member or Install RECAP to Make More Alerts</h2>
+      <p x-dialog:description class="text-sm text-greyscale-800">Docket alerts are an advanced feature of CourtListener. Members can create unlimited docket alerts. If you are not a member, we allow <strong>{{ MAX_FREE_DOCKET_ALERTS|apnumber }}</strong> alerts and give a bonus of <strong>{{ DOCKET_ALERT_RECAP_BONUS|apnumber }}</strong> alerts to anybody with the RECAP Extension installed.</p>
+      {# The count is only known on refusal: the toggle response swaps it in before the dialog opens. #}
+      <p class="text-sm text-greyscale-800">You currently have <strong id="docket-alert-quota-count-{{ docket.pk }}"></strong> alerts. To create additional alerts, please install the RECAP Extension or become a Member.</p>
+      <p class="text-sm text-greyscale-800">We can sometimes provide need-based exceptions to these rules. If you might need an exception, <a href="{% url 'contact' %}" class="text-primary-600">please let us know</a>.</p>
+      <div class="flex flex-row flex-wrap justify-end gap-2">
+        <c-button variant="outline" x-on:click="close">Close</c-button>
+        <c-button variant="outline" href="https://free.law/recap/">Install RECAP</c-button>
+        <c-button variant="primary" href="https://free.law/membership/">Become a Member</c-button>
+      </div>
+    </c-slot>
+  </c-dialog>
 {% endif %}
 
 {# A section with no items renders nothing. #}

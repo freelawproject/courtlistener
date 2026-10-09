@@ -4146,9 +4146,9 @@ class DocketAlertToggleV2Test(TestCase):
         self.assertIsNotNone(match)
         return " ".join(match.group(1).split())
 
-    def dialog_id(self) -> str:
-        """The id attribute of the quota dialog placeholder, shared with the fragment."""
-        return f'id="docket-alert-quota-dialog-{self.docket.pk}"'
+    def quota_count_id(self) -> str:
+        """The id attribute of the quota dialog's alert count, shared with the partial."""
+        return f'id="docket-alert-quota-count-{self.docket.pk}"'
 
     async def test_logged_out_item_links_to_sign_in(self) -> None:
         """A visitor gets a plain link back to this docket after signing in."""
@@ -4160,7 +4160,7 @@ class DocketAlertToggleV2Test(TestCase):
         )
         self.assertIn(f'href="{reverse("sign-in")}?next={docket_path}"', menu)
         self.assertNotIn("hx-post", menu)
-        self.assertNotIn(self.dialog_id(), html)
+        self.assertNotIn(self.quota_count_id(), html)
 
     async def test_signed_in_item_posts_through_htmx(self) -> None:
         """A signed-in user gets the htmx toggle, which closes the menu on a refusal."""
@@ -4199,18 +4199,17 @@ class DocketAlertToggleV2Test(TestCase):
         self.assertFalse(r.context["has_alert"])
         self.assertIn("hx-post", self.menu(r.content.decode()))
 
-    async def test_quota_dialog_placeholder_and_scripts_are_on_the_page(
-        self,
-    ) -> None:
-        """The page holds the empty swap target the refusal fragment replaces.
+    async def test_quota_dialog_and_its_scripts_are_on_the_page(self) -> None:
+        """The page renders the quota dialog closed, waiting for the refusal event.
 
-        The dialog's scripts must come from the page too: a fragment cannot
-        register them, and the dialog arrives after they have run.
+        The dialog brings its scripts with it: a partial cannot register
+        them, and the refusal only opens the dialog and fills its count.
         """
         await self.login()
         r = await self.page()
         page = r.content.decode()
-        self.assertIn(self.dialog_id(), page)
+        self.assertIn('x-on:docket-alert-quota-reached.window="open"', page)
+        self.assertIn(self.quota_count_id(), page)
         # Plugins are required without an extension, so the page carries
         # either the .js or the .min.js build depending on DEBUG.
         for script in (
