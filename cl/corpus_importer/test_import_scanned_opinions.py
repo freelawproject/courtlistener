@@ -419,15 +419,79 @@ class ImportScannedOpinionsTest(TestCase):
         self.assertEqual(OpinionCluster.objects.get().docket_id, docket.pk)
 
     def test_scan_from_another_reporter_is_not_duplicated(self) -> None:
-        """Is a scan of a case already imported from a scan detected by text?"""
+        """Is a scan with the same opinion XML detected by its content?"""
         self.import_scan()
         xml = self.scan_xml.replace("388 So. 3d 1", "49 Fla. L. Weekly D1100")
         with mock.patch(f"{COMMAND_MODULE}.logger") as mock_logger:
             self.import_xml(xml)
 
         self.assertEqual(OpinionCluster.objects.count(), 1)
+        self.assertIn("already imported", mock_logger.info.call_args[0][0])
+
+    def test_scan_matching_a_scanned_cluster_is_not_merged(self) -> None:
+        """Is a scan matching a cluster that already has scan XML skipped?"""
+        self.import_scan()
+        xml = self.scan_xml.replace(
+            "388 So. 3d 1", "49 Fla. L. Weekly D1100"
+        ).replace("confession of error", "confession of the error")
+        with mock.patch(f"{COMMAND_MODULE}.logger") as mock_logger:
+            self.import_xml(xml)
+
+        self.assertEqual(OpinionCluster.objects.count(), 1)
         self.assertIn(
             "which already has scan XML", mock_logger.warning.call_args[0][0]
+        )
+
+    def test_same_opinion_text_in_other_cases_is_imported(self) -> None:
+        """Are cases with identical boilerplate opinions all imported?"""
+        xml = """<?xml version="1.0" encoding="utf-8"?>
+<casebody firstpage="{page}" lastpage="{page}" schema="1">
+  <citation>388 So. 3d {page}</citation>
+  <parties><party>John {name}, Appellant,</party> <separator>v.</separator>
+  <party>STATE of Florida, Appellee.</party></parties>
+  <docketnumber>No. {docket_number}</docketnumber>
+  <court>District Court of Appeal of Florida, Fourth District.</court>
+  <decisiondate>[May 22, 2024]</decisiondate>
+  <opinion><author>PER CURIAM.</author><p>Affirmed.</p></opinion>
+</casebody>"""
+        self.import_xml(
+            xml.format(page="5", name="DOE", docket_number="4D2023-1111")
+        )
+        self.import_xml(
+            xml.format(page="6", name="ROE", docket_number="4D2023-2222")
+        )
+
+        self.assertEqual(
+            sorted(
+                OpinionCluster.objects.values_list(
+                    "docket__docket_number", flat=True
+                )
+            ),
+            ["4D2023-1111", "4D2023-2222"],
+        )
+
+    def test_opinions_without_docket_numbers_on_same_page(self) -> None:
+        """Are two docket-less opinions on a page with similar names kept?"""
+        xml = """<?xml version="1.0" encoding="utf-8"?>
+<casebody firstpage="1" lastpage="1" schema="1">
+  <citation>388 So. 3d 1</citation>
+  <parties><party>STATE of Florida, Appellant,</party>
+  <separator>v.</separator> <party>John {name}, Appellee.</party></parties>
+  <court>District Court of Appeal of Florida, Fourth District.</court>
+  <decisiondate>[May 22, 2024]</decisiondate>
+  <opinion><author>PER CURIAM.</author><p>{text}</p></opinion>
+</casebody>"""
+        self.import_xml(xml.format(name="SMITH", text="Affirmed."))
+        self.import_xml(
+            xml.format(name="SMITHSON", text="Reversed and remanded.")
+        )
+
+        self.assertEqual(
+            sorted(OpinionCluster.objects.values_list("case_name", flat=True)),
+            [
+                "State of Florida v. John Smith",
+                "State of Florida v. John Smithson",
+            ],
         )
 
     def test_other_opinion_on_same_page_is_imported(self) -> None:

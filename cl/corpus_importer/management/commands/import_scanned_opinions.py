@@ -462,16 +462,52 @@ def parse_scan_xml(
     )
 
 
+def is_same_case(cluster: OpinionCluster, scan_case: ScanCase) -> bool:
+    """Check whether a cluster with the same opinion XML is this scanned case.
+
+    Short opinions like "PER CURIAM. Affirmed." are identical across cases,
+    so the opinion XML alone doesn't identify a case. The case names must be
+    similar, and the docket numbers must match when both have one. Without a
+    docket number, the cluster must share a citation with the scan.
+
+    :param cluster: A cluster with scanning project content.
+    :param scan_case: The parsed scanned opinion.
+    :return: True if the cluster is the scanned case.
+    """
+    if case_names_are_too_different(cluster.case_name, scan_case.case_name):
+        return False
+    if cluster.docket.docket_number and scan_case.docket_number:
+        return cluster.docket.docket_number == scan_case.docket_number
+    return any(
+        cluster.citations.filter(
+            volume=cite.groups["volume"],
+            reporter=cite.corrected_reporter(),
+            page=cite.groups["page"],
+        ).exists()
+        for cite in scan_case.parsed_citations
+    )
+
+
 def find_imported_scan(scan_case: ScanCase) -> OpinionCluster | None:
     """Find the cluster this scanned opinion was already imported into.
 
-    A cluster with one of the opinion's citations and a scan XML is the same
-    scanned opinion when its docket number and case name also match. Short
-    opinions often share a page, and so a citation, with other opinions.
+    First looks for scanning project content with the same opinion XML in
+    the same case. As a fallback, for clusters whose opinion content wasn't merged, a cluster
+    with one of the opinion's citations and a scan XML is the same scanned
+    opinion when its docket number and case name also match. Short opinions
+    often share a page, and so a citation, with other opinions.
 
     :param scan_case: The parsed scanned opinion.
     :return: The cluster, or None if it was not imported yet.
     """
+    contents = OpinionContent.objects.filter(
+        source=OpinionContent.FLP_SCANNING,
+        sha1__in=[sha1(str(op)) for op in scan_case.opinions],
+    ).select_related("opinion__cluster__docket")
+    for content in contents:
+        if is_same_case(content.opinion.cluster, scan_case):
+            return content.opinion.cluster
+
     for cite in scan_case.parsed_citations:
         clusters = (
             OpinionCluster.objects.filter(
@@ -483,8 +519,12 @@ def find_imported_scan(scan_case: ScanCase) -> OpinionCluster | None:
             .select_related("docket")
         )
         for cluster in clusters:
-            if cluster.docket.docket_number == scan_case.docket_number and (
-                not case_names_are_too_different(
+            # Without docket numbers, two opinions on a page can have names
+            # close enough to look like the same case
+            if (
+                scan_case.docket_number
+                and cluster.docket.docket_number == scan_case.docket_number
+                and not case_names_are_too_different(
                     cluster.case_name, scan_case.case_name
                 )
             ):
