@@ -732,7 +732,28 @@ def add_new_case(scan_case: ScanCase) -> OpinionCluster:
             case_name_full=scan_case.case_name_full,
             ia_needs_upload=False,
         )
-        if docket.pk:
+        if docket.pk and case_names_are_too_different(
+            docket.case_name, scan_case.case_name
+        ):
+            # Old reporters reuse short docket numbers like "No. 12", so a
+            # docket found by number alone can be an unrelated case
+            logger.info(
+                "Docket %s has the docket number of %s but is a different "
+                "case. Creating a new docket.",
+                docket.pk,
+                scan_case.citation.corrected_citation(),
+            )
+            docket = Docket(
+                case_name=scan_case.case_name,
+                case_name_short=scan_case.case_name_short,
+                case_name_full=scan_case.case_name_full,
+                source=Docket.SCANNING_PROJECT,
+                docket_number=scan_case.docket_number,
+                docket_number_raw=scan_case.docket_number,
+                court=scan_case.court,
+                ia_needs_upload=False,
+            )
+        elif docket.pk:
             logger.info("Using existing docket %s", docket.pk)
         docket.save()
 

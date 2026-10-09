@@ -507,6 +507,23 @@ class ImportScannedOpinionsTest(TestCase):
             [("2024", "WL", "2312345"), ("388", "So. 3d", "1")],
         )
 
+    def test_unrelated_docket_with_same_number_is_not_reused(self) -> None:
+        """Is a new docket made when the docket number's case differs?"""
+        docket = DocketFactory.create(
+            court=self.court,
+            source=Docket.SCRAPER,
+            docket_number="4D2023-2459",
+            docket_number_raw="4D2023-2459",
+            case_name="Johnson v. Department of Revenue",
+        )
+
+        self.import_scan()
+
+        self.assertEqual(Docket.objects.count(), 2)
+        docket.refresh_from_db()
+        self.assertEqual(docket.source, Docket.SCRAPER)
+        self.assertNotEqual(OpinionCluster.objects.get().docket_id, docket.pk)
+
     def test_other_opinion_on_same_page_is_imported(self) -> None:
         """Is a different case with the same citation imported?"""
         self.import_scan()
