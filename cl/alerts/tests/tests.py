@@ -1063,12 +1063,22 @@ class DocketAlertTest(TestCase):
         send_docket_alert_webhook_events([de.pk], [self.user.pk])
         webhook_event = WebhookEvent.objects.filter(webhook=self.webhook).get()
         content = webhook_event.content
-        assert content is not None
+        self.assertIsNotNone(content)
         results = content["payload"]["results"]
         self.assertEqual(len(results), 1)
         self.assertEqual(
             results[0]["recap_documents"][0]["pacer_doc_id"], "232322332"
         )
+
+    @mock.patch("cl.alerts.tasks.send_docket_alert_webhook_events.delay")
+    def test_recap_webhook_enqueue_omits_d_pk(self, mock_delay) -> None:
+        """Does a RECAP alert enqueue the two-arg Celery signature so a
+        pre-deploy worker still accepts the message?"""
+        send_alert_and_webhook(self.docket.pk, self.before)
+        mock_delay.assert_called_once()
+        args, kwargs = mock_delay.call_args
+        self.assertEqual(len(args), 2)
+        self.assertEqual(kwargs, {})
 
 
 class DocketAlertSourceTest(TestCase):
@@ -1202,9 +1212,9 @@ class DocketAlertScotusTest(TestCase):
         webhook_triggered = WebhookEvent.objects.filter(webhook=self.webhook)
         self.assertEqual(webhook_triggered.count(), 1)
         webhook_event = webhook_triggered.first()
-        assert webhook_event is not None
+        self.assertIsNotNone(webhook_event)
         content = webhook_event.content
-        assert content is not None
+        self.assertIsNotNone(content)
         results = content["payload"]["results"]
         self.assertEqual(len(results), 1)
         self.assertEqual(results[0]["id"], de.pk)
@@ -1241,7 +1251,7 @@ class DocketAlertScotusTest(TestCase):
         )
         webhook_event = WebhookEvent.objects.filter(webhook=self.webhook).get()
         content = webhook_event.content
-        assert content is not None
+        self.assertIsNotNone(content)
         results = content["payload"]["results"]
         self.assertEqual(len(results), 1)
         self.assertEqual(results[0]["id"], scotus_de.pk)
@@ -1250,6 +1260,40 @@ class DocketAlertScotusTest(TestCase):
         )
         self.assertNotIn("recap_documents", results[0])
         self.assertIn("scotus_documents", results[0])
+
+    @mock.patch("cl.alerts.tasks.send_docket_alert_webhook_events.delay")
+    def test_scotus_webhook_enqueue_passes_d_pk(self, mock_delay) -> None:
+        """Does a SCOTUS alert pass d_pk so the worker uses the SCOTUS
+        serializer?"""
+        SCOTUSDocketEntryFactory(docket=self.docket)
+        send_alert_and_webhook(self.docket.pk, self.before)
+        mock_delay.assert_called_once()
+        args, kwargs = mock_delay.call_args
+        self.assertEqual(len(args), 3)
+        self.assertEqual(args[2], self.docket.pk)
+        self.assertEqual(kwargs, {})
+
+    @mock.patch(
+        "cl.api.webhooks.requests.post",
+        side_effect=lambda *args, **kwargs: MockResponse(200, mock_raw=True),
+    )
+    def test_webhook_with_deleted_docket_sends_empty_results(
+        self, mock_post
+    ) -> None:
+        """Does a missing docket skip the RECAP pk lookup instead of
+        crashing or serializing a colliding DocketEntry?"""
+        shared_pk = 8_888_887
+        DocketEntryFactory(
+            pk=shared_pk, docket=DocketFactory(court=CourtFactory())
+        )
+        SCOTUSDocketEntryFactory(pk=shared_pk, docket=self.docket)
+        d_pk = self.docket.pk
+        self.docket.delete()
+        send_docket_alert_webhook_events([shared_pk], [self.user.pk], d_pk)
+        webhook_event = WebhookEvent.objects.filter(webhook=self.webhook).get()
+        content = webhook_event.content
+        self.assertIsNotNone(content)
+        self.assertEqual(content["payload"]["results"], [])
 
 
 class DisableDocketAlertTest(TestCase):

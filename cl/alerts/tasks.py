@@ -16,6 +16,7 @@ from django.utils.timezone import now
 from elasticsearch.exceptions import ConnectionError
 from redis import ConnectionError as RedisConnectionError
 
+from cl.alerts.docket_alert_sources import RECAP_ALERT_SOURCE
 from cl.alerts.models import Alert, DocketAlert, ScheduledAlertHit
 from cl.alerts.utils import (
     add_document_hit_to_alert_set,
@@ -382,8 +383,15 @@ def send_alert_and_webhook(
     )
     DocketAlert.objects.filter(docket=d).update(date_last_hit=now())
 
-    # Send docket entries to webhook
-    send_docket_alert_webhook_events.delay(des_pks, webhook_recipients, d.pk)
+    # RECAP keeps the two-arg signature so a pre-deploy Celery worker
+    # still accepts the message. Non-RECAP sources pass d_pk so the
+    # worker does not look those pks up on DocketEntry.
+    if source is RECAP_ALERT_SOURCE:
+        send_docket_alert_webhook_events.delay(des_pks, webhook_recipients)
+    else:
+        send_docket_alert_webhook_events.delay(
+            des_pks, webhook_recipients, d.pk
+        )
     if not recap_email_user_only:
         delete_redis_semaphore("ALERTS", make_alert_key(d_pk))
 
