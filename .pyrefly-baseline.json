@@ -2563,48 +2563,6 @@
       "severity": "error"
     },
     {
-      "column": 16,
-      "path": "cl/recap/management/commands/import_idb.py",
-      "name": "not-iterable",
-      "concise_description": "`in` is not supported between `Unknown` and `type[bool]`",
-      "severity": "error"
-    },
-    {
-      "column": 16,
-      "path": "cl/recap/management/commands/import_idb.py",
-      "name": "not-iterable",
-      "concise_description": "`in` is not supported between `Unknown` and `type[date]`",
-      "severity": "error"
-    },
-    {
-      "column": 16,
-      "path": "cl/recap/management/commands/import_idb.py",
-      "name": "not-iterable",
-      "concise_description": "`in` is not supported between `Unknown` and `type[int]`",
-      "severity": "error"
-    },
-    {
-      "column": 16,
-      "path": "cl/recap/management/commands/import_idb.py",
-      "name": "not-iterable",
-      "concise_description": "`in` is not supported between `Unknown` and `type[str]`",
-      "severity": "error"
-    },
-    {
-      "column": 16,
-      "path": "cl/recap/management/commands/import_idb.py",
-      "name": "unsupported-operation",
-      "concise_description": "`in` is not supported between `Unknown` and `type[Court]`",
-      "severity": "error"
-    },
-    {
-      "column": 16,
-      "path": "cl/recap/management/commands/import_idb.py",
-      "name": "unsupported-operation",
-      "concise_description": "`in` is not supported between `Unknown` and `type[Court]`",
-      "severity": "error"
-    },
-    {
       "column": 49,
       "path": "cl/recap/management/commands/merge_idb_into_dockets.py",
       "name": "bad-argument-type",
@@ -2665,13 +2623,6 @@
       "path": "cl/recap/mergers.py",
       "name": "bad-argument-type",
       "concise_description": "Argument `Any | None` is not assignable to parameter `full_name` with type `HumanName | str` in function `cl.people_db.lookup_utils.lookup_judge_by_full_name_and_set_attr`",
-      "severity": "error"
-    },
-    {
-      "column": 27,
-      "path": "cl/recap/mergers.py",
-      "name": "unsupported-operation",
-      "concise_description": "`None` is not subscriptable",
       "severity": "error"
     },
     {
@@ -3571,31 +3522,10 @@
       "severity": "error"
     },
     {
-      "column": 11,
-      "path": "cl/recap/tasks.py",
-      "name": "unsupported-operation",
-      "concise_description": "`None` is not subscriptable",
-      "severity": "error"
-    },
-    {
-      "column": 13,
-      "path": "cl/recap/tasks.py",
-      "name": "unsupported-operation",
-      "concise_description": "`None` is not subscriptable",
-      "severity": "error"
-    },
-    {
       "column": 37,
       "path": "cl/recap/tasks.py",
       "name": "bad-argument-type",
       "concise_description": "Argument `dict[str, None] | TexasCourtOfAppealsDocket | TexasCourtOfCriminalAppealsDocket | TexasSupremeCourtDocket` is not assignable to parameter `docket_data` with type `TexasCourtOfAppealsDocket | TexasCourtOfCriminalAppealsDocket | TexasSupremeCourtDocket` in function `cl.corpus_importer.tasks.merge_texas_docket`",
-      "severity": "error"
-    },
-    {
-      "column": 21,
-      "path": "cl/recap/tasks.py",
-      "name": "unsupported-operation",
-      "concise_description": "`None` is not subscriptable",
       "severity": "error"
     },
     {

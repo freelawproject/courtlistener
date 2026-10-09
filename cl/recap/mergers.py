@@ -3,7 +3,7 @@ import json
 import logging
 import re
 from collections import defaultdict
-from collections.abc import AsyncGenerator, Mapping
+from collections.abc import AsyncGenerator, Iterable, Mapping
 from copy import deepcopy
 from datetime import date, timedelta
 from typing import Any, Literal, NotRequired, TypedDict, overload
@@ -679,12 +679,16 @@ async def update_docket_appellate_metadata(d, docket_data):
     return d, d_og_info
 
 
-def get_order_of_docket(docket_entries):
+def get_order_of_docket(
+    docket_entries: Iterable[Mapping[str, Any]],
+) -> Literal["asc", "desc"] | None:
     """Determine whether the docket is ascending or descending or whether
     that is knowable.
     """
     order = None
     for _, de, nxt in previous_and_next(docket_entries):
+        if nxt is None:
+            continue
         try:
             current_num = int(de["document_number"])
             nxt_num = int(nxt["document_number"])
