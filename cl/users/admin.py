@@ -84,17 +84,17 @@ class UserAdmin(admin.ModelAdmin, AdminTweaksMixin):
     readonly_fields = ("api_calls_count",)
     inlines = (
         UserProfileInline,
-        DonationInline,
-        MonthlyDonationInline,
-        PrayerInline,
+        NeonMembershipInline,
+        APIThrottleInline,
+        TokenInline,
+        WebhookInline,
         AlertInline,
         DocketAlertInline,
         NoteInline,
+        PrayerInline,
         UserTagInline,
-        NeonMembershipInline,
-        TokenInline,
-        WebhookInline,
-        APIThrottleInline,
+        DonationInline,
+        MonthlyDonationInline,
     )
     list_display = (
         "username",
