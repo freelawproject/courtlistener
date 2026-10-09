@@ -16,6 +16,7 @@ from asgiref.sync import async_to_sync
 from bs4 import BeautifulSoup
 from courts_db import find_court
 from django.conf import settings
+from django.db import transaction
 from django.db.models import QuerySet
 from django.db.utils import IntegrityError
 from django.utils.timezone import now
@@ -796,8 +797,11 @@ def add_citations_to_cluster(
                 )
                 continue
             try:
-                # We don't have the citation or any citation from the reporter
-                Citation.objects.create(**citation_params)
+                # We don't have the citation or any citation from the reporter.
+                # The savepoint keeps a caught IntegrityError from aborting an
+                # outer transaction.
+                with transaction.atomic():
+                    Citation.objects.create(**citation_params)
                 logger.info(
                     f"New citation: {cite} added to cluster id: {cluster_id}"
                 )
