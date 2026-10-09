@@ -181,9 +181,7 @@ class UserAdmin(admin.ModelAdmin, AdminTweaksMixin):
             clear_membership_throttles(user)
             return
 
-        if not apply_membership_throttles(
-            user, membership.level, clear_cache=True
-        ):
+        if not apply_membership_throttles(user, membership.level):
             self.message_user(
                 request,
                 f"Could not refresh throttles (no matching membership level): {user.username}",
