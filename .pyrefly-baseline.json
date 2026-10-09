@@ -2178,17 +2178,10 @@
       "severity": "error"
     },
     {
-      "column": 16,
-      "path": "cl/people_db/import_judges/populate_fjc_judges.py",
-      "name": "bad-argument-type",
-      "concise_description": "Argument `list[str | Any] | None` is not assignable to parameter `obj` with type `Sized` in function `len`",
-      "severity": "error"
-    },
-    {
       "column": 17,
       "path": "cl/people_db/import_judges/populate_fjc_judges.py",
-      "name": "unsupported-operation",
-      "concise_description": "`None` is not subscriptable",
+      "name": "missing-attribute",
+      "concise_description": "Object of class `NoneType` has no attribute `insert`",
       "severity": "error"
     },
     {
@@ -2201,162 +2194,8 @@
     {
       "column": 17,
       "path": "cl/people_db/import_judges/populate_fjc_judges.py",
-      "name": "unsupported-operation",
-      "concise_description": "Cannot set item in `None`",
-      "severity": "error"
-    },
-    {
-      "column": 17,
-      "path": "cl/people_db/import_judges/populate_fjc_judges.py",
       "name": "missing-attribute",
       "concise_description": "Object of class `NoneType` has no attribute `insert`",
-      "severity": "error"
-    },
-    {
-      "column": 17,
-      "path": "cl/people_db/import_judges/populate_fjc_judges.py",
-      "name": "unsupported-operation",
-      "concise_description": "Cannot set item in `None`",
-      "severity": "error"
-    },
-    {
-      "column": 17,
-      "path": "cl/people_db/import_judges/populate_fjc_judges.py",
-      "name": "missing-attribute",
-      "concise_description": "Object of class `NoneType` has no attribute `insert`",
-      "severity": "error"
-    },
-    {
-      "column": 13,
-      "path": "cl/people_db/import_judges/populate_fjc_judges.py",
-      "name": "missing-attribute",
-      "concise_description": "Object of class `NoneType` has no attribute `insert`",
-      "severity": "error"
-    },
-    {
-      "column": 13,
-      "path": "cl/people_db/import_judges/populate_fjc_judges.py",
-      "name": "missing-attribute",
-      "concise_description": "Object of class `NoneType` has no attribute `insert`",
-      "severity": "error"
-    },
-    {
-      "column": 12,
-      "path": "cl/people_db/import_judges/populate_fjc_judges.py",
-      "name": "unsupported-operation",
-      "concise_description": "`None` is not subscriptable",
-      "severity": "error"
-    },
-    {
-      "column": 13,
-      "path": "cl/people_db/import_judges/populate_fjc_judges.py",
-      "name": "missing-attribute",
-      "concise_description": "Object of class `NoneType` has no attribute `insert`",
-      "severity": "error"
-    },
-    {
-      "column": 29,
-      "path": "cl/people_db/import_judges/populate_fjc_judges.py",
-      "name": "unsupported-operation",
-      "concise_description": "`None` is not subscriptable",
-      "severity": "error"
-    },
-    {
-      "column": 20,
-      "path": "cl/people_db/import_judges/populate_fjc_judges.py",
-      "name": "unsupported-operation",
-      "concise_description": "`None` is not subscriptable",
-      "severity": "error"
-    },
-    {
-      "column": 20,
-      "path": "cl/people_db/import_judges/populate_fjc_judges.py",
-      "name": "unsupported-operation",
-      "concise_description": "`None` is not subscriptable",
-      "severity": "error"
-    },
-    {
-      "column": 28,
-      "path": "cl/people_db/import_judges/populate_fjc_judges.py",
-      "name": "missing-attribute",
-      "concise_description": "Object of class `NoneType` has no attribute `pop`",
-      "severity": "error"
-    },
-    {
-      "column": 21,
-      "path": "cl/people_db/import_judges/populate_fjc_judges.py",
-      "name": "missing-attribute",
-      "concise_description": "Object of class `NoneType` has no attribute `extend`",
-      "severity": "error"
-    },
-    {
-      "column": 21,
-      "path": "cl/people_db/import_judges/populate_fjc_judges.py",
-      "name": "missing-attribute",
-      "concise_description": "Object of class `NoneType` has no attribute `extend`",
-      "severity": "error"
-    },
-    {
-      "column": 30,
-      "path": "cl/people_db/import_judges/populate_fjc_judges.py",
-      "name": "unsupported-operation",
-      "concise_description": "`None` is not subscriptable",
-      "severity": "error"
-    },
-    {
-      "column": 21,
-      "path": "cl/people_db/import_judges/populate_fjc_judges.py",
-      "name": "unsupported-operation",
-      "concise_description": "`None` is not subscriptable",
-      "severity": "error"
-    },
-    {
-      "column": 17,
-      "path": "cl/people_db/import_judges/populate_fjc_judges.py",
-      "name": "unsupported-operation",
-      "concise_description": "Cannot set item in `None`",
-      "severity": "error"
-    },
-    {
-      "column": 21,
-      "path": "cl/people_db/import_judges/populate_fjc_judges.py",
-      "name": "unsupported-operation",
-      "concise_description": "Cannot set item in `None`",
-      "severity": "error"
-    },
-    {
-      "column": 28,
-      "path": "cl/people_db/import_judges/populate_fjc_judges.py",
-      "name": "missing-attribute",
-      "concise_description": "Object of class `NoneType` has no attribute `pop`",
-      "severity": "error"
-    },
-    {
-      "column": 21,
-      "path": "cl/people_db/import_judges/populate_fjc_judges.py",
-      "name": "missing-attribute",
-      "concise_description": "Object of class `NoneType` has no attribute `extend`",
-      "severity": "error"
-    },
-    {
-      "column": 21,
-      "path": "cl/people_db/import_judges/populate_fjc_judges.py",
-      "name": "missing-attribute",
-      "concise_description": "Object of class `NoneType` has no attribute `extend`",
-      "severity": "error"
-    },
-    {
-      "column": 24,
-      "path": "cl/people_db/import_judges/populate_fjc_judges.py",
-      "name": "bad-argument-type",
-      "concise_description": "Argument `list[str | Any] | None` is not assignable to parameter `obj` with type `Sized` in function `len`",
-      "severity": "error"
-    },
-    {
-      "column": 21,
-      "path": "cl/people_db/import_judges/populate_fjc_judges.py",
-      "name": "missing-attribute",
-      "concise_description": "Object of class `NoneType` has no attribute `append`",
       "severity": "error"
     },
     {
