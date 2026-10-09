@@ -174,9 +174,7 @@ class FloridaDocumentMerger(
         if (
             not scraped
             or [
-                attachment.document_name
-                for entry in self.params.params.params
-                for attachment in scraped.attachments
+                attachment.document_name for attachment in scraped.attachments
             ].count(self.scrape.document_name)
             != 1
         ):
@@ -257,7 +255,7 @@ def _submitted_by_id(
 class FloridaDocketEntryMerger(
     DocketEntryMerger[
         ScrapeFloridaDocketEntry,
-        set[UUID],
+        list[ScrapeFloridaDocketEntry],
         FloridaDocketEntry,
     ]
 ):
@@ -321,7 +319,7 @@ def _appeal_from_str(docket_data: FloridaCase, params: None) -> str | None:
 class FloridaOriginatingCourtInformationMerger(
     Merger[
         FloridaOriginatingCase,
-        RelatedParams[set[UUID]],
+        RelatedParams[list[ScrapeFloridaDocketEntry]],
         OriginatingCourtInformation,
     ]
 ):
