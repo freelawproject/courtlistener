@@ -6,7 +6,7 @@ from django.contrib.auth.models import User
 from django.http import HttpResponse
 from django.template.loader import TemplateDoesNotExist, get_template
 from django.test import override_settings
-from django.urls import reverse
+from django.urls import resolve, reverse
 from lxml.html import fromstring
 from waffle.testutils import override_flag
 
@@ -15,6 +15,23 @@ from cl.simple_pages.forms import ContactForm
 from cl.simple_pages.sitemap import SimpleSitemap
 from cl.tests.cases import SimpleTestCase, TestCase
 from cl.tests.utils import parse_csp
+
+
+class ChangePasswordWellKnownTests(SimpleTestCase):
+    """Ensure password managers can discover the password-change page."""
+
+    def test_change_password(self) -> None:
+        """The standard URL temporarily redirects to a real password page."""
+        response = self.client.get(reverse("well_known_change_password"))
+
+        self.assertRedirects(
+            response,
+            reverse("password_change"),
+            fetch_redirect_response=False,
+        )
+        self.assertEqual(
+            resolve(response["Location"]).url_name, "password_change"
+        )
 
 
 # Mock the hcaptcha thing so that we're sure it validates during tests
@@ -387,6 +404,8 @@ class V2PagesRegisterTest(PageLoadTestMixin, SimpleUserDataMixin, TestCase):
         ({"viewname": "help_home"}, "v2_help/index.html"),
         # Info pages
         ({"viewname": "components"}, "v2_components.html"),
+        # API pages
+        ({"viewname": "court_index"}, "v2_jurisdictions.html"),
     ]
 
     @staticmethod
@@ -424,6 +443,28 @@ class V2PagesRegisterTest(PageLoadTestMixin, SimpleUserDataMixin, TestCase):
                 self.assertTemplateUsed(
                     r, self._get_legacy_counterpart(v2_template) or v2_template
                 )
+
+
+@override_flag("use_new_design", True)
+@override_settings(WAFFLE_CACHE_PREFIX="test_new_base_view_count_waffle")
+class NewBaseViewCountTest(TestCase):
+    """new_base.html only wires view counting for decorated views.
+
+    The tracked side is covered on the docket page in
+    cl/opinion_page/tests.py; this checks the untracked side on a page
+    whose view has no track_view_counter.
+    """
+
+    async def test_untracked_page_sends_no_view_count(self) -> None:
+        """A v2 page whose view is not decorated carries no label, no endpoint
+        and no store, so the browser makes no request."""
+        r = await self.async_client.get(reverse("help_home"))
+        self.assertTemplateUsed(r, "new_base.html")
+        html = r.content.decode()
+        body = next(fromstring(html).iter("body"))
+        self.assertIsNone(body.get("data-view-count-label"))
+        self.assertIsNone(body.get("data-view-count-url"))
+        self.assertNotIn("view_count.js", html)
 
 
 @patch("hcaptcha.fields.hCaptchaField.validate", return_value=True)

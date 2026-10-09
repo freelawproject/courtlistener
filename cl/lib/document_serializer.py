@@ -90,13 +90,13 @@ class NullableListField(serializers.ListField):
     empty. For API V3 compatibility.
     """
 
-    def to_representation(self, data):
+    def to_representation(self, value):
         """
         Return "None" if the list is empty, otherwise return the list.
         """
-        if not data:
+        if not value:
             return None
-        return super().to_representation(data)
+        return super().to_representation(value)
 
 
 class HighlightedField(serializers.Field):
@@ -107,7 +107,7 @@ class HighlightedField(serializers.Field):
 
 
 class SuppressHighlightsField(serializers.Field):
-    """Supress highlights from text fields."""
+    """Suppress highlights from text fields."""
 
     def to_representation(self, value):
         return strip_tags(render_string_or_list(value))

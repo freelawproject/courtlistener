@@ -1440,13 +1440,24 @@ class FloridaDocumentDownloadTest(TestCase):
     """Tests for the download_fl_document Celery task."""
 
     def setUp(self) -> None:
-        """Mock the task throttle, the download stream, and the extraction
-        task dispatch."""
+        """Mock the task throttle, the ACIS proof-of-work gate, the download
+        stream, and the extraction task dispatch."""
         self.throttle_patch = mock.patch(
             "cl.lib.celery_utils.get_task_wait", return_value=0
         )
         self.throttle_patch.start()
         self.addCleanup(self.throttle_patch.stop)
+        # A 204 from the challenge endpoint means the gate is off, so the
+        # stored URL is fetched unchanged. The gate itself is covered in
+        # cl.search.state.florida.tests.
+        self.challenge_patch = mock.patch(
+            "cl.search.state.florida.models.httpx.get",
+            return_value=httpx.Response(
+                204, request=httpx.Request("GET", "https://acis-api.test")
+            ),
+        )
+        self.challenge_patch.start()
+        self.addCleanup(self.challenge_patch.stop)
         self.download_document_patch = mock.patch(
             "cl.corpus_importer.tasks.download_document_in_stream"
         )

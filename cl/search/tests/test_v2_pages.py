@@ -1,6 +1,8 @@
+import json
 from datetime import timedelta
 from unittest.mock import patch
 
+from django import forms
 from django.db import connection
 from django.test import AsyncClient, override_settings
 from django.urls import reverse
@@ -8,6 +10,7 @@ from django.utils import timezone
 from lxml import html as lhtml
 from waffle.testutils import override_flag
 
+from cl.lib import widgets
 from cl.lib.test_helpers import (
     CourtTestCase,
     PeopleTestCase,
@@ -15,6 +18,8 @@ from cl.lib.test_helpers import (
     SearchTestCase,
     SimpleUserDataMixin,
 )
+from cl.search.constants import CORPUS_SEARCH_SCOPES
+from cl.search.forms import CorpusSearchForm
 from cl.search.models import Docket, Opinion, RECAPDocument
 from cl.search.utils import get_v2_homepage_stats
 from cl.stats.models import Stat
@@ -182,6 +187,41 @@ class HomepageStructureTest(SimpleUserDataMixin, TestCase):
                 self.assertIn(label, html, f"Not found in template: {label}")
 
 
+class CorpusSearchFormWidgetTest(TestCase):
+    """Tests enforcing shared widget usage in CorpusSearchForm."""
+
+    @staticmethod
+    def _get_offending_fields(form: forms.Form) -> dict[str, str]:
+        """Return text/select fields that do not use shared CL widgets."""
+        built_in_widget_families = (forms.TextInput, forms.Select)
+        approved_widgets = (widgets.TextInput, widgets.Select)
+        return {
+            field_name: (
+                f"{type(field.widget).__module__}."
+                f"{type(field.widget).__qualname__}"
+            )
+            for field_name, field in form.fields.items()
+            if isinstance(field.widget, built_in_widget_families)
+            and not isinstance(field.widget, approved_widgets)
+        }
+
+    def test_uses_custom_text_and_select_widgets(self) -> None:
+        """Prevent fields from reverting to built-in widgets with CL alternatives."""
+        offending_fields = self._get_offending_fields(CorpusSearchForm())
+
+        self.assertEqual(offending_fields, {})
+
+    def test_rejects_builtin_date_input(self) -> None:
+        """Catch a date field that falls back to Django's DateInput."""
+        form = CorpusSearchForm()
+        form.fields["filed_after"].widget = forms.DateInput()
+
+        self.assertEqual(
+            self._get_offending_fields(form),
+            {"filed_after": "django.forms.widgets.DateInput"},
+        )
+
+
 @override_flag("use_new_design", True)
 @override_settings(WAFFLE_CACHE_PREFIX="test_corpus_search_form_waffle")
 class CorpusSearchFormTest(SimpleUserDataMixin, TestCase):
@@ -305,12 +345,7 @@ class CorpusSearchFormTest(SimpleUserDataMixin, TestCase):
         Regression for #7035: tabs used Alpine x-for, so labels were missing
         from the initial HTML and flashed in after JavaScript loaded.
         """
-        expected_labels = [
-            "Case Law",
-            "RECAP Archive",
-            "Oral Arguments",
-            "Judges",
-        ]
+        expected_labels = [scope["label"] for scope in CORPUS_SEARCH_SCOPES]
         tablist = self.tree.xpath(
             '//*[@role="tablist" and @aria-label="Select the scope of your search"]'
         )
@@ -318,6 +353,18 @@ class CorpusSearchFormTest(SimpleUserDataMixin, TestCase):
             len(tablist),
             1,
             "Expected one corpus search tablist on the homepage",
+        )
+        scope_scripts = self.tree.xpath(
+            '//script[@id="corpus-search-scopes" and @type="application/json"]'
+        )
+        self.assertEqual(
+            len(scope_scripts),
+            1,
+            "Expected one serialized corpus search scope payload",
+        )
+        self.assertEqual(
+            json.loads(scope_scripts[0].text_content()),
+            list(CORPUS_SEARCH_SCOPES),
         )
         tab_labels = [
             "".join(tab.itertext()).strip()
@@ -334,6 +381,93 @@ class CorpusSearchFormTest(SimpleUserDataMixin, TestCase):
             tablist[0].xpath(".//template[@x-for]"),
             "Homepage tablist should not use Alpine x-for for initial render",
         )
+
+    def test_corpus_search_menu_is_server_rendered(self):
+        """Corpus search menu trigger and options appear in HTML before Alpine
+        runs.
+
+        Regression for #7827: menu trigger and options used Alpine x-text and
+        x-for, so content was missing from the initial HTML and flashed in
+        after JavaScript loaded.
+        """
+        # 1. Verify mobile trigger buttons (inline and dialog) contain label
+        # and description, and initial aria-expanded="false"
+        trigger_buttons = self.tree.xpath(
+            '//button[@aria-haspopup="menu" and @aria-label="Open menu to select the scope of your search"]'
+        )
+        self.assertEqual(
+            len(trigger_buttons),
+            2,
+            "Expected two corpus search scope menu trigger buttons on the homepage (inline and dialog)",
+        )
+        for trigger_button in trigger_buttons:
+            self.assertEqual(
+                trigger_button.get("aria-expanded"),
+                "false",
+                "Expected initial aria-expanded='false' on scope menu trigger",
+            )
+            trigger_text = "".join(trigger_button.itertext()).strip()
+            self.assertIn(
+                "Case Law",
+                trigger_text,
+                f"Trigger label 'Case Law' missing from server-rendered HTML; found {trigger_text!r}",
+            )
+            self.assertIn(
+                "10M+ Opinions",
+                trigger_text,
+                f"Trigger description '10M+ Opinions' missing from server-rendered HTML; found {trigger_text!r}",
+            )
+
+        # 2. Verify menus (inline and dialog) exist and do not use Alpine x-for
+        # for initial render
+        menus = self.tree.xpath(
+            '//menu[@role="menu" and @aria-label="Select the scope of your search"]'
+        )
+        self.assertEqual(
+            len(menus),
+            2,
+            "Expected two corpus search scope menus on the homepage (inline and dialog)",
+        )
+
+        expected_labels = [
+            "Case Law",
+            "RECAP Archive",
+            "Oral Arguments",
+            "Judges",
+        ]
+        for menu in menus:
+            self.assertFalse(
+                menu.xpath(".//template[@x-for]"),
+                "Scope menu should not use Alpine x-for for initial render",
+            )
+            menu_items = menu.xpath('.//*[@role="menuitemradio"]')
+            self.assertEqual(
+                len(menu_items),
+                len(expected_labels),
+                f"Expected {len(expected_labels)} menu items, found {len(menu_items)}",
+            )
+            item_labels = [
+                "".join(item.itertext()).strip() for item in menu_items
+            ]
+            for label in expected_labels:
+                with self.subTest(label=label):
+                    self.assertTrue(
+                        any(label in item_label for item_label in item_labels),
+                        f"Menu item {label!r} missing from server-rendered HTML; "
+                        f"found {item_labels!r}",
+                    )
+
+            # Verify checkmark display states (only the first item visible initially)
+            first_svg = menu_items[0].xpath(".//svg")
+            self.assertTrue(
+                first_svg, "Expected checkmark SVG on first menu item"
+            )
+            self.assertNotIn("display: none", first_svg[0].get("style", ""))
+
+            for item in menu_items[1:]:
+                svg = item.xpath(".//svg")
+                self.assertTrue(svg, "Expected checkmark SVG on menu item")
+                self.assertIn("display: none", svg[0].get("style", ""))
 
 
 @override_flag("use_new_design", True)

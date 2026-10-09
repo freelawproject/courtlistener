@@ -2015,7 +2015,7 @@ def update_docket_from_hidden_api(data):
     d = Docket.objects.get(pk=data["pass_through"])
 
     # need to populate the docket number for tests to pass until we
-    # activate the docket_number_raw cleaning flag. This will be overriden by
+    # activate the docket_number_raw cleaning flag. This will be overridden by
     # the clean docket_number_raw value once cleaning is activated
     if not d.docket_number:
         d.docket_number = data["docket_number"]
@@ -3042,7 +3042,7 @@ def download_pacer_pdf_and_save_to_pq(
     pacer_doc_id: str | None,
     user_pk: int,
     appellate: bool,
-    attachment_number: int = None,
+    attachment_number: int | None = None,
     de_seq_num: str | None = None,
     is_bankr_short_doc_id: bool = False,
     acms: bool = False,

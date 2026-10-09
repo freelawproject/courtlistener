@@ -6,7 +6,7 @@ from typing import Any, NotRequired, TypedDict
 
 from django.http import HttpRequest
 from django_elasticsearch_dsl.search import Search
-from elasticsearch.dsl.query import QueryString
+from elasticsearch.dsl.query import Query
 
 from cl.users.models import User
 
@@ -15,7 +15,9 @@ TaskData = dict[str, Any]
 
 
 class AuthenticatedHttpRequest(HttpRequest):
-    user: User
+    # Narrowing `user` is the purpose of this class; views that take it are
+    # only reachable once authentication has run.
+    user: User  # pyrefly:ignore[bad-override-mutable-attribute]
 
 
 class EmailType(TypedDict, total=False):
@@ -95,7 +97,7 @@ OptionsType = dict[str, str | Callable]
 """
 The following classes provide a homogeneous collection of variables
 as a reusable group. The goal of these classes is to work as
-containers of the data thats coming from a Position queryset.
+containers of the data that's coming from a Position queryset.
 
 - The BasePositionMapping class contains the smallest set of common
 fields that we use in the UI and we need in the API response.
@@ -197,15 +199,15 @@ class BasePositionMapping:
 class EsMainQueries:
     search_query: Search
     boost_mode: str
-    parent_query: QueryString | None = None
-    child_query: QueryString | None = None
+    parent_query: Query | None = None
+    child_query: Query | None = None
 
 
 @dataclass
 class EsJoinQueries:
-    main_query: QueryString | list
-    parent_query: QueryString | None
-    child_query: QueryString | None
+    main_query: Query | list
+    parent_query: Query | None
+    child_query: Query | None
     has_text_query: bool
 
 

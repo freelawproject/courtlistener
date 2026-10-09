@@ -71,7 +71,7 @@ class Command(VerboseCommand):
             "--output-directory",
             type=str,
             help="Where the bulk data will be output to. Note that if Docker "
-            "is used for Celery, this is a direcotry *inside* docker.",
+            "is used for Celery, this is a directory *inside* docker.",
             default=BULK_OUTPUT_DIRECTORY,
         )
 

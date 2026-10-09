@@ -1,5 +1,6 @@
 {% load component_tags extras humanize svg_tags text_filters tz %}
 {% require_script "js/alpine/components/docket_page.js" %}
+{% require_script "js/third_party/htmx" defer=True %}
 
 <c-vars
   docket=""
@@ -12,7 +13,7 @@
   tab_content_id="tab-content"
 />
 
-<div class="max-lg:px-[--mobile-main-padding]">
+<div>
 {# Filed date eyebrow #}
 {% if docket.date_filed %}
   <c-eyebrow class="mb-2">Filed: {{ docket.date_filed }}</c-eyebrow>
@@ -20,10 +21,11 @@
 
 {# Title and court #}
 <hgroup>
+  {# select-all makes each value a one-click selection for copying, as the legacy page does. #}
   <h1 data-type="search.Docket" data-id="{{ docket.pk }}">
-    {{ docket|best_case_name|safe|v_wrapper }}
+    <span class="select-all cursor-text">{{ docket|best_case_name|safe|v_wrapper }}</span>
     {% if docket.docket_number %}
-      (<span class="whitespace-nowrap">{{ docket.docket_number }}</span>)
+      (<span class="select-all cursor-text whitespace-nowrap">{{ docket.docket_number }}</span>)
     {% endif %}
   </h1>
   {% if docket.court %}
@@ -47,22 +49,55 @@
     Tags
   </c-button>
   {% if docket_source_url %}
-  {# TODO: Wire up alert toggle interactivity (auth checks, AJAX toggle, state change). #}
   <c-menu-button
     button_variant="outline"
     widget_aria_label="Docket alerts menu"
-    trigger_aria_label="Get Alerts"
     menu_aria_label="Alert options"
   >
     <c-slot name="button_content">
-      {% svg "bell" class="w-4 h-4" aria_hidden="true" %}
-      Get Alerts
+      {# Swap target: the toggle response replaces this span's contents. #}
+      <span id="docket-alert-label-{{ docket.pk }}" class="contents">
+        <c-docket-alert-label :has_alert="has_alert" />
+      </span>
       <span
         class="transition-transform duration-200 group-aria-[expanded=true]:rotate-180 flex justify-center items-center w-4 h-4"
         aria-hidden="true"
       >{% svg "chevron" class="w-full h-full text-greyscale-400" %}</span>
     </c-slot>
     <c-slot name="menu_content">
+      {% if user.is_authenticated %}
+        {% if has_alert or user.profile.can_make_another_alert %}
+          <c-menu-button.item
+            tag="button"
+            hx-post="{% url 'toggle_docket_alert' %}"
+            hx-vals='{"id": "{{ docket.pk }}"}'
+            hx-swap="none"
+            hx-disabled-elt="this"
+          >
+            <span id="docket-alert-toggle-{{ docket.pk }}" class="contents">
+              <c-docket-alert-label :has_alert="has_alert" icon_class="w-4 h-4 text-greyscale-500" />
+            </span>
+          </c-menu-button.item>
+        {% else %}
+          <c-menu-button.item
+            tag="button"
+            icon="bell"
+            icon_class="w-4 h-4 text-greyscale-500"
+            disabled
+          >
+            Get Alerts
+          </c-menu-button.item>
+        {% endif %}
+      {% else %}
+        <c-menu-button.item
+          href="{% url 'sign-in' %}?next={{ request.get_full_path|urlencode }}"
+          icon="bell"
+          icon_class="w-4 h-4 text-greyscale-500"
+          rel="nofollow"
+        >
+          Get Alerts
+        </c-menu-button.item>
+      {% endif %}
       <c-menu-button.item
         href="{% url 'docket_feed' docket.pk %}"
         icon="rss"
@@ -88,8 +123,19 @@
       </c-menu-button.item>
     </c-slot>
   </c-menu-button>
+  {# Announces the toggle's outcome; the response swaps its contents. #}
+  <span id="docket-alert-status-{{ docket.pk }}" role="status" class="sr-only"></span>
   {% endif %}
   <c-docket-source-button :docket="docket" :docket_source="docket_source" />
+  {% if user.is_authenticated %}
+    <c-button
+      variant="outline"
+      hx-get="{% url 'view_download_docket' docket.id %}"
+      hx-swap="none"
+    >
+      Export entries CSV
+    </c-button>
+  {% endif %}
 </div>
 
 {# A section with no items renders nothing. #}
@@ -125,7 +171,9 @@
   {% for tab in tabs %}
     <a href="{{ tab.url }}"
        {% if active_tab == tab.key %}aria-current="page"{% endif %}
-       class="px-5 py-3 text-sm font-normal rounded-t-2xl whitespace-nowrap focus-visible:ring-2 focus-visible:ring-primary-400 focus-visible:outline-none {% if active_tab == tab.key %}bg-white text-greyscale-900{% else %}bg-greyscale-50 text-greyscale-600{% endif %}">
+       class="flex items-center gap-1 px-5 py-3 text-sm font-normal rounded-t-2xl whitespace-nowrap focus-visible:ring-2 focus-visible:ring-primary-400 focus-visible:outline-none {% if active_tab == tab.key %}bg-white text-greyscale-900{% else %}bg-greyscale-50 text-greyscale-600{% endif %}">
+      {# Some tab icons hardcode their fill and have several paths, so the wrapper sizes and recolors them. #}
+      <span class="flex items-center justify-center w-4 h-4 shrink-0 [&_path]:fill-current" aria-hidden="true">{% svg tab.icon class="w-full h-full" %}</span>
       {{ tab.label }}
     </a>
   {% endfor %}

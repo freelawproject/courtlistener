@@ -9,8 +9,7 @@ from django.core.files.base import ContentFile
 from django.db.models import Q
 from eyecite.find import get_citations
 from eyecite.tokenizers import HyperscanTokenizer
-from juriscraper import AbstractSite
-from juriscraper.AbstractSite import logger
+from juriscraper.AbstractSite import AbstractSite, logger
 from reporters_db import REPORTERS
 
 from cl.citations.utils import map_reporter_db_cite_type
@@ -252,7 +251,7 @@ def case_names_are_too_different(
     """
     new_parts = winnow_case_name(first.lower())
     old_parts = winnow_case_name(second.lower())
-    # or 1 to prevent 0 lenght minimum
+    # or 1 to prevent 0 length minimum
     denominator = min(len(old_parts), len(new_parts)) or 1
     return len(new_parts.intersection(old_parts)) / denominator < threshold
 

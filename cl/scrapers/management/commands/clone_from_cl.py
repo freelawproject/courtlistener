@@ -110,7 +110,9 @@ class CloneException(Exception):
         self.message = message
 
 
-def clean_api_data(data: dict, fields_to_remove: list[str] = None) -> dict:
+def clean_api_data(
+    data: dict, fields_to_remove: list[str] | None = None
+) -> dict:
     """Remove fields that shouldn't be saved to the db
 
     :param data: The dictionary data obtained from the CourtListener API.
@@ -595,7 +597,7 @@ def clone_audio_files(
                     audio.local_path_mp3.name
                 )
             ):
-                print("Download, file doesnt exist in local storage")
+                print("Download, file doesn't exist in local storage")
                 try:
                     _, year, month, day, _ = local_path_mp3.split("/")
                     file_with_date = datetime(int(year), int(month), int(day))
@@ -1052,7 +1054,7 @@ def clone_court(session: Session, court_ids: list, no_update: bool = False):
 class Command(BaseCommand):
     help = (
         "Clone data from CourtListener.com into dev environment. It "
-        "requires to set CL_API_TOKEN varible in the .env file."
+        "requires to set CL_API_TOKEN variable in the .env file."
     )
 
     def __init__(self, *args, **kwargs):

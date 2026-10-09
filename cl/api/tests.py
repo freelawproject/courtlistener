@@ -25,6 +25,7 @@ from django.test.utils import CaptureQueriesContext
 from django.urls import reverse
 from django.utils.timezone import now
 from django.utils.xmlutils import UnserializableContentError
+from lxml import html as lhtml
 from rest_framework import status
 from rest_framework.authtoken.models import Token
 from rest_framework.exceptions import NotFound, Throttled
@@ -32,8 +33,9 @@ from rest_framework.pagination import Cursor, CursorPagination
 from rest_framework.request import Request
 from rest_framework.response import Response
 from rest_framework.test import APIRequestFactory
+from rest_framework.views import APIView
 from rest_framework_xml.renderers import XMLRenderer
-from waffle.testutils import override_switch
+from waffle.testutils import override_flag, override_switch
 
 from cl.alerts.api_views import DocketAlertViewSet, SearchAlertViewSet
 from cl.api.api_permissions import V3APIPermission
@@ -53,9 +55,12 @@ from cl.api.models import (
 from cl.api.pagination import VersionBasedPagination
 from cl.api.utils import (
     DOUBLE_API_THROTTLES_SWITCH,
+    CloudFrontAnonRateThrottle,
+    EventCounterThrottle,
     ExceptionalUserRateThrottle,
     FetchRateThrottle,
     LoggingMixin,
+    TagRateThrottle,
     apply_membership_throttles,
     clear_membership_throttles,
     detect_unknown_filter_params,
@@ -199,6 +204,17 @@ class BasicAPIPageTest(ESIndexTestCase, TestCase):
         r = await self.async_client.get(reverse("court_index"))
         self.assertEqual(r.status_code, 200)
 
+    async def test_drf_login_redirects_to_sign_in(self) -> None:
+        """Is DRF's browsable-API login page pointed at our own?
+
+        Its own login view skips the ratelimiting, redirect sanitizing and
+        confirmed-email check that /sign-in/ has.
+        """
+        r = await self.async_client.get(reverse("drf_login_redirect"))
+        self.assertRedirects(
+            r, reverse("sign-in"), fetch_redirect_response=False
+        )
+
     async def test_wiki_data_endpoint(self) -> None:
         """Does the wiki data endpoint return the expected JSON structure?"""
         await caches["default"].adelete("wiki-data")
@@ -285,6 +301,61 @@ class BasicAPIPageTest(ESIndexTestCase, TestCase):
         duration_minutes = data["oral_arguments"]["duration_minutes"]
         self.assertIsInstance(duration_minutes, int)
         self.assertEqual(duration_minutes, 4)
+
+
+@override_settings(WAFFLE_CACHE_PREFIX="test_jurisdictions_v2_waffle")
+@override_flag("use_new_design", active=True)
+class JurisdictionsV2TemplateTest(TestCase):
+    """Row markup of the v2 jurisdictions table that the template builds itself.
+
+    `WAFFLE_CACHE_PREFIX` isolates the flag cache from parallel workers, see
+    `DocketPageV2TemplateTest`.
+    """
+
+    @classmethod
+    def setUpTestData(cls) -> None:
+        # Pin the jurisdiction: make_court_variable() drops TESTING_COURT rows,
+        # and the factory's random choice would otherwise hit it sometimes.
+        cls.with_url = CourtFactory(
+            id="v2withurl", jurisdiction="F", url="https://example.com/"
+        )
+        cls.without_url = CourtFactory(id="v2nourl", jurisdiction="F", url="")
+        cls.unsafe_url = CourtFactory(
+            id="v2badurl", jurisdiction="F", url="javascript:alert(1)"
+        )
+
+    async def test_row_links(self) -> None:
+        """Does every court link to its search, and only courts with an http(s) URL to a homepage?"""
+        r = await self.async_client.get(reverse("court_index"))
+        tbody = lhtml.fromstring(r.content).findall(".//tbody")[0]
+        search_url = reverse("show_results")
+        expected = (
+            (self.with_url, [self.with_url.url]),
+            (self.without_url, []),
+            (self.unsafe_url, []),
+        )
+        for court, homepage_links in expected:
+            with self.subTest(court=court.pk):
+                search_href = (
+                    f"{search_url}?q=&court_{court.pk}=on&order_by=score+desc"
+                )
+                rows = [
+                    row
+                    for row in tbody.findall("tr")
+                    if any(
+                        a.get("href") == search_href
+                        for a in row.findall(".//a")
+                    )
+                ]
+                self.assertEqual(len(rows), 1)
+                self.assertEqual(
+                    [
+                        a.get("href")
+                        for a in rows[0].findall(".//a")
+                        if a.get("class") == "links-external"
+                    ],
+                    homepage_links,
+                )
 
 
 @override_settings(
@@ -1055,6 +1126,51 @@ class BlockV3APITests(TestCase):
         """Confirm anonymous users are not allowed to POST requests."""
         response = await self.async_client.post(self.debt_path_v4, {})
         self.assertEqual(response.status_code, HTTPStatus.UNAUTHORIZED)
+
+
+class JudgeAndDisclosureAPIAuthTest(TestCase):
+    """Judge and financial disclosure endpoints require an account."""
+
+    endpoints = [
+        "person-list",
+        "position-list",
+        "retentionevent-list",
+        "education-list",
+        "school-list",
+        "politicalaffiliation-list",
+        "source-list",
+        "abarating-list",
+        "agreement-list",
+        "debt-list",
+        "financialdisclosure-list",
+        "gift-list",
+        "investment-list",
+        "noninvestmentincome-list",
+        "disclosureposition-list",
+        "reimbursement-list",
+        "spouseincome-list",
+    ]
+
+    @classmethod
+    def setUpTestData(cls) -> None:
+        cls.user = UserFactory()
+
+    async def test_anonymous_users_are_rejected(self) -> None:
+        """Do anonymous requests get a 401?"""
+        for endpoint in self.endpoints:
+            with self.subTest(endpoint=endpoint):
+                path = reverse(endpoint, kwargs={"version": "v4"})
+                r = await self.async_client.get(path)
+                self.assertEqual(r.status_code, HTTPStatus.UNAUTHORIZED)
+
+    async def test_authenticated_users_can_read(self) -> None:
+        """Can logged-in users without model permissions still read?"""
+        await self.async_client.aforce_login(self.user)
+        for endpoint in self.endpoints:
+            with self.subTest(endpoint=endpoint):
+                path = reverse(endpoint, kwargs={"version": "v4"})
+                r = await self.async_client.get(path)
+                self.assertEqual(r.status_code, HTTPStatus.OK)
 
 
 class DRFOrderingTests(TestCase):
@@ -5405,6 +5521,149 @@ class MultiRateThrottleTest(TestCase):
         with self.assertRaises(Throttled) as ctx:
             throttle.allow_request(request, view=None)
         self.assertIn("blocked", str(ctx.exception.detail).lower())
+
+
+@override_settings(
+    CACHES={
+        "default": {
+            "BACKEND": "django.core.cache.backends.locmem.LocMemCache",
+            "LOCATION": "anon-throttle-ident-test",
+        }
+    }
+)
+class AnonThrottleIdentTest(TestCase):
+    """Does the anonymous throttle count a client by one stable key?
+
+    Behind CloudFront, X-Forwarded-For and REMOTE_ADDR both vary from request
+    to request, so keying on them scattered one client's requests across many
+    buckets and the limit stopped holding (#7655).
+    """
+
+    def setUp(self) -> None:
+        caches["default"].clear()
+        self.factory = RequestFactory()
+        self.view = APIView()
+
+    def _request(self, **headers) -> Request:
+        """Build the DRF request a throttle sees, anonymous until given a user."""
+        return Request(self.factory.get("/", **headers))
+
+    def test_the_viewer_address_decides_the_key(self) -> None:
+        """One viewer behind two proxy paths gets one key, not two."""
+        throttle = CloudFrontAnonRateThrottle()
+        first = self._request(
+            HTTP_CLOUDFRONT_VIEWER_ADDRESS="96.23.39.106:51396",
+            HTTP_X_FORWARDED_FOR="10.0.0.1",
+            REMOTE_ADDR="10.0.0.1",
+        )
+        second = self._request(
+            HTTP_CLOUDFRONT_VIEWER_ADDRESS="96.23.39.106:22222",
+            HTTP_X_FORWARDED_FOR="10.0.0.2",
+            REMOTE_ADDR="10.0.0.2",
+        )
+
+        self.assertEqual(
+            throttle.get_cache_key(first, view=self.view),
+            throttle.get_cache_key(second, view=self.view),
+        )
+
+    def test_two_viewers_are_counted_separately(self) -> None:
+        throttle = CloudFrontAnonRateThrottle()
+        one = self._request(
+            HTTP_CLOUDFRONT_VIEWER_ADDRESS="96.23.39.106:51396"
+        )
+        two = self._request(
+            HTTP_CLOUDFRONT_VIEWER_ADDRESS="96.23.39.107:51396"
+        )
+
+        self.assertNotEqual(
+            throttle.get_cache_key(one, view=self.view),
+            throttle.get_cache_key(two, view=self.view),
+        )
+
+    def test_it_falls_back_without_the_header(self) -> None:
+        """Local development and tests see no CloudFront header."""
+        throttle = CloudFrontAnonRateThrottle()
+        request = self._request(REMOTE_ADDR="10.0.0.1")
+
+        self.assertEqual(throttle.get_ident(request), "10.0.0.1")
+
+    def test_an_authenticated_client_is_keyed_by_user(self) -> None:
+        """The viewer address decides nothing once there's a user.
+
+        get_ident() is only reached on the anonymous branch, so a signed-in
+        user counts by their pk no matter which address CloudFront reports.
+        """
+        user = UserFactory()
+        throttle = ExceptionalUserRateThrottle()
+        first = self._request(
+            HTTP_CLOUDFRONT_VIEWER_ADDRESS="96.23.39.106:51396"
+        )
+        first.user = user
+        second = self._request(
+            HTTP_CLOUDFRONT_VIEWER_ADDRESS="203.0.113.9:22222"
+        )
+        second.user = user
+
+        key = throttle.get_cache_key(first, view=self.view)
+        self.assertEqual(key, throttle.get_cache_key(second, view=self.view))
+        self.assertIn(str(user.pk), key)
+
+    def test_two_authenticated_clients_are_counted_separately(self) -> None:
+        """Even sharing one address, as an office behind one NAT would."""
+        throttle = ExceptionalUserRateThrottle()
+        requests = []
+        for _ in range(2):
+            request = self._request(
+                HTTP_CLOUDFRONT_VIEWER_ADDRESS="96.23.39.106:51396"
+            )
+            request.user = UserFactory()
+            requests.append(request)
+
+        self.assertNotEqual(
+            throttle.get_cache_key(requests[0], view=self.view),
+            throttle.get_cache_key(requests[1], view=self.view),
+        )
+
+    def test_the_anon_throttle_skips_authenticated_clients(self) -> None:
+        """It returns no key at all for them, as DRF's does."""
+        throttle = CloudFrontAnonRateThrottle()
+        request = self._request(
+            HTTP_CLOUDFRONT_VIEWER_ADDRESS="96.23.39.106:51396"
+        )
+        request.user = UserFactory()
+
+        self.assertIsNone(throttle.get_cache_key(request, view=self.view))
+
+    def test_the_user_scope_keys_anonymous_clients_the_same_way(self) -> None:
+        """Anonymous requests are counted in the user scope too.
+
+        DRF's UserRateThrottle falls back to the ident for a request with no
+        user, which is why an anonymous client can see the user scope's
+        "5/min" message. That key has to be stable for the same reason, and
+        for every other UserRateThrottle an anonymous client can reach: the
+        event counter and the read-only tag endpoints.
+        """
+        first = self._request(
+            HTTP_CLOUDFRONT_VIEWER_ADDRESS="96.23.39.106:51396",
+            REMOTE_ADDR="10.0.0.1",
+        )
+        second = self._request(
+            HTTP_CLOUDFRONT_VIEWER_ADDRESS="96.23.39.106:22222",
+            REMOTE_ADDR="10.0.0.2",
+        )
+
+        for throttle_class in (
+            ExceptionalUserRateThrottle,
+            EventCounterThrottle,
+            TagRateThrottle,
+        ):
+            with self.subTest(throttle=throttle_class.__name__):
+                throttle = throttle_class()
+                self.assertEqual(
+                    throttle.get_cache_key(first, view=self.view),
+                    throttle.get_cache_key(second, view=self.view),
+                )
 
 
 @override_settings(

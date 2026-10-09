@@ -1,4 +1,5 @@
 import datetime
+from typing import Any, cast
 from unittest import mock
 
 import time_machine
@@ -2297,13 +2298,17 @@ class RECAPAlertsSweepIndexTest(
         v2_webhook_event = WebhookEvent.objects.filter(
             webhook=webhook_2_1
         ).first()
+        assert v1_webhook_event is not None  # for the type checker
+        assert v2_webhook_event is not None  # for the type checker
+        v1_content = v1_webhook_event.content
+        v2_content = v2_webhook_event.content
+        assert v1_content is not None  # for the type checker
+        assert v2_content is not None  # for the type checker
         self.assertEqual(
-            v1_webhook_event.content["webhook"]["deprecation_date"],
+            v1_content["webhook"]["deprecation_date"],
             get_webhook_deprecation_date(settings.WEBHOOK_V1_DEPRECATION_DATE),
         )
-        self.assertEqual(
-            v2_webhook_event.content["webhook"]["deprecation_date"], None
-        )
+        self.assertEqual(v2_content["webhook"]["deprecation_date"], None)
 
         self.assertEqual(
             mail.outbox[1].subject,
@@ -4168,7 +4173,7 @@ class RECAPAlertsPercolatorTest(
         their query and hits matched conditions.
 
         - Docket-only Alerts should be triggered only upon a Docket ingestion.
-          commiting RECAPDocument ingestion that can match the alert.
+          committing RECAPDocument ingestion that can match the alert.
         - The Docket or RD shouldn’t have triggered the alert previously.
         - RECAP-only Alerts should only include RDs that have not triggered the
           same alert previously.
@@ -4446,10 +4451,13 @@ class RECAPAlertsPercolatorTest(
                 source=Docket.RECAP,
                 pacer_case_id="999555",
             )
-            docket_data = DocketWithBankruptcyDataFactory(
-                court_id=docket.court_id,
-                case_name=docket.case_name,
-                chapter=7,
+            docket_data = cast(
+                dict[str, Any],
+                DocketWithBankruptcyDataFactory(
+                    court_id=docket.court_id,
+                    case_name=docket.case_name,
+                    chapter=7,
+                ),
             )
             set_skip_percolation_if_bankruptcy_data(docket_data, docket)
             docket.save()
@@ -4483,10 +4491,13 @@ class RECAPAlertsPercolatorTest(
             self.captureOnCommitCallbacks(execute=True),
         ):
             docket.docket_number = "1:21-bk-1235"
-            docket_data = DocketWithBankruptcyDataFactory(
-                court_id=docket.court_id,
-                case_name=docket.case_name,
-                chapter=8,
+            docket_data = cast(
+                dict[str, Any],
+                DocketWithBankruptcyDataFactory(
+                    court_id=docket.court_id,
+                    case_name=docket.case_name,
+                    chapter=8,
+                ),
             )
             set_skip_percolation_if_bankruptcy_data(docket_data, docket)
             docket.save()

@@ -147,6 +147,10 @@ class UserProfile(models.Model):
         help_text="If enabled, the user's pending document prayers will be viewable by the public",
         default=False,
     )
+    save_query_history = models.BooleanField(
+        help_text="Should the user's search query history be saved?",
+        default=True,
+    )
 
     @property
     def is_member(self) -> bool:
@@ -517,7 +521,9 @@ class FailedEmail(AbstractDateTimeModel):
         return f"Failed Email: {self.stored_email.message_id}"
 
 
-def generate_recap_email(user_profile: UserProfile, append: int = None) -> str:
+def generate_recap_email(
+    user_profile: UserProfile, append: int | None = None
+) -> str:
     username = user_profile.user.username
     recap_email_header = re.sub(r"[^0-9a-zA-Z]+", ".", username) + str(
         append if append is not None else ""

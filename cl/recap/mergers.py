@@ -6,7 +6,7 @@ from collections import defaultdict
 from collections.abc import AsyncGenerator
 from copy import deepcopy
 from datetime import date, timedelta
-from typing import Any
+from typing import Any, Literal, overload
 
 from asgiref.sync import async_to_sync, sync_to_async
 from django.core.exceptions import ValidationError
@@ -16,6 +16,7 @@ from django.db.models import Count, Prefetch, Q, QuerySet
 from django.utils.timezone import now
 from juriscraper.lib.string_utils import CaseNameTweaker
 from juriscraper.pacer import AppellateAttachmentPage, AttachmentPage
+from waffle import switch_is_active
 
 from cl.alerts.utils import (
     set_skip_percolation_if_bankruptcy_data,
@@ -81,6 +82,11 @@ from cl.search.models import (
 from cl.search.tasks import index_docket_parties_in_es
 
 logger = logging.getLogger(__name__)
+
+# Waffle switch controlling whether failed PDF ProcessingQueue items get retried
+# after a docket or attachment page merge. Active by default; flip it off in
+# the admin to stop the retries.
+PROCESS_ORPHAN_DOCUMENTS_SWITCH = "process-orphan-documents"
 
 cnt = CaseNameTweaker()
 
@@ -269,6 +275,7 @@ async def find_docket_object_query(
     return Docket.objects.none()
 
 
+@overload
 async def find_docket_object(
     court_id: str,
     pacer_case_id: str | None,
@@ -276,6 +283,32 @@ async def find_docket_object(
     federal_defendant_number: str | None,
     federal_dn_judge_initials_assigned: str | None,
     federal_dn_judge_initials_referred: str | None,
+    *,
+    using: str = ...,
+    docket_source: int = ...,
+    allow_create: Literal[False],
+) -> Docket | None: ...
+@overload
+async def find_docket_object(
+    court_id: str,
+    pacer_case_id: str | None,
+    docket_number: str,
+    federal_defendant_number: str | None,
+    federal_dn_judge_initials_assigned: str | None,
+    federal_dn_judge_initials_referred: str | None,
+    *,
+    using: str = ...,
+    docket_source: int = ...,
+    allow_create: Literal[True] = ...,
+) -> Docket: ...
+async def find_docket_object(
+    court_id: str,
+    pacer_case_id: str | None,
+    docket_number: str,
+    federal_defendant_number: str | None,
+    federal_dn_judge_initials_assigned: str | None,
+    federal_dn_judge_initials_referred: str | None,
+    *,
     using: str = "default",
     docket_source: int = Docket.RECAP,
     allow_create: bool = True,
@@ -482,7 +515,7 @@ async def update_docket_metadata(
     await mark_ia_upload_needed(d, save_docket=False)
 
     # need to populate the docket number for tests to pass until we
-    # activate the docket_number_raw cleaning flag. This will be overriden by
+    # activate the docket_number_raw cleaning flag. This will be overridden by
     # the clean docket_number_raw value once cleaning is activated
     if not d.docket_number:
         d.docket_number = docket_data["docket_number"]
@@ -778,7 +811,7 @@ def normalize_long_description(docket_entry):
 
 
 async def merge_unnumbered_docket_entries(
-    des: QuerySet, docket_entry: dict[str, any]
+    des: QuerySet, docket_entry: dict[str, Any]
 ) -> DocketEntry:
     """Unnumbered docket entries come from many sources, with different data.
     This sometimes results in two docket entries when there should be one. The
@@ -987,7 +1020,7 @@ def add_create_docket_entry_transaction(d, docket_entry):
 
 async def get_or_make_docket_entry(
     d: Docket,
-    docket_entry: dict[str, any],
+    docket_entry: dict[str, Any],
     des_by_entry_number: dict[int, list[DocketEntry]] | None = None,
 ) -> tuple[DocketEntry, bool] | None:
     """Lookup or create a docket entry to match the one that was scraped.
@@ -1961,7 +1994,9 @@ def get_data_from_appellate_att_report(
     return att_data
 
 
-async def add_tags_to_objs(tag_names: list[str], objs: Any) -> list[Tag]:
+async def add_tags_to_objs(
+    tag_names: list[str] | None, objs: Any
+) -> list[Tag]:
     """Add tags by name to objects
 
     :param tag_names: A list of tag name strings
@@ -2494,7 +2529,14 @@ async def process_orphan_documents(
     for that docket that were lingering in our processing queue. This addresses
     the issue that arises when somebody (somehow) uploads a PDF without first
     uploading a docket.
+
+    Gated behind the PROCESS_ORPHAN_DOCUMENTS_SWITCH waffle switch.
     """
+    if not await sync_to_async(switch_is_active)(
+        PROCESS_ORPHAN_DOCUMENTS_SWITCH
+    ):
+        return None
+
     pacer_doc_ids = [rd.pacer_doc_id for rd in rds_created]
     if docket_date:
         # If we get a date from the docket, set the cutoff to 30 days prior for

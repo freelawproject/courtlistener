@@ -37,6 +37,10 @@ function updatePrayerButton(button, lock = false) {
 }
 
 document.addEventListener('htmx:beforeRequest', function (event) {
+  // Ignore other HTMX requests on the page (e.g. Export CSV).
+  let path = event.detail.requestConfig.path;
+  if (!path || !path.includes('/prayer/')) return;
+
   // Before sending the request, update the button's appearance and counter to
   // provide instant feedback.
   let form = event.detail.elt;
@@ -45,10 +49,19 @@ document.addEventListener('htmx:beforeRequest', function (event) {
 });
 
 document.addEventListener('htmx:afterRequest', function (event) {
-  // If the request was successful, don't update the button as it will be
-  // updated by another HTMX event.
-  showTutorialModal();
-  if (event.detail.successful) return;
+  let path = event.detail.requestConfig.path;
+  if (!path || !path.includes('/prayer/')) return;
+
+  if (event.detail.successful) {
+    // Only a brand new prayer should trigger the tutorial modal -- not a
+    // removal, and not hitting the daily limit.
+    let dailyLimitReached = event.detail.xhr.responseText.includes('daily_limit_tooltip');
+    if (path.includes('/create/') && !dailyLimitReached) {
+      showTutorialModal();
+    }
+    // Don't update the button here; it'll be updated by another HTMX event.
+    return;
+  }
   // If there was an error, revert the changes made to the button and counter.
   let form = event.detail.elt;
   let button = form.querySelector('button');
@@ -59,6 +72,7 @@ document.addEventListener('htmx:oobBeforeSwap', function (event) {
   // Before swapping the new content, update the prayer counter in the incoming
   // fragment to avoid unnecessary server calculations.
   let form = event.detail.elt;
+  if (!form.matches('form[id^="pray_"]')) return;
   let button = form.querySelector('button');
   // If the daily limit tooltip is present in the fragment, it means the user
   // has reached their limit. Therefore, we should revert any changes made to

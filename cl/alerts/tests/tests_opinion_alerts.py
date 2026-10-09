@@ -371,6 +371,7 @@ class OpinionAlertsPercolatorTest(
                     msg="The event status doesn't match.",
                 )
                 content = webhook_sent.content
+                assert content is not None  # for the type checker
 
                 alert_data_compare = alert_data[
                     content["payload"]["alert"]["id"]
