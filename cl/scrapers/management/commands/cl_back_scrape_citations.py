@@ -38,7 +38,7 @@ class Command(cl_back_scrape_opinions.Command):
     ):
         """
         If the scraped case has citation data
-            Check for Opinion existance via content hash
+            Check for Opinion existence via content hash
             If we have the Opinion
                 if we don't have the citation -> ingest
                 if we already have the citation -> pass

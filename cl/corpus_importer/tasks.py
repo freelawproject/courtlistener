@@ -493,7 +493,7 @@ def get_and_save_free_document_report(
         elif isinstance(exc, SoftTimeLimitExceeded):
             msg = "Soft time limit exceeded"
         else:
-            msg = "An unknown error ocurred while getting an opinion report"
+            msg = "An unknown error occurred while getting an opinion report"
 
         if self.request.retries == self.max_retries:
             logger.error(f"{msg} at %s (%s to %s).", court_id, start, end)  # noqa: G004

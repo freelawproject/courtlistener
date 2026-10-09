@@ -91,7 +91,7 @@ def sha256(s):
 
     :param s: The data to hash. Ideally bytes, but if unicode is passed in, it
     will convert it to bytes first.
-    :return A hexidecimal SHA256 hash of the data
+    :return A hexadecimal SHA256 hash of the data
     """
     if isinstance(s, str):
         s = s.encode()

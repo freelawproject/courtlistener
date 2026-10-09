@@ -2678,7 +2678,7 @@ class CustomBackendEmailTest(RestartSentEmailQuotaMixin, TestCase):
         returns the total number of times that add_bcc_random returned True
         """
 
-        # Test differnt BCC rates
+        # Test different BCC rates
         # No messages are BCC'ed
         zero_bcc_rate = 0
         # All messages are BCC'ed
@@ -2879,7 +2879,7 @@ class CustomBackendEmailTest(RestartSentEmailQuotaMixin, TestCase):
         # The Emergency brake error should be triggered.
         with self.assertRaisesMessage(ValueError, "Emergency brake engaged"):
             email.send()
-        # No additional messsage should be stored.
+        # No additional message should be stored.
         self.assertEqual(stored_email.count(), 5)
 
     @patch(
@@ -2926,7 +2926,7 @@ class CustomBackendEmailTest(RestartSentEmailQuotaMixin, TestCase):
             "Emergency brake engaged to prevent email quota exhaustion",
         ):
             email.send()
-        # No additional messsage should be stored.
+        # No additional message should be stored.
         self.assertEqual(stored_email.count(), 5)
 
 
@@ -4900,6 +4900,44 @@ class UserAdminEmailSearchTest(TestCase):
         )
         self.assertEqual(results.count(), User.objects.count())
         self.assertFalse(use_distinct)
+
+
+class UserAdminNeonLinksTest(TestCase):
+    """Tests for the Neon links shown on the user admin page."""
+
+    @classmethod
+    def setUpTestData(cls) -> None:
+        cls.user = UserProfileWithParentsFactory.create(
+            neon_account_id="112684"
+        ).user
+
+    def test_no_links_without_neon_ids(self) -> None:
+        """Users with no Neon account or membership get no Neon links."""
+        user = UserProfileWithParentsFactory.create().user
+        self.assertEqual(UserAdmin._get_neon_links(user.pk), [])
+
+    def test_account_link(self) -> None:
+        """A Neon account ID produces a link to the Neon account page."""
+        self.assertEqual(
+            UserAdmin._get_neon_links(self.user.pk),
+            [
+                {
+                    "href": "https://donate.free.law/admin/accounts/112684/about",
+                    "label": "Neon User",
+                }
+            ],
+        )
+
+    def test_account_and_membership_links(self) -> None:
+        """A membership with a Neon ID adds a link to the membership page."""
+        NeonMembershipFactory(user=self.user, neon_id="11394")
+        self.assertEqual(
+            [link["href"] for link in UserAdmin._get_neon_links(self.user.pk)],
+            [
+                "https://donate.free.law/admin/accounts/112684/about",
+                "https://donate.free.law/admin/memberships/11394",
+            ],
+        )
 
 
 class UserAdminApiCallsCountTest(TestCase):
