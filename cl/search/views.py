@@ -1,4 +1,5 @@
 from datetime import date
+from typing import Any
 from urllib.parse import quote
 
 from django.contrib import messages
@@ -127,7 +128,7 @@ def show_results(request: HttpRequest) -> HttpResponse:
     get_string_sans_alert = make_get_string(
         request, ["page", "edit_alert", "show_alert_modal"]
     )
-    render_dict = {
+    render_dict: dict[str, Any] = {
         "private": True,
         "get_string": get_string,
         "get_string_sans_alert": get_string_sans_alert,
@@ -316,7 +317,7 @@ def show_results(request: HttpRequest) -> HttpResponse:
 
 @never_cache
 def advanced(request: HttpRequest, search_type: str) -> HttpResponse:
-    render_dict = {"private": False}
+    render_dict: dict[str, Any] = {"private": False}
     courts = courts_in_use = Court.objects.filter(in_use=True)
 
     if search_type == SEARCH_TYPES.OPINION:
@@ -365,7 +366,7 @@ def es_search(request: HttpRequest) -> HttpResponse:
     :param request: HttpRequest object
     :return: HttpResponse
     """
-    render_dict = {"private": False}
+    render_dict: dict[str, Any] = {"private": False}
     courts = Court.objects.filter(in_use=True)
     render_dict.update({"search_type": "parenthetical"})
     obj_type = SEARCH_TYPES.PARENTHETICAL

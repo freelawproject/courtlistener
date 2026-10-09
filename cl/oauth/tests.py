@@ -33,7 +33,7 @@ from cl.oauth.cleanup_utils import (
 from cl.oauth.factories import ApplicationFactory
 from cl.tests.cases import APITestCase, TestCase
 from cl.tests.utils import parse_csp
-from cl.users.factories import UserFactory
+from cl.users.factories import UserFactory, UserProfileWithParentsFactory
 
 Application = get_application_model()
 Grant = get_grant_model()
@@ -271,17 +271,15 @@ class OAuthMetadataTest(APITestCase):
         # The registration endpoint must point at our DCR view.
         self.assertTrue(body["registration_endpoint"].endswith("/o/register/"))
 
-    def test_scopes_supported_excludes_openid_when_oidc_disabled(self):
+    def test_scopes_supported_excludes_oidc_scopes_when_oidc_disabled(self):
         with patch.dict(settings.OAUTH2_PROVIDER, {"OIDC_ENABLED": False}):
             resp = self.client.get(self.url)
         self.assertEqual(resp.json()["scopes_supported"], ["api"])
 
-    def test_scopes_supported_includes_openid_when_oidc_enabled(self):
+    def test_scopes_supported_lists_only_dcr_scopes_when_oidc_enabled(self):
         with patch.dict(settings.OAUTH2_PROVIDER, {"OIDC_ENABLED": True}):
             resp = self.client.get(self.url)
-        scopes = resp.json()["scopes_supported"]
-        self.assertIn("api", scopes)
-        self.assertIn("openid", scopes)
+        self.assertEqual(resp.json()["scopes_supported"], ["api", "openid"])
 
 
 class ApplicationRedirectUriPolicyTest(TestCase):
@@ -776,3 +774,202 @@ class RegistrationSourceBackfillTest(TestCase):
             with self.subTest(app=app.name):
                 app.refresh_from_db()
                 self.assertEqual(app.registration_source, expected)
+
+
+@override_settings(
+    OAUTH2_PROVIDER={**settings.OAUTH2_PROVIDER, "OIDC_ENABLED": True}
+)
+class OIDCClaimsTest(APITestCase):
+    """Userinfo and discovery expose the validator's claims by scope."""
+
+    @classmethod
+    def setUpTestData(cls) -> None:
+        cls.profile = UserProfileWithParentsFactory(
+            user__first_name="Ada", user__last_name="Lovelace"
+        )
+        cls.user = cls.profile.user
+        cls.application = ApplicationFactory()
+
+    def _userinfo(self, user, scope: str) -> dict:
+        """Mint a token with *scope* for *user* and fetch their claims."""
+        raw = f"tok-{user.pk}-{scope.replace(' ', '-')}"
+        token = AccessToken(
+            user=user,
+            application=self.application,
+            scope=scope,
+            expires=now() + timedelta(hours=1),
+        )
+        set_token_value(token, raw)
+        token.save()
+        resp = self.client.get(
+            reverse("oauth2_provider:user-info"),
+            HTTP_AUTHORIZATION=f"Bearer {raw}",
+        )
+        self.assertEqual(resp.status_code, 200, resp.content)
+        return resp.json()
+
+    def test_claims_follow_granted_scopes(self):
+        profile_claims = {"name", "given_name", "family_name"}
+        email_claims = {"email", "email_verified"}
+        for scope, expected in (
+            ("openid", set()),
+            ("openid email", email_claims),
+            ("openid profile", profile_claims),
+            ("openid email profile", email_claims | profile_claims),
+            ("openid api wiki", set()),
+        ):
+            with self.subTest(scope=scope):
+                claims = self._userinfo(self.user, scope)
+                self.assertEqual(set(claims), {"sub"} | expected)
+
+    def test_claim_values(self):
+        claims = self._userinfo(self.user, "openid email profile")
+        self.assertEqual(claims["sub"], str(self.user.pk))
+        self.assertEqual(claims["email"], self.user.email)
+        self.assertIs(claims["email_verified"], True)
+        self.assertEqual(claims["name"], "Ada Lovelace")
+        self.assertEqual(claims["given_name"], "Ada")
+        self.assertEqual(claims["family_name"], "Lovelace")
+
+    def test_unconfirmed_email_is_not_verified(self):
+        profile = UserProfileWithParentsFactory(email_confirmed=False)
+        claims = self._userinfo(profile.user, "openid email")
+        self.assertEqual(claims["email"], profile.user.email)
+        self.assertIs(claims["email_verified"], False)
+
+    def test_blank_email_omits_email_verified(self):
+        profile = UserProfileWithParentsFactory(
+            user__email="", email_confirmed=True
+        )
+        claims = self._userinfo(profile.user, "openid email")
+        self.assertEqual(set(claims), {"sub"})
+
+    def test_empty_name_claims_are_omitted(self):
+        profile = UserProfileWithParentsFactory(
+            user__first_name="", user__last_name=""
+        )
+        claims = self._userinfo(profile.user, "openid profile")
+        self.assertEqual(set(claims), {"sub"})
+
+    def test_discovery_advertises_claims_and_scopes(self):
+        resp = self.client.get(
+            reverse("oauth2_provider:oidc-connect-discovery-info")
+        )
+        self.assertEqual(resp.status_code, 200, resp.content)
+        body = resp.json()
+        for claim in (
+            "sub",
+            "email",
+            "email_verified",
+            "name",
+            "given_name",
+            "family_name",
+        ):
+            with self.subTest(claim=claim):
+                self.assertIn(claim, body["claims_supported"])
+        for scope in ("api", "wiki", "openid", "email", "profile"):
+            with self.subTest(scope=scope):
+                self.assertIn(scope, body["scopes_supported"])
+
+
+@override_settings(
+    OAUTH2_PROVIDER={**settings.OAUTH2_PROVIDER, "OIDC_ENABLED": True}
+)
+class DCRScopeRestrictionTest(TestCase):
+    """Dynamically registered apps may request only ``api`` and ``openid``.
+
+    Anyone can register an app through DCR under any name, so the identity
+    and wiki scopes are reserved for applications we create by hand.
+    """
+
+    REDIRECT_URI = "https://client.example.com/callback"
+
+    @classmethod
+    def setUpTestData(cls) -> None:
+        cls.user = UserFactory()
+        cls.dcr_app = ApplicationFactory(
+            client_type=Application.CLIENT_PUBLIC,
+            redirect_uris=cls.REDIRECT_URI,
+            registration_source=Application.RegistrationSource.DCR,
+        )
+        cls.manual_app = ApplicationFactory(
+            client_type=Application.CLIENT_PUBLIC,
+            redirect_uris=cls.REDIRECT_URI,
+        )
+
+    def setUp(self) -> None:
+        super().setUp()
+        self.client.force_login(self.user)
+
+    def _authorize(self, application, scope: str):
+        """GET the consent screen for *application* requesting *scope*."""
+        return self.client.get(
+            reverse("oauth2_provider:authorize"),
+            {
+                "response_type": "code",
+                "client_id": application.client_id,
+                "redirect_uri": self.REDIRECT_URI,
+                "scope": scope,
+                "state": "xyz",
+                "code_challenge": s256_challenge("a" * 64),
+                "code_challenge_method": "S256",
+            },
+        )
+
+    def test_dcr_app_may_request_api_and_openid(self):
+        r = self._authorize(self.dcr_app, "api openid")
+        self.assertEqual(r.status_code, 200, r.content)
+
+    def test_dcr_app_is_refused_other_scopes(self):
+        for scope in ("api wiki", "openid email", "openid profile", "wiki"):
+            with self.subTest(scope=scope):
+                r = self._authorize(self.dcr_app, scope)
+                self.assertEqual(r.status_code, 302)
+                self.assertTrue(r["Location"].startswith(self.REDIRECT_URI))
+                self.assertIn("error=invalid_scope", r["Location"])
+
+    def test_manual_app_may_request_every_scope(self):
+        r = self._authorize(self.manual_app, "openid api wiki email profile")
+        self.assertEqual(r.status_code, 200, r.content)
+
+
+class IntrospectionSubTest(APITestCase):
+    """Introspection includes ``sub`` matching the OIDC subject."""
+
+    @classmethod
+    def setUpTestData(cls) -> None:
+        cls.user = UserFactory()
+        cls.application = ApplicationFactory(client_secret="wiki-secret")
+        cls.url = reverse("oauth2_provider:introspect")
+
+    def _introspect(self, token_value: str) -> dict:
+        creds = base64.b64encode(
+            f"{self.application.client_id}:wiki-secret".encode()
+        ).decode()
+        resp = self.client.post(
+            self.url,
+            {"token": token_value},
+            HTTP_AUTHORIZATION=f"Basic {creds}",
+        )
+        self.assertEqual(resp.status_code, 200, resp.content)
+        return resp.json()
+
+    def test_active_token_includes_sub(self):
+        token = AccessToken(
+            user=self.user,
+            application=self.application,
+            scope="openid api wiki",
+            expires=now() + timedelta(hours=1),
+            resource=["https://wiki.free.law/"],
+        )
+        set_token_value(token, "introspect-me")
+        token.save()
+        data = self._introspect("introspect-me")
+        self.assertIs(data["active"], True)
+        self.assertEqual(data["sub"], str(self.user.pk))
+        self.assertEqual(data["username"], self.user.username)
+        self.assertEqual(data["scope"], "openid api wiki")
+        self.assertEqual(data["aud"], ["https://wiki.free.law/"])
+
+    def test_inactive_token_has_no_sub(self):
+        self.assertEqual(self._introspect("nope"), {"active": False})

@@ -1736,7 +1736,7 @@ class OpinionSearchFunctionalTest(BaseSeleniumTest):
         text_box.send_keys("1337")
         text_box.submit()
 
-        # The SERP refreshes and she sees resuls that
+        # The SERP refreshes and she sees results that
         # only contain fragments of the docker number she entered
         new_count = self.extract_result_count_from_serp()
         self.assertTrue(new_count < initial_count)
@@ -2064,7 +2064,7 @@ class OpinionSearchFunctionalTest(BaseSeleniumTest):
             "a SearchQuery with get_params 'q=lissner' and 'pandora' user should have been created",
         )
 
-        # Test if the SearchQuery get's deleted when the user is deleted
+        # Test if the SearchQuery gets deleted when the user is deleted
         self.pandora_profile.user.delete()
         lookup.pop("user")
         self.assertFalse(

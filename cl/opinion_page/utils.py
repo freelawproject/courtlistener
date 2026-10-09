@@ -3,7 +3,7 @@ import logging
 import traceback
 from dataclasses import dataclass, field
 from io import StringIO
-from typing import Any, cast
+from typing import Any, TypedDict, cast
 from zoneinfo import ZoneInfo
 
 import waffle
@@ -540,22 +540,22 @@ async def _common_metadata_sections(
     ]
 
 
+class CoreDocketDataDict(TypedDict):
+    docket: Docket
+    title: str
+    note_form: NoteForm
+    has_alert: bool
+    timezone: str
+    private: bool
+    docket_source: DocketEntrySource
+    docket_source_url: str | None
+    metadata_sections: list[MetadataSection]
+
+
 async def core_docket_data(
     request: HttpRequest,
     pk: int,
-) -> tuple[
-    Docket,
-    dict[
-        str,
-        bool
-        | str
-        | None
-        | Docket
-        | NoteForm
-        | DocketEntrySource
-        | list[MetadataSection],
-    ],
-]:
+) -> tuple[Docket, CoreDocketDataDict]:
     """Gather the core data for a docket, party, or IDB page."""
     docket: Docket = await aget_object_or_404(Docket, pk=pk)
     source = docket.get_entry_source()
