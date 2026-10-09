@@ -701,20 +701,6 @@
       "severity": "error"
     },
     {
-      "column": 24,
-      "path": "cl/citations/api_views.py",
-      "name": "unsupported-operation",
-      "concise_description": "`|` is not supported between `QuerySet[OpinionCluster, OpinionCluster]` and `None`",
-      "severity": "error"
-    },
-    {
-      "column": 37,
-      "path": "cl/citations/group_parentheticals.py",
-      "name": "unsupported-operation",
-      "concise_description": "Cannot set item in `dict[str, list[str]]`",
-      "severity": "error"
-    },
-    {
       "column": 35,
       "path": "cl/citations/management/commands/reindex_es_cite_fields.py",
       "name": "unbound-name",
@@ -733,27 +719,6 @@
       "path": "cl/citations/management/commands/reindex_es_cite_fields.py",
       "name": "bad-argument-type",
       "concise_description": "Argument `list[_CiteCountUpdateDict]` is not assignable to parameter `documents_to_index` with type `list[dict[str, Any]]` in function `cl.lib.search_index_utils.index_documents_in_bulk`",
-      "severity": "error"
-    },
-    {
-      "column": 40,
-      "path": "cl/citations/match_citations.py",
-      "name": "not-iterable",
-      "concise_description": "Type `None` is not iterable",
-      "severity": "error"
-    },
-    {
-      "column": 28,
-      "path": "cl/citations/match_citations.py",
-      "name": "unsupported-operation",
-      "concise_description": "`None` is not subscriptable",
-      "severity": "error"
-    },
-    {
-      "column": 28,
-      "path": "cl/citations/match_citations.py",
-      "name": "bad-return",
-      "concise_description": "Returned type `Opinion | Unknown | None` is not assignable to declared return type `Opinion | Resource`",
       "severity": "error"
     },
     {
