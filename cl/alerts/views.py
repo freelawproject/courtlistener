@@ -260,9 +260,11 @@ def _toggle_docket_alert_htmx(
         elif not profile.can_make_another_alert:
             has_alert = False
             quota_reached = True
-            subscription_count = DocketAlert.objects.filter(
-                user=request.user, alert_type=DocketAlert.SUBSCRIPTION
-            ).count()
+            subscription_count = (
+                DocketAlert.objects.subscriptions()
+                .filter(user=request.user)
+                .count()
+            )
             message = "You have reached your docket alert limit."
             headers["HX-Trigger"] = "docket-alert-quota-reached"
         else:

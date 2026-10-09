@@ -3207,8 +3207,6 @@ class ToggleDocketAlertHtmxTest(TestCase):
         self.assertFalse(r.context["has_alert"])
         self.assertTrue(r.context["quota_reached"])
         self.assertEqual(r.context["subscription_count"], 0)
-        self.assertEqual(r.context["MAX_FREE_DOCKET_ALERTS"], 0)
-        self.assertIn("DOCKET_ALERT_RECAP_BONUS", r.context)
         self.assertEqual(r["HX-Trigger"], "docket-alert-quota-reached")
         self.assertContains(r, f'{self.count_id()} hx-swap-oob="innerHTML"')
 

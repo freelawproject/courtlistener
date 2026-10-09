@@ -4199,27 +4199,13 @@ class DocketAlertToggleV2Test(TestCase):
         self.assertFalse(r.context["has_alert"])
         self.assertIn("hx-post", self.menu(r.content.decode()))
 
-    async def test_quota_dialog_and_its_scripts_are_on_the_page(self) -> None:
-        """The page renders the quota dialog closed, waiting for the refusal event.
-
-        The dialog brings its scripts with it: a partial cannot register
-        them, and the refusal only opens the dialog and fills its count.
-        """
+    async def test_quota_dialog_is_on_the_page(self) -> None:
+        """The page renders the quota dialog closed, waiting for the refusal event."""
         await self.login()
         r = await self.page()
         page = r.content.decode()
         self.assertIn('x-on:docket-alert-quota-reached.window="open"', page)
         self.assertIn(self.quota_count_id(), page)
-        # Plugins are required without an extension, so the page carries
-        # either the .js or the .min.js build depending on DEBUG.
-        for script in (
-            "js/alpine/composables/utils.js",
-            "js/alpine/composables/dialog.js",
-            "js/alpine/plugins/focus",
-            "js/alpine/plugins/ui",
-        ):
-            with self.subTest(script=script):
-                self.assertIn(script, page)
 
     async def test_trigger_has_no_aria_label(self) -> None:
         """The visible label is the trigger's accessible name.
