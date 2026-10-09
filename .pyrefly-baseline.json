@@ -372,27 +372,6 @@
       "severity": "error"
     },
     {
-      "column": 27,
-      "path": "cl/api/pagination.py",
-      "name": "unsupported-operation",
-      "concise_description": "Cannot set item in `dict[str, AttrList[Unknown] | None]`",
-      "severity": "error"
-    },
-    {
-      "column": 27,
-      "path": "cl/api/pagination.py",
-      "name": "unsupported-operation",
-      "concise_description": "Cannot set item in `dict[str, AttrList[Unknown] | None]`",
-      "severity": "error"
-    },
-    {
-      "column": 27,
-      "path": "cl/api/pagination.py",
-      "name": "unsupported-operation",
-      "concise_description": "Cannot set item in `dict[str, AttrList[Unknown] | None]`",
-      "severity": "error"
-    },
-    {
       "column": 13,
       "path": "cl/api/pagination.py",
       "name": "bad-argument-type",
@@ -467,13 +446,6 @@
       "path": "cl/api/utils.py",
       "name": "missing-attribute",
       "concise_description": "Object of class `FilterSet` has no attribute `_clean_join_table_key`",
-      "severity": "error"
-    },
-    {
-      "column": 25,
-      "path": "cl/api/utils.py",
-      "name": "unsupported-operation",
-      "concise_description": "Cannot set item in `OrderedDict[str, list[Unknown]]`",
       "severity": "error"
     },
     {

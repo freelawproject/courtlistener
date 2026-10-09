@@ -416,7 +416,7 @@ class NoEmptyFilterSet(FilterSet):
 class SimpleMetadataWithFilters(SimpleMetadata):
     def determine_metadata(self, request, view):
         metadata = super().determine_metadata(request, view)
-        filters = OrderedDict()
+        filters: OrderedDict[str, OrderedDict[str, Any]] = OrderedDict()
         if not hasattr(view, "filterset_class"):
             # This is the API Root, which is not filtered.
             return metadata
