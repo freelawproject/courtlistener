@@ -50,6 +50,7 @@ from cl.corpus_importer.state.florida.utils import (
 )
 from cl.corpus_importer.state.merger import (
     Attribute,
+    ManyStrategy,
     Merger,
     OneToOneRelation,
     RelatedParams,
@@ -126,8 +127,12 @@ def _content_type(document: ScrapeFloridaDocument, params: Any) -> str:
     return mime
 
 
-class FloridaDocumentMerger[ParamType](
-    DocumentMerger[ScrapeFloridaDocument, ParamType, FloridaDocument]
+class FloridaDocumentMerger(
+    DocumentMerger[
+        ScrapeFloridaDocument,
+        RelatedParams[list[ScrapeFloridaDocketEntry]],
+        FloridaDocument,
+    ]
 ):
     model: ClassVar[type[Model]] = FloridaDocument
     key: ClassVar[Iterable[str]] = ["link_uuid"]
@@ -142,6 +147,68 @@ class FloridaDocumentMerger[ParamType](
     link_uuid: UUID = Attribute(
         lambda doc, params: doc.document_link_uuid, strategy=overwrite
     )
+
+    def scrape_link_uuids(self) -> list[UUID]:
+        """Shorthand to get the full set of link UUIDs passed as a parameter to the root merger"""
+        return [
+            attachment.document_link_uuid
+            for entry in self.params.params.params
+            for attachment in entry.attachments
+        ]
+
+    @override
+    def query(self) -> QuerySet[FloridaDocument]:
+        by_uuid = self.manager.filter(link_uuid=self.transformed["link_uuid"])[
+            :2
+        ]
+        if len(list(by_uuid)) > 0:
+            return by_uuid
+
+        entry = cast(FloridaDocketEntry, self.params.parent)
+        scraped: ScrapeFloridaDocketEntry | None = None
+        for scraped_entry in self.params.params.params:
+            if scraped_entry.docket_entry_uuid == entry.docket_entry_uuid:
+                scraped = scraped_entry
+                break
+
+        if (
+            not scraped
+            or [
+                attachment.document_name for attachment in scraped.attachments
+            ].count(self.scrape.document_name)
+            != 1
+        ):
+            # This is a potential new document.
+            return self.manager.none()
+
+        # Stored documents whose link UUID is still in the scrape belong to
+        # those attachments (even if they were renamed), so they can't be the
+        # one replaced. Excluding them also keeps the candidates stable while
+        # sibling attachments merge.
+        return self.manager.filter(
+            document_name=self.scrape.document_name
+        ).exclude(
+            link_uuid__in=[
+                attachment.document_link_uuid
+                for attachment in scraped.attachments
+            ]
+        )
+
+    @override
+    def resolve_query(
+        self, qs: QuerySet[FloridaDocument]
+    ) -> tuple[bool, FloridaDocument | None]:
+        link_uuid: UUID = self.transformed["link_uuid"]
+
+        if self.scrape_link_uuids().count(link_uuid) > 1:
+            logger.error(
+                "Multiple scraped attachments with link UUID %s in docket entry %s",
+                link_uuid,
+                cast(FloridaDocketEntry, self.params.parent).docket_entry_uuid,
+            )
+            return False, None
+
+        return super().resolve_query(qs)
 
 
 # Retrieved 2026-07-29
@@ -185,10 +252,10 @@ def _submitted_by_id(
     )
 
 
-class FloridaDocketEntryMerger[ParamType](
+class FloridaDocketEntryMerger(
     DocketEntryMerger[
         ScrapeFloridaDocketEntry,
-        ParamType,
+        list[ScrapeFloridaDocketEntry],
         FloridaDocketEntry,
     ]
 ):
@@ -222,7 +289,7 @@ class FloridaDocketEntryMerger[ParamType](
         lambda e, params: e.docket_entry_uuid, strategy=overwrite
     )
     documents: list[FloridaDocument] = AttachmentRelation(
-        FloridaDocumentMerger
+        FloridaDocumentMerger, strategy=ManyStrategy.REPLACE
     )
 
 
@@ -252,7 +319,7 @@ def _appeal_from_str(docket_data: FloridaCase, params: None) -> str | None:
 class FloridaOriginatingCourtInformationMerger(
     Merger[
         FloridaOriginatingCase,
-        RelatedParams[None],
+        RelatedParams[list[ScrapeFloridaDocketEntry]],
         OriginatingCourtInformation,
     ]
 ):
@@ -324,7 +391,9 @@ def _florida_transfers(
     return transferable
 
 
-class FloridaDocketMerger(DocketMerger[FloridaCase, None]):
+class FloridaDocketMerger(
+    DocketMerger[FloridaCase, list[ScrapeFloridaDocketEntry]]
+):
     model: ClassVar[type[Model]] = Docket
 
     atomic = True

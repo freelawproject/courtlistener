@@ -8,7 +8,9 @@ import requests
 from asgiref.sync import async_to_sync
 from django.core.files import File
 from django.db import models
-from django.db.models import Q, QuerySet
+from django.db.models import Model, Q, QuerySet
+from django.db.models.signals import pre_delete
+from django.dispatch import receiver
 
 from cl.lib.decorators import document_model
 from cl.lib.models import AbstractPDF
@@ -405,3 +407,16 @@ class AbstractStateDocument(AbstractPDF):
 
     class Meta:
         abstract = True
+
+
+@receiver(pre_delete)
+def cleanup_document_storage[M: Model](
+    sender: type[M],
+    instance: M,
+    origin: M | QuerySet[M],
+    **kwargs,
+):
+    if isinstance(instance, AbstractStateDocument):
+        instance.filepath_local.delete(save=False)
+        if instance.thumbnail is not None:
+            instance.thumbnail.delete(save=False)
