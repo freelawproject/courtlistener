@@ -1089,7 +1089,7 @@ class BlockV3APITests(TestCase):
             V3APIPermission, "check_request", return_value=True
         ):
             response = await self.async_client.get(self.audio_path_v3)
-        self.assertEqual(response.status_code, HTTPStatus.FORBIDDEN)
+        self.assertEqual(response.status_code, HTTPStatus.UNAUTHORIZED)
 
     async def test_allow_v4_for_new_users(self, mock_api_prefix) -> None:
         """Confirm new API users are allowed to use V4 of the API"""
@@ -1101,13 +1101,13 @@ class BlockV3APITests(TestCase):
             )
         self.assertEqual(response.status_code, HTTPStatus.OK)
 
-    async def test_allow_v4_for_anonymous_users(self, mock_api_prefix) -> None:
-        """Confirm V4 anonymous API users are not allowed to use V4 of the API"""
+    async def test_block_v4_for_anonymous_users(self, mock_api_prefix) -> None:
+        """Confirm anonymous API users are not allowed to use V4 of the API"""
         with mock.patch.object(
             V3APIPermission, "check_request", return_value=True
         ):
             response = await self.async_client.get(self.audio_path_v4)
-        self.assertEqual(response.status_code, HTTPStatus.OK)
+        self.assertEqual(response.status_code, HTTPStatus.UNAUTHORIZED)
 
     async def test_confirm_v4_post_requests_are_not_allowed(
         self, mock_api_prefix
@@ -1131,10 +1131,11 @@ class BlockV3APITests(TestCase):
         self.assertEqual(response.status_code, HTTPStatus.UNAUTHORIZED)
 
 
-class JudgeAndDisclosureAPIAuthTest(TestCase):
-    """Judge and financial disclosure endpoints require an account."""
+class AuthRequiredAPIEndpointsTest(TestCase):
+    """Judge, financial disclosure and audio endpoints require an account."""
 
     endpoints = [
+        "audio-list",
         "person-list",
         "position-list",
         "retentionevent-list",
