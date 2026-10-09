@@ -5636,13 +5636,6 @@
       "severity": "error"
     },
     {
-      "column": 20,
-      "path": "cl/users/admin.py",
-      "name": "unsupported-operation",
-      "concise_description": "`+` is not supported between `list[((Unknown) -> bool | str) | str]` and `tuple[Literal['email'], Literal['username']]`",
-      "severity": "error"
-    },
-    {
       "column": 9,
       "path": "cl/users/api_views.py",
       "name": "bad-override",
@@ -5990,13 +5983,6 @@
       "path": "cl/users/views.py",
       "name": "missing-attribute",
       "concise_description": "Object of class `User` has no attribute `profile`",
-      "severity": "error"
-    },
-    {
-      "column": 12,
-      "path": "cl/users/views.py",
-      "name": "unsupported-operation",
-      "concise_description": "`<` is not supported between `None` and `datetime`",
       "severity": "error"
     },
     {

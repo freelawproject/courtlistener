@@ -105,7 +105,7 @@ class ZohoModule(ZohoBase):
         return f"Zoho API Exception [{code}] {status}: {message} | Details: {detail_str}"
 
     @staticmethod
-    def handle_api_response(response):
+    def handle_api_response(response) -> list[Any] | None:
         """
         Handle a Zoho API response, raising exceptions on errors.
 
@@ -342,7 +342,9 @@ class AddTagsMixin:
 
 
 class CreateRecordMixin:
-    def create_record(self: HasModuleName, fields: dict[str | Field, Any]):
+    def create_record(
+        self: HasModuleName, fields: dict[str | Field, Any]
+    ) -> list[Any] | None:
         """
         Create a single Zoho CRM record with the given field values.
 
