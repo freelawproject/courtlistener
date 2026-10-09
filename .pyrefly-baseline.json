@@ -3956,13 +3956,6 @@
       "severity": "error"
     },
     {
-      "column": 36,
-      "path": "cl/scrapers/test_assets/test_opinion_scraper.py",
-      "name": "unsupported-operation",
-      "concise_description": "Cannot set item in `dict[str, dict[str, str | Any]]`",
-      "severity": "error"
-    },
-    {
       "column": 24,
       "path": "cl/scrapers/test_assets/test_oral_arg_scraper.py",
       "name": "missing-attribute",
@@ -4369,13 +4362,6 @@
       "severity": "error"
     },
     {
-      "column": 37,
-      "path": "cl/search/documents.py",
-      "name": "unsupported-operation",
-      "concise_description": "Cannot set item in `dict[str, (x: Unknown) -> Any]`",
-      "severity": "error"
-    },
-    {
       "column": 7,
       "path": "cl/search/documents.py",
       "name": "inconsistent-inheritance",
@@ -4537,20 +4523,6 @@
       "severity": "error"
     },
     {
-      "column": 36,
-      "path": "cl/search/management/commands/cl_compute_token_count.py",
-      "name": "unsupported-operation",
-      "concise_description": "`/` is not supported between `int` and `None`",
-      "severity": "error"
-    },
-    {
-      "column": 40,
-      "path": "cl/search/management/commands/cl_compute_token_count.py",
-      "name": "unsupported-operation",
-      "concise_description": "`/` is not supported between `int` and `None`",
-      "severity": "error"
-    },
-    {
       "column": 52,
       "path": "cl/search/management/commands/cl_compute_token_count.py",
       "name": "bad-argument-type",
@@ -4562,13 +4534,6 @@
       "path": "cl/search/management/commands/cl_compute_token_count.py",
       "name": "bad-argument-type",
       "concise_description": "Argument `list[int]` is not assignable to parameter `array` with type `list[float]` in function `compute_avg_from_list`",
-      "severity": "error"
-    },
-    {
-      "column": 12,
-      "path": "cl/search/management/commands/cl_index_embeddings.py",
-      "name": "unsupported-operation",
-      "concise_description": "`%` is not supported between `int` and `None`",
       "severity": "error"
     },
     {
@@ -4576,13 +4541,6 @@
       "path": "cl/search/management/commands/cl_index_embeddings.py",
       "name": "missing-attribute",
       "concise_description": "Object of class `NoneType` has no attribute `maybe_wait`",
-      "severity": "error"
-    },
-    {
-      "column": 24,
-      "path": "cl/search/management/commands/cl_index_embeddings.py",
-      "name": "bad-argument-type",
-      "concise_description": "Argument `Unknown | None` is not assignable to parameter `seconds` with type `SupportsIndex | float` in function `time.sleep`",
       "severity": "error"
     },
     {
@@ -4677,13 +4635,6 @@
       "severity": "error"
     },
     {
-      "column": 16,
-      "path": "cl/search/management/commands/fix_rd_broken_links.py",
-      "name": "unsupported-operation",
-      "concise_description": "`%` is not supported between `int` and `None`",
-      "severity": "error"
-    },
-    {
       "column": 17,
       "path": "cl/search/management/commands/fix_rd_broken_links.py",
       "name": "missing-attribute",
@@ -4695,13 +4646,6 @@
       "path": "cl/search/management/commands/fix_rd_broken_links.py",
       "name": "bad-argument-type",
       "concise_description": "Argument `Unknown | None` is not assignable to parameter `seconds` with type `SupportsIndex | float` in function `time.sleep`",
-      "severity": "error"
-    },
-    {
-      "column": 16,
-      "path": "cl/search/management/commands/fix_rd_broken_links.py",
-      "name": "unsupported-operation",
-      "concise_description": "`>=` is not supported between `int` and `None`",
       "severity": "error"
     },
     {
@@ -4747,31 +4691,10 @@
       "severity": "error"
     },
     {
-      "column": 27,
-      "path": "cl/search/management/commands/pacer_bulk_fetch.py",
-      "name": "unsupported-operation",
-      "concise_description": "`None` is not subscriptable",
-      "severity": "error"
-    },
-    {
       "column": 13,
       "path": "cl/search/management/commands/pacer_bulk_fetch.py",
       "name": "missing-attribute",
       "concise_description": "Object of class `NoneType` has no attribute `pk`",
-      "severity": "error"
-    },
-    {
-      "column": 31,
-      "path": "cl/search/management/commands/pacer_bulk_fetch.py",
-      "name": "unsupported-operation",
-      "concise_description": "`None` is not subscriptable",
-      "severity": "error"
-    },
-    {
-      "column": 31,
-      "path": "cl/search/management/commands/pacer_bulk_fetch.py",
-      "name": "unsupported-operation",
-      "concise_description": "`None` is not subscriptable",
       "severity": "error"
     },
     {
@@ -4842,13 +4765,6 @@
       "path": "cl/search/management/commands/pacer_bulk_fetch.py",
       "name": "missing-attribute",
       "concise_description": "Object of class `NoneType` has no attribute `pk`",
-      "severity": "error"
-    },
-    {
-      "column": 47,
-      "path": "cl/search/management/commands/pacer_bulk_fetch.py",
-      "name": "unsupported-operation",
-      "concise_description": "`None` is not subscriptable",
       "severity": "error"
     },
     {

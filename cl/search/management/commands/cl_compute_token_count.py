@@ -1,4 +1,5 @@
 from math import ceil
+from typing import cast
 
 import nh3
 from django.contrib.humanize.templatetags.humanize import intword
@@ -30,6 +31,7 @@ def get_recap_random_dataset(
     Returns:
         A Django QuerySet containing a random sample of RECAPDocument objects.
     """
+    # TODO: Statically guarantee output will have non-null page count
     return RECAPDocument.objects.using(db_connection).raw(
         f"SELECT * FROM search_recapdocument TABLESAMPLE SYSTEM ({percentage}) "
         "where is_available= True and plain_text <> '' and page_count > 0"
@@ -207,9 +209,12 @@ class Command(VerboseCommand):
         for document in rd_queryset.iterator():
             count = get_token_count_from_string(document.plain_text)
             token_count.append(count)
-            tokens_per_page.append(count / document.page_count)
+            # The way the get_recap_random_dataset query is set up, this cast is fine, but there should be a way to statically guarantee it
+            tokens_per_page.append(count / cast(int, document.page_count))
             word_count = len(document.plain_text.split())
-            words_per_page.append(ceil(word_count / document.page_count))
+            words_per_page.append(
+                ceil(word_count / cast(int, document.page_count))
+            )
 
         self.stdout.write("Computing averages.")
         sample_size = len(token_count)
