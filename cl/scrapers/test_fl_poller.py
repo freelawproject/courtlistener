@@ -3,12 +3,14 @@
 import json
 from collections.abc import AsyncGenerator, Mapping, Sequence
 from datetime import UTC, date, datetime, timedelta
+from typing import cast
 from unittest import mock
 from uuid import UUID, uuid4
 
 import time_machine
 from asgiref.sync import async_to_sync
 from django.core.management import call_command
+from juriscraper.state.florida import FloridaScraper
 from juriscraper.state.florida.cases import FloridaCase
 from juriscraper.state.florida.common import FloridaPaginatedResults
 from juriscraper.state.florida.courts import FloridaCourt, FloridaCourtID
@@ -139,7 +141,9 @@ class FakeFloridaScraper:
         result = self.case_results[case_uuid]
         if callable(result):
             result = result()
-        return result
+        return cast(
+            tuple[FloridaCase, list[PaginationFailed]] | Exception, result
+        )
 
 
 class FloridaDocumentPollParserTest(SimpleTestCase):
@@ -236,7 +240,7 @@ class FlPollerPollTest(TestCase):
         ):
             async_to_sync(Command().poll)(
                 self.throttle,
-                scraper,
+                cast(FloridaScraper, scraper),
                 [FloridaCourtID.FIRST_COA],
                 case_backfill_days,
                 0,

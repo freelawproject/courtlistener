@@ -5846,13 +5846,6 @@
       "severity": "error"
     },
     {
-      "column": 15,
-      "path": "cl/scrapers/management/commands/tames_poller.py",
-      "name": "missing-attribute",
-      "concise_description": "Object of class `EllipsisType` has no attribute `strip`",
-      "severity": "error"
-    },
-    {
       "column": 13,
       "path": "cl/scrapers/management/commands/update_from_text.py",
       "name": "missing-attribute",
