@@ -3704,13 +3704,6 @@
       "severity": "error"
     },
     {
-      "column": 21,
-      "path": "cl/recap/tasks.py",
-      "name": "missing-attribute",
-      "concise_description": "Object of class `NoneType` has no attribute `docket_entry`",
-      "severity": "error"
-    },
-    {
       "column": 20,
       "path": "cl/recap/tasks.py",
       "name": "missing-attribute",
@@ -3718,24 +3711,10 @@
       "severity": "error"
     },
     {
-      "column": 96,
-      "path": "cl/recap/tasks.py",
-      "name": "missing-attribute",
-      "concise_description": "Object of class `NoneType` has no attribute `pk`",
-      "severity": "error"
-    },
-    {
       "column": 20,
       "path": "cl/recap/tasks.py",
       "name": "missing-attribute",
       "concise_description": "Object of class `NoneType` has no attribute `is_acms_document`",
-      "severity": "error"
-    },
-    {
-      "column": 89,
-      "path": "cl/recap/tasks.py",
-      "name": "missing-attribute",
-      "concise_description": "Object of class `NoneType` has no attribute `pk`",
       "severity": "error"
     },
     {
