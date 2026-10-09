@@ -57,8 +57,8 @@ HYPERSCAN_TOKENIZER = HyperscanTokenizer(cache_dir=".hyperscan")
 cnt = CaseNameTweaker()
 
 # The scanning portal stores one XML per approved opinion at
-# final-xml/{scan id}/{opinion id}.xml in its private bucket
-FINAL_XML_PREFIX = "final-xml/"
+# export/{scan id}/{opinion id}.xml in its private bucket
+FINAL_XML_PREFIX = "export/"
 # The `schema` attribute values of `<casebody>` this command knows how to
 # read. The portal raises it when its output changes shape.
 SUPPORTED_SCHEMAS = {"1"}
@@ -212,7 +212,7 @@ def s3_xml_keys(
     :param scan_ids: The scans to import. When empty, every scan with an
         exported XML.
     :param opinion_id: A single opinion of the only scan in `scan_ids`.
-    :return: A list of S3 keys, e.g. "final-xml/15343/3.xml".
+    :return: A list of S3 keys, e.g. "export/15343/3.xml".
     """
     if opinion_id and scan_ids:
         return [f"{FINAL_XML_PREFIX}{scan_ids[0]}/{opinion_id}.xml"]

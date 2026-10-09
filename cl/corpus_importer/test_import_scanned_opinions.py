@@ -808,10 +808,10 @@ class ScanningBucketKeysTest(SimpleTestCase):
         ScanningFinalXmlStorage,
         FakeScanningStorage(
             {
-                "final-xml/15343/3.xml": "",
-                "final-xml/15343/10.xml": "",
-                "final-xml/15343/notes.txt": "",
-                "final-xml/9/1.xml": "",
+                "export/15343/3.xml": "",
+                "export/15343/10.xml": "",
+                "export/15343/notes.txt": "",
+                "export/9/1.xml": "",
             }
         ),
     )
@@ -820,7 +820,7 @@ class ScanningBucketKeysTest(SimpleTestCase):
         """Are the XML keys of the given scans listed in human order?"""
         self.assertEqual(
             s3_xml_keys(self.storage, ["15343"]),
-            ["final-xml/15343/3.xml", "final-xml/15343/10.xml"],
+            ["export/15343/3.xml", "export/15343/10.xml"],
         )
 
     def test_keys_of_every_scan(self) -> None:
@@ -828,9 +828,9 @@ class ScanningBucketKeysTest(SimpleTestCase):
         self.assertEqual(
             s3_xml_keys(self.storage, None),
             [
-                "final-xml/9/1.xml",
-                "final-xml/15343/3.xml",
-                "final-xml/15343/10.xml",
+                "export/9/1.xml",
+                "export/15343/3.xml",
+                "export/15343/10.xml",
             ],
         )
 
@@ -838,7 +838,7 @@ class ScanningBucketKeysTest(SimpleTestCase):
         """Is a single opinion's key built from the two ids?"""
         self.assertEqual(
             s3_xml_keys(self.storage, ["15343"], "3"),
-            ["final-xml/15343/3.xml"],
+            ["export/15343/3.xml"],
         )
 
 
@@ -868,7 +868,7 @@ class ImportFromScanningBucketTest(TestCase):
     def test_import_scan(self) -> None:
         """Is the XML of a scan imported from the bucket?"""
         self.import_from_bucket(
-            {"final-xml/3593/12.xml": self.scan_xml}, scan_id=["3593"]
+            {"export/3593/12.xml": self.scan_xml}, scan_id=["3593"]
         )
         cluster = OpinionCluster.objects.get()
         self.assertEqual(
@@ -879,7 +879,7 @@ class ImportFromScanningBucketTest(TestCase):
     def test_import_every_scan(self) -> None:
         """Does --all import the XML of every scan?"""
         self.import_from_bucket(
-            {"final-xml/3593/12.xml": self.scan_xml}, all=True
+            {"export/3593/12.xml": self.scan_xml}, all=True
         )
         self.assertEqual(OpinionCluster.objects.count(), 1)
 
@@ -888,8 +888,8 @@ class ImportFromScanningBucketTest(TestCase):
         other = self.scan_xml.replace("388 So. 3d 1<", "388 So. 3d 9<")
         self.import_from_bucket(
             {
-                "final-xml/3593/12.xml": self.scan_xml,
-                "final-xml/3593/13.xml": other,
+                "export/3593/12.xml": self.scan_xml,
+                "export/3593/13.xml": other,
             },
             scan_id=["3593"],
             opinion_id="12",
@@ -912,7 +912,7 @@ class ImportFromScanningBucketTest(TestCase):
         """Does a missing key log the failure and leave the run going?"""
         with mock.patch(f"{COMMAND_MODULE}.logger") as mock_logger:
             self.import_from_bucket(
-                {"final-xml/3593/13.xml": self.scan_xml},
+                {"export/3593/13.xml": self.scan_xml},
                 scan_id=["3593"],
                 opinion_id="12",
             )
