@@ -117,9 +117,8 @@ class ScanCase:
     case_name_short: str
     case_name_full: str
     docket_number: str
-    court_id: str
+    court: Court
     date_filed: date
-    citations: list[str]
     parsed_citations: list[FullCaseCitation]
     judges: str
     body_characters: str
@@ -131,6 +130,16 @@ class ScanCase:
     def citation(self) -> FullCaseCitation:
         """The first citation of the scanned opinion."""
         return self.parsed_citations[0]
+
+    @property
+    def citations(self) -> list[str]:
+        """Every citation of the scanned opinion, one per string.
+
+        A `<citation>` element can hold parallel citations, e.g.
+        "388 So. 3d 1, 2024 WL 2312345", but helpers like
+        `add_citations_to_cluster` only read the first citation of a string.
+        """
+        return [cite.corrected_citation() for cite in self.parsed_citations]
 
     @property
     def file_name(self) -> str:
@@ -417,7 +426,7 @@ def parse_scan_xml(
             )
             return None
         court_id = found_courts[0]
-    if not Court.objects.filter(id=court_id).exists():
+    if not (court := Court.objects.filter(id=court_id).first()):
         logger.warning("Court not found in CourtListener: %s", court_id)
         return None
 
@@ -448,9 +457,8 @@ def parse_scan_xml(
         case_name_short=cnt.make_case_name_short(case_name),
         case_name_full=case_name_full,
         docket_number=get_docket_number(soup),
-        court_id=court_id,
+        court=court,
         date_filed=date_filed,
-        citations=cite_strings,
         parsed_citations=cites,
         judges=get_judges(soup),
         page_count=get_page_count(soup),
@@ -554,7 +562,7 @@ def find_existing_cluster(scan_case: ScanCase) -> OpinionCluster | None:
     }
     return find_previously_imported_cases(
         data,
-        scan_case.court_id,
+        scan_case.court.pk,
         scan_case.date_filed,
         scan_case.body_characters,
         scan_case.case_name_full,
@@ -717,7 +725,7 @@ def add_new_case(scan_case: ScanCase) -> OpinionCluster:
         docket = update_or_create_docket(
             scan_case.case_name,
             scan_case.case_name_short,
-            Court.objects.get(id=scan_case.court_id),
+            scan_case.court,
             scan_case.docket_number,
             Docket.SCANNING_PROJECT,
             from_harvard=False,

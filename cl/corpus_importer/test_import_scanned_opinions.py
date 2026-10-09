@@ -494,6 +494,19 @@ class ImportScannedOpinionsTest(TestCase):
             ],
         )
 
+    def test_parallel_citations_are_saved(self) -> None:
+        """Is every citation of a citation element saved?"""
+        xml = self.scan_xml.replace(
+            "388 So. 3d 1<", "388 So. 3d 1, 2024 WL 2312345<"
+        )
+
+        self.import_xml(xml)
+
+        self.assertEqual(
+            sorted(Citation.objects.values_list("volume", "reporter", "page")),
+            [("2024", "WL", "2312345"), ("388", "So. 3d", "1")],
+        )
+
     def test_other_opinion_on_same_page_is_imported(self) -> None:
         """Is a different case with the same citation imported?"""
         self.import_scan()
