@@ -1,6 +1,7 @@
 import itertools
 import os
 import uuid
+from typing import Any
 
 from django.conf import settings
 from django.core.files.storage import Storage
@@ -119,7 +120,11 @@ class ScanningFinalXmlStorage(S3Storage):
     region_name = settings.SCANNING_BUCKET_REGION
     querystring_auth = True
 
-    def __init__(self, **kwargs):
+    def __init__(self, **kwargs: Any) -> None:
+        """Use the scanning portal's read-only keys when they are set.
+
+        :param kwargs: The S3Storage settings; explicit keys take precedence.
+        """
         if settings.SCANNING_AWS_ACCESS_KEY_ID:
             kwargs.setdefault(
                 "access_key", settings.SCANNING_AWS_ACCESS_KEY_ID
