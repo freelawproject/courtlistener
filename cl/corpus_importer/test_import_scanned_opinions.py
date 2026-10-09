@@ -222,12 +222,12 @@ class ImportScannedOpinionsTest(TestCase):
         with open(SCAN_XML_PATH, encoding="utf-8") as f:
             cls.scan_xml = f.read()
 
-    def import_scan(self, **kwargs: str | None) -> None:
+    def import_scan(self, **kwargs: str | bool | None) -> None:
         """Run the command over the test XML."""
         options = {"court_id": self.court.pk, "path": SCAN_XML_PATH} | kwargs
         call_command("import_scanned_opinions", **options)
 
-    def import_xml(self, xml: str, **kwargs: str | None) -> None:
+    def import_xml(self, xml: str, **kwargs: str | bool | None) -> None:
         """Run the command over an XML written to a temporary directory."""
         with tempfile.TemporaryDirectory() as tmp_dir:
             Path(tmp_dir, "scan.xml").write_text(xml, encoding="utf-8")
@@ -523,6 +523,52 @@ class ImportScannedOpinionsTest(TestCase):
         docket.refresh_from_db()
         self.assertEqual(docket.source, Docket.SCRAPER)
         self.assertNotEqual(OpinionCluster.objects.get().docket_id, docket.pk)
+
+    def test_dry_run(self) -> None:
+        """Does a dry run leave the database and storage untouched?"""
+        cluster = self.make_matching_cluster()
+        for message, setup in [
+            ("would merge", lambda: None),
+            ("would add", cluster.delete),
+        ]:
+            with (
+                self.subTest(message=message),
+                mock.patch(f"{COMMAND_MODULE}.logger") as mock_logger,
+                mock.patch.object(FieldFile, "save") as mock_file_save,
+            ):
+                setup()
+                before = self.database_rows()
+                self.import_scan(dry_run=True)
+
+                mock_file_save.assert_not_called()
+                self.assertEqual(self.database_rows(), before)
+                self.assertIn(message, mock_logger.info.call_args[0][0])
+
+    def database_rows(self) -> dict[str, list[tuple]]:
+        """Snapshot the rows an import can create or change."""
+        return {
+            "dockets": list(
+                Docket.objects.order_by("pk").values_list(
+                    "pk", "source", "case_name"
+                )
+            ),
+            "clusters": list(
+                OpinionCluster.objects.order_by("pk").values_list(
+                    "pk", "source", "attorneys", "judges", "filepath_xml_scan"
+                )
+            ),
+            "citations": list(
+                Citation.objects.order_by("pk").values_list(
+                    "cluster_id", "volume", "reporter", "page"
+                )
+            ),
+            "opinions": list(
+                Opinion.objects.order_by("pk").values_list("pk", "xml_scan")
+            ),
+            "contents": list(
+                OpinionContent.objects.order_by("pk").values_list("pk")
+            ),
+        }
 
     def test_other_opinion_on_same_page_is_imported(self) -> None:
         """Is a different case with the same citation imported?"""

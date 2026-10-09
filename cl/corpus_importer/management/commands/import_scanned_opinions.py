@@ -779,7 +779,7 @@ def add_new_case(scan_case: ScanCase) -> OpinionCluster:
 
 
 def import_scanned_opinion(
-    xml: str, file_path: str, court_id: str | None
+    xml: str, file_path: str, court_id: str | None, dry_run: bool = False
 ) -> None:
     """Import a scanning project final XML into CourtListener.
 
@@ -791,6 +791,8 @@ def import_scanned_opinion(
     :param file_path: The local path or the S3 key of the XML, used for
         logging.
     :param court_id: The CL court id, or None to look it up in the XML.
+    :param dry_run: Only log whether the opinion would be skipped, merged or
+        added, without writing to the database or uploading files.
     :return: None
     """
     logger.info("Processing %s", file_path)
@@ -818,6 +820,14 @@ def import_scanned_opinion(
                 cluster.filepath_xml_scan.name,
             )
             return
+        if dry_run:
+            logger.info(
+                "Dry run: would merge %s (%s) into cluster %s",
+                file_path,
+                citation,
+                cluster.id,
+            )
+            return
         logger.info(
             "Merging %s (%s) into cluster %s: %s",
             file_path,
@@ -828,6 +838,13 @@ def import_scanned_opinion(
         merge_into_cluster(cluster, scan_case)
         return
 
+    if dry_run:
+        logger.info(
+            "Dry run: would add %s (%s) as a new cluster",
+            scan_case.case_name,
+            citation,
+        )
+        return
     cluster = add_new_case(scan_case)
     logger.info(
         "Added %s (%s) as cluster %s: %s",
@@ -882,6 +899,12 @@ class Command(VerboseCommand):
             help="The CL court id. If not given, it is looked up from the "
             "court element of each XML.",
         )
+        parser.add_argument(
+            "--dry-run",
+            action="store_true",
+            help="Log what would be skipped, merged or added without "
+            "changing anything.",
+        )
 
     def handle(self, *args: Any, **options: Any) -> None:
         """Import every XML file found in the given path.
@@ -905,7 +928,10 @@ class Command(VerboseCommand):
         for file_path in file_paths:
             try:
                 import_scanned_opinion(
-                    read(file_path), file_path, options["court_id"]
+                    read(file_path),
+                    file_path,
+                    options["court_id"],
+                    options["dry_run"],
                 )
             except Exception:
                 # Keep going; one bad file shouldn't stop a volume import
