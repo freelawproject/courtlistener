@@ -1,4 +1,5 @@
-{# Out-of-band response to the alert toggle. It replaces only the contents of three nodes already on the docket page, never the nodes themselves, so focus and the live region survive the swap. #}
+{% load humanize %}
+{# Out-of-band response to the alert toggle. It replaces only the contents of nodes already on the docket page, never the nodes themselves, so focus and the live region survive the swap. A refused toggle also fills the alert count of the page's quota dialog, which the HX-Trigger header opens. #}
 <span id="docket-alert-label-{{ docket.pk }}" hx-swap-oob="innerHTML">
   <c-docket-alert-label :has_alert="has_alert" />
 </span>
@@ -6,3 +7,6 @@
   <c-docket-alert-label :has_alert="has_alert" icon_class="w-4 h-4 text-greyscale-500" />
 </span>
 <span id="docket-alert-status-{{ docket.pk }}" hx-swap-oob="innerHTML">{{ message }}</span>
+{% if quota_reached %}
+  <span id="docket-alert-quota-count-{{ docket.pk }}" hx-swap-oob="innerHTML">{{ subscription_count|apnumber }}</span>
+{% endif %}

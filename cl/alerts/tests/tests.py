@@ -28,7 +28,11 @@ if TYPE_CHECKING:
     from django.test.client import _MonkeyPatchedWSGIResponse
 
 from cl.alerts.constants import LEGACY_MEMBERSHIP_HELP_URL
-from cl.alerts.factories import AlertFactory, DocketAlertWithParentsFactory
+from cl.alerts.factories import (
+    AlertFactory,
+    DocketAlertFactory,
+    DocketAlertWithParentsFactory,
+)
 from cl.alerts.forms import CreateAlertForm
 from cl.alerts.management.commands.cl_send_scheduled_alerts import (
     DAYS_TO_DELETE,
@@ -3147,6 +3151,10 @@ class ToggleDocketAlertHtmxTest(TestCase):
             headers={"HX-Request": "true"},
         )
 
+    def count_id(self) -> str:
+        """The id attribute of the quota dialog's alert count on the docket page."""
+        return f'id="docket-alert-quota-count-{self.docket.pk}"'
+
     def subscriptions(self) -> int:
         """How many active alerts the user has on the docket."""
         return DocketAlert.objects.filter(
@@ -3170,10 +3178,13 @@ class ToggleDocketAlertHtmxTest(TestCase):
         self.assertTemplateUsed(r, self.FRAGMENT)
         self.assertEqual(self.subscriptions(), 1)
         self.assertTrue(r.context["has_alert"])
+        self.assertFalse(r.context["quota_reached"])
+        self.assertNotIn("HX-Trigger", r)
         self.assertContains(r, f'id="docket-alert-label-{self.docket.pk}"')
         self.assertContains(r, f'id="docket-alert-toggle-{self.docket.pk}"')
         self.assertContains(r, f'id="docket-alert-status-{self.docket.pk}"')
         self.assertContains(r, 'hx-swap-oob="innerHTML"', count=3)
+        self.assertNotContains(r, self.count_id())
 
     def test_htmx_disables_the_alert(self) -> None:
         """Toggling a subscribed docket unsubscribes it."""
@@ -3185,11 +3196,19 @@ class ToggleDocketAlertHtmxTest(TestCase):
 
     @override_settings(MAX_FREE_DOCKET_ALERTS=0)
     def test_htmx_refuses_to_subscribe_over_quota(self) -> None:
-        """A user at quota gets no alert, even without the page's dialog."""
+        """A user at quota gets the quota dialog instead of an alert.
+
+        The partial fills the dialog's alert count out of band, and the
+        header is what opens the dialog on the page.
+        """
         r = self.toggle()
         self.assertEqual(r.status_code, HTTPStatus.OK)
         self.assertEqual(self.subscriptions(), 0)
         self.assertFalse(r.context["has_alert"])
+        self.assertTrue(r.context["quota_reached"])
+        self.assertEqual(r.context["subscription_count"], 0)
+        self.assertEqual(r["HX-Trigger"], "docket-alert-quota-reached")
+        self.assertContains(r, f'{self.count_id()} hx-swap-oob="innerHTML"')
 
     @override_settings(MAX_FREE_DOCKET_ALERTS=1)
     def test_htmx_allows_disabling_at_quota(self) -> None:
@@ -3198,6 +3217,17 @@ class ToggleDocketAlertHtmxTest(TestCase):
         r = self.toggle()
         self.assertEqual(self.subscriptions(), 0)
         self.assertFalse(r.context["has_alert"])
+        self.assertFalse(r.context["quota_reached"])
+
+    @override_settings(MAX_FREE_DOCKET_ALERTS=1)
+    def test_quota_dialog_reports_the_current_count(self) -> None:
+        """The dialog's count is the user's live subscription total."""
+        DocketAlertFactory(
+            user=self.profile.user, docket=DocketFactory(source=Docket.RECAP)
+        )
+        r = self.toggle()
+        self.assertTrue(r.context["quota_reached"])
+        self.assertEqual(r.context["subscription_count"], 1)
 
     def test_htmx_without_id_is_a_bad_request(self) -> None:
         """A missing or malformed docket id is the caller's error.

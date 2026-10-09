@@ -4168,18 +4168,24 @@ class DocketAlertToggleV2Test(TestCase):
         self.assertIsNotNone(match)
         return " ".join(match.group(1).split())
 
+    def quota_count_id(self) -> str:
+        """The id attribute of the quota dialog's alert count, shared with the partial."""
+        return f'id="docket-alert-quota-count-{self.docket.pk}"'
+
     async def test_logged_out_item_links_to_sign_in(self) -> None:
         """A visitor gets a plain link back to this docket after signing in."""
         r = await self.page()
-        menu = self.menu(r.content.decode())
+        html = r.content.decode()
+        menu = self.menu(html)
         docket_path = reverse(
             "view_docket", args=[self.docket.pk, self.docket.slug]
         )
         self.assertIn(f'href="{reverse("sign-in")}?next={docket_path}"', menu)
         self.assertNotIn("hx-post", menu)
+        self.assertNotIn(self.quota_count_id(), html)
 
-    async def test_under_quota_item_posts_through_htmx(self) -> None:
-        """A user who can make an alert gets the htmx toggle."""
+    async def test_signed_in_item_posts_through_htmx(self) -> None:
+        """A signed-in user gets the htmx toggle, which closes the menu on a refusal."""
         await self.login()
         r = await self.page()
         self.assertFalse(r.context["has_alert"])
@@ -4187,6 +4193,9 @@ class DocketAlertToggleV2Test(TestCase):
         self.assertIn(f'hx-post="{reverse("toggle_docket_alert")}"', menu)
         self.assertIn(f'id="docket-alert-toggle-{self.docket.pk}"', menu)
         self.assertIn('hx-disabled-elt="this"', menu)
+        self.assertIn(
+            'x-on:docket-alert-quota-reached="closeAndFocusTrigger"', menu
+        )
 
     @override_settings(MAX_FREE_DOCKET_ALERTS=0)
     async def test_subscribed_user_can_always_disable(self) -> None:
@@ -4205,12 +4214,20 @@ class DocketAlertToggleV2Test(TestCase):
         )
 
     @override_settings(MAX_FREE_DOCKET_ALERTS=0)
-    async def test_at_quota_item_never_posts(self) -> None:
-        """A user at quota with no alert is not offered the htmx toggle."""
+    async def test_at_quota_item_still_posts(self) -> None:
+        """The page does not judge the quota; the server refuses and answers with the dialog."""
         await self.login()
         r = await self.page()
         self.assertFalse(r.context["has_alert"])
-        self.assertNotIn("hx-post", self.menu(r.content.decode()))
+        self.assertIn("hx-post", self.menu(r.content.decode()))
+
+    async def test_quota_dialog_is_on_the_page(self) -> None:
+        """The page renders the quota dialog closed, waiting for the refusal event."""
+        await self.login()
+        r = await self.page()
+        page = r.content.decode()
+        self.assertIn('x-on:docket-alert-quota-reached.window="open"', page)
+        self.assertIn(self.quota_count_id(), page)
 
     async def test_trigger_has_no_aria_label(self) -> None:
         """The visible label is the trigger's accessible name.
