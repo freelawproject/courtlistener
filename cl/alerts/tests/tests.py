@@ -65,9 +65,14 @@ from cl.api.models import (
     WebhookEvent,
     WebhookEventType,
 )
+from cl.api.tasks import send_docket_alert_webhook_events
 from cl.api.utils import get_webhook_deprecation_date
 from cl.audio.factories import AudioWithParentsFactory
 from cl.audio.models import Audio
+from cl.corpus_importer.api_serializers import (
+    DocketEntrySerializer,
+    SCOTUSDocketEntrySerializer,
+)
 from cl.donate.models import (
     MembershipPaymentStatus,
     NeonMembership,
@@ -1045,6 +1050,36 @@ class DocketAlertTest(TestCase):
             WEBHOOK_EVENT_STATUS.SUCCESSFUL,
         )
 
+    @mock.patch(
+        "cl.api.webhooks.requests.post",
+        side_effect=lambda *args, **kwargs: MockResponse(200, mock_raw=True),
+    )
+    def test_webhook_without_d_pk_still_serializes_recap_entries(
+        self, mock_post
+    ) -> None:
+        """Do Celery messages queued without d_pk still use the RECAP
+        serializer?"""
+        de = DocketEntry.objects.get(docket=self.docket)
+        send_docket_alert_webhook_events([de.pk], [self.user.pk])
+        webhook_event = WebhookEvent.objects.filter(webhook=self.webhook).get()
+        content = webhook_event.content
+        self.assertIsNotNone(content)
+        results = content["payload"]["results"]
+        self.assertEqual(len(results), 1)
+        self.assertEqual(
+            results[0]["recap_documents"][0]["pacer_doc_id"], "232322332"
+        )
+
+    @mock.patch("cl.alerts.tasks.send_docket_alert_webhook_events.delay")
+    def test_recap_webhook_enqueue_omits_d_pk(self, mock_delay) -> None:
+        """Does a RECAP alert enqueue the two-arg Celery signature so a
+        pre-deploy worker still accepts the message?"""
+        send_alert_and_webhook(self.docket.pk, self.before)
+        mock_delay.assert_called_once()
+        args, kwargs = mock_delay.call_args
+        self.assertEqual(len(args), 2)
+        self.assertEqual(kwargs, {})
+
 
 class DocketAlertSourceTest(TestCase):
     """Does the per-source alert registry resolve the right
@@ -1112,6 +1147,15 @@ class DocketAlertSourceTest(TestCase):
             self.scotus_docket.get_alert_source(), SCOTUS_ALERT_SOURCE
         )
 
+    def test_webhook_serializer_is_per_source(self) -> None:
+        """Does each source expose the serializer its webhook payload uses?"""
+        self.assertIs(
+            RECAP_ALERT_SOURCE.webhook_serializer, DocketEntrySerializer
+        )
+        self.assertIs(
+            SCOTUS_ALERT_SOURCE.webhook_serializer, SCOTUSDocketEntrySerializer
+        )
+
 
 class DocketAlertScotusTest(TestCase):
     """Does send_alert_and_webhook work end-to-end for a SCOTUS docket --
@@ -1121,6 +1165,12 @@ class DocketAlertScotusTest(TestCase):
     def setUpTestData(cls) -> None:
         cls.user = UserFactory()
         cls.court = Court.objects.get(id="scotus")
+        cls.webhook = WebhookFactory(
+            user=cls.user,
+            event_type=WebhookEventType.DOCKET_ALERT,
+            url="https://example.com/",
+            enabled=True,
+        )
 
     def setUp(self) -> None:
         self.before = now()
@@ -1146,6 +1196,104 @@ class DocketAlertScotusTest(TestCase):
         after = now()
         send_alert_and_webhook(self.docket.pk, after)
         self.assertEqual(len(mail.outbox), 0)
+
+    @mock.patch(
+        "cl.api.webhooks.requests.post",
+        side_effect=lambda *args, **kwargs: MockResponse(200, mock_raw=True),
+    )
+    def test_triggering_docket_webhook_for_a_scotus_docket(
+        self, mock_post
+    ) -> None:
+        """Does a SCOTUS docket alert POST SCOTUSDocketEntry payload, not
+        RECAP documents?"""
+        de = SCOTUSDocketEntryFactory(docket=self.docket)
+        doc = SCOTUSDocumentFactory(docket_entry=de)
+        send_alert_and_webhook(self.docket.pk, self.before)
+        webhook_triggered = WebhookEvent.objects.filter(webhook=self.webhook)
+        self.assertEqual(webhook_triggered.count(), 1)
+        webhook_event = webhook_triggered.first()
+        self.assertIsNotNone(webhook_event)
+        content = webhook_event.content
+        self.assertIsNotNone(content)
+        results = content["payload"]["results"]
+        self.assertEqual(len(results), 1)
+        self.assertEqual(results[0]["id"], de.pk)
+        self.assertEqual(results[0]["docket"], self.docket.pk)
+        self.assertEqual(results[0]["sequence_number"], de.sequence_number)
+        self.assertNotIn("recap_documents", results[0])
+        self.assertEqual(len(results[0]["scotus_documents"]), 1)
+        self.assertEqual(results[0]["scotus_documents"][0]["id"], doc.pk)
+        self.assertEqual(results[0]["scotus_documents"][0]["url"], doc.url)
+        self.assertEqual(
+            webhook_event.event_status,
+            WEBHOOK_EVENT_STATUS.SUCCESSFUL,
+        )
+
+    @mock.patch(
+        "cl.api.webhooks.requests.post",
+        side_effect=lambda *args, **kwargs: MockResponse(200, mock_raw=True),
+    )
+    def test_scotus_webhook_ignores_recap_entries_with_the_same_pk(
+        self, mock_post
+    ) -> None:
+        """Does the webhook task refuse to serialize a DocketEntry that
+        happens to share a pk with the SCOTUS entry?"""
+        shared_pk = 8_888_888
+        recap_de = DocketEntryFactory(
+            pk=shared_pk, docket=DocketFactory(court=CourtFactory())
+        )
+        RECAPDocumentFactory(
+            docket_entry=recap_de, pacer_doc_id="should-not-appear"
+        )
+        scotus_de = SCOTUSDocketEntryFactory(pk=shared_pk, docket=self.docket)
+        send_docket_alert_webhook_events(
+            [shared_pk], [self.user.pk], self.docket.pk
+        )
+        webhook_event = WebhookEvent.objects.filter(webhook=self.webhook).get()
+        content = webhook_event.content
+        self.assertIsNotNone(content)
+        results = content["payload"]["results"]
+        self.assertEqual(len(results), 1)
+        self.assertEqual(results[0]["id"], scotus_de.pk)
+        self.assertEqual(
+            results[0]["sequence_number"], scotus_de.sequence_number
+        )
+        self.assertNotIn("recap_documents", results[0])
+        self.assertIn("scotus_documents", results[0])
+
+    @mock.patch("cl.alerts.tasks.send_docket_alert_webhook_events.delay")
+    def test_scotus_webhook_enqueue_passes_d_pk(self, mock_delay) -> None:
+        """Does a SCOTUS alert pass d_pk so the worker uses the SCOTUS
+        serializer?"""
+        SCOTUSDocketEntryFactory(docket=self.docket)
+        send_alert_and_webhook(self.docket.pk, self.before)
+        mock_delay.assert_called_once()
+        args, kwargs = mock_delay.call_args
+        self.assertEqual(len(args), 3)
+        self.assertEqual(args[2], self.docket.pk)
+        self.assertEqual(kwargs, {})
+
+    @mock.patch(
+        "cl.api.webhooks.requests.post",
+        side_effect=lambda *args, **kwargs: MockResponse(200, mock_raw=True),
+    )
+    def test_webhook_with_deleted_docket_sends_empty_results(
+        self, mock_post
+    ) -> None:
+        """Does a missing docket skip the RECAP pk lookup instead of
+        crashing or serializing a colliding DocketEntry?"""
+        shared_pk = 8_888_887
+        DocketEntryFactory(
+            pk=shared_pk, docket=DocketFactory(court=CourtFactory())
+        )
+        SCOTUSDocketEntryFactory(pk=shared_pk, docket=self.docket)
+        d_pk = self.docket.pk
+        self.docket.delete()
+        send_docket_alert_webhook_events([shared_pk], [self.user.pk], d_pk)
+        webhook_event = WebhookEvent.objects.filter(webhook=self.webhook).get()
+        content = webhook_event.content
+        self.assertIsNotNone(content)
+        self.assertEqual(content["payload"]["results"], [])
 
 
 class DisableDocketAlertTest(TestCase):

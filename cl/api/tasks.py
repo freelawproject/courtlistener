@@ -4,6 +4,10 @@ from elasticsearch.dsl.response import Hit
 from rest_framework.renderers import JSONRenderer
 
 from cl.alerts.api_serializers import SearchAlertSerializerModel
+from cl.alerts.docket_alert_sources import (
+    RECAP_ALERT_SOURCE,
+    DocketAlertSource,
+)
 from cl.alerts.models import Alert
 from cl.api.models import (
     Webhook,
@@ -14,7 +18,6 @@ from cl.api.models import (
 from cl.api.utils import generate_webhook_key_content
 from cl.api.webhooks import send_webhook_event
 from cl.celery_init import app
-from cl.corpus_importer.api_serializers import DocketEntrySerializer
 from cl.favorites.api_serializers import PrayerSerializer
 from cl.favorites.models import Prayer
 from cl.lib.elasticsearch_utils import set_child_docs_and_score
@@ -25,7 +28,7 @@ from cl.search.api_serializers import (
     V3OpinionESResultSerializer,
 )
 from cl.search.api_utils import ResultObject
-from cl.search.models import SEARCH_TYPES, DocketEntry
+from cl.search.models import SEARCH_TYPES, Docket
 from cl.search.types import ESDictDocument
 
 
@@ -49,27 +52,59 @@ def send_test_webhook_event(
     send_webhook_event(webhook_event, content_str.encode("utf-8"))
 
 
+def _webhook_source_for_docket(d_pk: int | None) -> DocketAlertSource | None:
+    """Return the alert source for a docket, or None if it no longer exists.
+
+    A missing docket must not fall back to looking up entry pks on
+    DocketEntry: those pks can collide with unrelated RECAP rows.
+    """
+    if d_pk is None:
+        return RECAP_ALERT_SOURCE
+    try:
+        return Docket.objects.get(pk=d_pk).get_alert_source()
+    except Docket.DoesNotExist:
+        return None
+
+
 @app.task()
 def send_docket_alert_webhook_events(
     des_pks: list[int],
     webhook_recipients_pks: list[int],
+    d_pk: int | None = None,
+    **kwargs: object,
 ) -> None:
-    """POSTS the DocketAlert to the recipients webhook(s)
+    """POST the docket-alert payload to each recipient's enabled webhook.
 
-    :param des_pks: The list of docket entries primary keys.
-    :param webhook_recipients_pks: A list of User pks to send the webhook to.
+    Entry pks are resolved through the docket's alert source so SCOTUS (and
+    later state) rows are not looked up on DocketEntry, whose pks can collide.
+
+    :param des_pks: Primary keys of the new docket entries to include.
+    :param webhook_recipients_pks: User pks whose DOCKET_ALERT webhooks should
+        receive the event.
+    :param d_pk: Docket primary key used to select the alert source. None keeps
+        the RECAP lookup so two-argument Celery messages (old workers, or RECAP
+        producers that omit it during a rolling deploy) still serialize
+        correctly.
     :return: None
     """
+    extra_d_pk = kwargs.get("d_pk")
+    if d_pk is None and isinstance(extra_d_pk, int):
+        d_pk = extra_d_pk
 
     webhooks = Webhook.objects.filter(
         event_type=WebhookEventType.DOCKET_ALERT,
         user_id__in=webhook_recipients_pks,
         enabled=True,
     )
-    docket_entries = DocketEntry.objects.filter(pk__in=des_pks)
-    serialized_docket_entries = []
-    for de in docket_entries:
-        serialized_docket_entries.append(DocketEntrySerializer(de).data)
+    source = _webhook_source_for_docket(d_pk)
+    serialized_docket_entries = (
+        [
+            source.webhook_serializer(de).data
+            for de in source.entries_by_pk(des_pks)
+        ]
+        if source is not None
+        else []
+    )
 
     for webhook in webhooks:
         post_content = {
