@@ -52,7 +52,9 @@ from cl.search.models import (
     OpinionsCited,
     OriginatingCourtInformation,
     RECAPDocument,
+    SCOTUSDocketEntry,
     ScotusDocketMetadata,
+    SCOTUSDocument,
     Tag,
 )
 from cl.search.types import ESDictDocument
@@ -206,6 +208,36 @@ class FullDocketSerializer(DocketSerializer):
     docket_entries = DocketEntrySerializer(many=True, read_only=True)
 
 
+class BaseSourceDocumentSerializer(
+    RetrieveFilteredFieldsMixin,
+    NestedDynamicFieldsMixin,
+    HyperlinkedModelSerializerWithId,
+):
+    """Base serializer for the documents of a docket source.
+
+    The model must inherit AbstractPDF and provide an is_available property
+    and get_absolute_url().
+    """
+
+    filepath_local = serializers.FileField(use_url=True, read_only=True)
+    absolute_url = serializers.CharField(
+        source="get_absolute_url", read_only=True
+    )
+    is_available = serializers.BooleanField(read_only=True)
+
+
+class BaseSourceDocketEntrySerializer(
+    RetrieveFilteredFieldsMixin,
+    NestedDynamicFieldsMixin,
+    HyperlinkedModelSerializerWithId,
+):
+    """Base serializer for the docket entries of a docket source."""
+
+    docket = serializers.HyperlinkedRelatedField(
+        view_name="docket-detail", read_only=True
+    )
+
+
 class ScotusDocketMetadataSerializer(
     RetrieveFilteredFieldsMixin,
     NestedDynamicFieldsMixin,
@@ -219,6 +251,34 @@ class ScotusDocketMetadataSerializer(
 
     class Meta:
         model = ScotusDocketMetadata
+        fields = "__all__"
+
+
+class SCOTUSDocumentSerializer(BaseSourceDocumentSerializer):
+    """A SCOTUS document, with a link to its docket entry."""
+
+    class Meta:
+        model = SCOTUSDocument
+        fields = "__all__"
+
+
+class NestedSCOTUSDocumentSerializer(SCOTUSDocumentSerializer):
+    """A SCOTUS document nested in its entry, without the entry link."""
+
+    class Meta:
+        model = SCOTUSDocument
+        exclude = ("docket_entry",)
+
+
+class SCOTUSDocketEntrySerializer(BaseSourceDocketEntrySerializer):
+    """A SCOTUS docket entry with its documents nested."""
+
+    scotus_documents = NestedSCOTUSDocumentSerializer(
+        many=True, read_only=True
+    )
+
+    class Meta:
+        model = SCOTUSDocketEntry
         fields = "__all__"
 
 
