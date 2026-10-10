@@ -1,5 +1,6 @@
 import os
 
+from asgiref.sync import async_to_sync
 from celery.canvas import chain
 from django.conf import settings
 from juriscraper.lib.string_utils import CaseNameTweaker
@@ -10,7 +11,7 @@ from cl.corpus_importer.tasks import (
 )
 from cl.lib.celery_utils import CeleryThrottle
 from cl.lib.command_utils import CommandUtils, VerboseCommand, logger
-from cl.lib.pacer_session import ProxyPacerSession
+from cl.lib.pacer_session import log_into_pacer
 from cl.lib.utils import chunks
 from cl.recap.constants import CV_2017, CV_2020, CV_2021
 from cl.recap.models import FjcIntegratedDatabase
@@ -116,10 +117,9 @@ class Command(VerboseCommand, CommandUtils):
         ds = Docket.objects.filter(idb_data__isnull=False, pacer_case_id=None)
         q = options["queue"]
         throttle = CeleryThrottle(queue_name=q)
-        session = ProxyPacerSession(
+        session = async_to_sync(log_into_pacer)(
             username=PACER_USERNAME, password=PACER_PASSWORD
         )
-        session.login()
         for i, d in enumerate(ds.iterator()):
             if i < options["offset"]:
                 continue
@@ -129,10 +129,9 @@ class Command(VerboseCommand, CommandUtils):
             if i % 5000 == 0:
                 # Re-authenticate just in case the auto-login mechanism isn't
                 # working.
-                session = ProxyPacerSession(
+                session = async_to_sync(log_into_pacer)(
                     username=PACER_USERNAME, password=PACER_PASSWORD
                 )
-                session.login()
 
             throttle.maybe_wait()
             logger.info("Getting pacer_case_id for item %s", d)
@@ -142,9 +141,7 @@ class Command(VerboseCommand, CommandUtils):
                     pass_through=d.pk,
                     docket_number=d.idb_data.docket_number,
                     court_id=d.idb_data.district_id,
-                    cookies_data=SessionData(
-                        session.cookies, session.proxy_address
-                    ),
+                    session_data=session,
                     **params,
                 ).set(queue=q),
                 update_docket_from_hidden_api.s().set(queue=q),

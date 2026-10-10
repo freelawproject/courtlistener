@@ -141,6 +141,9 @@ dev = [
   "unittest-xml-reporting>=4.0.0",
 ]
 
+[tool.uv.sources]
+juriscraper = {git = "https://github.com/ttys0dev/juriscraper.git", rev = "89b5f73c372e8e4f769d2d4742d5a2aaffb98bab"}
+
 [tool.ruff]
 line-length = 79
 lint.extend-safe-fixes = [

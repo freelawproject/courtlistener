@@ -2,10 +2,20 @@ import itertools
 import os
 import uuid
 
+from asgiref.sync import sync_to_async
 from django.conf import settings
+from django.core.files.base import File
 from django.core.files.storage import Storage
 from storages.backends.s3 import S3ManifestStaticStorage, S3Storage
 from storages.backends.s3boto3 import S3Boto3Storage
+
+
+@sync_to_async
+def read_file_bytes(file: File) -> bytes:
+    """Read a Django file in binary mode and close it."""
+    with file:
+        file.open(mode="rb")
+        return file.read()
 
 
 def clobbering_get_name(

@@ -1,11 +1,13 @@
 import json
 import logging
+from contextlib import nullcontext
 from io import BufferedReader
 from typing import Any, cast
 
 from asgiref.sync import sync_to_async
 from botocore.exceptions import ClientError
 from django.conf import settings
+from django.core.files.base import File
 from httpx import (
     AsyncClient,
     NetworkError,
@@ -63,7 +65,7 @@ async def microservice(
     service: str,
     method: str = "POST",
     item: AbstractPDF | Opinion | Audio | None = None,
-    file: BufferedReader | None = None,
+    file: BufferedReader | File | bytes | None = None,
     file_type: str | None = None,
     filepath: str | None = None,
     data=None,
@@ -77,11 +79,15 @@ async def microservice(
     Because of the various ways our db is setup we have a few different params we use
     in this function.
 
+    Only the selected file source is opened, preferring file, then item, then
+    filepath. A missing PDF on item is cleaned up and falls back to filepath.
+    Named Django files keep their filename unless file_type is provided.
+
     :param service: The service to call
     :param method: The method to use (defaults to POST)
     :param item: The document as a db object
-    :param file: The file as a byte array
-    :param file_type: The sometimes you just need the extension of the file
+    :param file: A caller-owned file or byte array; this function does not close it
+    :param file_type: Override the upload filename with dummy.<file_type>
     :param filepath: The filepath of the file
     :param data: The data to send
     :param params: The params to send
@@ -90,66 +96,67 @@ async def microservice(
 
     services = settings.MICROSERVICE_URLS
 
-    files = None
-    # Add file from filepath
-    if filepath:
-        files = {"file": (filepath, open(filepath, "rb"))}
-
-    # Handle our documents based on the type of model object
-    # Sadly these are not uniform
-    if item:
+    file_context = nullcontext()
+    field_file = None
+    filename = "filename"
+    if file:
+        file_context = nullcontext(file)
+        if file_type:
+            filename = f"dummy.{file_type}"
+        elif isinstance(file, File) and file.name:
+            filename = file.name
+    else:
         if isinstance(item, AbstractPDF):
-            try:
-                files = {
-                    "file": (
-                        item.filepath_local.name,
-                        item.filepath_local.open(mode="rb"),
-                    )
-                }
-            except FileNotFoundError:
-                # The file is no longer available, clean it up in DB
-                await clean_up_recap_document_file(item)
+            field_file = item.filepath_local
         elif isinstance(item, Opinion):
-            files = {
-                "file": (
-                    item.local_path.name,
-                    item.local_path.open(mode="rb"),
-                )
-            }
+            field_file = item.local_path
         elif isinstance(item, Audio):
-            match service:
-                case "downsize-audio":
-                    files = {
-                        "file": (
-                            item.local_path_mp3.name,
-                            item.local_path_mp3.open(mode="rb"),
-                        )
-                    }
-                case _:
-                    files = {
-                        "file": (
-                            item.local_path_original_file.name,
-                            item.local_path_original_file.open(mode="rb"),
-                        )
-                    }
-    # Sometimes we will want to pass in a filename and the file bytes
-    # to avoid writing them to disk. Filename can often be generic
-    # and is used to identify the file extension for our microservices
-    if file and file_type:
-        files = {"file": (f"dummy.{file_type}", file)}
-    elif file:
-        files = {"file": ("filename", file)}
+            field_file = (
+                item.local_path_mp3
+                if service == "downsize-audio"
+                else item.local_path_original_file
+            )
 
-    async with AsyncClient(follow_redirects=True, http2=True) as client:
-        req = client.build_request(
-            method=method,
-            url=services[service]["url"],  # type: ignore
-            data=data,
-            files=files,
-            params=params,
-            timeout=services[service]["timeout"],
-        )
-        return await client.send(req)
+        if field_file is not None:
+            filename = field_file.name
+            file_context = field_file
+
+    # Enter before reopening so failed S3 downloads are also closed.
+    with file_context as upload_file:
+        if field_file is not None:
+            try:
+                field_file.open(mode="rb")
+            except FileNotFoundError:
+                if not isinstance(item, AbstractPDF):
+                    raise
+                # The file is no longer available, clean it up in DB.
+                await clean_up_recap_document_file(item)
+                upload_file = None
+
+        upload_context = nullcontext(upload_file)
+        if upload_file is None and filepath:
+            filename = filepath
+            upload_context = open(filepath, "rb")
+
+        with upload_context as upload_file:
+            files = (
+                {"file": (filename, upload_file)}
+                if upload_file is not None
+                else None
+            )
+
+            async with AsyncClient(
+                follow_redirects=True, http2=True
+            ) as client:
+                req = client.build_request(
+                    method=method,
+                    url=services[service]["url"],  # type: ignore
+                    data=data,
+                    files=files,
+                    params=params,
+                    timeout=services[service]["timeout"],
+                )
+                return await client.send(req)
 
 
 @retry(

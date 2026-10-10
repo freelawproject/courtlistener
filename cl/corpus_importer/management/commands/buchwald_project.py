@@ -1,6 +1,7 @@
 import os
 from argparse import RawTextHelpFormatter
 
+from asgiref.sync import async_to_sync
 from celery import chain
 from django.conf import settings
 
@@ -13,7 +14,7 @@ from cl.corpus_importer.tasks import (
 )
 from cl.lib.celery_utils import CeleryThrottle
 from cl.lib.command_utils import VerboseCommand, logger
-from cl.lib.pacer_session import ProxyPacerSession, SessionData
+from cl.lib.pacer_session import SessionData, log_into_pacer
 from cl.search.models import Docket
 
 PACER_USERNAME = os.environ.get("PACER_USERNAME", settings.PACER_USERNAME)
@@ -33,10 +34,9 @@ def add_all_nysd_to_cl(options):
     """
     q = options["queue"]
     throttle = CeleryThrottle(queue_name=q)
-    session = ProxyPacerSession(
+    session = async_to_sync(log_into_pacer)(
         username=PACER_USERNAME, password=PACER_PASSWORD
     )
-    session.login()
 
     # IDs obtained by binary search of docket numbers on PACER website.
     earliest_id = 405990
@@ -50,10 +50,9 @@ def add_all_nysd_to_cl(options):
         if pacer_case_id % 5000 == 0:
             # Re-authenticate just in case the auto-login mechanism isn't
             # working.
-            session = ProxyPacerSession(
+            session = async_to_sync(log_into_pacer)(
                 username=PACER_USERNAME, password=PACER_PASSWORD
             )
-            session.login()
 
         throttle.maybe_wait()
         logger.info("Doing pacer_case_id: %s", pacer_case_id)
@@ -69,10 +68,9 @@ def get_dockets(options):
     """
     q = options["queue"]
     throttle = CeleryThrottle(queue_name=q)
-    session = ProxyPacerSession(
+    session = async_to_sync(log_into_pacer)(
         username=PACER_USERNAME, password=PACER_PASSWORD
     )
-    session.login()
 
     buchwald_id = 450
     ds = (
@@ -92,10 +90,9 @@ def get_dockets(options):
         if i % 5000 == 0:
             # Re-authenticate just in case the auto-login mechanism isn't
             # working.
-            session = ProxyPacerSession(
+            session = async_to_sync(log_into_pacer)(
                 username=PACER_USERNAME, password=PACER_PASSWORD
             )
-            session.login()
 
         throttle.maybe_wait()
         logger.info("%s: Doing docket with pk: %s", i, d.pk)

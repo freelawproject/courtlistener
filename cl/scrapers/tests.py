@@ -638,6 +638,9 @@ class ExtractFormattedTextSanitizationTest(TestCase):
         DataError ('PostgreSQL text fields cannot contain NUL (0x00) bytes')?
         """
         texas_document = TexasDocumentFactory.create()
+        texas_document.filepath_local.save(
+            "document.pdf", ContentFile(b"document")
+        )
         # Doctor occasionally returns extracted text containing NUL bytes
         # (e.g. from malformed PDFs). PostgreSQL rejects these in text
         # columns, so the extractor must strip them before saving.
@@ -682,6 +685,9 @@ class ExtractFormattedTextReleasesConnectionTest(TransactionTestCase):
         """Is the DB connection closed when Doctor is called, and reopened
         for the save afterwards?"""
         texas_document = TexasDocumentFactory.create()
+        texas_document.filepath_local.save(
+            "document.pdf", ContentFile(b"document")
+        )
         connection_open_during_doctor_call: list[bool] = []
 
         async def fake_doctor(*args, **kwargs) -> httpx.Response:
@@ -2906,7 +2912,7 @@ class TexasCaseMailIntegrationTest(TestCase):
 
 @mock.patch("cl.recap.tasks.merge_scotus_docket")
 @mock.patch("cl.recap.tasks.fetch_and_archive_scotus_docket_followup")
-@mock.patch("cl.recap.tasks.SCOTUSEmail")
+@mock.patch("cl.recap.tasks.SCOTUSEmail", autospec=True)
 @mock.patch("cl.recap.tasks.SCOTUSSESStorage")
 class SCOTUSEmailIntegrationTest(TestCase):
     """Integration test for the SCOTUS email processing flow.
