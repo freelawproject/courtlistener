@@ -68,6 +68,7 @@ from cl.search.models import (
     OpinionCluster,
     ParentheticalGroup,
     RECAPDocument,
+    SCOTUSDocument,
 )
 
 
@@ -1179,6 +1180,7 @@ class RECAPBaseDocument(Document):
     )
     date_created = fields.DateField(attr="date_created")
     pacer_case_id = fields.KeywordField(attr="pacer_case_id")
+    capital_case = fields.BooleanField()
 
     class Django:
         model = Docket
@@ -1334,7 +1336,10 @@ class ESRECAPDocument(
         return instance.document_number or None
 
     def prepare_document_type(self, instance):
-        return instance.get_document_type_display()
+        # SCOTUS documents have no document_type attribute, so no
+        # get_document_type_display() either.
+        get_display = getattr(instance, "get_document_type_display", None)
+        return get_display() if get_display else None
 
     def prepare_filepath_local(self, instance):
         if instance.filepath_local:
@@ -1423,14 +1428,23 @@ class ESRECAPDocument(
         return escape(instance.plain_text.translate(null_map))
 
     def prepare_cites(self, instance):
+        cited_opinions = getattr(instance, "cited_opinions", None)
+        if cited_opinions is None:
+            return []
         return list(
-            instance.cited_opinions.all().values_list(
-                "cited_opinion_id", flat=True
-            )
+            cited_opinions.all().values_list("cited_opinion_id", flat=True)
         )
 
     def prepare_pacer_case_id(self, instance):
         return instance.docket_entry.docket.pacer_case_id
+
+    def prepare_capital_case(
+        self, instance: RECAPDocument | SCOTUSDocument
+    ) -> bool | None:
+        scotus_metadata = getattr(
+            instance.docket_entry.docket, "scotus_metadata", None
+        )
+        return scotus_metadata.capital_case if scotus_metadata else None
 
 
 class DocketBaseDocument(DSLDocument):
@@ -1561,6 +1575,10 @@ class DocketDocument(
     def prepare_trustee_str(self, instance):
         if BankruptcyInformation.objects.filter(docket=instance).exists():
             return instance.bankruptcy_information.trustee_str
+
+    def prepare_capital_case(self, instance: Docket) -> bool | None:
+        scotus_metadata = getattr(instance, "scotus_metadata", None)
+        return scotus_metadata.capital_case if scotus_metadata else None
 
     def prepare_docket_child(self, instance):
         return "docket"
