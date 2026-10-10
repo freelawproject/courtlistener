@@ -21,11 +21,11 @@ from cl.api.utils import (
 )
 from cl.donate.api_permissions import AllowNeonWebhook
 from cl.donate.models import (
-    MembershipPaymentStatus,
     NeonMembership,
     NeonMembershipLevel,
     NeonWebhookEvent,
 )
+from cl.donate.utils import map_payment_status_value
 from cl.lib.auth import filter_by_email
 from cl.lib.crypto import generate_activation_key
 from cl.lib.neon_utils import NeonClient
@@ -257,34 +257,6 @@ class MembershipWebhookViewSet(
 
         return trigger
 
-    @staticmethod
-    def _map_payment_status_value(status: str) -> int:
-        """
-        Maps a payment status string into its corresponding
-        integer value defined in the `MembershipPaymentStatus` class.
-
-        An empty status means Neon attached no payment info to the membership.
-        That happens for free tiers and for memberships granted manually in
-        Neon, treat both as SUCCEEDED so they don't stick in "Awaiting payment
-        processing".
-
-        Args:
-            status (str): The payment status string (e.g., "succeeded", "failed").
-
-        Returns:
-            int: The mapped constant value from `MembershipPaymentStatus`.
-                Defaults to `PENDING` for unrecognized values.
-        """
-        match status:
-            case "succeeded" | "":
-                payment_status = MembershipPaymentStatus.SUCCEEDED
-            case "failed":
-                payment_status = MembershipPaymentStatus.FAILED
-            case _:
-                payment_status = MembershipPaymentStatus.PENDING
-
-        return payment_status
-
     def _store_webhook_payload(self, webhook_data) -> None:
         trigger = self._map_trigger_value(webhook_data["eventTrigger"])
         if trigger != NeonWebhookEvent.MEMBERSHIP_DELETE:
@@ -323,7 +295,7 @@ class MembershipWebhookViewSet(
         membership_level = NeonMembershipLevel.TYPES_INVERTED[
             membership_data["membershipName"]
         ]
-        payment_status = self._map_payment_status_value(
+        payment_status = map_payment_status_value(
             membership_data["paymentStatus"]
         )
 
@@ -378,7 +350,7 @@ class MembershipWebhookViewSet(
                         [user.email],
                     )
 
-        payment_status = self._map_payment_status_value(
+        payment_status = map_payment_status_value(
             membership_data["paymentStatus"]
         )
 
