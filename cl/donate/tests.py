@@ -1,27 +1,31 @@
 from collections import defaultdict
-from datetime import timedelta
+from datetime import UTC, date, datetime, timedelta
 from http import HTTPStatus
 from unittest.mock import MagicMock, patch
 
+import requests
 import time_machine
 from asgiref.sync import sync_to_async
 from django.core import mail
+from django.core.management import call_command
 from django.test import override_settings
 from django.test.client import AsyncClient, Client
 from django.urls import reverse
 from django.utils.timezone import now
 
+from cl.api.constants import TIER_1_RATES, TIER_2_RATES
 from cl.api.models import APIThrottle, ThrottleType
 from cl.donate.api_views import MembershipWebhookViewSet
-from cl.donate.factories import NeonWebhookEventFactory
+from cl.donate.factories import NeonMembershipFactory, NeonWebhookEventFactory
 from cl.donate.models import (
     MembershipPaymentStatus,
     NeonMembership,
     NeonMembershipLevel,
     NeonWebhookEvent,
 )
+from cl.lib.neon_utils import NeonClient
 from cl.lib.test_helpers import UserProfileWithParentsFactory
-from cl.tests.cases import TestCase
+from cl.tests.cases import SimpleTestCase, TestCase
 from cl.users.models import UserProfile
 from cl.users.utils import create_stub_account
 
@@ -1099,3 +1103,310 @@ class MembershipWebhookThrottleSyncTest(TestCase):
             ).values_list("rate", "source")
         ]
         self.assertEqual(remaining, [("0/min", APIThrottle.Source.MANUAL)])
+
+
+def make_neon_membership(
+    membership_id: str = "200",
+    level_name: str = "CL Membership - Tier 2",
+    term_end_date: str = "2027-10-04-05:00",
+    payment_status: str = "Succeeded",
+) -> dict:
+    """Build a membership record shaped like the Neon API returns it."""
+    return {
+        "id": membership_id,
+        "accountId": "1234",
+        "membershipLevel": {"id": "2", "name": level_name},
+        "termEndDate": term_end_date,
+        "status": "SUCCEEDED",
+        "payments": [{"paymentStatus": payment_status}],
+    }
+
+
+class NeonClientMembershipTest(SimpleTestCase):
+    """Tests for NeonClient.get_primary_active_membership."""
+
+    @patch("cl.lib.neon_utils.requests.get")
+    def test_returns_first_membership_or_none(self, mock_get) -> None:
+        """Returns Neon's first membership, or None when the list is empty."""
+        neon_membership = make_neon_membership()
+        for memberships, expected in (
+            ([neon_membership], neon_membership),
+            ([], None),
+        ):
+            with self.subTest(memberships=memberships):
+                mock_get.return_value = MagicMock(
+                    status_code=200,
+                    **{"json.return_value": {"memberships": memberships}},
+                )
+                result = NeonClient().get_primary_active_membership("1234")
+                self.assertEqual(result, expected)
+                self.assertTrue(
+                    mock_get.call_args.args[0].endswith(
+                        "/accounts/1234/memberships"
+                    )
+                )
+                params = mock_get.call_args.kwargs["params"]
+                self.assertEqual(params["primaryActiveMembership"], "true")
+                self.assertEqual(params["sortDirection"], "DESC")
+
+
+@time_machine.travel(datetime(2026, 10, 9, 12, 0, tzinfo=UTC), tick=False)
+class SyncNeonMembershipsCommandTest(TestCase):
+    """Tests for the sync_neon_memberships command."""
+
+    @classmethod
+    def setUpTestData(cls) -> None:
+        cls.user_profile = UserProfileWithParentsFactory(
+            user__email="member@example.com", neon_account_id="1234"
+        )
+        cls.user = cls.user_profile.user
+
+    def setUp(self) -> None:
+        # A Tier 1 membership that lapsed five days ago, i.e. inside the
+        # default 24-hour-to-90-day sync window.
+        self.membership = NeonMembershipFactory(
+            user=self.user,
+            neon_id="100",
+            level=NeonMembershipLevel.TIER_1,
+            termination_date=now() - timedelta(days=5),
+        )
+        patcher = patch.object(NeonClient, "get_primary_active_membership")
+        self.mock_get_membership = patcher.start()
+        self.addCleanup(patcher.stop)
+        zoho_patcher = patch(
+            "cl.donate.management.commands.sync_neon_memberships"
+            ".tag_zoho_record_for_membership"
+        )
+        self.mock_tag_zoho = zoho_patcher.start()
+        self.addCleanup(zoho_patcher.stop)
+
+    def get_membership_rates(self) -> list[str]:
+        """Return the user's MEMBERSHIP-source API throttle rates, sorted."""
+        return sorted(
+            APIThrottle.objects.filter(
+                user=self.user,
+                throttle_type=ThrottleType.API,
+                source=APIThrottle.Source.MEMBERSHIP,
+            ).values_list("rate", flat=True)
+        )
+
+    def called_account_ids(self) -> set[str]:
+        """Return the Neon account ids the mocked client was asked about."""
+        return {
+            call.args[0] for call in self.mock_get_membership.call_args_list
+        }
+
+    def assert_membership_untouched(self) -> None:
+        """Assert the lapsed membership, throttles and Zoho were left alone."""
+        self.assertTrue(
+            NeonMembership.objects.filter(pk=self.membership.pk).exists()
+        )
+        self.membership.refresh_from_db()
+        self.assertEqual(self.membership.neon_id, "100")
+        self.assertEqual(self.membership.level, NeonMembershipLevel.TIER_1)
+        self.assertFalse(self.membership.is_active)
+        self.assertEqual(self.get_membership_rates(), [])
+        self.mock_tag_zoho.delay.assert_not_called()
+
+    def test_updates_lapsed_membership_from_neon(self) -> None:
+        """Syncs id, level, term end and payment, then rebuilds throttles."""
+        self.mock_get_membership.return_value = make_neon_membership()
+
+        call_command("sync_neon_memberships")
+
+        self.mock_get_membership.assert_called_once_with("1234")
+        self.membership.refresh_from_db()
+        self.assertEqual(self.membership.neon_id, "200")
+        self.assertEqual(self.membership.level, NeonMembershipLevel.TIER_2)
+        self.assertEqual(
+            self.membership.termination_date.date(), date(2027, 10, 4)
+        )
+        self.assertEqual(
+            self.membership.payment_status, MembershipPaymentStatus.SUCCEEDED
+        )
+        self.assertTrue(self.membership.is_active)
+        self.assertEqual(self.get_membership_rates(), sorted(TIER_2_RATES))
+        self.mock_tag_zoho.delay.assert_called_once_with(
+            self.user.pk, NeonMembershipLevel.TIER_2
+        )
+
+    def test_updates_extended_term_on_same_membership(self) -> None:
+        """Picks up a new term end date even when the membership id matches."""
+        self.mock_get_membership.return_value = make_neon_membership(
+            membership_id="100",
+            level_name="CL Membership - Tier 1",
+            term_end_date="2027-01-01",
+        )
+
+        call_command("sync_neon_memberships")
+
+        self.membership.refresh_from_db()
+        self.assertEqual(self.membership.neon_id, "100")
+        self.assertEqual(
+            self.membership.termination_date.date(), date(2027, 1, 1)
+        )
+        self.assertTrue(self.membership.is_active)
+        self.assertEqual(self.get_membership_rates(), sorted(TIER_1_RATES))
+
+    def test_leaves_matching_membership_alone(self) -> None:
+        """Keeps a lapse younger than a week when Neon's record matches ours."""
+        self.mock_get_membership.return_value = make_neon_membership(
+            membership_id="100",
+            level_name="CL Membership - Tier 1",
+            term_end_date=self.membership.termination_date.date().isoformat(),
+        )
+
+        call_command("sync_neon_memberships")
+
+        self.assert_membership_untouched()
+
+    def test_skips_when_neon_has_no_active_membership(self) -> None:
+        """Keeps a lapse younger than a week when Neon has nothing newer."""
+        self.mock_get_membership.return_value = None
+
+        call_command("sync_neon_memberships")
+
+        self.mock_get_membership.assert_called_once_with("1234")
+        self.assert_membership_untouched()
+
+    def test_only_checks_memberships_inside_window(self) -> None:
+        """Checks lapses between 24 hours and 90 days old unless told otherwise."""
+        for account_id, expired_for in (
+            ("too-recent", timedelta(hours=1)),
+            ("too-old", timedelta(days=91)),
+        ):
+            profile = UserProfileWithParentsFactory(neon_account_id=account_id)
+            NeonMembershipFactory(
+                user=profile.user, termination_date=now() - expired_for
+            )
+        self.mock_get_membership.return_value = None
+
+        # Deletion is off so every run sees the same records.
+        for options, expected_account_ids in (
+            ({}, {"1234"}),
+            ({"max_days_expired": 0}, {"1234", "too-old"}),
+            (
+                {"min_hours_expired": 0, "max_days_expired": 30},
+                {"1234", "too-recent"},
+            ),
+        ):
+            with self.subTest(options=options):
+                self.mock_get_membership.reset_mock()
+                call_command(
+                    "sync_neon_memberships", delete_after_days=0, **options
+                )
+                self.assertEqual(
+                    self.called_account_ids(), expected_account_ids
+                )
+
+    def test_skips_user_without_neon_account_id(self) -> None:
+        """Never calls Neon for a member whose profile has no account id."""
+        self.user_profile.neon_account_id = ""
+        self.user_profile.save()
+
+        call_command("sync_neon_memberships")
+
+        self.mock_get_membership.assert_not_called()
+        self.assert_membership_untouched()
+
+    def test_continues_after_neon_api_error(self) -> None:
+        """A failed Neon request skips that member and processes the rest."""
+        other_profile = UserProfileWithParentsFactory(neon_account_id="5678")
+        other_membership = NeonMembershipFactory(
+            user=other_profile.user,
+            neon_id="300",
+            termination_date=now() - timedelta(days=10),
+        )
+        # Memberships are processed oldest expiration first, so the failure
+        # hits the other member and ours is still synced afterwards. The
+        # failed one is over a week old but must not be deleted unchecked.
+        self.mock_get_membership.side_effect = [
+            requests.HTTPError("500 Server Error"),
+            make_neon_membership(),
+        ]
+
+        call_command("sync_neon_memberships")
+
+        self.assertEqual(self.mock_get_membership.call_count, 2)
+        other_membership.refresh_from_db()
+        self.assertEqual(other_membership.neon_id, "300")
+        self.membership.refresh_from_db()
+        self.assertEqual(self.membership.neon_id, "200")
+        self.assertEqual(self.get_membership_rates(), sorted(TIER_2_RATES))
+
+    def test_skips_unknown_level_and_edu_without_edu_email(self) -> None:
+        """Keeps records with levels we don't map or EDU for non-.edu users."""
+        # Old enough to delete, but skipped records are left for a human.
+        self.membership.termination_date = now() - timedelta(days=10)
+        self.membership.save()
+        for level_name in ("Not a real level", "EDU Membership"):
+            with self.subTest(level_name=level_name):
+                self.mock_get_membership.return_value = make_neon_membership(
+                    level_name=level_name
+                )
+
+                call_command("sync_neon_memberships")
+
+                self.assert_membership_untouched()
+
+    def test_deletes_stale_membership_neon_confirms_unchanged(self) -> None:
+        """Deletes a week-old lapse Neon matches, and only its MEMBERSHIP throttles."""
+        self.membership.termination_date = now() - timedelta(days=10)
+        self.membership.save()
+        for rate, source in (
+            ("10/min", APIThrottle.Source.MEMBERSHIP),
+            ("500/day", APIThrottle.Source.MANUAL),
+        ):
+            APIThrottle.objects.create(
+                user=self.user,
+                throttle_type=ThrottleType.API,
+                rate=rate,
+                source=source,
+            )
+        self.mock_get_membership.return_value = make_neon_membership(
+            membership_id="100",
+            level_name="CL Membership - Tier 1",
+            term_end_date=self.membership.termination_date.date().isoformat(),
+        )
+
+        call_command("sync_neon_memberships")
+
+        self.assertFalse(
+            NeonMembership.objects.filter(pk=self.membership.pk).exists()
+        )
+        remaining = list(
+            APIThrottle.objects.filter(user=self.user).values_list(
+                "rate", "source"
+            )
+        )
+        self.assertEqual(remaining, [("500/day", APIThrottle.Source.MANUAL)])
+        self.mock_tag_zoho.delay.assert_not_called()
+
+    def test_deletes_stale_membership_when_neon_has_none(self) -> None:
+        """Deletes a week-old lapse when Neon has no active membership."""
+        self.membership.termination_date = now() - timedelta(days=8)
+        self.membership.save()
+        self.mock_get_membership.return_value = None
+
+        call_command("sync_neon_memberships")
+
+        self.assertFalse(
+            NeonMembership.objects.filter(pk=self.membership.pk).exists()
+        )
+
+    def test_delete_threshold_is_configurable(self) -> None:
+        """Honors --delete-after-days, and 0 turns deletion off."""
+        self.membership.termination_date = now() - timedelta(days=10)
+        self.membership.save()
+        self.mock_get_membership.return_value = None
+
+        call_command("sync_neon_memberships", delete_after_days=0)
+        self.assert_membership_untouched()
+
+        call_command("sync_neon_memberships", delete_after_days=30)
+        self.assert_membership_untouched()
+
+        call_command("sync_neon_memberships", delete_after_days=9)
+        self.assertFalse(
+            NeonMembership.objects.filter(pk=self.membership.pk).exists()
+        )
