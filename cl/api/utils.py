@@ -932,17 +932,22 @@ def apply_membership_throttles(
     return True
 
 
-def clear_membership_throttles(user: User) -> None:
+def clear_membership_throttles(user: User, clear_cache: bool = True) -> None:
     """Delete the user's MEMBERSHIP-source API throttle rows.
 
     MANUAL rows are never touched.
+
+    :param user: The user whose membership throttles are removed.
+    :param clear_cache: When True, call ``clear_tiered_cache()`` if any rows
+        were deleted. Batch callers can pass False and clear the cache once
+        after their loop instead of scanning Redis on every iteration.
     """
     deleted, _ = APIThrottle.objects.filter(
         user=user,
         throttle_type=ThrottleType.API,
         source=APIThrottle.Source.MEMBERSHIP,
     ).delete()
-    if deleted:
+    if deleted and clear_cache:
         clear_tiered_cache()
 
 
