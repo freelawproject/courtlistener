@@ -27,6 +27,7 @@ project-includes = [
     "cl/oauth/migrations/0001_backfill_registration_source.py",
     "cl/recap/fetch_scheduler.py",
     "cl/recap/management/commands/recap_fetch_scheduler_daemon.py",
+    "cl/recap/tests/test_fetch_scheduler.py",
     "cl/recap/management/commands/remove_appellate_entries_with_long_numbers.py",
     "cl/recap/utils.py",
     "cl/scrapers/management/commands/back_scrape_dockets.py",
