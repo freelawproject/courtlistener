@@ -59,16 +59,15 @@ from cl.search.tasks import (
 from cl.search.types import (
     ESDocumentClassType,
     ESModelClassType,
-    ESModelType,
 )
 
 type DocumentModelMapping = dict[str, dict[type[Model], dict]]
 
 
 def check_fields_that_changed(
-    current_instance: ESModelType,
+    current_instance: Model,
     tracked_set: FieldInstanceTracker,
-    previous_instance: ESModelType | None = None,
+    previous_instance: Model | None = None,
 ) -> list[str]:
     """Identify which fields have changed between two instances of a model or
     between an instance and its previous state.
@@ -124,7 +123,7 @@ def check_fields_that_changed(
 
 
 def updated_fields(
-    instance: ESModelType, es_document: ESDocumentClassType
+    instance: Model, es_document: ESDocumentClassType
 ) -> list[str]:
     """Look for changes in the tracked fields of an instance.
     :param instance: The instance to check for changed fields.
@@ -176,7 +175,7 @@ def get_fields_to_update(
 def update_es_documents(
     main_model: ESModelClassType,
     es_document: ESDocumentClassType,
-    instance: ESModelType,
+    instance: Model,
     created: bool,
     mapping_fields: dict,
 ) -> None:
@@ -361,7 +360,7 @@ def update_es_documents(
 def update_remove_m2m_documents(
     main_model: ESModelClassType,
     es_document: ESDocumentClassType,
-    instance: ESModelType,
+    instance: Model,
     mapping_fields: dict,
     affected_field: str,
 ) -> None:
@@ -390,7 +389,7 @@ def update_remove_m2m_documents(
 
 
 def update_m2m_field_in_es_document(
-    instance: ESModelType,
+    instance: Model,
     es_document: ESDocumentClassType,
     affected_field: str,
 ) -> None:
@@ -432,7 +431,7 @@ def update_m2m_field_in_es_document(
 def update_reverse_related_documents(
     main_model: ESModelClassType,
     es_document: ESDocumentClassType,
-    instance: ESModelType,
+    instance: Model,
     query_string: str,
     affected_fields: list[str],
     fields_map: dict[str, str],
@@ -530,7 +529,7 @@ def update_reverse_related_documents(
 def delete_reverse_related_documents(
     main_model: ESModelClassType,
     es_document: ESDocumentClassType,
-    instance: ESModelType,
+    instance: Model,
     query_string: str,
     affected_fields: list[str],
 ) -> None:
@@ -640,7 +639,7 @@ def delete_reverse_related_documents(
 
 
 def allow_es_audio_indexing(
-    instance: ESModelType,
+    instance: Model,
     update_fields: list[str] | None,
 ):
     """Check conditions to abort Elasticsearch indexing for Audio instances.
