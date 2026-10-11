@@ -281,13 +281,6 @@
       "severity": "error"
     },
     {
-      "column": 17,
-      "path": "cl/alerts/utils.py",
-      "name": "bad-argument-type",
-      "concise_description": "Argument `type[ESRECAPBaseDocument]` is not assignable to parameter `es_document_class` with type `type[AudioDocument | AudioPercolator | DocketDocument | ESRECAPDocument | OpinionClusterDocument | OpinionDocument | ParentheticalGroupDocument | PersonDocument | PositionDocument]` in function `select_es_document_fields`",
-      "severity": "error"
-    },
-    {
       "column": 12,
       "path": "cl/alerts/utils.py",
       "name": "bad-return",
