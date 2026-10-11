@@ -31,7 +31,7 @@ from cl.recap.api_serializers import (
     PacerFetchQueueSerializer,
     ProcessingQueueSerializer,
 )
-from cl.recap.fetch_scheduler import SCHEDULER_SWITCH, enqueue_fetch
+from cl.recap.fetch_scheduler import SCHEDULER_SWITCH, schedule_fetch
 from cl.recap.filters import (
     EmailProcessingQueueFilter,
     FjcIntegratedDatabaseFilter,
@@ -185,7 +185,7 @@ class PacerFetchRequestViewSet(
         if not switch_is_active(SCHEDULER_SWITCH):
             do_pacer_fetch(fq)
             return
-        enqueue_fetch(fq.pk)
+        schedule_fetch(fq)
 
 
 class PacerDocIdLookupViewSet(LoggingMixin, ModelViewSet):

@@ -82,3 +82,7 @@ AUDIO_REENQUEUE_MAX_PER_SWEEP = env.int(
 RECAP_FETCH_SCHEDULER_DAEMON_ENABLED = env.bool(
     "RECAP_FETCH_SCHEDULER_DAEMON_ENABLED", default=False
 )
+# How fast we send requests to a single court's PACER server.
+RECAP_FETCH_DEFAULT_COURT_RATE = env(
+    "RECAP_FETCH_DEFAULT_COURT_RATE", default="1/s"
+)
