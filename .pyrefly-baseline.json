@@ -85,6 +85,13 @@
       "severity": "error"
     },
     {
+      "column": 15,
+      "path": "cl/alerts/api_serializers.py",
+      "name": "non-exhaustive-match",
+      "concise_description": "Match on `AlertLimitViolation | None` is not exhaustive",
+      "severity": "error"
+    },
+    {
       "column": 17,
       "path": "cl/alerts/api_serializers.py",
       "name": "missing-attribute",
@@ -103,6 +110,13 @@
       "path": "cl/alerts/forms.py",
       "name": "missing-attribute",
       "concise_description": "Object of class `Field` has no attribute `choices`",
+      "severity": "error"
+    },
+    {
+      "column": 15,
+      "path": "cl/alerts/forms.py",
+      "name": "non-exhaustive-match",
+      "concise_description": "Match on `AlertLimitViolation | None` is not exhaustive",
       "severity": "error"
     },
     {
@@ -4040,6 +4054,13 @@
       "severity": "error"
     },
     {
+      "column": 11,
+      "path": "cl/search/management/commands/cl_index_parent_and_child_docs.py",
+      "name": "non-exhaustive-match",
+      "concise_description": "Match on `EventTable | None` is not exhaustive",
+      "severity": "error"
+    },
+    {
       "column": 35,
       "path": "cl/search/management/commands/cl_index_parent_and_child_docs.py",
       "name": "bad-argument-type",
@@ -4163,6 +4184,13 @@
       "path": "cl/search/management/commands/pacer_bulk_fetch.py",
       "name": "bad-argument-type",
       "concise_description": "Argument `Unknown | None` is not assignable to parameter `time_interval` with type `float` in function `enough_time_elapsed`",
+      "severity": "error"
+    },
+    {
+      "column": 15,
+      "path": "cl/search/management/commands/pacer_bulk_fetch.py",
+      "name": "non-exhaustive-match",
+      "concise_description": "Match on `SkipReason | None` is not exhaustive",
       "severity": "error"
     },
     {
