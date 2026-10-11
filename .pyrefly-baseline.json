@@ -3795,13 +3795,6 @@
       "severity": "error"
     },
     {
-      "column": 21,
-      "path": "cl/recap/tasks.py",
-      "name": "bad-argument-type",
-      "concise_description": "Argument `ProxyPacerSession` is not assignable to parameter `session` with type `SessionData` in function `purchase_appellate_docket_by_docket_number`",
-      "severity": "error"
-    },
-    {
       "column": 22,
       "path": "cl/recap/tasks.py",
       "name": "bad-argument-type",
@@ -3827,13 +3820,6 @@
       "path": "cl/recap/tasks.py",
       "name": "bad-argument-type",
       "concise_description": "Argument `PacerFetchQueue` is not assignable to parameter `pq` with type `EmailProcessingQueue | ProcessingQueue`",
-      "severity": "error"
-    },
-    {
-      "column": 48,
-      "path": "cl/recap/tasks.py",
-      "name": "bad-argument-type",
-      "concise_description": "Argument `ProxyPacerSession` is not assignable to parameter `session` with type `SessionData` in function `fetch_docket_by_pacer_case_id`",
       "severity": "error"
     },
     {

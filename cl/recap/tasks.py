@@ -2560,7 +2560,7 @@ def create_or_update_docket_data_from_fetch(
 
 
 def fetch_docket_by_pacer_case_id(
-    session: SessionData,
+    session: ProxyPacerSession,
     court_id: str,
     pacer_case_id: str,
     fq: PacerFetchQueue,
@@ -2585,7 +2585,7 @@ def fetch_docket_by_pacer_case_id(
 
 
 def purchase_appellate_docket_by_docket_number(
-    session: SessionData,
+    session: ProxyPacerSession,
     court_id: str,
     docket_number: str,
     fq: PacerFetchQueue,
