@@ -65,6 +65,7 @@ ESModelClassType = (
 
 ESDocumentInstanceType = (
     AudioDocument
+    | DocketDocument
     | ParentheticalGroupDocument
     | AudioPercolator
     | PersonDocument

@@ -6105,13 +6105,6 @@
       "severity": "error"
     },
     {
-      "column": 12,
-      "path": "cl/search/tasks.py",
-      "name": "bad-return",
-      "concise_description": "Returned type `AudioDocument | AudioPercolator | DocketDocument | ESRECAPDocument | OpinionClusterDocument | OpinionDocument | ParentheticalGroupDocument | PersonDocument | PositionDocument | None` is not assignable to declared return type `AudioDocument | AudioPercolator | ESRECAPDocument | OpinionClusterDocument | OpinionDocument | ParentheticalGroupDocument | PersonDocument | PositionDocument | None`",
-      "severity": "error"
-    },
-    {
       "column": 25,
       "path": "cl/search/tasks.py",
       "name": "missing-attribute",
