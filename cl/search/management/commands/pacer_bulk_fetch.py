@@ -457,7 +457,8 @@ class Command(VerboseCommand):
                 )
                 return None
 
-        return None
+            case None:
+                return None
 
     def fetch_docs_from_pacer(self) -> None:
         """Process documents with one fetch per court at a time"""
