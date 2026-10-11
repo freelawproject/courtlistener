@@ -212,12 +212,28 @@ def get_courts_with_waiting_fetches() -> list[str]:
     return [str(court_id) for court_id in r.smembers(_courts_key())]
 
 
-def schedule_fetch(fq: PacerFetchQueue) -> None:
-    """Put a new request in the line for its court.
+def schedule_fetch(fq: PacerFetchQueue) -> float:
+    """Put a new request in line and tell its user how long the wait may be.
+
+    The explanation of the estimate is saved to the request's message, where
+    the API returns it.
 
     :param fq: The PacerFetchQueue row, already saved with status ENQUEUED.
+    :return: The estimated wait in seconds. See estimate_delay for what the
+    number does and does not promise.
     """
-    enqueue_fetch(get_court_id_from_fetch_queue(fq), fq.user_id, fq.pk)
+    court_id = get_court_id_from_fetch_queue(fq)
+    enqueue_fetch(court_id, fq.user_id, fq.pk)
+    delay = estimate_delay(court_id, fq.user_id)
+    fq.message = (
+        f"Waiting in the queue for court {court_id}. Estimated wait before "
+        f"we start this request: {round(delay)} s. That is an estimate of "
+        "when we will begin the request to PACER, not of when it will "
+        "finish, and it can grow if other users join the queue for this "
+        "court, if the court's rate is lowered or if our workers are busy."
+    )
+    fq.save(update_fields=["message"])
+    return delay
 
 
 def hand_off_fetch(fq_pk: int) -> None:
@@ -243,3 +259,48 @@ def run_dispatch_cycle() -> int:
             hand_off_fetch(fq_pk)
             handed_off += 1
     return handed_off
+
+
+def estimate_delay(
+    court_id: str, user_id: int, now_ms: int | None = None
+) -> float:
+    """Estimate how long a user's newest request will wait before it starts.
+
+    Call it right after enqueue_fetch for the same court and user.
+
+    This is an estimate of when we begin the request to PACER, not of when it
+    completes, and it is not a promise. It assumes every other waiting user
+    takes each turn they are entitled to before this request's own turn comes,
+    which is the worst case for the users waiting now. It will be too low if
+    more users join the court's queue afterwards, if the court's rate is
+    lowered, or if Celery workers are too busy to start requests promptly.
+
+    :param court_id: The court the request will be sent to.
+    :param user_id: The user who made the request.
+    :param now_ms: The current time in milliseconds. Only tests should set it.
+    :return: The estimated wait in seconds.
+    """
+    now_ms = _now_ms() if now_ms is None else now_ms
+    r = get_redis_interface("CACHE")
+    other_users = [
+        str(user)
+        for user in r.zrange(_users_key(court_id), 0, -1)
+        if str(user) != str(user_id)
+    ]
+    pipe = r.pipeline()
+    pipe.llen(_user_list_key(court_id, user_id))
+    pipe.get(_next_key(court_id))
+    for user in other_users:
+        pipe.llen(f"{_user_list_prefix(court_id)}{user}")
+    own_depth, next_ms, *other_depths = pipe.execute()
+
+    # Users take turns, so before this user's Nth request starts, each other
+    # user gets at most N turns, and fewer if they have fewer requests waiting.
+    turns_ahead = max(own_depth - 1, 0) + sum(
+        min(depth, own_depth) for depth in other_depths
+    )
+    until_court_is_free = max(int(next_ms or 0) - now_ms, 0)
+    delay_ms = until_court_is_free + turns_ahead * get_court_interval_ms(
+        court_id
+    )
+    return delay_ms / 1000
