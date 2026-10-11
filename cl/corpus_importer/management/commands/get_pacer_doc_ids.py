@@ -5,7 +5,7 @@ from django.conf import settings
 from cl.corpus_importer.tasks import get_pacer_doc_id_with_show_case_doc_url
 from cl.lib.celery_utils import CeleryThrottle
 from cl.lib.command_utils import VerboseCommand, logger
-from cl.lib.pacer_session import ProxyPacerSession
+from cl.lib.pacer_session import ProxyPacerSession, SessionData
 from cl.search.models import Court, RECAPDocument
 
 PACER_USERNAME = os.environ.get("PACER_USERNAME", settings.PACER_USERNAME)
@@ -42,7 +42,8 @@ def get_pacer_doc_ids(options):
                 f"Sent {completed} tasks to celery so far. Latest pk: {row_pk}"
             )
         get_pacer_doc_id_with_show_case_doc_url.apply_async(
-            args=(row_pk, session.cookies), queue=q
+            # pyrefly: ignore [unbound-name] `completed % 1000 == 0` is true on the first iteration.
+            args=(row_pk, SessionData(session.cookies, session.proxy_address)), queue=q
         )
         completed += 1
 

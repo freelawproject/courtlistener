@@ -1009,13 +1009,6 @@
       "severity": "error"
     },
     {
-      "column": 27,
-      "path": "cl/corpus_importer/management/commands/get_pacer_doc_ids.py",
-      "name": "unbound-name",
-      "concise_description": "`session` may be uninitialized",
-      "severity": "error"
-    },
-    {
       "column": 55,
       "path": "cl/corpus_importer/management/commands/harvard_merge.py",
       "name": "bad-argument-type",
