@@ -1148,14 +1148,15 @@ def get_pacer_case_id_and_title(
         court_id,
     )
 
-    if not session_data and user_pk:
-        session_data = get_pacer_cookie_from_cache(user_pk)
-        if not session_data:
-            raise Exception("Cookies not available in cache")
-    else:
-        raise Exception(
-            "user_pk is unavailable, cookies cannot be retrieved from cache"
-        )
+    if not session_data:
+        if user_pk:
+            session_data = get_pacer_cookie_from_cache(user_pk)
+            if not session_data:
+                raise Exception("Cookies not available in cache")
+        else:
+            raise Exception(
+                "user_pk is unavailable, cookies cannot be retrieved from cache"
+            )
 
     s = ProxyPacerSession(
         cookies=session_data.cookies, proxy=session_data.proxy_address
