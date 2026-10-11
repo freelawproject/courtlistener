@@ -68,7 +68,7 @@ def get_dockets(options):
             ).set(queue=q),
             get_docket_by_pacer_case_id.s(
                 court_id="ilnb",
-                cookies_data=session_data,
+                session_data=session_data,
                 tag_names=[TAG],
                 **{
                     "show_parties_and_counsel": True,
