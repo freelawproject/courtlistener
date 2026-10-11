@@ -159,4 +159,4 @@ class Command(VerboseCommand):
                 )
             get_dockets(options)
         elif options["task"] == "district_attachments":
-            get_district_attachment_pages(options)
+            get_att_pages(options)

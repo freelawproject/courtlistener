@@ -925,27 +925,6 @@
       "severity": "error"
     },
     {
-      "column": 42,
-      "path": "cl/corpus_importer/management/commands/760_project.py",
-      "name": "missing-argument",
-      "concise_description": "Missing argument `rd_pks` in function `cl.corpus_importer.task_canvases.get_district_attachment_pages`",
-      "severity": "error"
-    },
-    {
-      "column": 42,
-      "path": "cl/corpus_importer/management/commands/760_project.py",
-      "name": "missing-argument",
-      "concise_description": "Missing argument `tag_names` in function `cl.corpus_importer.task_canvases.get_district_attachment_pages`",
-      "severity": "error"
-    },
-    {
-      "column": 42,
-      "path": "cl/corpus_importer/management/commands/760_project.py",
-      "name": "missing-argument",
-      "concise_description": "Missing argument `session` in function `cl.corpus_importer.task_canvases.get_district_attachment_pages`",
-      "severity": "error"
-    },
-    {
       "column": 21,
       "path": "cl/corpus_importer/management/commands/anon_2020_import.py",
       "name": "bad-argument-type",
