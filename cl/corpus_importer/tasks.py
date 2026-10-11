@@ -1869,7 +1869,7 @@ def get_docket_by_pacer_case_id(
             self.request.chain = None
             return None
         logger.info(f"{msg} Retrying.", logging_id)  # noqa: G004
-        raise self.retry(exc)
+        raise self.retry(exc=exc)
     docket_data = report.data
     logger.info("Querying and parsing complete for %s", logging_id)
 
@@ -2062,7 +2062,7 @@ def get_attachment_page_by_rd(
             logger.warning(
                 "Ran into HTTPError: %s. Retrying.", exc.response.status_code
             )
-            raise self.retry(exc)
+            raise self.retry(exc=exc)
         elif exc.response:
             msg = "Ran into unknown HTTPError. %s. Aborting."
             logger.error(msg, exc.response.status_code)
@@ -2136,7 +2136,7 @@ def get_bankr_claims_registry(
             "Retrying.",
             logging_id,
         )
-        raise self.retry(exc)
+        raise self.retry(exc=exc)
     claims_data = report.data
     logger.info("Querying and parsing complete for %s", logging_id)
 
@@ -2865,7 +2865,7 @@ def get_pacer_doc_id_with_show_case_doc_url(
                 return
 
             logger.info(f"{msg} Retrying", status_code)  # noqa: G004
-            raise self.retry(exc)
+            raise self.retry(exc=exc)
         elif exc.response:
             status_code = exc.response.status_code
             msg = "Ran into unknown HTTPError. %s. Aborting."
