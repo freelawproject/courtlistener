@@ -792,15 +792,17 @@ class ESSignalProcessor:
                 )
 
     @elasticsearch_enabled
-    def handle_save(
+    def handle_save[M: Model](
         self,
-        sender,
-        instance=None,
+        sender: type[M],
+        instance: M | None = None,
         created=False,
         update_fields=None,
         **kwargs,
-    ):
+    ) -> None:
         """Receiver function that gets called after an object instance is saved"""
+        if instance is None:
+            raise TypeError("Signals did not send an instance")
 
         if update_fields and "view_count" in update_fields:
             # If the save includes 'view_count' in the update fields, abort
@@ -861,8 +863,15 @@ class ESSignalProcessor:
         )
 
     @elasticsearch_enabled
-    def handle_delete(self, sender, instance, **kwargs):
+    def handle_delete[M: Model](
+        self,
+        sender: type[M],
+        instance: M | None = None,
+        **kwargs
+    ) -> None:
         """Receiver function that gets called after an object instance is deleted"""
+        if instance is None:
+            raise TypeError("Signals did not send an instance")
 
         doc_id, routing_id = get_es_doc_id_and_parent_id(
             self.es_document, instance
@@ -880,8 +889,17 @@ class ESSignalProcessor:
         )
 
     @elasticsearch_enabled
-    def handle_m2m(self, sender, instance=None, action=None, **kwargs):
+    def handle_m2m[M: Model](
+        self,
+        sender: type[M],
+        instance: M | None = None,
+        action=None,
+        **kwargs
+    ) -> None:
         """Receiver function that gets called after a m2m relation is modified"""
+        if instance is None:
+            raise TypeError("Signals did not send an instance")
+
         if action == "post_add" or action == "post_remove":
             mapping_fields = self.documents_model_mapping["m2m"][sender]
             for key, fields_map in mapping_fields.items():
@@ -895,10 +913,18 @@ class ESSignalProcessor:
                 )
 
     @elasticsearch_enabled
-    def handle_reverse_actions(self, sender, instance=None, **kwargs):
+    def handle_reverse_actions[M: Model](
+        self,
+        sender: type[M],
+        instance: M | None = None,
+        **kwargs
+    ) -> None:
         """Receiver function that gets called after a reverse relation is
         created, updated or removed.
         """
+        if instance is None:
+            raise TypeError("Signals did not send an instance")
+
         mapping_fields = self.documents_model_mapping["reverse"][sender]
         for query_string, fields_map in mapping_fields.items():
             match instance:
@@ -939,10 +965,18 @@ class ESSignalProcessor:
             )
 
     @elasticsearch_enabled
-    def handle_reverse_actions_delete(self, sender, instance=None, **kwargs):
+    def handle_reverse_actions_delete[M: Model](
+        self,
+        sender: type[M],
+        instance: M | None = None,
+        **kwargs
+    ) -> None:
         """Receiver function that gets called after a reverse relation is
         removed.
         """
+        if instance is None:
+            raise TypeError("Signals did not send an instance")
+
         mapping_fields = self.documents_model_mapping["reverse-delete"][sender]
         for query_string, fields_map in mapping_fields.items():
             try:
