@@ -43,7 +43,8 @@ def get_pacer_doc_ids(options):
             )
         get_pacer_doc_id_with_show_case_doc_url.apply_async(
             # pyrefly: ignore [unbound-name] `completed % 1000 == 0` is true on the first iteration.
-            args=(row_pk, SessionData(session.cookies, session.proxy_address)), queue=q
+            args=(row_pk, SessionData(session.cookies, session.proxy_address)),
+            queue=q,
         )
         completed += 1
 

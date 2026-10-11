@@ -19,7 +19,12 @@ from cl.recap.tasks import process_recap_attachment
 
 
 def get_docket_and_claims(
-    docket_number, court, case_name, session_data: SessionData, tags: list[str], q
+    docket_number,
+    court,
+    case_name,
+    session_data: SessionData,
+    tags: list[str],
+    q,
 ):
     """
     Get the docket report, claims history report, and save it all to the DB
@@ -49,7 +54,9 @@ def get_docket_and_claims(
     ).apply_async()
 
 
-def get_district_attachment_pages(options, rd_pks, tag_names: list[str], session_data: SessionData):
+def get_district_attachment_pages(
+    options, rd_pks, tag_names: list[str], session_data: SessionData
+):
     """Get the attachment page information for all of the items selected
 
     :param options: The options returned by argparse. Should have the following

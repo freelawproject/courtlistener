@@ -284,7 +284,10 @@ def get_attachment_pages(options, tag):
     session.login()
     session_data = SessionData(session.cookies, session.proxy_address)
     get_district_attachment_pages(
-        options=options, rd_pks=rd_pks, tag_names=[tag], session_data=session_data
+        options=options,
+        rd_pks=rd_pks,
+        tag_names=[tag],
+        session_data=session_data,
     )
 
 
