@@ -1,15 +1,18 @@
 import csv
 import logging
 import traceback
+import zipfile
 from dataclasses import dataclass, field
 from io import StringIO
-from typing import Any, TypedDict, cast
+from typing import Any, cast
+from io import BytesIO, StringIO
 from zoneinfo import ZoneInfo
 
 import waffle
 from asgiref.sync import sync_to_async
 from django.conf import settings
 from django.contrib.auth.models import AnonymousUser, User
+from django.core.exceptions import ObjectDoesNotExist
 from django.db.models import QuerySet
 from django.http import Http404, HttpRequest
 from django.shortcuts import aget_object_or_404
@@ -32,6 +35,7 @@ from cl.lib.elasticsearch_utils import (
     build_join_es_filters,
     build_more_like_this_query,
 )
+from cl.lib.recap_utils import get_document_filename
 from cl.lib.s3_cache import get_s3_cache, make_s3_cache_key
 from cl.lib.string_utils import trunc
 from cl.lib.types import CleanData
@@ -54,6 +58,7 @@ from cl.search.models import (
     OpinionCluster,
     OriginatingCourtInformation,
     SCOTUSDocketEntry,
+    RECAPDocument,
 )
 
 logger: logging.Logger = logging.getLogger(__name__)
@@ -668,6 +673,54 @@ def generate_docket_entries_csv_data(
     csv_content: str = output.getvalue()
     output.close()
     return csv_content
+
+
+def get_available_recap_documents(
+    docket_id: int,
+) -> QuerySet[RECAPDocument]:
+    """Return the RECAPDocuments for a docket that have a PDF on file.
+
+    Shared by the bulk PDF zip download feature's synchronous view and its
+    background Celery task so both build the zip from the same document set.
+
+    :param docket_id: The docket whose available PDFs should be fetched.
+    """
+    return RECAPDocument.objects.filter(
+        docket_entry__docket_id=docket_id,
+        is_available=True,
+    ).exclude(filepath_local="")
+
+
+def generate_docket_pdf_zip_data(
+    docket: Docket, recap_documents: QuerySet[RECAPDocument]
+) -> bytes | None:
+    """Build a zip archive containing every available PDF for a docket.
+
+    Each PDF is named using the same convention as its individual PACER
+    download filename, so files extracted from the zip remain identifiable.
+
+    :param docket: The docket the documents belong to, used to build filenames.
+    :param recap_documents: The documents to include, e.g. from
+        ``get_available_recap_documents``.
+    :returns: The zip file's raw bytes, or None if none of the documents
+        actually had a downloadable PDF.
+    """
+    zip_buffer = BytesIO()
+    added_any = False
+    with zipfile.ZipFile(zip_buffer, "w", zipfile.ZIP_DEFLATED) as zf:
+        for rd in recap_documents:
+            if not rd.has_valid_pdf:
+                continue
+            filename = get_document_filename(
+                docket.court_id,
+                docket.pacer_case_id,
+                rd.document_number,
+                rd.attachment_number,
+            )
+            zf.writestr(filename, rd.filepath_local.read())
+            added_any = True
+
+    return zip_buffer.getvalue() if added_any else None
 
 
 async def build_cites_clusters_query(

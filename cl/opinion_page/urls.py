@@ -8,6 +8,7 @@ from cl.opinion_page.views import (
     court_publish_page,
     docket_authorities,
     docket_idb_data,
+    download_case_pdfs,
     download_docket_entries_csv,
     redirect_docket_recap,
     redirect_og_lookup,
@@ -74,6 +75,11 @@ urlpatterns: list[URLPattern] = [
         "docket/<int:docket_id>/download/",
         download_docket_entries_csv,
         name="view_download_docket",
+    ),
+    path(
+        "docket/<int:docket_id>/download-all/",
+        download_case_pdfs,  # type: ignore[arg-type]
+        name="download_case_pdfs",
     ),
     path(
         "docket/<int:pk>/<blank-slug:slug>/",
