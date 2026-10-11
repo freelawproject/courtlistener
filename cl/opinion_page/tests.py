@@ -3678,9 +3678,7 @@ class BuildAndEmailDocketPdfZipTest(TestCase):
         )
 
     def test_builds_zip_uploads_and_emails_link(self) -> None:
-        fake_url = (
-            "https://storage.courtlistener.com/recap/bulk-pdfs/fake.zip"
-        )
+        fake_url = "https://storage.courtlistener.com/recap/bulk-pdfs/fake.zip"
         with mock.patch(
             "cl.opinion_page.tasks.IncrementingAWSMediaStorage"
         ) as mock_storage_cls:

@@ -3,16 +3,14 @@ import logging
 import traceback
 import zipfile
 from dataclasses import dataclass, field
-from io import StringIO
-from typing import Any, cast
 from io import BytesIO, StringIO
+from typing import Any, cast
 from zoneinfo import ZoneInfo
 
 import waffle
 from asgiref.sync import sync_to_async
 from django.conf import settings
 from django.contrib.auth.models import AnonymousUser, User
-from django.core.exceptions import ObjectDoesNotExist
 from django.db.models import QuerySet
 from django.http import Http404, HttpRequest
 from django.shortcuts import aget_object_or_404
@@ -57,8 +55,8 @@ from cl.search.models import (
     DocketEntry,
     OpinionCluster,
     OriginatingCourtInformation,
-    SCOTUSDocketEntry,
     RECAPDocument,
+    SCOTUSDocketEntry,
 )
 
 logger: logging.Logger = logging.getLogger(__name__)
