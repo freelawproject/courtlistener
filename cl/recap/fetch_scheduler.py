@@ -27,15 +27,22 @@ turn, so one user's large batch cannot hold up another user's single request.
                                         courts that don't use the default rate
 """
 
+import logging
 import time
+from datetime import timedelta
 
 from django.conf import settings
+from django.utils.timezone import now
+from sentry_sdk import capture_exception
 
+from cl.api.webhooks import send_recap_fetch_webhooks
 from cl.lib.ratelimiter import parse_rate
 from cl.lib.redis_utils import get_redis_interface, release_redis_lock
 from cl.recap.models import PROCESSING_STATUS, PacerFetchQueue
-from cl.recap.tasks import do_pacer_fetch
+from cl.recap.tasks import do_pacer_fetch, mark_fq_status
 from cl.recap.utils import get_court_id_from_fetch_queue
+
+logger = logging.getLogger(__name__)
 
 # Waffle switch that sends new Fetch API requests through this waiting room.
 # While it is off, requests go straight to Celery as they did before.
@@ -47,6 +54,20 @@ KEY_PREFIX = "recap_fetch"
 # and allows the next one. Without this, a request lost between Redis and
 # Celery would block its court forever.
 PENDING_TTL_SECONDS = 5 * 60
+
+# A request that has not started this long after it was made is failed. The
+# user's PACER cookies are cached for an hour and we never store their
+# password, so past that point the request could not succeed anyway.
+STALE_AFTER = timedelta(minutes=70)
+
+# Don't fail requests older than this. It keeps the first run in production
+# from sending webhooks for rows that have been stuck for months.
+SWEEP_LOOKBACK = timedelta(days=1)
+
+STALE_MESSAGE = (
+    "This request waited too long to start and was cancelled before "
+    "anything was requested from PACER. Please submit it again."
+)
 
 # Atomically take the next request for a court, if the court is ready for one.
 # This has to be a script because it reads the court's clock, decides, and
@@ -265,6 +286,19 @@ def clear_pending_fetch(court_id: str, fq_pk: int) -> None:
     release_redis_lock(r, _pending_key(court_id), str(fq_pk))
 
 
+def remove_fetch(court_id: str, user_id: int, fq_pk: int) -> bool:
+    """Take a waiting request out of the queue without running it.
+
+    :param court_id: The court the request is waiting in.
+    :param user_id: The user who made the request.
+    :param fq_pk: The PK of the PacerFetchQueue row.
+    :return: True if the request was still waiting and has been removed. False
+    means it had already been handed off or was never queued.
+    """
+    r = get_redis_interface("CACHE")
+    return bool(r.lrem(_user_list_key(court_id, user_id), 0, str(fq_pk)))
+
+
 def get_courts_with_waiting_fetches() -> list[str]:
     """List the courts that may have requests waiting.
 
@@ -304,6 +338,10 @@ def schedule_fetch(fq: PacerFetchQueue) -> float:
 def hand_off_fetch(court_id: str, fq_pk: int) -> bool:
     """Send a request that has left the line to Celery.
 
+    If the request cannot be sent it is marked as failed rather than put back
+    in line. Putting it back risks running it twice, and every run is billed
+    to the user's PACER account.
+
     :param court_id: The court the request was taken from.
     :param fq_pk: The PK returned by pop_next_fetch.
     :return: True if the request was sent to Celery.
@@ -315,7 +353,19 @@ def hand_off_fetch(court_id: str, fq_pk: int) -> bool:
         # Deleted or already finished while it waited: nothing to run.
         clear_pending_fetch(court_id, fq_pk)
         return False
-    do_pacer_fetch(fq)
+
+    try:
+        do_pacer_fetch(fq)
+    except Exception as e:
+        logger.exception("Unable to send fetch request %s to Celery.", fq_pk)
+        capture_exception(e)
+        mark_fq_status(
+            fq,
+            "We were unable to schedule this request. Please submit it again.",
+            PROCESSING_STATUS.FAILED,
+        )
+        clear_pending_fetch(court_id, fq_pk)
+        return False
     return True
 
 
@@ -390,3 +440,42 @@ def estimate_delay(
         court_id
     )
     return delay_ms / 1000
+
+
+def fail_stale_fetches() -> int:
+    """Fail requests that have waited too long to ever succeed.
+
+    This is what guarantees no request stays in ENQUEUED forever, whatever
+    happened to it: lost from Redis, lost on the way to Celery, or stuck
+    behind workers that never came back.
+
+    Only ENQUEUED rows are touched. Once a task has started, the request
+    belongs to Celery and its retries.
+
+    :return: The number of requests that were failed.
+    """
+    cutoff = now() - STALE_AFTER
+    stale_fqs = PacerFetchQueue.objects.filter(
+        status=PROCESSING_STATUS.ENQUEUED,
+        date_created__lt=cutoff,
+        date_created__gt=now() - SWEEP_LOOKBACK,
+    )
+    failed = 0
+    for fq in stale_fqs.iterator():
+        # Claim the row only if it is still ENQUEUED, so a task that started
+        # between the query above and this line is left alone.
+        claimed = PacerFetchQueue.objects.filter(
+            pk=fq.pk, status=PROCESSING_STATUS.ENQUEUED
+        ).update(
+            status=PROCESSING_STATUS.FAILED,
+            message=STALE_MESSAGE,
+            date_modified=now(),
+        )
+        if not claimed:
+            continue
+        failed += 1
+        fq.status = PROCESSING_STATUS.FAILED
+        fq.message = STALE_MESSAGE
+        send_recap_fetch_webhooks(fq)
+        remove_fetch(get_court_id_from_fetch_queue(fq), fq.user_id, fq.pk)
+    return failed

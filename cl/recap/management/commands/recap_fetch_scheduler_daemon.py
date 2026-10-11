@@ -18,10 +18,14 @@ from django.conf import settings
 from sentry_sdk import capture_exception
 
 from cl.lib.command_utils import VerboseCommand, logger
-from cl.recap.fetch_scheduler import run_dispatch_cycle
+from cl.recap.fetch_scheduler import fail_stale_fetches, run_dispatch_cycle
 
 # Seconds to wait after one dispatch cycle finishes before starting the next.
 DISPATCH_WAIT = 0.5
+
+# Seconds between sweeps for requests that waited too long. Sweeping is a
+# database query, so it runs far less often than dispatching.
+SWEEP_WAIT = 60
 
 shutdown_requested = False
 
@@ -38,8 +42,9 @@ def _request_shutdown(signum: int, _frame: Any) -> None:
 class Command(VerboseCommand):
     help = (
         "Long-running daemon that hands waiting RECAP Fetch requests to "
-        "Celery. To stop it, set RECAP_FETCH_SCHEDULER_DAEMON_ENABLED=False "
-        "and restart the pod (the env var is read once at Django startup)."
+        "Celery and fails requests that waited too long to succeed. To stop "
+        "it, set RECAP_FETCH_SCHEDULER_DAEMON_ENABLED=False and restart the "
+        "pod (the env var is read once at Django startup)."
     )
 
     def add_arguments(self, parser: argparse.ArgumentParser) -> None:
@@ -61,6 +66,8 @@ class Command(VerboseCommand):
 
         testing_iterations: int = options["testing_iterations"]
         iterations_completed = 0
+        # Sweep on the first cycle, so a restart doesn't delay it.
+        next_sweep = time.monotonic()
 
         logger.info(
             "RECAP Fetch scheduler daemon starting. enabled=%s.",
@@ -73,6 +80,10 @@ class Command(VerboseCommand):
         ):
             try:
                 run_dispatch_cycle()
+                if time.monotonic() >= next_sweep:
+                    next_sweep = time.monotonic() + SWEEP_WAIT
+                    if failed := fail_stale_fetches():
+                        logger.info("Failed %s stale fetch requests.", failed)
             except Exception as e:
                 # One bad cycle (e.g. a Redis or DB blip) shouldn't crash the
                 # pod and cause a restart loop. Waiting requests stay in Redis
