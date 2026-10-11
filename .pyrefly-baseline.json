@@ -4068,13 +4068,6 @@
       "severity": "error"
     },
     {
-      "column": 69,
-      "path": "cl/search/management/commands/cl_index_parent_and_child_docs.py",
-      "name": "bad-argument-type",
-      "concise_description": "Argument `dict[str, list[str]]` is not assignable to parameter `fields_map` with type `dict[str, str]` in function `cl.lib.es_signal_processor.get_fields_to_update`",
-      "severity": "error"
-    },
-    {
       "column": 25,
       "path": "cl/search/management/commands/cl_index_parent_and_child_docs.py",
       "name": "bad-argument-type",

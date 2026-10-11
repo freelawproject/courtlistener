@@ -1,10 +1,17 @@
+from collections.abc import Callable, Iterable
 from functools import partial
 
 from celery.canvas import chain
 from django.conf import settings
 from django.core.exceptions import FieldDoesNotExist, ObjectDoesNotExist
 from django.db import transaction
-from django.db.models.signals import m2m_changed, post_delete, post_save
+from django.db.models import Model
+from django.db.models.signals import (
+    ModelSignal,
+    m2m_changed,
+    post_delete,
+    post_save,
+)
 from model_utils.tracker import FieldInstanceTracker
 
 from cl.alerts.tasks import (
@@ -54,6 +61,8 @@ from cl.search.types import (
     ESModelClassType,
     ESModelType,
 )
+
+type DocumentModelMapping = dict[str, dict[type[Model], dict]]
 
 
 def check_fields_that_changed(
@@ -701,7 +710,12 @@ class ESSignalProcessor:
         "update_reverse_related_{}_on_delete"
     )
 
-    def __init__(self, main_model, es_document, documents_model_mapping):
+    def __init__(
+        self,
+        main_model,
+        es_document,
+        documents_model_mapping: DocumentModelMapping,
+    ):
         self.main_model = main_model
         self.es_document = es_document
         self.documents_model_mapping = documents_model_mapping
@@ -760,7 +774,12 @@ class ESSignalProcessor:
         )
 
     @staticmethod
-    def connect_signals(models, handler, signal_to_uid_mapping, weak=False):
+    def connect_signals(
+        models: Iterable[type[Model]],
+        handler: Callable[..., None],
+        signal_to_uid_mapping: dict[ModelSignal, str],
+        weak: bool = False,
+    ) -> None:
         """Helper method to connect signals to a handler for multiple models."""
         for model in models:
             model_name = model.__name__.lower()
