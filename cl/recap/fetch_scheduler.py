@@ -5,7 +5,11 @@ daemon hands them to Celery. Only the PK of each PacerFetchQueue row is kept
 here; PostgreSQL remains the source of truth for the request itself.
 
 Each court has its own clock, because each court has its own PACER server, so
-that we never send it requests faster than its rate allows.
+that we never send it requests faster than its rate allows. The clock counts
+from when a request starts running, not from when it is handed to Celery, and
+a court never has more than one request handed off but not yet started.
+Otherwise requests that pile up in Celery while workers are busy would all
+start together once the workers free up.
 
 Within a court, each user has their own line and users take turns. The next
 request always belongs to the user who has waited longest since their last
@@ -15,6 +19,8 @@ turn, so one user's large batch cannot hold up another user's single request.
     recap_fetch:{court}:users           ZSET of users with requests waiting,
                                         scored by the time of their last turn
     recap_fetch:{court}:user:{user_id}  LIST of that user's request PKs, FIFO
+    recap_fetch:{court}:pending         PK handed to Celery that has not
+                                        started yet
     recap_fetch:{court}:next            Earliest time the court may be sent
                                         its next request, in milliseconds
     recap_fetch:rates                   HASH of court ID to rate, for the
@@ -26,8 +32,8 @@ import time
 from django.conf import settings
 
 from cl.lib.ratelimiter import parse_rate
-from cl.lib.redis_utils import get_redis_interface
-from cl.recap.models import PacerFetchQueue
+from cl.lib.redis_utils import get_redis_interface, release_redis_lock
+from cl.recap.models import PROCESSING_STATUS, PacerFetchQueue
 from cl.recap.tasks import do_pacer_fetch
 from cl.recap.utils import get_court_id_from_fetch_queue
 
@@ -37,15 +43,24 @@ SCHEDULER_SWITCH = "recap-fetch-scheduler"
 
 KEY_PREFIX = "recap_fetch"
 
+# How long a court waits for a handed-off request to start before it gives up
+# and allows the next one. Without this, a request lost between Redis and
+# Celery would block its court forever.
+PENDING_TTL_SECONDS = 5 * 60
+
 # Atomically take the next request for a court, if the court is ready for one.
 # This has to be a script because it reads the court's clock, decides, and
 # then writes. Done as separate commands, two processes could both read the
 # clock before either one moved it forward, and both would send a request.
 #
-# KEYS: the court's users ZSET, the court's next key, the courts SET
-# ARGV: now (ms), the court's next allowed time if a request is taken (ms),
-#       the court ID, the prefix of the court's per-user LIST keys
+# KEYS: the court's users ZSET, the court's next key, the courts SET, the
+#       court's pending key
+# ARGV: now (ms), how long the pending marker lives (s), the court ID, the
+#       prefix of the court's per-user LIST keys
 POP_NEXT_SCRIPT = """
+if redis.call('EXISTS', KEYS[4]) == 1 then
+    return false
+end
 if tonumber(ARGV[1]) < tonumber(redis.call('GET', KEYS[2]) or '0') then
     return false
 end
@@ -65,7 +80,7 @@ if redis.call('LLEN', user_list) > 0 then
 else
     redis.call('ZREM', KEYS[1], user)
 end
-redis.call('SET', KEYS[2], ARGV[2])
+redis.call('SET', KEYS[4], pk, 'EX', tonumber(ARGV[2]))
 return pk
 """
 
@@ -93,6 +108,11 @@ def _user_list_prefix(court_id: str) -> str:
 def _user_list_key(court_id: str, user_id: int) -> str:
     """Return the key of the LIST of one user's waiting requests in a court."""
     return f"{_user_list_prefix(court_id)}{user_id}"
+
+
+def _pending_key(court_id: str) -> str:
+    """Return the key holding the court's handed-off, not yet started PK."""
+    return f"{KEY_PREFIX}:{court_id}:pending"
 
 
 def _next_key(court_id: str) -> str:
@@ -170,34 +190,79 @@ def pop_next_fetch(court_id: str, now_ms: int | None = None) -> int | None:
     The request comes from the user who has waited longest since their last
     turn in the court, and is that user's oldest one.
 
-    Taking a request starts the court's interval: nothing else can be taken
-    for that court until the interval has passed.
-
     The caller MUST hand the returned request to Celery: it has left the line,
-    and nothing else will run it.
+    and nothing else will run it. The court then accepts no other request
+    until this one starts (see mark_fetch_started) and its interval passes,
+    or until PENDING_TTL_SECONDS pass.
 
     Safe to call from any number of processes at once: between them they get
-    at most one request per court per interval.
+    at most one request per court.
 
     :param court_id: The court to take a request from.
     :param now_ms: The current time in milliseconds. Only tests should set it.
-    :return: The PK of the PacerFetchQueue row, or None if nothing is waiting
-    or the court is still inside its interval.
+    :return: The PK of the PacerFetchQueue row, or None if nothing is waiting,
+    the court's previous request has not started, or the court is still
+    inside its interval.
     """
     now_ms = _now_ms() if now_ms is None else now_ms
     r = get_redis_interface("CACHE")
     fq_pk = r.eval(
         POP_NEXT_SCRIPT,
-        3,
+        4,
         _users_key(court_id),
         _next_key(court_id),
         _courts_key(),
+        _pending_key(court_id),
         now_ms,
-        now_ms + get_court_interval_ms(court_id),
+        PENDING_TTL_SECONDS,
         court_id,
         _user_list_prefix(court_id),
     )
     return int(str(fq_pk)) if fq_pk else None
+
+
+def get_pending_fetch(court_id: str) -> int | None:
+    """Get the request a court has handed to Celery that has not started.
+
+    :param court_id: The court to look up.
+    :return: The PK of the PacerFetchQueue row, or None if there is none.
+    """
+    fq_pk = get_redis_interface("CACHE").get(_pending_key(court_id))
+    return int(str(fq_pk)) if fq_pk else None
+
+
+def mark_fetch_started(
+    court_id: str, fq_pk: int, now_ms: int | None = None
+) -> None:
+    """Record that a court's handed-off request has started running.
+
+    The court's interval is counted from this moment.
+
+    :param court_id: The court the request was sent to.
+    :param fq_pk: The PK of the PacerFetchQueue row that started.
+    :param now_ms: The current time in milliseconds. Only tests should set it.
+    """
+    now_ms = _now_ms() if now_ms is None else now_ms
+    r = get_redis_interface("CACHE")
+    # Order matters: set the next allowed time before releasing the court, so
+    # there is never a moment when the court looks free and unthrottled.
+    r.set(_next_key(court_id), now_ms + get_court_interval_ms(court_id))
+    # Only clear the marker if it still names this request, so a slow caller
+    # cannot release a newer request's hold on the court.
+    release_redis_lock(r, _pending_key(court_id), str(fq_pk))
+
+
+def clear_pending_fetch(court_id: str, fq_pk: int) -> None:
+    """Free a court whose taken request will not be handed to Celery.
+
+    Unlike mark_fetch_started, this does not start the court's interval,
+    because nothing was sent to PACER.
+
+    :param court_id: The court the request was taken from.
+    :param fq_pk: The PK of the PacerFetchQueue row that was taken.
+    """
+    r = get_redis_interface("CACHE")
+    release_redis_lock(r, _pending_key(court_id), str(fq_pk))
 
 
 def get_courts_with_waiting_fetches() -> list[str]:
@@ -236,27 +301,48 @@ def schedule_fetch(fq: PacerFetchQueue) -> float:
     return delay
 
 
-def hand_off_fetch(fq_pk: int) -> None:
+def hand_off_fetch(court_id: str, fq_pk: int) -> bool:
     """Send a request that has left the line to Celery.
 
+    :param court_id: The court the request was taken from.
     :param fq_pk: The PK returned by pop_next_fetch.
+    :return: True if the request was sent to Celery.
     """
-    fq = PacerFetchQueue.objects.filter(pk=fq_pk).first()
+    fq = PacerFetchQueue.objects.filter(
+        pk=fq_pk, status=PROCESSING_STATUS.ENQUEUED
+    ).first()
     if fq is None:
-        # The row was deleted while it waited, so there is nothing to run.
-        return
+        # Deleted or already finished while it waited: nothing to run.
+        clear_pending_fetch(court_id, fq_pk)
+        return False
     do_pacer_fetch(fq)
+    return True
 
 
 def run_dispatch_cycle() -> int:
     """Hand off at most one request per court, for each court that is ready.
 
+    A court is ready when its previous request has started and its interval
+    has passed since then. "Started" is read from PostgreSQL: the fetch tasks
+    move the row out of ENQUEUED as their first step.
+
+    Safe to run from several processes at once.
+
     :return: The number of requests handed off.
     """
     handed_off = 0
     for court_id in get_courts_with_waiting_fetches():
-        if (fq_pk := pop_next_fetch(court_id)) is not None:
-            hand_off_fetch(fq_pk)
+        if (pending_pk := get_pending_fetch(court_id)) is not None:
+            still_waiting = PacerFetchQueue.objects.filter(
+                pk=pending_pk, status=PROCESSING_STATUS.ENQUEUED
+            ).exists()
+            if not still_waiting:
+                mark_fetch_started(court_id, pending_pk)
+            continue
+
+        if (fq_pk := pop_next_fetch(court_id)) is None:
+            continue
+        if hand_off_fetch(court_id, fq_pk):
             handed_off += 1
     return handed_off
 
