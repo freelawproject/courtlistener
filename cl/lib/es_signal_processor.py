@@ -1,6 +1,6 @@
 from functools import partial
 
-from celery.canvas import chain
+from celery.canvas import Signature, chain
 from django.conf import settings
 from django.core.exceptions import FieldDoesNotExist, ObjectDoesNotExist
 from django.db import transaction
@@ -210,7 +210,7 @@ def update_es_documents(
                     and "html_with_citations" in fields_to_update
                     and settings.ENABLE_EMBEDDING_COMPUTATION
                 )
-                c = chain(
+                c: Signature = chain(
                     update_es_document.si(
                         es_document.__name__,
                         fields_to_update,

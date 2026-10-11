@@ -2017,13 +2017,6 @@
       "severity": "error"
     },
     {
-      "column": 47,
-      "path": "cl/lib/es_signal_processor.py",
-      "name": "missing-attribute",
-      "concise_description": "Object of class `dict` has no attribute `apply_async`",
-      "severity": "error"
-    },
-    {
       "column": 37,
       "path": "cl/lib/es_signal_processor.py",
       "name": "bad-argument-type",
