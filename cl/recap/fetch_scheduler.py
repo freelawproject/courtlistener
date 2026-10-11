@@ -4,15 +4,21 @@ Requests made through the Fetch API wait here, in Redis, until the scheduler
 daemon hands them to Celery. Only the PK of each PacerFetchQueue row is kept
 here; PostgreSQL remains the source of truth for the request itself.
 
-Each court has its own line, because each court has its own PACER server, and
-its own clock, so that we never send it requests faster than its rate allows:
+Each court has its own clock, because each court has its own PACER server, so
+that we never send it requests faster than its rate allows.
 
-    recap_fetch:courts          SET of courts with requests waiting
-    recap_fetch:{court}:queue   LIST of request PKs waiting for that court
-    recap_fetch:{court}:next    Earliest time the court may be sent its next
-                                request, in milliseconds
-    recap_fetch:rates           HASH of court ID to rate, for the courts that
-                                don't use the default rate
+Within a court, each user has their own line and users take turns. The next
+request always belongs to the user who has waited longest since their last
+turn, so one user's large batch cannot hold up another user's single request.
+
+    recap_fetch:courts                  SET of courts with requests waiting
+    recap_fetch:{court}:users           ZSET of users with requests waiting,
+                                        scored by the time of their last turn
+    recap_fetch:{court}:user:{user_id}  LIST of that user's request PKs, FIFO
+    recap_fetch:{court}:next            Earliest time the court may be sent
+                                        its next request, in milliseconds
+    recap_fetch:rates                   HASH of court ID to rate, for the
+                                        courts that don't use the default rate
 """
 
 import time
@@ -36,17 +42,28 @@ KEY_PREFIX = "recap_fetch"
 # then writes. Done as separate commands, two processes could both read the
 # clock before either one moved it forward, and both would send a request.
 #
-# KEYS: the court's queue LIST, the court's next key, the courts SET
+# KEYS: the court's users ZSET, the court's next key, the courts SET
 # ARGV: now (ms), the court's next allowed time if a request is taken (ms),
-#       the court ID
+#       the court ID, the prefix of the court's per-user LIST keys
 POP_NEXT_SCRIPT = """
 if tonumber(ARGV[1]) < tonumber(redis.call('GET', KEYS[2]) or '0') then
     return false
 end
-local pk = redis.call('LPOP', KEYS[1])
-if not pk then
+local user = redis.call('ZRANGE', KEYS[1], 0, 0)[1]
+if not user then
     redis.call('SREM', KEYS[3], ARGV[3])
     return false
+end
+local user_list = ARGV[4] .. user
+local pk = redis.call('LPOP', user_list)
+if not pk then
+    redis.call('ZREM', KEYS[1], user)
+    return false
+end
+if redis.call('LLEN', user_list) > 0 then
+    redis.call('ZADD', KEYS[1], ARGV[1], user)
+else
+    redis.call('ZREM', KEYS[1], user)
 end
 redis.call('SET', KEYS[2], ARGV[2])
 return pk
@@ -63,9 +80,19 @@ def _courts_key() -> str:
     return f"{KEY_PREFIX}:courts"
 
 
-def _queue_key(court_id: str) -> str:
-    """Return the key of the LIST of requests waiting for a court."""
-    return f"{KEY_PREFIX}:{court_id}:queue"
+def _users_key(court_id: str) -> str:
+    """Return the key of the ZSET of users waiting in a court."""
+    return f"{KEY_PREFIX}:{court_id}:users"
+
+
+def _user_list_prefix(court_id: str) -> str:
+    """Return the prefix shared by every per-user LIST key in a court."""
+    return f"{KEY_PREFIX}:{court_id}:user:"
+
+
+def _user_list_key(court_id: str, user_id: int) -> str:
+    """Return the key of the LIST of one user's waiting requests in a court."""
+    return f"{_user_list_prefix(court_id)}{user_id}"
 
 
 def _next_key(court_id: str) -> str:
@@ -113,23 +140,35 @@ def set_court_rate(court_id: str, rate: str | None) -> None:
     r.hset(_rates_key(), court_id, rate)
 
 
-def enqueue_fetch(court_id: str, fq_pk: int) -> None:
-    """Put a request at the back of its court's line.
+def enqueue_fetch(
+    court_id: str, user_id: int, fq_pk: int, now_ms: int | None = None
+) -> None:
+    """Put a request at the back of its user's line in a court.
+
+    A user with nothing else waiting in the court joins behind the users who
+    are already waiting there. A user who is already waiting keeps their place.
 
     :param court_id: The court the request will be sent to.
+    :param user_id: The user who made the request.
     :param fq_pk: The PK of the PacerFetchQueue row to schedule.
+    :param now_ms: The current time in milliseconds. Only tests should set it.
     """
+    now_ms = _now_ms() if now_ms is None else now_ms
     r = get_redis_interface("CACHE")
-    # Both writes go in one MULTI/EXEC transaction, so a request is never in
-    # a court's line without that court being listed.
+    # None of these commands depends on a value read beforehand, so a
+    # MULTI/EXEC transaction is enough to apply them as one step.
     pipe = r.pipeline()
-    pipe.rpush(_queue_key(court_id), fq_pk)
+    pipe.rpush(_user_list_key(court_id, user_id), fq_pk)
+    pipe.zadd(_users_key(court_id), {str(user_id): now_ms}, nx=True)
     pipe.sadd(_courts_key(), court_id)
     pipe.execute()
 
 
 def pop_next_fetch(court_id: str, now_ms: int | None = None) -> int | None:
-    """Take the request at the front of a court's line, if the court is ready.
+    """Take the next request for a court, if the court is ready for one.
+
+    The request comes from the user who has waited longest since their last
+    turn in the court, and is that user's oldest one.
 
     Taking a request starts the court's interval: nothing else can be taken
     for that court until the interval has passed.
@@ -150,12 +189,13 @@ def pop_next_fetch(court_id: str, now_ms: int | None = None) -> int | None:
     fq_pk = r.eval(
         POP_NEXT_SCRIPT,
         3,
-        _queue_key(court_id),
+        _users_key(court_id),
         _next_key(court_id),
         _courts_key(),
         now_ms,
         now_ms + get_court_interval_ms(court_id),
         court_id,
+        _user_list_prefix(court_id),
     )
     return int(str(fq_pk)) if fq_pk else None
 
@@ -164,7 +204,7 @@ def get_courts_with_waiting_fetches() -> list[str]:
     """List the courts that may have requests waiting.
 
     A court can linger here briefly after its last request leaves; it is
-    dropped the next time pop_next_fetch finds its line empty.
+    dropped the next time pop_next_fetch finds nobody waiting there.
 
     :return: The court IDs, in no particular order.
     """
@@ -177,7 +217,7 @@ def schedule_fetch(fq: PacerFetchQueue) -> None:
 
     :param fq: The PacerFetchQueue row, already saved with status ENQUEUED.
     """
-    enqueue_fetch(get_court_id_from_fetch_queue(fq), fq.pk)
+    enqueue_fetch(get_court_id_from_fetch_queue(fq), fq.user_id, fq.pk)
 
 
 def hand_off_fetch(fq_pk: int) -> None:
