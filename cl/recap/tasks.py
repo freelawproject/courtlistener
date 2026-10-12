@@ -2063,6 +2063,9 @@ def fetch_pacer_doc_by_rd_base(
 
     rd = RECAPDocument.objects.get(pk=rd_pk)
     fq = PacerFetchQueue.objects.get(pk=fq_pk)
+    if fq_is_finished(fq):
+        self.request.chain = None
+        return None
     pacer_doc_id = rd.pacer_doc_id
     # Check court connectivity, if fails retry the task, hopefully, it'll be
     # retried in a different not blocked node
@@ -2262,6 +2265,9 @@ def fetch_attachment_page(self: Task, fq_pk: int) -> list[tuple[int, bool]]:
     """
 
     fq = PacerFetchQueue.objects.get(pk=fq_pk)
+    if fq_is_finished(fq):
+        self.request.chain = None
+        return []
     rd = fq.recap_document
     court_id = rd.docket_entry.docket.court_id
     pacer_case_id = rd.docket_entry.docket.pacer_case_id
@@ -2648,6 +2654,9 @@ def fetch_appellate_docket(self, fq_pk):
     :return: None
     """
     fq = PacerFetchQueue.objects.get(pk=fq_pk)
+    if fq_is_finished(fq):
+        self.request.chain = None
+        return None
     court_id = fq.court_id or getattr(fq.docket, "court_id", None)
 
     # Check court connectivity, if fails retry the task, hopefully, it'll be
@@ -2747,6 +2756,9 @@ def fetch_docket(self, fq_pk):
     """
 
     fq = PacerFetchQueue.objects.get(pk=fq_pk)
+    if fq_is_finished(fq):
+        self.request.chain = None
+        return None
     court_id = fq.court_id or getattr(fq.docket, "court_id", None)
     # Check court connectivity, if fails retry the task, hopefully, it'll be
     # retried in a different not blocked node
@@ -2862,6 +2874,26 @@ def mark_fq_successful(fq_pk):
     fq = PacerFetchQueue.objects.get(pk=fq_pk)
     msg = "Successfully completed fetch and save."
     mark_fq_status(fq, msg, PROCESSING_STATUS.SUCCESSFUL)
+
+
+def fq_is_finished(fq: PacerFetchQueue) -> bool:
+    """Check whether a fetch request already reached a final status.
+
+    Fetch tasks call this before doing any work. A request can be finished
+    before its task ever runs: the fetch scheduler fails requests that waited
+    too long (see cl.recap.fetch_scheduler.fail_stale_fetches), and by then
+    the user has been told so and may have submitted it again. Running it
+    anyway could bill their PACER account twice.
+
+    :param fq: The PacerFetchQueue item, freshly loaded from the database.
+    :return: True if the task MUST NOT process the request.
+    """
+    return fq.status in (
+        PROCESSING_STATUS.SUCCESSFUL,
+        PROCESSING_STATUS.FAILED,
+        PROCESSING_STATUS.INVALID_CONTENT,
+        PROCESSING_STATUS.NEEDS_INFO,
+    )
 
 
 def mark_fq_status(fq, msg, status):

@@ -13,6 +13,7 @@ from rest_framework.permissions import (
     IsAuthenticated,
 )
 from rest_framework.viewsets import GenericViewSet, ModelViewSet
+from waffle import switch_is_active
 
 from cl.api.api_permissions import IsOwner, V3APIPermission
 from cl.api.pagination import BigPagination
@@ -30,6 +31,7 @@ from cl.recap.api_serializers import (
     PacerFetchQueueSerializer,
     ProcessingQueueSerializer,
 )
+from cl.recap.fetch_scheduler import SCHEDULER_SWITCH, schedule_fetch
 from cl.recap.filters import (
     EmailProcessingQueueFilter,
     FjcIntegratedDatabaseFilter,
@@ -180,7 +182,12 @@ class PacerFetchRequestViewSet(
 
     def perform_create(self, serializer):
         fq = serializer.save(user=self.request.user)
-        do_pacer_fetch(fq)
+        if not switch_is_active(SCHEDULER_SWITCH):
+            do_pacer_fetch(fq)
+            return
+        # Not a model field: the serializer reads it off the instance so the
+        # estimate appears in the response to this POST.
+        fq.estimated_execution_delay = schedule_fetch(fq)
 
 
 class PacerDocIdLookupViewSet(LoggingMixin, ModelViewSet):
