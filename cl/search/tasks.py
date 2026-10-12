@@ -10,7 +10,7 @@ from datetime import UTC, date, datetime
 from importlib import import_module
 from pathlib import PurePosixPath
 from random import randint
-from typing import Any
+from typing import Any, Literal, NotRequired, TypedDict, cast
 
 from botocore import exceptions as botocore_exception
 from celery import Task
@@ -1462,7 +1462,17 @@ def percolate_document(
     ).apply_async()
 
 
-def build_cite_count_update(cluster_ids_to_update: list[int]) -> list[dict]:
+class _CiteCountUpdateDict(TypedDict):
+    _id: int | str
+    _op_type: Literal["update"]
+    _index: str
+    _routing: NotRequired[int]
+    doc: dict
+
+
+def build_cite_count_update(
+    cluster_ids_to_update: list[int],
+) -> list[_CiteCountUpdateDict]:
     """Create update documents for OpinionClusterDocument.citeCount
 
     :param cluster_ids_to_update: the cluster ids to update
@@ -1479,10 +1489,7 @@ def build_cite_count_update(cluster_ids_to_update: list[int]) -> list[dict]:
     )
 
     documents_to_update = []
-    base_doc = {
-        "_op_type": "update",
-        "_index": OpinionClusterDocument._index._name,
-    }
+    _index = OpinionClusterDocument._index._name
     for cluster in clusters_with_sub_opinions:
         if not OpinionClusterDocument.exists(id=cluster.pk):
             # If the OpinionClusterDocument does not exist, it might
@@ -1495,11 +1502,12 @@ def build_cite_count_update(cluster_ids_to_update: list[int]) -> list[dict]:
             )
 
         # Build the OpinionCluster dicts for updating the citeCount.
-        doc_to_update = {
+        doc_to_update: _CiteCountUpdateDict = {
             "_id": cluster.pk,
             "doc": {"citeCount": cluster.citation_count},
+            "_op_type": "update",
+            "_index": _index,
         }
-        doc_to_update.update(base_doc)
         documents_to_update.append(doc_to_update)
 
         for opinion in cluster.sub_opinions.all():
@@ -1519,9 +1527,10 @@ def build_cite_count_update(cluster_ids_to_update: list[int]) -> list[dict]:
             doc_to_update = {
                 "_id": ES_CHILD_ID(opinion.pk).OPINION,
                 "_routing": cluster.pk,
+                "_op_type": "update",
+                "_index": _index,
                 "doc": {"citeCount": cluster.citation_count},
             }
-            doc_to_update.update(base_doc)
             documents_to_update.append(doc_to_update)
 
     return documents_to_update
@@ -1571,7 +1580,7 @@ def index_related_cites_fields(
                 "_index": OpinionClusterDocument._index._name,
             }
             documents_to_update.extend(
-                build_cite_count_update(cluster_ids_to_update)
+                build_cite_count_update(cluster_ids_to_update or [])
             )
 
             # Finally build the Opinion dict for updating the cites.
@@ -1601,7 +1610,7 @@ def index_related_cites_fields(
     if not documents_to_update:
         return
 
-    index_documents_in_bulk(documents_to_update)
+    index_documents_in_bulk(cast(list[dict[str, Any]], documents_to_update))
 
     if settings.ELASTICSEARCH_DSL_AUTO_REFRESH:
         # Set auto-refresh, used for testing.
@@ -1734,7 +1743,7 @@ def remove_documents_by_query(
     :return: The ES request response, or None for unsupported removal actions.
     """
 
-    optional_params = {}
+    optional_params: dict[str, str | int] = {}
     es_document = getattr(es_document_module, es_document_name)
     s = es_document.search()
     match es_document_name:

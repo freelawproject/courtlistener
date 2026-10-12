@@ -511,7 +511,7 @@ class PacerBulkFetchUnitTest(TestCase):
 
         actual_docs = [doc["id"] for doc in self.command.recap_documents]
         self.assertFalse(
-            set(actual_docs), msg="Transcript RDs shoudn't be matched."
+            set(actual_docs), msg="Transcript RDs shouldn't be matched."
         )
 
     @patch(

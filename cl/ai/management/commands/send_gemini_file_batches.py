@@ -191,22 +191,20 @@ def get_s3_file_list(
 
     # Create S3 client with session token support for dev mode
     try:
-        client_kwargs = {
-            "service_name": "s3",
-            "aws_access_key_id": key_id,
-            "aws_secret_access_key": secret,
-        }
-
+        aws_session_token = None
         # In dev mode, add session token if available
         if settings.DEVELOPMENT:
             env = environ.FileAwareEnv()
-            session_token = env("AWS_SESSION_TOKEN", default=None) or env(
+            aws_session_token = env("AWS_SESSION_TOKEN", default=None) or env(
                 "AWS_DEV_SESSION_TOKEN", default=None
             )
-            if session_token:
-                client_kwargs["aws_session_token"] = session_token
 
-        s3_client = boto3.client(**client_kwargs)
+        s3_client = boto3.client(
+            "s3",
+            aws_access_key_id=key_id,
+            aws_secret_access_key=secret,
+            aws_session_token=aws_session_token,
+        )
     except (BotoCoreError, ClientError) as e:
         raise CommandError(f"Failed to create S3 client: {e}")
 

@@ -364,7 +364,7 @@ class Command(ScraperCommand):
         opinions_content = []
         opinions_to_download = []
 
-        # this field is populated when usign cl_back_scrape_citations
+        # this field is populated when using cl_back_scrape_citations
         if case_dict.get("content"):
             content = case_dict.pop("content")
             opinions_content.append(
