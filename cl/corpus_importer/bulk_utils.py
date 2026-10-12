@@ -4,7 +4,7 @@ from celery import chain
 from cl.corpus_importer.tasks import get_pacer_doc_by_rd
 from cl.lib.celery_utils import CeleryThrottle
 from cl.lib.command_utils import logger
-from cl.lib.pacer_session import SessionData, log_into_pacer
+from cl.lib.pacer_session import log_into_pacer
 from cl.scrapers.tasks import extract_pdf_document
 from cl.search.models import RECAPDocument
 
@@ -64,7 +64,7 @@ def get_petitions(
         chain(
             get_pacer_doc_by_rd.s(
                 rd_pk,
-                SessionData(session.cookies, session.proxy_address),
+                session,
                 tag=tag_petitions,
             ).set(queue=q),
             extract_pdf_document.si(rd_pk).set(queue=q),

@@ -15,7 +15,7 @@ from cl.corpus_importer.tasks import (
 )
 from cl.lib.celery_utils import CeleryThrottle
 from cl.lib.command_utils import VerboseCommand, logger
-from cl.lib.pacer_session import SessionData, log_into_pacer
+from cl.lib.pacer_session import log_into_pacer
 
 PACER_USERNAME = os.environ.get("PACER_USERNAME", "UNKNOWN!")
 PACER_PASSWORD = os.environ.get("PACER_PASSWORD", "UNKNOWN!")
@@ -46,10 +46,6 @@ def get_dockets(options):
             logger.info(f"Sent {i} tasks to celery so far.")
         logger.info("Doing row %s", i)
         throttle.maybe_wait()
-        session_data = SessionData(
-            pacer_session.cookies,
-            pacer_session.proxy_address,
-        )
         chain(
             get_pacer_case_id_and_title.s(
                 pass_through=None,
@@ -57,13 +53,13 @@ def get_dockets(options):
                     row["DOCKET"], row["OFFICE"]
                 ),
                 court_id="nywb",
-                session_data=session_data,
+                session_data=pacer_session,
                 office_number=row["OFFICE"],
                 docket_number_letters="bk",
             ).set(queue=q),
             get_docket_by_pacer_case_id.s(
                 court_id="nywb",
-                session_data=session_data,
+                session_data=pacer_session,
                 tag_names=[TAG],
                 **{
                     "doc_num_start": 1,
