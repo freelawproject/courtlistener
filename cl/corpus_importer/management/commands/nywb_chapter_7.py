@@ -30,7 +30,7 @@ def get_dockets(options):
     reader = csv.DictReader(f)
     q = options["queue"]
     throttle = CeleryThrottle(queue_name=q)
-    pacer_session = async_to_sync(log_into_pacer)(
+    session_data = async_to_sync(log_into_pacer)(
         username=PACER_USERNAME, password=PACER_PASSWORD
     )
     for i, row in enumerate(reader):
@@ -40,7 +40,7 @@ def get_dockets(options):
             break
 
         if i % 1000 == 0:
-            pacer_session = async_to_sync(log_into_pacer)(
+            session_data = async_to_sync(log_into_pacer)(
                 username=PACER_USERNAME, password=PACER_PASSWORD
             )
             logger.info(f"Sent {i} tasks to celery so far.")
@@ -53,13 +53,13 @@ def get_dockets(options):
                     row["DOCKET"], row["OFFICE"]
                 ),
                 court_id="nywb",
-                session_data=pacer_session,
+                session_data=session_data,
                 office_number=row["OFFICE"],
                 docket_number_letters="bk",
             ).set(queue=q),
             get_docket_by_pacer_case_id.s(
                 court_id="nywb",
-                session_data=pacer_session,
+                session_data=session_data,
                 tag_names=[TAG],
                 **{
                     "doc_num_start": 1,
