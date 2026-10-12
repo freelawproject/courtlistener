@@ -30,10 +30,13 @@ from cl.citations.tasks import (
 from cl.custom_filters.templatetags.text_filters import best_case_name
 from cl.lib.celery_utils import throttle_task
 from cl.lib.db_tools import release_db_connection
-from cl.lib.exceptions import ScrapeFailed
+from cl.lib.exceptions import CourtQueryError, IQuerySaveError, ScrapeFailed
 from cl.lib.juriscraper_utils import get_scraper_object_by_name
 from cl.lib.llm import call_llm_transcription
-from cl.lib.microservice_utils import microservice
+from cl.lib.microservice_utils import (
+    clean_up_recap_document_file,
+    microservice,
+)
 from cl.lib.models import AbstractPDF
 from cl.lib.pacer import map_cl_to_pacer_id
 from cl.lib.pacer_session import ProxyPacerSession, get_or_cache_pacer_cookies
@@ -45,7 +48,7 @@ from cl.lib.storage import (
 )
 from cl.lib.string_utils import trunc
 from cl.lib.utils import is_iter
-from cl.recap.mergers import save_iquery_to_docket
+from cl.recap.mergers import save_iquery_to_docket_base
 from cl.scrapers.management.commands.merge_opinion_versions import (
     get_query_from_url,
     merge_versions_by_text_similarity,
@@ -125,7 +128,7 @@ def update_document_from_text(
 
 @app.task(
     bind=True,
-    autoretry_for=(requests.ConnectionError, requests.ReadTimeout),
+    autoretry_for=(httpx.ConnectError, httpx.ReadTimeout),
     max_retries=5,
     retry_backoff=10,
 )
@@ -175,43 +178,45 @@ def extract_opinion_content(
 
     opinion = Opinion.objects.get(pk=pk)
 
-    # Try to extract opinion content without using OCR.
-    response = async_to_sync(microservice)(
-        service="document-extract",
-        item=opinion,
-    )
-    if not response.is_success:
-        logger.error(
-            "Error from document-extract microservice: %s",
-            response.status_code,
-            extra=dict(
-                opinion_id=opinion.id,
-                url=opinion.download_url,
-                local_path=opinion.local_path.name,
-                fingerprint=[
-                    f"{opinion.cluster.docket.court_id}-document-extract-failure"
-                ],
-            ),
-        )
-        return
-
-    content = response.json()["content"]
-    extracted_by_ocr = response.json()["extracted_by_ocr"]
-    # For PDF documents, if there's no content after the extraction without OCR
-    # Let's try to extract using OCR.
-    if (
-        ocr_available
-        and needs_ocr(content)
-        and ".pdf" in str(opinion.local_path)
-    ):
+    with opinion.local_path.open(mode="rb") as document_file:
+        # Try to extract opinion content without using OCR.
         response = async_to_sync(microservice)(
-            service="document-extract-ocr",
-            item=opinion,
-            params={"ocr_available": ocr_available},
+            service="document-extract",
+            file=document_file,
         )
-        if response.is_success:
-            content = response.json()["content"]
-            extracted_by_ocr = True
+        if not response.is_success:
+            logger.error(
+                "Error from document-extract microservice: %s",
+                response.status_code,
+                extra=dict(
+                    opinion_id=opinion.id,
+                    url=opinion.download_url,
+                    local_path=opinion.local_path.name,
+                    fingerprint=[
+                        f"{opinion.cluster.docket.court_id}-document-extract-failure"
+                    ],
+                ),
+            )
+            return
+
+        content = response.json()["content"]
+        extracted_by_ocr = response.json()["extracted_by_ocr"]
+        # For PDF documents, if there's no content after the extraction without OCR
+        # Let's try to extract using OCR.
+        if (
+            ocr_available
+            and needs_ocr(content)
+            and ".pdf" in str(opinion.local_path)
+        ):
+            document_file.seek(0)
+            response = async_to_sync(microservice)(
+                service="document-extract-ocr",
+                file=document_file,
+                params={"ocr_available": ocr_available},
+            )
+            if response.is_success:
+                content = response.json()["content"]
+                extracted_by_ocr = True
 
     data = response.json()
     extension = opinion.local_path.name.split(".")[-1]
@@ -264,7 +269,7 @@ def extract_opinion_content(
 # TODO: Remove after the new extract_opinion_content is deployed.
 @app.task(
     bind=True,
-    autoretry_for=(requests.ConnectionError, requests.ReadTimeout),
+    autoretry_for=(httpx.ConnectError, httpx.ReadTimeout),
     max_retries=5,
     retry_backoff=10,
 )
@@ -314,43 +319,45 @@ def extract_doc_content(
 
     opinion = Opinion.objects.get(pk=pk)
 
-    # Try to extract opinion content without using OCR.
-    response = async_to_sync(microservice)(
-        service="document-extract",
-        item=opinion,
-    )
-    if not response.is_success:
-        logger.error(
-            "Error from document-extract microservice: %s",
-            response.status_code,
-            extra=dict(
-                opinion_id=opinion.id,
-                url=opinion.download_url,
-                local_path=opinion.local_path.name,
-                fingerprint=[
-                    f"{opinion.cluster.docket.court_id}-document-extract-failure"
-                ],
-            ),
-        )
-        return
-
-    content = response.json()["content"]
-    extracted_by_ocr = response.json()["extracted_by_ocr"]
-    # For PDF documents, if there's no content after the extraction without OCR
-    # Let's try to extract using OCR.
-    if (
-        ocr_available
-        and needs_ocr(content)
-        and ".pdf" in str(opinion.local_path)
-    ):
+    with opinion.local_path.open(mode="rb") as document_file:
+        # Try to extract opinion content without using OCR.
         response = async_to_sync(microservice)(
-            service="document-extract-ocr",
-            item=opinion,
-            params={"ocr_available": ocr_available},
+            service="document-extract",
+            file=document_file,
         )
-        if response.is_success:
-            content = response.json()["content"]
-            extracted_by_ocr = True
+        if not response.is_success:
+            logger.error(
+                "Error from document-extract microservice: %s",
+                response.status_code,
+                extra=dict(
+                    opinion_id=opinion.id,
+                    url=opinion.download_url,
+                    local_path=opinion.local_path.name,
+                    fingerprint=[
+                        f"{opinion.cluster.docket.court_id}-document-extract-failure"
+                    ],
+                ),
+            )
+            return
+
+        content = response.json()["content"]
+        extracted_by_ocr = response.json()["extracted_by_ocr"]
+        # For PDF documents, if there's no content after the extraction without OCR
+        # Let's try to extract using OCR.
+        if (
+            ocr_available
+            and needs_ocr(content)
+            and ".pdf" in str(opinion.local_path)
+        ):
+            document_file.seek(0)
+            response = async_to_sync(microservice)(
+                service="document-extract-ocr",
+                file=document_file,
+                params={"ocr_available": ocr_available},
+            )
+            if response.is_success:
+                content = response.json()["content"]
+                extracted_by_ocr = True
 
     data = response.json()
     extension = opinion.local_path.name.split(".")[-1]
@@ -610,31 +617,40 @@ async def extract_formatted_text_document_base(
         # Django reopens one on the next query.
         await sync_to_async(release_db_connection)()
 
-        response = await microservice(
-            service="document-extract",
-            item=rd,
-        )
-        if not response.is_success:
+        try:
+            document_file = rd.filepath_local.open(mode="rb")
+        except FileNotFoundError:
+            await clean_up_recap_document_file(rd)
             continue
 
-        content = response.json()["content"]
-        extracted_by_ocr = response.json()["extracted_by_ocr"]
-        if isinstance(rd, AbstractStateDocument) and (
-            pages := response.json().get("page_count")
-        ):
-            rd.page_count = pages
-        if strip_html_tags and not str(rd.filepath_local).endswith(".pdf"):
-            content = strip_tags(content)
-        ocr_needed = needs_ocr(content, page_count=rd.page_count)
-        if ocr_available and ocr_needed:
+        # Reuse the downloaded file if extraction needs an OCR fallback.
+        with document_file:
             response = await microservice(
-                service="document-extract-ocr",
-                item=rd,
-                params={"ocr_available": ocr_available},
+                service="document-extract",
+                file=document_file,
             )
-            if response.is_success:
-                content = response.json()["content"]
-                extracted_by_ocr = True
+            if not response.is_success:
+                continue
+
+            content = response.json()["content"]
+            extracted_by_ocr = response.json()["extracted_by_ocr"]
+            if isinstance(rd, AbstractStateDocument) and (
+                pages := response.json().get("page_count")
+            ):
+                rd.page_count = pages
+            if strip_html_tags and not str(rd.filepath_local).endswith(".pdf"):
+                content = strip_tags(content)
+            ocr_needed = needs_ocr(content, page_count=rd.page_count)
+            if ocr_available and ocr_needed:
+                document_file.seek(0)
+                response = await microservice(
+                    service="document-extract-ocr",
+                    file=document_file,
+                    params={"ocr_available": ocr_available},
+                )
+                if response.is_success:
+                    content = response.json()["content"]
+                    extracted_by_ocr = True
 
         has_content = bool(content)
         match has_content, extracted_by_ocr:
@@ -697,8 +713,8 @@ async def extract_pdf_document_base(
 @app.task(
     bind=True,
     autoretry_for=(
-        requests.ConnectionError,
-        requests.ReadTimeout,
+        httpx.ConnectError,
+        httpx.ReadTimeout,
         httpx.TimeoutException,
     ),
     max_retries=3,
@@ -771,15 +787,33 @@ def process_audio_file(self, pk) -> None:
     interval_step=5,
 )
 @throttle_task("1/s", key="court_id")
-def update_docket_info_iquery(self, d_pk: int, court_id: str) -> None:
+def update_docket_info_iquery(
+    self: celery.Task, d_pk: int, court_id: str
+) -> None:
+    """Throttled Celery task wrapper for update_docket_info_iquery_base."""
+    try:
+        return async_to_sync(update_docket_info_iquery_base)(d_pk, court_id)
+    except CourtQueryError as exc:
+        logger.warning("%s", exc)
+        if self.request.retries == self.max_retries:
+            return
+        raise self.retry(exc=exc.__cause__)
+    except IQuerySaveError as exc:
+        if self.request.retries == self.max_retries:
+            logger.warning("%s", exc)
+            return
+        logger.info("%s Retrying.", exc)
+        raise self.retry(exc=exc.__cause__)
+
+
+async def update_docket_info_iquery_base(d_pk: int, court_id: str) -> None:
     """Update the docket info from iquery
 
-    :param self: The Celery task
     :param d_pk: The ID of the docket
     :param court_id: The court of the docket. Needed for throttling by court.
     :return: None
     """
-    session_data = get_or_cache_pacer_cookies(
+    session_data = await get_or_cache_pacer_cookies(
         "pacer_scraper",
         settings.PACER_USERNAME,
         password=settings.PACER_PASSWORD,
@@ -790,23 +824,19 @@ def update_docket_info_iquery(self, d_pk: int, court_id: str) -> None:
         password=settings.PACER_PASSWORD,
         proxy=session_data.proxy_address,
     )
-    d = Docket.objects.get(pk=d_pk, court_id=court_id)
+    d = await Docket.objects.aget(pk=d_pk, court_id=court_id)
     report = CaseQuery(map_cl_to_pacer_id(d.court_id), s)
     try:
-        report.query(d.pacer_case_id)
-    except (requests.Timeout, requests.RequestException) as exc:
-        logger.warning(
-            "Timeout or unknown RequestException on iquery crawl. "
-            "Trying again if retries not exceeded."
-        )
-        if self.request.retries == self.max_retries:
-            return
-        raise self.retry(exc=exc)
+        async with s:
+            await report.query(d.pacer_case_id)
+    except httpx.HTTPError as exc:
+        raise CourtQueryError(
+            "Timeout or unknown RequestException on iquery crawl."
+        ) from exc
     if not report.data:
         return
 
-    save_iquery_to_docket(
-        self,
+    await save_iquery_to_docket_base(
         report.data,
         report.response.text,
         d,

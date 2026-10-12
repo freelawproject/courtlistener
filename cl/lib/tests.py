@@ -6,6 +6,7 @@ from typing import TypedDict, cast
 from unittest import mock
 from unittest.mock import MagicMock, patch
 
+import httpx
 import time_machine
 from asgiref.sync import async_to_sync
 from django.contrib.auth.models import AnonymousUser, User
@@ -15,12 +16,11 @@ from django.core.files.base import ContentFile
 from django.core.files.uploadedfile import SimpleUploadedFile
 from django.http import HttpResponse
 from django.template.response import TemplateResponse
-from django.test import RequestFactory, SimpleTestCase, override_settings
+from django.test import RequestFactory, override_settings
 from django.urls import ResolverMatch, reverse
 from django.utils.functional import SimpleLazyObject
 from django_ratelimit.exceptions import Ratelimited
 from django_ratelimit.middleware import RatelimitMiddleware
-from requests import Request
 from requests.cookies import RequestsCookieJar
 from waffle.testutils import override_flag
 
@@ -66,7 +66,6 @@ from cl.lib.pacer import (
     normalize_us_state,
 )
 from cl.lib.pacer_session import (
-    InsecureCookieJar,
     ProxyPacerSession,
     SessionData,
     get_or_cache_pacer_cookies,
@@ -99,7 +98,7 @@ from cl.search.factories import (
     OpinionClusterWithMultipleOpinionsFactory,
 )
 from cl.search.models import Court, Docket, Opinion, OpinionCluster
-from cl.tests.cases import TestCase
+from cl.tests.cases import SimpleTestCase, TestCase
 from cl.users.factories import UserFactory
 
 
@@ -235,7 +234,7 @@ class TestPacerSessionUtils(TestCase):
         key = r.keys(session_key % "test_user_new_cookie")
         if key:
             r.delete(*key)
-        self.test_cookies = RequestsCookieJar()
+        self.test_cookies = httpx.Cookies()
         self.test_cookies.set("PacerSession", "this-is-a-test")
         r.set(
             session_key % "test_user_new_format",
@@ -267,7 +266,7 @@ class TestPacerSessionUtils(TestCase):
             self.test_cookies,
             "http://proxy_1:9090",
         )
-        session_data = get_or_cache_pacer_cookies(
+        session_data = async_to_sync(get_or_cache_pacer_cookies)(
             "test_user_new_cookie", username="test", password="password"
         )
         self.assertEqual(mock_log_into_pacer.call_count, 1)
@@ -277,7 +276,7 @@ class TestPacerSessionUtils(TestCase):
     @patch("cl.lib.pacer_session.log_into_pacer")
     def test_parse_cookie_proxy_pair_properly(self, mock_log_into_pacer):
         """Can we parse the dataclass from cache properly?"""
-        session_data = get_or_cache_pacer_cookies(
+        session_data = async_to_sync(get_or_cache_pacer_cookies)(
             "test_user_new_format", username="test", password="password"
         )
         self.assertEqual(mock_log_into_pacer.call_count, 0)
@@ -295,7 +294,7 @@ class TestPacerSessionUtils(TestCase):
 
         # Attempts to get almost expired cookies with the new format from cache
         # Expects refresh.
-        session_data = get_or_cache_pacer_cookies(
+        session_data = async_to_sync(get_or_cache_pacer_cookies)(
             "test_new_format_almost_expired",
             username="test",
             password="password",
@@ -304,62 +303,104 @@ class TestPacerSessionUtils(TestCase):
         self.assertEqual(mock_log_into_pacer.call_count, 1)
         self.assertEqual(session_data.proxy_address, "http://proxy_2:9090")
 
-    def test_proxy_session_keeps_secure_cookies_set_by_responses(self):
-        """Does ProxyPacerSession keep sending cookies PACER marks Secure?"""
-        session = ProxyPacerSession(
-            cookies=self.test_cookies, proxy="http://proxy_1:9090"
-        )
-        self.assertIs(type(session.cookies), InsecureCookieJar)
 
-        # PACER refreshes its session cookie with the Secure flag. Simulate
-        # that, then check it's still sent on the next http:// request.
-        session.cookies.set(
-            "NextGenCSO", "refreshed", domain=".uscourts.gov", secure=True
-        )
-        request = session.prepare_request(
-            Request("POST", "http://ecf.miwd.uscourts.gov/doc1/1")
-        )
-        self.assertIn("NextGenCSO=refreshed", request.headers["Cookie"])
+@override_settings(EGRESS_PROXY_HOSTS=["http://proxy_1:9090"])
+class TestPacerCookieTransport(SimpleTestCase):
+    """Check PACER proxy cookies and cache serialization without services."""
+
+    async def test_proxy_session_keeps_secure_cookies_set_by_responses(
+        self,
+    ) -> None:
+        """Does ProxyPacerSession keep sending cookies PACER marks Secure?"""
+
+        def respond(request: httpx.Request) -> httpx.Response:
+            """Refresh the session cookie before redirecting to a document."""
+            self.assertEqual(request.url.scheme, "http")
+            self.assertEqual(request.headers["X-WhSentry-TLS"], "true")
+            if request.url.path == "/start":
+                return httpx.Response(
+                    HTTPStatus.FOUND,
+                    headers={
+                        "Location": "https://ecf.miwd.uscourts.gov/doc1/1",
+                        "Set-Cookie": (
+                            "NextGenCSO=refreshed; Domain=.uscourts.gov; "
+                            "Path=/; Secure"
+                        ),
+                    },
+                )
+            self.assertIn("NextGenCSO=refreshed", request.headers["Cookie"])
+            return httpx.Response(HTTPStatus.OK)
+
+        async with ProxyPacerSession(
+            proxy="http://proxy_1:9090",
+            mounts={"http://": httpx.MockTransport(respond)},
+        ) as session:
+            response = await session.get(
+                "https://ecf.miwd.uscourts.gov/start", auto_login=False
+            )
+            self.assertEqual(len(response.history), 1)
+            await session.post(
+                "https://ecf.miwd.uscourts.gov/doc1/1", auto_login=False
+            )
 
     @patch.object(ProxyPacerSession, "_prepare_login_request")
-    def test_proxy_session_keeps_insecure_jar_after_login(
-        self, mock_login_request
-    ):
-        """Does login() keep the InsecureCookieJar it replaces?"""
-        mock_login_request.return_value = MagicMock(
-            status_code=HTTPStatus.OK,
-            json=lambda: {"loginResult": "0", "nextGenCSO": "token"},
+    async def test_proxy_session_keeps_cookies_after_login(
+        self, mock_login_request: mock.AsyncMock
+    ) -> None:
+        """Does async login leave cookies usable by proxy-rewritten requests?"""
+        mock_login_request.return_value = httpx.Response(
+            HTTPStatus.OK,
+            json={"loginResult": "0", "nextGenCSO": "token"},
         )
-        session = ProxyPacerSession(
+        async with ProxyPacerSession(
             username="test", password="password", proxy="http://proxy_1:9090"
-        )
-        # juriscraper's login() assigns a brand-new plain RequestsCookieJar.
-        session.login()
-        self.assertIs(type(session.cookies), InsecureCookieJar)
+        ) as session:
+            await session.login()
+            mock_login_request.assert_awaited_once()
+            request = session.build_request(
+                "POST", "http://ecf.miwd.uscourts.gov/doc1/1"
+            )
+            self.assertIn("NextGenCSO=token", request.headers["Cookie"])
 
-        session.cookies.set(
-            "NextGenCSO", "refreshed", domain=".uscourts.gov", secure=True
+    def test_session_data_pickles_without_project_classes(self) -> None:
+        """Can HTTPX cookies round-trip through the Redis pickle format?"""
+        response = httpx.Response(
+            HTTPStatus.OK,
+            request=httpx.Request("GET", "https://ecf.miwd.uscourts.gov/"),
+            headers={
+                "Set-Cookie": "NextGenCSO=x; Domain=.uscourts.gov; Path=/; Secure"
+            },
         )
-        request = session.prepare_request(
-            Request("POST", "http://ecf.miwd.uscourts.gov/doc1/1")
-        )
-        self.assertIn("NextGenCSO=refreshed", request.headers["Cookie"])
+        session_data = SessionData(response.cookies, "http://proxy_1:9090")
 
-    def test_session_data_pickles_without_project_classes(self):
-        """Does SessionData pickle without referencing InsecureCookieJar?"""
-        jar = InsecureCookieJar()
-        jar.set("NextGenCSO", "x", domain=".uscourts.gov", secure=True)
-        session_data = SessionData(jar, "http://proxy_1:9090")
-
-        self.assertIs(type(session_data.cookies), RequestsCookieJar)
-        self.assertNotIn(b"InsecureCookieJar", pickle.dumps(session_data))
-        cookie = next(iter(session_data.cookies))
+        pickled = pickle.dumps(session_data)
+        self.assertNotIn(b"InsecureCookieJar", pickled)
+        restored = pickle.loads(pickled)
+        self.assertIs(type(restored.cookies), httpx.Cookies)
+        self.assertEqual(restored.proxy_address, "http://proxy_1:9090")
+        cookie = next(iter(restored.cookies.jar))
         self.assertEqual(cookie.value, "x")
+        self.assertEqual(cookie.domain, ".uscourts.gov")
+        self.assertEqual(cookie.path, "/")
         self.assertFalse(cookie.secure)
 
-    def test_session_data_accepts_missing_cookies(self):
+    def test_session_data_restores_legacy_cookie_jar(self) -> None:
+        """Can cached Requests cookies still be used after the migration?"""
+        jar = RequestsCookieJar()
+        jar.set("NextGenCSO", "legacy", domain=".uscourts.gov", secure=True)
+        session_data = SessionData(None)
+        session_data.__setstate__(
+            {"cookies": jar, "proxy_address": "http://proxy_1:9090"}
+        )
+        self.assertIsInstance(session_data.cookies, httpx.Cookies)
+        restored = pickle.loads(pickle.dumps(session_data))
+        cookie = next(iter(restored.cookies.jar))
+        self.assertEqual(cookie.value, "legacy")
+        self.assertFalse(cookie.secure)
+
+    def test_session_data_accepts_missing_cookies(self) -> None:
         """Can SessionData still be built without cookies?"""
-        session_data = SessionData(None, None)
+        session_data = pickle.loads(pickle.dumps(SessionData(None)))
         self.assertIsNone(session_data.cookies)
         self.assertEqual(session_data.proxy_address, "http://proxy_1:9090")
 
