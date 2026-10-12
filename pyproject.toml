@@ -95,7 +95,8 @@ dependencies = [
   "types-dateparser>=1.2.2.20250809",
   "uvicorn[standard]>=0.52.3",
   "daphne>=4.2.2",
-  "httpx[http2]>=0.28.1",
+  "httpx>=0.28.1",
+  "httpx2[http2]>=2.13.1",
   "django-model-utils>=5.0.0",
   "django-permissions-policy>=4.34.0",
   "tiktoken>=0.14.0",
@@ -140,6 +141,9 @@ dev = [
   "pandas-stubs~=3.0.5",
   "unittest-xml-reporting>=4.0.0",
 ]
+
+[tool.uv.sources]
+juriscraper = {git = "https://github.com/ttys0dev/juriscraper.git", rev = "b305db227b44bd2cc2a5a4c3c686287245d5763d"}
 
 [tool.ruff]
 line-length = 79

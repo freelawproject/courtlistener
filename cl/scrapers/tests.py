@@ -7,7 +7,7 @@ from pathlib import Path
 from unittest import mock
 from unittest.mock import MagicMock, patch
 
-import httpx
+import httpx2
 import responses
 from asgiref.sync import async_to_sync, sync_to_async
 from django.conf import settings
@@ -647,7 +647,7 @@ class ExtractFormattedTextSanitizationTest(TestCase):
         content_with_nuls = (
             "Hello\0 world\x00. Hello " + chr(0) + "Courtlistener."
         )
-        microservice_mock.return_value = httpx.Response(
+        microservice_mock.return_value = httpx2.Response(
             200,
             json={
                 "content": content_with_nuls,
@@ -690,7 +690,7 @@ class ExtractFormattedTextReleasesConnectionTest(TransactionTestCase):
         )
         connection_open_during_doctor_call: list[bool] = []
 
-        async def fake_doctor(*args, **kwargs) -> httpx.Response:
+        async def fake_doctor(*args, **kwargs) -> httpx2.Response:
             # Connections are thread-local, so inspect the one owned by the
             # thread the task's DB calls run on, not the event loop's thread.
             connection_open_during_doctor_call.append(
@@ -698,7 +698,7 @@ class ExtractFormattedTextReleasesConnectionTest(TransactionTestCase):
                     lambda: connection.connection is not None
                 )()
             )
-            return httpx.Response(
+            return httpx2.Response(
                 200, json={"content": "Hello", "extracted_by_ocr": False}
             )
 
@@ -1001,14 +1001,14 @@ class AudioFileTaskTest(TestCase):
 class ScraperContentTypeTest(TestCase):
     def setUp(self):
         # Common mock setup for all tests
-        self.mock_response = mock.AsyncMock(httpx.Response)
+        self.mock_response = mock.AsyncMock(httpx2.Response)
         self.mock_response.content = b"not empty"
         self.mock_response.headers = {"Content-Type": "application/pdf"}
         self.site = test_opinion_scraper.Site()
         self.site.method = "GET"
         self.logger = logger
 
-    @mock.patch("httpx.AsyncClient.get")
+    @mock.patch("httpx2.AsyncClient.get")
     async def test_unexpected_content_type(self, mock_get):
         """Test when content type doesn't match scraper expectation."""
         mock_get.return_value = self.mock_response
@@ -1016,7 +1016,7 @@ class ScraperContentTypeTest(TestCase):
         with self.assertRaises(UnexpectedContentTypeError):
             await self.site.download_content("/dummy/url/")
 
-    @mock.patch("httpx.AsyncClient.get")
+    @mock.patch("httpx2.AsyncClient.get")
     async def test_correct_content_type(self, mock_get):
         """Test when content type matches scraper expectation."""
         mock_get.return_value = self.mock_response
@@ -1032,7 +1032,7 @@ class ScraperContentTypeTest(TestCase):
             _ = await self.site.download_content("/dummy/url/")
             error_mock.assert_not_called()
 
-    @mock.patch("httpx.AsyncClient.get")
+    @mock.patch("httpx2.AsyncClient.get")
     async def test_no_content_type(self, mock_get):
         """Test for no content type expected (ie. Montana)"""
         mock_get.return_value = self.mock_response
@@ -2768,7 +2768,7 @@ class SetOrderingKeysTest(SimpleTestCase):
         self.assertEqual(opinions_content[2][0]["ordering_key"], 4)
 
 
-@mock.patch("cl.recap.tasks.httpx.get")
+@mock.patch("cl.recap.tasks.httpx2.Client.get")
 @mock.patch("cl.recap.tasks.TexasEmailSESStorage")
 @mock.patch("cl.recap.tasks.TexasCourtOfAppealsScraper")
 class TexasCaseMailIntegrationTest(TestCase):

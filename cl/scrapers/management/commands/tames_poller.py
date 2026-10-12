@@ -13,7 +13,7 @@ import time
 from datetime import date, datetime, timedelta
 from typing import Any, cast
 
-import httpx
+import httpx2
 import requests
 from asgiref.sync import async_to_sync, sync_to_async
 from celery import chain
@@ -421,7 +421,7 @@ class Command(BaseCommand):
                         dict(case),
                         court_code or "unknown_court",
                     )
-                except httpx.HTTPError:
+                except httpx2.HTTPError:
                     logger.exception("Failed to fetch case URL %s", case_url)
                     continue
 

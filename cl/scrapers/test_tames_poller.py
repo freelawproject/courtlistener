@@ -6,7 +6,7 @@ from pathlib import Path
 from unittest import mock
 from unittest.mock import MagicMock
 
-import httpx
+import httpx2
 import responses
 import time_machine
 from django.conf import settings
@@ -295,19 +295,19 @@ class RateLimitedRequestManagerTest(SimpleTestCase):
             with self.subTest(failure=failure):
                 attempts = []
 
-                def respond(request: httpx.Request) -> httpx.Response:
+                def respond(request: httpx2.Request) -> httpx2.Response:
                     """Fail the first request and succeed on the retry."""
                     attempts.append(request)
                     if len(attempts) == 1:
                         if failure == "timeout":
-                            raise httpx.ReadTimeout(
+                            raise httpx2.ReadTimeout(
                                 "Timed out", request=request
                             )
-                        return httpx.Response(403)
-                    return httpx.Response(200, text="docket")
+                        return httpx2.Response(403)
+                    return httpx2.Response(200, text="docket")
 
-                session = httpx.AsyncClient(
-                    transport=httpx.MockTransport(respond)
+                session = httpx2.AsyncClient(
+                    transport=httpx2.MockTransport(respond)
                 )
                 callback = MagicMock()
                 with mock.patch(
@@ -333,16 +333,16 @@ class RateLimitedRequestManagerTest(SimpleTestCase):
         """Stop retrying after the configured backoff budget is exhausted."""
         attempts = []
 
-        def respond(request: httpx.Request) -> httpx.Response:
+        def respond(request: httpx2.Request) -> httpx2.Response:
             """Keep returning a retryable error."""
             attempts.append(request)
-            return httpx.Response(403)
+            return httpx2.Response(403)
 
-        session = httpx.AsyncClient(transport=httpx.MockTransport(respond))
+        session = httpx2.AsyncClient(transport=httpx2.MockTransport(respond))
         with mock.patch(
             "cl.scrapers.management.commands.back_scrape_dockets.asyncio.sleep"
         ) as sleep:
-            with self.assertRaises(httpx.HTTPStatusError):
+            with self.assertRaises(httpx2.HTTPStatusError):
                 async with RateLimitedRequestManager(
                     requests_per_second=0,
                     max_backoff_seconds=1,

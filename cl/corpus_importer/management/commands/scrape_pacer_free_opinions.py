@@ -11,7 +11,7 @@ from celery.canvas import chain
 from django.db.models import F, Max, Q, Window
 from django.db.models.functions import RowNumber
 from django.utils.timezone import now
-from httpx import HTTPError
+from httpx2 import HTTPError
 from juriscraper.lib.date_utils import make_date_range_tuples
 from juriscraper.lib.exceptions import PacerLoginException, ParsingException
 from juriscraper.lib.string_utils import CaseNameTweaker

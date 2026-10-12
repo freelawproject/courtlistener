@@ -6,7 +6,7 @@ from typing import TypedDict, cast
 from unittest import mock
 from unittest.mock import MagicMock, patch
 
-import httpx
+import httpx2
 import time_machine
 from asgiref.sync import async_to_sync
 from django.contrib.auth.models import AnonymousUser, User
@@ -234,7 +234,7 @@ class TestPacerSessionUtils(TestCase):
         key = r.keys(session_key % "test_user_new_cookie")
         if key:
             r.delete(*key)
-        self.test_cookies = httpx.Cookies()
+        self.test_cookies = httpx2.Cookies()
         self.test_cookies.set("PacerSession", "this-is-a-test")
         r.set(
             session_key % "test_user_new_format",
@@ -313,12 +313,12 @@ class TestPacerCookieTransport(SimpleTestCase):
     ) -> None:
         """Does ProxyPacerSession keep sending cookies PACER marks Secure?"""
 
-        def respond(request: httpx.Request) -> httpx.Response:
+        def respond(request: httpx2.Request) -> httpx2.Response:
             """Refresh the session cookie before redirecting to a document."""
             self.assertEqual(request.url.scheme, "http")
             self.assertEqual(request.headers["X-WhSentry-TLS"], "true")
             if request.url.path == "/start":
-                return httpx.Response(
+                return httpx2.Response(
                     HTTPStatus.FOUND,
                     headers={
                         "Location": "https://ecf.miwd.uscourts.gov/doc1/1",
@@ -329,11 +329,11 @@ class TestPacerCookieTransport(SimpleTestCase):
                     },
                 )
             self.assertIn("NextGenCSO=refreshed", request.headers["Cookie"])
-            return httpx.Response(HTTPStatus.OK)
+            return httpx2.Response(HTTPStatus.OK)
 
         async with ProxyPacerSession(
             proxy="http://proxy_1:9090",
-            mounts={"http://": httpx.MockTransport(respond)},
+            mounts={"http://": httpx2.MockTransport(respond)},
         ) as session:
             response = await session.get(
                 "https://ecf.miwd.uscourts.gov/start", auto_login=False
@@ -348,7 +348,7 @@ class TestPacerCookieTransport(SimpleTestCase):
         self, mock_login_request: mock.AsyncMock
     ) -> None:
         """Does async login leave cookies usable by proxy-rewritten requests?"""
-        mock_login_request.return_value = httpx.Response(
+        mock_login_request.return_value = httpx2.Response(
             HTTPStatus.OK,
             json={"loginResult": "0", "nextGenCSO": "token"},
         )
@@ -363,10 +363,10 @@ class TestPacerCookieTransport(SimpleTestCase):
             self.assertIn("NextGenCSO=token", request.headers["Cookie"])
 
     def test_session_data_pickles_without_project_classes(self) -> None:
-        """Can HTTPX cookies round-trip through the Redis pickle format?"""
-        response = httpx.Response(
+        """Can HTTPX2 cookies round-trip through the Redis pickle format?"""
+        response = httpx2.Response(
             HTTPStatus.OK,
-            request=httpx.Request("GET", "https://ecf.miwd.uscourts.gov/"),
+            request=httpx2.Request("GET", "https://ecf.miwd.uscourts.gov/"),
             headers={
                 "Set-Cookie": "NextGenCSO=x; Domain=.uscourts.gov; Path=/; Secure"
             },
@@ -376,7 +376,7 @@ class TestPacerCookieTransport(SimpleTestCase):
         pickled = pickle.dumps(session_data)
         self.assertNotIn(b"InsecureCookieJar", pickled)
         restored = pickle.loads(pickled)
-        self.assertIs(type(restored.cookies), httpx.Cookies)
+        self.assertIs(type(restored.cookies), httpx2.Cookies)
         self.assertEqual(restored.proxy_address, "http://proxy_1:9090")
         cookie = next(iter(restored.cookies.jar))
         self.assertEqual(cookie.value, "x")
@@ -392,7 +392,7 @@ class TestPacerCookieTransport(SimpleTestCase):
         session_data.__setstate__(
             {"cookies": jar, "proxy_address": "http://proxy_1:9090"}
         )
-        self.assertIsInstance(session_data.cookies, httpx.Cookies)
+        self.assertIsInstance(session_data.cookies, httpx2.Cookies)
         restored = pickle.loads(pickle.dumps(session_data))
         cookie = next(iter(restored.cookies.jar))
         self.assertEqual(cookie.value, "legacy")

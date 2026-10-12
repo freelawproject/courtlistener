@@ -8,7 +8,7 @@ from io import BytesIO
 
 import botocore.exceptions
 import celery
-import httpx
+import httpx2
 import openai
 import requests
 from asgiref.sync import async_to_sync, sync_to_async
@@ -17,7 +17,7 @@ from django.apps import apps
 from django.conf import settings
 from django.core.files.base import ContentFile
 from django.utils.html import strip_tags
-from httpx import Response
+from httpx2 import Response
 from juriscraper.lib.exceptions import PacerLoginException
 from juriscraper.pacer import CaseQuery
 from redis import ConnectionError as RedisConnectionError
@@ -128,7 +128,7 @@ def update_document_from_text(
 
 @app.task(
     bind=True,
-    autoretry_for=(httpx.ConnectError, httpx.ReadTimeout),
+    autoretry_for=(httpx2.ConnectError, httpx2.ReadTimeout),
     max_retries=5,
     retry_backoff=10,
 )
@@ -269,7 +269,7 @@ def extract_opinion_content(
 # TODO: Remove after the new extract_opinion_content is deployed.
 @app.task(
     bind=True,
-    autoretry_for=(httpx.ConnectError, httpx.ReadTimeout),
+    autoretry_for=(httpx2.ConnectError, httpx2.ReadTimeout),
     max_retries=5,
     retry_backoff=10,
 )
@@ -448,9 +448,9 @@ def find_and_merge_versions(self, pk: int) -> None:
 @app.task(
     bind=True,
     autoretry_for=(
-        httpx.ConnectError,
-        httpx.ConnectTimeout,
-        httpx.ReadTimeout,
+        httpx2.ConnectError,
+        httpx2.ConnectTimeout,
+        httpx2.ReadTimeout,
     ),
     max_retries=3,
     retry_backoff=10,
@@ -479,9 +479,9 @@ def extract_recap_pdf(
 @app.task(
     bind=True,
     autoretry_for=(
-        httpx.ConnectError,
-        httpx.ConnectTimeout,
-        httpx.ReadTimeout,
+        httpx2.ConnectError,
+        httpx2.ConnectTimeout,
+        httpx2.ReadTimeout,
     ),
     max_retries=3,
     retry_backoff=10,
@@ -542,9 +542,9 @@ def extract_formatted_text_document(
 @app.task(
     bind=True,
     autoretry_for=(
-        httpx.ConnectError,
-        httpx.ConnectTimeout,
-        httpx.ReadTimeout,
+        httpx2.ConnectError,
+        httpx2.ConnectTimeout,
+        httpx2.ReadTimeout,
     ),
     max_retries=3,
     retry_backoff=10,
@@ -713,9 +713,9 @@ async def extract_pdf_document_base(
 @app.task(
     bind=True,
     autoretry_for=(
-        httpx.ConnectError,
-        httpx.ReadTimeout,
-        httpx.TimeoutException,
+        httpx2.ConnectError,
+        httpx2.ReadTimeout,
+        httpx2.TimeoutException,
     ),
     max_retries=3,
     retry_backoff=10,
@@ -832,7 +832,7 @@ async def update_docket_info_iquery_base(d_pk: int, court_id: str) -> None:
     try:
         async with s:
             await report.query(d.pacer_case_id)
-    except httpx.HTTPError as exc:
+    except httpx2.HTTPError as exc:
         raise CourtQueryError(
             "Timeout or unknown RequestException on iquery crawl."
         ) from exc

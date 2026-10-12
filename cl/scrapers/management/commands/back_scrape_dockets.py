@@ -11,7 +11,7 @@ from datetime import date, datetime
 from types import TracebackType
 from typing import Any, Self
 
-import httpx
+import httpx2
 from asgiref.sync import async_to_sync, sync_to_async
 from django.core.files.base import ContentFile
 from django.core.management.base import CommandError
@@ -46,7 +46,7 @@ class RateLimitedRequestManager(ScraperRequestManager):
     - Session management with Chrome headers
 
     Attributes:
-        session: The HTTPX AsyncClient used for HTTP requests
+        session: The HTTPX2 AsyncClient used for HTTP requests
         requests_per_second: Maximum request rate
         max_backoff_seconds: Maximum time to wait during exponential backoff
         all_response_fn: Optional callback invoked after every HTTP response
@@ -56,7 +56,7 @@ class RateLimitedRequestManager(ScraperRequestManager):
         self,
         requests_per_second: float = 1.0,
         max_backoff_seconds: int = 300,
-        session: httpx.AsyncClient | None = None,
+        session: httpx2.AsyncClient | None = None,
         all_response_fn: ResponseCallback | None = None,
     ) -> None:
         """Initialize the rate-limited request manager.
@@ -64,7 +64,7 @@ class RateLimitedRequestManager(ScraperRequestManager):
         Args:
             requests_per_second: Maximum requests per second (default 1.0)
             max_backoff_seconds: Maximum backoff time for 403 retries (default 300)
-            session: Optional HTTPX AsyncClient. If not provided, a new session
+            session: Optional HTTPX2 AsyncClient. If not provided, a new session
                 will be created with default Juriscraper headers.
             all_response_fn: Optional callback function invoked after every
                 HTTP response. Receives the request manager and response.
@@ -72,7 +72,9 @@ class RateLimitedRequestManager(ScraperRequestManager):
         if session is not None:
             self.session = session
         else:
-            self.session = httpx.AsyncClient(follow_redirects=True, http2=True)
+            self.session = httpx2.AsyncClient(
+                follow_redirects=True, http2=True
+            )
             # Match more closely a chrome browser
             self.session.headers.update(
                 {
@@ -134,7 +136,7 @@ class RateLimitedRequestManager(ScraperRequestManager):
         method: str,
         url: str,
         **kwargs: Any,
-    ) -> httpx.Response:
+    ) -> httpx2.Response:
         """Make a request with exponential backoff retry on 403 or timeout.
 
         Args:
@@ -143,11 +145,11 @@ class RateLimitedRequestManager(ScraperRequestManager):
             **kwargs: Additional arguments passed to session.request()
 
         Returns:
-            The HTTPX Response object
+            The HTTPX2 Response object
 
         Raises:
-            httpx.HTTPStatusError: If max backoff time exceeded on 403
-            httpx.TimeoutException: If max backoff time exceeded on timeout
+            httpx2.HTTPStatusError: If max backoff time exceeded on 403
+            httpx2.TimeoutException: If max backoff time exceeded on timeout
         """
         kwargs.setdefault("timeout", 60)
         backoff = 1
@@ -164,7 +166,7 @@ class RateLimitedRequestManager(ScraperRequestManager):
 
             try:
                 response = await self.session.request(method, url, **kwargs)
-            except httpx.TimeoutException as e:
+            except httpx2.TimeoutException as e:
                 if total_wait >= self.max_backoff_seconds:
                     logger.error(
                         "Max backoff time (%d seconds) exceeded on timeout for URL: %s",
@@ -216,7 +218,7 @@ class RateLimitedRequestManager(ScraperRequestManager):
         method: str,
         url: str,
         **kwargs: Any,
-    ) -> httpx.Response:
+    ) -> httpx2.Response:
         """Make an HTTP request with rate limiting and 403 retry.
 
         Args:
@@ -225,7 +227,7 @@ class RateLimitedRequestManager(ScraperRequestManager):
             **kwargs: Additional arguments passed to session.request()
 
         Returns:
-            The HTTPX Response object
+            The HTTPX2 Response object
         """
         response = await self._request_with_retry(method, url, **kwargs)
 
@@ -242,17 +244,17 @@ class RateLimitedRequestManager(ScraperRequestManager):
             )
         self.session.headers.update(headers)
 
-    async def get(self, url: str, **kwargs: Any) -> httpx.Response:
+    async def get(self, url: str, **kwargs: Any) -> httpx2.Response:
         """Make a GET request. See request() for details."""
         return await self.request("GET", url, **kwargs)
 
-    async def post(self, url: str, **kwargs: Any) -> httpx.Response:
+    async def post(self, url: str, **kwargs: Any) -> httpx2.Response:
         """Make a POST request. See request() for details."""
         return await self.request("POST", url, **kwargs)
 
 
 def save_docket_response(
-    response: httpx.Response,
+    response: httpx2.Response,
     scraper_class_name: str,
     case_meta: dict,
     court_id: str = "unknown_court",
@@ -390,7 +392,7 @@ async def _process_batch(
                 skip_meta=False,
             )
             fetched += 1
-        except httpx.HTTPError as e:
+        except httpx2.HTTPError as e:
             logger.error("Failed to fetch case URL %s: %s", case_url, e)
     return fetched
 

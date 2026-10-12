@@ -5,7 +5,7 @@ from asgiref.sync import async_to_sync
 from django.conf import settings
 from django.db import transaction
 from django.utils.text import slugify
-from httpx import (
+from httpx2 import (
     HTTPStatusError,
     NetworkError,
     ReadError,
@@ -147,7 +147,7 @@ def transcribe_from_open_ai_api(self, audio_pk: int, dont_retry: bool = False):
             file = (f"{name}.ogg", audio_response.content, "ogg")
         else:
             # Stream from storage rather than loading the full file into
-            # memory; the httpx-backed openai client reads the handle lazily.
+            # memory; the httpx2-backed openai client reads the handle lazily.
             fh = stack.enter_context(audio_file.open("rb"))
             file = (file_name, fh, "mp3")
 

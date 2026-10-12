@@ -4,7 +4,7 @@ from datetime import date, datetime
 from tempfile import NamedTemporaryFile
 from unittest import mock
 
-import httpx
+import httpx2
 from juriscraper.state.docket import (
     DocketEntryType as ScrapeDocketEntryType,
 )
@@ -1451,9 +1451,9 @@ class FloridaDocumentDownloadTest(TestCase):
         # stored URL is fetched unchanged. The gate itself is covered in
         # cl.search.state.florida.tests.
         self.challenge_patch = mock.patch(
-            "cl.search.state.florida.models.httpx.get",
-            return_value=httpx.Response(
-                204, request=httpx.Request("GET", "https://acis-api.test")
+            "cl.search.state.florida.models.httpx2.Client.get",
+            return_value=httpx2.Response(
+                204, request=httpx2.Request("GET", "https://acis-api.test")
             ),
         )
         self.challenge_patch.start()
@@ -1485,7 +1485,7 @@ class FloridaDocumentDownloadTest(TestCase):
     ) -> None:
         """Does a PDF download store the file, and dispatch extraction?"""
         fl_document = FloridaDocumentModelFactory.create()
-        pcs_mock.return_value = httpx.Response(200, text="1")
+        pcs_mock.return_value = httpx2.Response(200, text="1")
 
         with NamedTemporaryFile(suffix=".tmp") as tmp:
             tmp.write(b"fake pdf data")

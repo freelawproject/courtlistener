@@ -3361,7 +3361,7 @@
       "severity": "error"
     },
     {
-      "column": 13,
+      "column": 17,
       "path": "cl/recap/tasks.py",
       "name": "unsupported-operation",
       "concise_description": "`None` is not subscriptable",

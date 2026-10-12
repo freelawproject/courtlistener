@@ -3,7 +3,7 @@ import json
 from unittest import mock
 from urllib.parse import parse_qs, urlparse
 
-import httpx
+import httpx2
 import requests
 from juriscraper.state.florida.scraper import FLORIDA_API_BASE
 
@@ -45,11 +45,11 @@ CHALLENGE_URL = f"{FLORIDA_API_BASE}/altcha/challenge"
 REFUSED_URL = "https://acis-api.test/refused"
 
 
-def challenge_response(status: int, **kwargs) -> httpx.Response:
-    """Build an `httpx.Response` for the challenge endpoint that supports
+def challenge_response(status: int, **kwargs) -> httpx2.Response:
+    """Build an `httpx2.Response` for the challenge endpoint that supports
     `raise_for_status`, which needs the request attached."""
-    return httpx.Response(
-        status, request=httpx.Request("GET", CHALLENGE_URL), **kwargs
+    return httpx2.Response(
+        status, request=httpx2.Request("GET", CHALLENGE_URL), **kwargs
     )
 
 
@@ -102,7 +102,7 @@ class DocumentDownloadTest(TestCase):
         )
 
         self.challenge_get = self.enterContext(
-            mock.patch("cl.search.state.florida.models.httpx.get")
+            mock.patch("cl.search.state.florida.models.httpx2.Client.get")
         )
         self.enterContext(
             mock.patch("cl.scrapers.utils.get_extension", return_value=".pdf")
@@ -220,7 +220,7 @@ class DocumentDownloadTest(TestCase):
         """Is a dropped connection to the challenge endpoint retried rather
         than costing us the document?"""
         self.challenge_get.side_effect = [
-            httpx.ConnectTimeout("slow gate"),
+            httpx2.ConnectTimeout("slow gate"),
             challenge_response(200, json=CHALLENGE_JSON),
         ]
 
