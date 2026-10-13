@@ -108,6 +108,7 @@ from cl.recap.factories import (
     AppellateAttachmentPageFactory,
     DocketEntriesDataFactory,
     DocketEntryDataFactory,
+    FjcIntegratedDatabaseFactory,
 )
 from cl.recap.mergers import add_docket_entries, merge_attachment_page_data
 from cl.search.factories import (
@@ -118,7 +119,9 @@ from cl.search.factories import (
     OpinionClusterWithChildrenAndParentsFactory,
     OpinionClusterWithParentsFactory,
     OpinionFactory,
+    OpinionsCitedByRECAPDocumentFactory,
     OpinionsCitedWithParentsFactory,
+    OpinionWithParentsFactory,
     RECAPAttachmentFactory,
     RECAPDocumentFactory,
     SCOTUSDocketEntryFactory,
@@ -3932,6 +3935,47 @@ class BuildDocketTabsTest(SimpleTestCase):
             tabs = build_docket_tabs(docket, False, True, False)
             keys = [t["key"] for t in tabs]
             self.assertEqual(keys, ["entries", "idb"])
+
+
+class DocketTabViewsTest(TestCase):
+    """Context every tab view of a docket shares, whichever stack renders it."""
+
+    @classmethod
+    def setUpTestData(cls) -> None:
+        cls.court = CourtFactory(id="canb", jurisdiction="FB")
+        cls.docket = DocketFactory(
+            court=cls.court,
+            source=Docket.RECAP,
+            idb_data=FjcIntegratedDatabaseFactory(),
+        )
+        party = PartyFactory.build()
+        party.save()
+        PartyTypeFactory(docket=cls.docket, party=party)
+        OpinionsCitedByRECAPDocumentFactory(
+            citing_document=RECAPDocumentFactory(
+                docket_entry=DocketEntryFactory(docket=cls.docket)
+            ),
+            cited_opinion=OpinionWithParentsFactory(),
+        )
+
+    async def test_every_tab_view_gets_the_full_tab_list(self) -> None:
+        """Each tab view hands the template the same navigation, so a tab
+        never disappears depending on which one is active."""
+        for url_name in (
+            "view_docket",
+            "docket_parties",
+            "docket_idb_data",
+            "docket_authorities",
+        ):
+            with self.subTest(view=url_name):
+                r = await self.async_client.get(
+                    reverse(url_name, args=[self.docket.pk, self.docket.slug])
+                )
+                self.assertEqual(r.status_code, HTTPStatus.OK)
+                keys = [tab["key"] for tab in r.context["tabs"]]
+                self.assertEqual(
+                    keys, ["entries", "parties", "idb", "authorities"]
+                )
 
 
 @override_settings(WAFFLE_CACHE_PREFIX="test_docket_page_v2_waffle")

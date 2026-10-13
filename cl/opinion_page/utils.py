@@ -550,13 +550,19 @@ class CoreDocketDataDict(TypedDict):
     docket_source: DocketEntrySource
     docket_source_url: str | None
     metadata_sections: list[MetadataSection]
+    parties: bool
+    tabs: list[dict[str, str]]
 
 
 async def core_docket_data(
     request: HttpRequest,
     pk: int,
 ) -> tuple[Docket, CoreDocketDataDict]:
-    """Gather the core data for a docket, party, or IDB page."""
+    """Gather the core data shared by every tab view of a docket.
+
+    The tab navigation is built here so every tab lists the same set,
+    whichever one is active.
+    """
     docket: Docket = await aget_object_or_404(Docket, pk=pk)
     source = docket.get_entry_source()
     is_scotus = source is docket_entry_sources.SCOTUS
@@ -610,6 +616,7 @@ async def core_docket_data(
         *await _common_metadata_sections(docket, og_info),
     ]
 
+    parties = await docket.parties.aexists()
     return (
         docket,
         {
@@ -626,6 +633,14 @@ async def core_docket_data(
                 docket
             ),
             "metadata_sections": metadata_sections,
+            "parties": parties,
+            "tabs": build_docket_tabs(
+                docket,
+                parties,
+                # Reads the FK id to avoid fetching the row in async code.
+                bool(docket.idb_data_id),  # pyrefly:ignore[missing-attribute]
+                await docket.ahas_authorities(),
+            ),
         },
     )
 
