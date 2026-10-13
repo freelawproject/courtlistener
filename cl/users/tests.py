@@ -6143,12 +6143,10 @@ class MembershipPageTest(TestCase):
     @classmethod
     def setUpTestData(cls) -> None:
         cls.user = UserProfileWithParentsFactory.create().user
-        cls.user.set_password("password")
-        cls.user.save()
         cls.url = reverse("profile_your_support")
 
     def setUp(self) -> None:
-        self.client.login(username=self.user.username, password="password")
+        self.client.force_login(self.user)
 
     def test_login_required(self) -> None:
         """Anonymous users are sent to sign in."""
