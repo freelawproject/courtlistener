@@ -2,13 +2,14 @@ import argparse
 import csv
 import os
 
+from asgiref.sync import async_to_sync
 from django.conf import settings
 
 from cl.corpus_importer.task_canvases import get_docket_and_claims
 from cl.corpus_importer.tasks import save_ia_docket_to_disk
 from cl.lib.celery_utils import CeleryThrottle
 from cl.lib.command_utils import VerboseCommand, logger
-from cl.lib.pacer_session import ProxyPacerSession, SessionData
+from cl.lib.pacer_session import SessionData, log_into_pacer
 from cl.search.models import Court, Docket
 
 PACER_USERNAME = os.environ.get("PACER_USERNAME", settings.PACER_USERNAME)
@@ -67,10 +68,9 @@ def get_data(options, row_transform, tags):
     reader = csv.DictReader(f)
     q = options["queue"]
     throttle = CeleryThrottle(queue_name=q)
-    session = ProxyPacerSession(
+    session = async_to_sync(log_into_pacer)(
         username=PACER_USERNAME, password=PACER_PASSWORD
     )
-    session.login()
     for i, row in enumerate(reader):
         if i < options["offset"]:
             continue
