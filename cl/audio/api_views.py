@@ -1,5 +1,5 @@
 from rest_framework import viewsets
-from rest_framework.permissions import DjangoModelPermissionsOrAnonReadOnly
+from rest_framework.permissions import DjangoModelPermissions
 
 from cl.api.api_permissions import V3APIPermission
 from cl.api.utils import DeferredFieldsMixin, LoggingMixin
@@ -12,7 +12,7 @@ class AudioViewSet(LoggingMixin, DeferredFieldsMixin, viewsets.ModelViewSet):
     serializer_class = AudioSerializer
     filterset_class = AudioFilter
     permission_classes = [
-        DjangoModelPermissionsOrAnonReadOnly,
+        DjangoModelPermissions,
         V3APIPermission,
     ]
     ordering_fields = (
