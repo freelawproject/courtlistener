@@ -6135,3 +6135,33 @@ class FailedSignInThrottleTest(TestCase):
             )
             self.sign_in(self.user.username, "a-good-password")
             self.assertIn("_auth_user_id", self.client.session)
+
+
+class AlertsPageMembershipNudgeTest(TestCase):
+    """Non-members are offered more alerts on their profile's alerts pages."""
+
+    @classmethod
+    def setUpTestData(cls) -> None:
+        cls.user = UserProfileWithParentsFactory.create().user
+        cls.user.set_password("password")
+        cls.user.save()
+        AlertFactory(user=cls.user)
+        DocketAlertWithParentsFactory(user=cls.user)
+
+    def setUp(self) -> None:
+        self.client.login(username=self.user.username, password="password")
+
+    def test_non_member_is_offered_more_alerts(self) -> None:
+        """Both alert pages mention what members get and link to join."""
+        for viewname in ("profile_search_alerts", "profile_docket_alerts"):
+            with self.subTest(viewname=viewname):
+                response = self.client.get(reverse(viewname))
+                self.assertContains(response, "Get More Alerts")
+
+    def test_member_is_not_offered_more_alerts(self) -> None:
+        """Members already get the benefit, so don't ask them to join."""
+        NeonMembershipFactory(user=self.user)
+        for viewname in ("profile_search_alerts", "profile_docket_alerts"):
+            with self.subTest(viewname=viewname):
+                response = self.client.get(reverse(viewname))
+                self.assertNotContains(response, "Get More Alerts")
