@@ -872,14 +872,14 @@
       "column": 55,
       "path": "cl/corpus_importer/management/commands/harvard_merge.py",
       "name": "bad-argument-type",
-      "concise_description": "Argument `QuerySet[Unknown]` is not assignable to parameter `sub_opinions` with type `list[Opinion]` in function `fetch_cl_opinion_content`",
+      "concise_description": "Argument `QuerySet[Opinion, Opinion]` is not assignable to parameter `sub_opinions` with type `list[Opinion]` in function `fetch_cl_opinion_content`",
       "severity": "error"
     },
     {
       "column": 47,
       "path": "cl/corpus_importer/management/commands/harvard_merge.py",
       "name": "bad-argument-type",
-      "concise_description": "Argument `QuerySet[Unknown]` is not assignable to parameter `cluster_sub_opinions` with type `list[Unknown]` in function `update_matching_opinions`",
+      "concise_description": "Argument `QuerySet[Opinion, Opinion]` is not assignable to parameter `cluster_sub_opinions` with type `list[Unknown]` in function `update_matching_opinions`",
       "severity": "error"
     },
     {
@@ -963,7 +963,7 @@
       "column": 43,
       "path": "cl/corpus_importer/management/commands/update_opinions_order.py",
       "name": "bad-argument-type",
-      "concise_description": "Argument `QuerySet[Unknown, Any]` is not assignable to parameter `opinions` with type `list[Any]` in function `match_text`",
+      "concise_description": "Argument `QuerySet[Opinion, Any]` is not assignable to parameter `opinions` with type `list[Any]` in function `match_text`",
       "severity": "error"
     },
     {
@@ -2119,6 +2119,27 @@
       "path": "cl/people_db/management/commands/cl_export_recap_judge_info.py",
       "name": "missing-module-attribute",
       "concise_description": "Could not import `to_pickle` from `pandas`",
+      "severity": "error"
+    },
+    {
+      "column": 45,
+      "path": "cl/people_db/management/commands/cl_export_recap_judge_info.py",
+      "name": "missing-attribute",
+      "concise_description": "Object of class `NoneType` has no attribute `year`",
+      "severity": "error"
+    },
+    {
+      "column": 34,
+      "path": "cl/people_db/management/commands/cl_export_recap_judge_info.py",
+      "name": "missing-attribute",
+      "concise_description": "Object of class `NoneType` has no attribute `year`",
+      "severity": "error"
+    },
+    {
+      "column": 33,
+      "path": "cl/people_db/management/commands/cl_export_recap_judge_info.py",
+      "name": "missing-attribute",
+      "concise_description": "Object of class `NoneType` has no attribute `year`",
       "severity": "error"
     },
     {
@@ -3959,7 +3980,7 @@
       "column": 12,
       "path": "cl/search/management/commands/cl_compute_token_count.py",
       "name": "bad-return",
-      "concise_description": "Returned type `RawQuerySet[Unknown]` is not assignable to declared return type `QuerySet[Opinion, Opinion]`",
+      "concise_description": "Returned type `RawQuerySet[Opinion]` is not assignable to declared return type `QuerySet[Opinion, Opinion]`",
       "severity": "error"
     },
     {
@@ -4282,20 +4303,6 @@
       "path": "cl/search/models.py",
       "name": "bad-assignment",
       "concise_description": "`Literal['']` is not assignable to attribute `pacer_doc_id` with type `Never`",
-      "severity": "error"
-    },
-    {
-      "column": 9,
-      "path": "cl/search/models.py",
-      "name": "bad-override",
-      "concise_description": "Class member `FederalCourtsQuerySet.all` overrides parent class `QuerySet` in an inconsistent manner",
-      "severity": "error"
-    },
-    {
-      "column": 9,
-      "path": "cl/search/models.py",
-      "name": "bad-override",
-      "concise_description": "Class member `StateCourtsQuerySet.all` overrides parent class `QuerySet` in an inconsistent manner",
       "severity": "error"
     },
     {

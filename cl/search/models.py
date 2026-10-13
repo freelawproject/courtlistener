@@ -1867,11 +1867,11 @@ class ClaimHistory(AbstractPacerDocument, AbstractPDF, AbstractDateTimeModel):
         return str(Path(root) / bucket / filename)
 
 
-class FederalCourtsQuerySet(models.QuerySet):
-    def all(self) -> models.QuerySet:
+class FederalCourtsQuerySet(models.QuerySet["Court"]):
+    def all(self) -> Self:
         return self.filter(jurisdiction__in=Court.FEDERAL_JURISDICTIONS)
 
-    def all_pacer_courts(self) -> models.QuerySet:
+    def all_pacer_courts(self) -> Self:
         return self.filter(
             Q(
                 jurisdiction__in=[
@@ -1885,7 +1885,7 @@ class FederalCourtsQuerySet(models.QuerySet):
             in_use=True,
         ).exclude(pk="scotus")
 
-    def district_or_bankruptcy_pacer_courts(self) -> models.QuerySet:
+    def district_or_bankruptcy_pacer_courts(self) -> Self:
         return self.filter(
             Q(
                 jurisdiction__in=[
@@ -1897,7 +1897,7 @@ class FederalCourtsQuerySet(models.QuerySet):
             end_date__isnull=True,
         )
 
-    def appellate_courts(self) -> models.QuerySet:
+    def appellate_courts(self) -> Self:
         return self.filter(
             Q(jurisdiction=Court.FEDERAL_APPELLATE)
             |
@@ -1906,32 +1906,32 @@ class FederalCourtsQuerySet(models.QuerySet):
             end_date__isnull=True,
         )
 
-    def bankruptcy_pacer_courts(self) -> models.QuerySet:
+    def bankruptcy_pacer_courts(self) -> Self:
         return self.filter(
             jurisdiction=Court.FEDERAL_BANKRUPTCY, end_date__isnull=True
         )
 
-    def district_courts(self) -> models.QuerySet:
+    def district_courts(self) -> Self:
         return self.filter(jurisdiction=Court.FEDERAL_DISTRICT)
 
-    def bankruptcy_courts(self) -> models.QuerySet:
+    def bankruptcy_courts(self) -> Self:
         return self.filter(jurisdictions__in=Court.BANKRUPTCY_JURISDICTIONS)
 
-    def appellate_courts(self) -> models.QuerySet:
+    def appellate_courts(self) -> Self:
         return self.filter(jurisdiction=Court.FEDERAL_APPELLATE)
 
-    def tribal_courts(self) -> models.QuerySet:
+    def tribal_courts(self) -> Self:
         return self.filter(jurisdictions__in=Court.TRIBAL_JURISDICTIONS)
 
-    def territorial_courts(self) -> models.QuerySet:
+    def territorial_courts(self) -> Self:
         return self.filter(jurisdictions__in=Court.TERRITORY_JURISDICTIONS)
 
-    def military_courts(self) -> models.QuerySet:
+    def military_courts(self) -> Self:
         return self.filter(jurisdictions__in=Court.MILITARY_JURISDICTIONS)
 
 
-class StateCourtsQuerySet(models.QuerySet):
-    def all(self) -> models.QuerySet:
+class StateCourtsQuerySet(models.QuerySet["Court"]):
+    def all(self) -> Self:
         return self.filter(jurisdiction__in=Court.STATE_JURISDICTIONS)
 
 
@@ -3086,8 +3086,8 @@ OPINION_TEXT_SOURCE_FIELDS = [
 ]
 
 
-class OpinionQuerySet(models.QuerySet):
-    def with_best_text(self):
+class OpinionQuerySet(models.QuerySet["Opinion"]):
+    def with_best_text(self) -> Self:
         """Annotates an Opinion QuerySet with best_text and best_text_source.
 
         To determine the best text, we get the first non-empty value from
