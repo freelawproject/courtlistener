@@ -21,6 +21,7 @@ from selenium.webdriver.support.wait import WebDriverWait
 from timeout_decorator import timeout_decorator
 
 from cl.custom_filters.templatetags.pacer import price
+from cl.donate.factories import NeonMembershipFactory
 from cl.donate.models import (
     MembershipPaymentStatus,
     NeonMembership,
@@ -1646,6 +1647,40 @@ class RECAPPrayAndPay(SimpleUserDataMixin, PrayAndPayTestCase):
 
         await self.rd_4.arefresh_from_db()
         self.assertEqual(self.rd_4.is_sealed, False)
+
+    async def test_prayers_page_nudges_non_members(self) -> None:
+        """Non-members are offered a way to get more daily prayers."""
+        await self.async_client.alogin(username="pandora", password="password")
+        r = await self.async_client.get(
+            reverse("user_prayers", args=["pandora"])
+        )
+        self.assertContains(r, "Get More Prayers")
+
+    async def test_prayers_page_does_not_nudge_members(self) -> None:
+        """Members already have more prayers, so don't ask them to join."""
+        user = await User.objects.aget(username="pandora")
+        await sync_to_async(NeonMembershipFactory)(user=user)
+        await self.async_client.alogin(username="pandora", password="password")
+        r = await self.async_client.get(
+            reverse("user_prayers", args=["pandora"])
+        )
+        self.assertNotContains(r, "Get More Prayers")
+
+    @override_settings(ALLOWED_PRAYER_COUNT=0)
+    async def test_daily_limit_tooltip_mentions_membership(self) -> None:
+        """Only people who could get more prayers are told that members do."""
+        user = await User.objects.aget(username="pandora")
+        await self.async_client.alogin(username="pandora", password="password")
+        url = reverse("create_prayer", args=[self.rd_2.pk])
+
+        r = await self.async_client.post(url, headers={"HX-Request": "true"})
+        self.assertContains(r, "You have reached your daily request limit.")
+        self.assertContains(r, "Members get more requests each day.")
+
+        await sync_to_async(NeonMembershipFactory)(user=user)
+        r = await self.async_client.post(url, headers={"HX-Request": "true"})
+        self.assertContains(r, "You have reached your daily request limit.")
+        self.assertNotContains(r, "Members get more requests each day.")
 
     async def test_can_we_load_the_top_prayers_page(self) -> None:
         """Does the 'top prayers' page return a successful response?"""
