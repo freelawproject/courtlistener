@@ -1,6 +1,7 @@
 from collections.abc import Iterable
 
-from cl.celery_init import app
+from celery import Task
+
 from cl.corpus_importer.management.utils import (
     CorpusImporterCommand,
 )
@@ -38,11 +39,11 @@ class Command(CorpusImporterCommand):
         return map(lambda r: (r[0].strip(), r[1].strip()), csv_reader)
 
     @staticmethod
-    def download_task() -> app.Task:
+    def download_task() -> Task:
         return fl_corpus_download_task
 
     @staticmethod
-    def merge_task() -> app.Task:
+    def merge_task() -> Task:
         return fl_ingest_docket_task
 
     def handle(
