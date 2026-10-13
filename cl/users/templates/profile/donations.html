@@ -2,7 +2,7 @@
 {% load static %}
 {% load humanize %}
 
-{% block title %}Your Support – CourtListener.com{% endblock %}
+{% block title %}Membership – CourtListener.com{% endblock %}
 
 {% block nav-account %}active{% endblock %}
 {% block footer-scripts %}
@@ -21,22 +21,85 @@
 
   <div class="flex flex-row justify-content-center col-xs-12">
     <div class="col-xs-12 col-sm-10 col-md-6">
-      {% if user.profile.is_member %}
-      <h1 class="text-center v-offset-above-2">
-        Thank you for being a member of Free Law Project! <i class="fa fa-heart red"></i>
-      </h1>
-      <p class="v-offset-above-2">
-        Your ongoing membership fuels our passion to keep developing these and other features that make the judiciary more equitable.
-      </p>
+      {% if membership and membership.is_active %}
+        <h1 class="text-center v-offset-above-2">
+          Thank you for being a member of Free Law Project! <i class="fa fa-heart red"></i>
+        </h1>
+        <p class="v-offset-above-2">
+          Your ongoing membership fuels our passion to keep developing these and other features that make the judiciary more equitable.
+        </p>
+
+        <h3 class="v-offset-above-3" id="membership-details">Your Membership</h3>
+        <dl class="dl-horizontal">
+          <dt>Level</dt>
+          <dd>{{ membership.get_level_display }}</dd>
+          <dt>Status</dt>
+          <dd>Active</dd>
+          {% if membership.termination_date %}
+            <dt>Term ends</dt>
+            <dd>{{ membership.termination_date|date:"F j, Y" }}</dd>
+          {% endif %}
+        </dl>
+        <p>
+          <a href="{{ upgrade_url }}"
+             class="btn btn-primary"
+             target="_blank" rel="noopener noreferrer">
+            {% if is_legacy_membership %}Get More Features{% else %}Upgrade Membership{% endif %}
+          </a>
+        </p>
+      {% elif membership %}
+        <h1 class="text-center v-offset-above-2">
+          Your Membership Isn't Active
+        </h1>
+        <p class="v-offset-above-2">
+          We have a <strong>{{ membership.get_level_display }}</strong> membership on file for you, but it isn't currently active. Thank you for your past support!
+        </p>
+        <dl class="dl-horizontal">
+          <dt>Level</dt>
+          <dd>{{ membership.get_level_display }}</dd>
+          <dt>Status</dt>
+          <dd>Inactive</dd>
+          <dt>Payment</dt>
+          <dd>{{ membership.get_payment_status_display }}</dd>
+          {% if membership.termination_date %}
+            <dt>Term ended</dt>
+            <dd>{{ membership.termination_date|date:"F j, Y" }}</dd>
+          {% endif %}
+        </dl>
+        <p>
+          <a href="https://free.law/membership/"
+             class="btn btn-danger"
+             target="_blank" rel="noopener noreferrer">
+            <i class="fa fa-heart-o"></i>&nbsp;Renew Your Membership
+          </a>
+        </p>
       {% else %}
-      <h1 class="text-center v-offset-above-2">
-        Thank You for Your Support <i class="fa fa-heart red"></i>
-      </h1>
+        <h1 class="text-center v-offset-above-2">
+          Thank You for Your Support <i class="fa fa-heart red"></i>
+        </h1>
+        <p class="v-offset-above-2">
+          You aren't a member yet. Members help support our work and get special access to features.
+        </p>
+        <p>
+          <a href="https://free.law/membership/"
+             class="btn btn-danger"
+             target="_blank" rel="noopener noreferrer">
+            <i class="fa fa-heart-o"></i>&nbsp;Become a Member
+          </a>
+        </p>
       {% endif %}
+
+      <h3 class="v-offset-above-3" id="membership-help">Not seeing your membership?</h3>
+      <ul>
+        <li>Log in to the <a href="{{ donor_portal_url }}" target="_blank" rel="noopener noreferrer">donor portal</a> to make sure your membership is active.</li>
+        <li>Make sure the email address on your CourtListener account matches the one in the donor portal.</li>
+        <li>Still stuck? Email us at <a href="mailto:memberships@free.law">memberships@free.law</a>.</li>
+      </ul>
+
       <p class="v-offset-above-2">
-        Your generosity deserves transparency. You can create an account in our donor portal to access your detailed donation list, including one-time and monthly contributions. See how you're making a difference.
+        Your generosity deserves transparency. You can create an account in our donor portal to access your detailed donation list, including one-time and monthly contributions. To upgrade your membership, change your payment frequency or profile, manage donations, or update your contact information, log in to the portal.
       </p>
-      <p class="text-center v-offset-above-2"><a href="https://donate.free.law/login"
+      <p class="text-center v-offset-above-2"><a href="{{ donor_portal_url }}"
         class="btn btn-lg btn-primary">Log in to the Donor Portal</a>
       </p>
       <p class="text-center v-offset-above-2">
