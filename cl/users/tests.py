@@ -6143,13 +6143,11 @@ class AlertsPageMembershipNudgeTest(TestCase):
     @classmethod
     def setUpTestData(cls) -> None:
         cls.user = UserProfileWithParentsFactory.create().user
-        cls.user.set_password("password")
-        cls.user.save()
         AlertFactory(user=cls.user)
         DocketAlertWithParentsFactory(user=cls.user)
 
     def setUp(self) -> None:
-        self.client.login(username=self.user.username, password="password")
+        self.client.force_login(self.user)
 
     def test_non_member_is_offered_more_alerts(self) -> None:
         """Both alert pages mention what members get and link to join."""
