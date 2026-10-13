@@ -6135,3 +6135,43 @@ class FailedSignInThrottleTest(TestCase):
             )
             self.sign_in(self.user.username, "a-good-password")
             self.assertIn("_auth_user_id", self.client.session)
+
+
+@override_settings(WAFFLE_CACHE_PREFIX="MembershipHeaderLinkTest")
+class MembershipHeaderLinkTest(TestCase):
+    """The header's donate slot should make sense for members and non-members."""
+
+    @classmethod
+    def setUpTestData(cls) -> None:
+        cls.user = UserProfileWithParentsFactory.create().user
+        cls.user.set_password("password")
+        cls.user.save()
+        cls.url = reverse("help_home")
+
+    def test_anonymous_user_sees_join_flp(self) -> None:
+        """Anonymous visitors are invited to join."""
+        response = self.client.get(self.url)
+        self.assertContains(response, "Join FLP")
+
+    def test_non_member_sees_join_flp(self) -> None:
+        """Signed-in users without a membership are still invited to join."""
+        self.client.login(username=self.user.username, password="password")
+        response = self.client.get(self.url)
+        self.assertContains(response, "Join FLP")
+
+    def test_active_member_sees_membership_link(self) -> None:
+        """Members get a link to their membership page, not a join button."""
+        NeonMembershipFactory(user=self.user)
+        self.client.login(username=self.user.username, password="password")
+        response = self.client.get(self.url)
+        self.assertNotContains(response, "Join FLP")
+        self.assertContains(response, "&nbsp;Membership</a>")
+
+    def test_lapsed_member_sees_join_flp(self) -> None:
+        """A membership that is no longer active shouldn't hide the join link."""
+        NeonMembershipFactory(
+            user=self.user, payment_status=MembershipPaymentStatus.FAILED
+        )
+        self.client.login(username=self.user.username, password="password")
+        response = self.client.get(self.url)
+        self.assertContains(response, "Join FLP")
