@@ -1,7 +1,9 @@
+from collections.abc import Iterable
 from http import HTTPStatus
 
 import requests
 from django.conf import settings
+from django.db.models import QuerySet
 from django.utils.timezone import now
 
 from cl.lib.command_utils import VerboseCommand, logger
@@ -49,7 +51,7 @@ def check_if_global_outage(session, url, timeout=5):
     return response
 
 
-def make_simple_url(court) -> str:
+def make_simple_url(court: Court) -> str:
     if court.pk == "cavc":
         return "https://efiling.uscourts.cavc.gov/"
     else:
@@ -84,7 +86,7 @@ def down_for_only_me(session: requests.Session, url: str) -> bool:
     return False
 
 
-def iterate_and_log_courts(courts):
+def iterate_and_log_courts(courts: Iterable[Court]):
     session = requests.Session()
     for court in courts:
         url = make_simple_url(court)
