@@ -135,7 +135,7 @@ async def contact(
                     "email_confirmed": profile.email_confirmed,
                 }
 
-            create_zoho_desk_ticket.delay(
+            await sync_to_async(create_zoho_desk_ticket.delay)(
                 subject=cd["phone_number"],
                 name=cd["name"],
                 email=account_email if is_authenticated else cd["email"],
@@ -380,6 +380,11 @@ async def components(request: HttpRequest) -> HttpResponse:
                     "value": "N.D. Cal.",
                     "suffix_text": "3:24-cv-01234",
                     "suffix_url": "/docket/1/example/",
+                },
+                {
+                    "label": "Citation",
+                    "value": "601 U.S. 416",
+                    "one_click_select": True,
                 },
             ],
         },

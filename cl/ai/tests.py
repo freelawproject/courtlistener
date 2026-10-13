@@ -620,7 +620,7 @@ class ResponseValidatorTest(SimpleTestCase):
 
         normalized = _ResponseValidator.normalize_response(single_response)
 
-        # Should return as-is (already normlized)
+        # Should return as-is (already normalized)
         self.assertEqual(normalized, single_response)
         self.assertIn("candidates", normalized)
         self.assertIn("usageMetadata", normalized)

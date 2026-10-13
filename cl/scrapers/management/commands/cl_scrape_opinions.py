@@ -3,6 +3,7 @@ import sys
 import time
 import traceback
 from datetime import date
+from types import ModuleType
 from typing import Any
 
 from asgiref.sync import async_to_sync, sync_to_async
@@ -364,7 +365,7 @@ class Command(ScraperCommand):
         opinions_content = []
         opinions_to_download = []
 
-        # this field is populated when usign cl_back_scrape_citations
+        # this field is populated when using cl_back_scrape_citations
         if case_dict.get("content"):
             content = case_dict.pop("content")
             opinions_content.append(
@@ -485,9 +486,13 @@ class Command(ScraperCommand):
                 item["case_names"].encode(),
             )
 
-    async def parse_and_scrape_site(self, mod, options: dict):
-        site = await mod.Site(save_response_fn=save_response).parse()
-        await self.scrape_court(site, options["full_crawl"])
+    async def parse_and_scrape_site(
+        self, mod: ModuleType, options: dict[str, Any]
+    ) -> None:
+        """Parse and scrape a court, closing its HTTP client on every exit."""
+        async with mod.Site(save_response_fn=save_response) as site:
+            await site.parse()
+            await self.scrape_court(site, options["full_crawl"])
 
     def handle(self, *args, **options):
         super().handle(*args, **options)

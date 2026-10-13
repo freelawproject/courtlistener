@@ -1169,7 +1169,7 @@ class DocketEntry(AbstractDateTimeModel, CSVExportMixin):
         return columns
 
     def get_column_function(self):
-        """Get dict of attrs: fucntion to apply on field value if it needs
+        """Get dict of attrs: function to apply on field value if it needs
         to be pre-processed before being add to csv
 
         returns: dict -- > {attr1: function}"""
