@@ -5,6 +5,7 @@ from datetime import datetime, timedelta
 from enum import Enum
 from typing import Any
 
+from asgiref.sync import async_to_sync
 from django.contrib.auth.models import User
 from django.core.cache import cache
 from django.core.management.base import CommandError
@@ -186,7 +187,7 @@ class Command(VerboseCommand):
 
     def handle_pacer_session(self) -> None:
         """Make sure we have an active PACER session for the user."""
-        get_or_cache_pacer_cookies(
+        async_to_sync(get_or_cache_pacer_cookies)(
             self.user.pk,
             username=self.pacer_username,
             password=self.pacer_password,
