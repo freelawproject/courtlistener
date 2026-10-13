@@ -224,6 +224,17 @@ class FakeFreeOpinionReport:
         pass
 
     async def download_pdf(self, *args, **kwargs) -> tuple[Response, str]:
+        """Return a fake PDF response.
+
+        Without a magic number, the real report sends ``de_seq_num`` as
+        multipart form data via httpx, which only accepts str values; anything
+        else fails the same way it does in production.
+        """
+        de_seq_num = kwargs.get("de_seq_num")
+        if de_seq_num is not None and not isinstance(de_seq_num, str):
+            raise AttributeError(
+                f"'{type(de_seq_num).__name__}' object has no attribute 'read'"
+            )
         return Response(200, content=b"Hello World"), ""
 
     async def query(self, *args, **kwargs):

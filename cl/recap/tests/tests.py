@@ -3875,6 +3875,35 @@ class RecapPdfFetchApiTest(TestCase):
         "cl.corpus_importer.tasks.FreeOpinionReport",
         new=fakes.FakeFreeOpinionReport,
     )
+    @mock.patch(
+        "cl.lib.storage.get_name_by_incrementing",
+        side_effect=clobbering_get_name,
+    )
+    @mock.patch("cl.scrapers.tasks.extract_pdf_document_base")
+    def test_fetch_unavailable_pdf_with_pacer_sequence_number(
+        self,
+        mock_extract,
+        mock_get_name,
+        mock_court_accessible,
+        mock_get_cookies,
+    ):
+        """Can we fetch a PDF whose entry has an int PACER sequence number?"""
+        self.de.pacer_sequence_number = 5
+        self.de.save()
+        self.rd.is_available = False
+        self.rd.save()
+
+        do_pacer_fetch(self.fq).get()
+
+        self.fq.refresh_from_db()
+        self.rd.refresh_from_db()
+        self.assertEqual(self.fq.status, PROCESSING_STATUS.SUCCESSFUL)
+        self.assertTrue(self.rd.is_available)
+
+    @mock.patch(
+        "cl.corpus_importer.tasks.FreeOpinionReport",
+        new=fakes.FakeFreeOpinionReport,
+    )
     def test_fetch_available_pdf(self, mock_court_accessible, mock_get_cookie):
         orig_date_modified = self.rd.date_modified
 
