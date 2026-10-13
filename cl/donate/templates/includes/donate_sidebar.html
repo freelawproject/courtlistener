@@ -5,6 +5,7 @@
     <h3><span>Thank You! <i class="fa fa-heart-o red"></i></span></h3>
     <p>You're a {{user.membership.get_level_display}} level supporter of the Free Law Project. Thank you for your support!
     </p>
+    <p><a href="{% url "profile_your_support" %}">View or upgrade your membership</a></p>
   {% else %}
     <h3><span>Support FLP <i class="fa fa-heart-o red"></i></span></h3>
     <p class="v-offset-above-1">
