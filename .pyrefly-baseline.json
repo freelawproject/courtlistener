@@ -1394,13 +1394,6 @@
       "severity": "error"
     },
     {
-      "column": 12,
-      "path": "cl/custom_filters/templatetags/extras.py",
-      "name": "bad-return",
-      "concise_description": "Returned type `str` is not assignable to declared return type `SafeString`",
-      "severity": "error"
-    },
-    {
       "column": 13,
       "path": "cl/custom_filters/templatetags/extras.py",
       "name": "bad-argument-type",
@@ -2742,13 +2735,6 @@
       "path": "cl/people_db/import_judges/populate_fjc_judges.py",
       "name": "unbound-name",
       "concise_description": "`court` may be uninitialized",
-      "severity": "error"
-    },
-    {
-      "column": 41,
-      "path": "cl/people_db/lookup_utils.py",
-      "name": "invalid-annotation",
-      "concise_description": "List literal cannot be used in annotations",
       "severity": "error"
     },
     {
@@ -4096,13 +4082,6 @@
       "severity": "error"
     },
     {
-      "column": 20,
-      "path": "cl/scrapers/management/commands/cl_scrape_opinions.py",
-      "name": "bad-unpacking",
-      "concise_description": "Cannot unpack tuple[dict[Unknown, Unknown]] (of size 1) into 3 values",
-      "severity": "error"
-    },
-    {
       "column": 9,
       "path": "cl/scrapers/management/commands/cl_scrape_opinions.py",
       "name": "bad-argument-type",
@@ -4114,13 +4093,6 @@
       "path": "cl/scrapers/management/commands/cl_scrape_opinions.py",
       "name": "bad-argument-type",
       "concise_description": "Argument `str | Any` is not assignable to parameter `blocked` with type `bool` in function `cl.scrapers.utils.update_or_create_docket`",
-      "severity": "error"
-    },
-    {
-      "column": 27,
-      "path": "cl/scrapers/management/commands/cl_scrape_opinions.py",
-      "name": "bad-argument-type",
-      "concise_description": "Argument `list[tuple[dict[Unknown, Unknown], bytes, str]]` is not assignable to parameter `opinions_content` with type `list[tuple[dict[Unknown, Unknown]]]` in function `set_ordering_keys`",
       "severity": "error"
     },
     {
@@ -5643,20 +5615,6 @@
       "severity": "error"
     },
     {
-      "column": 21,
-      "path": "cl/search/models.py",
-      "name": "bad-argument-type",
-      "concise_description": "Argument `list[CaseTransfer]` is not assignable to parameter `objs` with type `Iterable[Self@CaseTransfer]` in function `django.db.models.manager.Manager.bulk_update`",
-      "severity": "error"
-    },
-    {
-      "column": 17,
-      "path": "cl/search/models.py",
-      "name": "bad-argument-type",
-      "concise_description": "Argument `list[CaseTransfer]` is not assignable to parameter `objs` with type `Iterable[Self@CaseTransfer]` in function `django.db.models.manager.Manager.bulk_update`",
-      "severity": "error"
-    },
-    {
       "column": 28,
       "path": "cl/search/state/florida/factories.py",
       "name": "bad-assignment",
@@ -6266,24 +6224,10 @@
       "severity": "error"
     },
     {
-      "column": 10,
-      "path": "cl/sitemaps_infinite/base_sitemap.py",
-      "name": "not-a-type",
-      "concise_description": "Expected a type form, got instance of `GenericAlias`",
-      "severity": "error"
-    },
-    {
       "column": 13,
       "path": "cl/sitemaps_infinite/base_sitemap.py",
       "name": "bad-argument-type",
       "concise_description": "Argument `Literal[True] | str | None` is not assignable to parameter `cursor` with type `str` in function `InfinitePaginatorSitemap._urls`",
-      "severity": "error"
-    },
-    {
-      "column": 16,
-      "path": "cl/sitemaps_infinite/base_sitemap.py",
-      "name": "not-a-type",
-      "concise_description": "Expected a type form, got instance of `GenericAlias`",
       "severity": "error"
     },
     {
@@ -6333,13 +6277,6 @@
       "path": "cl/sitemaps_infinite/base_sitemap.py",
       "name": "bad-assignment",
       "concise_description": "`str | None` is not assignable to attribute `next_cursor` with type `str`",
-      "severity": "error"
-    },
-    {
-      "column": 16,
-      "path": "cl/sitemaps_infinite/base_sitemap.py",
-      "name": "bad-return",
-      "concise_description": "Returned type `tuple[CacheableList, str | None, bool | Unknown]` is not assignable to declared return type `tuple[Unknown, str, bool]`",
       "severity": "error"
     },
     {

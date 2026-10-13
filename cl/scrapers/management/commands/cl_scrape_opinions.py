@@ -53,7 +53,7 @@ die_now = False
 cnt = CaseNameTweaker()
 
 
-def set_ordering_keys(opinions_content: list[tuple[dict]]) -> None:
+def set_ordering_keys(opinions_content: list[tuple[dict, bytes, str]]) -> None:
     """Set a value for Opinion.ordering_key
 
     To know the relative order inside the cluster, we must know all the
