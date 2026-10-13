@@ -99,7 +99,7 @@ def find_citations_and_parantheticals_for_recap_documents(
         self: The bound Celery task.
         doc_ids: An iterable of search.RECAPDocument PKs
     """
-    documents: QuerySet[RECAPDocument, RECAPDocument] = (
+    documents: QuerySet[RECAPDocument] = (
         RECAPDocument.objects.filter(pk__in=doc_ids).filter(
             ocr_status__in=[
                 RECAPDocument.OCR_UNNECESSARY,
@@ -138,7 +138,7 @@ def find_citations_and_parentheticals_for_opinion_by_pks(
         percolate_opinion: Whether to percolate the related opinion document in
             order to trigger search alerts.
     """
-    opinions: QuerySet[Opinion, Opinion] = Opinion.objects.filter(
+    opinions: QuerySet[Opinion] = Opinion.objects.filter(
         pk__in=opinion_pks
     ).select_related("cluster")
 
