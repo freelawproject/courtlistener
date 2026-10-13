@@ -6077,20 +6077,6 @@
       "severity": "error"
     },
     {
-      "column": 34,
-      "path": "cl/search/tasks.py",
-      "name": "missing-attribute",
-      "concise_description": "Object of type `Audio | Citation | Docket | DocketEntry | Education | Opinion | OpinionCluster | Parenthetical | ParentheticalGroup | Person | Position | RECAPDocument` has no attribute `docket_entry`",
-      "severity": "error"
-    },
-    {
-      "column": 34,
-      "path": "cl/search/tasks.py",
-      "name": "missing-attribute",
-      "concise_description": "Object of type `Audio | Citation | Docket | DocketEntry | Education | Opinion | OpinionCluster | Parenthetical | ParentheticalGroup | Person | Position | RECAPDocument` has no attribute `cluster`",
-      "severity": "error"
-    },
-    {
       "column": 13,
       "path": "cl/search/tasks.py",
       "name": "bad-argument-type",
