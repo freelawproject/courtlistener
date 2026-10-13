@@ -20,8 +20,9 @@ from cl.donate.models import (
     NeonMembershipLevel,
     NeonWebhookEvent,
 )
+from cl.donate.utils import DONOR_PORTAL_URL, get_membership_upgrade_url
 from cl.lib.test_helpers import UserProfileWithParentsFactory
-from cl.tests.cases import TestCase
+from cl.tests.cases import SimpleTestCase, TestCase
 from cl.users.models import UserProfile
 from cl.users.utils import create_stub_account
 
@@ -1099,3 +1100,33 @@ class MembershipWebhookThrottleSyncTest(TestCase):
             ).values_list("rate", "source")
         ]
         self.assertEqual(remaining, [("0/min", APIThrottle.Source.MANUAL)])
+
+
+class MembershipUpgradeUrlTest(SimpleTestCase):
+    """Tests for get_membership_upgrade_url."""
+
+    def test_regular_member_gets_neon_upgrade_url(self) -> None:
+        """Regular members are sent to the Neon upgrade flow for their ID."""
+        membership = NeonMembership(
+            level=NeonMembershipLevel.TIER_1, neon_id="12345"
+        )
+        self.assertEqual(
+            get_membership_upgrade_url(membership),
+            "https://donate.free.law/constituent/memberships/upgrade/12345",
+        )
+
+    def test_legacy_member_gets_help_page(self) -> None:
+        """The Neon upgrade flow 404s for legacy members, so skip it."""
+        membership = NeonMembership(
+            level=NeonMembershipLevel.LEGACY, neon_id="12345"
+        )
+        url = get_membership_upgrade_url(membership)
+        self.assertIn("legacy-memberships", url)
+        self.assertNotIn("12345", url)
+
+    def test_member_without_neon_id_gets_portal(self) -> None:
+        """Without a Neon ID there's no upgrade URL to build."""
+        membership = NeonMembership(level=NeonMembershipLevel.TIER_2)
+        self.assertEqual(
+            get_membership_upgrade_url(membership), DONOR_PORTAL_URL
+        )
