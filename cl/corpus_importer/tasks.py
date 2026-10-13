@@ -1397,7 +1397,9 @@ async def query_case_query_report(
         proxy=session_data.proxy_address,
     ) as s:
         report = CaseQuery(map_cl_to_pacer_id(court_id), s)
-        await report.query(pacer_case_id)
+        # Juriscraper sends this as multipart form data, and httpx only
+        # accepts str/bytes values there; an int raises AttributeError.
+        await report.query(str(pacer_case_id))
         if report.response is None:
             raise ParsingException("The case query returned no response.")
         return report.data, report.response.text

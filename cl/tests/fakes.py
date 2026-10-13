@@ -370,8 +370,18 @@ class FakeCaseQueryReport:
         self.pacer_case_id = None
         self.court_id = court_id
 
-    async def query(self, pacer_case_id):
-        self.pacer_case_id = pacer_case_id
+    async def query(self, pacer_case_id: str) -> None:
+        """Store the requested case ID so ``data`` can look it up.
+
+        Mirrors the real report, whose multipart POST via httpx only accepts
+        str values; anything else fails the same way it does in production.
+        """
+        if not isinstance(pacer_case_id, str):
+            raise AttributeError(
+                f"'{type(pacer_case_id).__name__}' object has no attribute 'read'"
+            )
+        # test_patterns are keyed by int case IDs.
+        self.pacer_case_id = int(pacer_case_id)
 
     @property
     def data(self):
