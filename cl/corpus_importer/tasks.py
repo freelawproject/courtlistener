@@ -1397,7 +1397,9 @@ async def query_case_query_report(
         proxy=session_data.proxy_address,
     ) as s:
         report = CaseQuery(map_cl_to_pacer_id(court_id), s)
-        await report.query(pacer_case_id)
+        # Juriscraper sends this as multipart form data, and httpx only
+        # accepts str/bytes values there; an int raises AttributeError.
+        await report.query(str(pacer_case_id))
         if report.response is None:
             raise ParsingException("The case query returned no response.")
         return report.data, report.response.text
@@ -2398,7 +2400,7 @@ async def download_pacer_pdf_by_rd(
     pacer_doc_id: str,
     session_data: SessionData,
     magic_number: str | None = None,
-    de_seq_num: str | None = None,
+    de_seq_num: int | None = None,
 ) -> tuple[Response | None, str]:
     """Using a RECAPDocument object ID, download the PDF if it doesn't already
     exist.
@@ -2410,6 +2412,7 @@ async def download_pacer_pdf_by_rd(
     and proxy.
     :param magic_number: The magic number to fetch PACER documents for free
     this is an optional field, only used by RECAP Email documents
+    :param de_seq_num: The docket entry's PACER sequence number, if known.
     :return: A two-tuple of httpx.Response object usually containing a PDF,
     or None if that wasn't possible, and a string representing the error if
     there was one.
@@ -2438,7 +2441,9 @@ async def download_pacer_pdf_by_rd(
                 pacer_case_id,
                 cast(Any, pacer_doc_id),
                 magic_number,
-                de_seq_num=de_seq_num,
+                # Without a magic number, Juriscraper sends this as multipart
+                # form data, and httpx only accepts str/bytes values there.
+                de_seq_num=str(de_seq_num) if de_seq_num is not None else None,
             )
         return r, r_msg
 

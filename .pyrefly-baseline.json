@@ -1170,13 +1170,6 @@
       "severity": "error"
     },
     {
-      "column": 24,
-      "path": "cl/corpus_importer/tasks.py",
-      "name": "bad-argument-type",
-      "concise_description": "Argument `int | None` is not assignable to parameter `de_seq_num` with type `str | None` in function `download_pacer_pdf_by_rd`",
-      "severity": "error"
-    },
-    {
       "column": 23,
       "path": "cl/corpus_importer/tasks.py",
       "name": "bad-assignment",
@@ -1191,24 +1184,10 @@
       "severity": "error"
     },
     {
-      "column": 24,
-      "path": "cl/corpus_importer/tasks.py",
-      "name": "bad-argument-type",
-      "concise_description": "Argument `str` is not assignable to parameter `pacer_doc_id` with type `int | None` in function `juriscraper.pacer.reports.BaseReport.download_pdf`",
-      "severity": "error"
-    },
-    {
       "column": 9,
       "path": "cl/corpus_importer/tasks.py",
       "name": "bad-argument-type",
       "concise_description": "Argument `str | None` is not assignable to parameter `pacer_case_id` with type `str` in function `download_pacer_pdf_by_rd`",
-      "severity": "error"
-    },
-    {
-      "column": 20,
-      "path": "cl/corpus_importer/tasks.py",
-      "name": "bad-argument-type",
-      "concise_description": "Argument `int | None` is not assignable to parameter `de_seq_num` with type `str | None` in function `download_pacer_pdf_by_rd`",
       "severity": "error"
     },
     {
@@ -1230,13 +1209,6 @@
       "path": "cl/corpus_importer/tasks.py",
       "name": "bad-argument-type",
       "concise_description": "Argument `str | None` is not assignable to parameter `pacer_case_id` with type `str` in function `download_pacer_pdf_by_rd`",
-      "severity": "error"
-    },
-    {
-      "column": 20,
-      "path": "cl/corpus_importer/tasks.py",
-      "name": "bad-argument-type",
-      "concise_description": "Argument `int | None` is not assignable to parameter `de_seq_num` with type `str | None` in function `download_pacer_pdf_by_rd`",
       "severity": "error"
     },
     {
@@ -3554,13 +3526,6 @@
       "path": "cl/recap/tasks.py",
       "name": "bad-argument-type",
       "concise_description": "Argument `str | None` is not assignable to parameter `pacer_case_id` with type `str` in function `cl.corpus_importer.tasks.download_pacer_pdf_by_rd`",
-      "severity": "error"
-    },
-    {
-      "column": 28,
-      "path": "cl/recap/tasks.py",
-      "name": "bad-argument-type",
-      "concise_description": "Argument `int | None` is not assignable to parameter `de_seq_num` with type `str | None` in function `cl.corpus_importer.tasks.download_pacer_pdf_by_rd`",
       "severity": "error"
     },
     {
