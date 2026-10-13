@@ -8,6 +8,7 @@ from unittest import mock
 
 from bs4 import BeautifulSoup
 from django.core.management import CommandError, call_command
+from django.db import transaction
 from django.db.models.fields.files import FieldFile
 
 from cl.corpus_importer.management.commands.import_scanned_opinions import (
@@ -629,6 +630,52 @@ class ImportScannedOpinionsTest(TestCase):
                 OpinionContent.objects.order_by("pk").values_list("pk")
             ),
         }
+
+    def test_citation_finding(self) -> None:
+        """Are citations found in the scan of a new opinion?"""
+        self.import_scan()
+
+        opinion = Opinion.objects.get()
+        self.assertIn("282 So. 3d 998", opinion.html_with_citations)
+        self.assertIn('class="citation', opinion.html_with_citations)
+
+    def test_skip_citation_finding(self) -> None:
+        """Does --skip-citation-finding leave the citations alone?"""
+        with mock.patch(
+            f"{COMMAND_MODULE}.find_citations_and_parentheticals_for_opinion_by_pks"
+        ) as mock_task:
+            self.import_scan(skip_citation_finding=True)
+
+        mock_task.delay.assert_not_called()
+        self.assertEqual(Opinion.objects.get().html_with_citations, "")
+
+    def test_citation_finding_on_merge(self) -> None:
+        """Are citations only looked for when the scan is the opinion text?"""
+        for has_other_text in [True, False]:
+            with (
+                self.subTest(has_other_text=has_other_text),
+                transaction.atomic(),
+                mock.patch(
+                    f"{COMMAND_MODULE}.find_citations_and_parentheticals_for_opinion_by_pks"
+                ) as mock_task,
+            ):
+                cluster = self.make_matching_cluster()
+                opinion = cluster.sub_opinions.get()
+                if not has_other_text:
+                    Opinion.objects.update(
+                        **dict.fromkeys(OPINION_TEXT_FIELDS, "")
+                    )
+                with mock.patch(
+                    f"{COMMAND_MODULE}.find_existing_cluster",
+                    return_value=cluster,
+                ):
+                    self.import_scan()
+
+                if has_other_text:
+                    mock_task.delay.assert_not_called()
+                else:
+                    mock_task.delay.assert_called_once_with([opinion.pk])
+                transaction.set_rollback(True)
 
     def test_other_opinion_on_same_page_is_imported(self) -> None:
         """Is a different case with the same citation imported?"""

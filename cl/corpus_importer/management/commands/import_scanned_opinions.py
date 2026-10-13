@@ -23,6 +23,9 @@ from juriscraper.lib.string_utils import (
     titlecase,
 )
 
+from cl.citations.tasks import (
+    find_citations_and_parentheticals_for_opinion_by_pks,
+)
 from cl.corpus_importer.management.commands.harvard_opinions import (
     find_previously_imported_cases,
     map_opinion_type,
@@ -704,7 +707,9 @@ def add_opinion_content(
     )
 
 
-def merge_into_cluster(cluster: OpinionCluster, scan_case: ScanCase) -> None:
+def merge_into_cluster(
+    cluster: OpinionCluster, scan_case: ScanCase
+) -> list[int]:
     """Merge a scanned opinion into an existing cluster.
 
     Adds missing citations, fills empty cluster fields, stores the XML,
@@ -714,8 +719,10 @@ def merge_into_cluster(cluster: OpinionCluster, scan_case: ScanCase) -> None:
 
     :param cluster: The matching cluster.
     :param scan_case: The parsed scanned opinion.
-    :return: None
+    :return: The ids of the opinions whose text is now the scan, which need
+        citation finding. Opinions that already had text are left out.
     """
+    new_text_opinion_ids = []
     with transaction.atomic():
         add_citations_to_cluster(scan_case.citations, cluster.id)
 
@@ -750,15 +757,14 @@ def merge_into_cluster(cluster: OpinionCluster, scan_case: ScanCase) -> None:
             opinion = cl_opinions[0]
             opinion.xml_scan = str(scan_case.opinions[0])
             opinion.save(update_fields=["xml_scan"])
-            add_opinion_content(
-                opinion,
-                scan_case,
-                # OCR text shouldn't replace text from other sources
-                is_main_version=not (
-                    any(getattr(opinion, f) for f in OPINION_TEXT_FIELDS)
-                    or opinion.contents.filter(is_main_version=True).exists()
-                ),
+            # OCR text shouldn't replace text from other sources
+            is_main_version = not (
+                any(getattr(opinion, f) for f in OPINION_TEXT_FIELDS)
+                or opinion.contents.filter(is_main_version=True).exists()
             )
+            add_opinion_content(opinion, scan_case, is_main_version)
+            if is_main_version:
+                new_text_opinion_ids.append(opinion.pk)
         else:
             logger.warning(
                 "Cluster %s has %s opinions and the scan of %s has %s. "
@@ -771,6 +777,7 @@ def merge_into_cluster(cluster: OpinionCluster, scan_case: ScanCase) -> None:
 
         # Saves the cluster changes above too
         store_scan_xml(cluster, scan_case, update_fields)
+    return new_text_opinion_ids
 
 
 def add_new_case(scan_case: ScanCase) -> OpinionCluster:
@@ -837,7 +844,11 @@ def add_new_case(scan_case: ScanCase) -> OpinionCluster:
 
 
 def import_scanned_opinion(
-    xml: str, file_path: str, court_id: str | None, dry_run: bool = False
+    xml: str,
+    file_path: str,
+    court_id: str | None,
+    dry_run: bool = False,
+    skip_citation_finding: bool = False,
 ) -> None:
     """Import a scanning project final XML into CourtListener.
 
@@ -851,6 +862,9 @@ def import_scanned_opinion(
     :param court_id: The CL court id, or None to look it up in the XML.
     :param dry_run: Only log whether the opinion would be skipped, merged or
         added, without writing to the database or uploading files.
+    :param skip_citation_finding: Don't queue citation finding for the
+        opinions whose text is the scan, e.g. to run `find_citations` later in
+        bulk.
     :return: None
     """
     logger.info("Processing %s", file_path)
@@ -893,7 +907,11 @@ def import_scanned_opinion(
             cluster.id,
             cluster.get_absolute_url(),
         )
-        merge_into_cluster(cluster, scan_case)
+        opinion_ids = merge_into_cluster(cluster, scan_case)
+        if opinion_ids and not skip_citation_finding:
+            find_citations_and_parentheticals_for_opinion_by_pks.delay(
+                opinion_ids
+            )
         return
 
     if dry_run:
@@ -904,6 +922,10 @@ def import_scanned_opinion(
         )
         return
     cluster = add_new_case(scan_case)
+    if not skip_citation_finding:
+        find_citations_and_parentheticals_for_opinion_by_pks.delay(
+            list(cluster.sub_opinions.values_list("pk", flat=True))
+        )
     logger.info(
         "Added %s (%s) as cluster %s: %s",
         scan_case.case_name,
@@ -963,6 +985,12 @@ class Command(VerboseCommand):
             help="Log what would be skipped, merged or added without "
             "changing anything.",
         )
+        parser.add_argument(
+            "--skip-citation-finding",
+            action="store_true",
+            help="Don't look for citations in the imported opinions. Use it "
+            "to run find_citations later in bulk.",
+        )
 
     def handle(self, *args: Any, **options: Any) -> None:
         """Import every XML file found in the given path.
@@ -990,6 +1018,7 @@ class Command(VerboseCommand):
                     file_path,
                     options["court_id"],
                     options["dry_run"],
+                    options["skip_citation_finding"],
                 )
             except Exception:
                 # Keep going; one bad file shouldn't stop a volume import
