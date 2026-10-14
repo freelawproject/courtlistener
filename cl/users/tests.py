@@ -6168,3 +6168,11 @@ class AlertsPageMembershipNudgeTest(TestCase):
             with self.subTest(viewname=viewname):
                 response = self.client.get(reverse(viewname))
                 self.assertNotContains(response, "Members get")
+
+    def test_member_is_thanked_on_docket_alerts_page(self) -> None:
+        """Members see a thank-you where non-members see the nudge."""
+        NeonMembershipFactory(user=self.user)
+        response = self.client.get(reverse("profile_docket_alerts"))
+        self.assertContains(
+            response, "As a member you get unlimited docket alerts. Thanks!"
+        )
