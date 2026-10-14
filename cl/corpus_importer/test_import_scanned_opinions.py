@@ -1,4 +1,5 @@
 import io
+import os
 import re
 import tempfile
 from datetime import date
@@ -9,6 +10,7 @@ from unittest import mock
 from bs4 import BeautifulSoup
 from django.core.management import CommandError, call_command
 from django.db.models.fields.files import FieldFile
+from django.test import override_settings
 
 from cl.corpus_importer.management.commands.import_scanned_opinions import (
     get_citation_strings,
@@ -891,6 +893,30 @@ class FakeScanningStorage:
         if key not in self.files:
             raise FileNotFoundError(key)
         return io.BytesIO(self.files[key].encode())
+
+
+class ScanningFinalXmlStorageTest(SimpleTestCase):
+    """Tests for the credentials of the scanning portal's bucket."""
+
+    @override_settings(
+        SCANNING_AWS_ACCESS_KEY_ID="AKIASCANNING",
+        SCANNING_AWS_SECRET_ACCESS_KEY="secret",
+    )
+    @mock.patch.dict(os.environ, {"AWS_SESSION_TOKEN": "default-session"})
+    def test_own_keys_skip_the_session_token(self) -> None:
+        """Is the default keys' session token left out with the bucket's keys?"""
+        storage = ScanningFinalXmlStorage()
+
+        self.assertEqual(storage.access_key, "AKIASCANNING")
+        self.assertIsNone(storage.security_token)
+
+    @override_settings(SCANNING_AWS_ACCESS_KEY_ID="")
+    @mock.patch.dict(os.environ, {"AWS_SESSION_TOKEN": "default-session"})
+    def test_default_keys_keep_the_session_token(self) -> None:
+        """Is the session token kept when the default keys are used?"""
+        self.assertEqual(
+            ScanningFinalXmlStorage().security_token, "default-session"
+        )
 
 
 class ScanningBucketKeysTest(SimpleTestCase):

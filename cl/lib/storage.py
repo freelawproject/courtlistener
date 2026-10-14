@@ -111,12 +111,15 @@ class ScanningFinalXmlStorage(S3Storage):
     """Read-only S3 storage for the scanning portal's private bucket.
 
     import_scanned_opinions reads the final XML of the approved opinions
-    from it, at final-xml/{scan id}/{opinion id}.xml. The bucket belongs to
+    from it, at export/{scan id}/{opinion id}.xml. The bucket belongs to
     the scanning portal, so it can have a read-only user of its own.
     """
 
     default_acl = "private"
     bucket_name = settings.SCANNING_BUCKET_NAME
+    # Populated by django-storages from the settings and the kwargs.
+    access_key: str | None
+    security_token: str | None
     region_name = settings.SCANNING_BUCKET_REGION
     querystring_auth = True
 
@@ -132,6 +135,9 @@ class ScanningFinalXmlStorage(S3Storage):
             kwargs.setdefault(
                 "secret_key", settings.SCANNING_AWS_SECRET_ACCESS_KEY
             )
+            # django-storages reads AWS_SESSION_TOKEN from the environment.
+            # It belongs to the default keys, and S3 rejects it with these.
+            kwargs.setdefault("security_token", None)
         super().__init__(**kwargs)
 
 
