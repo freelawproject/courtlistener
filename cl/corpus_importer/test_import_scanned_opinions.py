@@ -31,7 +31,7 @@ from cl.lib.crypto import sha1
 from cl.lib.storage import ScanningFinalXmlStorage
 from cl.lib.url_utils import BASE_URL
 from cl.people_db.factories import PersonFactory, PositionFactory
-from cl.people_db.models import GRANULARITY_DAY
+from cl.people_db.models import GRANULARITY_DAY, Person
 from cl.search.cluster_sources import ClusterSources
 from cl.search.factories import (
     CourtFactory,
@@ -538,8 +538,8 @@ class ImportScannedOpinionsTest(TestCase):
         self.assertEqual(len(content.sha1), 40)
         self.assertEqual(content.page_count, 4)
 
-    def test_judges_are_linked(self) -> None:
-        """Are the author and the panel linked to people in the court?"""
+    def make_judges(self) -> dict[str, Person]:
+        """Make the judges named in the test XML, sitting in its court."""
         judges = {}
         for last_name in ["Gerber", "Conner", "Forst"]:
             judges[last_name] = PersonFactory.create(
@@ -551,6 +551,11 @@ class ImportScannedOpinionsTest(TestCase):
                 date_start=date(2010, 1, 1),
                 date_granularity_start=GRANULARITY_DAY,
             )
+        return judges
+
+    def test_judges_are_linked(self) -> None:
+        """Are the author and the panel linked to people in the court?"""
+        judges = self.make_judges()
 
         self.import_scan()
 
@@ -593,6 +598,28 @@ class ImportScannedOpinionsTest(TestCase):
         cluster = OpinionCluster.objects.get()
         self.assertIn("The syllabus.", cluster.syllabus)
         self.assertNotIn("syllabus", cluster.headmatter)
+
+    def test_merge_links_the_judges_it_fills(self) -> None:
+        """Are the judges a merge fills in linked, keeping set authors?"""
+        judges = self.make_judges()
+        cluster = self.make_matching_cluster()
+        opinion = cluster.sub_opinions.get()
+        author = opinion.author
+
+        self.import_scan()
+
+        cluster.refresh_from_db()
+        opinion.refresh_from_db()
+        self.assertEqual(set(cluster.panel.all()), set(judges.values()))
+        self.assertEqual(opinion.author, author)
+
+        other = self.make_matching_cluster()
+        OpinionCluster.objects.filter(pk=other.pk).update(judges="Klein")
+        cluster.delete()
+        self.import_scan()
+
+        other.refresh_from_db()
+        self.assertFalse(other.panel.exists())
 
     def test_reimport_is_skipped(self) -> None:
         """Is an already imported scanned opinion skipped?"""

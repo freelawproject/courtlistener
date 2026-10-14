@@ -939,6 +939,17 @@ def merge_into_cluster(cluster: OpinionCluster, scan_case: ScanCase) -> None:
                 len(scan_case.opinions),
             )
 
+        if "judges" in update_fields:
+            # The judges came from the scan: resolve them, without
+            # replacing the authors the opinions already have
+            authors = {o.pk: o.author for o in cl_opinions}
+            link_judges(cluster, cl_opinions)
+            for opinion in cl_opinions:
+                if authors[opinion.pk]:
+                    opinion.author = authors[opinion.pk]
+                elif opinion.author:
+                    opinion.save(update_fields=["author"])
+
         # Saves the cluster changes above too
         store_scan_xml(cluster, scan_case, update_fields)
 
