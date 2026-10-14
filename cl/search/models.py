@@ -2,7 +2,7 @@ import logging
 import re
 from datetime import datetime
 from pathlib import Path
-from typing import TYPE_CHECKING, Literal, TypeVar
+from typing import TYPE_CHECKING, Literal, Self, TypeVar
 from urllib.parse import quote
 
 import nh3
@@ -1169,7 +1169,7 @@ class DocketEntry(AbstractDateTimeModel, CSVExportMixin):
         return columns
 
     def get_column_function(self):
-        """Get dict of attrs: fucntion to apply on field value if it needs
+        """Get dict of attrs: function to apply on field value if it needs
         to be pre-processed before being add to csv
 
         returns: dict -- > {attr1: function}"""
@@ -4150,7 +4150,7 @@ class CaseTransfer(AbstractDateTimeModel):
             }
         )
         total = qs.count()
-        updated_transfers: list[CaseTransfer] = []
+        updated_transfers: list[Self] = []
         total_updated = 0
 
         for transfer in qs.iterator():

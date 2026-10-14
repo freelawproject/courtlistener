@@ -126,7 +126,7 @@ def lookup_and_save(new, debug=False):
     return d
 
 
-def get_first_missing_de_date(d: Docket):
+async def get_first_missing_de_date(d: Docket) -> date | None:
     """When buying dockets use this function to figure out which docket entries
     we already have, starting at the first item. Since PACER only allows you to
     do a range of docket entries, this allows us to figure out a later starting
@@ -143,29 +143,35 @@ def get_first_missing_de_date(d: Docket):
     # Get docket entry numbers for items that *have* docket entry descriptions.
     # This ensures that we don't count RSS items towards the docket being
     # complete, since we only have the short description for those.
-    de_number_tuples = list(
+    docket_entries = (
         d.docket_entries.exclude(description="")
         .order_by("entry_number")
         .values_list("entry_number", "date_filed")
     )
-    de_numbers = [i[0] for i in de_number_tuples if i[0]]
+    fallback_date = date(1960, 1, 1)
+    previous_number = 0
+    previous_date: date | None = fallback_date
+    last_date: date | None = fallback_date
+    has_number = False
+    gap_found = False
+    async for entry_number, entry_date in docket_entries.aiterator():
+        last_date = entry_date
+        if not entry_number:
+            continue
+        has_number = True
+        if gap_found or entry_number <= previous_number:
+            continue
+        if entry_number != previous_number + 1:
+            # Keep consuming the iterator so its database cursor is closed.
+            gap_found = True
+            continue
+        previous_number = entry_number
+        # For a gap, preserve the first date for duplicate entry numbers.
+        previous_date = entry_date
 
-    if len(de_numbers) > 0:
-        # Get the earliest missing item
-        end = de_numbers[-1]
-        missing_items = sorted(set(range(1, end + 1)).difference(de_numbers))
-        if missing_items:
-            if missing_items[0] == 1:
-                return date(1960, 1, 1)
-            else:
-                previous = missing_items[0] - 1
-                for entry_number, entry_date in de_number_tuples:
-                    if entry_number == previous:
-                        return entry_date
-        else:
-            # None missing, but we can start after the highest de we know.
-            return de_number_tuples[-1][1]
-    return date(1960, 1, 1)
+    if gap_found:
+        return previous_date
+    return last_date if has_number else fallback_date
 
 
 async def get_blocked_status(
