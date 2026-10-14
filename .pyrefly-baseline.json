@@ -253,13 +253,6 @@
       "severity": "error"
     },
     {
-      "column": 17,
-      "path": "cl/alerts/utils.py",
-      "name": "bad-argument-type",
-      "concise_description": "Argument `type[ESRECAPBaseDocument]` is not assignable to parameter `es_document_class` with type `type[AudioDocument | AudioPercolator | DocketDocument | ESRECAPDocument | OpinionClusterDocument | OpinionDocument | ParentheticalGroupDocument | PersonDocument | PositionDocument]` in function `select_es_document_fields`",
-      "severity": "error"
-    },
-    {
       "column": 12,
       "path": "cl/alerts/utils.py",
       "name": "bad-return",
@@ -925,13 +918,6 @@
       "severity": "error"
     },
     {
-      "column": 32,
-      "path": "cl/corpus_importer/management/commands/claims_activity_project.py",
-      "name": "missing-attribute",
-      "concise_description": "Object of class `NoneType` has no attribute `text`",
-      "severity": "error"
-    },
-    {
       "column": 25,
       "path": "cl/corpus_importer/management/commands/dump_opinions_as_html.py",
       "name": "bad-argument-type",
@@ -943,13 +929,6 @@
       "path": "cl/corpus_importer/management/commands/export_control.py",
       "name": "missing-attribute",
       "concise_description": "Object of class `Manager` has no attribute `bankruptcy_courts`",
-      "severity": "error"
-    },
-    {
-      "column": 27,
-      "path": "cl/corpus_importer/management/commands/get_pacer_doc_ids.py",
-      "name": "unbound-name",
-      "concise_description": "`session` may be uninitialized",
       "severity": "error"
     },
     {
@@ -1065,6 +1044,20 @@
       "severity": "error"
     },
     {
+      "column": 21,
+      "path": "cl/corpus_importer/management/utils.py",
+      "name": "missing-attribute",
+      "concise_description": "Object of class `NoneType` has no attribute `set`",
+      "severity": "error"
+    },
+    {
+      "column": 21,
+      "path": "cl/corpus_importer/management/utils.py",
+      "name": "missing-attribute",
+      "concise_description": "Object of class `NoneType` has no attribute `set`",
+      "severity": "error"
+    },
+    {
       "column": 38,
       "path": "cl/corpus_importer/signals.py",
       "name": "bad-argument-type",
@@ -1100,41 +1093,6 @@
       "severity": "error"
     },
     {
-      "column": 24,
-      "path": "cl/corpus_importer/tasks.py",
-      "name": "bad-argument-type",
-      "concise_description": "Argument `int | None` is not assignable to parameter `de_seq_num` with type `str | None` in function `download_pacer_pdf_by_rd`",
-      "severity": "error"
-    },
-    {
-      "column": 21,
-      "path": "cl/corpus_importer/tasks.py",
-      "name": "missing-attribute",
-      "concise_description": "Object of class `NoneType` has no attribute `text`",
-      "severity": "error"
-    },
-    {
-      "column": 25,
-      "path": "cl/corpus_importer/tasks.py",
-      "name": "missing-attribute",
-      "concise_description": "Object of class `NoneType` has no attribute `text`",
-      "severity": "error"
-    },
-    {
-      "column": 26,
-      "path": "cl/corpus_importer/tasks.py",
-      "name": "bad-argument-type",
-      "concise_description": "Argument `str | None` is not assignable to parameter `case_id` with type `str` in function `juriscraper.pacer.acms_attachment_page.ACMSAttachmentPage.query`",
-      "severity": "error"
-    },
-    {
-      "column": 21,
-      "path": "cl/corpus_importer/tasks.py",
-      "name": "missing-attribute",
-      "concise_description": "Object of class `NoneType` has no attribute `text`",
-      "severity": "error"
-    },
-    {
       "column": 23,
       "path": "cl/corpus_importer/tasks.py",
       "name": "missing-attribute",
@@ -1142,87 +1100,45 @@
       "severity": "error"
     },
     {
-      "column": 28,
+      "column": 9,
       "path": "cl/corpus_importer/tasks.py",
       "name": "bad-argument-type",
-      "concise_description": "Argument `str` is not assignable to parameter `pacer_doc_id` with type `int | None` in function `juriscraper.pacer.reports.BaseReport.download_pdf`",
-      "severity": "error"
-    },
-    {
-      "column": 24,
-      "path": "cl/corpus_importer/tasks.py",
-      "name": "bad-argument-type",
-      "concise_description": "Argument `str` is not assignable to parameter `pacer_doc_id` with type `int | None` in function `juriscraper.pacer.reports.BaseReport.download_pdf`",
-      "severity": "error"
-    },
-    {
-      "column": 12,
-      "path": "cl/corpus_importer/tasks.py",
-      "name": "bad-return",
-      "concise_description": "Returned type `datetime | str | Unknown | None` is not assignable to declared return type `str`",
+      "concise_description": "Argument `str | None` is not assignable to parameter `pacer_case_id` with type `str`",
       "severity": "error"
     },
     {
       "column": 9,
       "path": "cl/corpus_importer/tasks.py",
       "name": "bad-argument-type",
-      "concise_description": "Argument `str | None` is not assignable to parameter `pacer_case_id` with type `str` in function `download_pacer_pdf_by_rd`",
-      "severity": "error"
-    },
-    {
-      "column": 20,
-      "path": "cl/corpus_importer/tasks.py",
-      "name": "bad-argument-type",
-      "concise_description": "Argument `int | None` is not assignable to parameter `de_seq_num` with type `str | None` in function `download_pacer_pdf_by_rd`",
+      "concise_description": "Argument `str | None` is not assignable to parameter `pacer_case_id` with type `str`",
       "severity": "error"
     },
     {
       "column": 9,
       "path": "cl/corpus_importer/tasks.py",
       "name": "bad-argument-type",
-      "concise_description": "Argument `str | None` is not assignable to parameter `pacer_case_id` with type `str` in function `update_rd_metadata`",
+      "concise_description": "Argument `int | None` is not assignable to parameter `attachment_number` with type `int`",
       "severity": "error"
     },
     {
       "column": 9,
       "path": "cl/corpus_importer/tasks.py",
       "name": "bad-argument-type",
-      "concise_description": "Argument `int | None` is not assignable to parameter `attachment_number` with type `int` in function `update_rd_metadata`",
+      "concise_description": "Argument `str | None` is not assignable to parameter `pacer_case_id` with type `str`",
       "severity": "error"
     },
     {
       "column": 9,
       "path": "cl/corpus_importer/tasks.py",
       "name": "bad-argument-type",
-      "concise_description": "Argument `str | None` is not assignable to parameter `pacer_case_id` with type `str` in function `download_pacer_pdf_by_rd`",
-      "severity": "error"
-    },
-    {
-      "column": 20,
-      "path": "cl/corpus_importer/tasks.py",
-      "name": "bad-argument-type",
-      "concise_description": "Argument `int | None` is not assignable to parameter `de_seq_num` with type `str | None` in function `download_pacer_pdf_by_rd`",
+      "concise_description": "Argument `str | None` is not assignable to parameter `pacer_case_id` with type `str`",
       "severity": "error"
     },
     {
       "column": 9,
       "path": "cl/corpus_importer/tasks.py",
       "name": "bad-argument-type",
-      "concise_description": "Argument `str | None` is not assignable to parameter `pacer_case_id` with type `str` in function `update_rd_metadata`",
-      "severity": "error"
-    },
-    {
-      "column": 9,
-      "path": "cl/corpus_importer/tasks.py",
-      "name": "bad-argument-type",
-      "concise_description": "Argument `int | None` is not assignable to parameter `attachment_number` with type `int` in function `update_rd_metadata`",
-      "severity": "error"
-    },
-    {
-      "column": 24,
-      "path": "cl/corpus_importer/tasks.py",
-      "name": "missing-attribute",
-      "concise_description": "Object of class `NoneType` has no attribute `text`",
+      "concise_description": "Argument `int | None` is not assignable to parameter `attachment_number` with type `int`",
       "severity": "error"
     },
     {
@@ -1230,13 +1146,6 @@
       "path": "cl/corpus_importer/utils.py",
       "name": "missing-attribute",
       "concise_description": "Object of class `Manager` has no attribute `bankruptcy_pacer_courts`",
-      "severity": "error"
-    },
-    {
-      "column": 27,
-      "path": "cl/corpus_importer/utils.py",
-      "name": "missing-attribute",
-      "concise_description": "Object of class `Manager` has no attribute `appellate_courts`",
       "severity": "error"
     },
     {
@@ -1286,13 +1195,6 @@
       "path": "cl/custom_filters/templatetags/component_tags.py",
       "name": "missing-attribute",
       "concise_description": "Object of class `HttpRequest` has no attribute `_extensionless_scripts`",
-      "severity": "error"
-    },
-    {
-      "column": 12,
-      "path": "cl/custom_filters/templatetags/extras.py",
-      "name": "bad-return",
-      "concise_description": "Returned type `str` is not assignable to declared return type `SafeString`",
       "severity": "error"
     },
     {
@@ -1643,13 +1545,6 @@
       "path": "cl/lasc/models.py",
       "name": "missing-attribute",
       "concise_description": "Object of class `CaseIDQuerySet` has no attribute `_clone`",
-      "severity": "error"
-    },
-    {
-      "column": 36,
-      "path": "cl/lasc/tasks.py",
-      "name": "bad-argument-type",
-      "concise_description": "Argument `Unknown | None` is not assignable to parameter `data` with type `Buffer` in function `_pickle.loads`",
       "severity": "error"
     },
     {
@@ -2223,13 +2118,6 @@
       "column": 27,
       "path": "cl/opinion_page/types.py",
       "name": "missing-attribute",
-      "concise_description": "Object of class `OpinionCluster` has no attribute `depth`",
-      "severity": "error"
-    },
-    {
-      "column": 27,
-      "path": "cl/opinion_page/types.py",
-      "name": "missing-attribute",
       "concise_description": "Object of class `OpinionCluster` has no attribute `citation_depth`",
       "severity": "error"
     },
@@ -2556,13 +2444,6 @@
       "severity": "error"
     },
     {
-      "column": 41,
-      "path": "cl/people_db/lookup_utils.py",
-      "name": "invalid-annotation",
-      "concise_description": "List literal cannot be used in annotations",
-      "severity": "error"
-    },
-    {
       "column": 20,
       "path": "cl/people_db/management/commands/cl_export_recap_judge_info.py",
       "name": "missing-module-attribute",
@@ -2773,13 +2654,6 @@
       "severity": "error"
     },
     {
-      "column": 34,
-      "path": "cl/recap/management/commands/merge_idb_into_dockets.py",
-      "name": "unknown-name",
-      "concise_description": "Could not find name `SessionData`",
-      "severity": "error"
-    },
-    {
       "column": 18,
       "path": "cl/recap/management/commands/monitor_pacer_websites.py",
       "name": "missing-attribute",
@@ -2878,20 +2752,6 @@
       "severity": "error"
     },
     {
-      "column": 17,
-      "path": "cl/recap/mergers.py",
-      "name": "bad-argument-type",
-      "concise_description": "Argument `str` is not assignable to parameter `pacer_doc_id` with type `int` in function `merge_attachment_page_data`",
-      "severity": "error"
-    },
-    {
-      "column": 17,
-      "path": "cl/recap/mergers.py",
-      "name": "bad-argument-type",
-      "concise_description": "Argument `str` is not assignable to parameter `docket_number_core` with type `int | None` in function `merge_attachment_page_data`",
-      "severity": "error"
-    },
-    {
       "column": 44,
       "path": "cl/recap/mergers.py",
       "name": "bad-argument-type",
@@ -2937,7 +2797,7 @@
       "column": 34,
       "path": "cl/recap/mergers.py",
       "name": "bad-argument-type",
-      "concise_description": "Argument `int | str` is not assignable to parameter `object` with type `bool` in function `list.append`",
+      "concise_description": "Argument `bool | str` is not assignable to parameter `object` with type `bool` in function `list.append`",
       "severity": "error"
     },
     {
@@ -3095,13 +2955,6 @@
       "severity": "error"
     },
     {
-      "column": 1,
-      "path": "cl/recap/tasks.py",
-      "name": "missing-import",
-      "concise_description": "Cannot find module `requests.packages.urllib3.exceptions`",
-      "severity": "error"
-    },
-    {
       "column": 49,
       "path": "cl/recap/tasks.py",
       "name": "bad-argument-type",
@@ -3113,6 +2966,13 @@
       "path": "cl/recap/tasks.py",
       "name": "bad-argument-type",
       "concise_description": "Argument `date | None` is not assignable to parameter `docket_date` with type `date` in function `cl.recap.mergers.process_orphan_documents`",
+      "severity": "error"
+    },
+    {
+      "column": 28,
+      "path": "cl/recap/tasks.py",
+      "name": "bad-assignment",
+      "concise_description": "`str | None` is not assignable to attribute `pacer_case_id` with type `str`",
       "severity": "error"
     },
     {
@@ -3182,42 +3042,28 @@
       "column": 13,
       "path": "cl/recap/tasks.py",
       "name": "bad-argument-type",
-      "concise_description": "Argument `str` is not assignable to parameter `pacer_doc_id` with type `int` in function `cl.recap.mergers.merge_attachment_page_data`",
-      "severity": "error"
-    },
-    {
-      "column": 13,
-      "path": "cl/recap/tasks.py",
-      "name": "bad-argument-type",
-      "concise_description": "Argument `str` is not assignable to parameter `attachment_dicts` with type `list[dict[str, int | str]]` in function `cl.recap.mergers.merge_attachment_page_data`",
+      "concise_description": "Argument `str` is not assignable to parameter `attachment_dicts` with type `list[_MergeAttachmentDict]` in function `cl.recap.mergers.merge_attachment_page_data`",
       "severity": "error"
     },
     {
       "column": 17,
       "path": "cl/recap/tasks.py",
       "name": "bad-argument-type",
-      "concise_description": "Argument `str | None` is not assignable to parameter `pacer_case_id` with type `str` in function `cl.corpus_importer.tasks.download_pacer_pdf_by_rd`",
-      "severity": "error"
-    },
-    {
-      "column": 28,
-      "path": "cl/recap/tasks.py",
-      "name": "bad-argument-type",
-      "concise_description": "Argument `int | None` is not assignable to parameter `de_seq_num` with type `str | None` in function `cl.corpus_importer.tasks.download_pacer_pdf_by_rd`",
+      "concise_description": "Argument `str | None` is not assignable to parameter `pacer_case_id` with type `str`",
       "severity": "error"
     },
     {
       "column": 9,
       "path": "cl/recap/tasks.py",
       "name": "bad-argument-type",
-      "concise_description": "Argument `str | None` is not assignable to parameter `pacer_case_id` with type `str` in function `cl.corpus_importer.tasks.update_rd_metadata`",
+      "concise_description": "Argument `str | None` is not assignable to parameter `pacer_case_id` with type `str`",
       "severity": "error"
     },
     {
       "column": 9,
       "path": "cl/recap/tasks.py",
       "name": "bad-argument-type",
-      "concise_description": "Argument `int | None` is not assignable to parameter `attachment_number` with type `int` in function `cl.corpus_importer.tasks.update_rd_metadata`",
+      "concise_description": "Argument `int | None` is not assignable to parameter `attachment_number` with type `int`",
       "severity": "error"
     },
     {
@@ -3231,7 +3077,7 @@
       "column": 66,
       "path": "cl/recap/tasks.py",
       "name": "bad-argument-type",
-      "concise_description": "Argument `bytes | Any | None` is not assignable to parameter `pdf_bytes` with type `bytes` in function `cl.recap.utils.find_subdocket_pdf_rds_from_data`",
+      "concise_description": "Argument `bytes | None` is not assignable to parameter `pdf_bytes` with type `bytes` in function `cl.recap.utils.find_subdocket_pdf_rds_from_data`",
       "severity": "error"
     },
     {
@@ -3277,10 +3123,10 @@
       "severity": "error"
     },
     {
-      "column": 34,
+      "column": 49,
       "path": "cl/recap/tasks.py",
       "name": "bad-argument-type",
-      "concise_description": "Argument `RECAPDocument | None` is not assignable to parameter `rd` with type `RECAPDocument` in function `cl.corpus_importer.tasks.get_att_report_by_rd`",
+      "concise_description": "Argument `RECAPDocument | None` is not assignable to parameter `rd` with type `RECAPDocument`",
       "severity": "error"
     },
     {
@@ -3315,13 +3161,6 @@
       "column": 13,
       "path": "cl/recap/tasks.py",
       "name": "bad-argument-type",
-      "concise_description": "Argument `str | Unknown` is not assignable to parameter `pacer_doc_id` with type `int`",
-      "severity": "error"
-    },
-    {
-      "column": 13,
-      "path": "cl/recap/tasks.py",
-      "name": "bad-argument-type",
       "concise_description": "Argument `str | Unknown | None` is not assignable to parameter `document_number` with type `int | None`",
       "severity": "error"
     },
@@ -3329,84 +3168,7 @@
       "column": 13,
       "path": "cl/recap/tasks.py",
       "name": "bad-argument-type",
-      "concise_description": "Argument `str | Unknown` is not assignable to parameter `attachment_dicts` with type `list[dict[str, int | str]]`",
-      "severity": "error"
-    },
-    {
-      "column": 12,
-      "path": "cl/recap/tasks.py",
-      "name": "bad-return",
-      "concise_description": "Returned type `dict[str, bool | str]` is not assignable to declared return type `dict[str, bool | int]`",
-      "severity": "error"
-    },
-    {
-      "column": 12,
-      "path": "cl/recap/tasks.py",
-      "name": "bad-return",
-      "concise_description": "Returned type `dict[str, bool | str]` is not assignable to declared return type `dict[str, bool | int]`",
-      "severity": "error"
-    },
-    {
-      "column": 38,
-      "path": "cl/recap/tasks.py",
-      "name": "bad-argument-type",
-      "concise_description": "Argument `str | Any | None` is not assignable to parameter `court_id` with type `str` in function `cl.lib.pacer.is_pacer_court_accessible`",
-      "severity": "error"
-    },
-    {
-      "column": 35,
-      "path": "cl/recap/tasks.py",
-      "name": "bad-argument-type",
-      "concise_description": "Argument `PacerFetchQueue` is not assignable to parameter `pq` with type `EmailProcessingQueue | ProcessingQueue`",
-      "severity": "error"
-    },
-    {
-      "column": 21,
-      "path": "cl/recap/tasks.py",
-      "name": "bad-argument-type",
-      "concise_description": "Argument `ProxyPacerSession` is not assignable to parameter `session` with type `SessionData` in function `purchase_appellate_docket_by_docket_number`",
-      "severity": "error"
-    },
-    {
-      "column": 22,
-      "path": "cl/recap/tasks.py",
-      "name": "bad-argument-type",
-      "concise_description": "Argument `str | Any | None` is not assignable to parameter `court_id` with type `str` in function `purchase_appellate_docket_by_docket_number`",
-      "severity": "error"
-    },
-    {
-      "column": 27,
-      "path": "cl/recap/tasks.py",
-      "name": "bad-argument-type",
-      "concise_description": "Argument `str | Any | None` is not assignable to parameter `docket_number` with type `str` in function `purchase_appellate_docket_by_docket_number`",
-      "severity": "error"
-    },
-    {
-      "column": 38,
-      "path": "cl/recap/tasks.py",
-      "name": "bad-argument-type",
-      "concise_description": "Argument `str | Any | None` is not assignable to parameter `court_id` with type `str` in function `cl.lib.pacer.is_pacer_court_accessible`",
-      "severity": "error"
-    },
-    {
-      "column": 35,
-      "path": "cl/recap/tasks.py",
-      "name": "bad-argument-type",
-      "concise_description": "Argument `PacerFetchQueue` is not assignable to parameter `pq` with type `EmailProcessingQueue | ProcessingQueue`",
-      "severity": "error"
-    },
-    {
-      "column": 48,
-      "path": "cl/recap/tasks.py",
-      "name": "bad-argument-type",
-      "concise_description": "Argument `ProxyPacerSession` is not assignable to parameter `session` with type `SessionData` in function `fetch_docket_by_pacer_case_id`",
-      "severity": "error"
-    },
-    {
-      "column": 51,
-      "path": "cl/recap/tasks.py",
-      "name": "bad-argument-type",
-      "concise_description": "Argument `str | Any | None` is not assignable to parameter `court_id` with type `str` in function `fetch_docket_by_pacer_case_id`",
+      "concise_description": "Argument `str | Unknown` is not assignable to parameter `attachment_dicts` with type `list[_MergeAttachmentDict]`",
       "severity": "error"
     },
     {
@@ -3434,7 +3196,7 @@
       "column": 13,
       "path": "cl/recap/tasks.py",
       "name": "bad-argument-type",
-      "concise_description": "Argument `Any | None` is not assignable to parameter `session_data` with type `SessionData` in function `download_pacer_pdf_and_save_to_pq`",
+      "concise_description": "Argument `SessionData | None` is not assignable to parameter `session_data` with type `SessionData` in function `download_pacer_pdf_and_save_to_pq`",
       "severity": "error"
     },
     {
@@ -3442,13 +3204,6 @@
       "path": "cl/recap/tasks.py",
       "name": "bad-return",
       "concise_description": "Returned type `tuple[dict[Unknown, Unknown] | None, bytes]` is not assignable to declared return type `tuple[dict[str, bool | list[DocketType] | str] | None, str]`",
-      "severity": "error"
-    },
-    {
-      "column": 52,
-      "path": "cl/recap/tasks.py",
-      "name": "bad-argument-type",
-      "concise_description": "Argument `Any | None` is not assignable to parameter `session_data` with type `SessionData` in function `cl.corpus_importer.tasks.get_att_report_by_rd`",
       "severity": "error"
     },
     {
@@ -3571,10 +3326,10 @@
       "severity": "error"
     },
     {
-      "column": 46,
+      "column": 27,
       "path": "cl/recap/tasks.py",
       "name": "bad-argument-type",
-      "concise_description": "Argument `str | Unknown | None` is not assignable to parameter `case_id` with type `str` in function `cl.corpus_importer.tasks.is_docket_entry_sealed`",
+      "concise_description": "Argument `str | Unknown | None` is not assignable to parameter `case_id` with type `str`",
       "severity": "error"
     },
     {
@@ -3595,14 +3350,14 @@
       "column": 27,
       "path": "cl/recap/tasks.py",
       "name": "bad-argument-type",
-      "concise_description": "Argument `str | Unknown | None` is not assignable to parameter `pacer_doc_id` with type `str` in function `cl.corpus_importer.tasks.get_document_number_for_appellate`",
+      "concise_description": "Argument `str | Unknown | None` is not assignable to parameter `pacer_doc_id` with type `str`",
       "severity": "error"
     },
     {
       "column": 45,
       "path": "cl/recap/tasks.py",
       "name": "bad-argument-type",
-      "concise_description": "Argument `bool | list[DocketType] | str` is not assignable to parameter `acms` with type `bool` in function `cl.corpus_importer.tasks.get_document_number_for_appellate`",
+      "concise_description": "Argument `bool | list[DocketType] | str` is not assignable to parameter `acms` with type `bool`",
       "severity": "error"
     },
     {
@@ -3693,7 +3448,7 @@
       "column": 17,
       "path": "cl/recap/tasks.py",
       "name": "bad-argument-type",
-      "concise_description": "Argument `str | Unknown | None` is not assignable to parameter `document_url` with type `str` in function `fetch_attachment_data`",
+      "concise_description": "Argument `str | Unknown | None` is not assignable to parameter `document_url` with type `str`",
       "severity": "error"
     },
     {
@@ -3809,13 +3564,6 @@
       "severity": "error"
     },
     {
-      "column": 34,
-      "path": "cl/recap_rss/tasks.py",
-      "name": "missing-attribute",
-      "concise_description": "Object of class `list` has no attribute `description`",
-      "severity": "error"
-    },
-    {
       "column": 9,
       "path": "cl/scrapers/DupChecker.py",
       "name": "missing-attribute",
@@ -3827,27 +3575,6 @@
       "path": "cl/scrapers/DupChecker.py",
       "name": "missing-attribute",
       "concise_description": "Object of class `NoneType` has no attribute `save`",
-      "severity": "error"
-    },
-    {
-      "column": 42,
-      "path": "cl/scrapers/management/commands/back_scrape_dockets.py",
-      "name": "bad-argument-type",
-      "concise_description": "Argument `list[Unknown] | None` is not assignable to parameter `courts` with type `list[str]` in function `juriscraper.state.BaseStateScraper.BaseStateScraper.backfill`",
-      "severity": "error"
-    },
-    {
-      "column": 33,
-      "path": "cl/scrapers/management/commands/back_scrape_dockets.py",
-      "name": "bad-argument-type",
-      "concise_description": "Argument `HasCaseUrl` is not assignable to parameter `case` with type `dict[Unknown, Unknown]` in function `_checkpoint_and_sleep`",
-      "severity": "error"
-    },
-    {
-      "column": 52,
-      "path": "cl/scrapers/management/commands/back_scrape_dockets.py",
-      "name": "bad-argument-type",
-      "concise_description": "Argument `Unknown | None` is not assignable to parameter `sleep_minutes` with type `int` in function `_checkpoint_and_sleep`",
       "severity": "error"
     },
     {
@@ -3865,13 +3592,6 @@
       "severity": "error"
     },
     {
-      "column": 20,
-      "path": "cl/scrapers/management/commands/cl_scrape_opinions.py",
-      "name": "bad-unpacking",
-      "concise_description": "Cannot unpack tuple[dict[Unknown, Unknown]] (of size 1) into 3 values",
-      "severity": "error"
-    },
-    {
       "column": 9,
       "path": "cl/scrapers/management/commands/cl_scrape_opinions.py",
       "name": "bad-argument-type",
@@ -3883,13 +3603,6 @@
       "path": "cl/scrapers/management/commands/cl_scrape_opinions.py",
       "name": "bad-argument-type",
       "concise_description": "Argument `str | Any` is not assignable to parameter `blocked` with type `bool` in function `cl.scrapers.utils.update_or_create_docket`",
-      "severity": "error"
-    },
-    {
-      "column": 27,
-      "path": "cl/scrapers/management/commands/cl_scrape_opinions.py",
-      "name": "bad-argument-type",
-      "concise_description": "Argument `list[tuple[dict[Unknown, Unknown], bytes, str]]` is not assignable to parameter `opinions_content` with type `list[tuple[dict[Unknown, Unknown]]]` in function `set_ordering_keys`",
       "severity": "error"
     },
     {
@@ -3911,13 +3624,6 @@
       "path": "cl/scrapers/management/commands/cl_scrape_opinions.py",
       "name": "missing-attribute",
       "concise_description": "Object of class `NoneType` has no attribute `split`",
-      "severity": "error"
-    },
-    {
-      "column": 5,
-      "path": "cl/scrapers/management/commands/cl_scrape_oral_arguments.py",
-      "name": "missing-attribute",
-      "concise_description": "Object of class `Docket` has no attribute `docket`",
       "severity": "error"
     },
     {
@@ -4281,21 +3987,21 @@
       "column": 36,
       "path": "cl/scrapers/utils.py",
       "name": "missing-attribute",
-      "concise_description": "Object of type `AsyncClient | dict[Unknown, Unknown] | dict[str, str | Unknown] | None` has no attribute `headers`",
+      "concise_description": "Object of type `AsyncClient | dict[Unknown, Unknown] | dict[str, str] | None` has no attribute `headers`",
       "severity": "error"
     },
     {
       "column": 41,
       "path": "cl/scrapers/utils.py",
       "name": "missing-attribute",
-      "concise_description": "Object of type `AsyncClient | dict[Unknown, Unknown] | dict[str, str | Unknown] | None` has no attribute `content`",
+      "concise_description": "Object of type `AsyncClient | dict[Unknown, Unknown] | dict[str, str] | None` has no attribute `content`",
       "severity": "error"
     },
     {
       "column": 19,
       "path": "cl/scrapers/utils.py",
       "name": "missing-attribute",
-      "concise_description": "Object of type `AsyncClient | dict[Unknown, Unknown] | dict[str, str | Unknown] | None` has no attribute `content`",
+      "concise_description": "Object of type `AsyncClient | dict[Unknown, Unknown] | dict[str, str] | None` has no attribute `content`",
       "severity": "error"
     },
     {
@@ -5009,7 +4715,7 @@
       "column": 52,
       "path": "cl/search/management/commands/pacer_bulk_fetch.py",
       "name": "bad-argument-type",
-      "concise_description": "Argument `Unknown | None` is not assignable to parameter `time_interval` with type `int` in function `enough_time_elapsed`",
+      "concise_description": "Argument `Unknown | None` is not assignable to parameter `time_interval` with type `float` in function `enough_time_elapsed`",
       "severity": "error"
     },
     {
@@ -5209,20 +4915,6 @@
       "severity": "error"
     },
     {
-      "column": 21,
-      "path": "cl/search/models.py",
-      "name": "bad-argument-type",
-      "concise_description": "Argument `list[CaseTransfer]` is not assignable to parameter `objs` with type `Iterable[Self@CaseTransfer]` in function `django.db.models.manager.Manager.bulk_update`",
-      "severity": "error"
-    },
-    {
-      "column": 17,
-      "path": "cl/search/models.py",
-      "name": "bad-argument-type",
-      "concise_description": "Argument `list[CaseTransfer]` is not assignable to parameter `objs` with type `Iterable[Self@CaseTransfer]` in function `django.db.models.manager.Manager.bulk_update`",
-      "severity": "error"
-    },
-    {
       "column": 45,
       "path": "cl/search/state/new_york/models.py",
       "name": "missing-attribute",
@@ -5395,13 +5087,6 @@
       "path": "cl/search/tasks.py",
       "name": "bad-argument-type",
       "concise_description": "Unpacked keyword argument `int | str` is not assignable to parameter `index` with type `str | None` in function `elasticsearch.dsl._sync.document.Document.get`",
-      "severity": "error"
-    },
-    {
-      "column": 12,
-      "path": "cl/search/tasks.py",
-      "name": "bad-return",
-      "concise_description": "Returned type `AudioDocument | AudioPercolator | DocketDocument | ESRECAPDocument | OpinionClusterDocument | OpinionDocument | ParentheticalGroupDocument | PersonDocument | PositionDocument | None` is not assignable to declared return type `AudioDocument | AudioPercolator | ESRECAPDocument | OpinionClusterDocument | OpinionDocument | ParentheticalGroupDocument | PersonDocument | PositionDocument | None`",
       "severity": "error"
     },
     {
@@ -5608,20 +5293,6 @@
       "severity": "error"
     },
     {
-      "column": 34,
-      "path": "cl/search/tasks.py",
-      "name": "missing-attribute",
-      "concise_description": "Object of type `Audio | Citation | Docket | DocketEntry | Education | Opinion | OpinionCluster | Parenthetical | ParentheticalGroup | Person | Position | RECAPDocument` has no attribute `docket_entry`",
-      "severity": "error"
-    },
-    {
-      "column": 34,
-      "path": "cl/search/tasks.py",
-      "name": "missing-attribute",
-      "concise_description": "Object of type `Audio | Citation | Docket | DocketEntry | Education | Opinion | OpinionCluster | Parenthetical | ParentheticalGroup | Person | Position | RECAPDocument` has no attribute `cluster`",
-      "severity": "error"
-    },
-    {
       "column": 13,
       "path": "cl/search/tasks.py",
       "name": "bad-argument-type",
@@ -5797,24 +5468,10 @@
       "severity": "error"
     },
     {
-      "column": 10,
-      "path": "cl/sitemaps_infinite/base_sitemap.py",
-      "name": "not-a-type",
-      "concise_description": "Expected a type form, got instance of `GenericAlias`",
-      "severity": "error"
-    },
-    {
       "column": 13,
       "path": "cl/sitemaps_infinite/base_sitemap.py",
       "name": "bad-argument-type",
-      "concise_description": "Argument `Literal[True] | str | None` is not assignable to parameter `cursor` with type `str` in function `InfinitePaginatorSitemap._urls`",
-      "severity": "error"
-    },
-    {
-      "column": 16,
-      "path": "cl/sitemaps_infinite/base_sitemap.py",
-      "name": "not-a-type",
-      "concise_description": "Expected a type form, got instance of `GenericAlias`",
+      "concise_description": "Argument `str | None` is not assignable to parameter `cursor` with type `str` in function `InfinitePaginatorSitemap._urls`",
       "severity": "error"
     },
     {
@@ -5857,13 +5514,6 @@
       "path": "cl/sitemaps_infinite/base_sitemap.py",
       "name": "missing-attribute",
       "concise_description": "Object of class `InfinitePaginatorSitemap` has no attribute `_location`",
-      "severity": "error"
-    },
-    {
-      "column": 16,
-      "path": "cl/sitemaps_infinite/base_sitemap.py",
-      "name": "bad-return",
-      "concise_description": "Returned type `tuple[CacheableList, str | None, bool | Unknown]` is not assignable to declared return type `tuple[Unknown, str, bool]`",
       "severity": "error"
     },
     {

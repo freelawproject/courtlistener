@@ -1409,11 +1409,11 @@ def build_bulk_cites_doc(
     if not child_instance:
         return {}, None
 
-    match child_doc_model.__name__:
-        case "RECAPDocument":
+    match child_instance:
+        case RECAPDocument():
             parent_document_id = child_instance.docket_entry.docket.pk
             child_id_property = "RECAP"
-        case "Opinion":
+        case Opinion():
             parent_document_id = child_instance.cluster.pk
             child_id_property = "OPINION"
         case _:

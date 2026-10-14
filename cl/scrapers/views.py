@@ -1,5 +1,6 @@
 from dataclasses import dataclass
 
+from celery import Task
 from django.contrib.auth.models import User
 from rest_framework import serializers, status
 from rest_framework.exceptions import ValidationError
@@ -8,7 +9,6 @@ from rest_framework.serializers import ModelSerializer
 from rest_framework.viewsets import ModelViewSet
 
 from cl.api.utils import EmailProcessingQueueAPIUsersWithView, LoggingMixin
-from cl.celery_init import app
 from cl.recap.filters import EmailProcessingQueueFilter
 from cl.recap.models import EmailProcessingQueue, EmailSource
 from cl.recap.tasks import process_scotus_email, process_texas_email
@@ -26,7 +26,7 @@ class EmailProcessingTask:
         email.
     """
 
-    task: app.Task
+    task: Task
     source: int
     username: str
 
