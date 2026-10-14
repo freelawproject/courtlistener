@@ -6137,6 +6137,47 @@ class FailedSignInThrottleTest(TestCase):
             self.assertIn("_auth_user_id", self.client.session)
 
 
+class AlertsPageMembershipNudgeTest(TestCase):
+    """Non-members are offered more alerts on their profile's alerts pages."""
+
+    @classmethod
+    def setUpTestData(cls) -> None:
+        cls.user = UserProfileWithParentsFactory.create().user
+        AlertFactory(user=cls.user)
+        DocketAlertWithParentsFactory(user=cls.user)
+
+    def setUp(self) -> None:
+        self.client.force_login(self.user)
+
+    def test_non_member_is_offered_more_alerts(self) -> None:
+        """Both alert pages mention what members get and link to join."""
+        expected = {
+            "profile_search_alerts": "Members get more search alerts",
+            "profile_docket_alerts": "Members get unlimited docket alerts",
+        }
+        for viewname, nudge in expected.items():
+            with self.subTest(viewname=viewname):
+                response = self.client.get(reverse(viewname))
+                self.assertContains(response, nudge)
+                self.assertContains(response, ">Join FLP</a>")
+
+    def test_member_is_not_offered_more_alerts(self) -> None:
+        """Members already get the benefit, so don't ask them to join."""
+        NeonMembershipFactory(user=self.user)
+        for viewname in ("profile_search_alerts", "profile_docket_alerts"):
+            with self.subTest(viewname=viewname):
+                response = self.client.get(reverse(viewname))
+                self.assertNotContains(response, "Members get")
+
+    def test_member_is_thanked_on_docket_alerts_page(self) -> None:
+        """Members see a thank-you where non-members see the nudge."""
+        NeonMembershipFactory(user=self.user)
+        response = self.client.get(reverse("profile_docket_alerts"))
+        self.assertContains(
+            response, "As a member you get unlimited docket alerts. Thanks!"
+        )
+
+
 @override_settings(WAFFLE_CACHE_PREFIX="MembershipHeaderLinkTest")
 class MembershipHeaderLinkTest(TestCase):
     """The header's donate slot should make sense for members and non-members."""
