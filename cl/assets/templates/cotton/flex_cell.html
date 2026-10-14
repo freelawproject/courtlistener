@@ -2,11 +2,11 @@
 
 {% with base_class="text-sm font-normal px-2.5 py-4" %}
 {% if header %}
-<th scope="row" class="{{ base_class }} {% if valign == 'top' %}align-top{% else %}align-middle{% endif %} {{ class }}" {{ attrs }}>
+<th scope="row" class="{{ base_class }} {% if valign == 'top' %}align-top{% elif valign == 'bottom' %}align-bottom{% else %}align-middle{% endif %} {{ class }}" {{ attrs }}>
   {{ slot }}
 </th>
 {% else %}
-<td class="{{ base_class }} {% if valign == 'top' %}align-top{% else %}align-middle{% endif %} {{ class }}" {{ attrs }}>
+<td class="{{ base_class }} {% if valign == 'top' %}align-top{% elif valign == 'bottom' %}align-bottom{% else %}align-middle{% endif %} {{ class }}" {{ attrs }}>
   {{ slot }}
 </td>
 {% endif %}

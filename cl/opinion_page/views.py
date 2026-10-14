@@ -589,7 +589,7 @@ async def docket_authorities(
     slug: str,
 ) -> HttpResponse:
     docket, context = await core_docket_data(request, docket_id)
-    if not await docket.ahas_authorities():
+    if not context["has_authorities"]:
         raise Http404("No authorities data for this docket at this time")
 
     return TemplateResponse(

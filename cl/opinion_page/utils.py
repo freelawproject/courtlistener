@@ -454,14 +454,14 @@ def build_idb_rows(idb_data: FjcIntegratedDatabase) -> list[IdbRow]:
 
     Values are display-ready: dates in the site's date format, choice fields
     as their label, Origin and Jurisdiction as the code followed by the
-    label, and unset or False fields as "Not Provided".
+    label, and unset fields as "Not Provided".
     """
     not_provided = "Not Provided"
     codebook = "https://www.fjc.gov/research/idb/"
 
     def show(value: object) -> str:
         """Formats a value for display, with the fallback for unset ones."""
-        if not value:
+        if value is None or value == "":
             return not_provided
         if isinstance(value, date):
             return date_format(value)
@@ -469,7 +469,7 @@ def build_idb_rows(idb_data: FjcIntegratedDatabase) -> list[IdbRow]:
 
     def coded(code: object, label: str) -> str:
         """Formats a choice as its code followed by its label."""
-        return f"({code}) {label}" if code else not_provided
+        return f"({code}) {label}" if code is not None else not_provided
 
     def possible_values(field_name: str, intro: str = "") -> SafeString:
         """Lists the field's choices, after an optional intro paragraph."""
@@ -587,7 +587,7 @@ def build_idb_rows(idb_data: FjcIntegratedDatabase) -> list[IdbRow]:
         {
             "label": "Arbitration at Termination",
             "value": show(idb_data.get_arbitration_at_termination_display()),
-            "hint": possible_values("arbitration_at_filing"),
+            "hint": possible_values("arbitration_at_termination"),
         },
         {
             "label": "Multidistrict Litigation Number",
@@ -808,6 +808,7 @@ class CoreDocketDataDict(TypedDict):
     docket_source_url: str | None
     metadata_sections: list[MetadataSection]
     parties: bool
+    has_authorities: bool
     tabs: list[dict[str, str]]
 
 
@@ -874,6 +875,7 @@ async def core_docket_data(
     ]
 
     parties = await docket.parties.aexists()
+    has_authorities = await docket.ahas_authorities()
     return (
         docket,
         {
@@ -891,12 +893,13 @@ async def core_docket_data(
             ),
             "metadata_sections": metadata_sections,
             "parties": parties,
+            "has_authorities": has_authorities,
             "tabs": build_docket_tabs(
                 docket,
                 parties,
                 # Reads the FK id to avoid fetching the row in async code.
                 bool(docket.idb_data_id),  # pyrefly:ignore[missing-attribute]
-                await docket.ahas_authorities(),
+                has_authorities,
             ),
         },
     )

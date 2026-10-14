@@ -3649,13 +3649,15 @@ class BuildIdbRowsTest(SimpleTestCase):
 
     def test_values_are_display_ready(self) -> None:
         """Dates use the site format, choice fields show their label, coded
-        fields show code and label, and unset or False fall back."""
+        fields show code and label, False and 0 are values, and unset fields
+        fall back."""
         idb_data = FjcIntegratedDatabaseFactory.build(
             office="3",
             origin=FjcIntegratedDatabase.ORIG,
             date_filed=date(2016, 4, 21),
             jurisdiction=None,
             class_action=False,
+            monetary_demand=0,
             pro_se=FjcIntegratedDatabase.PRO_SE_NONE,
         )
         values = {
@@ -3665,7 +3667,8 @@ class BuildIdbRowsTest(SimpleTestCase):
         self.assertEqual(values["Origin"], "(1) Original Proceeding")
         self.assertEqual(values["Date Filed"], "April 21, 2016")
         self.assertEqual(values["Jurisdiction"], "Not Provided")
-        self.assertEqual(values["Class Action Status"], "Not Provided")
+        self.assertEqual(values["Class Action Status"], "False")
+        self.assertEqual(values["Monetary Demand"], "0")
         self.assertEqual(values["Date Terminated"], "Not Provided")
         self.assertEqual(
             values["Pro Se"], "No pro se plaintiffs or defendants"
