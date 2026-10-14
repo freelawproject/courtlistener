@@ -5,7 +5,7 @@ import math
 import random
 import re
 from collections import defaultdict
-from collections.abc import Generator, Iterator, Mapping, Sequence
+from collections.abc import Callable, Generator, Iterator, Mapping, Sequence
 from dataclasses import dataclass
 from datetime import date
 from difflib import SequenceMatcher
@@ -1141,16 +1141,41 @@ def match_based_text(
             logger.warning(f"Empty opinion in cluster id: {case.id}")
             continue
 
-        case_and_texts = [case, file_characters, cl_characters]
-        case_and_texts_and_docket = case_and_texts + [docket_number]
-        case_and_titles = [case, case_name_full, case_name_abbreviation]
-        if (
-            length_too_different(*case_and_texts)
-            or has_too_similar_citation(case, citation)
-            or case_names_dont_overlap(*case_and_titles)
-            or cosine_similarity_too_different(*case_and_titles)
-            or content_too_different(*case_and_texts_and_docket)
-        ):
+        # Checked in this order, cheapest first, until one fails
+        checks: list[tuple[str, Callable[[], bool]]] = [
+            (
+                "text length",
+                lambda: length_too_different(
+                    case, file_characters, cl_characters
+                ),
+            ),
+            ("citation", lambda: has_too_similar_citation(case, citation)),
+            (
+                "case name overlap",
+                lambda: case_names_dont_overlap(
+                    case, case_name_full, case_name_abbreviation
+                ),
+            ),
+            (
+                "case name similarity",
+                lambda: cosine_similarity_too_different(
+                    case, case_name_full, case_name_abbreviation
+                ),
+            ),
+            (
+                "content",
+                lambda: content_too_different(
+                    case, file_characters, cl_characters, docket_number
+                ),
+            ),
+        ]
+        if failed := next((name for name, check in checks if check()), None):
+            # Helps tune the matching, so duplicates aren't created
+            logger.debug(
+                "Cluster %s is not a match: the %s check failed",
+                case.id,
+                failed,
+            )
             continue
         return case
     return None

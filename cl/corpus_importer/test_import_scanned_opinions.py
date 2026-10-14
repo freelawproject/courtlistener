@@ -440,6 +440,22 @@ class ImportScannedOpinionsTest(TestCase):
         # The scan is richer than the court website text
         self.assertTrue(content.is_main_version)
 
+    def test_discarded_match_is_logged(self) -> None:
+        """Is a candidate cluster that doesn't match logged with the reason?"""
+        cluster = self.make_matching_cluster()
+        OpinionCluster.objects.filter(pk=cluster.pk).update(
+            case_name="Johnson v. Department of Revenue"
+        )
+
+        with mock.patch("cl.corpus_importer.utils.logger") as mock_logger:
+            self.import_scan()
+
+        self.assertEqual(OpinionCluster.objects.count(), 2)
+        self.assertIn(
+            ("Cluster %s is not a match: the %s check failed", cluster.pk),
+            [call.args[:2] for call in mock_logger.debug.call_args_list],
+        )
+
     def test_merge_logs_differing_metadata(self) -> None:
         """Are cluster values that differ from the scan kept and logged?"""
         cluster = self.make_matching_cluster()
