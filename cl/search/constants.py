@@ -338,8 +338,7 @@ jurisdiction_relevance_multipliers = {
 }
 
 
-# Homepage corpus search tabs. Kept in sync with
-# cl/assets/static-global/js/alpine/components/corpus_search.js searchScopes.
+# Homepage corpus search tabs.
 # Server-rendered so tabs appear before Alpine initializes (see #7035).
 CORPUS_SEARCH_SCOPES = (
     {

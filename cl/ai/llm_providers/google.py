@@ -1,7 +1,6 @@
 import json
 import logging
 import mimetypes
-import os
 import tempfile
 from datetime import date
 from typing import Any, TypedDict
@@ -290,22 +289,18 @@ class GoogleGenAIBatchWrapper:
         jsonl_content = "\n".join(json.dumps(req) for req in requests)
 
         with tempfile.NamedTemporaryFile(
-            mode="w+", delete=False, suffix=".jsonl"
+            mode="w+", delete_on_close=False, suffix=".jsonl"
         ) as temp_f:
             temp_f.write(jsonl_content)
             temp_f.flush()
-            temp_file_path = temp_f.name
 
-        try:
             jsonl_file = self.client.files.upload(
-                file=temp_file_path,
+                file=temp_f.name,
                 config=types.UploadFileConfig(
                     display_name=batch_display_name,
                     mime_type="application/jsonl",
                 ),
             )
-        finally:
-            os.remove(temp_file_path)
 
         config = types.CreateBatchJobConfig(display_name=batch_display_name)
 

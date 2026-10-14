@@ -1,10 +1,14 @@
 from typing import cast
 
 from django.apps import apps
+from django.conf import settings
 from django.contrib import admin, messages
 from django.contrib.auth.forms import UserChangeForm
 from django.contrib.auth.models import Permission, User
-from django.db.models import Model
+from django.core.exceptions import ValidationError
+from django.core.validators import validate_email
+from django.db.models import Model, QuerySet
+from django.http import HttpRequest
 from rest_framework.authtoken.models import Token
 
 from cl.alerts.admin import AlertInline, DocketAlertInline
@@ -19,10 +23,12 @@ from cl.donate.models import NeonMembership
 from cl.favorites.admin import NoteInline, PrayerInline, UserTagInline
 from cl.favorites.models import UserTag
 from cl.lib.admin import (
+    AdminLink,
     AdminLinkConfig,
     AdminTweaksMixin,
     generate_admin_links,
 )
+from cl.lib.auth import filter_by_email
 from cl.search.models import SearchQuery
 from cl.users.models import (
     BarMembership,
@@ -38,6 +44,15 @@ UserProxyEvent: type[Model] = cast(
 UserProfileEvent: type[Model] = cast(
     type[Model], apps.get_model("users", "UserProfileEvent")
 )
+
+
+def _is_complete_email(value: str) -> bool:
+    """Return True if value is a syntactically complete email address."""
+    try:
+        validate_email(value)
+    except ValidationError:
+        return False
+    return True
 
 
 class TokenInline(admin.StackedInline):
@@ -69,17 +84,17 @@ class UserAdmin(admin.ModelAdmin, AdminTweaksMixin):
     readonly_fields = ("api_calls_count",)
     inlines = (
         UserProfileInline,
-        DonationInline,
-        MonthlyDonationInline,
-        PrayerInline,
+        NeonMembershipInline,
+        APIThrottleInline,
+        TokenInline,
+        WebhookInline,
         AlertInline,
         DocketAlertInline,
         NoteInline,
+        PrayerInline,
         UserTagInline,
-        NeonMembershipInline,
-        TokenInline,
-        WebhookInline,
-        APIThrottleInline,
+        DonationInline,
+        MonthlyDonationInline,
     )
     list_display = (
         "username",
@@ -102,6 +117,27 @@ class UserAdmin(admin.ModelAdmin, AdminTweaksMixin):
         "pk",
     )
     actions = ["refresh_api_throttles"]
+
+    def get_search_results(
+        self,
+        request: HttpRequest,
+        queryset: QuerySet[User],
+        search_term: str,
+    ) -> tuple[QuerySet[User], bool]:
+        """Filter the changelist, using the LOWER(email) index for complete addresses.
+
+        Domain or partial terms keep the default icontains search.
+
+        :param request: The current HTTP request.
+        :param queryset: The changelist queryset to filter.
+        :param search_term: The raw string typed into the search box.
+        :return: Two-tuple of the filtered queryset and whether the caller
+            needs to de-duplicate the results.
+        """
+        term = search_term.strip()
+        if _is_complete_email(term):
+            return filter_by_email(queryset, term), False
+        return super().get_search_results(request, queryset, search_term)
 
     @admin.action(
         description="Refresh API throttles from active Neon membership"
@@ -188,11 +224,54 @@ class UserAdmin(admin.ModelAdmin, AdminTweaksMixin):
             },
         ]
 
-        extra_context["custom_links"] = generate_admin_links(custom_links)
+        links = generate_admin_links(custom_links)
+        if user is not None:
+            links.extend(self._get_neon_links(user.pk))
+        extra_context["custom_links"] = links
 
         return super().change_view(
             request, object_id, form_url, extra_context=extra_context
         )
+
+    @staticmethod
+    def _get_neon_links(user_id: int) -> list[AdminLink]:
+        """Build links to a user's Neon account and membership records.
+
+        Links are only returned for records we have a Neon ID for, so users
+        without a Neon account or membership get no link.
+
+        :param user_id: The pk of the user whose admin page is being rendered.
+        :return: Zero, one, or two links to the Neon admin site.
+        """
+        base_url = settings.NEON_ADMIN_URL.rstrip("/")
+        links: list[AdminLink] = []
+
+        account_id = (
+            UserProfile.objects.filter(user_id=user_id)
+            .values_list("neon_account_id", flat=True)
+            .first()
+        )
+        if account_id:
+            links.append(
+                {
+                    "href": f"{base_url}/accounts/{account_id}/about",
+                    "label": "Neon User",
+                }
+            )
+
+        membership_id = (
+            NeonMembership.objects.filter(user_id=user_id)
+            .values_list("neon_id", flat=True)
+            .first()
+        )
+        if membership_id:
+            links.append(
+                {
+                    "href": f"{base_url}/memberships/{membership_id}",
+                    "label": "Neon Membership",
+                }
+            )
+        return links
 
     @admin.display(description="Email Confirmed?")
     def get_email_confirmed(self, obj):

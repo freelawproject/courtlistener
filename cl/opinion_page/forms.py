@@ -65,6 +65,9 @@ class CitationRedirectorForm(forms.Form):
 
 
 class DocketEntryFilterForm(forms.Form):
+    """Filters and sorts the entries shown on a docket page, bound to the
+    request's GET params."""
+
     ASCENDING = "asc"
     DESCENDING = "desc"
     DOCKET_ORDER_BY_CHOICES = (
@@ -123,6 +126,20 @@ class DocketEntryFilterForm(forms.Form):
     ) -> None:
         self.request = request
         super().__init__(*args, **kwargs)
+
+    def has_filters(self) -> bool:
+        """Whether the bound data carries any filter or search param.
+
+        Checks the raw data rather than cleaned_data so an invalid value
+        (say, a non-numeric entry number) still counts: the user asked for a
+        filter either way. The docket page uses this to pick between the
+        "no entries yet" and the "nothing matches your filters" empty state.
+        """
+        # order_by only reorders the same entries, so an empty docket
+        # sorted either way still gets the "no entries yet" copy.
+        return any(
+            self.data.get(name) for name in self.fields if name != "order_by"
+        )
 
     def clean_order_by(self) -> str:
         data = self.cleaned_data["order_by"]

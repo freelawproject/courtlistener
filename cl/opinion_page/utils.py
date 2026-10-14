@@ -3,7 +3,7 @@ import logging
 import traceback
 from dataclasses import dataclass, field
 from io import StringIO
-from typing import Any, cast
+from typing import Any, TypedDict, cast
 from zoneinfo import ZoneInfo
 
 import waffle
@@ -185,7 +185,7 @@ def build_docket_metadata(
             "label": "Citation",
             "value": build_citation_string(docket),
             # Matches the select-all convenience old citation.html had.
-            "is_copyable": True,
+            "one_click_select": True,
         }
     )
 
@@ -441,13 +441,16 @@ def build_docket_tabs(
 ) -> list[dict[str, str]]:
     """Build the tab navigation items for the docket page.
 
-    Each item is a dict with 'label', 'url', and 'key'.
+    Each item is a dict with 'label', 'url', 'key' and 'icon'. 'icon' names a
+    file in cl/assets/static-global/svg/ for the {% svg %} tag; the mobile
+    dropdown ignores it.
     """
     tabs = [
         {
             "label": "Docket Entries",
             "url": docket.get_absolute_url(),
             "key": "entries",
+            "icon": "file_text",
         }
     ]
 
@@ -463,6 +466,7 @@ def build_docket_tabs(
                     },
                 ),
                 "key": "parties",
+                "icon": "group",
             }
         )
 
@@ -478,6 +482,7 @@ def build_docket_tabs(
                     },
                 ),
                 "key": "idb",
+                "icon": "circle_question_mark",
             }
         )
 
@@ -493,6 +498,7 @@ def build_docket_tabs(
                     },
                 ),
                 "key": "authorities",
+                "icon": "court",
             }
         )
 
@@ -534,22 +540,22 @@ async def _common_metadata_sections(
     ]
 
 
+class CoreDocketDataDict(TypedDict):
+    docket: Docket
+    title: str
+    note_form: NoteForm
+    has_alert: bool
+    timezone: str
+    private: bool
+    docket_source: DocketEntrySource
+    docket_source_url: str | None
+    metadata_sections: list[MetadataSection]
+
+
 async def core_docket_data(
     request: HttpRequest,
     pk: int,
-) -> tuple[
-    Docket,
-    dict[
-        str,
-        bool
-        | str
-        | None
-        | Docket
-        | NoteForm
-        | DocketEntrySource
-        | list[MetadataSection],
-    ],
-]:
+) -> tuple[Docket, CoreDocketDataDict]:
     """Gather the core data for a docket, party, or IDB page."""
     docket: Docket = await aget_object_or_404(Docket, pk=pk)
     source = docket.get_entry_source()
