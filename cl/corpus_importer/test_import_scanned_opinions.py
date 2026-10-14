@@ -21,6 +21,8 @@ from cl.corpus_importer.management.commands.import_scanned_opinions import (
 )
 from cl.lib.crypto import sha1
 from cl.lib.storage import ScanningFinalXmlStorage
+from cl.people_db.factories import PersonFactory, PositionFactory
+from cl.people_db.models import GRANULARITY_DAY
 from cl.search.cluster_sources import ClusterSources
 from cl.search.factories import (
     CourtFactory,
@@ -378,6 +380,26 @@ class ImportScannedOpinionsTest(TestCase):
         self.assertTrue(content.is_main_version)
         self.assertEqual(len(content.sha1), 40)
         self.assertEqual(content.page_count, 4)
+
+    def test_judges_are_linked(self) -> None:
+        """Are the author and the panel linked to people in the court?"""
+        judges = {}
+        for last_name in ["Gerber", "Conner", "Forst"]:
+            judges[last_name] = PersonFactory.create(
+                name_last=last_name, date_dob=None, date_dod=None
+            )
+            PositionFactory.create(
+                person=judges[last_name],
+                court=self.court,
+                date_start=date(2010, 1, 1),
+                date_granularity_start=GRANULARITY_DAY,
+            )
+
+        self.import_scan()
+
+        cluster = OpinionCluster.objects.get()
+        self.assertEqual(cluster.sub_opinions.get().author, judges["Gerber"])
+        self.assertEqual(set(cluster.panel.all()), set(judges.values()))
 
     def test_reimport_is_skipped(self) -> None:
         """Is an already imported scanned opinion skipped?"""
