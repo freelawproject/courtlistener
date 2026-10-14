@@ -70,7 +70,7 @@
   input[type="checkbox"]::before {
     mask: url("/static/svg/check_thick.svg") no-repeat center/contain;
   }
-  input[type="radio"] {
+  input[type="radio"]:not(.sr-only) {
     @apply relative appearance-none flex-shrink-0 w-5 h-5 rounded-full border border-greyscale-300;
     @apply checked:border-primary-600 checked:bg-primary-600;
     @apply focus-visible:outline focus-visible:outline-[3px] focus-visible:outline-offset-2 focus-visible:outline-primary-600/60;
