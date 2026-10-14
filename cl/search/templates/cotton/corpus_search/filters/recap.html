@@ -5,13 +5,13 @@
 <fieldset x-bind:id="fieldsetId" class="contents" x-show="isActiveScope" x-cloak data-scope="RECAP Archive">
   <legend class="sr-only">RECAP Archive filters</legend>
 
-  <c-corpus-search.filters.input :search_form="search_form" field_name="case_name" namespace="recap" :form_prefix="form_prefix" only/>
+  <c-form.input :form="search_form" field_name="case_name" namespace="recap" :form_prefix="form_prefix" only/>
 
-  <c-corpus-search.filters.input :search_form="search_form" field_name="docket_number" namespace="recap" :form_prefix="form_prefix" only/>
+  <c-form.input :form="search_form" field_name="docket_number" namespace="recap" :form_prefix="form_prefix" only/>
 
-  <c-corpus-search.filters.input :search_form="search_form" field_name="nature_of_suit" namespace="recap" :form_prefix="form_prefix" only/>
+  <c-form.input :form="search_form" field_name="nature_of_suit" namespace="recap" :form_prefix="form_prefix" only/>
 
-  <c-corpus-search.filters.input :search_form="search_form" field_name="cause" namespace="recap" :form_prefix="form_prefix" only/>
+  <c-form.input :form="search_form" field_name="cause" namespace="recap" :form_prefix="form_prefix" only/>
 
   <c-corpus-search.date-selector
     label="Docket Date"
@@ -31,19 +31,19 @@
     only
   />
 
-  <c-corpus-search.filters.input :search_form="search_form" field_name="assigned_to" namespace="recap" :form_prefix="form_prefix" only/>
+  <c-form.input :form="search_form" field_name="assigned_to" namespace="recap" :form_prefix="form_prefix" only/>
 
-  <c-corpus-search.filters.input :search_form="search_form" field_name="referred_to" namespace="recap" :form_prefix="form_prefix" only/>
+  <c-form.input :form="search_form" field_name="referred_to" namespace="recap" :form_prefix="form_prefix" only/>
 
-  <c-corpus-search.filters.input :search_form="search_form" field_name="description" namespace="recap" :form_prefix="form_prefix" only/>
+  <c-form.input :form="search_form" field_name="description" namespace="recap" :form_prefix="form_prefix" only/>
 
-  <c-corpus-search.filters.input :search_form="search_form" field_name="document_number" namespace="recap" :form_prefix="form_prefix" only/>
+  <c-form.input :form="search_form" field_name="document_number" namespace="recap" :form_prefix="form_prefix" only/>
 
-  <c-corpus-search.filters.input :search_form="search_form" field_name="attachment_number" namespace="recap" :form_prefix="form_prefix" only/>
+  <c-form.input :form="search_form" field_name="attachment_number" namespace="recap" :form_prefix="form_prefix" only/>
 
-  <c-corpus-search.filters.input :search_form="search_form" field_name="party_name" namespace="recap" :form_prefix="form_prefix" only/>
+  <c-form.input :form="search_form" field_name="party_name" namespace="recap" :form_prefix="form_prefix" only/>
 
-  <c-corpus-search.filters.input :search_form="search_form" field_name="atty_name" namespace="recap" :form_prefix="form_prefix" only/>
+  <c-form.input :form="search_form" field_name="atty_name" namespace="recap" :form_prefix="form_prefix" only/>
 
   {% with field_id=form_prefix|add:"_recap_available_only" %}
   <div class="h-full flex items-center gap-2 [&_label]:text-sm [&_label]:font-medium [&_label]:text-greyscale-600">

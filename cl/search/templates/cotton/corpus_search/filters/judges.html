@@ -5,9 +5,9 @@
 <fieldset x-bind:id="fieldsetId" class="contents" x-show="isActiveScope" x-cloak data-scope="Judges">
   <legend class="sr-only">Judges filters</legend>
 
-  <c-corpus-search.filters.input :search_form="search_form" field_name="name" namespace="judges" :form_prefix="form_prefix" only/>
+  <c-form.input :form="search_form" field_name="name" namespace="judges" :form_prefix="form_prefix" only/>
 
-  <c-corpus-search.filters.input :search_form="search_form" field_name="appointer" namespace="judges" :form_prefix="form_prefix" only/>
+  <c-form.input :form="search_form" field_name="appointer" namespace="judges" :form_prefix="form_prefix" only/>
 
   <c-corpus-search.date-selector
     label="Born After"
@@ -20,7 +20,7 @@
     only
   />
 
-  <c-corpus-search.filters.input :search_form="search_form" field_name="dob_city" namespace="judges" :form_prefix="form_prefix" only/>
+  <c-form.input :form="search_form" field_name="dob_city" namespace="judges" :form_prefix="form_prefix" only/>
 
   {% with field_id=form_prefix|add:"_judges_dob_state" %}
   <div class="flex flex-col justify-start gap-1.5 [&_label]:text-sm [&_label]:font-medium [&_label]:text-greyscale-600">
@@ -31,7 +31,7 @@
   </div>
   {% endwith %}
 
-  <c-corpus-search.filters.input :search_form="search_form" field_name="school" namespace="judges" :form_prefix="form_prefix" only/>
+  <c-form.input :form="search_form" field_name="school" namespace="judges" :form_prefix="form_prefix" only/>
 
   {% with field_id=form_prefix|add:"_judges_political_affiliation" %}
   <div class="flex flex-col justify-start gap-1.5 [&_label]:text-sm [&_label]:font-medium [&_label]:text-greyscale-600">
