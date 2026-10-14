@@ -211,7 +211,7 @@ else:
     )
     # Keyed by account rather than IP, for endpoints whose cost is tied to
     # the user (e.g. background jobs, emails) rather than to request volume.
-    ratelimiter_user_5_per_h = ratelimit(
+    ratelimiter_user_5_per_h = make_ratelimiter(
         key="user",
         rate="5/h",
     )
