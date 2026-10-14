@@ -17,6 +17,7 @@ from cl.corpus_importer.management.commands.import_scanned_opinions import (
     get_citation_strings,
     get_date_filed,
     get_docket_number,
+    get_headmatter,
     make_opinion,
     normalize_case_name_caps,
     s3_xml_keys,
@@ -162,6 +163,31 @@ class ScanXmlHelpersTest(SimpleTestCase):
                 self.assertEqual(
                     get_case_names(make_soup(xml)), (case_name, case_name_full)
                 )
+
+    def test_get_headmatter(self) -> None:
+        """Is the head matter the elements before the opinions?"""
+        cases = [
+            (
+                "<casebody><citation>1 So. 3d 1</citation>"
+                '<court>A <page-number label="2">*2</page-number>Court'
+                "</court><opinion><p>Text</p></opinion><p>After</p>"
+                "</casebody>",
+                "<headmatter>\n<citation>1 So. 3d 1</citation>\n"
+                '<court>A <page-number label="2">*2</page-number>Court'
+                "</court>\n</headmatter>",
+            ),
+            (
+                "<casebody><citation>1 So. 3d 1</citation>"
+                "<syllabus>Shown from its field</syllabus>"
+                "<opinion><p>Text</p></opinion></casebody>",
+                "<headmatter>\n<citation>1 So. 3d 1</citation>\n</headmatter>",
+            ),
+            ("<casebody><opinion><p>Text</p></opinion></casebody>", ""),
+            ("<court>No casebody</court>", ""),
+        ]
+        for xml, expected in cases:
+            with self.subTest(xml=xml):
+                self.assertEqual(get_headmatter(make_soup(xml)), expected)
 
     def test_get_date_filed(self) -> None:
         """Can we parse complete decision dates and reject partial ones?"""
@@ -398,6 +424,10 @@ class ImportScannedOpinionsTest(TestCase):
             cluster.filepath_xml_scan.name,
             r"/3593-12-388-so-3d-1(_[A-Za-z0-9]+)?\.xml$",
         )
+        self.assertTrue(cluster.headmatter.startswith("<headmatter>"))
+        self.assertIn("<docketnumber>", cluster.headmatter)
+        self.assertIn("pro se", cluster.headmatter)
+        self.assertNotIn("<opinion", cluster.headmatter)
 
         docket = cluster.docket
         self.assertEqual(docket.source, Docket.SCANNING_PROJECT)
@@ -458,6 +488,18 @@ class ImportScannedOpinionsTest(TestCase):
             f"{BASE_URL}{cluster.get_absolute_url()}", message % tuple(args)
         )
 
+    def test_syllabus_is_not_in_the_headmatter(self) -> None:
+        """Is the syllabus stored in its field and not in the head matter?"""
+        xml = self.scan_xml.replace(
+            "<court>", "<syllabus>The syllabus.</syllabus><court>", 1
+        )
+
+        self.import_xml(xml)
+
+        cluster = OpinionCluster.objects.get()
+        self.assertIn("The syllabus.", cluster.syllabus)
+        self.assertNotIn("syllabus", cluster.headmatter)
+
     def test_reimport_is_skipped(self) -> None:
         """Is an already imported scanned opinion skipped?"""
         self.import_scan()
@@ -481,6 +523,7 @@ class ImportScannedOpinionsTest(TestCase):
                 ClusterSources.COURT_WEBSITE, ClusterSources.SCANNING_PROJECT
             ),
         )
+        self.assertTrue(cluster.headmatter.startswith("<headmatter>"))
         self.assertIn("pro se", cluster.attorneys)
         self.assertIn("Gerber", cluster.judges)
         self.assertRegex(
@@ -516,13 +559,16 @@ class ImportScannedOpinionsTest(TestCase):
     def test_merge_logs_differing_metadata(self) -> None:
         """Are cluster values that differ from the scan kept and logged?"""
         cluster = self.make_matching_cluster()
-        OpinionCluster.objects.filter(pk=cluster.pk).update(judges="Klein")
+        OpinionCluster.objects.filter(pk=cluster.pk).update(
+            judges="Klein", headmatter="<p>Harvard head matter</p>"
+        )
 
         with mock.patch(f"{COMMAND_MODULE}.logger") as mock_logger:
             self.import_scan()
 
         cluster.refresh_from_db()
         self.assertEqual(cluster.judges, "Klein")
+        self.assertEqual(cluster.headmatter, "<p>Harvard head matter</p>")
         self.assertIn(
             "judges",
             [call.args[2] for call in mock_logger.debug.call_args_list],

@@ -136,6 +136,10 @@ PARTY_NAME_PART_RE = re.compile(
     re.IGNORECASE,
 )
 
+# Head matter elements kept out of `OpinionCluster.headmatter`, since the
+# opinion page shows them from their own field
+HEADMATTER_EXCLUDED = {"syllabus"}
+
 # Cluster fields that come from the head matter of the XML. When merging
 # into an existing cluster, only empty values are filled from the scan.
 SHORT_FIELDS = {
@@ -429,6 +433,33 @@ def get_case_names(soup: BeautifulSoup) -> tuple[str, str]:
     return case_name, normalize_case_name_caps(caption.strip(". "))
 
 
+def get_headmatter(soup: BeautifulSoup) -> str:
+    """Get the head matter: the `<casebody>` elements before its opinions.
+
+    Wrapped in `<headmatter>` for `OpinionCluster.headmatter`, so the
+    citation, parties, docket number, court, dates, attorneys and the rest
+    can be shown above the opinions. Their values are also stored in their
+    own fields. Elements in HEADMATTER_EXCLUDED are left out.
+
+    Caveat: call it before `parse_extra_fields`, which removes the page
+    numbers from the elements it reads.
+
+    :param soup: The parsed XML.
+    :return: The head matter XML, or an empty string if there is none.
+    """
+    if (casebody := soup.select_one("casebody")) is None:
+        return ""
+    elements = []
+    for element in casebody.find_all(recursive=False):
+        if element.name == "opinion":
+            break
+        if element.name not in HEADMATTER_EXCLUDED:
+            elements.append(str(element))
+    if not elements:
+        return ""
+    return "<headmatter>\n{}\n</headmatter>".format("\n".join(elements))
+
+
 def get_date_filed(soup: BeautifulSoup) -> date | None:
     """Parse the decision date of the scanned opinion.
 
@@ -542,6 +573,7 @@ def parse_scan_xml(
     if not opinions:
         logger.warning("No opinion found in %s", file_path)
         return None
+    headmatter = get_headmatter(soup)
 
     case_name, case_name_full = get_case_names(soup)
     if not case_name:
@@ -592,6 +624,8 @@ def parse_scan_xml(
         for name, value in {**short_data, **long_data}.items()
         if value
     }
+    if headmatter:
+        cluster_fields["headmatter"] = headmatter
 
     return ScanCase(
         xml=xml,
