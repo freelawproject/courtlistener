@@ -262,7 +262,7 @@ SEAL_BLOCKERS_MAP: dict[str, Callable[[OpinionCluster], Any]] = {
         pk=cluster.pk
     ),
     "search.SCOTUSDocketEntry": lambda cluster: (
-        cluster.docket.scotusdocketentry_set
+        cluster.docket.scotus_docket_entries
     ),
     "search.ScotusDocketMetadata": lambda cluster: getattr(
         cluster.docket, "scotus_metadata", None
