@@ -1,6 +1,8 @@
+import asyncio
 import json
 from datetime import date, datetime, timedelta
 from pathlib import Path
+from tempfile import TemporaryDirectory
 from typing import assert_type, cast
 from unittest import mock
 from unittest.mock import call, patch
@@ -17,7 +19,7 @@ from django.core.exceptions import ObjectDoesNotExist
 from django.core.files.base import ContentFile
 from django.core.management import call_command
 from django.db.models.signals import post_save
-from django.test import SimpleTestCase, override_settings
+from django.test import override_settings
 from django.utils import timezone
 from django.utils.timezone import now
 from eyecite.tokenizers import HyperscanTokenizer
@@ -45,6 +47,9 @@ from cl.corpus_importer.factories import (
     CitationFactory,
 )
 from cl.corpus_importer.llm_models import CaseNameExtractionResponse
+from cl.corpus_importer.management.commands.claims_activity_project import (
+    query_and_parse_claims_activity,
+)
 from cl.corpus_importer.management.commands.clean_up_mis_matched_dockets import (
     find_and_fix_mis_matched_dockets,
 )
@@ -93,10 +98,12 @@ from cl.corpus_importer.state.texas.utils import is_missing_file_page
 from cl.corpus_importer.state.utils import MergeResult
 from cl.corpus_importer.tasks import (
     classify_case_name_by_llm,
+    download_recap_item,
     download_texas_document,
     generate_ia_json,
     get_and_process_free_pdf,
     get_and_save_free_document_report,
+    get_document_number_for_appellate,
     is_texas_appellate_docket,
     is_texas_supreme_docket,
     merge_texas_case_transfers,
@@ -109,6 +116,7 @@ from cl.corpus_importer.tasks import (
     normalize_texas_parties,
     probe_or_scrape_iquery_pages,
     process_free_opinion_result,
+    upload_to_ia,
 )
 from cl.corpus_importer.utils import (
     DocketSourceException,
@@ -127,6 +135,7 @@ from cl.corpus_importer.utils import (
 from cl.favorites.models import PrayerAvailability
 from cl.lib.model_helpers import make_texas_docket_number_core
 from cl.lib.pacer import process_docket_data
+from cl.lib.pacer_session import SessionData
 from cl.lib.redis_utils import get_redis_interface
 from cl.people_db.factories import (
     ABARatingFactory,
@@ -160,7 +169,7 @@ from cl.recap.management.commands.nightly_pacer_updates import (
     get_docket_ids_week_ago_no_case_name,
     get_recap_documents_pray_and_pay,
 )
-from cl.recap.models import UPLOAD_TYPE, PacerHtmlFiles
+from cl.recap.models import UPLOAD_TYPE, PacerHtmlFiles, ProcessingQueue
 from cl.recap.tests.tests import mock_bucket_open
 from cl.scrapers.models import PACERFreeDocumentLog, PACERFreeDocumentRow
 from cl.scrapers.tasks import update_docket_info_iquery
@@ -208,7 +217,7 @@ from cl.search.state.texas.factories import (
 )
 from cl.search.state.texas.models import TexasDocketEntry, TexasDocument
 from cl.settings import MEDIA_ROOT
-from cl.tests.cases import TestCase
+from cl.tests.cases import SimpleTestCase, TestCase
 from cl.tests.fakes import FakeCaseQueryReport, FakeFreeOpinionReport
 from cl.tests.providers import fake
 from cl.tests.utils import MockResponse
@@ -387,7 +396,10 @@ class PacerDocketParserTest(TestCase):
         self.assertEqual(godfrey_llp.city, "Seattle")
         self.assertEqual(godfrey_llp.state, "WA")
 
-    @patch("cl.corpus_importer.tasks.get_or_cache_pacer_cookies")
+    @patch(
+        "cl.corpus_importer.tasks.get_or_cache_pacer_cookies",
+        return_value=SessionData(None, "http://proxy_1:9090"),
+    )
     def test_get_and_save_free_document_report(self, mock_cookies) -> None:
         """Test the retrieval and storage of free document report data."""
 
@@ -875,6 +887,114 @@ class GetQuarterTest(SimpleTestCase):
         self.assertEqual(
             date(2018, 10, 1), get_start_of_quarter(date(2018, 12, 1))
         )
+
+
+class ImporterTransportTest(SimpleTestCase):
+    """Check HTTP client boundaries without PACER or Internet Archive access."""
+
+    def test_claims_queries_share_the_login_event_loop(self) -> None:
+        """Await every query on the same loop and close the shared session."""
+        loops = []
+
+        async def record_loop(**kwargs: object) -> None:
+            """Capture the event loop used by login and report requests."""
+            loops.append(asyncio.get_running_loop())
+
+        module = (
+            "cl.corpus_importer.management.commands.claims_activity_project"
+        )
+        with (
+            TemporaryDirectory() as directory,
+            override_settings(MEDIA_ROOT=directory),
+            patch(f"{module}.ProxyPacerSession") as session_class,
+            patch(f"{module}.ClaimsActivity") as report_class,
+        ):
+            session_context = session_class.return_value
+            session = session_context.__aenter__.return_value
+            session.login.side_effect = record_loop
+            report = report_class.return_value
+            report.query = mock.AsyncMock(side_effect=record_loop)
+            report.response = httpx.Response(200, text="<html></html>")
+            report.data = {}
+
+            query_and_parse_claims_activity(
+                ["nysb"], date(2025, 1, 1), date(2025, 1, 2)
+            )
+
+            session.login.assert_awaited_once()
+            self.assertEqual(report.query.await_count, 4)
+            self.assertEqual(len(set(loops)), 1)
+            session_context.__aexit__.assert_awaited_once()
+            self.assertEqual(len(list(Path(directory).rglob("*.json"))), 4)
+
+    async def test_download_recap_item_uses_httpx_content(self) -> None:
+        """Write the downloaded bytes using the HTTPX response API."""
+        content = b"%PDF-1.7 test document"
+        client = httpx.AsyncClient(
+            transport=httpx.MockTransport(
+                lambda request: httpx.Response(200, content=content)
+            )
+        )
+        with TemporaryDirectory() as directory:
+            destination = Path(directory, "recap", "test.pdf")
+            destination.parent.mkdir()
+            with (
+                override_settings(MEDIA_ROOT=directory),
+                patch(
+                    "cl.corpus_importer.tasks.httpx.AsyncClient",
+                    return_value=client,
+                ),
+            ):
+                await download_recap_item(
+                    "https://archive.org/download/test.pdf", "test.pdf"
+                )
+            self.assertEqual(destination.read_bytes(), content)
+
+    async def test_confirmation_page_is_awaited_for_special_courts(
+        self,
+    ) -> None:
+        """Normalize the confirmation result instead of processing a coroutine."""
+        for court_id in ("ca8", "cadc"):
+            with (
+                self.subTest(court_id=court_id),
+                patch(
+                    "cl.corpus_importer.tasks.get_document_number_from_confirmation_page",
+                    return_value="00218987740",
+                ) as confirmation,
+            ):
+                result = await get_document_number_for_appellate(
+                    court_id, "00218987740", ProcessingQueue()
+                )
+                self.assertEqual(result, "208987740")
+                confirmation.assert_awaited_once_with(court_id, "00218987740")
+
+    def test_ia_upload_handles_requests_http_errors(self) -> None:
+        """Return terminal IA errors even though Requests considers them false."""
+        for status_code in (400, 403):
+            with (
+                self.subTest(status_code=status_code),
+                patch("cl.corpus_importer.tasks.ia_session") as ia_session,
+            ):
+                response = requests.Response()
+                response.status_code = status_code
+                ia_session.s3_is_overloaded.return_value = False
+                ia_session.get_item.return_value.upload.side_effect = (
+                    requests.HTTPError(response=response)
+                )
+                task = mock.MagicMock()
+                result = upload_to_ia(
+                    task,
+                    identifier="test",
+                    files="test.pdf",
+                    title="Test docket",
+                    collection=[],
+                    court_id="ca8",
+                    source_url="https://example.com/docket/",
+                    media_type="texts",
+                    description="Test",
+                )
+                self.assertEqual(result, [response])
+                task.retry.assert_not_called()
 
 
 @pytest.mark.django_db
@@ -4029,7 +4149,10 @@ class TexasMergerTest(TestCase):
         assert TrialCourtData.objects.filter(docket=docket_sc).count() == 1
 
 
-@patch("cl.corpus_importer.tasks.get_or_cache_pacer_cookies")
+@patch(
+    "cl.corpus_importer.tasks.get_or_cache_pacer_cookies",
+    return_value=SessionData(None, "http://proxy_1:9090"),
+)
 @override_settings(
     IQUERY_CASE_PROBE_DAEMON_ENABLED=True,
     IQUERY_SWEEP_UPLOADS_SIGNAL_ENABLED=True,
@@ -5123,7 +5246,10 @@ class ScrapeIqueryPagesTest(TestCase):
                     ),
                 ) as mock_iquery_sweep,
                 self.captureOnCommitCallbacks(execute=True),
-                patch("cl.scrapers.tasks.get_or_cache_pacer_cookies"),
+                patch(
+                    "cl.scrapers.tasks.get_or_cache_pacer_cookies",
+                    return_value=mock_cookies.return_value,
+                ),
             ):
                 update_docket_info_iquery.apply_async(
                     args=(docket_gand.pk, docket_gand.court_id)
@@ -5144,7 +5270,10 @@ class ScrapeIqueryPagesTest(TestCase):
                     ),
                 ) as mock_iquery_sweep,
                 self.captureOnCommitCallbacks(execute=True),
-                patch("cl.scrapers.tasks.get_or_cache_pacer_cookies"),
+                patch(
+                    "cl.scrapers.tasks.get_or_cache_pacer_cookies",
+                    return_value=mock_cookies.return_value,
+                ),
             ):
                 update_docket_info_iquery.apply_async(
                     args=(docket_cand.pk, docket_cand.court_id)
