@@ -1,0 +1,52 @@
+{% load static svg_tags component_tags %}
+
+<c-vars size eyebrow_text title_text paragraph_text buttons image_source image_alt></c-vars>
+
+<div class="bg-greyscale-100 border-greyscale-100 rounded-3xl {{ size }}">
+  <div class="!min-h-[304px] flex flex-col justify-between p-8 gap-4">
+    <div class="flex flex-col gap-4">
+      <c-eyebrow class="normal-case">{{ eyebrow_text }}</c-eyebrow>
+      <h2 class="font-semibold">{{ title_text }}</h2>
+      <p class="text-gray-700 text-sm font-light">{{ paragraph_text }}</p>
+    </div>
+      <div class="relative inline-flex gap-x-2">
+         {% for b in buttons %}
+            {% if b.options %}
+                <c-menu-button
+                  button_variant="{{ b.variant }}"
+                >
+                  <c-slot name="button_content">
+                    {{ b.name }}
+                    <span
+                      class="transition-transform duration-200 group-aria-[expanded=true]:rotate-180 flex justify-center items-center w-4 h-4"
+                      aria-hidden="true"
+                    >{% svg 'chevron' class="w-full h-full text-white" %}
+                    </span>
+                  </c-slot>
+                  <c-slot name="menu_content">
+                    {% for opt in b.options %}
+                      <c-menu-button.item
+                        href="{{ opt.href }}"
+                        icon="{{ opt.icon }}"
+                      >
+                        {{ opt.name }}
+                      </c-menu-button.item>
+                    {% endfor %}
+                  </c-slot>
+                </c-menu-button>
+            {% else %}
+                <c-button variant="{{ b.variant }}" href="{{ b.href }}">
+                    {{ b.name }}
+                </c-button>
+            {% endif %}
+         {% endfor %}
+      </div>
+  </div>
+  <div class="px-8 pb-8 hidden md:flex justify-center items-start">
+   <img
+      class="place-self-center"
+      src="{{image_source}}"
+      alt="{{image_alt}}"
+   />
+  </div>
+</div>
