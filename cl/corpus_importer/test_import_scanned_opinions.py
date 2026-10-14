@@ -9,8 +9,11 @@ from unittest import mock
 
 from bs4 import BeautifulSoup
 from django.core.management import CommandError, call_command
+from django.db import transaction
 from django.db.models.fields.files import FieldFile
 from django.test import override_settings
+from eyecite import get_citations
+from eyecite.models import FullCaseCitation
 
 from cl.corpus_importer.management.commands.import_scanned_opinions import (
     get_case_names,
@@ -18,6 +21,7 @@ from cl.corpus_importer.management.commands.import_scanned_opinions import (
     get_date_filed,
     get_docket_number,
     get_headmatter,
+    get_precedential_status,
     make_opinion,
     normalize_case_name_caps,
     s3_xml_keys,
@@ -35,6 +39,7 @@ from cl.search.factories import (
     OpinionFactory,
 )
 from cl.search.models import (
+    PRECEDENTIAL_STATUS,
     Citation,
     Court,
     Docket,
@@ -188,6 +193,58 @@ class ScanXmlHelpersTest(SimpleTestCase):
         for xml, expected in cases:
             with self.subTest(xml=xml):
                 self.assertEqual(get_headmatter(make_soup(xml)), expected)
+
+    def test_get_precedential_status(self) -> None:
+        """Are opinions with an unpublished reporter or notice unpublished?"""
+        far_notice = "x " * 1500 + "See the unpublished opinion in Doe."
+        cases = [
+            (
+                "<casebody><opinion><p>Text</p></opinion></casebody>",
+                "1 F.4th 1",
+            ),
+            (
+                "<casebody><opinion><p>Text</p></opinion></casebody>",
+                "1 F. App'x 1",
+            ),
+            (
+                "<casebody><heading>NOT PRECEDENTIAL</heading>"
+                "<opinion><p>Text</p></opinion></casebody>",
+                "1 F.4th 1",
+            ),
+            (
+                "<casebody><opinion><p>SUMMARY ORDER</p><p>Rulings by "
+                "summary order do not have precedential effect.</p>"
+                "</opinion></casebody>",
+                "1 F.4th 1",
+            ),
+            (
+                "<casebody><opinion><p>Not for publication.</p></opinion>"
+                "</casebody>",
+                "1 So. 3d 1",
+            ),
+            (
+                f"<casebody><opinion><p>{far_notice}</p></opinion></casebody>",
+                "1 F.4th 1",
+            ),
+        ]
+        expected = [
+            PRECEDENTIAL_STATUS.PUBLISHED,
+            PRECEDENTIAL_STATUS.UNPUBLISHED,
+            PRECEDENTIAL_STATUS.UNPUBLISHED,
+            PRECEDENTIAL_STATUS.UNPUBLISHED,
+            PRECEDENTIAL_STATUS.UNPUBLISHED,
+            PRECEDENTIAL_STATUS.PUBLISHED,
+        ]
+        for (xml, cite), status in zip(cases, expected, strict=True):
+            with self.subTest(xml=xml[:80], cite=cite):
+                citations = [
+                    c
+                    for c in get_citations(cite)
+                    if isinstance(c, FullCaseCitation)
+                ]
+                self.assertEqual(
+                    get_precedential_status(make_soup(xml), citations), status
+                )
 
     def test_get_date_filed(self) -> None:
         """Can we parse complete decision dates and reject partial ones?"""
@@ -488,6 +545,19 @@ class ImportScannedOpinionsTest(TestCase):
             f"{BASE_URL}{cluster.get_absolute_url()}", message % tuple(args)
         )
 
+    def test_unpublished_scan(self) -> None:
+        """Is a scan with an unpublished notice imported as unpublished?"""
+        xml = self.scan_xml.replace(
+            "<court>", "<heading>NOT FOR PUBLICATION</heading><court>", 1
+        )
+
+        self.import_xml(xml)
+
+        self.assertEqual(
+            OpinionCluster.objects.get().precedential_status,
+            PRECEDENTIAL_STATUS.UNPUBLISHED,
+        )
+
     def test_syllabus_is_not_in_the_headmatter(self) -> None:
         """Is the syllabus stored in its field and not in the head matter?"""
         xml = self.scan_xml.replace(
@@ -555,6 +625,26 @@ class ImportScannedOpinionsTest(TestCase):
             ("Cluster %s is not a match: the %s check failed", cluster.pk),
             [call.args[:2] for call in mock_logger.debug.call_args_list],
         )
+
+    def test_merge_sets_unknown_precedential_status(self) -> None:
+        """Is only an unknown precedential status set from the scan?"""
+        xml = self.scan_xml.replace(
+            "<court>", "<heading>NOT FOR PUBLICATION</heading><court>", 1
+        )
+        for current, expected in [
+            (PRECEDENTIAL_STATUS.UNKNOWN, PRECEDENTIAL_STATUS.UNPUBLISHED),
+            (PRECEDENTIAL_STATUS.PUBLISHED, PRECEDENTIAL_STATUS.PUBLISHED),
+        ]:
+            with self.subTest(current=current), transaction.atomic():
+                cluster = self.make_matching_cluster()
+                OpinionCluster.objects.filter(pk=cluster.pk).update(
+                    precedential_status=current
+                )
+                self.import_xml(xml)
+
+                cluster.refresh_from_db()
+                self.assertEqual(cluster.precedential_status, expected)
+                transaction.set_rollback(True)
 
     def test_merge_logs_differing_metadata(self) -> None:
         """Are cluster values that differ from the scan kept and logged?"""

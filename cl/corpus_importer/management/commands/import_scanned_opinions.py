@@ -136,6 +136,23 @@ PARTY_NAME_PART_RE = re.compile(
     re.IGNORECASE,
 )
 
+# Reporters of opinions that are never precedential
+UNPUBLISHED_REPORTERS = {"F. App'x"}
+# Notices printed on opinions without precedential effect, e.g. "NOT
+# PRECEDENTIAL", "Not for publication" or "Rulings by summary order do not
+# have precedential effect"
+UNPUBLISHED_NOTICE_RE = re.compile(
+    r"\bnot\s+(?:designated\s+)?for\s+(?:official\s+)?publication"
+    r"|\b(?:not|non)[\s-]precedential"
+    r"|\bunpublished\s+(?:opinion|decision|disposition|order)\b"
+    r"|\bdoes?\s+not\s+have\s+precedential\s+(?:effect|value)"
+    r"|\bsummary\s+order\b",
+    re.IGNORECASE,
+)
+# How much of the start of the first opinion is searched for the notice.
+# Further in, "unpublished" is likely a citation to another opinion.
+UNPUBLISHED_NOTICE_SPAN = 2000
+
 # Head matter elements kept out of `OpinionCluster.headmatter`, since the
 # opinion page shows them from their own field
 HEADMATTER_EXCLUDED = {"syllabus"}
@@ -171,6 +188,7 @@ class ScanCase:
     parsed_citations: list[FullCaseCitation]
     judges: str
     body_characters: str
+    precedential_status: str = PRECEDENTIAL_STATUS.PUBLISHED
     page_count: int | None = None
     cluster_fields: dict[str, str] = field(default_factory=dict)
     opinions: list[Tag] = field(default_factory=list)
@@ -460,6 +478,37 @@ def get_headmatter(soup: BeautifulSoup) -> str:
     return "<headmatter>\n{}\n</headmatter>".format("\n".join(elements))
 
 
+def get_precedential_status(
+    soup: BeautifulSoup, citations: list[FullCaseCitation]
+) -> str:
+    """Tell whether the scanned opinion is published or unpublished.
+
+    Unpublished when its reporter only prints unpublished opinions, like
+    F. App'x, or when the head matter or the start of the first opinion
+    prints a notice like "NOT PRECEDENTIAL" or "Not for publication".
+
+    Caveat: a notice deep in the opinion is not found, so that a
+    published opinion citing an "unpublished opinion" stays published.
+
+    :param soup: The parsed XML.
+    :param citations: The parsed citations of the opinion.
+    :return: A PRECEDENTIAL_STATUS value.
+    """
+    if any(c.corrected_reporter() in UNPUBLISHED_REPORTERS for c in citations):
+        return PRECEDENTIAL_STATUS.UNPUBLISHED
+    casebody = soup.select_one("casebody")
+    head = []
+    if casebody is not None:
+        for element in casebody.find_all(recursive=False):
+            if element.name == "opinion":
+                head.append(element.get_text(" ")[:UNPUBLISHED_NOTICE_SPAN])
+                break
+            head.append(element.get_text(" "))
+    if UNPUBLISHED_NOTICE_RE.search(" ".join(head)):
+        return PRECEDENTIAL_STATUS.UNPUBLISHED
+    return PRECEDENTIAL_STATUS.PUBLISHED
+
+
 def get_date_filed(soup: BeautifulSoup) -> date | None:
     """Parse the decision date of the scanned opinion.
 
@@ -639,6 +688,7 @@ def parse_scan_xml(
         date_filed=date_filed,
         parsed_citations=cites,
         judges=get_judges(soup),
+        precedential_status=get_precedential_status(soup, cites),
         page_count=get_page_count(soup),
         body_characters=clean_body_content(
             str(soup.select_one("casebody") or ""), harvard_file=True
@@ -869,6 +919,9 @@ def merge_into_cluster(cluster: OpinionCluster, scan_case: ScanCase) -> None:
             )
             setattr(cluster, field_name, value)
             update_fields.append(field_name)
+        if cluster.precedential_status in ("", PRECEDENTIAL_STATUS.UNKNOWN):
+            cluster.precedential_status = scan_case.precedential_status
+            update_fields.append("precedential_status")
         cluster.source = ClusterSources.merge_sources(
             cluster.source, ClusterSources.SCANNING_PROJECT
         )
@@ -949,7 +1002,7 @@ def add_new_case(scan_case: ScanCase) -> OpinionCluster:
             case_name=scan_case.case_name,
             case_name_short=scan_case.case_name_short,
             case_name_full=scan_case.case_name_full,
-            precedential_status=PRECEDENTIAL_STATUS.PUBLISHED,
+            precedential_status=scan_case.precedential_status,
             source=ClusterSources.SCANNING_PROJECT,
             date_filed=scan_case.date_filed,
             judges=scan_case.judges,
