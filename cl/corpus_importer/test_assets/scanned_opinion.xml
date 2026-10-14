@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
 <!-- scan 3593, opinion 1.2; approved text processing/3593/so3d/388/1/jobs/opinions/1.2/approved/r1.e1.j1.t20260926T010131549024Z.json; tagger run 1, model freelawproject/caselaw-block-tagger -->
-<casebody firstpage="1" lastpage="4">
+<casebody firstpage="1" lastpage="4" scan-id="3593" opinion-id="12" schema="1">
   <citation>388 So. 3d 1</citation>
   <parties><party><strong>Larry B. MERRITT, Appellant,</strong></party> <separator>v.</separator> <party><strong>STATE of Florida, Appellee.</strong></party></parties>
   <docketnumber><strong>No. 4D2023-2459</strong></docketnumber>

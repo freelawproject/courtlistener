@@ -5,7 +5,7 @@ import math
 import random
 import re
 from collections import defaultdict
-from collections.abc import Generator, Iterator, Mapping, Sequence
+from collections.abc import Callable, Generator, Iterator, Mapping, Sequence
 from dataclasses import dataclass
 from datetime import date
 from difflib import SequenceMatcher
@@ -16,6 +16,7 @@ from asgiref.sync import async_to_sync
 from bs4 import BeautifulSoup
 from courts_db import find_court
 from django.conf import settings
+from django.db import transaction
 from django.db.models import QuerySet
 from django.db.utils import IntegrityError
 from django.utils.timezone import now
@@ -189,19 +190,7 @@ def is_bankruptcy_court(court_id: str) -> bool:
     return bankr_court_ids.filter(pk=court_id).exists()
 
 
-def is_appellate_court(court_id: str) -> bool:
-    """Checks if the given court_id belongs to an appellate court.
-
-    :param court_id: The unique identifier of the court.
-
-    :return: True if the court_id corresponds to an appellate court,
-        False otherwise.
-    """
-    appellate_court_ids = Court.federal_courts.appellate_courts()
-    return appellate_court_ids.filter(pk=court_id).exists()
-
-
-async def ais_appellate_court(court_id: str) -> bool:
+async def is_appellate_court(court_id: str) -> bool:
     """Checks if the given court_id belongs to an appellate court.
 
     :param court_id: The unique identifier of the court.
@@ -796,8 +785,11 @@ def add_citations_to_cluster(
                 )
                 continue
             try:
-                # We don't have the citation or any citation from the reporter
-                Citation.objects.create(**citation_params)
+                # We don't have the citation or any citation from the reporter.
+                # The savepoint keeps a caught IntegrityError from aborting an
+                # outer transaction.
+                with transaction.atomic():
+                    Citation.objects.create(**citation_params)
                 logger.info(
                     f"New citation: {cite} added to cluster id: {cluster_id}"
                 )
@@ -1137,16 +1129,41 @@ def match_based_text(
             logger.warning(f"Empty opinion in cluster id: {case.id}")
             continue
 
-        case_and_texts = [case, file_characters, cl_characters]
-        case_and_texts_and_docket = case_and_texts + [docket_number]
-        case_and_titles = [case, case_name_full, case_name_abbreviation]
-        if (
-            length_too_different(*case_and_texts)
-            or has_too_similar_citation(case, citation)
-            or case_names_dont_overlap(*case_and_titles)
-            or cosine_similarity_too_different(*case_and_titles)
-            or content_too_different(*case_and_texts_and_docket)
-        ):
+        # Checked in this order, cheapest first, until one fails
+        checks: list[tuple[str, Callable[[], bool]]] = [
+            (
+                "text length",
+                lambda: length_too_different(
+                    case, file_characters, cl_characters
+                ),
+            ),
+            ("citation", lambda: has_too_similar_citation(case, citation)),
+            (
+                "case name overlap",
+                lambda: case_names_dont_overlap(
+                    case, case_name_full, case_name_abbreviation
+                ),
+            ),
+            (
+                "case name similarity",
+                lambda: cosine_similarity_too_different(
+                    case, case_name_full, case_name_abbreviation
+                ),
+            ),
+            (
+                "content",
+                lambda: content_too_different(
+                    case, file_characters, cl_characters, docket_number
+                ),
+            ),
+        ]
+        if failed := next((name for name, check in checks if check()), None):
+            # Helps tune the matching, so duplicates aren't created
+            logger.debug(
+                "Cluster %s is not a match: the %s check failed",
+                case.id,
+                failed,
+            )
             continue
         return case
     return None

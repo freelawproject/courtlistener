@@ -108,6 +108,12 @@ opinioncluster_fields='(
    )'
 opinioncluster_csv_filename="opinion-clusters-$(date -I).csv"
 
+# search_clusterredirection
+clusterredirection_fields='(
+       id, date_created, deleted_cluster_id, cluster_id, reason
+   )'
+clusterredirection_csv_filename="cluster-redirections-$(date -I).csv"
+
 search_opinion_joined_by_fields='(
 			id, opinion_id, person_id
 )'
@@ -353,6 +359,7 @@ declare -a t_31=("disclosures_gift" "$disclosures_gift_fields" "$disclosures_gif
 declare -a t_32=("disclosures_debt" "$disclosures_debt_fields" "$disclosures_debt_csv_filename")
 
 declare -a t_33=("citations_unmatchedcitation" "$unmatchedcitations_fields" "$unmatchedcitations_csv_filename")
+declare -a t_34=("search_clusterredirection" "$clusterredirection_fields" "$clusterredirection_csv_filename")
 
 # After search_opinion (t_12), which its opinion_id references
 declare -a t_34=("search_opinioncontent" "$opinioncontent_fields" "$opinioncontent_csv_filename")

@@ -35,6 +35,7 @@ from cl.search.models import (
 ESModelType = (
     Citation
     | Docket
+    | DocketEntry
     | Opinion
     | OpinionCluster
     | Parenthetical
@@ -59,16 +60,17 @@ ESModelClassType = (
     | type[Position]
     | type[Education]
     | type[RECAPDocument]
-    | type[ESRECAPBaseDocument]
 )
 
 ESDocumentInstanceType = (
     AudioDocument
+    | DocketDocument
     | ParentheticalGroupDocument
     | AudioPercolator
     | PersonDocument
     | PositionDocument
     | ESRECAPDocument
+    | ESRECAPBaseDocument
     | OpinionDocument
     | OpinionClusterDocument
 )
@@ -83,6 +85,7 @@ ESDocumentClassType = (
     | type[OpinionDocument]
     | type[OpinionClusterDocument]
     | type[ESRECAPDocument]
+    | type[ESRECAPBaseDocument]
 )
 
 ESDocumentNameType = Literal[
@@ -95,6 +98,7 @@ ESDocumentNameType = Literal[
     "OpinionDocument",
     "OpinionClusterDocument",
     "ESRECAPDocument",
+    "ESRECAPBaseDocument",
 ]
 
 ESDictDocument = dict[str, Any]

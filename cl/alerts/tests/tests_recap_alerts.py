@@ -4173,7 +4173,7 @@ class RECAPAlertsPercolatorTest(
         their query and hits matched conditions.
 
         - Docket-only Alerts should be triggered only upon a Docket ingestion.
-          commiting RECAPDocument ingestion that can match the alert.
+          committing RECAPDocument ingestion that can match the alert.
         - The Docket or RD shouldn’t have triggered the alert previously.
         - RECAP-only Alerts should only include RDs that have not triggered the
           same alert previously.

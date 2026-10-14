@@ -17,11 +17,13 @@ from cl.corpus_importer.utils import winnow_case_name
 from cl.lib.decorators import retry
 from cl.lib.microservice_utils import microservice
 from cl.lib.storage import S3GlacierInstantRetrievalStorage
+from cl.people_db.lookup_utils import lookup_judges_by_messy_str
 from cl.recap.mergers import find_docket_object
 from cl.search.models import (
     Citation,
     Court,
     Docket,
+    Opinion,
     OpinionCluster,
     OriginatingCourtInformation,
 )
@@ -251,9 +253,47 @@ def case_names_are_too_different(
     """
     new_parts = winnow_case_name(first.lower())
     old_parts = winnow_case_name(second.lower())
-    # or 1 to prevent 0 lenght minimum
+    # or 1 to prevent 0 length minimum
     denominator = min(len(old_parts), len(new_parts)) or 1
     return len(new_parts.intersection(old_parts)) / denominator < threshold
+
+
+def link_judges(cluster: OpinionCluster, opinions: list[Opinion]) -> None:
+    """Link the judges named in a cluster to people in the judges database.
+
+    An opinion's author comes from its `author_str`, or from the cluster's
+    `judges` when the cluster has a single opinion without an author. When `judges` names several people, they are added
+    to the cluster's panel. Call it after the cluster is saved and before
+    the opinions are.
+
+    Caveat: a name that matches more than one person is left unresolved.
+
+    :param cluster: The saved cluster.
+    :param opinions: The cluster's unsaved opinions.
+    :return: None
+    """
+    court_id = cluster.docket.court_id
+    if cluster.judges:
+        candidates = async_to_sync(lookup_judges_by_messy_str)(
+            cluster.judges, court_id, cluster.date_filed
+        )
+        if (
+            len(candidates) == 1
+            and len(opinions) == 1
+            and not opinions[0].author_str
+        ):
+            opinions[0].author = candidates[0]
+        elif len(candidates) > 1:
+            cluster.panel.add(*candidates)
+
+    for opinion in opinions:
+        if not opinion.author_str or opinion.per_curiam:
+            continue
+        candidates = async_to_sync(lookup_judges_by_messy_str)(
+            opinion.author_str, court_id, cluster.date_filed
+        )
+        if len(candidates) == 1:
+            opinion.author = candidates[0]
 
 
 def update_or_create_docket(

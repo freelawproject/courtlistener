@@ -19,6 +19,7 @@ CSS_FILE = "cl/assets/tailwind/input.css"
 V2_TEMPLATE_FILE = "cl/foo/templates/v2_help/index.html"
 LEGACY_TEMPLATE_FILE = "cl/foo/templates/help/index.html"
 V2_TEMPLATE_BODY = '{% extends "new_base.html" %}'
+V2_PARTIAL_FILE = "cl/foo/templates/v2_includes/help/button.html"
 
 
 def _run_checks_on(
@@ -196,6 +197,39 @@ class LegacyTemplateDeletedTest(unittest.TestCase):
             changed={V2_TEMPLATE_FILE: "D"},
         )
         self.assertEqual(findings, [])
+
+
+class V2PartialTest(unittest.TestCase):
+    """Partials under v2_includes/ are v2 templates but not pages."""
+
+    def test_added_partial_skips_the_page_only_checks(self) -> None:
+        """No base template and no page URL is expected of a partial."""
+        findings = _run_checks_on(
+            {V2_PARTIAL_FILE: "<c-button>Pray</c-button>"},
+            changed={V2_PARTIAL_FILE: "A"},
+        )
+        self.assertEqual(findings, [])
+
+    def test_added_page_still_needs_both(self) -> None:
+        """The page-only checks keep firing for a v2 page."""
+        findings = _run_checks_on(
+            {V2_TEMPLATE_FILE: "<c-button>Pray</c-button>"},
+            changed={V2_TEMPLATE_FILE: "A"},
+        )
+        self.assertEqual(
+            findings,
+            [
+                (V2_TEMPLATE_FILE, 1, "check_extends_new_base"),
+                (V2_TEMPLATE_FILE, 1, "check_v2_register"),
+            ],
+        )
+
+    def test_partial_keeps_the_other_v2_checks(self) -> None:
+        """A partial is still held to the new stack's rules."""
+        findings = _run_checks_on(
+            {V2_PARTIAL_FILE: "<script>$('.pray').click();</script>"}
+        )
+        self.assertEqual(findings, [(V2_PARTIAL_FILE, 1, "check_jquery")])
 
 
 class V2RegisterTest(unittest.TestCase):

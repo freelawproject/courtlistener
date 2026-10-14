@@ -1402,6 +1402,10 @@ class CitationObjectTest(ESIndexTestCase, TestCase):
         setattr(citation, "citing_opinion", Opinion.objects.all()[0])
         results = resolve_fullcase_citation(citation)
         opinion12 = Opinion.objects.get(cluster__pk=self.citation12.cluster_id)
+        citation.citing_opinion = (
+            Opinion.objects.exclude(pk=opinion12.pk).order_by("pk").first()
+        )
+        results = resolve_fullcase_citation(citation)
         self.assertEqual(results.pk, opinion12.pk, msg=results)
 
     def test_citation_resolve_to_pincite(self) -> None:
@@ -1412,6 +1416,10 @@ class CitationObjectTest(ESIndexTestCase, TestCase):
         setattr(citation, "citing_opinion", Opinion.objects.all()[0])
         results = resolve_fullcase_citation(citation)
         opinion12 = Opinion.objects.get(cluster__pk=self.citation12.cluster_id)
+        citation.citing_opinion = (
+            Opinion.objects.exclude(pk=opinion12.pk).order_by("pk").first()
+        )
+        results = resolve_fullcase_citation(citation)
         self.assertEqual(results.pk, opinion12.pk, msg=results)
 
     def test_citation_multiple_matches(self) -> None:
@@ -3247,11 +3255,9 @@ class UnmatchedCitationTest(TransactionTestCase):
     cluster = None
     opinion: Opinion
 
-    @classmethod
-    def setUpClass(cls):
-        cls.cluster = OpinionClusterWithChildrenAndParentsFactory()
-        cls.opinion = cls.cluster.sub_opinions.first()
-        UnmatchedCitation.objects.all().delete()
+    def setUp(self) -> None:
+        self.cluster = OpinionClusterWithChildrenAndParentsFactory()
+        self.opinion = self.cluster.sub_opinions.all()[0]
 
     def test_1st_creation(self) -> None:
         """Can we save unmatched citations?"""
@@ -3595,7 +3601,7 @@ class ReindexESCiteFieldsTest(ESIndexTestCase, TransactionTestCase):
         doc = OpinionClusterDocument.get(id=cluster.id)
         self.assertEqual(doc.citeCount, cite_count)
 
-        # make a change that won't be catched by signals
+        # make a change that won't be caught by signals
         OpinionCluster.objects.filter(id=cluster.id).update(
             citation_count=cite_count + 1
         )

@@ -7,6 +7,7 @@ from cl.alerts.models import AlertEvent, DocketAlertEvent
 from cl.api.models import WebhookHistoryEvent
 from cl.favorites.models import DocketTagEvent, NoteEvent, UserTagEvent
 from cl.lib.crypto import md5
+from cl.lib.decorators import tiered_cache
 from cl.lib.types import EmailType
 from cl.users.models import (
     UserProfile,
@@ -400,3 +401,18 @@ message_dict = {
         "message": "Your password was changed successfully",
     },
 }
+
+
+@tiered_cache(memory_timeout=60, redis_timeout=60 * 5)
+def is_search_history_on_cached(user_pk: int) -> bool:
+    """Return whether the user wants their search queries saved.
+
+    Cached for five minutes, so changes may take that long to apply. Intended
+    for the API; website requests should read the profile directly.
+
+    :param user_pk: The primary key of the user.
+    :return: True if the user's search queries should be saved.
+    """
+    return UserProfile.objects.values_list(
+        "save_query_history", flat=True
+    ).get(user_id=user_pk)
