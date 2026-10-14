@@ -22,6 +22,7 @@ from cl.corpus_importer.management.commands.import_scanned_opinions import (
 )
 from cl.lib.crypto import sha1
 from cl.lib.storage import ScanningFinalXmlStorage
+from cl.lib.url_utils import BASE_URL
 from cl.people_db.factories import PersonFactory, PositionFactory
 from cl.people_db.models import GRANULARITY_DAY
 from cl.search.cluster_sources import ClusterSources
@@ -382,6 +383,17 @@ class ImportScannedOpinionsTest(TestCase):
         cluster = OpinionCluster.objects.get()
         self.assertEqual(cluster.sub_opinions.get().author, judges["Gerber"])
         self.assertEqual(set(cluster.panel.all()), set(judges.values()))
+
+    def test_logs_the_cluster_url(self) -> None:
+        """Is the full URL of the new cluster logged?"""
+        with mock.patch(f"{COMMAND_MODULE}.logger") as mock_logger:
+            self.import_scan()
+
+        cluster = OpinionCluster.objects.get()
+        message, *args = mock_logger.info.call_args[0]
+        self.assertIn(
+            f"{BASE_URL}{cluster.get_absolute_url()}", message % tuple(args)
+        )
 
     def test_reimport_is_skipped(self) -> None:
         """Is an already imported scanned opinion skipped?"""

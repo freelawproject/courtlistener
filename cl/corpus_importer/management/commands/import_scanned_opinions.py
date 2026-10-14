@@ -38,6 +38,7 @@ from cl.corpus_importer.utils import (
 from cl.lib.command_utils import VerboseCommand, logger
 from cl.lib.crypto import sha1
 from cl.lib.storage import ScanningFinalXmlStorage
+from cl.lib.url_utils import BASE_URL
 from cl.lib.utils import human_sort
 from cl.people_db.lookup_utils import (
     extract_judge_last_name,
@@ -899,17 +900,20 @@ def import_scanned_opinion(
             return
         if dry_run:
             logger.info(
-                "Dry run: would merge %s (%s) into cluster %s",
+                "Dry run: would merge %s (%s) into cluster %s: %s%s",
                 file_path,
                 citation,
                 cluster.id,
+                BASE_URL,
+                cluster.get_absolute_url(),
             )
             return
         logger.info(
-            "Merging %s (%s) into cluster %s: %s",
+            "Merging %s (%s) into cluster %s: %s%s",
             file_path,
             citation,
             cluster.id,
+            BASE_URL,
             cluster.get_absolute_url(),
         )
         merge_into_cluster(cluster, scan_case)
@@ -924,10 +928,11 @@ def import_scanned_opinion(
         return
     cluster = add_new_case(scan_case)
     logger.info(
-        "Added %s (%s) as cluster %s: %s",
+        "Added %s (%s) as cluster %s: %s%s",
         scan_case.case_name,
         citation,
         cluster.id,
+        BASE_URL,
         cluster.get_absolute_url(),
     )
 
