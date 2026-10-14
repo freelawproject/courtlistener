@@ -1,13 +1,18 @@
 import base64
 import hashlib
+import html
 import importlib
+import re
 from datetime import timedelta
 from types import SimpleNamespace
 from unittest.mock import patch
+from urllib.parse import parse_qs, urlencode, urlsplit
 
+import requests
 import time_machine
 from django.apps import apps
 from django.conf import settings
+from django.contrib.auth.models import User
 from django.core.cache import cache
 from django.core.exceptions import ValidationError
 from django.core.management import call_command
@@ -24,6 +29,8 @@ from oauth2_provider.models import (
     set_token_value,
 )
 from rest_framework.authtoken.models import Token
+from waffle import get_waffle_flag_model
+from waffle.testutils import override_flag
 
 from cl.oauth.cleanup_utils import (
     delete_unconfirmed_applications,
@@ -31,6 +38,7 @@ from cl.oauth.cleanup_utils import (
     unconfirmed_applications,
 )
 from cl.oauth.factories import ApplicationFactory
+from cl.oauth.views import DCR_CLIENTS_VIA_MCP_FLAG
 from cl.tests.cases import APITestCase, TestCase
 from cl.tests.utils import parse_csp
 from cl.users.factories import UserFactory, UserProfileWithParentsFactory
@@ -563,6 +571,364 @@ class AuthorizeViewCSPTest(TestCase):
         """The exemption doesn't leak to the URLs mounted beside it."""
         r = self.client.get(reverse("oauth2_metadata"))
         self.assertEqual(parse_csp(r)["form-action"], ["'self'"])
+
+
+def turn_flag_on_for(user: User) -> None:
+    """Turns the migration flag on for *user* alone."""
+    flag = get_waffle_flag_model().objects.create(
+        name=DCR_CLIENTS_VIA_MCP_FLAG
+    )
+    flag.users.add(user)
+    flag.flush()
+
+
+class AuthorizeRedirectTest(TestCase):
+    """Clients registered through DCR are sent to the MCP server's authorize
+    endpoint when the flag is on for the user; others stay here."""
+
+    @classmethod
+    def setUpTestData(cls) -> None:
+        cls.user = UserFactory()
+        cls.other_user = UserFactory()
+        cls.dcr_app = ApplicationFactory(
+            client_type=Application.CLIENT_PUBLIC,
+            redirect_uris="https://claude.ai/api/mcp/auth_callback",
+            registration_source=Application.RegistrationSource.DCR,
+        )
+        cls.manual_app = ApplicationFactory(
+            client_type=Application.CLIENT_PUBLIC,
+            redirect_uris="https://claude.ai/api/mcp/auth_callback",
+            registration_source=Application.RegistrationSource.MANUAL,
+        )
+
+    def setUp(self) -> None:
+        super().setUp()
+        cache.clear()
+
+    def _authorize_params(
+        self,
+        application,
+        redirect_uri="https://claude.ai/api/mcp/auth_callback",
+    ) -> dict[str, str]:
+        """The query a real client sends to start an authorization."""
+        challenge = (
+            base64.urlsafe_b64encode(hashlib.sha256(b"v" * 64).digest())
+            .decode()
+            .rstrip("=")
+        )
+        return {
+            "response_type": "code",
+            "client_id": application.client_id,
+            "redirect_uri": redirect_uri,
+            "scope": "openid api",
+            "state": "abc123",
+            "code_challenge": challenge,
+            "code_challenge_method": "S256",
+        }
+
+    def _authorize(self, application, **params):
+        return self.client.get(
+            reverse("oauth2_provider:authorize"),
+            self._authorize_params(application, **params),
+        )
+
+    def assertSentToMcp(self, r, application) -> None:
+        self.assertEqual(r.status_code, 200, r.content)
+        self.assertEqual(r["Cache-Control"], "no-store")
+        refresh = re.fullmatch(
+            r'<meta http-equiv="refresh" content="0;url=(.*)">',
+            r.content.decode(),
+        )
+        self.assertIsNotNone(refresh)
+        target = urlsplit(html.unescape(refresh[1]))
+        expected = urlsplit(f"{settings.OAUTH2_MCP_URL}/authorize")
+        self.assertEqual(
+            (target.scheme, target.netloc, target.path),
+            (expected.scheme, expected.netloc, expected.path),
+        )
+        self.assertEqual(
+            parse_qs(target.query),
+            {k: [v] for k, v in self._authorize_params(application).items()},
+        )
+
+    def assertStaysHere(self, r) -> None:
+        self.assertEqual(r.status_code, 200, r.content)
+        self.assertNotIn(b'http-equiv="refresh"', r.content)
+
+    @override_flag(DCR_CLIENTS_VIA_MCP_FLAG, active=True)
+    def test_dcr_client_is_sent_to_the_mcp_server_with_its_request_intact(
+        self,
+    ):
+        self.client.force_login(self.user)
+        self.assertSentToMcp(self._authorize(self.dcr_app), self.dcr_app)
+
+    @override_flag(DCR_CLIENTS_VIA_MCP_FLAG, active=True)
+    def test_flag_for_everyone_redirects_before_our_login(self):
+        """The user signs in once, at the MCP server's upstream login."""
+        self.assertSentToMcp(self._authorize(self.dcr_app), self.dcr_app)
+
+    def test_flag_for_one_user_redirects_that_user_alone(self):
+        turn_flag_on_for(self.user)
+        with self.subTest("flagged user"):
+            self.client.force_login(self.user)
+            self.assertSentToMcp(self._authorize(self.dcr_app), self.dcr_app)
+        with self.subTest("another user"):
+            self.client.force_login(self.other_user)
+            self.assertStaysHere(self._authorize(self.dcr_app))
+        with self.subTest("not signed in yet"):
+            self.client.logout()
+            r = self._authorize(self.dcr_app)
+            self.assertEqual(r.status_code, 302)
+            self.assertIn(reverse("sign-in"), r["Location"])
+
+    @override_flag(DCR_CLIENTS_VIA_MCP_FLAG, active=True)
+    def test_manually_registered_client_is_not_redirected(self):
+        self.client.force_login(self.user)
+        self.assertStaysHere(self._authorize(self.manual_app))
+
+    @override_flag(DCR_CLIENTS_VIA_MCP_FLAG, active=True)
+    def test_a_client_whose_registration_here_is_gone_is_still_sent_on(self):
+        gone = SimpleNamespace(client_id="x" * 40)
+        self.assertSentToMcp(self._authorize(gone), gone)
+
+    @override_flag(DCR_CLIENTS_VIA_MCP_FLAG, active=True)
+    def test_a_redirect_the_client_never_registered_is_refused_here(self):
+        self.client.force_login(self.user)
+        r = self._authorize(
+            self.dcr_app, redirect_uri="https://attacker.example/callback"
+        )
+        self.assertEqual(r.status_code, 400, r.content)
+
+    @override_flag(DCR_CLIENTS_VIA_MCP_FLAG, active=False)
+    def test_flag_off_leaves_dcr_clients_alone(self):
+        self.client.force_login(self.user)
+        self.assertStaysHere(self._authorize(self.dcr_app))
+
+
+class DcrClientTokenRequestTest(TestCase):
+    """Token requests from clients registered through DCR are relayed to the
+    MCP server when DOT can't serve them, and refused for flagged users."""
+
+    @classmethod
+    def setUpTestData(cls) -> None:
+        cls.user = UserFactory()
+        cls.other_user = UserFactory()
+        cls.dcr_app = ApplicationFactory(
+            client_type=Application.CLIENT_PUBLIC,
+            registration_source=Application.RegistrationSource.DCR,
+        )
+        cls.confidential_dcr_app = ApplicationFactory(
+            client_secret="s3cret",
+            registration_source=Application.RegistrationSource.DCR,
+        )
+        cls.manual_app = ApplicationFactory(
+            client_type=Application.CLIENT_PUBLIC,
+            registration_source=Application.RegistrationSource.MANUAL,
+        )
+
+    def setUp(self) -> None:
+        super().setUp()
+        cache.clear()
+
+    def _post(self, data, **headers):
+        """Posts *data* the way OAuth clients do, form-encoded."""
+        return self.client.post(
+            reverse("oauth2_provider:token"),
+            urlencode(data),
+            content_type="application/x-www-form-urlencoded",
+            **headers,
+        )
+
+    def _exchange(self, application):
+        return self._post(
+            {
+                "grant_type": "authorization_code",
+                "client_id": application.client_id,
+                "code": "mcp-issued-code",
+                "code_verifier": "v" * 64,
+                "redirect_uri": "https://claude.ai/api/mcp/auth_callback",
+            }
+        )
+
+    def _issue_refresh_token(self, application, user) -> str:
+        """Issues a live CourtListener refresh token the way a consent did."""
+        access = AccessToken(
+            user=user,
+            application=application,
+            scope="openid api",
+            expires=now() + timedelta(hours=1),
+        )
+        set_token_value(access, f"at-{application.pk}-{user.pk}")
+        access.save()
+        refresh = RefreshToken(
+            user=user, application=application, access_token=access
+        )
+        set_token_value(refresh, f"rt-{application.pk}-{user.pk}")
+        refresh.save()
+        return f"rt-{application.pk}-{user.pk}"
+
+    def _refresh(self, application, user):
+        return self._post(
+            {
+                "grant_type": "refresh_token",
+                "refresh_token": self._issue_refresh_token(application, user),
+                "client_id": application.client_id,
+            }
+        )
+
+    def _mcp_response(self, status_code=200, body=b'{"access_token": "x"}'):
+        response = SimpleNamespace(
+            status_code=status_code,
+            content=body,
+            headers={"Content-Type": "application/json"},
+        )
+        return patch("cl.oauth.views.requests.post", return_value=response)
+
+    def assertLiveTokens(self, application, user, live: bool) -> None:
+        self.assertEqual(
+            RefreshToken.objects.filter(
+                application=application, user=user, revoked__isnull=True
+            ).exists(),
+            live,
+        )
+        self.assertEqual(
+            AccessToken.objects.filter(
+                application=application, user=user
+            ).exists(),
+            live,
+        )
+
+    def test_a_grant_courtlistener_cannot_redeem_is_relayed(self):
+        with self._mcp_response() as post:
+            r = self._exchange(self.dcr_app)
+        self.assertEqual(r.status_code, 200)
+        self.assertEqual(r.content, b'{"access_token": "x"}')
+        self.assertEqual(r["Cache-Control"], "no-store")
+        post.assert_called_once()
+        self.assertEqual(
+            post.call_args.args[0], f"{settings.OAUTH2_MCP_URL}/token"
+        )
+        self.assertEqual(
+            post.call_args.kwargs["data"],
+            {
+                "grant_type": ["authorization_code"],
+                "client_id": [self.dcr_app.client_id],
+                "code": ["mcp-issued-code"],
+                "code_verifier": ["v" * 64],
+                "redirect_uri": ["https://claude.ai/api/mcp/auth_callback"],
+            },
+        )
+
+    def test_the_relay_puts_a_basic_auth_client_id_in_the_body(self):
+        credentials = base64.b64encode(
+            f"{self.confidential_dcr_app.client_id}:s3cret".encode()
+        ).decode()
+        with self._mcp_response() as post:
+            r = self._post(
+                {"grant_type": "refresh_token", "refresh_token": "mcp-rt"},
+                HTTP_AUTHORIZATION=f"Basic {credentials}",
+            )
+        self.assertEqual(r.status_code, 200, r.content)
+        self.assertEqual(
+            post.call_args.kwargs["data"]["client_id"],
+            [self.confidential_dcr_app.client_id],
+        )
+
+    def test_the_mcp_servers_answer_passes_through(self):
+        with self._mcp_response(400, b'{"error": "invalid_grant"}'):
+            r = self._exchange(self.dcr_app)
+        self.assertEqual(r.status_code, 400)
+        self.assertEqual(r.json()["error"], "invalid_grant")
+
+    def test_an_unreachable_mcp_server_is_a_502(self):
+        with patch(
+            "cl.oauth.views.requests.post",
+            side_effect=requests.ConnectionError("down"),
+        ):
+            r = self._exchange(self.dcr_app)
+        self.assertEqual(r.status_code, 502)
+        self.assertEqual(r.json()["error"], "temporarily_unavailable")
+
+    def test_manually_registered_clients_are_never_relayed(self):
+        with self._mcp_response() as post:
+            r = self._exchange(self.manual_app)
+        post.assert_not_called()
+        self.assertEqual(r.status_code, 400)
+        self.assertEqual(r.json()["error"], "invalid_grant")
+
+    def test_a_client_whose_registration_here_is_gone_is_still_relayed(self):
+        with self._mcp_response() as post:
+            r = self._post(
+                {
+                    "grant_type": "refresh_token",
+                    "refresh_token": "mcp-rt",
+                    "client_id": "x" * 40,
+                }
+            )
+        post.assert_called_once()
+        self.assertEqual(r.status_code, 200)
+
+    def test_a_wrong_secret_is_refused_here(self):
+        credentials = base64.b64encode(
+            f"{self.confidential_dcr_app.client_id}:wrong".encode()
+        ).decode()
+        with self._mcp_response() as post:
+            r = self._post(
+                {"grant_type": "refresh_token", "refresh_token": "mcp-rt"},
+                HTTP_AUTHORIZATION=f"Basic {credentials}",
+            )
+        post.assert_not_called()
+        self.assertEqual(r.json()["error"], "invalid_client")
+
+    def test_the_relay_drops_the_client_secret(self):
+        with self._mcp_response() as post:
+            r = self._post(
+                {
+                    "grant_type": "refresh_token",
+                    "refresh_token": "mcp-rt",
+                    "client_id": self.confidential_dcr_app.client_id,
+                    "client_secret": "s3cret",
+                }
+            )
+        self.assertEqual(r.status_code, 200, r.content)
+        self.assertNotIn("client_secret", post.call_args.kwargs["data"])
+
+    def test_a_refresh_is_served_here_while_the_flag_is_off(self):
+        with self._mcp_response() as post:
+            r = self._refresh(self.dcr_app, self.user)
+        post.assert_not_called()
+        self.assertEqual(r.status_code, 200, r.content)
+        self.assertIn("refresh_token", r.json())
+        self.assertLiveTokens(self.dcr_app, self.user, live=True)
+
+    def test_a_refresh_is_refused_for_a_user_whose_flag_is_on(self):
+        turn_flag_on_for(self.user)
+        with self._mcp_response() as post:
+            r = self._refresh(self.dcr_app, self.user)
+        post.assert_not_called()
+        self.assertEqual(r.status_code, 400)
+        self.assertEqual(r.json(), {"error": "invalid_grant"})
+        self.assertEqual(r["Cache-Control"], "no-store")
+        self.assertLiveTokens(self.dcr_app, self.user, live=False)
+
+    def test_a_refresh_is_refused_for_everyone_when_the_flag_says_so(self):
+        with override_flag(DCR_CLIENTS_VIA_MCP_FLAG, active=True):
+            r = self._refresh(self.dcr_app, self.user)
+        self.assertEqual(r.status_code, 400)
+        self.assertLiveTokens(self.dcr_app, self.user, live=False)
+
+    def test_other_users_are_untouched_by_a_per_user_flag(self):
+        turn_flag_on_for(self.other_user)
+        r = self._refresh(self.dcr_app, self.user)
+        self.assertEqual(r.status_code, 200, r.content)
+        self.assertLiveTokens(self.dcr_app, self.user, live=True)
+
+    @override_flag(DCR_CLIENTS_VIA_MCP_FLAG, active=True)
+    def test_manually_registered_clients_keep_refreshing(self):
+        """The MCP server's own refreshes of CourtListener tokens go on."""
+        r = self._refresh(self.manual_app, self.user)
+        self.assertEqual(r.status_code, 200, r.content)
+        self.assertLiveTokens(self.manual_app, self.user, live=True)
 
 
 class UnconfirmedApplicationCleanupTest(TestCase):

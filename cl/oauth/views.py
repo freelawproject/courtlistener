@@ -9,26 +9,46 @@ discovery, JWKS). They add:
 * RFC 8414 Authorization Server Metadata at
   ``/.well-known/oauth-authorization-server`` so MCP clients can
   discover our endpoints.
+* Authorize and token views that hand clients registered through DCR
+  over to the MCP server, which is their authorization server now,
+  behind the ``oauth_dcr_clients_via_mcp`` flag.
 """
 
+import base64
+import binascii
+import hashlib
 import json
 import uuid
-from typing import Any
+from typing import Any, cast
+from urllib.parse import parse_qs, unquote
 
+import requests
 from django.conf import settings
 from django.contrib.auth.models import User
-from django.http import JsonResponse
+from django.http import (
+    HttpRequest,
+    HttpResponse,
+    HttpResponseBase,
+    JsonResponse,
+)
 from django.urls import reverse
 from django.utils import timezone
 from django.utils.decorators import method_decorator
+from django.utils.html import format_html
 from django_ratelimit.decorators import ratelimit
 from django_ratelimit.exceptions import Ratelimited
 from oauth2_provider import views as oauth2_views
-from oauth2_provider.models import get_application_model
+from oauth2_provider.models import (
+    AbstractAccessToken,
+    get_access_token_model,
+    get_application_model,
+    revoke_access_token,
+)
 from rest_framework import status
 from rest_framework.request import Request
 from rest_framework.response import Response
 from rest_framework.views import APIView
+from waffle import flag_is_active
 
 from cl.lib.ratelimiter import get_ip_for_ratelimiter
 from cl.oauth.api_serializers import (
@@ -40,7 +60,11 @@ from cl.oauth.api_serializers import (
 )
 from cl.oauth.validators import CourtListenerOAuth2Validator
 
+AccessToken = get_access_token_model()
 Application = get_application_model()
+
+DCR_CLIENTS_VIA_MCP_FLAG = "oauth_dcr_clients_via_mcp"
+MCP_RELAY_TIMEOUT_SECONDS = 35
 
 
 def _invalid_metadata(description: str) -> Response:
@@ -140,6 +164,141 @@ class DynamicClientRegistrationView(APIView):
             response_data["client_secret"] = client_secret_plaintext
             response_data["client_secret_expires_at"] = 0
         return Response(response_data, status=status.HTTP_201_CREATED)
+
+
+class AuthorizationView(oauth2_views.AuthorizationView):
+    """DOT's authorize view, sending clients registered through DCR on to
+    the MCP server when the flag is on for the user."""
+
+    def dispatch(
+        self, request: HttpRequest, *args: Any, **kwargs: Any
+    ) -> HttpResponseBase:
+        if handed_to_mcp(
+            request.GET.get("client_id"), request.GET.get("redirect_uri", "")
+        ) and flag_is_active(request, DCR_CLIENTS_VIA_MCP_FLAG):
+            return handoff(
+                f"{settings.OAUTH2_MCP_URL}/authorize?{request.META['QUERY_STRING']}"
+            )
+        return super().dispatch(request, *args, **kwargs)
+
+
+def handoff(url: str) -> HttpResponse:
+    """A page that sends the browser on to *url*, ending any redirect chain
+    from a sign-in form that Chrome would hold to that form's form-action."""
+    return HttpResponse(
+        format_html('<meta http-equiv="refresh" content="0;url={}">', url),
+        headers={"Cache-Control": "no-store"},
+    )
+
+
+class TokenView(oauth2_views.TokenView):
+    """DOT's token view, which for clients registered through DCR relays what
+    DOT can't serve to the MCP server and refuses refreshes for flagged users."""
+
+    def post(
+        self, request: HttpRequest, *args: Any, **kwargs: Any
+    ) -> HttpResponse:
+        body = request.body
+        response = super().post(request, *args, **kwargs)
+        client_id = client_id_of(request, body)
+        if not handed_to_mcp(client_id):
+            return response
+        error = error_of(response)
+        if error == "invalid_grant" or (
+            error == "invalid_client"
+            and not Application.objects.filter(client_id=client_id).exists()
+        ):
+            return relay_to_mcp(body, cast(str, client_id))
+        if (token := minted_token(response)) is None or token.user is None:
+            return response
+        request.user = token.user
+        if not flag_is_active(request, DCR_CLIENTS_VIA_MCP_FLAG):
+            return response
+        revoke_access_token(token)
+        return invalid_grant()
+
+
+def handed_to_mcp(
+    client_id: str | None, redirect_uri: str | None = None
+) -> bool:
+    """Whether a client is the MCP server's to serve: one registered through
+    DCR, asking for a redirect it registered, or whose registration was pruned."""
+    if not client_id:
+        return False
+    app = Application.objects.filter(client_id=client_id).first()
+    if app is None:
+        return True
+    if app.registration_source != Application.RegistrationSource.DCR:
+        return False
+    return redirect_uri is None or app.redirect_uri_allowed(redirect_uri)
+
+
+def client_id_of(request: HttpRequest, body: bytes) -> str | None:
+    """The client id of a token request, from its body or HTTP Basic auth."""
+    if client_id := parse_qs(body.decode(errors="replace")).get("client_id"):
+        return client_id[0]
+    scheme, _, credentials = request.META.get(
+        "HTTP_AUTHORIZATION", ""
+    ).partition(" ")
+    if scheme.lower() != "basic":
+        return None
+    try:
+        decoded = base64.b64decode(credentials, validate=True).decode()
+    except (binascii.Error, UnicodeDecodeError):
+        return None
+    return unquote(decoded.partition(":")[0]) or None
+
+
+def error_of(response: HttpResponse) -> str | None:
+    """The OAuth error code of a failed token response."""
+    if response.status_code == status.HTTP_200_OK:
+        return None
+    return json.loads(response.content).get("error")
+
+
+def minted_token(response: HttpResponse) -> AbstractAccessToken | None:
+    """The access token a successful token response just issued."""
+    if response.status_code != status.HTTP_200_OK:
+        return None
+    raw = json.loads(response.content)["access_token"]
+    checksum = hashlib.sha256(raw.encode()).hexdigest()
+    return AccessToken.objects.select_related("user").get(
+        token_checksum=checksum
+    )
+
+
+def invalid_grant() -> JsonResponse:
+    """The refusal that makes a client drop its tokens and authorize again."""
+    return JsonResponse(
+        {"error": "invalid_grant"},
+        status=status.HTTP_400_BAD_REQUEST,
+        headers={"Cache-Control": "no-store"},
+    )
+
+
+def relay_to_mcp(body: bytes, client_id: str) -> HttpResponse:
+    """Replay a token request at the MCP server."""
+    form = parse_qs(body.decode(errors="replace"))
+    form.setdefault("client_id", [client_id])
+    form.pop("client_secret", None)
+    try:
+        upstream = requests.post(
+            f"{settings.OAUTH2_MCP_URL}/token",
+            data=form,
+            timeout=MCP_RELAY_TIMEOUT_SECONDS,
+        )
+    except requests.RequestException:
+        return JsonResponse(
+            {"error": "temporarily_unavailable"},
+            status=status.HTTP_502_BAD_GATEWAY,
+            headers={"Cache-Control": "no-store"},
+        )
+    return HttpResponse(
+        upstream.content,
+        status=upstream.status_code,
+        content_type=upstream.headers.get("Content-Type", "application/json"),
+        headers={"Cache-Control": "no-store"},
+    )
 
 
 class IntrospectTokenView(oauth2_views.IntrospectTokenView):

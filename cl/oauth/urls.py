@@ -1,7 +1,6 @@
 from django.conf import settings
 from django.urls import include, path
 from django.views.decorators.csp import csp_override
-from oauth2_provider import views as oauth2_views
 from oauth2_provider.urls import (
     app_name as oauth2_app_name,
 )
@@ -33,20 +32,26 @@ CSP_ALLOWING_FOREIGN_REDIRECT = {
 authorize_urlpattern = path(
     "authorize/",
     csp_override(CSP_ALLOWING_FOREIGN_REDIRECT)(
-        oauth2_views.AuthorizationView.as_view()
+        views.AuthorizationView.as_view()
     ),
     name="authorize",
 )
+
+token_urlpattern = path("token/", views.TokenView.as_view(), name="token")
 
 introspect_urlpattern = path(
     "introspect/", views.IntrospectTokenView.as_view(), name="introspect"
 )
 
-mcp_base_urlpatterns = [authorize_urlpattern, introspect_urlpattern] + [
+mcp_base_urlpatterns = [
+    authorize_urlpattern,
+    token_urlpattern,
+    introspect_urlpattern,
+] + [
     p
     for p in base_urlpatterns
     if not (p.name or "").startswith("device")
-    and p.name not in ("authorize", "introspect")
+    and p.name not in ("authorize", "token", "introspect")
 ]
 
 mcp_oidc_urlpatterns = [
