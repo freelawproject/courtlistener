@@ -118,6 +118,7 @@ class Audio(AbstractDateTimeModel):
         null=True,
         blank=True,
     )
+    # TODO: Rounded up or down or to nearest?
     duration = models.SmallIntegerField(
         help_text="the length of the item, in seconds",
         null=True,

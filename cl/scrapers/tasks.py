@@ -760,13 +760,14 @@ def process_audio_file(self, pk) -> None:
     # TODO: Don't do this
     audio_obj.file_with_date = audio_obj.docket.date_argued  # type: ignore[attr-defined]
     audio_obj.local_path_mp3.save(file_name, cf, save=False)
-    # pyrefly:ignore[bad-assignment] Django should handle this
-    audio_obj.duration = float(
-        async_to_sync(microservice)(
-            service="audio-duration",
-            file=audio_response.content,
-            file_type="mp3",
-        ).text
+    audio_obj.duration = round(
+        float(
+            async_to_sync(microservice)(
+                service="audio-duration",
+                file=audio_response.content,
+                file_type="mp3",
+            ).text
+        )
     )
     audio_obj.processing_complete = True
     audio_obj.save(
