@@ -36,6 +36,7 @@ from django.test.client import AsyncClient
 from django.test.utils import CaptureQueriesContext
 from django.urls import reverse
 from django.utils.html import escape
+from django.utils.safestring import SafeString
 from django_cotton.compiler_regex import CottonCompiler
 from factory import RelatedFactory
 from lxml.etree import _Attrib, _Element
@@ -82,6 +83,7 @@ from cl.opinion_page.forms import (
 from cl.opinion_page.utils import (
     build_docket_metadata,
     build_docket_tabs,
+    build_idb_rows,
     build_originating_court_metadata,
     es_cited_case_count,
     es_get_cited_clusters_with_cache,
@@ -111,6 +113,7 @@ from cl.recap.factories import (
     FjcIntegratedDatabaseFactory,
 )
 from cl.recap.mergers import add_docket_entries, merge_attachment_page_data
+from cl.recap.models import FjcIntegratedDatabase
 from cl.search.factories import (
     CitationWithParentsFactory,
     CourtFactory,
@@ -3634,6 +3637,57 @@ class ClusterRedirectionTest(TestCase):
         )
 
 
+class BuildIdbRowsTest(SimpleTestCase):
+    """Test the build_idb_rows helper function."""
+
+    def test_every_field_gets_a_row(self) -> None:
+        """One row per IDB field, Office Number first and Pro Se last."""
+        rows = build_idb_rows(FjcIntegratedDatabaseFactory.build())
+        self.assertEqual(len(rows), 28)
+        self.assertEqual(rows[0]["label"], "Office Number")
+        self.assertEqual(rows[-1]["label"], "Pro Se")
+
+    def test_values_are_display_ready(self) -> None:
+        """Dates use the site format, choice fields show their label, coded
+        fields show code and label, and unset or False fall back."""
+        idb_data = FjcIntegratedDatabaseFactory.build(
+            office="3",
+            origin=FjcIntegratedDatabase.ORIG,
+            date_filed=date(2016, 4, 21),
+            jurisdiction=None,
+            class_action=False,
+            pro_se=FjcIntegratedDatabase.PRO_SE_NONE,
+        )
+        values = {
+            row["label"]: row["value"] for row in build_idb_rows(idb_data)
+        }
+        self.assertEqual(values["Office Number"], "3")
+        self.assertEqual(values["Origin"], "(1) Original Proceeding")
+        self.assertEqual(values["Date Filed"], "April 21, 2016")
+        self.assertEqual(values["Jurisdiction"], "Not Provided")
+        self.assertEqual(values["Class Action Status"], "Not Provided")
+        self.assertEqual(values["Date Terminated"], "Not Provided")
+        self.assertEqual(
+            values["Pro Se"], "No pro se plaintiffs or defendants"
+        )
+
+    def test_hints_are_safe_markup_with_the_choices(self) -> None:
+        """Hints carry their links unescaped and list the field's choices."""
+        hints = {
+            row["label"]: row.get("hint")
+            for row in build_idb_rows(FjcIntegratedDatabaseFactory.build())
+        }
+        self.assertIsInstance(hints["Office Number"], SafeString)
+        self.assertIn("<a ", hints["Office Number"])
+        self.assertIn(
+            "Denied or Granted", hints["Termination Class Action Status"]
+        )
+        self.assertIn(
+            "Formal Arbitration Program", hints["Arbitration at Filing"]
+        )
+        self.assertIsNone(hints["Date Filed"])
+
+
 class BuildDocketMetadataTest(TestCase):
     """Test the build_docket_metadata helper function."""
 
@@ -3976,6 +4030,60 @@ class DocketTabViewsTest(TestCase):
                 self.assertEqual(
                     keys, ["entries", "parties", "idb", "authorities"]
                 )
+
+
+@override_settings(WAFFLE_CACHE_PREFIX="test_docket_idb_v2_waffle")
+@override_flag("use_new_design", active=True)
+class DocketIdbV2TemplateTest(TestCase):
+    """The v2 FJC Integrated Database tab.
+
+    `WAFFLE_CACHE_PREFIX` isolates the flag cache from parallel workers, as
+    in DocketPageV2TemplateTest.
+    """
+
+    @classmethod
+    def setUpTestData(cls) -> None:
+        cls.court = CourtFactory(id="canb", jurisdiction="FB")
+        cls.docket = DocketFactory(
+            court=cls.court,
+            source=Docket.RECAP,
+            idb_data=FjcIntegratedDatabaseFactory(
+                office="3",
+                origin=FjcIntegratedDatabase.ORIG,
+                date_filed=date(2016, 4, 21),
+            ),
+        )
+
+    async def get_page(self) -> HttpResponse:
+        """Requests the IDB tab and checks it rendered through the v2 template."""
+        r = await self.async_client.get(
+            reverse(
+                "docket_idb_data",
+                args=[self.docket.pk, self.docket.slug],
+            )
+        )
+        self.assertEqual(r.status_code, HTTPStatus.OK)
+        self.assertTemplateUsed(r, "v2_docket_idb_data.html")
+        return r
+
+    async def test_renders_the_idb_values(self) -> None:
+        """Set fields, choice displays and the fallback for unset fields all
+        come through the table."""
+        content = (await self.get_page()).content.decode()
+        self.assertIn("(1) Original Proceeding", content)
+        self.assertIn("April 21, 2016", content)
+        self.assertIn("Not Provided", content)
+
+    async def test_idb_tab_is_current(self) -> None:
+        """The tab navigation marks the IDB tab as the current page."""
+        content = (await self.get_page()).content.decode()
+        current = [
+            el
+            for el in fromstring(content).iter("a")
+            if el.get("aria-current") == "page"
+        ]
+        self.assertEqual(len(current), 1)
+        self.assertIn("FJC Integrated Database", current[0].text_content())
 
 
 @override_settings(WAFFLE_CACHE_PREFIX="test_docket_page_v2_waffle")

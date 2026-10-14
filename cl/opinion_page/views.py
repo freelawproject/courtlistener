@@ -95,6 +95,7 @@ from cl.opinion_page.forms import (
     TennWorkCompClUploadForm,
 )
 from cl.opinion_page.utils import (
+    build_idb_rows,
     core_docket_data,
     es_cited_case_count,
     es_get_cited_clusters_with_cache,
@@ -558,6 +559,8 @@ async def docket_idb_data(
         context
         | {
             "docket_entries": await docket.docket_entries.aexists(),
+            "idb_data": idb_data,
+            "idb_rows": build_idb_rows(idb_data),
             "origin_csv": choices_to_csv(idb_data, "origin"),
             "jurisdiction_csv": choices_to_csv(idb_data, "jurisdiction"),
             "arbitration_csv": choices_to_csv(

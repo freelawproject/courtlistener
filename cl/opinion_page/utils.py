@@ -2,8 +2,9 @@ import csv
 import logging
 import traceback
 from dataclasses import dataclass, field
+from datetime import date
 from io import StringIO
-from typing import Any, TypedDict, cast
+from typing import Any, NotRequired, TypedDict, cast
 from zoneinfo import ZoneInfo
 
 import waffle
@@ -15,8 +16,9 @@ from django.http import Http404, HttpRequest
 from django.shortcuts import aget_object_or_404
 from django.urls import reverse
 from django.utils.formats import date_format
+from django.utils.html import format_html
 from django.utils.http import urlencode
-from django.utils.safestring import mark_safe
+from django.utils.safestring import SafeString, mark_safe
 from django.utils.timezone import localtime
 from django_elasticsearch_dsl.search import Search
 from elasticsearch.dsl import Q
@@ -32,6 +34,7 @@ from cl.lib.elasticsearch_utils import (
     build_join_es_filters,
     build_more_like_this_query,
 )
+from cl.lib.model_helpers import choices_to_csv
 from cl.lib.s3_cache import get_s3_cache, make_s3_cache_key
 from cl.lib.string_utils import trunc
 from cl.lib.types import CleanData
@@ -44,6 +47,7 @@ from cl.opinion_page.docket_entry_sources import (
 )
 from cl.people_db.models import Person
 from cl.recap.constants import COURT_TIMEZONES
+from cl.recap.models import FjcIntegratedDatabase
 from cl.search.documents import OpinionClusterDocument
 from cl.search.models import (
     PRECEDENTIAL_STATUS,
@@ -431,6 +435,259 @@ def build_originating_court_metadata(
         )
 
     return items
+
+
+class IdbRow(TypedDict):
+    """One Field / Value / Hints row of the FJC Integrated Database tab.
+
+    hint is HTML-safe: static copy with links plus the field's choice labels.
+    Rows without a hint omit it.
+    """
+
+    label: str
+    value: str
+    hint: NotRequired[SafeString]
+
+
+def build_idb_rows(idb_data: FjcIntegratedDatabase) -> list[IdbRow]:
+    """Build the Field / Value / Hints rows of the FJC IDB tab.
+
+    Values are display-ready: dates in the site's date format, choice fields
+    as their label, Origin and Jurisdiction as the code followed by the
+    label, and unset or False fields as "Not Provided".
+    """
+    not_provided = "Not Provided"
+    codebook = "https://www.fjc.gov/research/idb/"
+
+    def show(value: object) -> str:
+        """Formats a value for display, with the fallback for unset ones."""
+        if not value:
+            return not_provided
+        if isinstance(value, date):
+            return date_format(value)
+        return str(value)
+
+    def coded(code: object, label: str) -> str:
+        """Formats a choice as its code followed by its label."""
+        return f"({code}) {label}" if code else not_provided
+
+    def possible_values(field_name: str, intro: str = "") -> SafeString:
+        """Lists the field's choices, after an optional intro paragraph."""
+        csv = choices_to_csv(idb_data, field_name)
+        if not intro:
+            return format_html("Possible values: {}.", csv)
+        return format_html("<p>{}</p><p>Possible values: {}.</p>", intro, csv)
+
+    def codebook_link(text: str) -> SafeString:
+        """Links text to the FJC codebook."""
+        return format_html(
+            '<a class="links-external" href="{}">{}</a>', codebook, text
+        )
+
+    return [
+        {
+            "label": "Office Number",
+            "value": show(idb_data.office),
+            "hint": mark_safe(
+                "Office codes are listed in the "
+                '<a class="links-external" href="https://free.law/xlsx/fjc/integrated-database/office-codes.xlsx">'
+                "Guide to Judiciary Policies and Procedures, Appendix A</a>."
+            ),
+        },
+        {
+            "label": "Origin",
+            "value": coded(idb_data.origin, idb_data.get_origin_display()),
+            "hint": possible_values("origin"),
+        },
+        {"label": "Date Filed", "value": show(idb_data.date_filed)},
+        {"label": "Date Terminated", "value": show(idb_data.date_terminated)},
+        {
+            "label": "Jurisdiction",
+            "value": coded(
+                idb_data.jurisdiction, idb_data.get_jurisdiction_display()
+            ),
+            "hint": possible_values(
+                "jurisdiction",
+                "The basis for U.S. district court jurisdiction in the case.",
+            ),
+        },
+        {
+            "label": "Nature of Suit",
+            "value": show(idb_data.get_nature_of_suit_display()),
+        },
+        {
+            "label": "Title",
+            "value": show(idb_data.title),
+            "hint": mark_safe(
+                "The title in the U.S.C. for the cause of this case."
+            ),
+        },
+        {
+            "label": "Section",
+            "value": show(idb_data.section),
+            "hint": mark_safe(
+                "The section in the U.S.C. for the cause of this case."
+            ),
+        },
+        {
+            "label": "Subsection",
+            "value": show(idb_data.subsection),
+            "hint": mark_safe(
+                "The subsection in the U.S.C. for the cause of this case."
+            ),
+        },
+        {
+            "label": "Diversity of Residence",
+            "value": show(idb_data.diversity_of_residence),
+        },
+        {
+            "label": "Class Action Status",
+            "value": show(idb_data.class_action),
+            "hint": mark_safe(
+                "If true, designates that the case involves an allegation by "
+                "the plaintiff that the complaint meets the prerequisites of "
+                '"Class Action" as provided in Rule 23.'
+            ),
+        },
+        {
+            "label": "Termination Class Action Status",
+            "value": show(
+                idb_data.get_termination_class_action_status_display()
+            ),
+            "hint": possible_values("termination_class_action_status"),
+        },
+        {
+            "label": "Monetary Demand",
+            "value": show(idb_data.monetary_demand),
+            "hint": format_html(
+                "The monetary amount sought by the plaintiff (in thousands). "
+                "Amounts less than $500 appear as 1 and amounts over $10k "
+                "appear as 9999. See notes {} for details.",
+                codebook_link("in codebook on FJC website"),
+            ),
+        },
+        {
+            "label": "County of Residence",
+            "value": show(idb_data.county_of_residence),
+            "hint": format_html(
+                "The code for the county of residence for the first listed "
+                "plaintiff (see notes in {}).",
+                codebook_link("codebook on FJC website"),
+            ),
+        },
+        {
+            "label": "Arbitration at Filing",
+            "value": show(idb_data.get_arbitration_at_filing_display()),
+            "hint": possible_values(
+                "arbitration_at_filing",
+                "Only used by courts participating in the Formal Arbitration "
+                "Program.",
+            ),
+        },
+        {
+            "label": "Arbitration at Termination",
+            "value": show(idb_data.get_arbitration_at_termination_display()),
+            "hint": possible_values("arbitration_at_filing"),
+        },
+        {
+            "label": "Multidistrict Litigation Number",
+            "value": show(idb_data.multidistrict_litigation_docket_number),
+            "hint": mark_safe("A four digit multidistrict litigation number."),
+        },
+        {
+            "label": "Plaintiff",
+            "value": show(idb_data.plaintiff),
+            "hint": mark_safe(
+                "The first listed plaintiff in the case. Field truncated to "
+                "30 characters upon extraction by the AOUSC source system."
+            ),
+        },
+        {
+            "label": "Defendant",
+            "value": show(idb_data.defendant),
+            "hint": mark_safe(
+                "The first listed defendant in the case. Field truncated to "
+                "30 characters upon extraction by the AOUSC source system."
+            ),
+        },
+        {
+            "label": "Date of Transfer",
+            "value": show(idb_data.date_transfer),
+            "hint": mark_safe(
+                "The date when the papers for the case were received by the "
+                "receiving district for a transferred case."
+            ),
+        },
+        {
+            "label": "Transfer Docket Number",
+            "value": show(idb_data.transfer_docket_number),
+            "hint": mark_safe(
+                "The docket number of the case in the source district."
+            ),
+        },
+        {
+            "label": "Transfer Origin",
+            "value": show(idb_data.transfer_origin),
+            "hint": mark_safe(
+                "The origin number of the case in the source district."
+            ),
+        },
+        {
+            "label": "Procedural Progress",
+            "value": show(idb_data.get_procedural_progress_display()),
+            "hint": possible_values(
+                "procedural_progress",
+                format_html(
+                    "The point to which the case had progressed when it was "
+                    "disposed of (see notes in {}).",
+                    codebook_link("codebook on FJC website"),
+                ),
+            ),
+        },
+        {
+            "label": "Disposition",
+            "value": show(idb_data.get_disposition_display()),
+            "hint": possible_values(
+                "disposition", "The manner in which the case was disposed of."
+            ),
+        },
+        {
+            "label": "Nature of Judgment",
+            "value": show(idb_data.get_nature_of_judgement_display()),
+            "hint": possible_values(
+                "nature_of_judgement",
+                "Cases disposed of by an entry of a final judgment.",
+            ),
+        },
+        {
+            "label": "Amount Received",
+            "value": show(idb_data.amount_received),
+            "hint": format_html(
+                "Dollar amount received (in thousands) when appropriate. "
+                "Field not uniformally used; {}.",
+                codebook_link("see codebook"),
+            ),
+        },
+        {
+            "label": "Judgment",
+            "value": show(idb_data.get_judgment_display()),
+            "hint": possible_values(
+                "judgment", "Which party the case was disposed in favor of."
+            ),
+        },
+        {
+            "label": "Pro Se",
+            "value": show(idb_data.get_pro_se_display()),
+            "hint": possible_values(
+                "pro_se",
+                format_html(
+                    "The parties that filed pro se in the case. See {} for "
+                    "more details.",
+                    codebook_link("codebook on IDB website"),
+                ),
+            ),
+        },
+    ]
 
 
 def build_docket_tabs(
