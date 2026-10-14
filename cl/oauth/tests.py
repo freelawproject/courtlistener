@@ -3,9 +3,11 @@ import hashlib
 import html
 import importlib
 import re
+from contextlib import AbstractContextManager
 from datetime import timedelta
 from types import SimpleNamespace
-from unittest.mock import patch
+from typing import TYPE_CHECKING
+from unittest.mock import MagicMock, patch
 from urllib.parse import parse_qs, urlencode, urlsplit
 
 import requests
@@ -17,10 +19,12 @@ from django.core.cache import cache
 from django.core.exceptions import ValidationError
 from django.core.management import call_command
 from django.db import connection
+from django.http import HttpResponse
 from django.test import override_settings
 from django.urls import reverse
 from django.utils.timezone import now
 from oauth2_provider.models import (
+    AbstractApplication,
     get_access_token_model,
     get_application_model,
     get_grant_model,
@@ -31,6 +35,9 @@ from oauth2_provider.models import (
 from rest_framework.authtoken.models import Token
 from waffle import get_waffle_flag_model
 from waffle.testutils import override_flag
+
+if TYPE_CHECKING:
+    from django.test.client import _MonkeyPatchedWSGIResponse
 
 from cl.oauth.cleanup_utils import (
     delete_unconfirmed_applications,
@@ -607,16 +614,17 @@ class AuthorizeRedirectTest(TestCase):
 
     def _authorize_params(
         self,
-        application,
-        redirect_uri="https://claude.ai/api/mcp/auth_callback",
+        application: AbstractApplication,
+        redirect_uri: str | None = "https://claude.ai/api/mcp/auth_callback",
     ) -> dict[str, str]:
-        """The query a real client sends to start an authorization."""
+        """The query a real client sends to start an authorization, without
+        a redirect when *redirect_uri* is None."""
         challenge = (
             base64.urlsafe_b64encode(hashlib.sha256(b"v" * 64).digest())
             .decode()
             .rstrip("=")
         )
-        return {
+        params = {
             "response_type": "code",
             "client_id": application.client_id,
             "redirect_uri": redirect_uri,
@@ -625,14 +633,22 @@ class AuthorizeRedirectTest(TestCase):
             "code_challenge": challenge,
             "code_challenge_method": "S256",
         }
+        return {k: v for k, v in params.items() if v is not None}
 
-    def _authorize(self, application, **params):
+    def _authorize(
+        self, application: AbstractApplication, **params: str | None
+    ) -> "_MonkeyPatchedWSGIResponse":
+        """Starts an authorization for *application*."""
         return self.client.get(
             reverse("oauth2_provider:authorize"),
             self._authorize_params(application, **params),
         )
 
-    def assertSentToMcp(self, r, application) -> None:
+    def assertSentToMcp(
+        self, r: HttpResponse, application: AbstractApplication
+    ) -> None:
+        """*r* hands the browser to the MCP server with the request a real
+        client sends for *application*."""
         self.assertEqual(r.status_code, 200, r.content)
         self.assertEqual(r["Cache-Control"], "no-store")
         refresh = re.fullmatch(
@@ -651,7 +667,8 @@ class AuthorizeRedirectTest(TestCase):
             {k: [v] for k, v in self._authorize_params(application).items()},
         )
 
-    def assertStaysHere(self, r) -> None:
+    def assertStaysHere(self, r: HttpResponse) -> None:
+        """*r* is our own consent page, not a hand-off."""
         self.assertEqual(r.status_code, 200, r.content)
         self.assertNotIn(b'http-equiv="refresh"', r.content)
 
@@ -687,9 +704,32 @@ class AuthorizeRedirectTest(TestCase):
         self.assertStaysHere(self._authorize(self.manual_app))
 
     @override_flag(DCR_CLIENTS_VIA_MCP_FLAG, active=True)
-    def test_a_client_whose_registration_here_is_gone_is_still_sent_on(self):
-        gone = SimpleNamespace(client_id="x" * 40)
-        self.assertSentToMcp(self._authorize(gone), gone)
+    def test_an_unknown_client_is_refused_here(self):
+        self.client.force_login(self.user)
+        params = self._authorize_params(self.dcr_app)
+        params["client_id"] = "x" * 40
+        r = self.client.get(reverse("oauth2_provider:authorize"), params)
+        self.assertEqual(r.status_code, 400, r.content)
+
+    @override_flag(DCR_CLIENTS_VIA_MCP_FLAG, active=True)
+    def test_a_request_without_a_redirect_gets_the_registered_one(self):
+        self.client.force_login(self.user)
+        r = self._authorize(self.dcr_app, redirect_uri=None)
+        self.assertSentToMcp(r, self.dcr_app)
+
+    def test_only_who_the_flag_names_counts(self):
+        """Percent rollouts and a flag nobody has created migrate no one."""
+        superuser = UserFactory(is_superuser=True)
+        with self.subTest("flag not created yet"):
+            self.client.force_login(superuser)
+            self.assertStaysHere(self._authorize(self.dcr_app))
+        get_waffle_flag_model().objects.create(
+            name=DCR_CLIENTS_VIA_MCP_FLAG, percent=99.9, superusers=False
+        )
+        cache.clear()
+        with self.subTest("percent"):
+            self.client.force_login(self.user)
+            self.assertStaysHere(self._authorize(self.dcr_app))
 
     @override_flag(DCR_CLIENTS_VIA_MCP_FLAG, active=True)
     def test_a_redirect_the_client_never_registered_is_refused_here(self):
@@ -730,7 +770,9 @@ class DcrClientTokenRequestTest(TestCase):
         super().setUp()
         cache.clear()
 
-    def _post(self, data, **headers):
+    def _post(
+        self, data: dict[str, str], **headers: str
+    ) -> "_MonkeyPatchedWSGIResponse":
         """Posts *data* the way OAuth clients do, form-encoded."""
         return self.client.post(
             reverse("oauth2_provider:token"),
@@ -739,7 +781,11 @@ class DcrClientTokenRequestTest(TestCase):
             **headers,
         )
 
-    def _exchange(self, application):
+    def _exchange(
+        self, application: AbstractApplication
+    ) -> "_MonkeyPatchedWSGIResponse":
+        """Redeems a code CourtListener never issued, as the MCP server's
+        codes are."""
         return self._post(
             {
                 "grant_type": "authorization_code",
@@ -750,7 +796,9 @@ class DcrClientTokenRequestTest(TestCase):
             }
         )
 
-    def _issue_refresh_token(self, application, user) -> str:
+    def _issue_refresh_token(
+        self, application: AbstractApplication, user: User
+    ) -> str:
         """Issues a live CourtListener refresh token the way a consent did."""
         access = AccessToken(
             user=user,
@@ -767,7 +815,10 @@ class DcrClientTokenRequestTest(TestCase):
         refresh.save()
         return f"rt-{application.pk}-{user.pk}"
 
-    def _refresh(self, application, user):
+    def _refresh(
+        self, application: AbstractApplication, user: User
+    ) -> "_MonkeyPatchedWSGIResponse":
+        """Refreshes a live CourtListener token for *user*."""
         return self._post(
             {
                 "grant_type": "refresh_token",
@@ -776,7 +827,10 @@ class DcrClientTokenRequestTest(TestCase):
             }
         )
 
-    def _mcp_response(self, status_code=200, body=b'{"access_token": "x"}'):
+    def _mcp_response(
+        self, status_code: int = 200, body: bytes = b'{"access_token": "x"}'
+    ) -> AbstractContextManager[MagicMock]:
+        """Stands in for the MCP server's token endpoint."""
         response = SimpleNamespace(
             status_code=status_code,
             content=body,
@@ -784,7 +838,10 @@ class DcrClientTokenRequestTest(TestCase):
         )
         return patch("cl.oauth.views.requests.post", return_value=response)
 
-    def assertLiveTokens(self, application, user, live: bool) -> None:
+    def assertLiveTokens(
+        self, application: AbstractApplication, user: User, live: bool
+    ) -> None:
+        """Whether *user* holds live tokens for *application*."""
         self.assertEqual(
             RefreshToken.objects.filter(
                 application=application, user=user, revoked__isnull=True
@@ -916,6 +973,13 @@ class DcrClientTokenRequestTest(TestCase):
             r = self._refresh(self.dcr_app, self.user)
         self.assertEqual(r.status_code, 400)
         self.assertLiveTokens(self.dcr_app, self.user, live=False)
+
+    def test_a_percent_rollout_refuses_no_one(self):
+        get_waffle_flag_model().objects.create(
+            name=DCR_CLIENTS_VIA_MCP_FLAG, percent=99.9
+        )
+        r = self._refresh(self.dcr_app, self.user)
+        self.assertEqual(r.status_code, 200, r.content)
 
     def test_other_users_are_untouched_by_a_per_user_flag(self):
         turn_flag_on_for(self.other_user)

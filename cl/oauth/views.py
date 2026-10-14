@@ -24,7 +24,8 @@ from urllib.parse import parse_qs, unquote
 
 import requests
 from django.conf import settings
-from django.contrib.auth.models import User
+from django.contrib.auth.base_user import AbstractBaseUser
+from django.contrib.auth.models import AnonymousUser, User
 from django.http import (
     HttpRequest,
     HttpResponse,
@@ -48,7 +49,7 @@ from rest_framework import status
 from rest_framework.request import Request
 from rest_framework.response import Response
 from rest_framework.views import APIView
-from waffle import flag_is_active
+from waffle import get_waffle_flag_model
 
 from cl.lib.ratelimiter import get_ip_for_ratelimiter
 from cl.oauth.api_serializers import (
@@ -173,13 +174,41 @@ class AuthorizationView(oauth2_views.AuthorizationView):
     def dispatch(
         self, request: HttpRequest, *args: Any, **kwargs: Any
     ) -> HttpResponseBase:
-        if handed_to_mcp(
-            request.GET.get("client_id"), request.GET.get("redirect_uri", "")
-        ) and flag_is_active(request, DCR_CLIENTS_VIA_MCP_FLAG):
-            return handoff(
-                f"{settings.OAUTH2_MCP_URL}/authorize?{request.META['QUERY_STRING']}"
-            )
+        if (url := mcp_authorize_url(request)) and migrating(request.user):
+            return handoff(url)
         return super().dispatch(request, *args, **kwargs)
+
+
+def mcp_authorize_url(request: HttpRequest) -> str | None:
+    """The MCP server's authorize URL for a request from a client registered
+    through DCR that asks for a redirect it registered, filling in its only
+    registered redirect when the request names none, as DOT would."""
+    app = Application.objects.filter(
+        client_id=request.GET.get("client_id", ""),
+        registration_source=Application.RegistrationSource.DCR,
+    ).first()
+    if app is None:
+        return None
+    query = request.GET.copy()
+    if (
+        "redirect_uri" not in query
+        and len(uris := app.redirect_uris.split()) == 1
+    ):
+        query["redirect_uri"] = uris[0]
+    if not app.redirect_uri_allowed(query.get("redirect_uri", "")):
+        return None
+    return f"{settings.OAUTH2_MCP_URL}/authorize?{query.urlencode()}"
+
+
+def migrating(user: AbstractBaseUser | AnonymousUser) -> bool:
+    """Whether the flag hands *user*'s DCR clients to the MCP server, going by
+    its everyone, user, group, staff and superuser settings alone."""
+    flag = get_waffle_flag_model().get(DCR_CLIENTS_VIA_MCP_FLAG)
+    if not flag.pk:
+        return False
+    if isinstance(user, AnonymousUser):
+        return bool(flag.everyone)
+    return bool(flag.is_active_for_user(user))
 
 
 def handoff(url: str) -> HttpResponse:
@@ -211,26 +240,22 @@ class TokenView(oauth2_views.TokenView):
             return relay_to_mcp(body, cast(str, client_id))
         if (token := minted_token(response)) is None or token.user is None:
             return response
-        request.user = token.user
-        if not flag_is_active(request, DCR_CLIENTS_VIA_MCP_FLAG):
+        if not migrating(token.user):
             return response
         revoke_access_token(token)
         return invalid_grant()
 
 
-def handed_to_mcp(
-    client_id: str | None, redirect_uri: str | None = None
-) -> bool:
-    """Whether a client is the MCP server's to serve: one registered through
-    DCR, asking for a redirect it registered, or whose registration was pruned."""
+def handed_to_mcp(client_id: str | None) -> bool:
+    """Whether a token request is the MCP server's to serve: from a client
+    registered through DCR, or whose registration was pruned."""
     if not client_id:
         return False
-    app = Application.objects.filter(client_id=client_id).first()
-    if app is None:
-        return True
-    if app.registration_source != Application.RegistrationSource.DCR:
-        return False
-    return redirect_uri is None or app.redirect_uri_allowed(redirect_uri)
+    return (
+        not Application.objects.filter(client_id=client_id)
+        .exclude(registration_source=Application.RegistrationSource.DCR)
+        .exists()
+    )
 
 
 def client_id_of(request: HttpRequest, body: bytes) -> str | None:
