@@ -8,7 +8,6 @@ from functools import partial
 from glob import glob
 from typing import Any
 
-from asgiref.sync import async_to_sync
 from bs4 import BeautifulSoup, Tag
 from django.core.files.base import ContentFile
 from django.core.management import CommandError, CommandParser
@@ -42,10 +41,10 @@ from cl.lib.url_utils import BASE_URL
 from cl.lib.utils import human_sort
 from cl.people_db.lookup_utils import (
     extract_judge_last_name,
-    lookup_judges_by_messy_str,
 )
 from cl.scrapers.utils import (
     case_names_are_too_different,
+    link_judges,
     update_or_create_docket,
 )
 from cl.search.cluster_sources import ClusterSources
@@ -813,45 +812,6 @@ def make_opinion(op: Tag, cluster_id: int) -> Opinion:
         xml_scan=opinion_xml,
         extracted_by_ocr=True,
     )
-
-
-def link_judges(cluster: OpinionCluster, opinions: list[Opinion]) -> None:
-    """Link the judges named in the scan to people in the judges database.
-
-    Like the scrapers do, an opinion's author comes from its `author_str`,
-    or from the cluster's `judges` when the cluster has a single opinion
-    without an author. When `judges` names several people, they are added
-    to the cluster's panel. Call it after the cluster is saved and before
-    the opinions are.
-
-    Caveat: a name that matches more than one person is left unresolved.
-
-    :param cluster: The saved cluster.
-    :param opinions: The cluster's unsaved opinions.
-    :return: None
-    """
-    court_id = cluster.docket.court_id
-    if cluster.judges:
-        candidates = async_to_sync(lookup_judges_by_messy_str)(
-            cluster.judges, court_id, cluster.date_filed
-        )
-        if (
-            len(candidates) == 1
-            and len(opinions) == 1
-            and not opinions[0].author_str
-        ):
-            opinions[0].author = candidates[0]
-        elif len(candidates) > 1:
-            cluster.panel.add(*candidates)
-
-    for opinion in opinions:
-        if not opinion.author_str or opinion.per_curiam:
-            continue
-        candidates = async_to_sync(lookup_judges_by_messy_str)(
-            opinion.author_str, court_id, cluster.date_filed
-        )
-        if len(candidates) == 1:
-            opinion.author = candidates[0]
 
 
 def store_scan_xml(
