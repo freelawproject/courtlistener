@@ -580,6 +580,12 @@ class AuthorizeViewCSPTest(TestCase):
         self.assertEqual(parse_csp(r)["form-action"], ["'self'"])
 
 
+def forget_flag() -> None:
+    """Drops the migration flag from waffle's cache, leaving the rest of the
+    cache, which parallel test runs share, alone."""
+    get_waffle_flag_model()(name=DCR_CLIENTS_VIA_MCP_FLAG).flush()
+
+
 def turn_flag_on_for(user: User) -> None:
     """Turns the migration flag on for *user* alone."""
     flag = get_waffle_flag_model().objects.create(
@@ -610,7 +616,7 @@ class AuthorizeRedirectTest(TestCase):
 
     def setUp(self) -> None:
         super().setUp()
-        cache.clear()
+        forget_flag()
 
     def _authorize_params(
         self,
@@ -725,8 +731,7 @@ class AuthorizeRedirectTest(TestCase):
             self.assertStaysHere(self._authorize(self.dcr_app))
         get_waffle_flag_model().objects.create(
             name=DCR_CLIENTS_VIA_MCP_FLAG, percent=99.9, superusers=False
-        )
-        cache.clear()
+        ).flush()
         with self.subTest("percent"):
             self.client.force_login(self.user)
             self.assertStaysHere(self._authorize(self.dcr_app))
@@ -768,7 +773,7 @@ class DcrClientTokenRequestTest(TestCase):
 
     def setUp(self) -> None:
         super().setUp()
-        cache.clear()
+        forget_flag()
 
     def _post(
         self, data: dict[str, str], **headers: str
@@ -977,7 +982,7 @@ class DcrClientTokenRequestTest(TestCase):
     def test_a_percent_rollout_refuses_no_one(self):
         get_waffle_flag_model().objects.create(
             name=DCR_CLIENTS_VIA_MCP_FLAG, percent=99.9
-        )
+        ).flush()
         r = self._refresh(self.dcr_app, self.user)
         self.assertEqual(r.status_code, 200, r.content)
 
