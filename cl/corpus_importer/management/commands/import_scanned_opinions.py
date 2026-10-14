@@ -17,7 +17,6 @@ from django.db.models import Q
 from django.utils.text import slugify
 from eyecite.find import get_citations
 from eyecite.models import FullCaseCitation
-from eyecite.tokenizers import HyperscanTokenizer
 from juriscraper.lib.string_utils import (
     CaseNameTweaker,
     convert_date_string,
@@ -31,6 +30,7 @@ from cl.corpus_importer.management.commands.harvard_opinions import (
     parse_extra_fields,
 )
 from cl.corpus_importer.utils import (
+    HYPERSCAN_TOKENIZER,
     add_citations_to_cluster,
     clean_body_content,
     get_court_id,
@@ -57,8 +57,6 @@ from cl.search.models import (
     OpinionCluster,
     OpinionContent,
 )
-
-HYPERSCAN_TOKENIZER = HyperscanTokenizer(cache_dir=".hyperscan")
 
 cnt = CaseNameTweaker()
 
