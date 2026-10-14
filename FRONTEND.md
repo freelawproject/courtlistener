@@ -198,8 +198,8 @@ Label prefixes are validated by `EventCountSerializer` (`cl/favorites/api_serial
 ## Links
 
 - All `<a>` tags in new templates MUST have a `class` attribute
-- Internal links: `class="links"`
-- External links: `class="links-external"` (adds the external-link icon)
+- Internal links: `text-primary-600`
+- External links: `underline`
 - `target="_blank"` MUST include `rel="noopener"` or `rel="noreferrer"` (`noreferrer` alone is sufficient — it implies `noopener`)
 - Do NOT add `nofollow` to editorial links — `nofollow` is for user-generated content and for links into pages we don't want crawled: `noindex` pages (search results, anything rendered with `private=True`) and file downloads, e.g. the per-court search links on the jurisdictions page or the document links in docket entries
 
