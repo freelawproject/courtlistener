@@ -110,30 +110,6 @@ HYPERSCAN_TOKENIZER = HyperscanTokenizer(cache_dir=".hyperscan")
 
 
 class CitationTextTest(TestCase):
-    def test_make_get_citations_kwargs_uses_xml_scan_last(self) -> None:
-        """Is the scanning project XML used only when there's no other text?"""
-        xml = "<opinion><p>See 282 So. 3d 998.</p></opinion>"
-        for opinion, expected in [
-            (
-                Opinion(xml_scan=xml),
-                {
-                    "markup_text": xml,
-                    "clean_steps": ["xml", "html", "all_whitespace"],
-                },
-            ),
-            (
-                Opinion(xml_scan=xml, plain_text="Court text"),
-                {
-                    "plain_text": "Court text",
-                    "clean_steps": ["all_whitespace"],
-                },
-            ),
-        ]:
-            with self.subTest(expected=expected):
-                self.assertEqual(
-                    make_get_citations_kwargs(opinion), [expected]
-                )
-
     def test_make_html_from_plain_text(self) -> None:
         """Can we convert the plain text of an opinion into HTML?"""
         # fmt: off

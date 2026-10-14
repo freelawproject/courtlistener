@@ -237,8 +237,6 @@ def make_get_citations_kwargs(
         "html_lawbox",
         "html",
         "plain_text",
-        # Scanning project OCR; only used when there is no other text
-        "xml_scan",
     ]:
         text = getattr(document, attr, None)
         if not text:
