@@ -1,12 +1,12 @@
-<c-vars header class=""></c-vars>
+<c-vars header valign="middle" class=""></c-vars>
 
-{% with base_class="align-middle text-sm font-normal px-2.5 py-4" %}
+{% with base_class="text-sm font-normal px-2.5 py-4" %}
 {% if header %}
-<th scope="row" class="{{ base_class }} {{ class }}" {{ attrs }}>
+<th scope="row" class="{{ base_class }} {% if valign == 'top' %}align-top{% else %}align-middle{% endif %} {{ class }}" {{ attrs }}>
   {{ slot }}
 </th>
 {% else %}
-<td class="{{ base_class }} {{ class }}" {{ attrs }}>
+<td class="{{ base_class }} {% if valign == 'top' %}align-top{% else %}align-middle{% endif %} {{ class }}" {{ attrs }}>
   {{ slot }}
 </td>
 {% endif %}
