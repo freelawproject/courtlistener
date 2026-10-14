@@ -158,6 +158,16 @@ class ScanXmlHelpersTest(SimpleTestCase):
                 "Appellant, v. Acme Services, LLC, Defendant",
             ),
             (
+                "<casebody><p><party><strong>UNITED STATES of America, "
+                "Appellee</strong></party> <separator>v.</separator></p>"
+                "<parties><party><strong>Jonathan JOHNSON, also known as "
+                "Johnathan Johnson, Appellant</strong></party></parties>"
+                "<opinion><p>Text</p></opinion></casebody>",
+                "United States v. Jonathan Johnson",
+                "United States of America, Appellee v. Jonathan Johnson, "
+                "Also Known as Johnathan Johnson, Appellant",
+            ),
+            (
                 "<parties><party>In re ESTATE OF John SMITH</party></parties>",
                 "In re Estate of John Smith",
                 "In re Estate of John Smith",

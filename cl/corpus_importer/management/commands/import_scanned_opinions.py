@@ -420,23 +420,19 @@ def normalize_case_name_caps(case_name: str) -> str:
 def get_party_sides(soup: BeautifulSoup) -> tuple[list[str], list[str]]:
     """Get the caption's parties on each side of its "v." separator.
 
-    The parties are usually in `<parties>`, but some captions are a
-    paragraph of `<party>` elements without it.
+    The `<party>` and `<separator>` elements before the first opinion are
+    read in document order, whatever wraps them: usually `<parties>`, but
+    the portal can put a caption in a `<p>`, or split it between a `<p>`
+    and `<parties>`.
 
     :param soup: The parsed XML.
     :return: The texts of the parties before and after the separator.
     """
-    if (parties := soup.select_one("parties")) is None:
-        first_party = next(
-            (p for p in soup.select("party") if not p.find_parent("opinion")),
-            None,
-        )
-        parties = first_party.parent if first_party else None
     sides: tuple[list[str], list[str]] = ([], [])
-    if parties is None:
-        return sides
     side = 0
-    for element in parties.find_all(["party", "separator"]):
+    for element in soup.find_all(["party", "separator", "opinion"]):
+        if element.name == "opinion":
+            break
         if element.name == "separator":
             side = 1
         elif text := element.get_text(" ", strip=True):
