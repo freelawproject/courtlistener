@@ -2,7 +2,7 @@
 {# frontend-checks-skip: check_hardcoded_ids #}
 {# This component is a singleton so hardcoded IDs are intentional #}
 
-<c-vars variant request csrf_token class=""></c-vars>
+<c-vars user variant request csrf_token class=""></c-vars>
 
 <header
   class="relative w-full {% if variant == "homepage" %}h-18 {% else %}md:max-h-[--desktop-header-height] max-md:h-18 {% endif %} py-3 md:py-2.5 {{ class }}"
@@ -31,14 +31,25 @@
         >
           Make a Donation
         </c-menu-button.item>
-        <c-menu-button.item
-          href="https://free.law/membership/"
-          icon="group"
-          item_class="px-4 py-1.5 text-md text-greyscale-800 flex flex-row justify-start items-center gap-2 w-full"
-          li_class="hover:bg-greyscale-50"
-        >
-          Become a Member
-        </c-menu-button.item>
+        {% if user.is_authenticated and user.profile.is_member %}
+          <c-menu-button.item
+            href="{% url "profile_your_support" %}"
+            icon="group"
+            item_class="px-4 py-1.5 text-md text-greyscale-800 flex flex-row justify-start items-center gap-2 w-full"
+            li_class="hover:bg-greyscale-50"
+          >
+            Your Membership
+          </c-menu-button.item>
+        {% else %}
+          <c-menu-button.item
+            href="https://free.law/membership/"
+            icon="group"
+            item_class="px-4 py-1.5 text-md text-greyscale-800 flex flex-row justify-start items-center gap-2 w-full"
+            li_class="hover:bg-greyscale-50"
+          >
+            Become a Member
+          </c-menu-button.item>
+        {% endif %}
       </c-slot>
     </c-menu-button>
 
