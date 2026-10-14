@@ -13,6 +13,7 @@ from django.db.models.fields.files import FieldFile
 from django.test import override_settings
 
 from cl.corpus_importer.management.commands.import_scanned_opinions import (
+    get_case_names,
     get_citation_strings,
     get_date_filed,
     get_docket_number,
@@ -95,10 +96,72 @@ class ScanXmlHelpersTest(SimpleTestCase):
             ("STATE EX REL. SMITH v. JONES", "State ex rel. Smith v. Jones"),
             ("HENRY VIII v. John DOE", "Henry VIII v. John Doe"),
             ("CIVIL SERVICE v. DOE", "Civil Service v. Doe"),
+            ("Betzaida SANTOS-PAGÁN v. DOE", "Betzaida Santos-Pagán v. Doe"),
         ]
         for case_name, expected in cases:
             with self.subTest(case_name=case_name):
                 self.assertEqual(normalize_case_name_caps(case_name), expected)
+
+    def test_get_case_names(self) -> None:
+        """Is the case name made of the first party on each side?"""
+        cases = [
+            (
+                "<parties><party>Cody Allan KOTRC, Appellant (Defendant),"
+                "</party> <separator>v.</separator> <party>The STATE of "
+                "Wyoming, Appellee (Plaintiff).</party></parties>",
+                "Cody Allan Kotrc v. State of Wyoming",
+                "Cody Allan Kotrc, Appellant (Defendant), v. the State of "
+                "Wyoming, Appellee (Plaintiff)",
+            ),
+            (
+                "<parties><party>Ashton ORR; Zaya Perysian, Plaintiffs,"
+                "</party> <separator>v.</separator> <party>Donald J. TRUMP, "
+                "in the Official Capacity as President; U.S. Department of "
+                "State, Defendants.</party></parties>",
+                "Ashton Orr v. Donald J. Trump",
+                "Ashton Orr; Zaya Perysian, Plaintiffs, v. Donald J. Trump, "
+                "in the Official Capacity as President; U.S. Department of "
+                "State, Defendants",
+            ),
+            (
+                "<parties><party>UNITED STATES of America, Plaintiff,</party>"
+                " <separator>v.</separator> <party>Raef HAMAED, Registered "
+                "Pharmacist (25-1056); Tarek Fakhuri, Defendants.</party>"
+                "</parties>",
+                "United States v. Raef Hamaed",
+                "United States of America, Plaintiff, v. Raef Hamaed, "
+                "Registered Pharmacist (25-1056); Tarek Fakhuri, Defendants",
+            ),
+            (
+                "<parties><party>STATE of Oklahoma, EX REL. OKLAHOMA BAR "
+                "ASSOCIATION, Complainant,</party> <separator>v.</separator> "
+                "<party>Theodore KOSS, Jr., Respondent.</party></parties>",
+                "State of Oklahoma, ex rel. Oklahoma Bar Association v. "
+                "Theodore Koss, Jr.",
+                "State of Oklahoma, ex rel. Oklahoma Bar Association, "
+                "Complainant, v. Theodore Koss, Jr., Respondent",
+            ),
+            (
+                "<casebody><p><party>Julie HALBOWER, TRUSTEE OF HALBOWER "
+                "TRUST, Plaintiff-Appellant,</party> <separator>v.</separator>"
+                " <party>ACME SERVICES, LLC, Defendant.</party></p>"
+                "<opinion><party>Not a caption</party></opinion></casebody>",
+                "Julie Halbower v. Acme Services, LLC",
+                "Julie Halbower, Trustee of Halbower Trust, Plaintiff-"
+                "Appellant, v. Acme Services, LLC, Defendant",
+            ),
+            (
+                "<parties><party>In re ESTATE OF John SMITH</party></parties>",
+                "In re Estate of John Smith",
+                "In re Estate of John Smith",
+            ),
+            ("<casebody/>", "", ""),
+        ]
+        for xml, case_name, case_name_full in cases:
+            with self.subTest(xml=xml):
+                self.assertEqual(
+                    get_case_names(make_soup(xml)), (case_name, case_name_full)
+                )
 
     def test_get_date_filed(self) -> None:
         """Can we parse complete decision dates and reject partial ones?"""

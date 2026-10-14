@@ -125,6 +125,16 @@ CASE_NAME_ABBREVIATIONS = {
 }
 # Roman numerals up to 39, e.g. "VIII". `titlecase` only keeps II and III.
 ROMAN_NUMERAL_RE = re.compile(r"(?=[IVX])X{0,3}(?:IX|IV|V?I{0,3})")
+# Vowels, including the accented capitals of names like "PAGÁN"
+CAPITAL_VOWEL_RE = re.compile(r"[AEIOUYÀ-ÆÈ-ÏÒ-ÖØ-Ý]")
+# Comma-separated parts of a caption party that are still its name, like
+# "ex rel. Oklahoma Bar Association", "Jr." or "LLC". Other parts are the
+# party's role or a description: "Appellant (Defendant)", "Trustee of ...".
+PARTY_NAME_PART_RE = re.compile(
+    r"^(?:ex\s+rel\.|jr\.?|sr\.?|[ivx]+|inc\.?|l\.?l\.?c\.?|l\.?l\.?p\.?"
+    r"|ltd\.?|corp\.?|co\.?|n\.a\.|p\.a\.|p\.c\.|pllc)(?:\s|$)",
+    re.IGNORECASE,
+)
 
 # Cluster fields that come from the head matter of the XML. When merging
 # into an existing cluster, only empty values are filled from the scan.
@@ -308,7 +318,7 @@ def _capitalize_caps_word(word: str) -> str:
     :param word: A word in capital letters.
     :return: The capitalized word.
     """
-    word = re.sub(r"[A-Za-z]+", lambda m: m.group().capitalize(), word)
+    word = re.sub(r"[^\W\d_]+", lambda m: m.group().capitalize(), word)
     return re.sub(r"'S\b", "'s", word)
 
 
@@ -328,7 +338,7 @@ def normalize_case_name_caps(case_name: str) -> str:
     """
     words = []
     for word in case_name.split():
-        letters = re.sub(r"[^A-Za-z]", "", word)
+        letters = "".join(filter(str.isalpha, word))
         if mc_name := re.fullmatch(r"(Mc|Mac)([A-Z]{2,})", letters):
             # e.g. McDONALD
             word = word.replace(
@@ -338,7 +348,7 @@ def normalize_case_name_caps(case_name: str) -> str:
             is_acronym = (
                 letters in CASE_NAME_ACRONYMS
                 or ROMAN_NUMERAL_RE.fullmatch(letters)
-                or not re.search(r"[AEIOUY]", letters)
+                or not CAPITAL_VOWEL_RE.search(letters)
             )
             if letters.lower() in LOWERCASE_CASE_NAME_WORDS:
                 word = word.lower()
@@ -349,6 +359,74 @@ def normalize_case_name_caps(case_name: str) -> str:
     # "ex rel."
     case_name = re.sub(r"\bIn Re\b", "In re", titlecase(" ".join(words)))
     return re.sub(r"\bEx Rel\b", "ex rel", case_name)
+
+
+def get_party_sides(soup: BeautifulSoup) -> tuple[list[str], list[str]]:
+    """Get the caption's parties on each side of its "v." separator.
+
+    The parties are usually in `<parties>`, but some captions are a
+    paragraph of `<party>` elements without it.
+
+    :param soup: The parsed XML.
+    :return: The texts of the parties before and after the separator.
+    """
+    if (parties := soup.select_one("parties")) is None:
+        first_party = next(
+            (p for p in soup.select("party") if not p.find_parent("opinion")),
+            None,
+        )
+        parties = first_party.parent if first_party else None
+    sides: tuple[list[str], list[str]] = ([], [])
+    if parties is None:
+        return sides
+    side = 0
+    for element in parties.find_all(["party", "separator"]):
+        if element.name == "separator":
+            side = 1
+        elif text := element.get_text(" ", strip=True):
+            sides[side].append(text)
+    return sides
+
+
+def get_party_name(party: str) -> str:
+    """Get the name of the first party in a caption party's text.
+
+    e.g. "Cody Allan KOTRC, Appellant (Defendant)," -> "Cody Allan KOTRC",
+    "Ashton ORR; Zaya Perysian, Plaintiffs," -> "Ashton ORR", and
+    "STATE of Oklahoma, EX REL. OKLAHOMA BAR ASSOCIATION, Complainant," ->
+    "STATE of Oklahoma, EX REL. OKLAHOMA BAR ASSOCIATION"
+
+    :param party: The text of a `<party>` element.
+    :return: The party's name, without its role or description.
+    """
+    first = re.sub(r"\([^)]*\)", "", party.split(";")[0])
+    name, *parts = [part.strip() for part in first.split(",")]
+    for part in parts:
+        if not PARTY_NAME_PART_RE.match(part):
+            break
+        name = f"{name}, {part}"
+    return re.sub(r"^the\s+", "", name.strip(" ,"), flags=re.IGNORECASE)
+
+
+def get_case_names(soup: BeautifulSoup) -> tuple[str, str]:
+    """Get the case name and the full case name from the caption.
+
+    The case name uses the first party on each side, e.g. "Cheri Lynn
+    Marler v. State of Wyoming"; the full name is the whole caption.
+
+    :param soup: The parsed XML.
+    :return: The case name and the full case name, or empty strings when
+        the XML has no parties.
+    """
+    left, right = get_party_sides(soup)
+    if not left:
+        return "", ""
+    names = [get_party_name(side[0]) for side in (left, right) if side]
+    case_name = normalize_case_name_caps(harmonize(" v. ".join(names)))
+    caption = " ".join(left)
+    if right:
+        caption = f"{caption} v. {' '.join(right)}"
+    return case_name, normalize_case_name_caps(caption.strip(". "))
 
 
 def get_date_filed(soup: BeautifulSoup) -> date | None:
@@ -465,12 +543,10 @@ def parse_scan_xml(
         logger.warning("No opinion found in %s", file_path)
         return None
 
-    parties = get_element_text(soup, "parties", " ")
-    if not parties:
+    case_name, case_name_full = get_case_names(soup)
+    if not case_name:
         logger.warning("No parties found in %s", file_path)
         return None
-    case_name = normalize_case_name_caps(harmonize(parties))
-    case_name_full = normalize_case_name_caps(parties.strip(". "))
 
     if not (date_filed := get_date_filed(soup)):
         logger.warning(
