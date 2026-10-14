@@ -54,6 +54,14 @@ Sync notice format:
 {% endcomment %}
 ```
 
+### Keep data shaping in the backend
+
+Templates render; they SHOULD know as little as possible about the data they show. Anything tightly coupled to the data (which fields a page lists, their labels, how a value is formatted or what it falls back to) belongs in the view or a backend helper. The helper hands the template a list of plain, typed items and the template loops over them with `{% for %}`. The loop still runs on the server, so this is entirely within the SSR model.
+
+- Shape items as `TypedDict`s in a builder next to the view, and pass the template one context key. Precedents: `build_docket_metadata` and `build_idb_rows` in `cl/opinion_page/utils.py`
+- Copy that needs markup, such as a hint with a link, is built with `format_html` so interpolated values are escaped. Static copy MAY use `mark_safe`
+- Templates SHOULD NOT read model attributes field by field for tabular data. A misspelled attribute in a template renders as empty with no error, while the same access in Python is type checked
+
 ## Cotton components
 
 - Live in `templates/cotton/`, snake_case filenames
@@ -190,8 +198,8 @@ Label prefixes are validated by `EventCountSerializer` (`cl/favorites/api_serial
 ## Links
 
 - All `<a>` tags in new templates MUST have a `class` attribute
-- Internal links: `text-primary-600`
-- External links: `underline`
+- Internal links: `class="links"`
+- External links: `class="links-external"` (adds the external-link icon)
 - `target="_blank"` MUST include `rel="noopener"` or `rel="noreferrer"` (`noreferrer` alone is sufficient — it implies `noopener`)
 - Do NOT add `nofollow` to editorial links — `nofollow` is for user-generated content and for links into pages we don't want crawled: `noindex` pages (search results, anything rendered with `private=True`) and file downloads, e.g. the per-court search links on the jurisdictions page or the document links in docket entries
 
