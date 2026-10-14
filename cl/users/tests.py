@@ -6151,10 +6151,15 @@ class AlertsPageMembershipNudgeTest(TestCase):
 
     def test_non_member_is_offered_more_alerts(self) -> None:
         """Both alert pages mention what members get and link to join."""
-        for viewname in ("profile_search_alerts", "profile_docket_alerts"):
+        expected = {
+            "profile_search_alerts": "Members get more search alerts",
+            "profile_docket_alerts": "Members get unlimited docket alerts",
+        }
+        for viewname, nudge in expected.items():
             with self.subTest(viewname=viewname):
                 response = self.client.get(reverse(viewname))
-                self.assertContains(response, "Get More Alerts")
+                self.assertContains(response, nudge)
+                self.assertContains(response, ">Join FLP</a>")
 
     def test_member_is_not_offered_more_alerts(self) -> None:
         """Members already get the benefit, so don't ask them to join."""
@@ -6162,4 +6167,4 @@ class AlertsPageMembershipNudgeTest(TestCase):
         for viewname in ("profile_search_alerts", "profile_docket_alerts"):
             with self.subTest(viewname=viewname):
                 response = self.client.get(reverse(viewname))
-                self.assertNotContains(response, "Get More Alerts")
+                self.assertNotContains(response, "Members get")
