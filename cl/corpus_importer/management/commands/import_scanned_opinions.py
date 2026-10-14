@@ -120,19 +120,6 @@ CASE_NAME_ABBREVIATIONS = {
 # Roman numerals up to 39, e.g. "VIII". `titlecase` only keeps II and III.
 ROMAN_NUMERAL_RE = re.compile(r"(?=[IVX])X{0,3}(?:IX|IV|V?I{0,3})")
 
-
-# Opinion fields with text from other sources. When one has text, the scan
-# isn't made the main version of the opinion content.
-OPINION_TEXT_FIELDS = (
-    "html",
-    "html_lawbox",
-    "html_columbia",
-    "html_anon_2020",
-    "html_with_citations",
-    "xml_harvard",
-    "plain_text",
-)
-
 # Cluster fields that come from the head matter of the XML. When merging
 # into an existing cluster, only empty values are filled from the scan.
 SHORT_FIELDS = {
@@ -680,25 +667,25 @@ def store_scan_xml(
 
 
 def add_opinion_content(
-    opinion: Opinion, scan_case: ScanCase, is_main_version: bool
+    opinion: Opinion, scan_case: ScanCase
 ) -> OpinionContent:
-    """Store the opinion XML in OpinionContent.
+    """Store the opinion XML in OpinionContent as the main version.
 
-    The XML is also kept in `Opinion.xml_scan` until the site reads from
-    OpinionContent.
+    The scan is richer than text from other sources, like scraped HTML, so
+    it replaces the opinion's previous main version. The XML is also kept in
+    `Opinion.xml_scan` until the site reads from OpinionContent.
 
     :param opinion: The saved opinion.
     :param scan_case: The parsed scanned opinion.
-    :param is_main_version: Whether this is the main version of the
-        opinion's content.
     :return: The new OpinionContent.
     """
+    opinion.contents.filter(is_main_version=True).update(is_main_version=False)
     return OpinionContent.objects.create(
         opinion=opinion,
         content=opinion.xml_scan,
         source=OpinionContent.FLP_SCANNING,
         extraction_type=OpinionContent.OCR,
-        is_main_version=is_main_version,
+        is_main_version=True,
         sha1=sha1(opinion.xml_scan),
         page_count=scan_case.page_count,
     )
@@ -750,15 +737,7 @@ def merge_into_cluster(cluster: OpinionCluster, scan_case: ScanCase) -> None:
             opinion = cl_opinions[0]
             opinion.xml_scan = str(scan_case.opinions[0])
             opinion.save(update_fields=["xml_scan"])
-            add_opinion_content(
-                opinion,
-                scan_case,
-                # OCR text shouldn't replace text from other sources
-                is_main_version=not (
-                    any(getattr(opinion, f) for f in OPINION_TEXT_FIELDS)
-                    or opinion.contents.filter(is_main_version=True).exists()
-                ),
-            )
+            add_opinion_content(opinion, scan_case)
         else:
             logger.warning(
                 "Cluster %s has %s opinions and the scan of %s has %s. "
@@ -831,7 +810,7 @@ def add_new_case(scan_case: ScanCase) -> OpinionCluster:
         for op in scan_case.opinions:
             opinion = make_opinion(op, cluster.id)
             opinion.save()
-            add_opinion_content(opinion, scan_case, is_main_version=True)
+            add_opinion_content(opinion, scan_case)
         store_scan_xml(cluster, scan_case, update_fields=[])
     return cluster
 

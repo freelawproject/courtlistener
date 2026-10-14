@@ -11,7 +11,6 @@ from django.core.management import CommandError, call_command
 from django.db.models.fields.files import FieldFile
 
 from cl.corpus_importer.management.commands.import_scanned_opinions import (
-    OPINION_TEXT_FIELDS,
     get_citation_strings,
     get_date_filed,
     get_docket_number,
@@ -19,6 +18,7 @@ from cl.corpus_importer.management.commands.import_scanned_opinions import (
     normalize_case_name_caps,
     s3_xml_keys,
 )
+from cl.lib.crypto import sha1
 from cl.lib.storage import ScanningFinalXmlStorage
 from cl.search.cluster_sources import ClusterSources
 from cl.search.factories import (
@@ -393,19 +393,30 @@ class ImportScannedOpinionsTest(TestCase):
         self.assertIn("confession of error", opinion.xml_scan)
         content = OpinionContent.objects.get(opinion=opinion)
         self.assertEqual(content.content, opinion.xml_scan)
-        # The opinion has text from the court website
-        self.assertFalse(content.is_main_version)
+        # The scan is richer than the court website text
+        self.assertTrue(content.is_main_version)
 
-    def test_merge_is_main_version_without_other_text(self) -> None:
-        """Is the scan the main version when the opinion has no other text?"""
+    def test_merge_replaces_the_main_version(self) -> None:
+        """Does the scan become the only main version of the opinion?"""
         cluster = self.make_matching_cluster()
-        with mock.patch(
-            f"{COMMAND_MODULE}.find_existing_cluster", return_value=cluster
-        ):
-            Opinion.objects.update(**dict.fromkeys(OPINION_TEXT_FIELDS, ""))
-            self.import_scan()
+        opinion = cluster.sub_opinions.get()
+        previous = OpinionContent.objects.create(
+            opinion=opinion,
+            content="<p>Scraped text</p>",
+            source=OpinionContent.SCRAPERS,
+            extraction_type=OpinionContent.DEFAULT,
+            is_main_version=True,
+            sha1=sha1("<p>Scraped text</p>"),
+        )
 
-        self.assertTrue(OpinionContent.objects.get().is_main_version)
+        self.import_scan()
+
+        previous.refresh_from_db()
+        self.assertFalse(previous.is_main_version)
+        self.assertEqual(
+            OpinionContent.objects.get(is_main_version=True).source,
+            OpinionContent.FLP_SCANNING,
+        )
 
     def test_merge_ignores_opinion_versions(self) -> None:
         """Is the scan merged into the main opinion, ignoring its versions?"""
