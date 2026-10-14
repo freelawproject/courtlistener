@@ -4,7 +4,7 @@ import traceback
 import zipfile
 from dataclasses import dataclass, field
 from io import BytesIO, StringIO
-from typing import Any, cast
+from typing import Any, TypedDict, cast
 from zoneinfo import ZoneInfo
 
 import waffle
