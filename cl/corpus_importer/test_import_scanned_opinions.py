@@ -440,6 +440,21 @@ class ImportScannedOpinionsTest(TestCase):
         # The scan is richer than the court website text
         self.assertTrue(content.is_main_version)
 
+    def test_merge_logs_differing_metadata(self) -> None:
+        """Are cluster values that differ from the scan kept and logged?"""
+        cluster = self.make_matching_cluster()
+        OpinionCluster.objects.filter(pk=cluster.pk).update(judges="Klein")
+
+        with mock.patch(f"{COMMAND_MODULE}.logger") as mock_logger:
+            self.import_scan()
+
+        cluster.refresh_from_db()
+        self.assertEqual(cluster.judges, "Klein")
+        self.assertIn(
+            "judges",
+            [call.args[2] for call in mock_logger.debug.call_args_list],
+        )
+
     def test_merge_replaces_the_main_version(self) -> None:
         """Does the scan become the only main version of the opinion?"""
         cluster = self.make_matching_cluster()

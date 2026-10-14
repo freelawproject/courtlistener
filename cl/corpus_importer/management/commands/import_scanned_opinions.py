@@ -753,12 +753,23 @@ def merge_into_cluster(cluster: OpinionCluster, scan_case: ScanCase) -> None:
             **scan_case.cluster_fields,
             "judges": scan_case.judges,
         }.items():
-            if value and not getattr(cluster, field_name):
-                logger.info(
-                    "Filling empty %s of cluster %s", field_name, cluster.id
-                )
-                setattr(cluster, field_name, value)
-                update_fields.append(field_name)
+            if not value:
+                continue
+            if current := getattr(cluster, field_name):
+                if current != value:
+                    logger.debug(
+                        "Cluster %s keeps its %s %r instead of the scan's %r",
+                        cluster.id,
+                        field_name,
+                        current,
+                        value,
+                    )
+                continue
+            logger.info(
+                "Filling empty %s of cluster %s", field_name, cluster.id
+            )
+            setattr(cluster, field_name, value)
+            update_fields.append(field_name)
         cluster.source = ClusterSources.merge_sources(
             cluster.source, ClusterSources.SCANNING_PROJECT
         )
