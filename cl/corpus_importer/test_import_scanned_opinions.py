@@ -14,6 +14,7 @@ from cl.corpus_importer.management.commands.import_scanned_opinions import (
     get_citation_strings,
     get_date_filed,
     get_docket_number,
+    get_docket_number_raw,
     make_opinion,
     normalize_case_name_caps,
     s3_xml_keys,
@@ -202,6 +203,26 @@ class ScanXmlHelpersTest(SimpleTestCase):
             with self.subTest(xml=xml):
                 self.assertEqual(get_docket_number(make_soup(xml)), expected)
 
+    def test_get_docket_number_raw(self) -> None:
+        """Is the docket number kept as printed?"""
+        cases = [
+            (
+                "<docketnumber>No. 4D2023-2459.</docketnumber>",
+                "No. 4D2023-2459.",
+            ),
+            (
+                "<casebody><docketnumber>No. 1</docketnumber>"
+                "<docketnumber>No. 2</docketnumber></casebody>",
+                "No. 1; No. 2",
+            ),
+            ("<casebody/>", ""),
+        ]
+        for xml, expected in cases:
+            with self.subTest(xml=xml):
+                self.assertEqual(
+                    get_docket_number_raw(make_soup(xml)), expected
+                )
+
     def test_make_opinion(self) -> None:
         """Are the author, per curiam and type read from the opinion?"""
         cases = [
@@ -335,6 +356,7 @@ class ImportScannedOpinionsTest(TestCase):
         self.assertEqual(docket.source, Docket.SCANNING_PROJECT)
         self.assertEqual(docket.court_id, self.court.pk)
         self.assertEqual(docket.docket_number, "4D2023-2459")
+        self.assertEqual(docket.docket_number_raw, "No. 4D2023-2459")
 
         citation = Citation.objects.get(cluster=cluster)
         self.assertEqual(
@@ -498,6 +520,22 @@ class ImportScannedOpinionsTest(TestCase):
 
         self.assertEqual(OpinionCluster.objects.count(), 1)
         self.assertIn("already imported", mock_logger.info.call_args[0][0])
+
+    def test_reuse_docket_of_a_scan(self) -> None:
+        """Does another opinion of a scanned case reuse the scan's docket?"""
+        self.import_scan()
+        xml = (
+            self.scan_xml.replace("388 So. 3d 1<", "388 So. 3d 9<")
+            .replace('opinion-id="12"', 'opinion-id="13"')
+            .replace("confession of error", "motion for rehearing")
+        )
+        with mock.patch(
+            f"{COMMAND_MODULE}.find_existing_cluster", return_value=None
+        ):
+            self.import_xml(xml)
+
+        self.assertEqual(OpinionCluster.objects.count(), 2)
+        self.assertEqual(Docket.objects.count(), 1)
 
     def test_scan_from_another_reporter_is_not_duplicated(self) -> None:
         """Is a scan matching a cluster that already has scan XML skipped?"""
