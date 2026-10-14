@@ -9,21 +9,70 @@ from django.urls import NoReverseMatch, reverse
 from cl.search.factories import (
     CourtFactory,
     DocketFactory,
+    SCOTUSDocketEntryFactory,
     ScotusDocketMetadataFactory,
+    SCOTUSDocumentFactory,
 )
-from cl.search.models import Docket, ScotusDocketMetadata
+from cl.search.models import (
+    Docket,
+    SCOTUSDocketEntry,
+    ScotusDocketMetadata,
+    SCOTUSDocument,
+)
 from cl.tests.cases import TestCase
 from cl.users.factories import UserFactory
 
-BASENAMES = ["scotusdocketmetadata"]
+BASENAMES = ["scotusdocketmetadata", "scotusdocketentry", "scotusdocument"]
+
+# The keys of a serialized SCOTUS docket entry.
+ENTRY_KEYS = {
+    "resource_uri",
+    "id",
+    "docket",
+    "scotus_documents",
+    "date_created",
+    "date_modified",
+    "entry_number",
+    "description",
+    "date_filed",
+    "sequence_number",
+}
+
+# The keys of a serialized SCOTUS document, without its docket_entry link.
+DOCUMENT_KEYS = {
+    "resource_uri",
+    "id",
+    "absolute_url",
+    "is_available",
+    "date_created",
+    "date_modified",
+    "sha1",
+    "page_count",
+    "file_size",
+    "filepath_local",
+    "plain_text",
+    "ocr_status",
+    "description",
+    "document_number",
+    "attachment_number",
+    "url",
+    "filepath_ia",
+    "ia_upload_failure_count",
+    "thumbnail",
+    "thumbnail_status",
+}
 
 
 class ScotusAPITestCase(TestCase):
-    """Shared SCOTUS data for the API tests."""
+    """Shared SCOTUS data for the API tests.
+
+    The entry with documents gets its attachment 2 created before attachment
+    1, so tests can tell display order apart from id order.
+    """
 
     @classmethod
     def setUpTestData(cls) -> None:
-        """Create the users, dockets and metadata shared by the tests."""
+        """Create the users, dockets, entries and documents shared by tests."""
         cls.user = UserFactory()
         cls.superuser = UserFactory(is_staff=True, is_superuser=True)
         cls.court = CourtFactory(id="scotus", jurisdiction="F")
@@ -36,6 +85,40 @@ class ScotusAPITestCase(TestCase):
             questions_presented_file="recap/gov.uscourts.scotus.1/qp.pdf",
         )
         cls.metadata_no_file = ScotusDocketMetadataFactory(docket=cls.docket_2)
+        cls.entry = SCOTUSDocketEntryFactory(
+            docket=cls.docket,
+            entry_number=1,
+            sequence_number="2",
+            date_filed=date(2025, 1, 10),
+        )
+        cls.entry_no_docs = SCOTUSDocketEntryFactory(
+            docket=cls.docket,
+            entry_number=2,
+            sequence_number="1",
+            date_filed=date(2025, 2, 20),
+        )
+        cls.entry_no_number = SCOTUSDocketEntryFactory(
+            docket=cls.docket_2,
+            entry_number=None,
+            sequence_number="3",
+            date_filed=date(2025, 1, 5),
+        )
+        cls.attachment_2 = SCOTUSDocumentFactory(
+            docket_entry=cls.entry, document_number=1, attachment_number=2
+        )
+        cls.attachment_1 = SCOTUSDocumentFactory(
+            docket_entry=cls.entry,
+            document_number=1,
+            attachment_number=1,
+            filepath_local="recap/gov.uscourts.scotus.1/1.1.pdf",
+            sha1="a" * 40,
+            ocr_status=SCOTUSDocument.OCR_COMPLETE,
+        )
+        cls.document_no_number = SCOTUSDocumentFactory(
+            docket_entry=cls.entry_no_number,
+            document_number=None,
+            attachment_number=1,
+        )
 
     @staticmethod
     def list_path(basename: str) -> str:
@@ -82,6 +165,8 @@ class ScotusAPIPermissionTest(ScotusAPITestCase):
         """
         targets = {
             "scotusdocketmetadata": (ScotusDocketMetadata, self.metadata.pk),
+            "scotusdocketentry": (SCOTUSDocketEntry, self.entry.pk),
+            "scotusdocument": (SCOTUSDocument, self.attachment_1.pk),
         }
         counts_before = {
             name: await model.objects.acount()
@@ -160,6 +245,79 @@ class ScotusAPISerializationTest(ScotusAPITestCase):
         )
         self.assertIsNone(r.json()["questions_presented_file"])
 
+    async def test_docket_entry(self) -> None:
+        """Does an entry nest its documents in display order?"""
+        r = await self.async_client.get(
+            self.detail_path("scotusdocketentry", self.entry.pk)
+        )
+        data = r.json()
+        self.assertEqual(set(data), ENTRY_KEYS)
+        self.assertEqual(
+            data["docket"],
+            self.absolute(self.detail_path("docket", self.docket.pk)),
+        )
+        nested = data["scotus_documents"]
+        self.assertEqual(
+            [doc["id"] for doc in nested],
+            [self.attachment_1.pk, self.attachment_2.pk],
+        )
+        for doc in nested:
+            with self.subTest(document=doc["id"]):
+                self.assertEqual(set(doc), DOCUMENT_KEYS)
+
+        r = await self.async_client.get(
+            self.detail_path("scotusdocketentry", self.entry_no_docs.pk)
+        )
+        self.assertEqual(r.json()["scotus_documents"], [])
+
+    async def test_document(self) -> None:
+        """Does a document link its entry and expose its file and page?"""
+        r = await self.async_client.get(
+            self.detail_path("scotusdocument", self.attachment_1.pk)
+        )
+        data = r.json()
+        self.assertEqual(set(data), DOCUMENT_KEYS | {"docket_entry"})
+        self.assertEqual(
+            data["docket_entry"],
+            self.absolute(
+                self.detail_path("scotusdocketentry", self.entry.pk)
+            ),
+        )
+        self.assertEqual(
+            data["absolute_url"],
+            reverse(
+                "view_recap_attachment",
+                kwargs={
+                    "docket_id": self.docket.pk,
+                    "doc_num": 1,
+                    "att_num": 1,
+                    "slug": self.docket.slug,
+                },
+            ),
+        )
+        self.assertTrue(data["is_available"])
+        self.assertEqual(
+            data["filepath_local"],
+            self.absolute(self.attachment_1.filepath_local.url),
+        )
+
+    async def test_document_without_file_or_page(self) -> None:
+        """Do missing files come back as null and missing pages as blanks?
+
+        The blank absolute_url matches what RECAP documents return.
+        """
+        cases = [
+            (self.attachment_2, "filepath_local", None),
+            (self.attachment_2, "is_available", False),
+            (self.document_no_number, "absolute_url", ""),
+        ]
+        for document, key, expected in cases:
+            with self.subTest(document=document.pk, key=key):
+                r = await self.async_client.get(
+                    self.detail_path("scotusdocument", document.pk)
+                )
+                self.assertEqual(r.json()[key], expected)
+
 
 class ScotusAPIFilterTest(ScotusAPITestCase):
     """The SCOTUS endpoints filter on their own fields and on related ones."""
@@ -194,6 +352,42 @@ class ScotusAPIFilterTest(ScotusAPITestCase):
             ],
         )
 
+    async def test_docket_entry_filters(self) -> None:
+        """Can entries be filtered by their fields and related objects?
+
+        Filtering through scotus_documents must not repeat an entry once per
+        matching document.
+        """
+        await self.assert_filter_counts(
+            "scotusdocketentry",
+            [
+                ({"docket": self.docket.pk}, 2),
+                ({"docket__id": self.docket.pk}, 2),
+                ({"entry_number": 1}, 1),
+                ({"entry_number__isnull": "true"}, 1),
+                ({"date_filed__gte": "2025-02-01"}, 1),
+                ({"date_filed__range": "2025-01-01,2025-01-31"}, 2),
+                ({"scotus_documents__id": self.attachment_2.pk}, 1),
+                ({"scotus_documents__document_number": 1}, 1),
+            ],
+        )
+
+    async def test_document_filters(self) -> None:
+        """Can documents be filtered by their fields and related objects?"""
+        await self.assert_filter_counts(
+            "scotusdocument",
+            [
+                ({"docket_entry": self.entry.pk}, 2),
+                ({"docket_entry__docket": self.docket.pk}, 2),
+                ({"attachment_number": 2}, 1),
+                ({"document_number__isnull": "true"}, 1),
+                ({"is_available": "true"}, 1),
+                ({"is_available": "false"}, 2),
+                ({"sha1": "a" * 40}, 1),
+                ({"ocr_status": SCOTUSDocument.OCR_COMPLETE}, 1),
+            ],
+        )
+
     async def test_unknown_params_are_rejected(self) -> None:
         """Do typos in filter names return a 400 instead of everything?"""
         for basename in BASENAMES:
@@ -203,6 +397,51 @@ class ScotusAPIFilterTest(ScotusAPITestCase):
                 )
                 self.assertEqual(r.status_code, HTTPStatus.BAD_REQUEST)
                 self.assertEqual(r.json()["unknown_params"], ["bogus"])
+
+    async def test_docket_entry_ordering(self) -> None:
+        """Can entries be ordered by their SCOTUS sequence number?"""
+        for order_by, expected in (
+            ("sequence_number", [self.entry_no_docs, self.entry]),
+            ("-sequence_number", [self.entry, self.entry_no_docs]),
+        ):
+            with self.subTest(order_by=order_by):
+                r = await self.async_client.get(
+                    self.list_path("scotusdocketentry"),
+                    {"docket": self.docket.pk, "order_by": order_by},
+                )
+                self.assertEqual(
+                    [entry["id"] for entry in r.json()["results"]],
+                    [entry.pk for entry in expected],
+                )
+
+
+class ScotusAPIDynamicFieldsTest(ScotusAPITestCase):
+    """The fields and omit params work on the nested documents."""
+
+    async def test_nested_fields_and_omit(self) -> None:
+        """Do fields and omit trim the nested documents?"""
+        await self.async_client.aforce_login(self.user)
+        path = self.detail_path("scotusdocketentry", self.entry.pk)
+        cases = [
+            (
+                {"fields": "id,scotus_documents__id"},
+                {"id", "scotus_documents"},
+                {"id"},
+            ),
+            (
+                {"omit": "scotus_documents__plain_text"},
+                ENTRY_KEYS,
+                DOCUMENT_KEYS - {"plain_text"},
+            ),
+        ]
+        for params, entry_keys, document_keys in cases:
+            with self.subTest(params=params):
+                r = await self.async_client.get(path, params)
+                self.assertEqual(r.status_code, HTTPStatus.OK)
+                data = r.json()
+                self.assertEqual(set(data), entry_keys)
+                for doc in data["scotus_documents"]:
+                    self.assertEqual(set(doc), document_keys)
 
 
 @mock.patch(
@@ -227,13 +466,20 @@ class ScotusAPIQueryCountTest(ScotusAPITestCase):
     def test_queries_are_flat(
         self, mock_logging_prefix: mock.MagicMock
     ) -> None:
-        """Does adding rows add no queries?"""
+        """Does adding entries with documents add no queries?"""
         # Warm up process-level caches that other tests may have cleared,
         # so the first measurement doesn't count one-time lookups.
         for name in BASENAMES:
             self.count_queries(name)
         before = {name: self.count_queries(name) for name in BASENAMES}
-        for _ in range(3):
+        for number in range(3, 6):
+            entry = SCOTUSDocketEntryFactory(
+                docket=self.docket, entry_number=number
+            )
+            for attachment in (1, 2):
+                SCOTUSDocumentFactory(
+                    docket_entry=entry, attachment_number=attachment
+                )
             ScotusDocketMetadataFactory(docket=DocketFactory(court=self.court))
         for name in BASENAMES:
             with self.subTest(endpoint=name):
