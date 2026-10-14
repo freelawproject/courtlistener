@@ -135,7 +135,7 @@ async def contact(
                     "email_confirmed": profile.email_confirmed,
                 }
 
-            create_zoho_desk_ticket.delay(
+            await sync_to_async(create_zoho_desk_ticket.delay)(
                 subject=cd["phone_number"],
                 name=cd["name"],
                 email=account_email if is_authenticated else cd["email"],
