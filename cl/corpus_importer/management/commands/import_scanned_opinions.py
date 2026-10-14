@@ -45,7 +45,6 @@ from cl.people_db.lookup_utils import (
 )
 from cl.scrapers.utils import (
     case_names_are_too_different,
-    get_existing_docket,
     update_or_create_docket,
 )
 from cl.search.cluster_sources import ClusterSources
@@ -152,7 +151,6 @@ class ScanCase:
     case_name_short: str
     case_name_full: str
     docket_number: str
-    docket_number_raw: str
     court: Court
     date_filed: date
     parsed_citations: list[FullCaseCitation]
@@ -280,15 +278,6 @@ def get_element_text(soup: BeautifulSoup, selector: str, sep: str) -> str:
     """
     texts = [e.get_text(" ", strip=True) for e in soup.select(selector)]
     return sep.join(t for t in texts if t)
-
-
-def get_docket_number_raw(soup: BeautifulSoup) -> str:
-    """Get the docket number as printed, e.g. "No. 4D2023-2459.".
-
-    :param soup: The parsed XML.
-    :return: The docket numbers joined by "; ", or an empty string.
-    """
-    return get_element_text(soup, "docketnumber", "; ")
 
 
 def get_docket_number(soup: BeautifulSoup) -> str:
@@ -535,7 +524,6 @@ def parse_scan_xml(
         case_name_short=cnt.make_case_name_short(case_name),
         case_name_full=case_name_full,
         docket_number=get_docket_number(soup),
-        docket_number_raw=get_docket_number_raw(soup),
         court=court,
         date_filed=date_filed,
         parsed_citations=cites,
@@ -809,22 +797,12 @@ def add_new_case(scan_case: ScanCase) -> OpinionCluster:
     :param scan_case: The parsed scanned opinion.
     :return: The new cluster.
     """
-    # Dockets are found by docket_number_raw. The ones made from scans store
-    # the printed number, and scraped ones the number without the prefix.
-    lookup_number = (
-        scan_case.docket_number_raw
-        if scan_case.docket_number_raw
-        and get_existing_docket(
-            scan_case.court.pk, scan_case.docket_number_raw
-        )
-        else scan_case.docket_number
-    )
     with transaction.atomic():
         docket = update_or_create_docket(
             scan_case.case_name,
             scan_case.case_name_short,
             scan_case.court,
-            lookup_number,
+            scan_case.docket_number,
             Docket.SCANNING_PROJECT,
             from_harvard=False,
             case_name_full=scan_case.case_name_full,
@@ -847,16 +825,12 @@ def add_new_case(scan_case: ScanCase) -> OpinionCluster:
                 case_name_full=scan_case.case_name_full,
                 source=Docket.SCANNING_PROJECT,
                 docket_number=scan_case.docket_number,
-                docket_number_raw=scan_case.docket_number_raw,
+                docket_number_raw=scan_case.docket_number,
                 court=scan_case.court,
                 ia_needs_upload=False,
             )
         elif docket.pk:
             logger.info("Using existing docket %s", docket.pk)
-        else:
-            # Keep the number as printed; docket_number is the clean one
-            docket.docket_number = scan_case.docket_number
-            docket.docket_number_raw = scan_case.docket_number_raw
         docket.save()
 
         cluster = OpinionCluster(

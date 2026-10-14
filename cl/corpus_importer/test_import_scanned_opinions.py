@@ -14,7 +14,6 @@ from cl.corpus_importer.management.commands.import_scanned_opinions import (
     get_citation_strings,
     get_date_filed,
     get_docket_number,
-    get_docket_number_raw,
     make_opinion,
     normalize_case_name_caps,
     s3_xml_keys,
@@ -205,26 +204,6 @@ class ScanXmlHelpersTest(SimpleTestCase):
             with self.subTest(xml=xml):
                 self.assertEqual(get_docket_number(make_soup(xml)), expected)
 
-    def test_get_docket_number_raw(self) -> None:
-        """Is the docket number kept as printed?"""
-        cases = [
-            (
-                "<docketnumber>No. 4D2023-2459.</docketnumber>",
-                "No. 4D2023-2459.",
-            ),
-            (
-                "<casebody><docketnumber>No. 1</docketnumber>"
-                "<docketnumber>No. 2</docketnumber></casebody>",
-                "No. 1; No. 2",
-            ),
-            ("<casebody/>", ""),
-        ]
-        for xml, expected in cases:
-            with self.subTest(xml=xml):
-                self.assertEqual(
-                    get_docket_number_raw(make_soup(xml)), expected
-                )
-
     def test_make_opinion(self) -> None:
         """Are the author, per curiam and type read from the opinion?"""
         cases = [
@@ -358,7 +337,8 @@ class ImportScannedOpinionsTest(TestCase):
         self.assertEqual(docket.source, Docket.SCANNING_PROJECT)
         self.assertEqual(docket.court_id, self.court.pk)
         self.assertEqual(docket.docket_number, "4D2023-2459")
-        self.assertEqual(docket.docket_number_raw, "No. 4D2023-2459")
+        # Without the printed "No.", which docket_number_core can't parse
+        self.assertEqual(docket.docket_number_raw, "4D2023-2459")
 
         citation = Citation.objects.get(cluster=cluster)
         self.assertEqual(
