@@ -1,6 +1,6 @@
 {% load static %}{% load humanize %}{% load widget_tweaks %}{% load extras %}{% load waffle_tags %}{% load svg_tags %}
 <!DOCTYPE html>
-<html lang="en">
+<html lang="en" data-color-mode="light">
 <head>
   <meta charset="utf-8"/>
   <meta http-equiv="Content-Language" content="en"/>
@@ -67,6 +67,22 @@
   <title>{% block title %}CourtListener.com{% endblock %}</title>
   {% block head %}{% endblock %}
   {% block canonical %}{% endblock %}
+  <script nonce="{{ csp_nonce }}">
+    (function () {
+      var colorMode;
+      try {
+        colorMode = window.localStorage.getItem('cl-color-mode');
+      } catch (error) {
+        colorMode = null;
+      }
+      if (colorMode !== 'dark' && colorMode !== 'light') {
+        colorMode = window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches
+          ? 'dark'
+          : 'light';
+      }
+      document.documentElement.dataset.colorMode = colorMode;
+    })();
+  </script>
   {% if DEBUG %}
     <link rel="stylesheet" href="{% static "css/bootstrap/3.3.0/bootstrap.css" %} "
           type="text/css">
@@ -182,6 +198,14 @@
                     </li>
                   </ul>
                 </li>
+                <li class="visible-xs">
+                  <button type="button"
+                          class="dark-mode-toggle dark-mode-toggle--mobile"
+                          data-theme-toggle
+                          aria-pressed="false">
+                    <i class="fa fa-moon-o" aria-hidden="true"></i>&nbsp;<span class="dark-mode-toggle__label">Dark Mode</span>
+                  </button>
+                </li>
               </ul>
             {% else %}
               <ul class="nav navbar-nav navbar-right">
@@ -189,6 +213,14 @@
                 <li class="visible-xs">
                   <a href="https://free.law/membership/"
                     >Become a Member</a>
+                </li>
+                <li class="visible-xs">
+                  <button type="button"
+                          class="dark-mode-toggle dark-mode-toggle--mobile"
+                          data-theme-toggle
+                          aria-pressed="false">
+                    <i class="fa fa-moon-o" aria-hidden="true"></i>&nbsp;<span class="dark-mode-toggle__label">Dark Mode</span>
+                  </button>
                 </li>
                 <li>
                   {% if request.path != "/sign-out/" %}
@@ -328,10 +360,19 @@
             </li>
           </ul>
           <ul class="nav navbar-nav navbar-right">
+            <li class="hidden-xs">
+              <button type="button"
+                      id="dark-mode-toggle"
+                      class="dark-mode-toggle dark-mode-toggle--desktop"
+                      data-theme-toggle
+                      aria-label="Use dark mode"
+                      aria-pressed="false">
+                <i class="fa fa-moon-o" aria-hidden="true"></i>
+              </button>
+            </li>
             <li
               class="{% block navbar-donate %}inactive{% endblock %} hidden-xs">
               <a href="https://free.law/membership/"
-
                  class="donate"><i class="fa fa-heart-o"></i>&nbsp;Join FLP</a>
             </li>
           </ul>
