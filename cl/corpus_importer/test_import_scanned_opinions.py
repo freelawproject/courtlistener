@@ -24,6 +24,7 @@ from cl.corpus_importer.management.commands.import_scanned_opinions import (
     get_precedential_status,
     make_opinion,
     normalize_case_name_caps,
+    parse_citations,
     s3_xml_keys,
 )
 from cl.lib.crypto import sha1
@@ -331,6 +332,29 @@ class ScanXmlHelpersTest(SimpleTestCase):
                 self.assertEqual(
                     get_citation_strings(make_soup(xml)), expected
                 )
+
+    def test_parse_citations(self) -> None:
+        """Are unparsed parts of a citation element logged as errors?"""
+        cases = [
+            (["388 So. 3d 1, 2024 WL 2312345"], 2, None),
+            (["578 P.3d 40 (Wyo. 2025)"], 1, None),
+            (["388 So. 3d 1, 5 Foo. Rptr. 9"], 1, "5 Foo. Rptr. 9"),
+            (["5 Foo. Rptr. 9"], 0, "5 Foo. Rptr. 9"),
+        ]
+        for cite_strings, count, unparsed in cases:
+            with (
+                self.subTest(cite_strings=cite_strings),
+                mock.patch(f"{COMMAND_MODULE}.logger") as mock_logger,
+            ):
+                cites = parse_citations(cite_strings, "scan.xml")
+
+                self.assertEqual(len(cites), count)
+                if unparsed is None:
+                    mock_logger.error.assert_not_called()
+                else:
+                    self.assertEqual(
+                        mock_logger.error.call_args.args[-1], unparsed
+                    )
 
     def test_get_docket_number(self) -> None:
         """Is the printed "No." prefix removed from docket numbers?"""

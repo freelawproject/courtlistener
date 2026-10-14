@@ -299,6 +299,43 @@ def get_citation_strings(soup: BeautifulSoup) -> list[str]:
     ]
 
 
+def parse_citations(
+    cite_strings: list[str], file_path: str
+) -> list[FullCaseCitation]:
+    """Parse the full case citations of the `<citation>` elements.
+
+    Logs an error when part of an element isn't parsed, e.g. a reporter
+    variation eyecite doesn't know, so it can be added. Such a part is left
+    out of the citations.
+
+    :param cite_strings: The texts of the `<citation>` elements.
+    :param file_path: The path of the XML file, used for logging.
+    :return: The parsed citations.
+    """
+    cites = []
+    for cite_str in cite_strings:
+        text = re.sub(r"\s+", " ", cite_str)
+        found = [
+            cite
+            for cite in get_citations(text, tokenizer=HYPERSCAN_TOKENIZER)
+            if isinstance(cite, FullCaseCitation)
+        ]
+        unparsed = list(text)
+        for cite in found:
+            start, end = cite.full_span()
+            unparsed[start:end] = " " * (end - start)
+        # Separators and spaces may be left, but not a volume or a page
+        if re.search(r"\d", leftover := "".join(unparsed)):
+            logger.error(
+                "Citation %r in %s was not fully parsed. Unparsed: %r",
+                cite_str,
+                file_path,
+                leftover.strip(" ,;"),
+            )
+        cites.extend(found)
+    return cites
+
+
 def get_element_text(soup: BeautifulSoup, selector: str, sep: str) -> str:
     """Join the text of all elements matching a selector.
 
@@ -652,14 +689,7 @@ def parse_scan_xml(
         return None
 
     cite_strings = get_citation_strings(soup)
-    cites = [
-        cite
-        for cite_str in cite_strings
-        for cite in get_citations(
-            re.sub(r"\s+", " ", cite_str), tokenizer=HYPERSCAN_TOKENIZER
-        )
-        if isinstance(cite, FullCaseCitation)
-    ]
+    cites = parse_citations(cite_strings, file_path)
     if not cites:
         logger.warning("No valid citation %s in %s", cite_strings, file_path)
         return None
