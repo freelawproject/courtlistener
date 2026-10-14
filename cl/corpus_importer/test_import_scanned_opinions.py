@@ -328,7 +328,7 @@ class ImportScannedOpinionsTest(TestCase):
         self.assertIn("Gerber", cluster.judges)
         self.assertRegex(
             cluster.filepath_xml_scan.name,
-            r"/388-so-3d-1(_[A-Za-z0-9]+)?\.xml$",
+            r"/3593-12-388-so-3d-1(_[A-Za-z0-9]+)?\.xml$",
         )
 
         docket = cluster.docket
@@ -384,7 +384,7 @@ class ImportScannedOpinionsTest(TestCase):
         self.assertIn("Gerber", cluster.judges)
         self.assertRegex(
             cluster.filepath_xml_scan.name,
-            r"/388-so-3d-1(_[A-Za-z0-9]+)?\.xml$",
+            r"/3593-12-388-so-3d-1(_[A-Za-z0-9]+)?\.xml$",
         )
         self.assertEqual(
             cluster.docket.source, Docket.SCRAPER_AND_SCANNING_PROJECT
@@ -489,22 +489,24 @@ class ImportScannedOpinionsTest(TestCase):
         self.assertEqual(docket.source, Docket.SCRAPER_AND_SCANNING_PROJECT)
         self.assertEqual(OpinionCluster.objects.get().docket_id, docket.pk)
 
-    def test_scan_from_another_reporter_is_not_duplicated(self) -> None:
-        """Is a scan with the same opinion XML detected by its content?"""
+    def test_reimport_is_found_by_scan_ids(self) -> None:
+        """Is a scanned opinion found by its ids even if its text changed?"""
         self.import_scan()
-        xml = self.scan_xml.replace("388 So. 3d 1", "49 Fla. L. Weekly D1100")
+        xml = self.scan_xml.replace("confession of error", "confession")
         with mock.patch(f"{COMMAND_MODULE}.logger") as mock_logger:
             self.import_xml(xml)
 
         self.assertEqual(OpinionCluster.objects.count(), 1)
         self.assertIn("already imported", mock_logger.info.call_args[0][0])
 
-    def test_scan_matching_a_scanned_cluster_is_not_merged(self) -> None:
+    def test_scan_from_another_reporter_is_not_duplicated(self) -> None:
         """Is a scan matching a cluster that already has scan XML skipped?"""
         self.import_scan()
-        xml = self.scan_xml.replace(
-            "388 So. 3d 1", "49 Fla. L. Weekly D1100"
-        ).replace("confession of error", "confession of the error")
+        xml = (
+            self.scan_xml.replace("388 So. 3d 1", "49 Fla. L. Weekly D1100")
+            .replace('scan-id="3593"', 'scan-id="4000"')
+            .replace('opinion-id="12"', 'opinion-id="1"')
+        )
         with mock.patch(f"{COMMAND_MODULE}.logger") as mock_logger:
             self.import_xml(xml)
 
@@ -516,7 +518,8 @@ class ImportScannedOpinionsTest(TestCase):
     def test_same_opinion_text_in_other_cases_is_imported(self) -> None:
         """Are cases with identical boilerplate opinions all imported?"""
         xml = """<?xml version="1.0" encoding="utf-8"?>
-<casebody firstpage="{page}" lastpage="{page}" schema="1">
+<casebody firstpage="{page}" lastpage="{page}" scan-id="1" opinion-id="{page}"
+  schema="1">
   <citation>388 So. 3d {page}</citation>
   <parties><party>John {name}, Appellant,</party> <separator>v.</separator>
   <party>STATE of Florida, Appellee.</party></parties>
@@ -544,7 +547,8 @@ class ImportScannedOpinionsTest(TestCase):
     def test_opinions_without_docket_numbers_on_same_page(self) -> None:
         """Are two docket-less opinions on a page with similar names kept?"""
         xml = """<?xml version="1.0" encoding="utf-8"?>
-<casebody firstpage="1" lastpage="1" schema="1">
+<casebody firstpage="1" lastpage="1" scan-id="1" opinion-id="{name}"
+  schema="1">
   <citation>388 So. 3d 1</citation>
   <parties><party>STATE of Florida, Appellant,</party>
   <separator>v.</separator> <party>John {name}, Appellee.</party></parties>
@@ -645,7 +649,8 @@ class ImportScannedOpinionsTest(TestCase):
         """Is a different case with the same citation imported?"""
         self.import_scan()
         xml = """<?xml version="1.0" encoding="utf-8"?>
-<casebody firstpage="1" lastpage="1" schema="1">
+<casebody firstpage="1" lastpage="1" scan-id="3593" opinion-id="13"
+  schema="1">
   <citation>388 So. 3d 1</citation>
   <parties><party>John DOEWELL, Appellant,</party> <separator>v.</separator>
   <party>STATE of Florida, Appellee.</party></parties>
@@ -775,6 +780,11 @@ class ImportScannedOpinionsTest(TestCase):
             (
                 "Unsupported schema",
                 self.scan_xml.replace(' schema="1"', ""),
+                self.court.pk,
+            ),
+            (
+                "Missing scan-id or opinion-id",
+                self.scan_xml.replace(' opinion-id="12"', ""),
                 self.court.pk,
             ),
         ]

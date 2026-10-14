@@ -12,6 +12,7 @@ from bs4 import BeautifulSoup, Tag
 from django.core.files.base import ContentFile
 from django.core.management import CommandError, CommandParser
 from django.db import transaction
+from django.db.models import Q
 from django.utils.text import slugify
 from eyecite.find import get_citations
 from eyecite.models import FullCaseCitation
@@ -140,6 +141,8 @@ class ScanCase:
     """Metadata and opinions parsed from a scanning project final XML."""
 
     xml: str
+    scan_id: str
+    scan_opinion_id: str
     case_name: str
     case_name_short: str
     case_name_full: str
@@ -169,12 +172,23 @@ class ScanCase:
         return [cite.corrected_citation() for cite in self.parsed_citations]
 
     @property
+    def file_name_prefix(self) -> str:
+        """The start of the stored XML file name, unique to the opinion.
+
+        e.g. "3593-12-" for opinion 12 of scan 3593
+        """
+        return f"{self.scan_id}-{self.scan_opinion_id}-"
+
+    @property
     def file_name(self) -> str:
         """The name used to store the XML in `filepath_xml_scan`.
 
-        e.g. "388-so-3d-1.xml" for 388 So. 3d 1
+        e.g. "3593-12-388-so-3d-1.xml" for opinion 12 of scan 3593, at
+        388 So. 3d 1. The ids identify the scanned opinion when it's imported
+        again, and keep opinions that share a page from sharing a name.
         """
-        return f"{slugify(self.citation.corrected_citation())}.xml"
+        citation_slug = slugify(self.citation.corrected_citation())
+        return f"{self.file_name_prefix}{citation_slug}.xml"
 
 
 def xml_file_paths(path: str) -> list[str]:
@@ -418,13 +432,26 @@ def parse_scan_xml(
 
     casebody = soup.select_one("casebody")
     schema = casebody.get("schema") if casebody else None
-    if schema not in SUPPORTED_SCHEMAS:
+    if casebody is None or schema not in SUPPORTED_SCHEMAS:
         logger.warning(
             "Unsupported schema %s in %s. Supported: %s",
             schema,
             file_path,
             sorted(SUPPORTED_SCHEMAS),
         )
+        return None
+
+    scan_id, scan_opinion_id = (
+        casebody.get("scan-id"),
+        casebody.get("opinion-id"),
+    )
+    if not (
+        isinstance(scan_id, str)
+        and scan_id
+        and isinstance(scan_opinion_id, str)
+        and scan_opinion_id
+    ):
+        logger.warning("Missing scan-id or opinion-id in %s", file_path)
         return None
 
     # Copy the opinion XML before `parse_extra_fields` mutates the soup
@@ -487,6 +514,8 @@ def parse_scan_xml(
 
     return ScanCase(
         xml=xml,
+        scan_id=scan_id,
+        scan_opinion_id=scan_opinion_id,
         case_name=case_name,
         case_name_short=cnt.make_case_name_short(case_name),
         case_name_full=case_name_full,
@@ -504,79 +533,35 @@ def parse_scan_xml(
     )
 
 
-def is_same_case(cluster: OpinionCluster, scan_case: ScanCase) -> bool:
-    """Check whether a cluster with the same opinion XML is this scanned case.
-
-    Short opinions like "PER CURIAM. Affirmed." are identical across cases,
-    so the opinion XML alone doesn't identify a case. The case names must be
-    similar, and the docket numbers must match when both have one. Without a
-    docket number, the cluster must share a citation with the scan.
-
-    :param cluster: A cluster with scanning project content.
-    :param scan_case: The parsed scanned opinion.
-    :return: True if the cluster is the scanned case.
-    """
-    if case_names_are_too_different(cluster.case_name, scan_case.case_name):
-        return False
-    if cluster.docket.docket_number and scan_case.docket_number:
-        return cluster.docket.docket_number == scan_case.docket_number
-    return any(
-        cluster.citations.filter(
-            volume=cite.groups["volume"],
-            reporter=cite.corrected_reporter(),
-            page=cite.groups["page"],
-        ).exists()
-        for cite in scan_case.parsed_citations
-    )
-
-
 def find_imported_scan(scan_case: ScanCase) -> OpinionCluster | None:
     """Find the cluster this scanned opinion was already imported into.
 
-    First looks for scanning project content with the same opinion XML in
-    the same case. As a fallback, for clusters whose opinion content wasn't merged, a cluster
-    with one of the opinion's citations and a scan XML is the same scanned
-    opinion when its docket number and case name also match. Short opinions
-    often share a page, and so a citation, with other opinions.
+    The stored XML file name starts with the scan and opinion ids, so it is
+    looked for in the clusters with one of the opinion's citations, which
+    are indexed, unlike the file path.
+
+    Caveat: a merged cluster that didn't get any of the scan's citations
+    isn't found here; `find_existing_cluster` matches it again, and the
+    import is skipped because the cluster already has a scan XML.
 
     :param scan_case: The parsed scanned opinion.
     :return: The cluster, or None if it was not imported yet.
     """
-    contents = OpinionContent.objects.filter(
-        source=OpinionContent.FLP_SCANNING,
-        sha1__in=[sha1(str(op)) for op in scan_case.opinions],
-    ).select_related("opinion__cluster__docket")
-    for content in contents:
-        if is_same_case(content.opinion.cluster, scan_case):
-            return content.opinion.cluster
-
+    citations = Q()
     for cite in scan_case.parsed_citations:
-        clusters = (
-            OpinionCluster.objects.filter(
-                citations__volume=cite.groups["volume"],
-                citations__reporter=cite.corrected_reporter(),
-                citations__page=cite.groups["page"],
-            )
-            .exclude(filepath_xml_scan="")
-            .select_related("docket")
+        citations |= Q(
+            citations__volume=cite.groups["volume"],
+            citations__reporter=cite.corrected_reporter(),
+            citations__page=cite.groups["page"],
         )
-        for cluster in clusters:
-            # Without docket numbers, two opinions on a page can have names
-            # close enough to look like the same case
-            if (
-                scan_case.docket_number
-                and cluster.docket.docket_number == scan_case.docket_number
-                and not case_names_are_too_different(
-                    cluster.case_name, scan_case.case_name
-                )
-            ):
-                return cluster
-            logger.info(
-                "Cluster %s shares citation %s but is a different case",
-                cluster.id,
-                cite.corrected_citation(),
-            )
-    return None
+    return (
+        OpinionCluster.objects.filter(
+            citations,
+            filepath_xml_scan__contains=f"/{scan_case.file_name_prefix}",
+        )
+        .distinct()
+        .first()
+    )
 
 
 def find_existing_cluster(scan_case: ScanCase) -> OpinionCluster | None:
