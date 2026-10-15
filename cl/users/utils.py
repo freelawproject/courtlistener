@@ -5,7 +5,12 @@ from django.db import transaction
 from rest_framework.authtoken.models import Token
 
 from cl.alerts.models import AlertEvent, DocketAlertEvent
-from cl.api.models import APIThrottleEvent, WebhookHistoryEvent
+from cl.api.models import (
+    APIThrottleEvent,
+    # pghistory builds this model at import time under a custom name, so the
+    # type checker can't see it.
+    WebhookHistoryEvent,  # pyrefly: ignore[missing-module-attribute]
+)
 from cl.favorites.models import (
     DocketTagEvent,
     NoteEvent,
