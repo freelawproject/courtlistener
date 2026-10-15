@@ -70,8 +70,11 @@ from cl.search.factories import (
     CourtFactory,
     DocketEntryFactory,
     DocketFactory,
+    OpinionsCitedByRECAPDocumentFactory,
     OpinionWithParentsFactory,
     RECAPDocumentFactory,
+    ScotusDocketMetadataFactory,
+    SCOTUSDocumentFactory,
 )
 from cl.search.management.commands.cl_index_parent_and_child_docs import (
     compose_redis_key,
@@ -4151,6 +4154,7 @@ class RECAPSearchAPIV3Test(
             "assignedTo",
             "assigned_to_id",
             "attachment_number",
+            "capital_case",
             "caseName",
             "cause",
             "court",
@@ -6545,6 +6549,93 @@ class RECAPSearchAPIV4Test(
                     "The date entered has an invalid format.",
                     r.content.decode(),
                 )
+
+
+class ESRECAPDocumentSCOTUSCompatibilityTest(TestCase):
+    """Confirm DocketDocument/ESRECAPDocument.prepare() stay compatible
+    with SCOTUS content (no RECAPDocument/DocketEntry rows)."""
+
+    def setUp(self) -> None:
+        self.court = CourtFactory(id="scotus", jurisdiction="F")
+
+    def test_capital_case_true_on_scotus_document_and_docket(self) -> None:
+        """A SCOTUS docket flagged as a capital case surfaces `True` at
+        both the Docket and RECAPDocument ES-document levels."""
+        scotus_document = SCOTUSDocumentFactory(
+            docket_entry__docket__court=self.court
+        )
+        docket = scotus_document.docket_entry.docket
+        ScotusDocketMetadataFactory(docket=docket, capital_case=True)
+
+        self.assertIs(
+            ESRECAPDocument().prepare(scotus_document)["capital_case"], True
+        )
+        self.assertIs(DocketDocument().prepare(docket)["capital_case"], True)
+
+    def test_capital_case_false_is_not_confused_with_absent(self) -> None:
+        """`capital_case=False` (a real SCOTUS case that isn't capital)
+        must come back as `False`, not `None` (no SCOTUS metadata)."""
+        scotus_document = SCOTUSDocumentFactory(
+            docket_entry__docket__court=self.court
+        )
+        docket = scotus_document.docket_entry.docket
+        ScotusDocketMetadataFactory(docket=docket, capital_case=False)
+
+        self.assertIs(
+            ESRECAPDocument().prepare(scotus_document)["capital_case"], False
+        )
+        self.assertIs(DocketDocument().prepare(docket)["capital_case"], False)
+
+    def test_capital_case_none_without_scotus_metadata(self) -> None:
+        """A SCOTUS docket with no ScotusDocketMetadata row yet
+        reports `None`, not a crash."""
+        scotus_document = SCOTUSDocumentFactory(
+            docket_entry__docket__court=self.court
+        )
+        docket = scotus_document.docket_entry.docket
+
+        self.assertIsNone(
+            ESRECAPDocument().prepare(scotus_document)["capital_case"]
+        )
+        self.assertIsNone(DocketDocument().prepare(docket)["capital_case"])
+
+    def test_capital_case_none_on_plain_recap_docket(self) -> None:
+        """A regular RECAP docket also reports `None` for capital_case,
+        not a crash."""
+        rd = RECAPDocumentFactory(docket_entry=DocketEntryFactory())
+        docket = rd.docket_entry.docket
+
+        self.assertIsNone(ESRECAPDocument().prepare(rd)["capital_case"])
+        self.assertIsNone(DocketDocument().prepare(docket)["capital_case"])
+
+    def test_scotus_document_type_and_cites_do_not_crash(self) -> None:
+        """SCOTUS documents have no document_type and no
+        citation attributes; prepare() shouldn't raise AttributeError."""
+        scotus_document = SCOTUSDocumentFactory(
+            docket_entry__docket__court=self.court
+        )
+
+        prepared = ESRECAPDocument().prepare(scotus_document)
+
+        self.assertIsNone(prepared["document_type"])
+        self.assertEqual(prepared["cites"], [])
+
+    def test_recap_document_type_and_cites_regression(self) -> None:
+        """A regular RECAPDocument still gets its real document_type and
+        cites values - the SCOTUS compatibility guards must not swallow
+        the existing PACER behavior."""
+        rd = RECAPDocumentFactory(
+            docket_entry=DocketEntryFactory(),
+            document_type=RECAPDocument.PACER_DOCUMENT,
+        )
+        citation = OpinionsCitedByRECAPDocumentFactory(
+            citing_document=rd, cited_opinion=OpinionWithParentsFactory()
+        )
+
+        prepared = ESRECAPDocument().prepare(rd)
+
+        self.assertEqual(prepared["document_type"], "PACER Document")
+        self.assertEqual(prepared["cites"], [citation.cited_opinion_id])
 
 
 class RECAPFeedTest(RECAPSearchTestCase, ESIndexTestCase, TestCase):

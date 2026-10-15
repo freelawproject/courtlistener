@@ -256,6 +256,11 @@ docket_api_common_keys: dict[str, object] = {
         if x["result"].docket_entry.docket.assigned_to
         else None
     ),
+    "capital_case": lambda x: (
+        x["result"].docket_entry.docket.scotus_metadata.capital_case
+        if hasattr(x["result"].docket_entry.docket, "scotus_metadata")
+        else None
+    ),
     "caseName": lambda x: (
         x["caseName"]
         if x.get("caseName")
@@ -441,6 +446,11 @@ recap_document_common_api_keys: dict[str, Any] = {
     "page_count": lambda x: x["result"].page_count or None,
     "filepath_local": lambda x: x["result"].filepath_local.name or None,
     "absolute_url": lambda x: x["result"].get_absolute_url(),
+    "capital_case": lambda x: (
+        x["result"].docket_entry.docket.scotus_metadata.capital_case
+        if hasattr(x["result"].docket_entry.docket, "scotus_metadata")
+        else None
+    ),
 }
 
 recap_document_v4_api_keys = recap_document_common_api_keys.copy()
