@@ -5,7 +5,4 @@ document.addEventListener("alpine:init", () => {
       if (url) window.location.href = url;
     },
   }));
-
-  // Alpine root for the staff actions row, which only reads the viewCount store.
-  Alpine.data("docketStaffActions", () => ({}));
 });

@@ -4222,9 +4222,9 @@ class DocketPageV2StaffLinksTest(TestCase):
     async def test_change_audio_shows_an_edit_link_per_recording(
         self,
     ) -> None:
-        """change_audio shows an Edit link to each recording's admin change
-        page, and nothing else from the admin. Each link names its recording
-        for screen readers, since the visible text is the same on all of them."""
+        """change_audio shows an icon-only Edit link to each recording's admin
+        change page, and nothing else from the admin. Each link names its
+        recording for screen readers."""
         user = await sync_to_async(self._user_with)("audio.change_audio")
         r = await self._get_docket_page(user)
         links = {
@@ -4244,8 +4244,8 @@ class DocketPageV2StaffLinksTest(TestCase):
                 self.assertIn(audio.case_name, links[href])
 
     async def test_blocked_badge_needs_change_docket(self) -> None:
-        """The Blocked badge in the staff row shows for change_docket on a
-        blocked docket and for nobody else."""
+        """The Blocked badge shows for change_docket on a blocked docket and
+        for nobody else."""
         await Docket.objects.filter(pk=self.docket.pk).aupdate(blocked=True)
         for perm, expected in (
             ("search.change_docket", True),
