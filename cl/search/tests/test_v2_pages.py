@@ -168,8 +168,10 @@ class HomepageMembershipLinksTest(SimpleUserDataMixin, TestCase):
         self.client.login(username="pandora", password="password")
         resp = self.client.get(reverse("show_results"))
         self.assertNotContains(resp, "Become a Member")
-        # Once in the "Support FLP" menu and once in the homepage actions.
-        self.assertContains(resp, "Upgrade Membership", count=2)
+        # The "Support FLP" menu says "Your Membership" and the homepage
+        # actions row says "Upgrade Membership".
+        self.assertContains(resp, "Your Membership", count=1)
+        self.assertContains(resp, "Upgrade Membership", count=1)
 
     def test_lapsed_member_is_invited_to_become_a_member(self):
         NeonMembershipFactory(
