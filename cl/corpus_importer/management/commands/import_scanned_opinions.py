@@ -894,15 +894,36 @@ def add_opinion_content(
     )
 
 
-def merge_into_cluster(cluster: OpinionCluster, scan_case: ScanCase) -> None:
-    """Merge a scanned opinion into an existing cluster.
+def get_opinion_to_merge(
+    cluster: OpinionCluster, scan_case: ScanCase
+) -> Opinion | None:
+    """Get the cluster opinion that the scanned opinion can be merged into.
 
-    Adds missing citations, fills empty cluster fields, stores the XML,
-    and updates the cluster and docket sources. The opinion text is only
-    stored when both the cluster and the XML have a single opinion, since
-    there is no reliable way yet to pair up multiple opinions.
+    There is no reliable way yet to pair up multiple opinions, so a scan is
+    only merged when both the cluster and the XML have a single opinion.
+    Versions of an opinion are kept in its cluster, so they are ignored.
 
     :param cluster: The matching cluster.
+    :param scan_case: The parsed scanned opinion.
+    :return: The opinion, or None if the opinions can't be paired.
+    """
+    cl_opinions = list(cluster.sub_opinions.filter(main_version__isnull=True))
+    if len(cl_opinions) != 1 or len(scan_case.opinions) != 1:
+        return None
+    return cl_opinions[0]
+
+
+def merge_into_cluster(
+    cluster: OpinionCluster, opinion: Opinion, scan_case: ScanCase
+) -> None:
+    """Merge a scanned opinion into an existing cluster.
+
+    Adds missing citations, fills empty cluster fields, stores the opinion
+    text and the XML, and updates the cluster and docket sources.
+
+    :param cluster: The matching cluster.
+    :param opinion: The cluster opinion paired with the scanned opinion,
+        from `get_opinion_to_merge`.
     :param scan_case: The parsed scanned opinion.
     :return: None
     """
@@ -946,36 +967,20 @@ def merge_into_cluster(cluster: OpinionCluster, scan_case: ScanCase) -> None:
         )
         docket.save(update_fields=["source"])
 
-        # Versions of an opinion are kept in its cluster; skip them
-        cl_opinions = list(
-            cluster.sub_opinions.filter(main_version__isnull=True)
-        )
-        if len(cl_opinions) == 1 and len(scan_case.opinions) == 1:
-            opinion = cl_opinions[0]
-            opinion.xml_scan = str(scan_case.opinions[0])
-            opinion.save(update_fields=["xml_scan"])
-            add_opinion_content(opinion, scan_case)
-            queue_citation_finding([opinion.pk])
-        else:
-            logger.warning(
-                "Cluster %s has %s opinions and the scan of %s has %s. "
-                "Opinion content was not merged.",
-                cluster.id,
-                len(cl_opinions),
-                scan_case.citation.corrected_citation(),
-                len(scan_case.opinions),
-            )
+        opinion.xml_scan = str(scan_case.opinions[0])
+        opinion.save(update_fields=["xml_scan"])
+        add_opinion_content(opinion, scan_case)
+        queue_citation_finding([opinion.pk])
 
         if "judges" in update_fields:
             # The judges came from the scan: resolve them, without
-            # replacing the authors the opinions already have
-            authors = {o.pk: o.author for o in cl_opinions}
-            link_judges(cluster, cl_opinions)
-            for opinion in cl_opinions:
-                if authors[opinion.pk]:
-                    opinion.author = authors[opinion.pk]
-                elif opinion.author:
-                    opinion.save(update_fields=["author"])
+            # replacing the author the opinion already has
+            author = opinion.author
+            link_judges(cluster, [opinion])
+            if author:
+                opinion.author = author
+            elif opinion.author:
+                opinion.save(update_fields=["author"])
 
         # Saves the cluster changes above too
         store_scan_xml(cluster, scan_case, update_fields)
@@ -1088,6 +1093,21 @@ def import_scanned_opinion(
                 cluster.filepath_xml_scan.name,
             )
             return
+        if not (opinion := get_opinion_to_merge(cluster, scan_case)):
+            # Skip it instead of merging only the cluster metadata, which
+            # would be hard to clean up afterwards
+            logger.warning(
+                "%s (%s) matched cluster %s, but its %s opinions can't be "
+                "paired with the scan's %s. Skipping it for review: %s%s",
+                file_path,
+                citation,
+                cluster.id,
+                cluster.sub_opinions.filter(main_version__isnull=True).count(),
+                len(scan_case.opinions),
+                BASE_URL,
+                cluster.get_absolute_url(),
+            )
+            return
         if dry_run:
             logger.info(
                 "Dry run: would merge %s (%s) into cluster %s: %s%s",
@@ -1106,7 +1126,7 @@ def import_scanned_opinion(
             BASE_URL,
             cluster.get_absolute_url(),
         )
-        merge_into_cluster(cluster, scan_case)
+        merge_into_cluster(cluster, opinion, scan_case)
         return
 
     if dry_run:

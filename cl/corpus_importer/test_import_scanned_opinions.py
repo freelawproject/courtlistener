@@ -772,21 +772,31 @@ class ImportScannedOpinionsTest(TestCase):
             [main_opinion.pk],
         )
 
-    def test_merge_skips_opinions_when_counts_differ(self) -> None:
-        """Is the opinion text left alone when opinions can't be paired?"""
+    def test_merge_skipped_when_opinions_cant_be_paired(self) -> None:
+        """Is nothing merged when the opinions can't be paired?"""
         cluster = self.make_matching_cluster(opinion_count=2)
+        source = cluster.source
+        docket_source = cluster.docket.source
 
-        with mock.patch(f"{COMMAND_MODULE}.logger") as mock_logger:
-            self.import_scan()
+        for dry_run in [True, False]:
+            with (
+                self.subTest(dry_run=dry_run),
+                mock.patch(f"{COMMAND_MODULE}.logger") as mock_logger,
+            ):
+                self.import_scan(dry_run=dry_run)
 
-        cluster.refresh_from_db()
-        self.assertTrue(cluster.filepath_xml_scan)
-        self.assertFalse(cluster.sub_opinions.exclude(xml_scan="").exists())
-        self.assertFalse(OpinionContent.objects.exists())
-        self.assertIn(
-            "Opinion content was not merged",
-            mock_logger.warning.call_args[0][0],
-        )
+                cluster.refresh_from_db()
+                self.assertFalse(cluster.filepath_xml_scan)
+                self.assertEqual(cluster.source, source)
+                self.assertEqual(cluster.attorneys, "")
+                self.assertEqual(cluster.docket.source, docket_source)
+                self.assertFalse(
+                    cluster.sub_opinions.exclude(xml_scan="").exists()
+                )
+                self.assertFalse(OpinionContent.objects.exists())
+                self.assertIn(
+                    "can't be paired", mock_logger.warning.call_args[0][0]
+                )
 
     def test_import_multiple_opinions(self) -> None:
         """Is each opinion element imported as an opinion with its type?"""
