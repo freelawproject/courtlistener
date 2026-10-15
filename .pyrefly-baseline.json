@@ -1513,13 +1513,6 @@
       "severity": "error"
     },
     {
-      "column": 44,
-      "path": "cl/donate/api_views.py",
-      "name": "bad-assignment",
-      "concise_description": "`str` is not assignable to attribute `termination_date` with type `datetime | None`",
-      "severity": "error"
-    },
-    {
       "column": 9,
       "path": "cl/donate/api_views.py",
       "name": "missing-attribute",

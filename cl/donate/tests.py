@@ -1,5 +1,5 @@
 from collections import defaultdict
-from datetime import timedelta
+from datetime import UTC, date, datetime, timedelta
 from http import HTTPStatus
 from unittest.mock import MagicMock, patch
 
@@ -13,7 +13,10 @@ from django.utils.timezone import now
 
 from cl.api.models import APIThrottle, ThrottleType
 from cl.donate.api_views import MembershipWebhookViewSet
-from cl.donate.factories import NeonWebhookEventFactory
+from cl.donate.factories import (
+    NeonMembershipFactory,
+    NeonWebhookEventFactory,
+)
 from cl.donate.models import (
     MembershipPaymentStatus,
     NeonMembership,
@@ -864,11 +867,9 @@ class ProfileMembershipTest(TestCase):
     def setUp(self) -> None:
         self.user_profile = UserProfileWithParentsFactory()
 
-    def test_is_member_returns_true_until_termination_date_passes(self):
-        """
-        checks the `is_member` property correctly identifies a user as a member
-        until their termination date has passed
-        """
+    @override_settings(NEON_MEMBERSHIP_GRACE_PERIOD_DAYS=3)
+    def test_is_member_returns_true_until_grace_period_passes(self):
+        """is_member stays True through the grace period after termination."""
         termination_date = now().date() + timedelta(weeks=4)
         NeonMembership.objects.create(
             level=NeonMembershipLevel.LEGACY,
@@ -893,13 +894,20 @@ class ProfileMembershipTest(TestCase):
         ):
             self.assertTrue(self.user_profile.is_member)
 
-        # Test a full day after the termination date
+        # Still a member through the grace period, including its last day.
+        for days in (1, 3):
+            with time_machine.travel(
+                termination_date + timedelta(days=days), tick=False
+            ):
+                self.assertTrue(self.user_profile.is_member)
+
+        # Benefits end the day after the grace period.
         with time_machine.travel(
-            termination_date + timedelta(days=1), tick=False
+            termination_date + timedelta(days=4), tick=False
         ):
             self.assertFalse(
                 self.user_profile.is_member,
-                "Should not be a member a day after termination.",
+                "Should not be a member once the grace period has passed.",
             )
 
     def test_is_member_true_when_payment_pending(self):
@@ -921,6 +929,129 @@ class ProfileMembershipTest(TestCase):
         )
         self.user_profile.refresh_from_db()
         self.assertFalse(self.user_profile.is_member)
+
+
+@override_settings(NEON_MEMBERSHIP_GRACE_PERIOD_DAYS=3)
+@time_machine.travel(datetime(2026, 10, 9, 12, 0, tzinfo=UTC), tick=False)
+class NeonMembershipActiveTest(TestCase):
+    """Tests for is_active, benefits_end_date and objects.active()."""
+
+    # "Today" is frozen at 2026-10-09. With a 3-day grace period, a term that
+    # ended on or after 2026-10-06 still grants benefits. Terms end at noon
+    # UTC so the calendar date is the same in UTC and in TIME_ZONE.
+    CASES = (
+        # label, term end, payment status, benefits end, active
+        (
+            "ends in a month",
+            date(2026, 11, 9),
+            MembershipPaymentStatus.SUCCEEDED,
+            date(2026, 11, 12),
+            True,
+        ),
+        (
+            "ends today",
+            date(2026, 10, 9),
+            MembershipPaymentStatus.SUCCEEDED,
+            date(2026, 10, 12),
+            True,
+        ),
+        (
+            "ended yesterday",
+            date(2026, 10, 8),
+            MembershipPaymentStatus.SUCCEEDED,
+            date(2026, 10, 11),
+            True,
+        ),
+        (
+            "ended on the grace cutoff",
+            date(2026, 10, 6),
+            MembershipPaymentStatus.SUCCEEDED,
+            date(2026, 10, 9),
+            True,
+        ),
+        (
+            "ended past the grace period",
+            date(2026, 10, 5),
+            MembershipPaymentStatus.SUCCEEDED,
+            date(2026, 10, 8),
+            False,
+        ),
+        (
+            "pending payment, ends today",
+            date(2026, 10, 9),
+            MembershipPaymentStatus.PENDING,
+            date(2026, 10, 12),
+            True,
+        ),
+        (
+            "failed payment, ends today",
+            date(2026, 10, 9),
+            MembershipPaymentStatus.FAILED,
+            date(2026, 10, 12),
+            False,
+        ),
+        (
+            "never ends",
+            None,
+            MembershipPaymentStatus.SUCCEEDED,
+            None,
+            True,
+        ),
+    )
+
+    @classmethod
+    def setUpTestData(cls) -> None:
+        cls.memberships = {
+            label: NeonMembershipFactory(
+                termination_date=(
+                    datetime(day.year, day.month, day.day, 12, tzinfo=UTC)
+                    if day
+                    else None
+                ),
+                payment_status=payment_status,
+            )
+            for label, day, payment_status, _, _ in cls.CASES
+        }
+
+    def active_pks(self) -> set[int]:
+        """Return the primary keys objects.active() currently selects."""
+        return set(
+            NeonMembership.objects.active().values_list("pk", flat=True)
+        )
+
+    def test_is_active_extends_term_by_grace_period(self) -> None:
+        """benefits_end_date adds the grace period and is_active honors it."""
+        for label, _, _, benefits_end_date, active in self.CASES:
+            with self.subTest(label):
+                membership = self.memberships[label]
+                self.assertEqual(
+                    membership.benefits_end_date, benefits_end_date
+                )
+                self.assertEqual(membership.is_active, active)
+
+    def test_active_queryset_applies_the_same_rule(self) -> None:
+        """objects.active() selects exactly the memberships is_active accepts."""
+        expected = {
+            self.memberships[label].pk
+            for label, _, _, _, active in self.CASES
+            if active
+        }
+
+        self.assertEqual(self.active_pks(), expected)
+
+    def test_zero_grace_period_ends_benefits_on_termination_date(self) -> None:
+        """With no grace period, benefits end on the termination date itself."""
+        ends_today = self.memberships["ends today"]
+        ended_yesterday = self.memberships["ended yesterday"]
+
+        with override_settings(NEON_MEMBERSHIP_GRACE_PERIOD_DAYS=0):
+            self.assertEqual(ends_today.benefits_end_date, date(2026, 10, 9))
+            self.assertTrue(ends_today.is_active)
+            self.assertFalse(ended_yesterday.is_active)
+            active_pks = self.active_pks()
+
+        self.assertIn(ends_today.pk, active_pks)
+        self.assertNotIn(ended_yesterday.pk, active_pks)
 
 
 class MembershipWebhookThrottleSyncTest(TestCase):

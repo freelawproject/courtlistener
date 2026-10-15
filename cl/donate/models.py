@@ -1,9 +1,13 @@
+from datetime import date, timedelta
+from typing import Self
+
 import pghistory
 from django.conf import settings
 from django.contrib.auth.models import User
 from django.core.serializers.json import DjangoJSONEncoder
 from django.core.validators import MinValueValidator
 from django.db import models
+from django.db.models import ExpressionWrapper, F, Q
 from django.utils import timezone
 
 from cl.lib.model_helpers import invert_choices_group_lookup
@@ -303,6 +307,32 @@ class NeonMembershipLevel:
     TYPES_INVERTED = invert_choices_group_lookup(TYPES)
 
 
+class NeonMembershipQuerySet(models.QuerySet):
+    """QuerySet for NeonMembership that owns the shared "active" rule."""
+
+    def active(self) -> Self:
+        """Memberships that currently grant benefits, grace period included.
+
+        Same rule as ``NeonMembership.is_active``: the payment status grants
+        benefits and the term, extended by NEON_MEMBERSHIP_GRACE_PERIOD_DAYS,
+        has not ended. Use this instead of filtering on termination_date so
+        ORM callers and Python callers can never disagree about who is a
+        member.
+        """
+        grace = timedelta(days=settings.NEON_MEMBERSHIP_GRACE_PERIOD_DAYS)
+        benefits_end = ExpressionWrapper(
+            F("termination_date") + grace, output_field=models.DateTimeField()
+        )
+        return (
+            self.annotate(benefits_end=benefits_end)
+            .filter(payment_status__in=NeonMembership.ACTIVE_PAYMENT_STATUSES)
+            .filter(
+                Q(termination_date__isnull=True)
+                | Q(benefits_end__date__gte=timezone.now().date())
+            )
+        )
+
+
 @pghistory.track()
 class NeonMembership(AbstractDateTimeModel):
     user = models.OneToOneField(
@@ -330,6 +360,8 @@ class NeonMembership(AbstractDateTimeModel):
         default=MembershipPaymentStatus.PENDING,
     )
 
+    objects = NeonMembershipQuerySet.as_manager()
+
     # Payment statuses that grant membership benefits. PENDING ("waiting for
     # payment") is included so members keep access while a charge is still
     # processing; only an outright FAILED/declined payment revokes benefits.
@@ -341,11 +373,31 @@ class NeonMembership(AbstractDateTimeModel):
     )
 
     @property
+    def benefits_end_date(self) -> date | None:
+        """Last day the membership grants benefits, grace period included.
+
+        The grace period (NEON_MEMBERSHIP_GRACE_PERIOD_DAYS) keeps benefits
+        going while a late renewal webhook or the daily Neon sync catches up.
+        None means the membership never expires.
+        """
+        if not self.termination_date:
+            return None
+        grace = timedelta(days=settings.NEON_MEMBERSHIP_GRACE_PERIOD_DAYS)
+        return self.termination_date.date() + grace
+
+    @property
     def is_active(self) -> bool:
+        """Whether the membership currently grants benefits.
+
+        Requires a payment status in ACTIVE_PAYMENT_STATUSES and a term that
+        has not ended, grace period included. ``NeonMembershipQuerySet.active``
+        applies the same rule in SQL.
+        """
         if self.payment_status not in self.ACTIVE_PAYMENT_STATUSES:
             return False
 
-        if not self.termination_date:
+        benefits_end_date = self.benefits_end_date
+        if benefits_end_date is None:
             return True
 
-        return self.termination_date.date() >= timezone.now().date()
+        return benefits_end_date >= timezone.now().date()

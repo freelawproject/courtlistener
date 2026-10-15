@@ -288,8 +288,13 @@ class AlertTest(SimpleUserDataMixin, ESIndexTestCase, TestCase):
         )
         rt_alert_params = self.alert_params.copy()
         rt_alert_params["rate"] = Alert.REAL_TIME
-        with time_machine.travel(
-            self.membership_termination_date + timedelta(days=2), tick=False
+        # Pin the grace period so two days past termination counts as expired.
+        with (
+            override_settings(NEON_MEMBERSHIP_GRACE_PERIOD_DAYS=0),
+            time_machine.travel(
+                self.membership_termination_date + timedelta(days=2),
+                tick=False,
+            ),
         ):
             r = await self.async_client.post(
                 reverse("show_results"), rt_alert_params, follow=True
