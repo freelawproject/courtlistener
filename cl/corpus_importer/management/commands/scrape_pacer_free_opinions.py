@@ -11,12 +11,11 @@ from celery.canvas import chain
 from django.db.models import F, Max, Q, Window
 from django.db.models.functions import RowNumber
 from django.utils.timezone import now
+from httpx import HTTPError
 from juriscraper.lib.date_utils import make_date_range_tuples
-from juriscraper.lib.exceptions import PacerLoginException
+from juriscraper.lib.exceptions import PacerLoginException, ParsingException
 from juriscraper.lib.string_utils import CaseNameTweaker
 from juriscraper.pacer.free_documents import FreeOpinionReport
-from requests import RequestException
-from urllib3.exceptions import ReadTimeoutError
 
 from cl.corpus_importer.tasks import (
     delete_pacer_row,
@@ -31,7 +30,6 @@ from cl.lib.argparse_types import valid_date
 from cl.lib.celery_utils import CeleryThrottle
 from cl.lib.command_utils import VerboseCommand, logger
 from cl.lib.pacer import map_cl_to_pacer_id, map_pacer_to_cl_id
-from cl.lib.types import OptionsType
 from cl.scrapers.models import PACERFreeDocumentLog, PACERFreeDocumentRow
 from cl.scrapers.tasks import extract_pdf_document
 from cl.search.models import Court, RECAPDocument
@@ -224,14 +222,15 @@ def fetch_doc_report(
             pacer_court_id, start, end, log.pk, day_span=day_span
         )  # type: ignore
     except (
-        RequestException,
-        ReadTimeoutError,
+        HTTPError,
+        TimeoutError,
         IndexError,
         TypeError,
         PacerLoginException,
+        ParsingException,
         ValueError,
     ) as exc:
-        if isinstance(exc, (RequestException | ReadTimeoutError)):
+        if isinstance(exc, (HTTPError | TimeoutError)):
             reason = "network error."
         elif isinstance(exc, IndexError):
             reason = (
@@ -242,6 +241,8 @@ def fetch_doc_report(
             reason = "failing PACER website."
         elif isinstance(exc, PacerLoginException):
             reason = "PACER login issue."
+        elif isinstance(exc, ParsingException):
+            reason = "PACER parsing error."
         else:
             reason = "unknown reason."
         logger.error(
@@ -754,7 +755,7 @@ class Command(VerboseCommand):
             ),
         )
 
-    def handle(self, *args: list[str], **options: OptionsType) -> None:
+    def handle(self, *args, **options) -> None:
         super().handle(*args, **options)
 
         if not self.validate_date_args(options):

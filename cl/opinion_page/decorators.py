@@ -1,14 +1,20 @@
+from collections.abc import Callable, Coroutine
 from functools import wraps
 from http import HTTPStatus
+from typing import Any, Concatenate
 
-from django.http import Http404
+from django.http import Http404, HttpRequest, HttpResponse
 from django.shortcuts import redirect
 from django.template.response import TemplateResponse
 
 from cl.search.models import ClusterRedirection
 
 
-def handle_cluster_redirection(view_func):
+def handle_cluster_redirection[**P](
+    view_func: Callable[
+        Concatenate[HttpRequest, P], Coroutine[Any, Any, HttpResponse]
+    ],
+) -> Callable[Concatenate[HttpRequest, P], Coroutine[Any, Any, HttpResponse]]:
     """
     Redirect from deleted clusters to existing clusters
 
@@ -16,7 +22,9 @@ def handle_cluster_redirection(view_func):
     """
 
     @wraps(view_func)
-    async def _wrapped_view(request, *args, **kwargs):
+    async def _wrapped_view(
+        request: HttpRequest, *args: P.args, **kwargs: P.kwargs
+    ) -> HttpResponse:
         try:
             response = await view_func(request, *args, **kwargs)
             return response
@@ -35,11 +43,16 @@ def handle_cluster_redirection(view_func):
 
             cluster_id = redirection.cluster_id
 
-            # redirect to the same URL, only change the target PK
+            # Without a resolved, named route there is no URL to rebuild.
+            if request.resolver_match is None:
+                raise exc
             url_name = request.resolver_match.url_name
-            url_kwargs = kwargs.copy()
+            if url_name is None:
+                raise exc
+
+            # redirect to the same URL, only change the target PK
+            url_kwargs = dict(kwargs)
             url_kwargs["pk"] = cluster_id
-            url_kwargs["permanent"] = True
-            return redirect(url_name, **url_kwargs)
+            return redirect(url_name, permanent=True, **url_kwargs)
 
     return _wrapped_view

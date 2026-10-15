@@ -2,7 +2,7 @@ import json
 import os
 import time
 from datetime import date
-from typing import TypedDict
+from typing import TypedDict, cast
 
 from django.conf import settings
 from django.core.management import CommandParser  # type: ignore
@@ -320,7 +320,9 @@ def add_bank_cases_to_cl(options: OptionsType, r) -> None:
             throttle.update_min_items(len(updated_court_ids))
             throttle.maybe_wait()
 
-            iquery_empty_count = int(r.hget("iquery_empty_results", court_id))
+            iquery_empty_count = int(
+                cast(str, r.hget("iquery_empty_results", court_id))
+            )
             if iquery_empty_count >= stop_threshold:
                 # Abort for consecutive empty results.
                 # Stop doing this court.

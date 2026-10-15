@@ -89,13 +89,26 @@ class ReplicaRoutingTokenAuthentication(TokenAuthentication):
         return result
 
 
+class InsufficientScope(exceptions.PermissionDenied):
+    """A valid bearer token that lacks the ``api`` scope (RFC 6750 §3.1)."""
+
+    auth_header = 'Bearer realm="api", error="insufficient_scope", scope="api"'
+
+
 class ReplicaRoutingOAuth2Authentication(OAuth2Authentication):
-    """OAuth2Authentication that activates replica routing after auth."""
+    """OAuth2Authentication that requires the ``api`` scope and activates
+    replica routing after auth.
+    """
 
     def authenticate(self, request: Request):
         result = super().authenticate(request)
         if result is not None:
-            _activate_replica_routing(request, result[0])
+            user, token = result
+            if not token.allow_scopes(["api"]):
+                raise InsufficientScope(
+                    "This bearer token does not have the api scope."
+                )
+            _activate_replica_routing(request, user)
             return result
         auth = get_authorization_header(request).split()
         if auth and auth[0].lower() == b"bearer":

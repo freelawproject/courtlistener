@@ -1,6 +1,6 @@
 import asyncio
+from types import ModuleType
 
-from juriscraper import AbstractSite
 from juriscraper.AbstractSite import logger
 from juriscraper.lib.importer import site_yielder
 
@@ -47,7 +47,7 @@ class Command(cl_scrape_opinions.Command):
 
     async def parse_and_scrape_site(
         self,
-        mod: AbstractSite,
+        mod: ModuleType,
         options: dict,
     ) -> None:
         """Parse the site and scrape it using the backscraper

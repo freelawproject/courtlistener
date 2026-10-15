@@ -1,4 +1,4 @@
-from typing import Any, TypedDict
+from typing import Any, TypedDict, cast
 from urllib.parse import urlencode
 
 from django.contrib import admin, messages
@@ -241,7 +241,10 @@ class SealableDocumentAdmin(admin.ModelAdmin):
 
         if queryset is None:
             doc_ids = request.POST.getlist("doc_ids")
-            queryset = RECAPDocument.objects.filter(pk__in=doc_ids)
+            queryset = cast(
+                QuerySet[RECAPDocument],
+                RECAPDocument.objects.filter(pk__in=doc_ids),
+            )
 
         ia_failures = seal_documents(queryset)
         sealed_count = queryset.count()

@@ -1,4 +1,4 @@
-from typing import IO
+from typing import IO, overload
 
 import instructor
 from openai import OpenAI
@@ -9,15 +9,38 @@ from openai.types.chat import (
 from pydantic import BaseModel
 
 
-def call_llm(
+@overload
+def call_llm[T: BaseModel](
+    *,
+    system_prompt: str,
+    user_prompt: str | list[str] | list[ChatCompletionContentPartParam],
+    model: str = ...,
+    response_model: None = None,
+    temperature: float = ...,
+    max_completion_tokens: int = ...,
+    api_key: str | None = ...,
+) -> dict | str: ...
+@overload
+def call_llm[T: BaseModel](
+    *,
+    system_prompt: str,
+    user_prompt: str | list[str] | list[ChatCompletionContentPartParam],
+    model: str = ...,
+    response_model: type[T],
+    temperature: float = ...,
+    max_completion_tokens: int = ...,
+    api_key: str | None = ...,
+) -> T: ...
+def call_llm[T: BaseModel](
+    *,
     system_prompt: str,
     user_prompt: str | list[str] | list[ChatCompletionContentPartParam],
     model: str = "openai/gpt-4o-mini",
-    response_model: type[BaseModel] | None = None,
+    response_model: type[T] | None = None,
     temperature: float = 0.0,
     max_completion_tokens: int = 1000,
     api_key: str | None = None,
-) -> BaseModel | dict | str:
+) -> T | dict | str:
     """Call an LLM via Instructor to get structured or raw output
 
     You must set any of these environment variables for some providers:

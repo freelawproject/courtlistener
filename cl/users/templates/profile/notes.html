@@ -23,10 +23,8 @@
           event.preventDefault();
           var pk = $(this).data("id");
           var ds = $("#data-store-" + pk);
-          $("#id_cluster_id").val(ds.data("cluster_id"));
-          $("#id_audio_id").val(ds.data("audio_id"));
-          $("#id_docket_id").val(ds.data("docket_id"));
-          $("#id_recap_doc_id").val(ds.data("recap_doc_id"));
+          $("#id_content_type").val(ds.data("content_type"));
+          $("#id_object_id").val(ds.data("object_id"));
           $("#save-note-notes-field").val(ds.data("notes"));
           $("#save-note-name-field").val(ds.data("name"));
           $("#modal-save-note").data("id", pk);
@@ -80,7 +78,7 @@
                         <a class="btn btn-default" href="{{ docket_search_url }}" role="button">
                       {% elif type == "Oral Arguments" %}
                         <a class="btn btn-default" href="{{ oral_search_url }}" role="button">
-                      {% elif type == "RECAP Documents" %}
+                      {% elif type == "Documents" %}
                         <a class="btn btn-default" href="{{ recap_search_url }}" role="button">
                       {% elif type == "Opinions" %}
                         <a class="btn btn-default" href="{{ opinion_search_url }}" role="button">
@@ -90,7 +88,7 @@
                   </tr>
                   </thead>
                   <tbody>
-                  {% for note_form in typed_note_forms %}
+                  {% for note_form, target in typed_note_forms %}
                     {% include "includes/notes-row.html" %}
                   {% endfor %}
                   </tbody>

@@ -28,7 +28,7 @@ class AuthoritiesContext:
     doc_type: Literal["opinion", "document"]
     query_all_authorities: bool = False
 
-    async def post_init(self):
+    async def post_init(self) -> None:
         if isinstance(self.citation_record, RECAPDocument):
             self.full_list_authorities = (
                 self.citation_record.authorities_with_data

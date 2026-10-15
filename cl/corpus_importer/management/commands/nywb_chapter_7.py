@@ -2,6 +2,7 @@ import argparse
 import csv
 import os
 
+from asgiref.sync import async_to_sync
 from celery.canvas import chain
 
 from cl.corpus_importer.bulk_utils import (
@@ -14,7 +15,7 @@ from cl.corpus_importer.tasks import (
 )
 from cl.lib.celery_utils import CeleryThrottle
 from cl.lib.command_utils import VerboseCommand, logger
-from cl.lib.pacer_session import ProxyPacerSession, SessionData
+from cl.lib.pacer_session import SessionData, log_into_pacer
 
 PACER_USERNAME = os.environ.get("PACER_USERNAME", "UNKNOWN!")
 PACER_PASSWORD = os.environ.get("PACER_PASSWORD", "UNKNOWN!")
@@ -29,10 +30,9 @@ def get_dockets(options):
     reader = csv.DictReader(f)
     q = options["queue"]
     throttle = CeleryThrottle(queue_name=q)
-    pacer_session = ProxyPacerSession(
+    pacer_session = async_to_sync(log_into_pacer)(
         username=PACER_USERNAME, password=PACER_PASSWORD
     )
-    pacer_session.login()
     for i, row in enumerate(reader):
         if i < options["offset"]:
             continue
@@ -40,10 +40,9 @@ def get_dockets(options):
             break
 
         if i % 1000 == 0:
-            pacer_session = ProxyPacerSession(
+            pacer_session = async_to_sync(log_into_pacer)(
                 username=PACER_USERNAME, password=PACER_PASSWORD
             )
-            pacer_session.login()
             logger.info(f"Sent {i} tasks to celery so far.")
         logger.info("Doing row %s", i)
         throttle.maybe_wait()

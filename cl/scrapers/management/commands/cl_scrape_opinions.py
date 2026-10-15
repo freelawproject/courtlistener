@@ -3,6 +3,7 @@ import sys
 import time
 import traceback
 from datetime import date
+from types import ModuleType
 from typing import Any
 
 from asgiref.sync import async_to_sync, sync_to_async
@@ -10,6 +11,7 @@ from django.core.files.base import ContentFile
 from django.core.management.base import CommandError
 from django.db import transaction
 from django.utils.encoding import force_bytes
+from juriscraper.AbstractSite import AbstractSite
 from juriscraper.lib.exceptions import BadContentError, InvalidDocumentError
 from juriscraper.lib.importer import build_module_list
 from juriscraper.lib.string_utils import CaseNameTweaker
@@ -51,7 +53,7 @@ die_now = False
 cnt = CaseNameTweaker()
 
 
-def set_ordering_keys(opinions_content: list[tuple[dict]]) -> None:
+def set_ordering_keys(opinions_content: list[tuple[dict, bytes, str]]) -> None:
     """Set a value for Opinion.ordering_key
 
     To know the relative order inside the cluster, we must know all the
@@ -291,7 +293,7 @@ class Command(ScraperCommand):
 
     async def scrape_court(
         self,
-        site,
+        site: AbstractSite,
         full_crawl: bool = False,
         ocr_available: bool = True,
         backscrape: bool = False,
@@ -349,7 +351,12 @@ class Command(ScraperCommand):
             await sync_to_async(dup_checker.update_site_hash)(site.hash)
 
     async def get_opinions_content(
-        self, case_dict: dict, site, court, dup_checker, next_case_date
+        self,
+        case_dict: dict,
+        site: AbstractSite,
+        court,
+        dup_checker,
+        next_case_date,
     ) -> list[tuple[dict, bytes, str]]:
         """Downloads opinions and checks if the content is duplicated
 
@@ -358,7 +365,7 @@ class Command(ScraperCommand):
         opinions_content = []
         opinions_to_download = []
 
-        # this field is populated when usign cl_back_scrape_citations
+        # this field is populated when using cl_back_scrape_citations
         if case_dict.get("content"):
             content = case_dict.pop("content")
             opinions_content.append(
@@ -433,7 +440,7 @@ class Command(ScraperCommand):
         item,
         next_case_date: date | None,
         ocr_available: bool,
-        site,
+        site: AbstractSite,
         dup_checker: DupChecker,
         court: Court,
     ):
@@ -479,9 +486,13 @@ class Command(ScraperCommand):
                 item["case_names"].encode(),
             )
 
-    async def parse_and_scrape_site(self, mod, options: dict):
-        site = await mod.Site(save_response_fn=save_response).parse()
-        await self.scrape_court(site, options["full_crawl"])
+    async def parse_and_scrape_site(
+        self, mod: ModuleType, options: dict[str, Any]
+    ) -> None:
+        """Parse and scrape a court, closing its HTTP client on every exit."""
+        async with mod.Site(save_response_fn=save_response) as site:
+            await site.parse()
+            await self.scrape_court(site, options["full_crawl"])
 
     def handle(self, *args, **options):
         super().handle(*args, **options)

@@ -60,6 +60,7 @@ from cl.lib.file_validation import (
     file_too_large_message,
 )
 from cl.lib.pacer import is_pacer_court_accessible, lookup_and_save
+from cl.lib.pacer_session import SessionData
 from cl.lib.recap_utils import needs_ocr
 from cl.lib.redis_utils import get_redis_interface
 from cl.lib.storage import clobbering_get_name
@@ -2900,6 +2901,7 @@ class ReplicateRecapUploadsTest(TestCase):
 )
 @mock.patch(
     "cl.recap.tasks.get_pacer_cookie_from_cache",
+    return_value=SessionData(None, "http://proxy_1:9090"),
 )
 class RecapDocketFetchApiTest(TestCase):
     """Tests for the RECAP docket Fetch API
@@ -3709,7 +3711,10 @@ class PacerFetchQueueScopedAccessTest(TestCase):
         self.assertEqual(self.fq.pacer_case_id, "123456")
 
 
-@mock.patch("cl.recap.tasks.get_pacer_cookie_from_cache")
+@mock.patch(
+    "cl.recap.tasks.get_pacer_cookie_from_cache",
+    return_value=SessionData(None, "http://proxy_1:9090"),
+)
 @mock.patch(
     "cl.recap.tasks.is_pacer_court_accessible",
     side_effect=lambda a: True,
@@ -3865,6 +3870,35 @@ class RecapPdfFetchApiTest(TestCase):
         self.assertEqual(self.fq.status, PROCESSING_STATUS.SUCCESSFUL)
         self.assertTrue(self.rd.is_available)
         mock_extract.assert_called_once()
+
+    @mock.patch(
+        "cl.corpus_importer.tasks.FreeOpinionReport",
+        new=fakes.FakeFreeOpinionReport,
+    )
+    @mock.patch(
+        "cl.lib.storage.get_name_by_incrementing",
+        side_effect=clobbering_get_name,
+    )
+    @mock.patch("cl.scrapers.tasks.extract_pdf_document_base")
+    def test_fetch_unavailable_pdf_with_pacer_sequence_number(
+        self,
+        mock_extract,
+        mock_get_name,
+        mock_court_accessible,
+        mock_get_cookies,
+    ):
+        """Can we fetch a PDF whose entry has an int PACER sequence number?"""
+        self.de.pacer_sequence_number = 5
+        self.de.save()
+        self.rd.is_available = False
+        self.rd.save()
+
+        do_pacer_fetch(self.fq).get()
+
+        self.fq.refresh_from_db()
+        self.rd.refresh_from_db()
+        self.assertEqual(self.fq.status, PROCESSING_STATUS.SUCCESSFUL)
+        self.assertTrue(self.rd.is_available)
 
     @mock.patch(
         "cl.corpus_importer.tasks.FreeOpinionReport",
@@ -4201,8 +4235,23 @@ class RecapAttPageFetchApiTest(TestCase):
         self.assertEqual(self.fq.status, PROCESSING_STATUS.FAILED)
         self.assertIn("Unable to find cached cookies", self.fq.message)
 
+    def test_fetch_att_page_rd_deleted(self, mock_court_accessible) -> None:
+        """Is the FQ marked as failed if its RD is deleted before the task
+        runs?
+        """
+        self.rd.delete()
+
+        result = do_pacer_fetch(self.fq)
+        result.get()
+
+        self.fq.refresh_from_db()
+        self.assertIsNone(self.fq.recap_document_id)
+        self.assertEqual(self.fq.status, PROCESSING_STATUS.FAILED)
+        self.assertIn("no longer exists", self.fq.message)
+
     @mock.patch(
         "cl.recap.tasks.get_pacer_cookie_from_cache",
+        return_value=SessionData(None, "http://proxy_1:9090"),
     )
     @mock.patch(
         "cl.recap.tasks.get_data_from_att_report",
@@ -4247,6 +4296,7 @@ class RecapAttPageFetchApiTest(TestCase):
 
     @mock.patch(
         "cl.recap.tasks.get_pacer_cookie_from_cache",
+        return_value=SessionData(None, "http://proxy_1:9090"),
     )
     @mock.patch(
         "cl.recap.tasks.get_data_from_appellate_att_report",
@@ -4296,6 +4346,7 @@ class RecapAttPageFetchApiTest(TestCase):
 
     @mock.patch(
         "cl.recap.tasks.get_pacer_cookie_from_cache",
+        return_value=SessionData(None, "http://proxy_1:9090"),
     )
     @mock.patch(
         "cl.corpus_importer.tasks.ACMSAttachmentPage",
@@ -5886,7 +5937,7 @@ class RecapDocketTaskTest(TestCase):
         for test, method in tests.items():
             for source, expected_source in non_recap_sources.items():
                 with self.subTest(
-                    f"Testing {test} source {source} assigment.",
+                    f"Testing {test} source {source} assignment.",
                     source=source,
                     expected_source=expected_source,
                 ):
@@ -5957,7 +6008,7 @@ class RecapDocketTaskTest(TestCase):
         for test, test_assets in tests.items():
             for source, expected_source in test_assets[0].items():
                 with self.subTest(
-                    f"Testing {test} source {source} assigment.",
+                    f"Testing {test} source {source} assignment.",
                     source=source,
                     expected_source=expected_source,
                 ):
@@ -8317,6 +8368,7 @@ class WebhooksRetries(TestCase):
 )
 @mock.patch(
     "cl.recap.tasks.get_pacer_cookie_from_cache",
+    return_value=SessionData(None, "http://proxy_1:9090"),
 )
 class RecapFetchWebhooksTest(TestCase):
     """Test RECAP Fetch Webhooks"""
