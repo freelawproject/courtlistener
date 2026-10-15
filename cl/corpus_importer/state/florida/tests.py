@@ -1355,6 +1355,28 @@ class FloridaDocumentMergerTest(TestCase):
                     },
                 )
 
+    def test_remerge_single_title_match_with_multiple_stored_candidates(self):
+        """When an entry has two stored documents sharing a title and the next
+        scrape has only one document with that title and an unseen link UUID,
+        is the new document created and are the stale ones removed?"""
+        first = FloridaDocumentFactory.create(document_name="Motion")
+        second = FloridaDocumentFactory.create(document_name="Motion")
+        docket_data = self._make_case(first, second)
+        FloridaDocketMerger(docket_data, params=docket_data.entries).merge()
+
+        replacement = FloridaDocumentFactory.create(document_name="Motion")
+        docket_data.entries[0].attachments = [replacement]
+        result = FloridaDocketMerger(
+            docket_data, params=docket_data.entries
+        ).merge()
+
+        self.assertTrue(result.success)
+        self.assertEqual(len(result.creates["FloridaDocument"]), 1)
+        self.assertEqual(
+            list(FloridaDocument.objects.values_list("link_uuid", flat=True)),
+            [replacement.document_link_uuid],
+        )
+
 
 class FloridaCaseTransferMergerTest(TestCase):
     """Tests for merging case transfers from Florida cases."""
