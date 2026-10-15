@@ -1,11 +1,21 @@
+from collections.abc import Coroutine
 from functools import wraps
 from inspect import iscoroutinefunction
+from typing import Any, cast
 
 from asgiref.sync import sync_to_async
+from django.http import HttpResponse
+from django.http.request import HttpRequest
 from django.template.response import SimpleTemplateResponse
 
+from cl.lib.types import DjangoViewDecorator, DjangoViewType
 
-def track_view_counter(tracks=str, label_format=str):
+
+def track_view_counter[
+    **P,
+    Request: HttpRequest,
+    Response: HttpResponse | Coroutine[Any, Any, HttpResponse],
+](tracks: str, label_format: str) -> DjangoViewDecorator[P, Request, Response]:
     """
     Decorator to injects a tracking label into template responses for event
     counting (e.g., view tracking).
@@ -31,7 +41,9 @@ def track_view_counter(tracks=str, label_format=str):
                             placeholder for the model's ID (e.g., 'd.%s:view').
     """
 
-    def decorator(func):
+    def decorator(
+        func: DjangoViewType[P, Request, Response],
+    ) -> DjangoViewType[P, Request, Response]:
         def _get_label(
             response: SimpleTemplateResponse,
             track_attribute: str,
@@ -62,7 +74,9 @@ def track_view_counter(tracks=str, label_format=str):
         if iscoroutinefunction(func):
 
             @wraps(func)
-            async def inner(request, *args, **kwargs):
+            async def inner(
+                request: Request, *args: P.args, **kwargs: P.kwargs
+            ) -> Response:
                 response = await func(request, *args, **kwargs)
                 if not isinstance(response, SimpleTemplateResponse):
                     return response
@@ -73,12 +87,14 @@ def track_view_counter(tracks=str, label_format=str):
                 response.context_data.update(
                     {"event_label": event_label, "track_events": True}
                 )
-                return response
+                return cast(Response, response)
 
         else:
 
             @wraps(func)
-            def inner(request, *args, **kwargs):
+            def inner(
+                request: Request, *args: P.args, **kwargs: P.kwargs
+            ) -> Response:
                 response = func(request, *args, **kwargs)
                 if not isinstance(response, SimpleTemplateResponse):
                     return response
@@ -89,6 +105,6 @@ def track_view_counter(tracks=str, label_format=str):
                 )
                 return response
 
-        return inner
+        return cast(DjangoViewType[P, Request, Response], inner)
 
     return decorator
