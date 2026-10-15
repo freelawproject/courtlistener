@@ -10,7 +10,7 @@ OIDC_RSA_PRIVATE_KEY = env("OIDC_RSA_PRIVATE_KEY", default="").replace(
     "\\n", "\n"
 )
 
-OAUTH2_DCR_RATELIMIT = env("OAUTH2_DCR_RATELIMIT", default="20000/h")
+OAUTH2_DCR_RATELIMIT = env("OAUTH2_DCR_RATELIMIT", default="100/h")
 
 if not OIDC_RSA_PRIVATE_KEY and not DEVELOPMENT and not TESTING:
     raise ImproperlyConfigured(
