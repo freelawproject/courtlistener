@@ -6539,34 +6539,6 @@
       "severity": "error"
     },
     {
-      "column": 27,
-      "path": "cl/users/utils.py",
-      "name": "missing-module-attribute",
-      "concise_description": "Could not import `WebhookHistoryEvent` from `cl.api.models`",
-      "severity": "error"
-    },
-    {
-      "column": 33,
-      "path": "cl/users/utils.py",
-      "name": "missing-module-attribute",
-      "concise_description": "Could not import `DocketTagEvent` from `cl.favorites.models`",
-      "severity": "error"
-    },
-    {
-      "column": 49,
-      "path": "cl/users/utils.py",
-      "name": "missing-module-attribute",
-      "concise_description": "Could not import `NoteEvent` from `cl.favorites.models`",
-      "severity": "error"
-    },
-    {
-      "column": 60,
-      "path": "cl/users/utils.py",
-      "name": "missing-module-attribute",
-      "concise_description": "Could not import `UserTagEvent` from `cl.favorites.models`",
-      "severity": "error"
-    },
-    {
       "column": 5,
       "path": "cl/users/utils.py",
       "name": "missing-module-attribute",
