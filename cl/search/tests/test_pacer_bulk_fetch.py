@@ -295,9 +295,9 @@ class PacerBulkFetchUnitTest(TestCase):
         self.command.user = self.user
         self.command.options = {
             "testing": True,
-            "min_page_count": 100,
-            "max_page_count": 10_000,
         }
+        self.command.min_page_count = 100
+        self.command.max_page_count = 10_000
         self.command.interval = 2
         self.command.total_launched = 0
         self.command.max_retries = 1
@@ -327,8 +327,8 @@ class PacerBulkFetchUnitTest(TestCase):
         mock_fetched_cache_key,
     ):
         """Test that identify_documents correctly filters documents based on criteria"""
-        self.command.options["min_page_count"] = 200
-        self.command.options["max_page_count"] = 300
+        self.command.min_page_count = 200
+        self.command.max_page_count = 300
 
         self.command.identify_documents()
 
@@ -469,8 +469,8 @@ class PacerBulkFetchUnitTest(TestCase):
         mock_fetched_cache_key,
     ):
         """Test exclude RECAPDocuments that are likely transcripts"""
-        self.command.options["min_page_count"] = 1000
-        self.command.options["max_page_count"] = 2000
+        self.command.min_page_count = 1000
+        self.command.max_page_count = 2000
 
         # Transcript RDs:
         de_5 = DocketEntryFactory(docket=self.docket, description="")

@@ -186,7 +186,6 @@ class Command(VerboseCommand):
 
     def setup_celery(self) -> None:
         """Setup Celery by setting the queue_name and throttle."""
-        self.queue_name = self.queue_name
         self.throttle = CeleryThrottle(queue_name=self.queue_name)
 
     def handle_pacer_session(self) -> None:
@@ -566,6 +565,7 @@ class Command(VerboseCommand):
 
     def handle(self, *args, **options) -> None:
         self.options = options
+        self.queue_name = options["queue_name"]
         self.setup_celery()
         self.interval = self.options["interval"]
         self.initial_backoff_time = self.options["initial_backoff_time"]

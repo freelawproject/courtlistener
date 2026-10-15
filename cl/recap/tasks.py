@@ -9,7 +9,7 @@ from datetime import datetime
 from functools import partial
 from http import HTTPStatus
 from multiprocessing import process
-from typing import Any, TypedDict, cast, overload
+from typing import Any, TypedDict, overload
 from zipfile import ZipFile
 
 import httpx
@@ -4010,35 +4010,35 @@ def process_texas_email(self: Task, epq_pk: int) -> None:
 
 
 def fetch_and_archive_scotus_docket_followup(
-    scotus_email: SCOTUSEmail,
+    court_id: str,
+    notification: SCOTUSNotificationEmail,
+    followup_url: str,
     timeout: float = 10.0,
 ) -> dict[str, str | dict[str, str]]:
     """Fetch the SCOTUS docket follow-up URL, archive the raw HTML in S3,
     and parse it.
 
-    :param scotus_email: A parsed ``SCOTUSEmail`` whose ``email_type`` is
-        ``DOCKET_ENTRY``.
+    :param court_id: The ID of the court from the ``SCOTUSEmail`` object
+    :param notification: The ``SCOTUSNotificationEmail`` object from the ``SCOTUSEmail["data"]`` field
+    :param followup_url: The URL to send the followup request to
     :param timeout: HTTP timeout in seconds.
     :return: A dict with ``email_type`` and ``data`` keys, matching the shape
         returned by ``SCOTUSEmail.handle_email``.
     """
-    parsed_email = scotus_email.data
     with httpx.Client(follow_redirects=True, http2=True) as client:
         response = client.get(
-            parsed_email["followup_url"],
+            followup_url,
             headers={"User-Agent": "Free Law Project"},
             timeout=timeout,
         )
     response.raise_for_status()
 
-    docket_number = cast(SCOTUSNotificationEmail, parsed_email["data"])[
-        "docket_number"
-    ]
+    docket_number = notification["docket_number"]
     save_scotus_raw_to_s3(
         f"responses/dockets/scotus-email/{docket_number}.html",
         response.text,
     )
-    report = SCOTUSDocketReportHTML(scotus_email.court_id)
+    report = SCOTUSDocketReportHTML(court_id)
     report._parse_text(response.text)
     return {
         "email_type": SCOTUSEmailType.DOCKET_ENTRY.value,
@@ -4096,8 +4096,12 @@ def process_scotus_email(self: Task, epq_pk: int) -> None:
     scotus_email = SCOTUSEmail()
     scotus_email._parse_text(body)
     if scotus_email.email_type == SCOTUSEmailType.DOCKET_ENTRY:
+        if scotus_email.data["data"] is None:
+            raise TypeError("SCOTUS email parsed data is unexpectedly none")
         handling_result = fetch_and_archive_scotus_docket_followup(
-            scotus_email
+            scotus_email.court_id,
+            scotus_email.data["data"],
+            scotus_email.data["followup_url"],
         )
     else:
         handling_result = async_to_sync(scotus_email.handle_email)()

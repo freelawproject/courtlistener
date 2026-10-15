@@ -33,7 +33,7 @@ class Command(VerboseCommand):
         self.retrieval_queue = None
         self.indexing_queue = None
         self.batch_size: int
-        self.delay: float = 1.0
+        self.delay: float
 
     def add_arguments(self, parser):
         parser.add_argument(
