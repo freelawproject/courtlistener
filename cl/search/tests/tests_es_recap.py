@@ -6810,7 +6810,7 @@ class RECAPFeedTest(RECAPSearchTestCase, ESIndexTestCase, TestCase):
             de_1.delete()
 
     def test_catch_es_errors(self) -> None:
-        """Can we catch es errors and just render an empy feed?"""
+        """Can we catch es errors and just render an empty feed?"""
 
         # Bad syntax error.
         params = {

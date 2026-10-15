@@ -6,6 +6,7 @@ import os
 from datetime import date
 
 import pandas as pd
+from asgiref.sync import async_to_sync
 from django.conf import settings
 from juriscraper.pacer import ClaimsActivity
 
@@ -19,7 +20,8 @@ PACER_USERNAME = os.environ.get("PACER_USERNAME", settings.PACER_USERNAME)
 PACER_PASSWORD = os.environ.get("PACER_PASSWORD", settings.PACER_PASSWORD)
 
 
-def query_and_parse_claims_activity(
+@async_to_sync
+async def query_and_parse_claims_activity(
     courts: list[str], date_start: date, date_end: date
 ) -> None:
     """Queries and parses claims activity for a list of courts and a specified
@@ -35,7 +37,7 @@ def query_and_parse_claims_activity(
         bankr_courts = (
             Court.federal_courts.bankruptcy_pacer_courts().all().only("pk")
         )
-        courts = [court.pk for court in bankr_courts]
+        courts = [court.pk async for court in bankr_courts]
 
     creditor_names = {
         "international_flavors": "International Flavors",
@@ -44,81 +46,87 @@ def query_and_parse_claims_activity(
         "firmenich": "Firmenich",
     }
 
-    s = ProxyPacerSession(username=PACER_USERNAME, password=PACER_PASSWORD)
-    s.login()
-    for court_id in courts:
-        court = map_cl_to_pacer_id(court_id)
-        for alias, creditor_name in creditor_names.items():
-            logger.info(f"Doing {court} and creditor {alias}")
+    async with ProxyPacerSession(
+        username=PACER_USERNAME, password=PACER_PASSWORD
+    ) as session:
+        await session.login()
+        for court_id in courts:
+            court = map_cl_to_pacer_id(court_id)
+            for alias, creditor_name in creditor_names.items():
+                logger.info(f"Doing {court} and creditor {alias}")
 
-            # Check if the reports directory already exists
-            html_path = os.path.join(
-                settings.MEDIA_ROOT, "claims_activity", "reports"
-            )
-            if not os.path.exists(html_path):
-                # Create the directory if it doesn't exist
-                os.makedirs(html_path)
-
-            html_file = os.path.join(
-                settings.MEDIA_ROOT,
-                "claims_activity",
-                "reports",
-                f"{court}-{alias}.html",
-            )
-            try:
-                report = ClaimsActivity(court, s)
-            except AssertionError:
-                # This is not a bankruptcy court.
-                logger.warning(f"Court {court} is not a bankruptcy court.")
-                continue
-
-            if not os.path.exists(html_file):
-                # If the HTML report for this creditor and court doesn't exist
-                # query it from PACER.
-                logger.info(f"File {html_file} doesn't exist.")
-                logger.info(
-                    f"Querying report, court_id: {court}, creditor_name: "
-                    f"{creditor_name}, date_start: {date_start}, date_end: "
-                    f"{date_end}."
+                # Check if the reports directory already exists
+                html_path = os.path.join(
+                    settings.MEDIA_ROOT, "claims_activity", "reports"
                 )
+                if not os.path.exists(html_path):
+                    # Create the directory if it doesn't exist
+                    os.makedirs(html_path)
 
-                report.query(
-                    pacer_case_id="",
-                    docket_number="",
-                    creditor_name=creditor_name,
-                    date_start=date_start,
-                    date_end=date_end,
+                html_file = os.path.join(
+                    settings.MEDIA_ROOT,
+                    "claims_activity",
+                    "reports",
+                    f"{court}-{alias}.html",
                 )
+                try:
+                    report = ClaimsActivity(court, session)
+                except AssertionError:
+                    # This is not a bankruptcy court.
+                    logger.warning(f"Court {court} is not a bankruptcy court.")
+                    continue
 
-                # Save report HTML in disk.
-                with open(html_file, "w", encoding="utf-8") as file:
-                    file.write(report.response.text)
-
-            else:
-                logger.info(
-                    f"File {html_file} already exists court: {court}, "
-                    f"creditor_name: {alias}, skipping report query."
-                )
-
-            json_file = os.path.join(
-                settings.MEDIA_ROOT,
-                "claims_activity",
-                "reports",
-                f"{court}-{alias}.json",
-            )
-            if not os.path.exists(json_file):
-                # If not json_file for court and creditor, parse it from HTML.
-                with open(html_file, "rb") as file:
-                    text = file.read().decode("utf-8")
-                report._parse_text(text)
-                with open(json_file, "w", encoding="utf-8") as file:
-                    json.dump(
-                        report.data,
-                        file,
-                        default=serialize_json,
-                        indent=2,
-                        sort_keys=True,
+                if not os.path.exists(html_file):
+                    # If the HTML report for this creditor and court doesn't exist
+                    # query it from PACER.
+                    logger.info(f"File {html_file} doesn't exist.")
+                    logger.info(
+                        f"Querying report, court_id: {court}, creditor_name: "
+                        f"{creditor_name}, date_start: {date_start}, date_end: "
+                        f"{date_end}."
                     )
+
+                    await report.query(
+                        pacer_case_id="",
+                        docket_number="",
+                        creditor_name=creditor_name,
+                        date_start=date_start,
+                        date_end=date_end,
+                    )
+                    if report.response is None:
+                        raise RuntimeError(
+                            "Claims activity query returned no response."
+                        )
+
+                    # Save report HTML in disk.
+                    with open(html_file, "w", encoding="utf-8") as file:
+                        file.write(report.response.text)
+
+                else:
+                    logger.info(
+                        f"File {html_file} already exists court: {court}, "
+                        f"creditor_name: {alias}, skipping report query."
+                    )
+
+                json_file = os.path.join(
+                    settings.MEDIA_ROOT,
+                    "claims_activity",
+                    "reports",
+                    f"{court}-{alias}.json",
+                )
+                if not os.path.exists(json_file):
+                    # If not json_file for court and creditor, parse it from HTML.
+                    with open(html_file, "rb") as file:
+                        text = file.read().decode("utf-8")
+                    report._parse_text(text)
+                    with open(json_file, "w", encoding="utf-8") as file:
+                        json.dump(
+                            report.data,
+                            file,
+                            default=serialize_json,
+                            indent=2,
+                            sort_keys=True,
+                        )
 
 
 def serialize_json(obj: date) -> str:

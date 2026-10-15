@@ -9,6 +9,7 @@ from pathlib import Path
 from typing import ClassVar
 
 import botocore.exceptions
+from asgiref.sync import sync_to_async
 from django.core.management import CommandError
 from django.core.management.base import BaseCommand, CommandParser
 from httpx import Response
@@ -372,7 +373,7 @@ class S3Cache(RequestHandler):
             )
             return
 
-        self.save_to_s3(request, response)
+        await sync_to_async(self.save_to_s3)(request, response)
 
     def __hash__(self) -> int:
         return hash(id(self))

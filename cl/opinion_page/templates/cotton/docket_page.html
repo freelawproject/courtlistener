@@ -14,6 +14,18 @@
 />
 
 <div>
+{% if perms.search|has_any_perm:"docket" %}
+  <div class="flex justify-end mb-2" x-data>
+    <c-button variant="dark" size="sm" href="{% url 'admin:search_docket_change' docket.pk %}">
+      {% svg "edit" class="w-3.5 h-3.5" aria_hidden="true" %}
+      Edit Docket
+      {% if track_events %}
+        <span x-show="$store.viewCount.loaded" x-cloak class="text-greyscale-300">(<span x-text="$store.viewCount.value"></span> views)</span>
+      {% endif %}
+    </c-button>
+  </div>
+{% endif %}
+
 {# Filed date eyebrow #}
 {% if docket.date_filed %}
   <c-eyebrow class="mb-2">Filed: {{ docket.date_filed }}</c-eyebrow>
@@ -49,22 +61,55 @@
     Tags
   </c-button>
   {% if docket_source_url %}
-  {# TODO: Wire up alert toggle interactivity (auth checks, AJAX toggle, state change). #}
   <c-menu-button
     button_variant="outline"
     widget_aria_label="Docket alerts menu"
-    trigger_aria_label="Get Alerts"
     menu_aria_label="Alert options"
   >
     <c-slot name="button_content">
-      {% svg "bell" class="w-4 h-4" aria_hidden="true" %}
-      Get Alerts
+      {# Swap target: the toggle response replaces this span's contents. #}
+      <span id="docket-alert-label-{{ docket.pk }}" class="contents">
+        <c-docket-alert-label :has_alert="has_alert" />
+      </span>
       <span
         class="transition-transform duration-200 group-aria-[expanded=true]:rotate-180 flex justify-center items-center w-4 h-4"
         aria-hidden="true"
       >{% svg "chevron" class="w-full h-full text-greyscale-400" %}</span>
     </c-slot>
     <c-slot name="menu_content">
+      {% if user.is_authenticated %}
+        {% if has_alert or user.profile.can_make_another_alert %}
+          <c-menu-button.item
+            tag="button"
+            hx-post="{% url 'toggle_docket_alert' %}"
+            hx-vals='{"id": "{{ docket.pk }}"}'
+            hx-swap="none"
+            hx-disabled-elt="this"
+          >
+            <span id="docket-alert-toggle-{{ docket.pk }}" class="contents">
+              <c-docket-alert-label :has_alert="has_alert" icon_class="w-4 h-4 text-greyscale-500" />
+            </span>
+          </c-menu-button.item>
+        {% else %}
+          <c-menu-button.item
+            tag="button"
+            icon="bell"
+            icon_class="w-4 h-4 text-greyscale-500"
+            disabled
+          >
+            Get Alerts
+          </c-menu-button.item>
+        {% endif %}
+      {% else %}
+        <c-menu-button.item
+          href="{% url 'sign-in' %}?next={{ request.get_full_path|urlencode }}"
+          icon="bell"
+          icon_class="w-4 h-4 text-greyscale-500"
+          rel="nofollow"
+        >
+          Get Alerts
+        </c-menu-button.item>
+      {% endif %}
       <c-menu-button.item
         href="{% url 'docket_feed' docket.pk %}"
         icon="rss"
@@ -90,6 +135,8 @@
       </c-menu-button.item>
     </c-slot>
   </c-menu-button>
+  {# Announces the toggle's outcome; the response swaps its contents. #}
+  <span id="docket-alert-status-{{ docket.pk }}" role="status" class="sr-only"></span>
   {% endif %}
   <c-docket-source-button :docket="docket" :docket_source="docket_source" />
   {% if user.is_authenticated %}
@@ -113,20 +160,28 @@
 {% endfor %}
 
 {# ORAL ARGUMENT RECORDINGS #}
-{% if docket.audio_files.count %}
+{% with recordings=docket.audio_files.all %}
+{% if recordings %}
   <h2 class="mt-6">Oral Argument Recordings</h2>
   <ul>
-    {% for af in docket.audio_files.all %}
+    {% for af in recordings %}
       <li>
-        <a class="links" href="{{ af.get_absolute_url }}{% querystring %}">
-          {{ af|best_case_name|safe|v_wrapper }}
-        </a>
-        <br/>
-        {{ af.docket.date_argued|default_if_none:"" }}
+        <div class="flex items-start gap-3">
+          {% if perms.audio.change_audio %}
+            <c-button variant="dark" size="sm" href="{% url 'admin:audio_audio_change' af.pk %}" title="Edit {{ af|best_case_name }}">{% svg "edit" class="w-4 h-4" aria_hidden="true" %}<span class="sr-only">Edit {{ af|best_case_name }}</span></c-button>
+          {% endif %}
+          <div>
+            <a class="links" href="{{ af.get_absolute_url }}{% querystring %}">
+              {{ af|best_case_name|safe|v_wrapper }}
+            </a>
+            <div>{{ af.docket.date_argued|default_if_none:"" }}</div>
+          </div>
+        </div>
       </li>
     {% endfor %}
   </ul>
 {% endif %}
+{% endwith %}
 
 </div>
 
