@@ -318,7 +318,7 @@ unmatchedcitations_fields='(
 unmatchedcitations_csv_filename="unmatched-citations-$(date -I).csv"
 
 # If you add or remove a table, you need to update this number
-NUM_TABLES=34
+NUM_TABLES=35
 
 # Every new table added to bulk script should be added as an associative array
 # This ordering is important. Tables with foreign key constraints must be loaded in order.
@@ -362,7 +362,7 @@ declare -a t_33=("citations_unmatchedcitation" "$unmatchedcitations_fields" "$un
 declare -a t_34=("search_clusterredirection" "$clusterredirection_fields" "$clusterredirection_csv_filename")
 
 # After search_opinion (t_12), which its opinion_id references
-declare -a t_34=("search_opinioncontent" "$opinioncontent_fields" "$opinioncontent_csv_filename")
+declare -a t_35=("search_opinioncontent" "$opinioncontent_fields" "$opinioncontent_csv_filename")
 
 # Create a new array with the data of each associative array
 declare -a listOfLists
