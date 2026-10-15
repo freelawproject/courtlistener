@@ -5,6 +5,7 @@ import os
 import re
 from typing import TypedDict, cast
 
+from asgiref.sync import async_to_sync
 from django.conf import settings
 
 from cl.corpus_importer.bulk_utils import make_bankr_docket_number
@@ -15,7 +16,7 @@ from cl.corpus_importer.tasks import (
 from cl.lib.celery_utils import CeleryThrottle
 from cl.lib.command_utils import VerboseCommand, logger
 from cl.lib.pacer import map_cl_to_pacer_id
-from cl.lib.pacer_session import ProxyPacerSession, SessionData
+from cl.lib.pacer_session import SessionData, log_into_pacer
 from cl.lib.redis_utils import create_redis_semaphore
 
 CLIENT_PACER_USERNAME = os.environ.get("CLIENT_PACER_USERNAME", "")
@@ -69,10 +70,9 @@ def query_and_save_creditors_data(options: OptionsType) -> None:
         else:
             raise ValueError(f"Bad file name {file}")
 
-    session = ProxyPacerSession(
+    session = async_to_sync(log_into_pacer)(
         username=CLIENT_PACER_USERNAME, password=CLIENT_PACER_PASSWORD
     )
-    session.login()
     throttle = CeleryThrottle(queue_name=q)
     completed = 0
     for i, rows in enumerate(

@@ -1,10 +1,12 @@
 import os
 import time
+from collections.abc import Collection
 from dataclasses import dataclass
 from datetime import datetime, timedelta
 from enum import Enum
 from typing import Any
 
+from asgiref.sync import async_to_sync
 from django.contrib.auth.models import User
 from django.core.cache import cache
 from django.core.management.base import CommandError
@@ -54,7 +56,7 @@ class MinimumWait:
 
 
 def enough_time_elapsed(
-    datetime_to_compare: datetime, time_interval: int
+    datetime_to_compare: datetime, time_interval: float
 ) -> bool:
     """Check if enough time has elapsed since datetime_to_compare
 
@@ -102,7 +104,7 @@ class Command(VerboseCommand):
         super().__init__(*args, **kwargs)
         self.options = None
         self.user = None
-        self.recap_documents = []
+        self.recap_documents: Collection[dict[str, Any]] = []
         self.courts_with_docs = {}
         self.total_launched = 0
         self.max_retries = 6
@@ -116,7 +118,7 @@ class Command(VerboseCommand):
         self.queue_name = None
         self.interval = None
         self.initial_backoff_time = None
-        self.max_fq_wait = 3600  # 1 hour. Maximum wait time for an FQ to be completed to prevent a deadlock
+        self.max_fq_wait: float = 3600  # 1 hour. Maximum wait time for an FQ to be completed to prevent a deadlock
         self.fetches_in_progress = {}  # {court_id: (fq_pk, retry_count)}
 
     def add_arguments(self, parser) -> None:
@@ -186,7 +188,7 @@ class Command(VerboseCommand):
 
     def handle_pacer_session(self) -> None:
         """Make sure we have an active PACER session for the user."""
-        get_or_cache_pacer_cookies(
+        async_to_sync(get_or_cache_pacer_cookies)(
             self.user.pk,
             username=self.pacer_username,
             password=self.pacer_password,

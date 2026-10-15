@@ -2,14 +2,17 @@ import json
 import logging
 import os
 import pickle
+from datetime import date
 
+from asgiref.sync import async_to_sync, sync_to_async
+from celery import Task
 from django.apps import apps
 from django.conf import settings
 from django.core.files.base import ContentFile
 from django.db import transaction
+from httpx import HTTPError
 from juriscraper.lasc.fetch import LASCSearch
 from juriscraper.lasc.http import LASCSession
-from requests import RequestException
 
 from cl.celery_init import app
 from cl.lasc.models import (
@@ -23,6 +26,7 @@ from cl.lasc.models import (
 )
 from cl.lasc.utils import make_case_id
 from cl.lib.crypto import sha1_of_json_data
+from cl.lib.exceptions import CourtQueryError
 from cl.lib.redis_utils import get_redis_interface
 
 logger = logging.getLogger(__name__)
@@ -40,7 +44,11 @@ class SESSION_IS:
     OK = "ok"
 
 
-def login_to_court():
+class LASCLoginInProgress(Exception):
+    """Another worker is logging in; try again after its cookies are cached."""
+
+
+async def login_to_court() -> None:
     """Set the login cookies in redis for an LASC user
 
     Replace any existing cookies in redis.
@@ -49,58 +57,82 @@ def login_to_court():
     """
     r = get_redis_interface("CACHE")
     # Give yourself a few minutes to log in
-    r.set(LASC_SESSION_STATUS_KEY, SESSION_IS.LOGGING_IN, ex=60 * 2)
-    lasc_session = LASCSession(username=LASC_USERNAME, password=LASC_PASSWORD)
-    lasc_session.login()
-    cookie_str = str(pickle.dumps(lasc_session.cookies))
+    await sync_to_async(r.set)(
+        LASC_SESSION_STATUS_KEY, SESSION_IS.LOGGING_IN, ex=60 * 2
+    )
+    async with LASCSession(
+        username=LASC_USERNAME, password=LASC_PASSWORD
+    ) as lasc_session:
+        await lasc_session.login()
+    # HTTPX cookie jars contain a lock that cannot be pickled.
+    cookie_bytes = pickle.dumps(list(lasc_session.cookies.jar))
     # Done logging in; save the cookies.
-    r.set(LASC_SESSION_COOKIE_KEY, cookie_str, ex=60 * 30)
-    r.set(LASC_SESSION_STATUS_KEY, SESSION_IS.OK, ex=60 * 30)
+    await sync_to_async(r.set)(
+        LASC_SESSION_COOKIE_KEY, cookie_bytes, ex=60 * 30
+    )
+    await sync_to_async(r.set)(
+        LASC_SESSION_STATUS_KEY, SESSION_IS.OK, ex=60 * 30
+    )
 
 
-def establish_good_login(self):
+async def establish_good_login() -> None:
     """Make sure that we have good login credentials for LASC in redis
 
     Checks the Login Status for LASC.  If no status is found runs login
     function to store good keys in redis.
 
-    :param self: A Celery task object
+    :raises LASCLoginInProgress: Another worker is currently logging in.
     :return: None
     """
     r = get_redis_interface("CACHE")
-    status = r.get(LASC_SESSION_STATUS_KEY)
+    status = await sync_to_async(r.get)(LASC_SESSION_STATUS_KEY)
     if status == SESSION_IS.LOGGING_IN:
-        self.retry()
+        raise LASCLoginInProgress
     if status == SESSION_IS.OK:
         return
-    login_to_court()
+    await login_to_court()
 
 
-def make_lasc_search() -> LASCSearch:
+async def make_lasc_search() -> LASCSearch:
     """Create a logged-in LASCSearch object with cookies pulled from cache
 
     :return: LASCSearch object
     """
-    r = get_redis_interface("CACHE")
+    r = get_redis_interface("CACHE", decode_responses=False)
+    cookie_bytes = await sync_to_async(r.get)(LASC_SESSION_COOKIE_KEY)
+    if cookie_bytes is None:
+        raise ValueError("LASC session cookies are not cached.")
     session = LASCSession()
-    session.cookies = pickle.loads(r.get(LASC_SESSION_COOKIE_KEY))
+    for cookie in pickle.loads(cookie_bytes):
+        session.cookies.jar.set_cookie(cookie)
     return LASCSearch(session)
 
 
 @app.task(bind=True, ignore_result=True, max_retries=3, retry_backoff=15)
-def download_pdf(self, pdf_pk):
+def download_pdf(self: Task, pdf_pk: int) -> None:
+    """Celery task wrapper for download_pdf_base."""
+    try:
+        return async_to_sync(download_pdf_base)(pdf_pk)
+    except LASCLoginInProgress:
+        raise self.retry()
+    except CourtQueryError as exc:
+        logger.warning("%s", exc)
+        if self.request.retries == self.max_retries:
+            return
+        raise self.retry(exc=exc.__cause__)
+
+
+async def download_pdf_base(pdf_pk: int) -> None:
     """Downloads the PDF associated with the PDF DB Object ID passed in.
 
-    :param self: The celery instance
     :param pdf_pk: The primary key of the QueuedPDF object we are downloading
     :return: None; object is saved to DB and filesystem
     """
-    establish_good_login(self)
-    lasc = make_lasc_search()
+    await establish_good_login()
 
-    q_pdf = QueuedPDF.objects.get(pk=pdf_pk)
+    q_pdf = await QueuedPDF.objects.select_related("docket").aget(pk=pdf_pk)
 
-    doc = DocumentImage.objects.get(doc_id=q_pdf.document_id)
+    doc = await DocumentImage.objects.aget(doc_id=q_pdf.document_id)
     if doc.is_available:
         logger.info(
             "Already have LASC PDF from docket ID %s with doc ID %s ",
@@ -109,17 +141,23 @@ def download_pdf(self, pdf_pk):
         )
         return
 
-    try:
-        pdf_data = lasc.get_pdf_from_url(q_pdf.document_url)
-    except RequestException as exc:
-        logger.warning(
-            "Got RequestException trying to get PDF for PDF Queue %s",
-            q_pdf.pk,
-        )
-        if self.request.retries == self.max_retries:
-            return
-        raise self.retry(exc=exc)
+    lasc = await make_lasc_search()
 
+    try:
+        async with lasc.session:
+            pdf_data = await lasc.get_pdf_from_url(q_pdf.document_url)
+    except HTTPError as exc:
+        raise CourtQueryError(
+            f"Got RequestException trying to get PDF for PDF Queue {q_pdf.pk}"
+        ) from exc
+
+    await sync_to_async(save_downloaded_pdf)(q_pdf, doc, pdf_data)
+
+
+def save_downloaded_pdf(
+    q_pdf: QueuedPDF, doc: DocumentImage, pdf_data: bytes
+) -> None:
+    """Store the PDF and finish its queue item in the existing transaction."""
     pdf_document = LASCPDF(
         content_object=q_pdf,
         docket_number=q_pdf.docket.case_id.split(";")[0],
@@ -182,49 +220,57 @@ def add_case(case_id, case_data, original_data):
 
 
 @app.task(bind=True, ignore_result=True, max_retries=3, retry_backoff=15)
-def add_or_update_case_db(self, case_id):
+def add_or_update_case_db(self: Task, case_id: str) -> None:
+    """Celery task wrapper for add_or_update_case_db_base."""
+    try:
+        return async_to_sync(add_or_update_case_db_base)(case_id)
+    except LASCLoginInProgress:
+        raise self.retry()
+    except CourtQueryError as exc:
+        retries_remaining = self.max_retries - self.request.retries
+        if retries_remaining == 0:
+            logger.error("%s", exc)
+            return
+        logger.info("%s %s retries remaining.", exc, retries_remaining)
+        r = get_redis_interface("CACHE")
+        r.delete(LASC_SESSION_COOKIE_KEY, LASC_SESSION_STATUS_KEY)
+        raise self.retry()
+
+
+async def add_or_update_case_db_base(case_id: str) -> None:
     """Add a case from the LASC MAP using an authenticated session object
 
-    :param self: The celery object
     :param case_id: The case ID to download, for example, '19STCV25157;SS;CV'
     :return: None
     """
-    establish_good_login(self)
-    lasc = make_lasc_search()
+    await establish_good_login()
+    lasc = await make_lasc_search()
 
     clean_data = {}
     try:
-        clean_data = lasc.get_json_from_internal_case_id(case_id)
+        async with lasc.session:
+            clean_data = await lasc.get_json_from_internal_case_id(case_id)
         logger.info("Successful Query")
-    except RequestException as e:
-        retries_remaining = self.max_retries - self.request.retries
-        if retries_remaining == 0:
-            logger.error("RequestException, unable to get case at %s", case_id)
-            return
-        logger.info(
-            "Failed to get JSON for '%s', with RequestException: %s. "
-            "%s retries remaining.",
-            case_id,
-            e,
-            retries_remaining,
-        )
-        r = get_redis_interface("CACHE")
-        r.delete(LASC_SESSION_COOKIE_KEY, LASC_SESSION_STATUS_KEY)
-        self.retry()
+    except HTTPError as e:
+        raise CourtQueryError(
+            f"Failed to get JSON for '{case_id}', with RequestException: {e}."
+        ) from e
 
     if not clean_data:
         logger.info("No information for case %s. Possibly sealed?", case_id)
         return
 
     ds = Docket.objects.filter(case_id=case_id)
-    ds_count = ds.count()
+    ds_count = await ds.acount()
     if ds_count == 0:
         logger.info("Adding lasc case with ID: %s", case_id)
-        add_case(case_id, clean_data, lasc.case_data)
+        await sync_to_async(add_case)(case_id, clean_data, lasc.case_data)
     elif ds_count == 1:
-        if latest_sha(case_id=case_id) != sha1_of_json_data(lasc.case_data):
+        if await sync_to_async(latest_sha)(
+            case_id=case_id
+        ) != sha1_of_json_data(lasc.case_data):
             logger.info("Updating lasc case with ID: %s", case_id)
-            update_case(lasc, clean_data)
+            await sync_to_async(update_case)(lasc, clean_data)
         else:
             logger.info("LASC case is already up to date: %s", case_id)
     else:
@@ -335,31 +381,38 @@ def add_case_from_filepath(filepath):
 
 
 @app.task(bind=True, ignore_result=True, max_retries=3, retry_backoff=15)
-def fetch_date_range(self, start, end):
+def fetch_date_range(self: Task, start: date, end: date) -> None:
+    """Celery task wrapper for fetch_date_range_base."""
+    try:
+        return async_to_sync(fetch_date_range_base)(start, end)
+    except LASCLoginInProgress:
+        raise self.retry()
+    except CourtQueryError as exc:
+        logger.warning("%s", exc)
+        if self.request.retries == self.max_retries:
+            return
+        raise self.retry(exc=exc.__cause__)
+
+
+async def fetch_date_range_base(start: date, end: date) -> None:
     """Queries LASC for one week or less range and returns the cases filed.
 
-    :param self: the celery object
     :param start: The date you want to start searching for cases
     :type start: datetime
     :param end: The date you want to stop searching for cases
     :type end: datetime
     :return: None
     """
-    establish_good_login(self)
-    lasc = make_lasc_search()
+    await establish_good_login()
+    lasc = await make_lasc_search()
 
     try:
-        cases = lasc.query_cases_by_date(start, end)
-    except RequestException as exc:
-        logger.warning(
-            "Got RequestException trying to get cases by date "
-            "between %s and %s",
-            start,
-            end,
-        )
-        if self.request.retries == self.max_retries:
-            return
-        raise self.retry(exc=exc)
+        async with lasc.session:
+            cases = await lasc.query_cases_by_date(start, end)
+    except HTTPError as exc:
+        raise CourtQueryError(
+            f"Got RequestException trying to get cases by date between {start} and {end}"
+        ) from exc
 
     cases_added_cnt = 0
     for case in cases:
@@ -367,8 +420,8 @@ def fetch_date_range(self, start, end):
         case_object = QueuedCase.objects.filter(
             internal_case_id=internal_case_id
         )
-        if not case_object.exists():
-            QueuedCase.objects.create(
+        if not await case_object.aexists():
+            await QueuedCase.objects.acreate(
                 **{
                     "internal_case_id": internal_case_id,
                     "judge_code": case["judge_code"],

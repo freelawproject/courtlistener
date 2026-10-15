@@ -446,8 +446,11 @@ async def view_docket(
     has_idb_data = bool(docket.idb_data_id)
     has_authorities = await docket.ahas_authorities()
 
-    context.update(
-        {
+    return TemplateResponse(
+        request,
+        "docket.html",
+        context
+        | {
             "parties": parties,
             "authorities": has_authorities,
             "docket_entries": paginated_entries,
@@ -458,9 +461,8 @@ async def view_docket(
             "tabs": build_docket_tabs(
                 docket, parties, has_idb_data, has_authorities
             ),
-        }
+        },
     )
-    return TemplateResponse(request, "docket.html", context)
 
 
 @cache_page_ignore_params(300, cache_alias="s3")
@@ -534,14 +536,16 @@ async def view_parties(
             parties[party_type.name] = []
         parties[party_type.name].append(party_type)
 
-    context.update(
-        {
+    return TemplateResponse(
+        request,
+        "docket_parties.html",
+        context
+        | {
             "parties": parties,
             "parties_paginator": party_types_paginator,
             "docket_entries": await docket.docket_entries.aexists(),
-        }
+        },
     )
-    return TemplateResponse(request, "docket_parties.html", context)
 
 
 @ratelimit_deny_list
@@ -557,8 +561,12 @@ async def docket_idb_data(
         )
     except ObjectDoesNotExist:
         raise Http404("No IDB data for this docket at this time")
-    context.update(
-        {
+
+    return TemplateResponse(
+        request,
+        "docket_idb_data.html",
+        context
+        | {
             # Needed to show/hide parties tab.
             "parties": await docket.parties.aexists(),
             "docket_entries": await docket.docket_entries.aexists(),
@@ -579,9 +587,8 @@ async def docket_idb_data(
             ),
             "judgment_csv": choices_to_csv(idb_data, "judgment"),
             "pro_se_csv": choices_to_csv(idb_data, "pro_se"),
-        }
+        },
     )
-    return TemplateResponse(request, "docket_idb_data.html", context)
 
 
 @ratelimit_deny_list
@@ -594,15 +601,17 @@ async def docket_authorities(
     if not await docket.ahas_authorities():
         raise Http404("No authorities data for this docket at this time")
 
-    context.update(
-        {
+    return TemplateResponse(
+        request,
+        "docket_authorities.html",
+        context
+        | {
             # Needed to show/hide parties tab.
             "parties": await docket.parties.aexists(),
             "docket_entries": await docket.docket_entries.aexists(),
             "authorities": docket.authority_opinions.distinct(),
-        }
+        },
     )
-    return TemplateResponse(request, "docket_authorities.html", context)
 
 
 def make_rd_title(rd: RECAPDocument | SCOTUSDocument) -> str:

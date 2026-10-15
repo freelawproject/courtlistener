@@ -3,7 +3,7 @@ import logging
 import traceback
 from dataclasses import dataclass, field
 from io import StringIO
-from typing import Any, cast
+from typing import Any, TypedDict, cast
 from zoneinfo import ZoneInfo
 
 import waffle
@@ -21,6 +21,7 @@ from django.utils.timezone import localtime
 from django_elasticsearch_dsl.search import Search
 from elasticsearch.dsl import Q
 from elasticsearch.dsl.response import Response
+from elasticsearch.dsl.response.hit import Hit
 from elasticsearch.exceptions import ApiError, ConnectionTimeout, RequestError
 
 from cl.alerts.models import DocketAlert
@@ -540,22 +541,22 @@ async def _common_metadata_sections(
     ]
 
 
+class CoreDocketDataDict(TypedDict):
+    docket: Docket
+    title: str
+    note_form: NoteForm
+    has_alert: bool
+    timezone: str
+    private: bool
+    docket_source: DocketEntrySource
+    docket_source_url: str | None
+    metadata_sections: list[MetadataSection]
+
+
 async def core_docket_data(
     request: HttpRequest,
     pk: int,
-) -> tuple[
-    Docket,
-    dict[
-        str,
-        bool
-        | str
-        | None
-        | Docket
-        | NoteForm
-        | DocketEntrySource
-        | list[MetadataSection],
-    ],
-]:
+) -> tuple[Docket, CoreDocketDataDict]:
     """Gather the core data for a docket, party, or IDB page."""
     docket: Docket = await aget_object_or_404(Docket, pk=pk)
     source = docket.get_entry_source()
@@ -762,7 +763,7 @@ class RelatedCitingResults:
     )
     sub_opinion_pks: list[int] = field(default_factory=list)
     url_search_params: dict[str, str] = field(default_factory=dict)
-    citing_clusters: list[OpinionClusterDocument] = field(default_factory=list)
+    citing_clusters: list[Hit] = field(default_factory=list)
     citing_cluster_count: int = 0
     timeout: bool = False
 
@@ -957,7 +958,7 @@ async def es_get_cited_clusters_with_cache(
         response = None
         timeout_cited = True
 
-    citing_clusters = list(response) if response is not None else []
+    citing_clusters: list[Hit] = list(response) if response is not None else []
     cluster_results.citing_clusters = citing_clusters
     cluster_results.citing_cluster_count = (
         cast(Any, response.hits).total.value if response is not None else 0

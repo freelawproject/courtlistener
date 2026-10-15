@@ -527,6 +527,10 @@ class TranscriptionTest(TestCase):
         }
 
         class OpenAITranscription:
+            def __init__(self):
+                self.text = cls.open_ai_api_returned_dict["text"]
+                self.duration = cls.open_ai_api_returned_dict["duration"]
+
             def to_dict(self):
                 return cls.open_ai_api_returned_dict
 
