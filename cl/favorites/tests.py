@@ -1654,7 +1654,8 @@ class RECAPPrayAndPay(SimpleUserDataMixin, PrayAndPayTestCase):
         r = await self.async_client.get(
             reverse("user_prayers", args=["pandora"])
         )
-        self.assertContains(r, "Get More Prayers")
+        self.assertContains(r, "Members get more prayers each day.")
+        self.assertContains(r, ">Join FLP</a>")
 
     async def test_prayers_page_does_not_nudge_members(self) -> None:
         """Members already have more prayers, so don't ask them to join."""
@@ -1664,7 +1665,7 @@ class RECAPPrayAndPay(SimpleUserDataMixin, PrayAndPayTestCase):
         r = await self.async_client.get(
             reverse("user_prayers", args=["pandora"])
         )
-        self.assertNotContains(r, "Get More Prayers")
+        self.assertNotContains(r, "Members get more prayers each day.")
 
     @override_settings(ALLOWED_PRAYER_COUNT=0)
     async def test_daily_limit_tooltip_mentions_membership(self) -> None:
@@ -1674,13 +1675,13 @@ class RECAPPrayAndPay(SimpleUserDataMixin, PrayAndPayTestCase):
         url = reverse("create_prayer", args=[self.rd_2.pk])
 
         r = await self.async_client.post(url, headers={"HX-Request": "true"})
-        self.assertContains(r, "You have reached your daily request limit.")
-        self.assertContains(r, "Members get more requests each day.")
+        self.assertContains(r, "You have reached your daily prayer limit.")
+        self.assertContains(r, "Join FLP to get higher limits.")
 
         await sync_to_async(NeonMembershipFactory)(user=user)
         r = await self.async_client.post(url, headers={"HX-Request": "true"})
-        self.assertContains(r, "You have reached your daily request limit.")
-        self.assertNotContains(r, "Members get more requests each day.")
+        self.assertContains(r, "You have reached your daily prayer limit.")
+        self.assertNotContains(r, "Join FLP to get higher limits.")
 
     async def test_can_we_load_the_top_prayers_page(self) -> None:
         """Does the 'top prayers' page return a successful response?"""
