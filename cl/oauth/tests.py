@@ -18,8 +18,6 @@ from oauth2_provider.models import (
     get_access_token_model,
     get_application_model,
     get_grant_model,
-    get_id_token_model,
-    get_refresh_token_model,
     set_token_value,
 )
 from rest_framework.authtoken.models import Token
@@ -32,8 +30,6 @@ from cl.users.factories import UserFactory, UserProfileWithParentsFactory
 Application = get_application_model()
 Grant = get_grant_model()
 AccessToken = get_access_token_model()
-RefreshToken = get_refresh_token_model()
-IDToken = get_id_token_model()
 
 
 @override_settings(RATELIMIT_ENABLE=False)
@@ -564,6 +560,7 @@ class CleanOAuthTablesCommandTest(TestCase):
     application alone, authorized or not."""
 
     def test_clears_expired_grants_and_keeps_applications(self):
+        """Expired grants go; a never-authorized application stays."""
         app = ApplicationFactory(name="never authorized")
         expired_grant = Grant.objects.create(
             user=UserFactory(),
