@@ -14,7 +14,7 @@ from asgiref.sync import sync_to_async
 from django.conf import settings
 from django.contrib import admin
 from django.contrib.auth.hashers import make_password
-from django.contrib.auth.models import User
+from django.contrib.auth.models import Group, User
 from django.contrib.auth.tokens import default_token_generator
 from django.core import mail
 from django.core.cache import cache as django_cache
@@ -53,6 +53,7 @@ from cl.api.factories import (
 )
 from cl.api.models import (
     APIThrottle,
+    APIThrottleEvent,
     ThrottleType,
     Webhook,
     WebhookEvent,
@@ -68,12 +69,18 @@ from cl.donate.models import (
     NeonMembership,
     NeonMembershipLevel,
 )
-from cl.favorites.factories import NoteFactory, UserTagFactory
+from cl.favorites.factories import (
+    NoteFactory,
+    PrayerFactory,
+    UserTagFactory,
+)
 from cl.favorites.models import (
     DocketTag,
     DocketTagEvent,
     Note,
     NoteEvent,
+    Prayer,
+    PrayerEvent,
     UserTag,
     UserTagEvent,
 )
@@ -99,6 +106,7 @@ from cl.search.factories import (
     SCOTUSDocumentFactory,
 )
 from cl.search.models import Docket, SearchQuery
+from cl.stats.models import Event as StatsEvent
 from cl.tests.base import SELENIUM_TIMEOUT, BaseSeleniumTest
 from cl.tests.cases import (
     APITestCase,
@@ -138,6 +146,7 @@ from cl.users.models import (
     EmailFlag,
     EmailSent,
     FailedEmail,
+    UserGroupsEvent,
     UserProfile,
     UserProfileBarMembershipEvent,
     UserProfileEvent,
@@ -762,22 +771,25 @@ class ProfileTest(SimpleUserDataMixin, TestCase):
         self.assertEqual(docket_tag_events_first.tag_id, tag_1_user_2.pk)
 
     def test_purges_user_data_and_history_on_account_deletion(self) -> None:
-        """Deleting an account hard-deletes the user's logged data and the
-        PII left behind in the pghistory event tables, keeps (but disables)
-        donation records, and leaves a second user's data untouched.
+        """Deleting an account hard-deletes the user's logged data, API
+        credentials and the PII left behind in the pghistory event tables,
+        keeps (but disables) donation records, and leaves a second user's data
+        untouched.
         """
         victim = UserProfileWithParentsFactory()
         bystander = UserProfileWithParentsFactory()
 
         # Edit tracked fields to generate UserProfile/UserProxy history, and
-        # associate a bar membership to generate barmembership history.
+        # associate a bar membership and a group to generate m2m history.
         bar = BarMembership.objects.create(barMembership="CA")
+        group = Group.objects.create(name="some-group")
         for profile in (victim, bystander):
             profile.user.first_name = "Real Name"
             profile.user.save()
             profile.employer = "Real Employer"
             profile.save()
             profile.barmembership.add(bar)
+            profile.user.groups.add(group)
 
             # Usage logs and assets tied to each user.
             SearchQuery.objects.create(
@@ -808,6 +820,18 @@ class ProfileTest(SimpleUserDataMixin, TestCase):
             gfk_note.notes = "edited"
             gfk_note.save()
 
+            # Prayers, throttle overrides and stats events, edited so that
+            # each one also leaves pghistory rows behind.
+            prayer = PrayerFactory(user=profile.user, status=Prayer.WAITING)
+            prayer.status = Prayer.GRANTED
+            prayer.save()
+            throttle = APIThrottleFactory(user=profile.user, rate="10/min")
+            throttle.rate = "20/min"
+            throttle.save()
+            StatsEvent.objects.create(
+                user=profile.user, description="Did something"
+            )
+
         # Sanity check: the victim's history and assets exist before deletion.
         self.assertTrue(
             UserProxyEvent.objects.filter(pgh_obj_id=victim.user.pk).exists()
@@ -824,6 +848,16 @@ class ProfileTest(SimpleUserDataMixin, TestCase):
         self.assertTrue(
             NoteEvent.objects.filter(user_id=victim.user.pk).exists()
         )
+        self.assertTrue(
+            PrayerEvent.objects.filter(user_id=victim.user.pk).exists()
+        )
+        self.assertTrue(
+            APIThrottleEvent.objects.filter(user_id=victim.user.pk).exists()
+        )
+        self.assertTrue(
+            UserGroupsEvent.objects.filter(user_id=victim.user.pk).exists()
+        )
+        self.assertTrue(Token.objects.filter(user=victim.user).exists())
 
         # Delete the victim's account.
         self.assertTrue(
@@ -842,6 +876,12 @@ class ProfileTest(SimpleUserDataMixin, TestCase):
         self.assertFalse(EmailSent.objects.filter(user=victim.user).exists())
         self.assertFalse(SCOTUSMap.objects.filter(user=victim.user).exists())
         self.assertFalse(Note.objects.filter(user=victim.user).exists())
+        self.assertFalse(Prayer.objects.filter(user=victim.user).exists())
+        self.assertFalse(StatsEvent.objects.filter(user=victim.user).exists())
+
+        # API credentials and per-user rate limit overrides are revoked.
+        self.assertFalse(Token.objects.filter(user=victim.user).exists())
+        self.assertFalse(APIThrottle.objects.filter(user=victim.user).exists())
 
         # The PII left behind in the event tables is purged.
         self.assertFalse(
@@ -857,6 +897,15 @@ class ProfileTest(SimpleUserDataMixin, TestCase):
         )
         self.assertFalse(
             NoteEvent.objects.filter(user_id=victim.user.pk).exists()
+        )
+        self.assertFalse(
+            PrayerEvent.objects.filter(user_id=victim.user.pk).exists()
+        )
+        self.assertFalse(
+            APIThrottleEvent.objects.filter(user_id=victim.user.pk).exists()
+        )
+        self.assertFalse(
+            UserGroupsEvent.objects.filter(user_id=victim.user.pk).exists()
         )
 
         # Donations are financial records: kept, but disabled.
@@ -877,6 +926,23 @@ class ProfileTest(SimpleUserDataMixin, TestCase):
             UserProxyEvent.objects.filter(
                 pgh_obj_id=bystander.user.pk
             ).exists()
+        )
+        self.assertTrue(Prayer.objects.filter(user=bystander.user).exists())
+        self.assertTrue(
+            StatsEvent.objects.filter(user=bystander.user).exists()
+        )
+        self.assertTrue(Token.objects.filter(user=bystander.user).exists())
+        self.assertTrue(
+            APIThrottle.objects.filter(user=bystander.user).exists()
+        )
+        self.assertTrue(
+            PrayerEvent.objects.filter(user_id=bystander.user.pk).exists()
+        )
+        self.assertTrue(
+            APIThrottleEvent.objects.filter(user_id=bystander.user.pk).exists()
+        )
+        self.assertTrue(
+            UserGroupsEvent.objects.filter(user_id=bystander.user.pk).exists()
         )
         self.assertTrue(
             UserProfileBarMembershipEvent.objects.filter(
