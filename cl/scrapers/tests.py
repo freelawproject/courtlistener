@@ -1242,7 +1242,7 @@ class ScraperDocketMatchingTest(TestCase):
             docket, self.ca2_docket, "Should match using docket number core"
         )
 
-    def test_does_not_unblock_existing_docket(self):
+    def test_does_not_unblock_existing_docket(self) -> None:
         """Matching an existing docket should never unblock it, nor
         overwrite its original date_blocked. It may block an unblocked one
         """
