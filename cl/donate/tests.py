@@ -1110,17 +1110,20 @@ class DonateSidebarTest(TestCase):
         cls.user = UserProfileWithParentsFactory.create().user
 
     def render_sidebar(self) -> str:
+        """Render the donate sidebar the way the search and opinion pages do."""
         return render_to_string(
             "includes/donate_sidebar.html", {"user": self.user}
         )
 
     def test_member_sees_level_and_link_to_membership_page(self) -> None:
+        """Members see their tier and can get to their membership page."""
         NeonMembershipFactory(user=self.user, level=NeonMembershipLevel.TIER_3)
         html = self.render_sidebar()
         self.assertIn("CL Membership - Tier 3", html)
         self.assertIn(reverse("profile_your_support"), html)
 
     def test_non_member_sees_join_button(self) -> None:
+        """Non-members see the join button and no membership link."""
         html = self.render_sidebar()
         self.assertIn("Join Free.law Now", html)
         self.assertNotIn(reverse("profile_your_support"), html)

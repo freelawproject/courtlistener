@@ -151,29 +151,30 @@ class AsyncHomepageTest(SimpleUserDataMixin, TestCase):
 class HomepageMembershipLinksTest(SimpleUserDataMixin, TestCase):
     """The homepage's membership links make sense for members and others."""
 
-    def test_anonymous_user_is_invited_to_become_a_member(self):
+    def test_anonymous_user_is_invited_to_become_a_member(self) -> None:
+        """Anonymous visitors are invited to become a member."""
         resp = self.client.get(reverse("show_results"))
         self.assertContains(resp, "Become a Member")
-        self.assertNotContains(resp, "Upgrade Membership")
+        self.assertNotContains(resp, "Your Membership")
 
-    def test_non_member_is_invited_to_become_a_member(self):
+    def test_non_member_is_invited_to_become_a_member(self) -> None:
+        """Signed-in users without a membership are invited to join."""
         self.client.login(username="pandora", password="password")
         resp = self.client.get(reverse("show_results"))
         self.assertContains(resp, "Become a Member")
-        self.assertNotContains(resp, "Upgrade Membership")
+        self.assertNotContains(resp, "Your Membership")
 
-    def test_active_member_is_offered_an_upgrade(self):
+    def test_active_member_is_sent_to_their_membership(self) -> None:
         """Members are sent to their membership page from both homepage spots."""
         NeonMembershipFactory(user=User.objects.get(username="pandora"))
         self.client.login(username="pandora", password="password")
         resp = self.client.get(reverse("show_results"))
         self.assertNotContains(resp, "Become a Member")
-        # The "Support FLP" menu says "Your Membership" and the homepage
-        # actions row says "Upgrade Membership".
-        self.assertContains(resp, "Your Membership", count=1)
-        self.assertContains(resp, "Upgrade Membership", count=1)
+        # Once in the "Support FLP" menu and once in the homepage actions.
+        self.assertContains(resp, "Your Membership", count=2)
 
-    def test_lapsed_member_is_invited_to_become_a_member(self):
+    def test_lapsed_member_is_invited_to_become_a_member(self) -> None:
+        """A membership that is no longer active doesn't hide the join link."""
         NeonMembershipFactory(
             user=User.objects.get(username="pandora"),
             payment_status=MembershipPaymentStatus.FAILED,
@@ -181,7 +182,7 @@ class HomepageMembershipLinksTest(SimpleUserDataMixin, TestCase):
         self.client.login(username="pandora", password="password")
         resp = self.client.get(reverse("show_results"))
         self.assertContains(resp, "Become a Member")
-        self.assertNotContains(resp, "Upgrade Membership")
+        self.assertNotContains(resp, "Your Membership")
 
 
 @override_flag("use_new_design", True)
