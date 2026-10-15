@@ -36,6 +36,7 @@ from django.urls import reverse
 from django.utils import timezone
 from django.utils.decorators import method_decorator
 from django.utils.html import format_html
+from django_ratelimit.core import is_ratelimited
 from django_ratelimit.decorators import ratelimit
 from django_ratelimit.exceptions import Ratelimited
 from oauth2_provider import views as oauth2_views
@@ -204,7 +205,7 @@ def migrating(user: AbstractBaseUser | AnonymousUser) -> bool:
     """Whether the flag hands *user*'s DCR clients to the MCP server, going by
     its everyone, user, group, staff and superuser settings alone."""
     flag = get_waffle_flag_model().get(DCR_CLIENTS_VIA_MCP_FLAG)
-    if not flag.pk:
+    if not flag.pk or flag.everyone is False:
         return False
     if isinstance(user, AnonymousUser):
         return bool(flag.everyone)
@@ -233,10 +234,24 @@ class TokenView(oauth2_views.TokenView):
         if not handed_to_mcp(client_id):
             return response
         error = error_of(response)
-        if error == "invalid_grant" or (
+        if error == "invalid_grant":
+            return relay_to_mcp(body, cast(str, client_id))
+        if (
             error == "invalid_client"
             and not Application.objects.filter(client_id=client_id).exists()
         ):
+            if is_ratelimited(
+                request,
+                group="oauth_mcp_relay",
+                key=get_ip_for_ratelimiter,
+                rate=settings.OAUTH2_MCP_RELAY_RATELIMIT,
+                increment=True,
+            ):
+                return JsonResponse(
+                    {"error": "temporarily_unavailable"},
+                    status=status.HTTP_429_TOO_MANY_REQUESTS,
+                    headers={"Cache-Control": "no-store"},
+                )
             return relay_to_mcp(body, cast(str, client_id))
         if (token := minted_token(response)) is None or token.user is None:
             return response

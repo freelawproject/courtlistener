@@ -580,6 +580,64 @@ class AuthorizeViewCSPTest(TestCase):
         self.assertEqual(parse_csp(r)["form-action"], ["'self'"])
 
 
+@override_settings(
+    OAUTH2_MCP_RELAY_RATELIMIT="1/h",
+    CACHES={
+        "default": {
+            "BACKEND": "django.core.cache.backends.locmem.LocMemCache",
+            "LOCATION": "oauth-mcp-relay-ratelimit-test",
+        },
+        "db_cache": {
+            "BACKEND": "django.core.cache.backends.db.DatabaseCache",
+            "LOCATION": "django_cache",
+        },
+    },
+)
+class UnknownClientRelayRateLimitTest(TestCase):
+    """Relays for client ids we have no application for are rate-limited per
+    IP; relays for grants of known clients are not. A process-local cache
+    keeps parallel workers from sharing the counter."""
+
+    @classmethod
+    def setUpTestData(cls) -> None:
+        cls.dcr_app = ApplicationFactory(
+            client_type=Application.CLIENT_PUBLIC,
+            registration_source=Application.RegistrationSource.DCR,
+        )
+
+    def _refresh(self, client_id: str) -> "_MonkeyPatchedWSGIResponse":
+        """Refreshes an MCP refresh token CourtListener doesn't know."""
+        return self.client.post(
+            reverse("oauth2_provider:token"),
+            urlencode(
+                {
+                    "grant_type": "refresh_token",
+                    "refresh_token": "mcp-rt",
+                    "client_id": client_id,
+                }
+            ),
+            content_type="application/x-www-form-urlencoded",
+        )
+
+    def test_unknown_client_relays_are_limited(self):
+        upstream = SimpleNamespace(
+            status_code=200,
+            content=b'{"access_token": "x"}',
+            headers={"Content-Type": "application/json"},
+        )
+        with patch(
+            "cl.oauth.views.requests.post", return_value=upstream
+        ) as post:
+            first = self._refresh("x" * 40)
+            second = self._refresh("y" * 40)
+            known = [self._refresh(self.dcr_app.client_id) for _ in range(2)]
+        self.assertEqual(first.status_code, 200)
+        self.assertEqual(second.status_code, 429)
+        self.assertEqual(second.json()["error"], "temporarily_unavailable")
+        self.assertEqual([r.status_code for r in known], [200, 200])
+        self.assertEqual(post.call_count, 3)
+
+
 def forget_flag() -> None:
     """Drops the migration flag from waffle's cache, leaving the rest of the
     cache, which parallel test runs share, alone."""
@@ -978,6 +1036,19 @@ class DcrClientTokenRequestTest(TestCase):
             r = self._refresh(self.dcr_app, self.user)
         self.assertEqual(r.status_code, 400)
         self.assertLiveTokens(self.dcr_app, self.user, live=False)
+
+    def test_everyone_no_refuses_no_one(self):
+        """Everyone set to No pauses the migration, even for listed users."""
+        turn_flag_on_for(self.user)
+        flag = get_waffle_flag_model().objects.get(
+            name=DCR_CLIENTS_VIA_MCP_FLAG
+        )
+        flag.everyone = False
+        flag.save()
+        flag.flush()
+        r = self._refresh(self.dcr_app, self.user)
+        self.assertEqual(r.status_code, 200, r.content)
+        self.assertLiveTokens(self.dcr_app, self.user, live=True)
 
     def test_a_percent_rollout_refuses_no_one(self):
         get_waffle_flag_model().objects.create(

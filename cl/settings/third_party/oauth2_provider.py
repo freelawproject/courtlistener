@@ -11,6 +11,9 @@ OIDC_RSA_PRIVATE_KEY = env("OIDC_RSA_PRIVATE_KEY", default="").replace(
 )
 
 OAUTH2_DCR_RATELIMIT = env("OAUTH2_DCR_RATELIMIT", default="20000/h")
+OAUTH2_MCP_RELAY_RATELIMIT = env(
+    "OAUTH2_MCP_RELAY_RATELIMIT", default="5000/h"
+)
 OAUTH2_MCP_URL = env(
     "OAUTH2_MCP_URL", default="https://mcp.courtlistener.com"
 ).rstrip("/")
