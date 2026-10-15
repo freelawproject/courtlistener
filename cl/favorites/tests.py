@@ -1,4 +1,3 @@
-import time
 from datetime import date, datetime, timedelta
 from http import HTTPStatus
 from unittest.mock import MagicMock, patch
@@ -17,6 +16,8 @@ from django.urls import reverse
 from django.utils import timezone
 from django.utils.timezone import make_naive, now
 from selenium.webdriver.common.by import By
+from selenium.webdriver.support import expected_conditions as EC
+from selenium.webdriver.support.wait import WebDriverWait
 from timeout_decorator import timeout_decorator
 
 from cl.custom_filters.templatetags.pacer import price
@@ -51,6 +52,7 @@ from cl.favorites.utils import (
     prayer_unavailable,
 )
 from cl.favorites.views import get_note
+from cl.lib.pacer_session import SessionData
 from cl.lib.test_helpers import (
     AudioTestCase,
     PrayAndPayTestCase,
@@ -451,7 +453,13 @@ class UserNotesTest(BaseSeleniumTest):
         self.browser.find_element(By.ID, "saveNote").click()
 
         # She now sees the note icon is full on yellow implying it's a note!
-        time.sleep(1)  # Selenium is sometimes faster than JS.
+        # Saving the note is an XHR and the icon only turns gold once it comes
+        # back, so wait for that rather than guessing how long it takes.
+        WebDriverWait(self.browser, SELENIUM_TIMEOUT).until(
+            EC.text_to_be_present_in_element_attribute(
+                (By.CSS_SELECTOR, "#add-note-button i"), "class", "gold"
+            )
+        )
         add_note_button = self.browser.find_element(By.ID, "add-note-button")
         add_note_icon = add_note_button.find_element(By.TAG_NAME, "i")
         self.assertIn("gold", add_note_icon.get_attribute("class"))
@@ -478,7 +486,10 @@ class UserNotesTest(BaseSeleniumTest):
         self.assertIsNone(dropdown_menu.get_attribute("display"))
 
         profile_dropdown.click()
-        time.sleep(1)
+        # The dropdown opens on an animation; wait for the link to be usable.
+        WebDriverWait(self.browser, SELENIUM_TIMEOUT).until(
+            EC.element_to_be_clickable((By.LINK_TEXT, "Notes"))
+        )
         self.click_link_for_new_page("Notes")
 
         # The case is right there with the same name and notes she gave it!
@@ -564,8 +575,13 @@ class UserNotesTest(BaseSeleniumTest):
         self.assertIn("Save", button.text)
         button.click()
 
-        # And notices the change on the page immediately
-        time.sleep(0.5)  # Selenium is too fast.
+        # And notices the change on the page immediately. Saving is an XHR
+        # that rewrites the row, so wait for the new name to land.
+        WebDriverWait(self.browser, SELENIUM_TIMEOUT).until(
+            EC.text_to_be_present_in_element(
+                (By.TAG_NAME, "body"), "Renamed Note"
+            )
+        )
         self.assertIn("Notes", self.browser.title)
         self.assert_text_in_node("Renamed Note", "body")
         self.assert_text_in_node("Modified Notes", "body")
@@ -1881,7 +1897,10 @@ class PrayAndPaySignalTests(PrayAndPayTestCase):
         )
 
 
-@patch("cl.favorites.tasks.get_or_cache_pacer_cookies")
+@patch(
+    "cl.favorites.tasks.get_or_cache_pacer_cookies",
+    return_value=SessionData(None, "http://proxy_1:9090"),
+)
 @patch("cl.favorites.tasks.prayer_unavailable", wraps=prayer_unavailable)
 class PrayAndPayCheckAvailabilityTaskTests(PrayAndPayTestCase):
     @patch(

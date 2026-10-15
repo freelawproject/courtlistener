@@ -25,7 +25,7 @@ class Command(VerboseCommand):
         start_id = options["start_id"]
         end_id = options["end_id"]
         if end_id <= start_id:
-            raise ValueError("`end-id` should be bigger thant `start-id`")
+            raise ValueError("`end-id` should be bigger than `start-id`")
 
         max_ids_per_command_call = 10_000_000
         if end_id - start_id > max_ids_per_command_call:

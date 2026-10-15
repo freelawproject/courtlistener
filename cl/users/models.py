@@ -521,7 +521,9 @@ class FailedEmail(AbstractDateTimeModel):
         return f"Failed Email: {self.stored_email.message_id}"
 
 
-def generate_recap_email(user_profile: UserProfile, append: int = None) -> str:
+def generate_recap_email(
+    user_profile: UserProfile, append: int | None = None
+) -> str:
     username = user_profile.user.username
     recap_email_header = re.sub(r"[^0-9a-zA-Z]+", ".", username) + str(
         append if append is not None else ""

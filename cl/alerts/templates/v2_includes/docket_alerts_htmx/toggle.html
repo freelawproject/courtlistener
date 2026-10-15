@@ -1,0 +1,8 @@
+{# Out-of-band response to the alert toggle. It replaces only the contents of three nodes already on the docket page, never the nodes themselves, so focus and the live region survive the swap. #}
+<span id="docket-alert-label-{{ docket.pk }}" hx-swap-oob="innerHTML">
+  <c-docket-alert-label :has_alert="has_alert" />
+</span>
+<span id="docket-alert-toggle-{{ docket.pk }}" hx-swap-oob="innerHTML">
+  <c-docket-alert-label :has_alert="has_alert" icon_class="w-4 h-4 text-greyscale-500" />
+</span>
+<span id="docket-alert-status-{{ docket.pk }}" hx-swap-oob="innerHTML">{{ message }}</span>
