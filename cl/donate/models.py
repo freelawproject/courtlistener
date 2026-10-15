@@ -307,7 +307,7 @@ class NeonMembershipLevel:
     TYPES_INVERTED = invert_choices_group_lookup(TYPES)
 
 
-class NeonMembershipQuerySet(models.QuerySet):
+class NeonMembershipQuerySet(models.QuerySet["NeonMembership"]):
     """QuerySet for NeonMembership that owns the shared "active" rule."""
 
     def active(self) -> Self:
@@ -331,6 +331,21 @@ class NeonMembershipQuerySet(models.QuerySet):
                 | Q(benefits_end__date__gte=timezone.now().date())
             )
         )
+
+
+class NeonMembershipManager(models.Manager["NeonMembership"]):
+    """Manager that exposes NeonMembershipQuerySet.active() on ``objects``.
+
+    Written out instead of using ``QuerySet.as_manager()`` because the type
+    checker can't see custom queryset methods behind that shortcut.
+    """
+
+    def get_queryset(self) -> NeonMembershipQuerySet:
+        return NeonMembershipQuerySet(self.model, using=self._db)
+
+    def active(self) -> NeonMembershipQuerySet:
+        """See ``NeonMembershipQuerySet.active``."""
+        return self.get_queryset().active()
 
 
 @pghistory.track()
@@ -360,7 +375,7 @@ class NeonMembership(AbstractDateTimeModel):
         default=MembershipPaymentStatus.PENDING,
     )
 
-    objects = NeonMembershipQuerySet.as_manager()
+    objects = NeonMembershipManager()
 
     # Payment statuses that grant membership benefits. PENDING ("waiting for
     # payment") is included so members keep access while a charge is still

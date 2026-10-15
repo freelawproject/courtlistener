@@ -19,7 +19,7 @@ from django.core.cache import cache as default_cache
 from django.core.cache import caches
 from django.core.cache.backends.base import BaseCache
 from django.db import transaction
-from django.db.models import F, Model, Prefetch, Q, QuerySet
+from django.db.models import F, Model, Prefetch, QuerySet
 from django.db.models.constants import LOOKUP_SEP
 from django.urls import resolve
 from django.utils.decorators import method_decorator
@@ -758,9 +758,10 @@ def get_all_throttle_overrides(
 
     - MANUAL overrides always apply.
     - MEMBERSHIP overrides apply only if the user's NeonMembership is active
-      (payment_status in ACTIVE_PAYMENT_STATUSES and termination_date is null
-      or in the future), and no MANUAL overrides exist. If any MANUAL overrides
-      are present, they fully replace the MEMBERSHIP set.
+      as defined by ``NeonMembership.objects.active()`` (payment status grants
+      benefits and the term, grace period included, has not ended), and no
+      MANUAL overrides exist. If any MANUAL overrides are present, they fully
+      replace the MEMBERSHIP set.
 
     :param throttle_type: The ThrottleType integer value (API or CITATION_LOOKUP).
     :return: Dictionary mapping username to a list of rate strings. A list
@@ -772,17 +773,7 @@ def get_all_throttle_overrides(
         source=APIThrottle.Source.MANUAL,
     ).values_list("user__username", "rate")
 
-    today = now().date()
-    active_member_ids = (
-        NeonMembership.objects.filter(
-            payment_status__in=NeonMembership.ACTIVE_PAYMENT_STATUSES,
-        )
-        .filter(
-            Q(termination_date__isnull=True)
-            | Q(termination_date__date__gte=today)
-        )
-        .values("user_id")
-    )
+    active_member_ids = NeonMembership.objects.active().values("user_id")
     membership_throttles = APIThrottle.objects.filter(
         throttle_type=throttle_type,
         source=APIThrottle.Source.MEMBERSHIP,
@@ -839,16 +830,9 @@ def get_promo_excluded_usernames() -> set[str]:
             source=APIThrottle.Source.MANUAL,
         ).values_list("user__username", flat=True)
     )
-    today = now().date()
     edu_members = set(
-        NeonMembership.objects.filter(
-            payment_status__in=NeonMembership.ACTIVE_PAYMENT_STATUSES,
-            level=NeonMembershipLevel.EDU,
-        )
-        .filter(
-            Q(termination_date__isnull=True)
-            | Q(termination_date__date__gte=today)
-        )
+        NeonMembership.objects.active()
+        .filter(level=NeonMembershipLevel.EDU)
         .values_list("user__username", flat=True)
     )
     return manual_users | edu_members
