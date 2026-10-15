@@ -2161,12 +2161,12 @@ class _MergeAttachmentPageParams(TypedDict):
     document_number: NotRequired[int | None]
     docket_entry__docket__docket_number_core: NotRequired[str | None]
     description: NotRequired[str | None]
-    docket_entry__docket__pacer_case_id: NotRequired[int]
+    docket_entry__docket__pacer_case_id: NotRequired[str]
 
 
 async def merge_attachment_page_data(
     court: Court,
-    pacer_case_id: int,
+    pacer_case_id: str,
     pacer_doc_id: str,
     document_number: int | None,
     text: str | None,
