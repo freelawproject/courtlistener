@@ -2,7 +2,9 @@ import logging
 
 from django.conf import settings
 from django.core.cache import cache
-from django.db.models.signals import post_save
+from django.db import transaction
+from django.db.models import Model, QuerySet
+from django.db.models.signals import post_delete, post_save
 from django.dispatch import receiver
 
 from cl.audio.models import Audio
@@ -50,6 +52,7 @@ from cl.search.models import (
     ParentheticalGroup,
     RECAPDocument,
 )
+from cl.search.state.shared import AbstractStateDocument
 from cl.settings import DEVELOPMENT, TESTING
 
 logger = logging.getLogger(__name__)
@@ -702,3 +705,27 @@ def handle_docket_number_raw_cleaning(
 
     if created or instance.docket_number_raw_tracker.changed():
         clean_docket_number_raw_and_update_redis_cache(instance)
+
+
+@receiver(post_delete)
+def cleanup_document_storage[M: Model](
+    sender: type[M],
+    instance: M,
+    origin: M | QuerySet[M],
+    **kwargs,
+):
+    if not isinstance(instance, AbstractStateDocument):
+        return
+
+    files = [f for f in (instance.filepath_local, instance.thumbnail) if f]
+
+    def delete_files() -> None:
+        for f in files:
+            try:
+                f.delete(save=False)
+            except Exception:
+                logger.exception(
+                    "Failed to delete %s for %r", f.name, instance
+                )
+
+    transaction.on_commit(delete_files, robust=True)

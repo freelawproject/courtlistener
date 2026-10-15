@@ -55,7 +55,7 @@ case "$1" in
     exec ./manage.py tames_poller
     ;;
 'fl-scraper-daemon')
-    exec ./manage.py fl_poller --auto-resume
+    exec ./manage.py fl_poller --auto-resume --archive-responses
     ;;
 'llm-clean-docket-number-daemon')
     exec ./manage.py llm_clean_docket_number_daemon

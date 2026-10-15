@@ -156,6 +156,14 @@ class FloridaDocumentMerger(
             for attachment in entry.attachments
         ]
 
+    def scraped_entry(self) -> ScrapeFloridaDocketEntry | None:
+        """Shorthand to get the scraped docket entry for this attachment"""
+        entry = cast(FloridaDocketEntry, self.params.parent)
+        for scraped_entry in self.params.params.params:
+            if scraped_entry.docket_entry_uuid == entry.docket_entry_uuid:
+                return scraped_entry
+        return None
+
     @override
     def query(self) -> QuerySet[FloridaDocument]:
         by_uuid = self.manager.filter(link_uuid=self.transformed["link_uuid"])[
@@ -164,12 +172,7 @@ class FloridaDocumentMerger(
         if len(list(by_uuid)) > 0:
             return by_uuid
 
-        entry = cast(FloridaDocketEntry, self.params.parent)
-        scraped: ScrapeFloridaDocketEntry | None = None
-        for scraped_entry in self.params.params.params:
-            if scraped_entry.docket_entry_uuid == entry.docket_entry_uuid:
-                scraped = scraped_entry
-                break
+        scraped = self.scraped_entry()
 
         if (
             not scraped
@@ -185,7 +188,7 @@ class FloridaDocumentMerger(
         # those attachments (even if they were renamed), so they can't be the
         # one replaced. Excluding them also keeps the candidates stable while
         # sibling attachments merge.
-        return self.manager.filter(
+        candidates = self.manager.filter(
             document_name=self.scrape.document_name
         ).exclude(
             link_uuid__in=[
@@ -194,13 +197,24 @@ class FloridaDocumentMerger(
             ]
         )
 
+        if len(list(candidates)) != 1:
+            return self.manager.none()
+        return candidates
+
     @override
     def resolve_query(
         self, qs: QuerySet[FloridaDocument]
     ) -> tuple[bool, FloridaDocument | None]:
         link_uuid: UUID = self.transformed["link_uuid"]
 
-        if self.scrape_link_uuids().count(link_uuid) > 1:
+        scraped = self.scraped_entry()
+        if (
+            scraped is not None
+            and [a.document_link_uuid for a in scraped.attachments].count(
+                link_uuid
+            )
+            > 1
+        ):
             logger.error(
                 "Multiple scraped attachments with link UUID %s in docket entry %s",
                 link_uuid,
