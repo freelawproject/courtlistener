@@ -222,11 +222,10 @@ def delete_cluster_files(cluster: OpinionCluster, delete_docket: bool) -> None:
 
 
 def _note_blockers_for_cluster(cluster: OpinionCluster) -> QuerySet[Note]:
-    """Notes blocking cluster/docket deletion, dual-read aware (#7725).
+    """Notes blocking cluster/docket deletion.
 
     Checks both the cluster and its docket -- a Note can be attached to
-    either. Replaces .note_set, which is blind to Notes in the new
-    content_type/object_id shape.
+    either.
 
     :param cluster: The OpinionCluster being considered for sealing.
     :return: A queryset of Notes attached to the cluster or its docket.

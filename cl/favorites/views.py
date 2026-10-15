@@ -42,10 +42,10 @@ def get_note(request: HttpRequest) -> Note | None:
     :param request: The request, expected to carry ``content_type`` (a
         ContentType pk) and ``object_id`` in POST data, identifying the
         noted object.
-    :return: The user's Note for that object (dual-read, see
-        resolve_legacy_object()), a blank unsaved Note if the object is
-        valid but has no Note yet, or None if content_type/object_id are
-        missing, invalid, or don't resolve to a model in NOTEABLE_MODELS.
+    :return: The user's Note for that object, a blank unsaved Note if the
+        object is valid but has no Note yet, or None if content_type/
+        object_id are missing, invalid, or don't resolve to a model in
+        NOTEABLE_MODELS.
     """
     content_type_pk = request.POST.get("content_type")
     raw_object_id = request.POST.get("object_id")

@@ -126,7 +126,7 @@ class OpinionClusterSealClustersActionTest(TestCase):
         # The cluster has an user note
         cls.note_cluster_3_user_1 = NoteFactory(
             user=cls.user_1,
-            cluster_id=cls.cluster_3,
+            content_object=cls.cluster_3,
             notes="Note Test",
         )
 
