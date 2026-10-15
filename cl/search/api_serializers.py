@@ -333,9 +333,7 @@ class OpinionClusterSerializer(
 
     class Meta:
         model = OpinionCluster
-        # The redacted scan PDF is in private storage until its redaction
-        # is approved for release
-        exclude = ("filepath_pdf_scan",)
+        fields = "__all__"
 
 
 class TagSerializer(
