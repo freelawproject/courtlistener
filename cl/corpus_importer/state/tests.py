@@ -975,7 +975,9 @@ class LoaderTestCase(TestCase):
         """The ledger the test's loads report into."""
         return LoadLedger(self.key)
 
-    def loader_class(self, **attributes: Any) -> type[JKentScrapeLoader[Any]]:
+    def loader_class(
+        self, **attributes: Any
+    ) -> type[JKentScrapeLoader[Any, Any, Any]]:
         """A loader over the test database, merging into `Docket`.
 
         The class is put in the registry for the test's lifetime, because a
@@ -1005,7 +1007,7 @@ class LoaderTestCase(TestCase):
                     court=test_court, docket_number=self.scrape.docket_number
                 )
 
-        loader: type[JKentScrapeLoader[Any]] = type(
+        loader: type[JKentScrapeLoader[Any, Any]] = type(
             "TestLoader",
             (JKentScrapeLoader,),
             {
@@ -1022,9 +1024,9 @@ class LoaderTestCase(TestCase):
 
     def loader(
         self,
-        loader_class: type[JKentScrapeLoader[Any]] | None = None,
+        loader_class: type[JKentScrapeLoader[Any, Any]] | None = None,
         **kwargs: Any,
-    ) -> JKentScrapeLoader[Any]:
+    ) -> JKentScrapeLoader[Any, Any]:
         """A loader over the test database, keeping a ledger by default.
 
         Neither wait sleeps by default. Celery runs eagerly here, so the

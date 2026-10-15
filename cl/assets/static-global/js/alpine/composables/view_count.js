@@ -7,6 +7,9 @@ templates never require it. Usage and caveats: FRONTEND.md, "View counting".
 document.addEventListener('alpine:init', () => {
   Alpine.store('viewCount', {
     value: null,
+    get loaded() {
+      return this.value !== null;
+    },
     async init() {
       const { viewCountLabel: label, viewCountUrl } = document.body.dataset;
       try {
