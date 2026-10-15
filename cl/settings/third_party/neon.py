@@ -16,5 +16,5 @@ NEON_MAX_WEBHOOK_NUMBER = env("NEON_MAX_WEBHOOK_NUMBER", default=100)
 # renewal webhooks that arrive late and gives sync_neon_memberships time to
 # recover missed ones before access drops.
 NEON_MEMBERSHIP_GRACE_PERIOD_DAYS = env.int(
-    "NEON_MEMBERSHIP_GRACE_PERIOD_DAYS", default=3
+    "NEON_MEMBERSHIP_GRACE_PERIOD_DAYS", default=2
 )
