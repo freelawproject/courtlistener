@@ -39,9 +39,18 @@ class SyncResult(Enum):
     UPDATED = "updated"
     # Neon matches our record or has nothing for the user; no new information.
     UNCHANGED = "unchanged"
-    # Neon has data we can't apply (unknown level, EDU without a .edu email);
-    # the record is left alone for a human to look at.
+    # Neon has data we can't apply yet or at all (payment still in progress,
+    # unexpected status, no term end date, unknown level, EDU without a .edu
+    # email); the record is left alone and never deleted.
     SKIPPED = "skipped"
+
+
+# Neon membership statuses the command understands. SUCCEEDED is the only
+# state copied locally. PENDING and FAILED mean a payment is still being
+# processed or retried, so the local record is left alone and re-checked on
+# the next run. Anything else is reported for manual review.
+NEON_STATUS_SUCCEEDED = "SUCCEEDED"
+NEON_STATUSES_IN_PROGRESS = frozenset({"PENDING", "FAILED"})
 
 
 def get_expired_memberships(
@@ -96,17 +105,77 @@ def sync_membership_from_neon(
     Mirrors what the webhook handlers do when a membership is created or
     updated: the local record takes Neon's membership ID, level, term end
     date and payment status, and the user's MEMBERSHIP-source API throttles
-    are rebuilt for the new level. Nothing is written when Neon's record
-    already matches ours, so the command is safe to run repeatedly.
+    are rebuilt for the new level.
 
-    EDU memberships are only honored for ``.edu`` email addresses, like the
-    webhook does, and Memberships with unknown levels are skipped.
+    Only a SUCCEEDED Neon membership whose term ends in the future, and later
+    than the local record, is applied. A record that is no newer than ours is
+    reported as unchanged so the caller can decide whether to delete the
+    local row. Memberships still PENDING or FAILED in Neon are left alone to
+    be re-checked on the next run. Anything else (no term end date, a
+    cancelled or refunded membership, an unknown level, an EDU membership
+    without a ``.edu`` email) is skipped and logged for a human.
 
     :param membership: The local membership to update.
     :param neon_membership: A membership record as returned by the Neon API.
     :return: Whether the record was updated, left unchanged, or skipped.
     """
     user = membership.user
+    neon_id = str(neon_membership["id"])
+    status = neon_membership.get("status")
+    payments = neon_membership.get("payments") or []
+    raw_payment_status = (
+        payments[0].get("paymentStatus", "") if payments else ""
+    )
+
+    term_end_date = neon_membership.get("termEndDate")
+    if not term_end_date:
+        logger.error(
+            "Neon membership %s for user %s has no termEndDate (status %s, "
+            "paymentStatus %r); skipping.",
+            neon_id,
+            user.username,
+            status,
+            raw_payment_status,
+        )
+        return SyncResult.SKIPPED
+
+    termination_date = parse_neon_date(term_end_date)
+    new_date = termination_date.date()
+    current_date = (
+        membership.termination_date.date()
+        if membership.termination_date
+        else None
+    )
+    if new_date < timezone.now().date() or (
+        current_date and new_date <= current_date
+    ):
+        # Neon's record grants nothing beyond what we already have: it is
+        # either expired as well or the same term we already stored.
+        return SyncResult.UNCHANGED
+
+    if status in NEON_STATUSES_IN_PROGRESS:
+        logger.warning(
+            "Neon membership %s for user %s is %s (paymentStatus %r); "
+            "leaving the local record for the next run.",
+            neon_id,
+            user.username,
+            status,
+            raw_payment_status,
+        )
+        return SyncResult.SKIPPED
+
+    if status != NEON_STATUS_SUCCEEDED:
+        logger.error(
+            "Neon membership %s for user %s has unexpected status %s "
+            "(paymentStatus %r, termEndDate %s); skipping.",
+            neon_id,
+            user.username,
+            status,
+            raw_payment_status,
+            term_end_date,
+        )
+        return SyncResult.SKIPPED
+
     level_name = neon_membership["membershipLevel"]["name"]
     level = NeonMembershipLevel.TYPES_INVERTED.get(level_name)
     if level is None:
@@ -125,36 +194,13 @@ def sync_membership_from_neon(
         )
         return SyncResult.SKIPPED
 
-    payments = neon_membership.get("payments") or []
-    payment_status = map_payment_status_value(
-        payments[0].get("paymentStatus", "").lower() if payments else ""
-    )
-
-    term_end_date = neon_membership.get("termEndDate")
-    termination_date = (
-        parse_neon_date(term_end_date) if term_end_date else None
-    )
-    current_date = (
-        membership.termination_date.date()
-        if membership.termination_date
-        else None
-    )
-    new_date = termination_date.date() if termination_date else None
-    unchanged = (
-        membership.neon_id == str(neon_membership["id"])
-        and membership.level == level
-        and membership.payment_status == payment_status
-        and current_date == new_date
-    )
-    if unchanged:
-        return SyncResult.UNCHANGED
-
+    payment_status = map_payment_status_value(raw_payment_status.lower())
     logger.info(
         "Syncing membership for user %s from Neon: id %s -> %s, level %s -> "
         "%s, termination %s -> %s, payment status %s -> %s",
         user.username,
         membership.neon_id,
-        neon_membership["id"],
+        neon_id,
         membership.level,
         level,
         current_date,
@@ -163,7 +209,7 @@ def sync_membership_from_neon(
         payment_status,
     )
     with transaction.atomic():
-        membership.neon_id = str(neon_membership["id"])
+        membership.neon_id = neon_id
         membership.level = level
         membership.termination_date = termination_date
         membership.payment_status = payment_status

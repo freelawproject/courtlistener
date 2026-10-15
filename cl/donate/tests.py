@@ -1108,8 +1108,9 @@ class MembershipWebhookThrottleSyncTest(TestCase):
 def make_neon_membership(
     membership_id: str = "200",
     level_name: str = "CL Membership - Tier 2",
-    term_end_date: str = "2027-10-04-05:00",
+    term_end_date: str | None = "2027-10-04-05:00",
     payment_status: str = "Succeeded",
+    status: str | None = "SUCCEEDED",
 ) -> dict:
     """Build a membership record shaped like the Neon API returns it."""
     return {
@@ -1117,7 +1118,7 @@ def make_neon_membership(
         "accountId": "1234",
         "membershipLevel": {"id": "2", "name": level_name},
         "termEndDate": term_end_date,
-        "status": "SUCCEEDED",
+        "status": status,
         "payments": [{"paymentStatus": payment_status}],
     }
 
@@ -1179,6 +1180,11 @@ class SyncNeonMembershipsCommandTest(TestCase):
         )
         self.mock_tag_zoho = zoho_patcher.start()
         self.addCleanup(zoho_patcher.stop)
+        logger_patcher = patch(
+            "cl.donate.management.commands.sync_neon_memberships.logger"
+        )
+        self.mock_logger = logger_patcher.start()
+        self.addCleanup(logger_patcher.stop)
 
     def get_membership_rates(self) -> list[str]:
         """Return the user's MEMBERSHIP-source API throttle rates, sorted."""
@@ -1348,6 +1354,72 @@ class SyncNeonMembershipsCommandTest(TestCase):
                 call_command("sync_neon_memberships")
 
                 self.assert_membership_untouched()
+
+    def test_leaves_in_progress_membership_for_next_run(self) -> None:
+        """Keeps a lapsed row untouched, and undeleted, while Neon retries."""
+        # Older than the default 7-day delete threshold on purpose.
+        self.membership.termination_date = now() - timedelta(days=10)
+        self.membership.save()
+        for status, payment_status in (
+            ("PENDING", "Pending"),
+            ("FAILED", "Failed"),
+        ):
+            with self.subTest(status=status):
+                self.mock_get_membership.return_value = make_neon_membership(
+                    status=status, payment_status=payment_status
+                )
+
+                call_command("sync_neon_memberships")
+
+                self.assert_membership_untouched()
+
+    def test_reports_unexpected_neon_status(self) -> None:
+        """Skips and logs an error for statuses the command doesn't handle."""
+        for status, payment_status in (
+            ("CANCELED", "Canceled"),
+            ("REFUNDED", "Refunded"),
+            ("CANCEL_PENDING", "Succeeded"),
+            ("DEFERRED", "Deferred"),
+            ("WAITINGLIST", "Pending"),
+            (None, "Succeeded"),
+        ):
+            with self.subTest(status=status):
+                self.mock_get_membership.return_value = make_neon_membership(
+                    status=status, payment_status=payment_status
+                )
+
+                # The mock accumulates calls across subTests.
+                self.mock_logger.error.reset_mock()
+
+                call_command("sync_neon_memberships")
+
+                self.mock_logger.error.assert_called_once()
+                self.assert_membership_untouched()
+
+    def test_reports_missing_term_end_date(self) -> None:
+        """Never stores a null termination date from Neon."""
+        self.mock_get_membership.return_value = make_neon_membership(
+            term_end_date=None
+        )
+
+        call_command("sync_neon_memberships")
+
+        self.mock_logger.error.assert_called_once()
+        self.assert_membership_untouched()
+
+    def test_ignores_neon_record_no_newer_than_ours(self) -> None:
+        """Treats a different but already expired Neon membership as unchanged."""
+        self.mock_get_membership.return_value = make_neon_membership(
+            term_end_date=(now() - timedelta(days=8)).date().isoformat(),
+            status="CANCELED",
+        )
+
+        call_command("sync_neon_memberships")
+
+        # The date check runs before the status check, so an expired
+        # CANCELED record must not be reported as an error.
+        self.mock_logger.error.assert_not_called()
+        self.assert_membership_untouched()
 
     def test_deletes_stale_membership_neon_confirms_unchanged(self) -> None:
         """Deletes a week-old lapse Neon matches, and only its MEMBERSHIP throttles."""
