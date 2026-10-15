@@ -7,6 +7,16 @@ env = environ.FileAwareEnv()
 ###################
 MAX_SEARCH_RESULTS_EXPORTED = env("MAX_SEARCH_RESULTS_EXPORTED", default=250)
 
+##############################
+# Bulk docket PDF zip export #
+##############################
+# Dockets with more available PDFs than this are zipped up in a background
+# Celery task and emailed to the user, instead of built synchronously in the
+# request/response cycle.
+MAX_DOCKET_PDF_ZIP_DOCUMENTS_SYNC = env(
+    "MAX_DOCKET_PDF_ZIP_DOCUMENTS_SYNC", default=10
+)
+
 ###################
 # Related content #
 ###################

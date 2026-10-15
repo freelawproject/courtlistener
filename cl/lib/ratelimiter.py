@@ -175,6 +175,7 @@ if "test" in sys.argv:
     ratelimiter_unsafe_10_per_m = lambda func: func
     ratelimiter_all_10_per_h = lambda func: func
     ratelimiter_unsafe_2000_per_h = lambda func: func
+    ratelimiter_user_5_per_h = lambda func: func
 else:
     ratelimiter_all_1000_per_h = make_ratelimiter(
         key=get_ip_for_ratelimiter,
@@ -207,6 +208,12 @@ else:
         key=get_path_to_make_key,
         rate="2000/h",
         method=UNSAFE,
+    )
+    # Keyed by account rather than IP, for endpoints whose cost is tied to
+    # the user (e.g. background jobs, emails) rather than to request volume.
+    ratelimiter_user_5_per_h = make_ratelimiter(
+        key="user",
+        rate="5/h",
     )
 
 # See: https://www.bing.com/webmaster/help/how-to-verify-bingbot-3905dc26
