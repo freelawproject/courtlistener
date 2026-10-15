@@ -341,6 +341,7 @@ class NeonMembershipManager(models.Manager["NeonMembership"]):
     """
 
     def get_queryset(self) -> NeonMembershipQuerySet:
+        """Return a NeonMembershipQuerySet so its methods chain off ``objects``."""
         return NeonMembershipQuerySet(self.model, using=self._db)
 
     def active(self) -> NeonMembershipQuerySet:
