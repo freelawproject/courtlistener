@@ -78,11 +78,11 @@ def mark_document_accessible_after_prayer_availability_deletion(
 
 
 def delete_orphaned_notes(sender, instance: Model, **kwargs):
-    """Delete a Note when the object it points to is deleted (#7725).
+    """Delete a Note when the object it points to is deleted.
 
-    Only needed for the GenericForeignKey shape -- a legacy-shaped Note is
-    already cleaned up by that FK's own on_delete=CASCADE, since object_id
-    is a plain integer column with no DB-level FK constraint of its own.
+    This is the only cleanup Notes get: object_id is a plain integer column
+    with no DB-level FK, so deletes that skip Django's post_delete leave
+    orphaned Notes behind.
     """
     get_notes_for(instance).delete()
 
