@@ -115,6 +115,10 @@ def sync_membership_from_neon(
     cancelled or refunded membership, an unknown level, an EDU membership
     without a ``.edu`` email) is skipped and logged for a human.
 
+    The caller loads memberships once per run, so by the time we write, a
+    webhook may already have changed or deleted the row. In that case the
+    webhook had newer data: nothing is written and the record is skipped.
+
     :param membership: The local membership to update.
     :param neon_membership: A membership record as returned by the Neon API.
     :return: Whether the record was updated, left unchanged, or skipped.
@@ -209,17 +213,33 @@ def sync_membership_from_neon(
         payment_status,
     )
     with transaction.atomic():
-        membership.neon_id = neon_id
-        membership.level = level
-        membership.termination_date = termination_date
-        membership.payment_status = payment_status
-        membership.save()
+        # date_modified detects webhook updates that happened while we were
+        # talking to Neon. The lock makes subsequent webhook updates wait
+        # until we commit. no_key is used since we don't change the
+        # primary key or user, and it doesn't block foreign key references.
+        locked = (
+            NeonMembership.objects.select_for_update(no_key=True)
+            .filter(pk=membership.pk, date_modified=membership.date_modified)
+            .first()
+        )
+        if locked is None:
+            logger.info(
+                "Membership for user %s changed or was deleted by a webhook "
+                "since this run started; skipping.",
+                user.username,
+            )
+            return SyncResult.SKIPPED
+        locked.neon_id = neon_id
+        locked.level = level
+        locked.termination_date = termination_date
+        locked.payment_status = payment_status
+        locked.save()
         apply_membership_throttles(user, level)
     tag_zoho_record_for_membership.delay(user.pk, level)
     return SyncResult.UPDATED
 
 
-def delete_expired_membership(membership: NeonMembership) -> None:
+def delete_expired_membership(membership: NeonMembership) -> bool:
     """Delete an expired membership and its membership-based API throttles.
 
     Only call this after Neon confirms there is no active membership.
@@ -227,15 +247,29 @@ def delete_expired_membership(membership: NeonMembership) -> None:
     If the user renews later, the createMembership webhook recreates the
     record from scratch.
 
-    The throttle override cache is left to expire on its own rather than
-    cleared, since clearing it costs a Redis scan and the membership was
-    already inactive.
+    The delete only happens if no webhook changed or removed the row since
+    it was loaded; otherwise the webhook had newer data and nothing is
+    touched. The throttle override cache is left to expire on its own
+    rather than cleared, since clearing it costs a Redis scan and the
+    membership was already inactive.
 
     :param membership: The expired membership to delete.
+    :return: True if the membership was deleted, False if a webhook got
+        there first.
     """
     with transaction.atomic():
+        deleted, _ = NeonMembership.objects.filter(
+            pk=membership.pk, date_modified=membership.date_modified
+        ).delete()
+        if not deleted:
+            logger.info(
+                "Membership for user %s changed or was deleted by a webhook "
+                "since this run started; not deleting.",
+                membership.user.username,
+            )
+            return False
         clear_membership_throttles(membership.user, clear_cache=False)
-        membership.delete()
+    return True
 
 
 def sync_expired_memberships(
@@ -312,8 +346,8 @@ def sync_expired_memberships(
                 membership.user.username,
                 membership.termination_date.date(),
             )
-            delete_expired_membership(membership)
-            deleted += 1
+            if delete_expired_membership(membership):
+                deleted += 1
 
     return checked, updated, deleted
 
