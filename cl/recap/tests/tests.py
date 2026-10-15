@@ -4235,6 +4235,20 @@ class RecapAttPageFetchApiTest(TestCase):
         self.assertEqual(self.fq.status, PROCESSING_STATUS.FAILED)
         self.assertIn("Unable to find cached cookies", self.fq.message)
 
+    def test_fetch_att_page_rd_deleted(self, mock_court_accessible) -> None:
+        """Is the FQ marked as failed if its RD is deleted before the task
+        runs?
+        """
+        self.rd.delete()
+
+        result = do_pacer_fetch(self.fq)
+        result.get()
+
+        self.fq.refresh_from_db()
+        self.assertIsNone(self.fq.recap_document_id)
+        self.assertEqual(self.fq.status, PROCESSING_STATUS.FAILED)
+        self.assertIn("no longer exists", self.fq.message)
+
     @mock.patch(
         "cl.recap.tasks.get_pacer_cookie_from_cache",
         return_value=SessionData(None, "http://proxy_1:9090"),

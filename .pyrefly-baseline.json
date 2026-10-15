@@ -2748,7 +2748,7 @@
       "column": 17,
       "path": "cl/recap/mergers.py",
       "name": "bad-argument-type",
-      "concise_description": "Argument `str | None` is not assignable to parameter `pacer_case_id` with type `int` in function `merge_attachment_page_data`",
+      "concise_description": "Argument `str | None` is not assignable to parameter `pacer_case_id` with type `str` in function `merge_attachment_page_data`",
       "severity": "error"
     },
     {
@@ -2983,13 +2983,6 @@
       "severity": "error"
     },
     {
-      "column": 13,
-      "path": "cl/recap/tasks.py",
-      "name": "bad-argument-type",
-      "concise_description": "Argument `str` is not assignable to parameter `pacer_case_id` with type `int` in function `cl.recap.mergers.merge_attachment_page_data`",
-      "severity": "error"
-    },
-    {
       "column": 49,
       "path": "cl/recap/tasks.py",
       "name": "bad-argument-type",
@@ -3022,20 +3015,6 @@
       "path": "cl/recap/tasks.py",
       "name": "bad-assignment",
       "concise_description": "`Unknown | None` is not assignable to attribute `pacer_case_id` with type `str`",
-      "severity": "error"
-    },
-    {
-      "column": 13,
-      "path": "cl/recap/tasks.py",
-      "name": "bad-argument-type",
-      "concise_description": "Argument `str` is not assignable to parameter `pacer_case_id` with type `int` in function `cl.recap.mergers.merge_attachment_page_data`",
-      "severity": "error"
-    },
-    {
-      "column": 13,
-      "path": "cl/recap/tasks.py",
-      "name": "bad-argument-type",
-      "concise_description": "Argument `str` is not assignable to parameter `pacer_case_id` with type `int` in function `cl.recap.mergers.merge_attachment_page_data`",
       "severity": "error"
     },
     {
@@ -3084,55 +3063,6 @@
       "column": 16,
       "path": "cl/recap/tasks.py",
       "name": "missing-attribute",
-      "concise_description": "Object of class `NoneType` has no attribute `docket_entry`",
-      "severity": "error"
-    },
-    {
-      "column": 21,
-      "path": "cl/recap/tasks.py",
-      "name": "missing-attribute",
-      "concise_description": "Object of class `NoneType` has no attribute `docket_entry`",
-      "severity": "error"
-    },
-    {
-      "column": 20,
-      "path": "cl/recap/tasks.py",
-      "name": "missing-attribute",
-      "concise_description": "Object of class `NoneType` has no attribute `pacer_doc_id`",
-      "severity": "error"
-    },
-    {
-      "column": 96,
-      "path": "cl/recap/tasks.py",
-      "name": "missing-attribute",
-      "concise_description": "Object of class `NoneType` has no attribute `pk`",
-      "severity": "error"
-    },
-    {
-      "column": 20,
-      "path": "cl/recap/tasks.py",
-      "name": "missing-attribute",
-      "concise_description": "Object of class `NoneType` has no attribute `is_acms_document`",
-      "severity": "error"
-    },
-    {
-      "column": 89,
-      "path": "cl/recap/tasks.py",
-      "name": "missing-attribute",
-      "concise_description": "Object of class `NoneType` has no attribute `pk`",
-      "severity": "error"
-    },
-    {
-      "column": 49,
-      "path": "cl/recap/tasks.py",
-      "name": "bad-argument-type",
-      "concise_description": "Argument `RECAPDocument | None` is not assignable to parameter `rd` with type `RECAPDocument`",
-      "severity": "error"
-    },
-    {
-      "column": 16,
-      "path": "cl/recap/tasks.py",
-      "name": "missing-attribute",
       "concise_description": "Object of class `NoneType` has no attribute `response`",
       "severity": "error"
     },
@@ -3153,8 +3083,8 @@
     {
       "column": 13,
       "path": "cl/recap/tasks.py",
-      "name": "missing-attribute",
-      "concise_description": "Object of class `NoneType` has no attribute `docket_entry`",
+      "name": "bad-argument-type",
+      "concise_description": "Argument `str | None` is not assignable to parameter `pacer_case_id` with type `str`",
       "severity": "error"
     },
     {
@@ -3169,6 +3099,13 @@
       "path": "cl/recap/tasks.py",
       "name": "bad-argument-type",
       "concise_description": "Argument `str | Unknown` is not assignable to parameter `attachment_dicts` with type `list[_MergeAttachmentDict]`",
+      "severity": "error"
+    },
+    {
+      "column": 45,
+      "path": "cl/recap/tasks.py",
+      "name": "bad-argument-type",
+      "concise_description": "Argument `list[str | None]` is not assignable to parameter `pacer_case_ids` with type `list[str]` in function `cl.recap.utils.find_subdocket_atts_rds_from_data`",
       "severity": "error"
     },
     {
@@ -5762,31 +5699,59 @@
       "severity": "error"
     },
     {
-      "column": 27,
+      "column": 5,
+      "path": "cl/users/utils.py",
+      "name": "missing-module-attribute",
+      "concise_description": "Could not import `APIThrottleEvent` from `cl.api.models`",
+      "severity": "error"
+    },
+    {
+      "column": 5,
       "path": "cl/users/utils.py",
       "name": "missing-module-attribute",
       "concise_description": "Could not import `WebhookHistoryEvent` from `cl.api.models`",
       "severity": "error"
     },
     {
-      "column": 33,
+      "column": 5,
       "path": "cl/users/utils.py",
       "name": "missing-module-attribute",
       "concise_description": "Could not import `DocketTagEvent` from `cl.favorites.models`",
       "severity": "error"
     },
     {
-      "column": 49,
+      "column": 5,
       "path": "cl/users/utils.py",
       "name": "missing-module-attribute",
       "concise_description": "Could not import `NoteEvent` from `cl.favorites.models`",
       "severity": "error"
     },
     {
-      "column": 60,
+      "column": 5,
+      "path": "cl/users/utils.py",
+      "name": "missing-module-attribute",
+      "concise_description": "Could not import `PrayerEvent` from `cl.favorites.models`",
+      "severity": "error"
+    },
+    {
+      "column": 5,
       "path": "cl/users/utils.py",
       "name": "missing-module-attribute",
       "concise_description": "Could not import `UserTagEvent` from `cl.favorites.models`",
+      "severity": "error"
+    },
+    {
+      "column": 5,
+      "path": "cl/users/utils.py",
+      "name": "missing-module-attribute",
+      "concise_description": "Could not import `UserGroupsEvent` from `cl.users.models`",
+      "severity": "error"
+    },
+    {
+      "column": 5,
+      "path": "cl/users/utils.py",
+      "name": "missing-module-attribute",
+      "concise_description": "Could not import `UserPermissionsEvent` from `cl.users.models`",
       "severity": "error"
     },
     {
@@ -5835,7 +5800,7 @@
       "column": 5,
       "path": "cl/users/utils.py",
       "name": "missing-attribute",
-      "concise_description": "Object of class `User` has no attribute `webhooks`",
+      "concise_description": "Object of class `User` has no attribute `api_throttles`",
       "severity": "error"
     },
     {
@@ -5849,7 +5814,35 @@
       "column": 5,
       "path": "cl/users/utils.py",
       "name": "missing-attribute",
+      "concise_description": "Object of class `User` has no attribute `emails`",
+      "severity": "error"
+    },
+    {
+      "column": 5,
+      "path": "cl/users/utils.py",
+      "name": "missing-attribute",
+      "concise_description": "Object of class `User` has no attribute `events`",
+      "severity": "error"
+    },
+    {
+      "column": 5,
+      "path": "cl/users/utils.py",
+      "name": "missing-attribute",
       "concise_description": "Object of class `User` has no attribute `notes`",
+      "severity": "error"
+    },
+    {
+      "column": 5,
+      "path": "cl/users/utils.py",
+      "name": "missing-attribute",
+      "concise_description": "Object of class `User` has no attribute `prayers`",
+      "severity": "error"
+    },
+    {
+      "column": 5,
+      "path": "cl/users/utils.py",
+      "name": "missing-attribute",
+      "concise_description": "Object of class `User` has no attribute `scotus_maps`",
       "severity": "error"
     },
     {
@@ -5863,14 +5856,7 @@
       "column": 5,
       "path": "cl/users/utils.py",
       "name": "missing-attribute",
-      "concise_description": "Object of class `User` has no attribute `emails`",
-      "severity": "error"
-    },
-    {
-      "column": 5,
-      "path": "cl/users/utils.py",
-      "name": "missing-attribute",
-      "concise_description": "Object of class `User` has no attribute `scotus_maps`",
+      "concise_description": "Object of class `User` has no attribute `webhooks`",
       "severity": "error"
     },
     {
