@@ -52,9 +52,3 @@ OAUTH2_PROVIDER = {
     # clients bind to them, so the default validator would reject them.
     "RESOURCE_SERVER_TOKEN_RESOURCE_VALIDATOR": None,
 }
-
-OAUTH_CLEANUP_BATCH_SIZE = env.int("OAUTH_CLEANUP_BATCH_SIZE", default=5000)
-OAUTH_CLEANUP_BATCH_PAUSE = env.float("OAUTH_CLEANUP_BATCH_PAUSE", default=0.1)
-OAUTH_CLEANUP_UNCONFIRMED_APP_MIN_AGE_HOURS = env.int(
-    "OAUTH_CLEANUP_UNCONFIRMED_APP_MIN_AGE_HOURS", default=24
-)
