@@ -23,6 +23,7 @@ from oauth2_provider.models import (
     get_refresh_token_model,
     set_token_value,
 )
+from rest_framework.authtoken.models import Token
 
 from cl.oauth.cleanup_utils import (
     delete_unconfirmed_applications,
@@ -427,6 +428,59 @@ class AudienceBoundTokenTest(APITestCase):
                     url, HTTP_AUTHORIZATION=f"Bearer {self._token(resource)}"
                 )
                 self.assertEqual(r.status_code, 200, r.content)
+
+
+class ApiScopeEnforcementTest(APITestCase):
+    """The REST API accepts OAuth tokens only when they carry ``api``.
+
+    Identity and wiki tokens are rejected with 403, the RFC 6750
+    ``insufficient_scope`` status. API keys are unaffected.
+    """
+
+    @classmethod
+    def setUpTestData(cls) -> None:
+        cls.user = UserFactory()
+        cls.application = ApplicationFactory()
+        cls.url = reverse("alert-list", kwargs={"version": "v4"})
+
+    def _token(self, scope: str) -> str:
+        raw = f"tok-{scope.replace(' ', '-')}"
+        token = AccessToken(
+            user=self.user,
+            application=self.application,
+            scope=scope,
+            expires=now() + timedelta(hours=1),
+        )
+        set_token_value(token, raw)
+        token.save()
+        return raw
+
+    def test_api_scope_is_accepted(self):
+        for scope in ("api", "openid api wiki"):
+            with self.subTest(scope=scope):
+                r = self.client.get(
+                    self.url, HTTP_AUTHORIZATION=f"Bearer {self._token(scope)}"
+                )
+                self.assertEqual(r.status_code, 200, r.content)
+
+    def test_tokens_without_api_scope_are_refused(self):
+        for scope in ("openid", "openid email profile", "openid wiki"):
+            with self.subTest(scope=scope):
+                r = self.client.get(
+                    self.url, HTTP_AUTHORIZATION=f"Bearer {self._token(scope)}"
+                )
+                self.assertEqual(r.status_code, 403, r.content)
+                self.assertIn("api scope", r.json()["detail"])
+                self.assertEqual(
+                    r["WWW-Authenticate"],
+                    'Bearer realm="api", error="insufficient_scope", '
+                    'scope="api"',
+                )
+
+    def test_api_keys_are_unaffected(self):
+        key, _ = Token.objects.get_or_create(user=self.user)
+        r = self.client.get(self.url, HTTP_AUTHORIZATION=f"Token {key.key}")
+        self.assertEqual(r.status_code, 200, r.content)
 
 
 class AuthorizeViewCSPTest(TestCase):

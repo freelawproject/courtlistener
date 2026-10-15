@@ -163,7 +163,7 @@ def get_es_doc_content(
 
 
 @register.simple_tag
-def citation(obj) -> SafeString:
+def citation(obj) -> str:
     # Inline import to avoid circular dependency
     from cl.opinion_page.utils import build_citation_string
 

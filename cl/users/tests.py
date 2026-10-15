@@ -5053,6 +5053,18 @@ class ViewApiUsageTest(TestCase):
     """Tests for /profile/api-usage/."""
 
     @classmethod
+    def setUpClass(cls) -> None:
+        super().setUpClass()
+        # get_all_throttle_overrides() gets its own @tiered_cache namespace
+        # so that parallel test don't clobber each other.
+        patcher = mock.patch(
+            "cl.lib.decorators.get_tiered_cache_prefix",
+            new=lambda: "tiered_view_api_usage_test",
+        )
+        patcher.start()
+        cls.addClassCleanup(patcher.stop)
+
+    @classmethod
     def setUpTestData(cls) -> None:
         cls.user = UserProfileWithParentsFactory.create().user
         cls.user.set_password("password")
@@ -6123,3 +6135,82 @@ class FailedSignInThrottleTest(TestCase):
             )
             self.sign_in(self.user.username, "a-good-password")
             self.assertIn("_auth_user_id", self.client.session)
+
+
+class AlertsPageMembershipNudgeTest(TestCase):
+    """Non-members are offered more alerts on their profile's alerts pages."""
+
+    @classmethod
+    def setUpTestData(cls) -> None:
+        cls.user = UserProfileWithParentsFactory.create().user
+        AlertFactory(user=cls.user)
+        DocketAlertWithParentsFactory(user=cls.user)
+
+    def setUp(self) -> None:
+        self.client.force_login(self.user)
+
+    def test_non_member_is_offered_more_alerts(self) -> None:
+        """Both alert pages mention what members get and link to join."""
+        expected = {
+            "profile_search_alerts": "Members get more search alerts",
+            "profile_docket_alerts": "Members get unlimited docket alerts",
+        }
+        for viewname, nudge in expected.items():
+            with self.subTest(viewname=viewname):
+                response = self.client.get(reverse(viewname))
+                self.assertContains(response, nudge)
+                self.assertContains(response, ">Join FLP</a>")
+
+    def test_member_is_not_offered_more_alerts(self) -> None:
+        """Members already get the benefit, so don't ask them to join."""
+        NeonMembershipFactory(user=self.user)
+        for viewname in ("profile_search_alerts", "profile_docket_alerts"):
+            with self.subTest(viewname=viewname):
+                response = self.client.get(reverse(viewname))
+                self.assertNotContains(response, "Members get")
+
+    def test_member_is_thanked_on_docket_alerts_page(self) -> None:
+        """Members see a thank-you where non-members see the nudge."""
+        NeonMembershipFactory(user=self.user)
+        response = self.client.get(reverse("profile_docket_alerts"))
+        self.assertContains(
+            response, "As a member you get unlimited docket alerts. Thanks!"
+        )
+
+
+@override_settings(WAFFLE_CACHE_PREFIX="MembershipHeaderLinkTest")
+class MembershipHeaderLinkTest(TestCase):
+    """The header's donate slot should make sense for members and non-members."""
+
+    @classmethod
+    def setUpTestData(cls) -> None:
+        cls.user = UserProfileWithParentsFactory.create().user
+        cls.url = reverse("help_home")
+
+    def test_anonymous_user_sees_join_flp(self) -> None:
+        """Anonymous visitors are invited to join."""
+        response = self.client.get(self.url)
+        self.assertContains(response, "Join FLP")
+
+    def test_non_member_sees_join_flp(self) -> None:
+        """Signed-in users without a membership are still invited to join."""
+        self.client.force_login(self.user)
+        response = self.client.get(self.url)
+        self.assertContains(response, "Join FLP")
+
+    def test_active_member_sees_membership_link(self) -> None:
+        """Members get a link to their membership page, not a join button."""
+        NeonMembershipFactory(user=self.user)
+        self.client.force_login(self.user)
+        response = self.client.get(self.url)
+        self.assertNotContains(response, "Join FLP")
+        self.assertContains(response, "&nbsp;Membership</a>")
+
+    def test_lapsed_member_sees_join_flp(self) -> None:
+        """A membership that is no longer active shouldn't hide the join link."""
+        NeonMembershipFactory(
+            user=self.user, payment_status=MembershipPaymentStatus.FAILED
+        )
+        self.client.force_login(self.user)
+        response = self.client.get(self.url)
+        self.assertContains(response, "Join FLP")
