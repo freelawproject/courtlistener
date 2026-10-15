@@ -47,6 +47,7 @@ from reporters_db import (
     VARIATIONS_ONLY,
 )
 from seal_rookery.search import ImageSizes, seal
+from waffle import flag_is_active
 
 from cl.citations.parenthetical_utils import get_or_create_parenthetical_groups
 from cl.citations.utils import (
@@ -77,7 +78,7 @@ from cl.lib.string_utils import trunc
 from cl.lib.thumbnails import make_png_thumbnail_for_instance
 from cl.lib.url_utils import get_redirect_or_abort
 from cl.lib.utils import human_sort
-from cl.opinion_page import docket_entry_sources
+from cl.opinion_page import docket_entry_sources, forms_v2
 from cl.opinion_page.decorators import handle_cluster_redirection
 from cl.opinion_page.docket_entry_sources import (
     SourceDocketEntry,
@@ -371,7 +372,10 @@ async def view_docket(
     request: HttpRequest, pk: int, slug: str
 ) -> HttpResponse:
     sort_order_asc = True
-    form = DocketEntryFilterForm(request.GET, request=request)
+    if await sync_to_async(flag_is_active)(request, "use_new_design"):
+        form = forms_v2.DocketEntryFilterForm(request.GET)
+    else:
+        form = DocketEntryFilterForm(request.GET, request=request)
     docket, context = await core_docket_data(request, pk)
 
     source = docket.get_entry_source()
