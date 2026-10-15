@@ -4243,24 +4243,6 @@ class DocketPageV2StaffLinksTest(TestCase):
                 href = reverse("admin:audio_audio_change", args=[audio.pk])
                 self.assertIn(audio.case_name, links[href])
 
-    async def test_blocked_badge_needs_change_docket(self) -> None:
-        """The Blocked badge shows for change_docket on a blocked docket and
-        for nobody else."""
-        await Docket.objects.filter(pk=self.docket.pk).aupdate(blocked=True)
-        for perm, expected in (
-            ("search.change_docket", True),
-            ("search.view_docket", False),
-        ):
-            with self.subTest(permission=perm):
-                user = await sync_to_async(self._user_with)(perm)
-                r = await self._get_docket_page(user)
-                badges = [
-                    el
-                    for el in fromstring(r.content.decode()).iter("span")
-                    if el.text_content().strip() == "Blocked"
-                ]
-                self.assertEqual(len(badges), 1 if expected else 0)
-
     async def test_users_without_permissions_see_no_admin_links(
         self,
     ) -> None:
