@@ -251,7 +251,7 @@ def case_names_are_too_different(
     """
     new_parts = winnow_case_name(first.lower())
     old_parts = winnow_case_name(second.lower())
-    # or 1 to prevent 0 lenght minimum
+    # or 1 to prevent 0 length minimum
     denominator = min(len(old_parts), len(new_parts)) or 1
     return len(new_parts.intersection(old_parts)) / denominator < threshold
 

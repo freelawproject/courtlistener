@@ -191,22 +191,20 @@ def get_s3_file_list(
 
     # Create S3 client with session token support for dev mode
     try:
-        client_kwargs = {
-            "service_name": "s3",
-            "aws_access_key_id": key_id,
-            "aws_secret_access_key": secret,
-        }
-
+        aws_session_token = None
         # In dev mode, add session token if available
         if settings.DEVELOPMENT:
             env = environ.FileAwareEnv()
-            session_token = env("AWS_SESSION_TOKEN", default=None) or env(
+            aws_session_token = env("AWS_SESSION_TOKEN", default=None) or env(
                 "AWS_DEV_SESSION_TOKEN", default=None
             )
-            if session_token:
-                client_kwargs["aws_session_token"] = session_token
 
-        s3_client = boto3.client(**client_kwargs)
+        s3_client = boto3.client(
+            "s3",
+            aws_access_key_id=key_id,
+            aws_secret_access_key=secret,
+            aws_session_token=aws_session_token,
+        )
     except (BotoCoreError, ClientError) as e:
         raise CommandError(f"Failed to create S3 client: {e}")
 
@@ -353,12 +351,11 @@ def create_tasks_from_files(
             task.save()
             logger.info(f"  - Referenced S3 file: {s3_key}")
 
-        temp_file = tempfile.NamedTemporaryFile(
+        with tempfile.NamedTemporaryFile(
             delete=False, suffix=os.path.splitext(filename)[1]
-        )
-        temp_file.write(file_content)
-        temp_file.close()
-        temp_files.append(temp_file.name)
+        ) as temp_file:
+            temp_files.append(temp_file.name)
+            temp_file.write(file_content)
 
         tasks_data.append(
             {"llm_key": llm_key, "input_file_path": temp_file.name}
@@ -430,8 +427,7 @@ def cleanup_temp_files(temp_files: list[str]) -> None:
     logger.info("Cleaning up temporary files...")
     for temp_file_path in temp_files:
         try:
-            if os.path.exists(temp_file_path):
-                os.remove(temp_file_path)
+            os.remove(temp_file_path)
         except OSError as e:
             if e.errno != 2:  # errno.ENOENT
                 logger.warning(
@@ -601,11 +597,11 @@ class Command(VerboseCommand):
                 )
             s3_files = filter_already_processed(s3_files, already_processed)
 
-        all_temp_files: list[str] = []
         batch_number = 0
         failed_batches = 0
         try:
             for chunk in chunk_iterator(s3_files, batch_size):
+                temp_files: list[str] = []
                 batch_number += 1
                 batch_name = (
                     f"{request_name} (part {batch_number})"
@@ -633,7 +629,7 @@ class Command(VerboseCommand):
                             llm_request,
                             chunk,
                             store_files,
-                            all_temp_files,
+                            temp_files,
                         )
 
                         submit_batch(
@@ -655,6 +651,8 @@ class Command(VerboseCommand):
                         model,
                     )
                     sentry_sdk.capture_exception(e)
+                finally:
+                    cleanup_temp_files(temp_files)
         except Exception as e:
             logger.exception(
                 "S3 iteration failed after batch %d. s3_path=%s, model=%s",
@@ -664,8 +662,6 @@ class Command(VerboseCommand):
             )
             sentry_sdk.capture_exception(e)
             raise
-        finally:
-            cleanup_temp_files(all_temp_files)
 
         succeeded = batch_number - failed_batches
         logger.info(

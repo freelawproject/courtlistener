@@ -145,7 +145,7 @@ class Command(VerboseCommand):
             for object_type in options["make_objects"]:
                 Factory = FACTORIES[object_type]
                 logger.info(
-                    f"Making {count} items and their dependant parents using "
+                    f"Making {count} items and their dependent parents using "
                     f"object type #{object_type}: {Factory}"
                 )
                 if parent_id:

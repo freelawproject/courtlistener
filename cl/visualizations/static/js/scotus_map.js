@@ -394,7 +394,7 @@ function drawGraph(target, opinions, chartType, axisType, height, maxDoS, mode, 
   ]);
 
   // the rangeBand is the percent of the width of the chart that a single data point takes up
-  // the floor of 5 div this div 100 yeilds a number from 0 to x that can be used to add padding
+  // the floor of 5 div this div 100 yields a number from 0 to x that can be used to add padding
 
   if (galleryId === '') {
     while (Math.floor(5 / xScaleCat.rangeBand() / 100) > xCatPadding && xCatPadding < 5) {
@@ -1358,7 +1358,7 @@ $(document).ready(function () {
     for (item in opinions) {
       if (opinions.hasOwnProperty(item)) {
         chartTarget = '#chart-' + item.toString();
-        // if settigns are embedded in the JSON then use them rather than defaults
+        // if settings are embedded in the JSON then use them rather than defaults
         type = ['dos', 'spaeth', 'genealogy'][item % 3];
 
         height = setHeight(chartTarget, false);

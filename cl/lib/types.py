@@ -97,7 +97,7 @@ OptionsType = dict[str, str | Callable]
 """
 The following classes provide a homogeneous collection of variables
 as a reusable group. The goal of these classes is to work as
-containers of the data thats coming from a Position queryset.
+containers of the data that's coming from a Position queryset.
 
 - The BasePositionMapping class contains the smallest set of common
 fields that we use in the UI and we need in the API response.
