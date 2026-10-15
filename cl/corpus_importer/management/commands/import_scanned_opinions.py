@@ -142,8 +142,7 @@ UNPUBLISHED_NOTICE_RE = re.compile(
     r"\bnot\s+(?:designated\s+)?for\s+(?:official\s+)?publication"
     r"|\b(?:not|non)[\s-]precedential"
     r"|\bunpublished\s+(?:opinion|decision|disposition|order)\b"
-    r"|\bdoes?\s+not\s+have\s+precedential\s+(?:effect|value)"
-    r"|\bsummary\s+order\b",
+    r"|\bdo(?:es)?\s+not\s+have\s+precedential\s+(?:effect|value)",
     re.IGNORECASE,
 )
 # How much of the start of the first opinion is searched for the notice.
