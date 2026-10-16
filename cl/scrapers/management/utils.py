@@ -241,7 +241,7 @@ class FLScrapeCommand(BaseCommand):
         queue: str,
         throttle_min_items: int,
         s3_base: Path,
-    ) -> "tuple[CeleryThrottle, FloridaScraper, S3Cache]":
+    ) -> tuple[CeleryThrottle, FloridaScraper, S3Cache]:
         """Initializes a celery queue throttle and Florida scraper with the given parameters and returns them"""
         throttle = CeleryThrottle(
             queue_name=queue, min_items=throttle_min_items

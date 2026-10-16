@@ -1910,6 +1910,7 @@ class PreflightCheckTest(SimpleTestCase):
         self.directory = TemporaryDirectory()
         self.addCleanup(self.directory.cleanup)
         self.database = Path(self.directory.name) / "run.db"
+        self.database_count = 0
 
     def results(self, rows: list[tuple[str, int]]) -> sqlite3.Connection:
         """A run database holding `rows`, open and ready to be checked.
@@ -1919,8 +1920,9 @@ class PreflightCheckTest(SimpleTestCase):
         :param rows: One `(result_type, is_valid)` pair per row.
         :return: The open connection.
         """
+        self.database_count += 1
         self.database = (
-            Path(self.directory.name) / f"run-{len(rows)}-{id(rows)}.db"
+            Path(self.directory.name) / f"run-{self.database_count}.db"
         )
         with closing(sqlite3.connect(self.database)) as connection:
             connection.execute(
@@ -2057,7 +2059,10 @@ class PreflightCheckTest(SimpleTestCase):
             stands for a file the scraper stored without hashing it.
         :return: The open connection.
         """
-        self.database = Path(self.directory.name) / f"archive-{id(hashes)}.db"
+        self.database_count += 1
+        self.database = (
+            Path(self.directory.name) / f"archive-{self.database_count}.db"
+        )
         with closing(sqlite3.connect(self.database)) as connection:
             connection.execute(
                 "CREATE TABLE archived_files ("

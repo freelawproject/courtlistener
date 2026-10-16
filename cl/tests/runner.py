@@ -1,12 +1,17 @@
 import logging
 import sys
 import warnings
+from functools import partial
 from typing import Any
 from unittest import TestCase as UnitTestCase
 from unittest import TestLoader
 
 from django.test import SimpleTestCase
-from django.test.runner import DiscoverRunner
+from django.test.runner import (
+    DiscoverRunner,
+    ParallelTestSuite,
+    RemoteTestRunner,
+)
 from override_storage import override_storage
 from xmlrunner import XMLTestRunner
 from xmlrunner.result import _TestInfo, _XMLTestResult
@@ -76,8 +81,33 @@ class DurationAwareXMLTestResult(_XMLTestResult):
         self.duration = None
 
 
+def setup_test_process(enable_logging: bool) -> None:
+    """Configure process-local warnings and logging for tests."""
+    warnings.simplefilter("default")
+    if not enable_logging:
+        logging.disable()
+
+
+class StorageRemoteTestRunner(RemoteTestRunner):
+    """Apply storage overrides inside each worker's test subsuite."""
+
+    def __init__(self, *args, enable_logging=False, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.enable_logging = enable_logging
+
+    def run(self, test):
+        setup_test_process(self.enable_logging)
+        with override_storage():
+            return super().run(test)
+
+
+class StorageParallelTestSuite(ParallelTestSuite):
+    runner_class = StorageRemoteTestRunner
+
+
 class TestRunner(DiscoverRunner):
     test_loader = OurCasesTestLoader()
+    parallel_test_suite = StorageParallelTestSuite
 
     def __init__(self, *args, enable_logging, xml_output=None, **kwargs):
         super().__init__(*args, **kwargs)
@@ -118,6 +148,14 @@ class TestRunner(DiscoverRunner):
         # See PR #5888 for more details.
         # parser.set_defaults(buffer=True)
 
+    def build_suite(self, *args, **kwargs):
+        suite = super().build_suite(*args, **kwargs)
+        if isinstance(suite, StorageParallelTestSuite):
+            suite.runner_class = partial(
+                StorageRemoteTestRunner, enable_logging=self.enable_logging
+            )
+        return suite
+
     def get_test_runner_kwargs(self) -> dict[str, Any]:
         """Build the kwargs for the test runner.
 
@@ -147,13 +185,7 @@ class TestRunner(DiscoverRunner):
 
     @override_storage()
     def run_tests(self, *args, **kwargs):
-        # Show all warnings once, especially to show DeprecationWarning
-        # messages which Python ignores by default
-        warnings.simplefilter("default")
-
-        # Disable logs for small performance boost.
-        if not self.enable_logging:
-            logging.disable()
+        setup_test_process(self.enable_logging)
 
         try:
             return super().run_tests(*args, **kwargs)

@@ -4,7 +4,6 @@ import traceback
 from dataclasses import dataclass, field
 from io import StringIO
 from typing import Any, TypedDict, cast
-from zoneinfo import ZoneInfo
 
 import waffle
 from asgiref.sync import sync_to_async
@@ -23,6 +22,7 @@ from elasticsearch.dsl import Q
 from elasticsearch.dsl.response import Response
 from elasticsearch.dsl.response.hit import Hit
 from elasticsearch.exceptions import ApiError, ConnectionTimeout, RequestError
+from zoneinfo import ZoneInfo
 
 from cl.alerts.models import DocketAlert
 from cl.custom_filters.templatetags.text_filters import best_case_name
