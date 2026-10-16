@@ -862,6 +862,7 @@ class PeopleTestCase(CourtTestCase):
 
     @classmethod
     def setUpTestData(cls):
+        super().setUpTestData()
         cls.w_race, _ = Race.objects.get_or_create(race="w")
         cls.b_race, _ = Race.objects.get_or_create(race="b")
         cls.person_1 = PersonFactory.create(
@@ -1000,7 +1001,6 @@ class PeopleTestCase(CourtTestCase):
             person=cls.person_2,
             year_rated="2015",
         )
-        super().setUpTestData()
 
 
 class SearchTestCase(PeopleTestCase):
@@ -1008,6 +1008,7 @@ class SearchTestCase(PeopleTestCase):
 
     @classmethod
     def setUpTestData(cls):
+        super().setUpTestData()
         cls.docket_1 = DocketFactory.create(
             date_reargument_denied=datetime.date(2015, 8, 15),
             court_id=cls.court_2.pk,
@@ -1211,7 +1212,6 @@ class SearchTestCase(PeopleTestCase):
             cited_opinion=cls.opinion_1,
             citing_opinion=cls.opinion_3,
         )
-        super().setUpTestData()
 
 
 class RECAPSearchTestCase(TestCase):
