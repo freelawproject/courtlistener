@@ -6,7 +6,6 @@ import random
 import re
 from collections import defaultdict
 from collections.abc import Callable, Generator, Iterator, Mapping, Sequence
-from dataclasses import dataclass
 from datetime import date
 from difflib import SequenceMatcher
 from typing import TYPE_CHECKING, Any, cast
