@@ -352,8 +352,8 @@ class PacerBulkFetchUnitTest(TestCase):
     ):
         """Test that identify_documents correctly filters subdockets"""
 
-        self.command.options["min_page_count"] = 200
-        self.command.options["max_page_count"] = 300
+        self.command.min_page_count = 200
+        self.command.max_page_count = 300
         docket_2 = DocketFactory(court=self.court)
         docket_entries = [
             DocketEntryFactory(docket=docket_2) for _ in range(5)
