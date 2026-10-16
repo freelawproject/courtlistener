@@ -24,7 +24,9 @@ def load_migration_fixture(apps, schema_editor, fixture, app_label):
     :param app_label: The app label the fixture should be loaded into.
     :return: None
     """
-    # Save the old _get_model_from_node() function
+    # Save the old _get_model_from_node() function. django-stubs omit this
+    # private method.
+    # pyrefly: ignore[missing-attribute]
     old_get_model = python.Deserializer._get_model_from_node
 
     # Define new _get_model_from_node() function here, which utilizes the apps
