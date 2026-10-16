@@ -175,6 +175,8 @@ class AuthorizationView(oauth2_views.AuthorizationView):
     def dispatch(
         self, request: HttpRequest, *args: Any, **kwargs: Any
     ) -> HttpResponseBase:
+        """Hand the request to the MCP server when it is from a DCR client and
+        the flag is on for the user; otherwise run DOT's authorize."""
         if (url := mcp_authorize_url(request)) and migrating(request.user):
             return handoff(url)
         return super().dispatch(request, *args, **kwargs)
@@ -225,6 +227,8 @@ class TokenView(oauth2_views.TokenView):
     def post(
         self, request: HttpRequest, *args: Any, **kwargs: Any
     ) -> HttpResponse:
+        """Serve the request with DOT, then relay or refuse it for clients
+        registered through DCR."""
         body = request.body
         response = super().post(request, *args, **kwargs)
         client_id = client_id_of(request, body)
