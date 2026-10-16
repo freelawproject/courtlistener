@@ -8,7 +8,7 @@ from unittest import mock
 from unittest.mock import call, patch
 
 import eyecite
-import httpx
+import httpx2
 import pytest
 import requests
 import responses
@@ -914,7 +914,7 @@ class ImporterTransportTest(SimpleTestCase):
             session.login.side_effect = record_loop
             report = report_class.return_value
             report.query = mock.AsyncMock(side_effect=record_loop)
-            report.response = httpx.Response(200, text="<html></html>")
+            report.response = httpx2.Response(200, text="<html></html>")
             report.data = {}
 
             query_and_parse_claims_activity(
@@ -928,11 +928,11 @@ class ImporterTransportTest(SimpleTestCase):
             self.assertEqual(len(list(Path(directory).rglob("*.json"))), 4)
 
     async def test_download_recap_item_uses_httpx_content(self) -> None:
-        """Write the downloaded bytes using the HTTPX response API."""
+        """Write the downloaded bytes using the HTTPX2 response API."""
         content = b"%PDF-1.7 test document"
-        client = httpx.AsyncClient(
-            transport=httpx.MockTransport(
-                lambda request: httpx.Response(200, content=content)
+        client = httpx2.AsyncClient(
+            transport=httpx2.MockTransport(
+                lambda request: httpx2.Response(200, content=content)
             )
         )
         with TemporaryDirectory() as directory:
@@ -941,7 +941,7 @@ class ImporterTransportTest(SimpleTestCase):
             with (
                 override_settings(MEDIA_ROOT=directory),
                 patch(
-                    "cl.corpus_importer.tasks.httpx.AsyncClient",
+                    "cl.corpus_importer.tasks.httpx2.AsyncClient",
                     return_value=client,
                 ),
             ):
@@ -2676,7 +2676,7 @@ class TexasMergerTest(TestCase):
         """
         Ensure plaintext extraction is triggered by `merge_texas_document`.
         """
-        pcs_mock.return_value = httpx.Response(200, text="1")
+        pcs_mock.return_value = httpx2.Response(200, text="1")
         # Stop the mocks just for this test
         self.download_task_patch.stop()
         self.extract_document_patch.stop()
@@ -3216,7 +3216,7 @@ class TexasMergerTest(TestCase):
             callback=get_test_pdf,
         )
 
-        pcs_mock.return_value = httpx.Response(200, text="1")
+        pcs_mock.return_value = httpx2.Response(200, text="1")
 
         result = download_texas_document(texas_document.pk)
 
@@ -3451,7 +3451,7 @@ class TexasMergerTest(TestCase):
         self.assertIn(".html", texas_document.filepath_local.name)
 
         # Mock Doctor returning HTML content
-        microservice_mock.return_value = httpx.Response(
+        microservice_mock.return_value = httpx2.Response(
             200,
             json={
                 "content": html_content,

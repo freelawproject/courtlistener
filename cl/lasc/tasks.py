@@ -10,7 +10,7 @@ from django.apps import apps
 from django.conf import settings
 from django.core.files.base import ContentFile
 from django.db import transaction
-from httpx import HTTPError
+from httpx2 import HTTPError
 from juriscraper.lasc.fetch import LASCSearch
 from juriscraper.lasc.http import LASCSession
 
@@ -64,7 +64,7 @@ async def login_to_court() -> None:
         username=LASC_USERNAME, password=LASC_PASSWORD
     ) as lasc_session:
         await lasc_session.login()
-    # HTTPX cookie jars contain a lock that cannot be pickled.
+    # HTTPX2 cookie jars contain a lock that cannot be pickled.
     cookie_bytes = pickle.dumps(list(lasc_session.cookies.jar))
     # Done logging in; save the cookies.
     await sync_to_async(r.set)(

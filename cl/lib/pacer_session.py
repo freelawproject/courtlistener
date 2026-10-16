@@ -6,7 +6,7 @@ from typing import Any
 
 from asgiref.sync import sync_to_async
 from django.conf import settings
-from httpx import URL, Cookies, Request, Response
+from httpx2 import URL, Cookies, Request, Response
 from juriscraper.pacer import PacerSession
 from redis import Redis
 
@@ -41,7 +41,7 @@ class SessionData:
             allow_insecure_cookie_transport(self.cookies)
 
     def __getstate__(self) -> dict[str, Any]:
-        """Serialize cookies without HTTPX's unpicklable cookie-jar lock."""
+        """Serialize cookies without HTTPX2's unpicklable cookie-jar lock."""
         state = self.__dict__.copy()
         if self.cookies is not None:
             state["cookies"] = list(self.cookies.jar)
@@ -104,7 +104,7 @@ class ProxyPacerSession(PacerSession):
         request.url = self._change_protocol(request.url)
         request.headers["X-WhSentry-TLS"] = "true"
         response = await super()._send_single_request(request)
-        # HTTPX has extracted cookies here, but has not built a redirect yet.
+        # HTTPX2 has extracted cookies here, but has not built a redirect yet.
         allow_insecure_cookie_transport(self.cookies)
         return response
 

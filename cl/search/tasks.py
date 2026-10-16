@@ -35,7 +35,7 @@ from elasticsearch.exceptions import (
     RequestError,
 )
 from elasticsearch.helpers import parallel_bulk, streaming_bulk
-from httpx import (
+from httpx2 import (
     HTTPStatusError,
     NetworkError,
     ReadError,

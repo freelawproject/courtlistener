@@ -4,7 +4,7 @@ import json
 from datetime import date
 from http import HTTPStatus
 
-import httpx
+import httpx2
 from django.core.files.base import ContentFile
 
 from cl.lib.storage import (
@@ -132,11 +132,12 @@ def fetch_scotus_docket_json(
         to trigger exponential backoff, matching the iquery probe semantics.
     """
     url = SCOTUS_JSON_URL_TEMPLATE.format(docket_number=docket_number)
-    resp = httpx.get(
-        url,
-        timeout=30,
-        headers={"User-Agent": "Free Law Project"},
-    )
+    with httpx2.Client(http2=True) as client:
+        resp = client.get(
+            url,
+            timeout=30,
+            headers={"User-Agent": "Free Law Project"},
+        )
     if resp.status_code == HTTPStatus.NOT_FOUND:
         return None, HTTPStatus.NOT_FOUND
     resp.raise_for_status()

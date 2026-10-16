@@ -1,7 +1,7 @@
 from datetime import date
 from unittest.mock import MagicMock
 
-from httpx import HTTPStatusError, Request, Response, TimeoutException
+from httpx2 import HTTPStatusError, Request, Response, TimeoutException
 
 from cl.corpus_importer.factories import (
     CaseQueryDataFactory,
@@ -227,7 +227,7 @@ class FakeFreeOpinionReport:
         """Return a fake PDF response.
 
         Without a magic number, the real report sends ``de_seq_num`` as
-        multipart form data via httpx, which only accepts str values; anything
+        multipart form data via httpx2, which only accepts str values; anything
         else fails the same way it does in production.
         """
         de_seq_num = kwargs.get("de_seq_num")
@@ -384,7 +384,7 @@ class FakeCaseQueryReport:
     async def query(self, pacer_case_id: str) -> None:
         """Store the requested case ID so ``data`` can look it up.
 
-        Mirrors the real report, whose multipart POST via httpx only accepts
+        Mirrors the real report, whose multipart POST via httpx2 only accepts
         str values; anything else fails the same way it does in production.
         """
         if not isinstance(pacer_case_id, str):

@@ -8,7 +8,7 @@ from http import HTTPStatus
 from urllib.parse import parse_qs, urlencode, urljoin, urlparse, urlunparse
 from zoneinfo import ZoneInfo
 
-import httpx
+import httpx2
 import pghistory
 from django.db import models
 from juriscraper.state.florida.scraper import FLORIDA_API_BASE
@@ -61,7 +61,7 @@ class AltchaData(BaseModel):
     resource: str
 
     @retry(
-        (httpx.ConnectError, httpx.TimeoutException),
+        (httpx2.ConnectError, httpx2.TimeoutException),
         tries=3,
         delay=1,
         backoff=2,
@@ -72,12 +72,13 @@ class AltchaData(BaseModel):
 
         Returns `None` when the endpoint answers 204, which means the gate is
         switched off and the document can be fetched with its bare URL."""
-        response = httpx.get(
-            CHALLENGE_URL,
-            params={"resource": self.resource},
-            headers={"User-Agent": COURT_REQUEST_USER_AGENT},
-            timeout=CHALLENGE_TIMEOUT,
-        )
+        with httpx2.Client(http2=True) as client:
+            response = client.get(
+                CHALLENGE_URL,
+                params={"resource": self.resource},
+                headers={"User-Agent": COURT_REQUEST_USER_AGENT},
+                timeout=CHALLENGE_TIMEOUT,
+            )
 
         response.raise_for_status()
 
@@ -294,7 +295,7 @@ class FloridaDocument(AbstractDateTimeModel, AbstractStateDocument):
 
         try:
             challenge = AltchaData(resource=path).fetch()
-        except httpx.HTTPStatusError as exc:
+        except httpx2.HTTPStatusError as exc:
             if exc.response.status_code != HTTPStatus.FORBIDDEN:
                 raise
             logger.error(

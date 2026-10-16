@@ -12,7 +12,7 @@ from uuid import UUID
 import botocore.exceptions
 from asgiref.sync import async_to_sync, sync_to_async
 from django.core.management import CommandParser
-from httpx import Response
+from httpx2 import Response
 from juriscraper.state.florida import FloridaCase, FloridaScraper
 from juriscraper.state.florida.courts import FloridaCourtID
 from juriscraper.state.RequestManager import (

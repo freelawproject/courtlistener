@@ -8,7 +8,7 @@ from asgiref.sync import sync_to_async
 from botocore.exceptions import ClientError
 from django.conf import settings
 from django.core.files.base import File
-from httpx import (
+from httpx2 import (
     AsyncClient,
     NetworkError,
     Response,

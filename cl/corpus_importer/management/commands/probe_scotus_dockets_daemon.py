@@ -3,8 +3,8 @@ import time
 from celery import chain
 from django.conf import settings
 from django.utils.timezone import localtime
-from httpx import HTTPStatusError as HTTPError
-from httpx import TimeoutException as Timeout
+from httpx2 import HTTPStatusError as HTTPError
+from httpx2 import TimeoutException as Timeout
 from juriscraper.scotus import SCOTUSDocketReport
 from redis import ConnectionError as RedisConnectionError
 

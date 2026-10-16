@@ -23,7 +23,7 @@ from uuid import UUID
 import botocore.exceptions
 import environ
 import eyecite
-import httpx
+import httpx2
 import internetarchive as ia
 import requests
 from asgiref.sync import async_to_sync, sync_to_async
@@ -37,7 +37,7 @@ from django.db.models import Prefetch
 from django.db.models.query import prefetch_related_objects
 from django.utils.timezone import localtime, now
 from eyecite.tokenizers import HyperscanTokenizer
-from httpx import (
+from httpx2 import (
     ConnectError,
     HTTPError,
     HTTPStatusError,
@@ -48,7 +48,7 @@ from httpx import (
     Response,
     TimeoutException,
 )
-from httpx import Response as HttpxResponse
+from httpx2 import Response as Httpx2Response
 from juriscraper.lib.exceptions import PacerLoginException, ParsingException
 from juriscraper.lib.string_utils import CaseNameTweaker, harmonize
 from juriscraper.pacer import (
@@ -388,7 +388,7 @@ async def download_recap_item(
     try:
         if os.path.isfile(location) and not clobber:
             raise OSError(f"    IOError: File already exists at {location}")
-        async with httpx.AsyncClient(
+        async with httpx2.AsyncClient(
             follow_redirects=True, http2=True
         ) as client:
             r = await client.get(
@@ -2407,7 +2407,7 @@ async def download_pacer_pdf_by_rd(
     :param magic_number: The magic number to fetch PACER documents for free
     this is an optional field, only used by RECAP Email documents
     :param de_seq_num: The docket entry's PACER sequence number, if known.
-    :return: A two-tuple of httpx.Response object usually containing a PDF,
+    :return: A two-tuple of httpx2.Response object usually containing a PDF,
     or None if that wasn't possible, and a string representing the error if
     there was one.
     """
@@ -2436,7 +2436,7 @@ async def download_pacer_pdf_by_rd(
                 cast(Any, pacer_doc_id),
                 magic_number,
                 # Without a magic number, Juriscraper sends this as multipart
-                # form data, and httpx only accepts str/bytes values there.
+                # form data, and httpx2 only accepts str/bytes values there.
                 de_seq_num=str(de_seq_num) if de_seq_num is not None else None,
             )
         return r, r_msg
@@ -2464,7 +2464,7 @@ async def download_pdf_by_magic_number(
     :param de_seq_num: The sequential number assigned by the PACER system to
      identify the docket entry within a case.
     :param acms: Whether the download belongs to an ACMS notification.
-    :return: A two-tuple of httpx.Response object usually containing a PDF,
+    :return: A two-tuple of httpx2.Response object usually containing a PDF,
     or None if that wasn't possible, and a string representing the error if
     there was one.
     """
@@ -3235,7 +3235,7 @@ async def query_and_save_list_of_creditors_base(
     backoff=2,
     logger=logger,
 )
-def extract_recap_document_for_opinions(rd: RECAPDocument) -> HttpxResponse:
+def extract_recap_document_for_opinions(rd: RECAPDocument) -> Httpx2Response:
     """Call recap-extract from doctor with retries
 
     :param rd: the recap document to extract
@@ -3492,7 +3492,7 @@ def is_pdf(response: Response | requests.Response) -> bool:
     """Check if an HTTP response wraps a PDF file using the
     "Content-Type" header.
 
-    :param response: The HTTPX or requests response to check.
+    :param response: The HTTPX2 or requests response to check.
     :return: Whether the response is a PDF file."""
     return (
         # HTTP header names are case-insensitive; real requests.Response

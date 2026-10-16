@@ -12,7 +12,7 @@ from multiprocessing import process
 from typing import Any, TypedDict, overload
 from zipfile import ZipFile
 
-import httpx
+import httpx2
 from asgiref.sync import async_to_sync, sync_to_async
 from botocore import exceptions as botocore_exception
 from celery import Task
@@ -2140,7 +2140,7 @@ def fetch_pacer_doc_by_rd_base(
                 magic_number,
                 de_seq_num=de_seq_num,
             )
-    except (httpx.RequestError, httpx.HTTPError):
+    except (httpx2.RequestError, httpx2.HTTPError):
         msg = "Failed to get PDF from network."
         async_to_sync(mark_fq_status)(fq, msg, PROCESSING_STATUS.FAILED)
         self.request.chain = None
@@ -2332,7 +2332,7 @@ def fetch_attachment_page(self: Task, fq_pk: int) -> list[tuple[int, bool]]:
             self.request.chain = None
             return []
         raise self.retry(exc=exc)
-    except httpx.RequestError as exc:
+    except httpx2.RequestError as exc:
         if self.request.retries == self.max_retries:
             msg = "Failed to get attachment page from network."
             async_to_sync(mark_fq_status)(fq, msg, PROCESSING_STATUS.FAILED)
@@ -2340,7 +2340,7 @@ def fetch_attachment_page(self: Task, fq_pk: int) -> list[tuple[int, bool]]:
             return []
         logger.info("Ran into a RequestException. Retrying.")
         raise self.retry(exc=exc)
-    except httpx.HTTPStatusError as exc:
+    except httpx2.HTTPStatusError as exc:
         msg = "Failed to get attachment page from network."
         if exc.response.status_code in [
             HTTPStatus.INTERNAL_SERVER_ERROR,
@@ -2757,7 +2757,7 @@ async def fetch_appellate_docket_base(
                 fq=fq,
                 **get_fq_appellate_docket_kwargs(fq),
             )
-    except httpx.HTTPError as exc:
+    except httpx2.HTTPError as exc:
         raise CourtQueryError(
             f"Network error while purchasing docket for fq: {fq_pk}."
         ) from exc
@@ -2855,7 +2855,7 @@ async def fetch_docket_base(
     ) as s:
         try:
             result = await fetch_pacer_case_id_and_title(s, fq, court_id)
-        except httpx.HTTPError as exc:
+        except httpx2.HTTPError as exc:
             raise CourtQueryError(
                 f"Network error getting pacer_case_id for fq: {fq_pk}."
             ) from exc
@@ -2894,7 +2894,7 @@ async def fetch_docket_base(
             result = await fetch_docket_by_pacer_case_id(
                 s, court_id, pacer_case_id, fq
             )
-        except httpx.HTTPError as exc:
+        except httpx2.HTTPError as exc:
             raise CourtQueryError(
                 f"Network error getting docket for fq: {fq_pk}."
             ) from exc
@@ -2976,8 +2976,8 @@ async def get_attachment_page_by_url(
         "Querying the email notice attachment page endpoint at URL: %s",
         att_page_url,
     )
-    req_timeout = httpx.Timeout(300, connect=60)
-    async with httpx.AsyncClient(follow_redirects=True, http2=True) as client:
+    req_timeout = httpx2.Timeout(300, connect=60)
+    async with httpx2.AsyncClient(follow_redirects=True, http2=True) as client:
         att_response = await client.get(att_page_url, timeout=req_timeout)
     att_data = get_data_from_att_report(att_response.text, court_id)
     if att_data == {}:
@@ -3496,7 +3496,7 @@ async def get_acms_pacer_case_id(
     autoretry_for=(
         botocore_exception.HTTPClientError,
         botocore_exception.ConnectionError,
-        httpx.HTTPError,
+        httpx2.HTTPError,
         PacerLoginException,
         RedisConnectionError,
     ),
@@ -3845,9 +3845,9 @@ def do_recap_document_fetch(epq: EmailProcessingQueue, user: User) -> None:
     autoretry_for=(
         botocore_exception.HTTPClientError,
         botocore_exception.ConnectionError,
-        httpx.NetworkError,
-        httpx.HTTPStatusError,
-        httpx.TimeoutException,
+        httpx2.NetworkError,
+        httpx2.HTTPStatusError,
+        httpx2.TimeoutException,
         RedisConnectionError,
     ),
     max_retries=10,
@@ -3917,12 +3917,13 @@ def process_texas_email(self: Task, epq_pk: int) -> None:
     docket_data = None
 
     for retry in range(MAX_RETRIES):
-        response = httpx.get(
-            email_data["url"],
-            headers={"User-Agent": "Free Law Project"},
-            timeout=30.0,
-            follow_redirects=True,
-        )
+        with httpx2.Client(http2=True) as client:
+            response = client.get(
+                email_data["url"],
+                headers={"User-Agent": "Free Law Project"},
+                timeout=30.0,
+                follow_redirects=True,
+            )
         response.raise_for_status()
 
         try:
@@ -4012,7 +4013,7 @@ def fetch_and_archive_scotus_docket_followup(
         returned by ``SCOTUSEmail.handle_email``.
     """
     parsed_email = scotus_email.data
-    with httpx.Client(follow_redirects=True, http2=True) as client:
+    with httpx2.Client(follow_redirects=True, http2=True) as client:
         response = client.get(
             parsed_email["followup_url"],
             headers={"User-Agent": "Free Law Project"},
@@ -4038,7 +4039,7 @@ def fetch_and_archive_scotus_docket_followup(
     autoretry_for=(
         botocore_exception.HTTPClientError,
         botocore_exception.ConnectionError,
-        httpx.HTTPError,
+        httpx2.HTTPError,
         RedisConnectionError,
     ),
     max_retries=10,
@@ -4144,9 +4145,9 @@ def process_scotus_email(self: Task, epq_pk: int) -> None:
 
 @app.task(
     autoretry_for=(
-        httpx.ConnectError,
-        httpx.ConnectTimeout,
-        httpx.ReadTimeout,
+        httpx2.ConnectError,
+        httpx2.ConnectTimeout,
+        httpx2.ReadTimeout,
     ),
     max_retries=2,
     retry_backoff=10,

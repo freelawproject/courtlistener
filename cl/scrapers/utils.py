@@ -2,7 +2,7 @@ import json
 import re
 from datetime import date, datetime
 
-import httpx
+import httpx2
 from asgiref.sync import async_to_sync
 from courts_db import find_court_by_id, find_court_ids_by_name
 from django.core.files.base import ContentFile
@@ -157,8 +157,8 @@ def get_child_court(child_court_name: str, court_id: str) -> Court | None:
 
 @retry(
     (
-        httpx.NetworkError,
-        httpx.TimeoutException,
+        httpx2.NetworkError,
+        httpx2.TimeoutException,
     ),
     tries=3,
     delay=5,

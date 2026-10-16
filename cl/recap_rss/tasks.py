@@ -15,7 +15,7 @@ from django.core.files.base import ContentFile
 from django.core.mail import send_mail
 from django.db import IntegrityError, transaction
 from django.utils.timezone import now
-from httpx import HTTPError
+from httpx2 import HTTPError
 from juriscraper.pacer import PacerRssFeed
 from pytz import timezone
 from redis import Redis

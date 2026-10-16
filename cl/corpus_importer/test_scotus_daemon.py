@@ -2,7 +2,7 @@ from datetime import date, datetime
 from http import HTTPStatus
 from unittest import mock
 
-import httpx
+import httpx2
 import time_machine
 from django.conf import settings
 from django.core.management import call_command
@@ -187,9 +187,9 @@ class ScotusDaemonTest(SimpleTestCase):
         self._seed_current_term(25, low=100, high=20000)
 
         def raising_fetch(_):
-            req = httpx.Request("GET", "https://www.supremecourt.gov/")
-            resp = httpx.Response(403, request=req)
-            raise httpx.HTTPStatusError("403", request=req, response=resp)
+            req = httpx2.Request("GET", "https://www.supremecourt.gov/")
+            resp = httpx2.Response(403, request=req)
+            raise httpx2.HTTPStatusError("403", request=req, response=resp)
 
         with (
             mock.patch.object(
@@ -450,7 +450,7 @@ class ScotusDaemonTest(SimpleTestCase):
             if dn in {"25-100", "25-101"}:
                 return f'{{"docket_number":"{dn}"}}', HTTPStatus.OK
             if dn == "25-102":
-                raise httpx.TimeoutException("timed out")
+                raise httpx2.TimeoutException("timed out")
             return None, HTTPStatus.NOT_FOUND
 
         with (
@@ -698,9 +698,9 @@ class ScotusDaemonIntegrationTest(TestCase):
         )
 
         def raising_fetch(_dn):
-            req = httpx.Request("GET", "https://www.supremecourt.gov/")
-            resp = httpx.Response(403, request=req)
-            raise httpx.HTTPStatusError("403", request=req, response=resp)
+            req = httpx2.Request("GET", "https://www.supremecourt.gov/")
+            resp = httpx2.Response(403, request=req)
+            raise httpx2.HTTPStatusError("403", request=req, response=resp)
 
         with (
             mock.patch.object(

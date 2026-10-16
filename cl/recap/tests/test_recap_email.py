@@ -3,7 +3,7 @@ from http import HTTPStatus
 from pathlib import Path
 from unittest import mock
 
-import httpx
+import httpx2
 from asgiref.sync import async_to_sync, sync_to_async
 from django.conf import settings
 from django.contrib.auth.hashers import make_password
@@ -1356,7 +1356,7 @@ class RecapEmailDocketAlerts(TestCase, SearchAlertsAssertions):
     @mock.patch(
         "cl.recap.tasks.download_pdf_by_magic_number",
         return_value=(
-            httpx.Response(200, content=b"Hello World"),
+            httpx2.Response(200, content=b"Hello World"),
             "OK",
         ),
     )
@@ -1365,8 +1365,8 @@ class RecapEmailDocketAlerts(TestCase, SearchAlertsAssertions):
         side_effect=lambda *args, **kwargs: MockResponse(200, mock_raw=True),
     )
     @mock.patch(
-        "cl.recap.tasks.httpx.AsyncClient.get",
-        return_value=httpx.Response(
+        "cl.recap.tasks.httpx2.AsyncClient.get",
+        return_value=httpx2.Response(
             200, content=mock_bucket_open("nyed_123019137279.html", "r", True)
         ),
     )
@@ -1939,13 +1939,13 @@ class RecapEmailDocketAlerts(TestCase, SearchAlertsAssertions):
     @mock.patch(
         "cl.recap.tasks.download_pdf_by_magic_number",
         return_value=(
-            httpx.Response(200, content=b"Hello World"),
+            httpx2.Response(200, content=b"Hello World"),
             "OK",
         ),
     )
     @mock.patch(
-        "cl.recap.tasks.httpx.AsyncClient.get",
-        return_value=httpx.Response(
+        "cl.recap.tasks.httpx2.AsyncClient.get",
+        return_value=httpx2.Response(
             200, content=mock_bucket_open("jpml_85001321035.html", "r", True)
         ),
     )
@@ -2250,8 +2250,8 @@ class RecapEmailDocketAlerts(TestCase, SearchAlertsAssertions):
         side_effect=lambda *args, **kwargs: MockResponse(200, mock_raw=True),
     )
     @mock.patch(
-        "cl.recap.tasks.httpx.AsyncClient.get",
-        return_value=httpx.Response(
+        "cl.recap.tasks.httpx2.AsyncClient.get",
+        return_value=httpx2.Response(
             200, content=mock_bucket_open("nyed_123019137279.html", "r", True)
         ),
     )
@@ -3392,7 +3392,7 @@ class GetDocumentNumberForAppellateDocuments(TestCase):
     @mock.patch(
         "cl.recap.tasks.download_pdf_by_magic_number",
         return_value=(
-            httpx.Response(
+            httpx2.Response(
                 200,
                 content=mock_bucket_open("nda_document.pdf", "rb", True),
             ),
@@ -3430,7 +3430,7 @@ class GetDocumentNumberForAppellateDocuments(TestCase):
     @mock.patch(
         "cl.recap.tasks.download_pdf_by_magic_number",
         return_value=(
-            httpx.Response(
+            httpx2.Response(
                 200,
                 content=mock_bucket_open(
                     "gov.uscourts.ca8.17-2543.00803263743.0.pdf", "rb", True
@@ -3477,7 +3477,7 @@ class GetDocumentNumberForAppellateDocuments(TestCase):
     @mock.patch(
         "cl.recap.tasks.download_pdf_by_magic_number",
         return_value=(
-            httpx.Response(
+            httpx2.Response(
                 200,
                 content=mock_bucket_open(
                     "gov.uscourts.ca8.17-2543.00803263743.0.pdf", "rb", True
@@ -3523,7 +3523,7 @@ class GetDocumentNumberForAppellateDocuments(TestCase):
     @mock.patch(
         "cl.recap.tasks.download_pdf_by_magic_number",
         return_value=(
-            httpx.Response(200, content=b""),
+            httpx2.Response(200, content=b""),
             "OK",
         ),
     )
@@ -3562,7 +3562,7 @@ class GetDocumentNumberForAppellateDocuments(TestCase):
     @mock.patch(
         "cl.recap.tasks.download_pdf_by_magic_number",
         return_value=(
-            httpx.Response(200, content=b""),
+            httpx2.Response(200, content=b""),
             "OK",
         ),
     )
@@ -3882,13 +3882,13 @@ class RecapEmailContentReplication(TestCase):
     @mock.patch(
         "cl.recap.tasks.download_pdf_by_magic_number",
         return_value=(
-            httpx.Response(200, content=b"Hello World"),
+            httpx2.Response(200, content=b"Hello World"),
             "OK",
         ),
     )
     @mock.patch(
-        "cl.recap.tasks.httpx.AsyncClient.get",
-        return_value=httpx.Response(200, content=b"Att content."),
+        "cl.recap.tasks.httpx2.AsyncClient.get",
+        return_value=httpx2.Response(200, content=b"Att content."),
     )
     async def test_nef_subdocket_replication_no_att(
         self,
@@ -4028,13 +4028,13 @@ class RecapEmailContentReplication(TestCase):
     @mock.patch(
         "cl.recap.tasks.download_pdf_by_magic_number",
         return_value=(
-            httpx.Response(200, content=b"Hello World"),
+            httpx2.Response(200, content=b"Hello World"),
             "OK",
         ),
     )
     @mock.patch(
-        "cl.recap.tasks.httpx.AsyncClient.get",
-        return_value=httpx.Response(200, content=b"Att content."),
+        "cl.recap.tasks.httpx2.AsyncClient.get",
+        return_value=httpx2.Response(200, content=b"Att content."),
     )
     async def test_source_field_set_for_email_and_replication_pqs(
         self,
@@ -4107,13 +4107,13 @@ class RecapEmailContentReplication(TestCase):
     @mock.patch(
         "cl.recap.tasks.download_pdf_by_magic_number",
         return_value=(
-            httpx.Response(200, content=b"Hello World"),
+            httpx2.Response(200, content=b"Hello World"),
             "OK",
         ),
     )
     @mock.patch(
-        "cl.recap.tasks.httpx.AsyncClient.get",
-        return_value=httpx.Response(200, content=b"Att content."),
+        "cl.recap.tasks.httpx2.AsyncClient.get",
+        return_value=httpx2.Response(200, content=b"Att content."),
     )
     async def test_multi_nef_subdocket_replication(
         self,
@@ -4316,13 +4316,13 @@ class RecapEmailContentReplication(TestCase):
     @mock.patch(
         "cl.recap.tasks.download_pdf_by_magic_number",
         return_value=(
-            httpx.Response(200, content=b"Hello World"),
+            httpx2.Response(200, content=b"Hello World"),
             "OK",
         ),
     )
     @mock.patch(
-        "cl.recap.tasks.httpx.AsyncClient.get",
-        return_value=httpx.Response(200, content=b"Att content."),
+        "cl.recap.tasks.httpx2.AsyncClient.get",
+        return_value=httpx2.Response(200, content=b"Att content."),
     )
     async def test_avoid_triggering_replication_for_minute_entries(
         self,
@@ -4470,7 +4470,7 @@ class RecapEmailContentReplication(TestCase):
     @mock.patch(
         "cl.recap.tasks.download_pdf_by_magic_number",
         return_value=(
-            httpx.Response(200, content=b"Hello World"),
+            httpx2.Response(200, content=b"Hello World"),
             "OK",
         ),
     )
@@ -4727,13 +4727,13 @@ class RecapEmailContentReplication(TestCase):
     @mock.patch(
         "cl.recap.tasks.download_pdf_by_magic_number",
         return_value=(
-            httpx.Response(200, content=b"Hello World"),
+            httpx2.Response(200, content=b"Hello World"),
             "OK",
         ),
     )
     @mock.patch(
-        "cl.recap.tasks.httpx.AsyncClient.get",
-        return_value=httpx.Response(200, content=b"Att content."),
+        "cl.recap.tasks.httpx2.AsyncClient.get",
+        return_value=httpx2.Response(200, content=b"Att content."),
     )
     async def test_recap_email_avoid_replication_on_pdf_available(
         self,
