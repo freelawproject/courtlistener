@@ -41,12 +41,12 @@ def extract_field_values(m2m_list: Iterable[Model], field: str) -> list[Model]:
 class InvalidDocumentError(Exception):
     """The document could not be formed"""
 
-    def __init__(self, message):
+    def __init__(self, message: str) -> None:
         Exception.__init__(self, message)
 
 
 # Used to nuke null and control characters.
-null_map = dict.fromkeys(
+null_map: dict[int, None] = dict.fromkeys(
     list(range(0, 10)) + list(range(11, 13)) + list(range(14, 32))
 )
 

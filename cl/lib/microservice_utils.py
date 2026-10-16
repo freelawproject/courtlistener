@@ -22,10 +22,10 @@ from cl.lib.exceptions import NoSuchKey
 from cl.lib.models import AbstractPDF
 from cl.search.models import Opinion, RECAPDocument
 
-logger = logging.getLogger(__name__)
+logger: logging.Logger = logging.getLogger(__name__)
 
 
-def log_invalid_embedding_errors(embeddings: Any):
+def log_invalid_embedding_errors(embeddings: Any) -> None:
     """Log an error when the embeddings response is not a list.
 
     :param embeddings: The embeddings object to validate and log.

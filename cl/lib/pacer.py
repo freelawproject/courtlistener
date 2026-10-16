@@ -33,9 +33,11 @@ from cl.scrapers.models import PACERFreeDocumentRow
 from cl.search.models import Court, Docket
 from cl.search.tasks import index_docket_parties_in_es
 
-logger = logging.getLogger(__name__)
+logger: logging.Logger = logging.getLogger(__name__)
 
-phone_digits_re = re.compile(r"^(?:1-?)?(\d{3})[-.]?(\d{3})[-.]?(\d{4})$")
+phone_digits_re: re.Pattern[str] = re.compile(
+    r"^(?:1-?)?(\d{3})[-.]?(\d{3})[-.]?(\d{4})$"
+)
 
 
 pacer_to_cl_ids = {
@@ -338,7 +340,7 @@ def normalize_attorney_role(r: str) -> RoleType:
     return role
 
 
-def normalize_us_phone_number(phone):
+def normalize_us_phone_number(phone: str) -> str:
     """Tidy up phone numbers so they're nice."""
     phone = re.sub(r"(\(|\)|\s+)", "", phone)
     m = phone_digits_re.search(phone)

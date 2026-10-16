@@ -97,7 +97,7 @@ from cl.search.forms import SearchForm
 from cl.search.models import SEARCH_TYPES, Court, Opinion, RECAPDocument
 from cl.stats.metrics import record_search_duration
 
-logger = logging.getLogger(__name__)
+logger: logging.Logger = logging.getLogger(__name__)
 
 OPENING_CHAR = r"[\(\[]"  # Matches the following characters: (, [
 CLOSING_CHAR = r"[\)\]]"  # Matches the following characters: ), ]

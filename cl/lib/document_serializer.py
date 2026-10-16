@@ -2,7 +2,7 @@ import copy
 import datetime
 from collections import OrderedDict
 from datetime import timezone
-from typing import Any
+from typing import Any, Never
 
 from dateutil import parser
 from django.core.exceptions import ImproperlyConfigured
@@ -20,8 +20,10 @@ from cl.lib.date_time import fixed_midnight_pt
 class TimeStampField(serializers.Field):
     """Handles a naive timestamp field."""
 
-    def __init__(self, default_timezone: timezone | None = None, **kwargs):
-        self.timezone = None
+    def __init__(
+        self, default_timezone: timezone | None = None, **kwargs: Any
+    ) -> None:
+        self.timezone: timezone | None = None
         if default_timezone is not None:
             self.timezone = default_timezone
         super().__init__(**kwargs)
@@ -94,9 +96,9 @@ class NullableListField(
     is empty. For API V3 compatibility.
     """
 
-    def __init__(self, **kwargs):
+    def __init__(self, **kwargs: Any) -> None:
         super().__init__(**kwargs)
-        self.list_field = serializers.ListField()
+        self.list_field: serializers.ListField = serializers.ListField()
 
     def to_representation(self, value: list[Any] | None) -> list[Any] | None:
         """
@@ -139,10 +141,10 @@ class NoneToListField(serializers.ListField):
 class DocumentSerializer(serializers.Serializer):
     """A dynamic DocumentSerializer class."""
 
-    def update(self, instance, validated_data):
+    def update(self, instance: Any, validated_data: Any) -> Never:
         raise NotImplementedError
 
-    def create(self, validated_data):
+    def create(self, validated_data: Any) -> Never:
         raise NotImplementedError
 
     _field_mapping = {
@@ -160,7 +162,9 @@ class DocumentSerializer(serializers.Serializer):
         fields.TextField: serializers.CharField,
     }
 
-    def __init__(self, instance: Any = None, data=empty, **kwargs):
+    def __init__(
+        self, instance: Any = None, data: Any = empty, **kwargs: Any
+    ) -> None:
         super().__init__(instance, data, **kwargs)
 
         if not hasattr(self, "Meta"):

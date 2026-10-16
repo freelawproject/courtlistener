@@ -6,7 +6,7 @@ from pathlib import Path
 
 from django.conf import settings
 
-logger = logging.getLogger(__name__)
+logger: logging.Logger = logging.getLogger(__name__)
 
 BASE_DOWNLOAD_URL = "https://www.archive.org/download"
 
@@ -170,10 +170,12 @@ def get_document_filename(
     )
 
 
-PAGINATION_RE = re.compile(r"\b(?:Page|Pg)\s+\d+", re.I)
-PAGINATION_COLON_RE = re.compile(r"\bPage:\s*\d+\b", re.I)
-PAGINATION_PAGE_ID_RE = re.compile(r"\bPageID\s+#:\s*\d+\b", re.I)
-PAGINATION_OF = re.compile(r"^\d+\s+of\s+\d+$", re.I)
+PAGINATION_RE: re.Pattern[str] = re.compile(r"\b(?:Page|Pg)\s+\d+", re.I)
+PAGINATION_COLON_RE: re.Pattern[str] = re.compile(r"\bPage:\s*\d+\b", re.I)
+PAGINATION_PAGE_ID_RE: re.Pattern[str] = re.compile(
+    r"\bPageID\s+#:\s*\d+\b", re.I
+)
+PAGINATION_OF: re.Pattern[str] = re.compile(r"^\d+\s+of\s+\d+$", re.I)
 
 
 def is_page_line(line: str) -> bool:
