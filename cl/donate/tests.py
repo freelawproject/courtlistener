@@ -6,6 +6,7 @@ from unittest.mock import MagicMock, patch
 import time_machine
 from asgiref.sync import sync_to_async
 from django.core import mail
+from django.template.loader import render_to_string
 from django.test import override_settings
 from django.test.client import AsyncClient, Client
 from django.urls import reverse
@@ -13,7 +14,7 @@ from django.utils.timezone import now
 
 from cl.api.models import APIThrottle, ThrottleType
 from cl.donate.api_views import MembershipWebhookViewSet
-from cl.donate.factories import NeonWebhookEventFactory
+from cl.donate.factories import NeonMembershipFactory, NeonWebhookEventFactory
 from cl.donate.models import (
     MembershipPaymentStatus,
     NeonMembership,
@@ -1099,3 +1100,30 @@ class MembershipWebhookThrottleSyncTest(TestCase):
             ).values_list("rate", "source")
         ]
         self.assertEqual(remaining, [("0/min", APIThrottle.Source.MANUAL)])
+
+
+class DonateSidebarTest(TestCase):
+    """Tests for the donate sidebar shown on search and opinion pages."""
+
+    @classmethod
+    def setUpTestData(cls) -> None:
+        cls.user = UserProfileWithParentsFactory.create().user
+
+    def render_sidebar(self) -> str:
+        """Render the donate sidebar the way the search and opinion pages do."""
+        return render_to_string(
+            "includes/donate_sidebar.html", {"user": self.user}
+        )
+
+    def test_member_sees_level_and_link_to_membership_page(self) -> None:
+        """Members see their tier and can get to their membership page."""
+        NeonMembershipFactory(user=self.user, level=NeonMembershipLevel.TIER_3)
+        html = self.render_sidebar()
+        self.assertIn("CL Membership - Tier 3", html)
+        self.assertIn(reverse("profile_your_support"), html)
+
+    def test_non_member_sees_join_button(self) -> None:
+        """Non-members see the join button and no membership link."""
+        html = self.render_sidebar()
+        self.assertIn("Join Free.law Now", html)
+        self.assertNotIn(reverse("profile_your_support"), html)

@@ -3,6 +3,7 @@ from datetime import timedelta
 from unittest.mock import patch
 
 from django import forms
+from django.contrib.auth.models import User
 from django.db import connection
 from django.test import AsyncClient, override_settings
 from django.urls import reverse
@@ -10,6 +11,8 @@ from django.utils import timezone
 from lxml import html as lhtml
 from waffle.testutils import override_flag
 
+from cl.donate.factories import NeonMembershipFactory
+from cl.donate.models import MembershipPaymentStatus
 from cl.lib import widgets
 from cl.lib.test_helpers import (
     CourtTestCase,
@@ -141,6 +144,45 @@ class AsyncHomepageTest(SimpleUserDataMixin, TestCase):
         self.assertIn(
             'aria-label="Toggle account menu"', resp.content.decode()
         )
+
+
+@override_flag("use_new_design", True)
+@override_settings(WAFFLE_CACHE_PREFIX="test_homepage_membership_links_waffle")
+class HomepageMembershipLinksTest(SimpleUserDataMixin, TestCase):
+    """The homepage's membership links make sense for members and others."""
+
+    def test_anonymous_user_is_invited_to_become_a_member(self) -> None:
+        """Anonymous visitors are invited to become a member."""
+        resp = self.client.get(reverse("show_results"))
+        self.assertContains(resp, "Become a Member")
+        self.assertNotContains(resp, "Your Membership")
+
+    def test_non_member_is_invited_to_become_a_member(self) -> None:
+        """Signed-in users without a membership are invited to join."""
+        self.client.login(username="pandora", password="password")
+        resp = self.client.get(reverse("show_results"))
+        self.assertContains(resp, "Become a Member")
+        self.assertNotContains(resp, "Your Membership")
+
+    def test_active_member_is_sent_to_their_membership(self) -> None:
+        """Members are sent to their membership page from both homepage spots."""
+        NeonMembershipFactory(user=User.objects.get(username="pandora"))
+        self.client.login(username="pandora", password="password")
+        resp = self.client.get(reverse("show_results"))
+        self.assertNotContains(resp, "Become a Member")
+        # Once in the "Support FLP" menu and once in the homepage actions.
+        self.assertContains(resp, "Your Membership", count=2)
+
+    def test_lapsed_member_is_invited_to_become_a_member(self) -> None:
+        """A membership that is no longer active doesn't hide the join link."""
+        NeonMembershipFactory(
+            user=User.objects.get(username="pandora"),
+            payment_status=MembershipPaymentStatus.FAILED,
+        )
+        self.client.login(username="pandora", password="password")
+        resp = self.client.get(reverse("show_results"))
+        self.assertContains(resp, "Become a Member")
+        self.assertNotContains(resp, "Your Membership")
 
 
 @override_flag("use_new_design", True)
