@@ -15,7 +15,7 @@ BASE_DOWNLOAD_URL = "https://www.archive.org/download"
 UNDATED_PATH_SEGMENT = "undated"
 
 
-def get_bucket_name(court, pacer_case_id):
+def get_bucket_name(court: str, pacer_case_id: str | int) -> str:
     bucketlist = ["gov", "uscourts", court, str(pacer_case_id)]
     if settings.DEBUG is True:
         bucketlist.insert(0, "dev")
@@ -93,7 +93,7 @@ def scotus_document_number_segments(
     ]
 
 
-def get_docketxml_url(court, pacer_case_id):
+def get_docketxml_url(court: str, pacer_case_id: str) -> str:
     return "{}/{}/{}".format(
         BASE_DOWNLOAD_URL,
         get_bucket_name(court, pacer_case_id),
@@ -101,7 +101,7 @@ def get_docketxml_url(court, pacer_case_id):
     )
 
 
-def get_docketxml_url_from_path(path):
+def get_docketxml_url_from_path(path: str) -> str:
     """Similar to above, but uses path of single file to figure out the rest.
 
     E.g. this:
@@ -115,45 +115,52 @@ def get_docketxml_url_from_path(path):
     return f"{BASE_DOWNLOAD_URL}/{bucket}/{filename}"
 
 
-def get_ia_document_url_from_path(path, document_number, attachment_number):
+def get_ia_document_url_from_path(
+    path: str, document_number: int, attachment_number: int
+) -> str:
     """Make an IA URL based on the download path of an item."""
     filename = path.rsplit("/", 1)[-1]
     bucket = ".".join(filename.split(".")[0:4])
     return f"{BASE_DOWNLOAD_URL}/{bucket}/{bucket}.{document_number}.{attachment_number}.pdf"
 
 
-def get_local_document_url_from_path(path, document_number, attachment_number):
+def get_local_document_url_from_path(
+    path: str, document_number: int, attachment_number: int
+) -> str:
     """Make a path to a local copy of a PDF."""
     filename = path.rsplit("/", 1)[-1]
     bucket = ".".join(filename.split(".")[0:4])
     return f"{bucket}.{document_number}.{attachment_number}.pdf"
 
 
-def get_pdf_url(court, pacer_case_id, filename):
+def get_pdf_url(court: str, pacer_case_id: str, filename: str) -> str:
     return f"{BASE_DOWNLOAD_URL}/{get_bucket_name(court, pacer_case_id)}/{filename}"
 
 
-def get_docket_filename(court, pacer_case_id, ext):
+def get_docket_filename(court: str, pacer_case_id: str, ext: str) -> str:
     return ".".join(
         [
             "gov",
             "uscourts",
-            str(court),
-            str(pacer_case_id),
+            court,
+            pacer_case_id,
             f"docket.{ext}",
         ]
     )
 
 
 def get_document_filename(
-    court, pacer_case_id, document_number, attachment_number
+    court: str,
+    pacer_case_id: str,
+    document_number: int,
+    attachment_number: int,
 ):
     return ".".join(
         [
             "gov",
             "uscourts",
-            str(court),
-            str(pacer_case_id),
+            court,
+            pacer_case_id,
             str(document_number),
             str(attachment_number or 0),
             "pdf",
@@ -221,7 +228,7 @@ def is_doc_common_header(line: str) -> bool:
     return False
 
 
-def needs_ocr(content, page_count: int | None = None) -> bool:
+def needs_ocr(content: str, page_count: int | None = None) -> bool:
     """Determines if OCR is needed for a PACER PDF.
 
     Every document in PACER (pretty much) has the case number written on the

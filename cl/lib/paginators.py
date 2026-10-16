@@ -13,7 +13,7 @@ class ESPaginator(Paginator):
             self._count = total_query_results
         else:
             self._count = len(self.object_list)
-        self._aggregations = (
+        self._aggregations: dict = (
             self.object_list.aggregations
             if hasattr(self.object_list, "aggregations")
             else {}
@@ -25,10 +25,10 @@ class ESPaginator(Paginator):
         return self._count
 
     @cached_property
-    def aggregations(self):
+    def aggregations(self) -> dict:
         """Set the aggregation object, across all pages."""
         return self._aggregations
 
-    def page(self, number):
+    def page(self, number: float | int | str) -> Page:
         number = self.validate_number(number)
         return Page(self.object_list, number, self)

@@ -11,7 +11,7 @@ from collections.abc import Callable
 from copy import deepcopy
 from dataclasses import fields
 from functools import reduce, wraps
-from typing import Any, Literal, cast
+from typing import Any, Literal, Never, cast
 
 from asgiref.sync import async_to_sync
 from django.conf import settings
@@ -421,7 +421,7 @@ def validate_query_syntax(value: str, query_type: QueryType) -> None:
 
 
 def build_fulltext_query(
-    fields: list[str], value: str, only_queries=False
+    fields: list[str], value: str, only_queries: bool = False
 ) -> Query | list[Query]:
     """Given the cleaned data from a form, return a Elastic Search string query or []
     https://www.elastic.co/guide/en/elasticsearch/reference/current/full-text-queries.html
@@ -489,8 +489,11 @@ def build_fulltext_query(
 
 
 def build_term_query(
-    field: str, value: str | list, make_phrase: bool = False, slop: int = 0
-) -> list:
+    field: str,
+    value: str | list[str],
+    make_phrase: bool = False,
+    slop: int = 0,
+) -> list[Query]:
     """Given field name and value or list of values, return Elasticsearch term
     or terms query or [].
     "term" Returns documents that contain an exact term in a provided field
@@ -533,7 +536,7 @@ def build_term_query(
     return [Q("term", **{field: value})]
 
 
-def build_text_filter(field: str, value: str) -> list:
+def build_text_filter(field: str, value: str) -> list[Query]:
     """Given a field and value, return Elasticsearch match_phrase query or [].
     "match_phrase" Returns documents that contain the exact phrase in a
     provided field, by default match_phrase has a slop of 0 that requires all
@@ -803,7 +806,7 @@ def extend_selected_courts_with_child_courts(
     return list(unique_courts)
 
 
-def build_es_plain_filters(cd: CleanData) -> list:
+def build_es_plain_filters(cd: CleanData) -> list[Query]:
     """Builds elasticsearch filters based on the CleanData object.
 
     :param cd: An object containing cleaned user data.
@@ -1210,7 +1213,7 @@ def build_has_child_query(
 
 def combine_plain_filters_and_queries(
     cd: CleanData,
-    filters: list,
+    filters: list[Query],
     string_query: Query | list[Query] | None,
     api_version: Literal["v3", "v4"] | None = None,
 ) -> Query:
@@ -1968,7 +1971,7 @@ def fill_position_mapping(
 
 
 def merge_semantic_relevant_chunks(
-    results: Page | Response | list,
+    results: Page | Response | list[Never],
 ) -> None:
     """
     Updates each child document in the given results with the most semantically

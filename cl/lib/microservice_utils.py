@@ -14,6 +14,7 @@ from httpx import (
     Response,
     TimeoutException,
 )
+from httpx2._types import QueryParamTypes, RequestData
 
 from cl.audio.models import Audio
 from cl.lib.decorators import retry
@@ -68,8 +69,8 @@ async def microservice(
     file: BufferedReader | File | bytes | None = None,
     file_type: str | None = None,
     filepath: str | None = None,
-    data=None,
-    params=None,
+    data: RequestData | None = None,
+    params: QueryParamTypes | None = None,
 ) -> Response:
     """Call a Microservice endpoint
 

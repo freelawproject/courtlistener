@@ -7,6 +7,7 @@ from typing import Any
 from asgiref.sync import sync_to_async
 from django.conf import settings
 from httpx import URL, Cookies, Request, Response
+from httpx._types import CookieTypes
 from juriscraper.pacer import PacerSession
 from redis import Redis
 
@@ -79,11 +80,11 @@ class ProxyPacerSession(PacerSession):
 
     def __init__(
         self,
-        cookies=None,
-        username=None,
-        password=None,
+        cookies: CookieTypes | None = None,
+        username: str | None = None,
+        password: str | None = None,
         client_code=None,
-        proxy=None,
+        proxy: str | None = None,
         *args,
         **kwargs,
     ):

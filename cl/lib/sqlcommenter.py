@@ -1,9 +1,11 @@
+from collections.abc import Callable
 from contextlib import ExitStack
 from typing import Any
 from urllib.parse import quote
 
 from django.conf import settings
 from django.db import connections
+from django.http.request import HttpRequest
 from django.utils.functional import SimpleLazyObject, empty
 
 
@@ -56,7 +58,7 @@ class SqlCommenter:
     the framework and the execution context.
     """
 
-    def __init__(self, get_response):
+    def __init__(self, get_response: Callable):
         self.get_response = get_response
 
     def __call__(self, request):
@@ -71,7 +73,7 @@ class SqlCommenter:
 
 
 class QueryWrapper:
-    def __init__(self, request):
+    def __init__(self, request: HttpRequest):
         self.request = request
 
     def get_context(self) -> dict[str, Any]:

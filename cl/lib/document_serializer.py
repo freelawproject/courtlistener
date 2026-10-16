@@ -1,11 +1,12 @@
 import copy
 import datetime
 from collections import OrderedDict
+from datetime import timezone
 from typing import Any
 
 from dateutil import parser
 from django.core.exceptions import ImproperlyConfigured
-from django.utils import timezone
+from django.utils import timezone as django_tz
 from django.utils.html import strip_tags
 from django_elasticsearch_dsl import Document, fields
 from rest_framework import serializers
@@ -19,23 +20,23 @@ from cl.lib.date_time import fixed_midnight_pt
 class TimeStampField(serializers.Field):
     """Handles a naive timestamp field."""
 
-    def __init__(self, default_timezone=None, **kwargs):
+    def __init__(self, default_timezone: timezone | None = None, **kwargs):
         self.timezone = None
         if default_timezone is not None:
             self.timezone = default_timezone
         super().__init__(**kwargs)
 
-    def to_representation(self, value):
+    def to_representation(self, value: Any) -> str:
         if isinstance(value, datetime.datetime):
             if self.timezone:
                 return serializers.DateTimeField(
                     default_timezone=self.timezone
                 ).to_representation(value)
             else:
-                if timezone.is_naive(value):
-                    value = timezone.make_aware(value, datetime.UTC)
+                if django_tz.is_naive(value):
+                    value = django_tz.make_aware(value, datetime.UTC)
                 return serializers.DateTimeField().to_representation(
-                    timezone.localtime(value)
+                    django_tz.localtime(value)
                 )
         if isinstance(value, str):
             parsed_datetime = parser.parse(value)
@@ -51,7 +52,7 @@ class TimeStampField(serializers.Field):
 class DateOrDateTimeField(serializers.Field):
     """Handles both datetime and date objects."""
 
-    def to_representation(self, value):
+    def to_representation(self, value: Any) -> str | Any:
         if isinstance(value, datetime.datetime):
             return serializers.DateTimeField().to_representation(value)
         elif isinstance(value, datetime.date):
@@ -65,7 +66,7 @@ class CoerceDateField(serializers.Field):
     is not a datetime, it returns the date directly.
     """
 
-    def to_representation(self, value):
+    def to_representation(self, value: Any) -> str:
         if isinstance(value, datetime.datetime):
             return serializers.DateField().to_representation(value.date())
         return serializers.DateField().to_representation(value)
@@ -76,7 +77,7 @@ class CoerceDateTimeField(serializers.Field):
     If the input is not a date, it returns the datetime directly.
     """
 
-    def to_representation(self, value):
+    def to_representation(self, value: Any) -> str:
         if isinstance(value, datetime.date):
             return serializers.DateTimeField().to_representation(
                 fixed_midnight_pt(value)
@@ -109,14 +110,14 @@ class NullableListField(
 class HighlightedField(serializers.Field):
     """Handles highlighted text fields."""
 
-    def to_representation(self, value):
+    def to_representation(self, value: Any) -> Any:
         return render_string_or_list(value)
 
 
 class SuppressHighlightsField(serializers.Field):
     """Suppress highlights from text fields."""
 
-    def to_representation(self, value):
+    def to_representation(self, value: Any) -> str:
         return strip_tags(render_string_or_list(value))
 
 
@@ -127,7 +128,7 @@ class NoneToListField(serializers.ListField):
     https://github.com/elastic/elasticsearch-dsl-py/issues/1819 solved.
     """
 
-    def get_attribute(self, instance):
+    def get_attribute(self, instance: Any) -> list[Any]:
         value = super().get_attribute(instance)
         # Convert None to empty list explicitly here.
         if value is None:
@@ -159,7 +160,7 @@ class DocumentSerializer(serializers.Serializer):
         fields.TextField: serializers.CharField,
     }
 
-    def __init__(self, instance=None, data=empty, **kwargs):
+    def __init__(self, instance: Any = None, data=empty, **kwargs):
         super().__init__(instance, data, **kwargs)
 
         if not hasattr(self, "Meta"):

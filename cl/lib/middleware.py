@@ -84,10 +84,10 @@ class IncrementalNewTemplateMiddleware:
     TODO: Remove this middleware once new design is completely rolled out.
     """
 
-    def __init__(self, get_response):
+    def __init__(self, get_response: Callable):
         self.get_response = get_response
 
-    def __call__(self, request):
+    def __call__(self, request: HttpRequest):
         response = self.get_response(request)
         return response
 
@@ -100,7 +100,9 @@ class IncrementalNewTemplateMiddleware:
             return False
         return True
 
-    def process_template_response(self, request, response):
+    def process_template_response(
+        self, request: HttpRequest, response: HttpResponseBase
+    ) -> HttpResponseBase | TemplateResponse:
         if not isinstance(response, TemplateResponse) or response.is_rendered:
             return response
 

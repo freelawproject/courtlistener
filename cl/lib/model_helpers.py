@@ -2,13 +2,16 @@ from __future__ import annotations
 
 import logging
 import re
-from collections.abc import Callable
+from collections.abc import Callable, Iterable, Sequence
 from functools import partial
 from pathlib import Path
-from typing import TYPE_CHECKING, Protocol
+from typing import TYPE_CHECKING, Any, Protocol
 from uuid import uuid4
 
 from django.core.exceptions import ValidationError
+from django.db.models import Model
+from django.forms import ChoiceField
+from django.utils.safestring import SafeString
 from django.utils.text import get_valid_filename
 from django.utils.timezone import now
 from juriscraper.state.texas.common import (
@@ -462,7 +465,7 @@ def make_upload_path(
     return f"{filename.split('.')[-1]}/{d.year}/{d.month:02d}/{d.day:02d}/{get_valid_filename(filename)}"
 
 
-def validate_partial_date(instance, fields):
+def validate_partial_date[M: Model](instance: M, fields: Iterable[str]):
     """Ensure that partial dates make sense.
 
     Validates that:
@@ -502,7 +505,7 @@ def validate_partial_date(instance, fields):
             )
 
 
-def validate_is_not_alias(instance, fields):
+def validate_is_not_alias[M: Model](instance: M, fields: Iterable[str]):
     """Ensure that an alias to an object is not being used instead of the object
     itself.
 
@@ -519,7 +522,7 @@ def validate_is_not_alias(instance, fields):
             )
 
 
-def validate_has_full_name(instance):
+def validate_has_full_name(instance: Any):
     """This ensures that blank values are not passed to the first and last name
     fields. Normally this can be done by the DB layer, but people could still
     pass blank strings through, and this blocks even that.
@@ -528,7 +531,7 @@ def validate_has_full_name(instance):
         raise ValidationError("Both first and last names are required.")
 
 
-def validate_nomination_fields_ok(instance):
+def validate_nomination_fields_ok(instance: Any):
     """Validate a few things:
     - date_nominated and date_elected cannot both have values
     - if nominated, then date_elected not complete and vice versa.
@@ -554,7 +557,7 @@ def validate_nomination_fields_ok(instance):
             )
 
 
-def validate_supervisor(instance):
+def validate_supervisor(instance: Any):
     """Ensure that the supervisor field makes sense.
 
     - Supervisors can only be judges.
@@ -579,7 +582,7 @@ def validate_supervisor(instance):
         )
 
 
-def validate_all_or_none(instance, fields):
+def validate_all_or_none(instance: Any, fields: Sequence[str]):
     """Ensure that all fields are complete or that none are complete"""
     num_fields = len(fields)
     completed_fields = sum(
@@ -595,7 +598,7 @@ def validate_all_or_none(instance, fields):
         )
 
 
-def validate_exactly_n(instance, n, fields):
+def validate_exactly_n(instance: Any, n: int, fields: Iterable[str]):
     """Ensure that exactly n of the fields has a value."""
     completed_fields = sum(1 for f in fields if getattr(instance, f))
     if completed_fields != n:
@@ -605,7 +608,7 @@ def validate_exactly_n(instance, n, fields):
         )
 
 
-def validate_at_most_n(instance, n, fields):
+def validate_at_most_n(instance: Any, n: int, fields: Iterable[str]):
     """Ensure that at most n fields are complete."""
     completed_fields = sum(1 for f in fields if getattr(instance, f))
     if completed_fields > n:
@@ -615,7 +618,7 @@ def validate_at_most_n(instance, n, fields):
         )
 
 
-def validate_not_all(instance, fields):
+def validate_not_all(instance: Any, fields: Sequence[str]):
     """Make sure that all of the passed fields are not complete."""
     num_fields = len(fields)
     num_completed_fields = sum(1 for f in fields if getattr(instance, f))
@@ -626,11 +629,13 @@ def validate_not_all(instance, fields):
         )
 
 
-def make_choices_group_lookup(c):
+def make_choices_group_lookup[K, V](
+    c: Iterable[tuple[K, V | list[Sequence[K]] | tuple[Sequence[K]]]],
+) -> dict[K, K | V]:
     """Invert a choices variable in a model to get the group name for a
     tuple.
     """
-    d = {}
+    d: dict[K, K | V] = {}
     for choice, value in c:
         if isinstance(value, (list | tuple)):
             for t in value:
@@ -640,7 +645,7 @@ def make_choices_group_lookup(c):
     return d
 
 
-def invert_choices_group_lookup(c):
+def invert_choices_group_lookup[K, V](c: Iterable[tuple[K, V]]) -> dict[V, K]:
     """Invert a choices variable in a model to get the key from the value.
     (key:, 'value') -> {'value': key}
     """
@@ -650,7 +655,7 @@ def invert_choices_group_lookup(c):
     return d
 
 
-def flatten_choices(self):
+def flatten_choices(self: ChoiceField) -> list:
     """Flattened version of choices tuple on a model or form field
 
     Important helper when you have named groups in your choices that you need
@@ -665,7 +670,7 @@ def flatten_choices(self):
     return flat
 
 
-def choices_to_csv(obj, field_name):
+def choices_to_csv[M: Model](obj: M, field_name: str) -> SafeString:
     """Produce a CSV of possible choices for a field on an object.
 
     :param obj: The object type you want to inspect
@@ -673,25 +678,12 @@ def choices_to_csv(obj, field_name):
     :return s: A comma-separated list of possible values for the field
     """
     field = obj._meta.get_field(field_name)
+    if not isinstance(field, ChoiceField):
+        raise TypeError("Cannot get choices of non-ChoiceField value")
     flat_choices = flatten_choices(field)
     # Get the second value in the choices tuple
     choice_values = [t for s, t in flat_choices]
     return oxford_join(choice_values, conjunction="or", separator=";")
-
-
-def disable_auto_now_fields(*models):
-    """Turns off the auto_now and auto_now_add attributes on a Model's fields,
-    so that an instance of the Model can be saved with a custom value.
-
-    Based on: https://stackoverflow.com/questions/7499767/temporarily-disable-auto-now-auto-now-add
-    """
-    for model in models:
-        # noinspection PyProtectedMember
-        for field in model._meta.local_fields:
-            if hasattr(field, "auto_now"):
-                field.auto_now = False
-            if hasattr(field, "auto_now_add"):
-                field.auto_now_add = False
 
 
 def linkify_orig_docket_number(agency: str, og_docket_number: str) -> str:

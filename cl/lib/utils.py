@@ -43,7 +43,7 @@ class _UNSPECIFIED:
     pass
 
 
-def deepgetattr(obj, name, default=_UNSPECIFIED):
+def deepgetattr(obj: object, name: str, default: Any = _UNSPECIFIED) -> Any:
     """Try to retrieve the given attribute of an object, digging on '.'.
 
     This is an extended getattr, digging deeper if '.' is found.
