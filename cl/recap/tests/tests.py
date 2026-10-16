@@ -5926,12 +5926,11 @@ class RecapDocketTaskTest(TestCase):
         pacer_free_doc_row = PACERFreeDocumentRowFactory(
             court_id=self.court.pk, pacer_case_id=docket.pacer_case_id
         )
-        pacer_free_doc_row.court = self.court
         delattr(pacer_free_doc_row, "id")
         tests = {
             "add_recap_source_test": lambda x: add_recap_source_and_save(x),
             "lookup_and_save_test": lambda x: lookup_and_save(
-                pacer_free_doc_row
+                pacer_free_doc_row, self.court
             ),
         }
         for test, method in tests.items():
@@ -6126,9 +6125,8 @@ class RecapDocketTaskTest(TestCase):
                     pacer_case_id=d.pacer_case_id,
                     nature_of_suit=nature_of_suit_from_row,
                 )
-                pacer_free_doc_row.court = self.court
                 delattr(pacer_free_doc_row, "id")
-                lookup_and_save(pacer_free_doc_row)
+                lookup_and_save(pacer_free_doc_row, self.court)
                 d.refresh_from_db()
                 self.assertEqual(
                     d.nature_of_suit,

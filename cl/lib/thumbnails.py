@@ -31,6 +31,7 @@ async def make_png_thumbnail_for_instance[M: AbstractPDF](
     else:
         item.thumbnail_status = THUMBNAIL_STATUSES.COMPLETE
         filename = f"{pk}.thumb.{max_dimension}.png"
+        # pyrefly:ignore[missing-attribute] FileField's descriptor always returns a FieldFile, even when null=True
         await sync_to_async(item.thumbnail.save)(
             filename, ContentFile(response.content)
         )

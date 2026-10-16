@@ -639,13 +639,6 @@
       "severity": "error"
     },
     {
-      "column": 47,
-      "path": "cl/audio/tasks.py",
-      "name": "bad-argument-type",
-      "concise_description": "Argument `str | None` is not assignable to parameter `pacer_case_id` with type `int | str` in function `cl.lib.recap_utils.get_bucket_name`",
-      "severity": "error"
-    },
-    {
       "column": 54,
       "path": "cl/audio/tasks.py",
       "name": "bad-specialization",
@@ -1003,20 +996,6 @@
       "severity": "error"
     },
     {
-      "column": 49,
-      "path": "cl/corpus_importer/tasks.py",
-      "name": "bad-argument-type",
-      "concise_description": "Argument `str | None` is not assignable to parameter `pacer_case_id` with type `str` in function `cl.lib.recap_utils.get_docket_filename`",
-      "severity": "error"
-    },
-    {
-      "column": 47,
-      "path": "cl/corpus_importer/tasks.py",
-      "name": "bad-argument-type",
-      "concise_description": "Argument `str | None` is not assignable to parameter `pacer_case_id` with type `int | str` in function `cl.lib.recap_utils.get_bucket_name`",
-      "severity": "error"
-    },
-    {
       "column": 9,
       "path": "cl/corpus_importer/tasks.py",
       "name": "missing-attribute",
@@ -1024,45 +1003,10 @@
       "severity": "error"
     },
     {
-      "column": 33,
-      "path": "cl/corpus_importer/tasks.py",
-      "name": "bad-argument-type",
-      "concise_description": "Argument `PACERFreeDocumentRow` is not assignable to parameter `new` with type `Docket` in function `cl.lib.pacer.lookup_and_save`",
-      "severity": "error"
-    },
-    {
-      "column": 9,
-      "path": "cl/corpus_importer/tasks.py",
-      "name": "bad-argument-type",
-      "concise_description": "Argument `str | None` is not assignable to parameter `pacer_case_id` with type `str` in function `cl.lib.recap_utils.get_document_filename`",
-      "severity": "error"
-    },
-    {
-      "column": 9,
-      "path": "cl/corpus_importer/tasks.py",
-      "name": "bad-argument-type",
-      "concise_description": "Argument `str` is not assignable to parameter `document_number` with type `int` in function `cl.lib.recap_utils.get_document_filename`",
-      "severity": "error"
-    },
-    {
-      "column": 47,
-      "path": "cl/corpus_importer/tasks.py",
-      "name": "bad-argument-type",
-      "concise_description": "Argument `str | None` is not assignable to parameter `pacer_case_id` with type `int | str` in function `cl.lib.recap_utils.get_bucket_name`",
-      "severity": "error"
-    },
-    {
       "column": 23,
       "path": "cl/corpus_importer/tasks.py",
       "name": "missing-attribute",
       "concise_description": "Object of class `NoneType` has no attribute `text`",
-      "severity": "error"
-    },
-    {
-      "column": 34,
-      "path": "cl/corpus_importer/tasks.py",
-      "name": "bad-argument-type",
-      "concise_description": "Argument `str` is not assignable to parameter `document_number` with type `int` in function `cl.lib.recap_utils.get_document_filename`",
       "severity": "error"
     },
     {
@@ -1451,13 +1395,6 @@
       "severity": "error"
     },
     {
-      "column": 14,
-      "path": "cl/lib/elasticsearch_utils.py",
-      "name": "bad-argument-type",
-      "concise_description": "Argument `str` is not assignable to parameter `data` with type `Mapping[str, Any] | None`",
-      "severity": "error"
-    },
-    {
       "column": 52,
       "path": "cl/lib/es_signal_processor.py",
       "name": "bad-argument-type",
@@ -1490,27 +1427,6 @@
       "path": "cl/lib/es_signal_processor.py",
       "name": "bad-argument-type",
       "concise_description": "Argument `M` is not assignable to parameter `instance` with type `Audio | Citation | Docket | DocketEntry | Education | Opinion | OpinionCluster | Parenthetical | ParentheticalGroup | Person | Position | RECAPDocument` in function `cl.search.tasks.get_es_doc_id_and_parent_id`",
-      "severity": "error"
-    },
-    {
-      "column": 9,
-      "path": "cl/lib/model_helpers.py",
-      "name": "not-iterable",
-      "concise_description": "Type `Choices` is not iterable",
-      "severity": "error"
-    },
-    {
-      "column": 26,
-      "path": "cl/lib/model_helpers.py",
-      "name": "not-iterable",
-      "concise_description": "Type `() -> Iterable[tuple[str, Iterable[tuple[Any, Any]]] | tuple[Any, Any]] | Mapping[Any, Any] | type[Choices]` is not iterable",
-      "severity": "error"
-    },
-    {
-      "column": 29,
-      "path": "cl/lib/thumbnails.py",
-      "name": "missing-attribute",
-      "concise_description": "Object of class `NoneType` has no attribute `save`",
       "severity": "error"
     },
     {
@@ -1847,20 +1763,6 @@
       "path": "cl/people_db/models.py",
       "name": "missing-attribute",
       "concise_description": "Object of class `NoneType` has no attribute `name_full`",
-      "severity": "error"
-    },
-    {
-      "column": 42,
-      "path": "cl/people_db/models.py",
-      "name": "bad-argument-type",
-      "concise_description": "Argument `str | None` is not assignable to parameter `key` with type `str` in function `dict.get`",
-      "severity": "error"
-    },
-    {
-      "column": 42,
-      "path": "cl/people_db/models.py",
-      "name": "bad-argument-type",
-      "concise_description": "Argument `str | None` is not assignable to parameter `key` with type `str` in function `dict.get`",
       "severity": "error"
     },
     {
@@ -2305,27 +2207,6 @@
       "severity": "error"
     },
     {
-      "column": 13,
-      "path": "cl/recap/tasks.py",
-      "name": "bad-argument-type",
-      "concise_description": "Argument `str | None` is not assignable to parameter `pacer_case_id` with type `str` in function `cl.lib.recap_utils.get_document_filename`",
-      "severity": "error"
-    },
-    {
-      "column": 13,
-      "path": "cl/recap/tasks.py",
-      "name": "bad-argument-type",
-      "concise_description": "Argument `str` is not assignable to parameter `document_number` with type `int` in function `cl.lib.recap_utils.get_document_filename`",
-      "severity": "error"
-    },
-    {
-      "column": 13,
-      "path": "cl/recap/tasks.py",
-      "name": "bad-argument-type",
-      "concise_description": "Argument `int | None` is not assignable to parameter `attachment_number` with type `int` in function `cl.lib.recap_utils.get_document_filename`",
-      "severity": "error"
-    },
-    {
       "column": 49,
       "path": "cl/recap/tasks.py",
       "name": "bad-argument-type",
@@ -2491,20 +2372,6 @@
       "path": "cl/recap/tasks.py",
       "name": "bad-argument-type",
       "concise_description": "Argument `int | None` is not assignable to parameter `attachment_number` with type `int` in function `cl.corpus_importer.tasks.update_rd_metadata`",
-      "severity": "error"
-    },
-    {
-      "column": 21,
-      "path": "cl/recap/tasks.py",
-      "name": "bad-argument-type",
-      "concise_description": "Argument `str` is not assignable to parameter `document_number` with type `int` in function `cl.lib.recap_utils.get_document_filename`",
-      "severity": "error"
-    },
-    {
-      "column": 21,
-      "path": "cl/recap/tasks.py",
-      "name": "bad-argument-type",
-      "concise_description": "Argument `int | None` is not assignable to parameter `attachment_number` with type `int` in function `cl.lib.recap_utils.get_document_filename`",
       "severity": "error"
     },
     {
@@ -3936,13 +3803,6 @@
       "severity": "error"
     },
     {
-      "column": 13,
-      "path": "cl/search/models.py",
-      "name": "bad-argument-type",
-      "concise_description": "Argument `str | None` is not assignable to parameter `pacer_case_id` with type `int | str` in function `cl.lib.recap_utils.get_bucket_name`",
-      "severity": "error"
-    },
-    {
       "column": 35,
       "path": "cl/search/models.py",
       "name": "bad-return",
@@ -4325,13 +4185,6 @@
       "path": "cl/search/tasks.py",
       "name": "bad-return",
       "concise_description": "Returned type `ObjectApiResponse[Any]` is not assignable to declared return type `dict[str, str] | None`",
-      "severity": "error"
-    },
-    {
-      "column": 18,
-      "path": "cl/search/tasks.py",
-      "name": "bad-argument-type",
-      "concise_description": "Argument `str` is not assignable to parameter `data` with type `Mapping[str, Any] | None` in function `cl.lib.microservice_utils.microservice`",
       "severity": "error"
     },
     {

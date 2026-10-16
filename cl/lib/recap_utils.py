@@ -15,7 +15,7 @@ BASE_DOWNLOAD_URL = "https://www.archive.org/download"
 UNDATED_PATH_SEGMENT = "undated"
 
 
-def get_bucket_name(court: str, pacer_case_id: str | int) -> str:
+def get_bucket_name(court: str, pacer_case_id: str | int | None) -> str:
     bucketlist = ["gov", "uscourts", court, str(pacer_case_id)]
     if settings.DEBUG is True:
         bucketlist.insert(0, "dev")
@@ -137,13 +137,15 @@ def get_pdf_url(court: str, pacer_case_id: str, filename: str) -> str:
     return f"{BASE_DOWNLOAD_URL}/{get_bucket_name(court, pacer_case_id)}/{filename}"
 
 
-def get_docket_filename(court: str, pacer_case_id: str, ext: str) -> str:
+def get_docket_filename(
+    court: str, pacer_case_id: str | None, ext: str
+) -> str:
     return ".".join(
         [
             "gov",
             "uscourts",
             court,
-            pacer_case_id,
+            str(pacer_case_id),
             f"docket.{ext}",
         ]
     )
@@ -151,16 +153,16 @@ def get_docket_filename(court: str, pacer_case_id: str, ext: str) -> str:
 
 def get_document_filename(
     court: str,
-    pacer_case_id: str,
-    document_number: int,
-    attachment_number: int,
-):
+    pacer_case_id: str | None,
+    document_number: str,
+    attachment_number: int | None,
+) -> str:
     return ".".join(
         [
             "gov",
             "uscourts",
             court,
-            pacer_case_id,
+            str(pacer_case_id),
             str(document_number),
             str(attachment_number or 0),
             "pdf",
