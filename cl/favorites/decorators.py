@@ -67,6 +67,10 @@ def track_view_counter[
             Returns:
                 A formatted tracking label.
             """
+            if response.context_data is None:
+                raise TypeError(
+                    f"Response context_data is None (attempting to track {track_attribute})"
+                )
             model = response.context_data[track_attribute]
             label = template % (model.id)
             return label

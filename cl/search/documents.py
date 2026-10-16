@@ -2112,6 +2112,10 @@ class OpinionDocument(CSVSerializableDocumentMixin, OpinionBaseDocument):
             return html_decode(
                 strip_tags(instance.xml_harvard.translate(null_map))
             )
+        elif instance.xml_scan:
+            return html_decode(
+                strip_tags(instance.xml_scan.translate(null_map))
+            )
         elif instance.html_anon_2020:
             return html_decode(
                 strip_tags(instance.html_anon_2020.translate(null_map))
@@ -2318,7 +2322,7 @@ class OpinionClusterDocument(
     def get_csv_transformations(cls) -> dict[str, Callable[..., Any]]:
         list_fields = ["panel_names", "citation"]
         hl_fields = list(SEARCH_OPINION_HL_FIELDS.keys())
-        transformations = {
+        transformations: dict[str, Callable[..., Any]] = {
             key: lambda x: render_string_or_list(x)
             for key in (hl_fields + list_fields)
         }

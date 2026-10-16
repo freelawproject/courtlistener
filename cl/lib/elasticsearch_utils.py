@@ -2147,7 +2147,9 @@ def merge_unavailable_fields_on_parent_document(
                 )
             )
 
-            initial_documents_in_page = {}
+            initial_documents_in_page: dict[
+                int, tuple[str | None, str | None, str]
+            ] = {}
             for initial_document in initial_documents:
                 if initial_document.has_valid_pdf:
                     # Initial Document available
@@ -2208,6 +2210,12 @@ def merge_unavailable_fields_on_parent_document(
                             ~QObject(xml_harvard=""),
                             then=Substr(
                                 "xml_harvard", 1, settings.NO_MATCH_HL_SIZE
+                            ),
+                        ),
+                        When(
+                            ~QObject(xml_scan=""),
+                            then=Substr(
+                                "xml_scan", 1, settings.NO_MATCH_HL_SIZE
                             ),
                         ),
                         When(

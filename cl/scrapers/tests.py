@@ -3173,6 +3173,7 @@ class SCOTUSEmailIntegrationTest(TestCase):
         )
 
         mock_email_cls.return_value.email_type = SCOTUSEmailType.DOCKET_ENTRY
+        mock_email_cls.return_value.court_id = "scotus"
         mock_fetch.return_value = {
             "email_type": SCOTUSEmailType.DOCKET_ENTRY.value,
             "data": docket_data,
