@@ -1093,13 +1093,6 @@
       "severity": "error"
     },
     {
-      "column": 27,
-      "path": "cl/corpus_importer/utils.py",
-      "name": "missing-attribute",
-      "concise_description": "Object of class `Manager` has no attribute `appellate_courts`",
-      "severity": "error"
-    },
-    {
       "column": 9,
       "path": "cl/corpus_importer/utils.py",
       "name": "missing-attribute",
@@ -1429,13 +1422,6 @@
       "severity": "error"
     },
     {
-      "column": 9,
-      "path": "cl/lib/document_serializer.py",
-      "name": "bad-override",
-      "concise_description": "Class member `DocumentSerializer.get_fields` overrides parent class `Serializer` in an inconsistent manner",
-      "severity": "error"
-    },
-    {
       "column": 26,
       "path": "cl/lib/document_serializer.py",
       "name": "missing-attribute",
@@ -1538,34 +1524,6 @@
       "path": "cl/lib/migration_utils.py",
       "name": "missing-attribute",
       "concise_description": "Class `Deserializer` has no class attribute `_get_model_from_node`",
-      "severity": "error"
-    },
-    {
-      "column": 41,
-      "path": "cl/lib/model_helpers.py",
-      "name": "unbound-name",
-      "concise_description": "`d` may be uninitialized",
-      "severity": "error"
-    },
-    {
-      "column": 41,
-      "path": "cl/lib/model_helpers.py",
-      "name": "missing-attribute",
-      "concise_description": "Object of class `NoneType` has no attribute `year`",
-      "severity": "error"
-    },
-    {
-      "column": 50,
-      "path": "cl/lib/model_helpers.py",
-      "name": "missing-attribute",
-      "concise_description": "Object of class `NoneType` has no attribute `month`",
-      "severity": "error"
-    },
-    {
-      "column": 64,
-      "path": "cl/lib/model_helpers.py",
-      "name": "missing-attribute",
-      "concise_description": "Object of class `NoneType` has no attribute `day`",
       "severity": "error"
     },
     {
@@ -1951,34 +1909,6 @@
       "path": "cl/people_db/import_judges/populate_fjc_judges.py",
       "name": "missing-attribute",
       "concise_description": "Object of class `NoneType` has no attribute `split`",
-      "severity": "error"
-    },
-    {
-      "column": 17,
-      "path": "cl/people_db/import_judges/populate_fjc_judges.py",
-      "name": "missing-attribute",
-      "concise_description": "Object of class `NoneType` has no attribute `insert`",
-      "severity": "error"
-    },
-    {
-      "column": 17,
-      "path": "cl/people_db/import_judges/populate_fjc_judges.py",
-      "name": "missing-attribute",
-      "concise_description": "Object of class `NoneType` has no attribute `insert`",
-      "severity": "error"
-    },
-    {
-      "column": 17,
-      "path": "cl/people_db/import_judges/populate_fjc_judges.py",
-      "name": "missing-attribute",
-      "concise_description": "Object of class `NoneType` has no attribute `insert`",
-      "severity": "error"
-    },
-    {
-      "column": 17,
-      "path": "cl/people_db/import_judges/populate_fjc_judges.py",
-      "name": "missing-attribute",
-      "concise_description": "Object of class `NoneType` has no attribute `append`",
       "severity": "error"
     },
     {
@@ -3053,13 +2983,6 @@
       "severity": "error"
     },
     {
-      "column": 9,
-      "path": "cl/scrapers/management/commands/cl_scrape_opinions.py",
-      "name": "missing-attribute",
-      "concise_description": "Object of class `Opinion` has no attribute `file_with_date`",
-      "severity": "error"
-    },
-    {
       "column": 12,
       "path": "cl/scrapers/management/commands/cl_scrape_opinions.py",
       "name": "bad-return",
@@ -3074,10 +2997,10 @@
       "severity": "error"
     },
     {
-      "column": 5,
+      "column": 33,
       "path": "cl/scrapers/management/commands/cl_scrape_oral_arguments.py",
-      "name": "missing-attribute",
-      "concise_description": "Object of class `Audio` has no attribute `file_with_date`",
+      "name": "bad-assignment",
+      "concise_description": "`date | None` is not assignable to attribute `file_with_date` with type `date`",
       "severity": "error"
     },
     {
