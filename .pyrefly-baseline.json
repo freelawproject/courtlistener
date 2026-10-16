@@ -1458,13 +1458,6 @@
       "severity": "error"
     },
     {
-      "column": 24,
-      "path": "cl/lib/podcast.py",
-      "name": "missing-attribute",
-      "concise_description": "Object of class `iTunesPodcastsFeedGenerator` has no attribute `_version`",
-      "severity": "error"
-    },
-    {
       "column": 5,
       "path": "cl/oauth/views.py",
       "name": "bad-override-mutable-attribute",
