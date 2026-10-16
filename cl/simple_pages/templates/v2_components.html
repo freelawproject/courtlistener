@@ -1485,7 +1485,15 @@ Sample code here.
 
     <h4 class="mt-3">Demo</h4>
     <c-banner variant="info" banner_id="demo-card" is_dismissible dismiss_days=10 icon="info" href="https://free.law/" link_text="Go to Case">
-      <p>It looks like you're trying to search for <strong>Miranda v. Arizona,</strong> from 1966.</p>
+      {% if "banner_dismissed_demo-card" not in request.COOKIES %}
+        <c-banner variant="info" banner_id="demo-card" is_dismissible dismiss_days=10 icon="info" href="https://free.law/" link_text="Go to Case">
+          <p>It looks like you're trying to search for <strong>Miranda v. Arizona,</strong> from 1966.</p>
+        </c-banner>
+      {% else %}
+        <div class="bg-gray-300 border border-gray-800 p-4 rounded-lg">
+          You already dismissed the dismissible demo banner! To restore it, clear the cookie <code>banner_dismissed_demo-card</code> in your browser's Dev Tools and reload the page.
+        </div>
+      {% endif %}
     </c-banner>
     <c-banner variant="info">
       The results below were contributed to the RECAP Archive by users of the RECAP Extension. If you use PACER, please install RECAP.

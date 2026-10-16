@@ -21,7 +21,7 @@
 <a
   href="{{ href }}"
 
-  class="{% if variant %}{{ base }} {% if size == 'xl' %}{{ xl }}{% else %}{{ md }}{% endif %} {% if variant == 'outline' %}{{ outline }} {{ link_outline_dis }}{% elif variant == 'dark' %}{{ dark }} {{ link_dark_dis }}{% elif variant == 'ghost' %}{{ ghost }} {{ link_ghost_dis }}{% elif variant == 'grey' %}{{ grey }} {{ link_grey_dis }}{% elif variant == 'blue' %}{{ blue }}{{ link_blue_dis }}{% else %}{{ primary }} {{ link_primary_dis }}{% endif %}{% endif %} {{ class }}"
+  class="{% if variant %}{{ base }} {% if size == 'xl' %}{{ xl }}{% elif size == 'sm' %}{{ sm }}{% else %}{{ md }}{% endif %} {% if variant == 'outline' %}{{ outline }} {{ link_outline_dis }}{% elif variant == 'dark' %}{{ dark }} {{ link_dark_dis }}{% elif variant == 'ghost' %}{{ ghost }} {{ link_ghost_dis }}{% elif variant == 'grey' %}{{ grey }} {{ link_grey_dis }}{% elif variant == 'blue' %}{{ blue }}{{ link_blue_dis }}{% else %}{{ primary }} {{ link_primary_dis }}{% endif %}{% endif %} {{ class }}"
   {{ attrs }}
 >{{ slot }}</a>
 {% elif touch_target %}
