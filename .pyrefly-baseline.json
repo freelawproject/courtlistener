@@ -1444,13 +1444,6 @@
       "severity": "error"
     },
     {
-      "column": 19,
-      "path": "cl/lib/models.py",
-      "name": "missing-attribute",
-      "concise_description": "Object of class `AbstractFile` has no attribute `filepath`",
-      "severity": "error"
-    },
-    {
       "column": 5,
       "path": "cl/oauth/views.py",
       "name": "bad-override-mutable-attribute",
