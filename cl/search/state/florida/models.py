@@ -6,13 +6,13 @@ import time
 from datetime import date, datetime
 from http import HTTPStatus
 from urllib.parse import parse_qs, urlencode, urljoin, urlparse, urlunparse
-from zoneinfo import ZoneInfo
 
 import httpx
 import pghistory
 from django.db import models
 from juriscraper.state.florida.scraper import FLORIDA_API_BASE
 from pydantic import BaseModel, Field
+from zoneinfo import ZoneInfo
 
 from cl.lib.decorators import document_model, retry
 from cl.lib.model_helpers import CSVExportMixin
@@ -67,7 +67,7 @@ class AltchaData(BaseModel):
         backoff=2,
         logger=logger,
     )
-    def fetch(self) -> "AltchaChallenge | None":
+    def fetch(self) -> AltchaChallenge | None:
         """Request a fresh challenge for `resource` from ACIS.
 
         Returns `None` when the endpoint answers 204, which means the gate is

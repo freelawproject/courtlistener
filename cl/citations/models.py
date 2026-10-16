@@ -139,7 +139,7 @@ class UnmatchedCitation(BaseUnmatchedCitation):
         eyecite_citation: FullCaseCitation,
         citing_opinion: Opinion,
         has_multiple_matches: bool,
-    ) -> "UnmatchedCitation":
+    ) -> UnmatchedCitation:
         """Create an UnmatchedCitation from an eyecite FullCaseCitation
 
         Saving is left to the caller
@@ -190,7 +190,7 @@ class UnmatchedCitationFromRECAPDocument(BaseUnmatchedCitation):
         eyecite_citation: FullCaseCitation,
         citing_recapdocument: RECAPDocument,
         has_multiple_matches: bool,
-    ) -> "UnmatchedCitationFromRECAPDocument":
+    ) -> UnmatchedCitationFromRECAPDocument:
         """Create an UnmatchedCitationFromRECAPDocument from an eyecite
         FullCaseCitation
 
