@@ -458,6 +458,7 @@ o_field_mapping = {
                 "html_columbia": ["text"],
                 "html_lawbox": ["text"],
                 "xml_harvard": ["text"],
+                "xml_scan": ["text"],
                 "html_anon_2020": ["text"],
                 "html": ["text"],
                 "plain_text": ["text"],

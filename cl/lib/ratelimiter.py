@@ -4,23 +4,24 @@ import hashlib
 import ipaddress
 import socket
 import sys
-from collections.abc import Callable, Sequence
+from collections.abc import Callable, Coroutine, Sequence
 from inspect import iscoroutinefunction
-from typing import Any
+from typing import Any, cast
 
 from asgiref.sync import sync_to_async
 from django.conf import settings
 from django.core.cache import BaseCache, caches
-from django.http import HttpRequest
+from django.http import HttpRequest, HttpResponse, HttpResponseBase
 from django_ratelimit import ALL, UNSAFE
 from django_ratelimit.core import get_header, is_ratelimited
 from django_ratelimit.decorators import ratelimit
 from django_ratelimit.exceptions import Ratelimited
 from redis import ConnectionError
 
+from cl.lib.types import DjangoViewDecorator, DjangoViewType
+
 type RatelimitKey = Callable[[str, HttpRequest], str] | str
 type RatelimitMethod = str | Sequence[str | None]
-type View = Callable[..., Any]
 
 
 def get_viewer_ip(request: HttpRequest) -> str:
@@ -94,12 +95,16 @@ def get_path_to_make_key(group: str, request: HttpRequest) -> str:
     return request.path
 
 
-def make_ratelimiter(
+def make_ratelimiter[
+    **P,
+    Request: HttpRequest,
+    Response: HttpResponseBase | Coroutine[Any, Any, HttpResponseBase],
+](
     *,
     key: RatelimitKey,
-    rate: str,
+    rate: str | None,
     method: RatelimitMethod = ALL,
-) -> Callable[[View], View]:
+) -> DjangoViewDecorator[P, Request, Response]:
     """Build a rate-limiting decorator that works on sync and async views.
 
     django-ratelimit's own decorator is sync-only. Wrapped around an async
@@ -128,12 +133,16 @@ def make_ratelimiter(
     """
     sync_decorator = ratelimit(key=key, rate=rate, method=method)
 
-    def decorator(view: View) -> View:
+    def decorator(
+        view: DjangoViewType[P, Request, Response],
+    ) -> DjangoViewType[P, Request, Response]:
         if not iscoroutinefunction(view):
             return sync_decorator(view)
 
         @functools.wraps(view)
-        async def wrapper(request: HttpRequest, *args, **kwargs):
+        async def wrapper(
+            request: Request, *args: P.args, **kwargs: P.kwargs
+        ) -> Response:
             # thread_sensitive=False: this only touches the cache, so it has
             # no reason to hold the main thread, where it would serialize
             # every throttled view behind one Redis round trip at a time.
@@ -159,55 +168,43 @@ def make_ratelimiter(
                 raise Ratelimited
             return await view(request, *args, **kwargs)
 
-        return wrapper
+        return cast(DjangoViewType[P, Request, Response], wrapper)
 
     return decorator
 
 
-# Decorators can't easily be mocked, and we need to not trigger this decorator
-# during tests or else the first test works and the rest are blocked. So,
-# check if we're doing a test and adjust the decorator accordingly.
-if "test" in sys.argv:
-    ratelimiter_all_1000_per_h = lambda func: func
-    ratelimiter_all_2_per_m = lambda func: func
-    ratelimiter_unsafe_3_per_m = lambda func: func
-    ratelimiter_unsafe_5_per_d = lambda func: func
-    ratelimiter_unsafe_10_per_m = lambda func: func
-    ratelimiter_all_10_per_h = lambda func: func
-    ratelimiter_unsafe_2000_per_h = lambda func: func
-else:
-    ratelimiter_all_1000_per_h = make_ratelimiter(
-        key=get_ip_for_ratelimiter,
-        rate="1000/h",
-    )
-    ratelimiter_all_2_per_m = make_ratelimiter(
-        key=get_ip_for_ratelimiter,
-        rate="2/m",
-    )
-    ratelimiter_unsafe_3_per_m = make_ratelimiter(
-        key=get_ip_for_ratelimiter,
-        rate="3/m",
-        method=UNSAFE,
-    )
-    ratelimiter_unsafe_5_per_d = make_ratelimiter(
-        key=get_ip_for_ratelimiter,
-        rate="5/d",
-        method=UNSAFE,
-    )
-    ratelimiter_unsafe_10_per_m = make_ratelimiter(
-        key=get_ip_for_ratelimiter,
-        rate="10/m",
-        method=UNSAFE,
-    )
-    ratelimiter_all_10_per_h = make_ratelimiter(
-        key=get_path_to_make_key,
-        rate="10/h",
-    )
-    ratelimiter_unsafe_2000_per_h = make_ratelimiter(
-        key=get_path_to_make_key,
-        rate="2000/h",
-        method=UNSAFE,
-    )
+ratelimiter_all_1000_per_h = make_ratelimiter(
+    key=get_ip_for_ratelimiter,
+    rate="1000/h" if "test" not in sys.argv else None,
+)
+ratelimiter_all_2_per_m = make_ratelimiter(
+    key=get_ip_for_ratelimiter,
+    rate="2/m" if "test" not in sys.argv else None,
+)
+ratelimiter_unsafe_3_per_m = make_ratelimiter(
+    key=get_ip_for_ratelimiter,
+    rate="3/m" if "test" not in sys.argv else None,
+    method=UNSAFE,
+)
+ratelimiter_unsafe_5_per_d = make_ratelimiter(
+    key=get_ip_for_ratelimiter,
+    rate="5/d" if "test" not in sys.argv else None,
+    method=UNSAFE,
+)
+ratelimiter_unsafe_10_per_m = make_ratelimiter(
+    key=get_ip_for_ratelimiter,
+    rate="10/m" if "test" not in sys.argv else None,
+    method=UNSAFE,
+)
+ratelimiter_all_10_per_h = make_ratelimiter(
+    key=get_path_to_make_key,
+    rate="10/h" if "test" not in sys.argv else None,
+)
+ratelimiter_unsafe_2000_per_h = make_ratelimiter(
+    key=get_path_to_make_key,
+    rate="2000/h" if "test" not in sys.argv else None,
+    method=UNSAFE,
+)
 
 # See: https://www.bing.com/webmaster/help/how-to-verify-bingbot-3905dc26
 # and: https://support.google.com/webmasters/answer/80553?hl=en
@@ -219,7 +216,13 @@ APPROVED_DOMAINS = [
 ]
 
 
-def ratelimit_deny_list(view: View) -> View:
+def ratelimit_deny_list[
+    **P,
+    Request: HttpRequest,
+    Response: HttpResponse | Coroutine[Any, Any, HttpResponse],
+](
+    view: DjangoViewType[P, Request, Response],
+) -> DjangoViewType[P, Request, Response]:
     """A wrapper for the ratelimit function that adds an allowlist for approved
     crawlers.
 
@@ -232,8 +235,11 @@ def ratelimit_deny_list(view: View) -> View:
     if iscoroutinefunction(view):
 
         @functools.wraps(view)
-        async def async_wrapper(request: HttpRequest, *args, **kwargs):
+        async def async_wrapper(
+            request: Request, *args: P.args, **kwargs: P.kwargs
+        ) -> Response:
             try:
+                # pyrefly:ignore[not-async] This is async, but Pyrefly isn't able to infer that view and ratelimited_view have the same return type
                 return await ratelimited_view(request, *args, **kwargs)
             except Ratelimited:
                 # thread_sensitive=False for the same reason as in
@@ -250,10 +256,12 @@ def ratelimit_deny_list(view: View) -> View:
                 # Unable to connect to redis, let the view proceed this time.
                 return await view(request, *args, **kwargs)
 
-        return async_wrapper
+        return cast(DjangoViewType[P, Request, Response], async_wrapper)
 
     @functools.wraps(view)
-    def wrapper(request, *args, **kwargs):
+    def wrapper(
+        request: Request, *args: P.args, **kwargs: P.kwargs
+    ) -> Response:
         try:
             return ratelimited_view(request, *args, **kwargs)
         except Ratelimited:
