@@ -145,8 +145,7 @@ UNPUBLISHED_NOTICE_RE = re.compile(
     r"\bnot\s+(?:designated\s+)?for\s+(?:official\s+)?publication"
     r"|\b(?:not|non)[\s-]precedential"
     r"|\bunpublished\s+(?:opinion|decision|disposition|order)\b"
-    r"|\bdoes?\s+not\s+have\s+precedential\s+(?:effect|value)"
-    r"|\bsummary\s+order\b",
+    r"|\bdo(?:es)?\s+not\s+have\s+precedential\s+(?:effect|value)",
     re.IGNORECASE,
 )
 # How much of the start of the first opinion is searched for the notice.
@@ -724,8 +723,8 @@ def parse_scan_xml(
     )
 
 
-def find_imported_scan(scan_case: ScanCase) -> OpinionCluster | None:
-    """Find the cluster this scanned opinion was already imported into.
+def find_imported_scan(scan_case: ScanCase) -> int | None:
+    """Find the id of the cluster this scanned opinion was imported into.
 
     The stored XML file name starts with the scan and opinion ids, so it is
     looked for in the clusters with one of the opinion's citations, which
@@ -735,8 +734,12 @@ def find_imported_scan(scan_case: ScanCase) -> OpinionCluster | None:
     isn't found here; `find_existing_cluster` matches it again, and the
     import is skipped because the cluster already has a scan XML.
 
+    A scanned opinion should be imported into a single cluster. If several
+    clusters have it, an error is logged for review and the lowest id is
+    returned, so no further cluster is created.
+
     :param scan_case: The parsed scanned opinion.
-    :return: The cluster, or None if it was not imported yet.
+    :return: The cluster id, or None if it was not imported yet.
     """
     citations = Q()
     for cite in scan_case.parsed_citations:
@@ -745,14 +748,23 @@ def find_imported_scan(scan_case: ScanCase) -> OpinionCluster | None:
             citations__reporter=cite.corrected_reporter(),
             citations__page=cite.groups["page"],
         )
-    return (
+    # The citations join returns a cluster once per matching citation
+    cluster_ids = list(
         OpinionCluster.objects.filter(
             citations,
             filepath_xml_scan__contains=f"/{scan_case.file_name_prefix}",
         )
+        .order_by("pk")
+        .values_list("pk", flat=True)
         .distinct()
-        .first()
     )
+    if len(cluster_ids) > 1:
+        logger.error(
+            "Scanned opinion %s was imported into several clusters: %s",
+            scan_case.file_name_prefix,
+            cluster_ids,
+        )
+    return cluster_ids[0] if cluster_ids else None
 
 
 def find_existing_cluster(scan_case: ScanCase) -> OpinionCluster | None:
@@ -968,19 +980,22 @@ def merge_into_cluster(
         docket.save(update_fields=["source"])
 
         opinion.xml_scan = str(scan_case.opinions[0])
-        opinion.save(update_fields=["xml_scan"])
-        add_opinion_content(opinion, scan_case)
-        queue_citation_finding([opinion.pk])
-
+        opinion_update_fields = ["xml_scan"]
         if "judges" in update_fields:
             # The judges came from the scan: resolve them, without
             # replacing the author the opinion already has
-            author = opinion.author
+            existing_author = opinion.author
+            # link_judges may attribute an author to the opinion if there is
+            # a single judge
             link_judges(cluster, [opinion])
-            if author:
-                opinion.author = author
+            if existing_author:
+                # Undo the author overwrite by link_judges
+                opinion.author = existing_author
             elif opinion.author:
-                opinion.save(update_fields=["author"])
+                # The opinion had no author: keep the one from link_judges
+                opinion_update_fields.append("author")
+        opinion.save(update_fields=opinion_update_fields)
+        add_opinion_content(opinion, scan_case)
 
         # Saves the cluster changes above too
         store_scan_xml(cluster, scan_case, update_fields)
@@ -1073,12 +1088,12 @@ def import_scanned_opinion(
         return
     citation = scan_case.citation.corrected_citation()
 
-    if cluster := find_imported_scan(scan_case):
+    if cluster_id := find_imported_scan(scan_case):
         logger.info(
             "Skipping %s (%s), already imported in cluster %s",
             file_path,
             citation,
-            cluster.id,
+            cluster_id,
         )
         return
 

@@ -323,9 +323,11 @@ def update_or_create_docket(
         Harvard importer; the Harvard data is considered
         more trustable  and should overwrite an existing docket's data
         Should be False when called from scrapers.
-    :param blocked: If the docket should be blocked, default False.
+    :param blocked: If the docket should be blocked, default False. May
+        block an existing docket, but will never unblock one
+    :param date_blocked: The docket date_blocked if it's blocked. Ignored if
+        the existing docket is already blocked.
     :param case_name_full: The docket case_name_full.
-    :param date_blocked: The docket date_blocked if it's blocked.
     :param date_argued: The docket date_argued if it's an oral argument.
     :param ia_needs_upload: If the docket needs upload to IA, default None.
     :param appeal_from_str: Name (not standardized id) of the lower level court.
@@ -374,10 +376,17 @@ def update_or_create_docket(
     # Update the existing docket with the new values
     docket.add_opinions_source(source)
 
+    # Read before the loop, since the loop may set `docket.blocked`
+    was_blocked = docket.blocked
     for field, value in docket_fields.items():
         # do not use blanket `if not value:`, since
         # blocked and ia_needs_upload are booleans and would be skipped
         if value is None or value == "":
+            continue
+
+        # Never unblock an existing docket, and keep its original
+        # date_blocked
+        if was_blocked and field in ("blocked", "date_blocked"):
             continue
 
         if (

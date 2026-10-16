@@ -6,7 +6,6 @@ import random
 import re
 from collections import defaultdict
 from collections.abc import Callable, Generator, Iterator, Mapping, Sequence
-from dataclasses import dataclass
 from datetime import date
 from difflib import SequenceMatcher
 from typing import TYPE_CHECKING, Any, cast
@@ -1107,21 +1106,23 @@ def match_based_text(
     file_characters: str,
     docket_number: str,
     case_name_full: str,
-    possible_cases: QuerySet,
+    possible_clusters: QuerySet[OpinionCluster],
     case_name_abbreviation: str,
     citation: FullCaseCitation,
 ) -> OpinionCluster | None:
     """Compare CL text to file content to establish duplicates
 
     :param file_characters: stripped characters to compare from file/source
-    :param possible_cases: List of opinions to check against
+    :param possible_clusters: Candidate clusters to compare against; the
+        first one that passes every check is returned
     :param docket_number: The docket number
     :param case_name_full: The full case name
     :param case_name_abbreviation: The case name abbreviation
     :param citation: The citation obtained from file/source to compare
     :return: OpinionCluster or None
     """
-    for case in possible_cases:
+    # The docket is read by the content check and by callers of the match
+    for case in possible_clusters.select_related("docket"):
         cl_case_body = get_opinion_text(case)
         cl_characters = clean_body_content(cl_case_body)
 
@@ -1393,14 +1394,6 @@ def create_docket_entry_sequence_numbers(
         date_counts[entry_date] = i + 1
 
     return sequence_numbers
-
-
-@dataclass
-class DownloadPDFResult:
-    """Result of a PDF download operation."""
-
-    success: bool
-    sha1: str | None = None
 
 
 def texas_js_court_id_to_court_id(js_court_id: str) -> str | None:

@@ -103,13 +103,15 @@ OPENING_CHAR = r"[\(\[]"  # Matches the following characters: (, [
 CLOSING_CHAR = r"[\)\]]"  # Matches the following characters: ), ]
 
 
-def elasticsearch_enabled(func: Callable) -> Callable:
+def elasticsearch_enabled[**P, R](
+    func: Callable[P, R],
+) -> Callable[P, R | None]:
     """A decorator to avoid executing Elasticsearch methods when it's disabled."""
 
     @wraps(func)
-    def wrapper_func(*args, **kwargs) -> Any:
+    def wrapper_func(*args: P.args, **kwargs: P.kwargs) -> R | None:
         if not settings.ELASTICSEARCH_DISABLED:
-            func(*args, **kwargs)
+            return func(*args, **kwargs)
 
     return wrapper_func
 

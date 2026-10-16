@@ -1,3 +1,4 @@
+
 # Tests should be removed from the exclusions eventually, but for now they're just noise
 project-excludes = ["**/migrations/**", "**/tests.py", "**/tests/**", "tests/**"]
 # Honor `# type: ignore` comments.

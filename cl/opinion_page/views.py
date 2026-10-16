@@ -319,15 +319,7 @@ async def redirect_og_lookup(request: HttpRequest) -> HttpResponse:
         filepath_local=file_path
     ).prefetch_related("docket_entry")
 
-    if not await rd_filter.aexists():
-        # We couldn't find the URL. Redirect back to AWS, but be sure to serve
-        # the file this time. Ideally this doesn't happen, but let's be ready
-        # in case it does.
-        return HttpResponseRedirect(
-            f"https://storage.courtlistener.com/{file_path}?no-og=1"
-        )
-    else:
-        rd = await rd_filter.afirst()
+    if (rd := await rd_filter.afirst()) is not None:
         return await view_recap_document(
             request,
             docket_id=rd.docket_entry.docket_id,
@@ -335,6 +327,13 @@ async def redirect_og_lookup(request: HttpRequest) -> HttpResponse:
             att_num=rd.attachment_number,
             is_og_bot=True,
         )
+
+    # We couldn't find the URL. Redirect back to AWS, but be sure to serve
+    # the file this time. Ideally this doesn't happen, but let's be ready
+    # in case it does.
+    return HttpResponseRedirect(
+        f"https://storage.courtlistener.com/{file_path}?no-og=1"
+    )
 
 
 async def redirect_docket_recap(

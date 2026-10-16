@@ -232,6 +232,11 @@ class ScanXmlHelpersTest(SimpleTestCase):
                 "1 F.4th 1",
             ),
             (
+                "<casebody><opinion><p>We review the district court's "
+                "summary order de novo.</p></opinion></casebody>",
+                "1 F.4th 1",
+            ),
+            (
                 "<casebody><opinion><p>Not for publication.</p></opinion>"
                 "</casebody>",
                 "1 So. 3d 1",
@@ -246,6 +251,7 @@ class ScanXmlHelpersTest(SimpleTestCase):
             PRECEDENTIAL_STATUS.UNPUBLISHED,
             PRECEDENTIAL_STATUS.UNPUBLISHED,
             PRECEDENTIAL_STATUS.UNPUBLISHED,
+            PRECEDENTIAL_STATUS.PUBLISHED,
             PRECEDENTIAL_STATUS.UNPUBLISHED,
             PRECEDENTIAL_STATUS.PUBLISHED,
         ]
