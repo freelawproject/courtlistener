@@ -12,7 +12,10 @@ OIDC_RSA_PRIVATE_KEY = env("OIDC_RSA_PRIVATE_KEY", default="").replace(
 
 OAUTH2_DCR_RATELIMIT = env("OAUTH2_DCR_RATELIMIT", default="100/h")
 OAUTH2_MCP_URL = env(
-    "OAUTH2_MCP_URL", default="https://mcp.courtlistener.com"
+    "OAUTH2_MCP_URL",
+    default="http://localhost:8080"
+    if DEVELOPMENT or TESTING
+    else "https://mcp.courtlistener.com",
 ).rstrip("/")
 
 if not OIDC_RSA_PRIVATE_KEY and not DEVELOPMENT and not TESTING:
