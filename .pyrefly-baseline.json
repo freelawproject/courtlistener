@@ -1569,27 +1569,6 @@
       "severity": "error"
     },
     {
-      "column": 13,
-      "path": "cl/lib/search_utils.py",
-      "name": "missing-attribute",
-      "concise_description": "Object of class `Court` has no attribute `checked`",
-      "severity": "error"
-    },
-    {
-      "column": 13,
-      "path": "cl/lib/search_utils.py",
-      "name": "missing-attribute",
-      "concise_description": "Object of class `Court` has no attribute `checked`",
-      "severity": "error"
-    },
-    {
-      "column": 9,
-      "path": "cl/lib/search_utils.py",
-      "name": "missing-attribute",
-      "concise_description": "Object of class `BoundField` has no attribute `count`",
-      "severity": "error"
-    },
-    {
       "column": 18,
       "path": "cl/lib/zoho.py",
       "name": "missing-attribute",
