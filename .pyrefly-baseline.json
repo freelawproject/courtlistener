@@ -1451,62 +1451,6 @@
       "severity": "error"
     },
     {
-      "column": 5,
-      "path": "cl/lib/pacer.py",
-      "name": "missing-attribute",
-      "concise_description": "Object of class `NoneType` has no attribute `add_recap_source`",
-      "severity": "error"
-    },
-    {
-      "column": 8,
-      "path": "cl/lib/pacer.py",
-      "name": "missing-attribute",
-      "concise_description": "Object of class `NoneType` has no attribute `nature_of_suit`",
-      "severity": "error"
-    },
-    {
-      "column": 9,
-      "path": "cl/lib/pacer.py",
-      "name": "missing-attribute",
-      "concise_description": "Object of class `NoneType` has no attribute `docket_number_raw`",
-      "severity": "error"
-    },
-    {
-      "column": 9,
-      "path": "cl/lib/pacer.py",
-      "name": "missing-attribute",
-      "concise_description": "Object of class `NoneType` has no attribute `save`",
-      "severity": "error"
-    },
-    {
-      "column": 13,
-      "path": "cl/lib/pacer.py",
-      "name": "missing-attribute",
-      "concise_description": "Object of class `NoneType` has no attribute `pk`",
-      "severity": "error"
-    },
-    {
-      "column": 13,
-      "path": "cl/lib/pacer.py",
-      "name": "missing-attribute",
-      "concise_description": "Object of class `NoneType` has no attribute `get_absolute_url`",
-      "severity": "error"
-    },
-    {
-      "column": 48,
-      "path": "cl/lib/pacer.py",
-      "name": "missing-attribute",
-      "concise_description": "Object of class `ForeignObjectRel` has no attribute `max_length`",
-      "severity": "error"
-    },
-    {
-      "column": 13,
-      "path": "cl/lib/pacer.py",
-      "name": "missing-attribute",
-      "concise_description": "No attribute `RepeatedLabelError` in module `usaddress`",
-      "severity": "error"
-    },
-    {
       "column": 16,
       "path": "cl/lib/paginators.py",
       "name": "missing-attribute",
