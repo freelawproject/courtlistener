@@ -1415,13 +1415,6 @@
       "severity": "error"
     },
     {
-      "column": 9,
-      "path": "cl/lib/document_serializer.py",
-      "name": "bad-override",
-      "concise_description": "Class member `NullableListField.to_representation` overrides parent class `ListField` in an inconsistent manner",
-      "severity": "error"
-    },
-    {
       "column": 17,
       "path": "cl/lib/elasticsearch_utils.py",
       "name": "missing-attribute",
