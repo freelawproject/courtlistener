@@ -3138,7 +3138,7 @@ class ToggleDocketAlertHtmxTest(TestCase):
     def setUp(self) -> None:
         self.client.force_login(self.profile.user)
 
-    def toggle(self) -> "_MonkeyPatchedWSGIResponse":
+    def toggle(self) -> _MonkeyPatchedWSGIResponse:
         """Posts the toggle the way the v2 docket page does."""
         return self.client.post(
             reverse("toggle_docket_alert"),

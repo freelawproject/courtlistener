@@ -140,7 +140,7 @@ S3_TEMPLATE = (
 
 
 def thumbnail_path(
-    instance: "FinancialDisclosure",
+    instance: FinancialDisclosure,
     filename: str | None = None,
 ) -> str:
     """Generate thumbnail location for disclosures
@@ -160,7 +160,7 @@ def thumbnail_path(
 
 
 def pdf_path(
-    instance: "FinancialDisclosure",
+    instance: FinancialDisclosure,
     filename: str | None = None,
 ) -> str:
     """Generate a path for the FD PDF
