@@ -32,6 +32,7 @@ from cl.search.models import (
     DocketEntry,
     Opinion,
     OpinionCluster,
+    OpinionContent,
     OpinionsCited,
     OpinionsCitedByRECAPDocument,
     Parenthetical,
@@ -181,6 +182,19 @@ class OpinionWithParentsFactory(OpinionFactory):
     cluster = SubFactory(
         "cl.search.factories.OpinionClusterWithParentsFactory",
     )
+
+
+class OpinionContentFactory(DjangoModelFactory):
+    """Make an OpinionContent from the scanning project for an opinion."""
+
+    class Meta:
+        model = OpinionContent
+
+    opinion = SubFactory(OpinionWithParentsFactory)
+    content = Faker("text", max_nb_chars=2000)
+    source = OpinionContent.FLP_SCANNING
+    extraction_type = OpinionContent.OCR
+    is_main_version = True
 
 
 class OpinionClusterFactory(DjangoModelFactory):

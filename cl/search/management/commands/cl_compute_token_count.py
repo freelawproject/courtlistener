@@ -69,6 +69,7 @@ def get_clean_opinion_text(opinion: Opinion) -> str:
         - html_columbia
         - html_lawbox
         - xml_harvard
+        - xml_scan
         - html_anon_2020
         - html
 
@@ -92,6 +93,8 @@ def get_clean_opinion_text(opinion: Opinion) -> str:
         text = opinion.html_lawbox
     elif opinion.xml_harvard:
         text = opinion.xml_harvard
+    elif opinion.xml_scan:
+        text = opinion.xml_scan
     elif opinion.html_anon_2020:
         text = opinion.html_anon_2020
     elif opinion.html:

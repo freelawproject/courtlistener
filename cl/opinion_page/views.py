@@ -1069,6 +1069,7 @@ async def get_opinions_queryset(
                 "html",
                 "plain_text",
                 "xml_harvard",
+                "xml_scan",
                 "html_lawbox",
                 "html_columbia",
                 "html_anon_2020",

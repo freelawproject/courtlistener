@@ -23,6 +23,9 @@ from juriscraper.lib.string_utils import (
     titlecase,
 )
 
+from cl.citations.tasks import (
+    find_citations_and_parentheticals_for_opinion_by_pks,
+)
 from cl.corpus_importer.management.commands.harvard_opinions import (
     find_previously_imported_cases,
     map_opinion_type,
@@ -822,6 +825,33 @@ def make_opinion(op: Tag, cluster_id: int) -> Opinion:
     )
 
 
+def queue_citation_finding(opinion_pks: list[int]) -> None:
+    """Find the citations of the opinions once the import is committed.
+
+    This builds `html_with_citations` from the scanned XML, replacing the
+    one of a merged opinion, which came from the court's text.
+
+    The import is committed when the task is queued, so a failure to queue
+    it is logged with the opinion ids instead of failing the import.
+
+    :param opinion_pks: The ids of the imported opinions.
+    :return: None
+    """
+
+    def queue() -> None:
+        try:
+            find_citations_and_parentheticals_for_opinion_by_pks.delay(
+                opinion_pks
+            )
+        except Exception:
+            logger.exception(
+                "Could not queue citation finding for opinions %s",
+                opinion_pks,
+            )
+
+    transaction.on_commit(queue)
+
+
 def store_scan_xml(
     cluster: OpinionCluster,
     scan_case: ScanCase,
@@ -966,6 +996,7 @@ def merge_into_cluster(
                 opinion_update_fields.append("author")
         opinion.save(update_fields=opinion_update_fields)
         add_opinion_content(opinion, scan_case)
+        queue_citation_finding([opinion.pk])
 
         # Saves the cluster changes above too
         store_scan_xml(cluster, scan_case, update_fields)
@@ -1032,6 +1063,7 @@ def add_new_case(scan_case: ScanCase) -> OpinionCluster:
             opinion.save()
             add_opinion_content(opinion, scan_case)
         store_scan_xml(cluster, scan_case, update_fields=[])
+        queue_citation_finding([opinion.pk for opinion in opinions])
     return cluster
 
 
