@@ -1106,21 +1106,23 @@ def match_based_text(
     file_characters: str,
     docket_number: str,
     case_name_full: str,
-    possible_cases: QuerySet,
+    possible_clusters: QuerySet[OpinionCluster],
     case_name_abbreviation: str,
     citation: FullCaseCitation,
 ) -> OpinionCluster | None:
     """Compare CL text to file content to establish duplicates
 
     :param file_characters: stripped characters to compare from file/source
-    :param possible_cases: List of opinions to check against
+    :param possible_clusters: Candidate clusters to compare against; the
+        first one that passes every check is returned
     :param docket_number: The docket number
     :param case_name_full: The full case name
     :param case_name_abbreviation: The case name abbreviation
     :param citation: The citation obtained from file/source to compare
     :return: OpinionCluster or None
     """
-    for case in possible_cases:
+    # The docket is read by the content check and by callers of the match
+    for case in possible_clusters.select_related("docket"):
         cl_case_body = get_opinion_text(case)
         cl_characters = clean_body_content(cl_case_body)
 
