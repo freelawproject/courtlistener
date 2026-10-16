@@ -66,6 +66,7 @@ AccessToken = get_access_token_model()
 Application = get_application_model()
 
 DCR_CLIENTS_VIA_MCP_FLAG = "oauth_dcr_clients_via_mcp"
+MCP_RELAY_CONNECT_TIMEOUT_SECONDS = 5
 MCP_RELAY_TIMEOUT_SECONDS = 35
 
 
@@ -297,7 +298,10 @@ def relay_to_mcp(body: bytes, client_id: str) -> HttpResponse:
         upstream = requests.post(
             f"{settings.OAUTH2_MCP_URL}/token",
             data=form,
-            timeout=MCP_RELAY_TIMEOUT_SECONDS,
+            timeout=(
+                MCP_RELAY_CONNECT_TIMEOUT_SECONDS,
+                MCP_RELAY_TIMEOUT_SECONDS,
+            ),
         )
     except requests.RequestException:
         return JsonResponse(
