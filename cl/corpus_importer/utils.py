@@ -1395,14 +1395,6 @@ def create_docket_entry_sequence_numbers(
     return sequence_numbers
 
 
-@dataclass
-class DownloadPDFResult:
-    """Result of a PDF download operation."""
-
-    success: bool
-    sha1: str | None = None
-
-
 def texas_js_court_id_to_court_id(js_court_id: str) -> str | None:
     """Translates a Juriscraper Texas court ID to a CourtListener Court ID.
 
