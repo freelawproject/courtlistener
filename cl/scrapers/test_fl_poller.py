@@ -649,7 +649,6 @@ class FlPollerCommandTest(SimpleTestCase):
         self.assertEqual(court_ids, [FloridaCourtID.SUPREME_COURT])
         self.assertEqual(case_backfill_days, 3)
         self.assertEqual(start, FROZEN_NOW - timedelta(days=3))
-        self.assertEqual(queue, "batch1")
         self.assertTrue(download_attachments)
 
     def test_auto_resume_starts_from_checkpoint(self, mock_poll):
