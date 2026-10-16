@@ -996,6 +996,7 @@ def merge_into_cluster(
                 opinion_update_fields.append("author")
         opinion.save(update_fields=opinion_update_fields)
         add_opinion_content(opinion, scan_case)
+        queue_citation_finding([opinion.pk])
 
         # Saves the cluster changes above too
         store_scan_xml(cluster, scan_case, update_fields)
