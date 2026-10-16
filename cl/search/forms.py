@@ -839,7 +839,7 @@ class SearchForm(forms.Form):
                 value = self.cleaned_data.get(field_name)
                 if value:
                     if isinstance(field, ChoiceField):
-                        choices = flatten_choices(self.fields[field_name])
+                        choices = flatten_choices(field)
                         value = dict(choices)[value]
                     display_dict[field.label] = value
 

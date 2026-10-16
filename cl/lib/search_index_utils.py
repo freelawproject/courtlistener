@@ -1,7 +1,9 @@
 import re
+from collections.abc import Iterable
 from datetime import date
 from typing import Any, cast
 
+from django.db.models import Model
 from elastic_transport import ApiResponseMeta
 from elasticsearch.dsl import connections
 from elasticsearch.exceptions import ConflictError
@@ -11,7 +13,7 @@ from cl.lib.command_utils import logger
 from cl.lib.date_time import midnight_pt
 
 
-def extract_field_values(m2m_list, field):
+def extract_field_values(m2m_list: Iterable[Model], field: str) -> list[Model]:
     """Extracts values from a list of objects.
 
     This function iterates over a list of objects, extracts the specified field value

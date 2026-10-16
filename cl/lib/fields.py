@@ -12,7 +12,7 @@ class CharNullField(models.CharField):
 
     description = "CharField that stores NULL but returns ''."
 
-    def from_db_value(self, value, expression, connection):
+    def from_db_value(self, value, expression, connection) -> str:
         """
         Gets value right out of the db and changes it if its ``None``.
         """
@@ -21,7 +21,7 @@ class CharNullField(models.CharField):
         else:
             return value
 
-    def to_python(self, value):
+    def to_python(self, value) -> models.CharField | str:
         """
         Gets value right out of the db or an instance, and changes it if its ``None``.
         """
@@ -35,7 +35,7 @@ class CharNullField(models.CharField):
         # Otherwise, just return the value.
         return value
 
-    def get_prep_value(self, value):
+    def get_prep_value(self, value) -> str | None:
         """
         Catches value right before sending to db.
         """

@@ -57,7 +57,7 @@ def map_cl_to_pacer_id(cl_id: str) -> str:
     return cl_to_pacer_ids.get(cl_id, cl_id)
 
 
-def lookup_and_save(new, debug=False):
+def lookup_and_save(new: Docket, debug: bool = False) -> Docket:
     """Merge new docket info into the database.
 
     Start by attempting to lookup an existing Docket. If that's not found,
@@ -177,7 +177,7 @@ async def get_first_missing_de_date(d: Docket) -> date | None:
 
 async def get_blocked_status(
     docket: Docket, count_override: int | None = None
-):
+) -> tuple[bool, date | None]:
     """Set the blocked status for the Docket.
 
     Dockets are public (blocked is False) when:
@@ -341,7 +341,7 @@ def normalize_us_phone_number(phone):
     return ""
 
 
-def normalize_us_state(state):
+def normalize_us_state(state: str) -> str:
     """Convert state values to valid state postal abbreviations
 
     va --> VA
@@ -360,7 +360,7 @@ def normalize_us_state(state):
     return state
 
 
-def make_address_lookup_key(address_info):
+def make_address_lookup_key(address_info: dict) -> str:
     """Make a key for looking up normalized addresses in the DB
 
     - Sort the fields alphabetically
@@ -390,7 +390,7 @@ def make_address_lookup_key(address_info):
     return re.sub(r"[^a-z0-9]", "", key.lower())
 
 
-def normalize_address_info(address_info):
+def normalize_address_info(address_info: dict) -> dict:
     """Normalize various address components"""
 
     # Titlecase where appropriate
@@ -425,7 +425,9 @@ def normalize_address_info(address_info):
     return address_info
 
 
-def normalize_attorney_contact(c, fallback_name=""):
+def normalize_attorney_contact(
+    c: str, fallback_name: str = ""
+) -> tuple[dict[str, str], dict[str, str]]:
     """Normalize the contact string for an attorney.
 
     Attorney contact strings are newline separated addresses like:
