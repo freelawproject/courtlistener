@@ -1451,13 +1451,6 @@
       "severity": "error"
     },
     {
-      "column": 16,
-      "path": "cl/lib/paginators.py",
-      "name": "missing-attribute",
-      "concise_description": "Object of class `ESPaginator` has no attribute `_get_page`",
-      "severity": "error"
-    },
-    {
       "column": 5,
       "path": "cl/oauth/views.py",
       "name": "bad-override-mutable-attribute",
