@@ -1395,34 +1395,6 @@
       "severity": "error"
     },
     {
-      "column": 26,
-      "path": "cl/lib/document_serializer.py",
-      "name": "missing-attribute",
-      "concise_description": "Object of class `DocumentSerializer` has no attribute `Meta`",
-      "severity": "error"
-    },
-    {
-      "column": 27,
-      "path": "cl/lib/document_serializer.py",
-      "name": "missing-attribute",
-      "concise_description": "Object of class `DocumentSerializer` has no attribute `Meta`",
-      "severity": "error"
-    },
-    {
-      "column": 33,
-      "path": "cl/lib/document_serializer.py",
-      "name": "missing-attribute",
-      "concise_description": "Object of class `DocumentSerializer` has no attribute `Meta`",
-      "severity": "error"
-    },
-    {
-      "column": 28,
-      "path": "cl/lib/document_serializer.py",
-      "name": "missing-attribute",
-      "concise_description": "Object of class `DocumentSerializer` has no attribute `Meta`",
-      "severity": "error"
-    },
-    {
       "column": 17,
       "path": "cl/lib/elasticsearch_utils.py",
       "name": "missing-attribute",

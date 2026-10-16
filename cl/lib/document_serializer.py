@@ -198,10 +198,11 @@ class DocumentSerializer(serializers.Serializer):
 
     def get_fields(self) -> OrderedDict[str, serializers.Field]:
         """Get the required fields for serializing the result."""
-        fields = getattr(self.Meta, "fields", ())
-        exclude = getattr(self.Meta, "exclude", ())
-        ignore_fields = getattr(self.Meta, "ignore_fields", ())
-        document = getattr(self.Meta, "document")
+        meta = getattr(self, "Meta", None)
+        fields = getattr(meta, "fields", ())
+        exclude = getattr(meta, "exclude", ())
+        ignore_fields = getattr(meta, "ignore_fields", ())
+        document = getattr(meta, "document")
         model = document.Django.model
         document_fields = document._fields
         declared_fields = copy.deepcopy(self._declared_fields)
