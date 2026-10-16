@@ -1479,34 +1479,6 @@
       "severity": "error"
     },
     {
-      "column": 41,
-      "path": "cl/lib/model_helpers.py",
-      "name": "unbound-name",
-      "concise_description": "`d` may be uninitialized",
-      "severity": "error"
-    },
-    {
-      "column": 41,
-      "path": "cl/lib/model_helpers.py",
-      "name": "missing-attribute",
-      "concise_description": "Object of class `NoneType` has no attribute `year`",
-      "severity": "error"
-    },
-    {
-      "column": 50,
-      "path": "cl/lib/model_helpers.py",
-      "name": "missing-attribute",
-      "concise_description": "Object of class `NoneType` has no attribute `month`",
-      "severity": "error"
-    },
-    {
-      "column": 64,
-      "path": "cl/lib/model_helpers.py",
-      "name": "missing-attribute",
-      "concise_description": "Object of class `NoneType` has no attribute `day`",
-      "severity": "error"
-    },
-    {
       "column": 19,
       "path": "cl/lib/models.py",
       "name": "missing-attribute",
@@ -2984,13 +2956,6 @@
       "severity": "error"
     },
     {
-      "column": 9,
-      "path": "cl/scrapers/management/commands/cl_scrape_opinions.py",
-      "name": "missing-attribute",
-      "concise_description": "Object of class `Opinion` has no attribute `file_with_date`",
-      "severity": "error"
-    },
-    {
       "column": 12,
       "path": "cl/scrapers/management/commands/cl_scrape_opinions.py",
       "name": "bad-return",
@@ -3005,10 +2970,10 @@
       "severity": "error"
     },
     {
-      "column": 5,
+      "column": 33,
       "path": "cl/scrapers/management/commands/cl_scrape_oral_arguments.py",
-      "name": "missing-attribute",
-      "concise_description": "Object of class `Audio` has no attribute `file_with_date`",
+      "name": "bad-assignment",
+      "concise_description": "`date | None` is not assignable to attribute `file_with_date` with type `date`",
       "severity": "error"
     },
     {
