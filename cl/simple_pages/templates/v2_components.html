@@ -206,7 +206,7 @@ Sample code here.
   <section class="max-w-full w-full border-t-2 border-greyscale-200" x-intersect.margin.-100px="show" id="feature-card">
     <h2 class="mt-6 mb-3">Feature Card</h2>
     <h4 class="mt-3">Demo</h4>
-    <c-feature_card
+    <c-feature-card
       size="basis-1/2"
       eyebrow_text="RECAP Suite"
       title_text="Turning PACER Around Since 2009"
@@ -272,7 +272,7 @@ Sample code here.
 
     <c-expansion-panel title="Code">
       <c-code>
-&lt;c-feature_card
+&lt;c-feature-card
       size="basis-1/2"
       eyebrow_text="RECAP Suite"
       title_text="Turning PACER Around Since 2009"
@@ -300,7 +300,7 @@ Sample code here.
         image_source="{%  static 'png/recap_search_container.png' %}"
         image_alt=""
       &gt;
-    &lt;/c-feature_card>
+    &lt;/c-feature-card>
       </c-code>
     </c-expansion-panel>
   </section>
@@ -1155,6 +1155,7 @@ Sample code here.
     <div class="flex flex-wrap gap-3 items-center">
       <c-button variant="primary" href="#">Primary link</c-button>
       <c-button variant="outline" href="#">Outline link</c-button>
+      <c-button variant="blue" href="#">Blue link</c-button>
     </div>
 
     <h4 class="mt-3">Disabled states</h4>
@@ -1179,6 +1180,7 @@ Sample code here.
       <c-button variant="dark" href="#" aria-disabled="true">Dark link</c-button>
       <c-button variant="ghost" href="#" aria-disabled="true">Ghost link</c-button>
       <c-button variant="grey" href="#" aria-disabled="true">Grey link</c-button>
+      <c-button variant="blue" href="#" aria-disabled="true">Blue link</c-button>
     </div>
 
     <c-library.list title="Props" only>
@@ -1494,7 +1496,7 @@ Sample code here.
     </c-banner>
 
     <c-library.list title="Props" only>
-      <c-library.item only>
+      <c-library.item optional only>
         <c-slot name="label"><code>variant</code></c-slot>
         <c-slot name="description">Type of banner, visually speaking. the Default is "info" for blue banners and "warning" for red banners.</c-slot>
       </c-library.item>
