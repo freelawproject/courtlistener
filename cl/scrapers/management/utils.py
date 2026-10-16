@@ -207,7 +207,7 @@ class FLScrapeCommand(BaseCommand):
         )
         parser.add_argument(
             "--queue",
-            default="batch1",
+            default="celery",
             help="The celery queue to dispatch S3 archive tasks to.",
         )
         parser.add_argument(

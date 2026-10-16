@@ -714,6 +714,12 @@ def cleanup_document_storage[M: Model](
     origin: M | QuerySet[M],
     **kwargs,
 ):
+    """Deletes files stored in S3 after a state document is deleted. Django does not delete
+    associated files when a row is deleted so without this a docket entry's attachments would
+    linger in storage with nothing pointing to them. This is a post-delete signal which schedules
+    files to be deleted once the current transaction is commited since otherwise if a file
+    deletion failed it would raise and cancel the whole transaction."""
+
     if not isinstance(instance, AbstractStateDocument):
         return
 
