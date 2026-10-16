@@ -86,6 +86,7 @@ from cl.search.factories import (
     CourtFactory,
     DocketEntryFactory,
     DocketFactory,
+    OpinionClusterFactory,
     OpinionWithParentsFactory,
     RECAPDocumentFactory,
 )
@@ -3493,29 +3494,27 @@ class DocketAlertGetNotesTagsTests(TestCase):
         cls.docket_3 = DocketFactory(
             court=cls.court,
         )
-        cls.docket_4 = DocketFactory(
-            court=cls.court,
-        )
         cls.note_docket_1_user_1 = NoteFactory(
             user=cls.user_1,
-            docket_id=cls.docket_1,
+            content_object=cls.docket_1,
             notes="Note 1 Test",
-        )
-        # GFK-shaped note (#7725) -- proves the lookup isn't legacy-only.
-        cls.note_docket_4_user_1 = NoteFactory.for_object(
-            cls.docket_4,
-            user=cls.user_1,
-            notes="Note 4 Test",
         )
         cls.note_docket_2_user_1 = NoteFactory(
             user=cls.user_1,
-            docket_id=cls.docket_2,
+            content_object=cls.docket_2,
             notes="",
         )
         cls.note_docket_1_user_2 = NoteFactory(
             user=cls.user_2,
-            docket_id=cls.docket_1,
+            content_object=cls.docket_1,
             notes="Note 2 Test",
+        )
+        cls.note_cluster_same_pk_user_1 = NoteFactory(
+            user=cls.user_1,
+            content_object=OpinionClusterFactory(
+                id=cls.docket_3.pk, docket=cls.docket_1
+            ),
+            notes="Note on a cluster sharing docket_3's pk",
         )
 
         cls.orphan_tag_user_1 = UserTagFactory(user=cls.user_1, name="orphan")
@@ -3564,16 +3563,10 @@ class DocketAlertGetNotesTagsTests(TestCase):
             notes_docket_3_user_1,
             tags_docket_3_user_1,
         ) = get_docket_notes_and_tags_by_user(self.docket_3.pk, self.user_1.pk)
+        # user_1's note on the cluster sharing docket_3's pk isn't a docket
+        # note, so it must not show up here.
         self.assertEqual(notes_docket_3_user_1, None)
         self.assertEqual(tags_docket_3_user_1, [])
-
-        # GFK-shaped note (#7725) -- must be found too, not just legacy ones.
-        (
-            notes_docket_4_user_1,
-            tags_docket_4_user_1,
-        ) = get_docket_notes_and_tags_by_user(self.docket_4.pk, self.user_1.pk)
-        self.assertEqual(notes_docket_4_user_1, "Note 4 Test")
-        self.assertEqual(tags_docket_4_user_1, [])
 
 
 @mock.patch("cl.search.tasks.percolator_alerts_models_supported", new=[Audio])
