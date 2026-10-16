@@ -1,3 +1,5 @@
+from typing import Any
+
 from django.core.paginator import Page, Paginator
 from django.utils.functional import cached_property
 
@@ -7,7 +9,9 @@ class ESPaginator(Paginator):
     Paginator for Elasticsearch hits(results).
     """
 
-    def __init__(self, total_query_results: int | None, *args, **kwargs):
+    def __init__(
+        self, total_query_results: int | None, *args: Any, **kwargs: Any
+    ) -> None:
         super().__init__(*args, **kwargs)
         if total_query_results:
             self._count = total_query_results

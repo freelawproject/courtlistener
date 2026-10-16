@@ -83,12 +83,14 @@ class ProxyPacerSession(PacerSession):
         cookies: CookieTypes | None = None,
         username: str | None = None,
         password: str | None = None,
-        client_code=None,
+        client_code: str | None = None,
         proxy: str | None = None,
-        *args,
-        **kwargs,
-    ):
-        self.proxy_address = proxy if proxy else self._pick_proxy_connection()
+        *args: Any,
+        **kwargs: Any,
+    ) -> None:
+        self.proxy_address: str = (
+            proxy if proxy else self._pick_proxy_connection()
+        )
         super().__init__(
             cookies,
             username,
@@ -214,7 +216,7 @@ async def get_or_cache_pacer_cookies(
 def get_pacer_cookie_from_cache(
     user_pk: str | int,
     r: Redis | None = None,
-):
+) -> SessionData | None:
     """Get the cookie for a user from the cache.
 
     :param user_pk: The ID of the user, can be a string or an ID
@@ -241,7 +243,7 @@ def get_pacer_cookie_from_cache(
 def delete_pacer_cookie_from_cache(
     user_pk: str | int,
     r: Redis | None = None,
-):
+) -> None:
     """Deletes the cookie for a user from the cache.
 
     :param user_pk: The ID of the user, can be a string or an ID

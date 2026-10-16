@@ -150,7 +150,7 @@ class AbstractFile(models.Model):
         with open(self.filepath.path) as f:
             return f.read()
 
-    def print_file_contents(self):
+    def print_file_contents(self) -> None:
         print(self.file_contents)
 
 

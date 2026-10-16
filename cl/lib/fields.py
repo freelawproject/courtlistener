@@ -1,4 +1,8 @@
+from typing import Any
+
 from django.db import models
+from django.db.backends.base.base import BaseDatabaseWrapper
+from django.db.models.expressions import Expression
 from django_elasticsearch_dsl import fields
 from elasticsearch.dsl import Join, Percolator
 
@@ -12,7 +16,12 @@ class CharNullField(models.CharField):
 
     description = "CharField that stores NULL but returns ''."
 
-    def from_db_value(self, value, expression, connection) -> str:
+    def from_db_value(
+        self,
+        value: str | None,
+        expression: Expression,
+        connection: BaseDatabaseWrapper,
+    ) -> str:
         """
         Gets value right out of the db and changes it if its ``None``.
         """
@@ -21,7 +30,7 @@ class CharNullField(models.CharField):
         else:
             return value
 
-    def to_python(self, value) -> models.CharField | str:
+    def to_python(self, value: Any) -> models.CharField | str:
         """
         Gets value right out of the db or an instance, and changes it if its ``None``.
         """
@@ -35,7 +44,7 @@ class CharNullField(models.CharField):
         # Otherwise, just return the value.
         return value
 
-    def get_prep_value(self, value) -> str | None:
+    def get_prep_value(self, value: Any) -> str | None:
         """
         Catches value right before sending to db.
         """

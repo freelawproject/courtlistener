@@ -1,12 +1,21 @@
+from collections.abc import Iterable
+
+from django.apps.registry import Apps
 from django.contrib.auth.hashers import make_password
 from django.contrib.auth.management import create_permissions
 from django.core.management import call_command
 from django.core.serializers import base, python
+from django.db.backends.base.schema import BaseDatabaseSchemaEditor
 from django.utils import timezone
 from rest_framework.authtoken.models import Token
 
 
-def load_migration_fixture(apps, schema_editor, fixture, app_label):
+def load_migration_fixture(
+    apps: Apps,
+    schema_editor: BaseDatabaseSchemaEditor,
+    fixture: str,
+    app_label: str,
+) -> None:
     """Load a fixture during a migration.
 
     This is a rather un-fun utility to load a fixture during a migration. It
@@ -53,7 +62,13 @@ def load_migration_fixture(apps, schema_editor, fixture, app_label):
         python.Deserializer._get_model_from_node = staticmethod(old_get_model)
 
 
-def make_new_user(apps, schema_editor, username, email, permission_codenames):
+def make_new_user(
+    apps: Apps,
+    schema_editor: BaseDatabaseSchemaEditor,
+    username: str,
+    email: str,
+    permission_codenames: Iterable[str],
+) -> None:
     User = apps.get_model(
         "auth",
         "User",

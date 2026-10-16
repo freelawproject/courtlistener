@@ -1,17 +1,17 @@
 import logging
 import os
 from argparse import ArgumentParser
-from typing import ClassVar
+from typing import Any, ClassVar
 
 from django.core.management import BaseCommand, CommandError
 
 from cl.lib.juriscraper_utils import get_module_by_court_id
 
-logger = logging.getLogger(__name__)
+logger: logging.Logger = logging.getLogger(__name__)
 
 
 class VerboseCommand(BaseCommand):
-    def handle(self, *args, **options):
+    def handle(self, *args: Any, **options: Any) -> None:
         verbosity = options.get("verbosity")
         if not verbosity:
             logger.setLevel(logging.WARN)
@@ -36,7 +36,7 @@ class ScraperCommand(VerboseCommand):
     # Defined by inheriting classes
     juriscraper_module_type: ClassVar[str] = ""
 
-    def add_arguments(self, parser: ArgumentParser):
+    def add_arguments(self, parser: ArgumentParser) -> None:
         parser.add_argument(
             "--courts",
             dest="court_id",
@@ -64,7 +64,7 @@ class CommandUtils:
     """A mixin to give some useful methods to sub classes."""
 
     @staticmethod
-    def ensure_file_ok(file_path: str):
+    def ensure_file_ok(file_path: str) -> None:
         """Check to make sure that a file path exists and is valid."""
         if not os.path.exists(file_path):
             raise CommandError(f"Unable to find file at {file_path}")

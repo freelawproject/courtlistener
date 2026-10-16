@@ -43,7 +43,7 @@ def sha1(s: bytes | str) -> str:
     return sha1sum.hexdigest()
 
 
-def sha1_of_file(file_path: str, buffer_size=2**16) -> str:
+def sha1_of_file(file_path: str, buffer_size: int = 2**16) -> str:
     """Generate a SHA1 hash of a file in constant memory
 
     !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!

@@ -77,9 +77,11 @@ from cl.stats.utils import tally_stat
 from cl.users.models import UserProfile
 from cl.users.utils import is_search_history_on_cached
 
-HYPERSCAN_TOKENIZER = HyperscanTokenizer(cache_dir=".hyperscan")
+HYPERSCAN_TOKENIZER: HyperscanTokenizer = HyperscanTokenizer(
+    cache_dir=".hyperscan"
+)
 
-logger = logging.getLogger(__name__)
+logger: logging.Logger = logging.getLogger(__name__)
 
 
 def check_pagination_depth(
@@ -481,7 +483,9 @@ def get_results_from_paginator(
     return results
 
 
-def enrich_search_results(results: Page, search_type: str, get_params: dict):
+def enrich_search_results(
+    results: Page, search_type: str, get_params: CleanData
+) -> None:
     """Enrich dataset before returning to user
 
     :param results: A ESPaginator page object

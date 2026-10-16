@@ -32,9 +32,16 @@ class RobotsHeaderMiddleware:
     sync_capable = True
     async_capable = True
 
-    def __init__(self, get_response: Callable):
-        self.get_response = get_response
-        self.async_mode = iscoroutinefunction(self.get_response)
+    def __init__(
+        self,
+        get_response: Callable[
+            [HttpRequest], HttpResponseBase | Awaitable[HttpResponseBase]
+        ],
+    ):
+        self.get_response: Callable[
+            [HttpRequest], HttpResponseBase | Awaitable[HttpResponseBase]
+        ] = get_response
+        self.async_mode: bool = iscoroutinefunction(self.get_response)
         if self.async_mode:
             markcoroutinefunction(self)
 
@@ -84,10 +91,14 @@ class IncrementalNewTemplateMiddleware:
     TODO: Remove this middleware once new design is completely rolled out.
     """
 
-    def __init__(self, get_response: Callable):
-        self.get_response = get_response
+    def __init__(
+        self, get_response: Callable[[HttpRequest], HttpResponseBase]
+    ):
+        self.get_response: Callable[[HttpRequest], HttpResponseBase] = (
+            get_response
+        )
 
-    def __call__(self, request: HttpRequest):
+    def __call__(self, request: HttpRequest) -> HttpResponseBase:
         response = self.get_response(request)
         return response
 

@@ -23,13 +23,19 @@ from cl.lib.string_utils import normalize_dashes
 
 if TYPE_CHECKING:
     from cl.audio.models import Audio
-    from cl.search.models import Opinion, OpinionCluster
+    from cl.lasc.models import LASCJSON
+    from cl.search.models import (
+        Docket,
+        Opinion,
+        OpinionCluster,
+        RECAPDocument,
+    )
 
 dist_d_num_regex = r"(?:\d:)?(\d\d)-[a-zA-Z]{1,5}-(\d+)"
 appellate_bankr_d_num_regex = r"(\d\d)-(\d+)"
 scotus_d_a_num_regex = r"(\d{2})a(\d{1,5})"
 
-logger = logging.getLogger(__name__)
+logger: logging.Logger = logging.getLogger(__name__)
 
 
 def is_docket_number(value: str) -> bool:
@@ -332,7 +338,7 @@ def make_path(root: str, filename: str) -> str:
     )
 
 
-def _make_llm_file_path(root: str, instance, filename: str) -> str:
+def _make_llm_file_path(root: str, instance: Model, filename: str) -> str:
     """Make a file path for LLM related uploads
 
     Falls back to uuid4 when instance.pk is None (unsaved instance)
@@ -347,16 +353,18 @@ def _make_llm_file_path(root: str, instance, filename: str) -> str:
     return make_path(root, f"{name}{ext}")
 
 
-make_llm_task_input_file_path = partial(_make_llm_file_path, "llm-tasks")
-make_llm_request_response_file_path = partial(
+make_llm_task_input_file_path: partial[str] = partial(
+    _make_llm_file_path, "llm-tasks"
+)
+make_llm_request_response_file_path: partial[str] = partial(
     _make_llm_file_path, "llm-requests"
 )
-make_llm_task_response_file_path = partial(
+make_llm_task_response_file_path: partial[str] = partial(
     _make_llm_file_path, "llm-tasks/responses"
 )
 
 
-def make_lasc_path(instance, filename):
+def make_lasc_path(instance: LASCJSON, filename: str) -> str:
     """Make a simple path for uploaded files.
 
     Start with the `root` node, and use the current date as the subdirectories.
@@ -366,7 +374,7 @@ def make_lasc_path(instance, filename):
     )
 
 
-def make_recap_path(instance, filename):
+def make_recap_path(instance: Docket, filename: str) -> str:
     """Make a path to a good location on the local system for RECAP files.
 
     This dumps them all into the same directory, which seems to be OK, at least
@@ -375,7 +383,9 @@ def make_recap_path(instance, filename):
     return f"recap/{get_valid_filename(filename)}"
 
 
-def base_recap_path(instance, filename, base_dir):
+def base_recap_path(
+    instance: RECAPDocument, filename: str, base_dir: str
+) -> str:
     """Make a filepath, accepting an extra parameter for the base directory
 
     Mirrors technique used by original RECAP server to upload PDFs to IA.
@@ -413,13 +423,13 @@ def make_pdf_path(
     return instance.get_pdf_path(filename, thumbs=thumbs)
 
 
-def make_json_path(instance, filename):
+def make_json_path(instance: Model, filename: str) -> str:
     # As additional types are needed, this will need to mirror the format of
     # make_pdf_path, by doing type checking.
     return make_path("json-data", filename)
 
 
-def make_lasc_json_path(instance, filename):
+def make_lasc_json_path(instance: LASCJSON, filename: str) -> str:
     # As additional types are needed, this will need to mirror the format of
     # make_pdf_path, by doing type checking.
     return make_lasc_path(instance, filename)
@@ -462,7 +472,9 @@ def make_upload_path(
     return f"{filename.split('.')[-1]}/{d.year}/{d.month:02d}/{d.day:02d}/{get_valid_filename(filename)}"
 
 
-def validate_partial_date[M: Model](instance: M, fields: Iterable[str]):
+def validate_partial_date[M: Model](
+    instance: M, fields: Iterable[str]
+) -> None:
     """Ensure that partial dates make sense.
 
     Validates that:
@@ -502,7 +514,9 @@ def validate_partial_date[M: Model](instance: M, fields: Iterable[str]):
             )
 
 
-def validate_is_not_alias[M: Model](instance: M, fields: Iterable[str]):
+def validate_is_not_alias[M: Model](
+    instance: M, fields: Iterable[str]
+) -> None:
     """Ensure that an alias to an object is not being used instead of the object
     itself.
 
@@ -519,7 +533,7 @@ def validate_is_not_alias[M: Model](instance: M, fields: Iterable[str]):
             )
 
 
-def validate_has_full_name(instance: Any):
+def validate_has_full_name(instance: Any) -> None:
     """This ensures that blank values are not passed to the first and last name
     fields. Normally this can be done by the DB layer, but people could still
     pass blank strings through, and this blocks even that.
@@ -528,7 +542,7 @@ def validate_has_full_name(instance: Any):
         raise ValidationError("Both first and last names are required.")
 
 
-def validate_nomination_fields_ok(instance: Any):
+def validate_nomination_fields_ok(instance: Any) -> None:
     """Validate a few things:
     - date_nominated and date_elected cannot both have values
     - if nominated, then date_elected not complete and vice versa.
@@ -554,7 +568,7 @@ def validate_nomination_fields_ok(instance: Any):
             )
 
 
-def validate_supervisor(instance: Any):
+def validate_supervisor(instance: Any) -> None:
     """Ensure that the supervisor field makes sense.
 
     - Supervisors can only be judges.
@@ -579,7 +593,7 @@ def validate_supervisor(instance: Any):
         )
 
 
-def validate_all_or_none(instance: Any, fields: Sequence[str]):
+def validate_all_or_none(instance: Any, fields: Sequence[str]) -> None:
     """Ensure that all fields are complete or that none are complete"""
     num_fields = len(fields)
     completed_fields = sum(
@@ -595,7 +609,7 @@ def validate_all_or_none(instance: Any, fields: Sequence[str]):
         )
 
 
-def validate_exactly_n(instance: Any, n: int, fields: Iterable[str]):
+def validate_exactly_n(instance: Any, n: int, fields: Iterable[str]) -> None:
     """Ensure that exactly n of the fields has a value."""
     completed_fields = sum(1 for f in fields if getattr(instance, f))
     if completed_fields != n:
@@ -605,7 +619,7 @@ def validate_exactly_n(instance: Any, n: int, fields: Iterable[str]):
         )
 
 
-def validate_at_most_n(instance: Any, n: int, fields: Iterable[str]):
+def validate_at_most_n(instance: Any, n: int, fields: Iterable[str]) -> None:
     """Ensure that at most n fields are complete."""
     completed_fields = sum(1 for f in fields if getattr(instance, f))
     if completed_fields > n:
@@ -615,7 +629,7 @@ def validate_at_most_n(instance: Any, n: int, fields: Iterable[str]):
         )
 
 
-def validate_not_all(instance: Any, fields: Sequence[str]):
+def validate_not_all(instance: Any, fields: Sequence[str]) -> None:
     """Make sure that all of the passed fields are not complete."""
     num_fields = len(fields)
     num_completed_fields = sum(1 for f in fields if getattr(instance, f))
