@@ -946,13 +946,13 @@ class Docket(AbstractDateTimeModel, DocketSources):
             f"?filename=/docket/docketfiles/html/public/{quote(self.docket_number)}.html"
         )
 
-    def get_entry_source(self) -> "DocketEntrySource":
+    def get_entry_source(self) -> DocketEntrySource:
         """Return the DocketEntrySource config for this docket's court - RECAP/PACER by default, with per-court overrides."""
         from cl.opinion_page import docket_entry_sources
 
         return docket_entry_sources.source_for_court_id(self.court_id)
 
-    def get_alert_source(self) -> "DocketAlertSource":
+    def get_alert_source(self) -> DocketAlertSource:
         """Return the DocketAlertSource config for this docket's court - RECAP/PACER by default, with per-court overrides."""
         from cl.alerts.docket_alert_sources import (
             _ALERT_SOURCES_BY_COURT_ID,
@@ -2749,7 +2749,7 @@ class OpinionCluster(AbstractDateTimeModel):
         return ", ".join(str(c) for c in citations)
 
     @property
-    def authorities(self) -> QuerySet["OpinionCluster"]:
+    def authorities(self) -> QuerySet[OpinionCluster]:
         """Returns a queryset that can be used for querying and caching authorities.
 
         Citation relationships connect individual opinions, but an authority
@@ -2768,7 +2768,7 @@ class OpinionCluster(AbstractDateTimeModel):
             .order_by("-citation_count", "-date_filed")
         )
 
-    async def aauthorities(self) -> QuerySet["OpinionCluster"]:
+    async def aauthorities(self) -> QuerySet[OpinionCluster]:
         """Returns a queryset that can be used for querying and caching authorities."""
         return self.authorities
 
@@ -2818,7 +2818,7 @@ class OpinionCluster(AbstractDateTimeModel):
         return self._has_private_authority
 
     @property
-    def authorities_with_data(self) -> QuerySet["OpinionCluster"]:
+    def authorities_with_data(self) -> QuerySet[OpinionCluster]:
         """Return authorities with their total citation depth and display data."""
         return (
             self.authorities.defer(
@@ -2843,7 +2843,7 @@ class OpinionCluster(AbstractDateTimeModel):
             .order_by("-citation_depth", "-citation_count", "-date_filed")
         )
 
-    async def aauthorities_with_data(self) -> list["OpinionCluster"]:
+    async def aauthorities_with_data(self) -> list[OpinionCluster]:
         """Returns a list of this cluster's authorities with an extra field appended related to citation depth, for eventual injection into a view template. The returned list is sorted by that citation depth field."""
         return [authority async for authority in self.authorities_with_data]
 
@@ -2877,7 +2877,7 @@ class OpinionCluster(AbstractDateTimeModel):
         return sub_opinions
 
     @cached_property
-    def opinion_main_version(self) -> QuerySet["Opinion"]:
+    def opinion_main_version(self) -> QuerySet[Opinion]:
         """Fetch the main (non-versioned) sub-opinions of the cluster.
 
         Despite the singular name, a cluster can have several main-version
@@ -3743,7 +3743,7 @@ class Tag(AbstractDateTimeModel):
     def __str__(self) -> str:
         return f"{self.pk}: {self.name}"
 
-    def tag_object(self, thing: TaggableType) -> tuple["Tag", bool]:
+    def tag_object(self, thing: TaggableType) -> tuple[Tag, bool]:
         """Atomically add a tag to an item.
 
         Django has a system for adding to a m2m relationship like the ones
