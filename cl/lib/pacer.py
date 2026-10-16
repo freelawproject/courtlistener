@@ -5,7 +5,7 @@ import socket
 from collections import OrderedDict
 from collections.abc import Mapping
 from datetime import UTC, date, datetime
-from typing import TypedDict
+from typing import TypedDict, cast
 
 import requests
 import usaddress
@@ -13,6 +13,7 @@ from asgiref.sync import async_to_sync
 from dateutil import parser
 from django.core.exceptions import ValidationError
 from django.core.validators import validate_email
+from django.db.models import CharField
 from juriscraper.lib.string_utils import titlecase
 from juriscraper.pacer import (
     AppellateDocketReport,
@@ -83,7 +84,7 @@ def lookup_and_save(new, debug=False):
         elif count == 1:
             # Nailed it!
             d = ds[0]
-        elif count > 1:
+        else:
             # Too many dockets returned. Disambiguate.
 
             def is_different(x):
@@ -414,8 +415,12 @@ def normalize_address_info(address_info):
 
     # Nuke any zip code that's longer than allowed in the DB (usually caused by
     # phone numbers)
-    zip_code_field = AttorneyOrganization._meta.get_field("zip_code")
-    if len(address_info.get("zip_code", "")) > zip_code_field.max_length:
+    zip_code_field = cast(
+        CharField, AttorneyOrganization._meta.get_field("zip_code")
+    )
+    # `USZipCodeField` always sets `max_length`.
+    zip_code_max_length = cast(int, zip_code_field.max_length)
+    if len(address_info.get("zip_code", "")) > zip_code_max_length:
         address_info["zip_code"] = ""
     return address_info
 
@@ -524,6 +529,8 @@ def normalize_attorney_contact(c, fallback_name=""):
         address_info, address_type = usaddress.tag(
             ", ".join(address_lines), tag_mapping=mapping
         )
+    # usaddress's bundled stub omits `RepeatedLabelError`.
+    # pyrefly: ignore[missing-attribute]
     except (usaddress.RepeatedLabelError, UnicodeEncodeError):
         # See https://github.com/datamade/probableparsing/issues/2 for why we
         # catch the UnicodeEncodeError. Oy.
