@@ -7,11 +7,16 @@
 
 <c-vars request dialog_class="" panel_class="" class=""></c-vars>
 
-<div x-data="dialog" x-id="dialogIdGroup" class="flex justify-center {{ class }}">
-  <!-- Trigger -->
+<div
+  x-data="dialog"
+  x-id="dialogIdGroup"
+  class="flex justify-center {{ class }}"
+  {{ attrs }}
+>
+  <!-- Trigger: omitted when the dialog is opened by other means, e.g. an x-on listener passed through attrs -->
   {% if trigger_button %}
     {{ trigger_button }}
-  {% else %}
+  {% elif button_content %}
     <c-dialog.trigger-button>
       {{ button_content }}
     </c-dialog.trigger-button>
