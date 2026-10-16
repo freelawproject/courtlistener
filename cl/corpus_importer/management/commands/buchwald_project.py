@@ -57,7 +57,7 @@ def add_all_nysd_to_cl(options):
         throttle.maybe_wait()
         logger.info("Doing pacer_case_id: %s", pacer_case_id)
         make_docket_by_iquery.apply_async(
-            args=("nysd", pacer_case_id, "default", [NYSD_TAG]),
+            args=("nysd", str(pacer_case_id), "default", [NYSD_TAG]),
             queue=q,
         )
 

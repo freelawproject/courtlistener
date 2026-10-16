@@ -484,8 +484,9 @@ class CitationTextTest(TestCase):
                     msg=f"\n{created_html}\n\n    !=\n\n{expected_html}",
                 )
 
-    def test_make_html_from_harvard_xml(self) -> None:
-        """Can we convert the XML of an opinion into modified HTML?"""
+    def test_make_html_from_harvard_and_scan_xml(self) -> None:
+        """Can we convert the Harvard or scanned XML of an opinion into
+        modified HTML?"""
         # fmt: off
 
         test_pairs = [
@@ -501,13 +502,15 @@ class CitationTextTest(TestCase):
         ]
 
         # fmt: on
-        for s, expected_html in test_pairs:
+        for (s, expected_html), field in itertools.product(
+            test_pairs, ["xml_harvard", "xml_scan"]
+        ):
             with self.subTest(
                 f"Testing html to html conversion for {s}...",
                 s=s,
-                expected_html=expected_html,
+                field=field,
             ):
-                opinion = Opinion(xml_harvard=s)
+                opinion = Opinion(**{field: s})
                 get_citations_kwargs = make_get_citations_kwargs(opinion)[0]
                 citations = get_citations(
                     tokenizer=HYPERSCAN_TOKENIZER,

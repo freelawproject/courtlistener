@@ -18,6 +18,7 @@ from re import Pattern
 from tempfile import NamedTemporaryFile
 from typing import IO, Any, TypeIs, cast
 from urllib.parse import urljoin
+from uuid import UUID
 
 import botocore.exceptions
 import environ
@@ -121,7 +122,6 @@ from cl.corpus_importer.state.loader import LoadPhase, fingerprint
 from cl.corpus_importer.state.registry import get_loader
 from cl.corpus_importer.state.utils import MergeResult
 from cl.corpus_importer.utils import (
-    DownloadPDFResult,
     compute_binary_probe_jitter,
     compute_blocked_court_wait,
     compute_next_binary_probe,
@@ -601,13 +601,11 @@ def process_free_opinion_result(
         return None
 
     # TODO: Come up with some way to do this that satisfies the type checker
-    result.court = Court.objects.get(
-        pk=map_pacer_to_cl_id(result.court_id)
-    )  # pyrefly:ignore[missing-attribute]
+    # pyrefly:ignore[missing-attribute]
+    result.court = Court.objects.get(pk=map_pacer_to_cl_id(result.court_id))
     result.case_name = harmonize(result.case_name)
-    result.case_name_short = cnt.make_case_name_short(
-        result.case_name
-    )  # pyrefly:ignore[missing-attribute]
+    # pyrefly:ignore[missing-attribute]
+    result.case_name_short = cnt.make_case_name_short(result.case_name)
 
     row_copy = copy.copy(result)
     # If we don't do this, the doc's date_filed becomes the docket's
@@ -1376,7 +1374,7 @@ def filter_docket_by_tags(
 
 
 async def query_case_query_report(
-    court_id: str, pacer_case_id: int
+    court_id: str, pacer_case_id: str
 ) -> tuple[dict[str, Any], str]:
     """Query the iquery page for a given PACER case ID.
 
@@ -1397,9 +1395,7 @@ async def query_case_query_report(
         proxy=session_data.proxy_address,
     ) as s:
         report = CaseQuery(map_cl_to_pacer_id(court_id), s)
-        # Juriscraper sends this as multipart form data, and httpx only
-        # accepts str/bytes values there; an int raises AttributeError.
-        await report.query(str(pacer_case_id))
+        await report.query(pacer_case_id)
         if report.response is None:
             raise ParsingException("The case query returned no response.")
         return report.data, report.response.text
@@ -1408,7 +1404,7 @@ async def query_case_query_report(
 def make_docket_by_iquery_base(
     self: Task,
     court_id: str,
-    pacer_case_id: int,
+    pacer_case_id: str,
     using: str = "default",
     tag_names: list[str] | None = None,
     log_results_redis: bool = False,
@@ -1461,7 +1457,7 @@ def make_docket_by_iquery_base(
 
     d = async_to_sync(find_docket_object)(
         court_id,
-        str(pacer_case_id),
+        pacer_case_id,
         report_data["docket_number"],
         report_data.get("federal_defendant_number"),
         report_data.get("federal_dn_judge_initials_assigned"),
@@ -1499,7 +1495,7 @@ def make_docket_by_iquery_base(
 def make_docket_by_iquery(
     self: Task,
     court_id: str,
-    pacer_case_id: int,
+    pacer_case_id: str,
     using: str = "default",
     tag_names: list[str] | None = None,
     log_results_redis: bool = False,
@@ -1546,7 +1542,7 @@ def make_docket_by_iquery(
 def make_docket_by_iquery_sweep(
     self: Task,
     court_id: str,
-    pacer_case_id: int,
+    pacer_case_id: str,
     using: str = "default",
     tag_names: list[str] | None = None,
     log_results_redis: bool = False,
@@ -1582,8 +1578,8 @@ def make_docket_by_iquery_sweep(
 
 @retry((TimeoutException, PacerLoginException), tries=3, delay=0.25, backoff=1)
 def query_iquery_page(
-    court_id: str, pacer_case_id: int
-) -> tuple[bool, None] | tuple[dict[str, Any], str]:
+    court_id: str, pacer_case_id: str
+) -> None | tuple[dict[str, Any], str]:
     """A small wrapper to query the iquery page for a given PACER case ID to
     support retries via the @retry decorator in case of a failure.
 
@@ -1602,7 +1598,7 @@ def query_iquery_page(
             court_id,
             pacer_case_id,
         )
-        return False, None
+        return None
     return report_data, report_text
 
 
@@ -1677,9 +1673,7 @@ def probe_or_scrape_iquery_pages(
         )
         probe_iteration += 1
         try:
-            report_data, report_text = query_iquery_page(
-                court_id, pacer_case_id_to_lookup
-            )
+            report = query_iquery_page(court_id, str(pacer_case_id_to_lookup))
         except TimeoutException:
             logger.warning(
                 "The court %s website is probably down. Aborting the probe task.",
@@ -1740,10 +1734,10 @@ def probe_or_scrape_iquery_pages(
             delete_redis_semaphore("CACHE", make_iquery_probing_key(court_id))
             return None
 
-        if report_data:
+        if report is not None:
             # Find and update/store the Docket.
             reports_data.append(
-                (pacer_case_id_to_lookup, report_data, report_text)
+                (pacer_case_id_to_lookup, report[0], report[1])
             )
             latest_match = pacer_case_id_to_lookup
             found_match = True
@@ -1840,7 +1834,7 @@ def probe_or_scrape_iquery_pages(
         try:
             process_case_query_report(
                 court_id,
-                pacer_case_id=pacer_case_id,
+                pacer_case_id=str(pacer_case_id),
                 report_data=report_data,
                 report_text=report_text,
                 skip_iquery_sweep=skip_iquery_sweep,
@@ -1852,7 +1846,7 @@ def probe_or_scrape_iquery_pages(
                 "IntegrityError occurred when processing iquery page for "
                 "court: %s and pacer_case_id: %s",
                 court_id,
-                report_data[0],
+                pacer_case_id,
             )
             continue
     delete_redis_semaphore("CACHE", make_iquery_probing_key(court_id))
@@ -3537,7 +3531,7 @@ def download_document_in_stream(
         delay=1,
         backoff=2,
     )
-    def download_to_file(tmp_file):
+    def download_to_file(tmp_file: IO[bytes]) -> str | None:
         tmp_file.seek(0)
         # Clear any partial content from previous attempt
         tmp_file.truncate()
@@ -3555,18 +3549,21 @@ def download_document_in_stream(
                     identifier,
                     url,
                 )
-                return DownloadPDFResult(success=False)
+                return None
             for chunk in response.iter_content(chunk_size=8 * 1024):
                 if chunk:
                     tmp_file.write(chunk)
                     hasher.update(chunk)
             tmp_file.flush()
             tmp_file.seek(0)
-            return DownloadPDFResult(success=True, sha1=hasher.hexdigest())
+            return hasher.hexdigest()
 
     with NamedTemporaryFile(prefix=temp_prefix, suffix=".pdf") as tmp:
         result = download_to_file(tmp)
-        yield (tmp, result.sha1) if result.success else None
+        if result is None:
+            yield None
+        else:
+            yield (tmp.file, result)
 
 
 @app.task(
@@ -4393,7 +4390,9 @@ def merge_texas_document(
 
     if needs_update:
         texas_document.description = input_document["description"]
-        texas_document.media_version_id = input_document["media_version_id"]
+        texas_document.media_version_id = UUID(
+            input_document["media_version_id"]
+        )
         texas_document.url = input_document["document_url"]
         if texas_document.filepath_local:
             texas_document.filepath_local.delete(save=False)
@@ -4501,7 +4500,7 @@ def merge_texas_docket_entry(
         appellate_brief["description"] if appellate_brief else ""
     )
     docket_entry.disposition = case_event["disposition"]
-    docket_entry.remarks = case_event.get("remarks", "")
+    docket_entry.remarks = cast(str, case_event.get("remarks", ""))
     docket_entry.save()
 
     logger.info(

@@ -343,12 +343,12 @@ async def get_top_prayers() -> QuerySet[RECAPDocument]:
 async def get_user_prayers(
     user: User, status: str | None = None
 ) -> QuerySet[RECAPDocument]:
-    filters = {"prayers__user": user}
+    filters = Q(prayers__user=user)
     if status is not None:
-        filters["prayers__status"] = status
+        filters &= Q(prayers__status=status)
 
     documents = (
-        RECAPDocument.objects.filter(**filters)
+        RECAPDocument.objects.filter(filters)
         .select_related(
             "docket_entry",
             "docket_entry__docket",

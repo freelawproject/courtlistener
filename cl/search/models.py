@@ -788,6 +788,8 @@ class Docket(AbstractDateTimeModel, DocketSources):
                 non_source_list = self.NON_SCRAPER_SOURCES()
             case self.HARVARD:
                 non_source_list = self.NON_HARVARD_SOURCES()
+            case self.SCANNING_PROJECT:
+                non_source_list = self.NON_SCANNING_PROJECT_SOURCES()
             case _:
                 return
 
@@ -3076,6 +3078,7 @@ def sort_cites(c):
 OPINION_TEXT_SOURCE_FIELDS = [
     "html_with_citations",
     "xml_harvard",
+    "xml_scan",
     "html_columbia",
     "html_lawbox",
     "html_anon_2020",
@@ -3097,6 +3100,7 @@ class OpinionQuerySet(models.QuerySet):
         The supported source fields are:
             - html_with_citations (preferred)
             - xml_harvard
+            - xml_scan
             - html_columbia
             - html_lawbox
             - html_anon_2020
@@ -3302,6 +3306,7 @@ class Opinion(AbstractDateTimeModel):
             "html_columbia",
             "html_lawbox",
             "xml_harvard",
+            "xml_scan",
             "html_anon_2020",
             "html",
             "plain_text",
