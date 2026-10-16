@@ -1513,41 +1513,6 @@
       "severity": "error"
     },
     {
-      "column": 18,
-      "path": "cl/lib/zoho.py",
-      "name": "missing-attribute",
-      "concise_description": "Object of class `NoneType` has no attribute `get_value`",
-      "severity": "error"
-    },
-    {
-      "column": 16,
-      "path": "cl/lib/zoho.py",
-      "name": "missing-attribute",
-      "concise_description": "Object of class `NoneType` has no attribute `get_value`",
-      "severity": "error"
-    },
-    {
-      "column": 19,
-      "path": "cl/lib/zoho.py",
-      "name": "missing-attribute",
-      "concise_description": "Object of class `NoneType` has no attribute `get_value`",
-      "severity": "error"
-    },
-    {
-      "column": 20,
-      "path": "cl/lib/zoho.py",
-      "name": "unsupported-operation",
-      "concise_description": "`None` is not subscriptable",
-      "severity": "error"
-    },
-    {
-      "column": 16,
-      "path": "cl/lib/zoho.py",
-      "name": "missing-attribute",
-      "concise_description": "Object of class `NoneType` has no attribute `token`",
-      "severity": "error"
-    },
-    {
       "column": 5,
       "path": "cl/oauth/views.py",
       "name": "bad-override-mutable-attribute",
