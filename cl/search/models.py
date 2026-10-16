@@ -788,6 +788,8 @@ class Docket(AbstractDateTimeModel, DocketSources):
                 non_source_list = self.NON_SCRAPER_SOURCES()
             case self.HARVARD:
                 non_source_list = self.NON_HARVARD_SOURCES()
+            case self.SCANNING_PROJECT:
+                non_source_list = self.NON_SCANNING_PROJECT_SOURCES()
             case _:
                 return
 

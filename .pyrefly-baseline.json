@@ -1156,31 +1156,10 @@
       "severity": "error"
     },
     {
-      "column": 34,
+      "column": 27,
       "path": "cl/corpus_importer/utils.py",
-      "name": "bad-argument-type",
-      "concise_description": "Argument `str | Unknown` is not assignable to parameter `case` with type `OpinionCluster` in function `length_too_different`",
-      "severity": "error"
-    },
-    {
-      "column": 40,
-      "path": "cl/corpus_importer/utils.py",
-      "name": "bad-argument-type",
-      "concise_description": "Argument `str | Unknown` is not assignable to parameter `case` with type `OpinionCluster` in function `case_names_dont_overlap`",
-      "severity": "error"
-    },
-    {
-      "column": 48,
-      "path": "cl/corpus_importer/utils.py",
-      "name": "bad-argument-type",
-      "concise_description": "Argument `str | Unknown` is not assignable to parameter `case` with type `OpinionCluster` in function `cosine_similarity_too_different`",
-      "severity": "error"
-    },
-    {
-      "column": 38,
-      "path": "cl/corpus_importer/utils.py",
-      "name": "bad-argument-type",
-      "concise_description": "Argument `str | Unknown` is not assignable to parameter `case` with type `OpinionCluster` in function `content_too_different`",
+      "name": "missing-attribute",
+      "concise_description": "Object of class `Manager` has no attribute `appellate_courts`",
       "severity": "error"
     },
     {

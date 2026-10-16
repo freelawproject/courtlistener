@@ -1,0 +1,1326 @@
+import io
+import os
+import re
+import tempfile
+from datetime import date
+from pathlib import Path
+from typing import cast
+from unittest import mock
+
+from bs4 import BeautifulSoup
+from django.core.management import CommandError, call_command
+from django.db import transaction
+from django.db.models.fields.files import FieldFile
+from django.test import override_settings
+from eyecite import get_citations
+from eyecite.models import FullCaseCitation
+
+from cl.corpus_importer.management.commands.import_scanned_opinions import (
+    get_case_names,
+    get_citation_strings,
+    get_date_filed,
+    get_docket_number,
+    get_headmatter,
+    get_precedential_status,
+    make_opinion,
+    normalize_case_name_caps,
+    parse_citations,
+    s3_xml_keys,
+)
+from cl.lib.crypto import sha1
+from cl.lib.storage import ScanningFinalXmlStorage
+from cl.lib.url_utils import BASE_URL
+from cl.people_db.factories import PersonFactory, PositionFactory
+from cl.people_db.models import GRANULARITY_DAY, Person
+from cl.search.cluster_sources import ClusterSources
+from cl.search.factories import (
+    CourtFactory,
+    DocketFactory,
+    OpinionClusterFactory,
+    OpinionFactory,
+)
+from cl.search.models import (
+    PRECEDENTIAL_STATUS,
+    Citation,
+    Court,
+    Docket,
+    Opinion,
+    OpinionCluster,
+    OpinionContent,
+)
+from cl.tests.cases import SimpleTestCase, TestCase
+
+COMMAND_MODULE = (
+    "cl.corpus_importer.management.commands.import_scanned_opinions"
+)
+SCAN_XML_PATH = str(
+    Path(__file__).parent / "test_assets" / "scanned_opinion.xml"
+)
+
+
+def make_soup(xml: str) -> BeautifulSoup:
+    """Parse XML the same way the importer does."""
+    return BeautifulSoup(xml, "lxml-xml")
+
+
+class ScanXmlHelpersTest(SimpleTestCase):
+    """Tests for the scanning project final XML parsing helpers."""
+
+    def test_normalize_case_name_caps(self) -> None:
+        """Are words printed in caps titlecased, keeping acronyms?"""
+        cases = [
+            (
+                "Larry B. MERRITT v. STATE of Florida",
+                "Larry B. Merritt v. State of Florida",
+            ),
+            ("In re ESTATE OF John SMITH", "In re Estate of John Smith"),
+            ("IN RE ESTATE OF John SMITH", "In re Estate of John Smith"),
+            ("Robert LEE v. Bobby COX", "Robert Lee v. Bobby Cox"),
+            ("ACME LLC v. John DOE", "Acme LLC v. John Doe"),
+            ("USA v. ONE 1990 FORD", "USA v. One 1990 Ford"),
+            (
+                "Mary O'BRIEN v. STATE'S ATTORNEY",
+                "Mary O'Brien v. State's Attorney",
+            ),
+            (
+                "Ann SMITH-JONES v. John McDONALD",
+                "Ann Smith-Jones v. John McDonald",
+            ),
+            ("Jane Roe v. Richard Roe", "Jane Roe v. Richard Roe"),
+            ("Mary JONES, JR. v. STATE", "Mary Jones, Jr. v. State"),
+            (
+                "ST. PAUL FIRE & MARINE INS. CO. v. SMITH",
+                "St. Paul Fire & Marine Ins. Co. v. Smith",
+            ),
+            ("MRS. SMITH v. JONES", "Mrs. Smith v. Jones"),
+            ("MR. SMITH v. DR. JONES", "Mr. Smith v. Dr. Jones"),
+            ("MS. SMITH v. ACME CO., LTD.", "Ms. Smith v. Acme Co., Ltd."),
+            (
+                "CITY OF FT. LAUDERDALE v. MT. SINAI",
+                "City of Ft. Lauderdale v. Mt. Sinai",
+            ),
+            ("STATE ex rel. SMITH v. JONES", "State ex rel. Smith v. Jones"),
+            ("STATE EX REL. SMITH v. JONES", "State ex rel. Smith v. Jones"),
+            ("HENRY VIII v. John DOE", "Henry VIII v. John Doe"),
+            ("CIVIL SERVICE v. DOE", "Civil Service v. Doe"),
+            ("Betzaida SANTOS-PAGÁN v. DOE", "Betzaida Santos-Pagán v. Doe"),
+        ]
+        for case_name, expected in cases:
+            with self.subTest(case_name=case_name):
+                self.assertEqual(normalize_case_name_caps(case_name), expected)
+
+    def test_get_case_names(self) -> None:
+        """Is the case name made of the first party on each side?"""
+        cases = [
+            (
+                "<parties><party>Cody Allan KOTRC, Appellant (Defendant),"
+                "</party> <separator>v.</separator> <party>The STATE of "
+                "Wyoming, Appellee (Plaintiff).</party></parties>",
+                "Cody Allan Kotrc v. State of Wyoming",
+                "Cody Allan Kotrc, Appellant (Defendant), v. the State of "
+                "Wyoming, Appellee (Plaintiff)",
+            ),
+            (
+                "<parties><party>Ashton ORR; Zaya Perysian, Plaintiffs,"
+                "</party> <separator>v.</separator> <party>Donald J. TRUMP, "
+                "in the Official Capacity as President; U.S. Department of "
+                "State, Defendants.</party></parties>",
+                "Ashton Orr v. Donald J. Trump",
+                "Ashton Orr; Zaya Perysian, Plaintiffs, v. Donald J. Trump, "
+                "in the Official Capacity as President; U.S. Department of "
+                "State, Defendants",
+            ),
+            (
+                "<parties><party>UNITED STATES of America, Plaintiff,</party>"
+                " <separator>v.</separator> <party>Raef HAMAED, Registered "
+                "Pharmacist (25-1056); Tarek Fakhuri, Defendants.</party>"
+                "</parties>",
+                "United States v. Raef Hamaed",
+                "United States of America, Plaintiff, v. Raef Hamaed, "
+                "Registered Pharmacist (25-1056); Tarek Fakhuri, Defendants",
+            ),
+            (
+                "<parties><party>STATE of Oklahoma, EX REL. OKLAHOMA BAR "
+                "ASSOCIATION, Complainant,</party> <separator>v.</separator> "
+                "<party>Theodore KOSS, Jr., Respondent.</party></parties>",
+                "State of Oklahoma, ex rel. Oklahoma Bar Association v. "
+                "Theodore Koss, Jr.",
+                "State of Oklahoma, ex rel. Oklahoma Bar Association, "
+                "Complainant, v. Theodore Koss, Jr., Respondent",
+            ),
+            (
+                "<casebody><p><party>Julie HALBOWER, TRUSTEE OF HALBOWER "
+                "TRUST, Plaintiff-Appellant,</party> <separator>v.</separator>"
+                " <party>ACME SERVICES, LLC, Defendant.</party></p>"
+                "<opinion><party>Not a caption</party></opinion></casebody>",
+                "Julie Halbower v. Acme Services, LLC",
+                "Julie Halbower, Trustee of Halbower Trust, Plaintiff-"
+                "Appellant, v. Acme Services, LLC, Defendant",
+            ),
+            (
+                "<casebody><p><party><strong>UNITED STATES of America, "
+                "Appellee</strong></party> <separator>v.</separator></p>"
+                "<parties><party><strong>Jonathan JOHNSON, also known as "
+                "Johnathan Johnson, Appellant</strong></party></parties>"
+                "<opinion><p>Text</p></opinion></casebody>",
+                "United States v. Jonathan Johnson",
+                "United States of America, Appellee v. Jonathan Johnson, "
+                "Also Known as Johnathan Johnson, Appellant",
+            ),
+            (
+                "<parties><party>In re ESTATE OF John SMITH</party></parties>",
+                "In re Estate of John Smith",
+                "In re Estate of John Smith",
+            ),
+            ("<casebody/>", "", ""),
+        ]
+        for xml, case_name, case_name_full in cases:
+            with self.subTest(xml=xml):
+                self.assertEqual(
+                    get_case_names(make_soup(xml)), (case_name, case_name_full)
+                )
+
+    def test_get_headmatter(self) -> None:
+        """Is the head matter the elements before the opinions?"""
+        cases = [
+            (
+                "<casebody><citation>1 So. 3d 1</citation>"
+                '<court>A <page-number label="2">*2</page-number>Court'
+                "</court><opinion><p>Text</p></opinion><p>After</p>"
+                "</casebody>",
+                "<headmatter>\n<citation>1 So. 3d 1</citation>\n"
+                '<court>A <page-number label="2">*2</page-number>Court'
+                "</court>\n</headmatter>",
+            ),
+            (
+                "<casebody><citation>1 So. 3d 1</citation>"
+                "<syllabus>Shown from its field</syllabus>"
+                "<opinion><p>Text</p></opinion></casebody>",
+                "<headmatter>\n<citation>1 So. 3d 1</citation>\n</headmatter>",
+            ),
+            ("<casebody><opinion><p>Text</p></opinion></casebody>", ""),
+            ("<court>No casebody</court>", ""),
+        ]
+        for xml, expected in cases:
+            with self.subTest(xml=xml):
+                self.assertEqual(get_headmatter(make_soup(xml)), expected)
+
+    def test_get_precedential_status(self) -> None:
+        """Are opinions with an unpublished reporter or notice unpublished?"""
+        far_notice = "x " * 1500 + "See the unpublished opinion in Doe."
+        cases = [
+            (
+                "<casebody><opinion><p>Text</p></opinion></casebody>",
+                "1 F.4th 1",
+            ),
+            (
+                "<casebody><opinion><p>Text</p></opinion></casebody>",
+                "1 F. App'x 1",
+            ),
+            (
+                "<casebody><heading>NOT PRECEDENTIAL</heading>"
+                "<opinion><p>Text</p></opinion></casebody>",
+                "1 F.4th 1",
+            ),
+            (
+                "<casebody><opinion><p>SUMMARY ORDER</p><p>Rulings by "
+                "summary order do not have precedential effect.</p>"
+                "</opinion></casebody>",
+                "1 F.4th 1",
+            ),
+            (
+                "<casebody><opinion><p>We review the district court's "
+                "summary order de novo.</p></opinion></casebody>",
+                "1 F.4th 1",
+            ),
+            (
+                "<casebody><opinion><p>Not for publication.</p></opinion>"
+                "</casebody>",
+                "1 So. 3d 1",
+            ),
+            (
+                f"<casebody><opinion><p>{far_notice}</p></opinion></casebody>",
+                "1 F.4th 1",
+            ),
+        ]
+        expected = [
+            PRECEDENTIAL_STATUS.PUBLISHED,
+            PRECEDENTIAL_STATUS.UNPUBLISHED,
+            PRECEDENTIAL_STATUS.UNPUBLISHED,
+            PRECEDENTIAL_STATUS.UNPUBLISHED,
+            PRECEDENTIAL_STATUS.PUBLISHED,
+            PRECEDENTIAL_STATUS.UNPUBLISHED,
+            PRECEDENTIAL_STATUS.PUBLISHED,
+        ]
+        for (xml, cite), status in zip(cases, expected, strict=True):
+            with self.subTest(xml=xml[:80], cite=cite):
+                citations = [
+                    c
+                    for c in get_citations(cite)
+                    if isinstance(c, FullCaseCitation)
+                ]
+                self.assertEqual(
+                    get_precedential_status(make_soup(xml), citations), status
+                )
+
+    def test_get_date_filed(self) -> None:
+        """Can we parse complete decision dates and reject partial ones?"""
+        cases = [
+            ("<decisiondate>[May 22, 2024]</decisiondate>", date(2024, 5, 22)),
+            (
+                "<decisiondate>Decided Dec. 18, 2009.</decisiondate>",
+                date(2009, 12, 18),
+            ),
+            (
+                "<decisiondate>Opinion filed Sept. 3, 2024</decisiondate>",
+                date(2024, 9, 3),
+            ),
+            ("<decisiondate>5/22/2024</decisiondate>", date(2024, 5, 22)),
+            (
+                "<decisiondate>May 22, 2024. Rehearing Denied "
+                "June 30, 2024.</decisiondate>",
+                date(2024, 5, 22),
+            ),
+            (
+                "<casebody><decisiondate>[May 22, 2024]</decisiondate>"
+                "<decisiondate>[June 30, 2024]</decisiondate></casebody>",
+                date(2024, 5, 22),
+            ),
+            (
+                "<casebody><decisiondate>Undated</decisiondate>"
+                "<decisiondate>June 30, 2024</decisiondate></casebody>",
+                date(2024, 6, 30),
+            ),
+            (
+                "<decisiondate>Argued Oct. 3, 2023. Decided May 22, "
+                "2024.</decisiondate>",
+                date(2024, 5, 22),
+            ),
+            (
+                "<decisiondate>Rehearing Denied Jan. 5, 2010. Decided "
+                "Dec. 18, 2009</decisiondate>",
+                date(2009, 12, 18),
+            ),
+            (
+                "<decisiondate>Motion for rehearing filed June 5, 2024. "
+                "Decided May 22, 2024.</decisiondate>",
+                date(2024, 5, 22),
+            ),
+            (
+                "<decisiondate>Argued Oct. 3, 2023. Decided on May 22, "
+                "2024.</decisiondate>",
+                date(2024, 5, 22),
+            ),
+            (
+                "<decisiondate>Submitted Oct. 3, 2023 - Decided - May 22, "
+                "2024</decisiondate>",
+                date(2024, 5, 22),
+            ),
+            (
+                "<casebody><decisiondate>Argued Oct. 3, 2023</decisiondate>"
+                "<decisiondate>Decided May 22, 2024</decisiondate>"
+                "</casebody>",
+                date(2024, 5, 22),
+            ),
+            ("<decisiondate>May 2024</decisiondate>", None),
+            ("<decisiondate>2024</decisiondate>", None),
+            ("<decisiondate>Feb. 30, 2024</decisiondate>", None),
+            ("<decisiondate>Not a date</decisiondate>", None),
+            ("<court>No date here</court>", None),
+        ]
+        for xml, expected in cases:
+            with self.subTest(xml=xml):
+                self.assertEqual(get_date_filed(make_soup(xml)), expected)
+
+    def test_get_citation_strings(self) -> None:
+        """Are citations read from the citation elements?"""
+        cases = [
+            (
+                "<casebody><citation>388 So. 3d 7</citation>"
+                "<citation>12 Fla. L. Weekly 3</citation></casebody>",
+                ["388 So. 3d 7", "12 Fla. L. Weekly 3"],
+            ),
+            ("<casebody><citation> </citation></casebody>", []),
+            ('<casebody firstpage="7"></casebody>', []),
+        ]
+        for xml, expected in cases:
+            with self.subTest(xml=xml):
+                self.assertEqual(
+                    get_citation_strings(make_soup(xml)), expected
+                )
+
+    def test_parse_citations(self) -> None:
+        """Are unparsed parts of a citation element logged as errors?"""
+        cases = [
+            (["388 So. 3d 1, 2024 WL 2312345"], 2, None),
+            (["578 P.3d 40 (Wyo. 2025)"], 1, None),
+            (["388 So. 3d 1, 5 Foo. Rptr. 9"], 1, "5 Foo. Rptr. 9"),
+            (["5 Foo. Rptr. 9"], 0, "5 Foo. Rptr. 9"),
+        ]
+        for cite_strings, count, unparsed in cases:
+            with (
+                self.subTest(cite_strings=cite_strings),
+                mock.patch(f"{COMMAND_MODULE}.logger") as mock_logger,
+            ):
+                cites = parse_citations(cite_strings, "scan.xml")
+
+                self.assertEqual(len(cites), count)
+                if unparsed is None:
+                    mock_logger.error.assert_not_called()
+                else:
+                    self.assertEqual(
+                        mock_logger.error.call_args.args[-1], unparsed
+                    )
+
+    def test_get_docket_number(self) -> None:
+        """Is the printed "No." prefix removed from docket numbers?"""
+        cases = [
+            ("<docketnumber>No. 4D2023-2459.</docketnumber>", "4D2023-2459"),
+            (
+                "<docketnumber>Nos. 1D22-1, 1D22-2</docketnumber>",
+                "1D22-1, 1D22-2",
+            ),
+            ("<docketnumber>Case No. SC2024-1</docketnumber>", "SC2024-1"),
+            ("<docketnumber>NOV-123</docketnumber>", "NOV-123"),
+            (
+                "<casebody><docketnumber>No. 1</docketnumber>"
+                "<docketnumber>No. 2</docketnumber></casebody>",
+                "1; 2",
+            ),
+            ("<casebody/>", ""),
+        ]
+        for xml, expected in cases:
+            with self.subTest(xml=xml):
+                self.assertEqual(get_docket_number(make_soup(xml)), expected)
+
+    def test_make_opinion(self) -> None:
+        """Are the author, per curiam and type read from the opinion?"""
+        cases = [
+            (
+                "<opinion><author>Gerber, J.</author></opinion>",
+                "Gerber",
+                False,
+                Opinion.COMBINED,
+            ),
+            (
+                "<opinion><author>PER CURIAM.</author></opinion>",
+                "Per Curiam",
+                True,
+                Opinion.COMBINED,
+            ),
+            (
+                "<opinion><author>Per Curiam:</author></opinion>",
+                "Per Curiam",
+                True,
+                Opinion.COMBINED,
+            ),
+            (
+                '<opinion type="dissent"><author>WARNER, J.</author></opinion>',
+                "Warner",
+                False,
+                Opinion.DISSENT,
+            ),
+            (
+                "<opinion><author>Klein and Stone, JJ.</author></opinion>",
+                "Klein, Stone",
+                False,
+                Opinion.COMBINED,
+            ),
+            (
+                "<opinion><p>No author.</p></opinion>",
+                "",
+                False,
+                Opinion.COMBINED,
+            ),
+        ]
+        for xml, author_str, per_curiam, op_type in cases:
+            with self.subTest(xml=xml):
+                op = make_soup(xml).select_one("opinion")
+                if op is None:
+                    self.fail(f"No opinion in {xml}")
+                opinion = make_opinion(op, cluster_id=1)
+                self.assertEqual(opinion.author_str, author_str)
+                self.assertEqual(opinion.per_curiam, per_curiam)
+                self.assertEqual(opinion.type, op_type)
+                self.assertEqual(opinion.xml_scan, xml)
+
+
+class ImportScannedOpinionsTest(TestCase):
+    """Tests for the import_scanned_opinions command."""
+
+    @classmethod
+    def setUpTestData(cls) -> None:
+        cls.court = CourtFactory.create(
+            id="fladistctapp4", jurisdiction=Court.STATE_APPELLATE
+        )
+        with open(SCAN_XML_PATH, encoding="utf-8") as f:
+            opinion = make_soup(f.read()).select_one("opinion")
+        if opinion is None:
+            raise ValueError("The test XML must have an opinion")
+        cls.opinion_text = opinion.get_text(" ")
+        with open(SCAN_XML_PATH, encoding="utf-8") as f:
+            cls.scan_xml = f.read()
+
+    def import_scan(self, **kwargs: str | bool | None) -> None:
+        """Run the command over the test XML."""
+        options = {"court_id": self.court.pk, "path": SCAN_XML_PATH} | kwargs
+        call_command("import_scanned_opinions", **options)
+
+    def import_xml(self, xml: str, **kwargs: str | bool | None) -> None:
+        """Run the command over an XML written to a temporary directory."""
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            Path(tmp_dir, "scan.xml").write_text(xml, encoding="utf-8")
+            self.import_scan(path=tmp_dir, **kwargs)
+
+    def make_matching_cluster(self, opinion_count: int = 1) -> OpinionCluster:
+        """Make a court website cluster that matches the test XML."""
+        docket = DocketFactory.create(
+            court=self.court,
+            source=Docket.SCRAPER,
+            docket_number="4D2023-2459",
+            case_name="Merritt v. State",
+        )
+        cluster = OpinionClusterFactory.create(
+            docket=docket,
+            case_name="Merritt v. State",
+            date_filed=date(2024, 5, 22),
+            source=ClusterSources.COURT_WEBSITE,
+            attorneys="",
+            judges="",
+        )
+        Citation.objects.create(
+            cluster=cluster,
+            volume=388,
+            reporter="So. 3d",
+            page="1",
+            type=Citation.STATE_REGIONAL,
+        )
+        OpinionFactory.create_batch(
+            opinion_count,
+            cluster=cluster,
+            plain_text=self.opinion_text,
+            html="",
+        )
+        return cluster
+
+    def test_import_new_case(self) -> None:
+        """Does a new scanned opinion create its docket, cluster and opinion?"""
+        self.import_scan()
+
+        cluster = OpinionCluster.objects.get()
+        self.assertEqual(
+            cluster.case_name, "Larry B. Merritt v. State of Florida"
+        )
+        self.assertEqual(cluster.source, ClusterSources.SCANNING_PROJECT)
+        self.assertEqual(cluster.date_filed, date(2024, 5, 22))
+        self.assertIn("pro se", cluster.attorneys)
+        self.assertIn("Reversed and remanded", cluster.disposition)
+        self.assertIn("Palm Beach County", cluster.history)
+        self.assertIn("Gerber", cluster.judges)
+        self.assertRegex(
+            cluster.filepath_xml_scan.name,
+            r"/3593-12-388-so-3d-1(_[A-Za-z0-9]+)?\.xml$",
+        )
+        self.assertTrue(cluster.headmatter.startswith("<headmatter>"))
+        self.assertIn("<docketnumber>", cluster.headmatter)
+        self.assertIn("pro se", cluster.headmatter)
+        self.assertNotIn("<opinion", cluster.headmatter)
+
+        docket = cluster.docket
+        self.assertEqual(docket.source, Docket.SCANNING_PROJECT)
+        self.assertEqual(docket.court_id, self.court.pk)
+        self.assertEqual(docket.docket_number, "4D2023-2459")
+        # Without the printed "No.", which docket_number_core can't parse
+        self.assertEqual(docket.docket_number_raw, "4D2023-2459")
+
+        citation = Citation.objects.get(cluster=cluster)
+        self.assertEqual(
+            (citation.volume, citation.reporter, citation.page),
+            ("388", "So. 3d", "1"),
+        )
+
+        opinion = Opinion.objects.get(cluster=cluster)
+        self.assertTrue(opinion.xml_scan.startswith("<opinion>"))
+        self.assertIn("confession of error", opinion.xml_scan)
+        self.assertEqual(opinion.author_str, "Gerber")
+        self.assertEqual(opinion.type, Opinion.COMBINED)
+        self.assertTrue(opinion.extracted_by_ocr)
+
+        content = OpinionContent.objects.get(opinion=opinion)
+        self.assertEqual(content.content, opinion.xml_scan)
+        self.assertEqual(content.source, OpinionContent.FLP_SCANNING)
+        self.assertEqual(content.extraction_type, OpinionContent.OCR)
+        self.assertTrue(content.is_main_version)
+        self.assertEqual(len(content.sha1), 40)
+        self.assertEqual(content.page_count, 4)
+
+    def make_judges(self) -> dict[str, Person]:
+        """Make the judges named in the test XML, sitting in its court."""
+        judges = {}
+        for last_name in ["Gerber", "Conner", "Forst"]:
+            judges[last_name] = PersonFactory.create(
+                name_last=last_name, date_dob=None, date_dod=None
+            )
+            PositionFactory.create(
+                person=judges[last_name],
+                court=self.court,
+                date_start=date(2010, 1, 1),
+                date_granularity_start=GRANULARITY_DAY,
+            )
+        return judges
+
+    def test_judges_are_linked(self) -> None:
+        """Are the author and the panel linked to people in the court?"""
+        judges = self.make_judges()
+
+        self.import_scan()
+
+        cluster = OpinionCluster.objects.get()
+        self.assertEqual(cluster.sub_opinions.get().author, judges["Gerber"])
+        self.assertEqual(set(cluster.panel.all()), set(judges.values()))
+
+    def test_logs_the_cluster_url(self) -> None:
+        """Is the full URL of the new cluster logged?"""
+        with mock.patch(f"{COMMAND_MODULE}.logger") as mock_logger:
+            self.import_scan()
+
+        cluster = OpinionCluster.objects.get()
+        message, *args = mock_logger.info.call_args[0]
+        self.assertIn(
+            f"{BASE_URL}{cluster.get_absolute_url()}", message % tuple(args)
+        )
+
+    def test_unpublished_scan(self) -> None:
+        """Is a scan with an unpublished notice imported as unpublished?"""
+        xml = self.scan_xml.replace(
+            "<court>", "<heading>NOT FOR PUBLICATION</heading><court>", 1
+        )
+
+        self.import_xml(xml)
+
+        self.assertEqual(
+            OpinionCluster.objects.get().precedential_status,
+            PRECEDENTIAL_STATUS.UNPUBLISHED,
+        )
+
+    def test_syllabus_is_not_in_the_headmatter(self) -> None:
+        """Is the syllabus stored in its field and not in the head matter?"""
+        xml = self.scan_xml.replace(
+            "<court>", "<syllabus>The syllabus.</syllabus><court>", 1
+        )
+
+        self.import_xml(xml)
+
+        cluster = OpinionCluster.objects.get()
+        self.assertIn("The syllabus.", cluster.syllabus)
+        self.assertNotIn("syllabus", cluster.headmatter)
+
+    def test_merge_links_the_judges_it_fills(self) -> None:
+        """Are the judges a merge fills in linked, keeping set authors?"""
+        judges = self.make_judges()
+        cluster = self.make_matching_cluster()
+        opinion = cluster.sub_opinions.get()
+        author = opinion.author
+
+        self.import_scan()
+
+        cluster.refresh_from_db()
+        opinion.refresh_from_db()
+        self.assertEqual(set(cluster.panel.all()), set(judges.values()))
+        self.assertEqual(opinion.author, author)
+
+        other = self.make_matching_cluster()
+        OpinionCluster.objects.filter(pk=other.pk).update(judges="Klein")
+        cluster.delete()
+        self.import_scan()
+
+        other.refresh_from_db()
+        self.assertFalse(other.panel.exists())
+
+    def test_reimport_is_skipped(self) -> None:
+        """Is an already imported scanned opinion skipped?"""
+        self.import_scan()
+        self.import_scan()
+        self.assertEqual(OpinionCluster.objects.count(), 1)
+        self.assertEqual(Opinion.objects.count(), 1)
+
+    def test_merge_into_existing_cluster(self) -> None:
+        """Is a scanned opinion merged into a matching cluster?"""
+        cluster = self.make_matching_cluster()
+
+        self.import_scan()
+
+        self.assertEqual(OpinionCluster.objects.count(), 1)
+        self.assertEqual(Opinion.objects.count(), 1)
+        self.assertEqual(Citation.objects.count(), 1)
+        cluster.refresh_from_db()
+        self.assertEqual(
+            cluster.source,
+            ClusterSources.merge_sources(
+                ClusterSources.COURT_WEBSITE, ClusterSources.SCANNING_PROJECT
+            ),
+        )
+        self.assertTrue(cluster.headmatter.startswith("<headmatter>"))
+        self.assertIn("pro se", cluster.attorneys)
+        self.assertIn("Gerber", cluster.judges)
+        self.assertRegex(
+            cluster.filepath_xml_scan.name,
+            r"/3593-12-388-so-3d-1(_[A-Za-z0-9]+)?\.xml$",
+        )
+        self.assertEqual(
+            cluster.docket.source, Docket.SCRAPER_AND_SCANNING_PROJECT
+        )
+        opinion = cluster.sub_opinions.get()
+        self.assertIn("confession of error", opinion.xml_scan)
+        content = OpinionContent.objects.get(opinion=opinion)
+        self.assertEqual(content.content, opinion.xml_scan)
+        # The scan is richer than the court website text
+        self.assertTrue(content.is_main_version)
+
+    def test_discarded_match_is_logged(self) -> None:
+        """Is a candidate cluster that doesn't match logged with the reason?"""
+        cluster = self.make_matching_cluster()
+        OpinionCluster.objects.filter(pk=cluster.pk).update(
+            case_name="Johnson v. Department of Revenue"
+        )
+
+        with mock.patch("cl.corpus_importer.utils.logger") as mock_logger:
+            self.import_scan()
+
+        self.assertEqual(OpinionCluster.objects.count(), 2)
+        self.assertIn(
+            ("Cluster %s is not a match: the %s check failed", cluster.pk),
+            [call.args[:2] for call in mock_logger.debug.call_args_list],
+        )
+
+    def test_merge_sets_unknown_precedential_status(self) -> None:
+        """Is only an unknown precedential status set from the scan?"""
+        xml = self.scan_xml.replace(
+            "<court>", "<heading>NOT FOR PUBLICATION</heading><court>", 1
+        )
+        for current, expected in [
+            (PRECEDENTIAL_STATUS.UNKNOWN, PRECEDENTIAL_STATUS.UNPUBLISHED),
+            (PRECEDENTIAL_STATUS.PUBLISHED, PRECEDENTIAL_STATUS.PUBLISHED),
+        ]:
+            with self.subTest(current=current), transaction.atomic():
+                cluster = self.make_matching_cluster()
+                OpinionCluster.objects.filter(pk=cluster.pk).update(
+                    precedential_status=current
+                )
+                self.import_xml(xml)
+
+                cluster.refresh_from_db()
+                self.assertEqual(cluster.precedential_status, expected)
+                transaction.set_rollback(True)
+
+    def test_merge_logs_differing_metadata(self) -> None:
+        """Are cluster values that differ from the scan kept and logged?"""
+        cluster = self.make_matching_cluster()
+        OpinionCluster.objects.filter(pk=cluster.pk).update(
+            judges="Klein", headmatter="<p>Harvard head matter</p>"
+        )
+
+        with mock.patch(f"{COMMAND_MODULE}.logger") as mock_logger:
+            self.import_scan()
+
+        cluster.refresh_from_db()
+        self.assertEqual(cluster.judges, "Klein")
+        self.assertEqual(cluster.headmatter, "<p>Harvard head matter</p>")
+        self.assertIn(
+            "judges",
+            [call.args[2] for call in mock_logger.debug.call_args_list],
+        )
+
+    def test_merge_replaces_the_main_version(self) -> None:
+        """Does the scan become the only main version of the opinion?"""
+        cluster = self.make_matching_cluster()
+        opinion = cluster.sub_opinions.get()
+        previous = OpinionContent.objects.create(
+            opinion=opinion,
+            content="<p>Scraped text</p>",
+            source=OpinionContent.SCRAPERS,
+            extraction_type=OpinionContent.DEFAULT,
+            is_main_version=True,
+            sha1=sha1("<p>Scraped text</p>"),
+        )
+
+        self.import_scan()
+
+        previous.refresh_from_db()
+        self.assertFalse(previous.is_main_version)
+        self.assertEqual(
+            OpinionContent.objects.get(is_main_version=True).source,
+            OpinionContent.FLP_SCANNING,
+        )
+
+    def test_merge_ignores_opinion_versions(self) -> None:
+        """Is the scan merged into the main opinion, ignoring its versions?"""
+        cluster = self.make_matching_cluster()
+        main_opinion = cluster.sub_opinions.get()
+        version = OpinionFactory.create(
+            cluster=cluster,
+            plain_text=self.opinion_text,
+            html="",
+            main_version=main_opinion,
+        )
+
+        self.import_scan()
+
+        main_opinion.refresh_from_db()
+        version.refresh_from_db()
+        self.assertIn("confession of error", main_opinion.xml_scan)
+        self.assertEqual(version.xml_scan, "")
+        self.assertEqual(
+            list(OpinionContent.objects.values_list("opinion_id", flat=True)),
+            [main_opinion.pk],
+        )
+
+    def test_merge_skipped_when_opinions_cant_be_paired(self) -> None:
+        """Is nothing merged when the opinions can't be paired?"""
+        cluster = self.make_matching_cluster(opinion_count=2)
+        source = cluster.source
+        docket_source = cluster.docket.source
+
+        for dry_run in [True, False]:
+            with (
+                self.subTest(dry_run=dry_run),
+                mock.patch(f"{COMMAND_MODULE}.logger") as mock_logger,
+            ):
+                self.import_scan(dry_run=dry_run)
+
+                cluster.refresh_from_db()
+                self.assertFalse(cluster.filepath_xml_scan)
+                self.assertEqual(cluster.source, source)
+                self.assertEqual(cluster.attorneys, "")
+                self.assertEqual(cluster.docket.source, docket_source)
+                self.assertFalse(
+                    cluster.sub_opinions.exclude(xml_scan="").exists()
+                )
+                self.assertFalse(OpinionContent.objects.exists())
+                self.assertIn(
+                    "can't be paired", mock_logger.warning.call_args[0][0]
+                )
+
+    def test_import_multiple_opinions(self) -> None:
+        """Is each opinion element imported as an opinion with its type?"""
+        xml = self.scan_xml.replace(
+            "</opinion>",
+            '</opinion><opinion type="dissent"><author>WARNER, J.</author>'
+            "<p>I respectfully dissent.</p></opinion>",
+        )
+
+        self.import_xml(xml)
+
+        opinions = Opinion.objects.order_by("pk")
+        self.assertEqual(
+            [(o.type, o.author_str) for o in opinions],
+            [(Opinion.COMBINED, "Gerber"), (Opinion.DISSENT, "Warner")],
+        )
+
+    def test_reuse_existing_docket(self) -> None:
+        """Is an existing docket without a matching cluster reused?"""
+        docket = DocketFactory.create(
+            court=self.court,
+            source=Docket.SCRAPER,
+            docket_number="4D2023-2459",
+            docket_number_raw="4D2023-2459",
+            case_name="Merritt v. State",
+        )
+
+        self.import_scan()
+
+        self.assertEqual(Docket.objects.count(), 1)
+        docket.refresh_from_db()
+        self.assertEqual(docket.source, Docket.SCRAPER_AND_SCANNING_PROJECT)
+        self.assertEqual(OpinionCluster.objects.get().docket_id, docket.pk)
+
+    def test_reimport_is_found_by_scan_ids(self) -> None:
+        """Is a scanned opinion found by its ids even if its text changed?"""
+        self.import_scan()
+        xml = self.scan_xml.replace("confession of error", "confession")
+        with mock.patch(f"{COMMAND_MODULE}.logger") as mock_logger:
+            self.import_xml(xml)
+
+        self.assertEqual(OpinionCluster.objects.count(), 1)
+        self.assertIn("already imported", mock_logger.info.call_args[0][0])
+
+    def test_reuse_docket_of_a_scan(self) -> None:
+        """Does another opinion of a scanned case reuse the scan's docket?"""
+        self.import_scan()
+        xml = (
+            self.scan_xml.replace("388 So. 3d 1<", "388 So. 3d 9<")
+            .replace('opinion-id="12"', 'opinion-id="13"')
+            .replace("confession of error", "motion for rehearing")
+        )
+        with mock.patch(
+            f"{COMMAND_MODULE}.find_existing_cluster", return_value=None
+        ):
+            self.import_xml(xml)
+
+        self.assertEqual(OpinionCluster.objects.count(), 2)
+        self.assertEqual(Docket.objects.count(), 1)
+
+    def test_scan_from_another_reporter_is_not_duplicated(self) -> None:
+        """Is a scan matching a cluster that already has scan XML skipped?"""
+        self.import_scan()
+        xml = (
+            self.scan_xml.replace("388 So. 3d 1", "49 Fla. L. Weekly D1100")
+            .replace('scan-id="3593"', 'scan-id="4000"')
+            .replace('opinion-id="12"', 'opinion-id="1"')
+        )
+        with mock.patch(f"{COMMAND_MODULE}.logger") as mock_logger:
+            self.import_xml(xml)
+
+        self.assertEqual(OpinionCluster.objects.count(), 1)
+        self.assertIn(
+            "which already has scan XML", mock_logger.warning.call_args[0][0]
+        )
+
+    def test_same_opinion_text_in_other_cases_is_imported(self) -> None:
+        """Are cases with identical boilerplate opinions all imported?"""
+        xml = """<?xml version="1.0" encoding="utf-8"?>
+<casebody firstpage="{page}" lastpage="{page}" scan-id="1" opinion-id="{page}"
+  schema="1">
+  <citation>388 So. 3d {page}</citation>
+  <parties><party>John {name}, Appellant,</party> <separator>v.</separator>
+  <party>STATE of Florida, Appellee.</party></parties>
+  <docketnumber>No. {docket_number}</docketnumber>
+  <court>District Court of Appeal of Florida, Fourth District.</court>
+  <decisiondate>[May 22, 2024]</decisiondate>
+  <opinion><author>PER CURIAM.</author><p>Affirmed.</p></opinion>
+</casebody>"""
+        self.import_xml(
+            xml.format(page="5", name="DOE", docket_number="4D2023-1111")
+        )
+        self.import_xml(
+            xml.format(page="6", name="ROE", docket_number="4D2023-2222")
+        )
+
+        self.assertEqual(
+            sorted(
+                OpinionCluster.objects.values_list(
+                    "docket__docket_number", flat=True
+                )
+            ),
+            ["4D2023-1111", "4D2023-2222"],
+        )
+
+    def test_opinions_without_docket_numbers_on_same_page(self) -> None:
+        """Are two docket-less opinions on a page with similar names kept?"""
+        xml = """<?xml version="1.0" encoding="utf-8"?>
+<casebody firstpage="1" lastpage="1" scan-id="1" opinion-id="{name}"
+  schema="1">
+  <citation>388 So. 3d 1</citation>
+  <parties><party>STATE of Florida, Appellant,</party>
+  <separator>v.</separator> <party>John {name}, Appellee.</party></parties>
+  <court>District Court of Appeal of Florida, Fourth District.</court>
+  <decisiondate>[May 22, 2024]</decisiondate>
+  <opinion><author>PER CURIAM.</author><p>{text}</p></opinion>
+</casebody>"""
+        self.import_xml(xml.format(name="SMITH", text="Affirmed."))
+        self.import_xml(
+            xml.format(name="SMITHSON", text="Reversed and remanded.")
+        )
+
+        self.assertEqual(
+            sorted(OpinionCluster.objects.values_list("case_name", flat=True)),
+            [
+                "State of Florida v. John Smith",
+                "State of Florida v. John Smithson",
+            ],
+        )
+
+    def test_parallel_citations_are_saved(self) -> None:
+        """Is every citation of a citation element saved?"""
+        xml = self.scan_xml.replace(
+            "388 So. 3d 1<", "388 So. 3d 1, 2024 WL 2312345<"
+        )
+
+        self.import_xml(xml)
+
+        self.assertEqual(
+            sorted(Citation.objects.values_list("volume", "reporter", "page")),
+            [("2024", "WL", "2312345"), ("388", "So. 3d", "1")],
+        )
+
+    def test_unrelated_docket_with_same_number_is_not_reused(self) -> None:
+        """Is a new docket made when the docket number's case differs?"""
+        docket = DocketFactory.create(
+            court=self.court,
+            source=Docket.SCRAPER,
+            docket_number="4D2023-2459",
+            docket_number_raw="4D2023-2459",
+            case_name="Johnson v. Department of Revenue",
+        )
+
+        self.import_scan()
+
+        self.assertEqual(Docket.objects.count(), 2)
+        docket.refresh_from_db()
+        self.assertEqual(docket.source, Docket.SCRAPER)
+        self.assertNotEqual(OpinionCluster.objects.get().docket_id, docket.pk)
+
+    def test_dry_run(self) -> None:
+        """Does a dry run leave the database and storage untouched?"""
+        cluster = self.make_matching_cluster()
+        for message, setup in [
+            ("would merge", lambda: None),
+            ("would add", cluster.delete),
+        ]:
+            with (
+                self.subTest(message=message),
+                mock.patch(f"{COMMAND_MODULE}.logger") as mock_logger,
+                mock.patch.object(FieldFile, "save") as mock_file_save,
+            ):
+                setup()
+                before = self.database_rows()
+                self.import_scan(dry_run=True)
+
+                mock_file_save.assert_not_called()
+                self.assertEqual(self.database_rows(), before)
+                self.assertIn(message, mock_logger.info.call_args[0][0])
+
+    def database_rows(self) -> dict[str, list[tuple]]:
+        """Snapshot the rows an import can create or change."""
+        return {
+            "dockets": list(
+                Docket.objects.order_by("pk").values_list(
+                    "pk", "source", "case_name"
+                )
+            ),
+            "clusters": list(
+                OpinionCluster.objects.order_by("pk").values_list(
+                    "pk", "source", "attorneys", "judges", "filepath_xml_scan"
+                )
+            ),
+            "citations": list(
+                Citation.objects.order_by("pk").values_list(
+                    "cluster_id", "volume", "reporter", "page"
+                )
+            ),
+            "opinions": list(
+                Opinion.objects.order_by("pk").values_list("pk", "xml_scan")
+            ),
+            "contents": list(
+                OpinionContent.objects.order_by("pk").values_list("pk")
+            ),
+        }
+
+    def test_other_opinion_on_same_page_is_imported(self) -> None:
+        """Is a different case with the same citation imported?"""
+        self.import_scan()
+        xml = """<?xml version="1.0" encoding="utf-8"?>
+<casebody firstpage="1" lastpage="1" scan-id="3593" opinion-id="13"
+  schema="1">
+  <citation>388 So. 3d 1</citation>
+  <parties><party>John DOEWELL, Appellant,</party> <separator>v.</separator>
+  <party>STATE of Florida, Appellee.</party></parties>
+  <docketnumber>No. 4D2023-9999</docketnumber>
+  <court>District Court of Appeal of Florida, Fourth District.</court>
+  <decisiondate>[May 22, 2024]</decisiondate>
+  <opinion><author>PER CURIAM.</author><p>Affirmed.</p></opinion>
+</casebody>"""
+        self.import_xml(xml)
+
+        self.assertEqual(OpinionCluster.objects.count(), 2)
+        new_cluster = OpinionCluster.objects.get(
+            docket__docket_number="4D2023-9999"
+        )
+        self.assertEqual(
+            new_cluster.case_name, "John Doewell v. State of Florida"
+        )
+        self.assertTrue(
+            Citation.objects.filter(
+                cluster=new_cluster, volume="388", reporter="So. 3d", page="1"
+            ).exists()
+        )
+
+    def test_failed_import_is_rolled_back(self) -> None:
+        """Is a failed import rolled back without uploading the XML?"""
+        with (
+            mock.patch(
+                f"{COMMAND_MODULE}.make_opinion",
+                side_effect=ValueError("boom"),
+            ),
+            mock.patch(f"{COMMAND_MODULE}.logger") as mock_logger,
+            mock.patch.object(FieldFile, "save") as mock_file_save,
+        ):
+            self.import_scan()
+
+        self.assertEqual(OpinionCluster.objects.count(), 0)
+        self.assertEqual(Docket.objects.count(), 0)
+        mock_file_save.assert_not_called()
+        mock_logger.exception.assert_called_once()
+
+    def test_failed_xml_path_save_deletes_the_upload(self) -> None:
+        """Is the uploaded XML deleted when saving its path fails?"""
+        cluster_save = OpinionCluster.save
+
+        def fail_path_save(cluster, *args, **kwargs):
+            if kwargs.get("update_fields") == ["filepath_xml_scan"]:
+                raise ValueError("boom")
+            return cluster_save(cluster, *args, **kwargs)
+
+        with (
+            mock.patch.object(
+                OpinionCluster,
+                "save",
+                autospec=True,
+                side_effect=fail_path_save,
+            ),
+            mock.patch(f"{COMMAND_MODULE}.logger") as mock_logger,
+            mock.patch.object(FieldFile, "save") as mock_file_save,
+            mock.patch.object(FieldFile, "delete") as mock_file_delete,
+        ):
+            self.import_scan()
+
+        self.assertEqual(OpinionCluster.objects.count(), 0)
+        mock_file_save.assert_called_once()
+        mock_file_delete.assert_called_once_with(save=False)
+        mock_logger.exception.assert_called_once()
+
+    def test_failed_file_does_not_stop_the_run(self) -> None:
+        """Does the command continue with the next file after a failure?"""
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            for name in ["1.xml", "2.xml"]:
+                Path(tmp_dir, name).write_text("<casebody/>", encoding="utf-8")
+            with (
+                mock.patch(
+                    f"{COMMAND_MODULE}.parse_scan_xml",
+                    side_effect=[ValueError("boom"), None],
+                ) as mock_parse,
+                mock.patch(f"{COMMAND_MODULE}.logger") as mock_logger,
+            ):
+                self.import_scan(path=tmp_dir)
+
+        self.assertEqual(mock_parse.call_count, 2)
+        mock_logger.exception.assert_called_once()
+
+    def test_court_lookup(self) -> None:
+        """Is the court found from the court element when not given?"""
+        self.import_scan(court_id=None)
+        self.assertEqual(
+            OpinionCluster.objects.get().docket.court_id, self.court.pk
+        )
+
+    def test_skip_invalid_files(self) -> None:
+        """Are files lacking required data skipped with a warning?"""
+        cases = [
+            (
+                "No valid citation",
+                self.scan_xml.replace("<citation>388 So. 3d 1</citation>", ""),
+                self.court.pk,
+            ),
+            (
+                "No parties",
+                re.sub(r"<parties>.*?</parties>", "", self.scan_xml),
+                self.court.pk,
+            ),
+            (
+                "No opinion",
+                re.sub(
+                    r"<opinion>.*</opinion>", "", self.scan_xml, flags=re.S
+                ),
+                self.court.pk,
+            ),
+            (
+                "Can't parse date",
+                self.scan_xml.replace("[May 22, 2024]", "Undated"),
+                self.court.pk,
+            ),
+            (
+                "Court not found",
+                self.scan_xml.replace("Fourth District", "Tenth Circuit"),
+                None,
+            ),
+            (
+                "Unsupported schema",
+                self.scan_xml.replace('schema="1"', 'schema="99"'),
+                self.court.pk,
+            ),
+            (
+                "Unsupported schema",
+                self.scan_xml.replace(' schema="1"', ""),
+                self.court.pk,
+            ),
+            (
+                "Missing scan-id or opinion-id",
+                self.scan_xml.replace(' opinion-id="12"', ""),
+                self.court.pk,
+            ),
+        ]
+        for message, xml, court_id in cases:
+            with (
+                self.subTest(message=message),
+                mock.patch(f"{COMMAND_MODULE}.logger") as mock_logger,
+            ):
+                self.import_xml(xml, court_id=court_id)
+                self.assertEqual(OpinionCluster.objects.count(), 0)
+                self.assertIn(message, mock_logger.warning.call_args[0][0])
+
+
+class FakeScanningStorage:
+    """An in-memory stand-in for the scanning portal's bucket."""
+
+    def __init__(self, files: dict[str, str]) -> None:
+        self.files = files
+
+    def listdir(self, path: str) -> tuple[list[str], list[str]]:
+        dirs, names = set(), []
+        for key in self.files:
+            if not key.startswith(path):
+                continue
+            rest = key[len(path) :]
+            if "/" in rest:
+                dirs.add(rest.split("/", 1)[0])
+            else:
+                names.append(rest)
+        return sorted(dirs), names
+
+    def open(self, key: str):
+        if key not in self.files:
+            raise FileNotFoundError(key)
+        return io.BytesIO(self.files[key].encode())
+
+
+class ScanningFinalXmlStorageTest(SimpleTestCase):
+    """Tests for the credentials of the scanning portal's bucket."""
+
+    @override_settings(
+        SCANNING_AWS_ACCESS_KEY_ID="AKIASCANNING",
+        SCANNING_AWS_SECRET_ACCESS_KEY="secret",
+    )
+    @mock.patch.dict(os.environ, {"AWS_SESSION_TOKEN": "default-session"})
+    def test_own_keys_skip_the_session_token(self) -> None:
+        """Is the default keys' session token left out with the bucket's keys?"""
+        storage = ScanningFinalXmlStorage()
+
+        self.assertEqual(storage.access_key, "AKIASCANNING")
+        self.assertIsNone(storage.security_token)
+
+    @override_settings(SCANNING_AWS_ACCESS_KEY_ID="")
+    @mock.patch.dict(os.environ, {"AWS_SESSION_TOKEN": "default-session"})
+    def test_default_keys_keep_the_session_token(self) -> None:
+        """Is the session token kept when the default keys are used?"""
+        self.assertEqual(
+            ScanningFinalXmlStorage().security_token, "default-session"
+        )
+
+
+class ScanningBucketKeysTest(SimpleTestCase):
+    """Tests for listing the final XML keys of the scanning bucket."""
+
+    storage = cast(
+        ScanningFinalXmlStorage,
+        FakeScanningStorage(
+            {
+                "export/15343/3.xml": "",
+                "export/15343/10.xml": "",
+                "export/15343/notes.txt": "",
+                "export/9/1.xml": "",
+            }
+        ),
+    )
+
+    def test_keys_of_scans(self) -> None:
+        """Are the XML keys of the given scans listed in human order?"""
+        self.assertEqual(
+            s3_xml_keys(self.storage, ["15343"]),
+            ["export/15343/3.xml", "export/15343/10.xml"],
+        )
+
+    def test_keys_of_every_scan(self) -> None:
+        """Are the keys of every scan listed when no scan is given?"""
+        self.assertEqual(
+            s3_xml_keys(self.storage, None),
+            [
+                "export/9/1.xml",
+                "export/15343/3.xml",
+                "export/15343/10.xml",
+            ],
+        )
+
+    def test_key_of_one_opinion(self) -> None:
+        """Is a single opinion's key built from the two ids?"""
+        self.assertEqual(
+            s3_xml_keys(self.storage, ["15343"], "3"),
+            ["export/15343/3.xml"],
+        )
+
+
+class ImportFromScanningBucketTest(TestCase):
+    """Tests for importing the final XML from the scanning bucket."""
+
+    @classmethod
+    def setUpTestData(cls) -> None:
+        cls.court = CourtFactory.create(
+            id="fladistctapp4", jurisdiction=Court.STATE_APPELLATE
+        )
+        with open(SCAN_XML_PATH, encoding="utf-8") as f:
+            cls.scan_xml = f.read()
+
+    def import_from_bucket(
+        self, files: dict[str, str], **options: object
+    ) -> None:
+        """Run the command over a fake scanning bucket."""
+        with mock.patch(
+            f"{COMMAND_MODULE}.ScanningFinalXmlStorage",
+            return_value=FakeScanningStorage(files),
+        ):
+            call_command(
+                "import_scanned_opinions", court_id=self.court.pk, **options
+            )
+
+    def test_import_scan(self) -> None:
+        """Is the XML of a scan imported from the bucket?"""
+        self.import_from_bucket(
+            {"export/3593/12.xml": self.scan_xml}, scan_id=["3593"]
+        )
+        cluster = OpinionCluster.objects.get()
+        self.assertEqual(
+            cluster.case_name, "Larry B. Merritt v. State of Florida"
+        )
+        self.assertEqual(cluster.sub_opinions.count(), 1)
+
+    def test_import_every_scan(self) -> None:
+        """Does --all import the XML of every scan?"""
+        self.import_from_bucket(
+            {"export/3593/12.xml": self.scan_xml}, all=True
+        )
+        self.assertEqual(OpinionCluster.objects.count(), 1)
+
+    def test_import_one_opinion(self) -> None:
+        """Does --opinion-id import that opinion alone?"""
+        other = self.scan_xml.replace("388 So. 3d 1<", "388 So. 3d 9<")
+        self.import_from_bucket(
+            {
+                "export/3593/12.xml": self.scan_xml,
+                "export/3593/13.xml": other,
+            },
+            scan_id=["3593"],
+            opinion_id="12",
+        )
+        self.assertEqual(
+            OpinionCluster.objects.get().citations.get().page, "1"
+        )
+
+    def test_opinion_id_needs_one_scan(self) -> None:
+        """Is --opinion-id refused without exactly one --scan-id?"""
+        for options in [
+            {"all": True, "opinion_id": "12"},
+            {"scan_id": ["1", "2"], "opinion_id": "12"},
+        ]:
+            with self.subTest(options=options):
+                with self.assertRaises(CommandError):
+                    self.import_from_bucket({}, **options)
+
+    def test_failed_read_does_not_stop_the_run(self) -> None:
+        """Does a missing key log the failure and leave the run going?"""
+        with mock.patch(f"{COMMAND_MODULE}.logger") as mock_logger:
+            self.import_from_bucket(
+                {"export/3593/13.xml": self.scan_xml},
+                scan_id=["3593"],
+                opinion_id="12",
+            )
+        mock_logger.exception.assert_called_once()
+        self.assertEqual(OpinionCluster.objects.count(), 0)
