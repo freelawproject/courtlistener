@@ -1465,13 +1465,6 @@
       "severity": "error"
     },
     {
-      "column": 18,
-      "path": "cl/lib/import_lib.py",
-      "name": "not-iterable",
-      "concise_description": "Type `Manager[Unknown]` is not iterable",
-      "severity": "error"
-    },
-    {
       "column": 21,
       "path": "cl/lib/migration_utils.py",
       "name": "missing-attribute",
@@ -2967,6 +2960,13 @@
       "path": "cl/scrapers/management/commands/cl_scrape_opinions.py",
       "name": "missing-attribute",
       "concise_description": "Object of class `NoneType` has no attribute `split`",
+      "severity": "error"
+    },
+    {
+      "column": 46,
+      "path": "cl/scrapers/management/commands/cl_scrape_oral_arguments.py",
+      "name": "bad-argument-type",
+      "concise_description": "Argument `date | None` is not assignable to parameter `d` with type `date` in function `cl.lib.import_lib.get_scotus_judges`",
       "severity": "error"
     },
     {
