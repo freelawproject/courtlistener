@@ -14,7 +14,7 @@ from httpx import (
     Response,
     TimeoutException,
 )
-from httpx2._types import QueryParamTypes, RequestData
+from httpx._types import QueryParamTypes, RequestContent, RequestData
 
 from cl.audio.models import Audio
 from cl.lib.decorators import retry
@@ -69,7 +69,7 @@ async def microservice(
     file: BufferedReader | File | bytes | None = None,
     file_type: str | None = None,
     filepath: str | None = None,
-    data: RequestData | None = None,
+    data: RequestData | RequestContent | None = None,
     params: QueryParamTypes | None = None,
 ) -> Response:
     """Call a Microservice endpoint
@@ -152,6 +152,7 @@ async def microservice(
                 req = client.build_request(
                     method=method,
                     url=services[service]["url"],  # type: ignore
+                    # pyrefly:ignore[bad-argument-type] httpx's stubs omit the (deprecated) raw-content form of data it still accepts
                     data=data,
                     files=files,
                     params=params,

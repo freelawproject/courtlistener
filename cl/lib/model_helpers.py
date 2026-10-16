@@ -9,8 +9,7 @@ from typing import TYPE_CHECKING, Any, Protocol
 from uuid import uuid4
 
 from django.core.exceptions import ValidationError
-from django.db.models import Model
-from django.forms import ChoiceField
+from django.db.models import Field, Model
 from django.utils.safestring import SafeString
 from django.utils.text import get_valid_filename
 from django.utils.timezone import now
@@ -655,21 +654,6 @@ def invert_choices_group_lookup[K, V](c: Iterable[tuple[K, V]]) -> dict[V, K]:
     return d
 
 
-def flatten_choices(self: ChoiceField) -> list:
-    """Flattened version of choices tuple on a model or form field
-
-    Important helper when you have named groups in your choices that you need
-    to have flattened.
-    """
-    flat = []
-    for choice, value in self.choices:
-        if isinstance(value, (list | tuple)):
-            flat.extend(value)
-        else:
-            flat.append((choice, value))
-    return flat
-
-
 def choices_to_csv[M: Model](obj: M, field_name: str) -> SafeString:
     """Produce a CSV of possible choices for a field on an object.
 
@@ -678,11 +662,10 @@ def choices_to_csv[M: Model](obj: M, field_name: str) -> SafeString:
     :return s: A comma-separated list of possible values for the field
     """
     field = obj._meta.get_field(field_name)
-    if not isinstance(field, ChoiceField):
-        raise TypeError("Cannot get choices of non-ChoiceField value")
-    flat_choices = flatten_choices(field)
+    if not isinstance(field, Field):
+        raise TypeError(f"{field_name} is not a concrete field")
     # Get the second value in the choices tuple
-    choice_values = [t for s, t in flat_choices]
+    choice_values = [t for s, t in field.flatchoices]
     return oxford_join(choice_values, conjunction="or", separator=";")
 
 

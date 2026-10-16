@@ -8,12 +8,12 @@ from django import forms
 from django.conf import settings
 from django.core.exceptions import ValidationError
 from django.forms import ChoiceField, DateField, Field
+from django.utils.choices import flatten_choices
 from django.utils.datastructures import MultiValueDictKeyError
 from localflavor.us.us_states import STATE_CHOICES
 
 from cl.lib import widgets
 from cl.lib.courts import get_active_court_from_cache
-from cl.lib.model_helpers import flatten_choices
 from cl.lib.utils import get_array_of_selected_fields
 from cl.people_db.models import PoliticalAffiliation, Position
 from cl.search.fields import (
@@ -839,7 +839,8 @@ class SearchForm(forms.Form):
                 value = self.cleaned_data.get(field_name)
                 if value:
                     if isinstance(field, ChoiceField):
-                        choices = flatten_choices(field)
+                        # pyrefly:ignore[bad-argument-type] django-stubs types the getter like the setter, but Django normalizes choices to an iterable on assignment
+                        choices = flatten_choices(field.choices)
                         value = dict(choices)[value]
                     display_dict[field.label] = value
 
