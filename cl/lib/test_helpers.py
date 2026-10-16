@@ -857,7 +857,7 @@ class CourtTestCase(TestCase):
         super().setUpTestData()
 
 
-class PeopleTestCase(TestCase):
+class PeopleTestCase(CourtTestCase):
     """People test case factories"""
 
     @classmethod
@@ -1003,7 +1003,7 @@ class PeopleTestCase(TestCase):
         super().setUpTestData()
 
 
-class SearchTestCase(TestCase):
+class SearchTestCase(PeopleTestCase):
     """Search test case factories"""
 
     @classmethod
