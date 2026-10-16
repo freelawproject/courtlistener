@@ -937,18 +937,22 @@ def merge_into_cluster(
         docket.save(update_fields=["source"])
 
         opinion.xml_scan = str(scan_case.opinions[0])
-        opinion.save(update_fields=["xml_scan"])
-        add_opinion_content(opinion, scan_case)
-
+        opinion_update_fields = ["xml_scan"]
         if "judges" in update_fields:
             # The judges came from the scan: resolve them, without
             # replacing the author the opinion already has
-            author = opinion.author
+            existing_author = opinion.author
+            # link_judges may attribute an author to the opinion if there is
+            # a single judge
             link_judges(cluster, [opinion])
-            if author:
-                opinion.author = author
+            if existing_author:
+                # Undo the author overwrite by link_judges
+                opinion.author = existing_author
             elif opinion.author:
-                opinion.save(update_fields=["author"])
+                # The opinion had no author: keep the one from link_judges
+                opinion_update_fields.append("author")
+        opinion.save(update_fields=opinion_update_fields)
+        add_opinion_content(opinion, scan_case)
 
         # Saves the cluster changes above too
         store_scan_xml(cluster, scan_case, update_fields)
