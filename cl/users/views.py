@@ -51,6 +51,8 @@ from cl.api.utils import (
 )
 from cl.api.views import parse_throttle_rate_for_template
 from cl.custom_filters.decorators import check_honeypot
+from cl.donate.models import NeonMembership, NeonMembershipLevel
+from cl.donate.utils import DONOR_PORTAL_URL, get_membership_upgrade_url
 from cl.favorites.forms import NoteForm
 from cl.favorites.utils import NOTEABLE_MODELS, get_noted_object
 from cl.lib.auth import filter_by_email
@@ -250,10 +252,28 @@ def view_notes(request: AuthenticatedHttpRequest) -> HttpResponse:
 @login_required
 @never_cache
 def view_donations(request: AuthenticatedHttpRequest) -> HttpResponse:
+    """Show the user's membership level and status, and how to manage it.
+
+    The membership may exist but be inactive (e.g., a failed payment or an
+    ended term), so the template checks ``membership.is_active`` rather than
+    only whether a membership exists.
+    """
+    membership = NeonMembership.objects.filter(user=request.user).first()
     return TemplateResponse(
         request,
         "profile/donations.html",
-        {"page": "profile_your_support", "private": True},
+        {
+            "page": "profile_your_support",
+            "private": True,
+            "membership": membership,
+            "is_legacy_membership": bool(
+                membership and membership.level == NeonMembershipLevel.LEGACY
+            ),
+            "upgrade_url": (
+                get_membership_upgrade_url(membership) if membership else ""
+            ),
+            "donor_portal_url": DONOR_PORTAL_URL,
+        },
     )
 
 
