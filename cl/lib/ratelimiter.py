@@ -6,7 +6,7 @@ import socket
 import sys
 from collections.abc import Callable, Coroutine, Sequence
 from inspect import iscoroutinefunction
-from typing import Any, cast
+from typing import Any, Protocol, cast
 
 from asgiref.sync import sync_to_async
 from django.conf import settings
@@ -22,6 +22,18 @@ from cl.lib.types import DjangoViewDecorator, DjangoViewType
 
 type RatelimitKey = Callable[[str, HttpRequest], str] | str
 type RatelimitMethod = str | Sequence[str | None]
+
+
+class RatelimitDecorator(Protocol):
+    """A rate-limiting view decorator that preserves the view's signature."""
+
+    def __call__[
+        **P,
+        Request: HttpRequest,
+        Response: HttpResponseBase | Coroutine[Any, Any, HttpResponseBase],
+    ](
+        self, view: DjangoViewType[P, Request, Response]
+    ) -> DjangoViewType[P, Request, Response]: ...
 
 
 def get_viewer_ip(request: HttpRequest) -> str:
@@ -173,34 +185,34 @@ def make_ratelimiter[
     return decorator
 
 
-ratelimiter_all_1000_per_h = make_ratelimiter(
+ratelimiter_all_1000_per_h: RatelimitDecorator = make_ratelimiter(
     key=get_ip_for_ratelimiter,
     rate="1000/h" if "test" not in sys.argv else None,
 )
-ratelimiter_all_2_per_m = make_ratelimiter(
+ratelimiter_all_2_per_m: RatelimitDecorator = make_ratelimiter(
     key=get_ip_for_ratelimiter,
     rate="2/m" if "test" not in sys.argv else None,
 )
-ratelimiter_unsafe_3_per_m = make_ratelimiter(
+ratelimiter_unsafe_3_per_m: RatelimitDecorator = make_ratelimiter(
     key=get_ip_for_ratelimiter,
     rate="3/m" if "test" not in sys.argv else None,
     method=UNSAFE,
 )
-ratelimiter_unsafe_5_per_d = make_ratelimiter(
+ratelimiter_unsafe_5_per_d: RatelimitDecorator = make_ratelimiter(
     key=get_ip_for_ratelimiter,
     rate="5/d" if "test" not in sys.argv else None,
     method=UNSAFE,
 )
-ratelimiter_unsafe_10_per_m = make_ratelimiter(
+ratelimiter_unsafe_10_per_m: RatelimitDecorator = make_ratelimiter(
     key=get_ip_for_ratelimiter,
     rate="10/m" if "test" not in sys.argv else None,
     method=UNSAFE,
 )
-ratelimiter_all_10_per_h = make_ratelimiter(
+ratelimiter_all_10_per_h: RatelimitDecorator = make_ratelimiter(
     key=get_path_to_make_key,
     rate="10/h" if "test" not in sys.argv else None,
 )
-ratelimiter_unsafe_2000_per_h = make_ratelimiter(
+ratelimiter_unsafe_2000_per_h: RatelimitDecorator = make_ratelimiter(
     key=get_path_to_make_key,
     rate="2000/h" if "test" not in sys.argv else None,
     method=UNSAFE,

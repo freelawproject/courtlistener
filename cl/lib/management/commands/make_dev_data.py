@@ -1,3 +1,5 @@
+from typing import Any
+
 from django.core.management.base import CommandParser
 
 from cl.alerts.factories import AlertFactory, DocketAlertWithParentsFactory
@@ -64,7 +66,7 @@ FACTORIES = {
     900: SCOTUSDocketEntryFactory,
     901: SCOTUSDocumentFactory,
 }
-factories_str = "\n".join(f"{k}: {v}" for k, v in FACTORIES.items())
+factories_str: str = "\n".join(f"{k}: {v}" for k, v in FACTORIES.items())
 
 
 class Command(VerboseCommand):
@@ -99,7 +101,7 @@ class Command(VerboseCommand):
             help="The parent of the object(s) being made",
         )
 
-    def handle(self, *args, **options) -> None:
+    def handle(self, *args: Any, **options: Any) -> None:
         super().handle(*args, **options)
 
         if options["list_objects"]:

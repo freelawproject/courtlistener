@@ -2,13 +2,15 @@ from __future__ import annotations
 
 import logging
 import re
-from collections.abc import Callable
+from collections.abc import Callable, Iterable, Sequence
 from functools import partial
 from pathlib import Path
-from typing import TYPE_CHECKING, Protocol
+from typing import TYPE_CHECKING, Any, Protocol
 from uuid import uuid4
 
 from django.core.exceptions import ValidationError
+from django.db.models import Field, Model
+from django.utils.safestring import SafeString
 from django.utils.text import get_valid_filename
 from django.utils.timezone import now
 from juriscraper.state.texas.common import (
@@ -21,13 +23,19 @@ from cl.lib.string_utils import normalize_dashes
 
 if TYPE_CHECKING:
     from cl.audio.models import Audio
-    from cl.search.models import Opinion, OpinionCluster
+    from cl.lasc.models import LASCJSON
+    from cl.search.models import (
+        Docket,
+        Opinion,
+        OpinionCluster,
+        RECAPDocument,
+    )
 
 dist_d_num_regex = r"(?:\d:)?(\d\d)-[a-zA-Z]{1,5}-(\d+)"
 appellate_bankr_d_num_regex = r"(\d\d)-(\d+)"
 scotus_d_a_num_regex = r"(\d{2})a(\d{1,5})"
 
-logger = logging.getLogger(__name__)
+logger: logging.Logger = logging.getLogger(__name__)
 
 
 def is_docket_number(value: str) -> bool:
@@ -330,7 +338,7 @@ def make_path(root: str, filename: str) -> str:
     )
 
 
-def _make_llm_file_path(root: str, instance, filename: str) -> str:
+def _make_llm_file_path(root: str, instance: Model, filename: str) -> str:
     """Make a file path for LLM related uploads
 
     Falls back to uuid4 when instance.pk is None (unsaved instance)
@@ -345,16 +353,18 @@ def _make_llm_file_path(root: str, instance, filename: str) -> str:
     return make_path(root, f"{name}{ext}")
 
 
-make_llm_task_input_file_path = partial(_make_llm_file_path, "llm-tasks")
-make_llm_request_response_file_path = partial(
+make_llm_task_input_file_path: partial[str] = partial(
+    _make_llm_file_path, "llm-tasks"
+)
+make_llm_request_response_file_path: partial[str] = partial(
     _make_llm_file_path, "llm-requests"
 )
-make_llm_task_response_file_path = partial(
+make_llm_task_response_file_path: partial[str] = partial(
     _make_llm_file_path, "llm-tasks/responses"
 )
 
 
-def make_lasc_path(instance, filename):
+def make_lasc_path(instance: LASCJSON, filename: str) -> str:
     """Make a simple path for uploaded files.
 
     Start with the `root` node, and use the current date as the subdirectories.
@@ -364,7 +374,7 @@ def make_lasc_path(instance, filename):
     )
 
 
-def make_recap_path(instance, filename):
+def make_recap_path(instance: Docket, filename: str) -> str:
     """Make a path to a good location on the local system for RECAP files.
 
     This dumps them all into the same directory, which seems to be OK, at least
@@ -373,7 +383,9 @@ def make_recap_path(instance, filename):
     return f"recap/{get_valid_filename(filename)}"
 
 
-def base_recap_path(instance, filename, base_dir):
+def base_recap_path(
+    instance: RECAPDocument, filename: str, base_dir: str
+) -> str:
     """Make a filepath, accepting an extra parameter for the base directory
 
     Mirrors technique used by original RECAP server to upload PDFs to IA.
@@ -411,13 +423,13 @@ def make_pdf_path(
     return instance.get_pdf_path(filename, thumbs=thumbs)
 
 
-def make_json_path(instance, filename):
+def make_json_path(instance: Model, filename: str) -> str:
     # As additional types are needed, this will need to mirror the format of
     # make_pdf_path, by doing type checking.
     return make_path("json-data", filename)
 
 
-def make_lasc_json_path(instance, filename):
+def make_lasc_json_path(instance: LASCJSON, filename: str) -> str:
     # As additional types are needed, this will need to mirror the format of
     # make_pdf_path, by doing type checking.
     return make_lasc_path(instance, filename)
@@ -462,7 +474,9 @@ def make_upload_path(
     return f"{filename.split('.')[-1]}/{d.year}/{d.month:02d}/{d.day:02d}/{get_valid_filename(filename)}"
 
 
-def validate_partial_date(instance, fields):
+def validate_partial_date[M: Model](
+    instance: M, fields: Iterable[str]
+) -> None:
     """Ensure that partial dates make sense.
 
     Validates that:
@@ -502,7 +516,9 @@ def validate_partial_date(instance, fields):
             )
 
 
-def validate_is_not_alias(instance, fields):
+def validate_is_not_alias[M: Model](
+    instance: M, fields: Iterable[str]
+) -> None:
     """Ensure that an alias to an object is not being used instead of the object
     itself.
 
@@ -519,7 +535,7 @@ def validate_is_not_alias(instance, fields):
             )
 
 
-def validate_has_full_name(instance):
+def validate_has_full_name(instance: Any) -> None:
     """This ensures that blank values are not passed to the first and last name
     fields. Normally this can be done by the DB layer, but people could still
     pass blank strings through, and this blocks even that.
@@ -528,7 +544,7 @@ def validate_has_full_name(instance):
         raise ValidationError("Both first and last names are required.")
 
 
-def validate_nomination_fields_ok(instance):
+def validate_nomination_fields_ok(instance: Any) -> None:
     """Validate a few things:
     - date_nominated and date_elected cannot both have values
     - if nominated, then date_elected not complete and vice versa.
@@ -554,7 +570,7 @@ def validate_nomination_fields_ok(instance):
             )
 
 
-def validate_supervisor(instance):
+def validate_supervisor(instance: Any) -> None:
     """Ensure that the supervisor field makes sense.
 
     - Supervisors can only be judges.
@@ -579,7 +595,7 @@ def validate_supervisor(instance):
         )
 
 
-def validate_all_or_none(instance, fields):
+def validate_all_or_none(instance: Any, fields: Sequence[str]) -> None:
     """Ensure that all fields are complete or that none are complete"""
     num_fields = len(fields)
     completed_fields = sum(
@@ -595,7 +611,7 @@ def validate_all_or_none(instance, fields):
         )
 
 
-def validate_exactly_n(instance, n, fields):
+def validate_exactly_n(instance: Any, n: int, fields: Iterable[str]) -> None:
     """Ensure that exactly n of the fields has a value."""
     completed_fields = sum(1 for f in fields if getattr(instance, f))
     if completed_fields != n:
@@ -605,7 +621,7 @@ def validate_exactly_n(instance, n, fields):
         )
 
 
-def validate_at_most_n(instance, n, fields):
+def validate_at_most_n(instance: Any, n: int, fields: Iterable[str]) -> None:
     """Ensure that at most n fields are complete."""
     completed_fields = sum(1 for f in fields if getattr(instance, f))
     if completed_fields > n:
@@ -615,7 +631,7 @@ def validate_at_most_n(instance, n, fields):
         )
 
 
-def validate_not_all(instance, fields):
+def validate_not_all(instance: Any, fields: Sequence[str]) -> None:
     """Make sure that all of the passed fields are not complete."""
     num_fields = len(fields)
     num_completed_fields = sum(1 for f in fields if getattr(instance, f))
@@ -626,11 +642,13 @@ def validate_not_all(instance, fields):
         )
 
 
-def make_choices_group_lookup(c):
+def make_choices_group_lookup[K, V](
+    c: Iterable[tuple[K, V | list[Sequence[K]] | tuple[Sequence[K]]]],
+) -> dict[K, K | V]:
     """Invert a choices variable in a model to get the group name for a
     tuple.
     """
-    d = {}
+    d: dict[K, K | V] = {}
     for choice, value in c:
         if isinstance(value, (list | tuple)):
             for t in value:
@@ -640,7 +658,7 @@ def make_choices_group_lookup(c):
     return d
 
 
-def invert_choices_group_lookup(c):
+def invert_choices_group_lookup[K, V](c: Iterable[tuple[K, V]]) -> dict[V, K]:
     """Invert a choices variable in a model to get the key from the value.
     (key:, 'value') -> {'value': key}
     """
@@ -650,22 +668,7 @@ def invert_choices_group_lookup(c):
     return d
 
 
-def flatten_choices(self):
-    """Flattened version of choices tuple on a model or form field
-
-    Important helper when you have named groups in your choices that you need
-    to have flattened.
-    """
-    flat = []
-    for choice, value in self.choices:
-        if isinstance(value, (list | tuple)):
-            flat.extend(value)
-        else:
-            flat.append((choice, value))
-    return flat
-
-
-def choices_to_csv(obj, field_name):
+def choices_to_csv[M: Model](obj: M, field_name: str) -> SafeString:
     """Produce a CSV of possible choices for a field on an object.
 
     :param obj: The object type you want to inspect
@@ -673,25 +676,11 @@ def choices_to_csv(obj, field_name):
     :return s: A comma-separated list of possible values for the field
     """
     field = obj._meta.get_field(field_name)
-    flat_choices = flatten_choices(field)
+    if not isinstance(field, Field):
+        raise TypeError(f"{field_name} is not a concrete field")
     # Get the second value in the choices tuple
-    choice_values = [t for s, t in flat_choices]
+    choice_values = [t for s, t in field.flatchoices]
     return oxford_join(choice_values, conjunction="or", separator=";")
-
-
-def disable_auto_now_fields(*models):
-    """Turns off the auto_now and auto_now_add attributes on a Model's fields,
-    so that an instance of the Model can be saved with a custom value.
-
-    Based on: https://stackoverflow.com/questions/7499767/temporarily-disable-auto-now-auto-now-add
-    """
-    for model in models:
-        # noinspection PyProtectedMember
-        for field in model._meta.local_fields:
-            if hasattr(field, "auto_now"):
-                field.auto_now = False
-            if hasattr(field, "auto_now_add"):
-                field.auto_now_add = False
 
 
 def linkify_orig_docket_number(agency: str, og_docket_number: str) -> str:

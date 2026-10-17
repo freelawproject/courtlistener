@@ -1478,6 +1478,20 @@
       "severity": "error"
     },
     {
+      "column": 19,
+      "path": "cl/lib/zoho.py",
+      "name": "missing-attribute",
+      "concise_description": "Object of class `User` has no attribute `profile`",
+      "severity": "error"
+    },
+    {
+      "column": 19,
+      "path": "cl/lib/zoho.py",
+      "name": "missing-attribute",
+      "concise_description": "Object of class `User` has no attribute `profile`",
+      "severity": "error"
+    },
+    {
       "column": 5,
       "path": "cl/oauth/views.py",
       "name": "bad-override-mutable-attribute",

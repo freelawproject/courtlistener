@@ -29,12 +29,15 @@ from cl.lib.redis_utils import get_redis_interface
 from cl.people_db.models import AttorneyOrganization, Role
 from cl.people_db.types import RoleType
 from cl.recap.models import UPLOAD_TYPE
+from cl.scrapers.models import PACERFreeDocumentRow
 from cl.search.models import Court, Docket
 from cl.search.tasks import index_docket_parties_in_es
 
-logger = logging.getLogger(__name__)
+logger: logging.Logger = logging.getLogger(__name__)
 
-phone_digits_re = re.compile(r"^(?:1-?)?(\d{3})[-.]?(\d{3})[-.]?(\d{4})$")
+phone_digits_re: re.Pattern[str] = re.compile(
+    r"^(?:1-?)?(\d{3})[-.]?(\d{3})[-.]?(\d{4})$"
+)
 
 
 pacer_to_cl_ids = {
@@ -49,15 +52,17 @@ pacer_to_cl_ids = {
 cl_to_pacer_ids = {v: k for k, v in pacer_to_cl_ids.items() if v != "nysb"}
 
 
-def map_pacer_to_cl_id(pacer_id):
+def map_pacer_to_cl_id(pacer_id: str) -> str:
     return pacer_to_cl_ids.get(pacer_id, pacer_id)
 
 
-def map_cl_to_pacer_id(cl_id):
+def map_cl_to_pacer_id(cl_id: str) -> str:
     return cl_to_pacer_ids.get(cl_id, cl_id)
 
 
-def lookup_and_save(new, debug=False):
+def lookup_and_save(
+    new: PACERFreeDocumentRow, court: Court, debug: bool = False
+) -> Docket:
     """Merge new docket info into the database.
 
     Start by attempting to lookup an existing Docket. If that's not found,
@@ -65,17 +70,20 @@ def lookup_and_save(new, debug=False):
     Docket found, and then save the Docket.
 
     Returns None if an error occurs, else, return the new or updated Docket.
+
+    :param new: The row to merge. Its `court_id` holds a PACER court ID, so
+        callers must remove it before calling.
+    :param court: The CourtListener court the row belongs to.
+    :param debug: If True, don't save the Docket.
     """
     try:
-        d = Docket.objects.get(
-            pacer_case_id=new.pacer_case_id, court=new.court
-        )
+        d = Docket.objects.get(pacer_case_id=new.pacer_case_id, court=court)
     except (Docket.DoesNotExist, Docket.MultipleObjectsReturned):
         d = None
 
     if d is None:
         ds = Docket.objects.filter(
-            docket_number_raw=new.docket_number, court=new.court
+            docket_number_raw=new.docket_number, court=court
         ).order_by("-date_filed")
         count = ds.count()
         if count < 1:
@@ -112,8 +120,8 @@ def lookup_and_save(new, debug=False):
 
     for attr, v in new.__dict__.items():
         setattr(d, attr, v)
+    d.court = court
 
-    # `new` is an instance of PACERFreeDocumentRow
     if new.docket_number:
         d.docket_number_raw = new.docket_number
 
@@ -177,7 +185,7 @@ async def get_first_missing_de_date(d: Docket) -> date | None:
 
 async def get_blocked_status(
     docket: Docket, count_override: int | None = None
-):
+) -> tuple[bool, date | None]:
     """Set the blocked status for the Docket.
 
     Dockets are public (blocked is False) when:
@@ -332,7 +340,7 @@ def normalize_attorney_role(r: str) -> RoleType:
     return role
 
 
-def normalize_us_phone_number(phone):
+def normalize_us_phone_number(phone: str) -> str:
     """Tidy up phone numbers so they're nice."""
     phone = re.sub(r"(\(|\)|\s+)", "", phone)
     m = phone_digits_re.search(phone)
@@ -341,7 +349,7 @@ def normalize_us_phone_number(phone):
     return ""
 
 
-def normalize_us_state(state):
+def normalize_us_state(state: str) -> str:
     """Convert state values to valid state postal abbreviations
 
     va --> VA
@@ -360,7 +368,7 @@ def normalize_us_state(state):
     return state
 
 
-def make_address_lookup_key(address_info):
+def make_address_lookup_key(address_info: dict) -> str:
     """Make a key for looking up normalized addresses in the DB
 
     - Sort the fields alphabetically
@@ -390,7 +398,7 @@ def make_address_lookup_key(address_info):
     return re.sub(r"[^a-z0-9]", "", key.lower())
 
 
-def normalize_address_info(address_info):
+def normalize_address_info(address_info: dict) -> dict:
     """Normalize various address components"""
 
     # Titlecase where appropriate
@@ -425,7 +433,9 @@ def normalize_address_info(address_info):
     return address_info
 
 
-def normalize_attorney_contact(c, fallback_name=""):
+def normalize_attorney_contact(
+    c: str, fallback_name: str = ""
+) -> tuple[dict[str, str], dict[str, str]]:
     """Normalize the contact string for an attorney.
 
     Attorney contact strings are newline separated addresses like:

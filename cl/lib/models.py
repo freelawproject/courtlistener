@@ -146,11 +146,11 @@ class AbstractFile(models.Model):
         abstract = True
 
     @property
-    def file_contents(self):
+    def file_contents(self) -> str:
         with open(self.filepath.path) as f:
             return f.read()
 
-    def print_file_contents(self):
+    def print_file_contents(self) -> None:
         print(self.file_contents)
 
 
