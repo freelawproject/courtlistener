@@ -174,9 +174,9 @@ def merge_form_with_courts(
 
     for court in courts:
         if no_facets_selected:
-            court.checked = True
+            setattr(court, "checked", True)
         elif court.pk in court_field_values:
-            court.checked = court_field_values[court.pk]
+            setattr(court, "checked", court_field_values[court.pk])
 
     # Build the dict with jurisdiction keys and arrange courts into tabs
     court_tabs: dict[str, list] = {
@@ -457,7 +457,7 @@ def fetch_facets(
             count = facet_values[field.html_name.replace("stat_", "")]
         except KeyError:
             count = 0
-        field.count = count
+        setattr(field, "count", count)
         facet_fields.append(field)
     return facet_fields
 

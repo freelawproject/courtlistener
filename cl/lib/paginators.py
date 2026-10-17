@@ -1,4 +1,4 @@
-from django.core.paginator import Paginator
+from django.core.paginator import Page, Paginator
 from django.utils.functional import cached_property
 
 
@@ -31,4 +31,4 @@ class ESPaginator(Paginator):
 
     def page(self, number):
         number = self.validate_number(number)
-        return self._get_page(self.object_list, number, self)
+        return Page(self.object_list, number, self)

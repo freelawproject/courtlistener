@@ -1,6 +1,7 @@
 import copy
 import datetime
 from collections import OrderedDict
+from typing import Any
 
 from dateutil import parser
 from django.core.exceptions import ImproperlyConfigured
@@ -85,18 +86,24 @@ class CoerceDateTimeField(serializers.Field):
         )
 
 
-class NullableListField(serializers.ListField):
-    """A custom ListField that returns None when serialized if the list is
-    empty. For API V3 compatibility.
+class NullableListField(
+    serializers.Field[list[Any] | None, list[Any], list[Any] | None, Any]
+):
+    """A read-only list field that returns None when serialized if the list
+    is empty. For API V3 compatibility.
     """
 
-    def to_representation(self, value):
+    def __init__(self, **kwargs):
+        super().__init__(**kwargs)
+        self.list_field = serializers.ListField()
+
+    def to_representation(self, value: list[Any] | None) -> list[Any] | None:
         """
         Return "None" if the list is empty, otherwise return the list.
         """
         if not value:
             return None
-        return super().to_representation(value)
+        return self.list_field.to_representation(value)
 
 
 class HighlightedField(serializers.Field):
@@ -198,10 +205,11 @@ class DocumentSerializer(serializers.Serializer):
 
     def get_fields(self) -> OrderedDict[str, serializers.Field]:
         """Get the required fields for serializing the result."""
-        fields = getattr(self.Meta, "fields", ())
-        exclude = getattr(self.Meta, "exclude", ())
-        ignore_fields = getattr(self.Meta, "ignore_fields", ())
-        document = getattr(self.Meta, "document")
+        meta = getattr(self, "Meta", None)
+        fields = getattr(meta, "fields", ())
+        exclude = getattr(meta, "exclude", ())
+        ignore_fields = getattr(meta, "ignore_fields", ())
+        document = getattr(meta, "document")
         model = document.Django.model
         document_fields = document._fields
         declared_fields = copy.deepcopy(self._declared_fields)

@@ -59,8 +59,6 @@ from cl.lib.models import THUMBNAIL_STATUSES
 from cl.lib.redis_utils import get_redis_interface
 from cl.lib.storage import clobbering_get_name
 from cl.lib.test_helpers import (
-    CourtTestCase,
-    PeopleTestCase,
     SearchTestCase,
     SimpleUserDataMixin,
     SitemapTest,
@@ -483,13 +481,7 @@ class SimpleLoadTest(TestCase):
 
 
 @override_flag("citing_and_related_enabled", True)
-class OpinionPageLoadTest(
-    ESIndexTestCase,
-    CourtTestCase,
-    PeopleTestCase,
-    SearchTestCase,
-    TestCase,
-):
+class OpinionPageLoadTest(ESIndexTestCase, SearchTestCase, TestCase):
     @classmethod
     def setUpTestData(cls) -> None:
         cls.o_cluster_1 = OpinionClusterWithParentsFactory.create(
