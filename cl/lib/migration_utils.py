@@ -89,6 +89,10 @@ def make_new_user(
     # Give the user permissions
     # https://stackoverflow.com/a/41564061/64911
     for app_config in apps.get_app_configs():
+        # create_permissions() skips apps without a models module, which
+        # includes every app in historical migration state. Any truthy value
+        # gets past that check.
+        # pyrefly: ignore[bad-assignment]
         app_config.models_module = True
         create_permissions(app_config, verbosity=0)
         app_config.models_module = None

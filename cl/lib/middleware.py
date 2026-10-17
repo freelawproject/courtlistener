@@ -1,5 +1,6 @@
 from collections.abc import Awaitable, Callable
 from inspect import iscoroutinefunction
+from typing import cast
 
 from asgiref.sync import markcoroutinefunction
 from django.http import HttpRequest, HttpResponseBase
@@ -54,7 +55,9 @@ class RobotsHeaderMiddleware:
         return response
 
     async def __acall__(self, request: HttpRequest) -> HttpResponseBase:
-        response = await self.get_response(request)
+        response = await cast(
+            Awaitable[HttpResponseBase], self.get_response(request)
+        )
         return response
 
     def process_template_response(

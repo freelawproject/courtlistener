@@ -1,4 +1,5 @@
 from typing import Any
+from xml.sax.xmlreader import AttributesImpl
 
 from django.utils.feedgenerator import Rss201rev2Feed
 from django.utils.xmlutils import SimplerXMLGenerator
@@ -22,7 +23,7 @@ class iTunesPodcastsFeedGenerator(Rss201rev2Feed):
         handler.addQuickElement(
             "itunes:explicit", self.feed["iTunes_explicit"]
         )
-        handler.startElement("itunes:owner", {})
+        handler.startElement("itunes:owner", AttributesImpl({}))
         handler.addQuickElement("itunes:name", self.feed["iTunes_name"])
         handler.addQuickElement("itunes:email", self.feed["iTunes_email"])
         handler.endElement("itunes:owner")
