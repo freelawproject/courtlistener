@@ -1430,55 +1430,6 @@
       "severity": "error"
     },
     {
-      "column": 20,
-      "path": "cl/lib/middleware.py",
-      "name": "not-async",
-      "concise_description": "Type `HttpResponseBase` is not awaitable",
-      "severity": "error"
-    },
-    {
-      "column": 36,
-      "path": "cl/lib/migration_utils.py",
-      "name": "bad-assignment",
-      "concise_description": "`Literal[True]` is not assignable to attribute `models_module` with type `ModuleType | None`",
-      "severity": "error"
-    },
-    {
-      "column": 46,
-      "path": "cl/lib/podcast.py",
-      "name": "bad-argument-type",
-      "concise_description": "Argument `dict[@_, @_]` is not assignable to parameter `attrs` with type `AttributesImpl` in function `django.utils.xmlutils.SimplerXMLGenerator.startElement`",
-      "severity": "error"
-    },
-    {
-      "column": 34,
-      "path": "cl/lib/test_helpers.py",
-      "name": "no-matching-overload",
-      "concise_description": "No matching overload found for function `typing.MutableMapping.update` called with arguments: (dict[str, (dict[str, Any]) -> Any])",
-      "severity": "error"
-    },
-    {
-      "column": 34,
-      "path": "cl/lib/test_helpers.py",
-      "name": "no-matching-overload",
-      "concise_description": "No matching overload found for function `typing.MutableMapping.update` called with arguments: (dict[str, (dict[str, Any]) -> Any])",
-      "severity": "error"
-    },
-    {
-      "column": 34,
-      "path": "cl/lib/test_helpers.py",
-      "name": "no-matching-overload",
-      "concise_description": "No matching overload found for function `typing.MutableMapping.update` called with arguments: (dict[str, (dict[str, Any]) -> Any])",
-      "severity": "error"
-    },
-    {
-      "column": 36,
-      "path": "cl/lib/test_helpers.py",
-      "name": "no-matching-overload",
-      "concise_description": "No matching overload found for function `typing.MutableMapping.update` called with arguments: (dict[str, (dict[str, Any]) -> Any])",
-      "severity": "error"
-    },
-    {
       "column": 19,
       "path": "cl/lib/zoho.py",
       "name": "missing-attribute",
