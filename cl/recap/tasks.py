@@ -3144,19 +3144,45 @@ def download_pacer_pdf_and_save_to_pq(
     if pacer_doc_id is None:
         pacer_doc_id = ""
     with transaction.atomic():
-        (
-            pq,
-            created,
-        ) = ProcessingQueue.objects.get_or_create(
-            uploader_id=user_pk,
-            pacer_doc_id=pacer_doc_id,
-            pacer_case_id=pacer_case_id,
-            court_id=court_id,
-            upload_type=UPLOAD_TYPE.PDF,
-            date_created__gt=cutoff_date,
-            defaults={"source": PROCESSING_QUEUE_SOURCE.EMAIL},
+        # Notifications for the same document from different recap.email
+        # subscribers all run as the same user, so they match the same PQ
+        # rows and can be processed at the same time. get_or_create isn't
+        # safe here: without a unique constraint, concurrent tasks can each
+        # create a row, and a later retry then fails with
+        # MultipleObjectsReturned. Instead, lock and reuse the oldest match.
+        pq = (
+            ProcessingQueue.objects.select_for_update()
+            .filter(
+                uploader_id=user_pk,
+                pacer_doc_id=pacer_doc_id,
+                pacer_case_id=pacer_case_id,
+                court_id=court_id,
+                upload_type=UPLOAD_TYPE.PDF,
+                date_created__gt=cutoff_date,
+            )
+            .order_by("pk")
+            .first()
         )
-        if created and magic_number and not is_bankr_short_doc_id:
+        created = pq is None
+        if pq is None:
+            pq = ProcessingQueue.objects.create(
+                uploader_id=user_pk,
+                pacer_doc_id=pacer_doc_id,
+                pacer_case_id=pacer_case_id,
+                court_id=court_id,
+                upload_type=UPLOAD_TYPE.PDF,
+                source=PROCESSING_QUEUE_SOURCE.EMAIL,
+            )
+        # Also download into an existing PQ whose earlier attempt failed. That
+        # attempt may have come from another subscriber's notification without
+        # a magic number. A failed PQ combined with our magic number would
+        # otherwise be read as a sealed document (#7940).
+        should_download = (
+            magic_number
+            and not is_bankr_short_doc_id
+            and (created or pq.status == PROCESSING_STATUS.FAILED)
+        )
+        if should_download:
             response, r_msg = async_to_sync(download_pdf_by_magic_number)(
                 court_id,
                 pacer_doc_id,
@@ -3176,6 +3202,9 @@ def download_pacer_pdf_and_save_to_pq(
                 )
                 cf = ContentFile(response.content)
                 pq.filepath_local.save(file_name, cf, save=False)
+                # Clear the failure left by an earlier attempt, if any.
+                pq.status = PROCESSING_STATUS.ENQUEUED
+                pq.error_message = ""
                 pq.save()
                 return pq
 
@@ -3183,7 +3212,7 @@ def download_pacer_pdf_and_save_to_pq(
             r_msg = "Invalid short pacer_doc_id for bankruptcy court."
         if not magic_number:
             r_msg = "No magic number available to download the document."
-        if created:
+        if created or should_download:
             async_to_sync(mark_pq_status)(
                 pq, r_msg, PROCESSING_STATUS.FAILED, "error_message"
             )
