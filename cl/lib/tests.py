@@ -1,6 +1,8 @@
 import datetime
 import pickle
+import threading
 import time
+from concurrent.futures import ThreadPoolExecutor
 from http import HTTPStatus
 from typing import TypedDict, cast
 from unittest import mock
@@ -76,6 +78,7 @@ from cl.lib.ratelimiter import parse_rate
 from cl.lib.recap_utils import needs_ocr
 from cl.lib.redis_utils import (
     acquire_redis_lock,
+    create_redis_semaphore,
     get_redis_interface,
     release_redis_lock,
 )
@@ -1838,6 +1841,32 @@ class TestRedisUtils(SimpleTestCase):
 
         result = release_redis_lock(r, lock_key, identifier)
         self.assertEqual(result, 1)
+
+    def test_redis_semaphore_has_single_winner(self) -> None:
+        """Concurrent callers get exactly one winner, and the key keeps its
+        TTL.
+
+        Each round releases many threads at once with a barrier so their
+        Redis calls interleave. A check-then-set implementation lets several
+        of them win.
+        """
+        key = "test_semaphore"
+        threads = 16
+        r = get_redis_interface("CACHE")
+        self.addCleanup(r.delete, key)
+
+        barrier = threading.Barrier(threads)
+
+        def contend(_: int) -> bool:
+            barrier.wait()
+            return create_redis_semaphore(r, key, ttl=60)
+
+        with ThreadPoolExecutor(max_workers=threads) as pool:
+            for round_number in range(20):
+                r.delete(key)
+                winners = sum(pool.map(contend, range(threads)))
+                self.assertEqual(winners, 1, msg=f"round {round_number}")
+        self.assertGreater(r.ttl(key), 0)
 
 
 class TestLinkifyOrigDocketNumber(SimpleTestCase):
