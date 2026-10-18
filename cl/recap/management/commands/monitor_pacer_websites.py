@@ -3,7 +3,6 @@ from http import HTTPStatus
 
 import requests
 from django.conf import settings
-from django.db.models import QuerySet
 from django.utils.timezone import now
 
 from cl.lib.command_utils import VerboseCommand, logger

@@ -611,9 +611,14 @@ async def update_docket_appellate_metadata(d, docket_data):
         if isinstance(court_id, str):
             cl_id = map_pacer_to_cl_id(court_id)
         else:
-            logger.error(f"unexpected court_id type expected str, found {type(court_id).__name__}")
+            logger.error(
+                f"unexpected court_id type expected str, found {type(court_id).__name__}"
+            )
             cl_id = court_id
-        if cl_id is not None and await Court.objects.filter(pk=cl_id).aexists():
+        if (
+            cl_id is not None
+            and await Court.objects.filter(pk=cl_id).aexists()
+        ):
             # Ensure the court exists. Sometimes PACER does weird things,
             # like in 14-1743 in CA3, where it says the court_id is 'uspci'.
             # If we don't do this check, the court ID could be invalid, and
