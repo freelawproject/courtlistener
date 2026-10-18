@@ -2774,34 +2774,6 @@
       "severity": "error"
     },
     {
-      "column": 17,
-      "path": "cl/scrapers/management/commands/merge_opinion_versions.py",
-      "name": "missing-attribute",
-      "concise_description": "Object of class `int` has no attribute `id`",
-      "severity": "error"
-    },
-    {
-      "column": 14,
-      "path": "cl/scrapers/management/commands/merge_opinion_versions.py",
-      "name": "missing-attribute",
-      "concise_description": "Object of class `int` has no attribute `id`",
-      "severity": "error"
-    },
-    {
-      "column": 31,
-      "path": "cl/scrapers/management/commands/merge_opinion_versions.py",
-      "name": "missing-attribute",
-      "concise_description": "Object of class `int` has no attribute `cluster_id`",
-      "severity": "error"
-    },
-    {
-      "column": 31,
-      "path": "cl/scrapers/management/commands/merge_opinion_versions.py",
-      "name": "missing-attribute",
-      "concise_description": "Object of class `int` has no attribute `cluster_id`",
-      "severity": "error"
-    },
-    {
       "column": 5,
       "path": "cl/scrapers/management/commands/merge_opinion_versions.py",
       "name": "missing-attribute",
