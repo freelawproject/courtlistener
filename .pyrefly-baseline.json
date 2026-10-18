@@ -1073,27 +1073,6 @@
       "severity": "error"
     },
     {
-      "column": 17,
-      "path": "cl/custom_filters/templatetags/text_filters.py",
-      "name": "unbound-name",
-      "concise_description": "`s` is uninitialized",
-      "severity": "error"
-    },
-    {
-      "column": 17,
-      "path": "cl/custom_filters/templatetags/text_filters.py",
-      "name": "unbound-name",
-      "concise_description": "`s` is uninitialized",
-      "severity": "error"
-    },
-    {
-      "column": 22,
-      "path": "cl/custom_filters/templatetags/text_filters.py",
-      "name": "unbound-name",
-      "concise_description": "`s` may be uninitialized",
-      "severity": "error"
-    },
-    {
       "column": 5,
       "path": "cl/disclosures/tasks.py",
       "name": "missing-attribute",
