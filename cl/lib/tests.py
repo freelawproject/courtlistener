@@ -80,6 +80,7 @@ from cl.lib.redis_utils import (
     acquire_redis_lock,
     create_redis_semaphore,
     get_redis_interface,
+    hset_if_lock_held,
     release_redis_lock,
 )
 from cl.lib.s3_cache import get_s3_cache, make_s3_cache_key
@@ -1867,6 +1868,32 @@ class TestRedisUtils(SimpleTestCase):
                 winners = sum(pool.map(contend, range(threads)))
                 self.assertEqual(winners, 1, msg=f"round {round_number}")
         self.assertGreater(r.ttl(key), 0)
+
+    def test_hset_if_lock_held(self) -> None:
+        """Writes apply only while the caller still holds the lock."""
+        lock_key = "test_fenced_lock"
+        hash_name = "test_fenced_hash"
+        r = get_redis_interface("CACHE")
+        r.delete(lock_key, hash_name)
+        self.addCleanup(r.delete, lock_key, hash_name)
+
+        identifier = acquire_redis_lock(r, lock_key, 60_000)
+        self.assertTrue(
+            hset_if_lock_held(
+                r,
+                lock_key,
+                identifier,
+                [(hash_name, "a", 2), (hash_name, "b", 3)],
+            )
+        )
+        self.assertEqual(r.hgetall(hash_name), {"a": "2", "b": "3"})
+
+        # Simulate the lease expiring and another process taking the lock.
+        r.set(lock_key, "someone-else")
+        self.assertFalse(
+            hset_if_lock_held(r, lock_key, identifier, [(hash_name, "a", 1)])
+        )
+        self.assertEqual(r.hget(hash_name, "a"), "2")
 
 
 class TestLinkifyOrigDocketNumber(SimpleTestCase):

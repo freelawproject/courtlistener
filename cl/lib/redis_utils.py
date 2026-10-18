@@ -105,3 +105,42 @@ def release_redis_lock(r: Redis, key: str, identifier: str) -> int:
     end
     """
     return r.eval(lua_script, 1, key, identifier)
+
+
+def hset_if_lock_held(
+    r: Redis,
+    lock_key: str,
+    identifier: str,
+    writes: list[tuple[str, str, str | int]],
+) -> bool:
+    """Atomically apply hash writes only if we still hold a lock.
+
+    Use this for the writes made under a lock from acquire_redis_lock. The
+    lock's TTL can expire while its holder is still working, letting another
+    process acquire it. Writing through this function fences out the stale
+    holder so it can't overwrite newer values. Either all the writes are
+    applied or none are.
+
+    :param r: The Redis DB to connect to as a connection interface.
+    :param lock_key: The key of the lock in Redis.
+    :param identifier: The identifier returned by acquire_redis_lock.
+    :param writes: A list of (hash name, field, value) tuples to HSET.
+    :return: True if the lock was held and the writes were applied, else
+    False.
+    """
+    # KEYS[i] for i >= 2 is a hash name, and its field and value are in
+    # ARGV[2i - 2] and ARGV[2i - 1].
+    lua_script = """
+    if redis.call("GET", KEYS[1]) ~= ARGV[1] then
+        return 0
+    end
+    for i = 2, #KEYS do
+        redis.call("HSET", KEYS[i], ARGV[2 * i - 2], ARGV[2 * i - 1])
+    end
+    return 1
+    """
+    keys = [lock_key] + [name for name, _, _ in writes]
+    args = [identifier] + [
+        arg for _, field, value in writes for arg in (field, value)
+    ]
+    return bool(r.eval(lua_script, len(keys), *keys, *args))

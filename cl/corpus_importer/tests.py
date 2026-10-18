@@ -136,7 +136,10 @@ from cl.favorites.models import PrayerAvailability
 from cl.lib.model_helpers import make_texas_docket_number_core
 from cl.lib.pacer import process_docket_data
 from cl.lib.pacer_session import SessionData
-from cl.lib.redis_utils import get_redis_interface
+from cl.lib.redis_utils import (
+    get_redis_interface,
+    make_update_pacer_case_id_key,
+)
 from cl.people_db.factories import (
     ABARatingFactory,
     AttorneyFactory,
@@ -6175,3 +6178,78 @@ class TamesMissingFileTest(SimpleTestCase):
         """Verify a normal HTML page is not flagged as missing."""
         normal_html = b"<html><body><p>Normal page content</p></body></html>"
         self.assertFalse(is_missing_file_page(normal_html))
+
+
+class IquerySweepLockTest(SimpleTestCase):
+    """Tests for the Redis lock around the iquery sweep counters."""
+
+    court_id = "test_iquery_lock"
+
+    def setUp(self) -> None:
+        super().setUp()
+        self.r = get_redis_interface("CACHE")
+        self.lock_key = make_update_pacer_case_id_key(self.court_id)
+        self._clean()
+        self.addCleanup(self._clean)
+        self.r.hset("iquery:highest_known_pacer_case_id", self.court_id, 5)
+        self.r.hset("iquery:pacer_case_id_current", self.court_id, 5)
+
+    def _clean(self) -> None:
+        """Remove this test's lock and counter fields from Redis."""
+        self.r.delete(self.lock_key)
+        self.r.hdel("iquery:highest_known_pacer_case_id", self.court_id)
+        self.r.hdel("iquery:pacer_case_id_current", self.court_id)
+
+    def _counters(self) -> tuple[int, int]:
+        """Return (highest_known_pacer_case_id, pacer_case_id_current)."""
+        return (
+            int(
+                self.r.hget(
+                    "iquery:highest_known_pacer_case_id", self.court_id
+                )
+            ),
+            int(self.r.hget("iquery:pacer_case_id_current", self.court_id)),
+        )
+
+    @patch(
+        "cl.corpus_importer.signals.make_docket_by_iquery_sweep.apply_async"
+    )
+    def test_updates_counters_while_lock_held(self, mock_apply) -> None:
+        """Both counters advance and the lock is released afterwards."""
+        update_latest_case_id_and_schedule_iquery_sweep(
+            None, court_pk=self.court_id, fixed_case_id_sweep=9
+        )
+        self.assertEqual(mock_apply.call_count, 3)
+        self.assertEqual(self._counters(), (9, 8))
+        self.assertIsNone(self.r.get(self.lock_key))
+
+    @patch(
+        "cl.corpus_importer.signals.make_docket_by_iquery_sweep.apply_async"
+    )
+    def test_lost_lock_does_not_overwrite_counters(self, mock_apply) -> None:
+        """If the lease expires mid-sweep and another process takes the
+        lock, the stale holder must not write its counters."""
+
+        def steal_lock(*args, **kwargs) -> None:
+            self.r.set(self.lock_key, "another-process")
+
+        mock_apply.side_effect = steal_lock
+        update_latest_case_id_and_schedule_iquery_sweep(
+            None, court_pk=self.court_id, fixed_case_id_sweep=9
+        )
+        self.assertEqual(self._counters(), (5, 5))
+        # The other process's lock must be left alone.
+        self.assertEqual(self.r.get(self.lock_key), "another-process")
+
+    @patch(
+        "cl.corpus_importer.signals.make_docket_by_iquery_sweep.apply_async",
+        side_effect=ConnectionError("broker down"),
+    )
+    def test_lock_released_when_enqueue_fails(self, mock_apply) -> None:
+        """An enqueue failure releases the lock and leaves counters as is."""
+        with self.assertRaises(ConnectionError):
+            update_latest_case_id_and_schedule_iquery_sweep(
+                None, court_pk=self.court_id, fixed_case_id_sweep=9
+            )
+        self.assertIsNone(self.r.get(self.lock_key))
+        self.assertEqual(self._counters(), (5, 5))
