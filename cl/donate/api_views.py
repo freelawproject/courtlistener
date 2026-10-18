@@ -300,10 +300,16 @@ class MembershipWebhookViewSet(
 
     def _handle_membership_update(self, webhook_data) -> None:
         membership_data = self._get_membership_data(webhook_data)
-        membership_query = NeonMembership.objects.filter(
-            neon_id=membership_data["membershipId"]
+        # Lock the row so a createMembership webhook for the same upgrade
+        # can't change it between this read and the save below. Without the
+        # lock, this handler could save the stale previous-membership data
+        # over the upgrade, or find the row gone and crash.
+        neon_membership = (
+            NeonMembership.objects.select_for_update()
+            .filter(neon_id=membership_data["membershipId"])
+            .first()
         )
-        if not membership_query.exists():
+        if neon_membership is None:
             # Prevents an existing membership from being overwritten by data
             # from an updateMembership webhook that's either from a previous
             # membership or one that doesn't exist in our database.
@@ -327,7 +333,6 @@ class MembershipWebhookViewSet(
             membership_data["paymentStatus"]
         )
 
-        neon_membership = membership_query.first()
         neon_membership.level = membership_level
         # pyrefly:ignore[bad-assignment] Django parses the string on save
         neon_membership.termination_date = membership_data["termEndDate"]

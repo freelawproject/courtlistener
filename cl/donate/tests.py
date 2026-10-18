@@ -6,8 +6,10 @@ from unittest.mock import MagicMock, patch
 import time_machine
 from asgiref.sync import sync_to_async
 from django.core import mail
+from django.db import connection
 from django.test import override_settings
 from django.test.client import AsyncClient, Client
+from django.test.utils import CaptureQueriesContext
 from django.urls import reverse
 from django.utils.timezone import make_aware, now
 
@@ -514,6 +516,44 @@ class MembershipWebhookTest(TestCase):
         membership = await NeonMembership.objects.aget(neon_id="12345")
 
         self.assertEqual(membership.neon_id, "12345")
+        self.assertEqual(membership.level, NeonMembershipLevel.TIER_4)
+
+    @patch.object(
+        MembershipWebhookViewSet, "_store_webhook_payload", return_value=None
+    )
+    def test_update_membership_locks_row(self, mock_store_webhook) -> None:
+        """updateMembership must lock the row it reads before saving it.
+
+        During an upgrade Neon sends createMembership and updateMembership
+        at nearly the same time. Without a row lock the update handler can
+        save stale data over the upgrade or crash if the row changes between
+        its reads.
+        """
+        NeonMembership.objects.create(
+            user=self.user_profile.user,
+            neon_id="12345",
+            level=NeonMembershipLevel.TIER_1,
+        )
+        self.data["eventTrigger"] = "updateMembership"
+        self.data["data"]["membership"]["membershipName"] = (
+            "CL Membership - Tier 4"
+        )
+
+        with CaptureQueriesContext(connection) as ctx:
+            r = Client().post(
+                reverse("membership-webhooks-list", kwargs={"version": "v4"}),
+                data=self.data,
+                content_type="application/json",
+            )
+
+        self.assertEqual(r.status_code, HTTPStatus.CREATED)
+        locking_reads = [
+            q["sql"]
+            for q in ctx.captured_queries
+            if "FOR UPDATE" in q["sql"] and "donate_neonmembership" in q["sql"]
+        ]
+        self.assertEqual(len(locking_reads), 1, msg=ctx.captured_queries)
+        membership = NeonMembership.objects.get(neon_id="12345")
         self.assertEqual(membership.level, NeonMembershipLevel.TIER_4)
 
     @patch.object(

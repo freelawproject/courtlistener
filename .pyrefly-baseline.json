@@ -1205,41 +1205,6 @@
       "severity": "error"
     },
     {
-      "column": 9,
-      "path": "cl/donate/api_views.py",
-      "name": "missing-attribute",
-      "concise_description": "Object of class `NoneType` has no attribute `level`",
-      "severity": "error"
-    },
-    {
-      "column": 9,
-      "path": "cl/donate/api_views.py",
-      "name": "missing-attribute",
-      "concise_description": "Object of class `NoneType` has no attribute `termination_date`",
-      "severity": "error"
-    },
-    {
-      "column": 9,
-      "path": "cl/donate/api_views.py",
-      "name": "missing-attribute",
-      "concise_description": "Object of class `NoneType` has no attribute `payment_status`",
-      "severity": "error"
-    },
-    {
-      "column": 9,
-      "path": "cl/donate/api_views.py",
-      "name": "missing-attribute",
-      "concise_description": "Object of class `NoneType` has no attribute `save`",
-      "severity": "error"
-    },
-    {
-      "column": 36,
-      "path": "cl/donate/api_views.py",
-      "name": "missing-attribute",
-      "concise_description": "Object of class `NoneType` has no attribute `user`",
-      "severity": "error"
-    },
-    {
       "column": 20,
       "path": "cl/donate/api_views.py",
       "name": "missing-attribute",
