@@ -105,6 +105,8 @@ class Alert(AbstractDateTimeModel):
     def save(self, *args, **kwargs):
         """Ensure we get a token when we save the first time."""
         if self.pk is None:
+            # pyrefly:ignore[bad-assignment] pyrefly bug: pk is incorrectly
+            # typed as never None, so this branch is wrongly treated as unreachable
             self.secret_key = get_random_string(length=40)
         super().save(*args, **kwargs)
 
@@ -183,6 +185,8 @@ class DocketAlert(AbstractDateTimeModel):
     def save(self, *args, **kwargs):
         """Ensure we get a token when we save the first time."""
         if self.pk is None:
+            # pyrefly:ignore[bad-assignment] pyrefly bug: pk is incorrectly
+            # typed as never None, so this branch is wrongly treated as unreachable
             self.secret_key = get_random_string(length=40)
         super().save(*args, **kwargs)
 

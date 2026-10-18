@@ -316,7 +316,7 @@ class ScraperIngestionTest(ESIndexTestCase, TestCase):
             source_to_assign,
         ) in source_assigment_tests:
             with self.subTest(
-                f"Testing {source_to_assign} source assigment.",
+                f"Testing {source_to_assign} source assignment.",
                 expected_sources=expected_sources,
                 non_sources=non_sources,
                 source_to_assign=source_to_assign,
@@ -328,7 +328,7 @@ class ScraperIngestionTest(ESIndexTestCase, TestCase):
                 )
                 for source, expected_source in expected_sources.items():
                     with self.subTest(
-                        f"Testing source {source} assigment.",
+                        f"Testing source {source} assignment.",
                         source=source,
                         expected_source=expected_source,
                     ):
@@ -638,6 +638,9 @@ class ExtractFormattedTextSanitizationTest(TestCase):
         DataError ('PostgreSQL text fields cannot contain NUL (0x00) bytes')?
         """
         texas_document = TexasDocumentFactory.create()
+        texas_document.filepath_local.save(
+            "document.pdf", ContentFile(b"document")
+        )
         # Doctor occasionally returns extracted text containing NUL bytes
         # (e.g. from malformed PDFs). PostgreSQL rejects these in text
         # columns, so the extractor must strip them before saving.
@@ -682,6 +685,9 @@ class ExtractFormattedTextReleasesConnectionTest(TransactionTestCase):
         """Is the DB connection closed when Doctor is called, and reopened
         for the save afterwards?"""
         texas_document = TexasDocumentFactory.create()
+        texas_document.filepath_local.save(
+            "document.pdf", ContentFile(b"document")
+        )
         connection_open_during_doctor_call: list[bool] = []
 
         async def fake_doctor(*args, **kwargs) -> httpx.Response:
@@ -859,7 +865,7 @@ class DupcheckerPressOnTest(TestCase):
         self.dc_not_full_crawl.press_on(*self.press_on_args[:-1], "not a dup")
 
     def test_press_on_with_a_dup_found(self) -> None:
-        """Do we raise the appropiate exceptions when a dup is found?"""
+        """Do we raise the appropriate exceptions when a dup is found?"""
         # First duplicate
         try:
             self.dc_full_crawl.press_on(*self.press_on_args)
@@ -899,7 +905,7 @@ class DupcheckerPressOnTest(TestCase):
             pass  # expected behavior
 
     def test_press_on_with_dup_found_and_older_date(self) -> None:
-        """Do we raise the appropiate exception when a duplicate is found
+        """Do we raise the appropriate exception when a duplicate is found
         and we account for case dates?
         """
         self.dc_not_full_crawl.reset()
@@ -1236,6 +1242,84 @@ class ScraperDocketMatchingTest(TestCase):
             docket, self.ca2_docket, "Should match using docket number core"
         )
 
+    def test_does_not_unblock_existing_docket(self) -> None:
+        """Matching an existing docket should never unblock it, nor
+        overwrite its original date_blocked. It may block an unblocked one
+        """
+        original_date = date(2020, 1, 1)
+        new_date = date(2024, 1, 1)
+        cases = [
+            # (description, docket blocked, kwargs, expected blocked,
+            # expected date_blocked)
+            (
+                "blocked docket, blocked=False",
+                True,
+                {"blocked": False},
+                True,
+                original_date,
+            ),
+            (
+                "blocked docket, blocked=True",
+                True,
+                {"blocked": True, "date_blocked": new_date},
+                True,
+                original_date,
+            ),
+            (
+                "unblocked docket, blocked=True",
+                False,
+                {"blocked": True, "date_blocked": new_date},
+                True,
+                new_date,
+            ),
+        ]
+        for i, (
+            description,
+            docket_blocked,
+            kwargs,
+            expected_blocked,
+            expected_date,
+        ) in enumerate(cases):
+            with self.subTest(description):
+                docket_number = f"1 CA-CV 24-000{i}"
+                existing = DocketFactory(
+                    docket_number=docket_number,
+                    case_name="Smith v. Jones",
+                    court=self.ariz,
+                    source=Docket.SCRAPER,
+                    pacer_case_id=None,
+                    blocked=docket_blocked,
+                    date_blocked=original_date if docket_blocked else None,
+                )
+                docket = update_or_create_docket(
+                    "Smith v. Jones",
+                    "",
+                    self.ariz,
+                    docket_number,
+                    Docket.SCRAPER,
+                    False,
+                    **kwargs,
+                )
+                self.assertEqual(docket.pk, existing.pk)
+                self.assertEqual(docket.blocked, expected_blocked)
+                self.assertEqual(docket.date_blocked, expected_date)
+
+        with self.subTest("Harvard, blocked docket, blocked not passed"):
+            self.ca2_docket.blocked = True
+            self.ca2_docket.date_blocked = original_date
+            self.ca2_docket.save()
+            docket = update_or_create_docket(
+                "Garbutt v. Conway",
+                "",
+                self.ca2,
+                "10-1039",
+                Docket.HARVARD,
+                from_harvard=True,
+            )
+            self.assertEqual(docket.pk, self.ca2_docket.pk)
+            self.assertTrue(docket.blocked)
+            self.assertEqual(docket.date_blocked, original_date)
+
 
 class UpdateFromTextCommandTest(TestCase):
     """Test the input processing and DB querying for the command"""
@@ -1277,7 +1361,6 @@ class UpdateFromTextCommandTest(TestCase):
                 source=ClusterSources.COURT_WEBSITE,
             ),
             plain_text="Some text with no matches",
-            id=101,
         )
 
         self.opinion_2022 = OpinionFactory(
@@ -1287,7 +1370,6 @@ class UpdateFromTextCommandTest(TestCase):
                 precedential_status="Unpublished",
                 source=ClusterSources.COURT_WEBSITE,
             ),
-            id=100,
             plain_text="Docket Number: 2022-13\n2022 VT 11",
         )
 
@@ -1301,7 +1383,9 @@ class UpdateFromTextCommandTest(TestCase):
             "cl.scrapers.tasks.get_scraper_object_by_name",
             return_value=test_opinion_scraper.Site(),
         ):
-            cmd.handle(court_id="somepath.sc", opinion_ids=[101])
+            cmd.handle(
+                court_id="somepath.sc", opinion_ids=[self.opinion_sc.pk]
+            )
 
         self.assertFalse(
             any(
@@ -2906,7 +2990,7 @@ class TexasCaseMailIntegrationTest(TestCase):
 
 @mock.patch("cl.recap.tasks.merge_scotus_docket")
 @mock.patch("cl.recap.tasks.fetch_and_archive_scotus_docket_followup")
-@mock.patch("cl.recap.tasks.SCOTUSEmail")
+@mock.patch("cl.recap.tasks.SCOTUSEmail", autospec=True)
 @mock.patch("cl.recap.tasks.SCOTUSSESStorage")
 class SCOTUSEmailIntegrationTest(TestCase):
     """Integration test for the SCOTUS email processing flow.
@@ -3089,6 +3173,7 @@ class SCOTUSEmailIntegrationTest(TestCase):
         )
 
         mock_email_cls.return_value.email_type = SCOTUSEmailType.DOCKET_ENTRY
+        mock_email_cls.return_value.court_id = "scotus"
         mock_fetch.return_value = {
             "email_type": SCOTUSEmailType.DOCKET_ENTRY.value,
             "data": docket_data,

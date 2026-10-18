@@ -25,7 +25,7 @@ from django.db import connection
 from django.http import HttpResponse, QueryDict
 from django.middleware.csrf import CSRF_TOKEN_LENGTH
 from django.template import TemplateDoesNotExist, engines
-from django.template.loader import get_template
+from django.template.loader import get_template, render_to_string
 from django.template.response import TemplateResponse
 from django.test import (
     AsyncRequestFactory,
@@ -46,6 +46,9 @@ from waffle.testutils import override_flag
 if TYPE_CHECKING:
     from django.test.client import _MonkeyPatchedASGIResponse
 
+from cl.alerts.factories import DocketAlertFactory
+from cl.alerts.models import DocketAlert
+from cl.audio.factories import AudioFactory
 from cl.citations.utils import slugify_reporter
 from cl.favorites.models import GenericCount
 from cl.lib.file_validation import (
@@ -410,6 +413,57 @@ class ESClusterSearchAsyncTest(TestCase):
             )
 
         self.assertNotEqual(execute_thread, event_loop_thread)
+
+
+class ScannedOpinionPageTest(TestCase):
+    """Is the text of scanned opinions displayed?"""
+
+    @classmethod
+    def setUpTestData(cls) -> None:
+        cls.cluster = OpinionClusterWithParentsFactory.create(
+            precedential_status=PRECEDENTIAL_STATUS.PUBLISHED,
+        )
+        cls.opinion = OpinionFactory.create(
+            cluster=cls.cluster,
+            type=Opinion.COMBINED,
+            plain_text="",
+            html_with_citations="",
+            xml_scan=(
+                "<opinion><p>Text from the scanned reporter"
+                '<page-number label="3">*3</page-number> continues</p>'
+                "</opinion>"
+            ),
+        )
+        CitationWithParentsFactory.create(
+            cluster=cls.cluster,
+            volume="388",
+            reporter="So. 3d",
+            page="1",
+            type=Citation.STATE_REGIONAL,
+        )
+
+    def test_scanned_opinion_text_is_displayed(self) -> None:
+        """Is the opinion XML shown when the opinion only has xml_scan?"""
+        path = reverse("view_case", args=[self.cluster.pk, self.cluster.slug])
+        response = self.client.get(path)
+
+        self.assertEqual(response.status_code, HTTPStatus.OK)
+        self.assertContains(
+            response,
+            '<div class="serif-text harvard"><opinion><p>Text from the '
+            "scanned reporter",
+            html=False,
+        )
+
+    async def test_link_to_page_in_scanned_opinion(self) -> None:
+        """Is a citation to an inner page found by its star pagination?"""
+        response = await self.async_client.get(
+            reverse(
+                "citation_redirector",
+                kwargs={"reporter": "so-3d", "volume": "388", "page": "3"},
+            )
+        )
+        self.assertEqual(response.url, self.cluster.get_absolute_url())
 
 
 class SimpleLoadTest(TestCase):
@@ -1290,7 +1344,7 @@ class CitationRedirectorTest(TestCase):
     async def test_volume_pagination(self) -> None:
         """Can we properly paginate reporter volume numbers?"""
 
-        # Create test data usign factories
+        # Create test data using factories
         test_obj = await sync_to_async(CitationWithParentsFactory.create)(
             volume="2016",
             reporter="COA",
@@ -4093,6 +4147,299 @@ class DocketPageV2TemplateTest(TestCase):
         token = header.group(1)
         self.assertEqual(len(token), CSRF_TOKEN_LENGTH)
         self.assertTrue(token.isalnum())
+
+    async def test_v2_docket_page_counts_views(self) -> None:
+        """A view decorated with track_view_counter hands the body the event
+        label and the increment endpoint, and loads the viewCount store that
+        POSTs them once per page load."""
+        r = await self.async_client.get(
+            reverse("view_docket", args=[self.docket.pk, self.docket.slug])
+        )
+        self.assertTemplateUsed(r, "new_base.html")
+        html = r.content.decode()
+        body = next(fromstring(html).iter("body"))
+        self.assertEqual(
+            body.get("data-view-count-label"), f"d.{self.docket.pk}:view"
+        )
+        self.assertEqual(
+            body.get("data-view-count-url"),
+            reverse("increment-event-list", kwargs={"version": "v4"}),
+        )
+        self.assertRegex(
+            html,
+            r'<script[^>]*src="[^"]*js/alpine/composables/view_count\.js"',
+        )
+
+
+@override_settings(WAFFLE_CACHE_PREFIX="test_docket_staff_links_v2_waffle")
+@override_flag("use_new_design", active=True)
+class DocketPageV2StaffLinksTest(TestCase):
+    """Staff-only admin links on the v2 docket page.
+
+    Each link is gated on the permission its admin target requires, as on
+    the legacy page. See DocketPageV2TemplateTest for the cache prefix.
+    """
+
+    @classmethod
+    def setUpTestData(cls) -> None:
+        cls.docket = DocketFactory(
+            court=CourtFactory(id="canb", jurisdiction="FB"),
+            source=Docket.RECAP,
+        )
+        cls.recordings = AudioFactory.create_batch(2, docket=cls.docket)
+        cls.no_perms_user = UserProfileWithParentsFactory(
+            user__is_staff=True
+        ).user
+
+    @staticmethod
+    def _user_with(*perms: str) -> User:
+        """Builds a staff user holding exactly the given permissions, named
+        as has_perm() takes them, e.g. "search.view_docket"."""
+        user = UserProfileWithParentsFactory(user__is_staff=True).user
+        for perm in perms:
+            app_label, codename = perm.split(".")
+            user.user_permissions.add(
+                Permission.objects.get(
+                    content_type__app_label=app_label, codename=codename
+                )
+            )
+        return user
+
+    async def _get_docket_page(
+        self, user: User | None = None
+    ) -> "_MonkeyPatchedASGIResponse":
+        """Loads the v2 docket page, logged in as user when given and
+        anonymously otherwise, whatever the client's previous login."""
+        if user is None:
+            await self.async_client.alogout()
+        else:
+            await self.async_client.aforce_login(user)
+        r = await self.async_client.get(
+            reverse("view_docket", args=[self.docket.pk, self.docket.slug])
+        )
+        self.assertTemplateUsed(r, "v2_docket.html")
+        return r
+
+    @staticmethod
+    def _admin_links(html: str) -> list[_Element]:
+        """Anchors on the page that point into the Django admin."""
+        admin_prefix = reverse("admin:index")
+        return [
+            a
+            for a in fromstring(html).iter("a")
+            if (a.get("href") or "").startswith(admin_prefix)
+        ]
+
+    async def test_docket_permissions_show_the_edit_docket_link(
+        self,
+    ) -> None:
+        """Any one of view, change or delete on dockets shows a link to the
+        docket's admin change page."""
+        expected_href = reverse(
+            "admin:search_docket_change", args=[self.docket.pk]
+        )
+        for perm in (
+            "search.view_docket",
+            "search.change_docket",
+            "search.delete_docket",
+        ):
+            with self.subTest(permission=perm):
+                user = await sync_to_async(self._user_with)(perm)
+                r = await self._get_docket_page(user)
+                links = self._admin_links(r.content.decode())
+                self.assertEqual(
+                    [a.get("href") for a in links], [expected_href]
+                )
+
+    async def test_edit_docket_link_binds_the_view_count(self) -> None:
+        """The link shows the count from the viewCount store, hidden until
+        the store has a value."""
+        user = await sync_to_async(self._user_with)("search.view_docket")
+        r = await self._get_docket_page(user)
+        link = self._admin_links(r.content.decode())[0]
+        count = [
+            el
+            for el in link.iter()
+            if el.get("x-text") == "$store.viewCount.value"
+        ]
+        self.assertEqual(len(count), 1)
+        gate = next(
+            el
+            for el in link.iter()
+            if el.get("x-show") == "$store.viewCount.loaded"
+        )
+        self.assertIn(count[0], list(gate.iter()))
+
+    async def test_change_audio_shows_an_edit_link_per_recording(
+        self,
+    ) -> None:
+        """change_audio shows an icon-only Edit link to each recording's admin
+        change page, and nothing else from the admin. Each link names its
+        recording for screen readers."""
+        user = await sync_to_async(self._user_with)("audio.change_audio")
+        r = await self._get_docket_page(user)
+        links = {
+            a.get("href"): " ".join(a.text_content().split())
+            for a in self._admin_links(r.content.decode())
+        }
+        self.assertEqual(
+            links.keys(),
+            {
+                reverse("admin:audio_audio_change", args=[audio.pk])
+                for audio in self.recordings
+            },
+        )
+        for audio in self.recordings:
+            with self.subTest(recording=audio.pk):
+                href = reverse("admin:audio_audio_change", args=[audio.pk])
+                self.assertIn(audio.case_name, links[href])
+
+    async def test_users_without_permissions_see_no_admin_links(
+        self,
+    ) -> None:
+        """Anonymous visitors and users without the permissions see no link
+        into the admin at all."""
+        for label, user in (
+            ("anonymous", None),
+            ("no permissions", self.no_perms_user),
+        ):
+            with self.subTest(user=label):
+                r = await self._get_docket_page(user)
+                self.assertEqual(self._admin_links(r.content.decode()), [])
+
+
+@override_settings(WAFFLE_CACHE_PREFIX="test_docket_alert_toggle_v2_waffle")
+@override_flag("use_new_design", active=True)
+class DocketAlertToggleV2Test(TestCase):
+    """The alerts menu of the v2 docket page, for every user state.
+
+    `WAFFLE_CACHE_PREFIX` isolates this class's flag cache namespace from
+    parallel test workers, as DocketPageV2TemplateTest explains.
+    """
+
+    FRAGMENT = "v2_includes/docket_alerts_htmx/toggle.html"
+
+    @classmethod
+    def setUpTestData(cls) -> None:
+        cls.court = CourtFactory(id="cand", jurisdiction="FD")
+        cls.docket = DocketFactory(court=cls.court, source=Docket.RECAP)
+        cls.profile = UserProfileWithParentsFactory(
+            user__password=make_password("password")
+        )
+
+    async def login(self) -> None:
+        """Signs the fixture user in on the async client."""
+        self.assertTrue(
+            await self.async_client.alogin(
+                username=self.profile.user.username, password="password"
+            )
+        )
+
+    async def page(self) -> "_MonkeyPatchedASGIResponse":
+        """Loads the v2 docket page."""
+        return await self.async_client.get(
+            reverse("view_docket", args=[self.docket.pk, self.docket.slug])
+        )
+
+    def menu(self, html: str) -> str:
+        """The alerts menu markup, from the trigger label to the status region."""
+        start = html.index(f'id="docket-alert-label-{self.docket.pk}"')
+        end = html.index(f'id="docket-alert-status-{self.docket.pk}"')
+        return html[start:end]
+
+    def swap_target(self, html: str, name: str) -> str:
+        """The inner markup of a swap target ("label" or "toggle"), whitespace-normalised."""
+        match = re.search(
+            rf'<span id="docket-alert-{name}-{self.docket.pk}"[^>]*>(.*?)</span>',
+            html,
+            re.S,
+        )
+        self.assertIsNotNone(match)
+        return " ".join(match.group(1).split())
+
+    async def test_logged_out_item_links_to_sign_in(self) -> None:
+        """A visitor gets a plain link back to this docket after signing in."""
+        r = await self.page()
+        menu = self.menu(r.content.decode())
+        docket_path = reverse(
+            "view_docket", args=[self.docket.pk, self.docket.slug]
+        )
+        self.assertIn(f'href="{reverse("sign-in")}?next={docket_path}"', menu)
+        self.assertNotIn("hx-post", menu)
+
+    async def test_under_quota_item_posts_through_htmx(self) -> None:
+        """A user who can make an alert gets the htmx toggle."""
+        await self.login()
+        r = await self.page()
+        self.assertFalse(r.context["has_alert"])
+        menu = self.menu(r.content.decode())
+        self.assertIn(f'hx-post="{reverse("toggle_docket_alert")}"', menu)
+        self.assertIn(f'id="docket-alert-toggle-{self.docket.pk}"', menu)
+        self.assertIn('hx-disabled-elt="this"', menu)
+
+    @override_settings(MAX_FREE_DOCKET_ALERTS=0)
+    async def test_subscribed_user_can_always_disable(self) -> None:
+        """An existing alert shows as subscribed and stays removable at quota."""
+        await sync_to_async(DocketAlertFactory)(
+            docket=self.docket,
+            user=self.profile.user,
+            alert_type=DocketAlert.SUBSCRIPTION,
+        )
+        await self.login()
+        r = await self.page()
+        self.assertTrue(r.context["has_alert"])
+        self.assertIn(
+            f'hx-post="{reverse("toggle_docket_alert")}"',
+            self.menu(r.content.decode()),
+        )
+
+    @override_settings(MAX_FREE_DOCKET_ALERTS=0)
+    async def test_at_quota_item_never_posts(self) -> None:
+        """A user at quota with no alert is not offered the htmx toggle."""
+        await self.login()
+        r = await self.page()
+        self.assertFalse(r.context["has_alert"])
+        self.assertNotIn("hx-post", self.menu(r.content.decode()))
+
+    async def test_trigger_has_no_aria_label(self) -> None:
+        """The visible label is the trigger's accessible name.
+
+        An aria-label would replace it and could not follow the swap.
+        """
+        await self.login()
+        r = await self.page()
+        html = r.content.decode()
+        triggers = re.findall(r"<button[^>]*x-menu:button[^>]*>", html)
+        label_at = html.index(f'id="docket-alert-label-{self.docket.pk}"')
+        ours = [t for t in triggers if html.index(t) < label_at][-1]
+        self.assertNotIn("aria-label", ours)
+
+    async def test_swap_targets_match_the_fragment(self) -> None:
+        """The page and the fragment render the same label and item for a state."""
+        await self.login()
+        for has_alert in (False, True):
+            with self.subTest(has_alert=has_alert):
+                if has_alert:
+                    await sync_to_async(DocketAlertFactory)(
+                        docket=self.docket,
+                        user=self.profile.user,
+                        alert_type=DocketAlert.SUBSCRIPTION,
+                    )
+                r = await self.page()
+                fragment = await sync_to_async(render_to_string)(
+                    self.FRAGMENT,
+                    {
+                        "docket": self.docket,
+                        "has_alert": has_alert,
+                        "message": "",
+                    },
+                )
+                page = r.content.decode()
+                for target in ("label", "toggle"):
+                    self.assertEqual(
+                        self.swap_target(page, target),
+                        self.swap_target(fragment, target),
+                    )
 
 
 @override_settings(WAFFLE_CACHE_PREFIX="test_docket_entry_rows_v2_waffle")

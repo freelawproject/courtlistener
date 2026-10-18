@@ -4,6 +4,7 @@ class DocketSources:
     _NON_SCRAPER_SOURCES_CACHE = None
     _NON_COLUMBIA_SOURCES_CACHE = None
     _NON_HARVARD_SOURCES_CACHE = None
+    _NON_SCANNING_PROJECT_SOURCES_CACHE = None
     _NON_IDB_SOURCES_CACHE = None
     _NON_ANON_2020_SOURCES_CACHE = None
 
@@ -1250,6 +1251,15 @@ class DocketSources:
                 "HARVARD", exclude=True
             )
         return cls._NON_HARVARD_SOURCES_CACHE
+
+    @classmethod
+    def NON_SCANNING_PROJECT_SOURCES(cls) -> list[int]:
+        """Sources that don't include the scanning project."""
+        if cls._NON_SCANNING_PROJECT_SOURCES_CACHE is None:
+            cls._NON_SCANNING_PROJECT_SOURCES_CACHE = (
+                cls.generate_source_group("SCANNING_PROJECT", exclude=True)
+            )
+        return cls._NON_SCANNING_PROJECT_SOURCES_CACHE
 
     @classmethod
     def NON_IDB_SOURCES(cls) -> list[int]:

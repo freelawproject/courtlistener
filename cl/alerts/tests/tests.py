@@ -2,7 +2,7 @@ from collections import defaultdict
 from datetime import datetime, timedelta
 from http import HTTPStatus
 from types import SimpleNamespace
-from typing import cast
+from typing import TYPE_CHECKING, cast
 from unittest import mock
 
 import pytz
@@ -23,6 +23,9 @@ from lxml.html import HtmlElement
 from selenium.webdriver.common.by import By
 from timeout_decorator import timeout_decorator
 from waffle.testutils import override_switch
+
+if TYPE_CHECKING:
+    from django.test.client import _MonkeyPatchedWSGIResponse
 
 from cl.alerts.constants import LEGACY_MEMBERSHIP_HELP_URL
 from cl.alerts.factories import AlertFactory, DocketAlertWithParentsFactory
@@ -88,7 +91,6 @@ from cl.search.factories import (
 )
 from cl.search.models import (
     PRECEDENTIAL_STATUS,
-    Court,
     Docket,
     DocketEntry,
     RECAPDocument,
@@ -286,8 +288,13 @@ class AlertTest(SimpleUserDataMixin, ESIndexTestCase, TestCase):
         )
         rt_alert_params = self.alert_params.copy()
         rt_alert_params["rate"] = Alert.REAL_TIME
-        with time_machine.travel(
-            self.membership_termination_date + timedelta(days=2), tick=False
+        # Pin the grace period so two days past termination counts as expired.
+        with (
+            override_settings(NEON_MEMBERSHIP_GRACE_PERIOD_DAYS=0),
+            time_machine.travel(
+                self.membership_termination_date + timedelta(days=2),
+                tick=False,
+            ),
         ):
             r = await self.async_client.post(
                 reverse("show_results"), rt_alert_params, follow=True
@@ -945,7 +952,7 @@ class DocketAlertTest(TestCase):
     @classmethod
     def setUpTestData(cls) -> None:
         cls.user = UserFactory()
-        cls.court = Court.objects.get(id="scotus")
+        cls.court = CourtFactory(id="scotus", jurisdiction="F")
 
         # Create a DOCKET_ALERT webhook
         cls.webhook = WebhookFactory(
@@ -2692,7 +2699,7 @@ class DocketAlertAPITests(APITestCase):
         cls.user_1 = UserFactory()
         cls.user_2 = UserFactory()
 
-        cls.court = Court.objects.get(id="scotus")
+        cls.court = CourtFactory(id="scotus", jurisdiction="F")
         cls.docket = DocketFactory(
             case_name="BARTON v. State Board for Rodgers Educator Certification",
             docket_number_core="0600078",
@@ -3123,6 +3130,111 @@ class OldDocketAlertsReportToggleTest(TestCase):
         self.assertEqual(da.date_modified, eighty_five_days_ahead)
 
 
+class ToggleDocketAlertHtmxTest(TestCase):
+    """The docket alert toggle answers htmx requests with a v2 fragment."""
+
+    FRAGMENT = "v2_includes/docket_alerts_htmx/toggle.html"
+
+    @classmethod
+    def setUpTestData(cls) -> None:
+        cls.profile = UserProfileWithParentsFactory()
+        cls.docket = DocketFactory(source=Docket.RECAP)
+
+    def setUp(self) -> None:
+        self.client.force_login(self.profile.user)
+
+    def toggle(self) -> "_MonkeyPatchedWSGIResponse":
+        """Posts the toggle the way the v2 docket page does."""
+        return self.client.post(
+            reverse("toggle_docket_alert"),
+            {"id": self.docket.pk},
+            headers={"HX-Request": "true"},
+        )
+
+    def subscriptions(self) -> int:
+        """How many active alerts the user has on the docket."""
+        return DocketAlert.objects.filter(
+            user=self.profile.user,
+            docket=self.docket,
+            alert_type=DocketAlert.SUBSCRIPTION,
+        ).count()
+
+    def test_legacy_request_keeps_the_legacy_response(self) -> None:
+        """A non-htmx, non-ajax POST is still refused as before."""
+        r = self.client.post(
+            reverse("toggle_docket_alert"), {"id": self.docket.pk}
+        )
+        self.assertEqual(r.status_code, HTTPStatus.METHOD_NOT_ALLOWED)
+
+    def test_htmx_creates_the_alert(self) -> None:
+        """The first toggle subscribes and swaps in the subscribed state."""
+        self.assertEqual(self.subscriptions(), 0)
+        r = self.toggle()
+        self.assertEqual(r.status_code, HTTPStatus.OK)
+        self.assertTemplateUsed(r, self.FRAGMENT)
+        self.assertEqual(self.subscriptions(), 1)
+        self.assertTrue(r.context["has_alert"])
+        self.assertContains(r, f'id="docket-alert-label-{self.docket.pk}"')
+        self.assertContains(r, f'id="docket-alert-toggle-{self.docket.pk}"')
+        self.assertContains(r, f'id="docket-alert-status-{self.docket.pk}"')
+        self.assertContains(r, 'hx-swap-oob="innerHTML"', count=3)
+
+    def test_htmx_disables_the_alert(self) -> None:
+        """Toggling a subscribed docket unsubscribes it."""
+        self.toggle()
+        r = self.toggle()
+        self.assertEqual(self.subscriptions(), 0)
+        self.assertTemplateUsed(r, self.FRAGMENT)
+        self.assertFalse(r.context["has_alert"])
+
+    @override_settings(MAX_FREE_DOCKET_ALERTS=0)
+    def test_htmx_refuses_to_subscribe_over_quota(self) -> None:
+        """A user at quota gets no alert, even without the page's dialog."""
+        r = self.toggle()
+        self.assertEqual(r.status_code, HTTPStatus.OK)
+        self.assertEqual(self.subscriptions(), 0)
+        self.assertFalse(r.context["has_alert"])
+
+    @override_settings(MAX_FREE_DOCKET_ALERTS=1)
+    def test_htmx_allows_disabling_at_quota(self) -> None:
+        """Quota never blocks turning an alert off."""
+        self.toggle()
+        r = self.toggle()
+        self.assertEqual(self.subscriptions(), 0)
+        self.assertFalse(r.context["has_alert"])
+
+    def test_htmx_without_id_is_a_bad_request(self) -> None:
+        """A missing or malformed docket id is the caller's error.
+
+        Superscript two passes str.isdigit() but int() rejects it, so a
+        looser check would let it through to a 500 in the query.
+        """
+        for data in ({}, {"id": "abc"}, {"id": "²"}):
+            with self.subTest(data=data):
+                r = self.client.post(
+                    reverse("toggle_docket_alert"),
+                    data,
+                    headers={"HX-Request": "true"},
+                )
+                self.assertEqual(r.status_code, HTTPStatus.BAD_REQUEST)
+
+    def test_htmx_unknown_docket_is_not_found(self) -> None:
+        """A well-formed id for a docket that does not exist is a 404."""
+        r = self.client.post(
+            reverse("toggle_docket_alert"),
+            {"id": self.docket.pk + 100000},
+            headers={"HX-Request": "true"},
+        )
+        self.assertEqual(r.status_code, HTTPStatus.NOT_FOUND)
+
+    def test_htmx_from_a_logged_out_user_redirects_to_login(self) -> None:
+        """Logged-out users are sent to sign in, never handed a fragment."""
+        self.client.logout()
+        r = self.toggle()
+        self.assertEqual(r.status_code, HTTPStatus.FOUND)
+        self.assertIn(reverse("sign-in"), r["Location"])
+
+
 class OldDocketAlertsWebhooksTest(TestCase):
     """Test Old Docket Alerts Webhooks"""
 
@@ -3376,7 +3488,7 @@ class DocketAlertGetNotesTagsTests(TestCase):
     def setUpTestData(cls) -> None:
         cls.user_1 = UserFactory()
         cls.user_2 = UserFactory()
-        cls.court = Court.objects.get(id="scotus")
+        cls.court = CourtFactory(id="scotus", jurisdiction="F")
         cls.docket_1 = DocketFactory(
             court=cls.court,
         )
@@ -3665,24 +3777,24 @@ class SearchAlertsOAESTests(
         # Two OA search alert emails should be sent, one for user_profile and
         # one for user_profile_2
         self.assertEqual(len(mail.outbox), 2)
-        text_content = mail.outbox[0].body
-        self.assertEqual(
-            mail.outbox[0].subject,
-            f"1 Alert has hits: {self.search_alert.name}",
-        )
+        emails_by_subject = {email.subject: email for email in mail.outbox}
+        alert_subject = f"1 Alert has hits: {self.search_alert.name}"
+        self.assertIn(alert_subject, emails_by_subject)
+        alert_email = emails_by_subject[alert_subject]
+        text_content = alert_email.body
 
         self.assertIn(rt_oral_argument.case_name, text_content)
 
         # Should have the List-Unsubscribe-Post and List-Unsubscribe header
         # because the email only includes one alert.
-        self.assertIn("List-Unsubscribe", mail.outbox[0].extra_headers)
-        self.assertIn("List-Unsubscribe-Post", mail.outbox[0].extra_headers)
+        self.assertIn("List-Unsubscribe", alert_email.extra_headers)
+        self.assertIn("List-Unsubscribe-Post", alert_email.extra_headers)
         unsubscribe_url = reverse(
             "one_click_disable_alert", args=[self.search_alert.secret_key]
         )
         self.assertIn(
             unsubscribe_url,
-            mail.outbox[0].extra_headers["List-Unsubscribe"],
+            alert_email.extra_headers["List-Unsubscribe"],
         )
 
         # Highlighting tags are not set in text version
@@ -3690,7 +3802,7 @@ class SearchAlertsOAESTests(
 
         # Extract HTML version.
         html_content = None
-        for content, content_type in mail.outbox[0].alternatives:
+        for content, content_type in alert_email.alternatives:
             if content_type == "text/html":
                 html_content = content
                 break
@@ -3725,7 +3837,14 @@ class SearchAlertsOAESTests(
         self.assertEqual(len(webhook_events), 4)
 
         # Compare webhook content.
-        content = webhook_events[0].content
+        matching = [
+            event.content
+            for event in webhook_events
+            if event.content["payload"]["alert"]["query"]
+            == self.search_alert.query
+        ]
+        self.assertEqual(len(matching), 1)
+        content = matching[0]
         self.assertEqual(
             content["payload"]["alert"]["query"], self.search_alert.query
         )
@@ -3854,7 +3973,8 @@ class SearchAlertsOAESTests(
         # Two OA search alert emails should be sent, one for user_profile and
         # one for user_profile_2
         self.assertEqual(len(mail.outbox), 2)
-        text_content = mail.outbox[0].body
+        emails_by_recipient = {email.to[0]: email for email in mail.outbox}
+        text_content = emails_by_recipient[self.user_profile.user.email].body
         self.assertIn(rt_oral_argument.case_name, text_content)
 
         # 4 webhook events should be sent to user_profile.
@@ -3882,7 +4002,8 @@ class SearchAlertsOAESTests(
         call_command("cl_send_rt_percolator_alerts", testing_mode=True)
         # New alerts shouldn't be sent. Since document was just updated.
         self.assertEqual(len(mail.outbox), 2)
-        text_content = mail.outbox[0].body
+        emails_by_recipient = {email.to[0]: email for email in mail.outbox}
+        text_content = emails_by_recipient[self.user_profile.user.email].body
         self.assertIn(rt_oral_argument.case_name, text_content)
 
         # No new webhook events should be triggered.
@@ -4833,29 +4954,32 @@ class SearchAlertsOAESTests(
 
         # Two emails should be sent, one for user_profile and one for user_profile_2
         self.assertEqual(len(mail.outbox), 2)
+        emails_by_recipient = {email.to[0]: email for email in mail.outbox}
+        first_email = emails_by_recipient[self.user_profile.user.email]
+        second_email = emails_by_recipient[self.user_profile_2.user.email]
 
         # Confirm emails contains the hits+ count.
         self.assertIn(
             f"had {settings.SCHEDULED_ALERT_HITS_LIMIT}+ hits",
-            mail.outbox[0].body,
+            first_email.body,
         )
         # No "+" if hits do not reach the SCHEDULED_ALERT_HITS_LIMIT.
         self.assertIn(
             "had 2 hits",
-            mail.outbox[1].body,
+            second_email.body,
         )
 
         # Confirm each email contains the max number of hits for each alert.
         self.assertEqual(
-            mail.outbox[0].body.count("USA vs Bank"),
+            first_email.body.count("USA vs Bank"),
             settings.SCHEDULED_ALERT_HITS_LIMIT,
         )
         self.assertEqual(
-            mail.outbox[0].body.count("Texas vs Corp"),
+            first_email.body.count("Texas vs Corp"),
             2,
         )
         self.assertEqual(
-            mail.outbox[1].body.count("Texas vs Corp"),
+            second_email.body.count("Texas vs Corp"),
             2,
         )
 
