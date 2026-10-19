@@ -863,10 +863,7 @@ class ESSignalProcessor:
 
     @elasticsearch_enabled
     def handle_delete[M: Model](
-        self,
-        sender: type[M],
-        instance: M | None = None,
-        **kwargs
+        self, sender: type[M], instance: M | None = None, **kwargs
     ) -> None:
         """Receiver function that gets called after an object instance is deleted"""
         if instance is None:
@@ -889,11 +886,7 @@ class ESSignalProcessor:
 
     @elasticsearch_enabled
     def handle_m2m[M: Model](
-        self,
-        sender: type[M],
-        instance: M | None = None,
-        action=None,
-        **kwargs
+        self, sender: type[M], instance: M | None = None, action=None, **kwargs
     ) -> None:
         """Receiver function that gets called after a m2m relation is modified"""
         if instance is None:
@@ -913,10 +906,7 @@ class ESSignalProcessor:
 
     @elasticsearch_enabled
     def handle_reverse_actions[M: Model](
-        self,
-        sender: type[M],
-        instance: M | None = None,
-        **kwargs
+        self, sender: type[M], instance: M | None = None, **kwargs
     ) -> None:
         """Receiver function that gets called after a reverse relation is
         created, updated or removed.
@@ -965,10 +955,7 @@ class ESSignalProcessor:
 
     @elasticsearch_enabled
     def handle_reverse_actions_delete[M: Model](
-        self,
-        sender: type[M],
-        instance: M | None = None,
-        **kwargs
+        self, sender: type[M], instance: M | None = None, **kwargs
     ) -> None:
         """Receiver function that gets called after a reverse relation is
         removed.
