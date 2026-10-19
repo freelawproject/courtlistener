@@ -1296,7 +1296,7 @@ class RecapUploadsTest(TestCase):
             filepath_local=self.f,
         )
         with mock.patch(
-            "cl.recap.tasks.ACMSDocketReport", MockACMSDocketReport
+            "cl.recap.parsers.ACMSDocketReport", MockACMSDocketReport
         ):
             # Process the ACMS docket report.
             async_to_sync(process_recap_acms_docket)(pq.pk)
@@ -1404,7 +1404,7 @@ class RecapUploadsTest(TestCase):
         # After adding 1 docket entry, it should only exist its main RD.
         self.assertEqual(recap_documents.count(), 1)
         with mock.patch(
-            "cl.recap.tasks.ACMSAttachmentPage", MockACMSAttachmentPage
+            "cl.recap.parsers.ACMSAttachmentPage", MockACMSAttachmentPage
         ):
             # Process the acms attachment page containing 3 attachments.
             async_to_sync(process_recap_acms_appellate_attachment)(pq.pk)
@@ -1427,7 +1427,7 @@ class RecapUploadsTest(TestCase):
             filepath_local=self.f,
         )
         with mock.patch(
-            "cl.recap.tasks.ACMSAttachmentPage", MockACMSAttachmentPage
+            "cl.recap.parsers.ACMSAttachmentPage", MockACMSAttachmentPage
         ):
             # Process the acms attachment page containing 3 attachments.
             async_to_sync(process_recap_acms_appellate_attachment)(pq_1.pk)
