@@ -13,7 +13,7 @@ document.addEventListener('alpine:init', () => {
      */
     closeAndFocusTrigger() {
       this.$data.__close(false);
-      this.$refs.__button.focus();
+      this.$refs.__button.focus({ preventScroll: true });
     },
   }));
 });
