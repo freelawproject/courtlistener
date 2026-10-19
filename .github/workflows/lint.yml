@@ -37,3 +37,8 @@ jobs:
 
       - name: pyrefly Static Type Checker
         run: uv run pyrefly check --error-stale-baseline --output-format full-text-with-github
+
+        # For some reason `--error-stale-baseline` and `--prune-baseline` don’t recognize removals that affect the
+        # baseline. This appears to be fixed in v1.4.0. Below is a stop-gap that performs this check manually.
+      - name: pyrefly Static Type Checker - staleness
+        run: uv run pyrefly check --update-baseline && git diff --exit-code .pyrefly-baseline.json
