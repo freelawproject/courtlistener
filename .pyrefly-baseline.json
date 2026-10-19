@@ -1093,13 +1093,6 @@
       "severity": "error"
     },
     {
-      "column": 27,
-      "path": "cl/corpus_importer/utils.py",
-      "name": "missing-attribute",
-      "concise_description": "Object of class `Manager` has no attribute `appellate_courts`",
-      "severity": "error"
-    },
-    {
       "column": 9,
       "path": "cl/corpus_importer/utils.py",
       "name": "missing-attribute",
@@ -1426,13 +1419,6 @@
       "path": "cl/lib/document_serializer.py",
       "name": "bad-override",
       "concise_description": "Class member `NullableListField.to_representation` overrides parent class `ListField` in an inconsistent manner",
-      "severity": "error"
-    },
-    {
-      "column": 9,
-      "path": "cl/lib/document_serializer.py",
-      "name": "bad-override",
-      "concise_description": "Class member `DocumentSerializer.get_fields` overrides parent class `Serializer` in an inconsistent manner",
       "severity": "error"
     },
     {
@@ -2042,34 +2028,6 @@
       "path": "cl/people_db/import_judges/populate_fjc_judges.py",
       "name": "missing-attribute",
       "concise_description": "Object of class `NoneType` has no attribute `split`",
-      "severity": "error"
-    },
-    {
-      "column": 17,
-      "path": "cl/people_db/import_judges/populate_fjc_judges.py",
-      "name": "missing-attribute",
-      "concise_description": "Object of class `NoneType` has no attribute `insert`",
-      "severity": "error"
-    },
-    {
-      "column": 17,
-      "path": "cl/people_db/import_judges/populate_fjc_judges.py",
-      "name": "missing-attribute",
-      "concise_description": "Object of class `NoneType` has no attribute `insert`",
-      "severity": "error"
-    },
-    {
-      "column": 17,
-      "path": "cl/people_db/import_judges/populate_fjc_judges.py",
-      "name": "missing-attribute",
-      "concise_description": "Object of class `NoneType` has no attribute `insert`",
-      "severity": "error"
-    },
-    {
-      "column": 17,
-      "path": "cl/people_db/import_judges/populate_fjc_judges.py",
-      "name": "missing-attribute",
-      "concise_description": "Object of class `NoneType` has no attribute `append`",
       "severity": "error"
     },
     {
