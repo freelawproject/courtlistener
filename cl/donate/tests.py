@@ -1417,6 +1417,20 @@ class SyncNeonMembershipsCommandTest(TestCase):
             self.user.pk, NeonMembershipLevel.TIER_2
         )
 
+    def test_checks_membership_still_inside_grace_period(self) -> None:
+        """Fixes a lapsed membership while the grace period keeps it active."""
+        self.membership.termination_date = now() - timedelta(hours=30)
+        self.membership.save()
+        self.assertTrue(self.membership.is_active)
+        self.mock_get_membership.return_value = make_neon_membership()
+
+        call_command("sync_neon_memberships")
+
+        self.mock_get_membership.assert_called_once_with("1234")
+        self.membership.refresh_from_db()
+        self.assertEqual(self.membership.neon_id, "200")
+        self.assertTrue(self.membership.is_active)
+
     def test_updates_extended_term_on_same_membership(self) -> None:
         """Picks up a new term end date even when the membership id matches."""
         self.mock_get_membership.return_value = make_neon_membership(

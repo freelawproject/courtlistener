@@ -4,6 +4,12 @@ This command runs daily and checks expired memberships against the Neon API.
 If a member renewed but the renewal webhook was missed, it updates the local
 record and rebuilds the member's API throttles.
 
+Memberships keep their benefits for NEON_MEMBERSHIP_GRACE_PERIOD_DAYS after
+their termination date. That grace period is what gives this command time to
+catch a missed renewal before access drops, so it selects memberships by
+their raw termination date, not by whether benefits have ended, and should
+run at least daily with --min-hours-expired well below the grace period.
+
 Memberships that Neon confirms have no active membership are deleted after a
 week. The membership history is kept by pghistory, and a later renewal creates
 a new record through the createMembership webhook.
@@ -64,6 +70,8 @@ def get_expired_memberships(
     matching webhooks before we poll. The upper bound keeps the number of
     Neon API calls per daily run proportional to recent lapses, including
     records the command can't fix and would otherwise re-check forever.
+    The window is based on the termination date itself, so memberships still
+    inside the grace period are checked while their benefits are intact.
 
     :param min_hours_expired: Minimum hours since the membership expired.
     :param max_days_expired: Maximum days since expiration, or None for no
