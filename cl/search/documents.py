@@ -1428,6 +1428,8 @@ class ESRECAPDocument(
         return escape(instance.plain_text.translate(null_map))
 
     def prepare_cites(self, instance):
+        # SCOTUSDocument has no cited_opinions relation yet -- citation
+        # matching isn't built for SCOTUS content yet, but is planned.
         cited_opinions = getattr(instance, "cited_opinions", None)
         if cited_opinions is None:
             return []

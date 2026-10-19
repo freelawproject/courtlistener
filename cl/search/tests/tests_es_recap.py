@@ -6567,10 +6567,22 @@ class ESRECAPDocumentSCOTUSCompatibilityTest(TestCase):
         docket = scotus_document.docket_entry.docket
         ScotusDocketMetadataFactory(docket=docket, capital_case=True)
 
-        self.assertIs(
-            ESRECAPDocument().prepare(scotus_document)["capital_case"], True
+        prepared_document = ESRECAPDocument().prepare(scotus_document)
+        prepared_docket = DocketDocument().prepare(docket)
+
+        self.assertIs(prepared_document["capital_case"], True)
+        self.assertIs(prepared_docket["capital_case"], True)
+        self.assertEqual(
+            prepared_document["short_description"],
+            scotus_document.description,
         )
-        self.assertIs(DocketDocument().prepare(docket)["capital_case"], True)
+        self.assertEqual(
+            prepared_document["attachment_number"],
+            scotus_document.attachment_number,
+        )
+        self.assertEqual(prepared_document["docket_id"], docket.pk)
+        self.assertEqual(prepared_docket["caseName"], docket.case_name)
+        self.assertEqual(prepared_docket["docketNumber"], docket.docket_number)
 
     def test_capital_case_false_is_not_confused_with_absent(self) -> None:
         """`capital_case=False` (a real SCOTUS case that isn't capital)
@@ -6581,10 +6593,17 @@ class ESRECAPDocumentSCOTUSCompatibilityTest(TestCase):
         docket = scotus_document.docket_entry.docket
         ScotusDocketMetadataFactory(docket=docket, capital_case=False)
 
-        self.assertIs(
-            ESRECAPDocument().prepare(scotus_document)["capital_case"], False
+        prepared_document = ESRECAPDocument().prepare(scotus_document)
+        prepared_docket = DocketDocument().prepare(docket)
+
+        self.assertIs(prepared_document["capital_case"], False)
+        self.assertIs(prepared_docket["capital_case"], False)
+        self.assertEqual(
+            prepared_document["short_description"],
+            scotus_document.description,
         )
-        self.assertIs(DocketDocument().prepare(docket)["capital_case"], False)
+        self.assertEqual(prepared_document["docket_id"], docket.pk)
+        self.assertEqual(prepared_docket["caseName"], docket.case_name)
 
     def test_capital_case_none_without_scotus_metadata(self) -> None:
         """A SCOTUS docket with no ScotusDocketMetadata row yet
@@ -6594,10 +6613,17 @@ class ESRECAPDocumentSCOTUSCompatibilityTest(TestCase):
         )
         docket = scotus_document.docket_entry.docket
 
-        self.assertIsNone(
-            ESRECAPDocument().prepare(scotus_document)["capital_case"]
+        prepared_document = ESRECAPDocument().prepare(scotus_document)
+        prepared_docket = DocketDocument().prepare(docket)
+
+        self.assertIsNone(prepared_document["capital_case"])
+        self.assertIsNone(prepared_docket["capital_case"])
+        self.assertEqual(
+            prepared_document["short_description"],
+            scotus_document.description,
         )
-        self.assertIsNone(DocketDocument().prepare(docket)["capital_case"])
+        self.assertEqual(prepared_document["docket_id"], docket.pk)
+        self.assertEqual(prepared_docket["caseName"], docket.case_name)
 
     def test_capital_case_none_on_plain_recap_docket(self) -> None:
         """A regular RECAP docket also reports `None` for capital_case,
@@ -6605,8 +6631,16 @@ class ESRECAPDocumentSCOTUSCompatibilityTest(TestCase):
         rd = RECAPDocumentFactory(docket_entry=DocketEntryFactory())
         docket = rd.docket_entry.docket
 
-        self.assertIsNone(ESRECAPDocument().prepare(rd)["capital_case"])
-        self.assertIsNone(DocketDocument().prepare(docket)["capital_case"])
+        prepared_document = ESRECAPDocument().prepare(rd)
+        prepared_docket = DocketDocument().prepare(docket)
+
+        self.assertIsNone(prepared_document["capital_case"])
+        self.assertIsNone(prepared_docket["capital_case"])
+        self.assertEqual(
+            prepared_document["short_description"], rd.description
+        )
+        self.assertEqual(prepared_document["docket_id"], docket.pk)
+        self.assertEqual(prepared_docket["caseName"], docket.case_name)
 
     def test_scotus_document_type_and_cites_do_not_crash(self) -> None:
         """SCOTUS documents have no document_type and no
@@ -6615,10 +6649,18 @@ class ESRECAPDocumentSCOTUSCompatibilityTest(TestCase):
             docket_entry__docket__court=self.court
         )
 
+        docket = scotus_document.docket_entry.docket
         prepared = ESRECAPDocument().prepare(scotus_document)
 
         self.assertIsNone(prepared["document_type"])
         self.assertEqual(prepared["cites"], [])
+        self.assertEqual(
+            prepared["short_description"], scotus_document.description
+        )
+        self.assertEqual(
+            prepared["attachment_number"], scotus_document.attachment_number
+        )
+        self.assertEqual(prepared["docket_id"], docket.pk)
 
     def test_recap_document_type_and_cites_regression(self) -> None:
         """A regular RECAPDocument still gets its real document_type and
@@ -6632,10 +6674,13 @@ class ESRECAPDocumentSCOTUSCompatibilityTest(TestCase):
             citing_document=rd, cited_opinion=OpinionWithParentsFactory()
         )
 
+        docket = rd.docket_entry.docket
         prepared = ESRECAPDocument().prepare(rd)
 
         self.assertEqual(prepared["document_type"], "PACER Document")
         self.assertEqual(prepared["cites"], [citation.cited_opinion_id])
+        self.assertEqual(prepared["short_description"], rd.description)
+        self.assertEqual(prepared["docket_id"], docket.pk)
 
 
 class RECAPFeedTest(RECAPSearchTestCase, ESIndexTestCase, TestCase):
