@@ -660,6 +660,9 @@ class ApiQueryCountTests(TestCase):
         api_prefix = "api:test_counts.count"
         r.set(api_prefix, 101)
         self.clear_query_caches()
+        # This call is a bit arbitrary, and intended to warm caches
+        # so that we have consistent cache behavior for tests.
+        self.client.get(reverse("audio-list", kwargs={"version": "v3"}))
 
     def tearDown(self) -> None:
         UserProfile.objects.all().delete()
@@ -1086,7 +1089,7 @@ class BlockV3APITests(TestCase):
             V3APIPermission, "check_request", return_value=True
         ):
             response = await self.async_client.get(self.audio_path_v3)
-        self.assertEqual(response.status_code, HTTPStatus.FORBIDDEN)
+        self.assertEqual(response.status_code, HTTPStatus.UNAUTHORIZED)
 
     async def test_allow_v4_for_new_users(self, mock_api_prefix) -> None:
         """Confirm new API users are allowed to use V4 of the API"""
@@ -1098,13 +1101,13 @@ class BlockV3APITests(TestCase):
             )
         self.assertEqual(response.status_code, HTTPStatus.OK)
 
-    async def test_allow_v4_for_anonymous_users(self, mock_api_prefix) -> None:
-        """Confirm V4 anonymous API users are not allowed to use V4 of the API"""
+    async def test_block_v4_for_anonymous_users(self, mock_api_prefix) -> None:
+        """Confirm anonymous API users are not allowed to use V4 of the API"""
         with mock.patch.object(
             V3APIPermission, "check_request", return_value=True
         ):
             response = await self.async_client.get(self.audio_path_v4)
-        self.assertEqual(response.status_code, HTTPStatus.OK)
+        self.assertEqual(response.status_code, HTTPStatus.UNAUTHORIZED)
 
     async def test_confirm_v4_post_requests_are_not_allowed(
         self, mock_api_prefix
@@ -1128,10 +1131,11 @@ class BlockV3APITests(TestCase):
         self.assertEqual(response.status_code, HTTPStatus.UNAUTHORIZED)
 
 
-class JudgeAndDisclosureAPIAuthTest(TestCase):
-    """Judge and financial disclosure endpoints require an account."""
+class AuthRequiredAPIEndpointsTest(TestCase):
+    """Judge, financial disclosure and audio endpoints require an account."""
 
     endpoints = [
+        "audio-list",
         "person-list",
         "position-list",
         "retentionevent-list",
@@ -5240,10 +5244,11 @@ class ThrottleOverrideIntegrationTest(TestCase):
         overrides = get_all_throttle_overrides(ThrottleType.API)
         self.assertNotIn(throttle.user.username, overrides)
 
+    @override_settings(NEON_MEMBERSHIP_GRACE_PERIOD_DAYS=0)
     def test_overrides_drop_membership_when_membership_terminated(
         self,
     ) -> None:
-        """MEMBERSHIP throttles are dropped when termination_date is in the past."""
+        """MEMBERSHIP throttles are dropped once the term ends, with no grace."""
         user = UserFactory()
         APIThrottleFactory(
             user=user,
@@ -5257,6 +5262,28 @@ class ThrottleOverrideIntegrationTest(TestCase):
         )
         overrides = get_all_throttle_overrides(ThrottleType.API)
         self.assertNotIn(user.username, overrides)
+
+    @override_settings(NEON_MEMBERSHIP_GRACE_PERIOD_DAYS=3)
+    def test_overrides_keep_membership_within_grace_period(self) -> None:
+        """MEMBERSHIP throttles survive the grace period after the term ends."""
+        in_grace = UserFactory()
+        past_grace = UserFactory()
+        for user, days_ago in ((in_grace, 2), (past_grace, 4)):
+            APIThrottleFactory(
+                user=user,
+                throttle_type=ThrottleType.API,
+                rate="10/min",
+                source=APIThrottle.Source.MEMBERSHIP,
+            )
+            NeonMembershipFactory(
+                user=user,
+                termination_date=now() - timedelta(days=days_ago),
+            )
+
+        overrides = get_all_throttle_overrides(ThrottleType.API)
+
+        self.assertIn(in_grace.username, overrides)
+        self.assertNotIn(past_grace.username, overrides)
 
     def test_overrides_drop_membership_when_payment_failed(self) -> None:
         """MEMBERSHIP throttles are dropped when payment_status is FAILED."""

@@ -319,15 +319,7 @@ async def redirect_og_lookup(request: HttpRequest) -> HttpResponse:
         filepath_local=file_path
     ).prefetch_related("docket_entry")
 
-    if not await rd_filter.aexists():
-        # We couldn't find the URL. Redirect back to AWS, but be sure to serve
-        # the file this time. Ideally this doesn't happen, but let's be ready
-        # in case it does.
-        return HttpResponseRedirect(
-            f"https://storage.courtlistener.com/{file_path}?no-og=1"
-        )
-    else:
-        rd = await rd_filter.afirst()
+    if (rd := await rd_filter.afirst()) is not None:
         return await view_recap_document(
             request,
             docket_id=rd.docket_entry.docket_id,
@@ -335,6 +327,13 @@ async def redirect_og_lookup(request: HttpRequest) -> HttpResponse:
             att_num=rd.attachment_number,
             is_og_bot=True,
         )
+
+    # We couldn't find the URL. Redirect back to AWS, but be sure to serve
+    # the file this time. Ideally this doesn't happen, but let's be ready
+    # in case it does.
+    return HttpResponseRedirect(
+        f"https://storage.courtlistener.com/{file_path}?no-og=1"
+    )
 
 
 async def redirect_docket_recap(
@@ -446,8 +445,11 @@ async def view_docket(
     has_idb_data = bool(docket.idb_data_id)
     has_authorities = await docket.ahas_authorities()
 
-    context.update(
-        {
+    return TemplateResponse(
+        request,
+        "docket.html",
+        context
+        | {
             "parties": parties,
             "authorities": has_authorities,
             "docket_entries": paginated_entries,
@@ -458,9 +460,8 @@ async def view_docket(
             "tabs": build_docket_tabs(
                 docket, parties, has_idb_data, has_authorities
             ),
-        }
+        },
     )
-    return TemplateResponse(request, "docket.html", context)
 
 
 @cache_page_ignore_params(300, cache_alias="s3")
@@ -534,14 +535,16 @@ async def view_parties(
             parties[party_type.name] = []
         parties[party_type.name].append(party_type)
 
-    context.update(
-        {
+    return TemplateResponse(
+        request,
+        "docket_parties.html",
+        context
+        | {
             "parties": parties,
             "parties_paginator": party_types_paginator,
             "docket_entries": await docket.docket_entries.aexists(),
-        }
+        },
     )
-    return TemplateResponse(request, "docket_parties.html", context)
 
 
 @ratelimit_deny_list
@@ -557,8 +560,12 @@ async def docket_idb_data(
         )
     except ObjectDoesNotExist:
         raise Http404("No IDB data for this docket at this time")
-    context.update(
-        {
+
+    return TemplateResponse(
+        request,
+        "docket_idb_data.html",
+        context
+        | {
             # Needed to show/hide parties tab.
             "parties": await docket.parties.aexists(),
             "docket_entries": await docket.docket_entries.aexists(),
@@ -579,9 +586,8 @@ async def docket_idb_data(
             ),
             "judgment_csv": choices_to_csv(idb_data, "judgment"),
             "pro_se_csv": choices_to_csv(idb_data, "pro_se"),
-        }
+        },
     )
-    return TemplateResponse(request, "docket_idb_data.html", context)
 
 
 @ratelimit_deny_list
@@ -594,15 +600,17 @@ async def docket_authorities(
     if not await docket.ahas_authorities():
         raise Http404("No authorities data for this docket at this time")
 
-    context.update(
-        {
+    return TemplateResponse(
+        request,
+        "docket_authorities.html",
+        context
+        | {
             # Needed to show/hide parties tab.
             "parties": await docket.parties.aexists(),
             "docket_entries": await docket.docket_entries.aexists(),
             "authorities": docket.authority_opinions.distinct(),
-        }
+        },
     )
-    return TemplateResponse(request, "docket_authorities.html", context)
 
 
 def make_rd_title(rd: RECAPDocument | SCOTUSDocument) -> str:
@@ -1045,7 +1053,7 @@ async def setup_opinion_context(
 async def get_opinions_queryset(
     sub_opinions_prefetch: str,
 ) -> QuerySet[OpinionCluster]:
-    """Prepare a cluster queryset with common prefetchs to prevent extra
+    """Prepare a cluster queryset with common prefetches to prevent extra
     queries
 
     :param sub_opinions_prefetch: a plain string which identifies a prefetch
@@ -1061,6 +1069,7 @@ async def get_opinions_queryset(
                 "html",
                 "plain_text",
                 "xml_harvard",
+                "xml_scan",
                 "html_lawbox",
                 "html_columbia",
                 "html_anon_2020",
@@ -1101,7 +1110,7 @@ async def render_opinion_view(
 
 
 async def update_opinion_tabs(request: HttpRequest, pk: int) -> HttpResponse:
-    """Generate opinions tab dinamically
+    """Generate opinions tab dynamically
 
     :param request: The HTTP request from the user
     :param pk: OpinionCluster pk

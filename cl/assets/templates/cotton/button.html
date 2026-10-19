@@ -10,7 +10,7 @@
 {# --- Base --- #}
 {% with base="rounded-lg w-fit font-normal flex gap-1 items-center" %}
 {# --- Sizes --- #}
-{% with md="py-2.5 px-3.5 text-sm" xl="py-3 px-4.5 text-md" %}
+{% with sm="py-1.5 px-2.5 text-xs" md="py-2.5 px-3.5 text-sm" xl="py-3 px-4.5 text-md" %}
 {# --- Variants --- #}
 {% with primary="text-white bg-primary-600 outline-none hover:bg-primary-700 focus-visible:ring-4 focus-visible:ring-primary-300" outline="bg-white text-greyscale-700 border border-greyscale-300 outline-none hover:bg-greyscale-50 hover:border-greyscale-400 focus-visible:ring-4 focus-visible:ring-greyscale-300" dark="text-white bg-greyscale-900 outline-none hover:bg-greyscale-800 focus-visible:ring-4 focus-visible:ring-greyscale-400" ghost="hover:bg-greyscale-100 focus-visible:ring-4 focus-visible:ring-greyscale-200" grey="bg-greyscale-100 hover:bg-greyscale-200 focus-visible:ring-4 focus-visible:ring-greyscale-200" %}
 {# --- Disabled: button uses disabled:, link uses aria-disabled: --- #}
@@ -21,7 +21,7 @@
 <a
   href="{{ href }}"
 
-  class="{% if variant %}{{ base }} {% if size == 'xl' %}{{ xl }}{% else %}{{ md }}{% endif %} {% if variant == 'outline' %}{{ outline }} {{ link_outline_dis }}{% elif variant == 'dark' %}{{ dark }} {{ link_dark_dis }}{% elif variant == 'ghost' %}{{ ghost }} {{ link_ghost_dis }}{% elif variant == 'grey' %}{{ grey }} {{ link_grey_dis }}{% else %}{{ primary }} {{ link_primary_dis }}{% endif %}{% endif %} {{ class }}"
+  class="{% if variant %}{{ base }} {% if size == 'xl' %}{{ xl }}{% elif size == 'sm' %}{{ sm }}{% else %}{{ md }}{% endif %} {% if variant == 'outline' %}{{ outline }} {{ link_outline_dis }}{% elif variant == 'dark' %}{{ dark }} {{ link_dark_dis }}{% elif variant == 'ghost' %}{{ ghost }} {{ link_ghost_dis }}{% elif variant == 'grey' %}{{ grey }} {{ link_grey_dis }}{% else %}{{ primary }} {{ link_primary_dis }}{% endif %}{% endif %} {{ class }}"
   {{ attrs }}
 >{{ slot }}</a>
 {% elif touch_target %}
@@ -31,13 +31,13 @@
   class="min-h-13 h-fit min-w-13 w-fit flex justify-center items-center focus-visible:outline-none group"
   {{ attrs }}
 >
-  <span class="{% if variant %}{{ base }} {% if size == 'xl' %}{{ xl }}{% else %}{{ md }}{% endif %} {% if variant == 'outline' %}{{ outline }}{% elif variant == 'dark' %}{{ dark }}{% elif variant == 'ghost' %}{{ ghost }}{% elif variant == 'grey' %}{{ grey }}{% else %}{{ primary }}{% endif %} group-focus-visible:ring-4 group-focus-visible:ring-greyscale-300{% endif %} {{ class }}">{{ slot }}</span>
+  <span class="{% if variant %}{{ base }} {% if size == 'xl' %}{{ xl }}{% elif size == 'sm' %}{{ sm }}{% else %}{{ md }}{% endif %} {% if variant == 'outline' %}{{ outline }}{% elif variant == 'dark' %}{{ dark }}{% elif variant == 'ghost' %}{{ ghost }}{% elif variant == 'grey' %}{{ grey }}{% else %}{{ primary }}{% endif %} group-focus-visible:ring-4 group-focus-visible:ring-greyscale-300{% endif %} {{ class }}">{{ slot }}</span>
 </button>
 {% else %}
 <button
   type="{{ type }}"
 
-  class="{% if variant %}{{ base }} {% if size == 'xl' %}{{ xl }}{% else %}{{ md }}{% endif %} {% if variant == 'outline' %}{{ outline }} {{ btn_outline_dis }}{% elif variant == 'dark' %}{{ dark }} {{ btn_dark_dis }}{% elif variant == 'ghost' %}{{ ghost }} {{ btn_ghost_dis }}{% elif variant == 'grey' %}{{ grey }} {{ btn_grey_dis }}{% else %}{{ primary }} {{ btn_primary_dis }}{% endif %}{% endif %} {{ class }}"
+  class="{% if variant %}{{ base }} {% if size == 'xl' %}{{ xl }}{% elif size == 'sm' %}{{ sm }}{% else %}{{ md }}{% endif %} {% if variant == 'outline' %}{{ outline }} {{ btn_outline_dis }}{% elif variant == 'dark' %}{{ dark }} {{ btn_dark_dis }}{% elif variant == 'ghost' %}{{ ghost }} {{ btn_ghost_dis }}{% elif variant == 'grey' %}{{ grey }} {{ btn_grey_dis }}{% else %}{{ primary }} {{ btn_primary_dis }}{% endif %}{% endif %} {{ class }}"
   {{ attrs }}
 >{{ slot }}</button>
 {% endif %}

@@ -2,7 +2,7 @@ import logging
 import re
 from datetime import datetime
 from pathlib import Path
-from typing import TYPE_CHECKING, Literal, TypeVar
+from typing import TYPE_CHECKING, Literal, Self, TypeVar
 from urllib.parse import quote
 
 import nh3
@@ -788,6 +788,8 @@ class Docket(AbstractDateTimeModel, DocketSources):
                 non_source_list = self.NON_SCRAPER_SOURCES()
             case self.HARVARD:
                 non_source_list = self.NON_HARVARD_SOURCES()
+            case self.SCANNING_PROJECT:
+                non_source_list = self.NON_SCANNING_PROJECT_SOURCES()
             case _:
                 return
 
@@ -1169,7 +1171,7 @@ class DocketEntry(AbstractDateTimeModel, CSVExportMixin):
         return columns
 
     def get_column_function(self):
-        """Get dict of attrs: fucntion to apply on field value if it needs
+        """Get dict of attrs: function to apply on field value if it needs
         to be pre-processed before being add to csv
 
         returns: dict -- > {attr1: function}"""
@@ -3076,6 +3078,7 @@ def sort_cites(c):
 OPINION_TEXT_SOURCE_FIELDS = [
     "html_with_citations",
     "xml_harvard",
+    "xml_scan",
     "html_columbia",
     "html_lawbox",
     "html_anon_2020",
@@ -3097,6 +3100,7 @@ class OpinionQuerySet(models.QuerySet):
         The supported source fields are:
             - html_with_citations (preferred)
             - xml_harvard
+            - xml_scan
             - html_columbia
             - html_lawbox
             - html_anon_2020
@@ -3302,6 +3306,7 @@ class Opinion(AbstractDateTimeModel):
             "html_columbia",
             "html_lawbox",
             "xml_harvard",
+            "xml_scan",
             "html_anon_2020",
             "html",
             "plain_text",
@@ -4150,7 +4155,7 @@ class CaseTransfer(AbstractDateTimeModel):
             }
         )
         total = qs.count()
-        updated_transfers: list[CaseTransfer] = []
+        updated_transfers: list[Self] = []
         total_updated = 0
 
         for transfer in qs.iterator():
