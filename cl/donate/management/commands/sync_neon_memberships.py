@@ -16,6 +16,7 @@ a new record through the createMembership webhook.
 """
 
 import logging
+from collections import Counter
 from datetime import datetime, timedelta
 from enum import Enum
 from typing import Any
@@ -41,7 +42,7 @@ logger = logging.getLogger(__name__)
 
 
 class SyncResult(Enum):
-    """Result of syncing a membership with Neon."""
+    """Outcome of checking one membership against Neon."""
 
     # Neon had newer data and the local record was updated.
     UPDATED = "updated"
@@ -49,8 +50,13 @@ class SyncResult(Enum):
     UNCHANGED = "unchanged"
     # Neon has data we can't apply yet or at all (payment still in progress,
     # unexpected status, no term end date, unknown level, EDU without a .edu
-    # email); the record is left alone and never deleted.
+    # email, no Neon account id); the record is left alone and never deleted.
     SKIPPED = "skipped"
+    # Neon confirmed the lapse and the local record was deleted.
+    DELETED = "deleted"
+    # The check itself failed (Neon request error or an unexpected error);
+    # nothing was written and the record is retried on the next run.
+    FAILED = "failed"
 
 
 # Neon membership statuses the command understands. SUCCEEDED is the only
@@ -280,19 +286,86 @@ def delete_expired_membership(membership: NeonMembership) -> bool:
             )
             return False
         clear_membership_throttles(membership.user, clear_cache=False)
+    logger.info(
+        "Deleted expired membership for user %s: it ended on %s and Neon "
+        "had nothing newer.",
+        membership.user.username,
+        membership.termination_date
+        and timezone.localdate(membership.termination_date),
+    )
     return True
+
+
+def check_membership(
+    client: NeonClient,
+    membership: NeonMembership,
+    delete_before: datetime | None,
+) -> SyncResult:
+    """Check one expired membership against Neon and apply what it finds.
+
+    Fetches the account's primary active membership, syncs it into the local
+    record when it is newer, and deletes the local record when Neon confirms
+    the lapse and the membership ended before ``delete_before``. A failed
+    Neon request is logged and reported as FAILED so the caller can move on
+    to the next member; any other exception propagates to the caller.
+
+    :param client: The Neon API client.
+    :param membership: The local membership to check, with its user and
+        profile loaded.
+    :param delete_before: Delete confirmed lapses that ended before this
+        instant, or None to never delete.
+    :return: What happened to the membership.
+    """
+    user = membership.user
+    account_id = user.profile.neon_account_id  # type: ignore
+    if not account_id:
+        logger.warning(
+            "User %s has a membership but no Neon account ID; skipping.",
+            user.username,
+        )
+        return SyncResult.SKIPPED
+
+    try:
+        neon_membership = client.get_primary_active_membership(account_id)
+    except requests.RequestException as e:
+        logger.warning(
+            "Neon API request failed for account %s (user %s): %s",
+            account_id,
+            user.username,
+            e,
+        )
+        return SyncResult.FAILED
+
+    if neon_membership is None:
+        logger.debug(
+            "Neon reports no active membership for user %s.", user.username
+        )
+        result = SyncResult.UNCHANGED
+    else:
+        result = sync_membership_from_neon(membership, neon_membership)
+
+    if (
+        result is SyncResult.UNCHANGED
+        and delete_before is not None
+        and membership.termination_date
+        and membership.termination_date < delete_before
+        and delete_expired_membership(membership)
+    ):
+        return SyncResult.DELETED
+    return result
 
 
 def sync_expired_memberships(
     min_hours_expired: int,
     max_days_expired: int | None,
     delete_after_days: int,
-) -> tuple[int, int, int]:
+) -> Counter[SyncResult]:
     """Check expired memberships against the Neon API and sync their data.
 
-    Each membership requires one API request. If a request fails, the user
-    has no Neon account ID, or the membership cannot be updated safely, the
-    command skips that membership and continues.
+    Each membership costs one API request. One bad record must not stop the
+    run: a failed Neon request is logged as a warning, and any other error
+    while handling a membership is logged with its traceback, so it reaches
+    Sentry, and counted as FAILED.
 
     Memberships confirmed to have no active membership are deleted once
     they have been expired for at least delete_after_days. Set this value
@@ -302,7 +375,7 @@ def sync_expired_memberships(
     :param max_days_expired: See `get_expired_memberships`.
     :param delete_after_days: Age in days past the termination date after
         which a confirmed-expired membership is deleted. 0 disables deletion.
-    :return: A three-tuple of memberships checked, updated and deleted.
+    :return: How many memberships ended in each ``SyncResult``.
     """
     client = NeonClient()
     delete_before = (
@@ -310,57 +383,21 @@ def sync_expired_memberships(
         if delete_after_days > 0
         else None
     )
-    checked = updated = deleted = 0
+    counts: Counter[SyncResult] = Counter()
     for membership in get_expired_memberships(
         min_hours_expired, max_days_expired
     ):
-        checked += 1
-        account_id = membership.user.profile.neon_account_id  # type: ignore
-        if not account_id:
-            logger.warning(
-                "User %s has a membership but no Neon account ID; skipping.",
-                membership.user.username,
-            )
-            continue
-
         try:
-            neon_membership = client.get_primary_active_membership(account_id)
-        except requests.RequestException as e:
-            logger.warning(
-                "Neon API request failed for account %s (user %s): %s",
-                account_id,
-                membership.user.username,
-                e,
-            )
-            continue
-
-        if neon_membership is None:
-            logger.debug(
-                "Neon reports no active membership for user %s.",
+            result = check_membership(client, membership, delete_before)
+        except Exception:
+            logger.exception(
+                "Unexpected error while syncing the membership of user %s; "
+                "leaving it for the next run.",
                 membership.user.username,
             )
-            result = SyncResult.UNCHANGED
-        else:
-            result = sync_membership_from_neon(membership, neon_membership)
-
-        if result is SyncResult.UPDATED:
-            updated += 1
-        elif (
-            result is SyncResult.UNCHANGED
-            and delete_before is not None
-            and membership.termination_date
-            and membership.termination_date < delete_before
-        ):
-            logger.info(
-                "Deleting expired membership for user %s: expired on %s and "
-                "Neon has nothing newer.",
-                membership.user.username,
-                membership.termination_date.date(),
-            )
-            if delete_expired_membership(membership):
-                deleted += 1
-
-    return checked, updated, deleted
+            result = SyncResult.FAILED
+        counts[result] += 1
+    return counts
 
 
 class Command(VerboseCommand):
@@ -413,12 +450,15 @@ class Command(VerboseCommand):
                 f"grace period ({grace_days} days) or 0 to disable deletion."
             )
         max_days_expired = options["max_days_expired"]
-        checked, updated, deleted = sync_expired_memberships(
+        counts = sync_expired_memberships(
             options["min_hours_expired"],
             max_days_expired if max_days_expired > 0 else None,
             delete_after_days,
         )
         self.stdout.write(
-            f"Checked {checked} expired memberships, updated {updated}, "
-            f"deleted {deleted}."
+            f"Checked {sum(counts.values())} expired memberships: "
+            f"{counts[SyncResult.UPDATED]} updated, "
+            f"{counts[SyncResult.DELETED]} deleted, "
+            f"{counts[SyncResult.SKIPPED]} skipped, "
+            f"{counts[SyncResult.FAILED]} failed."
         )

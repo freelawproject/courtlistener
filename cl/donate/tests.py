@@ -1,6 +1,7 @@
 from collections import defaultdict
 from datetime import UTC, date, datetime, timedelta
 from http import HTTPStatus
+from io import StringIO
 from unittest.mock import MagicMock, patch
 
 import requests
@@ -1525,8 +1526,9 @@ class SyncNeonMembershipsCommandTest(TestCase):
             requests.HTTPError("500 Server Error"),
             make_neon_membership(),
         ]
+        out = StringIO()
 
-        call_command("sync_neon_memberships")
+        call_command("sync_neon_memberships", stdout=out)
 
         self.assertEqual(self.mock_get_membership.call_count, 2)
         other_membership.refresh_from_db()
@@ -1534,6 +1536,38 @@ class SyncNeonMembershipsCommandTest(TestCase):
         self.membership.refresh_from_db()
         self.assertEqual(self.membership.neon_id, "200")
         self.assertEqual(self.get_membership_rates(), sorted(TIER_2_RATES))
+        self.assertIn(
+            "1 updated, 0 deleted, 0 skipped, 1 failed", out.getvalue()
+        )
+
+    def test_continues_after_unexpected_error(self) -> None:
+        """A malformed Neon record is logged with its traceback and skipped."""
+        other_profile = UserProfileWithParentsFactory(neon_account_id="5678")
+        other_membership = NeonMembershipFactory(
+            user=other_profile.user,
+            neon_id="300",
+            termination_date=now() - timedelta(days=10),
+        )
+        malformed = make_neon_membership()
+        del malformed["membershipLevel"]
+        # Oldest expiration first, so the malformed record hits the other
+        # member, who is old enough to delete but must be left alone.
+        self.mock_get_membership.side_effect = [
+            malformed,
+            make_neon_membership(),
+        ]
+        out = StringIO()
+
+        call_command("sync_neon_memberships", stdout=out)
+
+        self.mock_logger.exception.assert_called_once()
+        other_membership.refresh_from_db()
+        self.assertEqual(other_membership.neon_id, "300")
+        self.membership.refresh_from_db()
+        self.assertEqual(self.membership.neon_id, "200")
+        self.assertIn(
+            "1 updated, 0 deleted, 0 skipped, 1 failed", out.getvalue()
+        )
 
     def test_skips_unknown_level_and_edu_without_edu_email(self) -> None:
         """Keeps records with levels we don't map or EDU for non-.edu users."""
