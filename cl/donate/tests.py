@@ -8,6 +8,7 @@ import time_machine
 from asgiref.sync import sync_to_async
 from django.core import mail
 from django.core.management import call_command
+from django.core.management.base import CommandError
 from django.test import override_settings
 from django.test.client import AsyncClient, Client
 from django.urls import reverse
@@ -1662,3 +1663,16 @@ class SyncNeonMembershipsCommandTest(TestCase):
         self.assertFalse(
             NeonMembership.objects.filter(pk=self.membership.pk).exists()
         )
+
+    def test_rejects_delete_threshold_inside_grace_period(self) -> None:
+        """--delete-after-days must exceed the grace period unless it is 0."""
+        self.mock_get_membership.return_value = None
+        # The class pins the grace period to 2 days.
+        for days in (1, 2):
+            with self.subTest(days=days), self.assertRaises(CommandError):
+                call_command("sync_neon_memberships", delete_after_days=days)
+        self.assert_membership_untouched()
+
+        for days in (0, 3):
+            with self.subTest(days=days):
+                call_command("sync_neon_memberships", delete_after_days=days)

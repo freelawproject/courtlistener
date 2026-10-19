@@ -15,6 +15,8 @@ from enum import Enum
 from typing import Any
 
 import requests
+from django.conf import settings
+from django.core.management.base import CommandError
 from django.db import models, transaction
 from django.db.models import QuerySet
 from django.utils import timezone
@@ -385,17 +387,28 @@ class Command(VerboseCommand):
             type=int,
             default=7,
             help="Delete expired memberships that Neon confirms have nothing "
-            "newer once they expired at least this many days ago. 0 "
-            "disables deletion. Default: 7.",
+            "newer once they expired at least this many days ago. Must be "
+            "greater than NEON_MEMBERSHIP_GRACE_PERIOD_DAYS so members are "
+            "never deleted while still inside the grace period. 0 disables "
+            "deletion. Default: 7.",
         )
 
     def handle(self, *args, **options):
         super().handle(*args, **options)
+        delete_after_days = options["delete_after_days"]
+        grace_days = settings.NEON_MEMBERSHIP_GRACE_PERIOD_DAYS
+        if 0 < delete_after_days <= grace_days:
+            # Deleting the row also deletes its MEMBERSHIP throttles, so a
+            # delete inside the grace period would cut access early.
+            raise CommandError(
+                "--delete-after-days must be greater than the membership "
+                f"grace period ({grace_days} days) or 0 to disable deletion."
+            )
         max_days_expired = options["max_days_expired"]
         checked, updated, deleted = sync_expired_memberships(
             options["min_hours_expired"],
             max_days_expired if max_days_expired > 0 else None,
-            options["delete_after_days"],
+            delete_after_days,
         )
         self.stdout.write(
             f"Checked {checked} expired memberships, updated {updated}, "
