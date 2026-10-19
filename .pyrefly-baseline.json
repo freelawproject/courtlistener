@@ -4334,28 +4334,28 @@
       "severity": "error"
     },
     {
-      "column": 20,
+      "column": 24,
       "path": "cl/search/models.py",
       "name": "bad-return",
       "concise_description": "Returned type `tuple[Model, bool]` is not assignable to declared return type `tuple[Tag, bool]`",
       "severity": "error"
     },
     {
-      "column": 20,
+      "column": 24,
       "path": "cl/search/models.py",
       "name": "bad-return",
       "concise_description": "Returned type `tuple[Model, bool]` is not assignable to declared return type `tuple[Tag, bool]`",
       "severity": "error"
     },
     {
-      "column": 20,
+      "column": 24,
       "path": "cl/search/models.py",
       "name": "bad-return",
       "concise_description": "Returned type `tuple[Model, bool]` is not assignable to declared return type `tuple[Tag, bool]`",
       "severity": "error"
     },
     {
-      "column": 20,
+      "column": 24,
       "path": "cl/search/models.py",
       "name": "bad-return",
       "concise_description": "Returned type `tuple[Model, bool]` is not assignable to declared return type `tuple[Tag, bool]`",
