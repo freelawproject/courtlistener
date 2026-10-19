@@ -229,8 +229,9 @@ def _toggle_docket_alert_htmx(
     A user at their quota is refused a new or re-enabled subscription. The
     refusal is still a 200: htmx does not swap error responses, and the
     partial carries the status message plus the live alert count for the
-    page's quota dialog. The `HX-Trigger` header is what opens that dialog,
-    once the menu has closed and refocused its trigger.
+    page's quota dialog. The `HX-Trigger-After-Swap` header is what opens
+    that dialog, once the count is in the page and the menu has closed and
+    refocused its trigger.
     """
     if request.method != "POST":
         return HttpResponseNotAllowed(permitted_methods={"POST"})
@@ -266,7 +267,7 @@ def _toggle_docket_alert_htmx(
                 .count()
             )
             message = "You have reached your docket alert limit."
-            headers["HX-Trigger"] = "docket-alert-quota-reached"
+            headers["HX-Trigger-After-Swap"] = "docket-alert-quota-reached"
         else:
             if alert:
                 alert.alert_type = DocketAlert.SUBSCRIPTION

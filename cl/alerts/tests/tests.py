@@ -3183,7 +3183,7 @@ class ToggleDocketAlertHtmxTest(TestCase):
         self.assertEqual(self.subscriptions(), 1)
         self.assertTrue(r.context["has_alert"])
         self.assertFalse(r.context["quota_reached"])
-        self.assertNotIn("HX-Trigger", r)
+        self.assertNotIn("HX-Trigger-After-Swap", r)
         self.assertContains(r, f'id="docket-alert-label-{self.docket.pk}"')
         self.assertContains(r, f'id="docket-alert-toggle-{self.docket.pk}"')
         self.assertContains(r, f'id="docket-alert-status-{self.docket.pk}"')
@@ -3211,7 +3211,9 @@ class ToggleDocketAlertHtmxTest(TestCase):
         self.assertFalse(r.context["has_alert"])
         self.assertTrue(r.context["quota_reached"])
         self.assertEqual(r.context["subscription_count"], 0)
-        self.assertEqual(r["HX-Trigger"], "docket-alert-quota-reached")
+        self.assertEqual(
+            r["HX-Trigger-After-Swap"], "docket-alert-quota-reached"
+        )
         self.assertContains(r, f'{self.count_id()} hx-swap-oob="innerHTML"')
 
     @override_settings(MAX_FREE_DOCKET_ALERTS=1)

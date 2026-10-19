@@ -8,6 +8,7 @@ from django.template import engines
 from django.template.loader import TemplateDoesNotExist, get_template
 from django.test import RequestFactory, override_settings
 from django.urls import resolve, reverse
+from django_cotton.compiler_regex import CottonCompiler
 from lxml.html import fromstring
 from waffle.testutils import override_flag
 
@@ -725,24 +726,23 @@ class DialogComponentTest(SimpleTestCase):
     """The c-dialog component renders a trigger only when given one."""
 
     def render(self, source: str) -> str:
-        """Renders Cotton's compiled form of a template snippet."""
-        template = engines["django"].from_string(source)
+        """Compiles a Cotton snippet and renders it."""
+        compiled = CottonCompiler().process(source)
+        template = engines["django"].from_string(compiled)
         return template.render({"request": RequestFactory().get("/")})
 
     def test_trigger_slot_renders_a_trigger(self) -> None:
         """Trigger content renders the default trigger button."""
         html = self.render(
-            "{% cotton dialog %}{% cotton:slot button_content %}Open"
-            "{% endcotton:slot %}{% cotton:slot panel %}Body"
-            "{% endcotton:slot %}{% endcotton %}"
+            '<c-dialog><c-slot name="button_content">Open</c-slot>'
+            '<c-slot name="panel">Body</c-slot></c-dialog>'
         )
         self.assertIn('aria-haspopup="dialog"', html)
 
     def test_without_a_trigger_slot_no_trigger_is_rendered(self) -> None:
         """A dialog opened by other means, such as an event listener, has no trigger button."""
         html = self.render(
-            "{% cotton dialog %}{% cotton:slot panel %}Body"
-            "{% endcotton:slot %}{% endcotton %}"
+            '<c-dialog><c-slot name="panel">Body</c-slot></c-dialog>'
         )
         self.assertNotIn('aria-haspopup="dialog"', html)
         self.assertIn("Body", html)
