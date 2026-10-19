@@ -196,7 +196,7 @@ class DocumentSerializer(serializers.Serializer):
 
         return kwargs
 
-    def get_fields(self):
+    def get_fields(self) -> OrderedDict[str, serializers.Field]:
         """Get the required fields for serializing the result."""
         fields = getattr(self.Meta, "fields", ())
         exclude = getattr(self.Meta, "exclude", ())
@@ -205,7 +205,7 @@ class DocumentSerializer(serializers.Serializer):
         model = document.Django.model
         document_fields = document._fields
         declared_fields = copy.deepcopy(self._declared_fields)
-        field_mapping = OrderedDict()
+        field_mapping: OrderedDict[str, serializers.Field] = OrderedDict()
 
         if all([fields, exclude]):
             raise ImproperlyConfigured(

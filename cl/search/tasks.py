@@ -1409,11 +1409,11 @@ def build_bulk_cites_doc(
     if not child_instance:
         return {}, None
 
-    match child_doc_model.__name__:
-        case "RECAPDocument":
+    match child_instance:
+        case RECAPDocument():
             parent_document_id = child_instance.docket_entry.docket.pk
             child_id_property = "RECAP"
-        case "Opinion":
+        case Opinion():
             parent_document_id = child_instance.cluster.pk
             child_id_property = "OPINION"
         case _:
@@ -2129,8 +2129,8 @@ def index_embeddings(
         "_index": OpinionClusterDocument._index._name,
     }
     documents_to_update = []
-    for embeddings in embeddings:
-        opinion_id = embeddings["id"]
+    for embeddings_item in embeddings:
+        opinion_id = embeddings_item["id"]
         opinion_instance = (
             Opinion.objects.filter(id=opinion_id)
             .only("pk", "cluster", "main_version")
@@ -2144,7 +2144,7 @@ def index_embeddings(
             "_id": ES_CHILD_ID(opinion_id).OPINION,
             "_routing": opinion_instance.cluster_id,
             "doc": {
-                "embeddings": embeddings["embeddings"],
+                "embeddings": embeddings_item["embeddings"],
                 "timestamp": datetime.now(UTC),
             },
         }

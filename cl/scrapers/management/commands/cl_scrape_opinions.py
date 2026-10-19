@@ -21,7 +21,6 @@ from cl import settings
 from cl.lib.command_utils import ScraperCommand, logger
 from cl.lib.crypto import sha1
 from cl.lib.string_utils import trunc
-from cl.people_db.lookup_utils import lookup_judges_by_messy_str
 from cl.scrapers.DupChecker import DupChecker
 from cl.scrapers.exceptions import (
     ConsecutiveDuplicatesError,
@@ -32,6 +31,7 @@ from cl.scrapers.utils import (
     check_duplicate_ingestion,
     get_child_court,
     get_extension,
+    link_judges,
     make_citation,
     save_response,
     signal_handler,
@@ -53,7 +53,7 @@ die_now = False
 cnt = CaseNameTweaker()
 
 
-def set_ordering_keys(opinions_content: list[tuple[dict]]) -> None:
+def set_ordering_keys(opinions_content: list[tuple[dict, bytes, str]]) -> None:
     """Set a value for Opinion.ordering_key
 
     To know the relative order inside the cluster, we must know all the
@@ -225,29 +225,8 @@ def save_everything(
         citation.cluster_id = cluster.pk
         citation.save()
 
-    if cluster.judges:
-        candidate_judges = async_to_sync(lookup_judges_by_messy_str)(
-            cluster.judges, docket.court.pk, cluster.date_filed
-        )
-
-        if (
-            len(candidate_judges) == 1
-            and len(opinions) == 1
-            and not opinions[0].author_str
-        ):
-            opinions[0].author = candidate_judges[0]
-        elif len(candidate_judges) > 1:
-            for candidate in candidate_judges:
-                cluster.panel.add(candidate)
-
+    link_judges(cluster, opinions)
     for opinion in opinions:
-        if opinion.author_str:
-            candidate = async_to_sync(lookup_judges_by_messy_str)(
-                opinion.author_str, docket.court.pk, cluster.date_filed
-            )
-            if len(candidate) == 1:
-                opinion.author = candidate[0]
-
         opinion.cluster = cluster
         opinion.save()
 
