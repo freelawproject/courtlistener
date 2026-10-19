@@ -144,17 +144,18 @@ def sync_membership_from_neon(
         return SyncResult.SKIPPED
 
     termination_date = parse_neon_date(term_end_date)
-    new_date = termination_date.date()
+    new_date = timezone.localdate(termination_date)
     current_date = (
-        membership.termination_date.date()
+        timezone.localdate(membership.termination_date)
         if membership.termination_date
         else None
     )
-    if new_date < timezone.now().date() or (
+    if new_date < timezone.localdate() or (
         current_date and new_date <= current_date
     ):
         # Neon's record grants nothing beyond what we already have: it is
-        # either expired as well or the same term we already stored.
+        # either expired as well or the same term we already stored. Dates
+        # are compared in the current time zone, like NeonMembership.is_active.
         return SyncResult.UNCHANGED
 
     if status in NEON_STATUSES_IN_PROGRESS:

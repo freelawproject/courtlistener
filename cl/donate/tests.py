@@ -1330,6 +1330,7 @@ class NeonClientMembershipTest(SimpleTestCase):
                 self.assertEqual(params["sortDirection"], "DESC")
 
 
+@override_settings(NEON_MEMBERSHIP_GRACE_PERIOD_DAYS=2)
 @time_machine.travel(datetime(2026, 10, 9, 12, 0, tzinfo=UTC), tick=False)
 class SyncNeonMembershipsCommandTest(TestCase):
     """Tests for the sync_neon_memberships command."""
