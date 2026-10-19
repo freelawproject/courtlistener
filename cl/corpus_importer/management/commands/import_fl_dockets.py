@@ -1,9 +1,8 @@
 from collections.abc import Iterable
 from typing import ClassVar
 
-from pydantic import Field
-
 from celery import Task
+from pydantic import Field
 
 from cl.corpus_importer.management.utils import (
     CorpusImporterCommand,
