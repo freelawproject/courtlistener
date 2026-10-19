@@ -14,6 +14,18 @@
 />
 
 <div>
+{% if perms.search|has_any_perm:"docket" %}
+  <div class="flex justify-end mb-2" x-data>
+    <c-button variant="dark" size="sm" href="{% url 'admin:search_docket_change' docket.pk %}">
+      {% svg "edit" class="w-3.5 h-3.5" aria_hidden="true" %}
+      Edit Docket
+      {% if track_events %}
+        <span x-show="$store.viewCount.loaded" x-cloak class="text-greyscale-300">(<span x-text="$store.viewCount.value"></span> views)</span>
+      {% endif %}
+    </c-button>
+  </div>
+{% endif %}
+
 {# Filed date eyebrow #}
 {% if docket.date_filed %}
   <c-eyebrow class="mb-2">Filed: {{ docket.date_filed }}</c-eyebrow>
@@ -148,20 +160,28 @@
 {% endfor %}
 
 {# ORAL ARGUMENT RECORDINGS #}
-{% if docket.audio_files.count %}
+{% with recordings=docket.audio_files.all %}
+{% if recordings %}
   <h2 class="mt-6">Oral Argument Recordings</h2>
   <ul>
-    {% for af in docket.audio_files.all %}
+    {% for af in recordings %}
       <li>
-        <a class="links" href="{{ af.get_absolute_url }}{% querystring %}">
-          {{ af|best_case_name|safe|v_wrapper }}
-        </a>
-        <br/>
-        {{ af.docket.date_argued|default_if_none:"" }}
+        <div class="flex items-start gap-3">
+          {% if perms.audio.change_audio %}
+            <c-button variant="dark" size="sm" href="{% url 'admin:audio_audio_change' af.pk %}" title="Edit {{ af|best_case_name }}">{% svg "edit" class="w-4 h-4" aria_hidden="true" %}<span class="sr-only">Edit {{ af|best_case_name }}</span></c-button>
+          {% endif %}
+          <div>
+            <a class="links" href="{{ af.get_absolute_url }}{% querystring %}">
+              {{ af|best_case_name|safe|v_wrapper }}
+            </a>
+            <div>{{ af.docket.date_argued|default_if_none:"" }}</div>
+          </div>
+        </div>
       </li>
     {% endfor %}
   </ul>
 {% endif %}
+{% endwith %}
 
 </div>
 

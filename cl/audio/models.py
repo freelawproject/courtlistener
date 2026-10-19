@@ -37,6 +37,7 @@ class Audio(AbstractDateTimeModel):
     ]
 
     # Annotation required b/c this FK is nullable, which breaks absolute_url
+    # pyrefly:ignore[bad-assignment] Deliberately narrower than the field
     docket: Docket = models.ForeignKey(
         Docket,
         help_text="The docket that the oral argument is a part of",
@@ -117,6 +118,7 @@ class Audio(AbstractDateTimeModel):
         null=True,
         blank=True,
     )
+    # TODO: Rounded up or down or to nearest?
     duration = models.SmallIntegerField(
         help_text="the length of the item, in seconds",
         null=True,

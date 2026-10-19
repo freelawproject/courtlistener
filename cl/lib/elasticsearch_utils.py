@@ -103,13 +103,15 @@ OPENING_CHAR = r"[\(\[]"  # Matches the following characters: (, [
 CLOSING_CHAR = r"[\)\]]"  # Matches the following characters: ), ]
 
 
-def elasticsearch_enabled(func: Callable) -> Callable:
+def elasticsearch_enabled[**P, R](
+    func: Callable[P, R],
+) -> Callable[P, R | None]:
     """A decorator to avoid executing Elasticsearch methods when it's disabled."""
 
     @wraps(func)
-    def wrapper_func(*args, **kwargs) -> Any:
+    def wrapper_func(*args: P.args, **kwargs: P.kwargs) -> R | None:
         if not settings.ELASTICSEARCH_DISABLED:
-            func(*args, **kwargs)
+            return func(*args, **kwargs)
 
     return wrapper_func
 
@@ -2145,7 +2147,9 @@ def merge_unavailable_fields_on_parent_document(
                 )
             )
 
-            initial_documents_in_page = {}
+            initial_documents_in_page: dict[
+                int, tuple[str | None, str | None, str]
+            ] = {}
             for initial_document in initial_documents:
                 if initial_document.has_valid_pdf:
                     # Initial Document available
@@ -2206,6 +2210,12 @@ def merge_unavailable_fields_on_parent_document(
                             ~QObject(xml_harvard=""),
                             then=Substr(
                                 "xml_harvard", 1, settings.NO_MATCH_HL_SIZE
+                            ),
+                        ),
+                        When(
+                            ~QObject(xml_scan=""),
+                            then=Substr(
+                                "xml_scan", 1, settings.NO_MATCH_HL_SIZE
                             ),
                         ),
                         When(

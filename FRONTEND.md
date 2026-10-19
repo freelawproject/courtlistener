@@ -169,7 +169,7 @@ To display the count, bind to the store from any Alpine root. The store only exi
 {% if track_events %}<span x-text="$store.viewCount.value"></span>{% endif %}
 ```
 
-`value` is `null` until the response arrives and stays `null` when the request fails. Failures are logged to the console and never shown to the user. The endpoint returns the count before the current view, and 0 for recognized bots, so `value` excludes the view being recorded.
+`value` is `null` until the response arrives and stays `null` when the request fails; `loaded` is true once it holds a count, for `x-show` gates since the CSP build cannot compare in markup. Failures are logged to the console and never shown to the user. The endpoint returns the count before the current view, and 0 for recognized bots, so `value` excludes the view being recorded.
 
 Cotton components rendered with `only` do not see the page context, so `track_events` is false inside them: pass it explicitly (`:track_events="track_events"`) or render the element from the page template.
 
