@@ -79,6 +79,7 @@ from cl.search.factories import (
     OpinionsCitedByRECAPDocumentFactory,
     OpinionWithParentsFactory,
     RECAPDocumentFactory,
+    SCOTUSDocketEntryFactory,
     ScotusDocketMetadataFactory,
     SCOTUSDocumentFactory,
 )
@@ -6688,6 +6689,56 @@ class ESRECAPDocumentSCOTUSCompatibilityTest(TestCase):
         self.assertEqual(prepared["cites"], [citation.cited_opinion_id])
         self.assertEqual(prepared["short_description"], rd.description)
         self.assertEqual(prepared["docket_id"], docket.pk)
+
+
+class SCOTUSFieldTrackerTest(TestCase):
+    """Confirm the FieldTrackers added for #8020 (ScotusDocketMetadata,
+    SCOTUSDocketEntry, SCOTUSDocument) track the fields the ES signal
+    mapping depends on -- entirely at the model level, no ES or
+    signals involved.
+    """
+
+    def setUp(self) -> None:
+        self.court = CourtFactory(id="scotus", jurisdiction="F")
+
+    def test_scotus_document_tracks_docket_entry_id(self) -> None:
+        """Must include docket_entry_id, or reparenting a
+        SCOTUSDocument would never trigger the mapping's ["prepare"]
+        sentinel -- leaving its ES entry on the old docket forever."""
+        entry_a = SCOTUSDocketEntryFactory(docket__court=self.court)
+        entry_b = SCOTUSDocketEntryFactory(docket__court=self.court)
+        document = SCOTUSDocumentFactory(docket_entry=entry_a)
+
+        document.docket_entry = entry_b
+
+        self.assertIn(
+            "docket_entry_id", document.es_rd_field_tracker.changed()
+        )
+
+    def test_scotus_docket_entry_tracks_mapped_fields(self) -> None:
+        """Tracks every field scotus_document_field_mapping depends on
+        (description, entry_number, date_filed)."""
+        entry = SCOTUSDocketEntryFactory(docket__court=self.court)
+
+        entry.description = "updated"
+        entry.entry_number = 999
+        entry.date_filed = datetime.date(2020, 1, 1)
+
+        changed = entry.es_rd_field_tracker.changed()
+        self.assertIn("description", changed)
+        self.assertIn("entry_number", changed)
+        self.assertIn("date_filed", changed)
+
+    def test_scotus_docket_metadata_tracks_capital_case(self) -> None:
+        """Tracks capital_case."""
+        docket = DocketFactory(court=self.court, source=Docket.DEFAULT)
+        metadata = ScotusDocketMetadataFactory(
+            docket=docket, capital_case=False
+        )
+
+        metadata.capital_case = True
+
+        self.assertIn("capital_case", metadata.es_rd_field_tracker.changed())
 
 
 class ESDocketSourcesTest(SimpleTestCase):
