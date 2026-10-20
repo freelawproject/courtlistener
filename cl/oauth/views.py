@@ -70,12 +70,12 @@ class DynamicClientRegistrationView(APIView):
     """RFC 7591 Dynamic Client Registration endpoint.
 
     Open registration: anyone on the internet may POST to this
-    endpoint to create an OAuth client. This is required by the MCP
-    authorization spec so that clients the server has never seen
-    before can self-register. The resulting client is useless until a
-    real user completes the authorization-code flow and grants
-    consent, so the abuse surface is DB pollution, which we bound
-    with a per-IP rate limit.
+    endpoint to create an OAuth client. The MCP server registers its
+    own clients now; this stays open for clients that still hold its
+    address from before the cutover. The resulting client is useless
+    until a real user completes the authorization-code flow and grants
+    consent, so the abuse surface is DB pollution, which the tight
+    per-IP rate limit bounds.
     """
 
     authentication_classes: list[Any] = []
