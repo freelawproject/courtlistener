@@ -49,15 +49,15 @@ type ESModelType = (
 
 type ESDocumentType = (
     AudioDocument
-    | DocketDocument
     | ParentheticalGroupDocument
     | AudioPercolator
     | PersonDocument
     | PositionDocument
-    | ESRECAPDocument
-    | ESRECAPBaseDocument
+    | DocketDocument
     | OpinionDocument
     | OpinionClusterDocument
+    | ESRECAPDocument
+    | ESRECAPBaseDocument
 )
 
 type ESDocumentNameType = Literal[
