@@ -3222,38 +3222,10 @@
       "severity": "error"
     },
     {
-      "column": 24,
-      "path": "cl/search/api_views.py",
-      "name": "missing-attribute",
-      "concise_description": "Object of type `type[AudioDocument] | type[DocketDocument] | type[DocketESResultSerializer] | type[OAESResultSerializer] | type[OpinionClusterDocument] | type[OpinionClusterESResultSerializer] | type[PersonDocument] | type[PersonESResultSerializer] | type[RECAPDocumentESResultSerializer] | type[RECAPESResultSerializer]` has no attribute `search`",
-      "severity": "error"
-    },
-    {
-      "column": 13,
-      "path": "cl/search/api_views.py",
-      "name": "bad-argument-count",
-      "concise_description": "Expected 0 positional arguments, got 1 in function `cl.search.documents.AudioDocument.__init__`",
-      "severity": "error"
-    },
-    {
-      "column": 27,
-      "path": "cl/search/api_views.py",
-      "name": "unexpected-keyword",
-      "concise_description": "Unexpected keyword argument `many` in function `cl.search.documents.AudioDocument.__init__`",
-      "severity": "error"
-    },
-    {
-      "column": 38,
-      "path": "cl/search/api_views.py",
-      "name": "unexpected-keyword",
-      "concise_description": "Unexpected keyword argument `context` in function `cl.search.documents.AudioDocument.__init__`",
-      "severity": "error"
-    },
-    {
       "column": 13,
       "path": "cl/search/api_views.py",
       "name": "bad-argument-type",
-      "concise_description": "Argument `ReturnDict[Unknown, Unknown] | Any` is not assignable to parameter `data` with type `list[dict[Unknown, Unknown]]` in function `cl.api.pagination.ESCursorPagination.get_paginated_response`",
+      "concise_description": "Argument `ReturnDict[Unknown, Unknown]` is not assignable to parameter `data` with type `list[dict[Unknown, Unknown]]` in function `cl.api.pagination.ESCursorPagination.get_paginated_response`",
       "severity": "error"
     },
     {
