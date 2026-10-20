@@ -1,11 +1,8 @@
 /*
-Detects the RECAP extension and records it for the stylesheet and the server.
-The extension announces itself with a window message on every page load. On
-that message, `<html>` gets the `recap-installed` class, which hides every
-`[data-recap-plea]` element, and the `recap_installed` cookie is set so later
-responses render the class themselves and can read the signal server-side.
-Loaded by `new_base.html` on every page; templates never require it. Usage
-and caveats: FRONTEND.md, "RECAP extension".
+Detects the RECAP extension from the message it posts on every page load, and
+records it as the `recap-installed` class on <html> and the `recap_installed`
+cookie. Loaded by `new_base.html` on every page; templates never require it.
+Usage and caveats: FRONTEND.md, "RECAP extension".
 */
 
 const RECAP_COOKIE_MAX_AGE_SECONDS = 7 * 24 * 60 * 60;
