@@ -1,3 +1,4 @@
+from dataclasses import dataclass
 from http import HTTPStatus
 
 from django.db.models import Prefetch
@@ -448,37 +449,29 @@ class SearchViewSet(LoggingMixin, viewsets.ViewSet):
         )
 
 
+@dataclass
+class _ESResultSerializers:
+    recap: type[RECAPESResultSerializer]
+    docket: type[DocketESResultSerializer]
+    recap_document: type[RECAPDocumentESResultSerializer]
+    opinion: type[OpinionClusterESResultSerializer]
+    person: type[PersonESResultSerializer]
+    oral_argument: type[OAESResultSerializer]
+
+
 class SearchV4ViewSet(LoggingMixin, viewsets.ViewSet):
     # Default permissions use Django permissions, so here we AllowAny,
     # but folks will need to log in to get past the thresholds.
     permission_classes = (permissions.AllowAny,)
 
-    supported_search_types = {
-        SEARCH_TYPES.RECAP: {
-            "document_class": DocketDocument,
-            "serializer_class": RECAPESResultSerializer,
-        },
-        SEARCH_TYPES.DOCKETS: {
-            "document_class": DocketDocument,
-            "serializer_class": DocketESResultSerializer,
-        },
-        SEARCH_TYPES.RECAP_DOCUMENT: {
-            "document_class": DocketDocument,
-            "serializer_class": RECAPDocumentESResultSerializer,
-        },
-        SEARCH_TYPES.OPINION: {
-            "document_class": OpinionClusterDocument,
-            "serializer_class": OpinionClusterESResultSerializer,
-        },
-        SEARCH_TYPES.PEOPLE: {
-            "document_class": PersonDocument,
-            "serializer_class": PersonESResultSerializer,
-        },
-        SEARCH_TYPES.ORAL_ARGUMENT: {
-            "document_class": AudioDocument,
-            "serializer_class": OAESResultSerializer,
-        },
-    }
+    search_serializers = _ESResultSerializers(
+        recap=RECAPESResultSerializer,
+        docket=DocketESResultSerializer,
+        recap_document=RECAPDocumentESResultSerializer,
+        opinion=OpinionClusterESResultSerializer,
+        person=PersonESResultSerializer,
+        oral_argument=OAESResultSerializer,
+    )
 
     def execute_es_search(self, cleaned_data, request) -> Response:
         """
@@ -492,10 +485,31 @@ class SearchV4ViewSet(LoggingMixin, viewsets.ViewSet):
             errors.
         """
         search_type = cleaned_data["type"]
-        supported_search_type = self.supported_search_types.get(search_type)
-        if not supported_search_type:
-            raise NotFound(detail="Search type not found or not supported.")
-        search_query = supported_search_type["document_class"].search()
+        match search_type:
+            case SEARCH_TYPES.RECAP:
+                document_class = DocketDocument
+                serializer_class = self.search_serializers.recap
+            case SEARCH_TYPES.DOCKETS:
+                document_class = DocketDocument
+                serializer_class = self.search_serializers.docket
+            case SEARCH_TYPES.RECAP_DOCUMENT:
+                document_class = DocketDocument
+                serializer_class = self.search_serializers.recap_document
+            case SEARCH_TYPES.OPINION:
+                document_class = OpinionClusterDocument
+                serializer_class = self.search_serializers.opinion
+            case SEARCH_TYPES.PEOPLE:
+                document_class = PersonDocument
+                serializer_class = self.search_serializers.person
+            case SEARCH_TYPES.ORAL_ARGUMENT:
+                document_class = AudioDocument
+                serializer_class = self.search_serializers.oral_argument
+            case _:
+                raise NotFound(
+                    detail="Search type not found or not supported."
+                )
+
+        search_query = document_class.search()
 
         paginator = ESCursorPagination()
         cleaned_data["request_date"] = (
@@ -522,7 +536,7 @@ class SearchV4ViewSet(LoggingMixin, viewsets.ViewSet):
             results_page, paginator.cursor, cached_response
         )
 
-        serializer_class = supported_search_type["serializer_class"]
+        serializer_class = serializer_class
         serializer = serializer_class(
             results_page, many=True, context={"request": request}
         )
