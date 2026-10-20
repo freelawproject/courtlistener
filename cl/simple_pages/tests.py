@@ -469,6 +469,35 @@ class NewBaseViewCountTest(TestCase):
         self.assertNotIn("view_count.js", html)
 
 
+@override_flag("use_new_design", True)
+@override_settings(WAFFLE_CACHE_PREFIX="test_new_base_recap_waffle")
+class NewBaseRecapDetectionTest(TestCase):
+    """new_base.html loads the RECAP extension detector and reflects its cookie.
+
+    The class on <html> is what the stylesheet keys on to hide RECAP pleas;
+    rendering it from the cookie keeps later page loads from flashing them.
+    """
+
+    async def test_detector_is_loaded_on_every_page(self) -> None:
+        """A v2 page requires the detector whether or not the cookie is set."""
+        r = await self.async_client.get(reverse("help_home"))
+        self.assertTemplateUsed(r, "new_base.html")
+        self.assertIn("recap_extension.js", r.content.decode())
+
+    async def test_html_class_follows_the_cookie(self) -> None:
+        """<html> carries recap-installed only when the cookie is present."""
+        r = await self.async_client.get(reverse("help_home"))
+        self.assertNotIn(
+            "recap-installed", fromstring(r.content.decode()).get("class")
+        )
+
+        self.async_client.cookies["recap_installed"] = "true"
+        r = await self.async_client.get(reverse("help_home"))
+        self.assertIn(
+            "recap-installed", fromstring(r.content.decode()).get("class")
+        )
+
+
 @patch("hcaptcha.fields.hCaptchaField.validate", return_value=True)
 class SealingOrderDetectionTest(SimpleTestCase):
     def _make_form(
