@@ -488,13 +488,13 @@ class NewBaseRecapDetectionTest(TestCase):
         """<html> carries recap-installed only when the cookie is present."""
         r = await self.async_client.get(reverse("help_home"))
         self.assertNotIn(
-            "recap-installed", fromstring(r.content.decode()).get("class")
+            "recap-installed", fromstring(r.content.decode()).get("class", "")
         )
 
         self.async_client.cookies["recap_installed"] = "true"
         r = await self.async_client.get(reverse("help_home"))
         self.assertIn(
-            "recap-installed", fromstring(r.content.decode()).get("class")
+            "recap-installed", fromstring(r.content.decode()).get("class", "")
         )
 
 
