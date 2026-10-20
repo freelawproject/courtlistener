@@ -8,6 +8,7 @@ from itertools import batched, chain
 from typing import Any, TypedDict
 
 import eyecite
+from asgiref.sync import async_to_sync, sync_to_async
 from celery import chain as celery_chain
 from dateutil import parser
 from dateutil.rrule import DAILY, rrule
@@ -18,7 +19,7 @@ from django.core.cache import cache as default_cache
 from django.core.cache import caches
 from django.core.cache.backends.base import BaseCache
 from django.db import transaction
-from django.db.models import F, Model, Prefetch, Q, QuerySet
+from django.db.models import F, Model, Prefetch, QuerySet
 from django.db.models.constants import LOOKUP_SEP
 from django.urls import resolve
 from django.utils.decorators import method_decorator
@@ -416,7 +417,7 @@ class NoEmptyFilterSet(FilterSet):
 class SimpleMetadataWithFilters(SimpleMetadata):
     def determine_metadata(self, request, view):
         metadata = super().determine_metadata(request, view)
-        filters = OrderedDict()
+        filters: OrderedDict[str, OrderedDict[str, Any]] = OrderedDict()
         if not hasattr(view, "filterset_class"):
             # This is the API Root, which is not filtered.
             return metadata
@@ -757,9 +758,10 @@ def get_all_throttle_overrides(
 
     - MANUAL overrides always apply.
     - MEMBERSHIP overrides apply only if the user's NeonMembership is active
-      (payment_status in ACTIVE_PAYMENT_STATUSES and termination_date is null
-      or in the future), and no MANUAL overrides exist. If any MANUAL overrides
-      are present, they fully replace the MEMBERSHIP set.
+      as defined by ``NeonMembership.objects.active()`` (payment status grants
+      benefits and the term, grace period included, has not ended), and no
+      MANUAL overrides exist. If any MANUAL overrides are present, they fully
+      replace the MEMBERSHIP set.
 
     :param throttle_type: The ThrottleType integer value (API or CITATION_LOOKUP).
     :return: Dictionary mapping username to a list of rate strings. A list
@@ -771,17 +773,7 @@ def get_all_throttle_overrides(
         source=APIThrottle.Source.MANUAL,
     ).values_list("user__username", "rate")
 
-    today = now().date()
-    active_member_ids = (
-        NeonMembership.objects.filter(
-            payment_status__in=NeonMembership.ACTIVE_PAYMENT_STATUSES,
-        )
-        .filter(
-            Q(termination_date__isnull=True)
-            | Q(termination_date__date__gte=today)
-        )
-        .values("user_id")
-    )
+    active_member_ids = NeonMembership.objects.active().values("user_id")
     membership_throttles = APIThrottle.objects.filter(
         throttle_type=throttle_type,
         source=APIThrottle.Source.MEMBERSHIP,
@@ -838,16 +830,9 @@ def get_promo_excluded_usernames() -> set[str]:
             source=APIThrottle.Source.MANUAL,
         ).values_list("user__username", flat=True)
     )
-    today = now().date()
     edu_members = set(
-        NeonMembership.objects.filter(
-            payment_status__in=NeonMembership.ACTIVE_PAYMENT_STATUSES,
-            level=NeonMembershipLevel.EDU,
-        )
-        .filter(
-            Q(termination_date__isnull=True)
-            | Q(termination_date__date__gte=today)
-        )
+        NeonMembership.objects.active()
+        .filter(level=NeonMembershipLevel.EDU)
         .values_list("user__username", flat=True)
     )
     return manual_users | edu_members
@@ -1877,7 +1862,7 @@ def get_next_webhook_retry_date(retry_counter: int) -> datetime:
 WEBHOOK_MAX_RETRY_COUNTER = 7
 
 
-def check_webhook_failure_count_and_notify(
+async def check_webhook_failure_count_and_notify(
     webhook_event: WebhookEvent,
 ) -> None:
     """Check if a Webhook needs to be disabled and/or send a notification about
@@ -1900,7 +1885,7 @@ def check_webhook_failure_count_and_notify(
         6: False,
         7: True,  # Send webhook disabled notification
     }
-    webhook = webhook_event.webhook
+    webhook = await Webhook.objects.aget(webhook_events=webhook_event)
     if not webhook.enabled or webhook_event.debug:
         return
 
@@ -1912,33 +1897,33 @@ def check_webhook_failure_count_and_notify(
     current_try_counter = webhook_event.retry_counter
     notify = notify_on[current_try_counter]
     if notify:
-        oldest_enqueued_for_retry = WebhookEvent.objects.filter(
-            webhook=webhook_event.webhook,
+        oldest_enqueued_for_retry = await WebhookEvent.objects.filter(
+            webhook=webhook,
             event_status=WEBHOOK_EVENT_STATUS.ENQUEUED_RETRY,
             debug=False,
-        ).earliest("date_created")
+        ).aearliest("date_created")
         if current_try_counter >= WEBHOOK_MAX_RETRY_COUNTER:
             webhook.enabled = False
             update_fields.append("enabled")
             update_fields.append("date_modified")
             # If the parent webhook is disabled mark all current ENQUEUED_RETRY
             # events as ENDPOINT_DISABLED
-            WebhookEvent.objects.filter(
-                webhook=webhook_event.webhook,
+            await WebhookEvent.objects.filter(
+                webhook=webhook,
                 event_status=WEBHOOK_EVENT_STATUS.ENQUEUED_RETRY,
                 debug=False,
-            ).update(
+            ).aupdate(
                 event_status=WEBHOOK_EVENT_STATUS.ENDPOINT_DISABLED,
                 date_modified=now(),
             )
         if oldest_enqueued_for_retry.pk == webhook_event.pk:
             failure_counter = current_try_counter + 1
-            notify_failing_webhook.delay(
+            await sync_to_async(notify_failing_webhook.delay)(
                 webhook_event.pk, failure_counter, webhook.enabled
             )
 
     # Save webhook and avoid emailing admins via signal in cl.users.signals
-    webhook.save(update_fields=update_fields)
+    await webhook.asave(update_fields=update_fields)
 
 
 def update_webhook_event_after_request(
@@ -1982,7 +1967,7 @@ def update_webhook_event_after_request(
         if error is None:
             error = ""
         webhook_event.error_message = error
-        check_webhook_failure_count_and_notify(webhook_event)
+        async_to_sync(check_webhook_failure_count_and_notify)(webhook_event)
         if webhook_event.retry_counter >= WEBHOOK_MAX_RETRY_COUNTER:
             # If the webhook has reached the max retry counter, mark as failed
             webhook_event.event_status = WEBHOOK_EVENT_STATUS.FAILED

@@ -110,7 +110,7 @@ dependencies = [
   "django-cotton>=2.7.2",
   "django-cursor-pagination>=0.3.0",
   "django-elasticsearch-dsl>=9.0",
-  "juriscraper>=3.0.0",
+  "juriscraper>=4.0.0",
   "instructor>=1.17.0",
   "django-s3-express-cache>=0.2.0",
   "zohocrmsdk8-0==7.0.0",
@@ -136,7 +136,7 @@ dev = [
   "django-debug-toolbar>=8.0.0",
   "django-tailwind[reload]~=4.5.0",
   "responses>=0.26.3",
-  "pyrefly>=1.3.0",
+  "pyrefly>=1.4.0",
   "pandas-stubs~=3.0.5",
   "unittest-xml-reporting>=4.0.0",
 ]

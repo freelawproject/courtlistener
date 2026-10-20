@@ -1145,14 +1145,22 @@ class Command(BaseCommand):
             help="Do not update existing objects.",
         )
 
-    def handle(self, *args, **options):
-        self.type = options.get("type")
-        self.ids = options.get("ids")
-        download_cluster_files = options.get("download_cluster_files")
-        download_opinion_files = options.get("download_opinion_files")
-        add_docket_entries = options.get("add_docket_entries")
-        clone_person_positions = options.get("clone_person_positions")
-        no_update = options.get("no_update")
+    def handle(
+        self,
+        *args,
+        type: str,
+        ids: list[str],
+        download_cluster_files: bool,
+        download_opinion_files: bool,
+        add_docket_entries: bool,
+        add_audio_files: bool,
+        add_clusters: bool,
+        clone_person_positions: bool,
+        no_update: bool,
+        **options,
+    ):
+        self.type = type
+        self.ids = ids
 
         if not os.environ.get("CL_API_TOKEN"):
             self.stdout.write("Error: CL_API_TOKEN not set in .env file")
@@ -1164,7 +1172,7 @@ class Command(BaseCommand):
             )
             return
 
-        if options["download_opinion_files"]:
+        if download_opinion_files:
             required_keys = [
                 "AWS_ACCESS_KEY_ID",
                 "AWS_SECRET_ACCESS_KEY",
@@ -1196,8 +1204,8 @@ class Command(BaseCommand):
                     self.s,
                     self.ids,
                     add_docket_entries,
-                    options["add_audio_files"],
-                    options["add_clusters"],
+                    add_audio_files,
+                    add_clusters,
                     clone_person_positions,
                     download_opinion_files,
                     no_update,

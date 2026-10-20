@@ -488,8 +488,9 @@ class CitationTextTest(TestCase):
                     msg=f"\n{created_html}\n\n    !=\n\n{expected_html}",
                 )
 
-    def test_make_html_from_harvard_xml(self) -> None:
-        """Can we convert the XML of an opinion into modified HTML?"""
+    def test_make_html_from_harvard_and_scan_xml(self) -> None:
+        """Can we convert the Harvard or scanned XML of an opinion into
+        modified HTML?"""
         # fmt: off
 
         test_pairs = [
@@ -505,13 +506,15 @@ class CitationTextTest(TestCase):
         ]
 
         # fmt: on
-        for s, expected_html in test_pairs:
+        for (s, expected_html), field in itertools.product(
+            test_pairs, ["xml_harvard", "xml_scan"]
+        ):
             with self.subTest(
                 f"Testing html to html conversion for {s}...",
                 s=s,
-                expected_html=expected_html,
+                field=field,
             ):
-                opinion = Opinion(xml_harvard=s)
+                opinion = Opinion(**{field: s})
                 get_citations_kwargs = make_get_citations_kwargs(opinion)[0]
                 citations = get_citations(
                     tokenizer=HYPERSCAN_TOKENIZER,
@@ -1403,6 +1406,10 @@ class CitationObjectTest(ESIndexTestCase, TestCase):
         setattr(citation, "citing_opinion", Opinion.objects.all()[0])
         results = resolve_fullcase_citation(citation)
         opinion12 = Opinion.objects.get(cluster__pk=self.citation12.cluster_id)
+        citation.citing_opinion = (
+            Opinion.objects.exclude(pk=opinion12.pk).order_by("pk").first()
+        )
+        results = resolve_fullcase_citation(citation)
         self.assertEqual(results.pk, opinion12.pk, msg=results)
 
     def test_citation_resolve_to_pincite(self) -> None:
@@ -1413,6 +1420,10 @@ class CitationObjectTest(ESIndexTestCase, TestCase):
         setattr(citation, "citing_opinion", Opinion.objects.all()[0])
         results = resolve_fullcase_citation(citation)
         opinion12 = Opinion.objects.get(cluster__pk=self.citation12.cluster_id)
+        citation.citing_opinion = (
+            Opinion.objects.exclude(pk=opinion12.pk).order_by("pk").first()
+        )
+        results = resolve_fullcase_citation(citation)
         self.assertEqual(results.pk, opinion12.pk, msg=results)
 
     def test_resolved_opinion_skips_text(self) -> None:
@@ -3304,11 +3315,9 @@ class UnmatchedCitationTest(TransactionTestCase):
     cluster = None
     opinion: Opinion
 
-    @classmethod
-    def setUpClass(cls):
-        cls.cluster = OpinionClusterWithChildrenAndParentsFactory()
-        cls.opinion = cls.cluster.sub_opinions.first()
-        UnmatchedCitation.objects.all().delete()
+    def setUp(self) -> None:
+        self.cluster = OpinionClusterWithChildrenAndParentsFactory()
+        self.opinion = self.cluster.sub_opinions.all()[0]
 
     def test_1st_creation(self) -> None:
         """Can we save unmatched citations?"""
