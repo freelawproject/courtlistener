@@ -535,6 +535,12 @@ class ES_CHILD_ID:
         return f"rd_{self.instance_id}"
 
     @property
+    def SCOTUS(self) -> str:
+        # Own prefix because SCOTUSDocument's pk sequence is independent
+        # from RECAPDocument's -- sharing one could collide on the same _id.
+        return f"sd_{self.instance_id}"
+
+    @property
     def OPINION(self) -> str:
         return f"o_{self.instance_id}"
 
@@ -1250,7 +1256,7 @@ class ESRECAPBaseDocument(DSLDocument):
         search_analyzer="search_analyzer",
     )
     attachment_number = fields.IntegerField(attr="attachment_number")
-    is_available = fields.BooleanField(attr="is_available")
+    is_available = fields.BooleanField()
     page_count = fields.IntegerField(attr="page_count")
     filepath_local = fields.KeywordField(index=False)
     absolute_url = fields.KeywordField(index=False)
@@ -1344,6 +1350,9 @@ class ESRECAPDocument(
     def prepare_filepath_local(self, instance):
         if instance.filepath_local:
             return instance.filepath_local.name
+
+    def prepare_is_available(self, instance):
+        return instance.is_available
 
     def prepare_absolute_url(self, instance):
         return instance.get_absolute_url()
