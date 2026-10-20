@@ -23,6 +23,7 @@ from juriscraper.lib.string_utils import (
     titlecase,
 )
 
+from cl.citations.parenthetical_utils import create_parenthetical_groups
 from cl.citations.tasks import (
     find_citations_and_parentheticals_for_opinion_by_pks,
 )
@@ -64,6 +65,8 @@ from cl.search.models import (
     OpinionCluster,
     OpinionContent,
     OpinionsCited,
+    OpinionsCitedByRECAPDocument,
+    Parenthetical,
 )
 from cl.search.tasks import remove_document_from_es_index
 
@@ -1084,27 +1087,46 @@ def make_version(version: Opinion, main_opinion: Opinion) -> None:
     """Make an opinion a version of another opinion of its cluster.
 
     Like `merge_opinion_versions`, the objects that reference the version
-    are moved to the main opinion, its citation data is deleted, and it's
-    removed from search once the import is committed. Unlike it, both
-    opinions are in the same cluster, so no cluster or docket is merged,
-    and the citations of other opinions to the version move to the main
-    opinion, since they cite the same case.
+    are moved to the main opinion, its citation data is deleted, its own
+    versions are moved to the main opinion, and it's removed from search
+    once the import is committed. Unlike it, both opinions are in the same
+    cluster, so no cluster or docket is merged, and what other opinions and
+    RECAP documents say about the version moves to the main opinion, since
+    they refer to the same case: their citations and parentheticals.
 
     :param version: The saved opinion that becomes a version.
     :param main_opinion: The saved opinion it is a version of.
     :return: None
     """
     update_referencing_objects(main_opinion, version)
+    # delete_version_related_objects deletes what refers to the version,
+    # so move first what refers to the case
     already_citing = OpinionsCited.objects.filter(
         cited_opinion=main_opinion
     ).values("citing_opinion_id")
     OpinionsCited.objects.filter(cited_opinion=version).exclude(
         citing_opinion_id__in=already_citing
     ).update(cited_opinion=main_opinion)
+    already_citing_documents = OpinionsCitedByRECAPDocument.objects.filter(
+        cited_opinion=main_opinion
+    ).values("citing_document_id")
+    OpinionsCitedByRECAPDocument.objects.filter(cited_opinion=version).exclude(
+        citing_document_id__in=already_citing_documents
+    ).update(cited_opinion=main_opinion)
+    moved_parentheticals = Parenthetical.objects.filter(
+        described_opinion=version
+    ).update(described_opinion=main_opinion)
+    # A version points to a main opinion, not to another version
+    Opinion.objects.filter(main_version=version).update(
+        main_version=main_opinion
+    )
     version.main_version = main_opinion
     version.html_with_citations = ""
     version.save(update_fields=["main_version", "html_with_citations"])
     delete_version_related_objects(version)
+    if moved_parentheticals:
+        # The groups of the moved parentheticals still name the version
+        create_parenthetical_groups(main_opinion.cluster)
     es_id = ES_CHILD_ID(version.pk).OPINION
     transaction.on_commit(
         lambda: remove_document_from_es_index.delay(
@@ -1159,11 +1181,11 @@ def add_scanned_opinions(
     """
     if not plan.new_opinions:
         return []
-    if plan.version and plan.version.ordering_key is not None:
-        # The ordering key is unique in the cluster, and the new opinions
-        # take 1 to N
+    # The ordering key is unique in the cluster, versions included, and the
+    # new opinions take 1 to N
+    cluster.sub_opinions.exclude(ordering_key=None).update(ordering_key=None)
+    if plan.version:
         plan.version.ordering_key = None
-        plan.version.save(update_fields=["ordering_key"])
     link_judges(cluster, plan.new_opinions)
     for ordering_key, opinion in enumerate(plan.new_opinions, start=1):
         opinion.ordering_key = ordering_key

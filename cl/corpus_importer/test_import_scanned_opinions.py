@@ -40,7 +40,9 @@ from cl.search.factories import (
     DocketFactory,
     OpinionClusterFactory,
     OpinionFactory,
+    OpinionsCitedByRECAPDocumentFactory,
     OpinionWithParentsFactory,
+    ParentheticalFactory,
 )
 from cl.search.models import (
     PRECEDENTIAL_STATUS,
@@ -52,6 +54,7 @@ from cl.search.models import (
     OpinionContent,
     OpinionJoinedBy,
     OpinionsCited,
+    ParentheticalGroup,
 )
 from cl.tests.cases import SimpleTestCase, TestCase
 
@@ -913,6 +916,16 @@ class ImportScannedOpinionsTest(TestCase):
         OpinionJoinedBy.objects.create(opinion=old, person=joined_by)
         citing = OpinionWithParentsFactory.create()
         OpinionsCited.objects.create(citing_opinion=citing, cited_opinion=old)
+        parenthetical = ParentheticalFactory.create(
+            describing_opinion=citing, described_opinion=old
+        )
+        recap_citation = OpinionsCitedByRECAPDocumentFactory.create(
+            cited_opinion=old
+        )
+        # An older version, e.g. merged by text similarity, keeping its key
+        older = OpinionFactory.create(
+            cluster=cluster, main_version=old, ordering_key=2
+        )
 
         with (
             mock.patch(
@@ -946,6 +959,17 @@ class ImportScannedOpinionsTest(TestCase):
             ),
             [(citing.pk, lead.pk)],
         )
+        parenthetical.refresh_from_db()
+        self.assertEqual(parenthetical.described_opinion, lead)
+        self.assertEqual(
+            list(ParentheticalGroup.objects.values_list("opinion", flat=True)),
+            [lead.pk],
+        )
+        recap_citation.refresh_from_db()
+        self.assertEqual(recap_citation.cited_opinion, lead)
+        older.refresh_from_db()
+        self.assertEqual(older.main_version, lead)
+        self.assertIsNone(older.ordering_key)
         self.assertTrue(lead.contents.get().is_main_version)
         mock_remove.delay.assert_called_once_with(
             OpinionDocument.__name__,
