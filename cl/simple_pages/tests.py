@@ -482,7 +482,7 @@ class NewBaseRecapDetectionTest(TestCase):
         """A v2 page requires the detector whether or not the cookie is set."""
         r = await self.async_client.get(reverse("help_home"))
         self.assertTemplateUsed(r, "new_base.html")
-        self.assertIn("recap_extension.js", r.content.decode())
+        self.assertIn("recap_detection.js", r.content.decode())
 
     async def test_html_class_follows_the_cookie(self) -> None:
         """<html> carries recap-installed only when the cookie is present."""
