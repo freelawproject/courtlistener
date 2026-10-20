@@ -742,8 +742,11 @@ def parse_scan_xml(
         judges=get_judges(soup),
         precedential_status=get_precedential_status(soup, cites),
         page_count=get_page_count(soup),
+        # The whole casebody, like a scraped PDF that prints the caption,
+        # docket number and dates above the opinion. With the opinions
+        # alone, short ones fail the length check against scraped texts.
         body_characters=clean_body_content(
-            str(soup.select_one("casebody") or ""), harvard_file=True
+            str(soup.select_one("casebody") or "")
         ),
         cluster_fields=cluster_fields,
         opinions=opinions,
