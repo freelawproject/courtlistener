@@ -28,7 +28,6 @@ from cl.corpus_importer.management.commands.import_scanned_opinions import (
     parse_citations,
     s3_xml_keys,
 )
-from cl.lib.crypto import sha1
 from cl.lib.storage import ScanningFinalXmlStorage
 from cl.lib.url_utils import BASE_URL
 from cl.people_db.factories import PersonFactory, PositionFactory
@@ -121,53 +120,67 @@ class ScanXmlHelpersTest(SimpleTestCase):
                 self.assertEqual(normalize_case_name_caps(case_name), expected)
 
     def test_pair_opinions(self) -> None:
-        """Are opinions paired by type, and by author within a type?"""
+        """Are opinions paired by author and text, and only one-to-one?"""
+        with open(SCAN_XML_PATH, encoding="utf-8") as f:
+            lead_opinion = make_soup(f.read()).select_one("opinion")
+        if lead_opinion is None:
+            self.fail("The test XML must have an opinion")
+        lead_text = lead_opinion.get_text(" ")
+        dissent_text = (
+            "I respectfully dissent. The record shows the trial court "
+            "attached the portions of the record that refute each claim, "
+            "and the state's confession of error does not bind this court. "
+            "I would affirm the summary denial of the motion."
+        )
 
-        def opinion(op_type: str, author_str: str = "") -> Opinion:
-            return Opinion(type=op_type, author_str=author_str)
+        def opinion(author_str: str, text: str) -> Opinion:
+            return Opinion(author_str=author_str, plain_text=text)
 
         lead, dissent = (
-            opinion(Opinion.LEAD, "Gerber"),
-            opinion(Opinion.DISSENT, "Warner"),
+            opinion("Gerber", lead_text),
+            opinion("Warner", dissent_text),
         )
-        concur_a, concur_b = (
-            opinion(Opinion.CONCURRENCE, "Klein"),
-            opinion(Opinion.CONCURRENCE, "Stone"),
-        )
+        # OCR text with small differences from the court's text
+        scan_lead = opinion("Gerber", lead_text.replace("the", "tbe", 10))
+        scan_dissent = opinion("Warner", dissent_text)
         cases = [
             (
-                "by type",
+                "by author and text",
                 [lead, dissent],
-                [opinion(Opinion.DISSENT), opinion(Opinion.LEAD)],
-                [dissent, lead],
+                [scan_dissent, scan_lead],
+                [(lead, scan_lead), (dissent, scan_dissent)],
             ),
             (
-                "by author within a type",
-                [concur_a, concur_b],
+                "same text, other author",
+                [lead, dissent],
+                [opinion("Klein", lead_text), scan_dissent],
+                None,
+            ),
+            (
+                "same author, other text",
+                [lead, dissent],
+                [opinion("Gerber", dissent_text), scan_dissent],
+                None,
+            ),
+            (
+                "unknown author",
+                [opinion("", lead_text), dissent],
+                [opinion("", lead_text), scan_dissent],
+                None,
+            ),
+            (
+                "per curiam",
+                [opinion("Per Curiam", lead_text), dissent],
+                [opinion("Per Curiam", lead_text), scan_dissent],
                 [
-                    opinion(Opinion.CONCURRENCE, "Stone"),
-                    opinion(Opinion.CONCURRENCE, "Klein"),
+                    (
+                        opinion("Per Curiam", ""),
+                        opinion("Per Curiam", lead_text),
+                    ),
+                    (dissent, scan_dissent),
                 ],
-                [concur_b, concur_a],
             ),
-            (
-                "different authors",
-                [lead, dissent],
-                [opinion(Opinion.LEAD), opinion(Opinion.DISSENT, "Combs")],
-                None,
-            ),
-            (
-                "same type, unknown authors",
-                [concur_a, concur_b],
-                [opinion(Opinion.CONCURRENCE), opinion(Opinion.CONCURRENCE)],
-                None,
-            ),
-            (
-                "missing opinion",
-                [lead, dissent],
-                [opinion(Opinion.LEAD)],
-                None,
-            ),
+            ("missing opinion", [lead, dissent], [scan_lead], None),
         ]
         for message, cl_opinions, scan_opinions, expected in cases:
             with self.subTest(message):
@@ -175,8 +188,16 @@ class ScanXmlHelpersTest(SimpleTestCase):
                 if expected is None:
                     self.assertIsNone(pairs)
                     continue
+                self.assertIsNotNone(pairs)
                 self.assertEqual(
-                    pairs, list(zip(expected, scan_opinions, strict=True))
+                    [
+                        (cl.author_str, scan.author_str, scan.plain_text[:20])
+                        for cl, scan in pairs or []
+                    ],
+                    [
+                        (cl.author_str, scan.author_str, scan.plain_text[:20])
+                        for cl, scan in expected
+                    ],
                 )
 
     def test_get_case_names(self) -> None:
@@ -464,13 +485,16 @@ class ScanXmlHelpersTest(SimpleTestCase):
                 self.assertEqual(get_docket_number(make_soup(xml)), expected)
 
     def test_make_opinion(self) -> None:
-        """Are the author, per curiam and type read from the opinion?"""
+        """Are the author, per curiam and type read from the opinion?
+
+        An opinion without a type that a single judge wrote is a lead one.
+        """
         cases = [
             (
                 "<opinion><author>Gerber, J.</author></opinion>",
                 "Gerber",
                 False,
-                Opinion.COMBINED,
+                Opinion.LEAD,
             ),
             (
                 "<opinion><author>PER CURIAM.</author></opinion>",
@@ -613,7 +637,7 @@ class ImportScannedOpinionsTest(TestCase):
         self.assertTrue(opinion.xml_scan.startswith("<opinion>"))
         self.assertIn("confession of error", opinion.xml_scan)
         self.assertEqual(opinion.author_str, "Gerber")
-        self.assertEqual(opinion.type, Opinion.COMBINED)
+        self.assertEqual(opinion.type, Opinion.LEAD)
         self.assertTrue(opinion.extracted_by_ocr)
 
         content = OpinionContent.objects.get(opinion=opinion)
@@ -721,7 +745,7 @@ class ImportScannedOpinionsTest(TestCase):
         self.import_scan()
 
         self.assertEqual(OpinionCluster.objects.count(), 1)
-        self.assertEqual(Opinion.objects.count(), 1)
+        self.assertEqual(Opinion.objects.count(), 2)
         self.assertEqual(Citation.objects.count(), 1)
         cluster.refresh_from_db()
         self.assertEqual(
@@ -740,11 +764,18 @@ class ImportScannedOpinionsTest(TestCase):
         self.assertEqual(
             cluster.docket.source, Docket.SCRAPER_AND_SCANNING_PROJECT
         )
-        opinion = cluster.sub_opinions.get()
+        # The scan is the published version of the court website's opinion
+        opinion = cluster.sub_opinions.get(main_version=None)
+        self.assertEqual(
+            (opinion.type, opinion.author_str), (Opinion.LEAD, "Gerber")
+        )
         self.assertIn("confession of error", opinion.xml_scan)
+        self.assertEqual(
+            cluster.sub_opinions.exclude(pk=opinion.pk).get().main_version,
+            opinion,
+        )
         content = OpinionContent.objects.get(opinion=opinion)
         self.assertEqual(content.content, opinion.xml_scan)
-        # The scan is richer than the court website text
         self.assertTrue(content.is_main_version)
 
     def test_discarded_match_is_logged(self) -> None:
@@ -801,30 +832,26 @@ class ImportScannedOpinionsTest(TestCase):
             [call.args[2] for call in mock_logger.debug.call_args_list],
         )
 
-    def test_merge_replaces_the_main_version(self) -> None:
-        """Does the scan become the only main version of the opinion?"""
-        cluster = self.make_matching_cluster()
-        opinion = cluster.sub_opinions.get()
-        previous = OpinionContent.objects.create(
-            opinion=opinion,
-            content="<p>Scraped text</p>",
-            source=OpinionContent.SCRAPERS,
-            extraction_type=OpinionContent.DEFAULT,
-            is_main_version=True,
-            sha1=sha1("<p>Scraped text</p>"),
-        )
+    def test_merge_keeps_the_version_author_of_the_byline(self) -> None:
+        """Is the version's author kept only when the scan names that judge?"""
+        for last_name, kept in [("Gerber", True), ("Klein", False)]:
+            with self.subTest(last_name=last_name), transaction.atomic():
+                cluster = self.make_matching_cluster()
+                author = PersonFactory.create(name_last=last_name)
+                cluster.sub_opinions.update(
+                    author=author, joined_by_str="Ciklin"
+                )
 
-        self.import_scan()
+                self.import_scan()
 
-        previous.refresh_from_db()
-        self.assertFalse(previous.is_main_version)
-        self.assertEqual(
-            OpinionContent.objects.get(is_main_version=True).source,
-            OpinionContent.FLP_SCANNING,
-        )
+                scanned = cluster.sub_opinions.get(main_version=None)
+                self.assertEqual(scanned.author == author, kept)
+                self.assertEqual(scanned.author_str, "Gerber")
+                self.assertEqual(scanned.joined_by_str, "Ciklin")
+                transaction.set_rollback(True)
 
     def test_merge_ignores_opinion_versions(self) -> None:
-        """Is the scan merged into the main opinion, ignoring its versions?"""
+        """Are the main opinion and its versions made versions of the scan?"""
         cluster = self.make_matching_cluster()
         main_opinion = cluster.sub_opinions.get()
         version = OpinionFactory.create(
@@ -836,13 +863,15 @@ class ImportScannedOpinionsTest(TestCase):
 
         self.import_scan()
 
+        scanned = cluster.sub_opinions.get(main_version=None)
         main_opinion.refresh_from_db()
         version.refresh_from_db()
-        self.assertIn("confession of error", main_opinion.xml_scan)
-        self.assertEqual(version.xml_scan, "")
+        self.assertIn("confession of error", scanned.xml_scan)
+        self.assertEqual(main_opinion.main_version, scanned)
+        self.assertEqual(version.main_version, scanned)
         self.assertEqual(
             list(OpinionContent.objects.values_list("opinion_id", flat=True)),
-            [main_opinion.pk],
+            [scanned.pk],
         )
 
     def test_merge_skipped_when_opinions_cant_be_paired(self) -> None:
@@ -884,7 +913,7 @@ class ImportScannedOpinionsTest(TestCase):
         opinions = Opinion.objects.order_by("pk")
         self.assertEqual(
             [(o.type, o.author_str) for o in opinions],
-            [(Opinion.COMBINED, "Gerber"), (Opinion.DISSENT, "Warner")],
+            [(Opinion.LEAD, "Gerber"), (Opinion.DISSENT, "Warner")],
         )
 
     def scan_with_dissent(self) -> str:
@@ -902,7 +931,7 @@ class ImportScannedOpinionsTest(TestCase):
         cluster = OpinionCluster.objects.get()
         self.assertEqual(
             [(o.ordering_key, o.type) for o in cluster.ordered_opinions],
-            [(1, Opinion.COMBINED), (2, Opinion.DISSENT)],
+            [(1, Opinion.LEAD), (2, Opinion.DISSENT)],
         )
 
     def test_merge_makes_the_combined_opinion_a_version(self) -> None:
@@ -945,7 +974,7 @@ class ImportScannedOpinionsTest(TestCase):
                 (lead.ordering_key, lead.type),
                 (dissent.ordering_key, dissent.type),
             ],
-            [(1, Opinion.COMBINED), (2, Opinion.DISSENT)],
+            [(1, Opinion.LEAD), (2, Opinion.DISSENT)],
         )
         self.assertEqual(old.main_version, lead)
         self.assertIsNone(old.ordering_key)
@@ -978,7 +1007,7 @@ class ImportScannedOpinionsTest(TestCase):
         )
 
     def test_merge_pairs_multiple_opinions(self) -> None:
-        """Are the scan's opinions merged into the cluster's paired ones?"""
+        """Does each cluster opinion become a version of its scanned one?"""
         cluster = self.make_matching_cluster()
         lead = cluster.sub_opinions.get()
         Opinion.objects.filter(pk=lead.pk).update(
@@ -988,6 +1017,7 @@ class ImportScannedOpinionsTest(TestCase):
             cluster=cluster,
             type=Opinion.DISSENT,
             author_str="Warner",
+            plain_text="WARNER, J. I respectfully dissent.",
             ordering_key=2,
         )
 
@@ -998,9 +1028,11 @@ class ImportScannedOpinionsTest(TestCase):
 
         lead.refresh_from_db()
         dissent.refresh_from_db()
-        self.assertEqual(cluster.sub_opinions.count(), 2)
-        self.assertIn("confession of error", lead.xml_scan)
-        self.assertIn("I respectfully dissent", dissent.xml_scan)
+        scan_lead, scan_dissent = cluster.ordered_opinions
+        self.assertIn("confession of error", scan_lead.xml_scan)
+        self.assertIn("I respectfully dissent", scan_dissent.xml_scan)
+        self.assertEqual(lead.main_version, scan_lead)
+        self.assertEqual(dissent.main_version, scan_dissent)
         self.assertEqual(
             OpinionContent.objects.filter(is_main_version=True).count(), 2
         )
@@ -1253,7 +1285,13 @@ class ImportScannedOpinionsTest(TestCase):
             .replace("4D2023-2459", "4D2023-1")
         )
         cases = [
-            ("merged opinion", self.scan_xml, lambda: [merged_opinion.pk]),
+            (
+                "merged opinion",
+                self.scan_xml,
+                lambda: [
+                    cluster.sub_opinions.exclude(pk=merged_opinion.pk).get().pk
+                ],
+            ),
             (
                 "new case",
                 new_case_xml,
