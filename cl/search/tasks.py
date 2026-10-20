@@ -162,9 +162,9 @@ def person_first_time_indexing(parent_id: int, position: Position) -> None:
         )
 
 
-def get_instance_from_db(
-    instance_id: int, model: type[ESModelType]
-) -> ESModelType | None:
+def get_instance_from_db[ModelT: ESModelType](
+    instance_id: int, model: type[ModelT]
+) -> ModelT | None:
     """Get a model instance from DB or return None if it doesn't exist.
 
     :param instance_id: The primary key of the parent instance.
@@ -642,10 +642,10 @@ def get_es_doc_id_and_parent_id(
     return doc_id, parent_id
 
 
-def get_doc_from_es(
-    es_document: type[ESDocumentType],
+def get_doc_from_es[DocumentT: ESDocumentType](
+    es_document: type[DocumentT],
     instance: ESModelType,
-) -> ESDocumentType | None:
+) -> DocumentT | None:
     """Get a document in Elasticsearch.
     :param es_document: The Elasticsearch document type.
     :param instance: The instance of the document to retrieve.
@@ -1388,11 +1388,11 @@ def index_dockets_in_bulk(
         DocketDocument._index.refresh()
 
 
-def build_bulk_cites_doc(
+def build_bulk_cites_doc[ModelT: ESModelType](
     es_child_doc_class: type[ESDocumentType],
     child_id: int,
-    child_doc_model: type[ESModelType],
-) -> tuple[ESDictDocument, ESModelType | None]:
+    child_doc_model: type[ModelT],
+) -> tuple[ESDictDocument, ModelT | None]:
     """Builds a bulk document for updating cites field in an ES document.
 
     :param es_child_doc_class: The ES child document class to update.
