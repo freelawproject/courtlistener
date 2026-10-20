@@ -27,6 +27,7 @@ from cl.favorites.utils import (
     get_existing_prayers_in_bulk,
     get_lifetime_prayer_stats,
     get_note_for_target,
+    get_prayer_counts_in_bulk,
     get_top_prayers,
     get_user_prayer_history,
     get_user_prayers,
@@ -241,15 +242,19 @@ async def create_prayer_view(
     user = request.user
     is_htmx_request = request.headers.get("hx-request", False)
     regular_size = bool(request.POST.get("regular_size"))
+    recap_document_obj = await RECAPDocument.objects.aget(id=recap_document)
     if not (await prayer_eligible(request.user))[0]:
         if is_htmx_request:
+            prayer_counts = await get_prayer_counts_in_bulk(
+                [recap_document_obj]
+            )
             return TemplateResponse(
                 request,
                 "includes/pray_and_pay_htmx/pray_button.html",
                 {
                     "prayer_exists": False,
                     "document_id": recap_document,
-                    "count": 0,
+                    "count": prayer_counts.get(recap_document_obj.pk, 0),
                     "daily_limit_reached": True,
                     "regular_size": regular_size,
                     "should_swap": True,
@@ -259,18 +264,18 @@ async def create_prayer_view(
             "User have reached your daily request limit"
         )
 
-    recap_document_obj = await RECAPDocument.objects.aget(id=recap_document)
-
     # Call the create_prayer async function
     await create_prayer(user, recap_document_obj)
     if is_htmx_request:
+        # Fetch after creation so the new prayer is included in the count.
+        prayer_counts = await get_prayer_counts_in_bulk([recap_document_obj])
         return TemplateResponse(
             request,
             "includes/pray_and_pay_htmx/pray_button.html",
             {
                 "prayer_exists": True,
                 "document_id": recap_document_obj.pk,
-                "count": 0,
+                "count": prayer_counts.get(recap_document_obj.pk, 0),
                 "daily_limit_reached": False,
                 "regular_size": regular_size,
                 "should_swap": True,
@@ -291,13 +296,14 @@ async def delete_prayer_view(
     regular_size = bool(request.POST.get("regular_size"))
     source = request.POST.get("source", "")
     if request.headers.get("hx-request"):
+        prayer_counts = await get_prayer_counts_in_bulk([recap_document_obj])
         return TemplateResponse(
             request,
             "includes/pray_and_pay_htmx/pray_button.html",
             {
                 "prayer_exists": False,
                 "document_id": recap_document_obj.pk,
-                "count": 0,
+                "count": prayer_counts.get(recap_document_obj.pk, 0),
                 "regular_size": regular_size,
                 "should_swap": True if source != "user_prayer_list" else False,
             },

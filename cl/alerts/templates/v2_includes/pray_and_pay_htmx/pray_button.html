@@ -1,0 +1,10 @@
+{% load component_tags %}
+
+{# htmx response: the new form replaces the old one, and the count is announced by the live region that <c-pray-button> keeps on the page. #}
+<c-pray-button-form
+  :document_id="document_id"
+  :count="count"
+  :prayer_exists="prayer_exists"
+  :daily_limit_reached="daily_limit_reached"
+/>
+<span id="pray_status_{{ document_id }}" hx-swap-oob="innerHTML">{{ count }} </span>
