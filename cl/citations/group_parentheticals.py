@@ -35,7 +35,7 @@ from copy import deepcopy
 from dataclasses import dataclass
 from functools import lru_cache
 from math import ceil
-from typing import Any, cast, Protocol
+from typing import Any, Protocol
 
 from datasketch import MinHash, MinHashLSH
 from Stemmer import (  # type:ignore[missing-import] Stemmer has no associated py or pyi file
