@@ -1059,7 +1059,10 @@ def add_new_case(scan_case: ScanCase) -> OpinionCluster:
         add_citations_to_cluster(scan_case.citations, cluster.id)
         opinions = [make_opinion(op, cluster.id) for op in scan_case.opinions]
         link_judges(cluster, opinions)
-        for opinion in opinions:
+        # The opinion page only shows the opinions of a cluster with several
+        # of them that have an ordering key
+        for ordering_key, opinion in enumerate(opinions, start=1):
+            opinion.ordering_key = ordering_key
             opinion.save()
             add_opinion_content(opinion, scan_case)
         store_scan_xml(cluster, scan_case, update_fields=[])

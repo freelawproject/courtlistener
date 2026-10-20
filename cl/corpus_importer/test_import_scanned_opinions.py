@@ -820,6 +820,24 @@ class ImportScannedOpinionsTest(TestCase):
             [(Opinion.COMBINED, "Gerber"), (Opinion.DISSENT, "Warner")],
         )
 
+    def scan_with_dissent(self) -> str:
+        """The test XML with a dissent after its majority opinion."""
+        return self.scan_xml.replace(
+            "</opinion>",
+            '</opinion><opinion type="dissent"><author>WARNER, J.</author>'
+            "<p>I respectfully dissent.</p></opinion>",
+        )
+
+    def test_multiple_opinions_are_ordered(self) -> None:
+        """Do the opinions of a new case get ordering keys, so they show?"""
+        self.import_xml(self.scan_with_dissent())
+
+        cluster = OpinionCluster.objects.get()
+        self.assertEqual(
+            [(o.ordering_key, o.type) for o in cluster.ordered_opinions],
+            [(1, Opinion.COMBINED), (2, Opinion.DISSENT)],
+        )
+
     def test_reuse_existing_docket(self) -> None:
         """Is an existing docket without a matching cluster reused?"""
         docket = DocketFactory.create(
