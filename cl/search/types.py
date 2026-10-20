@@ -32,7 +32,7 @@ from cl.search.models import (
     RECAPDocument,
 )
 
-ESModelType = (
+type ESModelType = (
     Citation
     | Docket
     | DocketEntry
@@ -47,7 +47,7 @@ ESModelType = (
     | RECAPDocument
 )
 
-ESModelClassType = (
+type ESModelClassType = (
     type[Citation]
     | type[Docket]
     | type[DocketEntry]
@@ -62,7 +62,7 @@ ESModelClassType = (
     | type[RECAPDocument]
 )
 
-ESDocumentInstanceType = (
+type ESDocumentInstanceType = (
     AudioDocument
     | DocketDocument
     | ParentheticalGroupDocument
@@ -75,7 +75,7 @@ ESDocumentInstanceType = (
     | OpinionClusterDocument
 )
 
-ESDocumentClassType = (
+type ESDocumentClassType = (
     type[AudioDocument]
     | type[ParentheticalGroupDocument]
     | type[AudioPercolator]
@@ -88,7 +88,7 @@ ESDocumentClassType = (
     | type[ESRECAPBaseDocument]
 )
 
-ESDocumentNameType = Literal[
+type ESDocumentNameType = Literal[
     "AudioDocument",
     "ParentheticalGroupDocument",
     "AudioPercolator",
@@ -101,7 +101,7 @@ ESDocumentNameType = Literal[
     "ESRECAPBaseDocument",
 ]
 
-ESDictDocument = dict[str, Any]
+type ESDictDocument = dict[str, Any]
 
 
 @dataclass
@@ -127,7 +127,7 @@ class SaveESDocumentReturn:
     app_label: str
 
 
-SearchAlertHitType = tuple[Alert, str, list[ESDictDocument], int]
+type SearchAlertHitType = tuple[Alert, str, list[ESDictDocument], int]
 
 
 class EventTable(StrEnum):
