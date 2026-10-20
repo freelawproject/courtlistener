@@ -10,8 +10,9 @@ and caveats: FRONTEND.md, "RECAP extension".
 
 const RECAP_COOKIE_MAX_AGE_SECONDS = 7 * 24 * 60 * 60;
 
-// Registered at load rather than on alpine:init: the extension's content
-// script may post before Alpine starts, and a later listener would miss it.
+// Registered at load rather than on alpine:init: the listener needs nothing
+// from Alpine, and the order between Alpine's deferred start and the
+// extension's content script is not guaranteed.
 window.addEventListener('message', (event) => {
   const isRecap =
     event.source === window &&
