@@ -47,9 +47,7 @@ type ESModelType = (
     | RECAPDocument
 )
 
-type ESModelClassType = type[ESModelType]
-
-type ESDocumentInstanceType = (
+type ESDocumentType = (
     AudioDocument
     | DocketDocument
     | ParentheticalGroupDocument
@@ -61,8 +59,6 @@ type ESDocumentInstanceType = (
     | OpinionDocument
     | OpinionClusterDocument
 )
-
-type ESDocumentClassType = type[ESDocumentInstanceType]
 
 type ESDocumentNameType = Literal[
     "AudioDocument",
