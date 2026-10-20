@@ -192,7 +192,6 @@ def make_objects(
         cf = ContentFile(force_bytes(content))
         extension = get_extension(content)
         file_name = trunc(item["case_names"].lower(), 75) + extension
-        opinion.file_with_date = cluster.date_filed
         opinion.local_path.save(file_name, cf, save=False)
         check_duplicate_ingestion(opinion.local_path.name)
 

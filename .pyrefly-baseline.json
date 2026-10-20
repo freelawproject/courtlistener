@@ -2795,13 +2795,6 @@
       "severity": "error"
     },
     {
-      "column": 33,
-      "path": "cl/scrapers/management/commands/cl_scrape_oral_arguments.py",
-      "name": "bad-assignment",
-      "concise_description": "`date | None` is not assignable to attribute `file_with_date` with type `date`",
-      "severity": "error"
-    },
-    {
       "column": 37,
       "path": "cl/scrapers/management/commands/cl_scrape_oral_arguments.py",
       "name": "bad-argument-type",

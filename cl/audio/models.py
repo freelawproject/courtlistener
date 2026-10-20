@@ -1,6 +1,3 @@
-from datetime import date
-from typing import TYPE_CHECKING
-
 import pghistory
 from django.db import models
 from django.urls import reverse
@@ -38,9 +35,6 @@ class Audio(AbstractDateTimeModel):
         (STT_OPENAI_WHISPER, "OpenAI API's whisper-1 model"),
         (STT_SELF_HOSTED_WHISPER, "Self hosted Whisper model"),
     ]
-
-    if TYPE_CHECKING:
-        file_with_date: date
 
     # Annotation required b/c this FK is nullable, which breaks absolute_url
     # pyrefly:ignore[bad-assignment] Deliberately narrower than the field

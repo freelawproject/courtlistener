@@ -1,6 +1,6 @@
 import logging
 import re
-from datetime import date, datetime
+from datetime import datetime
 from pathlib import Path
 from typing import TYPE_CHECKING, Literal, Self, assert_never
 from urllib.parse import quote
@@ -2299,9 +2299,6 @@ class OpinionCluster(AbstractDateTimeModel):
         (3, "Unspecifiable"),
     )
 
-    if TYPE_CHECKING:
-        file_with_date: date
-
     docket = models.ForeignKey(
         Docket,
         help_text="The docket that the opinion cluster is a part of",
@@ -3171,9 +3168,6 @@ class Opinion(AbstractDateTimeModel):
         (ON_MOTION_TO_STRIKE, "On Motion to Strike Cost Bill"),
         (TRIAL_COURT, "Trial Court Document"),
     )
-
-    if TYPE_CHECKING:
-        file_with_date: date
 
     cluster = models.ForeignKey(
         OpinionCluster,

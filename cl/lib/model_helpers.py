@@ -437,8 +437,6 @@ def make_upload_path(
     item in the correct location on disk.
     """
     if hasattr(instance, "file_with_date"):
-        # Cannot do proper type checking here because of circular import
-        # problems when importing Audio, Document, etc.
         d = instance.file_with_date
     else:
         from cl.audio.models import Audio
