@@ -3257,7 +3257,12 @@ class ToggleDocketAlertHtmxTest(TestCase):
 
     @override_settings(MAX_FREE_DOCKET_ALERTS=0, DOCKET_ALERT_RECAP_BONUS=1)
     def test_recap_cookie_grants_the_bonus(self) -> None:
-        """The recap_installed cookie raises the quota by the RECAP bonus; without it the free limit applies."""
+        """A truthy recap_installed cookie raises the quota by the RECAP bonus; absent or empty, the free limit applies."""
+        r = self.toggle()
+        self.assertTrue(r.context["quota_reached"])
+        self.assertEqual(self.subscriptions(), 0)
+
+        self.client.cookies["recap_installed"] = ""
         r = self.toggle()
         self.assertTrue(r.context["quota_reached"])
         self.assertEqual(self.subscriptions(), 0)

@@ -263,7 +263,7 @@ def _toggle_docket_alert_htmx(
             has_alert = False
             message = "Alert disabled successfully"
         elif not profile.can_make_another_alert(
-            recap_installed="recap_installed" in request.COOKIES
+            recap_installed=bool(request.COOKIES.get("recap_installed"))
         ):
             has_alert = False
             quota_reached = True
