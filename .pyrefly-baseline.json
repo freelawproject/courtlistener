@@ -3922,13 +3922,6 @@
       "severity": "error"
     },
     {
-      "column": 16,
-      "path": "cl/search/tasks.py",
-      "name": "bad-return",
-      "concise_description": "Returned type `Opinion | ModelT | Unknown` is not assignable to declared return type `ModelT | None`",
-      "severity": "error"
-    },
-    {
       "column": 45,
       "path": "cl/search/tasks.py",
       "name": "bad-argument-type",
@@ -4108,6 +4101,13 @@
       "path": "cl/search/tasks.py",
       "name": "bad-argument-type",
       "concise_description": "Argument `Literal['']` is not assignable to parameter `meta` with type `ApiResponseMeta` in function `elastic_transport._exceptions.ApiError.__init__`",
+      "severity": "error"
+    },
+    {
+      "column": 49,
+      "path": "cl/search/tasks.py",
+      "name": "bad-argument-type",
+      "concise_description": "Argument `int` is not assignable to parameter `id` with type `str` in function `elasticsearch.dsl._sync.document.Document.exists`",
       "severity": "error"
     },
     {

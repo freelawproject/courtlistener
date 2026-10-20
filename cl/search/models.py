@@ -2247,7 +2247,7 @@ class Courthouse(models.Model):
         verbose_name_plural = "Courthouses"
 
 
-class ClusterCitationQuerySet(models.query.QuerySet):
+class ClusterCitationQuerySet[M: OpinionCluster](models.QuerySet[M]):
     """Add filtering on citation strings.
 
     Historically we had citations in the db as strings like, "22 U.S. 44". The
@@ -2570,7 +2570,7 @@ class OpinionCluster(AbstractDateTimeModel):
         blank=True,
     )
 
-    objects = ClusterCitationQuerySet.as_manager()
+    objects = ClusterCitationQuerySet[Self].as_manager()
     es_pa_field_tracker = FieldTracker(
         fields=[
             "case_name",
@@ -3087,7 +3087,7 @@ OPINION_TEXT_SOURCE_FIELDS = [
 ]
 
 
-class OpinionQuerySet(models.QuerySet["Opinion"]):
+class OpinionQuerySet[M: Opinion](models.QuerySet[M]):
     def with_best_text(self) -> Self:
         """Annotates an Opinion QuerySet with best_text and best_text_source.
 
@@ -3326,7 +3326,7 @@ class Opinion(AbstractDateTimeModel):
         related_name="versions",
     )
 
-    objects = OpinionQuerySet.as_manager()
+    objects = OpinionQuerySet[Self].as_manager()
 
     class Meta:
         constraints = [
