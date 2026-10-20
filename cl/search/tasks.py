@@ -1653,20 +1653,23 @@ def index_related_cites_fields(
         percolate_opinion: Whether to percolate the related opinion document in
             order to trigger search alerts.
     """
-    documents_to_update = []
-    cites_doc_to_update = {}
-    base_doc = {}
-    citing_doc = None
-    es_child_doc_class = None
+    documents_to_update: list[ESDictDocument]
+    cites_doc_to_update: ESDictDocument
+    base_doc: ESDictDocument
+    citing_doc: ESModelType | None
+    child_doc_model: type[Opinion] | type[RECAPDocument]
+    es_child_doc_class: type[OpinionDocument] | type[ESRECAPDocument]
     match model_name:
         case OpinionsCited.__name__:
             base_doc = {
                 "_op_type": "update",
                 "_index": OpinionClusterDocument._index._name,
             }
-            documents_to_update.extend(
-                build_cite_count_update(cluster_ids_to_update or [])
-            )
+            # TODO: adjust `cites_doc_to_update` so that the structured type can be conserved.
+            documents_to_update = [
+                dict(d)
+                for d in build_cite_count_update(cluster_ids_to_update or [])
+            ]
 
             # Finally build the Opinion dict for updating the cites.
             child_doc_model = Opinion
@@ -1681,12 +1684,15 @@ def index_related_cites_fields(
                 "_op_type": "update",
                 "_index": DocketDocument._index._name,
             }
+            documents_to_update = []
 
             child_doc_model = RECAPDocument
             es_child_doc_class = ESRECAPDocument
             cites_doc_to_update, citing_doc = build_bulk_cites_doc(
                 es_child_doc_class, child_id, child_doc_model
             )
+        case _:
+            return
 
     if cites_doc_to_update and base_doc:
         cites_doc_to_update.update(base_doc)
@@ -1695,7 +1701,7 @@ def index_related_cites_fields(
     if not documents_to_update:
         return
 
-    index_documents_in_bulk(cast(list[dict[str, Any]], documents_to_update))
+    index_documents_in_bulk(documents_to_update)
 
     if settings.ELASTICSEARCH_DSL_AUTO_REFRESH:
         # Set auto-refresh, used for testing.

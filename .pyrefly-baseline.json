@@ -3684,20 +3684,6 @@
       "severity": "error"
     },
     {
-      "column": 11,
-      "path": "cl/search/tasks.py",
-      "name": "non-exhaustive-match-open-type",
-      "concise_description": "Match on `str` is not exhaustive",
-      "severity": "error"
-    },
-    {
-      "column": 36,
-      "path": "cl/search/tasks.py",
-      "name": "bad-argument-type",
-      "concise_description": "Argument `dict[str, Any] | dict[Unknown, Unknown]` is not assignable to parameter `object` with type `_CiteCountUpdateDict` in function `list.append`",
-      "severity": "error"
-    },
-    {
       "column": 9,
       "path": "cl/search/tasks.py",
       "name": "unexpected-keyword",
