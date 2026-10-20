@@ -688,9 +688,24 @@ def parse_scan_xml(
             )
             return None
         court_id = found_courts[0]
-    if not (court := Court.objects.filter(id=court_id).first()):
+    court = (
+        Court.objects.filter(id=court_id)
+        .select_related("parent_court")
+        .first()
+    )
+    if not court:
         logger.warning("Court not found in CourtListener: %s", court_id)
         return None
+    if not court.in_use and court.parent_court:
+        # Courts not in use keep their opinions in their parent court, e.g.
+        # the Florida district courts of appeal in "fladistctapp", where
+        # scraped cases are found and new ones belong
+        logger.info(
+            "Using court %s, the parent of %s, which is not in use",
+            court.parent_court.pk,
+            court.pk,
+        )
+        court = court.parent_court
 
     cite_strings = get_citation_strings(soup)
     cites = parse_citations(cite_strings, file_path)

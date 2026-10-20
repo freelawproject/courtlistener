@@ -1330,6 +1330,19 @@ class ImportScannedOpinionsTest(TestCase):
         self.assertEqual(mock_parse.call_count, 2)
         mock_logger.exception.assert_called_once()
 
+    def test_court_not_in_use_uses_its_parent(self) -> None:
+        """Is a scan of a court not in use imported into its parent court?"""
+        parent = CourtFactory.create(id="fladistctapp", in_use=True)
+        Court.objects.filter(pk=self.court.pk).update(
+            in_use=False, parent_court=parent
+        )
+
+        self.import_scan(court_id=None)
+
+        self.assertEqual(
+            OpinionCluster.objects.get().docket.court_id, parent.pk
+        )
+
     def test_court_lookup(self) -> None:
         """Is the court found from the court element when not given?"""
         self.import_scan(court_id=None)
