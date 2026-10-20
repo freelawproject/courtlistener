@@ -19,5 +19,6 @@ window.addEventListener('message', (event) => {
     event.data?.message_name === 'version';
   if (!isRecap) return;
   document.documentElement.classList.add('recap-installed');
-  document.cookie = `recap_installed=true; max-age=${RECAP_COOKIE_MAX_AGE_SECONDS}; samesite=lax; path=/`;
+  const secure = location.protocol === 'https:' ? '; secure' : '';
+  document.cookie = `recap_installed=true; max-age=${RECAP_COOKIE_MAX_AGE_SECONDS}; samesite=lax; path=/${secure}`;
 });
