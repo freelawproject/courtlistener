@@ -13,7 +13,9 @@ from cl.lib.command_utils import logger
 from cl.lib.date_time import midnight_pt
 
 
-def extract_field_values(m2m_list: Iterable[Model], field: str) -> list[Model]:
+def extract_field_values[M: Model](
+    m2m_list: Iterable[M], field: str
+) -> list[M]:
     """Extracts values from a list of objects.
 
     This function iterates over a list of objects, extracts the specified field value

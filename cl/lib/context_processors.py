@@ -1,11 +1,10 @@
 import random
-from typing import Never, cast
+from typing import Never, TypedDict, cast
 
 from django.conf import settings
 from django.contrib.auth.models import User
 from django.http import HttpRequest
 from django.urls import reverse
-from typing_extensions import TypedDict
 
 from cl.search.models import SEARCH_TYPES
 from cl.users.models import EMAIL_NOTIFICATIONS, FLAG_TYPES, EmailFlag
