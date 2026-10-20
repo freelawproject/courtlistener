@@ -47,20 +47,7 @@ type ESModelType = (
     | RECAPDocument
 )
 
-type ESModelClassType = (
-    type[Citation]
-    | type[Docket]
-    | type[DocketEntry]
-    | type[Opinion]
-    | type[OpinionCluster]
-    | type[Parenthetical]
-    | type[ParentheticalGroup]
-    | type[Audio]
-    | type[Person]
-    | type[Position]
-    | type[Education]
-    | type[RECAPDocument]
-)
+type ESModelClassType = type[ESModelType]
 
 type ESDocumentInstanceType = (
     AudioDocument
@@ -75,18 +62,7 @@ type ESDocumentInstanceType = (
     | OpinionClusterDocument
 )
 
-type ESDocumentClassType = (
-    type[AudioDocument]
-    | type[ParentheticalGroupDocument]
-    | type[AudioPercolator]
-    | type[PersonDocument]
-    | type[PositionDocument]
-    | type[DocketDocument]
-    | type[OpinionDocument]
-    | type[OpinionClusterDocument]
-    | type[ESRECAPDocument]
-    | type[ESRECAPBaseDocument]
-)
+type ESDocumentClassType = type[ESDocumentInstanceType]
 
 type ESDocumentNameType = Literal[
     "AudioDocument",
