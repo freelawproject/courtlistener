@@ -2,7 +2,7 @@ import json
 import logging
 from contextlib import nullcontext
 from io import BufferedReader
-from typing import Any, cast
+from typing import Any
 
 from asgiref.sync import sync_to_async
 from botocore.exceptions import ClientError
@@ -56,8 +56,8 @@ async def clean_up_recap_document_file(item: AbstractPDF) -> None:
         item.file_size = None
         item.page_count = None
         if isinstance(item, RECAPDocument):
-            cast(RECAPDocument, item).date_upload = None
-            cast(RECAPDocument, item).is_available = False
+            item.date_upload = None
+            item.is_available = False
         await item.asave()
 
 

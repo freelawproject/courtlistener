@@ -3,7 +3,7 @@ import inspect
 import time
 from collections.abc import Callable
 from datetime import datetime, timedelta
-from typing import Any, Final
+from typing import Final
 
 from celery import Task
 from dateutil import parser
@@ -134,7 +134,9 @@ class CeleryThrottle:
                 break
 
 
-def throttle_task(rate: str, key: str | None = None) -> Callable:
+def throttle_task[**P, R](
+    rate: str, key: str | None = None
+) -> Callable[[Callable[P, R]], Callable[P, R]]:
     """A decorator for throttling tasks to a given rate.
 
     :param rate: The maximum rate that you want your task to run. Takes the
@@ -145,9 +147,9 @@ def throttle_task(rate: str, key: str | None = None) -> Callable:
     :return: The decorated function
     """
 
-    def decorator_func(func: Callable) -> Callable:
+    def decorator_func(func: Callable[P, R]) -> Callable[P, R]:
         @functools.wraps(func)
-        def wrapper(*args, **kwargs) -> Any:
+        def wrapper(*args: P.args, **kwargs: P.kwargs) -> R:
             # Inspect the decorated function's parameters to get the task
             # itself and the value of the parameter referenced by key.
             sig = inspect.signature(func)

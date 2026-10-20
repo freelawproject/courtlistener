@@ -140,6 +140,7 @@ class IncrementalNewTemplateMiddleware:
         # header: the server knows what it renders, and a boosted full-page
         # request must still get the form.
         if not new_template_name.startswith(V2_PARTIALS_PREFIX):
+            # pyrefly:ignore[unsupported-operation] False positive based on Django docs
             response.context_data["search_form"] = CorpusSearchForm()
 
         return response

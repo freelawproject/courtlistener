@@ -3,10 +3,10 @@ import json
 import logging
 import re
 from collections import defaultdict
-from collections.abc import AsyncGenerator
+from collections.abc import AsyncGenerator, Iterable, Mapping
 from copy import deepcopy
 from datetime import date, timedelta
-from typing import Any, Literal, overload
+from typing import Any, Literal, NotRequired, TypedDict, overload
 
 from asgiref.sync import async_to_sync, sync_to_async
 from django.core.exceptions import ValidationError
@@ -607,9 +607,18 @@ async def update_docket_appellate_metadata(d, docket_data):
     if not og_info:
         return d, None
 
-    if og_info.get("court_id"):
-        cl_id = map_pacer_to_cl_id(og_info["court_id"])
-        if await Court.objects.filter(pk=cl_id).aexists():
+    if (court_id := og_info.get("court_id")) is not None:
+        if isinstance(court_id, str):
+            cl_id = map_pacer_to_cl_id(court_id)
+        else:
+            logger.error(
+                f"unexpected court_id type expected str, found {type(court_id).__name__}"
+            )
+            cl_id = court_id
+        if (
+            cl_id is not None
+            and await Court.objects.filter(pk=cl_id).aexists()
+        ):
             # Ensure the court exists. Sometimes PACER does weird things,
             # like in 14-1743 in CA3, where it says the court_id is 'uspci'.
             # If we don't do this check, the court ID could be invalid, and
@@ -680,12 +689,16 @@ async def update_docket_appellate_metadata(d, docket_data):
     return d, d_og_info
 
 
-def get_order_of_docket(docket_entries):
+def get_order_of_docket(
+    docket_entries: Iterable[Mapping[str, Any]],
+) -> Literal["asc", "desc"] | None:
     """Determine whether the docket is ascending or descending or whether
     that is knowable.
     """
     order = None
     for _, de, nxt in previous_and_next(docket_entries):
+        if nxt is None:
+            continue
         try:
             current_num = int(de["document_number"])
             nxt_num = int(nxt["document_number"])
@@ -1109,7 +1122,9 @@ async def keep_latest_rd_document(queryset: QuerySet) -> RECAPDocument:
     return rd
 
 
-async def clean_duplicate_documents(params: dict[str, Any]) -> RECAPDocument:
+async def clean_duplicate_documents(
+    params: Mapping[str, Any],
+) -> RECAPDocument:
     """Removes duplicate RECAPDocuments, keeping the most recent with PDF if
     available or otherwise the most recent overall.
 
@@ -1297,7 +1312,7 @@ async def add_docket_entries(
         # Then make the RECAPDocument object. Try to find it. If we do, update
         # the pacer_doc_id field if it's blank. If we can't find it, create it
         # or throw an error.
-        params = {"docket_entry": de}
+        params: dict[str, DocketEntry | int | str] = {"docket_entry": de}
         short_description = docket_entry.get("short_description")
         if short_description and (
             not docket_entry["document_number"] or is_scotus
@@ -2093,9 +2108,19 @@ def merge_pacer_docket_into_cl_docket(
     return rds_created, content_updated
 
 
+class _MergeAttachmentDict(TypedDict):
+    pacer_doc_id: NotRequired[str]
+    attachment_number: NotRequired[int]
+    acms_document_guid: NotRequired[str]
+    description: str
+    page_count: NotRequired[int | None]
+    file_size_bytes: int
+    file_size_str: str
+
+
 async def clean_duplicate_attachment_entries(
     de: DocketEntry,
-    attachment_dicts: list[dict[str, int | str]],
+    attachment_dicts: list[_MergeAttachmentDict],
 ):
     """Remove attachment page entries with duplicate pacer_doc_id's that
     have incorrect attachment numbers. This is needed because older attachment
@@ -2143,17 +2168,26 @@ async def clean_duplicate_attachment_entries(
         await keep_latest_rd_document(duplicate_rd_queryset)
 
 
+class _MergeAttachmentPageParams(TypedDict):
+    pacer_doc_id: str
+    docket_entry__docket__court: Court
+    document_number: NotRequired[int | None]
+    docket_entry__docket__docket_number_core: NotRequired[str | None]
+    description: NotRequired[str | None]
+    docket_entry__docket__pacer_case_id: NotRequired[str]
+
+
 async def merge_attachment_page_data(
     court: Court,
-    pacer_case_id: int,
-    pacer_doc_id: int,
+    pacer_case_id: str,
+    pacer_doc_id: str,
     document_number: int | None,
     text: str | None,
-    attachment_dicts: list[dict[str, int | str]],
+    attachment_dicts: list[_MergeAttachmentDict],
     debug: bool = False,
     is_acms_attachment: bool = False,
     subdocket_replication: bool = False,
-    docket_number_core: int | None = None,
+    docket_number_core: str | None = None,
     description: str | None = None,
 ) -> tuple[list[RECAPDocument], DocketEntry]:
     """Merge attachment page data into the docket
@@ -2179,7 +2213,7 @@ async def merge_attachment_page_data(
     # Create/update the attachment items.
     rds_created = []
     rds_affected = []
-    params = {
+    params: _MergeAttachmentPageParams = {
         "pacer_doc_id": pacer_doc_id,
         "docket_entry__docket__court": court,
     }
@@ -2350,22 +2384,26 @@ async def merge_attachment_page_data(
                 main_rd.acms_document_guid = attachment["acms_document_guid"]
             rd = main_rd
         else:
-            params = {
+            fallback_params = {
                 "docket_entry": de,
                 "document_number": document_number,
             }
             if attachment["attachment_number"] == 0:
-                params["document_type"] = RECAPDocument.PACER_DOCUMENT
+                fallback_params["document_type"] = RECAPDocument.PACER_DOCUMENT
             else:
-                params["attachment_number"] = attachment["attachment_number"]
-                params["document_type"] = RECAPDocument.ATTACHMENT
+                fallback_params["attachment_number"] = attachment[
+                    "attachment_number"
+                ]
+                fallback_params["document_type"] = RECAPDocument.ATTACHMENT
             if "acms_document_guid" in attachment:
-                params["acms_document_guid"] = attachment["acms_document_guid"]
+                fallback_params["acms_document_guid"] = attachment[
+                    "acms_document_guid"
+                ]
             try:
-                rd = await RECAPDocument.objects.aget(**params)
+                rd = await RECAPDocument.objects.aget(**fallback_params)
             except RECAPDocument.DoesNotExist:
                 try:
-                    doc_id_params = deepcopy(params)
+                    doc_id_params = deepcopy(fallback_params)
                     if not is_scotus:
                         # att number is required to match attachments in SCOTUS
                         # dockets since we don't have a pacer_doc_id
@@ -2405,7 +2443,7 @@ async def merge_attachment_page_data(
                         rd.attachment_number = attachment["attachment_number"]
                         rd.document_type = RECAPDocument.ATTACHMENT
                 except RECAPDocument.DoesNotExist:
-                    rd = RECAPDocument(**params)
+                    rd = RECAPDocument(**fallback_params)
                     if attachment["attachment_number"] == 0:
                         try:
                             old_main_rd = await RECAPDocument.objects.aget(
@@ -2582,7 +2620,7 @@ async def process_orphan_documents(
 @retry(IntegrityError, tries=3, delay=0.25, backoff=1)
 def process_case_query_report(
     court_id: str,
-    pacer_case_id: int,
+    pacer_case_id: str,
     report_data: dict[str, Any],
     report_text: str,
     skip_iquery_sweep: bool = False,
