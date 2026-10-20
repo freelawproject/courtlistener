@@ -5,6 +5,7 @@ project-excludes = ["**/migrations/**", "**/tests.py", "**/tests/**", "tests/**"
 permissive-ignores = true
 # Pre-existing errors are grandfathered here; only new errors fail the check.
 baseline = ".pyrefly-baseline.json"
+baseline-matching-mode = "column-ordered"
 
 check-unannotated-defs = true
 infer-return-types = "checked"

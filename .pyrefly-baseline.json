@@ -1,4 +1,5 @@
 {
+  "min_severity": "error",
   "errors": [
     {
       "column": 5,
@@ -67,7 +68,7 @@
       "column": 16,
       "path": "cl/ai/llm_providers/google.py",
       "name": "bad-return",
-      "concise_description": "Returned type `list[dict[str, str | Unknown | None]]` is not assignable to declared return type `list[ProcessedResult]`",
+      "concise_description": "Returned type `list[dict[str, str | Any | None]]` is not assignable to declared return type `list[ProcessedResult]`",
       "severity": "error"
     },
     {
@@ -757,24 +758,10 @@
       "severity": "error"
     },
     {
-      "column": 33,
-      "path": "cl/citations/unmatched_citations_utils.py",
-      "name": "bad-argument-type",
-      "concise_description": "Argument `Opinion | RECAPDocument` is not assignable to parameter `citing_recapdocument` with type `RECAPDocument` in function `cl.citations.models.UnmatchedCitationFromRECAPDocument.create_from_eyecite`",
-      "severity": "error"
-    },
-    {
       "column": 13,
       "path": "cl/citations/unmatched_citations_utils.py",
       "name": "bad-argument-type",
       "concise_description": "Argument `list[UnmatchedCitation | UnmatchedCitationFromRECAPDocument]` is not assignable to parameter `objs` with type `Iterable[UnmatchedCitation]` in function `django.db.models.manager.Manager.bulk_create`",
-      "severity": "error"
-    },
-    {
-      "column": 13,
-      "path": "cl/citations/unmatched_citations_utils.py",
-      "name": "bad-argument-type",
-      "concise_description": "Argument `list[UnmatchedCitation | UnmatchedCitationFromRECAPDocument]` is not assignable to parameter `objs` with type `Iterable[UnmatchedCitationFromRECAPDocument]` in function `django.db.models.manager.Manager.bulk_create`",
       "severity": "error"
     },
     {
@@ -796,20 +783,6 @@
       "path": "cl/corpus_importer/management/commands/760_project.py",
       "name": "missing-argument",
       "concise_description": "Missing argument `rd_pks` in function `cl.corpus_importer.task_canvases.get_district_attachment_pages`",
-      "severity": "error"
-    },
-    {
-      "column": 42,
-      "path": "cl/corpus_importer/management/commands/760_project.py",
-      "name": "missing-argument",
-      "concise_description": "Missing argument `tag_names` in function `cl.corpus_importer.task_canvases.get_district_attachment_pages`",
-      "severity": "error"
-    },
-    {
-      "column": 42,
-      "path": "cl/corpus_importer/management/commands/760_project.py",
-      "name": "missing-argument",
-      "concise_description": "Missing argument `session` in function `cl.corpus_importer.task_canvases.get_district_attachment_pages`",
       "severity": "error"
     },
     {
@@ -1083,13 +1056,6 @@
       "path": "cl/corpus_importer/utils.py",
       "name": "missing-attribute",
       "concise_description": "Object of class `Manager` has no attribute `bankruptcy_pacer_courts`",
-      "severity": "error"
-    },
-    {
-      "column": 27,
-      "path": "cl/corpus_importer/utils.py",
-      "name": "missing-attribute",
-      "concise_description": "Object of class `Manager` has no attribute `appellate_courts`",
       "severity": "error"
     },
     {
@@ -1426,13 +1392,6 @@
       "path": "cl/lib/document_serializer.py",
       "name": "bad-override",
       "concise_description": "Class member `NullableListField.to_representation` overrides parent class `ListField` in an inconsistent manner",
-      "severity": "error"
-    },
-    {
-      "column": 9,
-      "path": "cl/lib/document_serializer.py",
-      "name": "bad-override",
-      "concise_description": "Class member `DocumentSerializer.get_fields` overrides parent class `Serializer` in an inconsistent manner",
       "severity": "error"
     },
     {
@@ -2024,34 +1983,6 @@
       "severity": "error"
     },
     {
-      "column": 17,
-      "path": "cl/people_db/import_judges/populate_fjc_judges.py",
-      "name": "missing-attribute",
-      "concise_description": "Object of class `NoneType` has no attribute `insert`",
-      "severity": "error"
-    },
-    {
-      "column": 17,
-      "path": "cl/people_db/import_judges/populate_fjc_judges.py",
-      "name": "missing-attribute",
-      "concise_description": "Object of class `NoneType` has no attribute `insert`",
-      "severity": "error"
-    },
-    {
-      "column": 17,
-      "path": "cl/people_db/import_judges/populate_fjc_judges.py",
-      "name": "missing-attribute",
-      "concise_description": "Object of class `NoneType` has no attribute `insert`",
-      "severity": "error"
-    },
-    {
-      "column": 17,
-      "path": "cl/people_db/import_judges/populate_fjc_judges.py",
-      "name": "missing-attribute",
-      "concise_description": "Object of class `NoneType` has no attribute `append`",
-      "severity": "error"
-    },
-    {
       "column": 12,
       "path": "cl/people_db/import_judges/populate_fjc_judges.py",
       "name": "unbound-name",
@@ -2528,10 +2459,10 @@
       "severity": "error"
     },
     {
-      "column": 13,
+      "column": 42,
       "path": "cl/recap/mergers.py",
-      "name": "missing-attribute",
-      "concise_description": "Object of class `NoneType` has no attribute `document_url`",
+      "name": "bad-typed-dict-key",
+      "concise_description": "TypedDict `_MergeAttachmentDict` does not have key `document_url`",
       "severity": "error"
     },
     {
@@ -3648,27 +3579,6 @@
       "severity": "error"
     },
     {
-      "column": 13,
-      "path": "cl/search/api_views.py",
-      "name": "bad-argument-count",
-      "concise_description": "Expected 0 positional arguments, got 1 in function `cl.search.documents.DocketDocument.__init__`",
-      "severity": "error"
-    },
-    {
-      "column": 13,
-      "path": "cl/search/api_views.py",
-      "name": "bad-argument-count",
-      "concise_description": "Expected 0 positional arguments, got 1 in function `cl.search.documents.OpinionClusterDocument.__init__`",
-      "severity": "error"
-    },
-    {
-      "column": 13,
-      "path": "cl/search/api_views.py",
-      "name": "bad-argument-count",
-      "concise_description": "Expected 0 positional arguments, got 1 in function `cl.search.documents.PersonDocument.__init__`",
-      "severity": "error"
-    },
-    {
       "column": 27,
       "path": "cl/search/api_views.py",
       "name": "unexpected-keyword",
@@ -3676,52 +3586,10 @@
       "severity": "error"
     },
     {
-      "column": 27,
-      "path": "cl/search/api_views.py",
-      "name": "unexpected-keyword",
-      "concise_description": "Unexpected keyword argument `many` in function `cl.search.documents.DocketDocument.__init__`",
-      "severity": "error"
-    },
-    {
-      "column": 27,
-      "path": "cl/search/api_views.py",
-      "name": "unexpected-keyword",
-      "concise_description": "Unexpected keyword argument `many` in function `cl.search.documents.OpinionClusterDocument.__init__`",
-      "severity": "error"
-    },
-    {
-      "column": 27,
-      "path": "cl/search/api_views.py",
-      "name": "unexpected-keyword",
-      "concise_description": "Unexpected keyword argument `many` in function `cl.search.documents.PersonDocument.__init__`",
-      "severity": "error"
-    },
-    {
       "column": 38,
       "path": "cl/search/api_views.py",
       "name": "unexpected-keyword",
       "concise_description": "Unexpected keyword argument `context` in function `cl.search.documents.AudioDocument.__init__`",
-      "severity": "error"
-    },
-    {
-      "column": 38,
-      "path": "cl/search/api_views.py",
-      "name": "unexpected-keyword",
-      "concise_description": "Unexpected keyword argument `context` in function `cl.search.documents.DocketDocument.__init__`",
-      "severity": "error"
-    },
-    {
-      "column": 38,
-      "path": "cl/search/api_views.py",
-      "name": "unexpected-keyword",
-      "concise_description": "Unexpected keyword argument `context` in function `cl.search.documents.OpinionClusterDocument.__init__`",
-      "severity": "error"
-    },
-    {
-      "column": 38,
-      "path": "cl/search/api_views.py",
-      "name": "unexpected-keyword",
-      "concise_description": "Unexpected keyword argument `context` in function `cl.search.documents.PersonDocument.__init__`",
       "severity": "error"
     },
     {
@@ -3855,13 +3723,6 @@
       "path": "cl/search/factories.py",
       "name": "bad-override-mutable-attribute",
       "concise_description": "Class member `OpinionClusterWithChildrenAndParentsFactory.precedential_status` overrides parent class `OpinionClusterWithChildrenFactory` in an inconsistent manner",
-      "severity": "error"
-    },
-    {
-      "column": 5,
-      "path": "cl/search/factories.py",
-      "name": "bad-override-mutable-attribute",
-      "concise_description": "Class member `OpinionClusterWithChildrenAndParentsFactory.precedential_status` overrides parent class `OpinionClusterWithParentsFactory` in an inconsistent manner",
       "severity": "error"
     },
     {
@@ -4271,13 +4132,6 @@
       "severity": "error"
     },
     {
-      "column": 33,
-      "path": "cl/search/models.py",
-      "name": "bad-assignment",
-      "concise_description": "`Literal['']` is not assignable to attribute `pacer_doc_id` with type `Never`",
-      "severity": "error"
-    },
-    {
       "column": 17,
       "path": "cl/search/models.py",
       "name": "missing-attribute",
@@ -4359,13 +4213,6 @@
       "path": "cl/search/tasks.py",
       "name": "unexpected-keyword",
       "concise_description": "Unexpected keyword argument `_routing` in function `cl.search.documents.PositionDocument.__init__`",
-      "severity": "error"
-    },
-    {
-      "column": 26,
-      "path": "cl/search/tasks.py",
-      "name": "unexpected-keyword",
-      "concise_description": "Unexpected keyword argument `meta` in function `cl.search.documents.PositionDocument.__init__`",
       "severity": "error"
     },
     {
@@ -4502,20 +4349,6 @@
       "severity": "error"
     },
     {
-      "column": 36,
-      "path": "cl/search/tasks.py",
-      "name": "bad-argument-type",
-      "concise_description": "Unpacked keyword argument `int | str` is not assignable to parameter `using` with type `Elasticsearch | str | None` in function `elasticsearch.dsl._sync.document.Document.get`",
-      "severity": "error"
-    },
-    {
-      "column": 36,
-      "path": "cl/search/tasks.py",
-      "name": "bad-argument-type",
-      "concise_description": "Unpacked keyword argument `int | str` is not assignable to parameter `index` with type `str | None` in function `elasticsearch.dsl._sync.document.Document.get`",
-      "severity": "error"
-    },
-    {
       "column": 25,
       "path": "cl/search/tasks.py",
       "name": "missing-attribute",
@@ -4600,20 +4433,6 @@
       "severity": "error"
     },
     {
-      "column": 36,
-      "path": "cl/search/tasks.py",
-      "name": "unexpected-keyword",
-      "concise_description": "Unexpected keyword argument `meta` in function `cl.search.documents.OpinionClusterDocument.__init__`",
-      "severity": "error"
-    },
-    {
-      "column": 36,
-      "path": "cl/search/tasks.py",
-      "name": "unexpected-keyword",
-      "concise_description": "Unexpected keyword argument `meta` in function `cl.search.documents.PersonDocument.__init__`",
-      "severity": "error"
-    },
-    {
       "column": 13,
       "path": "cl/search/tasks.py",
       "name": "unbound-name",
@@ -4632,90 +4451,6 @@
       "path": "cl/search/tasks.py",
       "name": "bad-argument-type",
       "concise_description": "Unpacked keyword argument `int | str` is not assignable to parameter `index` with type `str` in function `elasticsearch._sync.client.Elasticsearch.delete`",
-      "severity": "error"
-    },
-    {
-      "column": 19,
-      "path": "cl/search/tasks.py",
-      "name": "bad-argument-type",
-      "concise_description": "Unpacked keyword argument `int | str` is not assignable to parameter `id` with type `str` in function `elasticsearch._sync.client.Elasticsearch.delete`",
-      "severity": "error"
-    },
-    {
-      "column": 19,
-      "path": "cl/search/tasks.py",
-      "name": "bad-argument-type",
-      "concise_description": "Unpacked keyword argument `int | str` is not assignable to parameter `error_trace` with type `bool | None` in function `elasticsearch._sync.client.Elasticsearch.delete`",
-      "severity": "error"
-    },
-    {
-      "column": 19,
-      "path": "cl/search/tasks.py",
-      "name": "bad-argument-type",
-      "concise_description": "Unpacked keyword argument `int | str` is not assignable to parameter `filter_path` with type `Sequence[str] | str | None` in function `elasticsearch._sync.client.Elasticsearch.delete`",
-      "severity": "error"
-    },
-    {
-      "column": 19,
-      "path": "cl/search/tasks.py",
-      "name": "bad-argument-type",
-      "concise_description": "Unpacked keyword argument `int | str` is not assignable to parameter `human` with type `bool | None` in function `elasticsearch._sync.client.Elasticsearch.delete`",
-      "severity": "error"
-    },
-    {
-      "column": 19,
-      "path": "cl/search/tasks.py",
-      "name": "bad-argument-type",
-      "concise_description": "Unpacked keyword argument `int | str` is not assignable to parameter `if_primary_term` with type `int | None` in function `elasticsearch._sync.client.Elasticsearch.delete`",
-      "severity": "error"
-    },
-    {
-      "column": 19,
-      "path": "cl/search/tasks.py",
-      "name": "bad-argument-type",
-      "concise_description": "Unpacked keyword argument `int | str` is not assignable to parameter `if_seq_no` with type `int | None` in function `elasticsearch._sync.client.Elasticsearch.delete`",
-      "severity": "error"
-    },
-    {
-      "column": 19,
-      "path": "cl/search/tasks.py",
-      "name": "bad-argument-type",
-      "concise_description": "Unpacked keyword argument `int | str` is not assignable to parameter `pretty` with type `bool | None` in function `elasticsearch._sync.client.Elasticsearch.delete`",
-      "severity": "error"
-    },
-    {
-      "column": 19,
-      "path": "cl/search/tasks.py",
-      "name": "bad-argument-type",
-      "concise_description": "Unpacked keyword argument `int | str` is not assignable to parameter `refresh` with type `bool | str | None` in function `elasticsearch._sync.client.Elasticsearch.delete`",
-      "severity": "error"
-    },
-    {
-      "column": 19,
-      "path": "cl/search/tasks.py",
-      "name": "bad-argument-type",
-      "concise_description": "Unpacked keyword argument `int | str` is not assignable to parameter `routing` with type `str | None` in function `elasticsearch._sync.client.Elasticsearch.delete`",
-      "severity": "error"
-    },
-    {
-      "column": 19,
-      "path": "cl/search/tasks.py",
-      "name": "bad-argument-type",
-      "concise_description": "Unpacked keyword argument `int | str` is not assignable to parameter `timeout` with type `Literal[-1, 0] | str | None` in function `elasticsearch._sync.client.Elasticsearch.delete`",
-      "severity": "error"
-    },
-    {
-      "column": 19,
-      "path": "cl/search/tasks.py",
-      "name": "bad-argument-type",
-      "concise_description": "Unpacked keyword argument `int | str` is not assignable to parameter `version` with type `int | None` in function `elasticsearch._sync.client.Elasticsearch.delete`",
-      "severity": "error"
-    },
-    {
-      "column": 19,
-      "path": "cl/search/tasks.py",
-      "name": "bad-argument-type",
-      "concise_description": "Unpacked keyword argument `int | str` is not assignable to parameter `version_type` with type `str | None` in function `elasticsearch._sync.client.Elasticsearch.delete`",
       "severity": "error"
     },
     {
