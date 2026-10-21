@@ -235,6 +235,23 @@ async def open_prayers(request: HttpRequest) -> HttpResponse:
     return TemplateResponse(request, "top_prayers.html", context)
 
 
+def get_prayer_button_template(request: HttpRequest) -> str:
+    """Return the htmx partial that re-renders the pray button.
+
+    The v2 pray button form posts ``design=v2`` to ask for its own partial.
+    The design middleware swaps templates by waffle flag alone, so relying on
+    it would send v2 markup to flagged users on pages that are still legacy.
+
+    This function may become obsolete once the new design is fully rolled out.
+
+    :param request: The pray button's create or delete request.
+    :return: The template name of the partial to render.
+    """
+    if request.POST.get("design") == "v2":
+        return "v2_includes/pray_and_pay_htmx/pray_button_new.html"
+    return "includes/pray_and_pay_htmx/pray_button.html"
+
+
 @login_required
 async def create_prayer_view(
     request: HttpRequest, recap_document: int
@@ -250,7 +267,7 @@ async def create_prayer_view(
             )
             return TemplateResponse(
                 request,
-                "includes/pray_and_pay_htmx/pray_button.html",
+                get_prayer_button_template(request),
                 {
                     "prayer_exists": False,
                     "document_id": recap_document,
@@ -271,7 +288,7 @@ async def create_prayer_view(
         prayer_counts = await get_prayer_counts_in_bulk([recap_document_obj])
         return TemplateResponse(
             request,
-            "includes/pray_and_pay_htmx/pray_button.html",
+            get_prayer_button_template(request),
             {
                 "prayer_exists": True,
                 "document_id": recap_document_obj.pk,
@@ -299,7 +316,7 @@ async def delete_prayer_view(
         prayer_counts = await get_prayer_counts_in_bulk([recap_document_obj])
         return TemplateResponse(
             request,
-            "includes/pray_and_pay_htmx/pray_button.html",
+            get_prayer_button_template(request),
             {
                 "prayer_exists": False,
                 "document_id": recap_document_obj.pk,

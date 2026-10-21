@@ -7,4 +7,6 @@
   :prayer_exists="prayer_exists"
   :daily_limit_reached="daily_limit_reached"
 />
-<span id="pray_status_{{ document_id }}" hx-swap-oob="innerHTML">{{ count }} </span>
+<span id="pray_status_{{ document_id }}" hx-swap-oob="innerHTML">
+  {% if daily_limit_reached %}Daily limit has been reached.{% else %}Pray-and-pay: request this document. {{ count }} requests so far.{% endif %}
+</span>
