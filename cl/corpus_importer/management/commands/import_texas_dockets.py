@@ -1,5 +1,6 @@
 from collections.abc import Iterable
 from pathlib import Path
+from typing import ClassVar
 
 from celery import Task
 
@@ -14,9 +15,9 @@ from cl.search.models import CaseTransfer
 
 
 class Command(CorpusImporterCommand):
-    help = "Import Texas dockets from S3 using an inventory CSV."
+    """Import Texas dockets from S3 using an inventory CSV."""
 
-    compose_redis_key = "texas_docket_import:log"
+    compose_redis_key: ClassVar[str] = "texas_docket_import:log"
 
     @staticmethod
     def transform_inventory_iterator(
@@ -49,6 +50,6 @@ class Command(CorpusImporterCommand):
     def merge_task() -> Task:
         return texas_ingest_docket_task
 
-    def handle(self, *args, **options):
-        super().handle(*args, **options)
+    def run(self, arguments: CorpusImporterCommand.Arguments):
+        super().run(arguments)
         CaseTransfer.fill_null_dockets()

@@ -1,4 +1,5 @@
 from collections.abc import Iterable
+from typing import ClassVar
 
 from celery import Task
 
@@ -13,24 +14,15 @@ from cl.search.models import CaseTransfer
 
 
 class Command(CorpusImporterCommand):
-    help = "Import Florida dockets from S3 using an inventory CSV."
+    """Import Florida dockets from S3 using an inventory CSV."""
 
-    compose_redis_key = "florida_docket_import:log"
+    compose_redis_key: ClassVar[str] = "florida_docket_import:log"
 
-    def add_arguments(self, parser):
-        super().add_arguments(parser)
-        parser.add_argument(
-            "--fill-case-transfer",
-            action="store_true",
-            help="Fill null dockets in CaseTransfer table",
-            default=False,
-        )
-        parser.add_argument(
-            "--skip-case-merge",
-            action="store_true",
-            help="Skip merging cases from the inventory file",
-            default=False,
-        )
+    class Arguments(CorpusImporterCommand.Arguments):
+        fill_case_transfer: bool = False
+        """Fill null dockets in CaseTransfer table"""
+        skip_case_merge: bool = False
+        """Skip merging cases from the inventory file"""
 
     @staticmethod
     def transform_inventory_iterator(
@@ -46,10 +38,8 @@ class Command(CorpusImporterCommand):
     def merge_task() -> Task:
         return fl_ingest_docket_task
 
-    def handle(
-        self, *args, fill_case_transfer: bool, skip_case_merge: bool, **options
-    ):
-        if not skip_case_merge:
-            super().handle(*args, **options)
-        if fill_case_transfer:
+    def run(self, arguments: Arguments):
+        if not arguments.skip_case_merge:
+            super().run(arguments)
+        if arguments.fill_case_transfer:
             CaseTransfer.fill_null_dockets()
