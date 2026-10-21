@@ -1481,10 +1481,9 @@ Sample code here.
   {# BANNER #}
   <section class="max-w-full w-full border-t-2 border-greyscale-200" x-intersect.margin.-100px="show" id="banner">
     <h2 class="mt-6 mb-3">Banner</h2>
-    <p>A banner element that allows to display highlighted information; it can be dismissed and hidden for a period of time. So far it a default info style and warning.</p>
+    <p>A banner element that allows to display highlighted information; it can be dismissed and hidden for a period of time. It currently supports two styles: info (default) and warning.</p>
 
     <h4 class="mt-3">Demo</h4>
-    <c-banner variant="info" banner_id="demo-card" is_dismissible dismiss_days=10 icon="info" href="https://free.law/" link_text="Go to Case">
       {% if "banner_dismissed_demo-card" not in request.COOKIES %}
         <c-banner variant="info" banner_id="demo-card" is_dismissible dismiss_days=10 icon="info" href="https://free.law/" link_text="Go to Case">
           <p>It looks like you're trying to search for <strong>Miranda v. Arizona,</strong> from 1966.</p>
@@ -1494,7 +1493,6 @@ Sample code here.
           You already dismissed the dismissible demo banner! To restore it, clear the cookie <code>banner_dismissed_demo-card</code> in your browser's Dev Tools and reload the page.
         </div>
       {% endif %}
-    </c-banner>
     <c-banner variant="info">
       The results below were contributed to the RECAP Archive by users of the RECAP Extension. If you use PACER, please install RECAP.
       <c-button href="https://free.law/" class="font-bold">Learn more.</c-button>
@@ -1506,15 +1504,15 @@ Sample code here.
     <c-library.list title="Props" only>
       <c-library.item optional only>
         <c-slot name="label"><code>variant</code></c-slot>
-        <c-slot name="description">Type of banner, visually speaking. the Default is "info" for blue banners and "warning" for red banners.</c-slot>
+        <c-slot name="description">Type of banner, visually speaking. the default is "info" for blue banners and "warning" for red banners.</c-slot>
       </c-library.item>
       <c-library.item optional only>
         <c-slot name="label"><code>banner_id</code></c-slot>
-        <c-slot name="description">Id for cookies purposes, please avoid leaving it empty if dismissed funtionality is gonna be used, take advantage of this value to manipulate banner visibility.</c-slot>
+        <c-slot name="description">ID used to name the dismissal cookie. Required if the dismiss functionality is going to be used; use this value to control the banner's visibility.</c-slot>
       </c-library.item>
       <c-library.item optional only>
         <c-slot name="label"><code>is_dismissible</code></c-slot>
-        <c-slot name="description">In combination with card_id allows to hide the card.</c-slot>
+        <c-slot name="description">In combination with <code>banner_id</code>, allows the banner to be dismissed.</c-slot>
       </c-library.item>
       <c-library.item optional only>
         <c-slot name="label"><code>dismiss_days</code></c-slot>
@@ -1552,7 +1550,7 @@ Sample code here.
           href="https://free.law/"
           link_text="Go to Case"&gt;
           It looks like you're trying to place some content in this banner.
-        &lt;/c-banner &gt;
+        &lt;/c-banner&gt;
       </c-code>
     </c-expansion-panel>
   </section>
