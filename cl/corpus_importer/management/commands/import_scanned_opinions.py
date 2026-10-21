@@ -23,6 +23,7 @@ from juriscraper.lib.string_utils import (
     titlecase,
 )
 
+from cl.citations.parenthetical_utils import create_parenthetical_groups
 from cl.citations.tasks import (
     find_citations_and_parentheticals_for_opinion_by_pks,
 )
@@ -45,12 +46,19 @@ from cl.lib.utils import human_sort
 from cl.people_db.lookup_utils import (
     extract_judge_last_name,
 )
+from cl.scrapers.management.commands.merge_opinion_versions import (
+    delete_version_related_objects,
+    get_text_similarity,
+    passes_length_ratio_check,
+    update_referencing_objects,
+)
 from cl.scrapers.utils import (
     case_names_are_too_different,
     link_judges,
     update_or_create_docket,
 )
 from cl.search.cluster_sources import ClusterSources
+from cl.search.documents import ES_CHILD_ID, OpinionDocument
 from cl.search.models import (
     PRECEDENTIAL_STATUS,
     Court,
@@ -58,7 +66,11 @@ from cl.search.models import (
     Opinion,
     OpinionCluster,
     OpinionContent,
+    OpinionsCited,
+    OpinionsCitedByRECAPDocument,
+    Parenthetical,
 )
+from cl.search.tasks import remove_document_from_es_index
 
 cnt = CaseNameTweaker()
 
@@ -681,9 +693,24 @@ def parse_scan_xml(
             )
             return None
         court_id = found_courts[0]
-    if not (court := Court.objects.filter(id=court_id).first()):
+    court = (
+        Court.objects.filter(id=court_id)
+        .select_related("parent_court")
+        .first()
+    )
+    if not court:
         logger.warning("Court not found in CourtListener: %s", court_id)
         return None
+    if not court.in_use and court.parent_court:
+        # Courts not in use keep their opinions in their parent court, e.g.
+        # the Florida district courts of appeal in "fladistctapp", where
+        # scraped cases are found and new ones belong
+        logger.info(
+            "Using court %s, the parent of %s, which is not in use",
+            court.parent_court.pk,
+            court.pk,
+        )
+        court = court.parent_court
 
     cite_strings = get_citation_strings(soup)
     cites = parse_citations(cite_strings, file_path)
@@ -715,8 +742,11 @@ def parse_scan_xml(
         judges=get_judges(soup),
         precedential_status=get_precedential_status(soup, cites),
         page_count=get_page_count(soup),
+        # The whole casebody, like a scraped PDF that prints the caption,
+        # docket number and dates above the opinion. With the opinions
+        # alone, short ones fail the length check against scraped texts.
         body_characters=clean_body_content(
-            str(soup.select_one("casebody") or ""), harvard_file=True
+            str(soup.select_one("casebody") or "")
         ),
         cluster_fields=cluster_fields,
         opinions=opinions,
@@ -815,9 +845,21 @@ def make_opinion(op: Tag, cluster_id: int) -> Opinion:
             )
         )
     op_type = op.get("type")
+    opinion_type = map_opinion_type(
+        op_type if isinstance(op_type, str) else ""
+    )
+    if (
+        opinion_type == Opinion.COMBINED
+        and not per_curiam
+        and author_str
+        and "," not in author_str
+    ):
+        # An opinion without a type that a single judge wrote is the
+        # opinion of the court, not a combined one
+        opinion_type = Opinion.LEAD
     return Opinion(
         cluster_id=cluster_id,
-        type=map_opinion_type(op_type if isinstance(op_type, str) else ""),
+        type=opinion_type,
         author_str="Per Curiam" if per_curiam else author_str,
         per_curiam=per_curiam,
         xml_scan=opinion_xml,
@@ -884,17 +926,15 @@ def store_scan_xml(
 def add_opinion_content(
     opinion: Opinion, scan_case: ScanCase
 ) -> OpinionContent:
-    """Store the opinion XML in OpinionContent as the main version.
+    """Store the XML of a new scanned opinion in OpinionContent.
 
-    The scan is richer than text from other sources, like scraped HTML, so
-    it replaces the opinion's previous main version. The XML is also kept in
-    `Opinion.xml_scan` until the site reads from OpinionContent.
+    The XML is also kept in `Opinion.xml_scan` until the site reads from
+    OpinionContent.
 
-    :param opinion: The saved opinion.
+    :param opinion: The saved scanned opinion.
     :param scan_case: The parsed scanned opinion.
-    :return: The new OpinionContent.
+    :return: The new OpinionContent, its main version.
     """
-    opinion.contents.filter(is_main_version=True).update(is_main_version=False)
     return OpinionContent.objects.create(
         opinion=opinion,
         content=opinion.xml_scan,
@@ -906,36 +946,317 @@ def add_opinion_content(
     )
 
 
-def get_opinion_to_merge(
-    cluster: OpinionCluster, scan_case: ScanCase
-) -> Opinion | None:
-    """Get the cluster opinion that the scanned opinion can be merged into.
+# Opinion fields with the text of the writing, in the order they are read
+# to compare two opinions
+OPINION_TEXT_FIELDS = (
+    "xml_scan",
+    "xml_harvard",
+    "html_columbia",
+    "html_lawbox",
+    "html_anon_2020",
+    "html",
+    "plain_text",
+    "html_with_citations",
+)
 
-    There is no reliable way yet to pair up multiple opinions, so a scan is
-    only merged when both the cluster and the XML have a single opinion.
+# Opinion types of the main writing of a case. The scan's first opinion of
+# one of these types is the one the single opinion of a cluster becomes a
+# version of.
+LEAD_OPINION_TYPES = {
+    Opinion.COMBINED,
+    Opinion.UNANIMOUS,
+    Opinion.LEAD,
+    Opinion.PLURALITY,
+}
+
+
+@dataclass
+class OpinionMergePlan:
+    """How the scanned opinions go into an existing cluster.
+
+    The scanned opinions are always created in the cluster, as the main
+    versions: a scan is the published version of a case, like the advance
+    sheet after the slip opinion. Each cluster opinion in `versions`
+    becomes a version of the scanned opinion paired with it.
+    """
+
+    new_opinions: list[Opinion]
+    versions: list[tuple[Opinion, Opinion]] = field(default_factory=list)
+
+    def describe(self) -> str:
+        """Describe the plan for the logs, e.g. "2 new opinions, ..."."""
+        pairs = ", ".join(
+            f"{version.pk} as a version of {describe_opinions([main])}"
+            for version, main in self.versions
+        )
+        count = len(self.new_opinions)
+        return f"{count} new opinion{'s' if count > 1 else ''}, with {pairs}"
+
+
+def get_lead_opinion(opinions: list[Opinion]) -> Opinion:
+    """Get the main writing of a case among its opinions.
+
+    :param opinions: The opinions, in the order they are printed.
+    :return: The first lead-type opinion, or the first opinion.
+    """
+    return next(
+        (o for o in opinions if o.type in LEAD_OPINION_TYPES), opinions[0]
+    )
+
+
+def get_author_names(opinion: Opinion) -> set[str]:
+    """Get the lowercased last names of an opinion's author.
+
+    Per curiam opinions are named "per curiam", so they match each other.
+
+    :param opinion: The opinion.
+    :return: The names from `author_str`, or from `author`, or an empty set.
+    """
+    if opinion.per_curiam or PER_CURIAM_RE.search(opinion.author_str):
+        return {"per curiam"}
+    if opinion.author_str:
+        return {n.lower() for n in extract_judge_last_name(opinion.author_str)}
+    if opinion.author:
+        return {opinion.author.name_last.lower()}
+    return set()
+
+
+def get_opinion_words(opinion: Opinion) -> str:
+    """Get the words of an opinion's text, to compare it with another one.
+
+    :param opinion: The opinion.
+    :return: Its first text field with content, without markup, lowercased
+        and with single spaces.
+    """
+    text = next(
+        (
+            value
+            for name in OPINION_TEXT_FIELDS
+            if (value := getattr(opinion, name))
+        ),
+        "",
+    )
+    words = BeautifulSoup(text, "lxml").get_text(" ")
+    return re.sub(r"\s+", " ", words).strip().lower()
+
+
+def is_same_writing(cl_opinion: Opinion, scan_opinion: Opinion) -> bool:
+    """Check whether a cluster opinion and a scanned one are the same writing.
+
+    They need the same author, known on both sides, and similar text: the
+    loose thresholds of `merge_opinion_versions`, since OCR and court text
+    differ in punctuation, page numbers and headers.
+
+    :param cl_opinion: A cluster opinion.
+    :param scan_opinion: An unsaved scanned opinion.
+    :return: True if they are the same writing.
+    """
+    authors = get_author_names(cl_opinion)
+    if not (authors and authors & get_author_names(scan_opinion)):
+        return False
+    cl_words = get_opinion_words(cl_opinion)
+    scan_words = get_opinion_words(scan_opinion)
+    if not passes_length_ratio_check(cl_words, scan_words)[0]:
+        return False
+    return get_text_similarity(cl_words, scan_words)[1]
+
+
+def describe_opinions(opinions: list[Opinion]) -> str:
+    """Describe opinions for the logs, e.g. "[Lead Opinion (Gerber)]".
+
+    :param opinions: The opinions.
+    :return: Their types and authors.
+    """
+    return "[{}]".format(
+        ", ".join(
+            f"{o.get_type_display()} ({o.author_str or 'no author'})"
+            for o in opinions
+        )
+    )
+
+
+def pair_opinions(
+    cl_opinions: list[Opinion], scan_opinions: list[Opinion]
+) -> list[tuple[Opinion, Opinion]] | None:
+    """Pair each cluster opinion with the scanned opinion of the same writing.
+
+    Each pair must be the same writing (see `is_same_writing`), and each
+    cluster opinion must pair with exactly one scanned opinion.
+
+    :param cl_opinions: The cluster's main-version opinions.
+    :param scan_opinions: The unsaved scanned opinions.
+    :return: The (cluster opinion, scanned opinion) pairs, or None unless
+        every opinion pairs one-to-one.
+    """
+    if len(cl_opinions) != len(scan_opinions):
+        return None
+    pairs = []
+    unpaired = list(scan_opinions)
+    for cl_opinion in cl_opinions:
+        matches = [o for o in unpaired if is_same_writing(cl_opinion, o)]
+        if len(matches) != 1:
+            return None
+        unpaired.remove(matches[0])
+        pairs.append((cl_opinion, matches[0]))
+    return pairs
+
+
+def plan_opinion_merge(
+    cluster: OpinionCluster, scan_case: ScanCase
+) -> OpinionMergePlan | None:
+    """Plan how the scanned opinions go into an existing cluster.
+
+    The scanned opinions are always created. The cluster's opinions become
+    their versions:
+    - A single cluster opinion, like a scraped combined one, becomes a
+      version of the scan's lead opinion, whatever their types.
+    - Several cluster opinions each become a version of the scanned opinion
+      with the same author and text (see `pair_opinions`).
+
     Versions of an opinion are kept in its cluster, so they are ignored.
+
+    Caveat: it reads the scanned opinions with `make_opinion`, which
+    removes the page numbers from their `<author>` elements.
 
     :param cluster: The matching cluster.
     :param scan_case: The parsed scanned opinion.
-    :return: The opinion, or None if the opinions can't be paired.
+    :return: The plan, or None if the cluster has no opinions or its
+        opinions can't be paired.
     """
-    cl_opinions = list(cluster.sub_opinions.filter(main_version__isnull=True))
-    if len(cl_opinions) != 1 or len(scan_case.opinions) != 1:
-        return None
-    return cl_opinions[0]
+    cl_opinions = list(
+        cluster.sub_opinions.filter(main_version__isnull=True).order_by(
+            "ordering_key", "pk"
+        )
+    )
+    scan_opinions = [make_opinion(op, cluster.id) for op in scan_case.opinions]
+    if len(cl_opinions) == 1:
+        return OpinionMergePlan(
+            new_opinions=scan_opinions,
+            versions=[(cl_opinions[0], get_lead_opinion(scan_opinions))],
+        )
+    if pairs := pair_opinions(cl_opinions, scan_opinions):
+        return OpinionMergePlan(new_opinions=scan_opinions, versions=pairs)
+    return None
+
+
+def make_version(version: Opinion, main_opinion: Opinion) -> None:
+    """Make an opinion a version of another opinion of its cluster.
+
+    Like `merge_opinion_versions`, the objects that reference the version
+    are moved to the main opinion, its citation data is deleted, its own
+    versions are moved to the main opinion, and it's removed from search
+    once the import is committed. Unlike it, both opinions are in the same
+    cluster, so no cluster or docket is merged, and what other opinions and
+    RECAP documents say about the version moves to the main opinion, since
+    they refer to the same case: their citations and parentheticals.
+
+    :param version: The saved opinion that becomes a version.
+    :param main_opinion: The saved opinion it is a version of.
+    :return: None
+    """
+    update_referencing_objects(main_opinion, version)
+    # delete_version_related_objects deletes what refers to the version,
+    # so move first what refers to the case
+    already_citing = OpinionsCited.objects.filter(
+        cited_opinion=main_opinion
+    ).values("citing_opinion_id")
+    OpinionsCited.objects.filter(cited_opinion=version).exclude(
+        citing_opinion_id__in=already_citing
+    ).update(cited_opinion=main_opinion)
+    already_citing_documents = OpinionsCitedByRECAPDocument.objects.filter(
+        cited_opinion=main_opinion
+    ).values("citing_document_id")
+    OpinionsCitedByRECAPDocument.objects.filter(cited_opinion=version).exclude(
+        citing_document_id__in=already_citing_documents
+    ).update(cited_opinion=main_opinion)
+    moved_parentheticals = Parenthetical.objects.filter(
+        described_opinion=version
+    ).update(described_opinion=main_opinion)
+    # A version points to a main opinion, not to another version
+    Opinion.objects.filter(main_version=version).update(
+        main_version=main_opinion
+    )
+    version.main_version = main_opinion
+    version.html_with_citations = ""
+    version.save(update_fields=["main_version", "html_with_citations"])
+    delete_version_related_objects(version)
+    if moved_parentheticals:
+        # The groups of the moved parentheticals still name the version
+        create_parenthetical_groups(main_opinion.cluster)
+    es_id = ES_CHILD_ID(version.pk).OPINION
+    transaction.on_commit(
+        lambda: remove_document_from_es_index.delay(
+            OpinionDocument.__name__, es_id, version.cluster_id
+        )
+    )
+
+
+def fill_from_version(opinion: Opinion, version: Opinion) -> None:
+    """Fill the empty author fields of a scanned opinion from its version.
+
+    The version's author is only taken when the scan's byline names no one
+    or names that judge, so a scraped opinion attributed to another judge
+    doesn't override the printed byline. The texts of the version, like its
+    HTML, stay on the version, so the scanned text is the one shown.
+
+    :param opinion: The unsaved scanned opinion.
+    :param version: The cluster opinion that becomes its version.
+    :return: None
+    """
+    if (
+        not opinion.author
+        and version.author
+        and (
+            not opinion.author_str
+            or version.author.name_last.lower() in get_author_names(opinion)
+        )
+    ):
+        opinion.author = version.author
+    for field_name in ("author_str", "joined_by_str"):
+        if not getattr(opinion, field_name) and (
+            value := getattr(version, field_name)
+        ):
+            setattr(opinion, field_name, value)
+
+
+def add_scanned_opinions(
+    cluster: OpinionCluster, plan: OpinionMergePlan, scan_case: ScanCase
+) -> list[Opinion]:
+    """Create the plan's scanned opinions, and make its versions point to them.
+
+    :param cluster: The cluster.
+    :param plan: The merge plan.
+    :param scan_case: The parsed scanned opinion.
+    :return: The created opinions.
+    """
+    # The ordering key is unique in the cluster, versions included, and the
+    # new opinions take 1 to N
+    cluster.sub_opinions.exclude(ordering_key=None).update(ordering_key=None)
+    link_judges(cluster, plan.new_opinions)
+    for version, opinion in plan.versions:
+        version.ordering_key = None
+        fill_from_version(opinion, version)
+    for ordering_key, opinion in enumerate(plan.new_opinions, start=1):
+        opinion.ordering_key = ordering_key
+        opinion.save()
+        add_opinion_content(opinion, scan_case)
+    for version, opinion in plan.versions:
+        make_version(version, opinion)
+    return plan.new_opinions
 
 
 def merge_into_cluster(
-    cluster: OpinionCluster, opinion: Opinion, scan_case: ScanCase
+    cluster: OpinionCluster, plan: OpinionMergePlan, scan_case: ScanCase
 ) -> None:
     """Merge a scanned opinion into an existing cluster.
 
-    Adds missing citations, fills empty cluster fields, stores the opinion
-    text and the XML, and updates the cluster and docket sources.
+    Adds missing citations, fills empty cluster fields, creates the scanned
+    opinions and makes the cluster's opinions their versions as the plan
+    says, stores the XML, and updates the cluster and docket sources.
 
     :param cluster: The matching cluster.
-    :param opinion: The cluster opinion paired with the scanned opinion,
-        from `get_opinion_to_merge`.
+    :param plan: How the scanned opinions go into the cluster, from
+        `plan_opinion_merge`.
     :param scan_case: The parsed scanned opinion.
     :return: None
     """
@@ -979,24 +1300,8 @@ def merge_into_cluster(
         )
         docket.save(update_fields=["source"])
 
-        opinion.xml_scan = str(scan_case.opinions[0])
-        opinion_update_fields = ["xml_scan"]
-        if "judges" in update_fields:
-            # The judges came from the scan: resolve them, without
-            # replacing the author the opinion already has
-            existing_author = opinion.author
-            # link_judges may attribute an author to the opinion if there is
-            # a single judge
-            link_judges(cluster, [opinion])
-            if existing_author:
-                # Undo the author overwrite by link_judges
-                opinion.author = existing_author
-            elif opinion.author:
-                # The opinion had no author: keep the one from link_judges
-                opinion_update_fields.append("author")
-        opinion.save(update_fields=opinion_update_fields)
-        add_opinion_content(opinion, scan_case)
-        queue_citation_finding([opinion.pk])
+        opinions = add_scanned_opinions(cluster, plan, scan_case)
+        queue_citation_finding([opinion.pk for opinion in opinions])
 
         # Saves the cluster changes above too
         store_scan_xml(cluster, scan_case, update_fields)
@@ -1059,7 +1364,10 @@ def add_new_case(scan_case: ScanCase) -> OpinionCluster:
         add_citations_to_cluster(scan_case.citations, cluster.id)
         opinions = [make_opinion(op, cluster.id) for op in scan_case.opinions]
         link_judges(cluster, opinions)
-        for opinion in opinions:
+        # The opinion page only shows the opinions of a cluster with several
+        # of them that have an ordering key
+        for ordering_key, opinion in enumerate(opinions, start=1):
+            opinion.ordering_key = ordering_key
             opinion.save()
             add_opinion_content(opinion, scan_case)
         store_scan_xml(cluster, scan_case, update_fields=[])
@@ -1109,40 +1417,48 @@ def import_scanned_opinion(
                 cluster.filepath_xml_scan.name,
             )
             return
-        if not (opinion := get_opinion_to_merge(cluster, scan_case)):
+        if not (plan := plan_opinion_merge(cluster, scan_case)):
             # Skip it instead of merging only the cluster metadata, which
             # would be hard to clean up afterwards
             logger.warning(
-                "%s (%s) matched cluster %s, but its %s opinions can't be "
+                "%s (%s) matched cluster %s, but its opinions %s can't be "
                 "paired with the scan's %s. Skipping it for review: %s%s",
                 file_path,
                 citation,
                 cluster.id,
-                cluster.sub_opinions.filter(main_version__isnull=True).count(),
-                len(scan_case.opinions),
+                describe_opinions(
+                    list(
+                        cluster.sub_opinions.filter(main_version__isnull=True)
+                    )
+                ),
+                describe_opinions(
+                    [make_opinion(op, cluster.id) for op in scan_case.opinions]
+                ),
                 BASE_URL,
                 cluster.get_absolute_url(),
             )
             return
         if dry_run:
             logger.info(
-                "Dry run: would merge %s (%s) into cluster %s: %s%s",
+                "Dry run: would merge %s (%s) into cluster %s (%s): %s%s",
                 file_path,
                 citation,
                 cluster.id,
+                plan.describe(),
                 BASE_URL,
                 cluster.get_absolute_url(),
             )
             return
         logger.info(
-            "Merging %s (%s) into cluster %s: %s%s",
+            "Merging %s (%s) into cluster %s (%s): %s%s",
             file_path,
             citation,
             cluster.id,
+            plan.describe(),
             BASE_URL,
             cluster.get_absolute_url(),
         )
-        merge_into_cluster(cluster, opinion, scan_case)
+        merge_into_cluster(cluster, plan, scan_case)
         return
 
     if dry_run:
