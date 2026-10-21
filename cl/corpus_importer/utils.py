@@ -890,8 +890,10 @@ def winnow_case_name(case_name: str) -> set:
     # "R. L. C. R. v. L. Z. S." -> "RLCR v. LZS"
     # "J. B. v. C. E." -> "JB v. CE"
     # "County v. A. D. B. County" -> "County v. ADB County"
+    # Only runs of single letters are joined, so names printed in capitals
+    # like "JAMES SMITH v. THE STATE" keep their words
     case_name = re.sub(
-        r"\b[A-Z][A-Z\.\s]*[A-Z]\b\.?",
+        r"\b[A-Z]\b(?:\.?\s*\b[A-Z]\b)+\.?",
         lambda m: m.group().replace(".", "").replace(" ", ""),
         case_name,
     )
@@ -1066,7 +1068,10 @@ def cosine_similarity_too_different(
 
     similarities = []
     for title in [case_name_full, case_name_abbreviation]:
-        similarity = get_cosine_similarity(title, case.case_name)
+        # Lowercased: scrapers can store names in capitals
+        similarity = get_cosine_similarity(
+            title.lower(), case.case_name.lower()
+        )
         similarities.append(similarity)
     max_similarity = max(similarities)
 
