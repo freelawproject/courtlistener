@@ -1,6 +1,7 @@
 import argparse
 import logging
 import os
+import re
 from argparse import Namespace
 from typing import (
     Any,
@@ -124,7 +125,7 @@ class AbstractCommand[S: BaseSettings](BaseCommand):
                 print(f"{self.go_valks}!")
         ```
 
-        Help text for individual arguments is pulled from the docstrings.
+        Command help text will be pulled from the class docstring. Help text for individual arguments is pulled from the docstrings.
 
         Flags (`action="store_true"` or `action="store_false"` when using argparse) are automatically created from
         boolean fields based on their default values.
@@ -154,6 +155,12 @@ class AbstractCommand[S: BaseSettings](BaseCommand):
     Arguments: ClassVar[type]
     """The `BaseSettings` class defining this command's arguments."""
     _cli_settings_source: CliSettingsSource | None = None
+
+    @classmethod
+    def __init_subclass__(cls, *args, **kwargs) -> None:
+        doc = cls.__doc__ or ""
+        cls.help = re.sub(r"\w\n\s+", " ", doc.replace("\n\n", "\n"))
+        super().__init_subclass__(*args, **kwargs)
 
     @final
     def add_arguments(self, parser: argparse.ArgumentParser) -> None:

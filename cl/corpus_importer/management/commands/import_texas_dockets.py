@@ -15,7 +15,7 @@ from cl.search.models import CaseTransfer
 
 
 class Command(CorpusImporterCommand):
-    help = "Import Texas dockets from S3 using an inventory CSV."
+    """Import Texas dockets from S3 using an inventory CSV."""
 
     compose_redis_key: ClassVar[str] = "texas_docket_import:log"
 
