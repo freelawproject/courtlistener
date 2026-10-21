@@ -1,0 +1,41 @@
+<c-vars
+  size=""
+  class=""
+/>
+
+{#
+  Sizes and colors measured from the Figma toggle sheet:
+  - md: 36×20 track, 16×16 thumb, 2px inset, 16px travel
+  - lg: 44×24 track, 20×20 thumb, 2px inset, 20px travel
+  - off: greyscale-100 / hover greyscale-200
+  - on: primary-600 / hover primary-700
+  - focus: 2px primary-300 outline, 2px offset
+  - disabled on/off: greyscale-100 track (no red), reduced opacity
+#}
+{% with track_md="h-5 w-9 after:top-0.5 after:left-0.5 after:h-4 after:w-4 peer-checked:after:translate-x-4" track_lg="h-6 w-11 after:top-0.5 after:left-0.5 after:h-5 after:w-5 peer-checked:after:translate-x-5" %}
+{% with track_base="relative inline-block shrink-0 rounded-full bg-greyscale-100 transition-colors after:absolute after:rounded-full after:bg-white after:shadow-sm after:transition-transform after:content-[''] hover:bg-greyscale-200 peer-checked:bg-primary-600 peer-checked:hover:bg-primary-700 peer-focus-visible:outline peer-focus-visible:outline-[2px] peer-focus-visible:outline-offset-2 peer-focus-visible:outline-primary-300 peer-disabled:bg-greyscale-100 peer-checked:peer-disabled:bg-greyscale-100 forced-colors:outline" %}
+
+{#
+  Accessible switch built on a native checkbox.
+  Pass checked, disabled, name, value, aria-label, hx-* (etc.) via attrs onto the input.
+  Provide an accessible name with aria-label / aria-labelledby, or visible label text in the default slot.
+#}
+<label
+  class="inline-flex items-center gap-2 cursor-pointer has-[:disabled]:cursor-not-allowed has-[:disabled]:opacity-50 has-[:disabled]:pointer-events-none {{ class }}"
+>
+  <input
+    type="checkbox"
+    role="switch"
+    class="peer sr-only"
+    {{ attrs }}
+  />
+  <span
+    class="{{ track_base }} {% if size == 'lg' %}{{ track_lg }}{% else %}{{ track_md }}{% endif %}"
+    aria-hidden="true"
+  ></span>
+  {% if slot %}
+    <span class="text-sm text-greyscale-700">{{ slot }}</span>
+  {% endif %}
+</label>
+
+{% endwith %}{% endwith %}
