@@ -50,6 +50,6 @@ class Command(CorpusImporterCommand):
     def merge_task() -> Task:
         return texas_ingest_docket_task
 
-    def run(self):
-        super().run()
+    def run(self, arguments: CorpusImporterCommand.Arguments):
+        super().run(arguments)
         CaseTransfer.fill_null_dockets()

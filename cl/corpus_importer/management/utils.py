@@ -9,7 +9,8 @@ from typing import ClassVar
 
 from celery import Task, chain
 from django.conf import settings
-from pydantic import BaseModel, Field, field_validator
+from pydantic import BaseModel, field_validator
+from pydantic_settings.main import BaseSettings
 
 from cl.lib.celery_utils import CeleryThrottle
 from cl.lib.command_utils import (
@@ -42,7 +43,9 @@ class TexasDocketMeta(BaseModel):
         return date(*(time.strptime(v, "%m/%d/%Y")[0:3]))
 
 
-class CorpusImporterCommand(AbstractCommand, VerboseCommand):
+class CorpusImporterCommand[S: "CorpusImporterCommand.Arguments"](
+    AbstractCommand[S], VerboseCommand
+):
     """Base class for `cl.corpus_importer` commands encapsulating inventory\
         file reading, celery queue interactions, and redis logging.
 
@@ -68,55 +71,27 @@ class CorpusImporterCommand(AbstractCommand, VerboseCommand):
 
     compose_redis_key: ClassVar[str]
 
-    inventory_file: str = Field(
-        alias="inventory_file",
-        description="Path to the inventory CSV relative to MEDIA_ROOT.",
-    )
-    retrieval_queue: str = Field(
-        alias="retrieval-queue",
-        default="celery",
-        description="Which celery queue to use for S3 retrieval.",
-    )
-    ingesting_queue: str = Field(
-        alias="ingesting-queue",
-        default="celery",
-        description="Which celery queue to use for DB ingesting.",
-    )
-    throttle_min_items: int = Field(
-        alias="throttle-min-items",
-        default=5,
-        description="CeleryThrottle min_items parameter.",
-    )
-    delay: float = Field(
-        alias="delay",
-        default=1.0,
-        description="Seconds to sleep between scheduling tasks.",
-    )
-    start_row: int = Field(
-        alias="start-row",
-        default=0,
-        description="Row number to start from (for manual resume).",
-    )
-    inventory_rows: int = Field(
-        alias="inventory-rows",
-        description="Total number of rows in the inventory CSV. Used to "
-        "log progress percentage.",
-    )
-    auto_resume: bool = Field(
-        alias="auto-resume",
-        default=False,
-        description="Resume from last row stored in Redis.",
-    )
-    test_random: bool = Field(
-        alias="test-random",
-        default=False,
-        description="Randomly select rows from the inventory file to import.",
-    )
-    download_attachments: bool = Field(
-        alias="download-attachments",
-        default=False,
-        description="Whether to download docket entry attachments as part of this command.",
-    )
+    class Arguments(BaseSettings):
+        inventory_file: str
+        """"Path to the inventory CSV relative to MEDIA_ROOT."""
+        retrieval_queue: str = "celery"
+        """Which celery queue to use for S3 retrieval."""
+        ingesting_queue: str = "celery"
+        """Which celery queue to use for DB ingesting."""
+        throttle_min_items: int = 5
+        """CeleryThrottle min_items parameter."""
+        delay: float = 1.0
+        """Seconds to sleep between scheduling tasks."""
+        start_row: int = 0
+        """Row number to start from (for manual resume)."""
+        inventory_rows: int
+        """Total number of rows in the inventory CSV. Used to log progress percentage."""
+        auto_resume: bool = False
+        """Resume from last row stored in Redis."""
+        test_random: bool = False
+        """Randomly select rows from the inventory file to import."""
+        download_attachments: bool = False
+        """Whether to download docket entry attachments as part of this command."""
 
     @staticmethod
     def download_task() -> Task:
@@ -145,26 +120,26 @@ class CorpusImporterCommand(AbstractCommand, VerboseCommand):
             download task."""
         return map(lambda row: [row[0].strip(), row[1].strip()], csv_reader)
 
-    def run(self):
-        inventory_path = settings.MEDIA_ROOT / self.inventory_file
+    def run(self, arguments: S):
+        inventory_path = settings.MEDIA_ROOT / arguments.inventory_file
 
-        start_row = self.start_row
-        if self.auto_resume:
+        start_row = arguments.start_row
+        if arguments.auto_resume:
             start_row = get_last_parent_document_id_processed(
                 self.compose_redis_key
             )
             logger.info("Auto-resuming from row %s.", start_row)
 
-        total_rows = self.inventory_rows - start_row
+        total_rows = arguments.inventory_rows - start_row
 
         throttle = CeleryThrottle(
-            min_items=self.throttle_min_items,
-            queue_name=self.ingesting_queue,
+            min_items=arguments.throttle_min_items,
+            queue_name=arguments.ingesting_queue,
         )
 
         with open(inventory_path, encoding="utf-8") as f:
             download_inputs = self.transform_inventory_iterator(csv.reader(f))
-            if self.test_random:
+            if arguments.test_random:
                 logger.warning(
                     "In testing mode. Randomly selecting rows from the inventory file."
                 )
@@ -178,12 +153,12 @@ class CorpusImporterCommand(AbstractCommand, VerboseCommand):
                 chain(
                     self.download_task()
                     .si(*download_args)
-                    .set(queue=self.retrieval_queue),
+                    .set(queue=arguments.retrieval_queue),
                     self.merge_task()
-                    .s(download_attachments=self.download_attachments)
-                    .set(queue=self.ingesting_queue),
+                    .s(download_attachments=arguments.download_attachments)
+                    .set(queue=arguments.ingesting_queue),
                 ).apply_async()
-                time.sleep(self.delay)
+                time.sleep(arguments.delay)
 
                 if row_idx % 100 == 0:
                     processed = row_idx - start_row
