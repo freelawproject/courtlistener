@@ -1,4 +1,4 @@
-from typing import Any, Protocol
+from typing import Any, Protocol, cast
 
 import requests
 from django.conf import settings
@@ -26,6 +26,7 @@ from zohocrmsdk.src.com.zoho.crm.api.tags import (
     Tag,
     TagsOperations,
 )
+from zohocrmsdk.src.com.zoho.crm.api.util import Choice
 
 from cl.lib.command_utils import logger
 
@@ -97,9 +98,9 @@ class ZohoModule(ZohoBase):
     @staticmethod
     def _format_api_exception(exc: APIException) -> str:
         """Format a Zoho APIException into a single-line error message."""
-        status = exc.get_status().get_value()
-        code = exc.get_code().get_value()
-        message = exc.get_message().get_value()
+        status = cast(Choice, exc.get_status()).get_value()
+        code = cast(Choice, exc.get_code()).get_value()
+        message = cast(Choice, exc.get_message()).get_value()
         details = exc.get_details() or {}
         detail_str = ", ".join(f"{k}: {v}" for k, v in details.items())
         return f"Zoho API Exception [{code}] {status}: {message} | Details: {detail_str}"
@@ -151,7 +152,7 @@ class ZohoModule(ZohoBase):
         """
         if isinstance(action_result, APIException):
             raise Exception(ZohoModule._format_api_exception(action_result))
-        return int(action_result.get_details()["id"])
+        return int(cast(dict[str, Any], action_result.get_details())["id"])
 
     @staticmethod
     def _build_record(
@@ -208,7 +209,11 @@ class ZohoDeskClient(ZohoBase):
         Zoho accounts API if needed, persists the new token to the
         ``FileStore``, and returns the access token string.
         """
-        return Initializer.get_initializer().token.get_token()
+        # `ZohoBase.__init__` guarantees the SDK is initialized with a token,
+        # and `get_token` refreshes the access token when it's missing.
+        initializer = cast(Initializer, Initializer.get_initializer())
+        token = cast(OAuthToken, initializer.token)
+        return cast(str, token.get_token())
 
     def _headers(self) -> dict[str, str]:
         return {

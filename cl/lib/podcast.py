@@ -6,7 +6,7 @@ from django.utils.feedgenerator import Rss201rev2Feed
 class iTunesPodcastsFeedGenerator(Rss201rev2Feed):
     def rss_attributes(self):
         return {
-            "version": self._version,
+            **super().rss_attributes(),
             "xmlns:atom": "https://www.w3.org/2005/Atom",
             "xmlns:itunes": "https://www.itunes.com/dtds/podcast-1.0.dtd",
         }

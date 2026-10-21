@@ -1,9 +1,11 @@
+from __future__ import annotations
+
 import logging
 import re
 from collections.abc import Callable
 from functools import partial
 from pathlib import Path
-from typing import Protocol
+from typing import TYPE_CHECKING, Protocol
 from uuid import uuid4
 
 from django.core.exceptions import ValidationError
@@ -16,6 +18,10 @@ from juriscraper.state.texas.common import (
 from cl.custom_filters.templatetags.text_filters import oxford_join
 from cl.lib.recap_utils import get_bucket_name
 from cl.lib.string_utils import normalize_dashes
+
+if TYPE_CHECKING:
+    from cl.audio.models import Audio
+    from cl.search.models import Opinion, OpinionCluster
 
 dist_d_num_regex = r"(?:\d:)?(\d\d)-[a-zA-Z]{1,5}-(\d+)"
 appellate_bankr_d_num_regex = r"(\d\d)-(\d+)"
@@ -421,27 +427,35 @@ def make_pdf_thumb_path(instance: SupportsPdfPath, filename: str) -> str:
     return make_pdf_path(instance, filename, thumbs=True)
 
 
-def make_upload_path(instance, filename):
+def make_upload_path(
+    instance: Audio | Opinion | OpinionCluster, filename: str
+) -> str:
     """Return a string like pdf/2010/08/13/foo_v._var.pdf
 
     This function requires that when you save an item you provide an attribute
     called file_with_date on the object. That date will be used to place the
     item in the correct location on disk.
     """
-    try:
-        # Cannot do proper type checking here because of circular import
-        # problems when importing Audio, Document, etc.
+    if hasattr(instance, "file_with_date"):
         d = instance.file_with_date
-    except AttributeError:
+    else:
         from cl.audio.models import Audio
         from cl.search.models import Opinion, OpinionCluster
 
         if isinstance(instance, Audio):
             d = instance.docket.date_argued
+            if d is None:
+                raise TypeError(
+                    "Cannot save audio with null docket.date_argued and no file_with_date attribute"
+                )
         elif isinstance(instance, Opinion):
             d = instance.cluster.date_filed
         elif isinstance(instance, OpinionCluster):
             d = instance.date_filed
+        else:
+            raise TypeError(
+                f"{instance.__class__!r} is not supported by make_upload_path without a file_with_date attribute"
+            )
 
     return f"{filename.split('.')[-1]}/{d.year}/{d.month:02d}/{d.day:02d}/{get_valid_filename(filename)}"
 

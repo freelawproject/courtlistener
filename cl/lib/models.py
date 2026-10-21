@@ -139,6 +139,8 @@ class AbstractFile(models.Model):
     content_type = models.ForeignKey(ContentType, on_delete=models.CASCADE)
     object_id = models.PositiveIntegerField()
     content_object = GenericForeignKey()
+    # Subclasses define this field with their own storage and upload paths.
+    filepath: models.FileField
 
     class Meta:
         abstract = True
