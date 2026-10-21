@@ -53,9 +53,7 @@ class LawboxCorruptionDetectionTest(TestCase):
     def test_detects_c1_control_block_characters(self) -> None:
         # The precise failure from the issue: byte 0x97 (CP1252 em-dash) was
         # decoded under ISO-8859-1 into U+0097 (a C1 control char).
-        self.assertTrue(
-            looks_like_lawbox_cp1252_corruption("MHL \u0097 and")
-        )
+        self.assertTrue(looks_like_lawbox_cp1252_corruption("MHL \u0097 and"))
         # 0x85 -> U+0085 (NEL, a C1 control char)
         self.assertTrue(looks_like_lawbox_cp1252_corruption("foo \u0085 bar"))
         # The bottom of the C1 block
@@ -427,9 +425,7 @@ class RepairLawboxEncodingCommandTest(TestCase):
         ):
             with self.subTest(field=field):
                 opinion = self._make_corrupt_opinion(**{field: value})
-                call_command(
-                    "repair_lawbox_encoding", doc_id=[opinion.pk]
-                )
+                call_command("repair_lawbox_encoding", doc_id=[opinion.pk])
                 opinion.refresh_from_db()
                 # The database row was still repaired ...
                 self.assertIn(self.REPAIRED, opinion.html_lawbox)
@@ -449,9 +445,7 @@ class RepairLawboxEncodingCommandTest(TestCase):
         # command must not claim a repair it cannot make. The recoverable
         # marker beside it is still repaired, though.
         html = f"<p>an {REPLACEMENT_CHAR} square and {self.MARKER}</p>"
-        opinion = OpinionWithParentsFactory(
-            html_lawbox=html, plain_text=""
-        )
+        opinion = OpinionWithParentsFactory(html_lawbox=html, plain_text="")
         call_command("repair_lawbox_encoding", doc_id=[opinion.pk])
         opinion.refresh_from_db()
         # The recoverable marker next to it still gets fixed ...
@@ -469,9 +463,7 @@ class RepairLawboxEncodingCommandTest(TestCase):
         self, mock_annotate, mock_update_es
     ) -> None:
         html = f"<p>an {REPLACEMENT_CHAR} square</p>"
-        opinion = OpinionWithParentsFactory(
-            html_lawbox=html, plain_text=""
-        )
+        opinion = OpinionWithParentsFactory(html_lawbox=html, plain_text="")
         call_command("repair_lawbox_encoding", doc_id=[opinion.pk])
         opinion.refresh_from_db()
         self.assertEqual(opinion.html_lawbox, html)

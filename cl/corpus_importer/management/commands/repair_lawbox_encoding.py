@@ -375,15 +375,12 @@ class Command(VerboseCommand):
         # rows are saved. Do not "fix" that by adding ``main_version`` to
         # only(): it would select_related the whole related Opinion on every
         # scanned row instead.
-        opinion = (
-            Opinion.objects.only(
-                "html_lawbox",
-                # Opinion.save() -> Opinion.clean() reads both of these.
-                "type",
-                "ordering_key",
-            )
-            .get(pk=opinion_pk)
-        )
+        opinion = Opinion.objects.only(
+            "html_lawbox",
+            # Opinion.save() -> Opinion.clean() reads both of these.
+            "type",
+            "ordering_key",
+        ).get(pk=opinion_pk)
         new_html_lawbox, html_lawbox_changed = repair_lawbox_content_if_needed(
             opinion.html_lawbox
         )
