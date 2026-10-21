@@ -173,6 +173,7 @@ def make_objects(
             url = ""
 
         opinion = Opinion(
+            cluster=cluster,
             type=opinion_metadata.get("types", Opinion.COMBINED),
             sha1=sha1_hash,
             download_url=url,
