@@ -32,6 +32,7 @@ from cl.alerts.factories import AlertFactory
 from cl.alerts.models import Alert
 from cl.api.factories import WebhookFactory
 from cl.api.models import WebhookEvent, WebhookEventType
+from cl.audio.dispatch import dispatch_process_audio_file
 from cl.audio.factories import AudioWithParentsFactory
 from cl.audio.models import Audio
 from cl.citations.models import UnmatchedCitation
@@ -968,6 +969,20 @@ class AudioFileTaskTest(TestCase):
             msg=f"We should end up with the proper duration of about {expected_duration}. "
             f"Instead we got {measured_duration}.",
         )
+
+    def test_completed_processing_allows_redispatch(self) -> None:
+        """Does a successful process_audio_file run free its dispatch lock?
+
+        A lock left behind after success blocks any later dispatch for the
+        same pk until the TTL expires, silently skipping processing.
+        """
+        with mock.patch("cl.lib.celery_utils.get_task_wait") as patched_wait:
+            patched_wait.return_value = 0
+            self.assertTrue(dispatch_process_audio_file(self.audio1.pk))
+            self.assertTrue(
+                dispatch_process_audio_file(self.audio1.pk),
+                msg="Dispatch was skipped after processing completed.",
+            )
 
     def test_audio_conversion(self) -> None:
         """Can we convert wav to audio and update the metadata"""
