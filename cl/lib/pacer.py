@@ -48,11 +48,11 @@ pacer_to_cl_ids = {
 cl_to_pacer_ids = {v: k for k, v in pacer_to_cl_ids.items() if v != "nysb"}
 
 
-def map_pacer_to_cl_id(pacer_id):
+def map_pacer_to_cl_id(pacer_id: str) -> str:
     return pacer_to_cl_ids.get(pacer_id, pacer_id)
 
 
-def map_cl_to_pacer_id(cl_id):
+def map_cl_to_pacer_id(cl_id: str) -> str:
     return cl_to_pacer_ids.get(cl_id, cl_id)
 
 
