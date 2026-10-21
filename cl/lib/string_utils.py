@@ -141,10 +141,33 @@ def normalize_dashes(text: str) -> str:
 # text; the replacement character (U+FFFD) is what lxml inserts when it
 # cannot map a byte at all. See:
 #   https://github.com/freelawproject/courtlistener/issues/410
+
+# CP1252 leaves five of the 32 C1 bytes undefined, so there is no character to
+# recover for them: they can only ever be *detected*, never repaired.
+_CP1252_UNDEFINED_C1_CODEPOINTS = frozenset({0x81, 0x8D, 0x8F, 0x90, 0x9D})
+
+# C1 control character -> the CP1252 character the original byte stood for.
+# Derived from the codec itself so the table can never drift from CP1252.
+_CP1252_REPAIR_TABLE = {
+    cp: bytes([cp]).decode("cp1252")
+    for cp in range(0x80, 0xA0)
+    if cp not in _CP1252_UNDEFINED_C1_CODEPOINTS
+}
+
+# Markers that flag a row as probably corrupted but cannot be repaired from
+# the stored text alone: the undefined C1 bytes above, plus U+FFFD, which is
+# above U+00FF and so is not even representable as a latin-1 byte.
+_CP1252_UNREPAIRABLE_MARKERS = _CP1252_UNDEFINED_C1_CODEPOINTS | {0xFFFD}
+
 _CP1252_CORRUPTION_CODEPOINTS = (
-    set(range(0x80, 0xA0))  # C1 control block, undefined in ISO-8859-1
-    | {0xFFFD}  # REPLACEMENT CHARACTER
+    frozenset(_CP1252_REPAIR_TABLE) | _CP1252_UNREPAIRABLE_MARKERS
 )
+
+# The same set as single-character strings. Passing a str to
+# ``frozenset.isdisjoint`` iterates *characters*, not code points, so the
+# predicate has to compare against characters; comparing code points here
+# would silently never match and the detector would never fire.
+_CP1252_CORRUPTION_CHARS = frozenset(map(chr, _CP1252_CORRUPTION_CODEPOINTS))
 
 
 def looks_like_lawbox_cp1252_corruption(s: str) -> bool:
@@ -158,6 +181,11 @@ def looks_like_lawbox_cp1252_corruption(s: str) -> bool:
     character (U+FFFD). This predicate reports whether ``s`` contains any of
     those markers.
 
+    A ``True`` result covers both the repairable markers (the C1 characters
+    CP1252 defines) and the unrepairable ones (U+FFFD and the five C1 bytes
+    CP1252 leaves undefined). Use :func:`repair_lawbox_cp1252` to tell them
+    apart.
+
     A ``True`` result is a strong *signal* of corruption, not a proof; combine
     with :func:`repair_lawbox_cp1252` (which is itself safe-by-construction)
     before mutating stored data.
@@ -167,60 +195,60 @@ def looks_like_lawbox_cp1252_corruption(s: str) -> bool:
     """
     if not isinstance(s, str):
         return False
-    return any(ord(ch) in _CP1252_CORRUPTION_CODEPOINTS for ch in s)
+    # ``isdisjoint`` iterates and compares in C and stops at the first hit, so
+    # this stays cheap even on multi-megabyte ``html_lawbox`` values.
+    return not _CP1252_CORRUPTION_CHARS.isdisjoint(s)
 
 
 def repair_lawbox_cp1252(s: str) -> str:
     """Repair CP1252-mis-decoded text of the kind described in issue #410.
 
-    The repair is only attempted when
-    :func:`looks_like_lawbox_cp1252_corruption` flags ``s``. The remembered
-    original bytes are gone (the importer is deleted and the DB stores the
-    decoded text), so we attempt the inverse of the wrong decode: encode the
-    text back to latin-1 bytes and re-decode those bytes as CP1252. This is
-    the standard idiom for this class of mojibake and is length-preserving.
+    The remembered original bytes are gone (the importer is deleted and the DB
+    stores the decoded text), so we apply the inverse of the wrong decode:
+    every C1 control character is replaced by the character CP1252 assigns to
+    the corresponding byte (``0x97`` -> em-dash, ``0x85`` -> ellipsis,
+    ``0x80`` -> Euro sign, ``0x93``/``0x94`` -> curly quotes, and so on).
 
-    The round-trip is **only safe** when ``s`` contains no codepoint above
-    U+00FF that is *not* itself a corruption marker: a genuine high-codepoint
-    character (for example a correctly-encoded em-dash U+2014, a smart quote,
-    or any non-Latin character) would be destroyed by ``encode("latin-1")``.
-    When such characters are present alongside the corruption markers, the
-    string is a mixed-content document and we leave it **unchanged** rather
-    than risk silent data loss. The caller (e.g. the
-    ``repair_lawbox_encoding`` management command) should log these skipped
-    rows for manual review.
+    The repair is a ``str.translate`` over the C1 block only, which makes it
+    safe by construction: no other character is touched, so a genuine
+    high-codepoint character sitting next to a corruption marker survives
+    instead of being destroyed. Worked examples, where ``U+0097`` is the
+    em-dash byte ``0x97`` that the importer stored as a C1 control character:
 
-    When the round-trip raises ``UnicodeEncodeError`` (mixed content with
-    high codepoints) the input is returned unchanged. When the round-trip
-    succeeds but yields a string identical to the input, the input is
-    returned unchanged (idempotent / no-op).
+    * ``"the MHL U+0097 and the discretion U+2014 as held"`` repairs the
+      ``U+0097`` and leaves the genuine em-dash ``U+2014`` alone.
+    * ``"smart U+201CquotesU+201D U+0097"`` keeps the curly quotes.
+    * ``"café U+0097"`` repairs the marker; ``U+00E9`` is below ``U+00FF`` and
+      so was never at risk of being dropped.
+    * A run of CJK (``U+6CD5 U+9662``) next to a marker is left intact.
+
+    Two markers can be detected but never repaired, because the original byte
+    is unrecoverable from the stored text: the five C1 bytes CP1252 leaves
+    undefined (``0x81``, ``0x8D``, ``0x8F``, ``0x90``, ``0x9D``), and
+    ``U+FFFD``, which points at an earlier decode having dropped the byte
+    rather than the Lawbox importer having mis-decoded it. Rows carrying only
+    those markers are returned unchanged, and the caller (e.g. the
+    ``repair_lawbox_encoding`` management command) should report them for
+    manual review instead of silently counting them as clean.
+
+    The repair is idempotent: every character the table produces is above
+    U+00FF, so a second pass finds no markers.
 
     :param s: The possibly-corrupted string.
-    :return: The repaired string, or the original if it is not safe to repair
-        (no corruption detected, mixed-content, or a round-trip no-op).
+    :return: The repaired string, or the original if nothing was recoverable.
     """
     if not isinstance(s, str) or not s:
         return s
+    # Cheap pre-filter. This is not merely an optimisation: ``str.translate``
+    # only has an in-place fast path for UCS1 strings, so skipping it on rows
+    # that carry no marker keeps a clean row several times cheaper to scan.
     if not looks_like_lawbox_cp1252_corruption(s):
         return s
 
-    # Reject mixed content: any codepoint above U+00FF that is NOT itself one
-    # of the corruption markers would be lost by the latin-1 encode below.
-    for ch in s:
-        cp = ord(ch)
-        if cp > 0xFF and cp not in _CP1252_CORRUPTION_CODEPOINTS:
-            return s
-
-    try:
-        repaired = s.encode("latin-1").decode("cp1252")
-    except (UnicodeEncodeError, UnicodeDecodeError):
-        # Defensive: should not happen given the checks above, but never
-        # silently mangle data.
-        return s
-
+    repaired = s.translate(_CP1252_REPAIR_TABLE)
     if repaired == s:
-        # The round-trip did nothing (e.g. the corruption markers were
-        # already correct under both codecs). Don't return a fresh object.
+        # Every marker was one of the unrepairable ones. Return the input
+        # object itself rather than a fresh copy.
         return s
     return repaired
 
