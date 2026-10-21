@@ -3,7 +3,7 @@ import json
 import logging
 import re
 from collections import defaultdict
-from collections.abc import AsyncGenerator, Mapping
+from collections.abc import AsyncGenerator, Iterable, Mapping
 from copy import deepcopy
 from datetime import date, timedelta
 from typing import Any, Literal, NotRequired, TypedDict, overload
@@ -607,9 +607,18 @@ async def update_docket_appellate_metadata(d, docket_data):
     if not og_info:
         return d, None
 
-    if og_info.get("court_id"):
-        cl_id = map_pacer_to_cl_id(og_info["court_id"])
-        if await Court.objects.filter(pk=cl_id).aexists():
+    if (court_id := og_info.get("court_id")) is not None:
+        if isinstance(court_id, str):
+            cl_id = map_pacer_to_cl_id(court_id)
+        else:
+            logger.error(
+                f"unexpected court_id type expected str, found {type(court_id).__name__}"
+            )
+            cl_id = court_id
+        if (
+            cl_id is not None
+            and await Court.objects.filter(pk=cl_id).aexists()
+        ):
             # Ensure the court exists. Sometimes PACER does weird things,
             # like in 14-1743 in CA3, where it says the court_id is 'uspci'.
             # If we don't do this check, the court ID could be invalid, and
@@ -680,12 +689,16 @@ async def update_docket_appellate_metadata(d, docket_data):
     return d, d_og_info
 
 
-def get_order_of_docket(docket_entries):
+def get_order_of_docket(
+    docket_entries: Iterable[Mapping[str, Any]],
+) -> Literal["asc", "desc"] | None:
     """Determine whether the docket is ascending or descending or whether
     that is knowable.
     """
     order = None
     for _, de, nxt in previous_and_next(docket_entries):
+        if nxt is None:
+            continue
         try:
             current_num = int(de["document_number"])
             nxt_num = int(nxt["document_number"])
