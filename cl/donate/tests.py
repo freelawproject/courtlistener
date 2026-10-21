@@ -1418,6 +1418,43 @@ class SyncNeonMembershipsCommandTest(TestCase):
             self.user.pk, NeonMembershipLevel.TIER_2
         )
 
+    def test_payment_status_follows_neon_membership_status(self) -> None:
+        """A SUCCEEDED membership is stored as paid whatever its payments say."""
+        for label, payments in (
+            (
+                "failed attempt listed first",
+                [
+                    {"paymentStatus": "Failed"},
+                    {"paymentStatus": "Succeeded"},
+                ],
+            ),
+            ("null payment status", [{"paymentStatus": None}]),
+            ("no payments", []),
+            ("payments missing", None),
+        ):
+            with self.subTest(label):
+                neon_membership = make_neon_membership()
+                if payments is None:
+                    del neon_membership["payments"]
+                else:
+                    neon_membership["payments"] = payments
+                self.mock_get_membership.return_value = neon_membership
+
+                call_command("sync_neon_memberships")
+
+                self.membership.refresh_from_db()
+                self.assertEqual(self.membership.neon_id, "200")
+                self.assertEqual(
+                    self.membership.payment_status,
+                    MembershipPaymentStatus.SUCCEEDED,
+                )
+                self.assertTrue(self.membership.is_active)
+                # Reset for the next case, as the command would otherwise
+                # see nothing newer.
+                self.membership.neon_id = "100"
+                self.membership.termination_date = now() - timedelta(days=5)
+                self.membership.save()
+
     def test_checks_membership_still_inside_grace_period(self) -> None:
         """Fixes a lapsed membership while the grace period keeps it active."""
         self.membership.termination_date = now() - timedelta(hours=30)

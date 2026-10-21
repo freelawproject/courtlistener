@@ -32,8 +32,11 @@ from cl.api.utils import (
     apply_membership_throttles,
     clear_membership_throttles,
 )
-from cl.donate.models import NeonMembership, NeonMembershipLevel
-from cl.donate.utils import map_payment_status_value
+from cl.donate.models import (
+    MembershipPaymentStatus,
+    NeonMembership,
+    NeonMembershipLevel,
+)
 from cl.lib.command_utils import VerboseCommand
 from cl.lib.neon_utils import NeonClient
 from cl.users.tasks import tag_zoho_record_for_membership
@@ -119,9 +122,9 @@ def sync_membership_from_neon(
     """Update a local membership to match a membership record from Neon.
 
     Mirrors what the webhook handlers do when a membership is created or
-    updated: the local record takes Neon's membership ID, level, term end
-    date and payment status, and the user's MEMBERSHIP-source API throttles
-    are rebuilt for the new level.
+    updated: the local record takes Neon's membership ID, level and term end
+    date, its payment status is marked SUCCEEDED, and the user's
+    MEMBERSHIP-source API throttles are rebuilt for the new level.
 
     Only a SUCCEEDED Neon membership whose term ends in the future, and later
     than the local record, is applied. A record that is no newer than ours is
@@ -142,9 +145,11 @@ def sync_membership_from_neon(
     user = membership.user
     neon_id = str(neon_membership["id"])
     status = neon_membership.get("status")
+    # ``payments`` is an unordered list that can include earlier failed
+    # attempts of a renewal that eventually succeeded.
     payments = neon_membership.get("payments") or []
     raw_payment_status = (
-        payments[0].get("paymentStatus", "") if payments else ""
+        (payments[0].get("paymentStatus") or "") if payments else ""
     )
 
     term_end_date = neon_membership.get("termEndDate")
@@ -215,7 +220,7 @@ def sync_membership_from_neon(
         )
         return SyncResult.SKIPPED
 
-    payment_status = map_payment_status_value(raw_payment_status.lower())
+    payment_status = MembershipPaymentStatus.SUCCEEDED
     logger.info(
         "Syncing membership for user %s from Neon: id %s -> %s, level %s -> "
         "%s, termination %s -> %s, payment status %s -> %s",
