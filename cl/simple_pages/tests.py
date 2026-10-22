@@ -752,48 +752,28 @@ class ContentSecurityPolicyTest(TestCase):
 
 
 class ButtonComponentTest(SimpleTestCase):
-    """The c-button loading state, on buttons and links alike."""
+    """The c-button busy state, keyed on aria-busy for buttons and links alike."""
 
     def render(self, source: str) -> str:
         """Compiles a Cotton snippet and renders it."""
         compiled = CottonCompiler().process(source)
         return engines["django"].from_string(compiled).render({})
 
-    def test_loading_marks_the_element_busy(self) -> None:
-        """`loading` renders `aria-busy` on the element and disables buttons; links have no disabled state."""
-        for source, disabled in (
-            ('<c-button variant="primary" loading>Save</c-button>', True),
-            (
-                '<c-button variant="primary" touch_target loading>Save</c-button>',
-                True,
-            ),
-            (
-                '<c-button variant="primary" href="#" loading>Save</c-button>',
-                False,
-            ),
+    def test_busy_keeps_the_label_and_hides_the_spinner_from_assistive_technology(
+        self,
+    ) -> None:
+        """The spinner is decoration and the label stays, so the accessible name survives."""
+        for source in (
+            '<c-button variant="primary" aria-busy="true">Save</c-button>',
+            '<c-button variant="primary" touch_target aria-busy="true">Save</c-button>',
+            '<c-button variant="primary" href="#" aria-busy="true">Save</c-button>',
         ):
             with self.subTest(source=source):
                 element = fromstring(self.render(source))
-                self.assertEqual(element.get("aria-busy"), "true")
-                self.assertEqual(element.get("disabled") is not None, disabled)
-
-    def test_not_loading_leaves_the_element_unmarked(self) -> None:
-        """Without `loading`, the element carries no `aria-busy`, so Alpine owns it."""
-        element = fromstring(
-            self.render('<c-button variant="primary">Save</c-button>')
-        )
-        self.assertIsNone(element.get("aria-busy"))
-        self.assertIsNone(element.get("disabled"))
-
-    def test_spinner_is_hidden_from_assistive_technology(self) -> None:
-        """The spinner is decoration and the label stays, so the accessible name survives loading."""
-        element = fromstring(
-            self.render('<c-button variant="primary" loading>Save</c-button>')
-        )
-        spinners = element.xpath('.//*[local-name()="svg"]')
-        self.assertEqual(len(spinners), 1)
-        self.assertEqual(spinners[0].get("aria-hidden"), "true")
-        self.assertEqual(element.text_content().strip(), "Save")
+                spinners = element.xpath('.//*[local-name()="svg"]')
+                self.assertEqual(len(spinners), 1)
+                self.assertEqual(spinners[0].get("aria-hidden"), "true")
+                self.assertEqual(element.text_content().strip(), "Save")
 
 
 class DialogComponentTest(SimpleTestCase):
