@@ -86,6 +86,7 @@ def make_objects(
     )
 
     audio_file = Audio(
+        docket=docket,
         judges=item.get("judges", ""),
         source=item.get("cluster_source") or ClusterSources.COURT_WEBSITE,
         case_name=item["case_names"],
@@ -101,7 +102,6 @@ def make_objects(
     if extension not in [".mp3", ".wma"]:
         extension = f".{item['download_urls'].lower().rsplit('.', 1)[1]}"
     file_name = trunc(item["case_names"].lower(), 75) + extension
-    audio_file.file_with_date = docket.date_argued
     audio_file.local_path_original_file.save(file_name, cf, save=False)
     check_duplicate_ingestion(audio_file.local_path_original_file.name)
     return docket, audio_file

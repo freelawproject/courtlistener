@@ -1,7 +1,8 @@
-from typing import Any, Protocol
+from typing import Any, Protocol, cast
 
 import requests
 from django.conf import settings
+from django.contrib.auth.models import User
 from django.core.cache import cache
 from zohocrmsdk.src.com.zoho.api.authenticator import OAuthToken
 from zohocrmsdk.src.com.zoho.crm.api import (
@@ -26,6 +27,7 @@ from zohocrmsdk.src.com.zoho.crm.api.tags import (
     Tag,
     TagsOperations,
 )
+from zohocrmsdk.src.com.zoho.crm.api.util import APIResponse, Choice
 
 from cl.lib.command_utils import logger
 
@@ -67,7 +69,7 @@ class ZohoBase:
             raise Exception("Subclasses must set `module_name`.")
 
     @staticmethod
-    def initialize():
+    def initialize() -> None:
         refresh_token = cache.get(f"{get_zoho_cache_key()}:refresh")
         if not refresh_token:
             raise Exception(
@@ -97,15 +99,15 @@ class ZohoModule(ZohoBase):
     @staticmethod
     def _format_api_exception(exc: APIException) -> str:
         """Format a Zoho APIException into a single-line error message."""
-        status = exc.get_status().get_value()
-        code = exc.get_code().get_value()
-        message = exc.get_message().get_value()
+        status = cast(Choice, exc.get_status()).get_value()
+        code = cast(Choice, exc.get_code()).get_value()
+        message = cast(Choice, exc.get_message()).get_value()
         details = exc.get_details() or {}
         detail_str = ", ".join(f"{k}: {v}" for k, v in details.items())
         return f"Zoho API Exception [{code}] {status}: {message} | Details: {detail_str}"
 
     @staticmethod
-    def handle_api_response(response) -> list[Any] | None:
+    def handle_api_response(response: APIResponse | None) -> list[Any] | None:
         """
         Handle a Zoho API response, raising exceptions on errors.
 
@@ -151,7 +153,7 @@ class ZohoModule(ZohoBase):
         """
         if isinstance(action_result, APIException):
             raise Exception(ZohoModule._format_api_exception(action_result))
-        return int(action_result.get_details()["id"])
+        return int(cast(dict[str, Any], action_result.get_details())["id"])
 
     @staticmethod
     def _build_record(
@@ -208,7 +210,11 @@ class ZohoDeskClient(ZohoBase):
         Zoho accounts API if needed, persists the new token to the
         ``FileStore``, and returns the access token string.
         """
-        return Initializer.get_initializer().token.get_token()
+        # `ZohoBase.__init__` guarantees the SDK is initialized with a token,
+        # and `get_token` refreshes the access token when it's missing.
+        initializer = cast(Initializer, Initializer.get_initializer())
+        token = cast(OAuthToken, initializer.token)
+        return cast(str, token.get_token())
 
     def _headers(self) -> dict[str, str]:
         return {
@@ -267,7 +273,7 @@ class SearchRecordMixin:
         cl_ids: list[int] | None = None,
         emails: list[str] | None = None,
         fields: list[str] | None = None,
-    ):
+    ) -> list[Any] | None:
         """Retrieve Zoho CRM records by CourtListener IDs or email addresses.
 
         At least one of `cl_ids` or `emails` must be provided. The method
@@ -316,7 +322,9 @@ class SearchRecordMixin:
 
 
 class AddTagsMixin:
-    def add_tags(self: HasModuleName, record_id: int, tag_names: list[str]):
+    def add_tags(
+        self: HasModuleName, record_id: int, tag_names: list[str]
+    ) -> list[Any] | None:
         """
         Add one or more tags to a Zoho CRM record.
 
@@ -371,7 +379,7 @@ class CreateRecordMixin:
 class UpdateRecordMixin:
     def update_record(
         self: HasModuleName, record_id: int, fields: dict[str | Field, Any]
-    ):
+    ) -> list[Any] | None:
         """
         Update a Zoho CRM record with the given field values.
 
@@ -393,7 +401,7 @@ class UpdateRecordMixin:
 class BuildPayloadMixin:
     """Mixin for shared payload building logic between contact and lead modules."""
 
-    def build_payload_from_user(self, user) -> dict[str | Field, Any]:
+    def build_payload_from_user(self, user: User) -> dict[str | Field, Any]:
         payload = {
             "CourtListener_ID": user.pk,
             Field.Leads.email(): user.email,
@@ -417,7 +425,7 @@ class LeadsModule(
 ):
     module_name = "Leads"
 
-    def build_payload_from_user(self, user) -> dict[str | Field, Any]:
+    def build_payload_from_user(self, user: User) -> dict[str | Field, Any]:
         payload = super().build_payload_from_user(user)
 
         # Profile-related fields
@@ -451,7 +459,7 @@ class ContactsModule(
 ):
     module_name = "Contacts"
 
-    def build_payload_from_user(self, user) -> dict[str | Field, Any]:
+    def build_payload_from_user(self, user: User) -> dict[str | Field, Any]:
         payload = super().build_payload_from_user(user)
 
         # Profile-related fields

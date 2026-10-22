@@ -175,6 +175,17 @@ Cotton components rendered with `only` do not see the page context, so `track_ev
 
 Label prefixes are validated by `EventCountSerializer` (`cl/favorites/api_serializers.py`). Tracking a new object type needs a new pattern there, otherwise every request fails with a 400 that only the console reports.
 
+## RECAP extension
+
+`new_base.html` requires `js/alpine/composables/recap_detection.js` on every page. The RECAP extension posts a window message on every page load of `https://www.courtlistener.com/*`; the script recognises it, adds the `recap-installed` class to `<html>` and sets the `recap_installed` cookie for seven days. `new_base.html` renders the class from the cookie on later requests, so pleas do not flash before the message arrives.
+
+To hide an "install RECAP" call to action from users who have the extension, mark the element with `data-recap-plea`. One rule in `input.css` hides every such element under `.recap-installed`; templates MUST NOT add cookie conditionals for it. Server code that needs the signal reads the `recap_installed` cookie from the request.
+
+> 💡 Development tip: The extension only announces itself on production, so simulate it locally from the browser console:
+>  ```js
+>  window.postMessage({sender: "recap-extension", message_name: "version", message: "dev"}, "*")
+>  ```
+
 ## Icons
 
 - Use the `{% svg %}` template tag (defined in `cl/custom_filters/templatetags/svg_tags.py`)

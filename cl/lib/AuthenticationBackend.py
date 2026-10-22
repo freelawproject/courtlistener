@@ -26,7 +26,7 @@ MAX_EMAIL_CANDIDATES = 3
 # The loosest test that still tells an address from a username: something, an
 # "@", and a domain with a dot in it. Anything stricter risks turning away an
 # address that an older validator once let into auth_user.
-LOOKS_LIKE_EMAIL = re.compile(r"^[^@\s]+@[^@\s]+\.[^@\s]+$")
+LOOKS_LIKE_EMAIL: re.Pattern[str] = re.compile(r"^[^@\s]+@[^@\s]+\.[^@\s]+$")
 
 
 def accounts_for_email(email: str) -> QuerySet[User]:
@@ -75,7 +75,7 @@ class EmailOrUsernameModelBackend(ModelBackend):
         request: HttpRequest | None,
         username: str | None = None,
         password: str | None = None,
-        **kwargs,
+        **kwargs: Any,
     ) -> User | None:
         """Find the account the submitted credentials belong to.
 
@@ -204,7 +204,7 @@ class ConfirmedEmailAuthenticationForm(AuthenticationForm):
     limit by spreading its guesses across many IPs.
     """
 
-    def __init__(self, *args, **kwargs) -> None:
+    def __init__(self, *args: Any, **kwargs: Any) -> None:
         super().__init__(*args, **kwargs)
 
     def clean(self) -> dict[str, Any]:

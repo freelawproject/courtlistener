@@ -114,6 +114,8 @@ class CreateAlertForm(ModelForm):
                         FLP_MEMBERSHIP_URL,
                     )
                 )
+            case None:
+                pass
 
         return rate
 
