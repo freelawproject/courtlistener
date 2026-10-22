@@ -46,6 +46,7 @@ from cl.lib.middleware import (
 )
 from cl.lib.mime_types import lookup_mime_type
 from cl.lib.model_helpers import (
+    choices_to_csv,
     clean_docket_number,
     clean_scotus_docket_number,
     clean_texas_docket_number,
@@ -91,7 +92,7 @@ from cl.lib.utils import (
     sanitize_unbalanced_quotes,
 )
 from cl.people_db.models import Role
-from cl.recap.models import UPLOAD_TYPE, PacerHtmlFiles
+from cl.recap.models import UPLOAD_TYPE, FjcIntegratedDatabase, PacerHtmlFiles
 from cl.search.factories import (
     CourtFactory,
     DocketFactory,
@@ -1934,6 +1935,13 @@ class TestLinkifyOrigDocketNumber(SimpleTestCase):
                     expected_output,
                     f"Got incorrect result from clean_parenthetical_text for text: {agency, docket_number}",
                 )
+
+
+class TestChoicesToCsv(SimpleTestCase):
+    def test_choices_to_csv_lists_model_field_choices(self):
+        """Are a model field's choice labels joined into a CSV?"""
+        csv = choices_to_csv(FjcIntegratedDatabase(), "origin")
+        self.assertTrue(csv.startswith("Original Proceeding; Removed"), csv)
 
 
 class TestAddSqlComment(SimpleTestCase):

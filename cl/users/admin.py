@@ -361,7 +361,7 @@ class UserProxyEventAdmin(BaseUserEventAdmin):
         "email",
         "username",
     )
-    list_display = BaseUserEventAdmin.list_display + (
+    list_display = BaseUserEventAdmin.common_list_display + (
         "email",
         "username",
     )

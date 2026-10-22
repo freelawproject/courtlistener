@@ -1,3 +1,5 @@
+from typing import TypedDict
+
 import pghistory
 from django.db import models
 from django.urls import reverse
@@ -22,6 +24,15 @@ class REPORT_TYPES:
         (ANNUAL, "Annual Report"),
         (FINAL, "Final Report"),
     )
+
+
+class _ValueRange(TypedDict):
+    min: int
+    max: int | None
+
+
+class _WealthEstimate(_ValueRange):
+    miss_count: int
 
 
 class CODES:
@@ -99,7 +110,7 @@ class CODES:
         (X, "Failed Extraction"),
     )
 
-    VALUES: dict[str, dict[str, int | None]] = {
+    VALUES: dict[str, _ValueRange] = {
         A: {"min": 1, "max": 1_000},
         B: {"min": 1_001, "max": 2_500},
         C: {"min": 2_501, "max": 5_000},
@@ -253,7 +264,7 @@ class FinancialDisclosure(AbstractDateTimeModel):
             args=(self.person.pk, self.pk, self.person.slug),
         )
 
-    def calculate_wealth(self, field_name: str) -> dict[str, str | int]:
+    def calculate_wealth(self, field_name: str) -> _WealthEstimate:
         """Calculate gross value of all investments in disclosure
 
         We can calculate the total investment for four fields
@@ -273,7 +284,14 @@ class FinancialDisclosure(AbstractDateTimeModel):
         min_value, max_value = 0, 0
         for investment in investments:
             min_value += CODES.VALUES[getattr(investment, field_name)]["min"]
-            max_value += CODES.VALUES[getattr(investment, field_name)]["max"]
+            if max_value is not None:
+                max_local = CODES.VALUES[getattr(investment, field_name)][
+                    "max"
+                ]
+                if max_local is None:
+                    max_value = None
+                else:
+                    max_value += max_local
         return {
             "min": min_value,
             "max": max_value,

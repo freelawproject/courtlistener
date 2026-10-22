@@ -1029,7 +1029,7 @@ Sample code here.
   {# DIALOG #}
   <c-layout-with-navigation.section class="border-t-2 border-greyscale-200" id="dialog">
     <h2 class="mt-6 mb-3">Dialog</h2>
-    <p>Renders a button that opens a dialog with an overlay. This component uses named slots.</p>
+    <p>Renders a button that opens a dialog with an overlay. This component uses named slots. Undeclared attributes are passed to the root element, e.g. an <code>x-on</code> listener that calls <code>open</code> for a dialog without a trigger.</p>
     <h4 class="mt-3">Demo</h4>
     <c-dialog panel_class="p-5 banner max-w-70" dialog_class="items-center z-20">
       <c-slot name="button_content">Click me!</c-slot>
@@ -1053,9 +1053,13 @@ Sample code here.
     </c-library.list>
 
     <c-library.list title="Slots" only>
-      <c-library.item only>
+      <c-library.item optional only>
         <c-slot name="label"><code>button_content</code></c-slot>
-        <c-slot name="description">Content added inside the trigger button slot.</c-slot>
+        <c-slot name="description">Content added inside the default trigger button.</c-slot>
+      </c-library.item>
+      <c-library.item optional only>
+        <c-slot name="label"><code>trigger_button</code></c-slot>
+        <c-slot name="description">A complete trigger element that replaces the default button. Prefer wrapping its content in <code>&lt;c-dialog.trigger-button&gt;</code>, which already opens the dialog and carries its ARIA attributes. A hand-built trigger must call <code>open</code> on click and should set <code>aria-haspopup="dialog"</code>, <code>aria-controls="dialogId"</code>, and <code>aria-expanded="isOpen"</code>. Takes precedence over <code>button_content</code>. When neither slot is given, no trigger is rendered and the dialog must be opened by some other means, such as an <code>x-on</code> listener calling <code>open</code>.</c-slot>
       </c-library.item>
       <c-library.item only>
         <c-slot name="label"><code>panel</code></c-slot>
@@ -1144,6 +1148,7 @@ Sample code here.
 
     <h4 class="mt-3">Sizes</h4>
     <div class="flex flex-wrap gap-3 items-center">
+      <c-button variant="primary" size="sm">SM (30px)</c-button>
       <c-button variant="primary">Default (40px)</c-button>
       <c-button variant="primary" size="xl">XL (48px)</c-button>
     </div>
@@ -1184,7 +1189,7 @@ Sample code here.
       </c-library.item>
       <c-library.item optional only>
         <c-slot name="label"><code>size</code></c-slot>
-        <c-slot name="description">Button size. Default is 40px height. Set to <code>xl</code> for 48px. Only applies when <code>variant</code> is set.</c-slot>
+        <c-slot name="description">Button size. Default is 40px height. Set to <code>sm</code> for 30px, for secondary controls such as admin links, or <code>xl</code> for 48px. Only applies when <code>variant</code> is set.</c-slot>
       </c-library.item>
       <c-library.item optional only>
         <c-slot name="label"><code>href</code></c-slot>
@@ -1225,6 +1230,7 @@ Sample code here.
 
 &lt;h4&gt;Sizes&lt;/h4&gt;
 &lt;div class="flex flex-wrap gap-3 items-center"&gt;
+  &lt;c-button variant="primary" size="sm"&gt;SM (30px)&lt;/c-button&gt;
   &lt;c-button variant="primary"&gt;Default (40px)&lt;/c-button&gt;
   &lt;c-button variant="primary" size="xl"&gt;XL (48px)&lt;/c-button&gt;
 &lt;/div&gt;

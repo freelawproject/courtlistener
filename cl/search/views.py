@@ -138,7 +138,7 @@ def show_results(request: HttpRequest) -> HttpResponse:
     edit_alert = "edit_alert" in request.GET
 
     if request.method == "POST":
-        alert_form_context = {
+        alert_form_context: dict[str, Any] = {
             "data": request.POST,
             "user": request.user,
             "initial": {

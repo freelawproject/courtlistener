@@ -169,11 +169,22 @@ To display the count, bind to the store from any Alpine root. The store only exi
 {% if track_events %}<span x-text="$store.viewCount.value"></span>{% endif %}
 ```
 
-`value` is `null` until the response arrives and stays `null` when the request fails. Failures are logged to the console and never shown to the user. The endpoint returns the count before the current view, and 0 for recognized bots, so `value` excludes the view being recorded.
+`value` is `null` until the response arrives and stays `null` when the request fails; `loaded` is true once it holds a count, for `x-show` gates since the CSP build cannot compare in markup. Failures are logged to the console and never shown to the user. The endpoint returns the count before the current view, and 0 for recognized bots, so `value` excludes the view being recorded.
 
 Cotton components rendered with `only` do not see the page context, so `track_events` is false inside them: pass it explicitly (`:track_events="track_events"`) or render the element from the page template.
 
 Label prefixes are validated by `EventCountSerializer` (`cl/favorites/api_serializers.py`). Tracking a new object type needs a new pattern there, otherwise every request fails with a 400 that only the console reports.
+
+## RECAP extension
+
+`new_base.html` requires `js/alpine/composables/recap_detection.js` on every page. The RECAP extension posts a window message on every page load of `https://www.courtlistener.com/*`; the script recognises it, adds the `recap-installed` class to `<html>` and sets the `recap_installed` cookie for seven days. `new_base.html` renders the class from the cookie on later requests, so pleas do not flash before the message arrives.
+
+To hide an "install RECAP" call to action from users who have the extension, mark the element with `data-recap-plea`. One rule in `input.css` hides every such element under `.recap-installed`; templates MUST NOT add cookie conditionals for it. Server code that needs the signal reads the `recap_installed` cookie from the request.
+
+> 💡 Development tip: The extension only announces itself on production, so simulate it locally from the browser console:
+>  ```js
+>  window.postMessage({sender: "recap-extension", message_name: "version", message: "dev"}, "*")
+>  ```
 
 ## Icons
 

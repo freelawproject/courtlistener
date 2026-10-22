@@ -7,6 +7,7 @@ from urllib.parse import parse_qs, urlencode
 
 from asgiref.sync import async_to_sync
 from django.conf import settings
+from django.contrib.auth.models import User
 from django.core.cache import cache
 from django.core.exceptions import PermissionDenied
 from django.core.paginator import EmptyPage, Page, PageNotAnInteger, Paginator
@@ -76,9 +77,11 @@ from cl.stats.utils import tally_stat
 from cl.users.models import UserProfile
 from cl.users.utils import is_search_history_on_cached
 
-HYPERSCAN_TOKENIZER = HyperscanTokenizer(cache_dir=".hyperscan")
+HYPERSCAN_TOKENIZER: HyperscanTokenizer = HyperscanTokenizer(
+    cache_dir=".hyperscan"
+)
 
-logger = logging.getLogger(__name__)
+logger: logging.Logger = logging.getLogger(__name__)
 
 
 def check_pagination_depth(
@@ -173,9 +176,9 @@ def merge_form_with_courts(
 
     for court in courts:
         if no_facets_selected:
-            court.checked = True
+            setattr(court, "checked", True)
         elif court.pk in court_field_values:
-            court.checked = court_field_values[court.pk]
+            setattr(court, "checked", court_field_values[court.pk])
 
     # Build the dict with jurisdiction keys and arrange courts into tabs
     court_tabs: dict[str, list] = {
@@ -347,7 +350,7 @@ def store_search_api_query(
         return
 
     if request.user.is_authenticated and not is_search_history_on_cached(
-        request.user.pk
+        cast(User, request.user).pk
     ):
         return
 
@@ -456,7 +459,7 @@ def fetch_facets(
             count = facet_values[field.html_name.replace("stat_", "")]
         except KeyError:
             count = 0
-        field.count = count
+        setattr(field, "count", count)
         facet_fields.append(field)
     return facet_fields
 
@@ -480,7 +483,9 @@ def get_results_from_paginator(
     return results
 
 
-def enrich_search_results(results: Page, search_type: str, get_params: dict):
+def enrich_search_results(
+    results: Page, search_type: str, get_params: CleanData
+) -> None:
     """Enrich dataset before returning to user
 
     :param results: A ESPaginator page object
