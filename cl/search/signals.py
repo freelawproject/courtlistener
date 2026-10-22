@@ -433,7 +433,7 @@ recap_document_field_mapping: DocumentModelMapping = {
     "reverse-delete": {},
 }
 
-scotus_document_field_mapping = {
+scotus_document_field_mapping: DocumentModelMapping = {
     "save": {
         SCOTUSDocument: {
             "self": {
@@ -492,7 +492,7 @@ scotus_document_field_mapping = {
     "reverse-delete": {},
 }
 
-o_field_mapping = {
+o_field_mapping: DocumentModelMapping = {
     "save": {
         Docket: {
             "docket": {
