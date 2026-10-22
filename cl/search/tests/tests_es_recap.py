@@ -112,7 +112,6 @@ from cl.search.types import EventTable
 from cl.tests.cases import (
     CountESTasksTestCase,
     ESIndexTestCase,
-    SimpleTestCase,
     TestCase,
     TransactionTestCase,
     V4SearchAPIAssertions,
@@ -6745,7 +6744,7 @@ class SCOTUSFieldTrackerTest(TestCase):
         self.assertIn("capital_case", metadata.es_rd_field_tracker.changed())
 
 
-class ESDocketSourcesTest(SimpleTestCase):
+class ESDocketSourcesTest(TestCase):
     """Confirm the per-source ES docket configuration added for #8020
     (cl.search.es_docket_sources) is internally consistent.
     """
@@ -6769,15 +6768,66 @@ class ESDocketSourcesTest(SimpleTestCase):
 
     def test_docket_belongs_distinguishes_recap_from_scotus(self) -> None:
         """Each source's docket_belongs checks the field it actually
-        relies on so a RECAP docket and a SCOTUS docket each belong
-        to exactly one source."""
-        recap_docket = Docket(source=Docket.RECAP, court_id="cand")
-        scotus_docket = Docket(source=Docket.DEFAULT, court_id="scotus")
+        relies on: Docket.source for RECAP, the _index_in_es flag or
+        ScotusDocketMetadata for SCOTUS. A RECAP docket and a real
+        SCOTUS docket each belong to exactly one source -- and a
+        scotus-court docket with neither the flag nor metadata (one
+        created only to hold a scraped Opinion) belongs to neither."""
+        recap_docket = DocketFactory(
+            source=Docket.RECAP,
+            pacer_case_id="12345",
+            docket_number_raw="1:20-cv-00001",
+        )
+        scotus_court = CourtFactory(id="scotus", jurisdiction="F")
+        opinion_only_docket = DocketFactory(
+            court=scotus_court, source=Docket.SCRAPER
+        )
+        entry_only_docket = SCOTUSDocketEntryFactory(
+            docket__court=scotus_court, docket__source=Docket.SCRAPER
+        ).docket
+        scotus_docket = ScotusDocketMetadataFactory(
+            docket__court=scotus_court, docket__source=Docket.SCRAPER
+        ).docket
 
         self.assertTrue(RECAP_ES_SOURCE.docket_belongs(recap_docket))
         self.assertFalse(SCOTUS_ES_SOURCE.docket_belongs(recap_docket))
+
+        self.assertFalse(RECAP_ES_SOURCE.docket_belongs(opinion_only_docket))
+        self.assertFalse(SCOTUS_ES_SOURCE.docket_belongs(opinion_only_docket))
+
+        self.assertFalse(RECAP_ES_SOURCE.docket_belongs(entry_only_docket))
+        self.assertFalse(SCOTUS_ES_SOURCE.docket_belongs(entry_only_docket))
+
         self.assertFalse(RECAP_ES_SOURCE.docket_belongs(scotus_docket))
         self.assertTrue(SCOTUS_ES_SOURCE.docket_belongs(scotus_docket))
+
+    def test_scotus_docket_belongs_via_flag_before_any_content(
+        self,
+    ) -> None:
+        """A scotus-court Docket with the _index_in_es flag set, but
+        no SCOTUSDocketEntry/ScotusDocketMetadata yet, already belongs
+        -- this is the moment merge_scotus_docket first saves a brand
+        new Docket, before its metadata exists."""
+        scotus_court = CourtFactory(id="scotus", jurisdiction="F")
+        docket = DocketFactory(court=scotus_court, source=Docket.SCRAPER)
+        docket._index_in_es = True
+
+        self.assertTrue(SCOTUS_ES_SOURCE.docket_belongs(docket))
+
+    def test_scotus_ready_to_index_requires_metadata(self) -> None:
+        """ready_to_index is False until ScotusDocketMetadata exists,
+        even if the Docket already belongs via the flag -- this is
+        what defers the first ES write to a single, complete one."""
+        scotus_court = CourtFactory(id="scotus", jurisdiction="F")
+        docket = DocketFactory(court=scotus_court, source=Docket.SCRAPER)
+        docket._index_in_es = True
+
+        self.assertTrue(SCOTUS_ES_SOURCE.docket_belongs(docket))
+        self.assertFalse(SCOTUS_ES_SOURCE.ready_to_index(docket))
+
+        ScotusDocketMetadataFactory(docket=docket)
+        docket.refresh_from_db()
+        self.assertTrue(SCOTUS_ES_SOURCE.ready_to_index(docket))
 
 
 class SCOTUSESIndexingSignalTest(
@@ -6809,11 +6859,15 @@ class SCOTUSESIndexingSignalTest(
             ),
         ):
             scotus_document = SCOTUSDocumentFactory(
-                docket_entry__docket__court=self.court
+                docket_entry__docket__court=self.court,
+                docket_entry__docket__source=Docket.SCRAPER,
             )
-        # 2 calls: the new Docket created along the way + the
-        # SCOTUSDocument itself.
-        self.reset_and_assert_task_count(expected=2)
+        # 1 call: the SCOTUSDocument itself. The new Docket has no
+        # SCOTUS content yet (and no _index_in_es flag) at its own
+        # creation moment, so it doesn't get its own es_save_document
+        # call -- but it still ends up indexed, when its SCOTUSDocument
+        # get indexed.
+        self.reset_and_assert_task_count(expected=1)
 
         hit = ESRECAPDocument.get(id=ES_CHILD_ID(scotus_document.pk).SCOTUS)
         self.assertIsNone(hit.capital_case)
@@ -6830,6 +6884,51 @@ class SCOTUSESIndexingSignalTest(
         self.assertFalse(
             ESRECAPDocument.exists(id=ES_CHILD_ID(scotus_document.pk).SCOTUS)
         )
+
+    def test_docket_creation_with_metadata_is_a_single_write(self) -> None:
+        """Simulates merge_scotus_docket's real order: the Docket's own
+        save (with the _index_in_es flag, before metadata exists)
+        shouldn't trigger any ES write -- only the ScotusDocketMetadata
+        creation right after does, and that one write already includes
+        capital_case, instead of an incomplete first write followed by
+        a second one to add it."""
+        docket = DocketFactory.build(
+            court=self.court, source=Docket.SCRAPER, appeal_from=None
+        )
+        docket._index_in_es = True
+        with (
+            mock.patch(
+                "cl.lib.es_signal_processor.es_save_document.si",
+                side_effect=lambda *args, **kwargs: self.count_task_calls(
+                    es_save_document, True, *args, **kwargs
+                ),
+            ),
+            mock.patch(
+                "cl.lib.es_signal_processor.update_es_document.si",
+                side_effect=lambda *args, **kwargs: self.count_task_calls(
+                    update_es_document, True, *args, **kwargs
+                ),
+            ),
+        ):
+            docket.save()
+        # The flag alone isn't enough -- ready_to_index still requires
+        # ScotusDocketMetadata, so this save triggers nothing yet.
+        self.reset_and_assert_task_count(expected=0)
+        self.assertFalse(DocketDocument.exists(docket.pk))
+
+        with mock.patch(
+            "cl.lib.es_signal_processor.update_es_document.si",
+            side_effect=lambda *args, **kwargs: self.count_task_calls(
+                update_es_document, True, *args, **kwargs
+            ),
+        ):
+            ScotusDocketMetadataFactory(docket=docket, capital_case=True)
+        # 1 call: the metadata's own cascade creates the Docket's ES
+        # doc directly, already complete.
+        self.reset_and_assert_task_count(expected=1)
+
+        hit = DocketDocument.get(id=docket.pk)
+        self.assertIs(hit.capital_case, True)
 
     def test_capital_case_create_update_delete_propagates(self) -> None:
         """Creating, updating, and deleting ScotusDocketMetadata each
@@ -7077,15 +7176,15 @@ class SCOTUSESIndexingSignalTest(
     def test_docket_own_field_change_indexes_for_non_recap_source(
         self,
     ) -> None:
-        """A Docket whose source isn't RECAP but whose court_id is
-        "scotus" still indexes on edit -- contrasted with an equally
-        non-RECAP docket whose court_id isn't "scotus", which stays
-        correctly skipped."""
-        docket = DocketFactory(
-            court=self.court,
-            source=Docket.SCRAPER,
-            case_name="Original Name",
-        )
+        """A Docket whose source isn't RECAP but has a
+        ScotusDocketMetadata row still indexes on edit -- contrasted
+        with a scotus-court Docket with no metadata and no
+        _index_in_es flag (e.g. one created only to hold a scraped
+        Opinion), and with an equally non-RECAP docket whose court_id
+        isn't "scotus" either, both of which stay correctly skipped."""
+        docket = ScotusDocketMetadataFactory(
+            docket__court=self.court, docket__source=Docket.SCRAPER
+        ).docket
 
         d = Docket.objects.get(pk=docket.pk)
         d.case_name = "Edited Name"
@@ -7102,7 +7201,29 @@ class SCOTUSESIndexingSignalTest(
             DocketDocument.get(id=docket.pk).caseName, "Edited Name"
         )
 
-        # Contrast: a docket that's equally non-RECAP but NOT scotus
+        # Contrast 1: a scotus-court docket with no SCOTUS content and
+        # no flag (e.g. one created only to hold a scraped Opinion)
+        # must stay skipped, on creation and on edit.
+        opinion_only_docket = DocketFactory(
+            court=self.court,
+            source=Docket.SCRAPER,
+            case_name="Opinion Only",
+        )
+        self.assertFalse(DocketDocument.exists(opinion_only_docket.pk))
+
+        ood = Docket.objects.get(pk=opinion_only_docket.pk)
+        ood.case_name = "Still Opinion Only"
+        with mock.patch(
+            "cl.lib.es_signal_processor.update_es_document.si",
+            side_effect=lambda *args, **kwargs: self.count_task_calls(
+                update_es_document, True, *args, **kwargs
+            ),
+        ):
+            ood.save()
+        self.reset_and_assert_task_count(expected=0)
+        self.assertFalse(DocketDocument.exists(opinion_only_docket.pk))
+
+        # Contrast 2: a docket that's equally non-RECAP but NOT scotus
         # should still be skipped entirely, on creation and on edit.
         non_scotus_court = CourtFactory(id="ordy3", jurisdiction="FD")
         other_docket = DocketFactory(

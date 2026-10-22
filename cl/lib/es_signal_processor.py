@@ -823,14 +823,20 @@ class ESSignalProcessor:
         if (
             isinstance(instance, Docket)
             and not any(
-                source.docket_belongs(instance) for source in ALL_ES_SOURCES
+                source.docket_belongs(instance)
+                # ready_to_index only gates the very first write -- an
+                # update on an already-indexed Docket is a normal
+                # partial update, not a race with incomplete data.
+                and (not created or source.ready_to_index(instance))
+                for source in ALL_ES_SOURCES
             )
             and mapping_fields.get(
                 "self", None
             )  # Apply only to signals intended to affect the DocketDocument mapping.
         ):
             # Avoid saving or updating the Docket in ES if it doesn't belong
-            # to any registered source.
+            # to any registered source, or is being created before its
+            # source is ready to index it.
             return
 
         if isinstance(instance, Opinion) and instance.main_version:
