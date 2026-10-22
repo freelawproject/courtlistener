@@ -38,6 +38,7 @@ SKIPPABLE_CHECKS = {
     "check_new_stack_leakage",
     "check_raw_css",
     "check_include_in_v2",
+    "check_component_in_loop",
 }
 
 # Directives live in Django ({# #}) or CSS (/* */) comments so they work in
@@ -635,6 +636,34 @@ def check_include_in_v2(lines: list[str]) -> list[tuple[int, str]]:
     return results
 
 
+def check_component_in_loop(lines: list[str]) -> list[tuple[int, str]]:
+    """Flag a Cotton component rendered inside a {% for %} loop.
+
+    Every iteration renders the component as its own template, tens of
+    microseconds each, so long lists add up. See FRONTEND.md, Cotton
+    components.
+    """
+    results = []
+    loop_open = re.compile(r"{%\s*for\s")
+    loop_close = re.compile(r"{%\s*endfor\s*%}")
+    # c-vars and c-slot are Cotton syntax inside a component, not renders.
+    component = re.compile(r"<c-(?!vars\b|slot\b)")
+    depth = 0
+    for i, line in enumerate(lines, 1):
+        depth += len(loop_open.findall(line))
+        if depth and component.search(line):
+            results.append(
+                (
+                    i,
+                    "Cotton component inside a {% for %} loop — rendered "
+                    "once per iteration; on long lists prefer plain markup "
+                    "or one component for the whole collection",
+                )
+            )
+        depth = max(depth - len(loop_close.findall(line)), 0)
+    return results
+
+
 def check_new_stack_leakage(lines: list[str]) -> list[tuple[int, str]]:
     """Flag Alpine/Cotton usage in legacy templates."""
     results = []
@@ -772,6 +801,7 @@ V2_CHECKS = [
     (check_inline_xdata, FAIL),
     (check_bare_links, FAIL),
     (check_include_in_v2, WARN),
+    (check_component_in_loop, WARN),
     (check_xdata_without_require_script, WARN),
 ]
 
@@ -785,6 +815,7 @@ COTTON_CHECKS = [
     (check_inline_xdata, FAIL),
     (check_bare_links, FAIL),
     (check_hardcoded_ids, WARN),
+    (check_component_in_loop, WARN),
 ]
 
 LEGACY_CHECKS = [

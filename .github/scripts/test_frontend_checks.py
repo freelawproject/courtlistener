@@ -235,6 +235,82 @@ class V2PartialTest(unittest.TestCase):
         self.assertEqual(findings, [(V2_PARTIAL_FILE, 1, "check_jquery")])
 
 
+class ComponentInLoopTest(unittest.TestCase):
+    """A Cotton component inside a {% for %} renders once per iteration."""
+
+    COTTON_FILE = "cl/foo/templates/cotton/rows.html"
+
+    def test_component_in_loop_warns(self) -> None:
+        """The finding points at the component's line, not the loop's."""
+        findings = _run_checks_on(
+            {
+                V2_PARTIAL_FILE: """
+                    {% for item in items %}
+                      <c-button>{{ item }}</c-button>
+                    {% endfor %}
+                """
+            }
+        )
+        self.assertEqual(
+            findings, [(V2_PARTIAL_FILE, 2, "check_component_in_loop")]
+        )
+
+    def test_component_outside_loop_is_silent(self) -> None:
+        """A component after {% endfor %} is not inside the loop."""
+        findings = _run_checks_on(
+            {
+                V2_PARTIAL_FILE: """
+                    {% for item in items %}<li>{{ item }}</li>{% endfor %}
+                    <c-button>Done</c-button>
+                """
+            }
+        )
+        self.assertEqual(findings, [])
+
+    def test_vars_and_slots_are_not_components(self) -> None:
+        """c-vars and c-slot are Cotton syntax, not component renders."""
+        findings = _run_checks_on(
+            {
+                self.COTTON_FILE: """
+                    <c-vars items="" />
+                    {% for item in items %}
+                      <c-slot name="row">{{ item }}</c-slot>
+                    {% endfor %}
+                """
+            }
+        )
+        self.assertEqual(findings, [])
+
+    def test_nested_loops_count_until_the_outer_endfor(self) -> None:
+        """Closing the inner loop keeps the outer one open."""
+        findings = _run_checks_on(
+            {
+                self.COTTON_FILE: """
+                    {% for row in rows %}
+                      {% for cell in row %}{{ cell }}{% endfor %}
+                      <c-pray-button :document_id="row.id" />
+                    {% endfor %}
+                """
+            }
+        )
+        self.assertEqual(
+            findings, [(self.COTTON_FILE, 3, "check_component_in_loop")]
+        )
+
+    def test_directive_silences_the_check(self) -> None:
+        """A long list that was measured and accepted can opt out per line."""
+        findings = _run_checks_on(
+            {
+                V2_PARTIAL_FILE: """
+                    {% for item in items %}
+                      <c-button>{{ item }}</c-button> {# frontend-checks-skip-line: check_component_in_loop #}
+                    {% endfor %}
+                """
+            }
+        )
+        self.assertEqual(findings, [])
+
+
 class V2RegisterTest(unittest.TestCase):
     """A new v2 template must be registered in V2PagesRegisterTest."""
 
