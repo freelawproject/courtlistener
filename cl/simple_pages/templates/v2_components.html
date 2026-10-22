@@ -897,9 +897,10 @@ Sample code here.
   {# FLEX TABLE #}
   <section class="max-w-full w-full border-t-2 border-greyscale-200" x-intersect.margin.-100px="show" id="flex-table">
     <h2 class="mt-6 mb-3">Flex table</h2>
-    <p>A slot-based table component for content that needs full control over row markup, such as links, buttons, or colspan. Use with <code>c-flex-cell</code> for consistent cell styling.</p>
+    <p>A slot-based table component for content that needs full control over row markup, such as links, buttons, or colspan. Body cells are plain <code>&lt;td&gt;</code> and <code>&lt;th scope="row"&gt;</code> elements: the table styles them, and a utility on a cell overrides those defaults.</p>
 
     <h4 class="my-3">Demo</h4>
+    <h5 class="mt-3">Default</h5>
     <c-flex-table
       caption="Usage example of flex table component"
       align="data-center"
@@ -917,18 +918,45 @@ Sample code here.
       ]"
     >
       <tr class="border-b-greyscale-200 border-b">
-        <c-flex-cell class="text-center first:text-start">First service</c-flex-cell>
-        <c-flex-cell class="text-center first:text-start">Fast</c-flex-cell>
-        <c-flex-cell class="text-center first:text-start">Great</c-flex-cell>
+        <td class="text-center first:text-start">First service</td>
+        <td class="text-center first:text-start">Fast</td>
+        <td class="text-center first:text-start">Great</td>
       </tr>
       <tr class="border-b-greyscale-200 border-b">
-        <c-flex-cell class="text-center first:text-start">Second service</c-flex-cell>
-        <c-flex-cell class="text-center first:text-start">Slow</c-flex-cell>
-        <c-flex-cell class="text-center first:text-start">Good</c-flex-cell>
+        <td class="text-center first:text-start">Second service</td>
+        <td class="text-center first:text-start">Slow</td>
+        <td class="text-center first:text-start">Good</td>
       </tr>
       <tr>
-        <c-flex-cell class="text-center first:text-start">Third service</c-flex-cell>
-        <td class="align-top text-sm font-normal p-2 text-start" colspan="2">This cell spans two columns using a raw td with colspan.</td>
+        <td class="text-center first:text-start">Third service</td>
+        <td colspan="2">This cell spans two columns using colspan.</td>
+      </tr>
+    </c-flex-table>
+
+    <h5 class="mt-3">Dense</h5>
+    <c-flex-table
+      dense
+      caption="Usage example of a dense flex table"
+      :columns="[
+        {'label': 'Service', 'field': 'first'},
+        {'label': 'Speed', 'field': 'second'},
+        {'label': 'Fidelity', 'field': 'third'},
+      ]"
+    >
+      <tr class="border-b-greyscale-200 border-b">
+        <th scope="row">First service</th>
+        <td>Fast</td>
+        <td>Great</td>
+      </tr>
+      <tr class="border-b-greyscale-200 border-b">
+        <th scope="row">Second service</th>
+        <td>Slow</td>
+        <td>Good</td>
+      </tr>
+      <tr>
+        <th scope="row">Third service</th>
+        <td>Medium</td>
+        <td>Fair</td>
       </tr>
     </c-flex-table>
 
@@ -955,37 +983,27 @@ Sample code here.
       </c-library.item>
 
       <c-library.item optional only>
+        <c-slot name="label"><code>c-flex-table</code>: <code>dense</code></c-slot>
+        <c-slot name="description">
+          Boolean. When present, body cells drop to <code>text-xs</code> and <code>p-2</code>, for tables with many columns.
+        </c-slot>
+      </c-library.item>
+
+      <c-library.item optional only>
         <c-slot name="label"><code>c-flex-table</code>: <code>footer</code></c-slot>
         <c-slot name="description">
           List of rows in the <code>&lt;tfoot&gt;</code>.<br>Each element is a dictionary where the keys correspond to the column fields. Content is rendered in bold.
         </c-slot>
       </c-library.item>
 
-      <c-library.item optional only>
-        <c-slot name="label"><code>c-flex-cell</code>: <code>header</code></c-slot>
-        <c-slot name="description">
-          Boolean. When present, renders a <code>&lt;th scope="row"&gt;</code> instead of <code>&lt;td&gt;</code> for row header cells.
-        </c-slot>
-      </c-library.item>
-
-      <c-library.item optional only>
-        <c-slot name="label"><code>c-flex-cell</code>: <code>class</code></c-slot>
-        <c-slot name="description">
-          Additional CSS classes appended to the cell's defaults (<code>align-middle text-sm font-normal px-2.5 py-4</code>). Use to override alignment (e.g., <code>text-center</code>) or add custom styling. Other HTML attributes are passed through via <code>attrs</code>.
-        </c-slot>
-      </c-library.item>
     </c-library.list>
 
     <c-library.list title="Slots" only>
       <c-library.item only>
         <c-slot name="label"><code>c-flex-table</code> default</c-slot>
         <c-slot name="description">
-          Raw <code>&lt;tr&gt;</code> elements for the table body. Use <code>c-flex-cell</code> for consistent cell styling, or raw <code>&lt;td&gt;</code> elements when you need attributes like <code>colspan</code>.
+          Raw <code>&lt;tr&gt;</code> elements for the table body, with plain <code>&lt;td&gt;</code> or <code>&lt;th scope="row"&gt;</code> cells. Cells get the table's styling (<code>align-middle text-sm font-normal px-2.5 py-4</code>); add utilities on a cell to override it, e.g. <code>text-center</code>.
         </c-slot>
-      </c-library.item>
-      <c-library.item only>
-        <c-slot name="label"><code>c-flex-cell</code> default</c-slot>
-        <c-slot name="description">Cell content.</c-slot>
       </c-library.item>
     </c-library.list>
 
@@ -1008,18 +1026,44 @@ Sample code here.
   ]"
 &gt;
   &lt;tr class="border-b-greyscale-200 border-b"&gt;
-    &lt;c-flex-cell class="text-center first:text-start"&gt;First service&lt;/c-flex-cell&gt;
-    &lt;c-flex-cell class="text-center first:text-start"&gt;Fast&lt;/c-flex-cell&gt;
-    &lt;c-flex-cell class="text-center first:text-start"&gt;Great&lt;/c-flex-cell&gt;
+    &lt;td class="text-center first:text-start"&gt;First service&lt;/td&gt;
+    &lt;td class="text-center first:text-start"&gt;Fast&lt;/td&gt;
+    &lt;td class="text-center first:text-start"&gt;Great&lt;/td&gt;
   &lt;/tr&gt;
   &lt;tr class="border-b-greyscale-200 border-b"&gt;
-    &lt;c-flex-cell class="text-center first:text-start"&gt;Second service&lt;/c-flex-cell&gt;
-    &lt;c-flex-cell class="text-center first:text-start"&gt;Slow&lt;/c-flex-cell&gt;
-    &lt;c-flex-cell class="text-center first:text-start"&gt;Good&lt;/c-flex-cell&gt;
+    &lt;td class="text-center first:text-start"&gt;Second service&lt;/td&gt;
+    &lt;td class="text-center first:text-start"&gt;Slow&lt;/td&gt;
+    &lt;td class="text-center first:text-start"&gt;Good&lt;/td&gt;
   &lt;/tr&gt;
   &lt;tr&gt;
-    &lt;c-flex-cell class="text-center first:text-start"&gt;Third service&lt;/c-flex-cell&gt;
-    &lt;td class="align-top text-sm font-normal p-2 text-start" colspan="2"&gt;This cell spans two columns using a raw td with colspan.&lt;/td&gt;
+    &lt;td class="text-center first:text-start"&gt;Third service&lt;/td&gt;
+    &lt;td colspan="2"&gt;This cell spans two columns using colspan.&lt;/td&gt;
+  &lt;/tr&gt;
+&lt;/c-flex-table&gt;
+
+&lt;c-flex-table
+  dense
+  caption="Usage example of a dense flex table"
+  :columns="[
+    {'label': 'Service', 'field': 'first'},
+    {'label': 'Speed', 'field': 'second'},
+    {'label': 'Fidelity', 'field': 'third'},
+  ]"
+&gt;
+  &lt;tr class="border-b-greyscale-200 border-b"&gt;
+    &lt;th scope="row"&gt;First service&lt;/th&gt;
+    &lt;td&gt;Fast&lt;/td&gt;
+    &lt;td&gt;Great&lt;/td&gt;
+  &lt;/tr&gt;
+  &lt;tr class="border-b-greyscale-200 border-b"&gt;
+    &lt;th scope="row"&gt;Second service&lt;/th&gt;
+    &lt;td&gt;Slow&lt;/td&gt;
+    &lt;td&gt;Good&lt;/td&gt;
+  &lt;/tr&gt;
+  &lt;tr&gt;
+    &lt;th scope="row"&gt;Third service&lt;/th&gt;
+    &lt;td&gt;Medium&lt;/td&gt;
+    &lt;td&gt;Fair&lt;/td&gt;
   &lt;/tr&gt;
 &lt;/c-flex-table&gt;
       </c-code>
