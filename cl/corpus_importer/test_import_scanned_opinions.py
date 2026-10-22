@@ -451,6 +451,19 @@ class ScanXmlHelpersTest(SimpleTestCase):
                 date(2024, 3, 1),
             ),
             ("<otherdate>Reargued Oct. 3, 2023</otherdate>", None),
+            ("<otherdate>Re-argued Oct. 3, 2023</otherdate>", None),
+            ("<otherdate>Re argued Oct. 3, 2023</otherdate>", None),
+            ("<otherdate>Re- argued Oct. 3, 2023</otherdate>", None),
+            (
+                "<otherdate>Argued Jan. 5 and 6, 2024. Re-argued Oct. 3, "
+                "2024.</otherdate>",
+                None,
+            ),
+            (
+                "<otherdate>Argued Jan. 5, 2024. Reargued Oct. 3, "
+                "2024.</otherdate>",
+                date(2024, 1, 5),
+            ),
             ("<otherdate>Argued May 2024</otherdate>", None),
             ("<decisiondate>Decided May 22, 2024</decisiondate>", None),
             ("<history>Argued Oct. 3, 2023</history>", None),
@@ -881,6 +894,33 @@ class ImportScannedOpinionsTest(TestCase):
         docket = OpinionCluster.objects.get().docket
         self.assertEqual(docket.date_argued, date(2024, 5, 1))
         self.assertIn("Argued May 1, 2024", docket.clusters.get().other_dates)
+
+    def test_reused_docket_keeps_its_date_argued(self) -> None:
+        """Is only an empty date_argued of a reused docket filled?"""
+        xml = self.scan_xml.replace(
+            "<decisiondate>",
+            "<otherdate>Argued May 1, 2024</otherdate><decisiondate>",
+            1,
+        )
+        for current, expected in [
+            (None, date(2024, 5, 1)),
+            (date(2024, 4, 2), date(2024, 4, 2)),
+        ]:
+            with self.subTest(current=current), transaction.atomic():
+                docket = DocketFactory.create(
+                    court=self.court,
+                    source=Docket.SCRAPER,
+                    docket_number="4D2023-2459",
+                    docket_number_raw="4D2023-2459",
+                    case_name="Merritt v. State",
+                    date_argued=current,
+                )
+                self.import_xml(xml)
+
+                self.assertEqual(OpinionCluster.objects.get().docket, docket)
+                docket.refresh_from_db()
+                self.assertEqual(docket.date_argued, expected)
+                transaction.set_rollback(True)
 
     def test_merge_fills_empty_date_argued(self) -> None:
         """Is only an empty docket date_argued filled from the scan?"""

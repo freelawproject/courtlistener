@@ -102,9 +102,12 @@ FILED_DATE_RE = re.compile(
     rf"\bfiled\b{DATE_LABEL_SEPARATOR}({FULL_DATE_PATTERN})", re.IGNORECASE
 )
 # Dates labeled as the oral argument date, e.g. "Argued September 18, 2025"
-# or "Argued and Submitted Oct. 3, 2023". "Reargued" dates don't match.
+# or "Argued and Submitted Oct. 3, 2023". Reargument dates, spelled
+# "Reargued", "Re-argued", "Re argued" or "Re- argued" when OCR splits the
+# word, don't match.
 ARGUED_DATE_RE = re.compile(
-    rf"\bargued(?:\s+and\s+submitted)?\b{DATE_LABEL_SEPARATOR}"
+    r"\b(?<!re[\s\-\u2013])(?<!re[\-\u2013]\s)argued"
+    rf"(?:\s+and\s+submitted)?\b{DATE_LABEL_SEPARATOR}"
     rf"({FULL_DATE_PATTERN})",
     re.IGNORECASE,
 )
@@ -1387,7 +1390,6 @@ def add_new_case(scan_case: ScanCase) -> OpinionCluster:
             Docket.SCANNING_PROJECT,
             from_harvard=False,
             case_name_full=scan_case.case_name_full,
-            date_argued=scan_case.date_argued,
             ia_needs_upload=False,
         )
         if docket.pk and case_names_are_too_different(
@@ -1414,6 +1416,10 @@ def add_new_case(scan_case: ScanCase) -> OpinionCluster:
             )
         elif docket.pk:
             logger.info("Using existing docket %s", docket.pk)
+            # Keep the date of a docket from another source, like a merge
+            fill_date_argued(docket, scan_case)
+        else:
+            docket.date_argued = scan_case.date_argued
         docket.save()
 
         cluster = OpinionCluster(
