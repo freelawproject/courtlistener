@@ -139,6 +139,7 @@
         x-on:click.prevent="start"
         x-bind:aria-busy="busy"
       >
+        {% svg "download" class="w-4 h-4" aria_hidden="true" %}
         Export entries CSV
       </c-button>
       <span x-show="error" x-cloak role="alert" class="text-sm text-red-600">There was a problem. Try again later.</span>
@@ -149,6 +150,7 @@
       href="{% url 'sign-in' %}?next={{ request.get_full_path|urlencode }}"
       rel="nofollow"
     >
+      {% svg "download" class="w-4 h-4" aria_hidden="true" %}
       Export entries CSV
     </c-button>
   {% endif %}
