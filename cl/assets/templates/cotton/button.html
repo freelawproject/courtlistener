@@ -4,11 +4,10 @@
   href=""
   type="button"
   touch_target=""
-  loading=""
   class=""
 />
 {% load svg_tags %}
-{# While busy, the content fades rather than hides so the accessible name survives under the spinner. #}
+{# While the element has aria-busy="true", the content fades rather than hides so the accessible name survives under the spinner. #}
 {% svg "loading" class="hidden group-aria-[busy=true]/button:block absolute inset-0 m-auto w-4 h-4 animate-spin" aria_hidden="true" as spinner %}
 
 {# --- Base --- #}
@@ -24,14 +23,12 @@
 {% if href %}
 <a
   href="{{ href }}"
-  {% if loading %}aria-busy="true"{% endif %}
   class="group/button relative aria-[busy=true]:pointer-events-none {% if variant %}{{ base }} {% if size == 'xl' %}{{ xl }}{% elif size == 'sm' %}{{ sm }}{% else %}{{ md }}{% endif %} {% if variant == 'outline' %}{{ outline }} {{ link_outline_dis }}{% elif variant == 'dark' %}{{ dark }} {{ link_dark_dis }}{% elif variant == 'ghost' %}{{ ghost }} {{ link_ghost_dis }}{% elif variant == 'grey' %}{{ grey }} {{ link_grey_dis }}{% else %}{{ primary }} {{ link_primary_dis }}{% endif %}{% endif %} {{ class }}"
   {{ attrs }}
 ><span class="flex gap-1 items-center group-aria-[busy=true]/button:opacity-0">{{ slot }}</span>{{ spinner }}</a>
 {% elif touch_target %}
 <button
   type="{{ type }}"
-  {% if loading %}aria-busy="true" disabled{% endif %}
   class="min-h-13 h-fit min-w-13 w-fit flex justify-center items-center focus-visible:outline-none group group/button aria-[busy=true]:pointer-events-none"
   {{ attrs }}
 >
@@ -40,7 +37,6 @@
 {% else %}
 <button
   type="{{ type }}"
-  {% if loading %}aria-busy="true" disabled{% endif %}
   class="group/button relative aria-[busy=true]:pointer-events-none {% if variant %}{{ base }} {% if size == 'xl' %}{{ xl }}{% elif size == 'sm' %}{{ sm }}{% else %}{{ md }}{% endif %} {% if variant == 'outline' %}{{ outline }} {{ btn_outline_dis }}{% elif variant == 'dark' %}{{ dark }} {{ btn_dark_dis }}{% elif variant == 'ghost' %}{{ ghost }} {{ btn_ghost_dis }}{% elif variant == 'grey' %}{{ grey }} {{ btn_grey_dis }}{% else %}{{ primary }} {{ btn_primary_dis }}{% endif %}{% endif %} {{ class }}"
   {{ attrs }}
 ><span class="flex gap-1 items-center group-aria-[busy=true]/button:opacity-0">{{ slot }}</span>{{ spinner }}</button>
