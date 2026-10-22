@@ -31,6 +31,7 @@
 
   {# TABLE #}
   <c-flex-table
+    dense
     caption="Jurisdictions available on CourtListener"
     :columns="[
       {'label': 'Name', 'field': 'full_name'},
@@ -46,7 +47,7 @@
     ]"
   >
   {% for court in courts %}
-    <tr class="text-xs">
+    <tr>
       <th scope="row" class="min-w-48">{{ court.full_name }}</th>
       <td>{{ court.count|intcomma }}</td>
       <td>{{ court.get_jurisdiction_display|nbsp  }}</td>
