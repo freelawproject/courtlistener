@@ -3,7 +3,8 @@ Downloads the file a link points to without leaving the page, in Alpine's
 CSP-friendly build, which doesn't support inline JavaScript. `busy` is true
 while the request runs; a non-2xx response sets `error` instead of
 navigating away, and a redirect, such as an expired session, is left to the
-browser to follow. Without JavaScript the link still downloads natively.
+browser to follow. Activation while `busy` is ignored, since a link cannot
+be disabled. Without JavaScript the link still downloads natively.
 
 Usage:
 

@@ -4691,6 +4691,7 @@ class DocketEntryRowsV2Test(TestCase):
         self.assertEqual(link.get("href"), download_path)
         self.assertEqual(link.get("rel"), "nofollow")
         self.assertEqual(link.get("x-on:click.prevent"), "start")
+        self.assertEqual(link.get("x-bind:aria-busy"), "busy")
         self.assertIsNone(link.get("hx-get"))
         component = link.xpath('ancestor::*[@x-data="download"]')
         self.assertEqual(len(component), 1)

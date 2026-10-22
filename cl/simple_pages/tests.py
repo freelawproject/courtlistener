@@ -751,6 +751,31 @@ class ContentSecurityPolicyTest(TestCase):
         self.assertNotIn('nonce=""', html)
 
 
+class ButtonComponentTest(SimpleTestCase):
+    """The c-button busy state, keyed on aria-busy for buttons and links alike."""
+
+    def render(self, source: str) -> str:
+        """Compiles a Cotton snippet and renders it."""
+        compiled = CottonCompiler().process(source)
+        return engines["django"].from_string(compiled).render({})
+
+    def test_busy_keeps_the_label_and_hides_the_spinner_from_assistive_technology(
+        self,
+    ) -> None:
+        """The spinner is decoration and the label stays, so the accessible name survives."""
+        for source in (
+            '<c-button variant="primary" aria-busy="true">Save</c-button>',
+            '<c-button variant="primary" touch_target aria-busy="true">Save</c-button>',
+            '<c-button variant="primary" href="#" aria-busy="true">Save</c-button>',
+        ):
+            with self.subTest(source=source):
+                element = fromstring(self.render(source))
+                spinners = element.xpath('.//*[local-name()="svg"]')
+                self.assertEqual(len(spinners), 1)
+                self.assertEqual(spinners[0].get("aria-hidden"), "true")
+                self.assertEqual(element.text_content().strip(), "Save")
+
+
 class DialogComponentTest(SimpleTestCase):
     """The c-dialog component renders a trigger only when given one."""
 
