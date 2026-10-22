@@ -7,7 +7,6 @@
   docket=""
   form=""
   page_obj=""
-  sort_order_asc="True"
   class=""
 />
 
@@ -57,12 +56,12 @@
         <legend class="sr-only">Sort order</legend>
         <div class="flex rounded-lg border border-greyscale-300 h-10">
           <label class="rounded-l-lg focus-container flex items-center gap-1 px-3 py-2 text-sm cursor-pointer [&:has(input:checked)]:bg-greyscale-100 [&:has(input:checked)]:font-medium bg-white text-greyscale-600">
-            <input type="radio" name="order_by" value="asc" {% if sort_order_asc %}checked{% endif %} class="sr-only" x-on:change="submitForm($event)" />
+            <input type="radio" name="order_by" value="asc" {% if form.order_by.value != "desc" %}checked{% endif %} class="sr-only" x-on:change="submitForm($event)" />
             {% svg "sort_asc" class="w-4 h-4" aria_hidden="true" %}
             <span class="hidden sm:inline">Asc</span>
           </label>
           <label class="rounded-r-lg focus-container flex items-center gap-1 px-3 py-2 text-sm cursor-pointer border-l border-greyscale-300 [&:has(input:checked)]:bg-greyscale-100 [&:has(input:checked)]:font-medium bg-white text-greyscale-600">
-            <input type="radio" name="order_by" value="desc" {% if not sort_order_asc %}checked{% endif %} class="sr-only" x-on:change="submitForm($event)" />
+            <input type="radio" name="order_by" value="desc" {% if form.order_by.value == "desc" %}checked{% endif %} class="sr-only" x-on:change="submitForm($event)" />
             {% svg "sort_desc" class="w-4 h-4" aria_hidden="true" %}
             <span class="hidden sm:inline">Desc</span>
           </label>
