@@ -194,7 +194,7 @@ class BasePositionMapping:
         "predecessor": {"predecessor__name_full_reverse": "predecessor_dict"},
     }
 
-    def get_db_to_dataclass_map(self):
+    def get_db_to_dataclass_map(self) -> dict[str, dict[str, str]]:
         return self.__db_to_dataclass_map
 
 
@@ -303,7 +303,7 @@ class ApiPositionMapping(BasePositionMapping):
         },
     }
 
-    def get_db_to_dataclass_map(self):
+    def get_db_to_dataclass_map(self) -> dict[str, dict[str, str]]:
         parent_map = super().get_db_to_dataclass_map()
         return parent_map | self.__db_to_dataclass_map
 

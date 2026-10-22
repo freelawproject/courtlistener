@@ -1,8 +1,8 @@
 import datetime
 import unittest
-from collections.abc import Sized
+from collections.abc import Callable, Coroutine, Sized
 from functools import wraps
-from typing import Any, cast
+from typing import Any, Concatenate, cast
 
 from django.apps import apps
 from django.conf import settings
@@ -51,7 +51,10 @@ from cl.search.models import (
 from cl.tests.cases import TestCase
 from cl.users.factories import UserFactory, UserProfileWithParentsFactory
 
-opinion_cluster_v3_v4_common_fields = {
+# Computes a field's expected API value from a test's comparison context.
+type ExpectedValueGetter = Callable[[dict[str, Any]], Any]
+
+opinion_cluster_v3_v4_common_fields: dict[str, ExpectedValueGetter] = {
     "absolute_url": lambda x: x["result"].cluster.get_absolute_url(),
     "attorney": lambda x: x["result"].cluster.attorneys,
     "caseName": lambda x: (
@@ -156,7 +159,7 @@ opinion_cluster_v3_v4_common_fields = {
     ),
 }
 
-opinion_document_v3_v4_common_fields = {
+opinion_document_v3_v4_common_fields: dict[str, ExpectedValueGetter] = {
     "author_id": lambda x: x["result"].author_id,
     "cites": lambda x: (
         list(
@@ -195,10 +198,14 @@ opinion_document_v3_v4_common_fields = {
     "ordering_key": lambda x: x["result"].ordering_key,
 }
 
-opinion_cluster_v3_fields = opinion_cluster_v3_v4_common_fields.copy()
-opinion_document_v3_fields = opinion_document_v3_v4_common_fields.copy()
+opinion_cluster_v3_fields: dict[str, ExpectedValueGetter] = (
+    opinion_cluster_v3_v4_common_fields.copy()
+)
+opinion_document_v3_fields: dict[str, ExpectedValueGetter] = (
+    opinion_document_v3_v4_common_fields.copy()
+)
 
-opinion_v3_search_api_keys = {
+opinion_v3_search_api_keys: dict[str, ExpectedValueGetter] = {
     "court_exact": lambda x: x["result"].cluster.docket.court_id,
     "date_created": lambda x: (
         x["result"].date_created.isoformat().replace("+00:00", "Z")
@@ -214,7 +221,7 @@ opinion_v3_search_api_keys = {
 opinion_v3_search_api_keys.update(opinion_cluster_v3_fields)
 opinion_v3_search_api_keys.update(opinion_document_v3_fields)
 
-opinion_v4_search_api_keys = {
+opinion_v4_search_api_keys: dict[str, ExpectedValueGetter | list[Any]] = {
     "non_participating_judge_ids": lambda x: list(
         x["result"]
         .cluster.non_participating_judges.all()
@@ -232,10 +239,12 @@ opinion_v4_search_api_keys = {
     "meta": [],
 }
 
-opinion_cluster_v4_common_fields = opinion_cluster_v3_v4_common_fields.copy()
+opinion_cluster_v4_common_fields: dict[str, ExpectedValueGetter] = (
+    opinion_cluster_v3_v4_common_fields.copy()
+)
 opinion_v4_search_api_keys.update(opinion_cluster_v4_common_fields)
 
-opinion_document_v4_api_keys = {
+opinion_document_v4_api_keys: dict[str, ExpectedValueGetter | list[Any]] = {
     "sha1": lambda x: x["result"].sha1,
     "meta": [],
 }
@@ -344,7 +353,7 @@ docket_api_common_keys: dict[str, object] = {
     ),
 }
 
-recap_type_v4_api_keys = docket_api_common_keys.copy()
+recap_type_v4_api_keys: dict[str, object] = docket_api_common_keys.copy()
 recap_type_v4_api_keys.update(
     {
         "attorney": lambda x: list(
@@ -453,7 +462,9 @@ recap_document_common_api_keys: dict[str, Any] = {
     ),
 }
 
-recap_document_v4_api_keys = recap_document_common_api_keys.copy()
+recap_document_v4_api_keys: dict[str, Any] = (
+    recap_document_common_api_keys.copy()
+)
 recap_document_v4_api_keys.update(
     {
         "pacer_doc_id": lambda x: x["result"].pacer_doc_id or "",
@@ -466,14 +477,14 @@ recap_document_v4_api_keys.update(
     }
 )
 
-rd_type_v4_api_keys = recap_document_v4_api_keys.copy()
+rd_type_v4_api_keys: dict[str, Any] = recap_document_v4_api_keys.copy()
 rd_type_v4_api_keys.update(
     {
         "docket_id": lambda x: x["result"].docket_entry.docket_id,
     }
 )
 
-v4_meta_keys = {
+v4_meta_keys: dict[str, ExpectedValueGetter] = {
     "date_created": lambda x: (
         x["result"].date_created.isoformat().replace("+00:00", "Z")
     ),
@@ -483,14 +494,14 @@ v4_meta_keys = {
     "score": lambda x: {"bm25": None},
 }
 
-v4_recap_meta_keys = v4_meta_keys.copy()
+v4_recap_meta_keys: dict[str, ExpectedValueGetter] = v4_meta_keys.copy()
 v4_recap_meta_keys.update(
     {
         "more_docs": lambda x: False,
     }
 )
 
-recap_v3_keys = docket_api_common_keys.copy()
+recap_v3_keys: dict[str, object] = docket_api_common_keys.copy()
 
 recap_v3_keys.update(recap_document_common_api_keys)
 recap_v3_keys.update(
@@ -772,7 +783,7 @@ audio_common_fields: dict[str, Any] = {
 }
 
 
-audio_v3_fields = audio_common_fields.copy()
+audio_v3_fields: dict[str, Any] = audio_common_fields.copy()
 audio_v3_fields.update(
     {
         "court_exact": lambda x: x["result"].docket.court.pk,
@@ -786,7 +797,7 @@ audio_v3_fields.update(
 )
 
 
-audio_v4_fields = audio_common_fields.copy()
+audio_v4_fields: dict[str, Any] = audio_common_fields.copy()
 audio_v4_fields.update(
     {
         "case_name_full": lambda x: x["result"].case_name_full,
@@ -849,7 +860,7 @@ class CourtTestCase(TestCase):
     """Court test case factories"""
 
     @classmethod
-    def setUpTestData(cls):
+    def setUpTestData(cls) -> None:
         cls.court_1 = CourtFactory(
             id="ca1",
             full_name="First Circuit",
@@ -867,11 +878,12 @@ class CourtTestCase(TestCase):
         super().setUpTestData()
 
 
-class PeopleTestCase(TestCase):
+class PeopleTestCase(CourtTestCase):
     """People test case factories"""
 
     @classmethod
-    def setUpTestData(cls):
+    def setUpTestData(cls) -> None:
+        super().setUpTestData()
         cls.w_race, _ = Race.objects.get_or_create(race="w")
         cls.b_race, _ = Race.objects.get_or_create(race="b")
         cls.person_1 = PersonFactory.create(
@@ -1010,14 +1022,14 @@ class PeopleTestCase(TestCase):
             person=cls.person_2,
             year_rated="2015",
         )
-        super().setUpTestData()
 
 
-class SearchTestCase(TestCase):
+class SearchTestCase(PeopleTestCase):
     """Search test case factories"""
 
     @classmethod
-    def setUpTestData(cls):
+    def setUpTestData(cls) -> None:
+        super().setUpTestData()
         cls.docket_1 = DocketFactory.create(
             date_reargument_denied=datetime.date(2015, 8, 15),
             court_id=cls.court_2.pk,
@@ -1221,14 +1233,13 @@ class SearchTestCase(TestCase):
             cited_opinion=cls.opinion_1,
             citing_opinion=cls.opinion_3,
         )
-        super().setUpTestData()
 
 
 class RECAPSearchTestCase(TestCase):
     """RECAP Search test case factories"""
 
     @classmethod
-    def setUpTestData(cls):
+    def setUpTestData(cls) -> None:
         cls.court = CourtFactory(id="canb", jurisdiction="FB")
         cls.court_2 = CourtFactory(id="ca1", jurisdiction="F")
         cls.judge = PersonFactory.create(
@@ -1400,7 +1411,7 @@ class AudioTestCase(TestCase):
     """Audio test case factories"""
 
     @classmethod
-    def setUpTestData(cls):
+    def setUpTestData(cls) -> None:
         super().setUpTestData()
         cls.audio_1 = AudioFactory.create(
             docket_id=1,
@@ -1432,7 +1443,7 @@ class AudioTestCase(TestCase):
         )
 
     @classmethod
-    def tearDownClass(cls):
+    def tearDownClass(cls) -> None:
         Audio.objects.all().delete()
         super().tearDownClass()
 
@@ -1447,7 +1458,7 @@ class AudioESTestCase(TestCase):
     ]
 
     @classmethod
-    def setUpTestData(cls):
+    def setUpTestData(cls) -> None:
         super().setUpTestData()
         cls.court_1 = CourtFactory(
             id="cabc",
@@ -1540,11 +1551,13 @@ class AudioESTestCase(TestCase):
         cls.audio_1.panel.add(cls.author)
 
 
-def skip_if_common_tests_skipped(method):
+def skip_if_common_tests_skipped[S, **P, R](
+    method: Callable[Concatenate[S, P], Coroutine[Any, Any, R]],
+) -> Callable[Concatenate[S, P], Coroutine[Any, Any, R]]:
     """Decorator to skip common tests based on the skip_common_tests attribute."""
 
     @wraps(method)
-    async def wrapper_func(self, *args, **kwargs):
+    async def wrapper_func(self: S, *args: P.args, **kwargs: P.kwargs) -> R:
         if getattr(self, "skip_common_tests", False):
             raise unittest.SkipTest("Skip common tests within the class.")
         return await method(self, *args, **kwargs)

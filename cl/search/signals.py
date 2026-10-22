@@ -17,7 +17,7 @@ from cl.citations.tasks import (
 )
 from cl.favorites.utils import send_prayer_emails
 from cl.lib.courts import get_cache_key_for_court_list
-from cl.lib.es_signal_processor import ESSignalProcessor
+from cl.lib.es_signal_processor import DocumentModelMapping, ESSignalProcessor
 from cl.people_db.models import (
     ABARating,
     Education,
@@ -76,7 +76,8 @@ logger = logging.getLogger(__name__)
 # should be added. Keys should be the field name on the Model and values
 # should be the field name in the ES document.
 
-pa_field_mapping = {
+
+pa_field_mapping: DocumentModelMapping = {
     "save": {
         Docket: {
             "opinion__cluster__docket": {
@@ -153,7 +154,7 @@ pa_field_mapping = {
     },
 }
 
-oa_field_mapping = {
+oa_field_mapping: DocumentModelMapping = {
     "save": {
         Docket: {
             "docket": {
@@ -189,7 +190,7 @@ oa_field_mapping = {
     "reverse-delete": {},
 }
 
-p_field_mapping = {
+p_field_mapping: DocumentModelMapping = {
     "save": {
         Person: {
             "self": {
@@ -232,7 +233,7 @@ p_field_mapping = {
     },
 }
 
-position_field_mapping = {
+position_field_mapping: DocumentModelMapping = {
     "save": {
         Person: {
             "appointer__person": {
@@ -309,7 +310,7 @@ position_field_mapping = {
     "reverse-delete": {},
 }
 
-docket_field_mapping = {
+docket_field_mapping: DocumentModelMapping = {
     "save": {
         Docket: {
             "self": {
@@ -369,7 +370,7 @@ docket_field_mapping = {
     },
 }
 
-recap_document_field_mapping = {
+recap_document_field_mapping: DocumentModelMapping = {
     "save": {
         RECAPDocument: {
             "self": {
@@ -553,7 +554,7 @@ o_field_mapping = {
     "reverse-delete": {},
 }
 
-o_cluster_field_mapping = {
+o_cluster_field_mapping: DocumentModelMapping = {
     "save": {
         Docket: {
             "docket": {

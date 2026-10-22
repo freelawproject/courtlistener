@@ -1,6 +1,7 @@
 import itertools
 import os
 import uuid
+from collections.abc import Callable
 from typing import Any
 
 from asgiref.sync import sync_to_async
@@ -193,8 +194,16 @@ class S3GlacierInstantRetrievalStorage(S3Storage):
     # Populated by django-storages from AWS_S3_OBJECT_PARAMETERS.
     object_parameters: dict[str, str]
 
-    def __init__(self, naming_strategy=get_name_by_incrementing, **settings):
-        self.naming_strategy = naming_strategy
+    def __init__(
+        self,
+        naming_strategy: Callable[
+            [Storage, str, int | None], str
+        ] = get_name_by_incrementing,
+        **settings: Any,
+    ) -> None:
+        self.naming_strategy: Callable[[Storage, str, int | None], str] = (
+            naming_strategy
+        )
         super().__init__(**settings)
 
     def get_object_parameters(self, name: str) -> dict[str, str]:
