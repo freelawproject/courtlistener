@@ -9,7 +9,7 @@ from datetime import datetime
 from functools import partial
 from http import HTTPStatus
 from multiprocessing import process
-from typing import Any
+from typing import Any, TypedDict, overload
 from zipfile import ZipFile
 
 import httpx
@@ -30,13 +30,9 @@ from django.utils.timezone import now
 from juriscraper.lib.exceptions import PacerLoginException, ParsingException
 from juriscraper.lib.string_utils import CaseNameTweaker, harmonize
 from juriscraper.pacer import (
-    ACMSAttachmentPage,
     AcmsCaseSearch,
     ACMSDocketReport,
     AppellateDocketReport,
-    CaseQuery,
-    ClaimsRegister,
-    DocketHistoryReport,
     DocketReport,
     PossibleCaseNumberApi,
     S3NotificationEmail,
@@ -46,6 +42,7 @@ from juriscraper.scotus import SCOTUSDocketReportHTML, SCOTUSEmail
 from juriscraper.scotus.scotus_email import (
     SCOTUSConfirmationResult,
     SCOTUSEmailType,
+    SCOTUSNotificationEmail,
 )
 from juriscraper.state.texas import (
     TexasCourtOfAppealsScraper,
@@ -135,6 +132,15 @@ from cl.recap.models import (
     PacerFetchQueue,
     PacerHtmlFiles,
     ProcessingQueue,
+)
+from cl.recap.parsers import (
+    parse_acms_attachment_json,
+    parse_acms_json,
+    parse_appellate_text,
+    parse_case_query_page_text,
+    parse_claims_register_text,
+    parse_docket_history_text,
+    parse_docket_text,
 )
 from cl.recap.utils import (
     find_subdocket_atts_rds_from_data,
@@ -271,6 +277,22 @@ async def mark_pq_successful(pq: ProcessingQueue) -> tuple[int, str]:
     return await mark_pq_status(pq, message, PROCESSING_STATUS.SUCCESSFUL)
 
 
+@overload
+async def associate_related_instances(
+    pq: ProcessingQueue,
+    d_id: int | None = ...,
+    de_id: int | None = ...,
+    rd_id: int | None = ...,
+    model_name: str = ...,
+) -> None: ...
+@overload
+async def associate_related_instances(
+    pq: EmailProcessingQueue,
+    d_id: int | None = ...,
+    de_id: int | None = ...,
+    rd_id: int | list[int] | None = ...,
+    model_name: str = ...,
+) -> None: ...
 async def associate_related_instances(
     pq: ProcessingQueue | EmailProcessingQueue,
     d_id: int | None = None,
@@ -317,6 +339,7 @@ async def associate_related_instances(
     else:
         pq.docket_id = d_id
         pq.docket_entry_id = de_id
+        # pyrefly:ignore[bad-assignment] It's just narrowed incorrectly
         pq.recap_document_id = rd_id
         await pq.asave()
 
@@ -681,12 +704,6 @@ async def process_recap_zip(pk: int) -> dict[str, list[int] | list[Task]]:
             }
 
 
-def parse_docket_text(court_id, text):
-    report = DocketReport(court_id)
-    report._parse_text(text)
-    return report.data
-
-
 async def process_recap_docket(pk):
     """Process an uploaded docket from the RECAP API endpoint.
 
@@ -1034,12 +1051,6 @@ async def process_recap_attachment(
     return pq_status, msg, rds_affected
 
 
-def parse_claims_register_text(court_id, text):
-    report = ClaimsRegister(court_id)
-    report._parse_text(text)
-    return report.data
-
-
 async def process_recap_claims_register(pk):
     """Merge bankruptcy claims registry HTML into RECAP
 
@@ -1148,12 +1159,6 @@ async def process_recap_claims_register(pk):
     await associate_related_instances(pq, d_id=d.pk)
     await mark_pq_successful(pq)
     return {"docket_pk": d.pk}
-
-
-def parse_docket_history_text(court_id, text):
-    report = DocketHistoryReport(court_id)
-    report._parse_text(text)
-    return report.data
 
 
 async def process_recap_docket_history_report(pk):
@@ -1266,12 +1271,6 @@ async def process_recap_docket_history_report(pk):
         "docket_pk": d.pk,
         "content_updated": bool(rds_created or content_updated),
     }
-
-
-def parse_case_query_page_text(court_id, text):
-    report = CaseQuery(court_id)
-    report._parse_text(text)
-    return report.data
 
 
 async def process_case_query_page(pk):
@@ -1387,24 +1386,6 @@ async def process_case_query_page(pk):
         "docket_pk": d.pk,
         "content_updated": content_updated,
     }
-
-
-def parse_appellate_text(court_id, text):
-    report = AppellateDocketReport(court_id)
-    report._parse_text(text)
-    return report.data
-
-
-def parse_acms_attachment_json(court_id, json):
-    report = ACMSAttachmentPage(court_id)
-    report._parse_text(json)
-    return report.data
-
-
-def parse_acms_json(court_id, json):
-    report = ACMSDocketReport(court_id)
-    report._parse_text(json)
-    return report.data
 
 
 async def process_recap_appellate_docket(pk):
@@ -1781,7 +1762,7 @@ async def process_recap_appellate_attachment(
 
     if pq.pacer_case_id in ["undefined", "null"]:
         # Bad data from the client. Fix it with parsed data.
-        pq.pacer_case_id = att_data.get("pacer_case_id")
+        pq.pacer_case_id = att_data.get("pacer_case_id", "")
         await pq.asave()
 
     try:
@@ -2229,10 +2210,10 @@ def fetch_pacer_doc_by_rd_and_mark_fq_completed(
     :param omit_page_count: If true, omit requesting the page_count from doctor.
     :return: None
     """
-    rd_pk = fetch_pacer_doc_by_rd_base(
+    fetched_rd_pk = fetch_pacer_doc_by_rd_base(
         self, rd_pk, fq_pk, magic_number, omit_page_count=omit_page_count
     )
-    if rd_pk:
+    if fetched_rd_pk:
         # Mark the FQ as completed if the RD pk is returned, since in any other
         # case, fetch_pacer_doc_by_rd_base will return None.
         fq = PacerFetchQueue.objects.get(pk=fq_pk)
@@ -2538,13 +2519,18 @@ async def fetch_pacer_case_id_and_title(s, fq, court_id):
     return {}
 
 
+class _CreateUpdateDocketFromFetchDict(TypedDict):
+    docket_pk: int
+    content_updated: bool
+
+
 async def create_or_update_docket_data_from_fetch(
     fq: PacerFetchQueue,
     court_id: str,
     pacer_case_id: str | None,
     report: DocketReport | AppellateDocketReport | ACMSDocketReport,
     docket_data: dict[str, Any],
-) -> dict[str, int | bool]:
+) -> _CreateUpdateDocketFromFetchDict:
     """Creates or updates docket data in the database from fetched data.
 
     :param fq: The PacerFetchQueue record associated with this fetch.
@@ -2581,7 +2567,7 @@ async def fetch_docket_by_pacer_case_id(
     court_id: str,
     pacer_case_id: str,
     fq: PacerFetchQueue,
-) -> dict[str, int | bool]:
+) -> _CreateUpdateDocketFromFetchDict:
     """Download the docket from PACER and merge it into CL
 
     :param session: A PacerSession object to work with
@@ -2607,7 +2593,7 @@ async def purchase_appellate_docket_by_docket_number(
     docket_number: str,
     fq: PacerFetchQueue,
     **kwargs,
-) -> dict[str, int | bool]:
+) -> _CreateUpdateDocketFromFetchDict:
     """Purchases and processes an appellate docket from PACER by docket number.
 
     :param session: A PacerSession object to work with
@@ -2659,7 +2645,7 @@ async def purchase_appellate_docket_by_docket_number(
 )
 def fetch_appellate_docket(
     self: Task, fq_pk: int
-) -> dict[str, int | bool] | None:
+) -> _CreateUpdateDocketFromFetchDict | None:
     """Celery task wrapper for fetch_appellate_docket_base."""
     try:
         result = async_to_sync(fetch_appellate_docket_base)(fq_pk)
@@ -2682,7 +2668,7 @@ def fetch_appellate_docket(
 
 async def fetch_appellate_docket_base(
     fq_pk: int,
-) -> dict[str, int | bool] | None:
+) -> _CreateUpdateDocketFromFetchDict | None:
     """Fetches an appellate docket from PACER using the docket number
     associated with the provided Fetch Queue record to attempt the purchase.
 
@@ -2771,7 +2757,9 @@ async def fetch_appellate_docket_base(
     interval_step=5,
     ignore_result=True,
 )
-def fetch_docket(self: Task, fq_pk: int) -> dict[str, int | bool] | None:
+def fetch_docket(
+    self: Task, fq_pk: int
+) -> _CreateUpdateDocketFromFetchDict | None:
     """Celery task wrapper for fetch_docket_base."""
     try:
         result = async_to_sync(fetch_docket_base)(fq_pk)
@@ -2792,7 +2780,9 @@ def fetch_docket(self: Task, fq_pk: int) -> dict[str, int | bool] | None:
     return result
 
 
-async def fetch_docket_base(fq_pk: int) -> dict[str, int | bool] | None:
+async def fetch_docket_base(
+    fq_pk: int,
+) -> _CreateUpdateDocketFromFetchDict | None:
     """Fetch a docket from PACER
 
     This mirrors code elsewhere that gets dockets, but manages status as it
@@ -3868,6 +3858,16 @@ def process_texas_email(self: Task, epq_pk: int) -> None:
     texas_email_parser._parse_text(body)
     email_data = texas_email_parser.data
 
+    if email_data is None:
+        async_to_sync(mark_pq_status)(
+            epq,
+            "Failed to parse Texas email.",
+            PROCESSING_STATUS.FAILED,
+            "status_message",
+        )
+        self.request.chain = None
+        return None
+
     match email_data["court_id"]:
         case CourtID.SUPREME_COURT.value:
             docket_parser = TexasSupremeCourtScraper()
@@ -3973,33 +3973,35 @@ def process_texas_email(self: Task, epq_pk: int) -> None:
 
 
 def fetch_and_archive_scotus_docket_followup(
-    scotus_email: SCOTUSEmail,
+    court_id: str,
+    notification: SCOTUSNotificationEmail,
+    followup_url: str,
     timeout: float = 10.0,
 ) -> dict[str, str | dict[str, str]]:
     """Fetch the SCOTUS docket follow-up URL, archive the raw HTML in S3,
     and parse it.
 
-    :param scotus_email: A parsed ``SCOTUSEmail`` whose ``email_type`` is
-        ``DOCKET_ENTRY``.
+    :param court_id: The ID of the court from the ``SCOTUSEmail`` object
+    :param notification: The ``SCOTUSNotificationEmail`` object from the ``SCOTUSEmail["data"]`` field
+    :param followup_url: The URL to send the followup request to
     :param timeout: HTTP timeout in seconds.
     :return: A dict with ``email_type`` and ``data`` keys, matching the shape
         returned by ``SCOTUSEmail.handle_email``.
     """
-    parsed_email = scotus_email.data
     with httpx.Client(follow_redirects=True, http2=True) as client:
         response = client.get(
-            parsed_email["followup_url"],
+            followup_url,
             headers={"User-Agent": "Free Law Project"},
             timeout=timeout,
         )
     response.raise_for_status()
 
-    docket_number = parsed_email["data"]["docket_number"]
+    docket_number = notification["docket_number"]
     save_scotus_raw_to_s3(
         f"responses/dockets/scotus-email/{docket_number}.html",
         response.text,
     )
-    report = SCOTUSDocketReportHTML(scotus_email.court_id)
+    report = SCOTUSDocketReportHTML(court_id)
     report._parse_text(response.text)
     return {
         "email_type": SCOTUSEmailType.DOCKET_ENTRY.value,
@@ -4057,8 +4059,12 @@ def process_scotus_email(self: Task, epq_pk: int) -> None:
     scotus_email = SCOTUSEmail()
     scotus_email._parse_text(body)
     if scotus_email.email_type == SCOTUSEmailType.DOCKET_ENTRY:
+        if scotus_email.data["data"] is None:
+            raise TypeError("SCOTUS email parsed data is unexpectedly none")
         handling_result = fetch_and_archive_scotus_docket_followup(
-            scotus_email
+            scotus_email.court_id,
+            scotus_email.data["data"],
+            scotus_email.data["followup_url"],
         )
     else:
         handling_result = async_to_sync(scotus_email.handle_email)()

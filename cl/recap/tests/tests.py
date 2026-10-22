@@ -1296,7 +1296,7 @@ class RecapUploadsTest(TestCase):
             filepath_local=self.f,
         )
         with mock.patch(
-            "cl.recap.tasks.ACMSDocketReport", MockACMSDocketReport
+            "cl.recap.parsers.ACMSDocketReport", MockACMSDocketReport
         ):
             # Process the ACMS docket report.
             async_to_sync(process_recap_acms_docket)(pq.pk)
@@ -1404,7 +1404,7 @@ class RecapUploadsTest(TestCase):
         # After adding 1 docket entry, it should only exist its main RD.
         self.assertEqual(recap_documents.count(), 1)
         with mock.patch(
-            "cl.recap.tasks.ACMSAttachmentPage", MockACMSAttachmentPage
+            "cl.recap.parsers.ACMSAttachmentPage", MockACMSAttachmentPage
         ):
             # Process the acms attachment page containing 3 attachments.
             async_to_sync(process_recap_acms_appellate_attachment)(pq.pk)
@@ -1427,7 +1427,7 @@ class RecapUploadsTest(TestCase):
             filepath_local=self.f,
         )
         with mock.patch(
-            "cl.recap.tasks.ACMSAttachmentPage", MockACMSAttachmentPage
+            "cl.recap.parsers.ACMSAttachmentPage", MockACMSAttachmentPage
         ):
             # Process the acms attachment page containing 3 attachments.
             async_to_sync(process_recap_acms_appellate_attachment)(pq_1.pk)
@@ -5926,12 +5926,11 @@ class RecapDocketTaskTest(TestCase):
         pacer_free_doc_row = PACERFreeDocumentRowFactory(
             court_id=self.court.pk, pacer_case_id=docket.pacer_case_id
         )
-        pacer_free_doc_row.court = self.court
         delattr(pacer_free_doc_row, "id")
         tests = {
             "add_recap_source_test": lambda x: add_recap_source_and_save(x),
             "lookup_and_save_test": lambda x: lookup_and_save(
-                pacer_free_doc_row
+                pacer_free_doc_row, self.court
             ),
         }
         for test, method in tests.items():
@@ -6126,9 +6125,8 @@ class RecapDocketTaskTest(TestCase):
                     pacer_case_id=d.pacer_case_id,
                     nature_of_suit=nature_of_suit_from_row,
                 )
-                pacer_free_doc_row.court = self.court
                 delattr(pacer_free_doc_row, "id")
-                lookup_and_save(pacer_free_doc_row)
+                lookup_and_save(pacer_free_doc_row, self.court)
                 d.refresh_from_db()
                 self.assertEqual(
                     d.nature_of_suit,

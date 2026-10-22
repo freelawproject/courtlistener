@@ -2,7 +2,7 @@ import json
 import logging
 from contextlib import nullcontext
 from io import BufferedReader
-from typing import Any, cast
+from typing import Any
 
 from asgiref.sync import sync_to_async
 from botocore.exceptions import ClientError
@@ -14,6 +14,7 @@ from httpx import (
     Response,
     TimeoutException,
 )
+from httpx._types import QueryParamTypes, RequestContent, RequestData
 
 from cl.audio.models import Audio
 from cl.lib.decorators import retry
@@ -21,10 +22,10 @@ from cl.lib.exceptions import NoSuchKey
 from cl.lib.models import AbstractPDF
 from cl.search.models import Opinion, RECAPDocument
 
-logger = logging.getLogger(__name__)
+logger: logging.Logger = logging.getLogger(__name__)
 
 
-def log_invalid_embedding_errors(embeddings: Any):
+def log_invalid_embedding_errors(embeddings: Any) -> None:
     """Log an error when the embeddings response is not a list.
 
     :param embeddings: The embeddings object to validate and log.
@@ -56,8 +57,8 @@ async def clean_up_recap_document_file(item: AbstractPDF) -> None:
         item.file_size = None
         item.page_count = None
         if isinstance(item, RECAPDocument):
-            cast(RECAPDocument, item).date_upload = None
-            cast(RECAPDocument, item).is_available = False
+            item.date_upload = None
+            item.is_available = False
         await item.asave()
 
 
@@ -68,8 +69,8 @@ async def microservice(
     file: BufferedReader | File | bytes | None = None,
     file_type: str | None = None,
     filepath: str | None = None,
-    data=None,
-    params=None,
+    data: RequestData | RequestContent | None = None,
+    params: QueryParamTypes | None = None,
 ) -> Response:
     """Call a Microservice endpoint
 
@@ -151,6 +152,7 @@ async def microservice(
                 req = client.build_request(
                     method=method,
                     url=services[service]["url"],  # type: ignore
+                    # pyrefly:ignore[bad-argument-type] httpx's stubs omit the (deprecated) raw-content form of data it still accepts
                     data=data,
                     files=files,
                     params=params,

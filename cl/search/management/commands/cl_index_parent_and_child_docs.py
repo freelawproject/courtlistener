@@ -79,10 +79,9 @@ def get_unique_oldest_history_rows(
     range for the given event table, or None if no event table is specified.
     """
 
-    oldest_unique_events = None
     match update_from_event_tables:
         case EventTable.DOCKET:
-            oldest_unique_events = (
+            return (
                 DocketEvent.objects.filter(
                     pgh_id__gte=pk_offset,
                     pgh_created_at__gte=start_date,
@@ -93,7 +92,7 @@ def get_unique_oldest_history_rows(
                 .distinct("id")
             )
         case EventTable.DOCKET_ENTRY:
-            oldest_unique_events = (
+            return (
                 DocketEntryEvent.objects.filter(
                     pgh_id__gte=pk_offset,
                     pgh_created_at__gte=start_date,
@@ -103,7 +102,7 @@ def get_unique_oldest_history_rows(
                 .distinct("id")
             )
         case EventTable.RECAP_DOCUMENT:
-            oldest_unique_events = (
+            return (
                 RECAPDocumentEvent.objects.filter(
                     pgh_id__gte=pk_offset,
                     pgh_created_at__gte=start_date,
@@ -112,7 +111,10 @@ def get_unique_oldest_history_rows(
                 .order_by("id", "pgh_created_at")
                 .distinct("id")
             )
-    return oldest_unique_events
+        case EventTable.UNDEFINED:
+            return None
+        case None:
+            return None
 
 
 def get_documents_to_update_or_remove(

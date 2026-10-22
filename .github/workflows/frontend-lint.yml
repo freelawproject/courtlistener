@@ -5,6 +5,8 @@ on:
     paths:
       - '**/*.html'
       - 'cl/assets/tailwind/input.css'
+      - 'cl/assets/static-global/js/third_party/**'
+      - 'cl/assets/static-global/js/alpine/**'
 
 permissions:
   contents: read

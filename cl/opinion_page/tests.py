@@ -59,8 +59,6 @@ from cl.lib.models import THUMBNAIL_STATUSES
 from cl.lib.redis_utils import get_redis_interface
 from cl.lib.storage import clobbering_get_name
 from cl.lib.test_helpers import (
-    CourtTestCase,
-    PeopleTestCase,
     SearchTestCase,
     SimpleUserDataMixin,
     SitemapTest,
@@ -415,6 +413,57 @@ class ESClusterSearchAsyncTest(TestCase):
         self.assertNotEqual(execute_thread, event_loop_thread)
 
 
+class ScannedOpinionPageTest(TestCase):
+    """Is the text of scanned opinions displayed?"""
+
+    @classmethod
+    def setUpTestData(cls) -> None:
+        cls.cluster = OpinionClusterWithParentsFactory.create(
+            precedential_status=PRECEDENTIAL_STATUS.PUBLISHED,
+        )
+        cls.opinion = OpinionFactory.create(
+            cluster=cls.cluster,
+            type=Opinion.COMBINED,
+            plain_text="",
+            html_with_citations="",
+            xml_scan=(
+                "<opinion><p>Text from the scanned reporter"
+                '<page-number label="3">*3</page-number> continues</p>'
+                "</opinion>"
+            ),
+        )
+        CitationWithParentsFactory.create(
+            cluster=cls.cluster,
+            volume="388",
+            reporter="So. 3d",
+            page="1",
+            type=Citation.STATE_REGIONAL,
+        )
+
+    def test_scanned_opinion_text_is_displayed(self) -> None:
+        """Is the opinion XML shown when the opinion only has xml_scan?"""
+        path = reverse("view_case", args=[self.cluster.pk, self.cluster.slug])
+        response = self.client.get(path)
+
+        self.assertEqual(response.status_code, HTTPStatus.OK)
+        self.assertContains(
+            response,
+            '<div class="serif-text harvard"><opinion><p>Text from the '
+            "scanned reporter",
+            html=False,
+        )
+
+    async def test_link_to_page_in_scanned_opinion(self) -> None:
+        """Is a citation to an inner page found by its star pagination?"""
+        response = await self.async_client.get(
+            reverse(
+                "citation_redirector",
+                kwargs={"reporter": "so-3d", "volume": "388", "page": "3"},
+            )
+        )
+        self.assertEqual(response.url, self.cluster.get_absolute_url())
+
+
 class SimpleLoadTest(TestCase):
     fixtures = [
         "test_objects_search.json",
@@ -432,13 +481,7 @@ class SimpleLoadTest(TestCase):
 
 
 @override_flag("citing_and_related_enabled", True)
-class OpinionPageLoadTest(
-    ESIndexTestCase,
-    CourtTestCase,
-    PeopleTestCase,
-    SearchTestCase,
-    TestCase,
-):
+class OpinionPageLoadTest(ESIndexTestCase, SearchTestCase, TestCase):
     @classmethod
     def setUpTestData(cls) -> None:
         cls.o_cluster_1 = OpinionClusterWithParentsFactory.create(
@@ -4306,18 +4349,24 @@ class DocketAlertToggleV2Test(TestCase):
         self.assertIsNotNone(match)
         return " ".join(match.group(1).split())
 
+    def quota_count_id(self) -> str:
+        """The id attribute of the quota dialog's alert count, shared with the partial."""
+        return f'id="docket-alert-quota-count-{self.docket.pk}"'
+
     async def test_logged_out_item_links_to_sign_in(self) -> None:
         """A visitor gets a plain link back to this docket after signing in."""
         r = await self.page()
-        menu = self.menu(r.content.decode())
+        html = r.content.decode()
+        menu = self.menu(html)
         docket_path = reverse(
             "view_docket", args=[self.docket.pk, self.docket.slug]
         )
         self.assertIn(f'href="{reverse("sign-in")}?next={docket_path}"', menu)
         self.assertNotIn("hx-post", menu)
+        self.assertNotIn(self.quota_count_id(), html)
 
-    async def test_under_quota_item_posts_through_htmx(self) -> None:
-        """A user who can make an alert gets the htmx toggle."""
+    async def test_signed_in_item_posts_through_htmx(self) -> None:
+        """A signed-in user gets the htmx toggle, which closes the menu on a refusal."""
         await self.login()
         r = await self.page()
         self.assertFalse(r.context["has_alert"])
@@ -4325,6 +4374,9 @@ class DocketAlertToggleV2Test(TestCase):
         self.assertIn(f'hx-post="{reverse("toggle_docket_alert")}"', menu)
         self.assertIn(f'id="docket-alert-toggle-{self.docket.pk}"', menu)
         self.assertIn('hx-disabled-elt="this"', menu)
+        self.assertIn(
+            'x-on:docket-alert-quota-reached="closeAndFocusTrigger"', menu
+        )
 
     @override_settings(MAX_FREE_DOCKET_ALERTS=0)
     async def test_subscribed_user_can_always_disable(self) -> None:
@@ -4343,12 +4395,20 @@ class DocketAlertToggleV2Test(TestCase):
         )
 
     @override_settings(MAX_FREE_DOCKET_ALERTS=0)
-    async def test_at_quota_item_never_posts(self) -> None:
-        """A user at quota with no alert is not offered the htmx toggle."""
+    async def test_at_quota_item_still_posts(self) -> None:
+        """The page does not judge the quota; the server refuses and answers with the dialog."""
         await self.login()
         r = await self.page()
         self.assertFalse(r.context["has_alert"])
-        self.assertNotIn("hx-post", self.menu(r.content.decode()))
+        self.assertIn("hx-post", self.menu(r.content.decode()))
+
+    async def test_quota_dialog_is_on_the_page(self) -> None:
+        """The page renders the quota dialog closed, waiting for the refusal event."""
+        await self.login()
+        r = await self.page()
+        page = r.content.decode()
+        self.assertIn('x-on:docket-alert-quota-reached.window="open"', page)
+        self.assertIn(self.quota_count_id(), page)
 
     async def test_trigger_has_no_aria_label(self) -> None:
         """The visible label is the trigger's accessible name.
