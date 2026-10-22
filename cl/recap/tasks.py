@@ -30,13 +30,9 @@ from django.utils.timezone import now
 from juriscraper.lib.exceptions import PacerLoginException, ParsingException
 from juriscraper.lib.string_utils import CaseNameTweaker, harmonize
 from juriscraper.pacer import (
-    ACMSAttachmentPage,
     AcmsCaseSearch,
     ACMSDocketReport,
     AppellateDocketReport,
-    CaseQuery,
-    ClaimsRegister,
-    DocketHistoryReport,
     DocketReport,
     PossibleCaseNumberApi,
     S3NotificationEmail,
@@ -136,6 +132,15 @@ from cl.recap.models import (
     PacerFetchQueue,
     PacerHtmlFiles,
     ProcessingQueue,
+)
+from cl.recap.parsers import (
+    parse_acms_attachment_json,
+    parse_acms_json,
+    parse_appellate_text,
+    parse_case_query_page_text,
+    parse_claims_register_text,
+    parse_docket_history_text,
+    parse_docket_text,
 )
 from cl.recap.utils import (
     find_subdocket_atts_rds_from_data,
@@ -699,12 +704,6 @@ async def process_recap_zip(pk: int) -> dict[str, list[int] | list[Task]]:
             }
 
 
-def parse_docket_text(court_id, text):
-    report = DocketReport(court_id)
-    report._parse_text(text)
-    return report.data
-
-
 async def process_recap_docket(pk):
     """Process an uploaded docket from the RECAP API endpoint.
 
@@ -1052,12 +1051,6 @@ async def process_recap_attachment(
     return pq_status, msg, rds_affected
 
 
-def parse_claims_register_text(court_id, text):
-    report = ClaimsRegister(court_id)
-    report._parse_text(text)
-    return report.data
-
-
 async def process_recap_claims_register(pk):
     """Merge bankruptcy claims registry HTML into RECAP
 
@@ -1166,12 +1159,6 @@ async def process_recap_claims_register(pk):
     await associate_related_instances(pq, d_id=d.pk)
     await mark_pq_successful(pq)
     return {"docket_pk": d.pk}
-
-
-def parse_docket_history_text(court_id, text):
-    report = DocketHistoryReport(court_id)
-    report._parse_text(text)
-    return report.data
 
 
 async def process_recap_docket_history_report(pk):
@@ -1284,12 +1271,6 @@ async def process_recap_docket_history_report(pk):
         "docket_pk": d.pk,
         "content_updated": bool(rds_created or content_updated),
     }
-
-
-def parse_case_query_page_text(court_id, text):
-    report = CaseQuery(court_id)
-    report._parse_text(text)
-    return report.data
 
 
 async def process_case_query_page(pk):
@@ -1405,24 +1386,6 @@ async def process_case_query_page(pk):
         "docket_pk": d.pk,
         "content_updated": content_updated,
     }
-
-
-def parse_appellate_text(court_id, text):
-    report = AppellateDocketReport(court_id)
-    report._parse_text(text)
-    return report.data
-
-
-def parse_acms_attachment_json(court_id, json):
-    report = ACMSAttachmentPage(court_id)
-    report._parse_text(json)
-    return report.data
-
-
-def parse_acms_json(court_id, json):
-    report = ACMSDocketReport(court_id)
-    report._parse_text(json)
-    return report.data
 
 
 async def process_recap_appellate_docket(pk):

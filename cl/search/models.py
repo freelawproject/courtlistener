@@ -2298,6 +2298,7 @@ class OpinionCluster(AbstractDateTimeModel):
         (2, "Liberal"),
         (3, "Unspecifiable"),
     )
+
     docket = models.ForeignKey(
         Docket,
         help_text="The docket that the opinion cluster is a part of",
@@ -3167,6 +3168,7 @@ class Opinion(AbstractDateTimeModel):
         (ON_MOTION_TO_STRIKE, "On Motion to Strike Cost Bill"),
         (TRIAL_COURT, "Trial Court Document"),
     )
+
     cluster = models.ForeignKey(
         OpinionCluster,
         help_text="The cluster that the opinion is a part of",

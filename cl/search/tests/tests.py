@@ -45,7 +45,7 @@ from cl.lib.indexing_utils import log_last_document_indexed
 from cl.lib.redis_utils import get_redis_interface
 from cl.lib.search_utils import merge_form_with_courts
 from cl.lib.storage import clobbering_get_name
-from cl.lib.test_helpers import CourtTestCase, PeopleTestCase
+from cl.lib.test_helpers import PeopleTestCase
 from cl.lib.utils import (
     cleanup_main_query,
     get_child_court_ids_for_parents,
@@ -2990,9 +2990,7 @@ class ESIndexingTasksUtils(TestCase):
     "cl.search.management.commands.sweep_indexer.compose_indexer_redis_key",
     return_value="es_sweep_indexer:log_test",
 )
-class SweepIndexerCommandTest(
-    CourtTestCase, PeopleTestCase, ESIndexTestCase, TestCase
-):
+class SweepIndexerCommandTest(PeopleTestCase, ESIndexTestCase, TestCase):
     """sweep_indexer command tests for Elasticsearch"""
 
     @classmethod
