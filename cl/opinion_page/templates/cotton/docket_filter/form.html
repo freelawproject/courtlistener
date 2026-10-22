@@ -2,7 +2,7 @@
 <c-vars form layout="desktop"/>
 
 {# `contents` lets the fields join the parent's flex layout. #}
-<form action="" method="get" class="contents">
+<form action="" method="get" class="contents" x-on:formdata="dropEmptyParams">
   {# Date range #}
   <div class="{% if layout == 'mobile' %}flex flex-col items-start gap-2 w-full{% else %}items-center gap-2 hidden md:flex{% endif %}">
     <span aria-hidden="true" class="font-medium {% if layout == 'mobile' %}text-md text-greyscale-800{% else %}text-sm text-greyscale-700{% endif %}">Filed</span>

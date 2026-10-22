@@ -38,6 +38,16 @@ document.addEventListener("alpine:init", () => {
       if (form) form.requestSubmit();
     },
     /**
+     * Drop empty fields from a filter form's submission, so the URL only
+     * carries the filters that are set. `formdata` fires on every submit
+     * path: the Apply button, implicit submission, and requestSubmit().
+     */
+    dropEmptyParams(event) {
+      for (const [name, value] of [...event.formData]) {
+        if (value === "") event.formData.delete(name);
+      }
+    },
+    /**
      * Merge all typed search terms into the final hidden `q` input so the search
      * stays scoped to the docket, in the same shape as build_docket_id_q_param.
      * The scope is read from `data-docket-scope` rather than from the hidden
