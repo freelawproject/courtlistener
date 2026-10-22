@@ -13,7 +13,7 @@
   class="flex justify-center {{ class }}"
   {{ attrs }}
 >
-  <!-- Trigger: omitted when the dialog is opened by other means, e.g. an x-on listener passed through attrs -->
+  {#  Trigger: omitted when the dialog is opened by other means, e.g. an x-on listener passed through attrs  #}
   {% if trigger_button %}
     {{ trigger_button }}
   {% elif button_content %}
@@ -22,7 +22,7 @@
     </c-dialog.trigger-button>
   {% endif %}
 
-  <!-- Dialog -->
+  {#  Dialog  #}
   <div
     x-dialog
     x-bind:open="isOpen"
@@ -33,14 +33,14 @@
     x-cloak
     class="fixed z-40 inset-0 overflow-hidden flex justify-center {{ dialog_class }}"
   >
-    <!-- Overlay -->
+    {#  Overlay  #}
     <div
       x-dialog:overlay
       x-on:click.stop.prevent="close"
       class="fixed z-40 inset-0 bg-greyscale-600/40"
     ></div>
 
-    <!-- Panel -->
+    {#  Panel  #}
     <div
       class="w-full flex flex-col bg-white shadow-md z-50 {{ panel_class }}"
       x-dialog:panel
