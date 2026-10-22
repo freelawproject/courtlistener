@@ -149,6 +149,13 @@
   .screenshot {
     @apply rounded-2xl block max-w-full;
   }
+  /* Body cells of c-flex-table; utilities on a cell override these. */
+  :where(.flex-table tbody) :is(td, th) {
+    @apply align-middle text-sm font-normal px-2.5 py-4;
+  }
+  :where(.flex-table-dense tbody) :is(td, th) {
+    @apply text-xs p-2;
+  }
   /* ----------- THIRD PARTY OVERRIDES ----------- */
 
   .flatpickr-calendar.animate {

@@ -1,9 +1,9 @@
 {% load extras %}
 
-<c-vars align="" caption="Options table"></c-vars>
+<c-vars align="" caption="Options table" dense></c-vars>
 
 <div class="overflow-auto">
-  <table class="w-full">
+  <table class="flex-table w-full{% if dense %} flex-table-dense{% endif %}">
     <caption class="sr-only">{{ caption }}</caption>
     <thead>
     <tr class="border-none">
