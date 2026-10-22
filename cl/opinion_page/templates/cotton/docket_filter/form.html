@@ -1,0 +1,41 @@
+{# The docket entry filter form, shared by the toolbar and the mobile dialog. It renders the Filed and Documents ranges, and the slot holds the controls each layout adds after them. `layout` is "desktop" or "mobile", and doubles as the inputs' id prefix. #}
+<c-vars form layout="desktop"/>
+
+{# `contents` lets the fields join the parent's flex layout. #}
+<form action="" method="get" class="contents">
+  {# Date range #}
+  <div class="{% if layout == 'mobile' %}flex flex-col items-start gap-2 w-full{% else %}items-center gap-2 hidden md:flex{% endif %}">
+    <span aria-hidden="true" class="font-medium {% if layout == 'mobile' %}text-md text-greyscale-800{% else %}text-sm text-greyscale-700{% endif %}">Filed</span>
+    <div class="flex items-center {% if layout == 'mobile' %}gap-4 w-full{% else %}gap-2{% endif %}">
+      <div class="{% if layout == 'mobile' %}contents{% else %}w-26 text-sm{% endif %}">
+        <c-form.input :form="form" field_name="filed_after" :form_prefix="layout" :hide_label="True" only/>
+      </div>
+      <span>&mdash;</span>
+      <div class="{% if layout == 'mobile' %}contents{% else %}w-26 text-sm{% endif %}">
+        <c-form.input :form="form" field_name="filed_before" :form_prefix="layout" :hide_label="True" only/>
+      </div>
+    </div>
+  </div>
+
+  {% if layout == 'mobile' %}
+    <c-divider only />
+  {% else %}
+    <c-divider class="h-8 w-[1px] hidden md:block"/>
+  {% endif %}
+
+  {# Document number range #}
+  <div class="{% if layout == 'mobile' %}flex flex-col items-start gap-2 w-full{% else %}items-center gap-2 hidden md:flex{% endif %}">
+    <span aria-hidden="true" class="font-medium {% if layout == 'mobile' %}text-md text-greyscale-800{% else %}text-sm text-greyscale-700{% endif %}">Documents</span>
+    <div class="flex items-center {% if layout == 'mobile' %}gap-4 w-full{% else %}gap-2{% endif %}">
+      <div class="{% if layout == 'mobile' %}contents{% else %}w-20{% endif %}">
+        <c-form.input :form="form" field_name="entry_gte" :form_prefix="layout" :hide_label="True" only/>
+      </div>
+      <span>&mdash;</span>
+      <div class="{% if layout == 'mobile' %}contents{% else %}w-20{% endif %}">
+        <c-form.input :form="form" field_name="entry_lte" :form_prefix="layout" :hide_label="True" only/>
+      </div>
+    </div>
+  </div>
+
+  {{ slot }}
+</form>

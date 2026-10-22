@@ -21,34 +21,7 @@
 
     <c-divider class="h-8 w-[1px] hidden md:block"/>
 
-    {# Filter form — uses `contents` so children join the parent flex layout #}
-    <form action="" method="get" class="contents">
-      {# Date range #}
-      <div class="items-center gap-2 hidden md:flex">
-        <span aria-hidden="true" class="text-sm font-medium text-greyscale-700">Filed</span>
-        <div class="w-26 text-sm">
-          <c-form.input :form="form" field_name="filed_after" form_prefix="desktop" :hide_label="True" only/>
-        </div>
-        <span>&mdash;</span>
-        <div class="w-26 text-sm">
-          <c-form.input :form="form" field_name="filed_before" form_prefix="desktop" :hide_label="True" only/>
-        </div>
-      </div>
-
-      <c-divider class="h-8 w-[1px] hidden md:block"/>
-
-      {# Document number range #}
-      <div class="items-center gap-2 hidden md:flex">
-        <span aria-hidden="true" class="text-sm font-medium text-greyscale-700">Documents</span>
-        <div class="w-20">
-          <c-form.input :form="form" field_name="entry_gte" form_prefix="desktop" :hide_label="True" only/>
-        </div>
-        <span>&mdash;</span>
-        <div class="w-20">
-          <c-form.input :form="form" field_name="entry_lte" form_prefix="desktop" :hide_label="True" only/>
-        </div>
-      </div>
-
+    <c-docket-filter.form :form="form" layout="desktop">
       <c-divider class="h-8 w-[1px]"/>
 
       {# Sort order #}
@@ -102,6 +75,6 @@
       </div>
 
       <c-button type="submit" class="sr-only" tabindex="-1">Filter</c-button>
-    </form>
+    </c-docket-filter.form>
   </div>
 </div>

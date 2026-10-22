@@ -34,29 +34,7 @@
         <c-docket-filter.search-form :docket="docket" input_id="de-search-mobile" class="w-full h-11" />
         <c-divider only />
 
-        <form action="" method="get" class="contents">
-          {# Date range #}
-          <div class="flex flex-col items-start gap-2 w-full">
-            <span aria-hidden="true" class="text-md font-medium text-greyscale-800">Filed</span>
-            <div class="flex flex-row gap-4 items-center w-full">
-              <c-form.input :form="form" field_name="filed_after" form_prefix="mobile" :hide_label="True" only/>
-              <span>&mdash;</span>
-              <c-form.input :form="form" field_name="filed_before" form_prefix="mobile" :hide_label="True" only/>
-            </div>
-          </div>
-
-          <c-divider only />
-
-          {# Document number range #}
-          <div class="flex flex-col items-start gap-2 w-full">
-            <span aria-hidden="true" class="text-md font-medium text-greyscale-800">Documents</span>
-            <div class="flex flex-row gap-4 items-center w-full">
-              <c-form.input :form="form" field_name="entry_gte" form_prefix="mobile" :hide_label="True" only/>
-              <span>&mdash;</span>
-              <c-form.input :form="form" field_name="entry_lte" form_prefix="mobile" :hide_label="True" only/>
-            </div>
-          </div>
-
+        <c-docket-filter.form :form="form" layout="mobile">
           <c-divider only />
 
           {# This form has no sort control, so carry the current sort through. #}
@@ -65,7 +43,7 @@
           {% endif %}
 
           <c-button type="submit" variant="primary" class="w-full py-3 px-4.5 text-md flex items-center justify-center">Apply</c-button>
-        </form>
+        </c-docket-filter.form>
       </div>
     </c-slot>
   </c-dialog>
