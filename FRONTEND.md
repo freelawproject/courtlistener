@@ -63,6 +63,8 @@ Sync notice format:
 - Check existing components before creating new ones — component library at `cl/simple_pages/templates/v2_components.html`
 - New components MUST have a corresponding entry in `v2_components.html` with four sections: Demo, Props, Slots, Code (even if some are empty)
 - Avoid hardcoded `id` attributes in components — they create duplicate IDs when a component is reused on the same page
+- Create a component when it encapsulates behavior (Alpine state, slots, ARIA wiring). For styling alone, use a component class in `input.css`: every component instance renders as its own template, tens of microseconds each, while a class costs nothing
+- Be aware of components rendered inside long loops (a table cell, a row on an unpaginated list): each iteration renders the component again, so thousands of instances on one page add up. A frontend check warns when a component sits inside a `{% for %}`; if the page measures fine, skip it on that line with `{# frontend-checks-skip-line: check_component_in_loop #}`
 
 **Dynamic attributes** — prefix with `:` to pass Django context variables:
 - Correct: `:items="nav_items"`
@@ -220,6 +222,7 @@ The rules in this doc are enforced as hard errors that block merge. See `fronten
 
 **Warnings** (annotated on PR, doesn't block):
 - `{% include %}` in v2 templates (use Cotton components; known exceptions exist)
+- Cotton component inside a `{% for %}` loop (rendered once per iteration; skippable per line once measured)
 - New cotton component without a component library entry
 - `x-data` without a corresponding `{% require_script %}`
 - Placeholder text (TODO, TBD, FIXME, Lorem ipsum)
