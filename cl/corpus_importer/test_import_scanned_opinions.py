@@ -18,6 +18,7 @@ from eyecite.models import FullCaseCitation
 from cl.corpus_importer.management.commands.import_scanned_opinions import (
     get_case_names,
     get_citation_strings,
+    get_date_argued,
     get_date_filed,
     get_docket_number,
     get_headmatter,
@@ -422,6 +423,41 @@ class ScanXmlHelpersTest(SimpleTestCase):
         for xml, expected in cases:
             with self.subTest(xml=xml):
                 self.assertEqual(get_date_filed(make_soup(xml)), expected)
+
+    def test_get_date_argued(self) -> None:
+        """Can we parse the argued date from the date elements?"""
+        cases = [
+            (
+                "<otherdate>Argued September 18, 2025</otherdate>",
+                date(2025, 9, 18),
+            ),
+            (
+                "<otherdate>Argued and Submitted Sept. 3, 2024</otherdate>",
+                date(2024, 9, 3),
+            ),
+            (
+                "<decisiondate>Argued Oct. 3, 2023. Decided May 22, "
+                "2024.</decisiondate>",
+                date(2023, 10, 3),
+            ),
+            (
+                "<casebody><otherdate>Submitted Oct. 3, 2023</otherdate>"
+                "<otherdate>Argued: Nov. 6, 2023</otherdate></casebody>",
+                date(2023, 11, 6),
+            ),
+            (
+                "<casebody><otherdate>Argued Feb. 30, 2024</otherdate>"
+                "<otherdate>Argued March 1, 2024</otherdate></casebody>",
+                date(2024, 3, 1),
+            ),
+            ("<otherdate>Reargued Oct. 3, 2023</otherdate>", None),
+            ("<otherdate>Argued May 2024</otherdate>", None),
+            ("<decisiondate>Decided May 22, 2024</decisiondate>", None),
+            ("<history>Argued Oct. 3, 2023</history>", None),
+        ]
+        for xml, expected in cases:
+            with self.subTest(xml=xml):
+                self.assertEqual(get_date_argued(make_soup(xml)), expected)
 
     def test_get_citation_strings(self) -> None:
         """Are citations read from the citation elements?"""
@@ -831,6 +867,42 @@ class ImportScannedOpinionsTest(TestCase):
             "judges",
             [call.args[2] for call in mock_logger.debug.call_args_list],
         )
+
+    def test_date_argued_is_imported(self) -> None:
+        """Is the argued date of a new scanned case saved on its docket?"""
+        xml = self.scan_xml.replace(
+            "<decisiondate>",
+            "<otherdate>Argued May 1, 2024</otherdate><decisiondate>",
+            1,
+        )
+
+        self.import_xml(xml)
+
+        docket = OpinionCluster.objects.get().docket
+        self.assertEqual(docket.date_argued, date(2024, 5, 1))
+        self.assertIn("Argued May 1, 2024", docket.clusters.get().other_dates)
+
+    def test_merge_fills_empty_date_argued(self) -> None:
+        """Is only an empty docket date_argued filled from the scan?"""
+        xml = self.scan_xml.replace(
+            "<decisiondate>",
+            "<otherdate>Argued May 1, 2024</otherdate><decisiondate>",
+            1,
+        )
+        for current, expected in [
+            (None, date(2024, 5, 1)),
+            (date(2024, 4, 2), date(2024, 4, 2)),
+        ]:
+            with self.subTest(current=current), transaction.atomic():
+                cluster = self.make_matching_cluster()
+                Docket.objects.filter(pk=cluster.docket_id).update(
+                    date_argued=current
+                )
+                self.import_xml(xml)
+
+                cluster.docket.refresh_from_db()
+                self.assertEqual(cluster.docket.date_argued, expected)
+                transaction.set_rollback(True)
 
     def test_merge_keeps_the_version_author_of_the_byline(self) -> None:
         """Is the version's author kept only when the scan names that judge?"""
