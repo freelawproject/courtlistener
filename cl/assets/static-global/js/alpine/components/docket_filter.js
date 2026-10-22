@@ -25,11 +25,16 @@ document.addEventListener("alpine:init", () => {
           });
         }
 
-        // If the filter form was submitted with errors, pop the mobile
-        // drawer open so the user can see the validation messages inside.
-        const drawer = this.$el.querySelector("[data-has-errors]");
-        if (drawer) {
-          drawer.dispatchEvent(new CustomEvent("open-filter-drawer"));
+        // If the filter form was submitted with errors, open the mobile
+        // dialog so the filters are in view. Only below the mobile
+        // breakpoint: above it the dialog is hidden, and opening it would
+        // leave an invisible modal open.
+        const breakpoint = getComputedStyle(document.documentElement)
+          .getPropertyValue("--mobile-breakpoint")
+          .trim();
+        const isMobile = !window.matchMedia(`(min-width: ${breakpoint})`).matches;
+        if ("hasErrors" in this.$el.dataset && isMobile) {
+          window.dispatchEvent(new CustomEvent("open-filter-dialog"));
         }
       });
     },

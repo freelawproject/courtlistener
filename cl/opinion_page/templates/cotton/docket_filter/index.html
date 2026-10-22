@@ -10,10 +10,7 @@
   class=""
 />
 
-<div x-data="docketFilter" data-docket-scope="docket_id:{{ docket.pk }}" class="{{ class }}">
-  {% if form.errors %}
-    <p class="text-sm text-red-700 mb-2">There were errors applying your filters.</p>
-  {% endif %}
+<div x-data="docketFilter" data-docket-scope="docket_id:{{ docket.pk }}" {% if form.errors %}data-has-errors{% endif %} class="{{ class }}">
 
   {# From md up, dividers are drawn by .divided-row-item, so none dangles when the row wraps. The mobile row never wraps, and its justify-between needs dividers that are flex items. #}
   <div class="divided-row">
@@ -78,4 +75,5 @@
       </c-docket-filter.form>
     </div>
   </div>
+  <c-docket-filter.errors :form="form" class="mt-2" only />
 </div>

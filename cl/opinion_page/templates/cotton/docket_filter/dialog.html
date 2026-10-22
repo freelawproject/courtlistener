@@ -3,7 +3,7 @@
 <c-vars docket/>
 
 <div class="md:hidden">
-  <c-dialog panel_class="py-6 rounded-2xl max-w-[706px] gap-6 absolute bottom-0 rounded-b-none max-w-full" only>
+  <c-dialog panel_class="py-6 rounded-2xl max-w-[706px] gap-6 absolute bottom-0 rounded-b-none max-w-full" x-on:open-filter-dialog.window="open" only>
     <c-slot name="trigger_button">
       <c-dialog.trigger-button class="justify-between w-48 max-w-[30vw] px-4">
         Filter
@@ -31,6 +31,7 @@
       </div>
 
       <div class="flex flex-col gap-4 max-h-[--mobile-dialog-panel-height] px-6">
+        <c-docket-filter.errors :form="form" only />
         <div class="pb-4 border-b border-greyscale-200">
           <c-docket-filter.search-form :docket="docket" input_id="de-search-mobile" class="w-full h-11" />
         </div>
