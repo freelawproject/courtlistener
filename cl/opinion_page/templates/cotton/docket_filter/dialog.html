@@ -59,6 +59,11 @@
 
           <c-divider only />
 
+          {# This form has no sort control, so carry the current sort through. #}
+          {% if form.order_by.value == "desc" %}
+            <input type="hidden" name="order_by" value="desc" />
+          {% endif %}
+
           <c-button type="submit" variant="primary" class="w-full py-3 px-4.5 text-md flex items-center justify-center">Apply</c-button>
         </form>
       </div>
