@@ -15,66 +15,67 @@
     <p class="text-sm text-red-700 mb-2">There were errors applying your filters.</p>
   {% endif %}
 
-  <div class="flex flex-wrap items-center md:justify-start justify-between sm:gap-3 gap-1">
-    <c-docket-filter.search-form :docket="docket" input_id="de-search-desktop" class="max-w-60 hidden md:block" />
-    <c-docket-filter.dialog :docket="docket" />
+  {# From md up, dividers are drawn by .divided-row-item, so none dangles when the row wraps. The mobile row never wraps, and its justify-between needs dividers that are flex items. #}
+  <div class="divided-row">
+    <div class="flex flex-wrap items-center md:justify-start justify-between sm:gap-3 gap-1 md:-ml-[--divided-row-gap] md:gap-x-0">
+      <c-docket-filter.search-form :docket="docket" input_id="de-search-desktop" class="max-w-60 hidden md:block divided-row-item" />
+      <c-docket-filter.dialog :docket="docket" />
 
-    <c-divider class="h-8 w-[1px] hidden md:block"/>
+      <c-docket-filter.form :form="form" layout="desktop">
+        <div aria-hidden="true" class="h-8 w-px bg-greyscale-200 md:hidden"></div>
 
-    <c-docket-filter.form :form="form" layout="desktop">
-      <c-divider class="h-8 w-[1px]"/>
+        {# Sort order #}
+        <fieldset class="flex items-center divided-row-item">
+          <legend class="sr-only">Sort order</legend>
+          <div class="flex rounded-lg border border-greyscale-300 h-10">
+            <label class="rounded-l-lg focus-container flex items-center gap-1 px-3 py-2 text-sm cursor-pointer [&:has(input:checked)]:bg-greyscale-100 [&:has(input:checked)]:font-medium bg-white text-greyscale-600">
+              <input type="radio" name="order_by" value="asc" {% if form.order_by.value != "desc" %}checked{% endif %} class="sr-only" x-on:change="submitForm($event)" />
+              {% svg "sort_asc" class="w-4 h-4" aria_hidden="true" %}
+              <span class="hidden sm:inline">Asc</span>
+            </label>
+            <label class="rounded-r-lg focus-container flex items-center gap-1 px-3 py-2 text-sm cursor-pointer border-l border-greyscale-300 [&:has(input:checked)]:bg-greyscale-100 [&:has(input:checked)]:font-medium bg-white text-greyscale-600">
+              <input type="radio" name="order_by" value="desc" {% if form.order_by.value == "desc" %}checked{% endif %} class="sr-only" x-on:change="submitForm($event)" />
+              {% svg "sort_desc" class="w-4 h-4" aria_hidden="true" %}
+              <span class="hidden sm:inline">Desc</span>
+            </label>
+          </div>
+        </fieldset>
 
-      {# Sort order #}
-      <fieldset class="flex items-center">
-        <legend class="sr-only">Sort order</legend>
-        <div class="flex rounded-lg border border-greyscale-300 h-10">
-          <label class="rounded-l-lg focus-container flex items-center gap-1 px-3 py-2 text-sm cursor-pointer [&:has(input:checked)]:bg-greyscale-100 [&:has(input:checked)]:font-medium bg-white text-greyscale-600">
-            <input type="radio" name="order_by" value="asc" {% if form.order_by.value != "desc" %}checked{% endif %} class="sr-only" x-on:change="submitForm($event)" />
-            {% svg "sort_asc" class="w-4 h-4" aria_hidden="true" %}
-            <span class="hidden sm:inline">Asc</span>
-          </label>
-          <label class="rounded-r-lg focus-container flex items-center gap-1 px-3 py-2 text-sm cursor-pointer border-l border-greyscale-300 [&:has(input:checked)]:bg-greyscale-100 [&:has(input:checked)]:font-medium bg-white text-greyscale-600">
-            <input type="radio" name="order_by" value="desc" {% if form.order_by.value == "desc" %}checked{% endif %} class="sr-only" x-on:change="submitForm($event)" />
-            {% svg "sort_desc" class="w-4 h-4" aria_hidden="true" %}
-            <span class="hidden sm:inline">Desc</span>
-          </label>
+        <div aria-hidden="true" class="h-8 w-px bg-greyscale-200 md:hidden"></div>
+
+        {# Prev/Next — links, not submit buttons. Implicit submission (Enter in #}
+        {# any field) uses the first submit button in tree order as the #}
+        {# submitter, so submit buttons named `page` here would carry a stale #}
+        {# page number along with the new filter values. As links, the sr-only #}
+        {# Filter button below is the form's only submit, and filter changes #}
+        {# reset to page 1. #}
+        <div class="flex items-end gap-1 divided-row-item">
+          {% if page_obj.has_previous %}
+            <c-button variant="outline" href="{% querystring page=page_obj.previous_page_number %}" title="Previous page" class="gap-2">
+              {% svg "chevron" class="w-4 h-4 rotate-90" aria_hidden="true" %}
+              <span class="hidden sm:inline">Prev</span>
+            </c-button>
+          {% else %}
+            <c-button variant="outline" disabled aria-disabled="true" title="Previous page" class="gap-2">
+              {% svg "chevron" class="w-4 h-4 rotate-90" aria_hidden="true" %}
+              <span class="hidden sm:inline">Prev</span>
+            </c-button>
+          {% endif %}
+          {% if page_obj.has_next %}
+            <c-button variant="outline" href="{% querystring page=page_obj.next_page_number %}" title="Next page" class="gap-2">
+              <span class="hidden sm:inline">Next</span>
+              {% svg "chevron" class="w-4 h-4 -rotate-90" aria_hidden="true" %}
+            </c-button>
+          {% else %}
+            <c-button variant="outline" disabled aria-disabled="true" title="Next page" class="gap-2">
+              <span class="hidden sm:inline">Next</span>
+              {% svg "chevron" class="w-4 h-4 -rotate-90" aria_hidden="true" %}
+            </c-button>
+          {% endif %}
         </div>
-      </fieldset>
 
-      <c-divider class="h-8 w-[1px]"/>
-
-      {# Prev/Next — links, not submit buttons. Implicit submission (Enter in #}
-      {# any field) uses the first submit button in tree order as the #}
-      {# submitter, so submit buttons named `page` here would carry a stale #}
-      {# page number along with the new filter values. As links, the sr-only #}
-      {# Filter button below is the form's only submit, and filter changes #}
-      {# reset to page 1. #}
-      <div class="flex items-end gap-1">
-        {% if page_obj.has_previous %}
-          <c-button variant="outline" href="{% querystring page=page_obj.previous_page_number %}" title="Previous page" class="gap-2">
-            {% svg "chevron" class="w-4 h-4 rotate-90" aria_hidden="true" %}
-            <span class="hidden sm:inline">Prev</span>
-          </c-button>
-        {% else %}
-          <c-button variant="outline" disabled aria-disabled="true" title="Previous page" class="gap-2">
-            {% svg "chevron" class="w-4 h-4 rotate-90" aria_hidden="true" %}
-            <span class="hidden sm:inline">Prev</span>
-          </c-button>
-        {% endif %}
-        {% if page_obj.has_next %}
-          <c-button variant="outline" href="{% querystring page=page_obj.next_page_number %}" title="Next page" class="gap-2">
-            <span class="hidden sm:inline">Next</span>
-            {% svg "chevron" class="w-4 h-4 -rotate-90" aria_hidden="true" %}
-          </c-button>
-        {% else %}
-          <c-button variant="outline" disabled aria-disabled="true" title="Next page" class="gap-2">
-            <span class="hidden sm:inline">Next</span>
-            {% svg "chevron" class="w-4 h-4 -rotate-90" aria_hidden="true" %}
-          </c-button>
-        {% endif %}
-      </div>
-
-      <c-button type="submit" class="sr-only" tabindex="-1">Filter</c-button>
-    </c-docket-filter.form>
+        <c-button type="submit" class="sr-only" tabindex="-1">Filter</c-button>
+      </c-docket-filter.form>
+    </div>
   </div>
 </div>

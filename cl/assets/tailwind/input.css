@@ -16,6 +16,8 @@
     --mobile-dialog-header-height: theme(spacing.18);
     --mobile-dialog-panel-height: calc(100vh - var(--mobile-dialog-header-height));
     --content-max-width: 1280px;
+    --divided-row-space: theme(spacing.3);
+    --divided-row-gap: calc(2 * var(--divided-row-space) + 1px);
   }
   code {
     @apply font-sans text-sm bg-brand-100 text-brand-600 border border-brand-300 rounded-[2px] px-1;
@@ -234,6 +236,21 @@
   }
   .capped-width {
     @apply w-full max-w-[--content-max-width] mx-auto px-4 lg:px-10 2xl:px-0;
+  }
+  /*
+   * From md up, a wrapping row with a vertical divider between items. Each
+   * .divided-row-item draws its divider in the --divided-row-gap to its left:
+   * a 1px line with --divided-row-space on each side. The flex row inside
+   * .divided-row is shifted left by that gap (md:-ml-[--divided-row-gap]
+   * md:gap-x-0), so the divider of whichever item starts a line is clipped
+   * instead of dangling at a line edge. The 4px of padding keeps focus
+   * outlines visible.
+   */
+  .divided-row {
+    @apply md:overflow-hidden md:-m-1 md:p-1;
+  }
+  .divided-row-item {
+    @apply md:relative md:ml-[--divided-row-gap] md:before:absolute md:before:-left-[calc(var(--divided-row-space)_+_1px)] md:before:top-1/2 md:before:-translate-y-1/2 md:before:h-8 md:before:w-px md:before:bg-greyscale-200;
   }
   .scrollbar-none {
     scrollbar-width: none; /* frontend-checks-skip-line: check_raw_css */

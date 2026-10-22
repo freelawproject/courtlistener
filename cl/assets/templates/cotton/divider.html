@@ -1,5 +1,0 @@
-<c-vars vertical class />
-
-{% with vertical_classes="h-full w-[1px]" horizontal_classes="h-[1px] w-full" %}
-<div aria-hidden="true" class="{% if class %}{{ class }}{% elif vertical %}{{ vertical_classes }}{% else %}h-[1px] w-full{% endif %} bg-greyscale-200"></div>
-{% endwith %}

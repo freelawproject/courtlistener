@@ -31,12 +31,11 @@
       </div>
 
       <div class="flex flex-col gap-4 max-h-[--mobile-dialog-panel-height] px-6">
-        <c-docket-filter.search-form :docket="docket" input_id="de-search-mobile" class="w-full h-11" />
-        <c-divider only />
+        <div class="pb-4 border-b border-greyscale-200">
+          <c-docket-filter.search-form :docket="docket" input_id="de-search-mobile" class="w-full h-11" />
+        </div>
 
         <c-docket-filter.form :form="form" layout="mobile">
-          <c-divider only />
-
           {# This form has no sort control, so carry the current sort through. #}
           {% if form.order_by.value == "desc" %}
             <input type="hidden" name="order_by" value="desc" />

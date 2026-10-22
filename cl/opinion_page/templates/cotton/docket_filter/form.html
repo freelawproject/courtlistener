@@ -4,7 +4,7 @@
 {# `contents` lets the fields join the parent's flex layout. #}
 <form action="" method="get" class="contents" x-on:formdata="dropEmptyParams">
   {# Date range #}
-  <div class="{% if layout == 'mobile' %}flex flex-col items-start gap-2 w-full{% else %}items-center gap-2 hidden md:flex{% endif %}">
+  <div class="{% if layout == 'mobile' %}flex flex-col items-start gap-2 w-full pb-4 border-b border-greyscale-200{% else %}items-center gap-2 hidden md:flex divided-row-item{% endif %}">
     <span aria-hidden="true" class="font-medium {% if layout == 'mobile' %}text-md text-greyscale-800{% else %}text-sm text-greyscale-700{% endif %}">Filed</span>
     <div class="flex items-center {% if layout == 'mobile' %}gap-4 w-full{% else %}gap-2{% endif %}">
       <div class="{% if layout == 'mobile' %}contents{% else %}w-26 text-sm{% endif %}">
@@ -17,14 +17,8 @@
     </div>
   </div>
 
-  {% if layout == 'mobile' %}
-    <c-divider only />
-  {% else %}
-    <c-divider class="h-8 w-[1px] hidden md:block"/>
-  {% endif %}
-
   {# Document number range #}
-  <div class="{% if layout == 'mobile' %}flex flex-col items-start gap-2 w-full{% else %}items-center gap-2 hidden md:flex{% endif %}">
+  <div class="{% if layout == 'mobile' %}flex flex-col items-start gap-2 w-full pb-4 border-b border-greyscale-200{% else %}items-center gap-2 hidden md:flex divided-row-item{% endif %}">
     <span aria-hidden="true" class="font-medium {% if layout == 'mobile' %}text-md text-greyscale-800{% else %}text-sm text-greyscale-700{% endif %}">Documents</span>
     <div class="flex items-center {% if layout == 'mobile' %}gap-4 w-full{% else %}gap-2{% endif %}">
       <div class="{% if layout == 'mobile' %}contents{% else %}w-20{% endif %}">
