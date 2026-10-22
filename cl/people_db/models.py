@@ -876,18 +876,21 @@ class Position(AbstractDateTimeModel):
         return f"{self.pk}: {self.person.name_full} at {self.court_id}"
 
     @property
-    def is_judicial_position(self):
+    def is_judicial_position(self) -> bool:
         """Return True if the position is judicial."""
-        if self.POSITION_TYPE_GROUPS.get(self.position_type) == "Judge":
-            return True
-        return False
+        return (
+            self.position_type is not None
+            and self.POSITION_TYPE_GROUPS.get(self.position_type) == "Judge"
+        )
 
     @property
-    def is_clerkship(self):
+    def is_clerkship(self) -> bool:
         """Return True if the position is a clerkship."""
-        if self.POSITION_TYPE_GROUPS.get(self.position_type) == "Clerkships":
-            return True
-        return False
+        return (
+            self.position_type is not None
+            and self.POSITION_TYPE_GROUPS.get(self.position_type)
+            == "Clerkships"
+        )
 
     @property
     def vote_string(self):
