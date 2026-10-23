@@ -2,14 +2,20 @@ from collections.abc import Callable
 from dataclasses import dataclass
 from datetime import datetime
 
-from django.db.models import QuerySet
+from django.db.models import Prefetch, QuerySet
 from rest_framework.serializers import ModelSerializer
 
 from cl.corpus_importer.api_serializers import (
     DocketEntrySerializer,
     SCOTUSDocketEntrySerializer,
 )
-from cl.search.models import Docket, DocketEntry, SCOTUSDocketEntry
+from cl.search.models import (
+    Docket,
+    DocketEntry,
+    RECAPDocument,
+    SCOTUSDocketEntry,
+    SCOTUSDocument,
+)
 
 
 @dataclass(frozen=True)
@@ -47,8 +53,17 @@ class DocketAlertSource:
 
 def _recap_entries_by_pk(des_pks: list[int]) -> QuerySet:
     """Return the DocketEntry rows matching the given pks."""
-    return DocketEntry.objects.filter(pk__in=des_pks).prefetch_related(
-        "recap_documents"
+    return (
+        DocketEntry.objects.filter(pk__in=des_pks)
+        .select_related("docket")
+        .prefetch_related(
+            Prefetch(
+                "recap_documents",
+                queryset=RECAPDocument.objects.select_related(
+                    "docket_entry__docket"
+                ).defer("plain_text"),
+            )
+        )
     )
 
 
@@ -71,8 +86,17 @@ RECAP_ALERT_SOURCE = DocketAlertSource(
 
 def _scotus_entries_by_pk(des_pks: list[int]) -> QuerySet:
     """Return the SCOTUSDocketEntry rows matching the given pks."""
-    return SCOTUSDocketEntry.objects.filter(pk__in=des_pks).prefetch_related(
-        "scotusdocument_set"
+    return (
+        SCOTUSDocketEntry.objects.filter(pk__in=des_pks)
+        .select_related("docket")
+        .prefetch_related(
+            Prefetch(
+                "scotusdocument_set",
+                queryset=SCOTUSDocument.objects.select_related(
+                    "docket_entry__docket"
+                ).defer("plain_text"),
+            )
+        )
     )
 
 
@@ -96,3 +120,17 @@ SCOTUS_ALERT_SOURCE = DocketAlertSource(
 _ALERT_SOURCES_BY_COURT_ID: dict[str, DocketAlertSource] = {
     "scotus": SCOTUS_ALERT_SOURCE,
 }
+
+
+def get_alert_source_for_court(
+    court_id: str | None,
+) -> DocketAlertSource:
+    """Return the alert source registered for this court.
+
+    Dispatch is by court_id (SCOTUS vs RECAP default). If a future source
+    is keyed off something else on the Docket -- for example a source
+    flag -- this lookup would choose the wrong config.
+    """
+    if not court_id:
+        return RECAP_ALERT_SOURCE
+    return _ALERT_SOURCES_BY_COURT_ID.get(court_id, RECAP_ALERT_SOURCE)

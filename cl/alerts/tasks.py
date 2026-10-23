@@ -383,14 +383,15 @@ def send_alert_and_webhook(
     )
     DocketAlert.objects.filter(docket=d).update(date_last_hit=now())
 
-    # RECAP keeps the two-arg signature so a pre-deploy Celery worker
-    # still accepts the message. Non-RECAP sources pass d_pk so the
-    # worker does not look those pks up on DocketEntry.
+    # Temporary: RECAP keeps the two-arg signature so a Celery worker
+    # still running the pre-deploy image accepts the message. Once every
+    # worker knows the third parameter, always pass court_id and delete
+    # this branch.
     if source is RECAP_ALERT_SOURCE:
         send_docket_alert_webhook_events.delay(des_pks, webhook_recipients)
     else:
         send_docket_alert_webhook_events.delay(
-            des_pks, webhook_recipients, d.pk
+            des_pks, webhook_recipients, d.court_id
         )
     if not recap_email_user_only:
         delete_redis_semaphore("ALERTS", make_alert_key(d_pk))

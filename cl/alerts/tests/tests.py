@@ -28,6 +28,7 @@ from cl.alerts.constants import LEGACY_MEMBERSHIP_HELP_URL
 from cl.alerts.docket_alert_sources import (
     RECAP_ALERT_SOURCE,
     SCOTUS_ALERT_SOURCE,
+    get_alert_source_for_court,
 )
 from cl.alerts.factories import AlertFactory, DocketAlertWithParentsFactory
 from cl.alerts.forms import CreateAlertForm
@@ -1054,10 +1055,10 @@ class DocketAlertTest(TestCase):
         "cl.api.webhooks.requests.post",
         side_effect=lambda *args, **kwargs: MockResponse(200, mock_raw=True),
     )
-    def test_webhook_without_d_pk_still_serializes_recap_entries(
+    def test_webhook_without_court_id_still_serializes_recap_entries(
         self, mock_post
     ) -> None:
-        """Do Celery messages queued without d_pk still use the RECAP
+        """Do Celery messages queued without court_id still use the RECAP
         serializer?"""
         de = DocketEntry.objects.get(docket=self.docket)
         send_docket_alert_webhook_events([de.pk], [self.user.pk])
@@ -1071,7 +1072,7 @@ class DocketAlertTest(TestCase):
         )
 
     @mock.patch("cl.alerts.tasks.send_docket_alert_webhook_events.delay")
-    def test_recap_webhook_enqueue_omits_d_pk(self, mock_delay) -> None:
+    def test_recap_webhook_enqueue_omits_court_id(self, mock_delay) -> None:
         """Does a RECAP alert enqueue the two-arg Celery signature so a
         pre-deploy worker still accepts the message?"""
         send_alert_and_webhook(self.docket.pk, self.before)
@@ -1146,6 +1147,18 @@ class DocketAlertSourceTest(TestCase):
         self.assertIs(
             self.scotus_docket.get_alert_source(), SCOTUS_ALERT_SOURCE
         )
+
+    def test_get_alert_source_for_court_dispatches_by_court_id(self) -> None:
+        """Does get_alert_source_for_court resolve SCOTUS vs the RECAP
+        default without loading a Docket?"""
+        self.assertIs(
+            get_alert_source_for_court("scotus"), SCOTUS_ALERT_SOURCE
+        )
+        self.assertIs(
+            get_alert_source_for_court(self.recap_docket.court_id),
+            RECAP_ALERT_SOURCE,
+        )
+        self.assertIs(get_alert_source_for_court(None), RECAP_ALERT_SOURCE)
 
     def test_webhook_serializer_is_per_source(self) -> None:
         """Does each source expose the serializer its webhook payload uses?"""
@@ -1247,7 +1260,7 @@ class DocketAlertScotusTest(TestCase):
         )
         scotus_de = SCOTUSDocketEntryFactory(pk=shared_pk, docket=self.docket)
         send_docket_alert_webhook_events(
-            [shared_pk], [self.user.pk], self.docket.pk
+            [shared_pk], [self.user.pk], self.docket.court_id
         )
         webhook_event = WebhookEvent.objects.filter(webhook=self.webhook).get()
         content = webhook_event.content
@@ -1262,15 +1275,15 @@ class DocketAlertScotusTest(TestCase):
         self.assertIn("scotus_documents", results[0])
 
     @mock.patch("cl.alerts.tasks.send_docket_alert_webhook_events.delay")
-    def test_scotus_webhook_enqueue_passes_d_pk(self, mock_delay) -> None:
-        """Does a SCOTUS alert pass d_pk so the worker uses the SCOTUS
+    def test_scotus_webhook_enqueue_passes_court_id(self, mock_delay) -> None:
+        """Does a SCOTUS alert pass court_id so the worker uses the SCOTUS
         serializer?"""
         SCOTUSDocketEntryFactory(docket=self.docket)
         send_alert_and_webhook(self.docket.pk, self.before)
         mock_delay.assert_called_once()
         args, kwargs = mock_delay.call_args
         self.assertEqual(len(args), 3)
-        self.assertEqual(args[2], self.docket.pk)
+        self.assertEqual(args[2], self.docket.court_id)
         self.assertEqual(kwargs, {})
 
     @mock.patch(
@@ -1287,9 +1300,9 @@ class DocketAlertScotusTest(TestCase):
             pk=shared_pk, docket=DocketFactory(court=CourtFactory())
         )
         SCOTUSDocketEntryFactory(pk=shared_pk, docket=self.docket)
-        d_pk = self.docket.pk
+        court_id = self.docket.court_id
         self.docket.delete()
-        send_docket_alert_webhook_events([shared_pk], [self.user.pk], d_pk)
+        send_docket_alert_webhook_events([shared_pk], [self.user.pk], court_id)
         webhook_event = WebhookEvent.objects.filter(webhook=self.webhook).get()
         content = webhook_event.content
         self.assertIsNotNone(content)
