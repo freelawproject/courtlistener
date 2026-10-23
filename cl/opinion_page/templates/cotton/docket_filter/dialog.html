@@ -38,7 +38,7 @@
 
         <c-docket-filter.form :form="form" layout="mobile">
           {# This form has no sort control, so carry the current sort through. #}
-          {% if form.order_by.value == "desc" %}
+          {% if not sort_order_asc %}
             <input type="hidden" name="order_by" value="desc" />
           {% endif %}
 

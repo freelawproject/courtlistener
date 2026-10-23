@@ -1789,6 +1789,10 @@ Sample code here.
         <c-slot name="label"><code>:page_obj</code></c-slot>
         <c-slot name="description">Django paginator page object for prev/next controls.</c-slot>
       </c-library.item>
+      <c-library.item optional only>
+        <c-slot name="label"><code>:sort_order_asc</code></c-slot>
+        <c-slot name="description">Bool — whether ascending sort is active. Default: <code>True</code>.</c-slot>
+      </c-library.item>
     </c-library.list>
 
     <c-library.list title="Slots" only>
@@ -1806,7 +1810,7 @@ Sample code here.
       </c-library.item>
       <c-library.item only>
         <c-slot name="label"><code>c-docket-filter.dialog</code></c-slot>
-        <c-slot name="description">The mobile layout: a Filter button that opens a dialog with the search form and the filter form. It opens on its own when the filters have errors. Reads <code>form</code> from the parent's context.</c-slot>
+        <c-slot name="description">The mobile layout: a Filter button that opens a dialog with the search form and the filter form. It opens on its own when the filters have errors. Reads <code>form</code> and <code>sort_order_asc</code> from the parent's context.</c-slot>
       </c-library.item>
       <c-library.item only>
         <c-slot name="label"><code>c-docket-filter.errors</code></c-slot>
@@ -1869,6 +1873,7 @@ Sample code here.
   :docket="docket"
   :form="form"
   :page_obj="docket_entries"
+  :sort_order_asc="sort_order_asc"
 /&gt;
 
 {% templatetag opencomment %} Inside cotton/docket_filter/index.html: one search form per layout, within the docketFilter root that supplies the scope and the submit handler {% templatetag closecomment %}

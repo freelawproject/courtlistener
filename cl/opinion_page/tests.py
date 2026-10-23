@@ -4949,6 +4949,28 @@ class DocketFilterPaginationWiringTest(TestCase):
         numbers = sorted(e.entry_number for e in r.context["docket_entries"])  # type:ignore[attr-defined] Django inserts the context attribute in test envs
         self.assertEqual(numbers, [3, 4, 5])
 
+    async def test_profile_default_order_applies_without_order_by(
+        self,
+    ) -> None:
+        """A signed-in user who saved newest-first as their docket order gets
+        the entries descending when the URL picks no order, and the toolbar
+        checks the Desc radio to match."""
+        profile = await sync_to_async(UserProfileWithParentsFactory)(
+            docket_default_order_desc=True
+        )
+        await self.async_client.aforce_login(profile.user)
+        r = await self._get_docket_and_verify_v2()
+        numbers = [e.entry_number for e in r.context["docket_entries"]]  # type:ignore[attr-defined] Django inserts the context attribute in test envs
+        self.assertEqual(numbers, [5, 4, 3, 2, 1])
+        checked = [
+            el.get("value")
+            for el in fromstring(r.content.decode()).iter("input")
+            if el.get("type") == "radio"
+            and el.get("name") == "order_by"
+            and "checked" in cast(_Attrib, el.attrib)
+        ]
+        self.assertEqual(checked, ["desc"])
+
     async def test_pagination_nav_renders_with_multiple_pages(self) -> None:
         """The bottom <c-pagination> only renders its <nav> when
         `page_obj.has_other_pages` is truthy. Create enough entries to
