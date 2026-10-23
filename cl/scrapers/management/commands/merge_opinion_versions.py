@@ -463,8 +463,8 @@ def update_referencing_objects(
     - there is a single key constraint (like JoinedBy -> Opinion)
     - there are multiple key constraints (like Citation -> OpinionCluster)
 
-    Notes are repointed separately, via repoint_notes(): they can be in
-    either of two shapes (dual-read, #7725), which the generic
+    Notes are repointed separately, via repoint_notes(): they point at
+    their object through a GenericForeignKey, which the generic
     single-FK-field handling above can't account for.
 
     :param main_object: the main version OpinionCluster or Docket
