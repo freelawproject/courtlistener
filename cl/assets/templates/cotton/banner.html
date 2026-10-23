@@ -3,12 +3,15 @@
 
 {# Component Structure #}
 {# variant: this modifies borders and background; current variants: info and warning. #}
-{# icon: optional icon displayed in the top-right corner of the banner. #}
+{# icon: optional icon shown on the left, before the content. #}
+{# banner_id: names the dismissal cookie, so it must be a plain token: letters, digits, and hyphens. #}
+{# request: optional; defaults to the page's request. Used to read the dismissal cookie and to load the component script. #}
 {# link_text: dynamic val inside the button/link. #}
 {# is_dismissible: enables dismissing the banner by adding a close button. #}
 {# dismiss_days: number of days the banner will be hidden, current default is 10 days, to show it again use the id value. #}
 
 <c-vars
+  :request="request"
   banner_id=""
   variant="info"
   dismiss_days=""
@@ -32,12 +35,11 @@
         </div>
       {% endif %}
       <div class="flex flex-wrap md:flex-nowrap items-center flex-auto gap-2">
-        <div class="inline-block">{{ slot }}</div>
+        <div>{{ slot }}</div>
         {% if href and link_text %}
           <c-button
             class="min-w-fit h-fit rounded-lg py-2 px-[14px] text-sm font-medium md:ml-auto"
             variant="{% if variant == 'info' %}blue{% elif variant == 'warning' %}primary{% endif %}"
-            aria-label="{{link_text}}"
             href="{{ href }}"
           >
             {{ link_text }}
@@ -46,7 +48,7 @@
       </div>
     {% if banner_id and is_dismissible %}
       <c-button
-        class="self-start rounded-full size-6 p-1 text-sm font-medium text-gray-700/75 focus-visible:ring-gray-400 "
+        class="self-start rounded-full size-6 p-1 text-sm font-medium text-greyscale-500"
         type="button"
         x-on:click="close"
         aria-label="Dismiss banner"
