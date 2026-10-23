@@ -1,5 +1,6 @@
 from dataclasses import dataclass
 from http import HTTPStatus
+from typing import cast
 
 from django.db.models import Prefetch
 from django.http.response import Http404
@@ -578,9 +579,11 @@ class SearchV4ViewSet(LoggingMixin, viewsets.ViewSet):
         serializer = serializer_class(
             results_page, many=True, context={"request": request}
         )
-        return paginator.get_paginated_response(
-            serializer.data, cached_response
-        )
+        # Because of `many=True`, above, the serializer produces a `list[dict]`
+        # Note: this isn't precisely a `list[dict]` it is actually a
+        # `ReturnList[ReturnDict]`
+        result_list = cast(list[dict], serializer.data)
+        return paginator.get_paginated_response(result_list, cached_response)
 
     def list(self, request, *args, **kwargs):
         search_form = SearchForm(request.GET, request=request)
