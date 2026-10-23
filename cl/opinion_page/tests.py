@@ -4196,6 +4196,46 @@ class BuildAuthorityRowsTest(TestCase):
             self.assertEqual(len(self.build_rows()), 2)
 
 
+class DocketAuthoritiesLegacyTest(TestCase):
+    """The legacy docket Authorities tab, served without the redesign flag."""
+
+    @classmethod
+    def setUpTestData(cls) -> None:
+        cls.docket = DocketFactory(
+            court=CourtFactory(id="canb", jurisdiction="FB"),
+            source=Docket.RECAP,
+        )
+        for case_name in ("Nollan v. Coastal", "Dolan v. Tigard"):
+            cite_from_docket(
+                cls.docket,
+                OpinionWithParentsFactory(cluster__case_name=case_name),
+            )
+
+    async def test_authorities_are_paginated(self) -> None:
+        """The legacy tab pages through the same authorities and still
+        counts them all in its heading."""
+        url = reverse(
+            "docket_authorities", args=[self.docket.pk, self.docket.slug]
+        )
+        with patch(
+            "cl.opinion_page.views.Paginator",
+            side_effect=lambda qs, *args, **kwargs: Paginator(qs, 1),
+        ):
+            r = await self.async_client.get(url, {"page": "2"})
+        self.assertEqual(r.status_code, HTTPStatus.OK)
+        self.assertTemplateUsed(r, "docket_authorities.html")
+        content = r.content.decode()
+        self.assertIn("The filings in this docket cite 2 opinions", content)
+        # Both authorities tie on filings and references, so either one can
+        # land on the second page, but only one of them does.
+        self.assertEqual(
+            ("Nollan" in content) + ("Dolan" in content),
+            1,
+            msg="Exactly one authority is listed on the second page",
+        )
+        self.assertIn("2 of 2", content)
+
+
 @override_settings(WAFFLE_CACHE_PREFIX="test_docket_page_v2_waffle")
 @override_flag("use_new_design", active=True)
 class DocketPageV2TemplateTest(TestCase):
