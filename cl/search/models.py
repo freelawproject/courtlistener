@@ -4030,6 +4030,7 @@ class ScotusDocketMetadata(AbstractDateTimeModel):
         max_length=1000,
         blank=True,
     )
+    es_rd_field_tracker = FieldTracker(fields=["capital_case"])
 
     def __str__(self) -> str:
         return f"SCOTUS metadata for docket {self.docket_id}"
@@ -4267,6 +4268,13 @@ class SCOTUSDocketEntry(AbstractDateTimeModel, CSVExportMixin):
     sequence_number = models.CharField(
         max_length=16,
     )
+    es_rd_field_tracker = FieldTracker(
+        fields=[
+            "entry_number",
+            "description",
+            "date_filed",
+        ]
+    )
 
     class Meta:
         ordering = ["-sequence_number"]
@@ -4298,6 +4306,17 @@ class SCOTUSDocument(AbstractDateTimeModel, AbstractPDF):
         null=True,
     )
     url = models.URLField(max_length=1000)
+    es_rd_field_tracker = FieldTracker(
+        fields=[
+            "docket_entry_id",
+            "description",
+            "document_number",
+            "attachment_number",
+            "plain_text",
+            "page_count",
+            "filepath_local",
+        ]
+    )
 
     class Meta:
         indexes = [
