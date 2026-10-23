@@ -260,12 +260,11 @@
     @apply hidden;
   }
   .no-spinner {
-    appearance: textfield;
+    @apply [appearance:textfield];
 
     &::-webkit-outer-spin-button,
     &::-webkit-inner-spin-button {
-      appearance: none;
-      margin: 0;
+      @apply appearance-none m-0;
     }
   }
 }
