@@ -11,6 +11,15 @@ from lxml.html import fromstring
 from waffle.testutils import override_flag
 
 from cl.lib.test_helpers import SimpleUserDataMixin
+from cl.search.factories import (
+    CourtFactory,
+    DocketEntryFactory,
+    DocketFactory,
+    OpinionsCitedByRECAPDocumentFactory,
+    OpinionWithParentsFactory,
+    RECAPDocumentFactory,
+)
+from cl.search.models import Docket
 from cl.simple_pages.forms import ContactForm
 from cl.simple_pages.sitemap import SimpleSitemap
 from cl.tests.cases import SimpleTestCase, TestCase
@@ -399,6 +408,10 @@ class V2PagesRegisterTest(PageLoadTestMixin, SimpleUserDataMixin, TestCase):
     tests in cl/search/tests/test_v2_pages.py.
     """
 
+    # Docket tab pages need a docket with data for the tab; it is created
+    # in setUpTestData with this pk, so the entries below can name it.
+    DOCKET_PK = 7072
+
     V2_PAGES: list[tuple[dict[str, Any], str]] = [
         # Help pages — (reverse_param, expected v2 template)
         ({"viewname": "help_home"}, "v2_help/index.html"),
@@ -406,7 +419,31 @@ class V2PagesRegisterTest(PageLoadTestMixin, SimpleUserDataMixin, TestCase):
         ({"viewname": "components"}, "v2_components.html"),
         # API pages
         ({"viewname": "court_index"}, "v2_jurisdictions.html"),
+        # Docket pages
+        (
+            {
+                "viewname": "docket_authorities",
+                "kwargs": {"docket_id": DOCKET_PK, "slug": "docket"},
+            },
+            "v2_docket_authorities.html",
+        ),
     ]
+
+    @classmethod
+    def setUpTestData(cls) -> None:
+        super().setUpTestData()
+        OpinionsCitedByRECAPDocumentFactory(
+            citing_document=RECAPDocumentFactory(
+                docket_entry=DocketEntryFactory(
+                    docket=DocketFactory(
+                        pk=cls.DOCKET_PK,
+                        court=CourtFactory(id="canb", jurisdiction="FB"),
+                        source=Docket.RECAP,
+                    )
+                )
+            ),
+            cited_opinion=OpinionWithParentsFactory(),
+        )
 
     @staticmethod
     def _get_legacy_counterpart(v2_template: str) -> str | None:

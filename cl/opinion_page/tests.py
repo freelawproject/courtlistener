@@ -40,7 +40,7 @@ from django.utils.safestring import SafeString
 from django_cotton.compiler_regex import CottonCompiler
 from factory import RelatedFactory
 from lxml.etree import _Attrib, _Element
-from lxml.html import fromstring
+from lxml.html import HtmlElement, fromstring
 from waffle.models import Flag
 from waffle.testutils import override_flag
 
@@ -4194,6 +4194,111 @@ class BuildAuthorityRowsTest(TestCase):
         query for the summaries, whatever the number of rows."""
         with self.assertNumQueries(5):
             self.assertEqual(len(self.build_rows()), 2)
+
+
+@override_settings(WAFFLE_CACHE_PREFIX="test_docket_authorities_v2_waffle")
+@override_flag("use_new_design", active=True)
+class DocketAuthoritiesV2TemplateTest(TestCase):
+    """The v2 docket Authorities tab.
+
+    `WAFFLE_CACHE_PREFIX` isolates the flag cache from parallel workers, as
+    in DocketPageV2TemplateTest.
+    """
+
+    @classmethod
+    def setUpTestData(cls) -> None:
+        cls.docket = DocketFactory(
+            court=CourtFactory(id="canb", jurisdiction="FB"),
+            source=Docket.RECAP,
+        )
+        cls.most_cited = OpinionWithParentsFactory(
+            cluster__case_name="Nollan v. California Coastal Commission",
+        )
+        cite_from_docket(cls.docket, cls.most_cited)
+        cite_from_docket(cls.docket, cls.most_cited)
+        ParentheticalFactory(
+            described_opinion=cls.most_cited, text="Top summary", score=0.9
+        )
+        cls.least_cited = OpinionWithParentsFactory(
+            cluster__case_name="Dolan v. City of Tigard",
+        )
+        cite_from_docket(cls.docket, cls.least_cited)
+
+    async def get_page(self, **params: str) -> str:
+        """Requests the Authorities tab and checks it rendered through the
+        v2 template."""
+        r = await self.async_client.get(
+            reverse(
+                "docket_authorities",
+                args=[self.docket.pk, self.docket.slug],
+            ),
+            params,
+        )
+        self.assertEqual(r.status_code, HTTPStatus.OK)
+        self.assertTemplateUsed(r, "v2_docket_authorities.html")
+        return r.content.decode()
+
+    def get_link(self, content: str, href: str) -> HtmlElement:
+        """Returns the one link of the page that points at href."""
+        links = [
+            a for a in fromstring(content).iter("a") if a.get("href") == href
+        ]
+        self.assertEqual(len(links), 1, msg=f"Expected one link to {href}")
+        return links[0]
+
+    async def test_case_name_is_one_link(self) -> None:
+        """The whole caption, "v." included, is a single link (#5896)."""
+        cluster = self.most_cited.cluster
+        link = self.get_link(await self.get_page(), cluster.get_absolute_url())
+        self.assertIn(
+            "Nollan v. California Coastal Commission", link.text_content()
+        )
+        self.assertEqual(len(link), 0, msg="The caption has no child element")
+
+    async def test_summary_links_to_the_summaries_tab(self) -> None:
+        """Authorities with a parenthetical show it above a summaries link."""
+        cluster = self.most_cited.cluster
+        content = await self.get_page()
+        self.assertIn("Top summary", content)
+        link = self.get_link(
+            content,
+            reverse("view_case_summaries", args=[cluster.pk, cluster.slug]),
+        )
+        self.assertEqual(link.text_content().strip(), "View Summary")
+
+    async def test_docket_counts_replace_the_cited_times(self) -> None:
+        """The last pill counts the docket's filings and references."""
+        content = await self.get_page()
+        self.assertIn("Cited in this docket:", content)
+        self.assertIn("2 filings", content)
+        self.assertIn("1 filing</a>", content)
+        self.assertNotIn("This opinion was cited", content)
+
+    async def test_authorities_tab_is_current(self) -> None:
+        """The tab navigation marks the Authorities tab as the current page."""
+        current = [
+            el
+            for el in fromstring(await self.get_page()).iter("a")
+            if el.get("aria-current") == "page"
+        ]
+        self.assertEqual(len(current), 1)
+        self.assertIn("Authorities", current[0].text_content())
+
+    async def test_authorities_are_paginated(self) -> None:
+        """Pages split the authorities and out-of-range pages are clamped."""
+        with patch(
+            "cl.opinion_page.views.Paginator",
+            side_effect=lambda qs, *args, **kwargs: Paginator(qs, 1),
+        ):
+            first = await self.get_page()
+            second = await self.get_page(page="2")
+            clamped = await self.get_page(page="99")
+        self.assertIn("Nollan", first)
+        self.assertNotIn("Dolan", first)
+        self.assertIn('aria-label="Pagination"', first)
+        self.assertIn("Dolan", second)
+        self.assertNotIn("Nollan", second)
+        self.assertIn("Dolan", clamped)
 
 
 class DocketAuthoritiesLegacyTest(TestCase):
