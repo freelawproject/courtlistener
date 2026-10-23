@@ -45,3 +45,19 @@ class Select(forms.Select):
             attrs["class"] = f"{classes} {INPUT_TEXT_CLASS}"
 
         super().__init__(attrs=attrs, choices=choices)
+
+
+class Textarea(forms.Textarea):
+    """Render a textarea with CourtListener's new-stack defaults.
+
+    Caller-provided attributes are retained and may override a default when a
+    field requires different behavior.
+    """
+
+    def __init__(self, attrs: dict[str, Any] | None = None) -> None:
+        """Apply the new-stack class and a compact default height."""
+        attrs = {} if attrs is None else attrs.copy()
+        attrs.setdefault("class", NEW_STACK_WIDGET_CLASSES)
+        attrs.setdefault("rows", 4)
+
+        super().__init__(attrs=attrs)
