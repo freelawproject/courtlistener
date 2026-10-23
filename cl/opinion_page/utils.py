@@ -698,11 +698,12 @@ def build_idb_rows(idb_data: FjcIntegratedDatabase) -> list[IdbRow]:
 class AuthorityRow(TypedDict):
     """One authority of the docket Authorities tab.
 
-    caption is HTML-safe; it carries the &nbsp; entities the cluster caption
-    is built with. Rows without a summary omit summary and summaries_url.
+    caption is plain text for the template to escape; its non-breaking
+    spaces are characters, not entities. Rows without a summary omit summary
+    and summaries_url.
     """
 
-    caption: SafeString
+    caption: str
     url: str
     blocked: bool
     date_filed: str
@@ -757,7 +758,11 @@ def build_authority_rows(
             str(o.pk) for o in cluster.sub_opinions.all()
         )
         row: AuthorityRow = {
-            "caption": mark_safe(cluster.caption),
+            # The cluster caption interpolates case names unescaped and
+            # joins its court and year with &nbsp; entities. Turning those
+            # into the character itself lets autoescaping handle the rest,
+            # instead of trusting the whole string as legacy's |safe does.
+            "caption": cluster.caption.replace("&nbsp;", "\N{NO-BREAK SPACE}"),
             "url": cluster.get_absolute_url(),
             "blocked": cluster.blocked,
             "date_filed": date_format(cluster.date_filed),

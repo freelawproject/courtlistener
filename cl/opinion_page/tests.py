@@ -4255,6 +4255,19 @@ class DocketAuthoritiesV2TemplateTest(TestCase):
         )
         self.assertEqual(len(link), 0, msg="The caption has no child element")
 
+    async def test_caption_is_escaped(self) -> None:
+        """Markup in a case name renders as text, while the caption's
+        non-breaking spaces survive as characters."""
+        opinion = await sync_to_async(OpinionWithParentsFactory)(
+            cluster__case_name="<b>Bold</b> v. Escaped",
+        )
+        await sync_to_async(cite_from_docket)(self.docket, opinion)
+        content = await self.get_page()
+        self.assertIn("&lt;b&gt;Bold&lt;/b&gt; v. Escaped", content)
+        self.assertNotIn("<b>Bold</b>", content)
+        link = self.get_link(content, opinion.cluster.get_absolute_url())
+        self.assertNotIn("&nbsp;", link.text_content())
+
     async def test_summary_links_to_the_summaries_tab(self) -> None:
         """Authorities with a parenthetical show it above a summaries link."""
         cluster = self.most_cited.cluster
