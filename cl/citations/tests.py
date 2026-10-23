@@ -69,7 +69,7 @@ from cl.citations.unmatched_citations_utils import (
 from cl.citations.utils import (
     make_get_citations_kwargs,
 )
-from cl.lib.test_helpers import CourtTestCase, PeopleTestCase, SearchTestCase
+from cl.lib.test_helpers import SearchTestCase
 from cl.search.documents import (
     ES_CHILD_ID,
     OpinionClusterDocument,
@@ -1761,9 +1761,7 @@ class CitationObjectTest(ESIndexTestCase, TestCase):
         )
 
 
-class CitationFeedTest(
-    ESIndexTestCase, CourtTestCase, PeopleTestCase, SearchTestCase, TestCase
-):
+class CitationFeedTest(ESIndexTestCase, SearchTestCase, TestCase):
     @classmethod
     def setUpTestData(cls) -> None:
         cls.rebuild_index("search.OpinionCluster")
@@ -2526,9 +2524,7 @@ class GroupParentheticalsTest(SimpleTestCase):
     "cl.api.utils.CitationCountRateThrottle.get_cache_key_for_citations",
     return_value="citations_tests",
 )
-class CitationLookUpApiTest(
-    CourtTestCase, PeopleTestCase, SearchTestCase, TestCase
-):
+class CitationLookUpApiTest(SearchTestCase, TestCase):
     @classmethod
     def setUpTestData(cls) -> None:
         UserProfileWithParentsFactory.create(
