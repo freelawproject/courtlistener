@@ -4,9 +4,11 @@ from unittest.mock import MagicMock, patch
 
 from django.contrib.auth.models import User
 from django.http import HttpResponse
+from django.template import engines
 from django.template.loader import TemplateDoesNotExist, get_template
-from django.test import override_settings
+from django.test import RequestFactory, override_settings
 from django.urls import resolve, reverse
+from django_cotton.compiler_regex import CottonCompiler
 from lxml.html import fromstring
 from waffle.testutils import override_flag
 
@@ -467,6 +469,35 @@ class NewBaseViewCountTest(TestCase):
         self.assertNotIn("view_count.js", html)
 
 
+@override_flag("use_new_design", True)
+@override_settings(WAFFLE_CACHE_PREFIX="test_new_base_recap_waffle")
+class NewBaseRecapDetectionTest(TestCase):
+    """new_base.html loads the RECAP extension detector and reflects its cookie.
+
+    The class on <html> is what the stylesheet keys on to hide RECAP pleas;
+    rendering it from the cookie keeps later page loads from flashing them.
+    """
+
+    async def test_detector_is_loaded_on_every_page(self) -> None:
+        """A v2 page requires the detector whether or not the cookie is set."""
+        r = await self.async_client.get(reverse("help_home"))
+        self.assertTemplateUsed(r, "new_base.html")
+        self.assertIn("recap_detection.js", r.content.decode())
+
+    async def test_html_class_follows_the_cookie(self) -> None:
+        """<html> carries recap-installed only when the cookie is present."""
+        r = await self.async_client.get(reverse("help_home"))
+        self.assertNotIn(
+            "recap-installed", fromstring(r.content.decode()).get("class", "")
+        )
+
+        self.async_client.cookies["recap_installed"] = "true"
+        r = await self.async_client.get(reverse("help_home"))
+        self.assertIn(
+            "recap-installed", fromstring(r.content.decode()).get("class", "")
+        )
+
+
 @patch("hcaptcha.fields.hCaptchaField.validate", return_value=True)
 class SealingOrderDetectionTest(SimpleTestCase):
     def _make_form(
@@ -718,3 +749,29 @@ class ContentSecurityPolicyTest(TestCase):
         # A script left with an empty nonce would be refused by the browser,
         # and the assertion above would still pass on the other scripts.
         self.assertNotIn('nonce=""', html)
+
+
+class DialogComponentTest(SimpleTestCase):
+    """The c-dialog component renders a trigger only when given one."""
+
+    def render(self, source: str) -> str:
+        """Compiles a Cotton snippet and renders it."""
+        compiled = CottonCompiler().process(source)
+        template = engines["django"].from_string(compiled)
+        return template.render({"request": RequestFactory().get("/")})
+
+    def test_trigger_slot_renders_a_trigger(self) -> None:
+        """Trigger content renders the default trigger button."""
+        html = self.render(
+            '<c-dialog><c-slot name="button_content">Open</c-slot>'
+            '<c-slot name="panel">Body</c-slot></c-dialog>'
+        )
+        self.assertIn('aria-haspopup="dialog"', html)
+
+    def test_without_a_trigger_slot_no_trigger_is_rendered(self) -> None:
+        """A dialog opened by other means, such as an event listener, has no trigger button."""
+        html = self.render(
+            '<c-dialog><c-slot name="panel">Body</c-slot></c-dialog>'
+        )
+        self.assertNotIn('aria-haspopup="dialog"', html)
+        self.assertIn("Body", html)

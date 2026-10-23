@@ -106,10 +106,8 @@ from cl.search.models import (
 )
 from cl.search.types import (
     ESDictDocument,
-    ESDocumentClassType,
-    ESDocumentInstanceType,
     ESDocumentNameType,
-    ESModelClassType,
+    ESDocumentType,
     ESModelType,
     EventTable,
     SaveESDocumentReturn,
@@ -164,9 +162,9 @@ def person_first_time_indexing(parent_id: int, position: Position) -> None:
         )
 
 
-def get_instance_from_db(
-    instance_id: int, model: ESModelClassType
-) -> ESModelType | None:
+def get_instance_from_db[ModelT: ESModelType](
+    instance_id: int, model: type[ModelT]
+) -> ModelT | None:
     """Get a model instance from DB or return None if it doesn't exist.
 
     :param instance_id: The primary key of the parent instance.
@@ -310,7 +308,7 @@ def es_save_document(
 
 
 def document_fields_to_update(
-    es_document: ESDocumentClassType,
+    es_document: type[ESDocumentType],
     main_instance: ESModelType,
     affected_fields: list[str],
     related_instance: ESModelType | None,
@@ -617,7 +615,7 @@ def update_es_document(
 
 
 def get_es_doc_id_and_parent_id(
-    es_document: ESDocumentClassType, instance: ESModelType
+    es_document: type[ESDocumentType], instance: ESModelType
 ) -> tuple[int | str, int | None]:
     """Retrieve the Elasticsearch document ID and parent ID for a given
      ES document type and DB instance.
@@ -644,10 +642,10 @@ def get_es_doc_id_and_parent_id(
     return doc_id, parent_id
 
 
-def get_doc_from_es(
-    es_document: ESDocumentClassType,
+def get_doc_from_es[DocumentT: ESDocumentType](
+    es_document: type[DocumentT],
     instance: ESModelType,
-) -> ESDocumentInstanceType | None:
+) -> DocumentT | None:
     """Get a document in Elasticsearch.
     :param es_document: The Elasticsearch document type.
     :param instance: The instance of the document to retrieve.
@@ -950,7 +948,7 @@ def index_docket_parties_in_es(
 
 def bulk_indexing_generator(
     docs_query_set: QuerySet,
-    es_document: ESDocumentClassType,
+    es_document: type[ESDocumentType],
     base_doc: dict[str, str],
     child_id_property: str | None = None,
     parent_id: int | None = None,
@@ -1001,7 +999,7 @@ def bulk_indexing_generator(
 
 def index_documents_in_bulk_from_queryset(
     docs_queryset: QuerySet,
-    es_document: ESDocumentClassType,
+    es_document: type[ESDocumentType],
     base_doc: dict[str, str],
     child_id_property: str | None = None,
     parent_instance_id: int | None = None,
@@ -1390,11 +1388,11 @@ def index_dockets_in_bulk(
         DocketDocument._index.refresh()
 
 
-def build_bulk_cites_doc(
-    es_child_doc_class: ESDocumentClassType,
+def build_bulk_cites_doc[ModelT: ESModelType](
+    es_child_doc_class: type[ESDocumentType],
     child_id: int,
-    child_doc_model: ESModelClassType,
-) -> tuple[ESDictDocument, ESModelType | None]:
+    child_doc_model: type[ModelT],
+) -> tuple[ESDictDocument, ModelT | None]:
     """Builds a bulk document for updating cites field in an ES document.
 
     :param es_child_doc_class: The ES child document class to update.
@@ -1440,7 +1438,7 @@ def build_bulk_cites_doc(
 
 
 def percolate_document(
-    es_doc_class: ESDocumentClassType, document_id: int, instance: ESModelType
+    es_doc_class: type[ESDocumentType], document_id: int, instance: ESModelType
 ) -> None:
     """Percolate a document by preparing it and sending it for alert matching.
 
@@ -2129,8 +2127,8 @@ def index_embeddings(
         "_index": OpinionClusterDocument._index._name,
     }
     documents_to_update = []
-    for embeddings in embeddings:
-        opinion_id = embeddings["id"]
+    for embeddings_item in embeddings:
+        opinion_id = embeddings_item["id"]
         opinion_instance = (
             Opinion.objects.filter(id=opinion_id)
             .only("pk", "cluster", "main_version")
@@ -2144,7 +2142,7 @@ def index_embeddings(
             "_id": ES_CHILD_ID(opinion_id).OPINION,
             "_routing": opinion_instance.cluster_id,
             "doc": {
-                "embeddings": embeddings["embeddings"],
+                "embeddings": embeddings_item["embeddings"],
                 "timestamp": datetime.now(UTC),
             },
         }

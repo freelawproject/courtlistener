@@ -32,6 +32,7 @@ from cl.alerts.factories import AlertFactory
 from cl.alerts.models import Alert
 from cl.api.factories import WebhookFactory
 from cl.api.models import WebhookEvent, WebhookEventType
+from cl.audio.dispatch import dispatch_process_audio_file
 from cl.audio.factories import AudioWithParentsFactory
 from cl.audio.models import Audio
 from cl.citations.models import UnmatchedCitation
@@ -969,6 +970,20 @@ class AudioFileTaskTest(TestCase):
             f"Instead we got {measured_duration}.",
         )
 
+    def test_completed_processing_allows_redispatch(self) -> None:
+        """Does a successful process_audio_file run free its dispatch lock?
+
+        A lock left behind after success blocks any later dispatch for the
+        same pk until the TTL expires, silently skipping processing.
+        """
+        with mock.patch("cl.lib.celery_utils.get_task_wait") as patched_wait:
+            patched_wait.return_value = 0
+            self.assertTrue(dispatch_process_audio_file(self.audio1.pk))
+            self.assertTrue(
+                dispatch_process_audio_file(self.audio1.pk),
+                msg="Dispatch was skipped after processing completed.",
+            )
+
     def test_audio_conversion(self) -> None:
         """Can we convert wav to audio and update the metadata"""
         audio_obj = Audio.objects.get(pk=self.audio2.id)
@@ -1241,6 +1256,84 @@ class ScraperDocketMatchingTest(TestCase):
         self.assertEqual(
             docket, self.ca2_docket, "Should match using docket number core"
         )
+
+    def test_does_not_unblock_existing_docket(self) -> None:
+        """Matching an existing docket should never unblock it, nor
+        overwrite its original date_blocked. It may block an unblocked one
+        """
+        original_date = date(2020, 1, 1)
+        new_date = date(2024, 1, 1)
+        cases = [
+            # (description, docket blocked, kwargs, expected blocked,
+            # expected date_blocked)
+            (
+                "blocked docket, blocked=False",
+                True,
+                {"blocked": False},
+                True,
+                original_date,
+            ),
+            (
+                "blocked docket, blocked=True",
+                True,
+                {"blocked": True, "date_blocked": new_date},
+                True,
+                original_date,
+            ),
+            (
+                "unblocked docket, blocked=True",
+                False,
+                {"blocked": True, "date_blocked": new_date},
+                True,
+                new_date,
+            ),
+        ]
+        for i, (
+            description,
+            docket_blocked,
+            kwargs,
+            expected_blocked,
+            expected_date,
+        ) in enumerate(cases):
+            with self.subTest(description):
+                docket_number = f"1 CA-CV 24-000{i}"
+                existing = DocketFactory(
+                    docket_number=docket_number,
+                    case_name="Smith v. Jones",
+                    court=self.ariz,
+                    source=Docket.SCRAPER,
+                    pacer_case_id=None,
+                    blocked=docket_blocked,
+                    date_blocked=original_date if docket_blocked else None,
+                )
+                docket = update_or_create_docket(
+                    "Smith v. Jones",
+                    "",
+                    self.ariz,
+                    docket_number,
+                    Docket.SCRAPER,
+                    False,
+                    **kwargs,
+                )
+                self.assertEqual(docket.pk, existing.pk)
+                self.assertEqual(docket.blocked, expected_blocked)
+                self.assertEqual(docket.date_blocked, expected_date)
+
+        with self.subTest("Harvard, blocked docket, blocked not passed"):
+            self.ca2_docket.blocked = True
+            self.ca2_docket.date_blocked = original_date
+            self.ca2_docket.save()
+            docket = update_or_create_docket(
+                "Garbutt v. Conway",
+                "",
+                self.ca2,
+                "10-1039",
+                Docket.HARVARD,
+                from_harvard=True,
+            )
+            self.assertEqual(docket.pk, self.ca2_docket.pk)
+            self.assertTrue(docket.blocked)
+            self.assertEqual(docket.date_blocked, original_date)
 
 
 class UpdateFromTextCommandTest(TestCase):
@@ -3095,6 +3188,7 @@ class SCOTUSEmailIntegrationTest(TestCase):
         )
 
         mock_email_cls.return_value.email_type = SCOTUSEmailType.DOCKET_ENTRY
+        mock_email_cls.return_value.court_id = "scotus"
         mock_fetch.return_value = {
             "email_type": SCOTUSEmailType.DOCKET_ENTRY.value,
             "data": docket_data,
