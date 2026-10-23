@@ -46,7 +46,8 @@
         {# page number along with the new filter values. As links, the sr-only #}
         {# Filter button below is the form's only submit, and filter changes #}
         {# reset to page 1. #}
-        <div class="flex items-end gap-1 divided-row-item">
+        {# Right-aligned from md up, so it gets padding for spacing instead of a divider, which would sit beside it rather than after the sort. #}
+        <div class="flex items-end gap-1 md:ml-auto md:pl-[--divided-row-gap]">
           {% if page_obj.has_previous %}
             <c-button variant="outline" href="{% querystring page=page_obj.previous_page_number %}" title="Previous page" class="gap-2">
               {% svg "chevron" class="w-4 h-4 rotate-90" aria_hidden="true" %}
