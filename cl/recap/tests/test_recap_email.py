@@ -1,4 +1,5 @@
 import json
+from datetime import timedelta
 from http import HTTPStatus
 from pathlib import Path
 from unittest import mock
@@ -36,6 +37,7 @@ from cl.recap.models import (
     ProcessingQueue,
 )
 from cl.recap.tasks import (
+    download_pacer_pdf_and_save_to_pq,
     get_and_copy_recap_attachment_docs,
     mark_pq_successful,
     set_rd_sealed_status,
@@ -4821,4 +4823,97 @@ class RecapEmailContentReplication(TestCase):
             await all_pqs_created.acount(),
             1,
             msg="Wrong number of ProcessingQueues.",
+        )
+
+
+class DownloadPacerPdfAndSaveToPQTest(TestCase):
+    """Tests for how download_pacer_pdf_and_save_to_pq reuses PQ rows when
+    several notifications for the same document are processed."""
+
+    @classmethod
+    def setUpTestData(cls):
+        cls.court = CourtFactory(id="dcd", jurisdiction="FD")
+        cls.user = User.objects.get(username="recap-email")
+
+    def setUp(self) -> None:
+        self.cutoff = now() - timedelta(minutes=1)
+
+    def _download(self, magic_number: str | None) -> ProcessingQueue:
+        """Run download_pacer_pdf_and_save_to_pq for the test document."""
+        pq = download_pacer_pdf_and_save_to_pq(
+            self.court.pk,
+            SessionData(cookies={}),
+            self.cutoff,
+            magic_number,
+            "291053",
+            "045012335794",
+            self.user.pk,
+            False,
+        )
+        if pq.filepath_local:
+            self.addCleanup(pq.filepath_local.delete, save=False)
+        return pq
+
+    @mock.patch("cl.recap.tasks.download_pdf_by_magic_number")
+    def test_magic_number_retries_pq_failed_without_one(
+        self, mock_download
+    ) -> None:
+        """A notification with a magic number must download into a PQ that
+        failed because another notification had no magic number (#7940).
+        Otherwise the failed PQ plus the magic number marks it as sealed.
+        """
+        mock_download.return_value = (MockResponse(200, b"%PDF-1.4"), "")
+
+        pq_no_magic = self._download(None)
+        self.assertEqual(pq_no_magic.status, PROCESSING_STATUS.FAILED)
+        mock_download.assert_not_called()
+
+        pq_magic = self._download("37784612")
+        mock_download.assert_called_once()
+        self.assertEqual(pq_magic.pk, pq_no_magic.pk)
+        self.assertNotEqual(pq_magic.status, PROCESSING_STATUS.FAILED)
+        self.assertEqual(pq_magic.error_message, "")
+        self.assertTrue(pq_magic.filepath_local)
+
+    @mock.patch(
+        "cl.recap.tasks.download_pdf_by_magic_number",
+        return_value=(None, "Document not available from magic link."),
+    )
+    def test_failed_magic_download_keeps_pq_failed(
+        self, mock_download
+    ) -> None:
+        """If the retried download also fails, the PQ stays failed with the
+        new error so the document can still be treated as sealed."""
+        self._download(None)
+        pq = self._download("37784612")
+
+        mock_download.assert_called_once()
+        self.assertEqual(pq.status, PROCESSING_STATUS.FAILED)
+        self.assertEqual(
+            pq.error_message, "Document not available from magic link."
+        )
+
+    def test_duplicate_pqs_reuse_oldest(self) -> None:
+        """Concurrent notifications can each create a PQ row. Lookups must
+        reuse the oldest one instead of raising MultipleObjectsReturned."""
+        pqs = [
+            ProcessingQueue.objects.create(
+                uploader=self.user,
+                pacer_doc_id="045012335794",
+                pacer_case_id="291053",
+                court=self.court,
+                upload_type=UPLOAD_TYPE.PDF,
+                source=PROCESSING_QUEUE_SOURCE.EMAIL,
+            )
+            for _ in range(2)
+        ]
+
+        pq = self._download(None)
+
+        self.assertEqual(pq.pk, min(p.pk for p in pqs))
+        self.assertEqual(
+            ProcessingQueue.objects.filter(
+                pacer_doc_id="045012335794"
+            ).count(),
+            2,
         )
