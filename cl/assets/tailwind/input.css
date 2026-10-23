@@ -250,7 +250,7 @@
     @apply md:overflow-hidden md:-m-1 md:p-1;
   }
   .divided-row-item {
-    @apply md:relative md:ml-[--divided-row-gap] md:before:absolute md:before:-left-[calc(var(--divided-row-space)_+_1px)] md:before:top-1/2 md:before:-translate-y-1/2 md:before:h-8 md:before:w-px md:before:bg-greyscale-200;
+    @apply md:relative md:ml-[--divided-row-gap] md:before:absolute md:before:-left-[calc(var(--divided-row-space)_+_1px)] md:before:top-1 md:before:h-8 md:before:w-px md:before:bg-greyscale-200;
   }
   .scrollbar-none {
     scrollbar-width: none; /* frontend-checks-skip-line: check_raw_css */

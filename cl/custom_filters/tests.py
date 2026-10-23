@@ -322,6 +322,19 @@ class TestExtras(SimpleTestCase):
         rendered = render_field_with_id(form["name"], "custom_id")
         self.assertNotIn('id="id_name"', rendered)
 
+    def test_render_field_with_id_marks_invalid_fields(self) -> None:
+        """Does render_field_with_id point an invalid field at its error?"""
+        form = SimpleForm({"name": "Jane", "email": "not-an-email"})
+        form.is_valid()
+
+        rendered = render_field_with_id(form["email"], "custom_email")
+        self.assertIn('aria-invalid="true"', rendered)
+        self.assertIn('aria-describedby="custom_email-error"', rendered)
+
+        rendered = render_field_with_id(form["name"], "custom_name")
+        self.assertNotIn("aria-invalid", rendered)
+        self.assertNotIn("aria-describedby", rendered)
+
     def test_render_field_with_corpus_search_form(self) -> None:
         """Test render_field_with_id works with actual CorpusSearchForm
 

@@ -14,7 +14,7 @@
 
   {# From md up, dividers are drawn by .divided-row-item, so none dangles when the row wraps. The mobile row never wraps, and its justify-between needs dividers that are flex items. #}
   <div class="divided-row">
-    <div class="flex flex-wrap items-center md:justify-start justify-between sm:gap-3 gap-1 md:-ml-[--divided-row-gap] md:gap-x-0">
+    <div class="flex flex-wrap items-center md:items-start md:justify-start justify-between sm:gap-3 gap-1 md:-ml-[--divided-row-gap] md:gap-x-0">
       <c-docket-filter.search-form :docket="docket" input_id="de-search-desktop" class="max-w-60 hidden md:block divided-row-item" />
       <c-docket-filter.dialog :docket="docket" />
 
