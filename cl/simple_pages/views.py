@@ -24,6 +24,7 @@ from cl.disclosures.models import (
 )
 from cl.opinion_page import docket_entry_sources
 from cl.opinion_page.docket_entry_sources import attach_display_fields
+from cl.opinion_page.forms_v2 import DocketEntryFilterForm
 from cl.search.models import Court, RECAPDocument
 from cl.simple_pages.forms import ContactForm
 from cl.simple_pages.tasks import create_zoho_desk_ticket
@@ -329,16 +330,6 @@ async def components(request: HttpRequest) -> HttpResponse:
         def end_index(self) -> int:
             return self.number * self.paginator.per_page
 
-    class MockFieldValue:
-        value = None
-
-    class MockDocketFilterForm:
-        errors: dict[str, list[str]] = {}
-        filed_after = MockFieldValue()
-        filed_before = MockFieldValue()
-        entry_gte = MockFieldValue()
-        entry_lte = MockFieldValue()
-
     class MockCourt:
         FEDERAL_APPELLATE = Court.FEDERAL_APPELLATE
         jurisdiction = Court.FEDERAL_DISTRICT
@@ -366,7 +357,7 @@ async def components(request: HttpRequest) -> HttpResponse:
             "docket_source": docket_entry_sources.RECAP,
             "demo_page_obj": MockPageObj(),
             "demo_docket": MockDocket(),
-            "demo_filter_form": MockDocketFilterForm(),
+            "demo_filter_form": DocketEntryFilterForm(),
             "demo_metadata_items": [
                 {"label": "Date Filed", "value": "January 14, 2025"},
                 {

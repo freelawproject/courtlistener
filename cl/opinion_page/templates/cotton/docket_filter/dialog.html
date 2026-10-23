@@ -1,0 +1,50 @@
+{% load svg_tags %}
+
+<c-vars docket/>
+
+<div class="md:hidden">
+  <c-dialog panel_class="py-6 rounded-2xl max-w-[706px] gap-6 absolute bottom-0 rounded-b-none max-w-full" x-on:open-filter-dialog.window="open" only>
+    <c-slot name="trigger_button">
+      <c-dialog.trigger-button class="justify-between w-48 max-w-[30vw] px-4">
+        Filter
+        {% svg "funnel" class="text-greyscale-400" %}
+      </c-dialog.trigger-button>
+    </c-slot>
+
+    <c-slot name="panel">
+      <div x-dialog:title class="font-medium text-gray-800 py-3 px-6 flex flex-row justify-between h-[--mobile-dialog-header-height]">
+        <div class="w-[226px] lg:min-w-[226px] flex justify-start">
+          <h2 class="h-10 w-[106px]">
+            Filters
+          </h2>
+        </div>
+        <div class="pt-1.5">
+          <c-button
+            variant="outline"
+            x-on:click.stop="close"
+            class="p-2 rounded-[10px]"
+            aria-label="Close modal"
+          >
+            {% svg "cross" class="text-greyscale-400" %}
+          </c-button>
+        </div>
+      </div>
+
+      <div class="flex flex-col gap-4 max-h-[--mobile-dialog-panel-height] px-6">
+        <c-docket-filter.errors :form="form" only />
+        <div class="pb-4 border-b border-greyscale-200">
+          <c-docket-filter.search-form :docket="docket" input_id="de-search-mobile" class="w-full h-11" />
+        </div>
+
+        <c-docket-filter.form :form="form" layout="mobile">
+          {# This form has no sort control, so carry the current sort through. #}
+          {% if not sort_order_asc %}
+            <input type="hidden" name="order_by" value="desc" />
+          {% endif %}
+
+          <c-button type="submit" variant="primary" class="w-full py-3 px-4.5 text-md flex items-center justify-center">Apply</c-button>
+        </c-docket-filter.form>
+      </div>
+    </c-slot>
+  </c-dialog>
+</div>
