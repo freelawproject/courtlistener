@@ -3718,6 +3718,26 @@ class BuildIdbRowsTest(SimpleTestCase):
             values["Pro Se"], "No pro se plaintiffs or defendants"
         )
 
+    def test_judgment_missing_codes_fall_back(self) -> None:
+        """Judgment shows "Not Provided" for the FJC missing-data codes, the
+        label for a known choice and the raw number for an unknown code."""
+        cases = [
+            (0, "Not Provided"),
+            (-8, "Not Provided"),
+            (FjcIntegratedDatabase.PLAINTIFF, "Plaintiff"),
+            (9, "9"),
+        ]
+        for judgment, expected in cases:
+            with self.subTest(judgment=judgment):
+                idb_data = FjcIntegratedDatabaseFactory.build(
+                    judgment=judgment
+                )
+                values = {
+                    row["label"]: row["value"]
+                    for row in build_idb_rows(idb_data)
+                }
+                self.assertEqual(values["Judgment"], expected)
+
     def test_hints_are_safe_markup_with_the_choices(self) -> None:
         """Hints carry their links unescaped and list the field's choices."""
         hints = {

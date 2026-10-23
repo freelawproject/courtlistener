@@ -671,7 +671,12 @@ def build_idb_rows(idb_data: FjcIntegratedDatabase) -> list[IdbRow]:
         },
         {
             "label": "Judgment",
-            "value": show(idb_data.get_judgment_display()),
+            # The FJC codebook uses 0 and -8 for missing judgment data.
+            "value": (
+                not_provided
+                if idb_data.judgment in (0, -8)
+                else show(idb_data.get_judgment_display())
+            ),
             "hint": possible_values(
                 "judgment", "Which party the case was disposed in favor of."
             ),
