@@ -10,7 +10,6 @@ from cl.audio.dispatch import (
 )
 from cl.audio.models import Audio
 from cl.lib.command_utils import VerboseCommand, logger
-from cl.lib.types import OptionsType
 
 
 def run_reenqueue_cycle(
@@ -213,7 +212,7 @@ class Command(VerboseCommand):
             ),
         )
 
-    def handle(self, *args, **options: OptionsType) -> None:
+    def handle(self, *args, **options) -> None:
         super().handle(*args, **options)
         # OptionsType is too loose for the function signature, but argparse
         # has already coerced these via type=int / action="store_true".

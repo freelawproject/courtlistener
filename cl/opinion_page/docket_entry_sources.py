@@ -35,7 +35,7 @@ class MetadataItem(TypedDict):
     both the c-metadata-section cotton component and
     includes/metadata_section.html.
 
-    is_copyable/has_tooltip/tooltip_message are flags + plain content,
+    one_click_select/has_tooltip/tooltip_message are flags + plain content,
     -- each stack decides its own concrete styling/mechanism.
     tooltip_message may contain HTML; the caller must mark_safe it.
     """
@@ -56,7 +56,7 @@ class MetadataItem(TypedDict):
     suffix_aria_label: NotRequired[str]
     suffix_has_tooltip: NotRequired[bool]
     suffix_tooltip_message: NotRequired[str]
-    is_copyable: NotRequired[bool]
+    one_click_select: NotRequired[bool]
     has_tooltip: NotRequired[bool]
     tooltip_message: NotRequired[str]
 
@@ -156,16 +156,21 @@ class DocketEntrySource:
     SCOTUS is the first override. A future state-specific model plugs in
     by adding one more instance and a court_id mapping below.
 
-    ``component`` picks which file renders this source's copy. Both
-    template stacks hold one file per component: under cotton/, the
-    docket_source_button/, docket_source_attribution/ and
+    ``empty_message`` is the sentence shown in place of the entry list
+    when the docket has no entries at all. It carries no wrapper, so the
+    caller supplies the surrounding element. Per-source copy that is plain
+    text is a field here; copy that needs markup gets a dispatch template
+    via ``component``.
+
+    ``component`` picks which file renders this source's copy that needs
+    markup. Both template stacks hold one file per component: under
+    cotton/, the docket_source_button/, docket_source_attribution/ and
     document_source_link/ folders; under includes/, those three plus
-    docket_empty_message/, docket_empty_cta/ and docket_source_li/. A
-    source named "xyz" needs xyz.html in every
-    folder of both stacks. A missing one fails at render time with an
-    error that doesn't name it, so DocketSourceComponentTest checks that
-    every component resolves. Sources that render the same copy MAY share
-    a component instead of copying files.
+    docket_empty_cta/ and docket_source_li/. A source named "xyz" needs
+    xyz.html in every folder of both stacks. A missing one fails at render
+    time with an error that doesn't name it, so DocketSourceComponentTest
+    checks that every component resolves. Sources that render the same
+    copy MAY share a component instead of copying files.
 
     ``document_detail_url`` returns a CourtListener path that we build
     ourselves, or None. docket_entry_rows.html renders it unfiltered into
@@ -210,6 +215,7 @@ class DocketEntrySource:
     document_external_url: Callable[[Any], str | None]
     docket_url: Callable[[Docket], str | None]
     component: str
+    empty_message: str
     has_pay_and_pray: bool = True
     admin_url_names: AdminNames = AdminNames(
         entry="admin:search_docketentry_change",
@@ -359,6 +365,10 @@ RECAP: DocketEntrySource = DocketEntrySource(
     docket_url=_recap_docket_url,
     metadata_sections=_recap_metadata_sections,
     component="recap",
+    empty_message=(
+        "There are no entries for this docket in the RECAP Archive. Please "
+        "download the latest from PACER while using the RECAP Extension."
+    ),
     documents_for_docket_and_number=_recap_documents_for_docket_and_number,
     get_document_for_render=_get_recap_document_for_render,
 )
@@ -479,6 +489,7 @@ SCOTUS: DocketEntrySource = DocketEntrySource(
     metadata_items=_scotus_metadata_items,
     has_pay_and_pray=False,
     component="scotus",
+    empty_message="There are no entries for this docket yet.",
     admin_url_names=AdminNames(
         entry="admin:search_scotusdocketentry_change",
         document="admin:search_scotusdocument_change",

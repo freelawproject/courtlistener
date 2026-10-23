@@ -83,7 +83,7 @@ def resolve_fullcase_citation(
                     get_clusters_from_citation_str
                 )(volume=volume, reporter=reporter, page=page)
 
-                if _count == 0:
+                if _count == 0 or clusters is None:
                     return NO_MATCH_RESOURCE
 
                 # exclude self links
@@ -98,6 +98,7 @@ def resolve_fullcase_citation(
 
                 if _count == 1:
                     # return the first item by ordering key
+                    # pyrefly:ignore[bad-return] This method is defined to always return a query set with at least one result
                     return clusters[0].ordered_opinions.first()
                 elif _count >= 2:
                     # set an attribute to differentiate 0-match and

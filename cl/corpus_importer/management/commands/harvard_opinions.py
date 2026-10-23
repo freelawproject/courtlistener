@@ -6,7 +6,7 @@ import os
 import re
 from datetime import date, datetime, timedelta
 from glob import glob
-from typing import Any, TypedDict
+from typing import Any, TypedDict, cast
 
 import requests
 from bs4 import BeautifulSoup
@@ -601,7 +601,7 @@ def add_opinions(
         if per_curiam:
             author_str = "Per Curiam"
 
-        op_type = map_opinion_type(op.get("type"))
+        op_type = map_opinion_type(cast(str, op.get("type")))
         opinion_xml = str(op)
         logger.info("Adding opinion for: %s", citation.corrected_citation())
         op = Opinion(

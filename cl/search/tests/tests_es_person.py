@@ -14,7 +14,6 @@ from lxml import html
 from cl.lib.elasticsearch_utils import build_es_base_query, build_es_main_query
 from cl.lib.search_index_utils import extract_field_values
 from cl.lib.test_helpers import (
-    CourtTestCase,
     PeopleTestCase,
     people_v4_fields,
     position_v4_fields,
@@ -44,7 +43,7 @@ from cl.tests.cases import (
 )
 
 
-class PeopleSearchAPICommonTests(CourtTestCase, PeopleTestCase):
+class PeopleSearchAPICommonTests(PeopleTestCase):
     version_api = "v3"
     skip_common_tests = True
 
@@ -367,7 +366,10 @@ class PeopleV3APISearchTest(
     def test_merge_unavailable_fields_api(self) -> None:
         """Confirm unavailable ES fields are properly merged from DB in the API"""
         with self.captureOnCommitCallbacks(execute=True):
-            person = PersonFactory.create(name_first="John American")
+            # prevent Faker from putting people in Lake Susan
+            person = PersonFactory.create(
+                name_first="John American", dob_city="Sacramento"
+            )
             position_5 = PositionFactory.create(
                 date_granularity_start="%Y-%m-%d",
                 court=self.court_1,
@@ -1258,9 +1260,7 @@ class PeopleV4APISearchTest(
             )
 
 
-class PeopleSearchTestElasticSearch(
-    CourtTestCase, PeopleTestCase, ESIndexTestCase, TestCase
-):
+class PeopleSearchTestElasticSearch(PeopleTestCase, ESIndexTestCase, TestCase):
     """People search tests for Elasticsearch"""
 
     @classmethod
@@ -1999,7 +1999,7 @@ class PeopleSearchTestElasticSearch(
 
 
 class IndexJudgesPositionsCommandTest(
-    CourtTestCase, PeopleTestCase, ESIndexTestCase, TestCase
+    PeopleTestCase, ESIndexTestCase, TestCase
 ):
     """test_cl_index_parent_and_child_docs_command tests for Elasticsearch"""
 

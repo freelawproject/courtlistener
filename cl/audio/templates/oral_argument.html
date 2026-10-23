@@ -130,7 +130,7 @@
         {% endif %}
 
         {# show this div if there is a note, otherwise, put it in place, in anticipation of it becoming one. #}
-        <div class="{% if not note_form.instance.audio_id %}hidden{% endif %} sidebar-section"
+        <div class="{% if not note_form.instance.pk %}hidden{% endif %} sidebar-section"
              id="sidebar-notes">
             <div>
                 <h3>
@@ -163,7 +163,7 @@
 
         <h3>{{ af.docket.court }}</h3>
         <p>
-          {% include "includes/add_note_button.html" with form_instance_id=note_form.instance.audio_id %}
+          {% include "includes/add_note_button.html" with form_instance_id=note_form.instance.pk %}
         </p>
         <p class="bottom">
             <span class="meta-data-header">Date Argued:</span>

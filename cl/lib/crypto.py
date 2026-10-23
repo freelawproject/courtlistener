@@ -5,7 +5,7 @@ import secrets
 import uuid
 
 
-def md5(s):
+def md5(s: bytes | str) -> str:
     """Return the md5 hexdigest of a string
 
     !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
@@ -24,7 +24,7 @@ def md5(s):
     return md5sum.hexdigest()
 
 
-def sha1(s):
+def sha1(s: bytes | str) -> str:
     """Return the sha1sum of a string.
 
     !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
@@ -43,7 +43,7 @@ def sha1(s):
     return sha1sum.hexdigest()
 
 
-def sha1_of_file(file_path, buffer_size=2**16):
+def sha1_of_file(file_path: str, buffer_size: int = 2**16) -> str:
     """Generate a SHA1 hash of a file in constant memory
 
     !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
@@ -66,7 +66,7 @@ def sha1_of_file(file_path, buffer_size=2**16):
     return sha1sum.hexdigest()
 
 
-def sha1_of_json_data(d):
+def sha1_of_json_data(d: bytes | str) -> str:
     """
     Generate SHA1 from a python object, stripping whitespace
 
@@ -86,12 +86,12 @@ def generate_activation_key() -> str:
     return secrets.token_hex(20)
 
 
-def sha256(s):
+def sha256(s: bytes | str) -> str:
     """Return the sha256sum of a string.
 
     :param s: The data to hash. Ideally bytes, but if unicode is passed in, it
     will convert it to bytes first.
-    :return A hexidecimal SHA256 hash of the data
+    :return A hexadecimal SHA256 hash of the data
     """
     if isinstance(s, str):
         s = s.encode()
@@ -100,7 +100,7 @@ def sha256(s):
     return sha256sum.hexdigest()
 
 
-def uuid_hex():
+def uuid_hex() -> str:
     """Generate a UUID4 hex code
 
     :return: A UUID4 hex code

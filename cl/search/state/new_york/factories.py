@@ -66,7 +66,8 @@ class NYCoADocketEntryFactory(DjangoModelFactory):
     )
 
     @post_generation
-    def party(obj, create, extracted, **kwargs):
+    # pyrefly:ignore[invalid-annotation] factory_boy passes the model instance
+    def party(obj: NYCoADocketEntry, create, extracted, **kwargs):
         """Attach a filing party tied to the entry's docket, since
         PartyFactory's default attorney requires a docket."""
         if not create:
