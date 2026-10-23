@@ -4753,58 +4753,61 @@ class DocketFilterRenderTestCase(TestCase):
         )
 
 
-class DocketFilterDrawerAttrPropagationTest(DocketFilterRenderTestCase):
-    """The mobile filter drawer auto-opens when a filter submission fails
-    validation, so users can see the error messages inside it. That depends
-    on two pieces of plumbing — `data-has-errors` reaching the drawer's root
-    element via Cotton's `{{ attrs }}` passthrough, and the
-    `x-on:open-filter-drawer` listener being wired up on the same element so
-    `docket_filter.js` can dispatch the open event. Lock both in.
+class DocketFilterErrorDialogTest(DocketFilterRenderTestCase):
+    """The mobile filter dialog auto-opens when a filter submission fails
+    validation. That depends on two pieces of plumbing — `data-has-errors`
+    on the `docketFilter` root, which `docket_filter.js` reads on init, and
+    the dialog listening for the `open-filter-dialog` window event the
+    script dispatches. Lock both in.
+
+    Elements are found by attribute instead of XPath because `:` in
+    attribute names isn't first-class in XPath.
     """
 
-    def _find_drawer(self, html: str) -> _Element | None:
-        """Return the element with `x-on:open-filter-drawer` (the drawer root).
-
-        Done element-wise instead of XPath because `:` in attribute names
-        isn't first-class in XPath.
-        """
+    def _find_by_attr(self, html: str, name: str) -> _Element | None:
+        """Return the first element that has the attribute `name`."""
         for el in fromstring(html).iter():
-            if "x-on:open-filter-drawer" in cast(_Attrib, el.attrib):
+            if name in cast(_Attrib, el.attrib):
                 return el
         return None
 
-    def test_data_has_errors_lands_on_drawer_when_form_invalid(self) -> None:
-        request = RequestFactory().get("/?entry_gte=abc")
+    def _render_root(self, query: str) -> _Element | None:
+        request = RequestFactory().get(f"/{query}")
         request.user = AnonymousUser()
         form = DocketEntryFilterForm(request.GET, request=request)
-        self.assertFalse(form.is_valid())
+        form.is_valid()
+        html = self._render(form)
+        for el in fromstring(html).iter():
+            if cast(_Attrib, el.attrib).get("x-data") == "docketFilter":
+                return el
+        return None
 
-        drawer = self._find_drawer(self._render(form))
+    def test_root_has_errors_when_form_invalid(self) -> None:
+        root = self._render_root("?entry_gte=abc")
+        self.assertIsNotNone(root, "docketFilter root not found")
+        self.assertIn("data-has-errors", root.attrib)
 
-        self.assertIsNotNone(
-            drawer, "drawer root with open listener not found"
-        )
-        self.assertIn(
-            "data-has-errors",
-            drawer.attrib,
-            "data-has-errors must land on the same element that listens "
-            "for open-filter-drawer — otherwise docket_filter.js can't "
-            "find the drawer to dispatch the open event",
-        )
-        self.assertEqual(
-            cast(_Attrib, drawer.attrib)["x-on:open-filter-drawer"], "open"
-        )
+    def test_root_has_no_errors_when_form_is_clean(self) -> None:
+        root = self._render_root("")
+        self.assertIsNotNone(root, "docketFilter root not found")
+        self.assertNotIn("data-has-errors", root.attrib)
 
-    def test_no_data_has_errors_when_form_is_clean(self) -> None:
+    def test_dialog_opens_on_window_event(self) -> None:
         request = RequestFactory().get("/")
         request.user = AnonymousUser()
         form = DocketEntryFilterForm(request.GET, request=request)
-        self.assertTrue(form.is_valid())
-
-        drawer = self._find_drawer(self._render(form))
-
-        self.assertIsNotNone(drawer)
-        self.assertNotIn("data-has-errors", drawer.attrib)
+        dialog = self._find_by_attr(
+            self._render(form), "x-on:open-filter-dialog.window"
+        )
+        self.assertIsNotNone(
+            dialog,
+            "the dialog must listen for open-filter-dialog on window, "
+            "which docket_filter.js dispatches when the filters have errors",
+        )
+        self.assertEqual(
+            cast(_Attrib, dialog.attrib)["x-on:open-filter-dialog.window"],
+            "open",
+        )
 
 
 class DocketFilterSearchScopeTest(DocketFilterRenderTestCase):
