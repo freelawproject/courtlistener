@@ -62,6 +62,22 @@ async def clean_up_recap_document_file(item: AbstractPDF) -> None:
         await item.asave()
 
 
+def doctor_auth_headers(url: str) -> dict[str, str]:
+    """Build the auth header for a request to doctor.
+
+    Doctor requires a bearer token once its DOCTOR_AUTH_TOKENS is set.
+    Only doctor gets the token: the other microservices share this helper
+    and must never see it.
+
+    :param url: The microservice URL about to be called.
+    :return: The headers to send; empty for other services or no token.
+    """
+    token = settings.DOCTOR_AUTH_TOKEN
+    if not token or not url.startswith(settings.DOCTOR_HOST):
+        return {}
+    return {"Authorization": f"Bearer {token}"}
+
+
 async def microservice(
     service: str,
     method: str = "POST",
@@ -96,6 +112,8 @@ async def microservice(
     """
 
     services = settings.MICROSERVICE_URLS
+    url = services[service]["url"]
+    headers = doctor_auth_headers(url)
 
     file_context = nullcontext()
     field_file = None
@@ -151,7 +169,8 @@ async def microservice(
             ) as client:
                 req = client.build_request(
                     method=method,
-                    url=services[service]["url"],  # type: ignore
+                    url=url,  # type: ignore
+                    headers=headers,
                     # pyrefly:ignore[bad-argument-type] httpx's stubs omit the (deprecated) raw-content form of data it still accepts
                     data=data,
                     files=files,
