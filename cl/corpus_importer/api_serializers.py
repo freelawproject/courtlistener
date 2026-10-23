@@ -1,4 +1,4 @@
-from rest_framework.serializers import CharField, ModelSerializer
+from rest_framework.serializers import BooleanField, CharField, ModelSerializer
 
 from cl.people_db.models import (
     Attorney,
@@ -18,6 +18,8 @@ from cl.search.models import (
     Opinion,
     OriginatingCourtInformation,
     RECAPDocument,
+    SCOTUSDocketEntry,
+    SCOTUSDocument,
 )
 
 
@@ -79,6 +81,29 @@ class DocketEntrySerializer(ModelSerializer):
     class Meta:
         model = DocketEntry
         exclude = ("tags",)
+
+
+class SCOTUSDocumentSerializer(ModelSerializer):
+    """Serialize a SCOTUSDocument for docket-alert webhook payloads."""
+
+    absolute_url = CharField(source="get_absolute_url", read_only=True)
+    is_available = BooleanField(read_only=True)
+
+    class Meta:
+        model = SCOTUSDocument
+        exclude = ("docket_entry", "plain_text")
+
+
+class SCOTUSDocketEntrySerializer(ModelSerializer):
+    """Serialize a SCOTUSDocketEntry for docket-alert webhook payloads."""
+
+    scotus_documents = SCOTUSDocumentSerializer(
+        source="scotusdocument_set", many=True, read_only=True
+    )
+
+    class Meta:
+        model = SCOTUSDocketEntry
+        fields = "__all__"
 
 
 class OriginalCourtInformationSerializer(ModelSerializer):
