@@ -1,6 +1,7 @@
 import csv
 import logging
 import traceback
+from collections.abc import Iterable
 from dataclasses import dataclass, field
 from datetime import date
 from io import StringIO
@@ -11,9 +12,11 @@ import waffle
 from asgiref.sync import sync_to_async
 from django.conf import settings
 from django.contrib.auth.models import AnonymousUser, User
+from django.contrib.humanize.templatetags.humanize import intcomma
 from django.db.models import QuerySet
 from django.http import Http404, HttpRequest
 from django.shortcuts import aget_object_or_404
+from django.template.defaultfilters import pluralize
 from django.urls import reverse
 from django.utils.formats import date_format
 from django.utils.html import format_html
@@ -55,8 +58,10 @@ from cl.search.models import (
     BankruptcyInformation,
     Docket,
     DocketEntry,
+    Opinion,
     OpinionCluster,
     OriginatingCourtInformation,
+    Parenthetical,
     SCOTUSDocketEntry,
 )
 
@@ -688,6 +693,101 @@ def build_idb_rows(idb_data: FjcIntegratedDatabase) -> list[IdbRow]:
             ),
         },
     ]
+
+
+class AuthorityRow(TypedDict):
+    """One authority of the docket Authorities tab.
+
+    caption is HTML-safe; it carries the &nbsp; entities the cluster caption
+    is built with. Rows without a summary omit summary and summaries_url.
+    """
+
+    caption: SafeString
+    url: str
+    blocked: bool
+    date_filed: str
+    date_filed_iso: str
+    status: str
+    court: str
+    citations: str
+    filings_label: str
+    filings_url: str
+    references_label: str
+    summary: NotRequired[str]
+    summaries_url: NotRequired[str]
+
+
+def _counted(count: int, noun: str) -> str:
+    """Formats a count followed by its noun, pluralized with a trailing s."""
+    return f"{intcomma(count)} {noun}{pluralize(count)}"
+
+
+def get_top_parentheticals(opinion_ids: list[int]) -> dict[int, str]:
+    """Map each opinion to the text of its highest scoring parenthetical.
+
+    Runs a single query whatever the number of opinions, so callers SHOULD
+    pass one page of authorities rather than an unbounded list. Opinions no
+    one has described are left out of the map.
+    """
+    return dict(
+        Parenthetical.objects.filter(described_opinion_id__in=opinion_ids)
+        # DISTINCT ON keeps the first row of each opinion in this ordering,
+        # i.e. its top-scored parenthetical.
+        .order_by("described_opinion_id", "-score")
+        .distinct("described_opinion_id")
+        .values_list("described_opinion_id", "text")
+    )
+
+
+def build_authority_rows(
+    docket: Docket, authorities: Iterable[Opinion]
+) -> list[AuthorityRow]:
+    """Build the rows of the docket Authorities tab.
+
+    authorities MUST come from Docket.authority_opinions, whose annotations
+    (num_filings, total_depth) and prefetches this relies on; pass one page
+    of it, as each call runs one more query for the summaries.
+    """
+    authorities = list(authorities)
+    summaries = get_top_parentheticals([o.pk for o in authorities])
+    rows: list[AuthorityRow] = []
+    for opinion in authorities:
+        cluster = opinion.cluster
+        sub_opinions = " OR ".join(
+            str(o.pk) for o in cluster.sub_opinions.all()
+        )
+        row: AuthorityRow = {
+            "caption": mark_safe(cluster.caption),
+            "url": cluster.get_absolute_url(),
+            "blocked": cluster.blocked,
+            "date_filed": date_format(cluster.date_filed),
+            "date_filed_iso": cluster.date_filed.isoformat(),
+            # The raw value ("Published"), as the opinion Authorities tab
+            # shows, rather than the display label ("Precedential").
+            "status": cluster.precedential_status,
+            "court": str(cluster.docket.court),
+            "citations": cluster.citation_string,
+            "filings_label": _counted(opinion.num_filings, "filing"),
+            # Lists the filings of this docket that cite any opinion of the
+            # authority's cluster, as the legacy tab does.
+            "filings_url": "{}?{}".format(
+                reverse("show_results"),
+                urlencode(
+                    {
+                        "type": SEARCH_TYPES.RECAP,
+                        "q": f"docket_id:{docket.pk} AND cites:({sub_opinions})",
+                    }
+                ),
+            ),
+            "references_label": _counted(opinion.total_depth, "reference"),
+        }
+        if summary := summaries.get(opinion.pk):
+            row["summary"] = summary
+            row["summaries_url"] = reverse(
+                "view_case_summaries", args=[cluster.pk, cluster.slug]
+            )
+        rows.append(row)
+    return rows
 
 
 def build_docket_tabs(

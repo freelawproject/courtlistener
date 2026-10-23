@@ -81,6 +81,8 @@ from cl.opinion_page.forms import (
     TennWorkCompClUploadForm,
 )
 from cl.opinion_page.utils import (
+    AuthorityRow,
+    build_authority_rows,
     build_docket_metadata,
     build_docket_tabs,
     build_idb_rows,
@@ -125,6 +127,7 @@ from cl.search.factories import (
     OpinionsCitedByRECAPDocumentFactory,
     OpinionsCitedWithParentsFactory,
     OpinionWithParentsFactory,
+    ParentheticalFactory,
     RECAPAttachmentFactory,
     RECAPDocumentFactory,
     SCOTUSDocketEntryFactory,
@@ -4087,6 +4090,110 @@ class DocketIdbV2TemplateTest(TestCase):
         ]
         self.assertEqual(len(current), 1)
         self.assertIn("FJC Integrated Database", current[0].text_content())
+
+
+def cite_from_docket(docket: Docket, opinion: Opinion, depth: int = 1) -> None:
+    """Make a new filing of docket cite opinion depth times."""
+    OpinionsCitedByRECAPDocumentFactory(
+        citing_document=RECAPDocumentFactory(
+            docket_entry=DocketEntryFactory(docket=docket)
+        ),
+        cited_opinion=opinion,
+        depth=depth,
+    )
+
+
+class BuildAuthorityRowsTest(TestCase):
+    """The rows of the docket Authorities tab, built from authority_opinions."""
+
+    @classmethod
+    def setUpTestData(cls) -> None:
+        cls.docket = DocketFactory(
+            court=CourtFactory(id="canb", jurisdiction="FB"),
+            source=Docket.RECAP,
+        )
+        cls.most_cited = OpinionWithParentsFactory(
+            cluster__case_name="Nollan v. California Coastal Commission",
+            cluster__date_filed=date(1987, 6, 26),
+            cluster__precedential_status=PRECEDENTIAL_STATUS.PUBLISHED,
+        )
+        cite_from_docket(cls.docket, cls.most_cited, depth=1)
+        cite_from_docket(cls.docket, cls.most_cited, depth=3)
+        ParentheticalFactory(described_opinion=cls.most_cited, score=0.2)
+        ParentheticalFactory(
+            described_opinion=cls.most_cited, text="Top summary", score=0.9
+        )
+        cls.least_cited = OpinionWithParentsFactory()
+        cite_from_docket(cls.docket, cls.least_cited)
+
+    def build_rows(self) -> list[AuthorityRow]:
+        """Builds the rows of every authority of the test docket."""
+        return build_authority_rows(
+            self.docket, self.docket.authority_opinions.distinct()
+        )
+
+    def test_rows_follow_the_authority_order(self) -> None:
+        """Rows keep the order of authority_opinions, most filings first."""
+        urls = [row["url"] for row in self.build_rows()]
+        self.assertEqual(
+            urls,
+            [
+                self.most_cited.cluster.get_absolute_url(),
+                self.least_cited.cluster.get_absolute_url(),
+            ],
+        )
+
+    def test_counts_are_labeled_and_pluralized(self) -> None:
+        """Filings and references are counted across the docket's filings."""
+        most_cited, least_cited = self.build_rows()
+        self.assertEqual(most_cited["filings_label"], "2 filings")
+        self.assertEqual(most_cited["references_label"], "4 references")
+        self.assertEqual(least_cited["filings_label"], "1 filing")
+        self.assertEqual(least_cited["references_label"], "1 reference")
+
+    def test_filings_url_searches_the_citing_filings(self) -> None:
+        """The filings link runs the search the legacy tab links to."""
+        url = urlparse(self.build_rows()[0]["filings_url"])
+        self.assertEqual(url.path, reverse("show_results"))
+        self.assertEqual(
+            parse_qs(url.query),
+            {
+                "type": [SEARCH_TYPES.RECAP],
+                "q": [
+                    f"docket_id:{self.docket.pk} "
+                    f"AND cites:({self.most_cited.pk})"
+                ],
+            },
+        )
+
+    def test_metadata_is_display_ready(self) -> None:
+        """Dates come formatted, with the ISO date for <time>."""
+        row = self.build_rows()[0]
+        self.assertEqual(row["date_filed"], "June 26, 1987")
+        self.assertEqual(row["date_filed_iso"], "1987-06-26")
+        self.assertEqual(row["status"], PRECEDENTIAL_STATUS.PUBLISHED)
+        self.assertEqual(
+            row["court"], str(self.most_cited.cluster.docket.court)
+        )
+
+    def test_summary_is_the_top_parenthetical(self) -> None:
+        """The highest scored parenthetical is the summary, linked to the
+        summaries tab; authorities without one get no summary keys."""
+        most_cited, least_cited = self.build_rows()
+        self.assertEqual(most_cited.get("summary"), "Top summary")
+        cluster = self.most_cited.cluster
+        self.assertEqual(
+            most_cited.get("summaries_url"),
+            reverse("view_case_summaries", args=[cluster.pk, cluster.slug]),
+        )
+        self.assertNotIn("summary", least_cited)
+        self.assertNotIn("summaries_url", least_cited)
+
+    def test_queries_do_not_grow_with_rows(self) -> None:
+        """A page costs the authorities query, its three prefetches and one
+        query for the summaries, whatever the number of rows."""
+        with self.assertNumQueries(5):
+            self.assertEqual(len(self.build_rows()), 2)
 
 
 @override_settings(WAFFLE_CACHE_PREFIX="test_docket_page_v2_waffle")
