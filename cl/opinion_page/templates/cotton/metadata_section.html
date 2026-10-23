@@ -17,17 +17,10 @@
 />
 
 {% if items %}
-  <section
-    {% if title %}aria-labelledby="{{ title|slugify }}"
-    {% else %}aria-labelledby="core-metadata"
-    {% endif %}
-    class="flex flex-col gap-3"
-  >
-    {% if title %}
-      <h2 id="{{ title|slugify }}">{{ title }}</h2>
-    {% else %}
-      <h2 id="core-metadata" class="sr-only">Core Metadata</h2>
-    {% endif %}
+  {# An untitled section still gets a heading for assistive technology. #}
+  {% firstof title "Core Metadata" as heading %}
+  <section aria-labelledby="{{ heading|slugify }}" class="flex flex-col gap-3">
+    <h2 id="{{ heading|slugify }}" {% if not title %}class="sr-only"{% endif %}>{{ heading }}</h2>
     <c-description-list class="{{ list_class }}">
       {% for item in items %}
         <c-description-item>

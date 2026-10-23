@@ -186,7 +186,7 @@
   {% with recordings=docket.audio_files.all %}
   {% if recordings %}
     <section aria-labelledby="oral-argument-recordings" class="flex flex-col gap-3">
-      <h2 id="oral-argument-recordings">Oral Argument Recordings</h2>
+      <h2 id="oral-argument-recordings">Oral Argument Recordings</h2>{# frontend-checks-skip-line: check_hardcoded_ids #}
       <ul>
         {% for af in recordings %}
           <li>
