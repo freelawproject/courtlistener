@@ -3130,32 +3130,40 @@ class RatelimitedViewTest(SimpleTestCase):
 class TestDoctorAuthHeaders(SimpleTestCase):
     """The doctor bearer token goes to doctor and nowhere else."""
 
-    @override_settings(DOCTOR_AUTH_TOKEN="s3cret")
-    def test_doctor_gets_the_token(self) -> None:
-        url = settings.MICROSERVICE_URLS["page-count"]["url"]
-        self.assertEqual(
-            doctor_auth_headers(url), {"Authorization": "Bearer s3cret"}
-        )
-
-    @override_settings(DOCTOR_AUTH_TOKEN="s3cret")
-    def test_other_services_never_see_it(self) -> None:
-        url = settings.MICROSERVICE_URLS["inception-text"]["url"]
-        self.assertEqual(doctor_auth_headers(url), {})
-
-    @override_settings(DOCTOR_AUTH_TOKEN="")
-    def test_no_token_sends_nothing(self) -> None:
-        url = settings.MICROSERVICE_URLS["page-count"]["url"]
-        self.assertEqual(doctor_auth_headers(url), {})
+    def test_only_doctor_gets_the_token(self) -> None:
+        """Doctor URLs get the header; other services and lookalike hosts
+        never do, and a blank token sends nothing anywhere."""
+        doctor_url = settings.MICROSERVICE_URLS["page-count"]["url"]
+        cases = [
+            ("s3cret", doctor_url, {"Authorization": "Bearer s3cret"}),
+            (
+                "s3cret",
+                settings.MICROSERVICE_URLS["inception-text"]["url"],
+                {},
+            ),
+            ("s3cret", f"{settings.DOCTOR_HOST}1/extract/doc/text/", {}),
+            ("s3cret", f"{settings.DOCTOR_HOST}.other/x/", {}),
+            ("", doctor_url, {}),
+        ]
+        for token, url, expected in cases:
+            with (
+                self.subTest(token=token, url=url),
+                override_settings(DOCTOR_AUTH_TOKEN=token),
+            ):
+                self.assertEqual(doctor_auth_headers(url), expected)
 
     @override_settings(DOCTOR_AUTH_TOKEN="s3cret")
     def test_microservice_sends_it_on_the_wire(self) -> None:
+        """The header reaches the request microservice() builds."""
         seen: list[httpx.Request] = []
 
         def respond(request: httpx.Request) -> httpx.Response:
+            """Record the request and answer like page-count would."""
             seen.append(request)
             return httpx.Response(200, text="1")
 
         def client(**kwargs: object) -> httpx.AsyncClient:
+            """Stand in for AsyncClient, answering from respond()."""
             return httpx.AsyncClient(transport=httpx.MockTransport(respond))
 
         with patch("cl.lib.microservice_utils.AsyncClient", client):

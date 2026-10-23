@@ -3,6 +3,7 @@ import logging
 from contextlib import nullcontext
 from io import BufferedReader
 from typing import Any
+from urllib.parse import urlparse
 
 from asgiref.sync import sync_to_async
 from botocore.exceptions import ClientError
@@ -73,7 +74,12 @@ def doctor_auth_headers(url: str) -> dict[str, str]:
     :return: The headers to send; empty for other services or no token.
     """
     token = settings.DOCTOR_AUTH_TOKEN
-    if not token or not url.startswith(settings.DOCTOR_HOST):
+    if not token:
+        return {}
+    # Scheme and host:port, not a string prefix: "http://doctor" must not
+    # also match "http://doctor-disclosures".
+    target, doctor = urlparse(url), urlparse(settings.DOCTOR_HOST)
+    if (target.scheme, target.netloc) != (doctor.scheme, doctor.netloc):
         return {}
     return {"Authorization": f"Bearer {token}"}
 
