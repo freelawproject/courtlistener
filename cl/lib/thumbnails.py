@@ -1,17 +1,15 @@
-from typing import Any
-
 from asgiref.sync import sync_to_async
 from django.core.files.base import ContentFile
 
 from cl.lib.microservice_utils import microservice
-from cl.lib.models import THUMBNAIL_STATUSES
+from cl.lib.models import THUMBNAIL_STATUSES, AbstractPDF
 
 
-async def make_png_thumbnail_for_instance(
+async def make_png_thumbnail_for_instance[M: AbstractPDF](
     pk: int,
-    klass: Any,
+    klass: type[M],
     max_dimension: int,
-) -> None:
+) -> int:
     """Abstract function for making a thumbnail for a PDF
 
     This function is a candidate for removal. Do not continue building off this
@@ -33,6 +31,7 @@ async def make_png_thumbnail_for_instance(
     else:
         item.thumbnail_status = THUMBNAIL_STATUSES.COMPLETE
         filename = f"{pk}.thumb.{max_dimension}.png"
+        # pyrefly:ignore[missing-attribute] FileField's descriptor always returns a FieldFile, even when null=True
         await sync_to_async(item.thumbnail.save)(
             filename, ContentFile(response.content)
         )

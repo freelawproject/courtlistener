@@ -26,6 +26,7 @@ from django.utils.timezone import localtime
 from django_elasticsearch_dsl.search import Search
 from elasticsearch.dsl import Q
 from elasticsearch.dsl.response import Response
+from elasticsearch.dsl.response.hit import Hit
 from elasticsearch.exceptions import ApiError, ConnectionTimeout, RequestError
 
 from cl.alerts.models import DocketAlert
@@ -675,7 +676,12 @@ def build_idb_rows(idb_data: FjcIntegratedDatabase) -> list[IdbRow]:
         },
         {
             "label": "Judgment",
-            "value": show(idb_data.get_judgment_display()),
+            # The FJC codebook uses 0 and -8 for missing judgment data.
+            "value": (
+                not_provided
+                if idb_data.judgment in (0, -8)
+                else show(idb_data.get_judgment_display())
+            ),
             "hint": possible_values(
                 "judgment", "Which party the case was disposed in favor of."
             ),
@@ -1150,7 +1156,7 @@ class RelatedCitingResults:
     )
     sub_opinion_pks: list[int] = field(default_factory=list)
     url_search_params: dict[str, str] = field(default_factory=dict)
-    citing_clusters: list[OpinionClusterDocument] = field(default_factory=list)
+    citing_clusters: list[Hit] = field(default_factory=list)
     citing_cluster_count: int = 0
     timeout: bool = False
 
@@ -1345,7 +1351,7 @@ async def es_get_cited_clusters_with_cache(
         response = None
         timeout_cited = True
 
-    citing_clusters = list(response) if response is not None else []
+    citing_clusters: list[Hit] = list(response) if response is not None else []
     cluster_results.citing_clusters = citing_clusters
     cluster_results.citing_cluster_count = (
         cast(Any, response.hits).total.value if response is not None else 0
