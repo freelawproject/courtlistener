@@ -767,7 +767,12 @@ def build_authority_rows(
             "status": cluster.precedential_status,
             "court": str(cluster.docket.court),
             "citations": cluster.citation_string,
-            "filings_label": _counted(opinion.num_filings, "filing"),
+            # num_filings and total_depth are annotations of
+            # build_authority_opinions_query, which the type checker can't see.
+            "filings_label": _counted(
+                opinion.num_filings,  # pyrefly:ignore[missing-attribute]
+                "filing",
+            ),
             # Lists the filings of this docket that cite any opinion of the
             # authority's cluster, as the legacy tab does.
             "filings_url": "{}?{}".format(
@@ -779,7 +784,10 @@ def build_authority_rows(
                     }
                 ),
             ),
-            "references_label": _counted(opinion.total_depth, "reference"),
+            "references_label": _counted(
+                opinion.total_depth,  # pyrefly:ignore[missing-attribute]
+                "reference",
+            ),
         }
         if summary := summaries.get(opinion.pk):
             row["summary"] = summary
