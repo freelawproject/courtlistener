@@ -58,11 +58,13 @@ document.addEventListener("alpine:init", () => {
      * The scope is read from `data-docket-scope` rather than from the hidden
      * input: assigning a hidden input's value rewrites its attribute, and back
      * navigation restores that DOM, so a second submit would wrap the previous
-     * query again.
+     * query again. It's looked up with closest() rather than `$root`, which
+     * resolves to the nearest x-data element: inside the mobile dialog, that
+     * is the dialog's own root, not the docketFilter one.
      */
     buildScopedQueryOnSubmit(event) {
       const form = event.target;
-      const scope = this.$root.dataset.docketScope;
+      const scope = form.closest("[data-docket-scope]").dataset.docketScope;
       const terms = form.querySelector("[data-search-terms]").value.trim();
       form.querySelector('input[name="q"]').value = terms ? `(${terms}) AND ${scope}` : scope;
     },
