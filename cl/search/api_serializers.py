@@ -52,6 +52,7 @@ from cl.search.models import (
     OpinionsCited,
     OriginatingCourtInformation,
     RECAPDocument,
+    ScotusDocketMetadata,
     Tag,
 )
 from cl.search.types import ESDictDocument
@@ -203,6 +204,22 @@ class DocketEntrySerializer(
 
 class FullDocketSerializer(DocketSerializer):
     docket_entries = DocketEntrySerializer(many=True, read_only=True)
+
+
+class ScotusDocketMetadataSerializer(
+    RetrieveFilteredFieldsMixin,
+    NestedDynamicFieldsMixin,
+    HyperlinkedModelSerializerWithId,
+):
+    """SCOTUS-specific metadata of a docket."""
+
+    questions_presented_file = serializers.FileField(
+        use_url=True, read_only=True
+    )
+
+    class Meta:
+        model = ScotusDocketMetadata
+        fields = "__all__"
 
 
 class CourtSerializer(
