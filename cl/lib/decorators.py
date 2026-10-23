@@ -7,7 +7,7 @@ from functools import wraps
 from hashlib import md5
 from inspect import iscoroutinefunction
 from math import ceil
-from typing import Any, cast
+from typing import Any, Concatenate, cast
 from urllib.parse import urlparse
 
 from asgiref.sync import sync_to_async
@@ -17,6 +17,7 @@ from django.core.cache.backends.base import InvalidCacheBackendError
 from django.db import models
 from django.http import HttpResponse
 from django.http.request import HttpRequest
+from django.http.response import HttpResponseBase
 from django.template.response import SimpleTemplateResponse
 from django.utils.cache import patch_response_headers
 
@@ -160,6 +161,33 @@ def clear_tiered_cache() -> None:
     keys = list(r.scan_iter(match=f":1:{get_tiered_cache_prefix()}:*"))
     if keys:
         r.delete(*keys)
+
+
+def coop_exempt[**P, Request: HttpRequest, Response: HttpResponseBase](
+    view_func: Callable[Concatenate[Request, P], Response],
+) -> Callable[Concatenate[Request, P], Response]:
+    """Serve a view with ``Cross-Origin-Opener-Policy: unsafe-none``.
+
+    Popup-based OAuth clients (Microsoft Copilot, for one) finish their flow
+    through the popup's ``window.opener``, which the site-wide ``same-origin``
+    policy severs on the first page the popup renders here. Apply this to
+    every page an OAuth popup can show; SecurityMiddleware only
+    ``setdefault``\\ s the header, so the value set here survives it.
+
+    ``unsafe-none`` is deliberate: ``same-origin-allow-popups`` only protects
+    a page that *opens* popups, not one rendered inside a popup. Sync views
+    only.
+    """
+
+    @wraps(view_func)
+    def _wrapped_view(
+        request: Request, *args: P.args, **kwargs: P.kwargs
+    ) -> Response:
+        response = view_func(request, *args, **kwargs)
+        response["Cross-Origin-Opener-Policy"] = "unsafe-none"
+        return response
+
+    return _wrapped_view
 
 
 def retry[**P, R](

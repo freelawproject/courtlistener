@@ -799,3 +799,76 @@ class IntrospectionSubTest(APITestCase):
 
     def test_inactive_token_has_no_sub(self):
         self.assertEqual(self._introspect("nope"), {"active": False})
+
+
+class OAuthPopupCoopTest(TestCase):
+    """The pages an OAuth popup can render opt out of opener isolation.
+
+    Popup-based OAuth clients (Microsoft Copilot among them) learn the
+    outcome of authorization through the popup's ``window.opener``, which
+    the site-wide COOP ``same-origin`` header severs permanently on the
+    first CourtListener page shown (issue #7633). The ``unsafe-none``
+    opt-out must cover exactly the authorization journey and nothing else.
+    """
+
+    REDIRECT_URI = "https://mcp.example.com/callback"
+    COOP = "Cross-Origin-Opener-Policy"
+
+    @classmethod
+    def setUpTestData(cls) -> None:
+        cls.user = UserFactory()
+        cls.application = ApplicationFactory(
+            client_type=Application.CLIENT_PUBLIC,
+            redirect_uris=cls.REDIRECT_URI,
+        )
+
+    def _authorize_params(self) -> dict[str, str]:
+        """Valid S256 authorize parameters for the test application."""
+        return {
+            "response_type": "code",
+            "client_id": self.application.client_id,
+            "redirect_uri": self.REDIRECT_URI,
+            "scope": "api",
+            "state": "xyz",
+            "code_challenge": s256_challenge("a" * 64),
+            "code_challenge_method": "S256",
+        }
+
+    def test_popup_journey_pages_opt_out(self) -> None:
+        """Sign-in and every page it links to serve COOP unsafe-none."""
+        journey = (
+            ("sign-in", {}),
+            ("register", {}),
+            ("register_success", {"next": "/"}),
+            ("password_reset", {}),
+            ("password_reset_done", {}),
+        )
+        for view_name, params in journey:
+            with self.subTest(view=view_name):
+                response = self.client.get(reverse(view_name), params)
+                self.assertEqual(
+                    response.headers.get(self.COOP), "unsafe-none"
+                )
+
+    def test_consent_page_opts_out(self) -> None:
+        """The consent screen itself serves COOP unsafe-none."""
+        self.client.force_login(self.user)
+        response = self.client.get(
+            reverse("oauth2_provider:authorize"), self._authorize_params()
+        )
+        self.assertEqual(response.status_code, 200, response.content)
+        self.assertEqual(response.headers.get(self.COOP), "unsafe-none")
+
+    def test_authorize_redirects_opt_out(self) -> None:
+        """Redirects from the authorize view carry the opt-out too, since
+        browsers evaluate COOP on redirect responses as well."""
+        response = self.client.get(
+            reverse("oauth2_provider:authorize"), self._authorize_params()
+        )
+        self.assertEqual(response.status_code, 302)
+        self.assertEqual(response.headers.get(self.COOP), "unsafe-none")
+
+    def test_rest_of_site_keeps_isolation(self) -> None:
+        """Pages outside the popup journey keep the hardened default."""
+        response = self.client.get(reverse("view_settings"))
+        self.assertEqual(response.headers.get(self.COOP), "same-origin")

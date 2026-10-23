@@ -10,6 +10,7 @@ from oauth2_provider.urls import (
     oidc_urlpatterns,
 )
 
+from cl.lib.decorators import coop_exempt
 from cl.oauth import views
 
 # Chrome checks form-action against the redirect a form submission lands on,
@@ -30,10 +31,17 @@ CSP_ALLOWING_FOREIGN_REDIRECT = {
 
 # Redeclared rather than wrapped in place: base_urlpatterns is a module-level
 # list, so mutating its entries would follow every other importer.
+#
+# coop_exempt: Copilot-style OAuth clients run this flow in a popup and learn
+# the outcome through window.opener, which the site-wide COOP header severs
+# (issue #7633). Every document the popup can render must opt out: this view,
+# plus the sign-in journey pages in cl/users/urls.py.
 authorize_urlpattern = path(
     "authorize/",
-    csp_override(CSP_ALLOWING_FOREIGN_REDIRECT)(
-        oauth2_views.AuthorizationView.as_view()
+    coop_exempt(
+        csp_override(CSP_ALLOWING_FOREIGN_REDIRECT)(
+            oauth2_views.AuthorizationView.as_view()
+        )
     ),
     name="authorize",
 )

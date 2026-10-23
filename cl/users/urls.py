@@ -5,6 +5,7 @@ from django_ses.views import SESEventWebhookView
 from rest_framework.routers import DefaultRouter
 
 from cl.lib.AuthenticationBackend import ConfirmedEmailAuthenticationForm
+from cl.lib.decorators import coop_exempt
 from cl.lib.ratelimiter import ratelimiter_unsafe_10_per_m
 from cl.users import api_views as user_views
 from cl.users import views
@@ -24,15 +25,22 @@ router.register(
 
 urlpatterns = [
     # Sign in/out and password pages
+    #
+    # coop_exempt marks the pages that can render inside an OAuth client's
+    # sign-in popup, which must not sever its window.opener link; see the
+    # authorize view in cl/oauth/urls.py. Pages reached from emailed links
+    # open in a fresh tab, not the popup, and stay isolated.
     path(
         "sign-in/",
-        ratelimiter_unsafe_10_per_m(
-            views.SafeRedirectLoginView.as_view(
-                **{
-                    "template_name": "register/login.html",
-                    "authentication_form": ConfirmedEmailAuthenticationForm,
-                    "extra_context": {"private": False},
-                }
+        coop_exempt(
+            ratelimiter_unsafe_10_per_m(
+                views.SafeRedirectLoginView.as_view(
+                    **{
+                        "template_name": "register/login.html",
+                        "authentication_form": ConfirmedEmailAuthenticationForm,
+                        "extra_context": {"private": False},
+                    }
+                )
             )
         ),
         name="sign-in",
@@ -49,18 +57,22 @@ urlpatterns = [
     ),
     path(
         "reset-password/",
-        views.RateLimitedPasswordResetView.as_view(
-            extra_context={"private": False}
+        coop_exempt(
+            views.RateLimitedPasswordResetView.as_view(
+                extra_context={"private": False}
+            )
         ),
         name="password_reset",
     ),
     path(
         "reset-password/instructions-sent/",
-        auth_views.PasswordResetDoneView.as_view(
-            **{
-                "template_name": "register/password_reset_done.html",
-                "extra_context": {"private": True},
-            },
+        coop_exempt(
+            auth_views.PasswordResetDoneView.as_view(
+                **{
+                    "template_name": "register/password_reset_done.html",
+                    "extra_context": {"private": True},
+                },
+            )
         ),
         name="password_reset_done",
     ),
@@ -159,14 +171,15 @@ urlpatterns = [
     ),
     path("profile/take-out/", views.take_out, name="take_out"),
     path("profile/take-out/done/", views.take_out_done, name="take_out_done"),
+    # Part of the sign-in popup journey; see the coop_exempt note above.
     path(
         "register/",
-        views.register,
+        coop_exempt(views.register),
         name="register",
     ),
     path(
         "register/success/",
-        views.register_success,
+        coop_exempt(views.register_success),
         name="register_success",
     ),
     # Registration pages
