@@ -265,6 +265,12 @@ class Docket(AbstractDateTimeModel, DocketSources):
     and link them together.
     """
 
+    # Not a model field - merge_scotus_docket sets this transiently, right
+    # before a Docket's first save, so the ES signal processor can tell a
+    # real SCOTUS docket from one created only to hold a scraped Opinion.
+    # Declared here only so the type checker knows the attribute exists.
+    _index_in_es: bool
+
     source = models.SmallIntegerField(
         help_text="contains the source of the Docket.",
         choices=DocketSources.SOURCE_CHOICES,

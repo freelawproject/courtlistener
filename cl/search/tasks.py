@@ -93,6 +93,7 @@ from cl.search.documents import (
     PersonDocument,
     PositionDocument,
 )
+from cl.search.es_docket_sources import SOURCE_BY_MODEL
 from cl.search.forms import SearchForm
 from cl.search.models import (
     SEARCH_TYPES,
@@ -248,7 +249,7 @@ def es_save_document(
                 self.request.chain = None
                 return None
             doc_id = instance.pk
-        case "search.RECAPDocument":
+        case _ if model in SOURCE_BY_MODEL:
             parent_id = getattr(instance.docket_entry.docket, "pk", None)
             if not parent_id:
                 self.request.chain = None
@@ -261,7 +262,10 @@ def es_save_document(
                 DocketDocument(meta={"id": parent_id}, **doc).save(
                     skip_empty=False, return_doc_meta=True
                 )
-            doc_id = ES_CHILD_ID(instance.pk).RECAP
+            doc_id = getattr(
+                ES_CHILD_ID(instance.pk),
+                SOURCE_BY_MODEL[type(instance)].child_id_property,
+            )
             es_args["_routing"] = parent_id
         case "search.Opinion":
             parent_id = getattr(instance.cluster, "pk", None)
@@ -629,8 +633,11 @@ def get_es_doc_id_and_parent_id(
     if es_document is PositionDocument:
         doc_id = ES_CHILD_ID(instance.pk).POSITION
         parent_id = getattr(instance, "person_id", None)
-    elif es_document is ESRECAPDocument:
-        doc_id = ES_CHILD_ID(instance.pk).RECAP
+    elif es_document is ESRECAPDocument and type(instance) in SOURCE_BY_MODEL:
+        doc_id = getattr(
+            ES_CHILD_ID(instance.pk),
+            SOURCE_BY_MODEL[type(instance)].child_id_property,
+        )
         parent_id = getattr(instance.docket_entry, "docket_id", None)
     elif es_document is OpinionDocument:
         doc_id = ES_CHILD_ID(instance.pk).OPINION

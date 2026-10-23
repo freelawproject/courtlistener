@@ -3965,6 +3965,11 @@ def merge_scotus_docket(
             )
             oci.save()
             d.originating_court_information = oci
+        # Marks this as real SCOTUS content for the ES signal
+        # processor's docket_belongs check -- the Docket's own
+        # source=SCRAPER is indistinguishable from an opinion-scraper
+        # Docket, so it can't tell them apart on its own.
+        d._index_in_es = True
         d.save()
 
         # Merge ScotusDocketMetadata
