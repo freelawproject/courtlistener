@@ -214,7 +214,7 @@ class NYCoDocketEntry(DocketEntry[NYCoAFile]):
     entry_doctype: ClassifiedFilingDocType = Unclassified.UNKNOWN
 
     @model_validator(mode="after")
-    def _tell_unlisted_from_uncovered(self) -> "NYCoDocketEntry":
+    def _tell_unlisted_from_uncovered(self) -> NYCoDocketEntry:
         """Separate a filing no FILINGS row named from one whose row named a
         type the vocabulary does not cover.
         """
@@ -248,7 +248,7 @@ class NYCoAIssue(BaseModel):
     detail: str = ""
 
     @model_validator(mode="after")
-    def _tell_unstated_from_uncovered(self) -> "NYCoAIssue":
+    def _tell_unstated_from_uncovered(self) -> NYCoAIssue:
         """Separate a half of the issue the Court did not state from one it
         stated in words the vocabulary does not cover.
 

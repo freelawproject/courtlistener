@@ -260,7 +260,7 @@ class APIVisualizationTestCase(APITestCase):
         JSONVersion.objects.all().delete()
         super().tearDown()
 
-    async def make_good_visualization(self, title: str) -> "Response":
+    async def make_good_visualization(self, title: str) -> Response:
         data = {
             "title": title,
             "cluster_start": reverse(

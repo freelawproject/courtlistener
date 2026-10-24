@@ -569,7 +569,7 @@ class ViewRecapDocumentTest(TestCase):
         follow: bool = False,
         params: dict | None = None,
         **kwargs: int | str,
-    ) -> "_MonkeyPatchedASGIResponse":
+    ) -> _MonkeyPatchedASGIResponse:
         kwargs["slug"] = ""
         if "att_num" in kwargs:
             path = reverse(
@@ -800,7 +800,7 @@ class ViewSCOTUSDocumentTest(TestCase):
 
     async def get(
         self, follow: bool = False, **kwargs: int | str
-    ) -> "_MonkeyPatchedASGIResponse":
+    ) -> _MonkeyPatchedASGIResponse:
         kwargs.setdefault("slug", self.docket.slug)
         if "att_num" in kwargs:
             path = reverse("view_recap_attachment", kwargs=kwargs)
@@ -4199,7 +4199,7 @@ class DocketPageV2StaffLinksTest(TestCase):
 
     async def _get_docket_page(
         self, user: User | None = None
-    ) -> "_MonkeyPatchedASGIResponse":
+    ) -> _MonkeyPatchedASGIResponse:
         """Loads the v2 docket page, logged in as user when given and
         anonymously otherwise, whatever the client's previous login."""
         if user is None:
@@ -4327,7 +4327,7 @@ class DocketAlertToggleV2Test(TestCase):
             )
         )
 
-    async def page(self) -> "_MonkeyPatchedASGIResponse":
+    async def page(self) -> _MonkeyPatchedASGIResponse:
         """Loads the v2 docket page."""
         return await self.async_client.get(
             reverse("view_docket", args=[self.docket.pk, self.docket.slug])

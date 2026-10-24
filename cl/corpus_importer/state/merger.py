@@ -89,7 +89,7 @@ class MergerSpecification[ScrapeType, ParamType, OutputType]:
         self.name: str = ""
 
     def run_validation(
-        self, merger: "type[Merger[Any, Any, Any]]"
+        self, merger: type[Merger[Any, Any, Any]]
     ) -> list[Exception]:
         """Runs validation for this spec against the given merger, returning any errors found."""
         try:
@@ -199,7 +199,7 @@ class RelatedMerger[
 
     def __init__(
         self,
-        merger: "type[Merger[ChildType, RelatedParams[ParamType], RM]]",
+        merger: type[Merger[ChildType, RelatedParams[ParamType], RM]],
         transform: Callable[[ScrapeType, ParamType], OutputType] | None = None,
         *,
         default: OutputType,
@@ -256,7 +256,7 @@ class OneToOneMerger[ScrapeType, ParamType, ChildType, RM: Model](
 
     def __init__(
         self,
-        merger: "type[Merger[ChildType, RelatedParams[ParamType], RM]]",
+        merger: type[Merger[ChildType, RelatedParams[ParamType], RM]],
         transform: Callable[[ScrapeType, ParamType], ChildType | None]
         | None = None,
     ):
@@ -310,7 +310,7 @@ class OneToOneMerger[ScrapeType, ParamType, ChildType, RM: Model](
 
 
 def OneToOneRelation[ParamType, ChildType, RM: Model](
-    merger: "type[Merger[ChildType, RelatedParams[ParamType], RM]]",
+    merger: type[Merger[ChildType, RelatedParams[ParamType], RM]],
     transform: Callable[..., ChildType | None] | None = None,
 ) -> Any:
     return OneToOneMerger(merger, transform)
@@ -337,7 +337,7 @@ class NToManyMerger[ScrapeType, ParamType, ChildType, RM: Model](
 
     def __init__(
         self,
-        merger: "type[Merger[ChildType, RelatedParams[ParamType], RM]]",
+        merger: type[Merger[ChildType, RelatedParams[ParamType], RM]],
         transform: Callable[[ScrapeType, ParamType], Sequence[ChildType]]
         | None = None,
         *,
@@ -348,7 +348,7 @@ class NToManyMerger[ScrapeType, ParamType, ChildType, RM: Model](
 
     def _transform_result_and_manager(
         self, parent: RM | None, scrape: ScrapeType, params: ParamType
-    ) -> "tuple[Sequence[ChildType], MergeResult[Any], RelatedManager[Any]]":
+    ) -> tuple[Sequence[ChildType], MergeResult[Any], RelatedManager[Any]]:
         related_manager: RelatedManager[Any] = getattr(parent, self.name)
         transformed = self.transform(scrape, params)
         if isinstance(transformed, (str, bytes)):
@@ -418,7 +418,7 @@ class OneToManyMerger[ScrapeType, ParamType, ChildType, RM: Model](
 
 
 def OneToManyRelation[ParamType, ChildType, RM: Model](
-    merger: "type[Merger[ChildType, RelatedParams[ParamType], RM]]",
+    merger: type[Merger[ChildType, RelatedParams[ParamType], RM]],
     transform: Callable[..., Sequence[ChildType]] | None = None,
     *,
     strategy: ManyStrategy = ManyStrategy.REPLACE,
@@ -460,8 +460,11 @@ class ManyToManyMerger[
 
     def __init__(
         self,
-        merger: "type[Merger[TransformType, RelatedParams[ParamType], RM]]",
-        through: "type[Merger[TransformType, ThroughParameters[ParamType], ThruM]] | None" = None,
+        merger: type[Merger[TransformType, RelatedParams[ParamType], RM]],
+        through: type[
+            Merger[TransformType, ThroughParameters[ParamType], ThruM]
+        ]
+        | None = None,
         transform: Callable[[ScrapeType, ParamType], Sequence[TransformType]]
         | None = None,
         *,
@@ -592,8 +595,9 @@ class ManyToManyMerger[
 
 
 def ManyToManyRelation[ParamType, ChildType, ThruM: Model, RM: Model](
-    merger: "type[Merger[ChildType, RelatedParams[ParamType], RM]]",
-    through: "type[Merger[ChildType, ThroughParameters[ParamType], ThruM]] | None" = None,
+    merger: type[Merger[ChildType, RelatedParams[ParamType], RM]],
+    through: type[Merger[ChildType, ThroughParameters[ParamType], ThruM]]
+    | None = None,
     transform: Callable[[Any, Any], Sequence[ChildType]] | None = None,
     *,
     strategy: ManyStrategy = ManyStrategy.REPLACE,
@@ -646,7 +650,7 @@ class MergerSpecRegistry[ScrapeType, ParamType]:
         )
 
     def validate(
-        self, merger: "type[Merger[ScrapeType, ParamType, Any]]"
+        self, merger: type[Merger[ScrapeType, ParamType, Any]]
     ) -> list[Exception]:
         """Run validation for every attached spec against the given merger. Used to defer running validation on base
         classes which may not have required properties defined yet.
