@@ -298,12 +298,48 @@ class MembershipWebhookViewSet(
             trigger=trigger,
         )
 
+    @staticmethod
+    def _lock_membership(neon_id: str) -> NeonMembership | None:
+        """Lock a membership's user, then the membership, and return it.
+
+        Use this before changing or deleting a membership. Must be called
+        inside a transaction.
+
+        Every handler must lock the User before the membership. Creation
+        locks the User first via _get_member_record, so a handler that
+        locked the membership first could deadlock with an overlapping
+        webhook for the same user. That includes a handler that only writes
+        APIThrottle rows, whose foreign key check locks the User at commit.
+
+        :param neon_id: The Neon membership ID.
+        :return: The locked membership, or None if no membership has this
+        ID once the locks are held, e.g. because a concurrent
+        createMembership replaced it.
+        """
+        user_id = (
+            NeonMembership.objects.filter(neon_id=neon_id)
+            .values_list("user_id", flat=True)
+            .first()
+        )
+        if user_id is None:
+            return None
+        User.objects.select_for_update().filter(pk=user_id).first()
+        return (
+            NeonMembership.objects.select_for_update()
+            .filter(neon_id=neon_id)
+            .first()
+        )
+
     def _handle_membership_update(self, webhook_data) -> None:
         membership_data = self._get_membership_data(webhook_data)
-        membership_query = NeonMembership.objects.filter(
-            neon_id=membership_data["membershipId"]
+        # Lock the row so a createMembership webhook for the same upgrade
+        # can't change it between this read and the save below. Without the
+        # lock, this handler could save the stale previous-membership data
+        # over the upgrade, or find the row gone and crash.
+        neon_membership = self._lock_membership(
+            membership_data["membershipId"]
         )
-        if not membership_query.exists():
+        if neon_membership is None:
             # Prevents an existing membership from being overwritten by data
             # from an updateMembership webhook that's either from a previous
             # membership or one that doesn't exist in our database.
@@ -327,7 +363,6 @@ class MembershipWebhookViewSet(
             membership_data["paymentStatus"]
         )
 
-        neon_membership = membership_query.first()
         neon_membership.level = membership_level
         # pyrefly:ignore[bad-assignment] Django parses the string on save
         neon_membership.termination_date = membership_data["termEndDate"]
@@ -407,11 +442,10 @@ class MembershipWebhookViewSet(
     @staticmethod
     def _handle_membership_deletion(webhook_data) -> None:
         membership_data = webhook_data["data"]["membership"]
-        try:
-            neon_membership = NeonMembership.objects.get(
-                neon_id=membership_data["membershipId"]
-            )
-        except NeonMembership.DoesNotExist:
+        neon_membership = MembershipWebhookViewSet._lock_membership(
+            membership_data["membershipId"]
+        )
+        if neon_membership is None:
             return HttpResponse(
                 "Error processing webhook, Membership not found",
                 status=HTTPStatus.INTERNAL_SERVER_ERROR,
