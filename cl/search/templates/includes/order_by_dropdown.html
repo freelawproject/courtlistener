@@ -5,13 +5,21 @@
 {% endcomment %}
 
 <div class="form-group">
-    <label for="id_order_by">Search Results Order:</label>
+    <label for="id_order_by">Search Results Order:
+    </label>
+    {% with search_form.type.value as v %}
+    <p class="help-block" style="margin-top: 5px;">
+        <a href="https://free.law/2013/11/12/citegeist/" target="_blank">
+            <i class="fa fa-question-circle"></i> What is CiteGeist?
+        </a>
+    </p>
+    {% endwith %}
     {% with search_form.type.value as v %}
     <select class="external-input form-control" id="id_order_by" name="order_by">
         <option value="score desc"
                 {% if search_form.order_by.value == "score desc" %}
                 selected="selected"
-                {% endif %}>Relevance</option>
+                {% endif %}>CiteGeist</option>
 
         {% if v == SEARCH_TYPES.OPINION or v == SEARCH_TYPES.RECAP or v == SEARCH_TYPES.DOCKETS or v == SEARCH_TYPES.PARENTHETICAL %}
             <option value="dateFiled desc"
