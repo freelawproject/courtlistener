@@ -1477,7 +1477,16 @@ label="194">*194</page-number>
             "overlaps": 0,
         }
 
-        cases = [case_1_data, case_2_data, case_3_data]
+        # A name printed in capitals keeps its words
+        case_4_data = {
+            "case_name_full": "James Sthubin, Appellant, v. the State of "
+            "Florida, Appellee",
+            "case_name_abbreviation": "James Sthubin v. State of Florida",
+            "case_name_cl": "JAMES STHUBIN v. THE STATE OF FLORIDA",
+            "overlaps": 3,
+        }
+
+        cases = [case_1_data, case_2_data, case_3_data, case_4_data]
 
         for case in cases:
             harvard_case = f"{case.get('case_name_full')} {case.get('case_name_abbreviation')}"

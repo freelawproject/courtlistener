@@ -23,7 +23,7 @@ from django.utils.cache import patch_response_headers
 from cl.lib.redis_utils import get_redis_interface
 from cl.lib.types import DjangoViewType
 
-logger = logging.getLogger(__name__)
+logger: logging.Logger = logging.getLogger(__name__)
 
 # In-memory cache for tiered_cache decorator (per-process, fastest tier)
 # Data model: {cache_key: (expiry_timestamp, cached_value)}
@@ -321,7 +321,7 @@ def cache_page_ignore_params[
     return decorator
 
 
-FIELD_DOCSTRING_EXTRACTION_RE = re.compile(
+FIELD_DOCSTRING_EXTRACTION_RE: re.Pattern[str] = re.compile(
     r":(?:var|ivar|cvar)\s+([a-z_][a-z0-9_]*):([^:]+)",
     re.IGNORECASE | re.MULTILINE,
 )
@@ -367,18 +367,14 @@ def document_model[M: models.Model](model: type[M]) -> type[M]:
     return model
 
 
-def time_call[**ParamType, ReturnType](
+def time_call[**P, R](
     fn_logger: logging.Logger,
-) -> Callable[
-    [Callable[ParamType, ReturnType]], Callable[ParamType, ReturnType]
-]:
+) -> Callable[[Callable[P, R]], Callable[P, R]]:
     def decorator(
-        f: Callable[ParamType, ReturnType],
-    ) -> Callable[ParamType, ReturnType]:
+        f: Callable[P, R],
+    ) -> Callable[P, R]:
         @wraps(f)
-        def wrapper(
-            *args: ParamType.args, **kwargs: ParamType.kwargs
-        ) -> ReturnType:
+        def wrapper(*args: P.args, **kwargs: P.kwargs) -> R:
             start = time.perf_counter_ns()
             result = f(*args, **kwargs)
             elapsed = time.perf_counter_ns() - start

@@ -600,10 +600,9 @@ def process_free_opinion_result(
         self.request.chain = None
         return None
 
-    # TODO: Come up with some way to do this that satisfies the type checker
-    # pyrefly:ignore[missing-attribute]
-    result.court = Court.objects.get(pk=map_pacer_to_cl_id(result.court_id))
+    court = Court.objects.get(pk=map_pacer_to_cl_id(result.court_id))
     result.case_name = harmonize(result.case_name)
+    # TODO: Come up with some way to do this that satisfies the type checker
     # pyrefly:ignore[missing-attribute]
     result.case_name_short = cnt.make_case_name_short(result.case_name)
 
@@ -618,7 +617,7 @@ def process_free_opinion_result(
     start_time = now()
     try:
         with transaction.atomic():
-            d = lookup_and_save(row_copy)
+            d = lookup_and_save(row_copy, court)
             if not d:
                 msg = f"Unable to create docket for {result}"
                 logger.error(msg)
