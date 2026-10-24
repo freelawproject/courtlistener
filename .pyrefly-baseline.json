@@ -695,6 +695,13 @@
       "severity": "error"
     },
     {
+      "column": 24,
+      "path": "cl/citations/api_views.py",
+      "name": "unsupported-operation",
+      "concise_description": "`|` is not supported between `QuerySet[OpinionCluster, OpinionCluster]` and `None`",
+      "severity": "error"
+    },
+    {
       "column": 35,
       "path": "cl/citations/management/commands/reindex_es_cite_fields.py",
       "name": "unbound-name",
