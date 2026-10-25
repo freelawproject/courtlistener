@@ -1126,6 +1126,56 @@ class DocketAlertSourceTest(TestCase):
             self.scotus_docket.get_alert_source(), SCOTUS_ALERT_SOURCE
         )
 
+    def test_entries_since_preloads_what_the_alert_email_renders(self) -> None:
+        """Does entries_since load the entries, their docket and their
+        documents (minus plain_text) in two queries, however many entries
+        there are?"""
+        before = now()
+        # Two entries, so any per-entry query shows up in the count.
+        for n in (10, 11):
+            RECAPDocumentFactory(
+                docket_entry=DocketEntryFactory(
+                    docket=self.recap_docket, entry_number=n
+                ),
+                document_number=str(n),
+            )
+            SCOTUSDocumentFactory(
+                docket_entry=SCOTUSDocketEntryFactory(
+                    docket=self.scotus_docket, entry_number=n
+                ),
+                document_number=n,
+            )
+
+        cases = [
+            (
+                "RECAP",
+                RECAP_ALERT_SOURCE,
+                self.recap_docket,
+                "recap_documents",
+            ),
+            (
+                "SCOTUS",
+                SCOTUS_ALERT_SOURCE,
+                self.scotus_docket,
+                "scotusdocument_set",
+            ),
+        ]
+        for source_name, source, docket, docs_attr in cases:
+            with self.subTest(source=source_name):
+                # One query for the entries joined with their docket, one
+                # for all their documents.
+                with self.assertNumQueries(2):
+                    docs = [
+                        doc
+                        for de in source.entries_since(docket, before)
+                        for doc in getattr(de, docs_attr).all()
+                    ]
+                    for doc in docs:
+                        doc.get_absolute_url()
+                self.assertEqual(len(docs), 2)
+                for doc in docs:
+                    self.assertIn("plain_text", doc.get_deferred_fields())
+
 
 class DocketAlertScotusTest(TestCase):
     """Does send_alert_and_webhook work end-to-end for a SCOTUS docket --
