@@ -4531,6 +4531,13 @@
       "severity": "error"
     },
     {
+      "column": 17,
+      "path": "cl/users/signals.py",
+      "name": "redundant-condition",
+      "concise_description": "String literal used as condition. It's equivalent to `True`",
+      "severity": "error"
+    },
+    {
       "column": 45,
       "path": "cl/users/signals.py",
       "name": "missing-attribute",
