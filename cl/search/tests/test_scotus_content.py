@@ -4,7 +4,7 @@ from unittest import mock
 from asgiref.sync import async_to_sync
 from django.core import mail
 from django.core.files.base import ContentFile
-from django.test import TestCase
+from django.test import TestCase, override_settings
 
 from cl.alerts.models import DocketAlert
 from cl.corpus_importer.tasks import (
@@ -543,6 +543,7 @@ class ScotusDocketMergeTest(TestCase):
             "Source should be compounded with SCRAPER.",
         )
 
+    @override_settings(SCOTUS_ALERTS_ENABLED=True)
     def test_merge_scotus_docket_triggers_docket_alert_for_a_new_entry(
         self,
     ) -> None:
@@ -573,6 +574,7 @@ class ScotusDocketMergeTest(TestCase):
         self.assertEqual(len(mail.outbox), 1)
         self.assertEqual(mail.outbox[0].to, [user.email])
 
+    @override_settings(SCOTUS_ALERTS_ENABLED=True)
     def test_merge_scotus_docket_does_not_alert_when_nothing_is_new(
         self,
     ) -> None:
@@ -603,6 +605,33 @@ class ScotusDocketMergeTest(TestCase):
         # Re-merge the exact same entry -- it already exists.
         merge_scotus_docket(data, download_file=False)
         self.assertEqual(len(mail.outbox), 0)
+
+    @mock.patch("cl.corpus_importer.tasks.enqueue_docket_alert")
+    def test_merge_scotus_docket_skips_alerts_when_disabled(
+        self, mock_enqueue
+    ) -> None:
+        """With SCOTUS_ALERTS_ENABLED off (the default), a new entry
+        notifies nobody and doesn't even take the alert semaphore."""
+        existing = DocketFactory(
+            court=self.court, docket_number="24-203", source=Docket.SCRAPER
+        )
+        DocketAlert.objects.create(docket=existing, user=UserFactory())
+
+        data = ScotusDocketDataFactory(
+            docket_number="24-203",
+            docket_entries=[
+                SCOTUSDocketEntryDataFactory(
+                    date_filed=datetime.date(2025, 6, 2),
+                    document_number=None,
+                    attachments=[],
+                )
+            ],
+            parties=[],
+        )
+        merge_scotus_docket(data, download_file=False)
+
+        self.assertEqual(len(mail.outbox), 0)
+        mock_enqueue.assert_not_called()
 
     def test_merge_scotus_docket_source_compounds_recap(self) -> None:
         """Merging into a RECAP docket compounds with SCRAPER."""

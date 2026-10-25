@@ -4011,7 +4011,7 @@ def merge_scotus_docket(
     doc_pks, content_updated = add_scotus_docket_entries(
         d, report_data["docket_entries"], download_file=download_file
     )
-    if content_updated:
+    if content_updated and settings.SCOTUS_ALERTS_ENABLED:
         newly_enqueued = enqueue_docket_alert(d.pk)
         if newly_enqueued:
             send_alert_and_webhook.delay(d.pk, start_time)
