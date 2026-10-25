@@ -25,13 +25,17 @@ from cl.search.models import (
     SCOTUSDocument,
 )
 
+# The entry and document models a DocketEntrySource can serve.
+type SourceDocketEntry = DocketEntry | SCOTUSDocketEntry
+type SourceDocument = RECAPDocument | SCOTUSDocument
+
 
 class MetadataItem(TypedDict):
     """Shape of a single item in a metadata description list. Rendered by
     both the c-metadata-section cotton component and
     includes/metadata_section.html.
 
-    is_copyable/has_tooltip/tooltip_message are flags + plain content,
+    one_click_select/has_tooltip/tooltip_message are flags + plain content,
     -- each stack decides its own concrete styling/mechanism.
     tooltip_message may contain HTML; the caller must mark_safe it.
     """
@@ -41,6 +45,9 @@ class MetadataItem(TypedDict):
     url: NotRequired[str]
     nofollow: NotRequired[bool]
     is_external: NotRequired[bool]
+    # When set with url, the label itself is the link (no separate
+    # value text) -- e.g. "Questions Presented".
+    is_label_link: NotRequired[bool]
     aria_label: NotRequired[str]
     suffix_text: NotRequired[str]
     suffix_url: NotRequired[str]
@@ -49,7 +56,7 @@ class MetadataItem(TypedDict):
     suffix_aria_label: NotRequired[str]
     suffix_has_tooltip: NotRequired[bool]
     suffix_tooltip_message: NotRequired[str]
-    is_copyable: NotRequired[bool]
+    one_click_select: NotRequired[bool]
     has_tooltip: NotRequired[bool]
     tooltip_message: NotRequired[str]
 
@@ -96,17 +103,19 @@ def build_scotus_metadata(
         items.append(
             {
                 "label": "Questions Presented",
-                "value": "View",
+                "value": "Questions Presented",
                 "url": scotus_metadata.questions_presented_file.url,
+                "is_label_link": True,
             }
         )
     elif http_url(scotus_metadata.questions_presented_url):
         items.append(
             {
                 "label": "Questions Presented",
-                "value": "View",
+                "value": "Questions Presented",
                 "url": scotus_metadata.questions_presented_url,
                 "is_external": True,
+                "is_label_link": True,
             }
         )
 
@@ -147,16 +156,21 @@ class DocketEntrySource:
     SCOTUS is the first override. A future state-specific model plugs in
     by adding one more instance and a court_id mapping below.
 
-    ``component`` picks which file renders this source's copy. Both
-    template stacks hold one file per component: under cotton/, the
-    docket_source_button/, docket_source_attribution/ and
+    ``empty_message`` is the sentence shown in place of the entry list
+    when the docket has no entries at all. It carries no wrapper, so the
+    caller supplies the surrounding element. Per-source copy that is plain
+    text is a field here; copy that needs markup gets a dispatch template
+    via ``component``.
+
+    ``component`` picks which file renders this source's copy that needs
+    markup. Both template stacks hold one file per component: under
+    cotton/, the docket_source_button/, docket_source_attribution/ and
     document_source_link/ folders; under includes/, those three plus
-    docket_empty_message/, docket_empty_cta/ and docket_source_li/. A
-    source named "xyz" needs xyz.html in every
-    folder of both stacks. A missing one fails at render time with an
-    error that doesn't name it, so DocketSourceComponentTest checks that
-    every component resolves. Sources that render the same copy MAY share
-    a component instead of copying files.
+    docket_empty_cta/ and docket_source_li/. A source named "xyz" needs
+    xyz.html in every folder of both stacks. A missing one fails at render
+    time with an error that doesn't name it, so DocketSourceComponentTest
+    checks that every component resolves. Sources that render the same
+    copy MAY share a component instead of copying files.
 
     ``document_detail_url`` returns a CourtListener path that we build
     ourselves, or None. docket_entry_rows.html renders it unfiltered into
@@ -186,12 +200,14 @@ class DocketEntrySource:
     wrap them in ``sync_to_async``.
     """
 
-    entries_queryset: Callable[[Docket], QuerySet]
+    entries_queryset: Callable[[Docket], QuerySet[SourceDocketEntry]]
     documents_for_entry: Callable[[Any], Iterable]
     order_by_asc: tuple[str, ...]
     order_by_desc: tuple[str, ...]
     # Single-document lookup, for the document detail page.
-    documents_for_docket_and_number: Callable[[int, str], QuerySet]
+    documents_for_docket_and_number: Callable[
+        [int, str], QuerySet[SourceDocument]
+    ]
     get_document_for_render: Callable[[int], Awaitable[Any]]
     document_is_attachment: Callable[[Any], bool]
     document_label: Callable[[Any], str]
@@ -199,6 +215,7 @@ class DocketEntrySource:
     document_external_url: Callable[[Any], str | None]
     docket_url: Callable[[Docket], str | None]
     component: str
+    empty_message: str
     has_pay_and_pray: bool = True
     admin_url_names: AdminNames = AdminNames(
         entry="admin:search_docketentry_change",
@@ -230,7 +247,7 @@ def attach_display_fields(source: DocketEntrySource, document: Any) -> None:
 # RECAP
 
 
-def _recap_entries(docket: Docket) -> QuerySet:
+def _recap_entries(docket: Docket) -> QuerySet[DocketEntry]:
     """Return this docket's DocketEntry queryset, with recap_documents
     prefetched for the docket page's entry list."""
     return docket.docket_entries.all().prefetch_related(
@@ -241,7 +258,7 @@ def _recap_entries(docket: Docket) -> QuerySet:
     )
 
 
-def _recap_documents_for_entry(de: DocketEntry) -> QuerySet:
+def _recap_documents_for_entry(de: DocketEntry) -> QuerySet[RECAPDocument]:
     """Return the RECAPDocuments attached to this docket entry."""
     return de.recap_documents.all()
 
@@ -308,7 +325,7 @@ def _recap_metadata_sections(docket: Docket) -> list[MetadataSection]:
 
 def _recap_documents_for_docket_and_number(
     docket_id: int, doc_num: str
-) -> QuerySet:
+) -> QuerySet[RECAPDocument]:
     """Look up RECAPDocuments by docket and document_number, for the
     document detail page."""
     return RECAPDocument.objects.filter(
@@ -335,7 +352,7 @@ async def _get_recap_document_for_render(pk: int) -> RECAPDocument:
     )
 
 
-RECAP = DocketEntrySource(
+RECAP: DocketEntrySource = DocketEntrySource(
     entries_queryset=_recap_entries,
     documents_for_entry=_recap_documents_for_entry,
     order_by_asc=("recap_sequence_number", "entry_number"),
@@ -348,13 +365,17 @@ RECAP = DocketEntrySource(
     docket_url=_recap_docket_url,
     metadata_sections=_recap_metadata_sections,
     component="recap",
+    empty_message=(
+        "There are no entries for this docket in the RECAP Archive. Please "
+        "download the latest from PACER while using the RECAP Extension."
+    ),
     documents_for_docket_and_number=_recap_documents_for_docket_and_number,
     get_document_for_render=_get_recap_document_for_render,
 )
 
 
 # SCOTUS
-def _scotus_entries(docket: Docket) -> QuerySet:
+def _scotus_entries(docket: Docket) -> QuerySet[SCOTUSDocketEntry]:
     """Return this docket's SCOTUSDocketEntry queryset, with
     scotusdocument_set prefetched for the docket page's entry list."""
     return docket.scotusdocketentry_set.all().prefetch_related(
@@ -365,14 +386,16 @@ def _scotus_entries(docket: Docket) -> QuerySet:
     )
 
 
-def _scotus_documents_for_entry(de: SCOTUSDocketEntry) -> QuerySet:
+def _scotus_documents_for_entry(
+    de: SCOTUSDocketEntry,
+) -> QuerySet[SCOTUSDocument]:
     """Return the SCOTUSDocuments attached to this docket entry."""
     return de.scotusdocument_set.all()
 
 
 def _scotus_documents_for_docket_and_number(
     docket_id: int, doc_num: str
-) -> QuerySet:
+) -> QuerySet[SCOTUSDocument]:
     """Look up SCOTUSDocuments by docket and document_number, for the
     document detail page."""
     return SCOTUSDocument.objects.filter(
@@ -451,7 +474,7 @@ def _scotus_docket_url(docket: Docket) -> str | None:
     return docket.scotus_docket_url or None
 
 
-SCOTUS = DocketEntrySource(
+SCOTUS: DocketEntrySource = DocketEntrySource(
     entries_queryset=_scotus_entries,
     documents_for_entry=_scotus_documents_for_entry,
     order_by_asc=("sequence_number",),
@@ -466,6 +489,7 @@ SCOTUS = DocketEntrySource(
     metadata_items=_scotus_metadata_items,
     has_pay_and_pray=False,
     component="scotus",
+    empty_message="There are no entries for this docket yet.",
     admin_url_names=AdminNames(
         entry="admin:search_scotusdocketentry_change",
         document="admin:search_scotusdocument_change",

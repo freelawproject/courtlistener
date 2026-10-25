@@ -14,7 +14,7 @@ from asgiref.sync import sync_to_async
 from django.conf import settings
 from django.contrib import admin
 from django.contrib.auth.hashers import make_password
-from django.contrib.auth.models import User
+from django.contrib.auth.models import Group, User
 from django.contrib.auth.tokens import default_token_generator
 from django.core import mail
 from django.core.cache import cache as django_cache
@@ -24,6 +24,7 @@ from django.core.mail import (
     get_connection,
     send_mail,
 )
+from django.db.models import QuerySet
 from django.http import HttpResponse
 from django.test import AsyncClient, RequestFactory
 from django.test.client import Client
@@ -52,6 +53,7 @@ from cl.api.factories import (
 )
 from cl.api.models import (
     APIThrottle,
+    APIThrottleEvent,
     ThrottleType,
     Webhook,
     WebhookEvent,
@@ -67,10 +69,18 @@ from cl.donate.models import (
     NeonMembership,
     NeonMembershipLevel,
 )
-from cl.favorites.factories import UserTagFactory
+from cl.favorites.factories import (
+    NoteFactory,
+    PrayerFactory,
+    UserTagFactory,
+)
 from cl.favorites.models import (
     DocketTag,
     DocketTagEvent,
+    Note,
+    NoteEvent,
+    Prayer,
+    PrayerEvent,
     UserTag,
     UserTagEvent,
 )
@@ -88,8 +98,15 @@ from cl.lib.test_helpers import (
     SimpleUserDataMixin,
     UserProfileWithParentsFactory,
 )
-from cl.search.factories import DocketFactory
-from cl.search.models import SearchQuery
+from cl.search.factories import (
+    CourtFactory,
+    DocketFactory,
+    RECAPDocumentFactory,
+    SCOTUSDocketEntryFactory,
+    SCOTUSDocumentFactory,
+)
+from cl.search.models import Docket, SearchQuery
+from cl.stats.models import Event as StatsEvent
 from cl.tests.base import SELENIUM_TIMEOUT, BaseSeleniumTest
 from cl.tests.cases import (
     APITestCase,
@@ -129,13 +146,14 @@ from cl.users.models import (
     EmailFlag,
     EmailSent,
     FailedEmail,
+    UserGroupsEvent,
     UserProfile,
     UserProfileBarMembershipEvent,
     UserProfileEvent,
     UserProxyEvent,
 )
 from cl.users.tasks import tag_zoho_record, tag_zoho_record_for_membership
-from cl.users.utils import create_stub_account
+from cl.users.utils import create_stub_account, message_dict
 from cl.visualizations.factories import VisualizationFactory
 from cl.visualizations.models import SCOTUSMap
 
@@ -753,22 +771,25 @@ class ProfileTest(SimpleUserDataMixin, TestCase):
         self.assertEqual(docket_tag_events_first.tag_id, tag_1_user_2.pk)
 
     def test_purges_user_data_and_history_on_account_deletion(self) -> None:
-        """Deleting an account hard-deletes the user's logged data and the
-        PII left behind in the pghistory event tables, keeps (but disables)
-        donation records, and leaves a second user's data untouched.
+        """Deleting an account hard-deletes the user's logged data, API
+        credentials and the PII left behind in the pghistory event tables,
+        keeps (but disables) donation records, and leaves a second user's data
+        untouched.
         """
         victim = UserProfileWithParentsFactory()
         bystander = UserProfileWithParentsFactory()
 
         # Edit tracked fields to generate UserProfile/UserProxy history, and
-        # associate a bar membership to generate barmembership history.
+        # associate a bar membership and a group to generate m2m history.
         bar = BarMembership.objects.create(barMembership="CA")
+        group = Group.objects.create(name="some-group")
         for profile in (victim, bystander):
             profile.user.first_name = "Real Name"
             profile.user.save()
             profile.employer = "Real Employer"
             profile.save()
             profile.barmembership.add(bar)
+            profile.user.groups.add(group)
 
             # Usage logs and assets tied to each user.
             SearchQuery.objects.create(
@@ -790,6 +811,27 @@ class ProfileTest(SimpleUserDataMixin, TestCase):
                 stripe_customer_id="cus_test",
             )
 
+            legacy_note = NoteFactory(user=profile.user)
+            legacy_note.notes = "edited"
+            legacy_note.save()
+            gfk_note = NoteFactory.for_object(
+                RECAPDocumentFactory(), user=profile.user
+            )
+            gfk_note.notes = "edited"
+            gfk_note.save()
+
+            # Prayers, throttle overrides and stats events, edited so that
+            # each one also leaves pghistory rows behind.
+            prayer = PrayerFactory(user=profile.user, status=Prayer.WAITING)
+            prayer.status = Prayer.GRANTED
+            prayer.save()
+            throttle = APIThrottleFactory(user=profile.user, rate="10/min")
+            throttle.rate = "20/min"
+            throttle.save()
+            StatsEvent.objects.create(
+                user=profile.user, description="Did something"
+            )
+
         # Sanity check: the victim's history and assets exist before deletion.
         self.assertTrue(
             UserProxyEvent.objects.filter(pgh_obj_id=victim.user.pk).exists()
@@ -802,6 +844,20 @@ class ProfileTest(SimpleUserDataMixin, TestCase):
                 userprofile_id=victim.pk
             ).exists()
         )
+        self.assertEqual(Note.objects.filter(user=victim.user).count(), 2)
+        self.assertTrue(
+            NoteEvent.objects.filter(user_id=victim.user.pk).exists()
+        )
+        self.assertTrue(
+            PrayerEvent.objects.filter(user_id=victim.user.pk).exists()
+        )
+        self.assertTrue(
+            APIThrottleEvent.objects.filter(user_id=victim.user.pk).exists()
+        )
+        self.assertTrue(
+            UserGroupsEvent.objects.filter(user_id=victim.user.pk).exists()
+        )
+        self.assertTrue(Token.objects.filter(user=victim.user).exists())
 
         # Delete the victim's account.
         self.assertTrue(
@@ -819,6 +875,13 @@ class ProfileTest(SimpleUserDataMixin, TestCase):
         self.assertFalse(SearchQuery.objects.filter(user=victim.user).exists())
         self.assertFalse(EmailSent.objects.filter(user=victim.user).exists())
         self.assertFalse(SCOTUSMap.objects.filter(user=victim.user).exists())
+        self.assertFalse(Note.objects.filter(user=victim.user).exists())
+        self.assertFalse(Prayer.objects.filter(user=victim.user).exists())
+        self.assertFalse(StatsEvent.objects.filter(user=victim.user).exists())
+
+        # API credentials and per-user rate limit overrides are revoked.
+        self.assertFalse(Token.objects.filter(user=victim.user).exists())
+        self.assertFalse(APIThrottle.objects.filter(user=victim.user).exists())
 
         # The PII left behind in the event tables is purged.
         self.assertFalse(
@@ -831,6 +894,18 @@ class ProfileTest(SimpleUserDataMixin, TestCase):
             UserProfileBarMembershipEvent.objects.filter(
                 userprofile_id=victim.pk
             ).exists()
+        )
+        self.assertFalse(
+            NoteEvent.objects.filter(user_id=victim.user.pk).exists()
+        )
+        self.assertFalse(
+            PrayerEvent.objects.filter(user_id=victim.user.pk).exists()
+        )
+        self.assertFalse(
+            APIThrottleEvent.objects.filter(user_id=victim.user.pk).exists()
+        )
+        self.assertFalse(
+            UserGroupsEvent.objects.filter(user_id=victim.user.pk).exists()
         )
 
         # Donations are financial records: kept, but disabled.
@@ -852,10 +927,31 @@ class ProfileTest(SimpleUserDataMixin, TestCase):
                 pgh_obj_id=bystander.user.pk
             ).exists()
         )
+        self.assertTrue(Prayer.objects.filter(user=bystander.user).exists())
+        self.assertTrue(
+            StatsEvent.objects.filter(user=bystander.user).exists()
+        )
+        self.assertTrue(Token.objects.filter(user=bystander.user).exists())
+        self.assertTrue(
+            APIThrottle.objects.filter(user=bystander.user).exists()
+        )
+        self.assertTrue(
+            PrayerEvent.objects.filter(user_id=bystander.user.pk).exists()
+        )
+        self.assertTrue(
+            APIThrottleEvent.objects.filter(user_id=bystander.user.pk).exists()
+        )
+        self.assertTrue(
+            UserGroupsEvent.objects.filter(user_id=bystander.user.pk).exists()
+        )
         self.assertTrue(
             UserProfileBarMembershipEvent.objects.filter(
                 userprofile_id=bystander.pk
             ).exists()
+        )
+        self.assertEqual(Note.objects.filter(user=bystander.user).count(), 2)
+        self.assertTrue(
+            NoteEvent.objects.filter(user_id=bystander.user.pk).exists()
         )
         self.assertTrue(
             MonthlyDonation.objects.get(donor=bystander.user).enabled
@@ -1024,6 +1120,36 @@ class ProfileTest(SimpleUserDataMixin, TestCase):
                         self.assertEqual(vals["direction"], "down")
                     else:
                         self.assertEqual(vals["direction"], "up")
+
+
+class NotesPageDeadLinkTest(TestCase):
+    """A noted object with no page of its own yet must not render as a
+    dead link on the profile Notes page.
+    """
+
+    def test_note_with_no_absolute_url_renders_without_a_dead_link(
+        self,
+    ) -> None:
+        user = UserProfileWithParentsFactory()
+        court = CourtFactory(id="scotus", jurisdiction="F")
+        docket = DocketFactory(court=court, source=Docket.SCRAPER)
+        entry = SCOTUSDocketEntryFactory(docket=docket, entry_number=None)
+        document = SCOTUSDocumentFactory(
+            docket_entry=entry, attachment_number=None
+        )
+        self.assertEqual(document.get_absolute_url(), "")
+        note = NoteFactory.for_object(
+            document, user=user.user, name="edge case note"
+        )
+
+        self.assertTrue(
+            self.client.login(username=user.user.username, password="password")
+        )
+        r = self.client.get(reverse("profile_notes"))
+        self.assertEqual(r.status_code, HTTPStatus.OK)
+        content = r.content.decode()
+        self.assertIn(note.name, content)
+        self.assertNotIn('href=""', content)
 
 
 class DisposableEmailTest(SimpleUserDataMixin, TestCase):
@@ -2618,7 +2744,7 @@ class CustomBackendEmailTest(RestartSentEmailQuotaMixin, TestCase):
         returns the total number of times that add_bcc_random returned True
         """
 
-        # Test differnt BCC rates
+        # Test different BCC rates
         # No messages are BCC'ed
         zero_bcc_rate = 0
         # All messages are BCC'ed
@@ -2819,7 +2945,7 @@ class CustomBackendEmailTest(RestartSentEmailQuotaMixin, TestCase):
         # The Emergency brake error should be triggered.
         with self.assertRaisesMessage(ValueError, "Emergency brake engaged"):
             email.send()
-        # No additional messsage should be stored.
+        # No additional message should be stored.
         self.assertEqual(stored_email.count(), 5)
 
     @patch(
@@ -2866,7 +2992,7 @@ class CustomBackendEmailTest(RestartSentEmailQuotaMixin, TestCase):
             "Emergency brake engaged to prevent email quota exhaustion",
         ):
             email.send()
-        # No additional messsage should be stored.
+        # No additional message should be stored.
         self.assertEqual(stored_email.count(), 5)
 
 
@@ -4277,6 +4403,33 @@ class NeonAccountUpdateTest(TestCase):
         update_account_mock.delay.assert_not_called()
 
 
+@patch("cl.users.views.create_neon_account")
+@patch("cl.users.views.update_neon_account")
+class SaveQueryHistorySettingTest(TestCase):
+    """Can users change whether their search queries are saved?"""
+
+    def test_can_disable_save_query_history(
+        self, update_account_mock, create_account_mock
+    ) -> None:
+        """Does unchecking the box on the settings page disable it?"""
+        up = UserProfileWithParentsFactory.create()
+        self.assertTrue(up.save_query_history)
+        self.client.force_login(up.user)
+        r = self.client.post(
+            reverse("view_settings"),
+            {
+                "first_name": "test_name",
+                "last_name": "test_last_name",
+                "email": up.user.email,
+            },
+            follow=True,
+        )
+
+        self.assertEqual(r.status_code, HTTPStatus.OK)
+        up.refresh_from_db()
+        self.assertFalse(up.save_query_history)
+
+
 @patch("cl.users.views.OptInConsentForm.is_valid", new=lambda self: True)
 @patch(
     "cl.custom_filters.decorators.verify_honeypot_value",
@@ -4391,6 +4544,467 @@ class RegisterViewTest(TestCase):
             "string",
         )
 
+    @staticmethod
+    def registration_data(username: str, email: str) -> dict[str, str | bool]:
+        """Build a valid registration POST for the given username and email."""
+        return {
+            "username": username,
+            "email": email,
+            "first_name": "User",
+            "last_name": "Person",
+            "password1": "TestPassw0rd!",
+            "password2": "TestPassw0rd!",
+            "consent": True,
+        }
+
+    @staticmethod
+    def normalize_page(content: bytes) -> bytes:
+        """Mask the parts of a rendered page that legitimately differ between
+        two otherwise identical responses: the per-response CSP nonce and the
+        analytics snippet that base.html includes at random one time in ten.
+        Whitespace is collapsed because that snippet's template block leaves
+        different whitespace behind depending on whether it rendered.
+        """
+        content = re.sub(rb'nonce="[^"]*"', b'nonce=""', content)
+        content = re.sub(
+            rb"<script\s+defer\s+data-domain=.*?</script>",
+            b"",
+            content,
+            flags=re.DOTALL,
+        )
+        return re.sub(rb"\s+", b" ", content)
+
+    async def test_taken_email_is_indistinguishable_from_a_fresh_signup(
+        self,
+    ) -> None:
+        """Registering with an address that already has an account must
+        return exactly what a successful registration returns, create no
+        account, and tell only the address owner by email.
+
+        See issue #7854. "This email is already in use" would let anyone test
+        whether an address has a CourtListener account.
+        """
+        email = "shared@example.com"
+        fresh = await self.async_client.post(
+            reverse("register"),
+            self.registration_data("first_signup", email),
+            follow=True,
+        )
+        self.assertEqual(fresh.status_code, HTTPStatus.OK)
+        mail.outbox.clear()
+
+        duplicate = await self.async_client.post(
+            reverse("register"),
+            self.registration_data("second_signup", email),
+            follow=True,
+        )
+
+        self.assertEqual(duplicate.status_code, fresh.status_code)
+        self.assertEqual(duplicate.redirect_chain, fresh.redirect_chain)
+        self.assertEqual(
+            self.normalize_page(duplicate.content),
+            self.normalize_page(fresh.content),
+        )
+
+        # No second account, and the first one is untouched.
+        self.assertFalse(
+            await User.objects.filter(username="second_signup").aexists()
+        )
+        self.assertEqual(
+            await User.objects.filter(email__iexact=email).acount(), 1
+        )
+
+        # The address owner, and nobody else, hears about the attempt.
+        self.assertEqual(len(mail.outbox), 1)
+        message = mail.outbox[0]
+        self.assertEqual(message.to, [email])
+        self.assertIn("already exists", message.body)
+        self.assertIn(reverse("sign-in"), message.body)
+        self.assertIn(reverse("password_reset"), message.body)
+
+    async def test_email_uniqueness_check_folds_case(self) -> None:
+        """Addresses that differ only in case are the same address."""
+        await sync_to_async(UserProfileWithParentsFactory.create)(
+            user__email="Casey@Example.com"
+        )
+        mail.outbox.clear()
+
+        response = await self.async_client.post(
+            reverse("register"),
+            self.registration_data("casey2", "casey@example.COM"),
+            follow=True,
+        )
+
+        self.assertEqual(response.status_code, HTTPStatus.OK)
+        self.assertFalse(
+            await User.objects.filter(username="casey2").aexists()
+        )
+        self.assertEqual(len(mail.outbox), 1)
+        self.assertEqual(mail.outbox[0].to, ["casey@example.COM"])
+
+    async def test_email_shaped_usernames_are_rejected_regardless(
+        self,
+    ) -> None:
+        """A username shaped like an email address is refused with the same
+        format error whether or not it matches an existing account's email.
+
+        Refusing only the addresses that have accounts, however the error is
+        worded, would tell the registrant that the address has an account.
+        """
+        await sync_to_async(UserProfileWithParentsFactory.create)(
+            user__username="ada", user__email="ada@example.com"
+        )
+
+        errors_seen = []
+        for username in [
+            "ada@example.com",  # Another account's address
+            "Ada@Example.com",  # Same, different case
+            "nobody@example.com",  # An address with no account
+            "mal@or.y",  # Email-shaped, though nobody's address
+        ]:
+            with self.subTest(username=username):
+                response = await self.async_client.post(
+                    reverse("register"),
+                    self.registration_data(username, "mallory@example.com"),
+                )
+                self.assertEqual(response.status_code, HTTPStatus.OK)
+                username_errors = response.context["form"].errors["username"]
+                self.assertEqual(len(username_errors), 1)
+                self.assertNotIn("exists", username_errors[0].lower())
+                self.assertNotIn("taken", username_errors[0].lower())
+                errors_seen.append(tuple(username_errors))
+                self.assertFalse(
+                    await User.objects.filter(
+                        username__iexact=username
+                    ).aexists()
+                )
+
+        # Every attempt got exactly the same error.
+        self.assertEqual(len(set(errors_seen)), 1)
+
+    async def test_an_at_sign_alone_does_not_make_a_username_an_email(
+        self,
+    ) -> None:
+        """A username with an "@" but no domain is not email-shaped and is
+        still allowed."""
+        response = await self.async_client.post(
+            reverse("register"),
+            self.registration_data("mal@ory", "mallory@example.com"),
+            follow=True,
+        )
+        self.assertEqual(response.status_code, HTTPStatus.OK)
+        self.assertTrue(
+            await User.objects.filter(username="mal@ory").aexists()
+        )
+
+    async def test_refused_duplicate_still_hashes_a_password(self) -> None:
+        """The refused path must pay for a password hash like the real signup
+        does, or response time alone would tell an observer which path ran.
+        """
+        await sync_to_async(UserProfileWithParentsFactory.create)(
+            user__email="taken@example.com"
+        )
+        with patch.object(User, "set_password") as set_password_mock:
+            await self.async_client.post(
+                reverse("register"),
+                self.registration_data("latecomer", "taken@example.com"),
+            )
+        set_password_mock.assert_called_once_with("TestPassw0rd!")
+        self.assertFalse(
+            await User.objects.filter(username="latecomer").aexists()
+        )
+
+    async def test_stub_lookup_ignores_surrounding_whitespace(self) -> None:
+        """An address with stray whitespace must still find the stub account,
+        or the form's stripped-address duplicate check would see that stub as
+        somebody else's account and refuse the claim.
+        """
+        stub_user, _ = await sync_to_async(create_stub_account)(
+            {
+                "email": "donor@example.com",
+                "first_name": "Donor",
+                "last_name": "Person",
+            },
+            {
+                "address1": "123 Main St",
+                "address2": "",
+                "city": "Anytown",
+                "state": "XX",
+                "zip_code": "00000",
+            },
+        )
+
+        response = await self.async_client.post(
+            reverse("register"),
+            self.registration_data("donor", "  donor@example.com  "),
+            follow=True,
+        )
+        self.assertEqual(response.status_code, HTTPStatus.OK)
+        await stub_user.arefresh_from_db()
+        self.assertEqual(stub_user.username, "donor")
+        self.assertEqual(
+            await User.objects.filter(email="donor@example.com").acount(), 1
+        )
+
+    async def test_stub_account_claim_is_not_treated_as_a_duplicate(
+        self,
+    ) -> None:
+        """Claiming a donor stub account binds the form to the account that
+        already holds the address, so it must upgrade the stub rather than be
+        refused as a duplicate."""
+        stub_user, _ = await sync_to_async(create_stub_account)(
+            {
+                "email": "donor@example.com",
+                "first_name": "Donor",
+                "last_name": "Person",
+            },
+            {
+                "address1": "123 Main St",
+                "address2": "",
+                "city": "Anytown",
+                "state": "XX",
+                "zip_code": "00000",
+            },
+        )
+        mail.outbox.clear()
+
+        response = await self.async_client.post(
+            reverse("register"),
+            self.registration_data("donor", "donor@example.com"),
+            follow=True,
+        )
+        self.assertEqual(response.status_code, HTTPStatus.OK)
+
+        stub_user = await User.objects.select_related("profile").aget(
+            pk=stub_user.pk
+        )
+        self.assertEqual(stub_user.username, "donor")
+        self.assertTrue(stub_user.is_active)
+        self.assertFalse(stub_user.profile.stub_account)
+        self.assertEqual(
+            await User.objects.filter(email="donor@example.com").acount(), 1
+        )
+
+        # The claimant gets the activation email, not the "already exists" one.
+        recipients = [m.to for m in mail.outbox]
+        self.assertIn(["donor@example.com"], recipients)
+        subjects = [m.subject for m in mail.outbox]
+        self.assertIn(
+            "Confirm your account on CourtListener.com",
+            subjects,
+        )
+        self.assertNotIn(
+            "You already have an account on CourtListener.com",
+            subjects,
+        )
+
+    @patch("cl.users.views.notify_existing_account_holder")
+    @patch("cl.users.views.send_new_account_emails")
+    async def test_both_outcomes_enqueue_mail_instead_of_sending_it(
+        self, new_account_mock: MagicMock, existing_account_mock: MagicMock
+    ) -> None:
+        """Neither outcome may send mail synchronously in the view. A fresh
+        signup that sent two emails inline while a refused duplicate sent one
+        would be distinguishable by response time alone."""
+        email = "timing@example.com"
+        mail.outbox.clear()
+
+        await self.async_client.post(
+            reverse("register"),
+            self.registration_data("timing_first", email),
+        )
+        user = await User.objects.aget(username="timing_first")
+        new_account_mock.delay.assert_called_once_with(user.pk)
+        existing_account_mock.delay.assert_not_called()
+        self.assertEqual(mail.outbox, [])
+
+        await self.async_client.post(
+            reverse("register"),
+            self.registration_data("timing_second", email),
+        )
+        existing_account_mock.delay.assert_called_once_with(email)
+        new_account_mock.delay.assert_called_once()
+        self.assertEqual(mail.outbox, [])
+
+
+class DuplicateEmailSettingsTest(TestCase):
+    """Users who already hold an address on more than one account exist and
+    must keep working until those duplicates are cleaned up."""
+
+    def setUp(self) -> None:
+        self.client = AsyncClient()
+        self.email = "twice@example.com"
+        UserProfileWithParentsFactory.create(
+            user__username="other_holder", user__email=self.email
+        )
+        self.up = UserProfileWithParentsFactory.create(
+            user__username="pandora",
+            user__password=make_password("password"),
+            user__email=self.email,
+        )
+
+    async def test_existing_duplicate_can_still_save_settings(self) -> None:
+        """Regression test: the registration form's uniqueness check must
+        not leak into UserForm, or a user whose address is shared with another
+        account could never save their settings page. See issue #7854."""
+        self.assertTrue(
+            await self.client.alogin(username="pandora", password="password")
+        )
+        response = await self.client.post(
+            reverse("view_settings"),
+            {
+                "first_name": "Still",
+                "last_name": "Works",
+                "email": self.email,
+            },
+            follow=True,
+        )
+
+        self.assertEqual(response.status_code, HTTPStatus.OK)
+        self.assertIn(
+            message_dict["settings_changed_successfully"]["message"],
+            response.content.decode(),
+        )
+        await self.up.user.arefresh_from_db()
+        self.assertEqual(self.up.user.first_name, "Still")
+        self.assertEqual(self.up.user.email, self.email)
+
+
+class UserAdminEmailSearchTest(TestCase):
+    """Admin user search uses the LOWER(email) index for complete addresses."""
+
+    @classmethod
+    def setUpTestData(cls) -> None:
+        cls.user = UserFactory.create(
+            username="admin-search",
+            first_name="Ada",
+            last_name="Lovelace",
+            email="Matcher@Example.com",
+        )
+        cls.other = UserFactory.create(
+            username="other-user",
+            first_name="Other",
+            last_name="Person",
+            email="other@example.org",
+        )
+
+    def setUp(self) -> None:
+        self.user_admin = UserAdmin(model=User, admin_site=admin.site)
+        self.request = RequestFactory().get(
+            reverse("admin:auth_user_changelist")
+        )
+
+    def search(self, term: str) -> QuerySet[User]:
+        """Run the User admin changelist search and return the queryset."""
+        results, _use_distinct = self.user_admin.get_search_results(
+            self.request, User.objects.all(), term
+        )
+        return results
+
+    def test_email_search_finds_the_account_regardless_of_case(self) -> None:
+        """Does a differently-cased complete address still find the account?"""
+        for email in [
+            "Matcher@Example.com",
+            "matcher@example.com",
+            "MATCHER@EXAMPLE.COM",
+        ]:
+            with self.subTest(email=email):
+                self.assertEqual(
+                    list(
+                        self.search(email).values_list("username", flat=True)
+                    ),
+                    ["admin-search"],
+                )
+
+    def test_a_different_address_does_not_match(self) -> None:
+        """Is a complete address match exact, once case is set aside?"""
+        self.assertEqual(
+            list(
+                self.search("nobody@example.com").values_list("pk", flat=True)
+            ),
+            [],
+        )
+
+    def test_partial_email_search_still_matches(self) -> None:
+        """Do domain and partial-address terms still use substring search?"""
+        cases = (
+            ("@example.com", "admin-search"),
+            ("Matcher@", "admin-search"),
+            ("@example.org", "other-user"),
+        )
+        for term, username in cases:
+            with self.subTest(term=term):
+                self.assertEqual(
+                    list(self.search(term).values_list("username", flat=True)),
+                    [username],
+                )
+
+    def test_email_search_folds_case_in_sql(self) -> None:
+        """Does a complete address compile to LOWER() rather than UPPER()/LIKE?"""
+        sql = str(self.search("matcher@example.com").query)
+        self.assertIn("LOWER", sql.upper())
+        self.assertNotIn("UPPER", sql.upper())
+        self.assertNotIn("LIKE", sql.upper())
+
+    def test_username_search_still_works(self) -> None:
+        """Does a non-address term still search username and name?"""
+        self.assertEqual(
+            list(
+                self.search("admin-search").values_list("username", flat=True)
+            ),
+            ["admin-search"],
+        )
+        self.assertEqual(
+            list(self.search("Lovelace").values_list("username", flat=True)),
+            ["admin-search"],
+        )
+
+    def test_empty_search_returns_everyone(self) -> None:
+        """Does an empty term leave the queryset unfiltered?"""
+        results, use_distinct = self.user_admin.get_search_results(
+            self.request, User.objects.all(), ""
+        )
+        self.assertEqual(results.count(), User.objects.count())
+        self.assertFalse(use_distinct)
+
+
+class UserAdminNeonLinksTest(TestCase):
+    """Tests for the Neon links shown on the user admin page."""
+
+    @classmethod
+    def setUpTestData(cls) -> None:
+        cls.user = UserProfileWithParentsFactory.create(
+            neon_account_id="112684"
+        ).user
+
+    def test_no_links_without_neon_ids(self) -> None:
+        """Users with no Neon account or membership get no Neon links."""
+        user = UserProfileWithParentsFactory.create().user
+        self.assertEqual(UserAdmin._get_neon_links(user.pk), [])
+
+    def test_account_link(self) -> None:
+        """A Neon account ID produces a link to the Neon account page."""
+        self.assertEqual(
+            UserAdmin._get_neon_links(self.user.pk),
+            [
+                {
+                    "href": "https://donate.free.law/admin/accounts/112684/about",
+                    "label": "Neon User",
+                }
+            ],
+        )
+
+    def test_account_and_membership_links(self) -> None:
+        """A membership with a Neon ID adds a link to the membership page."""
+        NeonMembershipFactory(user=self.user, neon_id="11394")
+        self.assertEqual(
+            [link["href"] for link in UserAdmin._get_neon_links(self.user.pk)],
+            [
+                "https://donate.free.law/admin/accounts/112684/about",
+                "https://donate.free.law/admin/memberships/11394",
+            ],
+        )
+
 
 class UserAdminApiCallsCountTest(TestCase):
     """Tests for UserAdmin.api_calls_count.
@@ -4503,6 +5117,18 @@ class UserProfileTotalApiUsageTest(TestCase):
 
 class ViewApiUsageTest(TestCase):
     """Tests for /profile/api-usage/."""
+
+    @classmethod
+    def setUpClass(cls) -> None:
+        super().setUpClass()
+        # get_all_throttle_overrides() gets its own @tiered_cache namespace
+        # so that parallel test don't clobber each other.
+        patcher = mock.patch(
+            "cl.lib.decorators.get_tiered_cache_prefix",
+            new=lambda: "tiered_view_api_usage_test",
+        )
+        patcher.start()
+        cls.addClassCleanup(patcher.stop)
 
     @classmethod
     def setUpTestData(cls) -> None:
@@ -5575,3 +6201,82 @@ class FailedSignInThrottleTest(TestCase):
             )
             self.sign_in(self.user.username, "a-good-password")
             self.assertIn("_auth_user_id", self.client.session)
+
+
+class AlertsPageMembershipNudgeTest(TestCase):
+    """Non-members are offered more alerts on their profile's alerts pages."""
+
+    @classmethod
+    def setUpTestData(cls) -> None:
+        cls.user = UserProfileWithParentsFactory.create().user
+        AlertFactory(user=cls.user)
+        DocketAlertWithParentsFactory(user=cls.user)
+
+    def setUp(self) -> None:
+        self.client.force_login(self.user)
+
+    def test_non_member_is_offered_more_alerts(self) -> None:
+        """Both alert pages mention what members get and link to join."""
+        expected = {
+            "profile_search_alerts": "Members get more search alerts",
+            "profile_docket_alerts": "Members get unlimited docket alerts",
+        }
+        for viewname, nudge in expected.items():
+            with self.subTest(viewname=viewname):
+                response = self.client.get(reverse(viewname))
+                self.assertContains(response, nudge)
+                self.assertContains(response, ">Join FLP</a>")
+
+    def test_member_is_not_offered_more_alerts(self) -> None:
+        """Members already get the benefit, so don't ask them to join."""
+        NeonMembershipFactory(user=self.user)
+        for viewname in ("profile_search_alerts", "profile_docket_alerts"):
+            with self.subTest(viewname=viewname):
+                response = self.client.get(reverse(viewname))
+                self.assertNotContains(response, "Members get")
+
+    def test_member_is_thanked_on_docket_alerts_page(self) -> None:
+        """Members see a thank-you where non-members see the nudge."""
+        NeonMembershipFactory(user=self.user)
+        response = self.client.get(reverse("profile_docket_alerts"))
+        self.assertContains(
+            response, "As a member you get unlimited docket alerts. Thanks!"
+        )
+
+
+@override_settings(WAFFLE_CACHE_PREFIX="MembershipHeaderLinkTest")
+class MembershipHeaderLinkTest(TestCase):
+    """The header's donate slot should make sense for members and non-members."""
+
+    @classmethod
+    def setUpTestData(cls) -> None:
+        cls.user = UserProfileWithParentsFactory.create().user
+        cls.url = reverse("help_home")
+
+    def test_anonymous_user_sees_join_flp(self) -> None:
+        """Anonymous visitors are invited to join."""
+        response = self.client.get(self.url)
+        self.assertContains(response, "Join FLP")
+
+    def test_non_member_sees_join_flp(self) -> None:
+        """Signed-in users without a membership are still invited to join."""
+        self.client.force_login(self.user)
+        response = self.client.get(self.url)
+        self.assertContains(response, "Join FLP")
+
+    def test_active_member_sees_membership_link(self) -> None:
+        """Members get a link to their membership page, not a join button."""
+        NeonMembershipFactory(user=self.user)
+        self.client.force_login(self.user)
+        response = self.client.get(self.url)
+        self.assertNotContains(response, "Join FLP")
+        self.assertContains(response, "&nbsp;Membership</a>")
+
+    def test_lapsed_member_sees_join_flp(self) -> None:
+        """A membership that is no longer active shouldn't hide the join link."""
+        NeonMembershipFactory(
+            user=self.user, payment_status=MembershipPaymentStatus.FAILED
+        )
+        self.client.force_login(self.user)
+        response = self.client.get(self.url)
+        self.assertContains(response, "Join FLP")

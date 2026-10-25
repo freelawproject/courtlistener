@@ -330,9 +330,14 @@
           <ul class="nav navbar-nav navbar-right">
             <li
               class="{% block navbar-donate %}inactive{% endblock %} hidden-xs">
-              <a href="https://free.law/membership/"
-
-                 class="donate"><i class="fa fa-heart-o"></i>&nbsp;Join FLP</a>
+              {% if user.is_authenticated and user.profile.is_member %}
+                {# Members don't need to join; send them to their membership info. #}
+                <a href="{% url "profile_your_support" %}"
+                   class="donate"><i class="fa fa-heart"></i>&nbsp;Membership</a>
+              {% else %}
+                <a href="https://free.law/membership/"
+                   class="donate"><i class="fa fa-heart-o"></i>&nbsp;Join FLP</a>
+              {% endif %}
             </li>
           </ul>
         </div>

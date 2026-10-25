@@ -17,6 +17,7 @@ check lives alongside the delete it protects rather than in the admin.
 """
 
 import time
+from collections.abc import Callable
 from typing import Any
 from urllib import parse
 
@@ -28,6 +29,8 @@ from django.db.models import FileField, Q, QuerySet
 from django.urls import reverse
 from requests import Response
 
+from cl.favorites.models import Note
+from cl.favorites.utils import get_notes_for
 from cl.lib.cloud_front import invalidate_cloudfront
 from cl.lib.decorators import retry
 from cl.lib.models import THUMBNAIL_STATUSES
@@ -185,14 +188,22 @@ def delete_cluster_files(cluster: OpinionCluster, delete_docket: bool) -> None:
     deleted_filepaths = []
 
     for opinion in cluster.sub_opinions.all():
-        if not opinion.local_path:
-            continue
-        path = opinion.local_path.name
-        # save=False: the Opinion row is about to be deleted by the
-        # caller's cascade anyway, so there's no point writing this
-        # change back to a row that won't exist a moment later.
-        opinion.local_path.delete(save=False)
-        deleted_filepaths.append(path)
+        # OpinionContent rows are cascade deleted with their opinion
+        field_files = [opinion.local_path] + [
+            content.local_path
+            for content in opinion.contents.exclude(local_path="").only(
+                "local_path"
+            )
+        ]
+        for field_file in field_files:
+            if not field_file:
+                continue
+            path = field_file.name
+            # save=False: the rows are about to be deleted by the caller's
+            # cascade anyway, so there's no point writing this change back
+            # to a row that won't exist a moment later.
+            field_file.delete(save=False)
+            deleted_filepaths.append(path)
 
     cluster_file_fields = [
         field.name
@@ -218,13 +229,24 @@ def delete_cluster_files(cluster: OpinionCluster, delete_docket: bool) -> None:
     invalidate_cloudfront([f"/{path}" for path in deleted_filepaths])
 
 
+def _note_blockers_for_cluster(cluster: OpinionCluster) -> QuerySet[Note]:
+    """Notes blocking cluster/docket deletion, dual-read aware (#7725).
+
+    Checks both the cluster and its docket -- a Note can be attached to
+    either. Replaces .note_set, which is blind to Notes in the new
+    content_type/object_id shape.
+
+    :param cluster: The OpinionCluster being considered for sealing.
+    :return: A queryset of Notes attached to the cluster or its docket.
+    """
+    return get_notes_for(cluster).union(get_notes_for(cluster.docket))
+
+
 # nosemgrep: python.lang.bad-return-outside-function
-SEAL_BLOCKERS_MAP = {
+SEAL_BLOCKERS_MAP: dict[str, Callable[[OpinionCluster], Any]] = {
     # These prevent cluster deletion
     "favorites.UserTag": lambda cluster: cluster.docket.user_tags,
-    "favorites.Note": lambda cluster: cluster.docket.note_set.all().union(
-        cluster.note_set.all()
-    ),
+    "favorites.Note": _note_blockers_for_cluster,
     "alerts.DocketAlert": lambda cluster: cluster.docket.alerts,
     "visualizations.SCOTUSMap": lambda cluster: SCOTUSMap.objects.filter(
         Q(cluster_start=cluster)

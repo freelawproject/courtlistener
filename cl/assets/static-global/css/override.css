@@ -525,6 +525,10 @@ a.button:active {
   text-decoration: none;
 }
 
+.underline {
+  text-decoration: underline;
+}
+
 a.black-link,
 a.black-link:hover,
 a.black-link:active,

@@ -35,9 +35,12 @@ from copy import deepcopy
 from dataclasses import dataclass
 from functools import lru_cache
 from math import ceil
+from typing import cast
 
 from datasketch import MinHash, MinHashLSH
-from Stemmer import Stemmer
+from Stemmer import (  # type:ignore[missing-import] Stemmer has no associated py or pyi file
+    Stemmer,
+)
 
 from cl.lib.stop_words import STOP_WORDS
 from cl.search.models import Parenthetical
@@ -154,7 +157,9 @@ def get_similarity_graph(
     """
     similarity_graph: Graph = {}
     for par_key, mhash in parenthetical_minhashes.items():
-        similarity_graph[par_key] = similarity_index.query(mhash)
+        similarity_graph[par_key] = cast(
+            list[str], similarity_index.query(mhash)
+        )
     return similarity_graph
 
 

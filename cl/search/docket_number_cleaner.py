@@ -323,11 +323,6 @@ def extract_with_llm(
         capture_exception(e)
         return None
 
-    if not isinstance(llm_response, CleanDocketNumber):
-        # Added this to avoid type checker errors
-        logger.error("LLM - Invalid response type: %s", type(llm_response))
-        return None
-
     records = {}
     for item in llm_response.docket_numbers:
         docket_id = item.unique_id

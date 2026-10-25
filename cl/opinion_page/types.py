@@ -1,6 +1,8 @@
 from dataclasses import dataclass, field
 from typing import Literal
 
+from django.db.models.query import QuerySet
+
 from cl.search.models import (
     OpinionCluster,
     OpinionsCitedByRECAPDocument,
@@ -19,16 +21,16 @@ class ViewAuthority:
 class AuthoritiesContext:
     citation_record: OpinionCluster | RECAPDocument
     query_string: str
-    full_list_authorities: list[
-        OpinionCluster | OpinionsCitedByRECAPDocument
-    ] = field(init=False)
+    full_list_authorities: (
+        QuerySet[OpinionCluster] | QuerySet[OpinionsCitedByRECAPDocument]
+    ) = field(init=False)
     total_authorities_count: int
     top_authorities: list[ViewAuthority] = field(init=False)
     view_all_url: str
     doc_type: Literal["opinion", "document"]
     query_all_authorities: bool = False
 
-    async def post_init(self):
+    async def post_init(self) -> None:
         if isinstance(self.citation_record, RECAPDocument):
             self.full_list_authorities = (
                 self.citation_record.authorities_with_data

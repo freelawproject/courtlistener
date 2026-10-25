@@ -19,6 +19,7 @@ from django.test import SimpleTestCase, override_settings
 from django.urls import reverse
 from elasticsearch import NotFoundError
 from eyecite import get_citations
+from eyecite.models import CitationBase, FullCaseCitation
 from eyecite.test_factories import (
     case_citation,
     id_citation,
@@ -60,6 +61,7 @@ from cl.citations.tasks import (
     store_opinion_citations_and_update_parentheticals,
     store_recap_citations,
 )
+from cl.citations.types import MatchedResourceType
 from cl.citations.unmatched_citations_utils import (
     handle_unmatched_citations,
     update_unmatched_citations_status,
@@ -67,7 +69,7 @@ from cl.citations.unmatched_citations_utils import (
 from cl.citations.utils import (
     make_get_citations_kwargs,
 )
-from cl.lib.test_helpers import CourtTestCase, PeopleTestCase, SearchTestCase
+from cl.lib.test_helpers import SearchTestCase
 from cl.search.documents import (
     ES_CHILD_ID,
     OpinionClusterDocument,
@@ -243,7 +245,9 @@ class CitationTextTest(TestCase):
                 # to receive.
                 if not citations:
                     continue
-                citation_resolutions = {NO_MATCH_RESOURCE: citations}
+                citation_resolutions: dict[
+                    MatchedResourceType, list[CitationBase]
+                ] = {NO_MATCH_RESOURCE: citations}
 
                 created_html = create_cited_html(citation_resolutions, {})
                 self.assertEqual(
@@ -384,7 +388,9 @@ class CitationTextTest(TestCase):
                 # purpose of this test is not to test that. We just need
                 # something that looks like what create_cited_html() expects
                 # to receive.
-                citation_resolutions = {NO_MATCH_RESOURCE: citations}
+                citation_resolutions: dict[
+                    MatchedResourceType, list[CitationBase]
+                ] = {NO_MATCH_RESOURCE: citations}
 
                 created_html = create_cited_html(
                     citation_resolutions, get_citations_kwargs
@@ -478,8 +484,9 @@ class CitationTextTest(TestCase):
                     msg=f"\n{created_html}\n\n    !=\n\n{expected_html}",
                 )
 
-    def test_make_html_from_harvard_xml(self) -> None:
-        """Can we convert the XML of an opinion into modified HTML?"""
+    def test_make_html_from_harvard_and_scan_xml(self) -> None:
+        """Can we convert the Harvard or scanned XML of an opinion into
+        modified HTML?"""
         # fmt: off
 
         test_pairs = [
@@ -495,13 +502,15 @@ class CitationTextTest(TestCase):
         ]
 
         # fmt: on
-        for s, expected_html in test_pairs:
+        for (s, expected_html), field in itertools.product(
+            test_pairs, ["xml_harvard", "xml_scan"]
+        ):
             with self.subTest(
                 f"Testing html to html conversion for {s}...",
                 s=s,
-                expected_html=expected_html,
+                field=field,
             ):
-                opinion = Opinion(xml_harvard=s)
+                opinion = Opinion(**{field: s})
                 get_citations_kwargs = make_get_citations_kwargs(opinion)[0]
                 citations = get_citations(
                     tokenizer=HYPERSCAN_TOKENIZER,
@@ -512,7 +521,9 @@ class CitationTextTest(TestCase):
                 # purpose of this test is not to test that. We just need
                 # something that looks like what create_cited_html() expects
                 # to receive.
-                citation_resolutions = {NO_MATCH_RESOURCE: citations}
+                citation_resolutions: dict[
+                    MatchedResourceType, list[CitationBase]
+                ] = {NO_MATCH_RESOURCE: citations}
 
                 created_html = create_cited_html(
                     citation_resolutions, get_citations_kwargs
@@ -1379,6 +1390,7 @@ class CitationObjectTest(ESIndexTestCase, TestCase):
         citation = get_citations(citation_str, tokenizer=HYPERSCAN_TOKENIZER)[
             0
         ]
+        assert isinstance(citation, FullCaseCitation)
         results = resolve_fullcase_citation(citation)
         self.assertEqual(NO_MATCH_RESOURCE, results)
 
@@ -1386,18 +1398,28 @@ class CitationObjectTest(ESIndexTestCase, TestCase):
         """Resolve to corrected reporter"""
         cite_str = "8 B. 415"
         citation = get_citations(cite_str, tokenizer=HYPERSCAN_TOKENIZER)[0]
-        citation.citing_opinion = Opinion.objects.all()[0]
+        assert isinstance(citation, FullCaseCitation)
+        setattr(citation, "citing_opinion", Opinion.objects.all()[0])
         results = resolve_fullcase_citation(citation)
         opinion12 = Opinion.objects.get(cluster__pk=self.citation12.cluster_id)
+        citation.citing_opinion = (
+            Opinion.objects.exclude(pk=opinion12.pk).order_by("pk").first()
+        )
+        results = resolve_fullcase_citation(citation)
         self.assertEqual(results.pk, opinion12.pk, msg=results)
 
     def test_citation_resolve_to_pincite(self) -> None:
         """Resolve to corrected reporter and pin cite inside xml harvard?"""
         cite_str = "8 B. 416"
         citation = get_citations(cite_str, tokenizer=HYPERSCAN_TOKENIZER)[0]
-        citation.citing_opinion = Opinion.objects.all()[0]
+        assert isinstance(citation, FullCaseCitation)
+        setattr(citation, "citing_opinion", Opinion.objects.all()[0])
         results = resolve_fullcase_citation(citation)
         opinion12 = Opinion.objects.get(cluster__pk=self.citation12.cluster_id)
+        citation.citing_opinion = (
+            Opinion.objects.exclude(pk=opinion12.pk).order_by("pk").first()
+        )
+        results = resolve_fullcase_citation(citation)
         self.assertEqual(results.pk, opinion12.pk, msg=results)
 
     def test_citation_multiple_matches(self) -> None:
@@ -1406,6 +1428,7 @@ class CitationObjectTest(ESIndexTestCase, TestCase):
         citation = get_citations(citation_str, tokenizer=HYPERSCAN_TOKENIZER)[
             0
         ]
+        assert isinstance(citation, FullCaseCitation)
         results = resolve_fullcase_citation(citation)
         self.assertEqual(MULTIPLE_MATCHES_RESOURCE, results)
 
@@ -1738,9 +1761,7 @@ class CitationObjectTest(ESIndexTestCase, TestCase):
         )
 
 
-class CitationFeedTest(
-    ESIndexTestCase, CourtTestCase, PeopleTestCase, SearchTestCase, TestCase
-):
+class CitationFeedTest(ESIndexTestCase, SearchTestCase, TestCase):
     @classmethod
     def setUpTestData(cls) -> None:
         cls.rebuild_index("search.OpinionCluster")
@@ -2503,9 +2524,7 @@ class GroupParentheticalsTest(SimpleTestCase):
     "cl.api.utils.CitationCountRateThrottle.get_cache_key_for_citations",
     return_value="citations_tests",
 )
-class CitationLookUpApiTest(
-    CourtTestCase, PeopleTestCase, SearchTestCase, TestCase
-):
+class CitationLookUpApiTest(SearchTestCase, TestCase):
     @classmethod
     def setUpTestData(cls) -> None:
         UserProfileWithParentsFactory.create(
@@ -3232,11 +3251,9 @@ class UnmatchedCitationTest(TransactionTestCase):
     cluster = None
     opinion: Opinion
 
-    @classmethod
-    def setUpClass(cls):
-        cls.cluster = OpinionClusterWithChildrenAndParentsFactory()
-        cls.opinion = cls.cluster.sub_opinions.first()
-        UnmatchedCitation.objects.all().delete()
+    def setUp(self) -> None:
+        self.cluster = OpinionClusterWithChildrenAndParentsFactory()
+        self.opinion = self.cluster.sub_opinions.all()[0]
 
     def test_1st_creation(self) -> None:
         """Can we save unmatched citations?"""
@@ -3580,7 +3597,7 @@ class ReindexESCiteFieldsTest(ESIndexTestCase, TransactionTestCase):
         doc = OpinionClusterDocument.get(id=cluster.id)
         self.assertEqual(doc.citeCount, cite_count)
 
-        # make a change that won't be catched by signals
+        # make a change that won't be caught by signals
         OpinionCluster.objects.filter(id=cluster.id).update(
             citation_count=cite_count + 1
         )

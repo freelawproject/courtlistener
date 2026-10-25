@@ -1,4 +1,8 @@
-document.addEventListener('htmx:beforeRequest', function () {
+document.addEventListener('htmx:beforeRequest', function (event) {
+  // These handlers fire on every HTMX request on the page (e.g. a prayer
+  // button), not just the CSV export links -- ignore anything else.
+  if (!event.detail.elt.matches('.export-csv')) return;
+
   // If the mobile error message is currently visible, adds the 'hidden' class
   // to hide it.
   let mobileErrorMessage = document.getElementById('mobile-export-csv-error');
@@ -15,6 +19,8 @@ document.addEventListener('htmx:beforeRequest', function () {
 });
 
 document.addEventListener('htmx:beforeOnLoad', function (event) {
+  if (!event.detail.elt.matches('.export-csv')) return;
+
   // Get the XMLHttpRequest object from the event details
   const xhr = event.detail.xhr;
   if (xhr.status == 200) {
