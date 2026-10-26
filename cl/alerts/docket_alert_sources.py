@@ -40,7 +40,8 @@ class DocketAlertSource:
 def _with_email_relations(
     qs: QuerySet, documents_attr: str, document_model: type[AbstractPDF]
 ) -> QuerySet:
-    """Preload what a docket alert email renders -- each entry's docket and
+    """Preload what a docket alert email renders -- each entry's docket (with
+    its court, which DocketEntry.datetime_filed reads for the timezone) and
     documents, minus their potentially huge plain_text -- in a fixed number
     of queries, however many entries there are. Re-rendering the evaluated
     entries, as make_alert_messages does per recipient, adds no queries.
@@ -50,7 +51,7 @@ def _with_email_relations(
     documents, e.g. "recap_documents".
     :param document_model: The document model behind `documents_attr`.
     """
-    return qs.select_related("docket").prefetch_related(
+    return qs.select_related("docket__court").prefetch_related(
         Prefetch(
             documents_attr,
             queryset=document_model.objects.defer("plain_text"),
