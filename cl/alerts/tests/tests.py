@@ -1119,6 +1119,28 @@ class DocketAlertSourceTest(TestCase):
             set(entries.values_list("pk", flat=True)), {de_new.pk}
         )
 
+    def test_scotus_source_lookups_return_oldest_entries_first(self) -> None:
+        """Do both SCOTUS lookups return entries oldest first, like RECAP's?"""
+        before = now()
+        des = [
+            SCOTUSDocketEntryFactory(
+                docket=self.scotus_docket, sequence_number=seq
+            )
+            for seq in ("2025-01-03.001", "2025-01-01.001", "2025-01-02.001")
+        ]
+        expected = ["2025-01-01.001", "2025-01-02.001", "2025-01-03.001"]
+        lookups = {
+            "entries_by_pk": SCOTUS_ALERT_SOURCE.entries_by_pk(
+                [de.pk for de in des]
+            ),
+            "entries_since": SCOTUS_ALERT_SOURCE.entries_since(
+                self.scotus_docket, before
+            ),
+        }
+        for lookup_name, qs in lookups.items():
+            with self.subTest(lookup=lookup_name):
+                self.assertEqual([de.sequence_number for de in qs], expected)
+
     def test_docket_get_alert_source_dispatches_by_court_id(self) -> None:
         """Does Docket.get_alert_source() route to the right registry entry?"""
         self.assertIs(self.recap_docket.get_alert_source(), RECAP_ALERT_SOURCE)
