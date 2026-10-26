@@ -1,5 +1,5 @@
 from collections import defaultdict
-from datetime import datetime, timedelta
+from datetime import datetime, time, timedelta
 from http import HTTPStatus
 from types import SimpleNamespace
 from typing import TYPE_CHECKING, cast
@@ -1135,7 +1135,10 @@ class DocketAlertSourceTest(TestCase):
         for n in (10, 11):
             RECAPDocumentFactory(
                 docket_entry=DocketEntryFactory(
-                    docket=self.recap_docket, entry_number=n
+                    docket=self.recap_docket,
+                    entry_number=n,
+                    date_filed=datetime(2025, 1, 2).date(),
+                    time_filed=time(15, 30),
                 ),
                 document_number=str(n),
             )
@@ -1172,6 +1175,9 @@ class DocketAlertSourceTest(TestCase):
                     ]
                     for doc in docs:
                         doc.get_absolute_url()
+                        # RECAP entries with a time_filed resolve their
+                        # court's timezone through their docket.
+                        getattr(doc.docket_entry, "datetime_filed", None)
                 self.assertEqual(len(docs), 2)
                 for doc in docs:
                     self.assertIn("plain_text", doc.get_deferred_fields())
