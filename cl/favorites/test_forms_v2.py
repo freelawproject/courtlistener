@@ -1,6 +1,10 @@
+from asgiref.sync import sync_to_async
+from django.contrib.auth.models import AnonymousUser
 from django.contrib.contenttypes.models import ContentType
 
 from cl.favorites.factories import NoteFactory
+from cl.favorites.forms import NoteForm as V1NoteForm
+from cl.favorites.forms import get_note_form_for
 from cl.favorites.forms_v2 import NoteForm
 from cl.lib.widgets import NEW_STACK_WIDGET_CLASSES
 from cl.search.factories import DocketFactory
@@ -124,3 +128,45 @@ class NoteFormV2Test(TestCase):
         self.assertEqual(saved.pk, note.pk)
         self.assertEqual(note.name, "New name")
         self.assertEqual(note.notes, "New notes")
+
+
+class GetNoteFormForTest(TestCase):
+    """Test that get_note_form_for() builds the form class it is given."""
+
+    @classmethod
+    def setUpTestData(cls) -> None:
+        cls.docket = DocketFactory()
+        cls.user = UserFactory()
+
+    async def test_defaults_to_the_v1_form(self) -> None:
+        """Do callers that don't choose a class keep getting the v1 form?"""
+        for user in (AnonymousUser(), self.user):
+            with self.subTest(user=type(user).__name__):
+                form = await get_note_form_for(self.docket, user, "Foo v. Bar")
+
+                self.assertIs(type(form), V1NoteForm)
+
+    async def test_builds_the_given_class_for_a_new_note(self) -> None:
+        """Is a blank form built with the given class and prefilled?"""
+        form = await get_note_form_for(
+            self.docket, self.user, "Foo v. Bar", form_class=NoteForm
+        )
+
+        self.assertIs(type(form), NoteForm)
+        self.assertFalse(form.instance.pk)
+        self.assertEqual(form.initial["object_id"], self.docket.pk)
+        self.assertEqual(form.initial["name"], "Foo v. Bar")
+
+    async def test_builds_the_given_class_for_an_existing_note(self) -> None:
+        """Is the user's existing note bound to the given class?"""
+        note = await sync_to_async(NoteFactory.for_object)(
+            self.docket, user=self.user, name="Old name"
+        )
+
+        form = await get_note_form_for(
+            self.docket, self.user, "Ignored", form_class=NoteForm
+        )
+
+        self.assertIs(type(form), NoteForm)
+        self.assertEqual(form.instance.pk, note.pk)
+        self.assertEqual(form.initial["name"], "Old name")

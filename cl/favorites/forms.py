@@ -77,6 +77,7 @@ async def get_note_form_for(
     obj: models.Model,
     user: AnonymousUser | User,
     name: str | Callable[[], Awaitable[str]],
+    form_class: type[NoteForm] = NoteForm,
 ) -> NoteForm:
     """Build a NoteForm for a noteable object: bound to the user's
     existing Note if one exists, else blank and pre-filled.
@@ -89,18 +90,20 @@ async def get_note_form_for(
         pages only know their case name via their parent Docket, so
         deferring means that extra query never runs when a Note already
         exists and the name ends up unused.
-    :return: A NoteForm bound to the user's existing Note for obj, or an
+    :param form_class: The NoteForm subclass to build, for pages that render
+        the V2 form.
+    :return: A form_class bound to the user's existing Note for obj, or an
         unsaved one pre-filled with obj's content_type/object_id.
     """
     note = await sync_to_async(get_note_for_target)(type(obj), obj.pk, user)
     if note is not None:
-        return NoteForm(instance=note)
+        return form_class(instance=note)
 
     resolved_name = await name() if callable(name) else name
     content_type = await sync_to_async(ContentType.objects.get_for_model)(
         type(obj)
     )
-    return NoteForm(
+    return form_class(
         initial={
             "content_type": content_type.pk,
             "object_id": obj.pk,
