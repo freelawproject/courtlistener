@@ -2,8 +2,10 @@
 Downloads the file a link points to without leaving the page, in Alpine's
 CSP-friendly build, which doesn't support inline JavaScript. `busy` is true
 while the request runs; a non-2xx response sets `error` instead of
-navigating away, and a redirect, such as an expired session, is left to the
-browser to follow. Without JavaScript the link still downloads natively.
+navigating away. A redirect, such as an expired session, sends the browser to
+the redirect's target with its `next` parameter pointed back at the current
+page, so signing in returns here. Without JavaScript the link still downloads
+natively.
 
 Usage:
 
@@ -35,7 +37,9 @@ document.addEventListener('alpine:init', () => {
       try {
         const response = await fetch(url);
         if (response.redirected) {
-          window.location.href = url;
+          const target = new URL(response.url);
+          target.searchParams.set('next', location.pathname + location.search);
+          window.location.href = target.href;
           return;
         }
         if (!response.ok) throw new Error(`HTTP ${response.status}`);
