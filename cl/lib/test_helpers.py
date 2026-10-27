@@ -1441,12 +1441,6 @@ class AudioTestCase(TestCase):
 class AudioESTestCase(TestCase):
     """Audio test case factories for ES"""
 
-    fixtures = [
-        "test_court.json",
-        "judge_judy.json",
-        "test_objects_search.json",
-    ]
-
     @classmethod
     def setUpTestData(cls) -> None:
         super().setUpTestData()
