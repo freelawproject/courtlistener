@@ -449,8 +449,10 @@ class SearchViewSet(LoggingMixin, viewsets.ViewSet):
 
 
 class SearchV4ViewSet(LoggingMixin, viewsets.ViewSet):
-    # Default permissions use Django permissions, so here we AllowAny,
-    # but folks will need to log in to get past the thresholds.
+    # Search results aren't backed by a model, so the project-wide
+    # DjangoModelPermissions default doesn't apply. Require authentication
+    # to prevent anonymous crawlers from spreading expensive queries across
+    # multiple IPs and overloading Elasticsearch.
     permission_classes = (permissions.IsAuthenticated,)
 
     supported_search_types = {
