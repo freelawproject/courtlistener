@@ -10,7 +10,7 @@ from itertools import product
 from typing import TYPE_CHECKING, Any, cast
 from unittest import mock
 from unittest.mock import AsyncMock, MagicMock, PropertyMock, patch
-from urllib.parse import parse_qs, urlencode, urlparse
+from urllib.parse import parse_qs, quote, urlencode, urlparse
 
 from asgiref.sync import async_to_sync, sync_to_async
 from django import forms
@@ -51,6 +51,7 @@ from cl.alerts.models import DocketAlert
 from cl.audio.factories import AudioFactory
 from cl.citations.utils import slugify_reporter
 from cl.favorites import forms_v2 as favorites_forms_v2
+from cl.favorites.factories import NoteFactory
 from cl.favorites.forms import NoteForm
 from cl.favorites.models import GenericCount
 from cl.lib.file_validation import (
@@ -5149,6 +5150,53 @@ class DocketNoteFormV2Test(TestCase):
 
         self.assertTemplateUsed(r, "docket_parties.html")
         self.assertIs(type(r.context["note_form"]), NoteForm)
+
+    async def test_logged_out_user_gets_sign_in_links(self) -> None:
+        """Does a logged-out user see sign-in and register links that return
+        to the docket, instead of the note form?"""
+        url = reverse("view_docket", args=[self.docket.pk, self.docket.slug])
+
+        r = await self.async_client.get(url)
+
+        content = r.content.decode()
+        self.assertIn("Add Note", content)
+        self.assertIn(f"{reverse('sign-in')}?next={quote(url)}", content)
+        self.assertIn(f"{reverse('register')}?next={quote(url)}", content)
+        self.assertNotIn(reverse("save_or_update_note"), content)
+
+    async def test_user_without_a_note_gets_the_add_form(self) -> None:
+        """Does a logged-in user with no note see "Add Note", the form
+        pointed at the save view, and no Delete button?"""
+        user = await sync_to_async(UserWithChildProfileFactory)()
+        await self.async_client.aforce_login(user)
+
+        r = await self.async_client.get(
+            reverse("view_docket", args=[self.docket.pk, self.docket.slug])
+        )
+
+        content = r.content.decode()
+        self.assertIn("Add Note", content)
+        self.assertNotIn("Edit Note", content)
+        self.assertIn(reverse("save_or_update_note"), content)
+        self.assertNotIn(reverse("delete_note"), content)
+
+    async def test_user_with_a_note_gets_the_edit_form(self) -> None:
+        """Does a user who already has a note see "Edit Note", their saved
+        values, and a Delete button?"""
+        user = await sync_to_async(UserWithChildProfileFactory)()
+        await sync_to_async(NoteFactory.for_object)(
+            self.docket, user=user, name="My saved note"
+        )
+        await self.async_client.aforce_login(user)
+
+        r = await self.async_client.get(
+            reverse("view_docket", args=[self.docket.pk, self.docket.slug])
+        )
+
+        content = r.content.decode()
+        self.assertIn("Edit Note", content)
+        self.assertIn("My saved note", content)
+        self.assertIn(reverse("delete_note"), content)
 
 
 @override_settings(WAFFLE_CACHE_PREFIX="test_docket_note_form_v1_waffle")
