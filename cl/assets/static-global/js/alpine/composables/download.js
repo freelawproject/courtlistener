@@ -1,12 +1,13 @@
 /*
 Downloads the file a link points to without leaving the page, in Alpine's
 CSP-friendly build, which doesn't support inline JavaScript. `busy` is true
-while the request runs. A non-2xx response sets `errorMessage` instead of
+while the request runs. A failed request sets `errorMessage` instead of
 navigating away, picked from the root element's `data-error-message-<status>`
-attributes with `data-error-message-default` as the fallback. A redirect, such as an
-expired session, sends the browser to the redirect's target with its `next`
-parameter pointed back at the current page, so signing in returns here.
-Without JavaScript the link still downloads natively.
+attributes with `data-error-message-default` as the fallback; without a
+default, a failure shows nothing. A redirect whose target carries a `next`
+parameter is taken as a sign-in redirect: the browser goes there with `next`
+pointed back at the current page, so signing in returns here. Without
+JavaScript the link still downloads natively.
 
 Usage:
 
@@ -42,8 +43,8 @@ document.addEventListener('alpine:init', () => {
       let status = 0;
       try {
         const response = await fetch(url);
-        if (response.redirected) {
-          const target = new URL(response.url);
+        const target = response.redirected ? new URL(response.url) : null;
+        if (target?.searchParams.has('next')) {
           target.searchParams.set('next', location.pathname + location.search);
           window.location.href = target.href;
           return;
@@ -73,8 +74,8 @@ document.addEventListener('alpine:init', () => {
     /** The error message the root element declares for a status, or its default one. */
     errorMessageFor(status) {
       return (
-        this.$root.getAttribute(`data-error-message-${status}`) ??
-        this.$root.getAttribute('data-error-message-default') ??
+        this.$root.getAttribute(`data-error-message-${status}`) ||
+        this.$root.getAttribute('data-error-message-default') ||
         ''
       );
     },
