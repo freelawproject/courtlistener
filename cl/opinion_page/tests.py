@@ -4675,7 +4675,9 @@ class DocketEntryRowsV2Test(TestCase):
         links = [
             a
             for a in fromstring(html).iter("a")
-            if " ".join(a.text_content().split()) == "Export entries CSV"
+            if " ".join(a.text_content().split()).startswith(
+                "Export entries CSV"
+            )
         ]
         self.assertEqual(len(links), 1)
         return links[0]
@@ -4692,6 +4694,7 @@ class DocketEntryRowsV2Test(TestCase):
         self.assertEqual(link.get("rel"), "nofollow")
         self.assertEqual(link.get("x-on:click.prevent"), "start")
         self.assertIsNone(link.get("hx-get"))
+        self.assertNotIn("sign in required", link.text_content())
         component = link.xpath('ancestor::*[@x-data="download"]')
         self.assertEqual(len(component), 1)
         self.assertTrue(component[0].xpath('.//*[@role="alert"]'))
@@ -4710,8 +4713,10 @@ class DocketEntryRowsV2Test(TestCase):
         self.assertEqual(
             link.get("href"), f"{reverse('sign-in')}?next={docket_path}"
         )
+        self.assertEqual(link.get("rel"), "nofollow")
         self.assertIsNone(link.get("x-on:click.prevent"))
         self.assertIsNone(link.get("hx-get"))
+        self.assertIn("sign in required", link.text_content())
 
     async def test_entries_use_option_d_semantic_markup(self) -> None:
         """Entries render as an <ol> of <li>, with <dl> for metadata and a nested <ul> for RECAP documents."""
