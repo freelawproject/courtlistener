@@ -125,7 +125,13 @@ class AsyncHomepageTest(SimpleUserDataMixin, TestCase):
         resp = await self.async_client.get(reverse("show_results"))
         self.assertEqual(resp.status_code, 200)
         self.assertTemplateUsed(resp, "v2_homepage.html")
-        self.assertIn(">Login</a>", resp.content.decode())
+        tree = lhtml.fromstring(resp.content)
+        sign_in_links = tree.xpath(
+            f'//a[starts-with(@href, "{reverse("sign-in")}")]'
+        )
+        self.assertIn(
+            "Login", [a.text_content().strip() for a in sign_in_links]
+        )
         self.assertNotIn(
             'aria-label="Toggle account menu"', resp.content.decode()
         )
@@ -135,7 +141,13 @@ class AsyncHomepageTest(SimpleUserDataMixin, TestCase):
         resp = await self.async_client.get(reverse("show_results"))
         self.assertEqual(resp.status_code, 200)
         self.assertTemplateUsed(resp, "v2_homepage.html")
-        self.assertNotIn(">Login</a>", resp.content.decode())
+        tree = lhtml.fromstring(resp.content)
+        sign_in_links = tree.xpath(
+            f'//a[starts-with(@href, "{reverse("sign-in")}")]'
+        )
+        self.assertNotIn(
+            "Login", [a.text_content().strip() for a in sign_in_links]
+        )
         self.assertIn(
             'aria-label="Toggle account menu"', resp.content.decode()
         )
