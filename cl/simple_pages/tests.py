@@ -762,7 +762,10 @@ class ButtonComponentTest(SimpleTestCase):
     def test_busy_keeps_the_label_and_hides_the_spinner_from_assistive_technology(
         self,
     ) -> None:
-        """The spinner is decoration and the label stays, so the accessible name survives."""
+        """aria-busy reaches the rendered element and the label survives.
+
+        The spinner is decoration, so the accessible name is the label alone.
+        """
         for source in (
             '<c-button variant="primary" aria-busy="true">Save</c-button>',
             '<c-button variant="primary" touch_target aria-busy="true">Save</c-button>',
@@ -770,6 +773,7 @@ class ButtonComponentTest(SimpleTestCase):
         ):
             with self.subTest(source=source):
                 element = fromstring(self.render(source))
+                self.assertEqual(element.get("aria-busy"), "true")
                 spinners = element.xpath('.//*[local-name()="svg"]')
                 self.assertEqual(len(spinners), 1)
                 self.assertEqual(spinners[0].get("aria-hidden"), "true")
