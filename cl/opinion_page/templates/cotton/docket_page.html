@@ -131,7 +131,13 @@
   {% endif %}
   <c-docket-source-button :docket="docket" :docket_source="docket_source" />
   {% if user.is_authenticated %}
-    <div x-data="download" class="flex flex-wrap items-center gap-2">
+    <div
+      x-data="download"
+      data-error-message-501="CSV export is not available for this docket's source."
+      data-error-message-429="You have reached the export limit. Try again in an hour."
+      data-error-message-default="There was a problem. Try again later."
+      class="flex flex-wrap items-center gap-2"
+    >
       <c-button
         variant="outline"
         href="{% url 'view_download_docket' docket.id %}"
@@ -142,7 +148,7 @@
         {% svg "download" class="w-4 h-4" aria_hidden="true" %}
         Export entries CSV
       </c-button>
-      <span x-show="error" x-cloak role="alert" class="text-sm text-red-600">There was a problem. Try again later.</span>
+      <span x-show="errorMessage" x-text="errorMessage" x-cloak role="alert" class="text-sm text-red-600"></span>
     </div>
   {% else %}
     <c-button

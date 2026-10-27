@@ -4697,7 +4697,17 @@ class DocketEntryRowsV2Test(TestCase):
         self.assertNotIn("sign in required", link.text_content())
         component = link.xpath('ancestor::*[@x-data="download"]')
         self.assertEqual(len(component), 1)
-        self.assertTrue(component[0].xpath('.//*[@role="alert"]'))
+        # The view answers 501 and 429; each needs its own message, plus a fallback.
+        for key in (
+            "data-error-message-501",
+            "data-error-message-429",
+            "data-error-message-default",
+        ):
+            self.assertTrue(component[0].get(key), key)
+        alerts = component[0].xpath('.//*[@role="alert"]')
+        self.assertEqual(
+            [alert.get("x-text") for alert in alerts], ["errorMessage"]
+        )
 
     async def test_csv_export_for_anonymous_user(self) -> None:
         """A visitor gets a plain link to sign in and come back to this docket."""
