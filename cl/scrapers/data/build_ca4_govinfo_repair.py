@@ -1,7 +1,8 @@
 """Build the mapping the fix_ca4_govinfo_pdfs command consumes.
 
-Kept for provenance: it records how ca4_govinfo_repair.csv was derived, so the
-mapping can be audited or rebuilt rather than taken on trust.
+Kept for provenance: it records how the mapping was derived, so it can be
+audited or rebuilt rather than taken on trust. The mapping itself is attached to
+issue 8100 rather than committed here, since it is a one-time artefact.
 
 Its two inputs are not in this repository. They are the outputs of the offline
 audit of issue 8100, which reads every affected record's GovInfo MODS metadata.
