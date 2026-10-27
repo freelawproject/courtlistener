@@ -81,6 +81,7 @@ from cl.search.tests.test_generate_opinion_embeddings import (
     FakeS3IntelligentTieringStorage,
 )
 from cl.tests.cases import (
+    AuthenticatedClientMixin,
     CountESTasksTestCase,
     ESIndexTestCase,
     TestCase,
@@ -571,6 +572,7 @@ class OpinionV3APISearchTest(
 
 
 class OpinionV4APISearchTest(
+    AuthenticatedClientMixin,
     OpinionSearchAPICommonTests,
     ESIndexTestCase,
     TestCase,
@@ -2427,7 +2429,7 @@ class OpinionsESSearchTest(ESIndexTestCase, SearchTestCase, TestCase):
 
 
 class OpinionSearchDecayRelevancyTest(
-    ESIndexTestCase, V4SearchAPIAssertions, TestCase
+    AuthenticatedClientMixin, ESIndexTestCase, V4SearchAPIAssertions, TestCase
 ):
     """
     Opinion Search Decay Relevancy Tests
@@ -2706,7 +2708,7 @@ class OpinionSearchDecayRelevancyTest(
 
 
 class OpinionSearchJurisdictionRelevancyTest(
-    ESIndexTestCase, V4SearchAPIAssertions, TestCase
+    AuthenticatedClientMixin, ESIndexTestCase, V4SearchAPIAssertions, TestCase
 ):
     """
     Opinion Search Jurisdiction Relevance Tests
