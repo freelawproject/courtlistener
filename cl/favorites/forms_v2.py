@@ -22,3 +22,12 @@ class NoteForm(V1NoteForm):
             "name": widgets.TextInput(attrs={"maxlength": "100"}),
             "notes": widgets.Textarea(attrs={"maxlength": "500"}),
         }
+
+    @property
+    def has_hidden_field_errors(self) -> bool:
+        """Whether content_type or object_id failed validation.
+
+        Users can't correct those fields, so templates show one fixed notice
+        instead of the field messages.
+        """
+        return any(field.errors for field in self.hidden_fields())

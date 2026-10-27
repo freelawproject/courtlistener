@@ -1,6 +1,9 @@
 from asgiref.sync import sync_to_async
 from django.contrib.auth.models import AnonymousUser
 from django.contrib.contenttypes.models import ContentType
+from django.template import engines
+from django.test import RequestFactory
+from django_cotton.compiler_regex import CottonCompiler
 
 from cl.favorites.factories import NoteFactory
 from cl.favorites.forms import NoteForm as V1NoteForm
@@ -93,6 +96,29 @@ class NoteFormV2Test(TestCase):
         self.assertFalse(form.is_valid())
         self.assertIn("object_id", form.errors)
 
+    def test_has_hidden_field_errors(self) -> None:
+        """Is only a failure of the hidden fields reported, and not a failure
+        of the fields the user fills in?"""
+        cases = (
+            ("valid", self.build_form(), False),
+            ("dangling object_id", self.build_form(object_id=999999999), True),
+            (
+                "unknown content_type",
+                self.build_form(content_type=999999999),
+                True,
+            ),
+            ("blank name", self.build_form(name=""), False),
+        )
+        for label, form, expected in cases:
+            with self.subTest(case=label):
+                form.is_valid()
+
+                self.assertIs(form.has_hidden_field_errors, expected)
+
+    def test_unbound_form_has_no_hidden_field_errors(self) -> None:
+        """Does a form that was never submitted report no errors?"""
+        self.assertFalse(NoteForm().has_hidden_field_errors)
+
     def test_binds_an_existing_note(self) -> None:
         """Does the form work with instance=, prefilled from the note?"""
         user = UserFactory()
@@ -128,6 +154,57 @@ class NoteFormV2Test(TestCase):
         self.assertEqual(saved.pk, note.pk)
         self.assertEqual(note.name, "New name")
         self.assertEqual(note.notes, "New notes")
+
+
+class NoteFormComponentTest(TestCase):
+    """Test the c-add-note.form component's error notice."""
+
+    NOTICE = "Please reload the page and try again."
+
+    @classmethod
+    def setUpTestData(cls) -> None:
+        cls.docket = DocketFactory()
+        cls.content_type = ContentType.objects.get_for_model(cls.docket)
+
+    def render(self, **overrides: str | int) -> str:
+        """Render the component with a validated form, with fields that can
+        be overridden."""
+        data = {
+            "content_type": self.content_type.pk,
+            "object_id": self.docket.pk,
+            "name": "Foo v. Bar",
+            "notes": "A note",
+        }
+        form = NoteForm(data={**data, **overrides})
+        form.is_valid()
+        compiled = CottonCompiler().process('<c-add-note.form :form="form" />')
+        return (
+            engines["django"]
+            .from_string(compiled)
+            .render({"form": form, "request": RequestFactory().get("/")})
+        )
+
+    def test_notice_is_shown_when_a_hidden_field_fails(self) -> None:
+        """Is the user told to reload when the noted object can't be found?"""
+        html = self.render(object_id=999999999)
+
+        self.assertIn('role="alert"', html)
+        self.assertIn(self.NOTICE, html)
+
+    def test_notice_is_not_shown_for_a_valid_form(self) -> None:
+        """Is a form with no errors rendered without the notice?"""
+        html = self.render()
+
+        self.assertNotIn('role="alert"', html)
+        self.assertNotIn(self.NOTICE, html)
+
+    def test_notice_is_not_shown_for_a_field_error(self) -> None:
+        """Is a mistake in a visible field left to that field's own message,
+        without telling the user to reload?"""
+        html = self.render(name="")
+
+        self.assertNotIn(self.NOTICE, html)
+        self.assertIn("This field is required.", html)
 
 
 class GetNoteFormForTest(TestCase):
