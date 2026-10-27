@@ -18,6 +18,7 @@ from django.utils.datastructures import MultiValueDictKeyError
 from django.views.decorators.http import require_http_methods
 
 from cl.favorites.forms import NoteForm
+from cl.favorites.forms_v2 import NoteForm as NoteFormV2
 from cl.favorites.models import DocketTag, Note, Prayer, UserTag
 from cl.favorites.selectors import prayer_eligible
 from cl.favorites.utils import (
@@ -70,6 +71,18 @@ def get_note(request: HttpRequest) -> Note | None:
 
 @login_required
 def save_or_update_note(request: HttpRequest) -> HttpResponse:
+    """Save or update a note.
+
+    Routes on the request type: htmx requests from the v2 pages get the form
+    fragment to swap in place, legacy AJAX requests get a plain text message.
+    """
+    if request.headers.get("HX-Request"):
+        return _save_or_update_note_htmx(request)
+
+    return _save_or_update_note_ajax(request)
+
+
+def _save_or_update_note_ajax(request: HttpRequest) -> HttpResponse:
     """Uses ajax to save or update a note.
 
     Receives a request as an argument, and then uses that plus POST data to
@@ -102,6 +115,46 @@ def save_or_update_note(request: HttpRequest) -> HttpResponse:
         return HttpResponseNotAllowed(
             permitted_methods={"POST"}, content="Not an ajax request."
         )
+
+
+def _save_or_update_note_htmx(request: HttpRequest) -> HttpResponse:
+    """Save or update the user's note for an object and return the v2 form.
+
+    Every outcome except a non-POST request is a 200 with the form fragment,
+    because htmx does not swap error responses. Invalid input comes back as
+    the form with its errors. A request that doesn't name a noteable object
+    comes back with an error on object_id, since the form accepts blank ids
+    and would otherwise save a note attached to nothing.
+    """
+    if request.method != "POST":
+        return HttpResponseNotAllowed(
+            permitted_methods={"POST"}, content="Not a POST request."
+        )
+
+    note = get_note(request)
+    form = NoteFormV2(request.POST, instance=note)
+    is_valid = form.is_valid()
+    if note is None:
+        form.add_error("object_id", "No such object exists.")
+    elif is_valid:
+        new_note = form.save(commit=False)
+        new_note.user = request.user
+        try:
+            new_note.save()
+        except IntegrityError:
+            # A concurrent request created this user's note first. Update
+            # that note instead of dropping this edit.
+            existing = get_note(request)
+            if existing is not None and existing.pk:
+                existing.name = form.cleaned_data["name"]
+                existing.notes = form.cleaned_data["notes"]
+                existing.save()
+                new_note = existing
+        form = NoteFormV2(instance=new_note)
+
+    return TemplateResponse(
+        request, "v2_includes/add_note/form.html", {"form": form}
+    )
 
 
 @login_required
