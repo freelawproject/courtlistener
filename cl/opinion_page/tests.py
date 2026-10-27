@@ -4683,7 +4683,11 @@ class DocketEntryRowsV2Test(TestCase):
         return links[0]
 
     async def test_csv_export_for_authenticated_user(self) -> None:
-        """A signed-in user gets the download link, fetched in place by Alpine."""
+        """A signed-in user gets the download link, fetched in place by Alpine.
+
+        The view answers 501 and 429, so the page declares a message for each
+        plus a fallback.
+        """
         user = await sync_to_async(UserWithChildProfileFactory)()
         await sync_to_async(self.async_client.force_login)(user)
         link = self.export_link(await self._get_docket_page())
@@ -4697,7 +4701,6 @@ class DocketEntryRowsV2Test(TestCase):
         self.assertNotIn("sign in required", link.text_content())
         component = link.xpath('ancestor::*[@x-data="download"]')
         self.assertEqual(len(component), 1)
-        # The view answers 501 and 429; each needs its own message, plus a fallback.
         for key in (
             "data-error-message-501",
             "data-error-message-429",
