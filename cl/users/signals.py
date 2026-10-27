@@ -207,11 +207,7 @@ def webhook_created_or_updated(
     if created:
         notify_new_or_updated_webhook.delay(instance.pk, created=True)
     else:
-        if update_fields:
-            if (
-                "failure_count"
-                or "enabled"
-                or "date_modified" in update_fields
-            ):
-                return
+        bypass_fields = ("failure_count", "enabled", "date_modified")
+        if update_fields and set(bypass_fields) & set(update_fields):
+            return
         notify_new_or_updated_webhook.delay(instance.pk, created=False)
