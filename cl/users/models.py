@@ -17,7 +17,7 @@ from cl.api.utils import invert_user_logs
 from cl.lib.model_helpers import invert_choices_group_lookup
 from cl.lib.models import AbstractDateTimeModel
 from cl.lib.redis_utils import get_redis_interface
-from cl.sso.membership import get_effective_membership
+from cl.sso.membership import EffectiveMembership, get_effective_membership
 
 donation_exclusion_codes = [
     1,  # Unknown error
@@ -154,16 +154,23 @@ class UserProfile(models.Model):
     )
 
     @property
+    def effective_membership(self) -> EffectiveMembership | None:
+        """The membership whose benefits the user gets, if any.
+
+        :return: See ``get_effective_membership``.
+        """
+        return get_effective_membership(self.user)
+
+    @property
     def is_member(self) -> bool:
         """Does the user get membership benefits?
 
         True for an active Neon membership of their own, or a seat in an
-        active organization (see ``get_effective_membership``). Use that
-        function instead when you also need the level.
+        active organization (see ``effective_membership``).
 
         :return bool: True if so, False if not.
         """
-        return get_effective_membership(self.user) is not None
+        return self.effective_membership is not None
 
     @property
     def is_eligible_for_rt_search_alerts(self) -> bool:

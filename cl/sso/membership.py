@@ -4,6 +4,7 @@ from django.contrib.auth.base_user import AbstractBaseUser
 from django.contrib.auth.models import AnonymousUser
 from django.core.exceptions import ObjectDoesNotExist
 
+from cl.donate.models import NeonMembershipLevel
 from cl.sso.models import Organization, OrganizationMembership
 
 
@@ -25,6 +26,11 @@ class EffectiveMembership:
     def is_organization(self) -> bool:
         """Whether the benefits come from an organization."""
         return self.organization is not None
+
+    @property
+    def level_display(self) -> str:
+        """The membership level's name, as shown to members."""
+        return dict(NeonMembershipLevel.TYPES).get(self.level, "")
 
 
 def get_effective_membership(

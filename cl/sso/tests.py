@@ -628,6 +628,7 @@ class EffectiveMembershipTest(TestCase):
         self.assertEqual(membership.level, NeonMembershipLevel.TIER_3)
         self.assertTrue(membership.is_organization)
         self.assertEqual(membership.neon_id, "")
+        self.assertEqual(membership.level_display, "CL Membership - Tier 3")
         self.assertTrue(self.user.profile.is_member)
 
     def test_membership_without_seat_does_not_count(self) -> None:

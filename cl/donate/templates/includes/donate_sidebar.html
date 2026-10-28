@@ -3,7 +3,7 @@
 <div class="sidebar-section hidden-xs">
   {% if user.profile.is_member %}
     <h3><span>Thank You! <i class="fa fa-heart-o red"></i></span></h3>
-    <p>You're a {{user.membership.get_level_display}} level supporter of the Free Law Project. Thank you for your support!
+    <p>You're a {{ user.profile.effective_membership.level_display }} level supporter of the Free Law Project. Thank you for your support!
     </p>
   {% else %}
     <h3><span>Support FLP <i class="fa fa-heart-o red"></i></span></h3>
