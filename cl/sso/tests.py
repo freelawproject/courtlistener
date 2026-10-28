@@ -1,5 +1,6 @@
 import base64
 import json
+import secrets
 import time
 from datetime import timedelta
 from io import StringIO
@@ -243,7 +244,6 @@ class FakeIdP:
         now = int(time.time())
         # allauth skips the signature check for an id_token it fetched
         # directly over TLS (as the OIDC spec allows), so the key is unused.
-        # nosemgrep: python.pyjwt.python-pyjwt-hardcoded-secret.python-pyjwt-hardcoded-secret, python.jwt.security.jwt-hardcode.jwt-python-hardcoded-secret
         id_token = jwt.encode(
             {
                 "iss": ISSUER,
@@ -253,7 +253,7 @@ class FakeIdP:
                 "iat": now,
                 "exp": now + 300,
             },
-            "unused-signing-key-for-tests-only-32b",
+            secrets.token_hex(32),
             algorithm="HS256",
         )
         return FakeResponse(
