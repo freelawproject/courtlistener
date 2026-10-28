@@ -65,6 +65,12 @@ from cl.search.api_serializers import (
 from cl.search.api_utils import CursorESList
 from cl.search.api_views import SearchV4ViewSet
 from cl.search.documents import ES_CHILD_ID, DocketDocument, ESRECAPDocument
+from cl.search.es_docket_sources import (
+    ALL_ES_SOURCES,
+    RECAP_ES_SOURCE,
+    SCOTUS_ES_SOURCE,
+    SOURCE_BY_MODEL,
+)
 from cl.search.factories import (
     BankruptcyInformationFactory,
     CourtFactory,
@@ -73,6 +79,7 @@ from cl.search.factories import (
     OpinionsCitedByRECAPDocumentFactory,
     OpinionWithParentsFactory,
     RECAPDocumentFactory,
+    SCOTUSDocketEntryFactory,
     ScotusDocketMetadataFactory,
     SCOTUSDocumentFactory,
 )
@@ -102,6 +109,7 @@ from cl.tests.cases import (
     AuthenticatedClientMixin,
     CountESTasksTestCase,
     ESIndexTestCase,
+    SimpleTestCase,
     TestCase,
     TransactionTestCase,
     V4SearchAPIAssertions,
@@ -6686,6 +6694,91 @@ class ESRECAPDocumentSCOTUSCompatibilityTest(TestCase):
         self.assertEqual(prepared["cites"], [citation.cited_opinion_id])
         self.assertEqual(prepared["short_description"], rd.description)
         self.assertEqual(prepared["docket_id"], docket.pk)
+
+
+class SCOTUSFieldTrackerTest(TestCase):
+    """Confirm the FieldTrackers added for #8020 (ScotusDocketMetadata,
+    SCOTUSDocketEntry, SCOTUSDocument) track the fields the ES signal
+    mapping depends on -- entirely at the model level, no ES or
+    signals involved.
+    """
+
+    def setUp(self) -> None:
+        self.court = CourtFactory(id="scotus", jurisdiction="F")
+
+    def test_scotus_document_tracks_docket_entry_id(self) -> None:
+        """Must include docket_entry_id, or reparenting a
+        SCOTUSDocument would never trigger the mapping's ["prepare"]
+        sentinel -- leaving its ES entry on the old docket forever."""
+        entry_a = SCOTUSDocketEntryFactory(docket__court=self.court)
+        entry_b = SCOTUSDocketEntryFactory(docket__court=self.court)
+        document = SCOTUSDocumentFactory(docket_entry=entry_a)
+
+        document.docket_entry = entry_b
+
+        self.assertIn(
+            "docket_entry_id", document.es_rd_field_tracker.changed()
+        )
+
+    def test_scotus_docket_entry_tracks_mapped_fields(self) -> None:
+        """Tracks every field scotus_document_field_mapping depends on
+        (description, entry_number, date_filed)."""
+        entry = SCOTUSDocketEntryFactory(docket__court=self.court)
+
+        entry.description = "updated"
+        entry.entry_number = 999
+        entry.date_filed = datetime.date(2020, 1, 1)
+
+        changed = entry.es_rd_field_tracker.changed()
+        self.assertIn("description", changed)
+        self.assertIn("entry_number", changed)
+        self.assertIn("date_filed", changed)
+
+    def test_scotus_docket_metadata_tracks_capital_case(self) -> None:
+        """Tracks capital_case."""
+        docket = DocketFactory(court=self.court, source=Docket.DEFAULT)
+        metadata = ScotusDocketMetadataFactory(
+            docket=docket, capital_case=False
+        )
+
+        metadata.capital_case = True
+
+        self.assertIn("capital_case", metadata.es_rd_field_tracker.changed())
+
+
+class ESDocketSourcesTest(SimpleTestCase):
+    """Confirm the per-source ES docket configuration added for #8020
+    (cl.search.es_docket_sources) is internally consistent.
+    """
+
+    def test_scotus_child_id_has_its_own_prefix(self) -> None:
+        """ES_CHILD_ID.SCOTUS must differ from .RECAP, or a
+        RECAPDocument and a SCOTUSDocument sharing a pk would collide
+        on the same ES _id."""
+        self.assertEqual(ES_CHILD_ID(42).RECAP, "rd_42")
+        self.assertEqual(ES_CHILD_ID(42).SCOTUS, "sd_42")
+
+    def test_all_sources_resolve_back_to_themselves_in_source_by_model(
+        self,
+    ) -> None:
+        """Every source's document_model (and metadata_model, if any)
+        must map back to that exact source."""
+        for source in ALL_ES_SOURCES:
+            self.assertIs(SOURCE_BY_MODEL[source.document_model], source)
+            if source.metadata_model is not None:
+                self.assertIs(SOURCE_BY_MODEL[source.metadata_model], source)
+
+    def test_docket_belongs_distinguishes_recap_from_scotus(self) -> None:
+        """Each source's docket_belongs checks the field it actually
+        relies on so a RECAP docket and a SCOTUS docket each belong
+        to exactly one source."""
+        recap_docket = Docket(source=Docket.RECAP, court_id="cand")
+        scotus_docket = Docket(source=Docket.DEFAULT, court_id="scotus")
+
+        self.assertTrue(RECAP_ES_SOURCE.docket_belongs(recap_docket))
+        self.assertFalse(SCOTUS_ES_SOURCE.docket_belongs(recap_docket))
+        self.assertFalse(RECAP_ES_SOURCE.docket_belongs(scotus_docket))
+        self.assertTrue(SCOTUS_ES_SOURCE.docket_belongs(scotus_docket))
 
 
 class RECAPFeedTest(RECAPSearchTestCase, ESIndexTestCase, TestCase):
