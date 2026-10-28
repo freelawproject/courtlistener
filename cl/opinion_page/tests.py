@@ -40,7 +40,7 @@ from django.utils.safestring import SafeString
 from django_cotton.compiler_regex import CottonCompiler
 from factory import RelatedFactory
 from lxml.etree import _Attrib, _Element
-from lxml.html import fromstring
+from lxml.html import HtmlElement, fromstring
 from waffle.models import Flag
 from waffle.testutils import override_flag
 
@@ -80,6 +80,8 @@ from cl.opinion_page.forms import (
     TennWorkCompClUploadForm,
 )
 from cl.opinion_page.utils import (
+    AuthorityRow,
+    build_authority_rows,
     build_docket_metadata,
     build_docket_tabs,
     build_idb_rows,
@@ -124,6 +126,7 @@ from cl.search.factories import (
     OpinionsCitedByRECAPDocumentFactory,
     OpinionsCitedWithParentsFactory,
     OpinionWithParentsFactory,
+    ParentheticalFactory,
     RECAPAttachmentFactory,
     RECAPDocumentFactory,
     SCOTUSDocketEntryFactory,
@@ -4151,6 +4154,268 @@ class DocketIdbV2TemplateTest(TestCase):
         ]
         self.assertEqual(len(current), 1)
         self.assertIn("FJC Integrated Database", current[0].text_content())
+
+
+def cite_from_docket(docket: Docket, opinion: Opinion, depth: int = 1) -> None:
+    """Make a new filing of docket cite opinion depth times."""
+    OpinionsCitedByRECAPDocumentFactory(
+        citing_document=RECAPDocumentFactory(
+            docket_entry=DocketEntryFactory(docket=docket)
+        ),
+        cited_opinion=opinion,
+        depth=depth,
+    )
+
+
+class BuildAuthorityRowsTest(TestCase):
+    """The rows of the docket Authorities tab, built from authority_opinions."""
+
+    @classmethod
+    def setUpTestData(cls) -> None:
+        cls.docket = DocketFactory(
+            court=CourtFactory(id="canb", jurisdiction="FB"),
+            source=Docket.RECAP,
+        )
+        cls.most_cited = OpinionWithParentsFactory(
+            cluster__case_name="Nollan v. California Coastal Commission",
+            cluster__date_filed=date(1987, 6, 26),
+            cluster__precedential_status=PRECEDENTIAL_STATUS.PUBLISHED,
+        )
+        cite_from_docket(cls.docket, cls.most_cited, depth=1)
+        cite_from_docket(cls.docket, cls.most_cited, depth=3)
+        ParentheticalFactory(described_opinion=cls.most_cited, score=0.2)
+        ParentheticalFactory(
+            described_opinion=cls.most_cited, text="Top summary", score=0.9
+        )
+        cls.least_cited = OpinionWithParentsFactory()
+        cite_from_docket(cls.docket, cls.least_cited)
+
+    def build_rows(self) -> list[AuthorityRow]:
+        """Builds the rows of every authority of the test docket."""
+        return build_authority_rows(
+            self.docket, self.docket.authority_opinions.distinct()
+        )
+
+    def test_rows_follow_the_authority_order(self) -> None:
+        """Rows keep the order of authority_opinions, most filings first."""
+        urls = [row["url"] for row in self.build_rows()]
+        self.assertEqual(
+            urls,
+            [
+                self.most_cited.cluster.get_absolute_url(),
+                self.least_cited.cluster.get_absolute_url(),
+            ],
+        )
+
+    def test_counts_are_labeled_and_pluralized(self) -> None:
+        """Filings and references are counted across the docket's filings."""
+        most_cited, least_cited = self.build_rows()
+        self.assertEqual(most_cited["filings_label"], "2 filings")
+        self.assertEqual(most_cited["references_label"], "4 references")
+        self.assertEqual(least_cited["filings_label"], "1 filing")
+        self.assertEqual(least_cited["references_label"], "1 reference")
+
+    def test_filings_url_searches_the_citing_filings(self) -> None:
+        """The filings link runs the search the legacy tab links to."""
+        url = urlparse(self.build_rows()[0]["filings_url"])
+        self.assertEqual(url.path, reverse("show_results"))
+        self.assertEqual(
+            parse_qs(url.query),
+            {
+                "type": [SEARCH_TYPES.RECAP],
+                "q": [
+                    f"docket_id:{self.docket.pk} "
+                    f"AND cites:({self.most_cited.pk})"
+                ],
+            },
+        )
+
+    def test_metadata_is_display_ready(self) -> None:
+        """Dates come formatted, with the ISO date for <time>."""
+        row = self.build_rows()[0]
+        self.assertEqual(row["date_filed"], "June 26, 1987")
+        self.assertEqual(row["date_filed_iso"], "1987-06-26")
+        self.assertEqual(row["status"], PRECEDENTIAL_STATUS.PUBLISHED)
+        self.assertEqual(
+            row["court"], str(self.most_cited.cluster.docket.court)
+        )
+
+    def test_summary_is_the_top_parenthetical(self) -> None:
+        """The highest scored parenthetical is the summary, linked to the
+        summaries tab; authorities without one get no summary keys."""
+        most_cited, least_cited = self.build_rows()
+        self.assertEqual(most_cited.get("summary"), "Top summary")
+        cluster = self.most_cited.cluster
+        self.assertEqual(
+            most_cited.get("summaries_url"),
+            reverse("view_case_summaries", args=[cluster.pk, cluster.slug]),
+        )
+        self.assertNotIn("summary", least_cited)
+        self.assertNotIn("summaries_url", least_cited)
+
+    def test_queries_do_not_grow_with_rows(self) -> None:
+        """A page costs the authorities query, its three prefetches and one
+        query for the summaries, whatever the number of rows."""
+        with self.assertNumQueries(5):
+            self.assertEqual(len(self.build_rows()), 2)
+
+
+@override_settings(WAFFLE_CACHE_PREFIX="test_docket_authorities_v2_waffle")
+@override_flag("use_new_design", active=True)
+class DocketAuthoritiesV2TemplateTest(TestCase):
+    """The v2 docket Authorities tab.
+
+    `WAFFLE_CACHE_PREFIX` isolates the flag cache from parallel workers, as
+    in DocketPageV2TemplateTest.
+    """
+
+    @classmethod
+    def setUpTestData(cls) -> None:
+        cls.docket = DocketFactory(
+            court=CourtFactory(id="canb", jurisdiction="FB"),
+            source=Docket.RECAP,
+        )
+        cls.most_cited = OpinionWithParentsFactory(
+            cluster__case_name="Nollan v. California Coastal Commission",
+        )
+        cite_from_docket(cls.docket, cls.most_cited)
+        cite_from_docket(cls.docket, cls.most_cited)
+        ParentheticalFactory(
+            described_opinion=cls.most_cited, text="Top summary", score=0.9
+        )
+        cls.least_cited = OpinionWithParentsFactory(
+            cluster__case_name="Dolan v. City of Tigard",
+        )
+        cite_from_docket(cls.docket, cls.least_cited)
+
+    async def get_page(self, **params: str) -> str:
+        """Requests the Authorities tab and checks it rendered through the
+        v2 template."""
+        r = await self.async_client.get(
+            reverse(
+                "docket_authorities",
+                args=[self.docket.pk, self.docket.slug],
+            ),
+            params,
+        )
+        self.assertEqual(r.status_code, HTTPStatus.OK)
+        self.assertTemplateUsed(r, "v2_docket_authorities.html")
+        return r.content.decode()
+
+    def get_link(self, content: str, href: str) -> HtmlElement:
+        """Returns the one link of the page that points at href."""
+        links = [
+            a for a in fromstring(content).iter("a") if a.get("href") == href
+        ]
+        self.assertEqual(len(links), 1, msg=f"Expected one link to {href}")
+        return links[0]
+
+    async def test_case_name_is_one_link(self) -> None:
+        """The whole caption, "v." included, is a single link (#5896)."""
+        cluster = self.most_cited.cluster
+        link = self.get_link(await self.get_page(), cluster.get_absolute_url())
+        self.assertIn(
+            "Nollan v. California Coastal Commission", link.text_content()
+        )
+        self.assertEqual(len(link), 0, msg="The caption has no child element")
+
+    async def test_caption_is_escaped(self) -> None:
+        """Markup in a case name renders as text, while the caption's
+        non-breaking spaces survive as characters."""
+        opinion = await sync_to_async(OpinionWithParentsFactory)(
+            cluster__case_name="<b>Bold</b> v. Escaped",
+        )
+        await sync_to_async(cite_from_docket)(self.docket, opinion)
+        content = await self.get_page()
+        self.assertIn("&lt;b&gt;Bold&lt;/b&gt; v. Escaped", content)
+        self.assertNotIn("<b>Bold</b>", content)
+        link = self.get_link(content, opinion.cluster.get_absolute_url())
+        self.assertNotIn("&nbsp;", link.text_content())
+
+    async def test_summary_links_to_the_summaries_tab(self) -> None:
+        """Authorities with a parenthetical show it above a summaries link."""
+        cluster = self.most_cited.cluster
+        content = await self.get_page()
+        self.assertIn("Top summary", content)
+        link = self.get_link(
+            content,
+            reverse("view_case_summaries", args=[cluster.pk, cluster.slug]),
+        )
+        self.assertEqual(link.text_content().strip(), "View Summary")
+
+    async def test_docket_counts_replace_the_cited_times(self) -> None:
+        """The last pill counts the docket's filings and references."""
+        content = await self.get_page()
+        self.assertIn("Cited in this docket:", content)
+        self.assertIn("2 filings", content)
+        self.assertIn("1 filing</a>", content)
+        self.assertNotIn("This opinion was cited", content)
+
+    async def test_authorities_tab_is_current(self) -> None:
+        """The tab navigation marks the Authorities tab as the current page."""
+        current = [
+            el
+            for el in fromstring(await self.get_page()).iter("a")
+            if el.get("aria-current") == "page"
+        ]
+        self.assertEqual(len(current), 1)
+        self.assertIn("Authorities", current[0].text_content())
+
+    async def test_authorities_are_paginated(self) -> None:
+        """Pages split the authorities and out-of-range pages are clamped."""
+        with patch(
+            "cl.opinion_page.views.Paginator",
+            side_effect=lambda qs, *args, **kwargs: Paginator(qs, 1),
+        ):
+            first = await self.get_page()
+            second = await self.get_page(page="2")
+            clamped = await self.get_page(page="99")
+        self.assertIn("Nollan", first)
+        self.assertNotIn("Dolan", first)
+        self.assertIn('aria-label="Pagination"', first)
+        self.assertIn("Dolan", second)
+        self.assertNotIn("Nollan", second)
+        self.assertIn("Dolan", clamped)
+
+
+class DocketAuthoritiesLegacyTest(TestCase):
+    """The legacy docket Authorities tab, served without the redesign flag."""
+
+    @classmethod
+    def setUpTestData(cls) -> None:
+        cls.docket = DocketFactory(
+            court=CourtFactory(id="canb", jurisdiction="FB"),
+            source=Docket.RECAP,
+        )
+        for case_name in ("Nollan v. Coastal", "Dolan v. Tigard"):
+            cite_from_docket(
+                cls.docket,
+                OpinionWithParentsFactory(cluster__case_name=case_name),
+            )
+
+    async def test_authorities_are_paginated(self) -> None:
+        """The legacy tab pages through the same authorities and still
+        counts them all in its heading."""
+        url = reverse(
+            "docket_authorities", args=[self.docket.pk, self.docket.slug]
+        )
+        with patch(
+            "cl.opinion_page.views.Paginator",
+            side_effect=lambda qs, *args, **kwargs: Paginator(qs, 1),
+        ):
+            r = await self.async_client.get(url, {"page": "2"})
+        self.assertEqual(r.status_code, HTTPStatus.OK)
+        self.assertTemplateUsed(r, "docket_authorities.html")
+        content = r.content.decode()
+        self.assertIn("The filings in this docket cite 2 opinions", content)
+        # Both authorities tie on filings and references, so either one can
+        # land on the second page, but only one of them does.
+        self.assertEqual(
+            ("Nollan" in content) + ("Dolan" in content),
+            1,
+            msg="Exactly one authority is listed on the second page",
+        )
+        self.assertIn("2 of 2", content)
 
 
 @override_settings(WAFFLE_CACHE_PREFIX="test_docket_page_v2_waffle")

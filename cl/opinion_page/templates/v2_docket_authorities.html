@@ -1,0 +1,86 @@
+{% extends "new_base.html" %}
+{% load extras humanize %}
+
+{% block title %}Authorities for {{ title }} – CourtListener.com{% endblock %}
+{% block og_title %}Authorities for {{ title }} - CourtListener.com{% endblock %}
+{% block description %}Authorities for {{ title }} — Brought to you by the RECAP Initiative and Free Law Project, a non-profit dedicated to creating high quality open legal information.{% endblock %}
+{% block og_description %}Authorities for {{ title }} — Brought to you by the RECAP Initiative and Free Law Project, a non-profit dedicated to creating high quality open legal information.{% endblock %}
+{% block canonical %}{% get_canonical_element %}{% endblock %}
+
+{% block content_wrapper %}
+<div class="bg-greyscale-100">
+  <div class="capped-width pt-4 md:pt-20 pb-35">
+    <c-docket-page
+      :docket="docket"
+      :docket_source="docket_source"
+      active_tab="authorities"
+      :metadata_sections="metadata_sections"
+      :tabs="tabs"
+      :has_alert="has_alert"
+      :note_form="note_form"
+    >
+      <h2 class="text-xl font-medium">Table of Authorities</h2>
+      <p class="text-sm text-greyscale-500 mt-1">
+        The filings in this docket cite {{ authorities.paginator.count|intcomma }} opinion{{ authorities.paginator.count|pluralize }}.
+      </p>
+
+      {# No empty state: the view 404s for dockets without authorities. #}
+      <ol role="list" class="list-none p-0 m-0 mt-4" aria-label="Authorities">
+        {% for authority in authority_rows %}
+          <li class="flex flex-col gap-2 py-4 border-b border-greyscale-200">
+            {# One link for the whole caption, "v." included (#5896). #}
+            <h3 class="text-sm font-medium">
+              <a href="{{ authority.url }}" class="links"{% if authority.blocked %} rel="nofollow"{% endif %}>{{ authority.caption }}</a>
+            </h3>
+
+            {% if authority.summary %}
+              <p class="text-sm text-greyscale-900">
+                {{ authority.summary }}
+                <a href="{{ authority.summaries_url }}" class="links font-medium">View Summary</a>
+              </p>
+            {% endif %}
+
+            <dl class="flex flex-wrap gap-x-3 gap-y-2.5 text-sm m-0">
+              <div class="flex gap-1 px-2 py-1 bg-white border border-greyscale-300 rounded-md">
+                <dt class="text-greyscale-600">Date Filed:</dt>
+                <dd class="font-medium text-greyscale-900"><time datetime="{{ authority.date_filed_iso }}">{{ authority.date_filed }}</time></dd>
+              </div>
+              <div class="flex gap-1 px-2 py-1 bg-white border border-greyscale-300 rounded-md">
+                <dt class="text-greyscale-600">Status:</dt>
+                <dd class="font-medium text-greyscale-900">{{ authority.status }}</dd>
+              </div>
+              <div class="flex gap-1 min-w-0 px-2 py-1 bg-white border border-greyscale-300 rounded-md">
+                <dt class="shrink-0 text-greyscale-600">Court:</dt>
+                <dd class="min-w-0 font-medium text-greyscale-900">{{ authority.court }}</dd>
+              </div>
+              {% if authority.citations %}
+                <div class="flex gap-1 min-w-0 px-2 py-1 bg-white border border-greyscale-300 rounded-md">
+                  <dt class="shrink-0 text-greyscale-600">Citations:</dt>
+                  <dd class="min-w-0 font-medium text-greyscale-900">{{ authority.citations }}</dd>
+                </div>
+              {% endif %}
+              <div class="flex gap-1 min-w-0 px-2 py-1 bg-white border border-greyscale-300 rounded-md">
+                <dt class="shrink-0 text-greyscale-600">Cited in this docket:</dt>
+                <dd class="min-w-0 font-medium text-greyscale-900">
+                  <a href="{{ authority.filings_url }}" class="links" rel="nofollow">{{ authority.filings_label }}</a>,
+                  {{ authority.references_label }}
+                </dd>
+              </div>
+            </dl>
+          </li>
+        {% endfor %}
+      </ol>
+
+      <c-pagination
+        :page_obj="authorities"
+        show_first
+        show_previous
+        show_page_indicator
+        show_range
+        show_next
+        show_last
+      />
+    </c-docket-page>
+  </div>
+</div>
+{% endblock %}
