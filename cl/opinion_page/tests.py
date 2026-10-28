@@ -4845,12 +4845,66 @@ class DocketEntryRowsV2Test(TestCase):
             escape(docket_entry_sources.RECAP.empty_message), content
         )
 
+    def export_link(self, html: str) -> _Element:
+        """The Export entries CSV link, rendered for every user state."""
+        links = [
+            a
+            for a in fromstring(html).iter("a")
+            if " ".join(a.text_content().split()).startswith(
+                "Export entries CSV"
+            )
+        ]
+        self.assertEqual(len(links), 1)
+        return links[0]
+
     async def test_csv_export_for_authenticated_user(self) -> None:
-        """CSV export button should render for authenticated users."""
+        """A signed-in user gets the download link, fetched in place by Alpine.
+
+        The view answers 501 and 429, so the page declares a message for each
+        plus a fallback.
+        """
         user = await sync_to_async(UserWithChildProfileFactory)()
         await sync_to_async(self.async_client.force_login)(user)
+        link = self.export_link(await self._get_docket_page())
+        download_path = reverse(
+            "view_download_docket", kwargs={"docket_id": self.docket.pk}
+        )
+        self.assertEqual(link.get("href"), download_path)
+        self.assertEqual(link.get("rel"), "nofollow")
+        self.assertEqual(link.get("x-on:click.prevent"), "start")
+        self.assertIsNone(link.get("hx-get"))
+        self.assertNotIn("sign in required", link.text_content())
+        component = link.xpath('ancestor::*[@x-data="download"]')
+        self.assertEqual(len(component), 1)
+        for key in (
+            "data-error-message-501",
+            "data-error-message-429",
+            "data-error-message-default",
+        ):
+            self.assertTrue(component[0].get(key), key)
+        alerts = component[0].xpath('.//*[@role="alert"]')
+        self.assertEqual(
+            [alert.get("x-text") for alert in alerts], ["errorMessage"]
+        )
+
+    async def test_csv_export_for_anonymous_user(self) -> None:
+        """A visitor gets a plain link to sign in and come back to this docket."""
         content = await self._get_docket_page()
-        self.assertIn("Export entries CSV", content)
+        download_path = reverse(
+            "view_download_docket", kwargs={"docket_id": self.docket.pk}
+        )
+        self.assertNotIn(download_path, content)
+        link = self.export_link(content)
+        docket_path = reverse(
+            "view_docket", args=[self.docket.pk, self.docket.slug]
+        )
+        self.assertEqual(
+            link.get("href"), f"{reverse('sign-in')}?next={docket_path}"
+        )
+        self.assertEqual(link.get("rel"), "nofollow")
+        self.assertIsNone(link.get("x-on:click.prevent"))
+        self.assertIsNone(link.get("hx-get"))
+        self.assertIn("sign in required", link.text_content())
 
     async def test_entries_use_option_d_semantic_markup(self) -> None:
         """Entries render as an <ol> of <li>, with <dl> for metadata and a nested <ul> for RECAP documents."""
