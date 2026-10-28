@@ -27,6 +27,7 @@ from cl.alerts.utils import (
 from cl.api.utils import DynamicFieldsMixin, HyperlinkedModelSerializerWithId
 from cl.donate.models import NeonMembershipLevel
 from cl.search.models import SEARCH_TYPES
+from cl.sso.membership import get_effective_membership
 
 # The number of days the alert frequency estimation averages over, matching
 # the value used by the alert_frequency endpoint in the frontend.
@@ -196,8 +197,18 @@ class SearchAlertSerializer(
                     f"Please join Free Law Project as a member: {FLP_MEMBERSHIP_URL}"
                 )
             case AlertLimitViolation.MEMBER_QUOTA_EXCEEDED:
-                membership = user.membership
-                if membership.level == NeonMembershipLevel.LEGACY:
+                membership = get_effective_membership(user)
+                if membership is not None and membership.is_organization:
+                    raise PermissionDenied(
+                        "You've used all of the alerts included with your "
+                        "organization's membership. Ask your organization's "
+                        "administrator about a higher tier, or disable a "
+                        "RECAP Alert."
+                    )
+                if (
+                    membership
+                    and membership.level == NeonMembershipLevel.LEGACY
+                ):
                     # Legacy memberships can't be upgraded online, so point
                     # them at the help page instead of the Neon upgrade flow.
                     raise PermissionDenied(
@@ -207,9 +218,7 @@ class SearchAlertSerializer(
                         f"{LEGACY_MEMBERSHIP_HELP_URL} to learn how to get "
                         "more features, or disable a RECAP Alert."
                     )
-                upgrade_url = (
-                    f"{MEMBERSHIP_UPGRADE_BASE_URL}{membership.neon_id}"
-                )
+                upgrade_url = f"{MEMBERSHIP_UPGRADE_BASE_URL}{membership.neon_id if membership else ''}"
                 raise PermissionDenied(
                     "You've used all of the alerts included with your "
                     "membership. To create this alert, upgrade your membership "

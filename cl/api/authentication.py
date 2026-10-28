@@ -19,6 +19,9 @@ from cl.api.routers import (
     is_replica_routing_active,
     set_replica_routing,
 )
+from cl.sso.events import record_auth_event
+from cl.sso.models import AuthMethod, AuthOutcome
+from cl.sso.policy import requirement_for_user
 
 
 def _activate_replica_routing(
@@ -70,12 +73,31 @@ def _activate_replica_routing(
 
 
 class ReplicaRoutingBasicAuthentication(BasicAuthentication):
-    """BasicAuthentication that activates replica routing after auth."""
+    """BasicAuthentication that activates replica routing after auth.
+
+    Refuses accounts that must sign in through SSO: a username and password
+    sent with every request would otherwise get around the organization's
+    IdP, and its MFA. Those accounts use API tokens or OAuth instead.
+    """
 
     def authenticate(self, request: Request):
         result = super().authenticate(request)
-        if result is not None:
-            _activate_replica_routing(request, result[0])
+        if result is None:
+            return result
+        user = result[0]
+        if requirement := requirement_for_user(user):
+            record_auth_event(
+                request=request._request,
+                method=AuthMethod.BASIC_AUTH,
+                outcome=AuthOutcome.REFUSED,
+                user=user,
+                detail=f"SSO required ({requirement.reason})",
+            )
+            raise exceptions.AuthenticationFailed(
+                "This account signs in through single sign-on, so it can't "
+                "use HTTP Basic authentication. Use an API token instead."
+            )
+        _activate_replica_routing(request, user)
         return result
 
 

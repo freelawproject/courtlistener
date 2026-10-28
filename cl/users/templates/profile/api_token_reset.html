@@ -36,8 +36,12 @@
 
     <form id="reset-token-form" action="" method="post" class="v-offset-above-3">{% csrf_token %}
       <div class="form-group">
-        {{ reset_form.password.label_tag }}
-        {{ reset_form.password }}
+        {% if reset_form.uses_sso %}
+          <p>You sign in through your organization's single sign-on, so instead of a password we check that you signed in recently.</p>
+        {% else %}
+          {{ reset_form.password.label_tag }}
+          {{ reset_form.password }}
+        {% endif %}
         {% if reset_form.password.errors %}
           <p class="help-block">
             {% for error in reset_form.password.errors %}

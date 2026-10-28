@@ -47,8 +47,12 @@
 
   <form action="" method="post">{% csrf_token %}
     <div class="form-group">
-      {{ delete_form.password.label_tag }}
-      {{ delete_form.password }}
+      {% if delete_form.uses_sso %}
+        <p>You sign in through your organization's single sign-on, so instead of a password we check that you signed in recently.</p>
+      {% else %}
+        {{ delete_form.password.label_tag }}
+        {{ delete_form.password }}
+      {% endif %}
       {% if delete_form.password.errors %}
         <p class="help-block">
           {% for error in delete_form.password.errors %}

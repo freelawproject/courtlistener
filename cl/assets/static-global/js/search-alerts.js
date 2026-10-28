@@ -8,6 +8,7 @@ document.addEventListener('DOMContentLoaded', function () {
   const FreeQuotaMsg = document.getElementById('msg-quota-free');
   const MemberQuotaMsg = document.getElementById('msg-quota-member');
   const LegacyMemberQuotaMsg = document.getElementById('msg-quota-member-legacy');
+  const OrganizationMemberQuotaMsg = document.getElementById('msg-quota-member-organization');
   const NoMemberButton = document.getElementById('no-member-button');
   const MemberButton = document.getElementById('member-button');
   const LegacyMemberButton = document.getElementById('member-legacy-button');
@@ -31,6 +32,7 @@ document.addEventListener('DOMContentLoaded', function () {
     const editAlert = alertsContext.editAlert;
     const isMember = alertsContext.level !== 'free';
     const isLegacy = alertsContext.isLegacy;
+    const isOrganization = alertsContext.isOrganization;
     const rateGroup = rateValue === 'rt' ? 'rt' : 'other_rates';
     const used = alertsContext.counts[rateGroup] || 0;
     const allowed =
@@ -42,6 +44,7 @@ document.addEventListener('DOMContentLoaded', function () {
     FreeQuotaMsg.classList.add('hidden');
     MemberQuotaMsg.classList.add('hidden');
     LegacyMemberQuotaMsg.classList.add('hidden');
+    OrganizationMemberQuotaMsg.classList.add('hidden');
     NoMemberButton.classList.add('hidden');
     MemberButton.classList.add('hidden');
     LegacyMemberButton.classList.add('hidden');
@@ -60,7 +63,11 @@ document.addEventListener('DOMContentLoaded', function () {
       if (isMember) {
         // Member has reached the quota for this rate group. Legacy members
         // can't upgrade online, so route them to the help page instead.
-        if (isLegacy) {
+        // Organization members can't upgrade themselves; their
+        // organization's administrator manages the membership.
+        if (isOrganization) {
+          OrganizationMemberQuotaMsg.classList.remove('hidden');
+        } else if (isLegacy) {
           LegacyMemberQuotaMsg.classList.remove('hidden');
           LegacyMemberButton.classList.remove('hidden');
         } else {

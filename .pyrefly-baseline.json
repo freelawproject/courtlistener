@@ -4160,20 +4160,6 @@
       "severity": "error"
     },
     {
-      "column": 13,
-      "path": "cl/search/views.py",
-      "name": "missing-attribute",
-      "concise_description": "Object of type `AbstractBaseUser | AnonymousUser` has no attribute `membership`",
-      "severity": "error"
-    },
-    {
-      "column": 15,
-      "path": "cl/search/views.py",
-      "name": "missing-attribute",
-      "concise_description": "Object of type `AbstractBaseUser | AnonymousUser` has no attribute `membership`",
-      "severity": "error"
-    },
-    {
       "column": 11,
       "path": "cl/search/views.py",
       "name": "invalid-argument",
@@ -4472,13 +4458,6 @@
       "path": "cl/users/models.py",
       "name": "missing-attribute",
       "concise_description": "Object of class `BarMembership` has no attribute `get_barMembership_display`",
-      "severity": "error"
-    },
-    {
-      "column": 26,
-      "path": "cl/users/models.py",
-      "name": "missing-attribute",
-      "concise_description": "Object of class `User` has no attribute `membership`",
       "severity": "error"
     },
     {

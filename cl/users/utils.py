@@ -1,3 +1,5 @@
+from allauth.socialaccount.models import SocialAccount
+from django.apps import apps
 from django.conf import settings
 from django.contrib import messages
 from django.contrib.auth.models import User
@@ -18,6 +20,7 @@ from cl.favorites.models import (
 from cl.lib.crypto import md5
 from cl.lib.decorators import tiered_cache
 from cl.lib.types import EmailType
+from cl.sso.models import OrganizationMembership
 from cl.users.models import (
     UserGroupsEvent,
     UserPermissionsEvent,
@@ -139,6 +142,10 @@ def delete_user_assets(user: User) -> None:
     Token.objects.filter(user=user).delete()
     user_tags.delete()
     user.webhooks.all().delete()
+    # Unlink SSO and give up any organization seat. A later SSO login finds
+    # the stub by address and upgrades it, as registering would.
+    SocialAccount.objects.filter(user=user).delete()
+    OrganizationMembership.objects.filter(user=user).delete()
     # Donations are financial records we need to keep, so disable the
     # recurring ones rather than deleting them.
     user.monthly_donations.all().update(enabled=False)
@@ -155,6 +162,11 @@ def delete_user_assets(user: User) -> None:
     UserPermissionsEvent.objects.filter(user_id=user.pk).delete()
     UserTagEvent.objects.filter(user_id=user.pk).delete()
     WebhookHistoryEvent.objects.filter(user_id=user.pk).delete()
+    # pghistory builds this event model at runtime, so the type checker
+    # can't see it if it's imported by name.
+    apps.get_model(
+        "sso", "OrganizationMembershipEvent"
+    )._default_manager.filter(user_id=user.pk).delete()
 
 
 emails: dict[str, EmailType] = {

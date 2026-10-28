@@ -17,6 +17,7 @@ from django.core.exceptions import ValidationError
 from django.core.mail import send_mail
 from django.forms import ModelForm
 from django.urls import reverse
+from django.utils.html import format_html
 from hcaptcha.fields import hCaptchaField
 from localflavor.us.forms import USStateField, USZipCodeField
 from localflavor.us.us_states import STATE_CHOICES
@@ -25,6 +26,16 @@ from cl.api.models import Webhook, WebhookEventType, WebhookVersions
 from cl.lib.auth import filter_by_email
 from cl.lib.AuthenticationBackend import LOOKS_LIKE_EMAIL, accounts_for_email
 from cl.lib.types import EmailType
+from cl.sso.emails import emails as sso_emails
+from cl.sso.events import record_auth_event
+from cl.sso.models import AuthEvent, AuthMethod, AuthOutcome, MembershipSource
+from cl.sso.policy import (
+    refusal_message,
+    requirement_for_email,
+    requirement_for_user,
+    sso_start_url,
+)
+from cl.sso.sessions import sso_authenticated_within
 from cl.users.models import UserProfile
 from cl.users.utils import emails
 
@@ -109,6 +120,8 @@ class CleanEmailMixin:
 
 
 class UserForm(ModelForm, CleanEmailMixin):
+    """The name and address part of the settings page."""
+
     email = forms.EmailField(
         required=True,
         widget=forms.TextInput(
@@ -139,6 +152,33 @@ class UserForm(ModelForm, CleanEmailMixin):
                 }
             ),
         }
+
+    def clean_email(self) -> str:
+        """Refuse moving an account onto a domain that requires SSO.
+
+        People get onto such a domain by signing in through its IdP, which
+        links their account. Allowing it here would let anybody put their
+        account on a firm's domain without the firm's sign-on, and pick up
+        the firm's benefits. Accounts already linked to that organization
+        through SSO may change between its addresses.
+
+        :return: The cleaned address.
+        :raises ValidationError: If the new address requires SSO.
+        """
+        email = super().clean_email()
+        if email.strip().lower() == (self.instance.email or "").lower():
+            return email
+        requirement = requirement_for_email(email)
+        if requirement is None:
+            return email
+        linked = requirement.organization.memberships.filter(
+            user=self.instance, source=MembershipSource.SSO
+        ).exists()
+        if not linked:
+            raise forms.ValidationError(
+                refusal_message(requirement, email), code="sso_required"
+            )
+        return email
 
 
 def validate_username_is_not_an_email(value: str) -> None:
@@ -273,6 +313,12 @@ class UserCreationFormExtended(UserCreationForm, CleanEmailMixin):
         docstring for why.
         """
         email = super().clean_email()
+        # Whether a domain uses SSO is public, so saying so here doesn't
+        # reveal whether this address has an account.
+        if requirement := requirement_for_email(email):
+            raise forms.ValidationError(
+                refusal_message(requirement, email), code="sso_required"
+            )
         self.email_taken = self._email_is_taken(email)
         return email
 
@@ -330,11 +376,44 @@ class PasswordConfirmForm(forms.Form):
     )
 
     def __init__(self, request=None, *args, **kwargs):
-        """Set the request attribute for use by the clean method."""
+        """Set the request attribute for use by the clean method.
+
+        Accounts that sign in through SSO (they have no password, or their
+        policy forbids using it) confirm by having signed in through their
+        IdP recently instead. ``uses_sso`` tells the template to show that
+        instead of the password field.
+        """
         self.request = request
         super().__init__(*args, **kwargs)
+        self.uses_sso = False
+        self.sso_reauth_url = ""
+        user = getattr(request, "user", None)
+        if request is None or user is None or not user.is_authenticated:
+            return
+        if user.has_usable_password() and requirement_for_user(user) is None:
+            return
+        self.uses_sso = True
+        self.fields["password"].required = False
+        self.sso_reauth_url = sso_start_url(
+            email=user.email, next_url=request.get_full_path()
+        )
 
     def clean_password(self) -> dict[str, str]:
+        if self.uses_sso:
+            if self.request is None or not sso_authenticated_within(
+                self.request, settings.SSO_REAUTHENTICATION_SECONDS
+            ):
+                raise ValidationError(
+                    format_html(
+                        'For your security, <a href="{}">sign in again '
+                        "through your organization</a>, then come back here "
+                        "within {} minutes.",
+                        self.sso_reauth_url,
+                        settings.SSO_REAUTHENTICATION_SECONDS // 60,
+                    )
+                )
+            return self.cleaned_data
+
         password = self.cleaned_data["password"]
 
         if password:
@@ -411,7 +490,8 @@ class CustomPasswordResetForm(PasswordResetForm):
         """Find the accounts a reset request for an address could act on.
 
         The accounts Django would consider — active, with a usable password —
-        minus stubs, which have no usable password anyway. Includes accounts
+        minus stubs, which have no usable password anyway, plus accounts SSO
+        created without a password. Includes accounts
         whose address nobody has proven they own, so it answers "is there an
         account here?" rather than "may this address have a reset link?". Use
         ``get_users()`` for the latter.
@@ -424,10 +504,29 @@ class CustomPasswordResetForm(PasswordResetForm):
         :return: The matching accounts, each with its profile loaded.
         """
         if self._accounts_at != email:
+            candidates = list(
+                accounts_for_email(email).select_related("profile")
+            )
+            # SSO creates accounts without a password. Once SSO no longer
+            # applies to one (its domain stopped requiring SSO, or support
+            # moved it to a personal address), a reset is how its owner sets
+            # one. Other passwordless accounts, such as bots, stay excluded.
+            passwordless = [
+                u.pk for u in candidates if not u.has_usable_password()
+            ]
+            sso_created = set(
+                AuthEvent.objects.filter(
+                    user_id__in=passwordless,
+                    method=AuthMethod.SSO,
+                    outcome=AuthOutcome.CREATED,
+                ).values_list("user_id", flat=True)
+                if passwordless
+                else []
+            )
             self._accounts = [
                 user
-                for user in accounts_for_email(email).select_related("profile")
-                if user.has_usable_password()
+                for user in candidates
+                if user.has_usable_password() or user.pk in sso_created
             ]
             self._accounts_at = email
         return self._accounts
@@ -462,10 +561,17 @@ class CustomPasswordResetForm(PasswordResetForm):
         ``email_confirmed`` (see ``cl.users.views.view_settings``), so this
         check bites the moment the address is repointed.
 
+        Accounts that must sign in through SSO never get one: a reset would
+        give them a password their organization's policy forbids.
+
         :param email: The submitted address.
         :return: The accounts to mail a reset link to.
         """
-        return iter(self.confirmed_accounts_at_address(email))
+        return iter(
+            user
+            for user in self.confirmed_accounts_at_address(email)
+            if requirement_for_user(user) is None
+        )
 
     def save(self, *args, **kwargs) -> None:
         """Send whichever of three emails fits the submitted address.
@@ -484,10 +590,44 @@ class CustomPasswordResetForm(PasswordResetForm):
           and would put a working token in an inbox nobody has yet proven
           they own.
         - Nothing at all: the "no account found" note we've always sent.
+
+        Before any of those, an address that may only be used through SSO
+        (or whose confirmed accounts all must use SSO) gets a "sign in with
+        your organization's SSO" note instead of a reset link.
         """
         recipient_addr = self.cleaned_data["email"]
         accounts = self.accounts_at_address(recipient_addr)
-        if len(self.confirmed_accounts_at_address(recipient_addr)) > 0:
+        confirmed = self.confirmed_accounts_at_address(recipient_addr)
+        resettable = list(self.get_users(recipient_addr))
+        # Accounts left in ``resettable`` are on their organization's SSO
+        # exception list, so they still get their link.
+        requirement = None
+        if not resettable:
+            requirement = requirement_for_email(recipient_addr) or (
+                requirement_for_user(confirmed[0]) if confirmed else None
+            )
+        if requirement is not None:
+            record_auth_event(
+                request=None,
+                method=AuthMethod.PASSWORD_RESET,
+                outcome=AuthOutcome.REFUSED,
+                user=confirmed[0] if confirmed else None,
+                identifier=recipient_addr,
+                detail=f"SSO required ({requirement.reason})",
+            )
+            sso_email = sso_emails["sign_in_with_sso"]
+            send_mail(
+                sso_email["subject"],
+                sso_email["body"]
+                % (
+                    requirement.organization.name,
+                    sso_start_url(email=recipient_addr),
+                ),
+                sso_email["from_email"],
+                [recipient_addr],
+            )
+            return
+        if resettable:
             super().save(*args, **kwargs)
             return
 

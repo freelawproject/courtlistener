@@ -64,6 +64,7 @@ from cl.lib.types import AuthenticatedHttpRequest, EmailType
 from cl.lib.url_utils import get_redirect_or_abort
 from cl.search.models import SEARCH_TYPES, RECAPDocument
 from cl.simple_pages.tasks import create_zoho_desk_ticket
+from cl.sso.models import MembershipSource, OrganizationMembership
 from cl.stats.metrics import accounts_deleted_total
 from cl.users.forms import (
     CustomPasswordChangeForm,
@@ -419,6 +420,9 @@ def view_settings(request: AuthenticatedHttpRequest) -> HttpResponse:
         {
             "profile_form": profile_form,
             "user_form": user_form,
+            "sso_memberships": OrganizationMembership.objects.filter(
+                user=user, source=MembershipSource.SSO
+            ).select_related("organization"),
             "page": "profile_settings",
             "private": True,
         },

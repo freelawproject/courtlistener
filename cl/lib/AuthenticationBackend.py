@@ -18,6 +18,9 @@ from cl.lib.ratelimiter import (
     count_login_attempt,
     reset_failed_login_count,
 )
+from cl.sso.events import record_auth_event
+from cl.sso.models import AuthMethod, AuthOutcome
+from cl.sso.policy import refusal_message, requirement_for_user
 
 # There can be many accounts for a given email address. To prevent
 # DOS attacks, only check this many of them, then stop.
@@ -250,7 +253,8 @@ class ConfirmedEmailAuthenticationForm(AuthenticationForm):
         return self.cleaned_data
 
     def confirm_login_allowed(self, user: AbstractBaseUser) -> None:
-        """Make sure the user is active and has a confirmed email address
+        """Make sure the user is active, has a confirmed email address, and
+        isn't required to sign in through SSO.
 
         If the given user cannot log in, this method should raise a
         ``forms.ValidationError``.
@@ -267,4 +271,19 @@ class ConfirmedEmailAuthenticationForm(AuthenticationForm):
             raise forms.ValidationError(
                 'Please <a href="{}">validate your email address</a> to '
                 "log in.".format(reverse("email_confirmation_request"))
+            )
+
+        # Checked only after the password was right, so this tells nobody
+        # anything about an account they can't already sign in to.
+        if requirement := requirement_for_user(user):  # type: ignore[arg-type]
+            record_auth_event(
+                request=self.request,
+                method=AuthMethod.PASSWORD,
+                outcome=AuthOutcome.REFUSED,
+                user=user,  # type: ignore[arg-type]
+                detail=f"SSO required ({requirement.reason})",
+            )
+            raise forms.ValidationError(
+                refusal_message(requirement, user.email),  # type: ignore[attr-defined]
+                code="sso_required",
             )

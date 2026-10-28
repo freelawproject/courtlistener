@@ -36,7 +36,8 @@
       <input type="hidden" name="next" value="{{ next }}">
       <button type="submit" class="btn btn-primary btn-lg float-right">Sign In</button>
     </form>
-    <p class="v-offset-above-2"><a href="{% url "password_reset" %}">Forgot username/password?</a></p>
+    <p class="v-offset-above-2"><a href="{% url "sso_start" %}?next={{ next|urlencode }}">Sign in with your organization's single sign-on (SSO)</a></p>
+    <p><a href="{% url "password_reset" %}">Forgot username/password?</a></p>
     <p><a href="{% url "register" %}?next={{ next|urlencode }}">Need to register?</a></p>
   </div>
   <div class="col-xs-1 col-sm-2 col-md-3"></div>

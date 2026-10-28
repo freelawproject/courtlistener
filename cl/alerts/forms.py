@@ -19,6 +19,7 @@ from cl.alerts.utils import (
 )
 from cl.donate.models import NeonMembershipLevel
 from cl.search.models import SEARCH_TYPES
+from cl.sso.membership import get_effective_membership
 
 
 class CreateAlertForm(ModelForm):
@@ -79,8 +80,21 @@ class CreateAlertForm(ModelForm):
                     )
                 )
             case AlertLimitViolation.MEMBER_QUOTA_EXCEEDED:
-                membership = self.user.membership
-                if membership.level == NeonMembershipLevel.LEGACY:
+                membership = get_effective_membership(self.user)
+                if membership is not None and membership.is_organization:
+                    raise ValidationError(
+                        format_html(
+                            "You've used all of the alerts included with your "
+                            "organization's membership. Ask your "
+                            "organization's administrator about a higher "
+                            "tier, or <a href='{}'>disable a RECAP Alert</a>.",
+                            reverse("profile_search_alerts"),
+                        )
+                    )
+                if (
+                    membership
+                    and membership.level == NeonMembershipLevel.LEGACY
+                ):
                     # Legacy memberships can't be upgraded online, so point
                     # them at the help page instead of the Neon upgrade flow.
                     raise ValidationError(
@@ -93,9 +107,7 @@ class CreateAlertForm(ModelForm):
                             reverse("profile_search_alerts"),
                         )
                     )
-                upgrade_flp_membership = (
-                    f"{MEMBERSHIP_UPGRADE_BASE_URL}{membership.neon_id}"
-                )
+                upgrade_flp_membership = f"{MEMBERSHIP_UPGRADE_BASE_URL}{membership.neon_id if membership else ''}"
                 raise ValidationError(
                     format_html(
                         "You've used all of the alerts included with your membership. "

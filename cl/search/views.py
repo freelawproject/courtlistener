@@ -38,6 +38,7 @@ from cl.search.forms import SearchForm, _clean_form
 from cl.search.models import SEARCH_TYPES, Court
 from cl.search.tasks import email_search_results
 from cl.search.utils import get_homepage_stats, get_v2_homepage_stats
+from cl.sso.membership import get_effective_membership
 from cl.stats.constants import StatMethod, StatMetric, StatQueryType
 from cl.stats.utils import tally_stat
 
@@ -48,8 +49,9 @@ def get_alerts_context(request: HttpRequest, edit_alert: bool) -> dict | None:
     if not user.is_authenticated or not hasattr(user, "profile"):
         return None
 
-    level = user.membership.level if user.profile.is_member else "free"
-    neon_id = user.membership.neon_id if user.profile.is_member else ""
+    membership = get_effective_membership(user)
+    level = membership.level if membership else "free"
+    neon_id = membership.neon_id if membership else ""
     # Legacy memberships can't be upgraded online, so the modal routes
     # them to a help page instead of the Neon upgrade flow (see #7136).
     is_legacy = level == NeonMembershipLevel.LEGACY
@@ -69,6 +71,9 @@ def get_alerts_context(request: HttpRequest, edit_alert: bool) -> dict | None:
         "level": level,
         "neon_id": neon_id,
         "isLegacy": is_legacy,
+        # Organization members can't upgrade themselves, so the modal sends
+        # them to their organization instead of the Neon upgrade flow.
+        "isOrganization": bool(membership and membership.is_organization),
         "legacyHelpUrl": LEGACY_MEMBERSHIP_HELP_URL,
         "counts": counts,
         "limits": RECAP_ALERT_QUOTAS,
