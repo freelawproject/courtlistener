@@ -2,8 +2,10 @@ from http import HTTPStatus
 from typing import TYPE_CHECKING
 from unittest import mock
 
+from django.contrib.auth.models import User
 from django.contrib.contenttypes.models import ContentType
 from django.db import IntegrityError
+from django.db.models import QuerySet
 from django.urls import reverse
 
 from cl.favorites.factories import NoteFactory
@@ -48,7 +50,7 @@ class SaveNoteHtmxTest(TestCase):
         }
         return self.client.post(self.url, {**data, **overrides}, headers=HTMX)
 
-    def user_notes(self, user=None):
+    def user_notes(self, user: User | None = None) -> QuerySet[Note]:
         """The notes a user has on the docket."""
         return Note.objects.filter(
             content_type=self.content_type,
