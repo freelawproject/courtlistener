@@ -13,3 +13,4 @@ infer-return-types = "checked"
 [errors]
 non-exhaustive-match = "error"
 non-exhaustive-match-open-type = "warn" # Beneficial, but there are ~10 violations and this is a low priority
+redundant-condition = "error" # move to `warn` if `min-severity` ever decreases to `warn`
