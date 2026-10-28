@@ -140,6 +140,7 @@ class Organization(AbstractDateTimeModel):
         ]
 
     def __str__(self) -> str:
+        """Return a readable name for the admin and logs."""
         return self.name
 
     @property
@@ -213,6 +214,7 @@ class OrganizationDomain(AbstractDateTimeModel):
         ordering = ["domain"]
 
     def __str__(self) -> str:
+        """Return a readable name for the admin and logs."""
         return self.domain
 
     @property
@@ -264,6 +266,7 @@ class SSOConnection(AbstractDateTimeModel):
         verbose_name = "SSO connection"
 
     def __str__(self) -> str:
+        """Return a readable name for the admin and logs."""
         return f"{self.organization}: {self.social_app.name}"
 
     @property
@@ -430,6 +433,7 @@ class OrganizationMembership(AbstractDateTimeModel):
         ]
 
     def __str__(self) -> str:
+        """Return a readable name for the admin and logs."""
         return f"{self.user} in {self.organization}"
 
 
@@ -461,6 +465,7 @@ class SSOEmailException(AbstractDateTimeModel):
         ]
 
     def __str__(self) -> str:
+        """Return a readable name for the admin and logs."""
         return self.email
 
 
@@ -518,6 +523,7 @@ class AuthEvent(models.Model):
         indexes = [models.Index(fields=["user", "date_created"])]
 
     def __str__(self) -> str:
+        """Return a readable name for the admin and logs."""
         return (
             f"{self.date_created:%Y-%m-%d %H:%M} {self.method} {self.outcome}"
         )

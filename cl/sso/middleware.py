@@ -73,12 +73,14 @@ def SSOSessionMiddleware(get_response):
     if iscoroutinefunction(get_response):
 
         async def async_middleware(request: HttpRequest) -> HttpResponse:
+            """Enforce SSO, then await the next handler."""
             response = await sync_to_async(enforce_sso_session)(request)
             return response or await get_response(request)
 
         return async_middleware
 
     def middleware(request: HttpRequest) -> HttpResponse:
+        """Enforce SSO, then call the next handler."""
         return enforce_sso_session(request) or get_response(request)
 
     return middleware

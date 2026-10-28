@@ -12,6 +12,8 @@ from cl.sso.policy import sso_start_url
 
 
 class Command(VerboseCommand):
+    """Tell a domain's existing accounts that their organization uses SSO."""
+
     help = (
         "Email the existing accounts on a verified domain that their "
         "organization now uses SSO, so they link their accounts before "
@@ -19,6 +21,7 @@ class Command(VerboseCommand):
     )
 
     def add_arguments(self, parser: argparse.ArgumentParser) -> None:
+        """Add the domain argument and the --send option."""
         parser.add_argument("domain", help="The domain, e.g. acmelaw.com")
         parser.add_argument(
             "--send",
@@ -28,6 +31,7 @@ class Command(VerboseCommand):
         )
 
     def handle(self, *args: Any, **options: Any) -> None:
+        """Count, or with --send email, the domain's existing accounts."""
         super().handle(*args, **options)
         domain = (
             OrganizationDomain.objects.filter(

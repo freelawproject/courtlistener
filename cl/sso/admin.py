@@ -18,12 +18,16 @@ from cl.sso.throttles import sync_organization_throttles
 
 
 class OrganizationDomainInline(admin.TabularInline):
+    """An organization's email domains."""
+
     model = OrganizationDomain
     extra = 0
     fields = ("domain", "enforcement", "verified_at")
 
 
 class SSOConnectionInline(admin.TabularInline):
+    """An organization's IdP connections, with the URLs its IdP needs."""
+
     model = SSOConnection
     extra = 0
     raw_id_fields = ("social_app",)
@@ -43,6 +47,8 @@ class SSOConnectionInline(admin.TabularInline):
 
 
 class OrganizationMembershipInline(admin.TabularInline):
+    """The people who belong to an organization."""
+
     model = OrganizationMembership
     extra = 0
     raw_id_fields = ("user",)
@@ -50,12 +56,16 @@ class OrganizationMembershipInline(admin.TabularInline):
 
 
 class SSOEmailExceptionInline(admin.TabularInline):
+    """Addresses exempt from an organization's enforcement."""
+
     model = SSOEmailException
     extra = 0
 
 
 @admin.register(Organization)
 class OrganizationAdmin(admin.ModelAdmin):
+    """Organizations, with their domains, connections and members."""
+
     list_display = (
         "name",
         "membership_level",

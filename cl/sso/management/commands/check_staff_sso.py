@@ -8,6 +8,8 @@ from cl.sso.staff import build_staff_sso_report
 
 
 class Command(VerboseCommand):
+    """Report staff accounts that can sign in without FLP's IdP."""
+
     help = (
         "Check that staff can only sign in through FLP's IdP: unlinked staff "
         "accounts and staff API tokens. Run it on a schedule and keep the "
@@ -15,6 +17,7 @@ class Command(VerboseCommand):
     )
 
     def add_arguments(self, parser: argparse.ArgumentParser) -> None:
+        """Add the --email option."""
         parser.add_argument(
             "--email",
             action="store_true",
@@ -23,6 +26,7 @@ class Command(VerboseCommand):
         )
 
     def handle(self, *args: Any, **options: Any) -> None:
+        """Print the staff SSO report, emailing it if asked."""
         super().handle(*args, **options)
         report = build_staff_sso_report()
         lines = [f"Staff organization: {report.staff_organization or 'none'}"]
