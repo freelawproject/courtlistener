@@ -221,19 +221,6 @@ def sync_membership_from_neon(
         return SyncResult.SKIPPED
 
     payment_status = MembershipPaymentStatus.SUCCEEDED
-    logger.info(
-        "Syncing membership for user %s from Neon: id %s -> %s, level %s -> "
-        "%s, termination %s -> %s, payment status %s -> %s",
-        user.username,
-        membership.neon_id,
-        neon_id,
-        membership.level,
-        level,
-        current_date,
-        new_date,
-        membership.payment_status,
-        payment_status,
-    )
     with transaction.atomic():
         # date_modified detects webhook updates that happened while we were
         # talking to Neon. The lock makes subsequent webhook updates wait
@@ -257,6 +244,19 @@ def sync_membership_from_neon(
         locked.payment_status = payment_status
         locked.save()
         apply_membership_throttles(user, level)
+    logger.info(
+        "Synced membership for user %s from Neon: id %s -> %s, level %s -> "
+        "%s, termination %s -> %s, payment status %s -> %s",
+        user.username,
+        membership.neon_id,
+        neon_id,
+        membership.level,
+        level,
+        current_date,
+        new_date,
+        membership.payment_status,
+        payment_status,
+    )
     tag_zoho_record_for_membership.delay(user.pk, level)
     return SyncResult.UPDATED
 
