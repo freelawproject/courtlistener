@@ -159,6 +159,18 @@ def _save_or_update_note_htmx(request: HttpRequest) -> HttpResponse:
 
 @login_required
 def delete_note(request: HttpRequest) -> HttpResponse:
+    """Delete a user's note.
+
+    Routes on the request type: htmx requests from the v2 pages get the form
+    fragment to swap in place, legacy AJAX requests get a plain text message.
+    """
+    if request.headers.get("HX-Request"):
+        return _delete_note_htmx(request)
+
+    return _delete_note_ajax(request)
+
+
+def _delete_note_ajax(request: HttpRequest) -> HttpResponse:
     """Delete a user's note
 
     Deletes a note for a user using an ajax call and post data.
@@ -189,6 +201,41 @@ def delete_note(request: HttpRequest) -> HttpResponse:
         return HttpResponseNotAllowed(
             permitted_methods=["POST"], content="Not an ajax request."
         )
+
+
+def _delete_note_htmx(request: HttpRequest) -> HttpResponse:
+    """Delete the user's note for an object and return the v2 form.
+
+    Every outcome except a non-POST request is a 200 with the form fragment,
+    because htmx does not swap error responses. A request that names no
+    noteable object comes back with the form and an error on object_id. A
+    request for a note that is already gone counts as deleted, since the user
+    wanted it gone and a second click or another tab can race this one.
+    """
+    if request.method != "POST":
+        return HttpResponseNotAllowed(
+            permitted_methods={"POST"}, content="Not a POST request."
+        )
+
+    note = get_note(request)
+    if note is None:
+        form = NoteFormV2(request.POST)
+        form.is_valid()
+        form.add_error("object_id", "No such object exists.")
+    else:
+        # get_note() returns an unsaved Note when the user has none.
+        if note.pk:
+            note.delete()
+        form = NoteFormV2(
+            initial={
+                "content_type": request.POST.get("content_type"),
+                "object_id": request.POST.get("object_id"),
+            }
+        )
+
+    return TemplateResponse(
+        request, "v2_includes/add_note/form.html", {"form": form}
+    )
 
 
 async def view_tag(request, username, tag_name):

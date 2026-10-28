@@ -225,3 +225,157 @@ class SaveNoteLegacyTest(TestCase):
                 self.assertEqual(r.status_code, HTTPStatus.FOUND)
                 self.assertTrue(r["Location"].startswith(reverse("sign-in")))
                 self.assertFalse(Note.objects.exists())
+
+
+class DeleteNoteHtmxTest(TestCase):
+    """Test that delete_note answers htmx requests with the v2 form."""
+
+    @classmethod
+    def setUpTestData(cls) -> None:
+        cls.user = UserFactory()
+        cls.other_user = UserFactory()
+        cls.docket = DocketFactory()
+        cls.content_type = ContentType.objects.get_for_model(Docket)
+        cls.url = reverse("delete_note")
+
+    def setUp(self) -> None:
+        self.client.force_login(self.user)
+
+    def post(self, **overrides: str | int) -> "_MonkeyPatchedWSGIResponse":
+        """Delete the docket's note as an htmx request, with fields that can
+        be overridden."""
+        data = {
+            "content_type": self.content_type.pk,
+            "object_id": self.docket.pk,
+            "name": "Foo v. Bar",
+            "notes": "A note",
+        }
+        return self.client.post(self.url, {**data, **overrides}, headers=HTMX)
+
+    def test_deletes_the_note(self) -> None:
+        """Is the note deleted, and the form returned in its empty state?"""
+        NoteFactory.for_object(self.docket, user=self.user)
+
+        r = self.post()
+
+        self.assertEqual(r.status_code, HTTPStatus.OK)
+        self.assertTemplateUsed(r, FRAGMENT_TEMPLATE)
+        self.assertFalse(Note.objects.filter(user=self.user).exists())
+        self.assertContains(r, "Add Note")
+        self.assertNotContains(r, reverse("delete_note"))
+        self.assertNotContains(r, RELOAD_NOTICE)
+
+    def test_the_returned_form_can_save_again(self) -> None:
+        """Does the returned form still identify the object, so the next save
+        works?"""
+        NoteFactory.for_object(self.docket, user=self.user)
+
+        r = self.post()
+
+        self.assertContains(
+            r, f'name="content_type" value="{self.content_type.pk}"'
+        )
+        self.assertContains(r, f'name="object_id" value="{self.docket.pk}"')
+
+    def test_leaves_other_users_notes_alone(self) -> None:
+        """Does deleting keep another user's note on the same object?"""
+        NoteFactory.for_object(self.docket, user=self.user)
+        other = NoteFactory.for_object(self.docket, user=self.other_user)
+
+        self.post()
+
+        self.assertTrue(Note.objects.filter(pk=other.pk).exists())
+
+    def test_a_note_that_is_already_gone_counts_as_deleted(self) -> None:
+        """Is deleting a missing note, as after a double click, answered with
+        the form and no error?"""
+        r = self.post()
+
+        self.assertEqual(r.status_code, HTTPStatus.OK)
+        self.assertTemplateUsed(r, FRAGMENT_TEMPLATE)
+        self.assertNotContains(r, RELOAD_NOTICE)
+
+    def test_form_values_do_not_block_the_delete(self) -> None:
+        """Is a note deleted even if the posted name or notes would fail
+        validation?"""
+        NoteFactory.for_object(self.docket, user=self.user)
+
+        self.post(name="", notes="a" * 501)
+
+        self.assertFalse(Note.objects.filter(user=self.user).exists())
+
+    def test_unusable_object_ids_ask_for_a_reload(self) -> None:
+        """Does a request that doesn't name a noteable object get the reload
+        notice, and keep the user's note?"""
+        note = NoteFactory.for_object(self.docket, user=self.user)
+        user_content_type = ContentType.objects.get_for_model(type(self.user))
+        cases = (
+            ("missing content_type", {"content_type": ""}),
+            ("missing object_id", {"object_id": ""}),
+            ("unknown content_type", {"content_type": 999999999}),
+            ("non-numeric object_id", {"object_id": "abc"}),
+            (
+                "model that can't be noted",
+                {"content_type": user_content_type.pk},
+            ),
+        )
+        for label, overrides in cases:
+            with self.subTest(case=label):
+                r = self.post(**overrides)
+
+                self.assertEqual(r.status_code, HTTPStatus.OK)
+                self.assertContains(r, RELOAD_NOTICE)
+                self.assertTrue(Note.objects.filter(pk=note.pk).exists())
+
+    def test_only_post_is_allowed(self) -> None:
+        """Is a GET from htmx refused?"""
+        r = self.client.get(self.url, headers=HTMX)
+
+        self.assertEqual(r.status_code, HTTPStatus.METHOD_NOT_ALLOWED)
+
+
+class DeleteNoteLegacyTest(TestCase):
+    """Test that delete_note still serves the legacy modal."""
+
+    @classmethod
+    def setUpTestData(cls) -> None:
+        cls.user = UserFactory()
+        cls.docket = DocketFactory()
+        cls.content_type = ContentType.objects.get_for_model(Docket)
+        cls.url = reverse("delete_note")
+        cls.data = {
+            "content_type": cls.content_type.pk,
+            "object_id": cls.docket.pk,
+        }
+
+    def test_ajax_request_gets_plain_text(self) -> None:
+        """Does an AJAX request delete the note and get the legacy text?"""
+        NoteFactory.for_object(self.docket, user=self.user)
+        self.client.force_login(self.user)
+
+        r = self.client.post(self.url, self.data, headers=AJAX)
+
+        self.assertEqual(r.content.decode(), "It worked.")
+        self.assertFalse(Note.objects.filter(user=self.user).exists())
+
+    def test_plain_request_is_refused(self) -> None:
+        """Is a request that is neither AJAX nor htmx still a 405, with the
+        note kept?"""
+        note = NoteFactory.for_object(self.docket, user=self.user)
+        self.client.force_login(self.user)
+
+        r = self.client.post(self.url, self.data)
+
+        self.assertEqual(r.status_code, HTTPStatus.METHOD_NOT_ALLOWED)
+        self.assertTrue(Note.objects.filter(pk=note.pk).exists())
+
+    def test_logged_out_user_is_sent_to_sign_in(self) -> None:
+        """Does the login requirement still apply to both kinds of request?"""
+        note = NoteFactory.for_object(self.docket, user=self.user)
+        for label, headers in (("htmx", HTMX), ("ajax", AJAX)):
+            with self.subTest(kind=label):
+                r = self.client.post(self.url, self.data, headers=headers)
+
+                self.assertEqual(r.status_code, HTTPStatus.FOUND)
+                self.assertTrue(r["Location"].startswith(reverse("sign-in")))
+                self.assertTrue(Note.objects.filter(pk=note.pk).exists())
