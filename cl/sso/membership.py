@@ -2,7 +2,6 @@ from dataclasses import dataclass
 
 from django.contrib.auth.base_user import AbstractBaseUser
 from django.contrib.auth.models import AnonymousUser
-from django.core.exceptions import ObjectDoesNotExist
 
 from cl.donate.models import NeonMembershipLevel
 from cl.sso.models import Organization, OrganizationMembership
@@ -56,10 +55,8 @@ def get_effective_membership(
     """
     if not user.is_authenticated:
         return None
-    try:
-        own = user.membership  # type: ignore[union-attr]
-    except ObjectDoesNotExist:
-        own = None
+    # A missing related object raises a subclass of AttributeError.
+    own = getattr(user, "membership", None)
     if own is not None and own.is_active:
         return EffectiveMembership(level=own.level, neon_id=own.neon_id)
 
@@ -76,8 +73,10 @@ def get_effective_membership(
     if org_membership is None:
         return None
     organization = org_membership.organization
+    if organization.membership_level is None:
+        return None
     return EffectiveMembership(
-        level=organization.membership_level,  # type: ignore[arg-type]
+        level=organization.membership_level,
         neon_id="",
         organization=organization,
     )

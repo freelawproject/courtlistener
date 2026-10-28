@@ -4,6 +4,7 @@ from asgiref.sync import iscoroutinefunction, sync_to_async
 from django.conf import settings
 from django.contrib import messages
 from django.contrib.auth import SESSION_KEY, logout
+from django.contrib.auth.models import User
 from django.http import HttpRequest, HttpResponse, HttpResponseRedirect
 from django.utils.decorators import sync_and_async_middleware
 
@@ -39,9 +40,9 @@ def enforce_sso_session(request: HttpRequest) -> HttpResponse | None:
         return None
 
     user = request.user
-    if not user.is_authenticated:
+    if not isinstance(user, User):
         return None
-    requirement = requirement_for_user(user)  # type: ignore[arg-type]
+    requirement = requirement_for_user(user)
     if requirement is None or (
         session.get(SSO_ORGANIZATION_KEY) == requirement.organization.pk
     ):
@@ -52,10 +53,10 @@ def enforce_sso_session(request: HttpRequest) -> HttpResponse | None:
         request=request,
         method=AuthMethod.PASSWORD,
         outcome=AuthOutcome.REFUSED,
-        user=user,  # type: ignore[arg-type]
+        user=user,
         detail="ended a session SSO policy no longer allows",
     )
-    email = user.email  # type: ignore[union-attr]
+    email = user.email
     logout(request)
     messages.warning(request, refusal_message(requirement, email))
     return HttpResponseRedirect(

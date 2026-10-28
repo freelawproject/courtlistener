@@ -100,7 +100,7 @@ class OrganizationAdmin(admin.ModelAdmin):
     def seats(self, obj: Organization) -> str:
         """Show seats used against the limit, e.g. "12 / 25"."""
         limit = "∞" if obj.seat_limit is None else obj.seat_limit
-        return f"{obj.seat_count} / {limit}"  # type: ignore[attr-defined]
+        return f"{getattr(obj, 'seat_count', 0)} / {limit}"
 
     def save_related(self, request, form, formsets, change) -> None:
         """Re-sync members' API throttles after the organization changes.

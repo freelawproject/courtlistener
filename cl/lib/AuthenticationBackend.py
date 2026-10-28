@@ -275,15 +275,17 @@ class ConfirmedEmailAuthenticationForm(AuthenticationForm):
 
         # Checked only after the password was right, so this tells nobody
         # anything about an account they can't already sign in to.
-        if requirement := requirement_for_user(user):  # type: ignore[arg-type]
+        if isinstance(user, User) and (
+            requirement := requirement_for_user(user)
+        ):
             record_auth_event(
                 request=self.request,
                 method=AuthMethod.PASSWORD,
                 outcome=AuthOutcome.REFUSED,
-                user=user,  # type: ignore[arg-type]
+                user=user,
                 detail=f"SSO required ({requirement.reason})",
             )
             raise forms.ValidationError(
-                refusal_message(requirement, user.email),  # type: ignore[attr-defined]
+                refusal_message(requirement, user.email),
                 code="sso_required",
             )
