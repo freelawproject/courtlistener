@@ -8,10 +8,12 @@ from django.core.exceptions import ValidationError
 from django.db import models
 from django.db.models import Q
 from django.db.models.functions import Lower
+from django.urls import reverse
 from django.utils import timezone
 
 from cl.donate.models import NeonMembership, NeonMembershipLevel
 from cl.lib.models import AbstractDateTimeModel
+from cl.lib.url_utils import BASE_URL
 
 # Domains anyone can get an address on. Verifying one of these would let a
 # single organization claim every user of the provider, so they can never be
@@ -82,7 +84,7 @@ class Organization(AbstractDateTimeModel):
 
     The organization, not each person, holds the membership level. People
     get it through an ``OrganizationMembership``, which the first SSO login
-    creates.
+    creates. See ``cl.sso.membership.get_effective_membership``.
     """
 
     name = models.CharField(max_length=200)
@@ -335,7 +337,8 @@ class SSOConnection(AbstractDateTimeModel):
             )
         # A SAML sign-in started at the IdP answers no request CourtListener
         # made, so nothing ties the response to this browser. allauth refuses
-        # them unless this is set to false.
+        # them unless this is set to false. IdP dashboard tiles use OIDC's
+        # initiate login URI instead (see views.oidc_initiate_login).
         if self.social_app.provider == "saml" and not advanced.get(
             "reject_idp_initiated_sso", True
         ):
@@ -346,6 +349,47 @@ class SSOConnection(AbstractDateTimeModel):
                     "SAML app's advanced settings."
                 }
             )
+
+    def get_login_url(self) -> str:
+        """Return the URL that starts a login through this IdP.
+
+        The URL must be POSTed to (SOCIALACCOUNT_LOGIN_ON_GET is off).
+
+        :return: A path on this site.
+        """
+        if self.social_app.provider == "saml":
+            return reverse(
+                "saml_login",
+                kwargs={"organization_slug": self.social_app.client_id},
+            )
+        return reverse(
+            "openid_connect_login",
+            kwargs={"provider_id": self.social_app.provider_id},
+        )
+
+    def get_idp_settings(self) -> dict[str, str]:
+        """List the URLs the organization's IdP admin enters for this app.
+
+        These are what the setup guide tells customers, filled in for this
+        connection, so staff can send them without working them out.
+
+        :return: {setting name as IdPs label it: absolute URL}, in the order
+        an IdP's setup screens ask for them.
+        """
+        if self.social_app.provider == "saml":
+            slug = {"organization_slug": self.social_app.client_id}
+            return {
+                "ACS (reply) URL": BASE_URL + reverse("saml_acs", kwargs=slug),
+                "SP entity ID (audience)": BASE_URL
+                + reverse("saml_metadata", kwargs=slug),
+            }
+        provider = {"provider_id": self.social_app.provider_id}
+        return {
+            "Sign-in redirect URI": BASE_URL
+            + reverse("openid_connect_callback", kwargs=provider),
+            "Initiate login URI": BASE_URL
+            + reverse("sso_oidc_initiate", kwargs=provider),
+        }
 
 
 class MembershipRole(models.TextChoices):
@@ -464,8 +508,9 @@ class AuthOutcome(models.TextChoices):
 class AuthEvent(models.Model):
     """An append-only record of sign-in activity, kept as audit evidence.
 
-    Successful HTTP Basic requests aren't recorded, because every API call
-    would add a row; refused and failed ones are.
+    Written by ``cl.sso.events.record_auth_event``. Successful HTTP Basic
+    requests aren't recorded, because every API call would add a row;
+    refused and failed ones are.
     """
 
     date_created = models.DateTimeField(auto_now_add=True, db_index=True)
