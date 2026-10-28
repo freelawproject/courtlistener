@@ -185,6 +185,7 @@
   .flatpickr-day.nextMonthDay.selected,
   .flatpickr-day.prevMonthDay.selected,
   .flatpickr-day.today.selected,
+  .flatpickr-day.selected:focus,
   .flatpickr-day.selected {
     @apply bg-primary-600 hover:bg-primary-700 border-none hover:text-white after:bg-greyscale-25;
   }
