@@ -1,5 +1,6 @@
 {% load component_tags svg_tags %}
 {% require_script "js/third_party/htmx" defer=True %}
+{% require_script "js/alpine/components/add_note_status.js" %}
 
 <c-vars form/>
 
@@ -20,6 +21,17 @@
         >
             <c-add-note.button_content :form="form" />
         </c-button>
+        {# Outside the panel, so it can still speak after the dialog closes. #}
+        <span
+            class="sr-only"
+            role="status"
+            x-data="noteStatus"
+            x-on:note-saved.window="saved"
+            x-on:note-deleted.window="deleted"
+            data-saved="Note saved."
+            data-deleted="Note deleted."
+            x-text="message"
+        ></span>
     </c-slot>
     {% if request.user.is_authenticated %}
         <c-slot name="panel">

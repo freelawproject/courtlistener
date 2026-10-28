@@ -110,6 +110,26 @@ class NoteFormV2Test(TestCase):
         self.assertNotIn("\r", form.cleaned_data["notes"])
         self.assertFalse(self.build_form(notes=over_limit).is_valid())
 
+    def test_first_invalid_visible_field_takes_focus(self) -> None:
+        """Does a failed save mark the first invalid visible field for
+        autofocus, and nothing else?"""
+        for label, form, focused in (
+            ("name", self.build_form(name="", notes="a" * 501), "name"),
+            ("notes", self.build_form(notes="a" * 501), "notes"),
+            ("valid", self.build_form(), None),
+            ("hidden only", self.build_form(object_id=999999999), None),
+            ("unbound", NoteForm(), None),
+        ):
+            with self.subTest(case=label):
+                form.is_valid()
+                marked = [
+                    name
+                    for name, field in form.fields.items()
+                    if field.widget.attrs.get("autofocus")
+                ]
+
+                self.assertEqual(marked, [focused] if focused else [])
+
     def test_rejects_a_dangling_object_id(self) -> None:
         """Is an object_id that names no row rejected? It's a plain integer,
         so only clean() stops it."""
@@ -320,6 +340,17 @@ class NoteDialogComponentTest(TestCase):
 
         self.assertIn('x-on:note-saved.window="close"', html)
         self.assertIn('x-on:note-deleted.window="close"', html)
+
+    def test_result_is_announced_outside_the_dialog_panel(self) -> None:
+        """Is there a status region that stays on the page, with both
+        messages, for when the dialog has already closed?"""
+        html = self.render(UserFactory())
+
+        self.assertIn('role="status"', html)
+        self.assertIn('x-on:note-saved.window="saved"', html)
+        self.assertIn('x-on:note-deleted.window="deleted"', html)
+        self.assertIn('data-saved="Note saved."', html)
+        self.assertIn('data-deleted="Note deleted."', html)
 
 
 class GetNoteFormForTest(TestCase):

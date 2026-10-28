@@ -49,6 +49,21 @@ class NoteForm(V1NoteForm):
             "notes": widgets.Textarea(attrs={"maxlength": "500", "rows": "6"}),
         }
 
+    def full_clean(self) -> None:
+        """Validate, then mark the first invalid visible field for autofocus.
+
+        htmx focuses an [autofocus] element in the fragment it swaps in, which
+        puts keyboard and screen reader users on the error after a failed save.
+        Only bound forms with errors are marked.
+        """
+        super().full_clean()
+        for name in self.errors:
+            # Non-field errors are keyed "__all__", which isn't a field.
+            field = self.fields.get(name)
+            if field and not field.widget.is_hidden:
+                field.widget.attrs["autofocus"] = True
+                return
+
     @property
     def has_hidden_field_errors(self) -> bool:
         """Whether content_type or object_id failed validation.
