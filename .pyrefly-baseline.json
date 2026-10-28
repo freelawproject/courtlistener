@@ -1927,13 +1927,6 @@
       "severity": "error"
     },
     {
-      "column": 12,
-      "path": "cl/recap/management/commands/nightly_pacer_updates.py",
-      "name": "bad-return",
-      "concise_description": "Returned type `set[str | Any]` is not assignable to declared return type `set[int]`",
-      "severity": "error"
-    },
-    {
       "column": 26,
       "path": "cl/recap/mergers.py",
       "name": "unbound-name",
