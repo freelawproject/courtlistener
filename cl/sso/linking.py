@@ -127,16 +127,18 @@ def get_connection(sociallogin: SocialLogin) -> SSOConnection | None:
 
     :param sociallogin: The pending login.
     :return: The connection, or None if the IdP isn't tied to an
-    organization or is switched off.
+    organization, is switched off, or shares its provider ID with another
+    connection.
     """
-    return (
+    # allauth keys identities on (provider ID, uid), so two IdPs sharing a
+    # provider ID could sign in as each other's people.
+    connections = list(
         SSOConnection.objects.filter(
             social_app__provider_id=sociallogin.account.provider,
             is_enabled=True,
-        )
-        .select_related("organization", "social_app")
-        .first()
+        ).select_related("organization", "social_app")[:2]
     )
+    return connections[0] if len(connections) == 1 else None
 
 
 def social_user(sociallogin: SocialLogin) -> User:

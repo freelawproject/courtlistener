@@ -278,8 +278,8 @@ class SSOConnection(AbstractDateTimeModel):
         """Make sure identities from this IdP can't collide with another's.
 
         :raises ValidationError: If the SocialApp isn't an OIDC or SAML app,
-        has no provider_id, or (for SAML) accepts unsigned assertions or
-        sign-ins started at the IdP.
+        has no provider_id or shares one with another app, or (for SAML)
+        accepts unsigned assertions or sign-ins started at the IdP.
         """
         if self.social_app.provider not in ("openid_connect", "saml"):
             raise ValidationError(
@@ -291,6 +291,17 @@ class SSOConnection(AbstractDateTimeModel):
                     "social_app": "Give the SocialApp a unique provider ID, "
                     "e.g. 'acme-law', so its identities are kept apart from "
                     "other organizations'."
+                }
+            )
+        if (
+            SocialApp.objects.filter(provider_id=self.social_app.provider_id)
+            .exclude(pk=self.social_app.pk)
+            .exists()
+        ):
+            raise ValidationError(
+                {
+                    "social_app": "Another SocialApp already uses this "
+                    "provider ID. Give each IdP its own."
                 }
             )
         # allauth doesn't require signed assertions by default. A signed

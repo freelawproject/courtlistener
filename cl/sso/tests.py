@@ -9,7 +9,7 @@ from urllib.parse import parse_qs, urlparse
 
 import jwt
 import time_machine
-from allauth.socialaccount.models import SocialAccount
+from allauth.socialaccount.models import SocialAccount, SocialLogin
 from django.conf import settings
 from django.contrib.auth.models import User
 from django.core import mail
@@ -43,6 +43,7 @@ from cl.sso.factories import (
     SocialAppFactory,
     SSOConnectionFactory,
 )
+from cl.sso.linking import get_connection
 from cl.sso.membership import EffectiveMembership, get_effective_membership
 from cl.sso.models import (
     AuthEvent,
@@ -1285,6 +1286,31 @@ class SSOConnectionTest(TestCase):
         )
         with self.assertRaises(ValidationError):
             connection.clean()
+
+    def test_shared_provider_id_rejected(self) -> None:
+        """Is a provider ID that another SocialApp uses rejected?"""
+        SocialAppFactory.create(provider_id="shared")
+        connection = SSOConnectionFactory.build(
+            organization=OrganizationFactory.create(),
+            social_app=SocialAppFactory.create(provider_id="shared"),
+        )
+        with self.assertRaises(ValidationError):
+            connection.clean()
+
+    def test_shared_provider_id_matches_no_connection(self) -> None:
+        """Is a login refused when two connections share a provider ID?"""
+        sociallogin = cast(
+            SocialLogin, mock.Mock(account=mock.Mock(provider="shared"))
+        )
+        SSOConnectionFactory.create(
+            social_app=SocialAppFactory.create(provider_id="shared")
+        )
+        self.assertIsNotNone(get_connection(sociallogin))
+
+        SSOConnectionFactory.create(
+            social_app=SocialAppFactory.create(provider_id="shared")
+        )
+        self.assertIsNone(get_connection(sociallogin))
 
 
 class StaffReportTest(TestCase):
