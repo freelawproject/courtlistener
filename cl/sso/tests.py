@@ -624,6 +624,26 @@ class EffectiveMembershipTest(TestCase):
         )
         self.assertIsNone(get_effective_membership(self.user))
 
+    def test_neon_deletion_keeps_organization_rates(self) -> None:
+        """Does losing a Neon membership fall back to the org's API rates?"""
+        NeonMembershipFactory.create(
+            user=self.user, level=NeonMembershipLevel.TIER_1, neon_id="99"
+        )
+        OrganizationMembershipFactory.create(
+            organization=self.org, user=self.user
+        )
+        sync_user_throttles(self.user)
+
+        MembershipWebhookViewSet._handle_membership_deletion(
+            {"data": {"membership": {"membershipId": "99"}}}
+        )
+
+        self.assertTrue(
+            APIThrottle.objects.filter(
+                user=self.user, source=APIThrottle.Source.MEMBERSHIP
+            ).exists()
+        )
+
     def test_own_membership_wins(self) -> None:
         """Does a person's own Neon membership beat their organization's?"""
         NeonMembershipFactory.create(

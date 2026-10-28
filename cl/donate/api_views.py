@@ -15,10 +15,7 @@ from rest_framework import mixins, serializers, viewsets
 from rest_framework.request import Request
 from rest_framework.response import Response
 
-from cl.api.utils import (
-    apply_membership_throttles,
-    clear_membership_throttles,
-)
+from cl.api.utils import apply_membership_throttles
 from cl.donate.api_permissions import AllowNeonWebhook
 from cl.donate.models import (
     MembershipPaymentStatus,
@@ -30,6 +27,7 @@ from cl.lib.auth import filter_by_email
 from cl.lib.crypto import generate_activation_key
 from cl.lib.neon_utils import NeonClient
 from cl.lib.types import EmailType
+from cl.sso.throttles import sync_user_throttles
 from cl.users.tasks import tag_zoho_record_for_membership
 from cl.users.utils import (
     create_stub_account,
@@ -416,5 +414,6 @@ class MembershipWebhookViewSet(
                 "Error processing webhook, Membership not found",
                 status=HTTPStatus.INTERNAL_SERVER_ERROR,
             )
-        clear_membership_throttles(neon_membership.user)
+        user_id = neon_membership.user_id
         neon_membership.delete()
+        sync_user_throttles(User.objects.get(pk=user_id))
