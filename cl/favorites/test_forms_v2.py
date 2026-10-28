@@ -1,7 +1,7 @@
 from unittest import mock
 
 from asgiref.sync import sync_to_async
-from django.contrib.auth.models import AnonymousUser
+from django.contrib.auth.models import AnonymousUser, User
 from django.contrib.contenttypes.models import ContentType
 from django.template import engines
 from django.test import RequestFactory
@@ -224,6 +224,63 @@ class NoteFormComponentTest(TestCase):
 
         self.assertNotIn(self.NOTICE, html)
         self.assertIn("This field is required.", html)
+
+
+class NoteDialogComponentTest(TestCase):
+    """Test the c-add-note.dialog component's button and listeners."""
+
+    @classmethod
+    def setUpTestData(cls) -> None:
+        cls.docket = DocketFactory()
+        cls.content_type = ContentType.objects.get_for_model(cls.docket)
+
+    def render(self, user: AnonymousUser | User, note: bool = False) -> str:
+        """Render the dialog for the docket, for a user who may have a
+        note."""
+        if note:
+            instance = NoteFactory.for_object(self.docket, user=user)
+            form = NoteForm(instance=instance)
+        else:
+            form = NoteForm(
+                initial={
+                    "content_type": self.content_type.pk,
+                    "object_id": self.docket.pk,
+                }
+            )
+        request = RequestFactory().get("/")
+        request.user = user
+        compiled = CottonCompiler().process(
+            '<c-add-note.dialog :form="form" />'
+        )
+        return (
+            engines["django"]
+            .from_string(compiled)
+            .render({"form": form, "request": request})
+        )
+
+    def test_button_has_the_id_the_response_updates(self) -> None:
+        """Does the note button carry the id that the htmx response targets,
+        built from the object's content type and id?"""
+        html = self.render(AnonymousUser())
+
+        self.assertIn(
+            f'id="note-trigger-{self.content_type.pk}-{self.docket.pk}"', html
+        )
+
+    def test_button_label_follows_the_note(self) -> None:
+        """Does the button offer to add a note, or to edit the existing
+        one?"""
+        user = UserFactory()
+
+        self.assertIn("Add Note", self.render(user))
+        self.assertIn("Edit Note", self.render(user, note=True))
+
+    def test_dialog_closes_when_a_note_is_saved_or_deleted(self) -> None:
+        """Does the dialog listen for the events the views send?"""
+        html = self.render(UserFactory())
+
+        self.assertIn('x-on:note-saved.window="close"', html)
+        self.assertIn('x-on:note-deleted.window="close"', html)
 
 
 class GetNoteFormForTest(TestCase):

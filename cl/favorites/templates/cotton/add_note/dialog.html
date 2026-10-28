@@ -3,22 +3,22 @@
 
 <c-vars form/>
 
-<c-dialog panel_class="p-5 banner max-w-xl" dialog_class="items-center z-20">
+<c-dialog
+    panel_class="p-5 banner max-w-xl"
+    dialog_class="items-center z-20"
+    x-on:note-saved.window="close"
+    x-on:note-deleted.window="close"
+    >
     <c-slot name="trigger_button">
         <c-button
+            id="note-trigger-{{ form.content_type.value }}-{{ form.object_id.value }}"
             variant="outline"
             x-on:click="open"
             x-bind:aria-controls="dialogId"
             x-bind:aria-expanded="isOpen"
             aria-haspopup="dialog"
         >
-            {% if form.instance.pk %}
-                {% svg "bookmark_full" class="w-4 h-4 text-primary-800" aria_hidden="true" %}
-                <span class="text-sm">Edit Note</span>
-            {% else %}
-                {% svg "bookmark" class="w-4 h-4" aria_hidden="true" %}
-                <span class="text-sm">Add Note</span>
-            {% endif %}
+            <c-add-note.button_content :form="form" />
         </c-button>
     </c-slot>
     {% if request.user.is_authenticated %}

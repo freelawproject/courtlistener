@@ -117,6 +117,32 @@ def _save_or_update_note_ajax(request: HttpRequest) -> HttpResponse:
         )
 
 
+def _note_form_response(
+    request: HttpRequest, form: NoteFormV2, event: str | None = None
+) -> TemplateResponse:
+    """Render the v2 note form fragment for htmx.
+
+    :param request: The request being answered.
+    :param form: The form to render, with its errors if any.
+    :param event: The event to announce once the fragment is swapped in, set
+        only when the note was saved or deleted. It also updates the note
+        button on the page and, through the dialog's listeners, closes the
+        dialog. A response that carries errors must leave it unset so the
+        dialog stays open.
+    :return: The fragment response.
+    """
+    if event is None:
+        return TemplateResponse(
+            request, "v2_includes/add_note/form.html", {"form": form}
+        )
+    return TemplateResponse(
+        request,
+        "v2_includes/add_note/form.html",
+        {"form": form, "update_trigger": True},
+        headers={"HX-Trigger-After-Swap": event},
+    )
+
+
 def _save_or_update_note_htmx(request: HttpRequest) -> HttpResponse:
     """Save or update the user's note for an object and return the v2 form.
 
@@ -150,14 +176,13 @@ def _save_or_update_note_htmx(request: HttpRequest) -> HttpResponse:
                 existing.notes = form.cleaned_data["notes"]
                 existing.save()
                 new_note = existing
-        form = NoteFormV2(
+        saved_form = NoteFormV2(
             instance=new_note,
             initial={"default_name": form.cleaned_data["default_name"]},
         )
+        return _note_form_response(request, saved_form, "note-saved")
 
-    return TemplateResponse(
-        request, "v2_includes/add_note/form.html", {"form": form}
-    )
+    return _note_form_response(request, form)
 
 
 @login_required
@@ -232,7 +257,7 @@ def _delete_note_htmx(request: HttpRequest) -> HttpResponse:
         # The page's suggested name, sent back by the form, restores the
         # prefill the page had before the note existed.
         default_name = request.POST.get("default_name", "")[:100]
-        form = NoteFormV2(
+        empty_form = NoteFormV2(
             initial={
                 "content_type": request.POST.get("content_type"),
                 "object_id": request.POST.get("object_id"),
@@ -240,10 +265,9 @@ def _delete_note_htmx(request: HttpRequest) -> HttpResponse:
                 "default_name": default_name,
             }
         )
+        return _note_form_response(request, empty_form, "note-deleted")
 
-    return TemplateResponse(
-        request, "v2_includes/add_note/form.html", {"form": form}
-    )
+    return _note_form_response(request, form)
 
 
 async def view_tag(request, username, tag_name):

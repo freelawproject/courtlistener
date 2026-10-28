@@ -68,6 +68,32 @@ class SaveNoteHtmxTest(TestCase):
         self.assertContains(r, "Edit Note")
         self.assertContains(r, reverse("delete_note"))
 
+    def test_save_closes_the_dialog_and_updates_the_button(self) -> None:
+        """Does a save announce itself, and refresh the note button in
+        place?"""
+        r = self.post()
+
+        self.assertEqual(r["HX-Trigger-After-Swap"], "note-saved")
+        self.assertContains(r, 'hx-swap-oob="innerHTML"')
+        self.assertContains(
+            r, f'id="note-trigger-{self.content_type.pk}-{self.docket.pk}"'
+        )
+        self.assertContains(r, "Edit Note", count=2)
+
+    def test_failed_save_keeps_the_dialog_and_the_button(self) -> None:
+        """Does a save that fails leave the dialog open and the button as it
+        was?"""
+        cases = (
+            ("blank name", {"name": ""}),
+            ("missing object_id", {"object_id": ""}),
+        )
+        for label, overrides in cases:
+            with self.subTest(case=label):
+                r = self.post(**overrides)
+
+                self.assertNotIn("HX-Trigger-After-Swap", r)
+                self.assertNotContains(r, "hx-swap-oob")
+
     def test_saved_form_keeps_the_suggested_name(self) -> None:
         """Does the form returned after a save still carry the page's
         suggested name, for a later delete?"""
@@ -283,6 +309,35 @@ class DeleteNoteHtmxTest(TestCase):
             r, f'name="content_type" value="{self.content_type.pk}"'
         )
         self.assertContains(r, f'name="object_id" value="{self.docket.pk}"')
+
+    def test_delete_closes_the_dialog_and_updates_the_button(self) -> None:
+        """Does a delete announce itself, and refresh the note button in
+        place, whether or not the note was still there?"""
+        for label, has_note in (
+            ("note exists", True),
+            ("already gone", False),
+        ):
+            with self.subTest(case=label):
+                if has_note:
+                    NoteFactory.for_object(self.docket, user=self.user)
+
+                r = self.post()
+
+                self.assertEqual(r["HX-Trigger-After-Swap"], "note-deleted")
+                self.assertContains(r, 'hx-swap-oob="innerHTML"')
+                self.assertContains(
+                    r,
+                    f'id="note-trigger-{self.content_type.pk}-{self.docket.pk}"',
+                )
+                self.assertContains(r, "Add Note", count=2)
+
+    def test_failed_delete_keeps_the_dialog_and_the_button(self) -> None:
+        """Does a delete that names no noteable object leave the dialog open
+        and the button as it was?"""
+        r = self.post(object_id="")
+
+        self.assertNotIn("HX-Trigger-After-Swap", r)
+        self.assertNotContains(r, "hx-swap-oob")
 
     def test_the_returned_form_is_back_to_its_initial_state(self) -> None:
         """Does the form come back with Name prefilled with the page's
