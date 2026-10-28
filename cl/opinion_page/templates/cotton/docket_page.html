@@ -73,13 +73,10 @@
     <span class="self-start px-3 py-1 text-sm font-semibold text-red-700 bg-red-100 border border-red-300 rounded-lg">Blocked</span>
   {% endif %}
 
-  {# Action buttons — Note and Tags are placeholders. #}
-  {# TODO: Wire up Add a Note and Tags button interactivity. #}
+  {# Action buttons — Tags is a placeholder. #}
+  {# TODO: Wire up Tags button interactivity. #}
   <div class="flex flex-wrap gap-2">
-    <c-button variant="outline">
-      {% svg "bookmark" class="w-4 h-4" aria_hidden="true" %}
-      Add a Note
-    </c-button>
+    <c-add-note.dialog :form="note_form"/>
     <c-button variant="outline">
       {% svg "tag" class="w-4 h-4" aria_hidden="true" %}
       Tags

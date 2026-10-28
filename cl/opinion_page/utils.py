@@ -554,10 +554,17 @@ class CoreDocketDataDict(TypedDict):
 
 
 async def core_docket_data(
-    request: HttpRequest,
-    pk: int,
+    request: HttpRequest, pk: int, note_form_class: type[NoteForm] = NoteForm
 ) -> tuple[Docket, CoreDocketDataDict]:
-    """Gather the core data for a docket, party, or IDB page."""
+    """Gather the core data for a docket, party, or IDB page.
+
+    :param request: The request, used for the user and feature flags.
+    :param pk: The primary key of the docket.
+    :param note_form_class: The NoteForm subclass to build the note form
+        with. Only pages that render the form with the matching widgets
+        should change it; the legacy modal depends on the default's ids.
+    :return: The docket and a dict of the data shared by docket pages.
+    """
     docket: Docket = await aget_object_or_404(Docket, pk=pk)
     source = docket.get_entry_source()
     is_scotus = source is docket_entry_sources.SCOTUS
@@ -576,6 +583,7 @@ async def core_docket_data(
         docket,
         await request.auser(),  # type: ignore[arg-type]
         trunc(best_case_name(docket), 100, ellipsis="..."),
+        form_class=note_form_class,
     )
 
     has_alert = await user_has_alert(

@@ -37,6 +37,7 @@
         {'href': '#docket-source-button', 'text': 'Docket source button'},
         {'href': '#docket-source-attribution', 'text': 'Docket source attribution'},
         {'href': '#docket-alert-label', 'text': 'Docket alert label'},
+        {'href': '#add-note', 'text': 'Add note'},
         {'href': '#docket-entry-rows', 'text': 'Docket entry rows'},
         {'href': '#document-source-link', 'text': 'Document source link'},
         {'href': '#docket-filter', 'text': 'Docket filter'},
@@ -1765,6 +1766,47 @@ Sample code here.
     <c-expansion-panel title="Code">
       <c-code>
 &lt;c-docket-alert-label :has_alert="has_alert" icon_class="w-4 h-4 text-greyscale-500" /&gt;
+      </c-code>
+    </c-expansion-panel>
+  </section>
+
+  {# ADD NOTE #}
+  <section class="max-w-full w-full border-t-2 border-greyscale-200" x-intersect.margin.-100px="show" id="add-note">
+    <h2 class="mt-6 mb-3">Add note</h2>
+    <p><code>&lt;c-add-note.dialog&gt;</code> is the "Add Note" button and the dialog it opens. Logged-in users get a form to add, edit or delete their note on an object. Logged-out users get sign-in and register links that return to the page. It saves over htmx, so the dialog closes and the button updates without a reload.</p>
+
+    <h4 class="mt-3">Demo</h4>
+    <p class="text-sm text-greyscale-600 mb-2">The button's two states: no note yet, and a saved note. The dialog isn't shown here because its form saves to the real note endpoint.</p>
+    <div class="my-4 flex flex-row gap-6 rounded-lg border border-greyscale-200 p-4 text-sm">
+      <span class="flex items-center gap-1"><c-add-note.button_content :form="demo_note_form" /></span>
+      <span class="flex items-center gap-1"><c-add-note.button_content :form="demo_saved_note_form" /></span>
+    </div>
+
+    <c-library.list title="Props" only>
+      <c-library.item only>
+        <c-slot name="label"><code>:form</code></c-slot>
+        <c-slot name="description">A <code>NoteForm</code> from <code>cl.favorites.forms_v2</code>. Its <code>content_type</code> and <code>object_id</code> values name the object being noted, and a saved <code>instance</code> switches the button to "Edit Note" and adds a Delete button.</c-slot>
+      </c-library.item>
+    </c-library.list>
+
+    <c-library.list title="Slots" only>
+      <p>No slots</p>
+    </c-library.list>
+
+    <c-library.list title="Sub-components">
+      <c-library.item only>
+        <c-slot name="label"><code>c-add-note.form</code></c-slot>
+        <c-slot name="description">The note form: name, notes with a character counter, and Cancel, Save and Delete buttons. Takes <code>:form</code> and an optional <code>form_prefix</code> for its input ids (default <code>note</code>).</c-slot>
+      </c-library.item>
+      <c-library.item only>
+        <c-slot name="label"><code>c-add-note.button_content</code></c-slot>
+        <c-slot name="description">The icon and label of the trigger button for one state. Takes <code>:form</code></c-slot>
+      </c-library.item>
+    </c-library.list>
+
+    <c-expansion-panel title="Code">
+      <c-code>
+&lt;c-add-note.dialog :form="note_form" /&gt;
       </c-code>
     </c-expansion-panel>
   </section>

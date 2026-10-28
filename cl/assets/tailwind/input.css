@@ -230,6 +230,7 @@
   .focus-container { /** provides focus state when a child input is focused */
     @apply [&:has(input:focus)]:outline [&:has(input:focus)]:outline-2 [&:has(input:focus)]:outline-primary-600 flex;
     @apply [&:has(select:focus)]:outline [&:has(select:focus)]:outline-2 [&:has(select:focus)]:outline-primary-600 flex;
+    @apply [&:has(textarea:focus)]:outline [&:has(textarea:focus)]:outline-2 [&:has(textarea:focus)]:outline-primary-600 flex;
   }
   .focus-self {
     @apply focus-visible:outline focus-visible:outline-2 focus-visible:outline-primary-600 -outline-offset-2;

@@ -57,8 +57,9 @@ from cl.citations.utils import (
     slugify_reporter,
 )
 from cl.custom_filters.templatetags.text_filters import best_case_name
+from cl.favorites import forms_v2 as favorites_forms_v2
 from cl.favorites.decorators import track_view_counter
-from cl.favorites.forms import get_note_form_for
+from cl.favorites.forms import NoteForm, get_note_form_for
 from cl.favorites.utils import (
     get_existing_prayers_in_bulk,
     get_prayer_counts_in_bulk,
@@ -373,9 +374,13 @@ async def view_docket(
     sort_order_asc = True
     if await sync_to_async(flag_is_active)(request, "use_new_design"):
         form = forms_v2.DocketEntryFilterForm(request.GET, request=request)
+        note_form_class = favorites_forms_v2.NoteForm
     else:
         form = DocketEntryFilterForm(request.GET, request=request)
-    docket, context = await core_docket_data(request, pk)
+        note_form_class = NoteForm
+    docket, context = await core_docket_data(
+        request, pk, note_form_class=note_form_class
+    )
 
     source = docket.get_entry_source()
     de_list = await fetch_docket_entries(docket)

@@ -1,4 +1,9 @@
-from cl.lib.widgets import NEW_STACK_WIDGET_CLASSES, Select, TextInput
+from cl.lib.widgets import (
+    NEW_STACK_WIDGET_CLASSES,
+    Select,
+    Textarea,
+    TextInput,
+)
 from cl.tests.cases import SimpleTestCase
 
 
@@ -88,3 +93,31 @@ class SelectTest(SimpleTestCase):
         self.assertInHTML(
             '<option value="ny" selected>New York</option>', rendered
         )
+
+
+class TextareaTest(SimpleTestCase):
+    """Test the shared textarea used by new-stack Django forms."""
+
+    def test_defaults_and_caller_attrs(self) -> None:
+        """Apply defaults without mutating caller attributes."""
+        attrs = {"placeholder": "Enter your note here"}
+
+        widget = Textarea(attrs=attrs)
+
+        self.assertEqual(attrs, {"placeholder": "Enter your note here"})
+        self.assertEqual(widget.attrs["placeholder"], "Enter your note here")
+        self.assertEqual(widget.attrs["class"], NEW_STACK_WIDGET_CLASSES)
+        self.assertEqual(widget.attrs["rows"], 4)
+        self.assertInHTML(
+            '<textarea name="note" cols="40" rows="4" '
+            'placeholder="Enter your note here" '
+            f'class="{NEW_STACK_WIDGET_CLASSES}"></textarea>',
+            widget.render("note", None),
+        )
+
+    def test_caller_attrs_override_defaults(self) -> None:
+        """Retain explicit class and rows values from the caller."""
+        widget = Textarea(attrs={"class": "custom-class", "rows": 8})
+
+        self.assertEqual(widget.attrs["class"], "custom-class")
+        self.assertEqual(widget.attrs["rows"], 8)

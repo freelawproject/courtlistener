@@ -10,7 +10,7 @@ from itertools import product
 from typing import TYPE_CHECKING, Any, cast
 from unittest import mock
 from unittest.mock import AsyncMock, MagicMock, PropertyMock, patch
-from urllib.parse import parse_qs, urlencode, urlparse
+from urllib.parse import parse_qs, quote, urlencode, urlparse
 
 from asgiref.sync import async_to_sync, sync_to_async
 from django import forms
@@ -50,6 +50,9 @@ from cl.alerts.factories import DocketAlertFactory
 from cl.alerts.models import DocketAlert
 from cl.audio.factories import AudioFactory
 from cl.citations.utils import slugify_reporter
+from cl.favorites import forms_v2 as favorites_forms_v2
+from cl.favorites.factories import NoteFactory
+from cl.favorites.forms import NoteForm
 from cl.favorites.models import GenericCount
 from cl.lib.file_validation import (
     NOT_A_PDF_MESSAGE,
@@ -5110,3 +5113,95 @@ class DocketFilterPaginationWiringTest(TestCase):
             "210",
             f"range total should be the paginator count; nav text={nav_text}",
         )
+
+
+@override_settings(WAFFLE_CACHE_PREFIX="test_docket_note_form_v2_waffle")
+@override_flag("use_new_design", active=True)
+class DocketNoteFormV2Test(TestCase):
+    """Test that docket pages get the note form matching their template.
+
+    The legacy modal's JS finds its inputs by id, so a legacy template must
+    never receive the v2 form. `WAFFLE_CACHE_PREFIX` isolates this class's
+    `use_new_design` cache namespace from parallel test workers, as in
+    `DocketPageV2TemplateTest`.
+    """
+
+    @classmethod
+    def setUpTestData(cls) -> None:
+        cls.docket = DocketFactory(source=Docket.RECAP)
+
+    async def test_docket_page_gets_the_v2_note_form(self) -> None:
+        """Does the v2 docket page get the v2 note form?"""
+        r = await self.async_client.get(
+            reverse("view_docket", args=[self.docket.pk, self.docket.slug])
+        )
+
+        self.assertTemplateUsed(r, "v2_docket.html")
+        self.assertIs(
+            type(r.context["note_form"]), favorites_forms_v2.NoteForm
+        )
+
+    async def test_tab_without_a_v2_template_keeps_the_v1_form(self) -> None:
+        """Does a tab with no v2 template keep the v1 form when the flag is
+        on? It still renders the legacy modal."""
+        r = await self.async_client.get(
+            reverse("docket_parties", args=[self.docket.pk, self.docket.slug])
+        )
+
+        self.assertTemplateUsed(r, "docket_parties.html")
+        self.assertIs(type(r.context["note_form"]), NoteForm)
+
+    async def test_logged_out_user_gets_sign_in_links(self) -> None:
+        """Does a logged-out user see sign-in and register links that return
+        to the docket, instead of the note form?"""
+        url = reverse("view_docket", args=[self.docket.pk, self.docket.slug])
+
+        r = await self.async_client.get(url)
+
+        content = r.content.decode()
+        self.assertIn("Add Note", content)
+        self.assertIn(f"{reverse('sign-in')}?next={quote(url)}", content)
+        self.assertIn(f"{reverse('register')}?next={quote(url)}", content)
+        self.assertNotIn(reverse("save_or_update_note"), content)
+
+    async def test_logged_in_user_gets_the_form_for_their_note(self) -> None:
+        """Does a logged-in user see "Add Note", the save form and no Delete
+        button until they have a note, and then "Edit Note", their saved
+        values and a Delete button?"""
+        user = await sync_to_async(UserWithChildProfileFactory)()
+        await self.async_client.aforce_login(user)
+        url = reverse("view_docket", args=[self.docket.pk, self.docket.slug])
+
+        content = (await self.async_client.get(url)).content.decode()
+        self.assertIn("Add Note", content)
+        self.assertNotIn("Edit Note", content)
+        self.assertIn(reverse("save_or_update_note"), content)
+        self.assertNotIn(reverse("delete_note"), content)
+
+        await sync_to_async(NoteFactory.for_object)(
+            self.docket, user=user, name="My saved note"
+        )
+        content = (await self.async_client.get(url)).content.decode()
+        self.assertIn("Edit Note", content)
+        self.assertIn("My saved note", content)
+        self.assertIn(reverse("delete_note"), content)
+
+
+@override_settings(WAFFLE_CACHE_PREFIX="test_docket_note_form_v1_waffle")
+@override_flag("use_new_design", active=False)
+class DocketNoteFormV1Test(TestCase):
+    """Test that the legacy docket page keeps the v1 note form."""
+
+    @classmethod
+    def setUpTestData(cls) -> None:
+        cls.docket = DocketFactory(source=Docket.RECAP)
+
+    async def test_docket_page_gets_the_v1_note_form(self) -> None:
+        """Does the legacy docket page keep the v1 note form?"""
+        r = await self.async_client.get(
+            reverse("view_docket", args=[self.docket.pk, self.docket.slug])
+        )
+
+        self.assertTemplateUsed(r, "docket.html")
+        self.assertTemplateNotUsed(r, "v2_docket.html")
+        self.assertIs(type(r.context["note_form"]), NoteForm)

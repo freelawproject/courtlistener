@@ -1,0 +1,66 @@
+{% load component_tags svg_tags %}
+{% require_script "js/third_party/htmx" defer=True %}
+{% require_script "js/alpine/components/add_note_status.js" %}
+
+<c-vars form/>
+
+<c-dialog
+    panel_class="p-5 banner {% if not request.user.is_authenticated %} max-w-lg items-center{% else %} max-w-xl{% endif %}"
+    dialog_class="items-center z-20"
+    x-on:note-saved.window="close"
+    x-on:note-deleted.window="close"
+    >
+    <c-slot name="trigger_button">
+        <c-button
+            id="note-trigger-{{ form.content_type.value }}-{{ form.object_id.value }}"
+            variant="outline"
+            x-on:click="open"
+            x-bind:aria-controls="dialogId"
+            x-bind:aria-expanded="isOpen"
+            aria-haspopup="dialog"
+        >
+            <c-add-note.button_content :form="form" />
+        </c-button>
+        {# Outside the panel, so it can still speak after the dialog closes. #}
+        <span
+            class="sr-only"
+            role="status"
+            x-data="noteStatus"
+            x-on:note-saved.window="saved"
+            x-on:note-deleted.window="deleted"
+            data-saved="Note saved."
+            data-deleted="Note deleted."
+            x-text="message"
+        ></span>
+    </c-slot>
+    {% if request.user.is_authenticated %}
+        <c-slot name="panel">
+            <c-add-note.form :form="form" />
+        </c-slot>
+    {% else %}
+        <c-slot name="panel">
+            <c-button variant="ghost" class="ml-auto" x-on:click="close" aria-label="Close modal">
+                {% svg "cross" class="w-4 h-4" aria_hidden="true" %}
+            </c-button>
+            <h2 x-dialog:title class="text-2xl font-semibold text-greyscale-900">Please Sign In or Register</h2>
+            <div class="flex flex-nowrap gap-4 mt-4 justify-center">
+                <c-button
+                    variant="primary"
+                    size="xl"
+                    href="{% url 'sign-in' %}?next={{ request.get_full_path|urlencode }}"
+                    aria-label="Sign into your account."
+                >
+                    Sign In
+                </c-button>
+                <c-button
+                    variant="outline"
+                    size="xl"
+                    href="{% url 'register' %}?next={{ request.get_full_path|urlencode }}"
+                    aria-label="Register as a new member."
+                >
+                    Register
+                </c-button>
+            </div>
+        </c-slot>
+    {% endif %}
+</c-dialog>
