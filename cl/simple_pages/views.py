@@ -22,6 +22,8 @@ from cl.disclosures.models import (
     Reimbursement,
     SpouseIncome,
 )
+from cl.favorites.forms_v2 import NoteForm as NoteFormV2
+from cl.favorites.models import Note
 from cl.opinion_page import docket_entry_sources
 from cl.opinion_page.docket_entry_sources import attach_display_fields
 from cl.opinion_page.forms_v2 import DocketEntryFilterForm
@@ -358,6 +360,10 @@ async def components(request: HttpRequest) -> HttpResponse:
             "demo_page_obj": MockPageObj(),
             "demo_docket": MockDocket(),
             "demo_filter_form": DocketEntryFilterForm(),
+            "demo_note_form": NoteFormV2(),
+            "demo_saved_note_form": NoteFormV2(
+                instance=Note(pk=1, content_type_id=1, object_id=12345)
+            ),
             "demo_metadata_items": [
                 {"label": "Date Filed", "value": "January 14, 2025"},
                 {
