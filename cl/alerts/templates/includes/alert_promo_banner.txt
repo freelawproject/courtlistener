@@ -1,0 +1,3 @@
+📣 The power of CourtListener can now be integrated into Claude and is part of Gemini Enterprise for Legal. Combine CourtListener with AI to make the hardest research just a prompt away.
+Learn more about Claude: https://free.law/2026/05/12/courtlistener-is-now-available-inside-claude/
+Learn more about Gemini Enterprise for Legal: https://free.law/2026/08/25/courtlistener-gemini-enterprise-for-legal/

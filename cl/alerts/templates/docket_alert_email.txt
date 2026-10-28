@@ -1,5 +1,7 @@
+{% extends "docket_alert_email_base.txt" %}
+{% load tz %}
 
-{% load text_filters %}{% load humanize %}{% load tz %}
+{% block intro %}
 {% if first_email and not auto_subscribe %}
 Your account on CourtListener just received its first email from PACER related to the case below.
 Your account has auto-subscribe turned off, so this is the only alert you will get for this case.
@@ -9,17 +11,12 @@ https://www.courtlistener.com{% url 'toggle_docket_alert_confirmation' "subscrib
 {% elif first_email and auto_subscribe %}
 Your account on CourtListener just received its first email from PACER related to the case below.
 You've been subscribed to this case because your account has auto-subscribe turned on.
-{% endif %}
-**************************
-CourtListener Docket Alert
-**************************
+{% endif %}{% endblock %}
 
-{{ count }} New Entr{{ count|pluralize:"y,ies" }} in {{ docket|best_case_name|safe }} {% if docket.docket_number %}({{ docket.docket_number }}){% endif %}
-{{ docket.court }}
-~~~
-View Docket: https://www.courtlistener.com{{ docket.get_absolute_url }}?order_by=desc{% if docket.pacer_url %}
-Buy Docket on PACER: {{ docket.pacer_url }}{% endif %}
+{% block docket_links %}{% if docket.pacer_url %}
+Buy Docket on PACER: {{ docket.pacer_url }}{% endif %}{% endblock %}
 
+{% block rows %}
 {% for de in new_des %}{% for rd in de.recap_documents.all %}Document Number: {{ de.entry_number }}{% if rd.attachment_number  %}-{{ rd.attachment_number }}{% endif %}
 Date Filed: {% if de.datetime_filed %}{{ de.datetime_filed|timezone:timezone|date:"M j, Y" }}{% else %}{{ de.date_filed|date:"M j, Y"|default:'Unknown' }}{% endif %}
 {% if rd.description %}{{ rd.description|safe }}{% else %}{{ de.description|default:"Unknown docket entry description"|safe }}{% endif %}
@@ -28,30 +25,4 @@ Download PDF from RECAP: {{ rd.filepath_local.url }}{% elif rd.is_sealed %}
 Unavailable on PACER{% else %}
 Download PDF from RECAP with PACER fallback: https://www.courtlistener.com{{ rd.get_absolute_url }}?redirect_to_download=True{% endif %}{% endif %}
 
-{% endfor %}{% endfor %}
-
-{% if notes or tags %}
-Your Note: {% if notes %}{{ notes }}{% else %} You have not added notes to this case. Learn More: {{ WIKI_HELP_URL }}/general/using-notes-to-annotate-content{% endif %}
-
-Your Tags: {% if tags %}{% for tag in tags %}{{ tag.name }}{% if not forloop.last %}, {% endif %}{% endfor %}{% else %} No tags yet. Learn More: {{ WIKI_HELP_URL }}/general/using-tags-to-organize-docket-collections{% endif %}
-{% else %}
-Use notes and tags to organize and share the cases you follow. Learn More: {{ WIKI_HELP_URL }}/general/using-tags-to-organize-docket-collections
-{% endif %}
-
-{% if not first_email or first_email and auto_subscribe %}
-This alert was sent because you subscribed to this docket with your account on CourtListener.com.
-To disable this alert unsubscribe here: https://www.courtlistener.com{% url 'toggle_docket_alert_confirmation' 'unsubscribe' docket_alert_secret_key %}
-{% endif %}
-************************
-📣 The power of CourtListener can now be integrated into Claude and is part of Gemini Enterprise for Legal. Combine CourtListener with AI to make the hardest research just a prompt away.
-Learn more about Claude: https://free.law/2026/05/12/courtlistener-is-now-available-inside-claude/
-Learn more about Gemini Enterprise for Legal: https://free.law/2026/08/25/courtlistener-gemini-enterprise-for-legal/
-
-This alert brought to you by the 501(c)(3) non-profit Free Law Project
-
- - Blog: https://free.law
- - BlueSky: https://bsky.app/profile/free.law
- - Donate: https://donate.free.law/forms/supportflp
- - Become a Member: https://free.law/membership/
-
-Please donate to support our work.
+{% endfor %}{% endfor %}{% endblock %}

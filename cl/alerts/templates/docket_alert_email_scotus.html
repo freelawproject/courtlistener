@@ -1,4 +1,62 @@
-{% load text_filters %}
-<!-- Placeholder -- This PR only proves dispatch works. Real SCOTUS content/design
-     is going to be available in the next PR. -->
-<p>{{ count }} New Entr{{ count|pluralize:"y,ies" }} in {{ docket|best_case_name|safe }}</p>
+{% extends "docket_alert_email_base.html" %}
+{% load extras %}
+
+{% block preheader %}
+      {% for de in new_des %}
+        {% if forloop.first %}
+          {% for doc in de.scotusdocument_set.all %}
+            {% if forloop.first %}
+              {% if doc.description %}
+                {{ doc.description|safe }}
+              {% else %}
+                 {{ de.description|safe|default:""|safe }}
+              {% endif %}
+            {% endif %}
+          {% empty %}
+            {{ de.description|safe|default:""|safe }}
+          {% endfor %}
+        {% endif %}
+      {% endfor %}{% endblock %}
+
+{% block rows %}
+      {% for de in new_des %}
+        {% for doc in de.scotusdocument_set.all %}
+          <tr>
+            <td style="text-align: center">
+              <a href="https://www.courtlistener.com{% if doc.get_absolute_url %}{{ doc.get_absolute_url }}{% else %}{{ docket.get_absolute_url }}#minute-entry-{{ de.pk }}{% endif %}">
+                {{ de.entry_number|default:"" }}{% if doc.attachment_number %}-{{ doc.attachment_number }}{% endif %}
+              </a>
+            </td>
+            <td>
+              {{ de.date_filed|date:"M j, Y"|default:'<em class="gray">Unknown</em>' }}
+            </td>
+            <td {% if not doc.document_number %}colspan="2"{% endif %}>
+              {% if doc.description %}
+                {{ doc.description|safe }}
+              {% else %}
+                {{ de.description|safe|default:"<em>Unknown</em>"|safe }}
+              {% endif %}
+            </td>
+            {% if doc.document_number %}
+              <td>
+                {% if doc.filepath_local %}
+                  <a href="{{ doc.filepath_local.url }}">From RECAP</a>
+                {% elif doc.url|http_url %}
+                  <a href="https://www.courtlistener.com{{ doc.get_absolute_url }}?redirect_to_download=True">From RECAP with SCOTUS fallback</a>
+                {% endif %}
+              </td>
+            {% endif %}
+          </tr>
+        {% empty %}
+          {# Procedural SCOTUS entries can have no documents at all. #}
+          <tr>
+            <td style="text-align: center">{{ de.entry_number|default:"" }}</td>
+            <td>
+              {{ de.date_filed|date:"M j, Y"|default:'<em class="gray">Unknown</em>' }}
+            </td>
+            <td colspan="2">
+              {{ de.description|safe|default:"<em>Unknown</em>"|safe }}
+            </td>
+          </tr>
+        {% endfor %}
+      {% endfor %}{% endblock %}
