@@ -1,5 +1,6 @@
 {% load component_tags %}
 {% require_script "js/third_party/htmx" defer=True %}
+{% require_script "js/alpine/components/add_note_counter.js" %}
 
 <c-vars form form_prefix="note" />
 
@@ -20,11 +21,12 @@
     {{ form.object_id }}
     {{ form.default_name }}
     <c-form.input :form="form" field_name="name" :form_prefix="form_prefix" only/>
-    <c-form.input :form="form" field_name="notes" :form_prefix="form_prefix" only/>
-    <p class="my-2 text-sm text-greyscale-500">
-        <span id="characters-remaining"></span>
-        characters remaining.
-    </p>
+    <div x-data="noteCounter" x-on:input="update">
+        <c-form.input :form="form" field_name="notes" :form_prefix="form_prefix" only/>
+        {# Visual count only. Screen readers get the status region below instead. #}
+        <p aria-hidden="true" class="my-2 text-sm text-greyscale-500" x-text="remainingText"></p>
+        <p class="sr-only" role="status" x-text="announcement"></p>
+    </div>
     <div class="w-full flex gap-2 mt-4 justify-end">
         {% if form.instance.pk %}
         <c-button

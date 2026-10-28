@@ -168,7 +168,7 @@ class NoteFormV2Test(TestCase):
 
 
 class NoteFormComponentTest(TestCase):
-    """Test the c-add-note.form component's error notice."""
+    """Test the c-add-note.form component's error notice and counter."""
 
     NOTICE = "Please reload the page and try again."
 
@@ -224,6 +224,34 @@ class NoteFormComponentTest(TestCase):
 
         self.assertNotIn(self.NOTICE, html)
         self.assertIn("This field is required.", html)
+
+    def test_counter_wraps_only_the_notes_field(self) -> None:
+        """Is the counter's root around the notes textarea, so typing in it
+        updates the count, and not around the name field?"""
+        html = self.render()
+
+        root = html.index('x-data="noteCounter"')
+        self.assertIn('x-on:input="update"', html)
+        self.assertLess(html.index('name="name"'), root)
+        self.assertGreater(html.index('name="notes"'), root)
+
+    def test_counter_reads_its_limit_from_the_textarea(self) -> None:
+        """Does the textarea carry the maxlength the counter counts down
+        from, so the limit is defined in one place?"""
+        html = self.render()
+
+        self.assertIn('maxlength="500"', html)
+        self.assertNotIn("characters-remaining", html)
+
+    def test_counter_keeps_the_visible_count_from_screen_readers(self) -> None:
+        """Is the visible count hidden from assistive tech, with a separate
+        status region to announce at the thresholds?"""
+        html = self.render()
+
+        self.assertIn('aria-hidden="true"', html)
+        self.assertIn('x-text="remainingText"', html)
+        self.assertIn('role="status"', html)
+        self.assertIn('x-text="announcement"', html)
 
 
 class NoteDialogComponentTest(TestCase):
