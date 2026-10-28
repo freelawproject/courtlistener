@@ -99,6 +99,17 @@ class NoteFormV2Test(TestCase):
                 self.assertFalse(over_limit.is_valid())
                 self.assertIn(field_name, over_limit.errors)
 
+    def test_line_breaks_count_as_one_character(self) -> None:
+        """Does a note the browser counted as 500 characters pass, even though
+        it is submitted with CRLF line breaks?"""
+        within_limit = "a" * 250 + "\r\n" + "a" * 249
+        over_limit = "a" * 251 + "\r\n" + "a" * 249
+
+        form = self.build_form(notes=within_limit)
+        self.assertTrue(form.is_valid())
+        self.assertNotIn("\r", form.cleaned_data["notes"])
+        self.assertFalse(self.build_form(notes=over_limit).is_valid())
+
     def test_rejects_a_dangling_object_id(self) -> None:
         """Is an object_id that names no row rejected? It's a plain integer,
         so only clean() stops it."""
