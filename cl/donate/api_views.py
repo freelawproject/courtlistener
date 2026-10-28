@@ -329,6 +329,7 @@ class MembershipWebhookViewSet(
 
         neon_membership = membership_query.first()
         neon_membership.level = membership_level
+        # pyrefly:ignore[bad-assignment] Django parses the string on save
         neon_membership.termination_date = membership_data["termEndDate"]
         neon_membership.payment_status = payment_status
         neon_membership.save()

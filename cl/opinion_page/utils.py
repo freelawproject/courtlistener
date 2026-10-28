@@ -3,14 +3,13 @@ import logging
 import traceback
 from dataclasses import dataclass, field
 from io import StringIO
-from typing import cast
+from typing import Any, TypedDict, cast
 from zoneinfo import ZoneInfo
 
 import waffle
 from asgiref.sync import sync_to_async
 from django.conf import settings
 from django.contrib.auth.models import AnonymousUser, User
-from django.core.exceptions import ObjectDoesNotExist
 from django.db.models import QuerySet
 from django.http import Http404, HttpRequest
 from django.shortcuts import aget_object_or_404
@@ -21,12 +20,13 @@ from django.utils.safestring import mark_safe
 from django.utils.timezone import localtime
 from django_elasticsearch_dsl.search import Search
 from elasticsearch.dsl import Q
+from elasticsearch.dsl.response import Response
+from elasticsearch.dsl.response.hit import Hit
 from elasticsearch.exceptions import ApiError, ConnectionTimeout, RequestError
 
 from cl.alerts.models import DocketAlert
 from cl.custom_filters.templatetags.text_filters import best_case_name
-from cl.favorites.forms import NoteForm
-from cl.favorites.models import Note
+from cl.favorites.forms import NoteForm, get_note_form_for
 from cl.lib.bot_detector import is_bot
 from cl.lib.elasticsearch_utils import (
     build_cardinality_count,
@@ -186,7 +186,7 @@ def build_docket_metadata(
             "label": "Citation",
             "value": build_citation_string(docket),
             # Matches the select-all convenience old citation.html had.
-            "is_copyable": True,
+            "one_click_select": True,
         }
     )
 
@@ -442,13 +442,16 @@ def build_docket_tabs(
 ) -> list[dict[str, str]]:
     """Build the tab navigation items for the docket page.
 
-    Each item is a dict with 'label', 'url', and 'key'.
+    Each item is a dict with 'label', 'url', 'key' and 'icon'. 'icon' names a
+    file in cl/assets/static-global/svg/ for the {% svg %} tag; the mobile
+    dropdown ignores it.
     """
     tabs = [
         {
             "label": "Docket Entries",
             "url": docket.get_absolute_url(),
             "key": "entries",
+            "icon": "file_text",
         }
     ]
 
@@ -464,6 +467,7 @@ def build_docket_tabs(
                     },
                 ),
                 "key": "parties",
+                "icon": "group",
             }
         )
 
@@ -479,6 +483,7 @@ def build_docket_tabs(
                     },
                 ),
                 "key": "idb",
+                "icon": "circle_question_mark",
             }
         )
 
@@ -494,6 +499,7 @@ def build_docket_tabs(
                     },
                 ),
                 "key": "authorities",
+                "icon": "court",
             }
         )
 
@@ -535,22 +541,22 @@ async def _common_metadata_sections(
     ]
 
 
+class CoreDocketDataDict(TypedDict):
+    docket: Docket
+    title: str
+    note_form: NoteForm
+    has_alert: bool
+    timezone: str
+    private: bool
+    docket_source: DocketEntrySource
+    docket_source_url: str | None
+    metadata_sections: list[MetadataSection]
+
+
 async def core_docket_data(
     request: HttpRequest,
     pk: int,
-) -> tuple[
-    Docket,
-    dict[
-        str,
-        bool
-        | str
-        | None
-        | Docket
-        | NoteForm
-        | DocketEntrySource
-        | list[MetadataSection],
-    ],
-]:
+) -> tuple[Docket, CoreDocketDataDict]:
     """Gather the core data for a docket, party, or IDB page."""
     docket: Docket = await aget_object_or_404(Docket, pk=pk)
     source = docket.get_entry_source()
@@ -566,21 +572,11 @@ async def core_docket_data(
 
     title = make_docket_title(docket)
 
-    try:
-        note = await Note.objects.aget(
-            docket_id=docket.pk,
-            user=await request.auser(),
-        )
-    except (ObjectDoesNotExist, TypeError):
-        # Not saved in notes or anonymous user
-        note_form = NoteForm(
-            initial={
-                "docket_id": docket.pk,
-                "name": trunc(best_case_name(docket), 100, ellipsis="..."),
-            }
-        )
-    else:
-        note_form = NoteForm(instance=note)
+    note_form = await get_note_form_for(
+        docket,
+        await request.auser(),  # type: ignore[arg-type]
+        trunc(best_case_name(docket), 100, ellipsis="..."),
+    )
 
     has_alert = await user_has_alert(
         cast(User | AnonymousUser, await request.auser()), docket
@@ -767,14 +763,14 @@ class RelatedCitingResults:
     )
     sub_opinion_pks: list[int] = field(default_factory=list)
     url_search_params: dict[str, str] = field(default_factory=dict)
-    citing_clusters: list[OpinionClusterDocument] = field(default_factory=list)
+    citing_clusters: list[Hit] = field(default_factory=list)
     citing_cluster_count: int = 0
     timeout: bool = False
 
 
 @dataclass
 class RelatedClusterResults:
-    related_clusters: list[OpinionClusterDocument] = field(
+    related_clusters: Response | list[OpinionClusterDocument] = field(
         default_factory=list
     )
     sub_opinion_pks: list[int] = field(default_factory=list)
@@ -962,10 +958,10 @@ async def es_get_cited_clusters_with_cache(
         response = None
         timeout_cited = True
 
-    citing_clusters = list(response) if response is not None else []
+    citing_clusters: list[Hit] = list(response) if response is not None else []
     cluster_results.citing_clusters = citing_clusters
     cluster_results.citing_cluster_count = (
-        response.hits.total.value if response is not None else 0
+        cast(Any, response.hits).total.value if response is not None else 0
     )
     cluster_results.timeout = False if citing_clusters else timeout_cited
     if not cluster_results.timeout:

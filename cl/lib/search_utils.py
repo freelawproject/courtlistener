@@ -7,6 +7,7 @@ from urllib.parse import parse_qs, urlencode
 
 from asgiref.sync import async_to_sync
 from django.conf import settings
+from django.contrib.auth.models import User
 from django.core.cache import cache
 from django.core.exceptions import PermissionDenied
 from django.core.paginator import EmptyPage, Page, PageNotAnInteger, Paginator
@@ -16,6 +17,7 @@ from django.http.request import QueryDict
 from django_elasticsearch_dsl.search import Search
 from elasticsearch.dsl import A
 from elasticsearch.dsl.response import Response
+from elasticsearch.dsl.response.hit import Hit
 from eyecite.models import FullCaseCitation
 from eyecite.tokenizers import HyperscanTokenizer
 from waffle import flag_is_active
@@ -72,10 +74,14 @@ from cl.search.models import (
 )
 from cl.stats.constants import StatMethod, StatMetric, StatQueryType
 from cl.stats.utils import tally_stat
+from cl.users.models import UserProfile
+from cl.users.utils import is_search_history_on_cached
 
-HYPERSCAN_TOKENIZER = HyperscanTokenizer(cache_dir=".hyperscan")
+HYPERSCAN_TOKENIZER: HyperscanTokenizer = HyperscanTokenizer(
+    cache_dir=".hyperscan"
+)
 
-logger = logging.getLogger(__name__)
+logger: logging.Logger = logging.getLogger(__name__)
 
 
 def check_pagination_depth(
@@ -170,9 +176,9 @@ def merge_form_with_courts(
 
     for court in courts:
         if no_facets_selected:
-            court.checked = True
+            setattr(court, "checked", True)
         elif court.pk in court_field_values:
-            court.checked = court_field_values[court.pk]
+            setattr(court, "checked", court_field_values[court.pk])
 
     # Build the dict with jurisdiction keys and arrange courts into tabs
     court_tabs: dict[str, list] = {
@@ -280,6 +286,12 @@ def store_search_query(request: HttpRequest, search_results: dict) -> None:
 
     if is_bot(request):
         return
+    if request.user.is_authenticated:
+        save_history = UserProfile.objects.values_list(
+            "save_query_history", flat=True
+        ).get(user_id=request.user.pk)
+        if not save_history:
+            return
     is_error = search_results.get("error")
     is_semantic = has_semantic_params(request.GET)
     search_query = SearchQuery(
@@ -335,6 +347,11 @@ def store_search_api_query(
 
     if not flag_is_active(request, "store-search-api-queries"):
         # Do not store search queries in the DB
+        return
+
+    if request.user.is_authenticated and not is_search_history_on_cached(
+        cast(User, request.user).pk
+    ):
         return
 
     SearchQuery.objects.create(
@@ -442,7 +459,7 @@ def fetch_facets(
             count = facet_values[field.html_name.replace("stat_", "")]
         except KeyError:
             count = 0
-        field.count = count
+        setattr(field, "count", count)
         facet_fields.append(field)
     return facet_fields
 
@@ -466,7 +483,9 @@ def get_results_from_paginator(
     return results
 
 
-def enrich_search_results(results: Page, search_type: str, get_params: dict):
+def enrich_search_results(
+    results: Page, search_type: str, get_params: CleanData
+) -> None:
     """Enrich dataset before returning to user
 
     :param results: A ESPaginator page object
@@ -547,13 +566,15 @@ def fetch_and_paginate_results(
             if use_es_items
             else results_dict["hits"]  # type: ignore[typeddict-item]
         )
+        # The search view only caches the integer estimate under these keys;
+        # the Response variant is written by the API micro-cache.
         main_total = (
-            results_dict["cardinality_count_response"]
+            cast(int | None, results_dict["cardinality_count_response"])
             if use_es_items
             else results_dict["main_total"]  # type: ignore[typeddict-item]
         )
         child_total = (
-            results_dict["child_cardinality_count_response"]
+            cast(int | None, results_dict["child_cardinality_count_response"])
             if use_es_items
             else results_dict["child_total"]  # type: ignore[typeddict-item]
         )
@@ -639,6 +660,26 @@ def remove_missing_citations(
     return missing_citations_str, suggested_query
 
 
+class ESSearchResult(TypedDict):
+    results: Page | list
+    results_details: list[int | None]
+    search_form: Any
+    search_summary_str: str
+    search_summary_dict: dict
+    error: bool
+    courts: dict[str, list]
+    court_count_human: str
+    court_count: str
+    query_citation: Hit | None
+    cited_cluster: Any
+    related_cluster: Any
+    facet_fields: list
+    error_message: str
+    suggested_query: str
+    estimated_count_threshold: int
+    missing_citations: list[str]
+
+
 def do_es_search(
     get_params: QueryDict,
     rows: int = settings.SEARCH_PAGE_SIZE,
@@ -647,7 +688,7 @@ def do_es_search(
     is_csv_export: bool = False,
     courts: QuerySet[Court] | None = None,
     is_semantic_frontend_active: bool = False,
-):
+) -> ESSearchResult:
     """Run Elasticsearch searching and filtering and prepare data to display
 
     :param get_params: The request.GET params sent by user.
@@ -665,7 +706,7 @@ def do_es_search(
     """
     if courts is None:
         courts = cast(QuerySet[Court], Court.objects.filter(in_use=True))
-    paged_results = None
+    paged_results: Page | list = []
     query_time: int | None = 0
     total_query_results: int | None = 0
     top_hits_limit: int | None = 5
@@ -704,10 +745,9 @@ def do_es_search(
     if search_form.is_valid() and document_type:
         # Copy cleaned_data to preserve the original data when displaying the form
         cd = search_form.cleaned_data.copy()
+        # Create necessary filters to execute ES query
+        search_query = document_type.search()
         try:
-            # Create necessary filters to execute ES query
-            search_query = document_type.search()
-
             if cd["type"] in [
                 SEARCH_TYPES.OPINION,
                 SEARCH_TYPES.RECAP,
@@ -924,6 +964,11 @@ def fetch_es_results_for_csv(
         return csv_rows, True
 
     results = search["results"]
+    if isinstance(results, list):
+        return (
+            [],
+            True,
+        )  # results is only ever a list if error is True so this is unreachable in practice, but the type checker doesn't know that
     max_results = settings.MAX_SEARCH_RESULTS_EXPORTED
     match search_type:
         case SEARCH_TYPES.OPINION | SEARCH_TYPES.RECAP | SEARCH_TYPES.DOCKETS:

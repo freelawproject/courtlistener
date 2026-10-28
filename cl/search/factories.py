@@ -32,6 +32,7 @@ from cl.search.models import (
     DocketEntry,
     Opinion,
     OpinionCluster,
+    OpinionContent,
     OpinionsCited,
     OpinionsCitedByRECAPDocument,
     Parenthetical,
@@ -110,7 +111,8 @@ class DocketFactory(DjangoModelFactory):
     """
 
     @post_generation
-    def filepath_local(self, create, extracted, **kwargs):
+    # pyrefly:ignore[invalid-annotation] factory_boy passes the model instance
+    def filepath_local(self: Docket, create, extracted, **kwargs):
         """Attaches a stub file to an instance of this factory."""
         if extracted:
             self.filepath_local = extracted
@@ -180,6 +182,19 @@ class OpinionWithParentsFactory(OpinionFactory):
     cluster = SubFactory(
         "cl.search.factories.OpinionClusterWithParentsFactory",
     )
+
+
+class OpinionContentFactory(DjangoModelFactory):
+    """Make an OpinionContent from the scanning project for an opinion."""
+
+    class Meta:
+        model = OpinionContent
+
+    opinion = SubFactory(OpinionWithParentsFactory)
+    content = Faker("text", max_nb_chars=2000)
+    source = OpinionContent.FLP_SCANNING
+    extraction_type = OpinionContent.OCR
+    is_main_version = True
 
 
 class OpinionClusterFactory(DjangoModelFactory):
@@ -314,7 +329,7 @@ class RECAPAttachmentFactory(RECAPDocumentFactory):
     @classmethod
     def _fixup(cls, obj):
         """
-        If an attachment_number wasn't specificed, then set it to the highest
+        If an attachment_number wasn't specified, then set it to the highest
         for the docket entry.
         """
         super()._fixup(obj)

@@ -30,6 +30,23 @@ if DEVELOPMENT:
     AWS_PRIVATE_STORAGE_BUCKET_NAME = "dev-com-courtlistener-private-storage"
     AWS_S3_CUSTOM_DOMAIN = f"{AWS_STORAGE_BUCKET_NAME}.s3.amazonaws.com"
 
+# The scanning portal's private bucket. import_scanned_opinions reads the
+# final XML of each approved opinion from it, with a read-only user of its
+# own when the keys are set, else with the keys above.
+SCANNING_BUCKET_NAME = env(
+    "SCANNING_BUCKET_NAME",
+    default=(
+        "dev-com-courtlistener-scanning-private-storage"
+        if DEVELOPMENT
+        else "com-courtlistener-scanning-private-storage"
+    ),
+)
+SCANNING_BUCKET_REGION = env("SCANNING_BUCKET_REGION", default="us-west-2")
+SCANNING_AWS_ACCESS_KEY_ID = env("SCANNING_AWS_ACCESS_KEY_ID", default="")
+SCANNING_AWS_SECRET_ACCESS_KEY = env(
+    "SCANNING_AWS_SECRET_ACCESS_KEY", default=""
+)
+
 
 # Cloudfront
 CLOUDFRONT_DOMAIN = env("CLOUDFRONT_DOMAIN", default="")

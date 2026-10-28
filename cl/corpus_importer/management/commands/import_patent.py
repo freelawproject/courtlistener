@@ -1,6 +1,7 @@
 import os
 import time
 
+from asgiref.sync import async_to_sync
 from celery import chain
 from django.conf import settings
 
@@ -11,7 +12,7 @@ from cl.corpus_importer.tasks import (
 )
 from cl.lib.celery_utils import CeleryThrottle
 from cl.lib.command_utils import VerboseCommand, logger
-from cl.lib.pacer_session import ProxyPacerSession, SessionData
+from cl.lib.pacer_session import SessionData, log_into_pacer
 from cl.recap.constants import PATENT, PATENT_ANDA
 from cl.recap.models import FjcIntegratedDatabase
 from cl.search.models import Docket
@@ -39,10 +40,9 @@ def get_dockets(options: dict) -> None:
 
     q = options["queue"]
     throttle = CeleryThrottle(queue_name=q)
-    session = ProxyPacerSession(
+    session = async_to_sync(log_into_pacer)(
         username=PACER_USERNAME, password=PACER_PASSWORD
     )
-    session.login()
     session_data = SessionData(session.cookies, session.proxy_address)
     NOS_CODES = [PATENT, PATENT_ANDA]
     DISTRICTS = ["ded", "txwd"]

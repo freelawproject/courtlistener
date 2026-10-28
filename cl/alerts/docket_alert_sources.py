@@ -9,6 +9,7 @@ from cl.corpus_importer.api_serializers import (
     DocketEntrySerializer,
     SCOTUSDocketEntrySerializer,
 )
+from cl.lib.models import AbstractPDF
 from cl.search.models import (
     Docket,
     DocketEntry,
@@ -48,28 +49,47 @@ class DocketAlertSource:
     webhook_serializer: type[ModelSerializer]
 
 
+def _with_email_relations(
+    qs: QuerySet, documents_attr: str, document_model: type[AbstractPDF]
+) -> QuerySet:
+    """Preload what a docket alert email renders -- each entry's docket (with
+    its court, which DocketEntry.datetime_filed reads for the timezone) and
+    documents, minus their potentially huge plain_text -- in a fixed number
+    of queries, however many entries there are. Re-rendering the evaluated
+    entries, as make_alert_messages does per recipient, adds no queries.
+
+    :param qs: The entries queryset.
+    :param documents_attr: The entry model's reverse accessor to its
+    documents, e.g. "recap_documents".
+    :param document_model: The document model behind `documents_attr`.
+    """
+    return qs.select_related("docket__court").prefetch_related(
+        Prefetch(
+            documents_attr,
+            queryset=document_model.objects.defer("plain_text"),
+        )
+    )
+
+
 # RECAP
 
 
 def _recap_entries_by_pk(des_pks: list[int]) -> QuerySet:
     """Return the DocketEntry rows matching the given pks."""
-    return (
-        DocketEntry.objects.filter(pk__in=des_pks)
-        .select_related("docket")
-        .prefetch_related(
-            Prefetch(
-                "recap_documents",
-                queryset=RECAPDocument.objects.select_related(
-                    "docket_entry__docket"
-                ).defer("plain_text"),
-            )
-        )
+    return _with_email_relations(
+        DocketEntry.objects.filter(pk__in=des_pks),
+        "recap_documents",
+        RECAPDocument,
     )
 
 
 def _recap_entries_since(docket: Docket, since: datetime) -> QuerySet:
     """Return the docket's entries created at or after `since`."""
-    return DocketEntry.objects.filter(date_created__gte=since, docket=docket)
+    return _with_email_relations(
+        DocketEntry.objects.filter(date_created__gte=since, docket=docket),
+        "recap_documents",
+        RECAPDocument,
+    )
 
 
 RECAP_ALERT_SOURCE = DocketAlertSource(
@@ -86,25 +106,22 @@ RECAP_ALERT_SOURCE = DocketAlertSource(
 
 def _scotus_entries_by_pk(des_pks: list[int]) -> QuerySet:
     """Return the SCOTUSDocketEntry rows matching the given pks."""
-    return (
-        SCOTUSDocketEntry.objects.filter(pk__in=des_pks)
-        .select_related("docket")
-        .prefetch_related(
-            Prefetch(
-                "scotusdocument_set",
-                queryset=SCOTUSDocument.objects.select_related(
-                    "docket_entry__docket"
-                ).defer("plain_text"),
-            )
-        )
+    return _with_email_relations(
+        SCOTUSDocketEntry.objects.filter(pk__in=des_pks),
+        "scotusdocument_set",
+        SCOTUSDocument,
     )
 
 
 def _scotus_entries_since(docket: Docket, since: datetime) -> QuerySet:
     """Return the docket's SCOTUSDocketEntry rows created at or after
     `since`."""
-    return SCOTUSDocketEntry.objects.filter(
-        date_created__gte=since, docket=docket
+    return _with_email_relations(
+        SCOTUSDocketEntry.objects.filter(
+            date_created__gte=since, docket=docket
+        ),
+        "scotusdocument_set",
+        SCOTUSDocument,
     )
 
 

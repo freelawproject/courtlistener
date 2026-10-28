@@ -13,12 +13,6 @@ from cl.search.models import SEARCH_TYPES, Court
 
 class JurisdictionPodcast(JurisdictionFeed):
     feed_type = iTunesPodcastsFeedGenerator
-    description = (
-        "A chronological podcast of oral arguments with improved "
-        "files and meta data. Hosted by Free Law Project through "
-        "the CourtListener.com initiative. Not an official podcast."
-    )
-    subtitle = description
     iTunes_name = "Free Law Project"
     iTunes_email = "feeds@courtlistener.com"
     iTunes_image_url = f"{static('png/producer-2000x2000.png')}"
@@ -28,6 +22,15 @@ class JurisdictionPodcast(JurisdictionFeed):
     def title(self, obj):
         _, court = obj
         return f"Oral Arguments for the {court.full_name}"
+
+    def description(self, obj):
+        return (
+            "A chronological podcast of oral arguments with improved "
+            "files and meta data. Hosted by Free Law Project through "
+            "the CourtListener.com initiative. Not an official podcast."
+        )
+
+    subtitle = description
 
     def get_object(self, request, court):
         return request, get_object_or_404(Court, pk=court)
@@ -98,10 +101,11 @@ class JurisdictionPodcast(JurisdictionFeed):
 
 
 class AllJurisdictionsPodcast(JurisdictionPodcast):
-    title = (
-        "CourtListener.com: Podcast of All Oral Arguments available in "
-        "the Federal Circuit Courts (High Volume)"
-    )
+    def title(self, obj):
+        return (
+            "CourtListener.com: Podcast of All Oral Arguments available in "
+            "the Federal Circuit Courts (High Volume)"
+        )
 
     def get_object(self, request):
         return request
@@ -168,7 +172,7 @@ class SearchPodcast(JurisdictionPodcast):
     def subtitle(self, obj):
         return self.description(obj)
 
-    def get_object(self, request, get_string):
+    def get_object(self, request, court):
         return request
 
     def items(self, obj):

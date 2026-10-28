@@ -23,13 +23,20 @@ from django.utils.timezone import now
 from elasticsearch.dsl import Q
 from factory import RelatedFactory
 from lxml import html
+from selenium.common.exceptions import (
+    NoSuchElementException,
+    StaleElementReferenceException,
+    TimeoutException,
+)
 from selenium.webdriver.common.by import By
+from selenium.webdriver.remote.webelement import WebElement
 from selenium.webdriver.support import expected_conditions as EC
 from selenium.webdriver.support.wait import WebDriverWait
 from timeout_decorator import timeout_decorator
 from waffle.testutils import override_flag
 
 from cl.audio.factories import AudioFactory
+from cl.lib.decorators import clear_tiered_cache
 from cl.lib.elasticsearch_utils import (
     build_daterange_query,
     simplify_estimated_count,
@@ -38,7 +45,7 @@ from cl.lib.indexing_utils import log_last_document_indexed
 from cl.lib.redis_utils import get_redis_interface
 from cl.lib.search_utils import merge_form_with_courts
 from cl.lib.storage import clobbering_get_name
-from cl.lib.test_helpers import CourtTestCase, PeopleTestCase
+from cl.lib.test_helpers import PeopleTestCase
 from cl.lib.utils import (
     cleanup_main_query,
     get_child_court_ids_for_parents,
@@ -76,6 +83,9 @@ from cl.search.factories import (
 from cl.search.forms import SearchForm
 from cl.search.llm_models import CleanDocketNumber, DocketItem
 from cl.search.management.commands import populate_docket_number_raw
+from cl.search.management.commands.cl_compute_token_count import (
+    get_clean_opinion_text,
+)
 from cl.search.management.commands.cl_index_parent_and_child_docs import (
     get_unique_oldest_history_rows,
 )
@@ -102,7 +112,12 @@ from cl.search.models import (
 from cl.search.tasks import get_es_doc_id_and_parent_id, index_dockets_in_bulk
 from cl.search.types import EventTable
 from cl.tests.base import SELENIUM_TIMEOUT, BaseSeleniumTest
-from cl.tests.cases import ESIndexTestCase, TestCase, TransactionTestCase
+from cl.tests.cases import (
+    ESIndexTestCase,
+    SimpleTestCase,
+    TestCase,
+    TransactionTestCase,
+)
 from cl.tests.utils import get_with_wait
 from cl.users.factories import UserProfileWithParentsFactory
 
@@ -1684,6 +1699,46 @@ class OpinionSearchFunctionalTest(BaseSeleniumTest):
         result_count = self.browser.find_element(By.ID, "result-count")
         self.assertIn("Opinions", result_count.text)
 
+    def _get_opinion_tab(self, label: str) -> WebElement:
+        """Find a tab in the opinion detail page's tab bar by its label.
+
+        :param label: The tab's label, e.g. "Cited By". Non-breaking spaces in
+            the rendered label are matched by a regular space.
+        :return: The tab's link element.
+        """
+        return self.browser.find_element(
+            By.XPATH,
+            "//ul[contains(@class, 'nav-tabs')]//li"
+            f"//a[contains(translate(., '\u00a0', ' '), '{label}')]",
+        )
+
+    def _get_opinion_tab_count(self, label: str) -> int:
+        """Return the count shown on an opinion tab, e.g. 13 for "Cited By (13)".
+
+        :param label: The tab's label, e.g. "Cited By".
+        :return: The count displayed on the tab.
+        :raises AssertionError: If no count appears before the Selenium timeout.
+        """
+        try:
+            match = WebDriverWait(
+                self.browser,
+                SELENIUM_TIMEOUT,
+                # The tab goes stale while htmx swaps the bar out from under us.
+                ignored_exceptions=(
+                    NoSuchElementException,
+                    StaleElementReferenceException,
+                ),
+            ).until(
+                lambda _: re.search(
+                    r"\((\d+)\)", self._get_opinion_tab(label).text
+                )
+            )
+        except TimeoutException:
+            self.fail(
+                f'"{label}" tab text must contain a number in parentheses (e.g., "(13)")'
+            )
+        return int(match.group(1))
+
     def test_query_cleanup_integration(self) -> None:
         # Dora goes to CL and performs a Search using a numbered citation
         # (e.g. "12-9238" or "3:18-cv-2383")
@@ -1735,7 +1790,7 @@ class OpinionSearchFunctionalTest(BaseSeleniumTest):
         text_box.send_keys("1337")
         text_box.submit()
 
-        # The SERP refreshes and she sees resuls that
+        # The SERP refreshes and she sees results that
         # only contain fragments of the docker number she entered
         new_count = self.extract_result_count_from_serp()
         self.assertTrue(new_count < initial_count)
@@ -1748,8 +1803,9 @@ class OpinionSearchFunctionalTest(BaseSeleniumTest):
     def test_opinion_search_result_detail_page(self) -> None:
         # Dora navigates to CL and does a simple wild card search
         self.browser.get(self.live_server_url)
-        self.browser.find_element(By.ID, "id_q").send_keys("voutila")
-        self.browser.find_element(By.ID, "id_q").submit()
+        searchbox = self.browser.find_element(By.ID, "id_q")
+        searchbox.send_keys("voutila")
+        searchbox.submit()
 
         # Seeing an Opinion immediately on the first page of results, she
         # wants more details so she clicks the title and drills into the result
@@ -1782,23 +1838,13 @@ class OpinionSearchFunctionalTest(BaseSeleniumTest):
         )
 
         # Verify "Cited By" tab exists and it has a count on it
-        cited_by_tab = self.browser.find_element(
-            By.XPATH,
-            '//ul[contains(@class, "nav-tabs")]//li//a[contains(., "Cited\u00a0By")]',
-        )
-        self.assertIsNotNone(cited_by_tab, "'Cited By' tab does not exist")
-        cited_by_count = re.search(r"\((\d+)\)", cited_by_tab.text)
-        self.assertIsNotNone(
-            cited_by_count,
-            '"Cited By" tab text must contain a number in parentheses (e.g., "(13)")',
-        )
-        cited_by_count = int(cited_by_count.group(1))
+        cited_by_count = self._get_opinion_tab_count("Cited By")
         self.assertGreaterEqual(
             cited_by_count, 1, f"Wrong Cited By count: {cited_by_count}"
         )
 
         # Go to cited by page and verify we loaded it correctly and then go back to main page
-        cited_by_tab.click()
+        self._get_opinion_tab("Cited By").click()
         section_title = self.browser.find_element(
             By.CSS_SELECTOR, ".opinion-section-title"
         )
@@ -1818,19 +1864,7 @@ class OpinionSearchFunctionalTest(BaseSeleniumTest):
         self.browser.back()
 
         # Verify "Authorities" tab exists and it has a count on it
-        authorities_tab = self.browser.find_element(
-            By.XPATH,
-            '//ul[contains(@class, "nav-tabs")]//li//a[contains(., "Authorities")]',
-        )
-        self.assertIsNotNone(
-            authorities_tab, "'Authorities' tab does not exist"
-        )
-        authorities_count = re.search(r"\((\d+)\)", authorities_tab.text)
-        self.assertIsNotNone(
-            authorities_count,
-            '"Authorities" tab text must contain a number in parentheses (e.g., "(13)")',
-        )
-        authorities_count = int(authorities_count.group(1))
+        authorities_count = self._get_opinion_tab_count("Authorities")
         self.assertGreaterEqual(
             authorities_count,
             1,
@@ -1838,7 +1872,7 @@ class OpinionSearchFunctionalTest(BaseSeleniumTest):
         )
 
         # Go to authorities page and verify we loaded it correctly and then go back to main page
-        authorities_tab.click()
+        self._get_opinion_tab("Authorities").click()
         section_title = self.browser.find_element(
             By.CSS_SELECTOR, ".opinion-section-title"
         )
@@ -1911,7 +1945,10 @@ class OpinionSearchFunctionalTest(BaseSeleniumTest):
     @override_flag("store-search-queries", active=True)
     @override_settings(WAFFLE_CACHE_PREFIX="test_opinion_search_functions")
     def test_basic_homepage_search_and_signin_and_signout(self) -> None:
-        wait = WebDriverWait(self.browser, 1)
+        # Every lookup below is for something that should be there, so budget
+        # the same as the rest of the suite. A one second budget passes only on
+        # a machine that never hesitates.
+        wait = WebDriverWait(self.browser, SELENIUM_TIMEOUT)
 
         # Dora navigates to the CL website.
         self.browser.get(self.live_server_url)
@@ -2063,7 +2100,7 @@ class OpinionSearchFunctionalTest(BaseSeleniumTest):
             "a SearchQuery with get_params 'q=lissner' and 'pandora' user should have been created",
         )
 
-        # Test if the SearchQuery get's deleted when the user is deleted
+        # Test if the SearchQuery gets deleted when the user is deleted
         self.pandora_profile.user.delete()
         lookup.pop("user")
         self.assertFalse(
@@ -2243,6 +2280,83 @@ class SaveSearchQueryTest(TestCase):
             SearchQuery.ELASTICSEARCH,
             f"Saved wrong `engine` value, expected {SearchQuery.ELASTICSEARCH}",
         )
+
+
+@override_flag("store-search-api-queries", active=True)
+@override_flag("store-search-queries", active=True)
+@override_settings(WAFFLE_CACHE_PREFIX="test_save_query_history")
+class SaveQueryHistoryTest(TestCase):
+    """Do we honor the user's save_query_history preference?"""
+
+    @classmethod
+    def setUpClass(cls) -> None:
+        super().setUpClass()
+        patcher = mock.patch(
+            "cl.lib.decorators.get_tiered_cache_prefix",
+            new=lambda: "tiered_save_query_history_test",
+        )
+        patcher.start()
+        cls.addClassCleanup(patcher.stop)
+
+    def setUp(self) -> None:
+        clear_tiered_cache()
+        self.website_url = f"{reverse('show_results')}?q=lissner"
+        self.api_url = (
+            f"{reverse('search-list', kwargs={'version': 'v4'})}?q=lissner"
+        )
+
+    def tearDown(self) -> None:
+        clear_tiered_cache()
+
+    def test_save_query_history(self) -> None:
+        """Are queries saved only for users who want them saved?"""
+        for source, url in (
+            (SearchQuery.WEBSITE, self.website_url),
+            (SearchQuery.API, self.api_url),
+        ):
+            for save_query_history in (True, False):
+                with self.subTest(
+                    source=source, save_query_history=save_query_history
+                ):
+                    profile = UserProfileWithParentsFactory(
+                        save_query_history=save_query_history
+                    )
+                    self.client.force_login(profile.user)
+                    self.client.get(url)
+                    self.assertEqual(
+                        SearchQuery.objects.filter(
+                            user=profile.user, source=source
+                        ).exists(),
+                        save_query_history,
+                    )
+
+    def test_api_caches_save_query_history(self) -> None:
+        """Does the API use a cached preference until it expires?"""
+        profile = UserProfileWithParentsFactory(save_query_history=True)
+        self.client.force_login(profile.user)
+        queries = SearchQuery.objects.filter(
+            user=profile.user, source=SearchQuery.API
+        )
+        self.client.get(self.api_url)
+        self.assertEqual(queries.count(), 1)
+
+        profile.save_query_history = False
+        profile.save()
+        self.client.get(self.api_url)
+        self.assertEqual(queries.count(), 2, "Cached value not used.")
+
+        # The website reads the profile directly, without the cache.
+        self.client.get(self.website_url)
+        self.assertFalse(
+            SearchQuery.objects.filter(
+                user=profile.user, source=SearchQuery.WEBSITE
+            ).exists()
+        )
+
+        # Simulate the cache expiring.
+        clear_tiered_cache()
+        self.client.get(self.api_url)
+        self.assertEqual(queries.count(), 2, "Cache did not expire.")
 
 
 class CaptionTest(TestCase):
@@ -2876,9 +2990,7 @@ class ESIndexingTasksUtils(TestCase):
     "cl.search.management.commands.sweep_indexer.compose_indexer_redis_key",
     return_value="es_sweep_indexer:log_test",
 )
-class SweepIndexerCommandTest(
-    CourtTestCase, PeopleTestCase, ESIndexTestCase, TestCase
-):
+class SweepIndexerCommandTest(PeopleTestCase, ESIndexTestCase, TestCase):
     """sweep_indexer command tests for Elasticsearch"""
 
     @classmethod
@@ -3546,6 +3658,17 @@ class OpinionQuerySetWithBestTextTest(TestCase):
             html_anon_2020="Other version",
             html="Other version",
         )
+        cls.opinion_xml_scan = OpinionFactory(
+            cluster=cls.opinion_cluster_1,
+            plain_text="Plain text fallback 7",
+            html_with_citations="",
+            html_columbia="Other version",
+            html_lawbox="Other version",
+            xml_harvard="",
+            xml_scan="XML scan content",
+            html_anon_2020="Other version",
+            html="Other version",
+        )
         cls.opinion_html_anon_2020 = OpinionFactory(
             cluster=cls.opinion_cluster_1,
             plain_text="Plain text fallback 5",
@@ -3608,6 +3731,10 @@ class OpinionQuerySetWithBestTextTest(TestCase):
         self.assertEqual(o_xml_harvard.best_text, "XML harvard content")
         self.assertEqual(o_xml_harvard.best_text_source, "xml_harvard")
 
+        o_xml_scan = qs.get(pk=self.opinion_xml_scan.pk)
+        self.assertEqual(o_xml_scan.best_text, "XML scan content")
+        self.assertEqual(o_xml_scan.best_text_source, "xml_scan")
+
         self.assertEqual(o_html_anon.best_text, "HTML anon 2020 content")
         self.assertEqual(o_html_anon.best_text_source, "html_anon_2020")
 
@@ -3616,6 +3743,22 @@ class OpinionQuerySetWithBestTextTest(TestCase):
 
         self.assertEqual(o_plain_text.best_text, "Plain text fallback")
         self.assertEqual(o_plain_text.best_text_source, "plain_text")
+
+
+class OpinionScanTextTest(SimpleTestCase):
+    """Tests for the text taken from scanned opinion XML."""
+
+    def test_token_count_text_from_xml_scan(self) -> None:
+        """Is the scanned XML used as the opinion text for token counts?"""
+        opinion = Opinion(xml_scan="<opinion><p>Scanned text</p></opinion>")
+        self.assertEqual(get_clean_opinion_text(opinion), "Scanned text")
+
+    def test_prepare_text_from_xml_scan(self) -> None:
+        """Is the scanned XML indexed as plain text?"""
+        opinion = Opinion(xml_scan="<opinion><p>Smith &amp; Co.</p></opinion>")
+        self.assertEqual(
+            OpinionDocument().prepare_text(opinion), "Smith & Co."
+        )
 
 
 class AdminActionsTest(TestCase):
