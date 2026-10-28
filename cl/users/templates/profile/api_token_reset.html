@@ -34,6 +34,7 @@
        exposed (for example, committed to a public repository). Otherwise,
        you may want to <a href="{% url "view_api_token" %}">go back</a>.</p>
 
+    {# nosemgrep: python.django.security.django-no-csrf-token.django-no-csrf-token #}
     <form id="reset-token-form" action="" method="post" class="v-offset-above-3">{% csrf_token %}
       <div class="form-group">
         {% if reset_form.uses_sso %}

@@ -74,6 +74,7 @@ def normalize_issuer(url: str) -> str:
 # The IdP may POST here from its own page, which has no CSRF token. Nothing
 # changes until the person authenticates at the IdP and the callback checks
 # the state this view stores, so there's nothing for CSRF to protect.
+# nosemgrep: python.django.security.audit.csrf-exempt.no-csrf-exempt
 @csrf_exempt
 @never_cache
 @require_http_methods(["GET", "POST"])

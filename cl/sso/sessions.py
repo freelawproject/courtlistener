@@ -37,4 +37,5 @@ def sso_authenticated_within(request: HttpRequest, seconds: int) -> bool:
     :return: True if the last SSO login was within that many seconds.
     """
     signed_in_at = request.session.get(SSO_AUTHENTICATED_AT_KEY)
+    # nosemgrep: python.django.security.nan-injection.nan-injection
     return bool(signed_in_at) and time.time() - signed_in_at <= seconds

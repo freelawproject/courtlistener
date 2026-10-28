@@ -22,7 +22,9 @@ class OrganizationFactory(DjangoModelFactory):
     class Meta:
         model = Organization
 
+    # nosemgrep: python.lang.maintainability.return.return-not-in-function
     name = factory.Sequence(lambda n: f"Firm {n}")
+    # nosemgrep: python.lang.maintainability.return.return-not-in-function
     slug = factory.Sequence(lambda n: f"firm-{n}")
     membership_level = NeonMembershipLevel.TIER_1
 
@@ -34,6 +36,7 @@ class OrganizationDomainFactory(DjangoModelFactory):
         model = OrganizationDomain
 
     organization = factory.SubFactory(OrganizationFactory)
+    # nosemgrep: python.lang.maintainability.return.return-not-in-function
     domain = factory.Sequence(lambda n: f"firm{n}.test")
     verified_at = factory.LazyFunction(timezone.now)
     enforcement = Enforcement.OFF
@@ -46,11 +49,15 @@ class SocialAppFactory(DjangoModelFactory):
         model = SocialApp
 
     provider = "openid_connect"
+    # nosemgrep: python.lang.maintainability.return.return-not-in-function
     provider_id = factory.Sequence(lambda n: f"idp-{n}")
+    # nosemgrep: python.lang.maintainability.return.return-not-in-function
     name = factory.Sequence(lambda n: f"IdP {n}")
+    # nosemgrep: python.lang.maintainability.return.return-not-in-function
     client_id = factory.Sequence(lambda n: f"client-{n}")
     secret = "client-secret"
     settings = factory.LazyFunction(
+        # nosemgrep: python.lang.maintainability.return.return-not-in-function
         lambda: {"server_url": "https://idp.firm.test"}
     )
 

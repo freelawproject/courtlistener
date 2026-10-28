@@ -239,6 +239,7 @@ class FakeIdP:
         now = int(time.time())
         # allauth skips the signature check for an id_token it fetched
         # directly over TLS (as the OIDC spec allows), so the key is unused.
+        # nosemgrep: python.pyjwt.python-pyjwt-hardcoded-secret.python-pyjwt-hardcoded-secret, python.jwt.security.jwt-hardcode.jwt-python-hardcoded-secret
         id_token = jwt.encode(
             {
                 "iss": ISSUER,

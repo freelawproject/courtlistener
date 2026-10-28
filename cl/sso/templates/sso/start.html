@@ -15,6 +15,7 @@
     {% if no_sso_domain %}
       <p class="alert alert-warning">
         {{ no_sso_domain }} doesn't use single sign-on with CourtListener.
+        {# nosemgrep: generic.html-templates.security.unquoted-attribute-var.unquoted-attribute-var #}
         <a href="{% url "sign-in" %}?next={{ next|urlencode }}">Sign in with your password</a> instead.
       </p>
     {% endif %}
@@ -31,6 +32,7 @@
       <input type="hidden" name="next" value="{{ next }}">
       <button type="submit" class="btn btn-primary btn-lg">Continue</button>
     </form>
+    {# nosemgrep: generic.html-templates.security.unquoted-attribute-var.unquoted-attribute-var #}
     <p class="v-offset-above-2"><a href="{% url "sign-in" %}?next={{ next|urlencode }}">Sign in with a username and password</a></p>
   </div>
   <div class="col-xs-1 col-sm-2 col-md-3"></div>
