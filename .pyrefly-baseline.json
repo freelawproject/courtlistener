@@ -1626,13 +1626,6 @@
       "severity": "error"
     },
     {
-      "column": 25,
-      "path": "cl/opinion_page/views.py",
-      "name": "missing-attribute",
-      "concise_description": "Object of class `Docket` has no attribute `idb_data_id`",
-      "severity": "error"
-    },
-    {
       "column": 9,
       "path": "cl/opinion_page/views.py",
       "name": "missing-attribute",
