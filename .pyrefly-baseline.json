@@ -1626,13 +1626,6 @@
       "severity": "error"
     },
     {
-      "column": 25,
-      "path": "cl/opinion_page/views.py",
-      "name": "missing-attribute",
-      "concise_description": "Object of class `Docket` has no attribute `idb_data_id`",
-      "severity": "error"
-    },
-    {
       "column": 9,
       "path": "cl/opinion_page/views.py",
       "name": "missing-attribute",
@@ -1931,13 +1924,6 @@
       "path": "cl/recap/management/commands/monitor_pacer_websites.py",
       "name": "missing-attribute",
       "concise_description": "Object of class `Manager` has no attribute `all_pacer_courts`",
-      "severity": "error"
-    },
-    {
-      "column": 12,
-      "path": "cl/recap/management/commands/nightly_pacer_updates.py",
-      "name": "bad-return",
-      "concise_description": "Returned type `set[str | Any]` is not assignable to declared return type `set[int]`",
       "severity": "error"
     },
     {
@@ -3922,20 +3908,6 @@
       "severity": "error"
     },
     {
-      "column": 33,
-      "path": "cl/search/tasks.py",
-      "name": "missing-attribute",
-      "concise_description": "Object of type `Audio | Citation | Docket | DocketEntry | Education | Opinion | OpinionCluster | Parenthetical | ParentheticalGroup | Person | Position | RECAPDocument` has no attribute `person`",
-      "severity": "error"
-    },
-    {
-      "column": 21,
-      "path": "cl/search/tasks.py",
-      "name": "missing-attribute",
-      "concise_description": "Object of type `Audio | Citation | Docket | DocketEntry | Education | Opinion | OpinionCluster | Parenthetical | ParentheticalGroup | Person | Position | RECAPDocument` has no attribute `person`",
-      "severity": "error"
-    },
-    {
       "column": 45,
       "path": "cl/search/tasks.py",
       "name": "bad-argument-type",
@@ -3950,52 +3922,10 @@
       "severity": "error"
     },
     {
-      "column": 55,
-      "path": "cl/search/tasks.py",
-      "name": "bad-argument-type",
-      "concise_description": "Argument `Audio | Citation | Docket | DocketEntry | Education | Opinion | OpinionCluster | Parenthetical | ParentheticalGroup | Person | Position | RECAPDocument` is not assignable to parameter `position` with type `Position` in function `person_first_time_indexing`",
-      "severity": "error"
-    },
-    {
-      "column": 20,
-      "path": "cl/search/tasks.py",
-      "name": "missing-attribute",
-      "concise_description": "Object of type `Audio | Citation | Docket | DocketEntry | Education | Opinion | OpinionCluster | Parenthetical | ParentheticalGroup | Person | Position | RECAPDocument` has no attribute `is_judge`",
-      "severity": "error"
-    },
-    {
-      "column": 33,
-      "path": "cl/search/tasks.py",
-      "name": "missing-attribute",
-      "concise_description": "Object of type `Audio | Citation | Docket | DocketEntry | Education | Opinion | OpinionCluster | Parenthetical | ParentheticalGroup | Person | Position | RECAPDocument` has no attribute `docket_entry`",
-      "severity": "error"
-    },
-    {
-      "column": 42,
-      "path": "cl/search/tasks.py",
-      "name": "missing-attribute",
-      "concise_description": "Object of type `Audio | Citation | Docket | DocketEntry | Education | Opinion | OpinionCluster | Parenthetical | ParentheticalGroup | Person | Position | RECAPDocument` has no attribute `docket_entry`",
-      "severity": "error"
-    },
-    {
       "column": 32,
       "path": "cl/search/tasks.py",
       "name": "unexpected-keyword",
       "concise_description": "Unexpected keyword argument `meta` in function `cl.search.documents.DocketDocument.__init__`",
-      "severity": "error"
-    },
-    {
-      "column": 33,
-      "path": "cl/search/tasks.py",
-      "name": "missing-attribute",
-      "concise_description": "Object of type `Audio | Citation | Docket | DocketEntry | Education | Opinion | OpinionCluster | Parenthetical | ParentheticalGroup | Person | Position | RECAPDocument` has no attribute `cluster`",
-      "severity": "error"
-    },
-    {
-      "column": 43,
-      "path": "cl/search/tasks.py",
-      "name": "missing-attribute",
-      "concise_description": "Object of type `Audio | Citation | Docket | DocketEntry | Education | Opinion | OpinionCluster | Parenthetical | ParentheticalGroup | Person | Position | RECAPDocument` has no attribute `cluster`",
       "severity": "error"
     },
     {
@@ -4069,17 +3999,10 @@
       "severity": "error"
     },
     {
-      "column": 32,
-      "path": "cl/search/tasks.py",
-      "name": "missing-attribute",
-      "concise_description": "Object of type `Audio | Citation | Docket | DocketEntry | Education | Opinion | OpinionCluster | Parenthetical | ParentheticalGroup | Person | Position | RECAPDocument` has no attribute `docket`",
-      "severity": "error"
-    },
-    {
       "column": 44,
       "path": "cl/search/tasks.py",
       "name": "bad-argument-type",
-      "concise_description": "Argument `int | Unknown` is not assignable to parameter `id` with type `str` in function `elasticsearch.dsl._sync.document.Document.exists`",
+      "concise_description": "Argument `int` is not assignable to parameter `id` with type `str` in function `elasticsearch.dsl._sync.document.Document.exists`",
       "severity": "error"
     },
     {
@@ -4164,6 +4087,13 @@
       "path": "cl/search/tasks.py",
       "name": "bad-argument-type",
       "concise_description": "Argument `Literal['']` is not assignable to parameter `meta` with type `ApiResponseMeta` in function `elastic_transport._exceptions.ApiError.__init__`",
+      "severity": "error"
+    },
+    {
+      "column": 49,
+      "path": "cl/search/tasks.py",
+      "name": "bad-argument-type",
+      "concise_description": "Argument `int` is not assignable to parameter `id` with type `str` in function `elasticsearch.dsl._sync.document.Document.exists`",
       "severity": "error"
     },
     {

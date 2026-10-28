@@ -1103,7 +1103,7 @@ class UnlimitedAlertsTest(TestCase):
         """Can a user create an alert?"""
         up = UserProfileWithParentsFactory()
         self.assertTrue(
-            up.can_make_another_alert,
+            up.can_make_another_alert(),
             msg="User with no alerts cannot make its first alert.",
         )
 
@@ -1115,8 +1115,28 @@ class UnlimitedAlertsTest(TestCase):
         )
 
         self.assertTrue(
-            up.can_make_another_alert,
+            up.can_make_another_alert(),
             msg="User with one alert cannot make another.",
+        )
+
+    @override_settings(MAX_FREE_DOCKET_ALERTS=0, DOCKET_ALERT_RECAP_BONUS=1)
+    def test_recap_bonus_raises_the_free_limit(self) -> None:
+        """The RECAP bonus adds to the free limit only when it is claimed."""
+        up = UserProfileWithParentsFactory()
+        self.assertFalse(
+            up.can_make_another_alert(),
+            msg="Got the bonus without claiming RECAP.",
+        )
+        self.assertTrue(
+            up.can_make_another_alert(recap_installed=True),
+            msg="Claiming RECAP did not raise the limit.",
+        )
+        DocketAlertWithParentsFactory(
+            user=up.user, docket__source=Docket.RECAP
+        )
+        self.assertFalse(
+            up.can_make_another_alert(recap_installed=True),
+            msg="The bonus allowed more alerts than the raised limit.",
         )
 
     @override_settings(MAX_FREE_DOCKET_ALERTS=0)
@@ -1132,7 +1152,7 @@ class UnlimitedAlertsTest(TestCase):
             msg="Grantlist allowed even though email should not be on list.",
         )
         self.assertFalse(
-            up.can_make_another_alert,
+            up.can_make_another_alert(),
             msg="Was able to make alerts even though the max free "
             "alerts was overridden to zero.",
         )
@@ -1142,7 +1162,7 @@ class UnlimitedAlertsTest(TestCase):
                 msg="Grantlist denied even though email should be allowed. ",
             )
             self.assertTrue(
-                up.can_make_another_alert,
+                up.can_make_another_alert(),
                 msg="Unable to make an alert even though user's email is "
                 "granted unlimited docket alerts",
             )
@@ -3231,6 +3251,28 @@ class ToggleDocketAlertHtmxTest(TestCase):
         DocketAlertFactory(
             user=self.profile.user, docket=DocketFactory(source=Docket.RECAP)
         )
+        r = self.toggle()
+        self.assertTrue(r.context["quota_reached"])
+        self.assertEqual(r.context["subscription_count"], 1)
+
+    @override_settings(MAX_FREE_DOCKET_ALERTS=0, DOCKET_ALERT_RECAP_BONUS=1)
+    def test_recap_cookie_grants_the_bonus(self) -> None:
+        """A truthy recap_installed cookie raises the quota by the RECAP bonus; absent or empty, the free limit applies."""
+        r = self.toggle()
+        self.assertTrue(r.context["quota_reached"])
+        self.assertEqual(self.subscriptions(), 0)
+
+        self.client.cookies["recap_installed"] = ""
+        r = self.toggle()
+        self.assertTrue(r.context["quota_reached"])
+        self.assertEqual(self.subscriptions(), 0)
+
+        self.client.cookies["recap_installed"] = "true"
+        r = self.toggle()
+        self.assertFalse(r.context["quota_reached"])
+        self.assertEqual(self.subscriptions(), 1)
+
+        self.docket = DocketFactory(source=Docket.RECAP)
         r = self.toggle()
         self.assertTrue(r.context["quota_reached"])
         self.assertEqual(r.context["subscription_count"], 1)

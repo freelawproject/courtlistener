@@ -232,6 +232,10 @@ def _toggle_docket_alert_htmx(
     page's quota dialog. The `HX-Trigger-After-Swap` header is what opens
     that dialog, once the count is in the page and the menu has closed and
     refocused its trigger.
+
+    The `recap_installed` cookie, set by the page when the RECAP extension
+    announces itself, raises the quota by the RECAP bonus. The cookie is
+    taken at face value.
     """
     if request.method != "POST":
         return HttpResponseNotAllowed(permitted_methods={"POST"})
@@ -258,7 +262,9 @@ def _toggle_docket_alert_htmx(
             alert.save()
             has_alert = False
             message = "Alert disabled successfully"
-        elif not profile.can_make_another_alert:
+        elif not profile.can_make_another_alert(
+            recap_installed=bool(request.COOKIES.get("recap_installed"))
+        ):
             has_alert = False
             quota_reached = True
             subscription_count = (
