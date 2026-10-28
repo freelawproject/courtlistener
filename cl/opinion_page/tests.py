@@ -5164,36 +5164,24 @@ class DocketNoteFormV2Test(TestCase):
         self.assertIn(f"{reverse('register')}?next={quote(url)}", content)
         self.assertNotIn(reverse("save_or_update_note"), content)
 
-    async def test_user_without_a_note_gets_the_add_form(self) -> None:
-        """Does a logged-in user with no note see "Add Note", the form
-        pointed at the save view, and no Delete button?"""
+    async def test_logged_in_user_gets_the_form_for_their_note(self) -> None:
+        """Does a logged-in user see "Add Note", the save form and no Delete
+        button until they have a note, and then "Edit Note", their saved
+        values and a Delete button?"""
         user = await sync_to_async(UserWithChildProfileFactory)()
         await self.async_client.aforce_login(user)
+        url = reverse("view_docket", args=[self.docket.pk, self.docket.slug])
 
-        r = await self.async_client.get(
-            reverse("view_docket", args=[self.docket.pk, self.docket.slug])
-        )
-
-        content = r.content.decode()
+        content = (await self.async_client.get(url)).content.decode()
         self.assertIn("Add Note", content)
         self.assertNotIn("Edit Note", content)
         self.assertIn(reverse("save_or_update_note"), content)
         self.assertNotIn(reverse("delete_note"), content)
 
-    async def test_user_with_a_note_gets_the_edit_form(self) -> None:
-        """Does a user who already has a note see "Edit Note", their saved
-        values, and a Delete button?"""
-        user = await sync_to_async(UserWithChildProfileFactory)()
         await sync_to_async(NoteFactory.for_object)(
             self.docket, user=user, name="My saved note"
         )
-        await self.async_client.aforce_login(user)
-
-        r = await self.async_client.get(
-            reverse("view_docket", args=[self.docket.pk, self.docket.slug])
-        )
-
-        content = r.content.decode()
+        content = (await self.async_client.get(url)).content.decode()
         self.assertIn("Edit Note", content)
         self.assertIn("My saved note", content)
         self.assertIn(reverse("delete_note"), content)

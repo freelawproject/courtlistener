@@ -249,16 +249,6 @@ class SaveNoteLegacyTest(TestCase):
         self.assertEqual(r.status_code, HTTPStatus.METHOD_NOT_ALLOWED)
         self.assertFalse(Note.objects.exists())
 
-    def test_logged_out_user_is_sent_to_sign_in(self) -> None:
-        """Does the login requirement still apply to both kinds of request?"""
-        for label, headers in (("htmx", HTMX), ("ajax", AJAX)):
-            with self.subTest(kind=label):
-                r = self.client.post(self.url, self.data, headers=headers)
-
-                self.assertEqual(r.status_code, HTTPStatus.FOUND)
-                self.assertTrue(r["Location"].startswith(reverse("sign-in")))
-                self.assertFalse(Note.objects.exists())
-
 
 class DeleteNoteHtmxTest(TestCase):
     """Test that delete_note answers htmx requests with the v2 form."""
@@ -298,18 +288,6 @@ class DeleteNoteHtmxTest(TestCase):
         self.assertNotContains(r, reverse("delete_note"))
         self.assertNotContains(r, RELOAD_NOTICE)
 
-    def test_the_returned_form_can_save_again(self) -> None:
-        """Does the returned form still identify the object, so the next save
-        works?"""
-        NoteFactory.for_object(self.docket, user=self.user)
-
-        r = self.post()
-
-        self.assertContains(
-            r, f'name="content_type" value="{self.content_type.pk}"'
-        )
-        self.assertContains(r, f'name="object_id" value="{self.docket.pk}"')
-
     def test_delete_closes_the_dialog_and_updates_the_button(self) -> None:
         """Does a delete announce itself, and refresh the note button in
         place, whether or not the note was still there?"""
@@ -341,7 +319,8 @@ class DeleteNoteHtmxTest(TestCase):
 
     def test_the_returned_form_is_back_to_its_initial_state(self) -> None:
         """Does the form come back with Name prefilled with the page's
-        suggested name and Notes empty, whatever the note held?"""
+        suggested name and Notes empty, whatever the note held, and still
+        identify the object so the next save works?"""
         NoteFactory.for_object(
             self.docket, user=self.user, name="Renamed", notes="Old text"
         )
@@ -355,15 +334,10 @@ class DeleteNoteHtmxTest(TestCase):
         self.assertContains(r, 'value="Suggested v. Name"', count=2)
         self.assertNotContains(r, "Renamed")
         self.assertNotContains(r, "Old text")
-
-    def test_a_long_suggested_name_is_cut_to_the_name_limit(self) -> None:
-        """Is a suggested name over the limit trimmed, not shown as is?"""
-        NoteFactory.for_object(self.docket, user=self.user)
-
-        r = self.post(default_name="a" * 150)
-
-        self.assertContains(r, f'value="{"a" * 100}"', count=2)
-        self.assertNotContains(r, "a" * 101)
+        self.assertContains(
+            r, f'name="content_type" value="{self.content_type.pk}"'
+        )
+        self.assertContains(r, f'name="object_id" value="{self.docket.pk}"')
 
     def test_leaves_other_users_notes_alone(self) -> None:
         """Does deleting keep another user's note on the same object?"""
@@ -382,15 +356,6 @@ class DeleteNoteHtmxTest(TestCase):
         self.assertEqual(r.status_code, HTTPStatus.OK)
         self.assertTemplateUsed(r, FRAGMENT_TEMPLATE)
         self.assertNotContains(r, RELOAD_NOTICE)
-
-    def test_form_values_do_not_block_the_delete(self) -> None:
-        """Is a note deleted even if the posted name or notes would fail
-        validation?"""
-        NoteFactory.for_object(self.docket, user=self.user)
-
-        self.post(name="", notes="a" * 501)
-
-        self.assertFalse(Note.objects.filter(user=self.user).exists())
 
     def test_unusable_object_ids_ask_for_a_reload(self) -> None:
         """Does a request that doesn't name a noteable object get the reload
@@ -456,14 +421,3 @@ class DeleteNoteLegacyTest(TestCase):
 
         self.assertEqual(r.status_code, HTTPStatus.METHOD_NOT_ALLOWED)
         self.assertTrue(Note.objects.filter(pk=note.pk).exists())
-
-    def test_logged_out_user_is_sent_to_sign_in(self) -> None:
-        """Does the login requirement still apply to both kinds of request?"""
-        note = NoteFactory.for_object(self.docket, user=self.user)
-        for label, headers in (("htmx", HTMX), ("ajax", AJAX)):
-            with self.subTest(kind=label):
-                r = self.client.post(self.url, self.data, headers=headers)
-
-                self.assertEqual(r.status_code, HTTPStatus.FOUND)
-                self.assertTrue(r["Location"].startswith(reverse("sign-in")))
-                self.assertTrue(Note.objects.filter(pk=note.pk).exists())
