@@ -1381,6 +1381,19 @@ class AccountDeletionTest(SSOFixtureMixin, TestCase):
             OrganizationMembership.objects.filter(user=user).exists()
         )
 
+    def test_delete_leaves_no_membership_throttles(self) -> None:
+        """Are API throttles gone for a member who also holds a seat?"""
+        user = UserProfileWithParentsFactory.create().user
+        NeonMembershipFactory.create(
+            user=user, level=NeonMembershipLevel.TIER_1
+        )
+        OrganizationMembershipFactory.create(organization=self.org, user=user)
+        sync_user_throttles(user)
+
+        delete_user_assets(user)
+
+        self.assertFalse(APIThrottle.objects.filter(user=user).exists())
+
 
 class AdminTest(SSOFixtureMixin, TestCase):
     """The organization admin's actions."""

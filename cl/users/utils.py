@@ -130,6 +130,12 @@ def delete_user_assets(user: User) -> None:
     user_tags = user.user_tags.all()
     user_tags_ids = [user_tag.pk for user_tag in user_tags]
 
+    # Unlink SSO and give up any organization seat. A later SSO login finds
+    # the stub by address and upgrades it, as registering would.
+    # This goes first: removing a seat re-syncs API throttles, and the
+    # throttle delete below must clean up whatever that writes.
+    SocialAccount.objects.filter(user=user).delete()
+    OrganizationMembership.objects.filter(user=user).delete()
     user.alerts.all().delete()
     user.api_throttles.all().delete()
     user.docket_alerts.all().delete()
@@ -142,10 +148,6 @@ def delete_user_assets(user: User) -> None:
     Token.objects.filter(user=user).delete()
     user_tags.delete()
     user.webhooks.all().delete()
-    # Unlink SSO and give up any organization seat. A later SSO login finds
-    # the stub by address and upgrades it, as registering would.
-    SocialAccount.objects.filter(user=user).delete()
-    OrganizationMembership.objects.filter(user=user).delete()
     # Donations are financial records we need to keep, so disable the
     # recurring ones rather than deleting them.
     user.monthly_donations.all().update(enabled=False)
