@@ -1,5 +1,5 @@
 from collections import defaultdict
-from datetime import datetime, timedelta
+from datetime import datetime, time, timedelta
 from http import HTTPStatus
 from types import SimpleNamespace
 from typing import TYPE_CHECKING, cast
@@ -28,6 +28,10 @@ if TYPE_CHECKING:
     from django.test.client import _MonkeyPatchedWSGIResponse
 
 from cl.alerts.constants import LEGACY_MEMBERSHIP_HELP_URL
+from cl.alerts.docket_alert_sources import (
+    RECAP_ALERT_SOURCE,
+    SCOTUS_ALERT_SOURCE,
+)
 from cl.alerts.factories import (
     AlertFactory,
     DocketAlertFactory,
@@ -92,6 +96,8 @@ from cl.search.factories import (
     DocketFactory,
     OpinionWithParentsFactory,
     RECAPDocumentFactory,
+    SCOTUSDocketEntryFactory,
+    SCOTUSDocumentFactory,
 )
 from cl.search.models import (
     PRECEDENTIAL_STATUS,
@@ -956,7 +962,7 @@ class DocketAlertTest(TestCase):
     @classmethod
     def setUpTestData(cls) -> None:
         cls.user = UserFactory()
-        cls.court = CourtFactory(id="scotus", jurisdiction="F")
+        cls.court = CourtFactory()
 
         # Create a DOCKET_ALERT webhook
         cls.webhook = WebhookFactory(
@@ -971,7 +977,7 @@ class DocketAlertTest(TestCase):
         # Create a new docket
         self.docket = Docket.objects.create(
             source=Docket.RECAP,
-            court_id="scotus",
+            court_id=self.court.pk,
             pacer_case_id="asdf",
             docket_number="12-cv-02354",
             docket_number_raw="12-cv-02354",
@@ -1052,6 +1058,164 @@ class DocketAlertTest(TestCase):
             webhook_event.event_status,
             WEBHOOK_EVENT_STATUS.SUCCESSFUL,
         )
+
+
+class DocketAlertSourceTest(TestCase):
+    """Does the per-source alert registry resolve the right
+    queries and templates for RECAP vs. SCOTUS dockets?"""
+
+    @classmethod
+    def setUpTestData(cls) -> None:
+        cls.recap_docket = DocketFactory(court=CourtFactory())
+        cls.recap_de_1 = DocketEntryFactory(docket=cls.recap_docket)
+        cls.recap_de_2 = DocketEntryFactory(docket=cls.recap_docket)
+
+        cls.scotus_court = CourtFactory(id="scotus", jurisdiction="F")
+        cls.scotus_docket = DocketFactory(court=cls.scotus_court)
+        cls.scotus_de_1 = SCOTUSDocketEntryFactory(docket=cls.scotus_docket)
+        cls.scotus_de_2 = SCOTUSDocketEntryFactory(docket=cls.scotus_docket)
+
+    def test_recap_source_entries_by_pk_returns_docket_entries(self) -> None:
+        """Does RECAP_ALERT_SOURCE.entries_by_pk look up DocketEntry rows?"""
+        entries = RECAP_ALERT_SOURCE.entries_by_pk(
+            [self.recap_de_1.pk, self.recap_de_2.pk]
+        )
+        self.assertEqual(
+            set(entries.values_list("pk", flat=True)),
+            {self.recap_de_1.pk, self.recap_de_2.pk},
+        )
+
+    def test_recap_source_entries_since_returns_docket_entries(self) -> None:
+        """Does RECAP_ALERT_SOURCE.entries_since filter by creation time?"""
+        before = now()
+        de_new = DocketEntryFactory(docket=self.recap_docket)
+        entries = RECAP_ALERT_SOURCE.entries_since(self.recap_docket, before)
+        self.assertEqual(
+            set(entries.values_list("pk", flat=True)), {de_new.pk}
+        )
+
+    def test_scotus_source_entries_by_pk_returns_scotus_docket_entries(
+        self,
+    ) -> None:
+        """Does SCOTUS_ALERT_SOURCE.entries_by_pk look up SCOTUSDocketEntry
+        rows, not DocketEntry?"""
+        entries = SCOTUS_ALERT_SOURCE.entries_by_pk(
+            [self.scotus_de_1.pk, self.scotus_de_2.pk]
+        )
+        self.assertEqual(
+            set(entries.values_list("pk", flat=True)),
+            {self.scotus_de_1.pk, self.scotus_de_2.pk},
+        )
+
+    def test_scotus_source_entries_since_returns_scotus_docket_entries(
+        self,
+    ) -> None:
+        """Does SCOTUS_ALERT_SOURCE.entries_since filter by creation time,
+        same as RECAP's?"""
+        before = now()
+        de_new = SCOTUSDocketEntryFactory(docket=self.scotus_docket)
+        entries = SCOTUS_ALERT_SOURCE.entries_since(self.scotus_docket, before)
+        self.assertEqual(
+            set(entries.values_list("pk", flat=True)), {de_new.pk}
+        )
+
+    def test_docket_get_alert_source_dispatches_by_court_id(self) -> None:
+        """Does Docket.get_alert_source() route to the right registry entry?"""
+        self.assertIs(self.recap_docket.get_alert_source(), RECAP_ALERT_SOURCE)
+        self.assertIs(
+            self.scotus_docket.get_alert_source(), SCOTUS_ALERT_SOURCE
+        )
+
+    def test_entries_since_preloads_what_the_alert_email_renders(self) -> None:
+        """Does entries_since load the entries, their docket and their
+        documents (minus plain_text) in two queries, however many entries
+        there are?"""
+        before = now()
+        # Two entries, so any per-entry query shows up in the count.
+        for n in (10, 11):
+            RECAPDocumentFactory(
+                docket_entry=DocketEntryFactory(
+                    docket=self.recap_docket,
+                    entry_number=n,
+                    date_filed=datetime(2025, 1, 2).date(),
+                    time_filed=time(15, 30),
+                ),
+                document_number=str(n),
+            )
+            SCOTUSDocumentFactory(
+                docket_entry=SCOTUSDocketEntryFactory(
+                    docket=self.scotus_docket, entry_number=n
+                ),
+                document_number=n,
+            )
+
+        cases = [
+            (
+                "RECAP",
+                RECAP_ALERT_SOURCE,
+                self.recap_docket,
+                "recap_documents",
+            ),
+            (
+                "SCOTUS",
+                SCOTUS_ALERT_SOURCE,
+                self.scotus_docket,
+                "scotusdocument_set",
+            ),
+        ]
+        for source_name, source, docket, docs_attr in cases:
+            with self.subTest(source=source_name):
+                # One query for the entries joined with their docket, one
+                # for all their documents.
+                with self.assertNumQueries(2):
+                    docs = [
+                        doc
+                        for de in source.entries_since(docket, before)
+                        for doc in getattr(de, docs_attr).all()
+                    ]
+                    for doc in docs:
+                        doc.get_absolute_url()
+                        # RECAP entries with a time_filed resolve their
+                        # court's timezone through their docket.
+                        getattr(doc.docket_entry, "datetime_filed", None)
+                self.assertEqual(len(docs), 2)
+                for doc in docs:
+                    self.assertIn("plain_text", doc.get_deferred_fields())
+
+
+class DocketAlertScotusTest(TestCase):
+    """Does send_alert_and_webhook work end-to-end for a SCOTUS docket --
+    resolving SCOTUSDocketEntry rows and rendering the SCOTUS templates?"""
+
+    @classmethod
+    def setUpTestData(cls) -> None:
+        cls.user = UserFactory()
+        cls.court = CourtFactory(id="scotus", jurisdiction="F")
+
+    def setUp(self) -> None:
+        self.before = now()
+        self.docket = DocketFactory(court=self.court)
+        self.alert = DocketAlert.objects.create(
+            docket=self.docket, user=self.user
+        )
+
+    def test_triggering_docket_alert_for_a_scotus_docket(self) -> None:
+        """Does the alert go out, using the SCOTUS entries/templates,
+        for an entry created after `since`?"""
+        de = SCOTUSDocketEntryFactory(docket=self.docket)
+        SCOTUSDocumentFactory(docket_entry=de)
+        send_alert_and_webhook(self.docket.pk, self.before)
+        self.assertEqual(len(mail.outbox), 1)
+        self.assertIn(self.docket.case_name, mail.outbox[0].body)
+
+    def test_nothing_happens_for_timers_after_de_creation(self) -> None:
+        """Do we avoid sending alerts for timers after the de was
+        created?"""
+        de = SCOTUSDocketEntryFactory(docket=self.docket)
+        SCOTUSDocumentFactory(docket_entry=de)
+        after = now()
+        send_alert_and_webhook(self.docket.pk, after)
+        self.assertEqual(len(mail.outbox), 0)
 
 
 class DisableDocketAlertTest(TestCase):
