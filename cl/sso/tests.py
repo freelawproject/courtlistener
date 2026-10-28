@@ -28,9 +28,12 @@ from rest_framework.exceptions import AuthenticationFailed
 from rest_framework.request import Request
 
 from cl.api.authentication import ReplicaRoutingBasicAuthentication
-from cl.api.models import APIThrottle
+from cl.api.models import APIThrottle, ThrottleType
+from cl.api.utils import get_all_throttle_overrides
+from cl.donate.api_views import MembershipWebhookViewSet
 from cl.donate.factories import NeonMembershipFactory
 from cl.donate.models import NeonMembershipLevel
+from cl.lib.decorators import clear_tiered_cache
 from cl.lib.url_utils import BASE_URL
 from cl.sso.adapters import SocialAccountAdapter
 from cl.sso.factories import (
@@ -415,6 +418,10 @@ class OIDCLoginTest(SSOFixtureMixin, TestCase):
             APIThrottle.objects.filter(
                 user=user, source=APIThrottle.Source.MEMBERSHIP
             ).exists()
+        )
+        clear_tiered_cache()
+        self.assertIn(
+            user.username, get_all_throttle_overrides(ThrottleType.API)
         )
 
     def test_new_person_gets_an_account(self) -> None:

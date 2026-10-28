@@ -19,7 +19,7 @@ from django.core.cache import cache as default_cache
 from django.core.cache import caches
 from django.core.cache.backends.base import BaseCache
 from django.db import transaction
-from django.db.models import F, Model, Prefetch, QuerySet
+from django.db.models import F, Model, Prefetch, Q, QuerySet
 from django.db.models.constants import LOOKUP_SEP
 from django.urls import resolve
 from django.utils.decorators import method_decorator
@@ -63,6 +63,7 @@ from cl.lib.ratelimiter import (
     parse_rate,
 )
 from cl.lib.redis_utils import get_redis_interface
+from cl.sso.models import Organization, OrganizationMembership
 from cl.stats.constants import StatMetric, StatWebhookEventType
 from cl.stats.models import Event
 from cl.stats.utils import MILESTONES_FLAT, get_milestone_range, tally_stat
@@ -759,9 +760,10 @@ def get_all_throttle_overrides(
     - MANUAL overrides always apply.
     - MEMBERSHIP overrides apply only if the user's NeonMembership is active
       as defined by ``NeonMembership.objects.active()`` (payment status grants
-      benefits and the term, grace period included, has not ended), and no
-      MANUAL overrides exist. If any MANUAL overrides are present, they fully
-      replace the MEMBERSHIP set.
+      benefits and the term, grace period included, has not ended) or the
+      user holds a seat in an active organization, and no MANUAL overrides
+      exist. If any MANUAL overrides are present, they fully replace the
+      MEMBERSHIP set.
 
     :param throttle_type: The ThrottleType integer value (API or CITATION_LOOKUP).
     :return: Dictionary mapping username to a list of rate strings. A list
@@ -774,11 +776,20 @@ def get_all_throttle_overrides(
     ).values_list("user__username", "rate")
 
     active_member_ids = NeonMembership.objects.active().values("user_id")
-    membership_throttles = APIThrottle.objects.filter(
-        throttle_type=throttle_type,
-        source=APIThrottle.Source.MEMBERSHIP,
-        user_id__in=active_member_ids,
-    ).values_list("user__username", "rate")
+    seat_holder_ids = OrganizationMembership.objects.filter(
+        has_seat=True,
+        organization__in=Organization.objects.active(),
+    ).values("user_id")
+    membership_throttles = (
+        APIThrottle.objects.filter(
+            throttle_type=throttle_type,
+            source=APIThrottle.Source.MEMBERSHIP,
+        )
+        .filter(
+            Q(user_id__in=active_member_ids) | Q(user_id__in=seat_holder_ids)
+        )
+        .values_list("user__username", "rate")
+    )
 
     overrides: dict[str, list[str]] = {}
     users_with_manual_throttle: set[str] = set()
