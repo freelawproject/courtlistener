@@ -24,7 +24,7 @@ from typing import Any
 import requests
 from django.conf import settings
 from django.core.management.base import CommandError
-from django.db import models, transaction
+from django.db import transaction
 from django.db.models import QuerySet
 from django.utils import timezone
 
@@ -37,6 +37,7 @@ from cl.donate.models import (
     NeonMembership,
     NeonMembershipLevel,
 )
+from cl.donate.utils import parse_neon_date
 from cl.lib.command_utils import VerboseCommand
 from cl.lib.neon_utils import NeonClient
 from cl.users.tasks import tag_zoho_record_for_membership
@@ -99,21 +100,6 @@ def get_expired_memberships(
     return queryset.select_related("user__profile").order_by(
         "termination_date"
     )
-
-
-def parse_neon_date(value: str) -> datetime:
-    """Parse a date string from Neon into a timezone-aware datetime.
-
-    Neon can send dates with or without a UTC offset. Using Django's date
-    parser keeps the result consistent with the webhook handlers.
-
-    :param value: The date string returned by Neon.
-    :return: The parsed datetime, made timezone-aware if needed.
-    """
-    parsed = models.DateTimeField().to_python(value)
-    if timezone.is_naive(parsed):
-        return timezone.make_aware(parsed)
-    return parsed
 
 
 def sync_membership_from_neon(
