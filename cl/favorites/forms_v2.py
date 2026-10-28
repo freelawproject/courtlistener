@@ -46,7 +46,7 @@ class NoteForm(V1NoteForm):
             "content_type": forms.HiddenInput(),
             "object_id": forms.HiddenInput(),
             "name": widgets.TextInput(attrs={"maxlength": "100"}),
-            "notes": widgets.Textarea(attrs={"maxlength": "500"}),
+            "notes": widgets.Textarea(attrs={"maxlength": "500", "rows": "6"}),
         }
 
     @property

@@ -4,7 +4,7 @@
 <c-vars form/>
 
 <c-dialog
-    panel_class="p-5 banner max-w-xl"
+    panel_class="p-5 banner {% if not request.user.is_authenticated %} max-w-lg items-center{% else %} max-w-xl{% endif %}"
     dialog_class="items-center z-20"
     x-on:note-saved.window="close"
     x-on:note-deleted.window="close"
@@ -27,24 +27,28 @@
         </c-slot>
     {% else %}
         <c-slot name="panel">
-            <c-button variant="outline" x-on:click="close" aria-label="Close modal">
+            <c-button variant="ghost" class="ml-auto" x-on:click="close" aria-label="Close modal">
                 {% svg "cross" class="w-4 h-4" aria_hidden="true" %}
             </c-button>
-            <h2 x-dialog:title class="text-lg font-semibold text-greyscale-900">Please Sign In or Register</h2>
-            <c-button
-                variant="outline"
-                href="{% url 'sign-in' %}?next={{ request.get_full_path|urlencode }}"
-                aria-label="Sign into your account."
-            >
-                Sign In
-            </c-button>
-            <c-button
-                variant="outline"
-                href="{% url 'register' %}?next={{ request.get_full_path|urlencode }}"
-                aria-label="Register as a new member."
-            >
-                Register
-            </c-button>
+            <h2 x-dialog:title class="text-2xl font-semibold text-greyscale-900">Please Sign In or Register</h2>
+            <div class="flex flex-nowrap gap-4 mt-4 justify-center">
+                <c-button
+                    variant="primary"
+                    size="xl"
+                    href="{% url 'sign-in' %}?next={{ request.get_full_path|urlencode }}"
+                    aria-label="Sign into your account."
+                >
+                    Sign In
+                </c-button>
+                <c-button
+                    variant="outline"
+                    size="xl"
+                    href="{% url 'register' %}?next={{ request.get_full_path|urlencode }}"
+                    aria-label="Register as a new member."
+                >
+                    Register
+                </c-button>
+            </div>
         </c-slot>
     {% endif %}
 </c-dialog>
