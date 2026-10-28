@@ -40,8 +40,10 @@ ALTER TABLE "sso_organizationmembership" ADD COLUMN "user_id" integer NOT NULL C
 ALTER TABLE "sso_ssoconnection" ADD COLUMN "organization_id" integer NOT NULL CONSTRAINT "sso_ssoconnection_organization_id_42474a8f_fk_sso_organ" REFERENCES "sso_organization"("id") DEFERRABLE INITIALLY DEFERRED; SET CONSTRAINTS "sso_ssoconnection_organization_id_42474a8f_fk_sso_organ" IMMEDIATE;
 --
 -- Add field social_app to ssoconnection
+-- No foreign key: socialaccount_socialapp holds IdP client secrets and
+-- isn't replicated to customers.
 --
-ALTER TABLE "sso_ssoconnection" ADD COLUMN "social_app_id" integer NOT NULL UNIQUE CONSTRAINT "sso_ssoconnection_social_app_id_0571427b_fk_socialacc" REFERENCES "socialaccount_socialapp"("id") DEFERRABLE INITIALLY DEFERRED; SET CONSTRAINTS "sso_ssoconnection_social_app_id_0571427b_fk_socialacc" IMMEDIATE;
+ALTER TABLE "sso_ssoconnection" ADD COLUMN "social_app_id" integer NOT NULL UNIQUE;
 --
 -- Add field connection to authevent
 --
