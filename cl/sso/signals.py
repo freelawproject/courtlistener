@@ -1,9 +1,12 @@
+from datetime import timedelta
+
 from allauth.account.signals import user_logged_in as allauth_user_logged_in
 from django.contrib.auth.models import User
 from django.contrib.auth.signals import user_logged_in, user_login_failed
 from django.db.models.signals import post_delete
 from django.dispatch import receiver
 from django.http import HttpRequest
+from django.utils import timezone
 
 from cl.sso.events import record_auth_event
 from cl.sso.linking import SSO_LOGIN_ATTR, SSOLoginResult, send_linked_email
@@ -29,7 +32,10 @@ def handle_sso_login(
     mark_sso_session(request, organization.pk)
     # Shorter than a password session, so somebody who has left their
     # organization loses access soon after their IdP account is disabled.
-    request.session.set_expiry(organization.session_max_age)
+    # A fixed end time; a number of seconds would restart on every save.
+    request.session.set_expiry(
+        timezone.now() + timedelta(seconds=organization.session_max_age)
+    )
     record_auth_event(
         request=request,
         method=AuthMethod.SSO,

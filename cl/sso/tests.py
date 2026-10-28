@@ -370,7 +370,9 @@ class OIDCLoginTest(SSOFixtureMixin, TestCase):
         self.assertEqual(
             self.client.session[SSO_ORGANIZATION_KEY], self.org.pk
         )
-        self.assertEqual(self.client.session.get_expiry_age(), 3600)
+        self.assertAlmostEqual(
+            self.client.session.get_expiry_age(), 3600, delta=5
+        )
         self.assertTrue(
             AuthEvent.objects.filter(
                 user=user,
@@ -407,6 +409,16 @@ class OIDCLoginTest(SSOFixtureMixin, TestCase):
         self.assertEqual(len(mail.outbox), 1)
         self.assertEqual(mail.outbox[0].to, [user.email])
         self.assertIn("Acme Law", mail.outbox[0].subject)
+
+    def test_session_end_is_fixed_at_sign_in(self) -> None:
+        """Does activity after an SSO sign-in leave the session's end alone?"""
+        user = self._confirmed_user()
+        with time_machine.travel(timezone.now(), tick=False) as traveller:
+            self._log_in_via_idp(FakeIdP(sub="s-1", email=user.email))
+            expires = self.client.session.get_expiry_date()
+            traveller.shift(timedelta(seconds=1000))
+            self.client.get(reverse("show_results"))
+            self.assertEqual(self.client.session.get_expiry_date(), expires)
 
     def test_seat_grants_api_throttles(self) -> None:
         """Does getting a seat give the organization's API rates?"""
