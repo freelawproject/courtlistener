@@ -45,7 +45,6 @@
   <p class="v-offset-below-3">If you have any last minute questions or comments, we hope you'll <a href="{% url "contact" %}" target="_blank">share them with us</a> before you delete your account.
   </p>
 
-  {# nosemgrep: python.django.security.django-no-csrf-token.django-no-csrf-token #}
   <form action="" method="post">{% csrf_token %}
     <div class="form-group">
       {% if delete_form.uses_sso %}
