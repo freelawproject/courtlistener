@@ -68,6 +68,13 @@ class SaveNoteHtmxTest(TestCase):
         self.assertContains(r, "Edit Note")
         self.assertContains(r, reverse("delete_note"))
 
+    def test_saved_form_keeps_the_suggested_name(self) -> None:
+        """Does the form returned after a save still carry the page's
+        suggested name, for a later delete?"""
+        r = self.post(default_name="Suggested v. Name")
+
+        self.assertContains(r, 'name="default_name" value="Suggested v. Name"')
+
     def test_updates_the_existing_note(self) -> None:
         """Does a second save change the user's note instead of adding one?"""
         note = NoteFactory.for_object(self.docket, user=self.user, name="Old")
@@ -276,6 +283,32 @@ class DeleteNoteHtmxTest(TestCase):
             r, f'name="content_type" value="{self.content_type.pk}"'
         )
         self.assertContains(r, f'name="object_id" value="{self.docket.pk}"')
+
+    def test_the_returned_form_is_back_to_its_initial_state(self) -> None:
+        """Does the form come back with Name prefilled with the page's
+        suggested name and Notes empty, whatever the note held?"""
+        NoteFactory.for_object(
+            self.docket, user=self.user, name="Renamed", notes="Old text"
+        )
+
+        r = self.post(
+            name="Renamed",
+            notes="Old text",
+            default_name="Suggested v. Name",
+        )
+
+        self.assertContains(r, 'value="Suggested v. Name"', count=2)
+        self.assertNotContains(r, "Renamed")
+        self.assertNotContains(r, "Old text")
+
+    def test_a_long_suggested_name_is_cut_to_the_name_limit(self) -> None:
+        """Is a suggested name over the limit trimmed, not shown as is?"""
+        NoteFactory.for_object(self.docket, user=self.user)
+
+        r = self.post(default_name="a" * 150)
+
+        self.assertContains(r, f'value="{"a" * 100}"', count=2)
+        self.assertNotContains(r, "a" * 101)
 
     def test_leaves_other_users_notes_alone(self) -> None:
         """Does deleting keep another user's note on the same object?"""

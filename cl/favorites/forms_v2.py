@@ -14,6 +14,11 @@ class NoteForm(V1NoteForm):
     render them with the form.
     """
 
+    ## Default name is a hidden field, so the form can be prefilled after a delete.
+    default_name = forms.CharField(
+        required=False, max_length=100, widget=forms.HiddenInput()
+    )
+
     class Meta(V1NoteForm.Meta):
         labels = {"name": "Name", "notes": "Notes"}
         widgets = {

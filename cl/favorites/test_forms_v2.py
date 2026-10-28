@@ -1,3 +1,5 @@
+from unittest import mock
+
 from asgiref.sync import sync_to_async
 from django.contrib.auth.models import AnonymousUser
 from django.contrib.contenttypes.models import ContentType
@@ -40,7 +42,7 @@ class NoteFormV2Test(TestCase):
 
         self.assertEqual(
             list(form.fields),
-            ["content_type", "object_id", "name", "notes"],
+            ["content_type", "object_id", "name", "notes", "default_name"],
         )
         for field_name, max_length in (("name", "100"), ("notes", "500")):
             with self.subTest(field=field_name):
@@ -49,9 +51,18 @@ class NoteFormV2Test(TestCase):
                 self.assertEqual(attrs["maxlength"], max_length)
                 self.assertNotIn("id", attrs)
 
-        for field_name in ("content_type", "object_id"):
+        for field_name in ("content_type", "object_id", "default_name"):
             with self.subTest(field=field_name):
                 self.assertTrue(form.fields[field_name].widget.is_hidden)
+
+    def test_default_name_is_optional_and_limited(self) -> None:
+        """Is the suggested name optional, and held to the name's limit?"""
+        self.assertTrue(self.build_form().is_valid())
+        self.assertTrue(self.build_form(default_name="a" * 100).is_valid())
+        over_limit = self.build_form(default_name="a" * 101)
+
+        self.assertFalse(over_limit.is_valid())
+        self.assertTrue(over_limit.has_hidden_field_errors)
 
     def test_labels(self) -> None:
         """Are users shown short labels instead of the model's verbose
@@ -191,6 +202,14 @@ class NoteFormComponentTest(TestCase):
         self.assertIn('role="alert"', html)
         self.assertIn(self.NOTICE, html)
 
+    def test_suggested_name_travels_with_the_form(self) -> None:
+        """Is the page's suggested name rendered as a hidden input, so it is
+        posted back with the form?"""
+        html = self.render(default_name="Foo v. Bar")
+
+        self.assertIn('name="default_name"', html)
+        self.assertIn('value="Foo v. Bar"', html)
+
     def test_notice_is_not_shown_for_a_valid_form(self) -> None:
         """Is a form with no errors rendered without the notice?"""
         html = self.render()
@@ -233,6 +252,7 @@ class GetNoteFormForTest(TestCase):
         self.assertFalse(form.instance.pk)
         self.assertEqual(form.initial["object_id"], self.docket.pk)
         self.assertEqual(form.initial["name"], "Foo v. Bar")
+        self.assertEqual(form.initial["default_name"], "Foo v. Bar")
 
     async def test_builds_the_given_class_for_an_existing_note(self) -> None:
         """Is the user's existing note bound to the given class?"""
@@ -247,3 +267,39 @@ class GetNoteFormForTest(TestCase):
         self.assertIs(type(form), NoteForm)
         self.assertEqual(form.instance.pk, note.pk)
         self.assertEqual(form.initial["name"], "Old name")
+
+    async def test_existing_note_still_gets_the_suggested_name(self) -> None:
+        """Does a v2 form for an existing note carry the page's suggested
+        name, whether it is given as text or as a lazy callable?"""
+        await sync_to_async(NoteFactory.for_object)(
+            self.docket, user=self.user, name="Old name"
+        )
+
+        async def lazy_name() -> str:
+            return "From the callable"
+
+        for label, name, expected in (
+            ("text", "Foo v. Bar", "Foo v. Bar"),
+            ("callable", lazy_name, "From the callable"),
+        ):
+            with self.subTest(name=label):
+                form = await get_note_form_for(
+                    self.docket, self.user, name, form_class=NoteForm
+                )
+
+                self.assertEqual(form.initial["name"], "Old name")
+                self.assertEqual(form.initial["default_name"], expected)
+
+    async def test_v1_form_does_not_compute_the_name_for_an_existing_note(
+        self,
+    ) -> None:
+        """Is the lazy name still skipped for the v1 form when the user has a
+        note, as the audio page relies on?"""
+        await sync_to_async(NoteFactory.for_object)(
+            self.docket, user=self.user, name="Old name"
+        )
+        lazy_name = mock.AsyncMock(return_value="Never needed")
+
+        await get_note_form_for(self.docket, self.user, lazy_name)
+
+        lazy_name.assert_not_awaited()

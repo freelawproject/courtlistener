@@ -91,13 +91,17 @@ async def get_note_form_for(
         deferring means that extra query never runs when a Note already
         exists and the name ends up unused.
     :param form_class: The NoteForm subclass to build, for pages that render
-        the V2 form.
+        the V2 form. A form that declares default_name gets the suggested
+        name even when the user has a note, so the name is computed then too.
     :return: A form_class bound to the user's existing Note for obj, or an
         unsaved one pre-filled with obj's content_type/object_id.
     """
     note = await sync_to_async(get_note_for_target)(type(obj), obj.pk, user)
     if note is not None:
-        return form_class(instance=note)
+        initial = {}
+        if "default_name" in form_class.base_fields:
+            initial["default_name"] = await name() if callable(name) else name
+        return form_class(instance=note, initial=initial)
 
     resolved_name = await name() if callable(name) else name
     content_type = await sync_to_async(ContentType.objects.get_for_model)(
@@ -108,5 +112,6 @@ async def get_note_form_for(
             "content_type": content_type.pk,
             "object_id": obj.pk,
             "name": resolved_name,
+            "default_name": resolved_name,
         }
     )

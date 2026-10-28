@@ -150,7 +150,10 @@ def _save_or_update_note_htmx(request: HttpRequest) -> HttpResponse:
                 existing.notes = form.cleaned_data["notes"]
                 existing.save()
                 new_note = existing
-        form = NoteFormV2(instance=new_note)
+        form = NoteFormV2(
+            instance=new_note,
+            initial={"default_name": form.cleaned_data["default_name"]},
+        )
 
     return TemplateResponse(
         request, "v2_includes/add_note/form.html", {"form": form}
@@ -226,10 +229,15 @@ def _delete_note_htmx(request: HttpRequest) -> HttpResponse:
         # get_note() returns an unsaved Note when the user has none.
         if note.pk:
             note.delete()
+        # The page's suggested name, sent back by the form, restores the
+        # prefill the page had before the note existed.
+        default_name = request.POST.get("default_name", "")[:100]
         form = NoteFormV2(
             initial={
                 "content_type": request.POST.get("content_type"),
                 "object_id": request.POST.get("object_id"),
+                "name": default_name,
+                "default_name": default_name,
             }
         )
 
