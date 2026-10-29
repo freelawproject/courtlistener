@@ -1,0 +1,111 @@
+{% extends "new_base.html" %}
+{% load extras svg_tags %}
+
+{% block title %}Parties for {{ title }} – CourtListener.com{% endblock %}
+{% block og_title %}Parties for {{ title }} - CourtListener.com{% endblock %}
+{% block description %}Parties for {{ title }} — Brought to you by the RECAP Initiative and Free Law Project, a non-profit dedicated to creating high quality open legal information.{% endblock %}
+{% block og_description %}Parties for {{ title }} — Brought to you by the RECAP Initiative and Free Law Project, a non-profit dedicated to creating high quality open legal information.{% endblock %}
+{% block canonical %}{% get_canonical_element %}{% endblock %}
+
+{% block content_wrapper %}
+<div class="bg-greyscale-100">
+  <div class="capped-width pt-4 md:pt-20 pb-35">
+    <c-docket-page
+      :docket="docket"
+      :docket_source="docket_source"
+      active_tab="parties"
+      :metadata_sections="metadata_sections"
+      :tabs="tabs"
+      :has_alert="has_alert"
+      :note_form="note_form"
+    >
+      {% for group in party_groups %}
+        <section class="text-sm text-greyscale-800">
+          <h2 class="flex items-center gap-2 px-2 py-4 border-b border-greyscale-200">
+            {% svg "group" class="w-5 h-5 text-greyscale-500" aria_hidden="true" %}
+            {{ group.name }}
+          </h2>
+
+          {% for party in group.parties %}
+            {# One grid per party. Desktop rows: "Represented By:" beside the party cell, then one row per attorney (attorney cell, firm cell), the party cell spanning the first two rows and an empty left cell on the rows after. Every attorney row carries the divider across the three columns; a party without attorneys carries it itself. #}
+            <div class="grid grid-cols-1 md:grid-cols-3">
+              <div class="px-2 py-4 border-greyscale-200 {% if party.attorneys %}md:row-span-2 md:border-b{% else %}border-b{% endif %}">
+                <h3 class="text-md">
+                  {{ party.name|safe }}
+                  {% if perms.people_db.change_party %}
+                    <a href="{% url 'admin:people_db_party_change' party.pk %}" class="inline-block align-middle ml-1 text-greyscale-500 hover:text-greyscale-700 focus-visible:ring-2 focus-visible:ring-primary-400 focus-visible:outline-none rounded" aria-label="Edit {{ party.name }}" title="Edit {{ party.name }}">{% svg "edit" class="w-4 h-4" aria_hidden="true" %}</a>
+                  {% endif %}
+                </h3>
+                {% if party.date_terminated %}
+                  <p class="italic">Terminated ({{ party.date_terminated }})</p>
+                {% endif %}
+              </div>
+
+              {% if party.attorneys %}
+                <p class="px-2 pt-4 text-md font-semibold text-greyscale-900">Represented By:</p>
+                <div class="hidden md:block"></div>
+              {% else %}
+                <div class="hidden md:block md:col-span-2 border-b border-greyscale-200"></div>
+              {% endif %}
+
+              {% for attorney in party.attorneys %}
+                {% if not forloop.first %}<div class="hidden md:block border-b border-greyscale-200"></div>{% endif %}
+                <div class="px-2 py-4 md:border-b border-greyscale-200">
+                  <p class="text-md font-semibold text-greyscale-900">
+                    {{ attorney.name|safe }}
+                    {% if perms.people_db.change_attorney %}
+                      <a href="{% url 'admin:people_db_attorney_change' attorney.pk %}" class="inline-block align-middle ml-1 text-greyscale-500 hover:text-greyscale-700 focus-visible:ring-2 focus-visible:ring-primary-400 focus-visible:outline-none rounded" aria-label="Edit {{ attorney.name }}" title="Edit {{ attorney.name }}">{% svg "edit" class="w-4 h-4" aria_hidden="true" %}</a>
+                    {% endif %}
+                  </p>
+                  <div class="mt-2">
+                    {% if attorney.phone %}<p>{{ attorney.phone }}</p>{% endif %}
+                    {% if attorney.fax %}<p>Fax: {{ attorney.fax }}</p>{% endif %}
+                    {% for role in attorney.roles %}<p>{{ role }}</p>{% endfor %}
+                  </div>
+                </div>
+                <div class="px-2 py-4 border-b border-greyscale-200 space-y-2">
+                  {% for firm in attorney.firms %}
+                    <div>
+                      <p>
+                        {{ firm.name }}
+                        {% if perms.people_db.change_attorneyorganization %}
+                          <a href="{% url 'admin:people_db_attorneyorganization_change' firm.pk %}" class="inline-block align-middle ml-1 text-greyscale-500 hover:text-greyscale-700 focus-visible:ring-2 focus-visible:ring-primary-400 focus-visible:outline-none rounded" aria-label="Edit {{ firm.name }}" title="Edit {{ firm.name }}">{% svg "edit" class="w-4 h-4" aria_hidden="true" %}</a>
+                        {% endif %}
+                      </p>
+                      {% for line in firm.address_lines %}<p class="italic">{{ line }}</p>{% endfor %}
+                    </div>
+                  {% endfor %}
+                </div>
+              {% endfor %}
+
+              {% if party.criminal %}
+                <div class="md:col-span-3 px-2 py-4 border-b border-greyscale-200">
+                  <c-data-table
+                    caption="Criminal counts and complaints for {{ party.name }}"
+                    :columns="[
+                      {'label': '', 'field': 'label'},
+                      {'label': 'Description', 'field': 'name'},
+                      {'label': 'Disposition', 'field': 'disposition'},
+                    ]"
+                    :rows="party.criminal.rows"
+                  />
+                  <c-description-list class="mt-4 flex flex-col gap-1">
+                    <c-description-item class="flex gap-1">
+                      <c-description-term>Highest Offense Level (Opening):</c-description-term>
+                      <c-description-details>{{ party.criminal.highest_offense_level_opening }}</c-description-details>
+                    </c-description-item>
+                    <c-description-item class="flex gap-1">
+                      <c-description-term>Highest Offense Level (Terminated):</c-description-term>
+                      <c-description-details>{{ party.criminal.highest_offense_level_terminated }}</c-description-details>
+                    </c-description-item>
+                  </c-description-list>
+                </div>
+              {% endif %}
+            </div>
+          {% endfor %}
+        </section>
+      {% endfor %}
+    </c-docket-page>
+  </div>
+</div>
+{% endblock %}
