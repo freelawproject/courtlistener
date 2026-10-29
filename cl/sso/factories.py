@@ -1,3 +1,5 @@
+from typing import Any
+
 import factory
 from allauth.socialaccount.models import SocialApp
 from django.contrib.sites.models import Site
@@ -53,7 +55,9 @@ class SocialAppFactory(DjangoModelFactory):
     settings = factory.Dict({"server_url": "https://idp.firm.test"})
 
     @classmethod
-    def _create(cls, model_class, *args, **kwargs) -> SocialApp:
+    def _create(
+        cls, model_class: type[SocialApp], *args: Any, **kwargs: Any
+    ) -> SocialApp:
         """Save the app and attach it to the current site.
 
         allauth only finds apps attached to the site being served.

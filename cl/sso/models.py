@@ -1,7 +1,8 @@
-from typing import Self
+from typing import Any, Self
 
 import pghistory
 from allauth.socialaccount.models import SocialApp
+from disposable_email_domains import blocklist
 from django.contrib.auth.models import User
 from django.core.exceptions import ValidationError
 from django.db import models
@@ -14,8 +15,9 @@ from cl.lib.models import AbstractDateTimeModel
 
 # Domains anyone can get an address on. Verifying one of these would let a
 # single organization claim every user of the provider, so they can never be
-# added as organization domains. disposable-email-domains covers throwaway
-# providers; this list adds the major free ones it leaves out.
+# added as organization domains, nor can their subdomains. The
+# disposable-email-domains blocklist covers throwaway providers; this list
+# adds the major free ones it leaves out.
 FREE_EMAIL_PROVIDERS = frozenset(
     {
         "aol.com",
@@ -173,6 +175,15 @@ class Organization(AbstractDateTimeModel):
         return self.seats_used() < self.seat_limit
 
 
+def normalize_domain(domain: str) -> str:
+    """Lowercase a domain and drop a leading "@" and trailing dot.
+
+    :param domain: The domain as typed, e.g. " @Acme-Law.com. ".
+    :return: The domain as stored, e.g. "acme-law.com".
+    """
+    return domain.strip().lower().lstrip("@").rstrip(".")
+
+
 class Enforcement(models.TextChoices):
     """How strongly a domain's addresses are steered to SSO."""
 
@@ -226,19 +237,22 @@ class OrganizationDomain(AbstractDateTimeModel):
         :raises ValidationError: For free email providers, or for
         enforcement on a domain that isn't verified yet.
         """
-        self.domain = self.domain.strip().lower().lstrip("@")
-        if self.domain in FREE_EMAIL_PROVIDERS:
-            raise ValidationError(
-                {"domain": f"{self.domain} is a public email provider."}
-            )
+        self.domain = normalize_domain(self.domain)
+        labels = self.domain.split(".")
+        for i in range(len(labels) - 1):
+            parent = ".".join(labels[i:])
+            if parent in FREE_EMAIL_PROVIDERS or parent in blocklist:
+                raise ValidationError(
+                    {"domain": f"{parent} is a public email provider."}
+                )
         if self.enforcement != Enforcement.OFF and not self.is_verified:
             raise ValidationError(
                 {"enforcement": "Verify the domain before enabling SSO on it."}
             )
 
-    def save(self, *args, **kwargs) -> None:
+    def save(self, *args: Any, **kwargs: Any) -> None:
         """Store the domain lowercased, however it was entered."""
-        self.domain = self.domain.strip().lower().lstrip("@")
+        self.domain = normalize_domain(self.domain)
         super().save(*args, **kwargs)
 
 
@@ -282,6 +296,8 @@ class SSOConnection(AbstractDateTimeModel):
         has no provider_id or shares one with another app, or (for SAML)
         accepts unsigned assertions or sign-ins started at the IdP.
         """
+        if self.social_app_id is None:
+            return
         if self.social_app.provider not in ("openid_connect", "saml"):
             raise ValidationError(
                 {"social_app": "Only OpenID Connect and SAML are supported."}

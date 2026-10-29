@@ -14,6 +14,17 @@ from cl.sso.models import (
 )
 
 
+def spreadsheet_safe(value: str) -> str:
+    """Stop a spreadsheet from running a CSV cell as a formula.
+
+    :param value: A cell's text.
+    :return: The text, with a leading quote if it starts like a formula.
+    """
+    if value.startswith(("=", "+", "-", "@", "\t", "\r")):
+        return f"'{value}"
+    return value
+
+
 class OrganizationDomainInline(admin.TabularInline):
     """An organization's email domains."""
 
@@ -115,8 +126,8 @@ class OrganizationAdmin(admin.ModelAdmin):
             writer.writerow(
                 [
                     m.organization.slug,
-                    m.user.username,
-                    m.user.email,
+                    spreadsheet_safe(m.user.username),
+                    spreadsheet_safe(m.user.email),
                     m.role,
                     m.source,
                     m.has_seat,
@@ -142,16 +153,25 @@ class AuthEventAdmin(admin.ModelAdmin):
     list_filter = ("method", "outcome")
     search_fields = ("user__username", "user__email", "ip_address")
     raw_id_fields = ("user", "connection")
+    list_select_related = (
+        "user",
+        "connection__organization",
+        "connection__social_app",
+    )
     date_hierarchy = "date_created"
 
     def has_add_permission(self, request: HttpRequest) -> bool:
         """Audit records are only ever written by the application."""
         return False
 
-    def has_change_permission(self, request: HttpRequest, obj=None) -> bool:
+    def has_change_permission(
+        self, request: HttpRequest, obj: AuthEvent | None = None
+    ) -> bool:
         """Audit records can't be edited."""
         return False
 
-    def has_delete_permission(self, request: HttpRequest, obj=None) -> bool:
+    def has_delete_permission(
+        self, request: HttpRequest, obj: AuthEvent | None = None
+    ) -> bool:
         """Audit records can't be deleted from the admin."""
         return False

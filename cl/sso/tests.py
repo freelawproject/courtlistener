@@ -1,5 +1,7 @@
 import time_machine
 from django.core.exceptions import ValidationError
+from django.db import connection
+from django.test.utils import CaptureQueriesContext
 from django.urls import reverse
 from django.utils import timezone
 
@@ -17,6 +19,7 @@ from cl.sso.models import (
     Enforcement,
     Organization,
     OrganizationDomain,
+    SSOConnection,
 )
 from cl.tests.cases import TestCase
 from cl.users.factories import UserFactory
@@ -57,12 +60,18 @@ class DomainTest(TestCase):
     """Domain records."""
 
     def test_free_email_domains_rejected(self) -> None:
-        """Can't an organization claim gmail.com?"""
-        domain = OrganizationDomain(
-            organization=OrganizationFactory.create(), domain="Gmail.com"
-        )
-        with self.assertRaises(ValidationError):
-            domain.full_clean()
+        """Can't an organization claim a public email provider?"""
+        org = OrganizationFactory.create()
+        for name in (
+            "Gmail.com",
+            "gmail.com.",
+            "mail.gmail.com",
+            "mailinator.com",
+        ):
+            with self.subTest(domain=name):
+                domain = OrganizationDomain(organization=org, domain=name)
+                with self.assertRaises(ValidationError):
+                    domain.full_clean()
 
     def test_enforcement_needs_verification(self) -> None:
         """Can't enforcement be turned on before the domain is verified?"""
@@ -132,6 +141,13 @@ class SSOConnectionTest(TestCase):
         with self.assertRaises(ValidationError):
             connection.clean()
 
+    def test_missing_social_app_is_a_validation_error(self) -> None:
+        """Is a connection with no SocialApp a form error, not a crash?"""
+        connection = SSOConnection(organization=OrganizationFactory.create())
+        with self.assertRaises(ValidationError) as cm:
+            connection.full_clean()
+        self.assertIn("social_app", cm.exception.message_dict)
+
     def test_shared_provider_id_rejected(self) -> None:
         """Is a provider ID that another SocialApp uses rejected?"""
         SocialAppFactory.create(provider_id="shared")
@@ -175,6 +191,44 @@ class AdminTest(TestCase):
 
         self.assertEqual(r["Content-Type"], "text/csv")
         self.assertIn(member.user.username, r.content.decode())
+
+    def test_export_members_neutralizes_formulas(self) -> None:
+        """Can't a member's email run as a formula in a spreadsheet?"""
+        OrganizationMembershipFactory.create(
+            organization=self.org,
+            user=UserFactory.create(email="=1+1@firm.test"),
+        )
+
+        r = self.client.post(
+            reverse("admin:sso_organization_changelist"),
+            {"action": "export_members", "_selected_action": [self.org.pk]},
+        )
+
+        self.assertIn(",'=1+1@firm.test,", r.content.decode())
+
+    def test_auth_event_list_queries_dont_grow(self) -> None:
+        """Does the audit log page run the same queries for more rows?"""
+        url = reverse("admin:sso_authevent_changelist")
+        sso_connection = SSOConnection.objects.get(organization=self.org)
+
+        def add_event() -> None:
+            AuthEvent.objects.create(
+                user=UserFactory.create(),
+                connection=sso_connection,
+                method=AuthMethod.SSO,
+                outcome=AuthOutcome.SUCCESS,
+                identifier_hash="0" * 64,
+            )
+
+        add_event()
+        with CaptureQueriesContext(connection) as one_row:
+            self.client.get(url)
+        for _ in range(3):
+            add_event()
+        with CaptureQueriesContext(connection) as four_rows:
+            self.client.get(url)
+
+        self.assertEqual(len(four_rows), len(one_row))
 
     def test_auth_events_are_read_only(self) -> None:
         """Can't audit records be added, edited or deleted in the admin?"""
