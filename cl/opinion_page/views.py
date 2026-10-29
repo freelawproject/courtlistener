@@ -95,7 +95,9 @@ from cl.opinion_page.forms import (
     TennWorkCompClUploadForm,
 )
 from cl.opinion_page.utils import (
+    CoreDocketDataDict,
     build_idb_rows,
+    build_party_groups,
     core_docket_data,
     es_cited_case_count,
     es_get_cited_clusters_with_cache,
@@ -468,9 +470,12 @@ async def view_parties(
     docket_id: int,
     slug: str,
 ) -> HttpResponse:
-    """Show the parties and attorneys tab on the docket with pagination."""
+    """Show the parties and attorneys tab on the docket.
 
-    page = request.GET.get("page", 1)
+    Routes on the new-design flag: the v2 tab gets every party at once,
+    however many there are, while the legacy tab keeps its pagination.
+    """
+
     docket, context = await core_docket_data(request, docket_id)
     # We work with this data at the level of party_types so that we can group
     # the parties by this field. From there, we do a whole mess of prefetching,
@@ -502,6 +507,41 @@ async def view_parties(
         )
         .order_by("name", "party__name")
     )
+
+    # The flag check matches the template middleware's.
+    if not await sync_to_async(waffle.flag_is_active)(
+        request, "use_new_design"
+    ):
+        return await _view_parties_legacy(
+            request, docket, context, party_types
+        )
+
+    return TemplateResponse(
+        request,
+        "docket_parties.html",
+        context
+        | {
+            "party_groups": await sync_to_async(build_party_groups)(
+                party_types
+            ),
+            "docket_entries": await docket.docket_entries.aexists(),
+        },
+    )
+
+
+async def _view_parties_legacy(
+    request: HttpRequest,
+    docket: Docket,
+    context: CoreDocketDataDict,
+    party_types: QuerySet[PartyType],
+) -> HttpResponse:
+    """Show the legacy parties and attorneys tab, paginated.
+
+    TODO: Remove once new design is completely rolled out, together with
+    the router in view_parties and the pager in docket_parties.html.
+    """
+
+    page = request.GET.get("page", 1)
 
     @sync_to_async
     def paginate_parties(
