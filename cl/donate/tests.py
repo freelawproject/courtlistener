@@ -1388,6 +1388,28 @@ class SyncNeonMembershipsCommandTest(TestCase):
             call.args[0] for call in self.mock_get_membership.call_args_list
         }
 
+    def make_unpaid_renewal(
+        self, payment_status: int, modified_days_ago: int
+    ) -> None:
+        """Turn the fixture into an unpaid renewal with a future term."""
+        self.membership.termination_date = now() + timedelta(days=300)
+        self.membership.payment_status = payment_status
+        self.membership.save()
+        # auto_now resets date_modified on save, so set it directly.
+        NeonMembership.objects.filter(pk=self.membership.pk).update(
+            date_modified=now() - timedelta(days=modified_days_ago)
+        )
+        self.membership.refresh_from_db()
+
+    def same_term_from_neon(self, **kwargs) -> dict:
+        """Build Neon's record for the fixture's own membership and term end."""
+        return make_neon_membership(
+            membership_id="100",
+            level_name="CL Membership - Tier 1",
+            term_end_date=self.membership.termination_date.date().isoformat(),
+            **kwargs,
+        )
+
     def assert_membership_untouched(self) -> None:
         """Assert the lapsed membership, throttles and Zoho were left alone."""
         self.assertTrue(
@@ -1522,15 +1544,55 @@ class SyncNeonMembershipsCommandTest(TestCase):
             NeonMembershipFactory(
                 user=profile.user, termination_date=now() - expired_for
             )
+        # Unpaid rows are selected by their last change instead, under the
+        # same lower bound, and the same termination date upper bound.
+        for account_id, payment_status, term_offset, modified_ago in (
+            (
+                "unpaid",
+                MembershipPaymentStatus.FAILED,
+                timedelta(days=300),
+                timedelta(days=3),
+            ),
+            (
+                "unpaid-recent",
+                MembershipPaymentStatus.PENDING,
+                timedelta(days=300),
+                timedelta(hours=1),
+            ),
+            (
+                "unpaid-old-term",
+                MembershipPaymentStatus.FAILED,
+                timedelta(days=-100),
+                timedelta(days=3),
+            ),
+            (
+                "paid-future",
+                MembershipPaymentStatus.SUCCEEDED,
+                timedelta(days=300),
+                timedelta(days=3),
+            ),
+        ):
+            profile = UserProfileWithParentsFactory(neon_account_id=account_id)
+            membership = NeonMembershipFactory(
+                user=profile.user,
+                payment_status=payment_status,
+                termination_date=now() + term_offset,
+            )
+            NeonMembership.objects.filter(pk=membership.pk).update(
+                date_modified=now() - modified_ago
+            )
         self.mock_get_membership.return_value = None
 
         # Deletion is off so every run sees the same records.
         for options, expected_account_ids in (
-            ({}, {"1234"}),
-            ({"max_days_expired": 0}, {"1234", "too-old"}),
+            ({}, {"1234", "unpaid"}),
+            (
+                {"max_days_expired": 0},
+                {"1234", "too-old", "unpaid", "unpaid-old-term"},
+            ),
             (
                 {"min_hours_expired": 0, "max_days_expired": 30},
-                {"1234", "too-recent"},
+                {"1234", "too-recent", "unpaid", "unpaid-recent"},
             ),
         ):
             with self.subTest(options=options):
@@ -1691,12 +1753,45 @@ class SyncNeonMembershipsCommandTest(TestCase):
         self.mock_logger.error.assert_not_called()
         self.assert_membership_untouched()
 
+    def test_repairs_unpaid_renewal_with_future_term(self) -> None:
+        """Finds a failed renewal by its last change and applies Neon's paid record."""
+        self.make_unpaid_renewal(MembershipPaymentStatus.FAILED, 3)
+        self.mock_get_membership.return_value = self.same_term_from_neon()
+        out = StringIO()
+
+        call_command("sync_neon_memberships", stdout=out)
+
+        self.mock_get_membership.assert_called_once_with("1234")
+        self.membership.refresh_from_db()
+        self.assertEqual(
+            self.membership.payment_status, MembershipPaymentStatus.SUCCEEDED
+        )
+        self.assertTrue(self.membership.is_active)
+        self.assertEqual(self.get_membership_rates(), sorted(TIER_1_RATES))
+        self.assertIn("1 updated", out.getvalue())
+
+    def test_leaves_unpaid_renewal_neon_still_retrying(self) -> None:
+        """Keeps a failed renewal untouched, and undeleted, while Neon retries."""
+        # Older than the default 7-day delete threshold on purpose.
+        self.make_unpaid_renewal(MembershipPaymentStatus.FAILED, 10)
+        self.mock_get_membership.return_value = self.same_term_from_neon(
+            status="FAILED", payment_status="Failed"
+        )
+
+        call_command("sync_neon_memberships")
+
+        self.mock_get_membership.assert_called_once_with("1234")
+        self.mock_logger.warning.assert_called_once()
+        self.assert_membership_untouched()
+        self.assertEqual(
+            self.membership.payment_status, MembershipPaymentStatus.FAILED
+        )
+
     def test_same_term_repairs_unpaid_record(self) -> None:
         """Applies Neon's paid record for our own term when we are unpaid."""
         # A failed renewal stored the new term's future end date, and the
         # retry then succeeded in Neon under the same membership and term.
         self.membership.termination_date = now() + timedelta(days=300)
-        same_term = self.membership.termination_date.date().isoformat()
         for payment_status in (
             MembershipPaymentStatus.FAILED,
             MembershipPaymentStatus.PENDING,
@@ -1706,11 +1801,7 @@ class SyncNeonMembershipsCommandTest(TestCase):
                 self.membership.save()
                 APIThrottle.objects.filter(user=self.user).delete()
                 self.mock_tag_zoho.reset_mock()
-                neon_membership = make_neon_membership(
-                    membership_id="100",
-                    level_name="CL Membership - Tier 1",
-                    term_end_date=same_term,
-                )
+                neon_membership = self.same_term_from_neon()
 
                 result = sync_membership_from_neon(
                     self.membership, neon_membership
