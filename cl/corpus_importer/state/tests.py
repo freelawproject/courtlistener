@@ -7,7 +7,7 @@ from contextlib import closing, contextmanager
 from io import StringIO
 from pathlib import Path
 from tempfile import TemporaryDirectory
-from typing import Any, ClassVar, ParamSpec, TypeVar, cast
+from typing import Any, ClassVar, cast
 from unittest.mock import MagicMock, Mock, call, patch
 
 from botocore.exceptions import BotoCoreError, ClientError
@@ -84,15 +84,12 @@ from cl.search.models import (
 )
 from cl.tests.cases import SimpleTestCase, TestCase
 
-Param = ParamSpec("Param")
-Return = TypeVar("Return")
 
-
-def merger_test(
+def merger_test[**P, R](
     *, expected_query_count: int | range | None = None
-) -> Callable[[Callable[Param, Return]], Callable[Param, Return]]:
-    def decorator(f: Callable[Param, Return]) -> Callable[Param, Return]:
-        def wrapper(*args: Param.args, **kwargs: Param.kwargs) -> Return:
+) -> Callable[[Callable[P, R]], Callable[P, R]]:
+    def decorator(f: Callable[P, R]) -> Callable[P, R]:
+        def wrapper(*args: P.args, **kwargs: P.kwargs) -> R:
             counts = {"merger": 0, "test": 0}
             merger_sql: list[str] = []
             merge_depth = 0
