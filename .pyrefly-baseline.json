@@ -226,13 +226,6 @@
       "severity": "error"
     },
     {
-      "column": 39,
-      "path": "cl/alerts/tasks.py",
-      "name": "bad-argument-type",
-      "concise_description": "Argument `QuerySet[DocketEntry, DocketEntry] | list[DocketEntry]` is not assignable to parameter `new_des` with type `list[DocketEntry]` in function `make_alert_messages`",
-      "severity": "error"
-    },
-    {
       "column": 23,
       "path": "cl/alerts/utils.py",
       "name": "missing-attribute",
