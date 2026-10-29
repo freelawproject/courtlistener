@@ -1,6 +1,7 @@
 import csv
 import logging
 import traceback
+from collections.abc import Iterable
 from dataclasses import dataclass, field
 from datetime import date
 from io import StringIO
@@ -46,7 +47,13 @@ from cl.opinion_page.docket_entry_sources import (
     MetadataSection,
     SourceDocketEntry,
 )
-from cl.people_db.models import Person
+from cl.people_db.models import (
+    AttorneyOrganization,
+    Party,
+    PartyType,
+    Person,
+    Role,
+)
 from cl.recap.constants import COURT_TIMEZONES
 from cl.recap.models import FjcIntegratedDatabase
 from cl.search.documents import OpinionClusterDocument
@@ -694,6 +701,188 @@ def build_idb_rows(idb_data: FjcIntegratedDatabase) -> list[IdbRow]:
             ),
         },
     ]
+
+
+class PartyFirm(TypedDict):
+    """One firm of an attorney on the Parties tab, with its mailing address
+    as one line per address part that is set."""
+
+    pk: int
+    name: str
+    address_lines: list[str]
+
+
+class PartyAttorney(TypedDict):
+    """One attorney of a party on the Parties tab.
+
+    roles are display-ready lines, the raw PACER role when known and the
+    choice label otherwise, each followed by its action date in parentheses.
+    Roles of unknown type are left out.
+    """
+
+    pk: int
+    name: str
+    phone: str
+    fax: str
+    roles: list[str]
+    firms: list[PartyFirm]
+
+
+class CriminalRow(TypedDict):
+    """One count or complaint row of a party's criminal table."""
+
+    label: str
+    name: str
+    disposition: str
+
+
+class PartyCriminalInfo(TypedDict):
+    """The criminal table of a party: counts and complaints as rows, with a
+    "None" placeholder row for each kind without records, plus the highest
+    offense levels."""
+
+    rows: list[CriminalRow]
+    highest_offense_level_opening: str
+    highest_offense_level_terminated: str
+
+
+class PartyItem(TypedDict):
+    """One party on the Parties tab. date_terminated is in the site's date
+    format and empty when unset. criminal is only present for parties with
+    criminal data."""
+
+    pk: int
+    name: str
+    date_terminated: str
+    attorneys: list[PartyAttorney]
+    criminal: NotRequired[PartyCriminalInfo]
+
+
+class PartyGroup(TypedDict):
+    """The parties sharing one party type (Plaintiff, Defendant, ...)."""
+
+    name: str
+    parties: list[PartyItem]
+
+
+def build_party_groups(party_types: Iterable[PartyType]) -> list[PartyGroup]:
+    """Build the party groups of the Parties and Attorneys tab.
+
+    party_types must be ordered by type name and carry the view's prefetches:
+    the party's roles on this docket with their attorney and the attorney's
+    firms_in_docket, plus the criminal counts and complaints. Attorneys are
+    listed by name; parties keep the order they come in.
+    """
+    none = "None"
+
+    def address_lines(firm: AttorneyOrganization) -> list[str]:
+        """Lists the set parts of the firm's mailing address."""
+        locality = " ".join(
+            part for part in (firm.state, firm.zip_code) if part
+        )
+        city_line = ", ".join(part for part in (firm.city, locality) if part)
+        return [
+            line for line in (firm.address1, firm.address2, city_line) if line
+        ]
+
+    def role_line(role: Role) -> str:
+        """Formats a role as its name followed by the action date, if any.
+        Empty for roles with neither a raw value nor a known type."""
+        name = role.role_raw or role.get_role_display() or ""
+        if name and role.date_action:
+            return f"{name} ({date_format(role.date_action)})"
+        return name
+
+    def attorneys(party: Party) -> list[PartyAttorney]:
+        """Groups the party's roles by attorney, attorneys sorted by name."""
+        by_attorney: dict[int, PartyAttorney] = {}
+        roles = sorted(party.roles.all(), key=lambda role: role.attorney.name)
+        for role in roles:
+            attorney = role.attorney
+            item = by_attorney.setdefault(
+                attorney.pk,
+                {
+                    "pk": attorney.pk,
+                    "name": attorney.name,
+                    "phone": attorney.phone,
+                    "fax": attorney.fax,
+                    "roles": [],
+                    "firms": [
+                        {
+                            "pk": firm.pk,
+                            "name": firm.name,
+                            "address_lines": address_lines(firm),
+                        }
+                        # Set by the view's prefetch to_attr.
+                        for firm in attorney.firms_in_docket  # pyrefly:ignore[missing-attribute]
+                    ],
+                },
+            )
+            if role.role != Role.UNKNOWN and (line := role_line(role)):
+                item["roles"].append(line)
+        return list(by_attorney.values())
+
+    def criminal_info(party_type: PartyType) -> PartyCriminalInfo | None:
+        """Builds the criminal table, None when the party has no criminal
+        data at all."""
+        counts = list(party_type.criminal_counts.all())
+        complaints = list(party_type.criminal_complaints.all())
+        if not (
+            counts
+            or complaints
+            or party_type.highest_offense_level_opening
+            or party_type.highest_offense_level_terminated
+        ):
+            return None
+        rows: list[CriminalRow] = [
+            {
+                "label": f"{count.get_status_display()} Count",
+                "name": count.name,
+                "disposition": count.disposition or none,
+            }
+            for count in counts
+        ] or [
+            {"label": "Pending Count", "name": none, "disposition": none},
+            {"label": "Terminated Count", "name": none, "disposition": none},
+        ]
+        rows += [
+            {
+                "label": "Complaint",
+                "name": complaint.name,
+                "disposition": complaint.disposition or none,
+            }
+            for complaint in complaints
+        ] or [{"label": "Complaint", "name": none, "disposition": none}]
+        return {
+            "rows": rows,
+            "highest_offense_level_opening": (
+                party_type.highest_offense_level_opening or none
+            ),
+            "highest_offense_level_terminated": (
+                party_type.highest_offense_level_terminated or none
+            ),
+        }
+
+    groups: dict[str, PartyGroup] = {}
+    for party_type in party_types:
+        party = party_type.party
+        item: PartyItem = {
+            "pk": party.pk,
+            "name": party.name,
+            "date_terminated": (
+                date_format(party_type.date_terminated)
+                if party_type.date_terminated
+                else ""
+            ),
+            "attorneys": attorneys(party),
+        }
+        if criminal := criminal_info(party_type):
+            item["criminal"] = criminal
+        group = groups.setdefault(
+            party_type.name, {"name": party_type.name, "parties": []}
+        )
+        group["parties"].append(item)
+    return list(groups.values())
 
 
 def build_docket_tabs(
