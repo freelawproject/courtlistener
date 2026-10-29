@@ -4893,6 +4893,54 @@ class DownloadPacerPdfAndSaveToPQTest(TestCase):
             pq.error_message, "Document not available from magic link."
         )
 
+    @mock.patch(
+        "cl.recap.tasks.download_pdf_by_magic_number",
+        # The free look was already used by the first attempt.
+        return_value=(None, "Document not available from magic link."),
+    )
+    def test_retry_prefers_pq_with_pdf_over_failed_pq(
+        self, mock_download
+    ) -> None:
+        """A retried task must reuse its own PQ that holds the PDF, not an
+        older failed one.
+
+        Two notifications processed at once can each create a PQ: one fails
+        without a magic number, the other stores the PDF. If the second task
+        is retried before its RD save commits, picking the failed PQ would
+        retry a free look that's already used up and mark the document as
+        sealed.
+        """
+        failed_pq = ProcessingQueue.objects.create(
+            uploader=self.user,
+            pacer_doc_id="045012335794",
+            pacer_case_id="291053",
+            court=self.court,
+            upload_type=UPLOAD_TYPE.PDF,
+            source=PROCESSING_QUEUE_SOURCE.EMAIL,
+            status=PROCESSING_STATUS.FAILED,
+            error_message="No magic number available to download the document.",
+        )
+        pq_with_pdf = ProcessingQueue.objects.create(
+            uploader=self.user,
+            pacer_doc_id="045012335794",
+            pacer_case_id="291053",
+            court=self.court,
+            upload_type=UPLOAD_TYPE.PDF,
+            source=PROCESSING_QUEUE_SOURCE.EMAIL,
+        )
+        pq_with_pdf.filepath_local.save(
+            "test.pdf", ContentFile(b"%PDF-1.4"), save=True
+        )
+        self.addCleanup(pq_with_pdf.filepath_local.delete, save=False)
+        self.assertLess(failed_pq.pk, pq_with_pdf.pk)
+
+        pq = self._download("37784612")
+
+        self.assertEqual(pq.pk, pq_with_pdf.pk)
+        mock_download.assert_not_called()
+        failed_pq.refresh_from_db()
+        self.assertEqual(failed_pq.status, PROCESSING_STATUS.FAILED)
+
     def test_duplicate_pqs_reuse_oldest(self) -> None:
         """Concurrent notifications can each create a PQ row. Lookups must
         reuse the oldest one instead of raising MultipleObjectsReturned."""

@@ -25,6 +25,7 @@ from django.core.exceptions import ValidationError
 from django.core.files.base import ContentFile, File
 from django.core.files.uploadedfile import SimpleUploadedFile
 from django.db import IntegrityError, transaction
+from django.db.models import Case, Value, When
 from django.db.models.fields.files import FieldFile
 from django.utils.timezone import now
 from juriscraper.lib.exceptions import PacerLoginException, ParsingException
@@ -3112,7 +3113,14 @@ def download_pacer_pdf_and_save_to_pq(
         # rows and can be processed at the same time. get_or_create isn't
         # safe here: without a unique constraint, concurrent tasks can each
         # create a row, and a later retry then fails with
-        # MultipleObjectsReturned. Instead, lock and reuse the oldest match.
+        # MultipleObjectsReturned. Instead, lock and reuse one match.
+        #
+        # Concurrent tasks can still each create a PQ, since
+        # select_for_update() only locks rows that already exist. So prefer
+        # a PQ that didn't fail: if a task is retried after storing the PDF
+        # in its own PQ, picking another notification's failed PQ would retry
+        # a free look that's already used up, mark the document as sealed,
+        # and never use the PDF we have.
         pq = (
             ProcessingQueue.objects.select_for_update()
             .filter(
@@ -3123,7 +3131,13 @@ def download_pacer_pdf_and_save_to_pq(
                 upload_type=UPLOAD_TYPE.PDF,
                 date_created__gt=cutoff_date,
             )
-            .order_by("pk")
+            .order_by(
+                Case(
+                    When(status=PROCESSING_STATUS.FAILED, then=Value(1)),
+                    default=Value(0),
+                ),
+                "pk",
+            )
             .first()
         )
         created = pq is None
