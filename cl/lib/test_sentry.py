@@ -111,14 +111,12 @@ class SentryClassifierTest(SimpleTestCase):
     def test_exception_fingerprint_attribute(self) -> None:
         """juriscraper sets sentry_fingerprint on the exception"""
 
+        class TaggedError(ValueError):
+            sentry_fingerprint = ["www.courts.example.gov", "bot-challenge"]
+            sentry_owner = "court-site"
+
         def raise_tagged() -> None:
-            exc = ValueError("blocked")
-            exc.sentry_fingerprint = [
-                "www.courts.example.gov",
-                "bot-challenge",
-            ]
-            exc.sentry_owner = "court-site"
-            raise exc
+            raise TaggedError("blocked")
 
         event = classify(raise_tagged, {"scrape_kind": "opinions"})
         self.assertEqual(
@@ -186,12 +184,14 @@ class SentryClassifierTest(SimpleTestCase):
     def test_classifier_failure_returns_the_event(self) -> None:
         """A bug in the hook must never drop an event"""
         event = {"extra": {}, "tags": {}}
+        # The test runner disables logging, so check the logger call directly
         with (
             mock.patch("cl.lib.sentry._classify", side_effect=RuntimeError),
-            self.assertLogs("cl.lib.sentry", level="WARNING"),
+            mock.patch("cl.lib.sentry.logger") as logger_mock,
         ):
             result = fingerprint_sentry_error(event, {})
         self.assertIs(result, event)
+        logger_mock.warning.assert_called_once()
 
 
 class ScraperTagsTest(SimpleTestCase):
@@ -202,6 +202,9 @@ class ScraperTagsTest(SimpleTestCase):
         async def read_tags() -> dict[str, str]:
             return dict(sentry_sdk.get_isolation_scope()._tags)
 
+        # Other tests may have tagged the process-wide scope already; the
+        # forked scope must not change it
+        before = dict(sentry_sdk.get_isolation_scope()._tags)
         with sentry_sdk.isolation_scope():
             set_scraper_tags("ky", "opinions")
             tags = async_to_sync(read_tags)()
@@ -209,4 +212,4 @@ class ScraperTagsTest(SimpleTestCase):
         self.assertEqual(tags["court_id"], "ky")
         self.assertEqual(tags["scrape_kind"], "opinions")
         self.assertEqual(tags["owner"], "juriscraper")
-        self.assertNotIn("court_id", sentry_sdk.get_isolation_scope()._tags)
+        self.assertEqual(dict(sentry_sdk.get_isolation_scope()._tags), before)
