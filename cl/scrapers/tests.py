@@ -9,6 +9,7 @@ from unittest.mock import MagicMock, patch
 
 import httpx
 import responses
+import sentry_sdk
 from asgiref.sync import async_to_sync, sync_to_async
 from django.conf import settings
 from django.contrib.auth.models import User
@@ -618,7 +619,7 @@ class IngestionTest(TestCase):
 
     def test_duplicate_ingestion_warnings(self) -> None:
         """Can we detect duplicate ingestion"""
-        with mock.patch.object(logger, "error") as error_mock:
+        with mock.patch("cl.scrapers.utils.logger.error") as error_mock:
             check_duplicate_ingestion("pdf/2025/06/05/state_v._walsh_1.pdf")
             error_mock.assert_not_called()
             check_duplicate_ingestion(
@@ -3261,4 +3262,52 @@ class AccountSubscriptionIncludeTest(TestCase):
         )
         self.assertEqual(
             self.subscription.last_subscription, date(2025, 3, 15)
+        )
+
+
+class ScrapeCommandSentryTest(TestCase):
+    """The scrape command reports each court failure with its tags"""
+
+    @classmethod
+    def setUpTestData(cls) -> None:
+        CourtFactory(id="test", has_opinion_scraper=True)
+
+    def test_failure_is_captured_with_court_tags_and_loop_continues(
+        self,
+    ) -> None:
+        captured: list[tuple[Exception, dict[str, str]]] = []
+
+        def capture(exc: Exception) -> None:
+            tags = sentry_sdk.get_isolation_scope()._tags
+            captured.append((exc, dict(tags)))
+
+        module = "cl.scrapers.test_assets.test_opinion_scraper"
+        with (
+            mock.patch(
+                "cl.scrapers.management.commands.cl_scrape_opinions.build_module_list",
+                return_value=[module, module],
+            ),
+            mock.patch(
+                "cl.scrapers.management.commands.cl_scrape_opinions.capture_exception",
+                side_effect=capture,
+            ),
+            mock.patch.object(
+                cl_scrape_opinions.Command,
+                "parse_and_scrape_site",
+                side_effect=ValueError("broken scraper"),
+            ),
+            mock.patch("time.sleep"),
+        ):
+            cl_scrape_opinions.Command().handle(
+                court_id=module, rate=1, daemon=False, full_crawl=False
+            )
+
+        self.assertEqual(len(captured), 2, "Both courts should be tried")
+        exc, tags = captured[0]
+        self.assertIsInstance(exc, ValueError)
+        self.assertEqual(tags["court_id"], "test")
+        self.assertEqual(tags["scrape_kind"], "opinions")
+        self.assertEqual(tags["owner"], "juriscraper")
+        self.assertEqual(
+            tags["scraper"], "cl.scrapers.test_assets.test_opinion_scraper"
         )

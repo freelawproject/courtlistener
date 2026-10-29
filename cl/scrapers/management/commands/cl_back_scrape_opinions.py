@@ -1,9 +1,9 @@
 import asyncio
 from types import ModuleType
 
-from juriscraper.AbstractSite import logger
 from juriscraper.lib.importer import site_yielder
 
+from cl.lib.command_utils import logger
 from cl.scrapers.management.commands import cl_scrape_opinions
 from cl.scrapers.utils import save_response
 
@@ -41,6 +41,8 @@ def add_backscraper_arguments(parser) -> None:
 
 
 class Command(cl_scrape_opinions.Command):
+    scrape_kind = "backscrape"
+
     def add_arguments(self, parser):
         super().add_arguments(parser)
         add_backscraper_arguments(parser)

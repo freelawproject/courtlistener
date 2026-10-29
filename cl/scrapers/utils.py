@@ -1,4 +1,5 @@
 import json
+import logging
 import re
 from datetime import date, datetime
 
@@ -9,7 +10,7 @@ from django.core.files.base import ContentFile
 from django.db.models import Q
 from eyecite.find import get_citations
 from eyecite.tokenizers import HyperscanTokenizer
-from juriscraper.AbstractSite import AbstractSite, logger
+from juriscraper.AbstractSite import AbstractSite
 from reporters_db import REPORTERS
 
 from cl.citations.utils import map_reporter_db_cite_type
@@ -29,6 +30,8 @@ from cl.search.models import (
 )
 
 HYPERSCAN_TOKENIZER = HyperscanTokenizer(cache_dir=".hyperscan")
+
+logger = logging.getLogger(__name__)
 
 
 def make_citation(

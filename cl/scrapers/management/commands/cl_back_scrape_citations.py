@@ -14,6 +14,7 @@ from django.db import IntegrityError
 from django.utils.encoding import force_bytes
 from juriscraper.AbstractSite import AbstractSite
 from juriscraper.lib.exceptions import BadContentError
+from sentry_sdk import capture_exception
 
 from cl import settings
 from cl.lib.command_utils import logger
@@ -67,7 +68,8 @@ class Command(cl_back_scrape_opinions.Command):
                 content = await site.download_content(
                     case["download_urls"], media_root=settings.MEDIA_ROOT
                 )
-            except BadContentError:
+            except BadContentError as e:
+                capture_exception(e)
                 continue
 
             sha1_hash = sha1(force_bytes(content))

@@ -110,6 +110,7 @@ def make_objects(
 class Command(cl_scrape_opinions.Command):
     scrape_target_descr = "oral arguments"
     juriscraper_module_type = "oral_args"
+    scrape_kind = "oral_args"
 
     async def ingest_a_case(
         self,

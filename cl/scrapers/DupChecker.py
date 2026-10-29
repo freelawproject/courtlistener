@@ -1,4 +1,4 @@
-from juriscraper.AbstractSite import logger
+import logging
 
 from cl.scrapers.exceptions import (
     ConsecutiveDuplicatesError,
@@ -6,6 +6,8 @@ from cl.scrapers.exceptions import (
 )
 from cl.scrapers.models import UrlHash
 from cl.search.models import Court
+
+logger = logging.getLogger(__name__)
 
 
 class DupChecker(dict):

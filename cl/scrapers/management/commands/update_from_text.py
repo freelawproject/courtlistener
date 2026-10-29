@@ -2,6 +2,7 @@ import traceback
 from datetime import datetime
 
 from django.db import transaction
+from sentry_sdk import capture_exception
 
 from cl.lib.command_utils import ScraperCommand, logger
 from cl.scrapers.tasks import (
@@ -51,8 +52,9 @@ def rerun_extract_from_text(
     with transaction.atomic():
         try:
             changes = update_document_from_text(opinion, juriscraper_module)
-        except:
+        except Exception as e:
             # Probably a bad implementation of `extract_from_text`
+            capture_exception(e)
             logger.debug(
                 "`update_document_from_text` failed for opinion %s. Traceback: %s",
                 opinion.id,

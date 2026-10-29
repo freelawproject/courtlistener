@@ -15,11 +15,12 @@ from juriscraper.AbstractSite import AbstractSite
 from juriscraper.lib.exceptions import BadContentError, InvalidDocumentError
 from juriscraper.lib.importer import build_module_list
 from juriscraper.lib.string_utils import CaseNameTweaker
-from sentry_sdk import capture_exception
+from sentry_sdk import capture_exception, isolation_scope
 
 from cl import settings
 from cl.lib.command_utils import ScraperCommand, logger
 from cl.lib.crypto import sha1
+from cl.lib.sentry import set_scraper_tags
 from cl.lib.string_utils import trunc
 from cl.scrapers.DupChecker import DupChecker
 from cl.scrapers.exceptions import (
@@ -235,6 +236,7 @@ class Command(ScraperCommand):
     help = "Runs the Juriscraper toolkit against one or many jurisdictions."
     juriscraper_module_type = "opinions"
     scrape_target_descr = "opinions"  # for logging purposes
+    scrape_kind = "opinions"  # Sentry tag, see cl.lib.sentry
 
     def __init__(self, stdout=None, stderr=None, no_color=False):
         super().__init__(stdout=None, stderr=None, no_color=False)
@@ -313,9 +315,10 @@ class Command(ScraperCommand):
                 break
             except SingleDuplicateError:
                 pass
-            except (BadContentError, InvalidDocumentError):
+            except (BadContentError, InvalidDocumentError) as e:
                 # do not update site hash to ensure a retry on the next scrape
                 update_site_hash = False
+                capture_exception(e)
 
         # Update the hash if everything finishes properly.
         logger.debug(
@@ -473,6 +476,25 @@ class Command(ScraperCommand):
             await site.parse()
             await self.scrape_court(site, options["full_crawl"])
 
+    def scrape_module(
+        self, module_string: str, court_id: str, options: dict
+    ) -> bool:
+        """Import one juriscraper module and scrape it
+
+        :param module_string: the full module path, e.g.
+            "juriscraper.opinions.united_states.state.ky"
+        :param court_id: the CourtListener court pk
+        :param options: the command options
+        :return: False when the court is disabled, True otherwise
+        """
+        package, module = module_string.rsplit(".", 1)
+        mod = __import__(f"{package}.{module}", globals(), locals(), [module])
+        if not Court.objects.get(id=court_id).has_opinion_scraper:
+            logger.info(f"{court_id} is currently disabled.")
+            return False
+        async_to_sync(self.parse_and_scrape_site)(mod, options)
+        return True
+
     def handle(self, *args, **options):
         super().handle(*args, **options)
         global die_now
@@ -495,24 +517,27 @@ class Command(ScraperCommand):
                 logger.info("The scraper has stopped.")
                 sys.exit(1)
 
-            package, module = module_strings[i].rsplit(".", 1)
-
-            mod = __import__(
-                f"{package}.{module}", globals(), locals(), [module]
-            )
-            module_string = mod.Site().court_id
+            module_string = module_strings[i]
             court_id = module_string.split(".")[-1].split("_")[0]
-            if not Court.objects.get(id=court_id).has_opinion_scraper:
-                logger.info(f"{court_id} is currently disabled.")
+            # One Sentry scope per court, so every event raised or logged
+            # while scraping it, by juriscraper too, says which court it was.
+            # The fingerprint is set in cl.lib.sentry, not here.
+            with isolation_scope() as scope:
+                scope.set_tag(
+                    "scraper", module_string.removeprefix("juriscraper.")
+                )
+                set_scraper_tags(court_id, self.scrape_kind)
+                try:
+                    enabled = self.scrape_module(
+                        module_string, court_id, options
+                    )
+                except Exception as e:
+                    capture_exception(e)
+                    logger.debug(traceback.format_exc())
+                    enabled = True
+            if not enabled:
                 i += 1
                 continue
-            try:
-                async_to_sync(self.parse_and_scrape_site)(mod, options)
-            except Exception as e:
-                capture_exception(
-                    e, fingerprint=[module_string, "{{ default }}"]
-                )
-                logger.debug(traceback.format_exc())
             last_court_in_list = i == (num_courts - 1)
             daemon_mode = options["daemon"]
             if last_court_in_list:
