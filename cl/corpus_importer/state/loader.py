@@ -99,7 +99,7 @@ def fingerprint(loader: str, phase: LoadPhase) -> dict[str, list[str]]:
     :param loader: The loader's registered name, such as `nycoa`.
     :param phase: Which phase went wrong.
     :return: The `extra` to log the error with. See
-        `cl.settings.third_party.sentry.fingerprint_sentry_error`.
+        `cl.lib.sentry.fingerprint_sentry_error`.
     """
     return {"fingerprint": [loader, phase.value]}
 
