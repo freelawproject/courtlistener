@@ -100,6 +100,7 @@ from cl.lib.pacer_session import (
     get_pacer_cookie_from_cache,
 )
 from cl.lib.recap_utils import get_document_filename
+from cl.lib.sentry import set_scraper_tags
 from cl.lib.storage import (
     RecapEmailSESStorage,
     SCOTUSSESStorage,
@@ -746,7 +747,7 @@ async def process_recap_docket(pk):
                     text,
                 )
     except Exception as e:
-        logging.exception(e)
+        logger.exception(e)
         await mark_pq_status(
             pq,
             f"We encountered a parsing error while processing this item: {e}",
@@ -1089,7 +1090,7 @@ async def process_recap_claims_register(pk):
                     text,
                 )
     except Exception as e:
-        logging.exception(e)
+        logger.exception(e)
         await mark_pq_status(
             pq,
             f"We encountered a parsing error while processing this item: {e}",
@@ -1193,7 +1194,7 @@ async def process_recap_docket_history_report(pk):
                     text,
                 )
     except Exception as e:
-        logging.exception(e)
+        logger.exception(e)
         await mark_pq_status(
             pq,
             f"We encountered a parsing error while processing this item: {e}",
@@ -1305,7 +1306,7 @@ async def process_case_query_page(pk):
                     text,
                 )
     except Exception as e:
-        logging.exception(e)
+        logger.exception(e)
         await mark_pq_status(
             pq,
             f"We encountered a parsing error while processing this item: {e}",
@@ -1431,7 +1432,7 @@ async def process_recap_appellate_docket(pk):
                     text,
                 )
     except Exception as e:
-        logging.exception(e)
+        logger.exception(e)
         await mark_pq_status(
             pq,
             f"We encountered a parsing error while processing this item: {e}",
@@ -1554,7 +1555,7 @@ async def process_recap_acms_docket(pk):
                     text,
                 )
     except Exception as e:
-        logging.exception(e)
+        logger.exception(e)
         await mark_pq_status(
             pq,
             f"We encountered a parsing error while processing this item: {e}",
@@ -1672,7 +1673,7 @@ async def process_recap_acms_appellate_attachment(
                     text,
                 )
     except Exception as e:
-        logging.exception(e)
+        logger.exception(e)
         await mark_pq_status(
             pq,
             f"We encountered a parsing error while processing this item: {e}",
@@ -2045,6 +2046,7 @@ def fetch_pacer_doc_by_rd_base(
 
     rd = RECAPDocument.objects.get(pk=rd_pk)
     fq = PacerFetchQueue.objects.get(pk=fq_pk)
+    set_scraper_tags(rd.docket_entry.docket.court_id, "pacer")
     pacer_doc_id = rd.pacer_doc_id
     # Check court connectivity, if fails retry the task, hopefully, it'll be
     # retried in a different not blocked node
@@ -2254,6 +2256,7 @@ def fetch_attachment_page(self: Task, fq_pk: int) -> list[tuple[int, bool]]:
         self.request.chain = None
         return []
     court_id = rd.docket_entry.docket.court_id
+    set_scraper_tags(court_id, "pacer")
     pacer_case_id = rd.docket_entry.docket.pacer_case_id
     pacer_doc_id = rd.pacer_doc_id
     # Check court connectivity, if fails retry the task, hopefully, it'll be
@@ -2679,6 +2682,7 @@ async def fetch_appellate_docket_base(
     """
     fq = await PacerFetchQueue.objects.select_related("docket").aget(pk=fq_pk)
     court_id = fq.court_id or getattr(fq.docket, "court_id", None)
+    set_scraper_tags(court_id, "pacer")
     if not court_id:
         await mark_fq_status(
             fq,
@@ -2795,6 +2799,7 @@ async def fetch_docket_base(
     """
     fq = await PacerFetchQueue.objects.select_related("docket").aget(pk=fq_pk)
     court_id = fq.court_id or getattr(fq.docket, "court_id", None)
+    set_scraper_tags(court_id, "pacer")
     if not court_id:
         await mark_fq_status(
             fq,
@@ -3516,6 +3521,7 @@ def process_recap_email(
         user_pk, settings.PACER_USERNAME, settings.PACER_PASSWORD
     )
     court_id = epq.court_id
+    set_scraper_tags(court_id, "email")
     appellate = data["appellate"]
     acms = data["acms"]
 
@@ -3829,6 +3835,7 @@ def process_texas_email(self: Task, epq_pk: int) -> None:
     :param epq_pk: The PK of the EmailProcessingQueue object to process
     """
     epq = EmailProcessingQueue.objects.get(pk=epq_pk)
+    set_scraper_tags(epq.court_id, "email")
 
     async_to_sync(mark_pq_status)(
         epq,
@@ -4034,6 +4041,7 @@ def process_scotus_email(self: Task, epq_pk: int) -> None:
     :param epq_pk: The PK of the EmailProcessingQueue object to process
     """
     epq = EmailProcessingQueue.objects.get(pk=epq_pk)
+    set_scraper_tags(epq.court_id, "email")
     async_to_sync(mark_pq_status)(
         epq,
         "Processing SCOTUS email",

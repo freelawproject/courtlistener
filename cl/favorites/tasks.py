@@ -12,6 +12,7 @@ from redis import ConnectionError as RedisConnectionError
 from cl.celery_init import app
 from cl.lib.pacer import map_cl_to_pacer_id
 from cl.lib.pacer_session import ProxyPacerSession, get_or_cache_pacer_cookies
+from cl.lib.sentry import set_scraper_tags
 from cl.search.models import RECAPDocument
 
 from .models import PrayerAvailability
@@ -44,6 +45,7 @@ async def check_prayer_pacer_base(rd_pk: int, user_pk: int) -> None:
     )
 
     court_id = map_cl_to_pacer_id(rd.docket_entry.docket.court_id)
+    set_scraper_tags(rd.docket_entry.docket.court_id, "pacer")
     pacer_doc_id = rd.pacer_doc_id
     recap_user = await User.objects.aget(username="recap")
     session_data = await get_or_cache_pacer_cookies(

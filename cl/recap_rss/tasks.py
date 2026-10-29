@@ -25,6 +25,7 @@ from cl.celery_init import app
 from cl.lib.crypto import sha256
 from cl.lib.pacer import map_cl_to_pacer_id
 from cl.lib.redis_utils import get_redis_interface
+from cl.lib.sentry import set_scraper_tags
 from cl.lib.types import EmailType
 from cl.recap.constants import COURT_TIMEZONES
 from cl.recap.mergers import (
@@ -206,6 +207,7 @@ async def check_if_feed_changed_base(
     :param date_last_built: The last time the court was scraped.
     """
     feed_status = await RssFeedStatus.objects.aget(pk=feed_status_pk)
+    set_scraper_tags(court_pk, "pacer")
     rss_feed = PacerRssFeed(map_cl_to_pacer_id(court_pk))
 
     try:

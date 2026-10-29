@@ -23,6 +23,7 @@ from juriscraper.state.BaseStateScraper import (
 )
 
 from cl.lib.command_utils import logger
+from cl.lib.sentry import set_scraper_tags
 from cl.lib.storage import (
     S3GlacierInstantRetrievalStorage,
     clobbering_get_name,
@@ -380,6 +381,7 @@ async def _process_batch(
             continue
 
         court_id = case.get("court_code") or "unknown_court"
+        set_scraper_tags(court_id, "state-docket")
         try:
             case_response = await case_request_manager.get(case_url)
             await sync_to_async(save_docket_response)(

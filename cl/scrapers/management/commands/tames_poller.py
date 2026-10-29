@@ -30,6 +30,7 @@ from cl.corpus_importer.tasks import (
 from cl.lib.command_utils import logger
 from cl.lib.exceptions import SubscriptionFailure
 from cl.lib.redis_utils import get_redis_interface
+from cl.lib.sentry import set_scraper_tags
 from cl.scrapers.management.commands.back_scrape_dockets import (
     RateLimitedRequestManager,
     save_docket_response,
@@ -392,6 +393,7 @@ class Command(StatePollCommand):
                     break
 
                 court_code = case.get("court_code", "")
+                set_scraper_tags(court_code, "state-docket")
                 try:
                     case_response = await case_request_manager.get(case_url)
                     bucket, base_key = await sync_to_async(

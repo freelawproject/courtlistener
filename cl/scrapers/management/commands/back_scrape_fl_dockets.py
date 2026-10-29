@@ -12,6 +12,7 @@ from juriscraper.state.florida.courts import FloridaCourtID
 
 from cl.lib.celery_utils import CeleryThrottle
 from cl.lib.command_utils import logger
+from cl.lib.sentry import set_scraper_tags
 from cl.scrapers.management.utils import (
     FL_COURT_ID_MAP,
     FLScrapeCommand,
@@ -60,6 +61,7 @@ async def _get_full_case(  # type: ignore[return]
                 "Failed to fetch full case data for %s: %s",
                 case_uuid,
                 e,
+                exc_info=e,
             )
             return None
         case (_, errors) if errors:
@@ -119,6 +121,7 @@ async def _backfill(
     try:
         async with scraper:
             for court_id, (start_date, end_date) in date_ranges.items():
+                set_scraper_tags(court_id.value, "state-docket")
                 i = 0
                 async for case in scraper.backfill(
                     start_date,

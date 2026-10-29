@@ -169,6 +169,7 @@ from cl.lib.recap_utils import (
     get_document_filename,
 )
 from cl.lib.redis_utils import delete_redis_semaphore, get_redis_interface
+from cl.lib.sentry import set_scraper_tags
 from cl.lib.storage import AWSMediaStorage, read_file_bytes
 from cl.lib.types import TaskData
 from cl.people_db.lookup_utils import (
@@ -458,6 +459,7 @@ async def get_and_save_free_document_report_base(
     read timeouts.
     :return: The status code of the scrape
     """
+    set_scraper_tags(map_pacer_to_cl_id(court_id), "pacer")
     msg = ""
     try:
         # Cancel fetching on its own event loop, not via a Celery signal in
@@ -601,6 +603,7 @@ def process_free_opinion_result(
         return None
 
     court = Court.objects.get(pk=map_pacer_to_cl_id(result.court_id))
+    set_scraper_tags(court.pk, "pacer")
     result.case_name = harmonize(result.case_name)
     # TODO: Come up with some way to do this that satisfies the type checker
     # pyrefly:ignore[missing-attribute]
@@ -750,6 +753,7 @@ def get_and_process_free_pdf(
         return None
     result = data["result"]
     rd = RECAPDocument.objects.get(pk=data["rd_pk"])
+    set_scraper_tags(map_pacer_to_cl_id(court_id), "pacer")
 
     if data.get("skip_pdf_download"):
         # We already have the PDF. The opinion import extracts its own text.
@@ -1424,6 +1428,7 @@ def make_docket_by_iquery_base(
     sweep itself.
     :return: None if failed, else the ID of the created/updated docket
     """
+    set_scraper_tags(court_id, "pacer")
 
     try:
         report_data, report_text = async_to_sync(query_case_query_report)(
