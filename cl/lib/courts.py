@@ -6,7 +6,7 @@ from django.core.cache import cache
 
 from cl.search.models import Court
 
-logger: logging.Logger = logging.getLogger(__name__)
+logger = logging.getLogger(__name__)
 
 
 def get_cache_key_for_court_list() -> str:

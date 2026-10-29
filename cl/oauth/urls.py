@@ -38,15 +38,10 @@ authorize_urlpattern = path(
     name="authorize",
 )
 
-introspect_urlpattern = path(
-    "introspect/", views.IntrospectTokenView.as_view(), name="introspect"
-)
-
-mcp_base_urlpatterns = [authorize_urlpattern, introspect_urlpattern] + [
+mcp_base_urlpatterns = [authorize_urlpattern] + [
     p
     for p in base_urlpatterns
-    if not (p.name or "").startswith("device")
-    and p.name not in ("authorize", "introspect")
+    if not (p.name or "").startswith("device") and p.name != "authorize"
 ]
 
 mcp_oidc_urlpatterns = [

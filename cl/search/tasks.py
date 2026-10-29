@@ -10,7 +10,7 @@ from datetime import UTC, date, datetime
 from importlib import import_module
 from pathlib import PurePosixPath
 from random import randint
-from typing import Any, Literal, NotRequired, TypedDict, cast
+from typing import Any
 
 from botocore import exceptions as botocore_exception
 from celery import Task
@@ -106,8 +106,10 @@ from cl.search.models import (
 )
 from cl.search.types import (
     ESDictDocument,
+    ESDocumentClassType,
+    ESDocumentInstanceType,
     ESDocumentNameType,
-    ESDocumentType,
+    ESModelClassType,
     ESModelType,
     EventTable,
     SaveESDocumentReturn,
@@ -162,9 +164,9 @@ def person_first_time_indexing(parent_id: int, position: Position) -> None:
         )
 
 
-def get_instance_from_db[ModelT: ESModelType](
-    instance_id: int, model: type[ModelT]
-) -> ModelT | None:
+def get_instance_from_db(
+    instance_id: int, model: ESModelClassType
+) -> ESModelType | None:
     """Get a model instance from DB or return None if it doesn't exist.
 
     :param instance_id: The primary key of the parent instance.
@@ -308,7 +310,7 @@ def es_save_document(
 
 
 def document_fields_to_update(
-    es_document: type[ESDocumentType],
+    es_document: ESDocumentClassType,
     main_instance: ESModelType,
     affected_fields: list[str],
     related_instance: ESModelType | None,
@@ -615,7 +617,7 @@ def update_es_document(
 
 
 def get_es_doc_id_and_parent_id(
-    es_document: type[ESDocumentType], instance: ESModelType
+    es_document: ESDocumentClassType, instance: ESModelType
 ) -> tuple[int | str, int | None]:
     """Retrieve the Elasticsearch document ID and parent ID for a given
      ES document type and DB instance.
@@ -642,10 +644,10 @@ def get_es_doc_id_and_parent_id(
     return doc_id, parent_id
 
 
-def get_doc_from_es[DocumentT: ESDocumentType](
-    es_document: type[DocumentT],
+def get_doc_from_es(
+    es_document: ESDocumentClassType,
     instance: ESModelType,
-) -> DocumentT | None:
+) -> ESDocumentInstanceType | None:
     """Get a document in Elasticsearch.
     :param es_document: The Elasticsearch document type.
     :param instance: The instance of the document to retrieve.
@@ -948,7 +950,7 @@ def index_docket_parties_in_es(
 
 def bulk_indexing_generator(
     docs_query_set: QuerySet,
-    es_document: type[ESDocumentType],
+    es_document: ESDocumentClassType,
     base_doc: dict[str, str],
     child_id_property: str | None = None,
     parent_id: int | None = None,
@@ -999,7 +1001,7 @@ def bulk_indexing_generator(
 
 def index_documents_in_bulk_from_queryset(
     docs_queryset: QuerySet,
-    es_document: type[ESDocumentType],
+    es_document: ESDocumentClassType,
     base_doc: dict[str, str],
     child_id_property: str | None = None,
     parent_instance_id: int | None = None,
@@ -1388,11 +1390,11 @@ def index_dockets_in_bulk(
         DocketDocument._index.refresh()
 
 
-def build_bulk_cites_doc[ModelT: ESModelType](
-    es_child_doc_class: type[ESDocumentType],
+def build_bulk_cites_doc(
+    es_child_doc_class: ESDocumentClassType,
     child_id: int,
-    child_doc_model: type[ModelT],
-) -> tuple[ESDictDocument, ModelT | None]:
+    child_doc_model: ESModelClassType,
+) -> tuple[ESDictDocument, ESModelType | None]:
     """Builds a bulk document for updating cites field in an ES document.
 
     :param es_child_doc_class: The ES child document class to update.
@@ -1407,11 +1409,11 @@ def build_bulk_cites_doc[ModelT: ESModelType](
     if not child_instance:
         return {}, None
 
-    match child_instance:
-        case RECAPDocument():
+    match child_doc_model.__name__:
+        case "RECAPDocument":
             parent_document_id = child_instance.docket_entry.docket.pk
             child_id_property = "RECAP"
-        case Opinion():
+        case "Opinion":
             parent_document_id = child_instance.cluster.pk
             child_id_property = "OPINION"
         case _:
@@ -1438,7 +1440,7 @@ def build_bulk_cites_doc[ModelT: ESModelType](
 
 
 def percolate_document(
-    es_doc_class: type[ESDocumentType], document_id: int, instance: ESModelType
+    es_doc_class: ESDocumentClassType, document_id: int, instance: ESModelType
 ) -> None:
     """Percolate a document by preparing it and sending it for alert matching.
 
@@ -1460,17 +1462,7 @@ def percolate_document(
     ).apply_async()
 
 
-class _CiteCountUpdateDict(TypedDict):
-    _id: int | str
-    _op_type: Literal["update"]
-    _index: str
-    _routing: NotRequired[int]
-    doc: dict
-
-
-def build_cite_count_update(
-    cluster_ids_to_update: list[int],
-) -> list[_CiteCountUpdateDict]:
+def build_cite_count_update(cluster_ids_to_update: list[int]) -> list[dict]:
     """Create update documents for OpinionClusterDocument.citeCount
 
     :param cluster_ids_to_update: the cluster ids to update
@@ -1487,7 +1479,10 @@ def build_cite_count_update(
     )
 
     documents_to_update = []
-    _index = OpinionClusterDocument._index._name
+    base_doc = {
+        "_op_type": "update",
+        "_index": OpinionClusterDocument._index._name,
+    }
     for cluster in clusters_with_sub_opinions:
         if not OpinionClusterDocument.exists(id=cluster.pk):
             # If the OpinionClusterDocument does not exist, it might
@@ -1500,12 +1495,11 @@ def build_cite_count_update(
             )
 
         # Build the OpinionCluster dicts for updating the citeCount.
-        doc_to_update: _CiteCountUpdateDict = {
+        doc_to_update = {
             "_id": cluster.pk,
             "doc": {"citeCount": cluster.citation_count},
-            "_op_type": "update",
-            "_index": _index,
         }
+        doc_to_update.update(base_doc)
         documents_to_update.append(doc_to_update)
 
         for opinion in cluster.sub_opinions.all():
@@ -1525,10 +1519,9 @@ def build_cite_count_update(
             doc_to_update = {
                 "_id": ES_CHILD_ID(opinion.pk).OPINION,
                 "_routing": cluster.pk,
-                "_op_type": "update",
-                "_index": _index,
                 "doc": {"citeCount": cluster.citation_count},
             }
+            doc_to_update.update(base_doc)
             documents_to_update.append(doc_to_update)
 
     return documents_to_update
@@ -1578,7 +1571,7 @@ def index_related_cites_fields(
                 "_index": OpinionClusterDocument._index._name,
             }
             documents_to_update.extend(
-                build_cite_count_update(cluster_ids_to_update or [])
+                build_cite_count_update(cluster_ids_to_update)
             )
 
             # Finally build the Opinion dict for updating the cites.
@@ -1608,7 +1601,7 @@ def index_related_cites_fields(
     if not documents_to_update:
         return
 
-    index_documents_in_bulk(cast(list[dict[str, Any]], documents_to_update))
+    index_documents_in_bulk(documents_to_update)
 
     if settings.ELASTICSEARCH_DSL_AUTO_REFRESH:
         # Set auto-refresh, used for testing.
@@ -1741,7 +1734,7 @@ def remove_documents_by_query(
     :return: The ES request response, or None for unsupported removal actions.
     """
 
-    optional_params: dict[str, str | int] = {}
+    optional_params = {}
     es_document = getattr(es_document_module, es_document_name)
     s = es_document.search()
     match es_document_name:
@@ -2127,8 +2120,8 @@ def index_embeddings(
         "_index": OpinionClusterDocument._index._name,
     }
     documents_to_update = []
-    for embeddings_item in embeddings:
-        opinion_id = embeddings_item["id"]
+    for embeddings in embeddings:
+        opinion_id = embeddings["id"]
         opinion_instance = (
             Opinion.objects.filter(id=opinion_id)
             .only("pk", "cluster", "main_version")
@@ -2142,7 +2135,7 @@ def index_embeddings(
             "_id": ES_CHILD_ID(opinion_id).OPINION,
             "_routing": opinion_instance.cluster_id,
             "doc": {
-                "embeddings": embeddings_item["embeddings"],
+                "embeddings": embeddings["embeddings"],
                 "timestamp": datetime.now(UTC),
             },
         }

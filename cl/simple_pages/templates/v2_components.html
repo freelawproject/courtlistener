@@ -12,7 +12,7 @@
         {'href': '#code-block', 'text': 'Code blocks'},
         {'href': '#two-column-list', 'text': 'Two column list'},
         {'href': '#eyebrow', 'text': 'Eyebrow'},
-        {'href': '#feature-card', 'text': 'Feature Card'},
+        {'href': '#banner', 'text': 'Banner'},
         {'href': '#copy', 'text': 'Copy to clipboard'},
         {'href': '#description-list', 'text': 'Description list'},
       ]},
@@ -29,13 +29,11 @@
         {'href': '#menu-button', 'text': 'Menu button'},
         {'href': '#pagination', 'text': 'Pagination'},
         {'href': '#filter-drawer', 'text': 'Filter drawer'},
-        {'href': '#banner', 'text': 'Banner'},
       ]},
       {'href': '#page-shells', 'text': 'Page shells', 'children': [
         {'href': '#docket-page', 'text': 'Docket page'},
         {'href': '#docket-source-button', 'text': 'Docket source button'},
         {'href': '#docket-source-attribution', 'text': 'Docket source attribution'},
-        {'href': '#docket-alert-label', 'text': 'Docket alert label'},
         {'href': '#docket-entry-rows', 'text': 'Docket entry rows'},
         {'href': '#document-source-link', 'text': 'Document source link'},
         {'href': '#docket-filter', 'text': 'Docket filter'},
@@ -202,11 +200,11 @@ Sample code here.
     </c-expansion-panel>
   </section>
 
-  {# FEATURE CARD #}
-  <section class="max-w-full w-full border-t-2 border-greyscale-200" x-intersect.margin.-100px="show" id="feature-card">
-    <h2 class="mt-6 mb-3">Feature Card</h2>
+  {# BANNER #}
+  <section class="max-w-full w-full border-t-2 border-greyscale-200" x-intersect.margin.-100px="show" id="banner">
+    <h2 class="mt-6 mb-3">Banner</h2>
     <h4 class="mt-3">Demo</h4>
-    <c-feature-card
+    <c-banner
       size="basis-1/2"
       eyebrow_text="RECAP Suite"
       title_text="Turning PACER Around Since 2009"
@@ -233,12 +231,12 @@ Sample code here.
         ]"
         image_source="{%  static 'png/recap_search_container.png' %}"
         image_alt=""
-    ></c-feature-card>
+    ></c-banner>
 
     <c-library.list title="Props" only>
       <c-library.item only>
         <c-slot name="label"><code>size</code></c-slot>
-        <c-slot name="description">Tailwind style determining fraction of feature card space to use</c-slot>
+        <c-slot name="description">Tailwind style determining fraction of banner space to use</c-slot>
       </c-library.item>
       <c-library.item only>
         <c-slot name="label"><code>eyebrow_text</code></c-slot>
@@ -272,7 +270,7 @@ Sample code here.
 
     <c-expansion-panel title="Code">
       <c-code>
-&lt;c-feature-card
+&lt;c-banner
       size="basis-1/2"
       eyebrow_text="RECAP Suite"
       title_text="Turning PACER Around Since 2009"
@@ -300,7 +298,7 @@ Sample code here.
         image_source="{%  static 'png/recap_search_container.png' %}"
         image_alt=""
       &gt;
-    &lt;/c-feature-card>
+    &lt;/c-banner>
       </c-code>
     </c-expansion-panel>
   </section>
@@ -462,13 +460,13 @@ Sample code here.
 
     <c-expansion-panel title="Code">
       <c-code>
-{% templatetag opencomment %} Single column (default) {% templatetag closecomment %}
+{# Single column (default) #}
 &lt;c-description-list&gt;
   &lt;c-description-term&gt;Term&lt;/c-description-term&gt;
   &lt;c-description-details&gt;Description.&lt;/c-description-details&gt;
 &lt;/c-description-list&gt;
 
-{% templatetag opencomment %} Responsive multi-column grid: 1 col mobile, 2 tablet, 4 desktop {% templatetag closecomment %}
+{# Responsive multi-column grid: 1 col mobile, 2 tablet, 4 desktop #}
 &lt;c-description-list class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4"&gt;
   &lt;c-description-item&gt;
     &lt;c-description-term&gt;Term&lt;/c-description-term&gt;
@@ -480,7 +478,7 @@ Sample code here.
   &lt;/c-description-item&gt;
 &lt;/c-description-list&gt;
 
-{% templatetag opencomment %} With class overrides {% templatetag closecomment %}
+{# With class overrides #}
 &lt;c-description-list class="grid grid-cols-1 md:grid-cols-2 gap-4"&gt;
   &lt;c-description-item&gt;
     &lt;c-description-term class="text-primary-600"&gt;Styled term&lt;/c-description-term&gt;
@@ -937,7 +935,7 @@ Sample code here.
       <c-library.item only>
         <c-slot name="label"><code>c-flex-table</code>: <code>columns</code></c-slot>
         <c-slot name="description">
-          List of headers.<br>Each element in the list is a dictionary with <code>label</code> (shown in the table headers) and <code>field</code> (used to identify the column). An optional <code>title</code> is rendered as the header's tooltip.
+          List of headers.<br>Each element in the list is a dictionary with <code>label</code> (shown in the table headers) and <code>field</code> (used to identify the column).
         </c-slot>
       </c-library.item>
 
@@ -1030,7 +1028,7 @@ Sample code here.
   {# DIALOG #}
   <c-layout-with-navigation.section class="border-t-2 border-greyscale-200" id="dialog">
     <h2 class="mt-6 mb-3">Dialog</h2>
-    <p>Renders a button that opens a dialog with an overlay. This component uses named slots. Undeclared attributes are passed to the root element, e.g. an <code>x-on</code> listener that calls <code>open</code> for a dialog without a trigger.</p>
+    <p>Renders a button that opens a dialog with an overlay. This component uses named slots.</p>
     <h4 class="mt-3">Demo</h4>
     <c-dialog panel_class="p-5 banner max-w-70" dialog_class="items-center z-20">
       <c-slot name="button_content">Click me!</c-slot>
@@ -1054,13 +1052,9 @@ Sample code here.
     </c-library.list>
 
     <c-library.list title="Slots" only>
-      <c-library.item optional only>
+      <c-library.item only>
         <c-slot name="label"><code>button_content</code></c-slot>
-        <c-slot name="description">Content added inside the default trigger button.</c-slot>
-      </c-library.item>
-      <c-library.item optional only>
-        <c-slot name="label"><code>trigger_button</code></c-slot>
-        <c-slot name="description">A complete trigger element that replaces the default button. Prefer wrapping its content in <code>&lt;c-dialog.trigger-button&gt;</code>, which already opens the dialog and carries its ARIA attributes. A hand-built trigger must call <code>open</code> on click and should set <code>aria-haspopup="dialog"</code>, <code>aria-controls="dialogId"</code>, and <code>aria-expanded="isOpen"</code>. Takes precedence over <code>button_content</code>. When neither slot is given, no trigger is rendered and the dialog must be opened by some other means, such as an <code>x-on</code> listener calling <code>open</code>.</c-slot>
+        <c-slot name="description">Content added inside the trigger button slot.</c-slot>
       </c-library.item>
       <c-library.item only>
         <c-slot name="label"><code>panel</code></c-slot>
@@ -1144,13 +1138,11 @@ Sample code here.
       <c-button variant="dark">Dark</c-button>
       <c-button variant="ghost">Ghost</c-button>
       <c-button variant="grey">Grey</c-button>
-      <c-button variant="blue">Blue</c-button>
       <c-button class="rounded-full px-4 py-2 text-sm font-medium bg-purple-100 text-purple-700 hover:bg-purple-200 focus-visible:ring-4 focus-visible:ring-purple-300">Custom</c-button>
     </div>
 
     <h4 class="mt-3">Sizes</h4>
     <div class="flex flex-wrap gap-3 items-center">
-      <c-button variant="primary" size="sm">SM (30px)</c-button>
       <c-button variant="primary">Default (40px)</c-button>
       <c-button variant="primary" size="xl">XL (48px)</c-button>
     </div>
@@ -1159,7 +1151,6 @@ Sample code here.
     <div class="flex flex-wrap gap-3 items-center">
       <c-button variant="primary" href="#">Primary link</c-button>
       <c-button variant="outline" href="#">Outline link</c-button>
-      <c-button variant="blue" href="#">Blue link</c-button>
     </div>
 
     <h4 class="mt-3">Disabled states</h4>
@@ -1174,7 +1165,6 @@ Sample code here.
       <c-button variant="dark" disabled>Dark</c-button>
       <c-button variant="ghost" disabled>Ghost</c-button>
       <c-button variant="grey" disabled>Grey</c-button>
-      <c-button variant="blue" disabled>Blue</c-button>
     </div>
 
     <h5 class="mt-3">Links with <code>aria-disabled="true"</code></h5>
@@ -1184,17 +1174,16 @@ Sample code here.
       <c-button variant="dark" href="#" aria-disabled="true">Dark link</c-button>
       <c-button variant="ghost" href="#" aria-disabled="true">Ghost link</c-button>
       <c-button variant="grey" href="#" aria-disabled="true">Grey link</c-button>
-      <c-button variant="blue" href="#" aria-disabled="true">Blue link</c-button>
     </div>
 
     <c-library.list title="Props" only>
       <c-library.item optional only>
         <c-slot name="label"><code>variant</code></c-slot>
-        <c-slot name="description">Visual style. Options: <code>primary</code>, <code>outline</code>, <code>dark</code>, <code>ghost</code>, <code>grey</code>, <code>blue</code>. When omitted, no built-in styling is applied.</c-slot>
+        <c-slot name="description">Visual style. Options: <code>primary</code>, <code>outline</code>, <code>dark</code>, <code>ghost</code>, <code>grey</code>. When omitted, no built-in styling is applied.</c-slot>
       </c-library.item>
       <c-library.item optional only>
         <c-slot name="label"><code>size</code></c-slot>
-        <c-slot name="description">Button size. Default is 40px height. Set to <code>sm</code> for 30px, for secondary controls such as admin links, or <code>xl</code> for 48px. Only applies when <code>variant</code> is set.</c-slot>
+        <c-slot name="description">Button size. Default is 40px height. Set to <code>xl</code> for 48px. Only applies when <code>variant</code> is set.</c-slot>
       </c-library.item>
       <c-library.item optional only>
         <c-slot name="label"><code>href</code></c-slot>
@@ -1230,13 +1219,11 @@ Sample code here.
   &lt;c-button variant="dark"&gt;Dark&lt;/c-button&gt;
   &lt;c-button variant="ghost"&gt;Ghost&lt;/c-button&gt;
   &lt;c-button variant="grey"&gt;Grey&lt;/c-button&gt;
-  &lt;c-button variant="blue"&gt;Blue&lt;/c-button&gt;
   &lt;c-button class="rounded-full px-4 py-2 text-sm font-medium bg-purple-100 text-purple-700 hover:bg-purple-200 focus-visible:ring-4 focus-visible:ring-purple-300"&gt;Custom&lt;/c-button&gt;
 &lt;/div&gt;
 
 &lt;h4&gt;Sizes&lt;/h4&gt;
 &lt;div class="flex flex-wrap gap-3 items-center"&gt;
-  &lt;c-button variant="primary" size="sm"&gt;SM (30px)&lt;/c-button&gt;
   &lt;c-button variant="primary"&gt;Default (40px)&lt;/c-button&gt;
   &lt;c-button variant="primary" size="xl"&gt;XL (48px)&lt;/c-button&gt;
 &lt;/div&gt;
@@ -1256,7 +1243,6 @@ Sample code here.
   &lt;c-button variant="dark" disabled&gt;Dark&lt;/c-button&gt;
   &lt;c-button variant="ghost" disabled&gt;Ghost&lt;/c-button&gt;
   &lt;c-button variant="grey" disabled&gt;Grey&lt;/c-button&gt;
-  &lt;c-button variant="blue" disabled&gt;Blue&lt;/c-button&gt;
 &lt;/div&gt;
 
 &lt;h5&gt;Links with aria-disabled="true"&lt;/h5&gt;
@@ -1320,7 +1306,7 @@ Sample code here.
       </c-library.item>
       <c-library.item optional only>
         <c-slot name="label"><code>trigger_aria_label</code></c-slot>
-        <c-slot name="description">Accessible name of the trigger button. Leave it out when the button's visible content already is the name: an <code>aria-label</code> replaces the content for assistive technology.</c-slot>
+        <c-slot name="description">Aria label for the trigger button.</c-slot>
       </c-library.item>
       <c-library.item optional only>
         <c-slot name="label"><code>menu_aria_label</code></c-slot>
@@ -1357,14 +1343,12 @@ Sample code here.
   {# PAGINATION #}
   <section class="max-w-full w-full border-t-2 border-greyscale-200" x-intersect.margin.-100px="show" id="pagination">
     <h2 class="mt-6 mb-3">Pagination</h2>
-    <p>Reusable pagination controls with configurable button visibility. Accepts a Django page object and renders first/previous/next/last navigation with an optional page indicator and item range. All buttons are responsive — labels hide on smaller screens, with <code>title</code> attributes for hover labels.</p>
+    <p>Reusable pagination controls with configurable button visibility. Accepts a Django page object and renders first/previous/next/last navigation with a page indicator. All buttons are responsive — labels hide on smaller screens, with <code>title</code> attributes for hover labels.</p>
 
     <h4 class="mt-3">Demo</h4>
     <div class="my-4 rounded-lg border border-greyscale-200 p-4">
-      <p class="text-sm text-greyscale-600 mb-2">Full pagination (all buttons, page indicator and item range):</p>
-      <c-pagination :page_obj="demo_page_obj" show_first show_previous show_page_indicator show_range show_next show_last />
-      <p class="text-sm text-greyscale-600 mb-2 mt-4">Item range only:</p>
-      <c-pagination :page_obj="demo_page_obj" show_previous show_range show_next />
+      <p class="text-sm text-greyscale-600 mb-2">Full pagination (all buttons):</p>
+      <c-pagination :page_obj="demo_page_obj" show_first show_previous show_page_indicator show_next show_last />
       <p class="text-sm text-greyscale-600 mb-2 mt-4">Prev/Next only:</p>
       <c-pagination :page_obj="demo_page_obj" show_previous show_next />
     </div>
@@ -1372,7 +1356,11 @@ Sample code here.
     <c-library.list title="Props" only>
       <c-library.item only>
         <c-slot name="label"><code>:page_obj</code></c-slot>
-        <c-slot name="description">Django paginator page object (required). Provides <code>number</code>, <code>has_previous</code>, <code>has_next</code>, <code>start_index</code>, <code>end_index</code>, <code>paginator.num_pages</code>, <code>paginator.count</code>.</c-slot>
+        <c-slot name="description">Django paginator page object (required). Provides <code>number</code>, <code>has_previous</code>, <code>has_next</code>, <code>paginator.num_pages</code>.</c-slot>
+      </c-library.item>
+      <c-library.item optional only>
+        <c-slot name="label"><code>base_url</code></c-slot>
+        <c-slot name="description">Base URL for page links. Defaults to current path.</c-slot>
       </c-library.item>
       <c-library.item optional only>
         <c-slot name="label"><code>show_first</code></c-slot>
@@ -1385,10 +1373,6 @@ Sample code here.
       <c-library.item optional only>
         <c-slot name="label"><code>show_page_indicator</code></c-slot>
         <c-slot name="description">Show the "Page X of Y" text. Default: off.</c-slot>
-      </c-library.item>
-      <c-library.item optional only>
-        <c-slot name="label"><code>show_range</code></c-slot>
-        <c-slot name="description">Show the "1–100 of 327" item range, from the page object's <code>start_index</code>, <code>end_index</code> and <code>paginator.count</code> (so it stays correct when the paginator uses <code>orphans</code>). Rendered after the page indicator when both are on. Default: off.</c-slot>
       </c-library.item>
       <c-library.item optional only>
         <c-slot name="label"><code>show_next</code></c-slot>
@@ -1412,7 +1396,6 @@ Sample code here.
   show_first
   show_previous
   show_page_indicator
-  show_range
   show_next
   show_last
 /&gt;
@@ -1482,87 +1465,6 @@ Sample code here.
     </c-expansion-panel>
   </section>
 
-  {# BANNER #}
-  <section class="max-w-full w-full border-t-2 border-greyscale-200" x-intersect.margin.-100px="show" id="banner">
-    <h2 class="mt-6 mb-3">Banner</h2>
-    <p>A banner element that allows to display highlighted information; it can be dismissed and hidden for a period of time. It currently supports two styles: info (default) and warning.</p>
-
-    <h4 class="mt-3">Demo</h4>
-      {% if "banner_dismissed_demo-card" not in request.COOKIES %}
-        <c-banner variant="info" banner_id="demo-card" is_dismissible dismiss_days=10 icon="info" href="https://free.law/" link_text="Go to Case">
-          <p>It looks like you're trying to search for <strong>Miranda v. Arizona,</strong> from 1966.</p>
-        </c-banner>
-      {% else %}
-        <div class="bg-gray-300 border border-gray-800 p-4 rounded-lg">
-          You already dismissed the dismissible demo banner! To restore it, clear the cookie <code>banner_dismissed_demo-card</code> in your browser's Dev Tools and reload the page.
-        </div>
-      {% endif %}
-    <c-banner variant="info">
-      The results below were contributed to the RECAP Archive by users of the RECAP Extension. If you use PACER, please install RECAP.
-      <c-button href="https://free.law/" class="font-bold underline">Learn more.</c-button>
-    </c-banner>
-    <c-banner variant="warning" icon="magnifier" href="https://free.law/" link_text="Go to Case">
-      <p>It looks like you're trying to search for <strong>Miranda v. Arizona,</strong> from 1966.</p>
-    </c-banner>
-
-    <c-library.list title="Props" only>
-      <c-library.item optional only>
-        <c-slot name="label"><code>request</code></c-slot>
-        <c-slot name="description">The current request, used to read the dismissal cookie and to load the component's script. Defaults to the page's request.</c-slot>
-      </c-library.item>
-      <c-library.item optional only>
-        <c-slot name="label"><code>variant</code></c-slot>
-        <c-slot name="description">Type of banner, visually speaking. the default is "info" for blue banners and "warning" for red banners.</c-slot>
-      </c-library.item>
-      <c-library.item optional only>
-        <c-slot name="label"><code>banner_id</code></c-slot>
-        <c-slot name="description">ID used to name the dismissal cookie. Required if the dismiss functionality is going to be used; use this value to control the banner's visibility.</c-slot>
-      </c-library.item>
-      <c-library.item optional only>
-        <c-slot name="label"><code>is_dismissible</code></c-slot>
-        <c-slot name="description">In combination with <code>banner_id</code>, allows the banner to be dismissed.</c-slot>
-      </c-library.item>
-      <c-library.item optional only>
-        <c-slot name="label"><code>dismiss_days</code></c-slot>
-        <c-slot name="description">Duration of banner being hidden - <strong>The dismiss default duration at the moment is 10 days.</strong></c-slot>
-      </c-library.item>
-      <c-library.item optional only>
-        <c-slot name="label"><code>icon</code></c-slot>
-        <c-slot name="description">Customizable icon for the banner.</c-slot>
-      </c-library.item>
-      <c-library.item optional only>
-        <c-slot name="label"><code>href</code></c-slot>
-        <c-slot name="description">Banner link.</c-slot>
-      </c-library.item>
-      <c-library.item optional only>
-        <c-slot name="label"><code>link_text</code></c-slot>
-        <c-slot name="description">Banner link text.</c-slot>
-      </c-library.item>
-    </c-library.list>
-
-    <c-library.list title="Slots" only>
-      <c-library.item only>
-        <c-slot name="label">Default</c-slot>
-        <c-slot name="description">Banner Content — rendered inside the banner.</c-slot>
-      </c-library.item>
-    </c-library.list>
-
-    <c-expansion-panel title="Code">
-      <c-code>
-        &lt;c-banner
-          variant="info"
-          banner_id="demo-card"
-          is_dismissible
-          dismiss_days=10
-          icon="info"
-          href="https://free.law/"
-          link_text="Go to Case"&gt;
-          &lt;p&gt;It looks like you're trying to search for &lt;strong&gt;Miranda v. Arizona,&lt;/strong&gt; from 1966.&lt;/p&gt;
-        &lt;/c-banner&gt;
-      </c-code>
-    </c-expansion-panel>
-  </section>
-
   {# DOCKET PAGE SHELL #}
   <section class="max-w-full w-full border-t-2 border-greyscale-200" x-intersect.margin.-100px="show" id="docket-page">
     <h2 class="mt-6 mb-3">Docket page</h2>
@@ -1587,7 +1489,7 @@ Sample code here.
       </c-library.item>
       <c-library.item only>
         <c-slot name="label"><code>tabs</code></c-slot>
-        <c-slot name="description">List of <code>{label, url, key, icon}</code> dicts for the tab nav, as built by <code>build_docket_tabs</code>. <code>icon</code> names an SVG in <code>cl/assets/static-global/svg/</code>, rendered before the label on desktop and skipped in the mobile dropdown. If only one tab is provided, the nav is hidden.</c-slot>
+        <c-slot name="description">List of <code>{label, url, key}</code> dicts for the tab nav. If only one tab is provided, the nav is hidden.</c-slot>
       </c-library.item>
       <c-library.item only>
         <c-slot name="label"><code>has_alert</code></c-slot>
@@ -1630,7 +1532,7 @@ Sample code here.
   {# DOCKET SOURCE BUTTON #}
   <section class="max-w-full w-full border-t-2 border-greyscale-200" x-intersect.margin.-100px="show" id="docket-source-button">
     <h2 class="mt-6 mb-3">Docket source button</h2>
-    <p>The control that sends a reader to this docket on the site it came from — "View on PACER" for a RECAP docket, "View in SCOTUS" for a SCOTUS one. It dispatches to <code>cotton/docket_source_button/&lt;component&gt;.html</code>, where <code>component</code> comes from <code>DocketEntrySource</code>, so <code>&lt;c-docket-page&gt;</code> stays source-agnostic. Plain-text per-source copy is a field on <code>DocketEntrySource</code>, while copy that needs markup lives in dispatch folders like this one. Adding a source means adding one file to that folder. Its per-document counterpart is <code>&lt;c-document-source-link&gt;</code>, and the sentence naming the source is <code>&lt;c-docket-source-attribution&gt;</code>.</p>
+    <p>The control that sends a reader to this docket on the site it came from — "View on PACER" for a RECAP docket, "View in SCOTUS" for a SCOTUS one. It dispatches to <code>cotton/docket_source_button/&lt;component&gt;.html</code>, where <code>component</code> comes from <code>DocketEntrySource</code>, so <code>&lt;c-docket-page&gt;</code> stays source-agnostic and <code>DocketEntrySource</code> never carries user-facing strings. Adding a source means adding one file to that folder. Its per-document counterpart is <code>&lt;c-document-source-link&gt;</code>, and the sentence naming the source is <code>&lt;c-docket-source-attribution&gt;</code>.</p>
 
     <h4 class="mt-3">Demo</h4>
     <p class="text-sm text-greyscale-600 mb-2">A RECAP docket at a district court, so the menu shows the district-only reports as well as the docket report. An appellate docket shows the docket report alone.</p>
@@ -1691,39 +1593,6 @@ Sample code here.
     </c-expansion-panel>
   </section>
 
-  {# DOCKET ALERT LABEL #}
-  <section class="max-w-full w-full border-t-2 border-greyscale-200" x-intersect.margin.-100px="show" id="docket-alert-label">
-    <h2 class="mt-6 mb-3">Docket alert label</h2>
-    <p>The icon and text of the docket alert toggle for one state. The docket page renders it in the alerts menu trigger and item, and the toggle response renders it again into both, so the four copies cannot drift.</p>
-
-    <h4 class="mt-3">Demo</h4>
-    <div class="my-4 flex flex-row gap-6 rounded-lg border border-greyscale-200 p-4 text-sm">
-      <span class="flex items-center gap-1"><c-docket-alert-label :has_alert="False" /></span>
-      <span class="flex items-center gap-1"><c-docket-alert-label :has_alert="True" icon_class="w-4 h-4 text-greyscale-500" /></span>
-    </div>
-
-    <c-library.list title="Props" only>
-      <c-library.item only>
-        <c-slot name="label"><code>:has_alert</code></c-slot>
-        <c-slot name="description">Whether the user is subscribed to the docket. Picks the bell or slashed bell and the matching text.</c-slot>
-      </c-library.item>
-      <c-library.item optional only>
-        <c-slot name="label"><code>icon_class</code></c-slot>
-        <c-slot name="description">CSS classes for the icon. Defaults to <code>w-4 h-4</code>.</c-slot>
-      </c-library.item>
-    </c-library.list>
-
-    <c-library.list title="Slots" only>
-      <p>No slots</p>
-    </c-library.list>
-
-    <c-expansion-panel title="Code">
-      <c-code>
-&lt;c-docket-alert-label :has_alert="has_alert" icon_class="w-4 h-4 text-greyscale-500" /&gt;
-      </c-code>
-    </c-expansion-panel>
-  </section>
-
   {# DOCKET ENTRY ROWS #}
   <section class="max-w-full w-full border-t-2 border-greyscale-200" x-intersect.margin.-100px="show" id="docket-entry-rows">
     <h2 class="mt-6 mb-3">Docket entry rows</h2>
@@ -1742,11 +1611,7 @@ Sample code here.
       </c-library.item>
       <c-library.item only>
         <c-slot name="label"><code>:docket_source</code></c-slot>
-        <c-slot name="description">The <code>DocketEntrySource</code> the view put in the context. Supplies <code>has_pay_and_pray</code> and <code>empty_message</code> here, and is forwarded to the nested <code>&lt;c-document-source-link&gt;</code> for its <code>component</code>.</c-slot>
-      </c-library.item>
-      <c-library.item only>
-        <c-slot name="label"><code>:filters_applied</code></c-slot>
-        <c-slot name="description">Bool — whether the request carried any filter or search param (<code>DocketEntryFilterForm.has_filters()</code>). Picks the empty state: "No docket entries match your filters." when true, the source's own "no entries yet" sentence, <code>docket_source.empty_message</code>, when false.</c-slot>
+        <c-slot name="description">The <code>DocketEntrySource</code> the view put in the context. Supplies <code>has_pay_and_pray</code> here and is forwarded to the nested <code>&lt;c-document-source-link&gt;</code> for its <code>component</code>.</c-slot>
       </c-library.item>
     </c-library.list>
 
@@ -1756,11 +1621,7 @@ Sample code here.
 
     <c-expansion-panel title="Code">
       <c-code>
-&lt;c-docket-entry-rows
-  :docket_entries="docket_entries"
-  :docket_source="docket_source"
-  :filters_applied="filters_applied"
-/&gt;
+&lt;c-docket-entry-rows :docket_entries="docket_entries" :docket_source="docket_source" /&gt;
       </c-code>
     </c-expansion-panel>
   </section>
@@ -1768,7 +1629,7 @@ Sample code here.
   {# DOCUMENT SOURCE LINK #}
   <section class="max-w-full w-full border-t-2 border-greyscale-200" x-intersect.margin.-100px="show" id="document-source-link">
     <h2 class="mt-6 mb-3">Document source link</h2>
-    <p>Links a document back to the site it came from, in that site's own wording — "Buy on PACER" for a RECAP docket, "View on SCOTUS" for a SCOTUS one. It dispatches to <code>cotton/document_source_link/&lt;component&gt;.html</code>, where <code>component</code> comes from <code>DocketEntrySource</code>, so <code>&lt;c-docket-entry-rows&gt;</code> stays source-agnostic. Plain-text per-source copy is a field on <code>DocketEntrySource</code>, while copy that needs markup lives in dispatch folders like this one. Adding a source means adding one file to that folder. Renders nothing when the document has no external URL, so callers don't have to guard it.</p>
+    <p>Links a document back to the site it came from, in that site's own wording — "Buy on PACER" for a RECAP docket, "View on SCOTUS" for a SCOTUS one. It dispatches to <code>cotton/document_source_link/&lt;component&gt;.html</code>, where <code>component</code> comes from <code>DocketEntrySource</code>, so <code>&lt;c-docket-entry-rows&gt;</code> stays source-agnostic and <code>DocketEntrySource</code> never carries user-facing strings. Adding a source means adding one file to that folder. Renders nothing when the document has no external URL, so callers don't have to guard it.</p>
 
     <h4 class="mt-3">Demo</h4>
     <p class="text-sm text-greyscale-600 mb-2">A RECAP document we don't host, so the price suffix shows. The <code>menu_item</code> variant is not shown here because it only renders inside a <code>&lt;c-menu-button&gt;</code> menu.</p>
@@ -1809,12 +1670,12 @@ Sample code here.
   <section class="max-w-full w-full border-t-2 border-greyscale-200" x-intersect.margin.-100px="show" id="docket-filter">
     <h2 class="mt-6 mb-3">Docket filter</h2>
     <p>Page-specific filter toolbar for docket entries. Includes search, date range (Flatpickr), document number range, sort toggle, and prev/next navigation. On mobile, filter fields move into a <code>&lt;c-filter-drawer&gt;</code> with an "Apply" button.</p>
-    <p>The search box is its own GET form to the RECAP search page, separate from the filters. The docket scope travels in a hidden <code>q</code> seeded with <code>docket_id:N</code>, and the visible input is unnamed, so the scope is never shown and clearing the box can't widen the search. On submit, <code>docket_filter.js</code> merges the typed terms into the hidden <code>q</code> as <code>(terms) AND docket_id:N</code>. An empty box, or a browser without JavaScript, submits the term-less docket search.</p>
 
     <h4 class="mt-3">Demo</h4>
     <p class="text-sm text-greyscale-600 mb-2">Desktop toolbar shown below. Resize below <code>md</code> breakpoint (768px) to see the mobile layout with search, prev/next, and filter drawer trigger.</p>
     <c-docket-filter
       :docket="demo_docket"
+      :docket_source="docket_source"
       :form="demo_filter_form"
       :page_obj="demo_page_obj"
     />
@@ -1823,6 +1684,10 @@ Sample code here.
       <c-library.item only>
         <c-slot name="label"><code>:docket</code></c-slot>
         <c-slot name="description">The Docket model instance (required).</c-slot>
+      </c-library.item>
+      <c-library.item only>
+        <c-slot name="label"><code>:docket_source</code></c-slot>
+        <c-slot name="description">The <code>DocketEntrySource</code> from the view context, forwarded to the nested <code>&lt;c-docket-source-attribution&gt;</code> that renders the source-attribution sentence below the toolbar.</c-slot>
       </c-library.item>
       <c-library.item only>
         <c-slot name="label"><code>:form</code></c-slot>
@@ -1836,50 +1701,26 @@ Sample code here.
         <c-slot name="label"><code>:sort_order_asc</code></c-slot>
         <c-slot name="description">Bool — whether ascending sort is active. Default: <code>True</code>.</c-slot>
       </c-library.item>
+      <c-library.item optional only>
+        <c-slot name="label"><code>htmx_target</code></c-slot>
+        <c-slot name="description">CSS selector for the htmx swap target. When set, the form uses htmx instead of full page navigation.</c-slot>
+      </c-library.item>
     </c-library.list>
 
     <c-library.list title="Slots" only>
       <p>No slots</p>
     </c-library.list>
 
-    <c-library.list title="Sub-components">
-      <c-library.item only>
-        <c-slot name="label"><code>c-docket-filter.search-form</code></c-slot>
-        <c-slot name="description">The "Search this docket" form described above, rendered once per layout. Must sit inside the <code>docketFilter</code> root, which supplies the submit handler and the scope.</c-slot>
-      </c-library.item>
-    </c-library.list>
-
-    <c-library.list title="c-docket-filter.search-form props" only>
-      <c-library.item only>
-        <c-slot name="label"><code>:docket</code></c-slot>
-        <c-slot name="description">The docket whose <code>pk</code> seeds the hidden <code>q</code>.</c-slot>
-      </c-library.item>
-      <c-library.item only>
-        <c-slot name="label"><code>input_id</code></c-slot>
-        <c-slot name="description">Id of the search input, unique per layout so each label points at its own field.</c-slot>
-      </c-library.item>
-      <c-library.item optional only>
-        <c-slot name="label"><code>class</code></c-slot>
-        <c-slot name="description">CSS classes forwarded to the <code>&lt;form&gt;</code>.</c-slot>
-      </c-library.item>
-    </c-library.list>
-
     <c-expansion-panel title="Code">
       <c-code>
-{% templatetag opencomment %} In the page template: the whole filter bar {% templatetag closecomment %}
 &lt;c-docket-filter
   :docket="docket"
+  :docket_source="docket_source"
   :form="form"
   :page_obj="docket_entries"
   :sort_order_asc="sort_order_asc"
+  htmx_target="#docket-entries"
 /&gt;
-
-{% templatetag opencomment %} Inside cotton/docket_filter/index.html: one search form per layout, within the docketFilter root that supplies the scope and the submit handler {% templatetag closecomment %}
-&lt;div x-data="docketFilter" data-docket-scope="docket_id:{% templatetag openvariable %} docket.pk {% templatetag closevariable %}"&gt;
-  &lt;c-docket-filter.search-form :docket="docket" input_id="de-search-desktop" class="flex-1 max-w-xs" /&gt;
-  ...
-  &lt;c-docket-filter.search-form :docket="docket" input_id="de-search-mobile" class="flex-1" /&gt;
-&lt;/div&gt;
       </c-code>
     </c-expansion-panel>
   </section>
@@ -1890,7 +1731,7 @@ Sample code here.
     <p>Renders an optional <code>&lt;h2&gt;</code> heading followed by a <code>c-description-list</code> built from a list of item dicts. <code>c-docket-page</code> renders one per entry in its <code>metadata_sections</code> prop, which is how a docket's source adds sections of its own.</p>
 
     <h4 class="mt-3">Demo</h4>
-    <p class="text-sm text-greyscale-600 mb-2">One item of each shape: plain, linked out, carrying a suffix link after the value, and copyable with a single click.</p>
+    <p class="text-sm text-greyscale-600 mb-2">One item of each shape: plain, linked out, and carrying a suffix link after the value.</p>
     <div class="my-4 rounded-lg border border-greyscale-200 p-4">
       <c-metadata-section
         :items="demo_metadata_items"
@@ -1902,7 +1743,7 @@ Sample code here.
     <c-library.list title="Props" only>
       <c-library.item only>
         <c-slot name="label"><code>items</code></c-slot>
-        <c-slot name="description">List of dicts with at least <code>label</code> and <code>value</code>. Optional keys: <code>url</code>, <code>nofollow</code>, <code>is_external</code>, <code>aria_label</code>, <code>suffix_text</code>, <code>suffix_url</code>, <code>suffix_nofollow</code>, <code>suffix_is_external</code>, <code>suffix_aria_label</code>, <code>one_click_select</code> (a single click selects the whole value for copying). The section renders nothing if <code>items</code> is empty.</c-slot>
+        <c-slot name="description">List of dicts with at least <code>label</code> and <code>value</code>. Optional keys: <code>url</code>, <code>nofollow</code>, <code>is_external</code>, <code>aria_label</code>, <code>suffix_text</code>, <code>suffix_url</code>, <code>suffix_nofollow</code>, <code>suffix_is_external</code>, <code>suffix_aria_label</code>. The section renders nothing if <code>items</code> is empty.</c-slot>
       </c-library.item>
       <c-library.item only>
         <c-slot name="label"><code>title</code></c-slot>

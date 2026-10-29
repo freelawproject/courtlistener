@@ -60,7 +60,6 @@ This PR...
 <summary><h4>Mobile</h4></summary>
 <!-- YOUR IMAGE(S) HERE -->
 </details>
-</details>
 <!-- END DELETE -->
 
 ## AI Disclosure

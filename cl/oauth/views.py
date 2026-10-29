@@ -11,19 +11,15 @@ discovery, JWKS). They add:
   discover our endpoints.
 """
 
-import json
 import uuid
 from typing import Any
 
 from django.conf import settings
-from django.contrib.auth.models import User
-from django.http import JsonResponse
 from django.urls import reverse
 from django.utils import timezone
 from django.utils.decorators import method_decorator
 from django_ratelimit.decorators import ratelimit
 from django_ratelimit.exceptions import Ratelimited
-from oauth2_provider import views as oauth2_views
 from oauth2_provider.models import get_application_model
 from rest_framework import status
 from rest_framework.request import Request
@@ -38,7 +34,6 @@ from cl.oauth.api_serializers import (
     DynamicClientRegistrationSerializer,
     first_error_description,
 )
-from cl.oauth.validators import CourtListenerOAuth2Validator
 
 Application = get_application_model()
 
@@ -70,12 +65,12 @@ class DynamicClientRegistrationView(APIView):
     """RFC 7591 Dynamic Client Registration endpoint.
 
     Open registration: anyone on the internet may POST to this
-    endpoint to create an OAuth client. The MCP server registers its
-    own clients now; this stays open for clients that still hold its
-    address from before the cutover. The resulting client is useless
-    until a real user completes the authorization-code flow and grants
-    consent, so the abuse surface is DB pollution, which the tight
-    per-IP rate limit bounds.
+    endpoint to create an OAuth client. This is required by the MCP
+    authorization spec so that clients the server has never seen
+    before can self-register. The resulting client is useless until a
+    real user completes the authorization-code flow and grants
+    consent, so the abuse surface is DB pollution, which we bound
+    with a per-IP rate limit.
     """
 
     authentication_classes: list[Any] = []
@@ -121,7 +116,6 @@ class DynamicClientRegistrationView(APIView):
             redirect_uris=" ".join(data["redirect_uris"]),
             algorithm=Application.RS256_ALGORITHM,
             skip_authorization=False,
-            registration_source=Application.RegistrationSource.DCR,
         )
         # Capture the plaintext BEFORE save() hashes it in place.
         client_secret_plaintext = app.client_secret
@@ -140,28 +134,6 @@ class DynamicClientRegistrationView(APIView):
             response_data["client_secret"] = client_secret_plaintext
             response_data["client_secret_expires_at"] = 0
         return Response(response_data, status=status.HTTP_201_CREATED)
-
-
-class IntrospectTokenView(oauth2_views.IntrospectTokenView):
-    """RFC 7662 introspection with the optional ``sub`` field.
-
-    Resource servers that link accounts by OIDC ``sub`` need it here too,
-    and the toolkit only returns ``username``.
-    """
-
-    @staticmethod
-    def get_token_response(token_value: str | None = None) -> JsonResponse:
-        response = oauth2_views.IntrospectTokenView.get_token_response(
-            token_value
-        )
-        data = json.loads(response.content)
-        if not data.get("active") or "username" not in data:
-            return response
-        pk = User.objects.values_list("pk", flat=True).get(
-            username=data["username"]
-        )
-        data["sub"] = str(pk)
-        return JsonResponse(data)
 
 
 class OAuthMetadataView(APIView):
@@ -183,15 +155,9 @@ class OAuthMetadataView(APIView):
 
     def get(self, request: Request) -> Response:
         base = request.build_absolute_uri("/").rstrip("/")
-        oidc_enabled = settings.OAUTH2_PROVIDER.get("OIDC_ENABLED")
-        # Discovery serves dynamically registered clients, so advertise
-        # only the scopes they are allowed to request.
-        scopes_supported = [
-            scope
-            for scope in settings.OAUTH2_PROVIDER["SCOPES"]
-            if scope in CourtListenerOAuth2Validator.DCR_SCOPES
-            and (oidc_enabled or scope not in settings.OIDC_SCOPES)
-        ]
+        scopes_supported = ["api"]
+        if settings.OAUTH2_PROVIDER.get("OIDC_ENABLED"):
+            scopes_supported.append("openid")
         return Response(
             {
                 "issuer": base,
@@ -212,11 +178,6 @@ class OAuthMetadataView(APIView):
                     ALLOWED_TOKEN_AUTH_METHODS
                 ),
                 "code_challenge_methods_supported": ["S256"],
-                "authorization_response_iss_parameter_supported": bool(
-                    settings.OAUTH2_PROVIDER.get(
-                        "COMPLIANT_BCP_RFC9700_AUTHZ_RESPONSE_ISS"
-                    )
-                ),
                 "scopes_supported": scopes_supported,
                 "service_documentation": f"{settings.WIKI_API_BASE_URL}/rest/v4/overview",
             }

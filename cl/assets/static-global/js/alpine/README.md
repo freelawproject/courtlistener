@@ -7,7 +7,7 @@ This directory contains both Alpine upstream code (core + plugins) and our custo
 | `alpinejscsp.*`         | Upstream ⚠️ | Alpine core (CSP build).                                              |
 | `plugins/*`             | Upstream ⚠️ | Official Alpine plugins.                                              |
 | `components/*`          | Ours        | Our custom Alpine components. Each corresponds to a Cotton component. |
-| `composables/*`         | Ours        | Our reusable Alpine logic, not tied to a particular component, and site-wide page scripts that `new_base.html` loads on every page. |
+| `composables/*`         | Ours        | Our reusable Alpine logic, not tied to a particular component.        |
 
 ## Upstream sources
 

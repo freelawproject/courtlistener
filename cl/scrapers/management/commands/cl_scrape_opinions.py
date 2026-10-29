@@ -3,7 +3,6 @@ import sys
 import time
 import traceback
 from datetime import date
-from types import ModuleType
 from typing import Any
 
 from asgiref.sync import async_to_sync, sync_to_async
@@ -21,6 +20,7 @@ from cl import settings
 from cl.lib.command_utils import ScraperCommand, logger
 from cl.lib.crypto import sha1
 from cl.lib.string_utils import trunc
+from cl.people_db.lookup_utils import lookup_judges_by_messy_str
 from cl.scrapers.DupChecker import DupChecker
 from cl.scrapers.exceptions import (
     ConsecutiveDuplicatesError,
@@ -31,7 +31,6 @@ from cl.scrapers.utils import (
     check_duplicate_ingestion,
     get_child_court,
     get_extension,
-    link_judges,
     make_citation,
     save_response,
     signal_handler,
@@ -53,7 +52,7 @@ die_now = False
 cnt = CaseNameTweaker()
 
 
-def set_ordering_keys(opinions_content: list[tuple[dict, bytes, str]]) -> None:
+def set_ordering_keys(opinions_content: list[tuple[dict]]) -> None:
     """Set a value for Opinion.ordering_key
 
     To know the relative order inside the cluster, we must know all the
@@ -173,7 +172,6 @@ def make_objects(
             url = ""
 
         opinion = Opinion(
-            cluster=cluster,
             type=opinion_metadata.get("types", Opinion.COMBINED),
             sha1=sha1_hash,
             download_url=url,
@@ -193,6 +191,7 @@ def make_objects(
         cf = ContentFile(force_bytes(content))
         extension = get_extension(content)
         file_name = trunc(item["case_names"].lower(), 75) + extension
+        opinion.file_with_date = cluster.date_filed
         opinion.local_path.save(file_name, cf, save=False)
         check_duplicate_ingestion(opinion.local_path.name)
 
@@ -225,8 +224,29 @@ def save_everything(
         citation.cluster_id = cluster.pk
         citation.save()
 
-    link_judges(cluster, opinions)
+    if cluster.judges:
+        candidate_judges = async_to_sync(lookup_judges_by_messy_str)(
+            cluster.judges, docket.court.pk, cluster.date_filed
+        )
+
+        if (
+            len(candidate_judges) == 1
+            and len(opinions) == 1
+            and not opinions[0].author_str
+        ):
+            opinions[0].author = candidate_judges[0]
+        elif len(candidate_judges) > 1:
+            for candidate in candidate_judges:
+                cluster.panel.add(candidate)
+
     for opinion in opinions:
+        if opinion.author_str:
+            candidate = async_to_sync(lookup_judges_by_messy_str)(
+                opinion.author_str, docket.court.pk, cluster.date_filed
+            )
+            if len(candidate) == 1:
+                opinion.author = candidate[0]
+
         opinion.cluster = cluster
         opinion.save()
 
@@ -344,7 +364,7 @@ class Command(ScraperCommand):
         opinions_content = []
         opinions_to_download = []
 
-        # this field is populated when using cl_back_scrape_citations
+        # this field is populated when usign cl_back_scrape_citations
         if case_dict.get("content"):
             content = case_dict.pop("content")
             opinions_content.append(
@@ -465,13 +485,9 @@ class Command(ScraperCommand):
                 item["case_names"].encode(),
             )
 
-    async def parse_and_scrape_site(
-        self, mod: ModuleType, options: dict[str, Any]
-    ) -> None:
-        """Parse and scrape a court, closing its HTTP client on every exit."""
-        async with mod.Site(save_response_fn=save_response) as site:
-            await site.parse()
-            await self.scrape_court(site, options["full_crawl"])
+    async def parse_and_scrape_site(self, mod, options: dict):
+        site = await mod.Site(save_response_fn=save_response).parse()
+        await self.scrape_court(site, options["full_crawl"])
 
     def handle(self, *args, **options):
         super().handle(*args, **options)

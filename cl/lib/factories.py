@@ -1,9 +1,6 @@
 import copy
-from typing import Any
 
 from factory import RelatedFactoryList
-from factory.builder import BuildStep
-from factory.declarations import PostGenerationContext
 
 
 class RelatedFactoryVariableList(RelatedFactoryList):
@@ -46,9 +43,7 @@ class RelatedFactoryVariableList(RelatedFactoryList):
 
     """
 
-    def call(
-        self, instance: Any, step: BuildStep, context: PostGenerationContext
-    ) -> list[Any]:
+    def call(self, instance, step, context):
         size = context.extra.pop("size", None)
         data = context.extra.pop("data", [])
         if size and data:

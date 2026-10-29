@@ -1,89 +1,38 @@
-import contextlib
 import functools
 import hashlib
-import ipaddress
 import socket
 import sys
-from collections.abc import Callable, Coroutine, Sequence
-from inspect import iscoroutinefunction
-from typing import Any, Protocol, cast
 
-from asgiref.sync import sync_to_async
 from django.conf import settings
 from django.core.cache import BaseCache, caches
-from django.http import HttpRequest, HttpResponse, HttpResponseBase
-from django_ratelimit import ALL, UNSAFE
-from django_ratelimit.core import get_header, is_ratelimited
+from django.http import HttpRequest
+from django_ratelimit import UNSAFE
+from django_ratelimit.core import get_header
 from django_ratelimit.decorators import ratelimit
 from django_ratelimit.exceptions import Ratelimited
 from redis import ConnectionError
 
-from cl.lib.types import DjangoViewDecorator, DjangoViewType
 
-type RatelimitKey = Callable[[str, HttpRequest], str] | str
-type RatelimitMethod = str | Sequence[str | None]
+def get_user_ip_from_cloudfront_headers(request: HttpRequest) -> str:
+    """Make a good key to use for caching the request's IP
 
+    CloudFront provides a header that returns the user's IP and port. Weirdly,
+    the port seems to be random, so we need to strip it to make the user's IP
+    a consistent key.
 
-class RatelimitDecorator(Protocol):
-    """A rate-limiting view decorator that preserves the view's signature."""
+    So we go from something like:
 
-    def __call__[
-        **P,
-        Request: HttpRequest,
-        Response: HttpResponseBase | Coroutine[Any, Any, HttpResponseBase],
-    ](
-        self, view: DjangoViewType[P, Request, Response]
-    ) -> DjangoViewType[P, Request, Response]: ...
+        96.23.39.106:51396
 
+    To:
 
-def get_viewer_ip(request: HttpRequest) -> str:
-    """Get the viewer's exact IP address from CloudFront's header.
-
-    CloudFront sends "IP:port", where the port seems to be random, so it is
-    stripped: 96.23.39.106:51396 becomes 96.23.39.106. Use this when you need
-    the address itself, as crawler verification does. To count requests, use
-    get_ratelimit_ident instead.
+        96.23.39.106
 
     :param request: The HTTP request from the user
-    :return: The address, normalized, with an IPv4-mapped IPv6 address
-        unwrapped to plain IPv4. The empty string when CloudFront didn't send
-        the header, as in local development, or sent something that isn't an
-        address.
+    :return: A simple key that can be used to throttle the user if needed.
     """
     header = get_header(request, "CloudFront-Viewer-Address")
-    if not header:
-        return ""
-
-    # The port is split off the right because an IPv6 address is itself
-    # colon-separated: CloudFront sends it unbracketed, as in
-    # 2600:1f18::1234:51396. Brackets are stripped just in case.
-    address = header.rsplit(":", 1)[0].strip("[]")
-    try:
-        ip = ipaddress.ip_address(address)
-    except ValueError:
-        return ""
-
-    if isinstance(ip, ipaddress.IPv6Address) and ip.ipv4_mapped:
-        ip = ip.ipv4_mapped
-    return str(ip)
-
-
-def get_ratelimit_ident(request: HttpRequest) -> str:
-    """Get the key to count the viewer's requests under.
-
-    This is the viewer's address, except that an IPv6 address is widened to
-    its /64, the smallest block a client is normally assigned. Otherwise a
-    client could rotate through the addresses in its block to dodge a limit.
-
-    :param request: The HTTP request from the user
-    :return: The key, or the empty string when there's no viewer address, as
-        in local development, where callers need their own fallback.
-    """
-    if not (ip := get_viewer_ip(request)):
-        return ""
-    if ipaddress.ip_address(ip).version == 4:
-        return ip
-    return str(ipaddress.ip_network(f"{ip}/64", strict=False).network_address)
+    return header.split(":")[0]
 
 
 def get_ip_for_ratelimiter(group: str, request: HttpRequest) -> str:
@@ -93,7 +42,7 @@ def get_ip_for_ratelimiter(group: str, request: HttpRequest) -> str:
     :param request: The HTTP request from the user
     :return: A simple key that can be used to throttle the user if needed.
     """
-    return get_ratelimit_ident(request)
+    return get_user_ip_from_cloudfront_headers(request)
 
 
 def get_path_to_make_key(group: str, request: HttpRequest) -> str:
@@ -107,116 +56,49 @@ def get_path_to_make_key(group: str, request: HttpRequest) -> str:
     return request.path
 
 
-def make_ratelimiter[
-    **P,
-    Request: HttpRequest,
-    Response: HttpResponseBase | Coroutine[Any, Any, HttpResponseBase],
-](
-    *,
-    key: RatelimitKey,
-    rate: str | None,
-    method: RatelimitMethod = ALL,
-) -> DjangoViewDecorator[P, Request, Response]:
-    """Build a rate-limiting decorator that works on sync and async views.
-
-    django-ratelimit's own decorator is sync-only. Wrapped around an async
-    view it hands Django a coroutine that nothing awaits, and the request dies
-    with "didn't return an HttpResponse object" instead of being throttled, so
-    MUST NOT be used directly on an async view. Sync views get that decorator
-    unchanged here; async views get an async wrapper around it.
-
-    The counting deliberately runs through django-ratelimit's sync path in a
-    worker thread rather than through Django's async cache API. Every Django
-    cache backend inherits ``BaseCache.aincr``, which is a read-modify-write
-    -- RedisCache does not override it -- so concurrent requests lose
-    increments and the limit doesn't hold. The sync path gets Redis's atomic
-    INCR.
-
-    A throttled request raises ``Ratelimited``, which RatelimitMiddleware
-    turns into the 429 page. Unlike django-ratelimit's decorator, the async
-    path here ignores the ``RATELIMIT_EXCEPTION_CLASS`` setting, which we
-    don't set.
-
-    :param key: What to count by, as django-ratelimit's ``key`` argument: our
-        key functions take (group, request) and return the string to count.
-    :param rate: A django-ratelimit rate, like "10/m".
-    :param method: Which HTTP methods to count. Defaults to all of them.
-    :return: A decorator to apply to a view.
-    """
-    sync_decorator = ratelimit(key=key, rate=rate, method=method)
-
-    def decorator(
-        view: DjangoViewType[P, Request, Response],
-    ) -> DjangoViewType[P, Request, Response]:
-        if not iscoroutinefunction(view):
-            return sync_decorator(view)
-
-        @functools.wraps(view)
-        async def wrapper(
-            request: Request, *args: P.args, **kwargs: P.kwargs
-        ) -> Response:
-            # thread_sensitive=False: this only touches the cache, so it has
-            # no reason to hold the main thread, where it would serialize
-            # every throttled view behind one Redis round trip at a time.
-            limited = await sync_to_async(
-                is_ratelimited, thread_sensitive=False
-            )(
-                request=request,
-                group=None,
-                fn=view,
-                key=key,
-                rate=rate,
-                method=method,
-                increment=True,
-            )
-            # setattr because django-ratelimit hangs this on the request
-            # too, and HttpRequest has no such attribute to assign to.
-            setattr(  # noqa: B010
-                request,
-                "limited",
-                limited or getattr(request, "limited", False),
-            )
-            if limited:
-                raise Ratelimited
-            return await view(request, *args, **kwargs)
-
-        return cast(DjangoViewType[P, Request, Response], wrapper)
-
-    return decorator
-
-
-ratelimiter_all_1000_per_h: RatelimitDecorator = make_ratelimiter(
+ratelimiter_all_250_per_h = ratelimit(
     key=get_ip_for_ratelimiter,
-    rate="1000/h" if "test" not in sys.argv else None,
+    rate="250/h",
 )
-ratelimiter_all_2_per_m: RatelimitDecorator = make_ratelimiter(
-    key=get_ip_for_ratelimiter,
-    rate="2/m" if "test" not in sys.argv else None,
-)
-ratelimiter_unsafe_3_per_m: RatelimitDecorator = make_ratelimiter(
-    key=get_ip_for_ratelimiter,
-    rate="3/m" if "test" not in sys.argv else None,
-    method=UNSAFE,
-)
-ratelimiter_unsafe_5_per_d: RatelimitDecorator = make_ratelimiter(
-    key=get_ip_for_ratelimiter,
-    rate="5/d" if "test" not in sys.argv else None,
-    method=UNSAFE,
-)
-ratelimiter_unsafe_10_per_m: RatelimitDecorator = make_ratelimiter(
-    key=get_ip_for_ratelimiter,
-    rate="10/m" if "test" not in sys.argv else None,
-    method=UNSAFE,
-)
-ratelimiter_all_10_per_h: RatelimitDecorator = make_ratelimiter(
-    key=get_path_to_make_key,
-    rate="10/h" if "test" not in sys.argv else None,
-)
-ratelimiter_unsafe_2000_per_h: RatelimitDecorator = make_ratelimiter(
-    key=get_path_to_make_key,
-    rate="2000/h" if "test" not in sys.argv else None,
-    method=UNSAFE,
-)
+# Decorators can't easily be mocked, and we need to not trigger this decorator
+# during tests or else the first test works and the rest are blocked. So,
+# check if we're doing a test and adjust the decorator accordingly.
+if "test" in sys.argv:
+    ratelimiter_all_2_per_m = lambda func: func
+    ratelimiter_unsafe_3_per_m = lambda func: func
+    ratelimiter_unsafe_5_per_d = lambda func: func
+    ratelimiter_unsafe_10_per_m = lambda func: func
+    ratelimiter_all_10_per_h = lambda func: func
+    ratelimiter_unsafe_2000_per_h = lambda func: func
+else:
+    ratelimiter_all_2_per_m = ratelimit(
+        key=get_ip_for_ratelimiter,
+        rate="2/m",
+    )
+    ratelimiter_unsafe_3_per_m = ratelimit(
+        key=get_ip_for_ratelimiter,
+        rate="3/m",
+        method=UNSAFE,
+    )
+    ratelimiter_unsafe_5_per_d = ratelimit(
+        key=get_ip_for_ratelimiter,
+        rate="5/d",
+        method=UNSAFE,
+    )
+    ratelimiter_unsafe_10_per_m = ratelimit(
+        key=get_ip_for_ratelimiter,
+        rate="10/m",
+        method=UNSAFE,
+    )
+    ratelimiter_all_10_per_h = ratelimit(
+        key=get_path_to_make_key,
+        rate="10/h",
+    )
+    ratelimiter_unsafe_2000_per_h = ratelimit(
+        key=get_path_to_make_key,
+        rate="2000/h",
+        method=UNSAFE,
+    )
 
 # See: https://www.bing.com/webmaster/help/how-to-verify-bingbot-3905dc26
 # and: https://support.google.com/webmasters/answer/80553?hl=en
@@ -228,58 +110,21 @@ APPROVED_DOMAINS = [
 ]
 
 
-def ratelimit_deny_list[
-    **P,
-    Request: HttpRequest,
-    Response: HttpResponse | Coroutine[Any, Any, HttpResponse],
-](
-    view: DjangoViewType[P, Request, Response],
-) -> DjangoViewType[P, Request, Response]:
+def ratelimit_deny_list(view):
     """A wrapper for the ratelimit function that adds an allowlist for approved
     crawlers.
-
-    Works on sync and async views alike. The allowlist check does a pair of
-    DNS lookups, so on an async view it runs in a worker thread rather than on
-    the event loop.
     """
-    ratelimited_view = ratelimiter_all_1000_per_h(view)
-
-    if iscoroutinefunction(view):
-
-        @functools.wraps(view)
-        async def async_wrapper(
-            request: Request, *args: P.args, **kwargs: P.kwargs
-        ) -> Response:
-            try:
-                # pyrefly:ignore[not-async] This is async, but Pyrefly isn't able to infer that view and ratelimited_view have the same return type
-                return await ratelimited_view(request, *args, **kwargs)
-            except Ratelimited:
-                # thread_sensitive=False for the same reason as in
-                # make_ratelimiter: this touches only the cache and DNS, and
-                # the shared thread-sensitive worker is the wrong place to
-                # wait on a name server.
-                bypass = await sync_to_async(
-                    should_bypass_ratelimit, thread_sensitive=False
-                )(request)
-                if not bypass:
-                    raise
-                return await view(request, *args, **kwargs)
-            except ConnectionError:
-                # Unable to connect to redis, let the view proceed this time.
-                return await view(request, *args, **kwargs)
-
-        return cast(DjangoViewType[P, Request, Response], async_wrapper)
+    ratelimited_view = ratelimiter_all_250_per_h(view)
 
     @functools.wraps(view)
-    def wrapper(
-        request: Request, *args: P.args, **kwargs: P.kwargs
-    ) -> Response:
+    def wrapper(request, *args, **kwargs):
         try:
             return ratelimited_view(request, *args, **kwargs)
-        except Ratelimited:
-            if not should_bypass_ratelimit(request):
-                raise
-            return view(request, *args, **kwargs)
+        except Ratelimited as e:
+            if is_allowlisted(request):
+                return view(request, *args, **kwargs)
+            else:
+                raise e
         except ConnectionError:
             # Unable to connect to redis, let the view proceed this time.
             return view(request, *args, **kwargs)
@@ -287,24 +132,38 @@ def ratelimit_deny_list[
     return wrapper
 
 
-def host_is_approved(host: str) -> bool:
-    """Check whether the domain is in our approved allowlist.
-
-    Matches the approved domain itself or any subdomain of it, never a name
-    that merely ends in the same letters: "notgooglebot.com" is not
-    "googlebot.com". The forward lookup in is_verified_crawler only proves the
-    requester controls the zone the PTR record names, so a loose suffix match
-    would let anyone who registers such a look-alike domain allowlist
-    themselves.
-
-    :param host: The hostname from a reverse DNS lookup.
-    :return: True if the host is an approved domain or one of its subdomains.
+def get_host_from_IP(ip_address: str) -> str:
+    """Get the host for an IP address by doing a reverse DNS lookup. Return
+    the value as a string.
     """
-    host = host.lower().rstrip(".")
+    return socket.getfqdn(ip_address)
+
+
+def get_ip_from_host(host: str) -> str:
+    """Do a forward DNS lookup of the host found in step one."""
+    return socket.gethostbyname(host)
+
+
+def host_is_approved(host: str) -> bool:
+    """Check whether the domain is in our approved allowlist."""
     return any(
-        host == domain or host.endswith(f".{domain}")
-        for domain in APPROVED_DOMAINS
+        host.endswith(approved_domain) for approved_domain in APPROVED_DOMAINS
     )
+
+
+def verify_ip_address(ip_address: str) -> bool:
+    """Do authentication checks for the IP address requesting the page."""
+    # First we do a rDNS lookup of the IP.
+    host = get_host_from_IP(ip_address)
+
+    #  Then we check the returned host to ensure it's an approved crawler
+    if host_is_approved(host):
+        # If it's approved, do a forward DNS lookup to get the IP from the host.
+        # If that matches the original IP, we're good.
+        if ip_address == get_ip_from_host(host):
+            # Everything checks out!
+            return True
+    return False
 
 
 def get_ratelimit_cache() -> BaseCache:
@@ -317,75 +176,34 @@ def get_ratelimit_cache() -> BaseCache:
     return caches[cache_name]
 
 
-def is_verified_crawler(ip: str) -> bool:
-    """Check whether an address belongs to an approved crawler.
+def is_allowlisted(request: HttpRequest) -> bool:
+    """Checks if the IP address is allowlisted due to belonging to an approved
+    crawler.
 
-    A reverse DNS lookup must name an approved domain, and a forward lookup of
-    that name must lead back to the address. A failed or malformed DNS answer
-    counts as "no" rather than raising: this runs for requests already over
-    their limit, and a lookup error there should get a 429, not a 500.
-
-    :param ip: The viewer's exact address, as from get_viewer_ip. A /64 from
-        get_ratelimit_ident has no PTR record and would never match.
-    :return: True if the address belongs to an approved crawler.
+    Returns True if so, else False.
     """
-    try:
-        host = socket.getfqdn(ip)
-        if not host_is_approved(host):
-            return False
-        # getaddrinfo rather than gethostbyname, which only returns A records
-        # and so could never confirm an IPv6 crawler.
-        forward_ips = {
-            ipaddress.ip_address(str(sockaddr[0]))
-            for *_, sockaddr in socket.getaddrinfo(
-                host, None, type=socket.SOCK_STREAM
-            )
-        }
-    except (OSError, UnicodeError):
-        # OSError covers socket.gaierror (NXDOMAIN, SERVFAIL, timeouts).
-        # UnicodeError is what the idna codec raises for a label over 63
-        # characters, which whoever controls the PTR record can supply.
-        return False
-    # Parsed, so that equal addresses match however they're written.
-    return ipaddress.ip_address(ip) in forward_ips
-
-
-def should_bypass_ratelimit(request: HttpRequest) -> bool:
-    """Should a request that hit its limit be let through anyway?
-
-    True for an approved crawler. Both answers are cached, so that whoever is
-    hammering us doesn't cost a fresh pair of DNS lookups on every request. A
-    "no" is kept for an hour rather than a week, so a crawler that moves to a
-    new address is picked up soon after.
-
-    Also True when the cache can't be reached: a Redis outage shouldn't turn
-    the allowlist into a 500, so it fails open like the rate limit itself.
-
-    :param request: The HTTP request from the user
-    :return: True when the view should run despite the limit, else False.
-    """
-    if not (ip := get_viewer_ip(request)):
-        # No CloudFront header, as in local development. There's nothing to
-        # look up, and getfqdn("") would answer for this host instead.
-        return False
-
     cache = get_ratelimit_cache()
-    key = f"rl:allowlist:{ip}"
-    try:
-        cached = cache.get(key)
-    except ConnectionError:
-        return True
-    # bool() rather than truthiness on the entry itself: a False is a real
-    # cached answer, and entries written before this stored the IP string.
-    if cached is not None:
-        return bool(cached)
+    allowlist_cache_prefix = "rl:allowlist"
+    ip_address = get_user_ip_from_cloudfront_headers(request)
+    if ip_address is None:
+        return False
 
-    verified = is_verified_crawler(ip)
-    a_week = 60 * 60 * 24 * 7
-    an_hour = 60 * 60
-    with contextlib.suppress(ConnectionError):
-        cache.set(key, verified, a_week if verified else an_hour)
-    return verified
+    allowlist_key = f"{allowlist_cache_prefix}:{ip_address}"
+
+    # Check if the ip address is in our allowlist.
+    if cache.get(allowlist_key):
+        return True
+
+    # If not whitelisted, verify the IP address and add it to the cache for
+    # future requests.
+    approved_crawler = verify_ip_address(ip_address)
+
+    if approved_crawler:
+        # Add the IP to our cache with a one week expiration date
+        a_week = 60 * 60 * 24 * 7
+        cache.set(allowlist_key, ip_address, a_week)
+
+    return approved_crawler
 
 
 def parse_rate(rate: str) -> tuple[int, int]:

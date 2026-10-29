@@ -5,7 +5,7 @@ import socket
 from collections import OrderedDict
 from collections.abc import Mapping
 from datetime import UTC, date, datetime
-from typing import TypedDict, cast
+from typing import TypedDict
 
 import requests
 import usaddress
@@ -13,7 +13,6 @@ from asgiref.sync import async_to_sync
 from dateutil import parser
 from django.core.exceptions import ValidationError
 from django.core.validators import validate_email
-from django.db.models import CharField
 from juriscraper.lib.string_utils import titlecase
 from juriscraper.pacer import (
     AppellateDocketReport,
@@ -29,15 +28,12 @@ from cl.lib.redis_utils import get_redis_interface
 from cl.people_db.models import AttorneyOrganization, Role
 from cl.people_db.types import RoleType
 from cl.recap.models import UPLOAD_TYPE
-from cl.scrapers.models import PACERFreeDocumentRow
 from cl.search.models import Court, Docket
 from cl.search.tasks import index_docket_parties_in_es
 
-logger: logging.Logger = logging.getLogger(__name__)
+logger = logging.getLogger(__name__)
 
-phone_digits_re: re.Pattern[str] = re.compile(
-    r"^(?:1-?)?(\d{3})[-.]?(\d{3})[-.]?(\d{4})$"
-)
+phone_digits_re = re.compile(r"^(?:1-?)?(\d{3})[-.]?(\d{3})[-.]?(\d{4})$")
 
 
 pacer_to_cl_ids = {
@@ -52,17 +48,15 @@ pacer_to_cl_ids = {
 cl_to_pacer_ids = {v: k for k, v in pacer_to_cl_ids.items() if v != "nysb"}
 
 
-def map_pacer_to_cl_id(pacer_id: str) -> str:
+def map_pacer_to_cl_id(pacer_id):
     return pacer_to_cl_ids.get(pacer_id, pacer_id)
 
 
-def map_cl_to_pacer_id(cl_id: str) -> str:
+def map_cl_to_pacer_id(cl_id):
     return cl_to_pacer_ids.get(cl_id, cl_id)
 
 
-def lookup_and_save(
-    new: PACERFreeDocumentRow, court: Court, debug: bool = False
-) -> Docket:
+def lookup_and_save(new, debug=False):
     """Merge new docket info into the database.
 
     Start by attempting to lookup an existing Docket. If that's not found,
@@ -70,20 +64,17 @@ def lookup_and_save(
     Docket found, and then save the Docket.
 
     Returns None if an error occurs, else, return the new or updated Docket.
-
-    :param new: The row to merge. Its `court_id` holds a PACER court ID, so
-        callers must remove it before calling.
-    :param court: The CourtListener court the row belongs to.
-    :param debug: If True, don't save the Docket.
     """
     try:
-        d = Docket.objects.get(pacer_case_id=new.pacer_case_id, court=court)
+        d = Docket.objects.get(
+            pacer_case_id=new.pacer_case_id, court=new.court
+        )
     except (Docket.DoesNotExist, Docket.MultipleObjectsReturned):
         d = None
 
     if d is None:
         ds = Docket.objects.filter(
-            docket_number_raw=new.docket_number, court=court
+            docket_number_raw=new.docket_number, court=new.court
         ).order_by("-date_filed")
         count = ds.count()
         if count < 1:
@@ -92,7 +83,7 @@ def lookup_and_save(
         elif count == 1:
             # Nailed it!
             d = ds[0]
-        else:
+        elif count > 1:
             # Too many dockets returned. Disambiguate.
 
             def is_different(x):
@@ -120,8 +111,8 @@ def lookup_and_save(
 
     for attr, v in new.__dict__.items():
         setattr(d, attr, v)
-    d.court = court
 
+    # `new` is an instance of PACERFreeDocumentRow
     if new.docket_number:
         d.docket_number_raw = new.docket_number
 
@@ -135,7 +126,7 @@ def lookup_and_save(
     return d
 
 
-async def get_first_missing_de_date(d: Docket) -> date | None:
+def get_first_missing_de_date(d: Docket):
     """When buying dockets use this function to figure out which docket entries
     we already have, starting at the first item. Since PACER only allows you to
     do a range of docket entries, this allows us to figure out a later starting
@@ -152,40 +143,34 @@ async def get_first_missing_de_date(d: Docket) -> date | None:
     # Get docket entry numbers for items that *have* docket entry descriptions.
     # This ensures that we don't count RSS items towards the docket being
     # complete, since we only have the short description for those.
-    docket_entries = (
+    de_number_tuples = list(
         d.docket_entries.exclude(description="")
         .order_by("entry_number")
         .values_list("entry_number", "date_filed")
     )
-    fallback_date = date(1960, 1, 1)
-    previous_number = 0
-    previous_date: date | None = fallback_date
-    last_date: date | None = fallback_date
-    has_number = False
-    gap_found = False
-    async for entry_number, entry_date in docket_entries.aiterator():
-        last_date = entry_date
-        if not entry_number:
-            continue
-        has_number = True
-        if gap_found or entry_number <= previous_number:
-            continue
-        if entry_number != previous_number + 1:
-            # Keep consuming the iterator so its database cursor is closed.
-            gap_found = True
-            continue
-        previous_number = entry_number
-        # For a gap, preserve the first date for duplicate entry numbers.
-        previous_date = entry_date
+    de_numbers = [i[0] for i in de_number_tuples if i[0]]
 
-    if gap_found:
-        return previous_date
-    return last_date if has_number else fallback_date
+    if len(de_numbers) > 0:
+        # Get the earliest missing item
+        end = de_numbers[-1]
+        missing_items = sorted(set(range(1, end + 1)).difference(de_numbers))
+        if missing_items:
+            if missing_items[0] == 1:
+                return date(1960, 1, 1)
+            else:
+                previous = missing_items[0] - 1
+                for entry_number, entry_date in de_number_tuples:
+                    if entry_number == previous:
+                        return entry_date
+        else:
+            # None missing, but we can start after the highest de we know.
+            return de_number_tuples[-1][1]
+    return date(1960, 1, 1)
 
 
 async def get_blocked_status(
     docket: Docket, count_override: int | None = None
-) -> tuple[bool, date | None]:
+):
     """Set the blocked status for the Docket.
 
     Dockets are public (blocked is False) when:
@@ -340,7 +325,7 @@ def normalize_attorney_role(r: str) -> RoleType:
     return role
 
 
-def normalize_us_phone_number(phone: str) -> str:
+def normalize_us_phone_number(phone):
     """Tidy up phone numbers so they're nice."""
     phone = re.sub(r"(\(|\)|\s+)", "", phone)
     m = phone_digits_re.search(phone)
@@ -349,7 +334,7 @@ def normalize_us_phone_number(phone: str) -> str:
     return ""
 
 
-def normalize_us_state(state: str) -> str:
+def normalize_us_state(state):
     """Convert state values to valid state postal abbreviations
 
     va --> VA
@@ -368,7 +353,7 @@ def normalize_us_state(state: str) -> str:
     return state
 
 
-def make_address_lookup_key(address_info: dict) -> str:
+def make_address_lookup_key(address_info):
     """Make a key for looking up normalized addresses in the DB
 
     - Sort the fields alphabetically
@@ -398,7 +383,7 @@ def make_address_lookup_key(address_info: dict) -> str:
     return re.sub(r"[^a-z0-9]", "", key.lower())
 
 
-def normalize_address_info(address_info: dict) -> dict:
+def normalize_address_info(address_info):
     """Normalize various address components"""
 
     # Titlecase where appropriate
@@ -423,19 +408,13 @@ def normalize_address_info(address_info: dict) -> dict:
 
     # Nuke any zip code that's longer than allowed in the DB (usually caused by
     # phone numbers)
-    zip_code_field = cast(
-        CharField, AttorneyOrganization._meta.get_field("zip_code")
-    )
-    # `USZipCodeField` always sets `max_length`.
-    zip_code_max_length = cast(int, zip_code_field.max_length)
-    if len(address_info.get("zip_code", "")) > zip_code_max_length:
+    zip_code_field = AttorneyOrganization._meta.get_field("zip_code")
+    if len(address_info.get("zip_code", "")) > zip_code_field.max_length:
         address_info["zip_code"] = ""
     return address_info
 
 
-def normalize_attorney_contact(
-    c: str, fallback_name: str = ""
-) -> tuple[dict[str, str], dict[str, str]]:
+def normalize_attorney_contact(c, fallback_name=""):
     """Normalize the contact string for an attorney.
 
     Attorney contact strings are newline separated addresses like:
@@ -539,8 +518,6 @@ def normalize_attorney_contact(
         address_info, address_type = usaddress.tag(
             ", ".join(address_lines), tag_mapping=mapping
         )
-    # usaddress's bundled stub omits `RepeatedLabelError`.
-    # pyrefly: ignore[missing-attribute]
     except (usaddress.RepeatedLabelError, UnicodeEncodeError):
         # See https://github.com/datamade/probableparsing/issues/2 for why we
         # catch the UnicodeEncodeError. Oy.

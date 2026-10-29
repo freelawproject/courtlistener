@@ -6,6 +6,7 @@ from django.conf import settings
 from cl.audio.dispatch import dispatch_transcribe
 from cl.audio.models import Audio
 from cl.lib.command_utils import VerboseCommand, logger
+from cl.lib.types import OptionsType
 from cl.lib.utils import deepgetattr
 
 
@@ -154,7 +155,7 @@ class Command(VerboseCommand):
             files to process""",
         )
 
-    def handle(self, *args, **options) -> None:
+    def handle(self, *args: list[str], **options: OptionsType) -> None:
         super().handle(*args, **options)
 
         if options["model"] == "open-ai-api":

@@ -259,7 +259,7 @@ NAME_CUTOFF = 3
 IS_JUDGE = {"wu", "re", "du", "de"}
 
 
-def find_all_judges(judge_text: str) -> list[str]:
+def find_all_judges(judge_text: str) -> [str]:
     """Find all judges
     This method is used to extract out multiple judge names from a text input
     from the harvard merger/import.

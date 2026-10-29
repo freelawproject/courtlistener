@@ -1,5 +1,3 @@
-from typing import TypedDict
-
 import pghistory
 from django.db import models
 from django.urls import reverse
@@ -24,15 +22,6 @@ class REPORT_TYPES:
         (ANNUAL, "Annual Report"),
         (FINAL, "Final Report"),
     )
-
-
-class _ValueRange(TypedDict):
-    min: int
-    max: int | None
-
-
-class _WealthEstimate(_ValueRange):
-    miss_count: int
 
 
 class CODES:
@@ -110,7 +99,7 @@ class CODES:
         (X, "Failed Extraction"),
     )
 
-    VALUES: dict[str, _ValueRange] = {
+    VALUES: dict[str, dict[str, int | None]] = {
         A: {"min": 1, "max": 1_000},
         B: {"min": 1_001, "max": 2_500},
         C: {"min": 2_501, "max": 5_000},
@@ -141,7 +130,7 @@ S3_TEMPLATE = (
 
 def thumbnail_path(
     instance: "FinancialDisclosure",
-    filename: str | None = None,
+    filename: str = None,
 ) -> str:
     """Generate thumbnail location for disclosures
 
@@ -161,7 +150,7 @@ def thumbnail_path(
 
 def pdf_path(
     instance: "FinancialDisclosure",
-    filename: str | None = None,
+    filename: str = None,
 ) -> str:
     """Generate a path for the FD PDF
 
@@ -264,7 +253,7 @@ class FinancialDisclosure(AbstractDateTimeModel):
             args=(self.person.pk, self.pk, self.person.slug),
         )
 
-    def calculate_wealth(self, field_name: str) -> _WealthEstimate:
+    def calculate_wealth(self, field_name: str) -> dict[str, str | int]:
         """Calculate gross value of all investments in disclosure
 
         We can calculate the total investment for four fields
@@ -284,14 +273,7 @@ class FinancialDisclosure(AbstractDateTimeModel):
         min_value, max_value = 0, 0
         for investment in investments:
             min_value += CODES.VALUES[getattr(investment, field_name)]["min"]
-            if max_value is not None:
-                max_local = CODES.VALUES[getattr(investment, field_name)][
-                    "max"
-                ]
-                if max_local is None:
-                    max_value = None
-                else:
-                    max_value += max_local
+            max_value += CODES.VALUES[getattr(investment, field_name)]["max"]
         return {
             "min": min_value,
             "max": max_value,

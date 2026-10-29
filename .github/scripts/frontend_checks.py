@@ -2,8 +2,7 @@
 """Automated frontend checks for CourtListener PR reviews.
 
 Runs checks on changed template and CSS files to enforce frontend
-conventions, and checks that changes to vendored JS are recorded in that
-directory's README. Called by the frontend-lint GitHub Actions workflow.
+conventions. Called by the frontend-lint GitHub Actions workflow.
 
 Input file must be in git --name-status format (STATUS\\tPATH per line).
 """
@@ -91,16 +90,6 @@ def is_v2_template(path: str) -> bool:
     return "templates/v2_" in path and path.endswith(".html")
 
 
-def is_v2_partial(path: str) -> bool:
-    """A v2 partial rendered on its own, such as an htmx response.
-
-    Partials have no page URL and no base template, so the page-only
-    checks do not apply to them. Everything else about v2 templates does.
-    The prefix mirrors V2_PARTIALS_PREFIX in cl/lib/middleware.py.
-    """
-    return is_v2_template(path) and "templates/v2_includes/" in path
-
-
 def is_cotton_component(path: str) -> bool:
     return "templates/cotton/" in path and path.endswith(".html")
 
@@ -119,24 +108,6 @@ def is_legacy_template(path: str) -> bool:
 
 def is_input_css(path: str) -> bool:
     return path == "cl/assets/tailwind/input.css"
-
-
-# ---------------------------------------------------------------------------
-# Vendored JS directories
-# ---------------------------------------------------------------------------
-
-# Each directory holds upstream code and a README listing every package
-# vendored there, with its version and source.
-VENDORED_JS_DIRS = (
-    "cl/assets/static-global/js/third_party/",
-    "cl/assets/static-global/js/alpine/",
-)
-
-# Our own code inside a vendored directory; changing it needs no README entry.
-VENDORED_JS_OWN_CODE = (
-    "cl/assets/static-global/js/alpine/components/",
-    "cl/assets/static-global/js/alpine/composables/",
-)
 
 
 # ---------------------------------------------------------------------------
@@ -770,14 +741,10 @@ V2_CHECKS = [
     (check_alpine_shortcuts, FAIL),
     (check_font_awesome, FAIL),
     (check_inline_xdata, FAIL),
+    (check_extends_new_base, FAIL),
     (check_bare_links, FAIL),
     (check_include_in_v2, WARN),
     (check_xdata_without_require_script, WARN),
-]
-
-# Only full pages extend a base template; partials (v2_includes/) don't.
-V2_PAGE_CHECKS = [
-    (check_extends_new_base, FAIL),
 ]
 
 COTTON_CHECKS = [
@@ -824,12 +791,7 @@ def run_checks(
     repo_root: Path,
     file_statuses: dict[str, str],
 ) -> list[Finding]:
-    """Run all applicable checks on the given files.
-
-    ``changed_files`` is the subset of the diff to lint (HTML and input.css);
-    ``file_statuses`` maps every path in the diff to its git status, so checks
-    that depend on non-frontend files must look there.
-    """
+    """Run all applicable checks on the given files."""
     findings: list[Finding] = []
 
     # Collect v2_ templates changed in this PR (for sync notice check)
@@ -839,8 +801,7 @@ def run_checks(
     components_library_modified = any(
         f.endswith("v2_components.html") for f in changed_files
     )
-    # The register test is a Python file, so it is never in changed_files.
-    v2_register_test_modified = V2_REGISTER_TEST_FILE in file_statuses
+    v2_register_test_modified = V2_REGISTER_TEST_FILE in changed_files
 
     for filepath in changed_files:
         abs_path = repo_root / filepath
@@ -857,9 +818,6 @@ def run_checks(
 
         if is_v2_template(filepath):
             _apply_checks(V2_CHECKS, lines, filepath, findings)
-
-        if is_v2_template(filepath) and not is_v2_partial(filepath):
-            _apply_checks(V2_PAGE_CHECKS, lines, filepath, findings)
 
             status = file_statuses.get(filepath, "")
             if (
@@ -980,46 +938,6 @@ def run_checks(
             )
         )
 
-    return findings
-
-
-def check_vendored_js_readme(diff_paths: list[str]) -> list[Finding]:
-    """Fail when upstream files in a vendored JS directory change but that
-    directory's README doesn't.
-
-    ``diff_paths`` is every path in the diff, including the old side of a
-    rename, so moving a file into or out of a directory counts for both.
-    """
-    findings = []
-    for vendored_dir in VENDORED_JS_DIRS:
-        readme = f"{vendored_dir}README.md"
-        upstream_changes = sorted(
-            {
-                path
-                for path in diff_paths
-                if path.startswith(vendored_dir)
-                and path != readme
-                and not path.startswith(VENDORED_JS_OWN_CODE)
-            }
-        )
-        if not upstream_changes or readme in diff_paths:
-            continue
-        shown = ", ".join(
-            path.removeprefix(vendored_dir) for path in upstream_changes[:3]
-        )
-        if len(upstream_changes) > 3:
-            shown += f" and {len(upstream_changes) - 3} more"
-        findings.append(
-            Finding(
-                readme,
-                1,
-                "check_vendored_js_readme",
-                FAIL,
-                f"Upstream files in {vendored_dir} changed ({shown}) but "
-                f"{readme} did not — record each package's version and "
-                "source there",
-            )
-        )
     return findings
 
 
@@ -1174,7 +1092,6 @@ def main() -> int:
     raw = Path(args.changed_files).read_text()
 
     changed_files = []
-    diff_paths: list[str] = []
     file_statuses: dict[str, str] = {}
     for line in raw.splitlines():
         line = line.strip()
@@ -1191,10 +1108,6 @@ def main() -> int:
         path = parts[-1]
         file_statuses[path] = status
         changed_files.append(path)
-        diff_paths.append(path)
-        # A rename also removes its old path; a copy leaves it untouched.
-        if status.startswith("R") and len(parts) == 3:
-            diff_paths.append(parts[1])
 
     # Filter to relevant files
     relevant = [
@@ -1204,11 +1117,10 @@ def main() -> int:
         and not any(fnmatch.fnmatch(f, g) for g in args.skip_files)
     ]
 
-    findings = check_vendored_js_readme(diff_paths)
-    if not relevant and not findings:
+    if not relevant:
         return 0
-    if relevant:
-        findings += run_checks(relevant, repo_root, file_statuses)
+
+    findings = run_checks(relevant, repo_root, file_statuses)
 
     if not findings:
         print("All frontend checks passed.")

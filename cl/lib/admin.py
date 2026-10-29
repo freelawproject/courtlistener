@@ -1,4 +1,4 @@
-from typing import Any, TypedDict
+from typing import Any, TypedDict, cast
 from urllib.parse import urlencode
 
 from django.contrib import admin, messages
@@ -6,7 +6,7 @@ from django.contrib.contenttypes.admin import GenericTabularInline
 from django.db.models import Model, QuerySet
 from django.http import HttpRequest, HttpResponse, HttpResponseRedirect
 from django.shortcuts import get_object_or_404, render
-from django.urls import URLPattern, path, reverse
+from django.urls import path, reverse
 
 from cl.lib.models import Note
 
@@ -167,7 +167,7 @@ class SealableDocumentAdmin(admin.ModelAdmin):
         """
         raise NotImplementedError
 
-    def get_urls(self) -> list[URLPattern]:
+    def get_urls(self):
         urls = super().get_urls()
         custom_urls = [
             path(
@@ -178,13 +178,7 @@ class SealableDocumentAdmin(admin.ModelAdmin):
         ]
         return custom_urls + urls
 
-    def change_view(
-        self,
-        request: HttpRequest,
-        object_id: Any,
-        form_url: str = "",
-        extra_context: dict[Any, Any] | None = None,
-    ) -> HttpResponse:
+    def change_view(self, request, object_id, form_url="", extra_context=None):
         extra_context = extra_context or {}
         seal_url = reverse(
             f"admin:{self.seal_url_name}",
@@ -247,7 +241,10 @@ class SealableDocumentAdmin(admin.ModelAdmin):
 
         if queryset is None:
             doc_ids = request.POST.getlist("doc_ids")
-            queryset = RECAPDocument.objects.filter(pk__in=doc_ids)
+            queryset = cast(
+                QuerySet[RECAPDocument],
+                RECAPDocument.objects.filter(pk__in=doc_ids),
+            )
 
         ia_failures = seal_documents(queryset)
         sealed_count = queryset.count()

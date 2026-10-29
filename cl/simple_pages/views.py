@@ -61,7 +61,7 @@ async def get_coverage_data_fds(bust_cache: bool = False) -> dict[str, int]:
     coverage_key = "coverage-data.fd3"
     coverage_data = None if bust_cache else await cache.aget(coverage_key)
     if coverage_data is None:
-        models = {
+        coverage_data = {
             "disclosures": FinancialDisclosure,
             "investments": Investment,
             "positions": Position,
@@ -72,10 +72,10 @@ async def get_coverage_data_fds(bust_cache: bool = False) -> dict[str, int]:
             "gifts": Gift,
             "debts": Debt,
         }
-        coverage_data = {
-            k: await model.objects.all().acount()
-            for k, model in models.items()
-        }
+        # Populate the models
+        for k, model in coverage_data.items():
+            coverage_data[k] = await model.objects.all().acount()
+
         coverage_data["private"] = False
         one_week_minutes = 60 * 60 * 24 * 7
         await cache.aset(coverage_key, coverage_data, one_week_minutes)
@@ -135,7 +135,7 @@ async def contact(
                     "email_confirmed": profile.email_confirmed,
                 }
 
-            await sync_to_async(create_zoho_desk_ticket.delay)(
+            create_zoho_desk_ticket.delay(
                 subject=cd["phone_number"],
                 name=cd["name"],
                 email=account_email if is_authenticated else cd["email"],
@@ -302,13 +302,9 @@ async def components(request: HttpRequest) -> HttpResponse:
         ),
     ]
 
-    # Mock page object for component library demos. Mirrors the parts of
-    # django.core.paginator.Page/Paginator that <c-pagination> reads;
-    # `per_page` only feeds the start/end index math below.
+    # Mock page object for component library demos
     class MockPaginator:
         num_pages = 10
-        per_page = 100
-        count = 973
 
     class MockPageObj:
         number = 3
@@ -322,12 +318,6 @@ async def components(request: HttpRequest) -> HttpResponse:
 
         def next_page_number(self) -> int:
             return self.number + 1
-
-        def start_index(self) -> int:
-            return (self.number - 1) * self.paginator.per_page + 1
-
-        def end_index(self) -> int:
-            return self.number * self.paginator.per_page
 
     class MockFieldValue:
         value = None
@@ -380,11 +370,6 @@ async def components(request: HttpRequest) -> HttpResponse:
                     "value": "N.D. Cal.",
                     "suffix_text": "3:24-cv-01234",
                     "suffix_url": "/docket/1/example/",
-                },
-                {
-                    "label": "Citation",
-                    "value": "601 U.S. 416",
-                    "one_click_select": True,
                 },
             ],
         },

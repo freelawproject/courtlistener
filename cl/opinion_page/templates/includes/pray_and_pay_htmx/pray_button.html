@@ -11,7 +11,7 @@
     </button>
     {% if daily_limit_reached %}
     &nbsp;
-    <span id='daily_limit_tooltip' class="flex align-items-center" data-toggle="tooltip" data-placement="left" title="You have reached your daily prayer limit.{% if not request.user.profile.is_member %} Join FLP to get higher limits.{% endif %}">
+    <span id='daily_limit_tooltip' class="flex align-items-center" data-toggle="tooltip" data-placement="left" title="You have reached your daily request limit.">
       <i class="fa fa-lg fa-exclamation-circle red" aria-hidden="true"></i>
     </span>
     {% endif %}

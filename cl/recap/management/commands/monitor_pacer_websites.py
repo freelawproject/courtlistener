@@ -1,4 +1,3 @@
-from collections.abc import Iterable
 from http import HTTPStatus
 
 import requests
@@ -50,7 +49,7 @@ def check_if_global_outage(session, url, timeout=5):
     return response
 
 
-def make_simple_url(court: Court) -> str:
+def make_simple_url(court) -> str:
     if court.pk == "cavc":
         return "https://efiling.uscourts.cavc.gov/"
     else:
@@ -85,7 +84,7 @@ def down_for_only_me(session: requests.Session, url: str) -> bool:
     return False
 
 
-def iterate_and_log_courts(courts: Iterable[Court]):
+def iterate_and_log_courts(courts):
     session = requests.Session()
     for court in courts:
         url = make_simple_url(court)

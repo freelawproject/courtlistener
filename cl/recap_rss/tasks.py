@@ -5,9 +5,9 @@ import logging
 import re
 from calendar import SATURDAY, SUNDAY
 from datetime import datetime, timedelta
-from typing import Any, cast
 
-from asgiref.sync import async_to_sync, sync_to_async
+import requests
+from asgiref.sync import async_to_sync
 from celery import Task
 from dateparser import parse
 from django.conf import settings
@@ -15,10 +15,10 @@ from django.core.files.base import ContentFile
 from django.core.mail import send_mail
 from django.db import IntegrityError, transaction
 from django.utils.timezone import now
-from httpx import HTTPError
 from juriscraper.pacer import PacerRssFeed
 from pytz import timezone
 from redis import Redis
+from requests import HTTPError
 
 from cl.alerts.tasks import enqueue_docket_alert
 from cl.celery_init import app
@@ -152,6 +152,18 @@ def mark_status(status_obj, status_value):
     status_obj.save()
 
 
+def abort_task(task: Task, feed_status: RssFeedStatus):
+    """Abort RSS tasks without retry.
+
+    We don't want to retry RSS tasks because they'll get retried by the
+    daemon anyway, and because they have log timeouts. Better just to let
+    them die.
+    """
+    mark_status(feed_status, RssFeedStatus.PROCESSING_FAILED)
+    task.request.chain = None
+    return
+
+
 @app.task(
     bind=True,
     max_retries=0,
@@ -159,22 +171,7 @@ def mark_status(status_obj, status_value):
 )
 def check_if_feed_changed(
     self: Task, court_pk: str, feed_status_pk: int, date_last_built: datetime
-) -> list[dict[str, Any]] | None:
-    """Check a feed and stop the chain when no merge is needed.
-
-    Failed feeds are retried by the daemon rather than by this task.
-    """
-    result = async_to_sync(check_if_feed_changed_base)(
-        court_pk, feed_status_pk, date_last_built
-    )
-    if result is None:
-        self.request.chain = None
-    return result
-
-
-async def check_if_feed_changed_base(
-    court_pk: str, feed_status_pk: int, date_last_built: datetime
-) -> list[dict[str, Any]] | None:
+):
     """Check if the feed changed
 
     For now, we do this in a very simple way, by using the lastBuildDate field
@@ -205,18 +202,15 @@ async def check_if_feed_changed_base(
     :param feed_status_pk: The CL ID for the status object.
     :param date_last_built: The last time the court was scraped.
     """
-    feed_status = await RssFeedStatus.objects.aget(pk=feed_status_pk)
+    feed_status = RssFeedStatus.objects.get(pk=feed_status_pk)
     rss_feed = PacerRssFeed(map_cl_to_pacer_id(court_pk))
-
     try:
-        async with rss_feed:
-            await rss_feed.query()
-    except HTTPError:
+        rss_feed.query()
+    except requests.RequestException:
         logger.warning(
             "Network error trying to get RSS feed at %s", rss_feed.url
         )
-        feed_status.status = RssFeedStatus.PROCESSING_FAILED
-        await feed_status.asave()
+        abort_task(self, feed_status)
         return
 
     content = rss_feed.response.content
@@ -227,8 +221,7 @@ async def check_if_feed_changed_base(
             )
         except Exception as exc:
             logger.warning(str(exc))
-            feed_status.status = RssFeedStatus.PROCESSING_FAILED
-            await feed_status.asave()
+            abort_task(self, feed_status)
             return
 
     try:
@@ -240,17 +233,16 @@ async def check_if_feed_changed_base(
             rss_feed.response.status_code,
             exc,
         )
-        feed_status.status = RssFeedStatus.PROCESSING_FAILED
-        await feed_status.asave()
+        abort_task(self, feed_status)
         return
 
     current_build_date = get_last_build_date(content)
     if current_build_date:
-        await sync_to_async(alert_on_staleness)(
+        alert_on_staleness(
             current_build_date, feed_status.court_id, rss_feed.url
         )
         feed_status.date_last_build = current_build_date
-        await feed_status.asave()
+        feed_status.save()
     else:
         try:
             raise Exception(
@@ -259,8 +251,7 @@ async def check_if_feed_changed_base(
             )
         except Exception as exc:
             logger.warning(str(exc))
-            feed_status.status = RssFeedStatus.PROCESSING_FAILED
-            await feed_status.asave()
+            abort_task(self, feed_status)
             return
 
     # Only check for early abortion during partial crawls.
@@ -271,15 +262,15 @@ async def check_if_feed_changed_base(
             date_last_built,
         )
         # Abort. Nothing has changed here.
-        feed_status.status = RssFeedStatus.UNCHANGED
-        await feed_status.asave()
+        self.request.chain = None
+        mark_status(feed_status, RssFeedStatus.UNCHANGED)
         return
 
     logger.info(
         "%s: Feed changed or doing a sweep. Moving on to the merge.",
         feed_status.court_id,
     )
-    await sync_to_async(rss_feed.parse)()
+    rss_feed.parse()
     logger.info(
         "%s: Got %s results to merge.",
         feed_status.court_id,
@@ -287,22 +278,17 @@ async def check_if_feed_changed_base(
     )
 
     # Update RSS entry types in Court table
-    feed_metadata = cast(dict[str, Any], rss_feed.feed["feed"])
-    await sync_to_async(update_entry_types)(
-        court_pk, feed_metadata["description"]
-    )
+    update_entry_types(court_pk, rss_feed.feed.feed.description)
 
     # Save the feed to the DB
     feed_data = RssFeedData(court_id=court_pk)
     try:
-        await sync_to_async(feed_data.filepath.save)(
+        feed_data.filepath.save(
             "rss.xml.bz2", ContentFile(bz2.compress(content))
         )
     except OSError as exc:
         if exc.errno == errno.EIO:
-            feed_status.status = RssFeedStatus.PROCESSING_FAILED
-            await feed_status.asave()
-            return None
+            abort_task(self, feed_status)
         else:
             raise exc
 

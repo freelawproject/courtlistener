@@ -110,9 +110,7 @@ class CloneException(Exception):
         self.message = message
 
 
-def clean_api_data(
-    data: dict, fields_to_remove: list[str] | None = None
-) -> dict:
+def clean_api_data(data: dict, fields_to_remove: list[str] = None) -> dict:
     """Remove fields that shouldn't be saved to the db
 
     :param data: The dictionary data obtained from the CourtListener API.
@@ -597,7 +595,7 @@ def clone_audio_files(
                     audio.local_path_mp3.name
                 )
             ):
-                print("Download, file doesn't exist in local storage")
+                print("Download, file doesnt exist in local storage")
                 try:
                     _, year, month, day, _ = local_path_mp3.split("/")
                     file_with_date = datetime(int(year), int(month), int(day))
@@ -1054,7 +1052,7 @@ def clone_court(session: Session, court_ids: list, no_update: bool = False):
 class Command(BaseCommand):
     help = (
         "Clone data from CourtListener.com into dev environment. It "
-        "requires to set CL_API_TOKEN variable in the .env file."
+        "requires to set CL_API_TOKEN varible in the .env file."
     )
 
     def __init__(self, *args, **kwargs):
@@ -1145,22 +1143,14 @@ class Command(BaseCommand):
             help="Do not update existing objects.",
         )
 
-    def handle(
-        self,
-        *args,
-        type: str,
-        ids: list[str],
-        download_cluster_files: bool,
-        download_opinion_files: bool,
-        add_docket_entries: bool,
-        add_audio_files: bool,
-        add_clusters: bool,
-        clone_person_positions: bool,
-        no_update: bool,
-        **options,
-    ):
-        self.type = type
-        self.ids = ids
+    def handle(self, *args, **options):
+        self.type = options.get("type")
+        self.ids = options.get("ids")
+        download_cluster_files = options.get("download_cluster_files")
+        download_opinion_files = options.get("download_opinion_files")
+        add_docket_entries = options.get("add_docket_entries")
+        clone_person_positions = options.get("clone_person_positions")
+        no_update = options.get("no_update")
 
         if not os.environ.get("CL_API_TOKEN"):
             self.stdout.write("Error: CL_API_TOKEN not set in .env file")
@@ -1172,7 +1162,7 @@ class Command(BaseCommand):
             )
             return
 
-        if download_opinion_files:
+        if options["download_opinion_files"]:
             required_keys = [
                 "AWS_ACCESS_KEY_ID",
                 "AWS_SECRET_ACCESS_KEY",
@@ -1204,8 +1194,8 @@ class Command(BaseCommand):
                     self.s,
                     self.ids,
                     add_docket_entries,
-                    add_audio_files,
-                    add_clusters,
+                    options["add_audio_files"],
+                    options["add_clusters"],
                     clone_person_positions,
                     download_opinion_files,
                     no_update,

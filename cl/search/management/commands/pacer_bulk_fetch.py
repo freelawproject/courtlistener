@@ -1,12 +1,10 @@
 import os
 import time
-from collections.abc import Collection
 from dataclasses import dataclass
 from datetime import datetime, timedelta
 from enum import Enum
 from typing import Any
 
-from asgiref.sync import async_to_sync
 from django.contrib.auth.models import User
 from django.core.cache import cache
 from django.core.management.base import CommandError
@@ -56,7 +54,7 @@ class MinimumWait:
 
 
 def enough_time_elapsed(
-    datetime_to_compare: datetime, time_interval: float
+    datetime_to_compare: datetime, time_interval: int
 ) -> bool:
     """Check if enough time has elapsed since datetime_to_compare
 
@@ -104,10 +102,7 @@ class Command(VerboseCommand):
         super().__init__(*args, **kwargs)
         self.options = None
         self.user = None
-        self.min_page_count: int = 0
-        self.max_page_count: int = 10_000
-        self.username: str
-        self.recap_documents: Collection[dict[str, Any]] = []
+        self.recap_documents = []
         self.courts_with_docs = {}
         self.total_launched = 0
         self.max_retries = 6
@@ -118,10 +113,10 @@ class Command(VerboseCommand):
             "PACER_PASSWORD", settings.PACER_PASSWORD
         )
         self.throttle = None
-        self.queue_name: str = "batch0"
+        self.queue_name = None
         self.interval = None
         self.initial_backoff_time = None
-        self.max_fq_wait: float = 3600  # 1 hour. Maximum wait time for an FQ to be completed to prevent a deadlock
+        self.max_fq_wait = 3600  # 1 hour. Maximum wait time for an FQ to be completed to prevent a deadlock
         self.fetches_in_progress = {}  # {court_id: (fq_pk, retry_count)}
 
     def add_arguments(self, parser) -> None:
@@ -186,11 +181,12 @@ class Command(VerboseCommand):
 
     def setup_celery(self) -> None:
         """Setup Celery by setting the queue_name and throttle."""
+        self.queue_name = self.options["queue_name"]
         self.throttle = CeleryThrottle(queue_name=self.queue_name)
 
     def handle_pacer_session(self) -> None:
         """Make sure we have an active PACER session for the user."""
-        async_to_sync(get_or_cache_pacer_cookies)(
+        get_or_cache_pacer_cookies(
             self.user.pk,
             username=self.pacer_username,
             password=self.pacer_password,
@@ -201,8 +197,8 @@ class Command(VerboseCommand):
         filters = [
             Q(pacer_doc_id__isnull=False),
             Q(is_available=False),
-            Q(page_count__gte=self.min_page_count),
-            Q(page_count__lte=self.max_page_count),
+            Q(page_count__gte=self.options["min_page_count"]),
+            Q(page_count__lte=self.options["max_page_count"]),
         ]
 
         # Do not attempt to fetch docs that were already fetched:
@@ -457,8 +453,7 @@ class Command(VerboseCommand):
                 )
                 return None
 
-            case None:
-                return None
+        return None
 
     def fetch_docs_from_pacer(self) -> None:
         """Process documents with one fetch per court at a time"""
@@ -543,7 +538,7 @@ class Command(VerboseCommand):
     def handle_fetch_docs(self):
         """Run only the fetching stage."""
         logger.info("Starting fetch stage in pacer_bulk_fetch command.")
-        self.user = User.objects.get(username=self.username)
+        self.user = User.objects.get(username=self.options["username"])
         self.identify_documents()
         logger.info(
             "%s found %s documents across %s courts.",
@@ -566,13 +561,9 @@ class Command(VerboseCommand):
 
     def handle(self, *args, **options) -> None:
         self.options = options
-        self.queue_name = options["queue_name"]
         self.setup_celery()
         self.interval = self.options["interval"]
         self.initial_backoff_time = self.options["initial_backoff_time"]
-        self.min_page_count = options.get("min_page_count", 0)
-        self.max_page_count = options["max_page_count"]
-        self.username = options["username"]
         if self.options.get("testing"):
             self.max_retries = 1
             self.max_fq_wait = 0.001

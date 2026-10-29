@@ -1,14 +1,7 @@
-from collections.abc import Callable, Coroutine
-from typing import Any, cast
-
 from django.contrib.auth.decorators import user_passes_test
-from django.contrib.auth.models import AbstractBaseUser, AnonymousUser, User
+from django.contrib.auth.models import User
 from django.db.models import QuerySet, Value
 from django.db.models.functions import Lower
-from django.http.request import HttpRequest
-from django.http.response import HttpResponseBase
-
-from cl.lib.types import DjangoViewType
 
 
 def filter_by_email(queryset: QuerySet[User], email: str) -> QuerySet[User]:
@@ -40,28 +33,17 @@ def filter_by_email(queryset: QuerySet[User], email: str) -> QuerySet[User]:
     )
 
 
-def group_required[
-    **P,
-    Request: HttpRequest,
-    Response: HttpResponseBase | Coroutine[Any, Any, HttpResponseBase],
-](
-    *group_names: str,
-) -> Callable[
-    [DjangoViewType[P, Request, Response]],
-    DjangoViewType[P, Request, Response],
-]:
+def group_required(*group_names):
     """Verify user group membership
 
     :param group_names: Array of strings
     :return: Whether the user is in one of the groups
     """
 
-    def in_groups(u: AbstractBaseUser | AnonymousUser) -> bool:
+    def in_groups(u):
         if u.is_authenticated:
-            return (
-                bool(cast(User, u).groups.filter(name__in=group_names))
-                | cast(User, u).is_superuser
-            )
+            if bool(u.groups.filter(name__in=group_names)) | u.is_superuser:
+                return True
         return False
 
     return user_passes_test(in_groups)

@@ -29,13 +29,13 @@ class NeonContact(TypedDict):
 
 
 class NeonClient:
-    def __init__(self, timeout: int = 10) -> None:
+    def __init__(self, timeout=10) -> None:
         self._timeout = timeout
         self._basic = HTTPBasicAuth(
             settings.NEON_ORG_ID, settings.NEON_API_KEY
         )
 
-    def get_account_by_id(self, account_id: int) -> dict:
+    def get_account_by_id(self, account_id: int):
         """
         Retrieves account data using the Neon API and the provided account ID.
 

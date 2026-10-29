@@ -2,25 +2,13 @@ from django.conf import settings
 from django.contrib import messages
 from django.contrib.auth.models import User
 from django.db import transaction
-from rest_framework.authtoken.models import Token
 
 from cl.alerts.models import AlertEvent, DocketAlertEvent
-from cl.api.models import (
-    APIThrottleEvent,
-    WebhookHistoryEvent,
-)
-from cl.favorites.models import (
-    DocketTagEvent,
-    NoteEvent,
-    PrayerEvent,
-    UserTagEvent,
-)
+from cl.api.models import WebhookHistoryEvent
+from cl.favorites.models import DocketTagEvent, NoteEvent, UserTagEvent
 from cl.lib.crypto import md5
-from cl.lib.decorators import tiered_cache
 from cl.lib.types import EmailType
 from cl.users.models import (
-    UserGroupsEvent,
-    UserPermissionsEvent,
     UserProfile,
     UserProfileBarMembershipEvent,
     UserProfileEvent,
@@ -111,49 +99,31 @@ def convert_to_stub_account(user: User) -> User:
 
 
 def delete_user_assets(user: User) -> None:
-    """Delete any associated data from a user account and profile
-
-    This removes the user's live assets (alerts, notes, prayers, API
-    credentials, etc.) and then purges the pghistory event rows that reference
-    them, so the deletion itself leaves no trace in the history tables. The
-    user and profile rows are not deleted here; `convert_to_stub_account`
-    blanks those afterwards.
-
-    :param user: The user whose assets should be deleted.
-    :return: None
-    """
+    """Delete any associated data from a user account and profile"""
 
     # Store user_tags before deleting the user-related objects.
     user_tags = user.user_tags.all()
     user_tags_ids = [user_tag.pk for user_tag in user_tags]
 
     user.alerts.all().delete()
-    user.api_throttles.all().delete()
-    user.docket_alerts.all().delete()
-    user.emails.all().delete()
-    user.events.all().delete()
-    user.notes.all().delete()
-    user.prayers.all().delete()
-    user.scotus_maps.all().delete()
-    user.search_queries.all().delete()
-    Token.objects.filter(user=user).delete()
-    user_tags.delete()
     user.webhooks.all().delete()
+    user.docket_alerts.all().delete()
+    user.notes.all().delete()
+    user_tags.delete()
+    user.search_queries.all().delete()
+    user.emails.all().delete()
+    user.scotus_maps.all().delete()
     # Donations are financial records we need to keep, so disable the
     # recurring ones rather than deleting them.
     user.monthly_donations.all().update(enabled=False)
 
     # After deleting user-related objects, nuke history objects related to the
     # user so that events generated due to delete() are also removed.
-    AlertEvent.objects.filter(user_id=user.pk).delete()
-    APIThrottleEvent.objects.filter(user_id=user.pk).delete()
     DocketAlertEvent.objects.filter(user_id=user.pk).delete()
-    DocketTagEvent.objects.filter(tag__id__in=user_tags_ids).delete()
+    AlertEvent.objects.filter(user_id=user.pk).delete()
     NoteEvent.objects.filter(user_id=user.pk).delete()
-    PrayerEvent.objects.filter(user_id=user.pk).delete()
-    UserGroupsEvent.objects.filter(user_id=user.pk).delete()
-    UserPermissionsEvent.objects.filter(user_id=user.pk).delete()
     UserTagEvent.objects.filter(user_id=user.pk).delete()
+    DocketTagEvent.objects.filter(tag__id__in=user_tags_ids).delete()
     WebhookHistoryEvent.objects.filter(user_id=user.pk).delete()
 
 
@@ -430,18 +400,3 @@ message_dict = {
         "message": "Your password was changed successfully",
     },
 }
-
-
-@tiered_cache(memory_timeout=60, redis_timeout=60 * 5)
-def is_search_history_on_cached(user_pk: int) -> bool:
-    """Return whether the user wants their search queries saved.
-
-    Cached for five minutes, so changes may take that long to apply. Intended
-    for the API; website requests should read the profile directly.
-
-    :param user_pk: The primary key of the user.
-    :return: True if the user's search queries should be saved.
-    """
-    return UserProfile.objects.values_list(
-        "save_query_history", flat=True
-    ).get(user_id=user_pk)

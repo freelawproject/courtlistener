@@ -29,11 +29,13 @@ A TypedDict representing the data stored in the Redis hash for the sitemap curso
 
 The `section` key contains the name of the sitemap section, and the `cursor` key contains the cursor value for that section.
 """
-cursor_data_default: TaskCursorData = {
-    "section": None,
-    "last_page": 1,
-    "has_next": 1,
-}
+cursor_data_default = TaskCursorData(
+    {
+        "section": None,
+        "last_page": 1,
+        "has_next": 1,
+    }
+)
 
 short_cache_timeout = 60 * 60 * 24
 long_cache_timeout = 60 * 60 * 24 * 180
@@ -65,7 +67,7 @@ def generate_urls_chunk(force_regenerate: bool = False) -> None:
 
     cursor_data: TaskCursorData = cursor_data_default.copy()
 
-    cursor_data_cached = redis_db.hgetall(HASH_NAME)
+    cursor_data_cached: TaskCursorData = redis_db.hgetall(HASH_NAME)
     if cursor_data_cached:
         cursor_data.update(cursor_data_cached)
 
@@ -308,13 +310,13 @@ def make_cache_key(
 def make_expiration_time(cache: BaseCache, timeout: int) -> datetime:
     """Make the expiration time for the cache"""
 
-    local_timeout = cache.get_backend_timeout(timeout)  # timestamp in future
+    timeout = cache.get_backend_timeout(timeout)  # timestamp in future
 
-    if local_timeout is None:
+    if timeout is None:
         exp = datetime.max
     else:
         tz = UTC if settings.USE_TZ else None
-        exp = datetime.fromtimestamp(local_timeout, tz=tz)
+        exp = datetime.fromtimestamp(timeout, tz=tz)
     exp = exp.replace(microsecond=0)
 
     return exp

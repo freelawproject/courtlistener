@@ -1,8 +1,7 @@
 from collections.abc import Iterable
 from pathlib import Path
 
-from celery import Task
-
+from cl.celery_init import app
 from cl.corpus_importer.management.utils import (
     CorpusImporterCommand,
 )
@@ -42,11 +41,11 @@ class Command(CorpusImporterCommand):
             )
 
     @staticmethod
-    def download_task() -> Task:
+    def download_task() -> app.Task:
         return texas_corpus_download_task
 
     @staticmethod
-    def merge_task() -> Task:
+    def merge_task() -> app.Task:
         return texas_ingest_docket_task
 
     def handle(self, *args, **options):

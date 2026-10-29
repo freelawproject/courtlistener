@@ -3,11 +3,9 @@ import math
 import re
 import string
 from collections import Counter
-from collections.abc import Iterable, Mapping, Sequence
-from typing import TypedDict
 
 
-def remove_words(phrase: str) -> str:
+def remove_words(phrase):
     # Removes words and punctuation that don't help the diff comparison.
     stop_words = (
         r"a|an|and|as|at|but|by|en|etc|for|if|in|is|of|on|or|the|to|v\.?|via"
@@ -29,7 +27,7 @@ def remove_words(phrase: str) -> str:
     return "".join(result)
 
 
-def gen_diff_ratio(left: str, right: str) -> float:
+def gen_diff_ratio(left, right):
     """
     Generates a difference between two strings.
     Returns a value between 0 and 1. 0 means the strings are totally different.
@@ -49,15 +47,7 @@ def gen_diff_ratio(left: str, right: str) -> float:
     return diff
 
 
-class _BestMatchOutput(TypedDict):
-    match_index: int
-    match_str: str
-    ratio: float
-
-
-def find_best_match(
-    items: Sequence[str], s: str, case_sensitive: bool = True
-) -> _BestMatchOutput:
+def find_best_match(items, s, case_sensitive=True):
     """Find the string in the list that is the closest match to the string
 
     :param items: The list to search within
@@ -87,9 +77,7 @@ def find_best_match(
     }
 
 
-def find_confidences(
-    results: Iterable[Mapping], case_name: str
-) -> list[float]:
+def find_confidences(results, case_name):
     """Returns all matches above a threshold.
 
     This is nearly identical to find_best_match, but returns any good matches

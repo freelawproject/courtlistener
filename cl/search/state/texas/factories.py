@@ -75,9 +75,7 @@ class TexasOriginatingCourtDictFactory(DictFactory):
 class TexasOriginatingAppellateCourtDictFactory(
     TexasOriginatingCourtDictFactory
 ):
-    court_type = court_type = Faker(
-        "random_element", elements=(CourtType.APPELLATE.value,)
-    )  # It looks odd, but it satisfies Pyrefly
+    court_type = CourtType.APPELLATE.value
     court_id = Faker(
         "random_element",
         elements=(
@@ -92,9 +90,7 @@ class TexasOriginatingAppellateCourtDictFactory(
 class TexasOriginatingDistrictCourtDictFactory(
     TexasOriginatingCourtDictFactory
 ):
-    court_type = court_type = Faker(
-        "random_element", elements=(CourtType.DISTRICT.value,)
-    )
+    court_type = CourtType.DISTRICT.value
     district = Faker("random_element", elements=list(range(1, 527)) + [None])
 
 
@@ -216,9 +212,7 @@ class TexasAppellateTransferDictFactory(DictFactory):
 class TexasCourtOfAppealsDocketDictFactory(TexasCommonDataDictFactory):
     """Factory for Texas Court of Appeals docket data."""
 
-    court_type = court_type = Faker(
-        "random_element", elements=(CourtType.APPELLATE.value,)
-    )
+    court_type = CourtType.APPELLATE.value
     court_id = Faker(
         "random_element",
         elements=(
@@ -246,9 +240,7 @@ class TexasCourtOfAppealsDocketDictFactory(TexasCommonDataDictFactory):
 class TexasFinalCourtDocketDictFactory(TexasCommonDataDictFactory):
     """Factory for Texas Supreme Court and Court of Criminal Appeals docket data."""
 
-    court_type = court_type = Faker(
-        "random_element", elements=(CourtType.SUPREME.value,)
-    )
+    court_type = CourtType.SUPREME.value
     appeals_court = SubFactory(TexasAppellateCourtInfoDictFactory)
     court_id = Faker(
         "random_element",

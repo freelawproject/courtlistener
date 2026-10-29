@@ -1,12 +1,9 @@
-from collections.abc import Callable
 from contextlib import ExitStack
 from typing import Any
 from urllib.parse import quote
 
 from django.conf import settings
 from django.db import connections
-from django.http import HttpResponseBase
-from django.http.request import HttpRequest
 from django.utils.functional import SimpleLazyObject, empty
 
 
@@ -59,14 +56,10 @@ class SqlCommenter:
     the framework and the execution context.
     """
 
-    def __init__(
-        self, get_response: Callable[[HttpRequest], HttpResponseBase]
-    ):
-        self.get_response: Callable[[HttpRequest], HttpResponseBase] = (
-            get_response
-        )
+    def __init__(self, get_response):
+        self.get_response = get_response
 
-    def __call__(self, request: HttpRequest) -> HttpResponseBase:
+    def __call__(self, request):
         with ExitStack() as stack:
             for db_alias in connections:
                 stack.enter_context(
@@ -78,8 +71,8 @@ class SqlCommenter:
 
 
 class QueryWrapper:
-    def __init__(self, request: HttpRequest):
-        self.request: HttpRequest = request
+    def __init__(self, request):
+        self.request = request
 
     def get_context(self) -> dict[str, Any]:
         """
@@ -116,13 +109,6 @@ class QueryWrapper:
             "url-name": resolver_match.view_name if resolver_match else None,
         }
 
-    def __call__(
-        self,
-        execute: Callable[[str, Any, bool, dict[str, Any]], Any],
-        sql: str,
-        params: Any,
-        many: bool,
-        context: dict[str, Any],
-    ) -> Any:
+    def __call__(self, execute, sql, params, many, context):
         sql_with_comment = add_sql_comment(sql, **self.get_context())
         return execute(sql_with_comment, params, many, context)

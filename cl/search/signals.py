@@ -2,9 +2,7 @@ import logging
 
 from django.conf import settings
 from django.core.cache import cache
-from django.db import transaction
-from django.db.models import Model, QuerySet
-from django.db.models.signals import post_delete, post_save
+from django.db.models.signals import post_save
 from django.dispatch import receiver
 
 from cl.audio.models import Audio
@@ -17,7 +15,7 @@ from cl.citations.tasks import (
 )
 from cl.favorites.utils import send_prayer_emails
 from cl.lib.courts import get_cache_key_for_court_list
-from cl.lib.es_signal_processor import DocumentModelMapping, ESSignalProcessor
+from cl.lib.es_signal_processor import ESSignalProcessor
 from cl.people_db.models import (
     ABARating,
     Education,
@@ -52,7 +50,6 @@ from cl.search.models import (
     ParentheticalGroup,
     RECAPDocument,
 )
-from cl.search.state.shared import AbstractStateDocument
 from cl.settings import DEVELOPMENT, TESTING
 
 logger = logging.getLogger(__name__)
@@ -73,8 +70,7 @@ logger = logging.getLogger(__name__)
 # should be added. Keys should be the field name on the Model and values
 # should be the field name in the ES document.
 
-
-pa_field_mapping: DocumentModelMapping = {
+pa_field_mapping = {
     "save": {
         Docket: {
             "opinion__cluster__docket": {
@@ -151,7 +147,7 @@ pa_field_mapping: DocumentModelMapping = {
     },
 }
 
-oa_field_mapping: DocumentModelMapping = {
+oa_field_mapping = {
     "save": {
         Docket: {
             "docket": {
@@ -187,7 +183,7 @@ oa_field_mapping: DocumentModelMapping = {
     "reverse-delete": {},
 }
 
-p_field_mapping: DocumentModelMapping = {
+p_field_mapping = {
     "save": {
         Person: {
             "self": {
@@ -230,7 +226,7 @@ p_field_mapping: DocumentModelMapping = {
     },
 }
 
-position_field_mapping: DocumentModelMapping = {
+position_field_mapping = {
     "save": {
         Person: {
             "appointer__person": {
@@ -307,7 +303,7 @@ position_field_mapping: DocumentModelMapping = {
     "reverse-delete": {},
 }
 
-docket_field_mapping: DocumentModelMapping = {
+docket_field_mapping = {
     "save": {
         Docket: {
             "self": {
@@ -361,7 +357,7 @@ docket_field_mapping: DocumentModelMapping = {
     },
 }
 
-recap_document_field_mapping: DocumentModelMapping = {
+recap_document_field_mapping = {
     "save": {
         RECAPDocument: {
             "self": {
@@ -424,7 +420,7 @@ recap_document_field_mapping: DocumentModelMapping = {
     "reverse-delete": {},
 }
 
-o_field_mapping: DocumentModelMapping = {
+o_field_mapping = {
     "save": {
         Docket: {
             "docket": {
@@ -462,7 +458,6 @@ o_field_mapping: DocumentModelMapping = {
                 "html_columbia": ["text"],
                 "html_lawbox": ["text"],
                 "xml_harvard": ["text"],
-                "xml_scan": ["text"],
                 "html_anon_2020": ["text"],
                 "html": ["text"],
                 "plain_text": ["text"],
@@ -486,7 +481,7 @@ o_field_mapping: DocumentModelMapping = {
     "reverse-delete": {},
 }
 
-o_cluster_field_mapping: DocumentModelMapping = {
+o_cluster_field_mapping = {
     "save": {
         Docket: {
             "docket": {
@@ -707,33 +702,3 @@ def handle_docket_number_raw_cleaning(
 
     if created or instance.docket_number_raw_tracker.changed():
         clean_docket_number_raw_and_update_redis_cache(instance)
-
-
-@receiver(post_delete)
-def cleanup_document_storage[M: Model](
-    sender: type[M],
-    instance: M,
-    origin: M | QuerySet[M],
-    **kwargs,
-):
-    """Deletes files stored in S3 after a state document is deleted. Django does not delete
-    associated files when a row is deleted so without this a docket entry's attachments would
-    linger in storage with nothing pointing to them. This is a post-delete signal which schedules
-    files to be deleted once the current transaction is commited since otherwise if a file
-    deletion failed it would raise and cancel the whole transaction."""
-
-    if not isinstance(instance, AbstractStateDocument):
-        return
-
-    files = [f for f in (instance.filepath_local, instance.thumbnail) if f]
-
-    def delete_files() -> None:
-        for f in files:
-            try:
-                f.delete(save=False)
-            except Exception:
-                logger.exception(
-                    "Failed to delete %s for %r", f.name, instance
-                )
-
-    transaction.on_commit(delete_files, robust=True)

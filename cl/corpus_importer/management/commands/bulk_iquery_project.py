@@ -70,7 +70,7 @@ def add_all_cases_to_cl(options: OptionsType) -> None:
                     court_ids.remove(court_id)
                     continue
                 make_docket_by_iquery.apply_async(
-                    args=(court_id, str(pacer_case_id), next(db_key_cycle)),
+                    args=(court_id, pacer_case_id, next(db_key_cycle)),
                     queue=q,
                 )
             except ConnectionError:

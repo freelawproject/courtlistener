@@ -36,7 +36,6 @@ from cl.search.factories import (
     DocketFactory,
     OpinionClusterFactory,
     OpinionClusterWithParentsFactory,
-    OpinionContentFactory,
     OpinionFactory,
     OpinionsCitedByRECAPDocumentFactory,
     OpinionWithParentsFactory,
@@ -483,12 +482,7 @@ class OpinionClusterSealFileCleanupTest(TestCase):
             filepath_xml_scan="scan/cluster.xml",
             filepath_pdf_scan="scan/cluster.pdf",
         )
-        opinion = OpinionFactory(
-            cluster=cluster, local_path="opinions/opinion.pdf"
-        )
-        OpinionContentFactory(
-            opinion=opinion, local_path="contents/opinion.xml"
-        )
+        OpinionFactory(cluster=cluster, local_path="opinions/opinion.pdf")
 
         seal_cluster(cluster, delete_docket=True)
 
@@ -507,7 +501,6 @@ class OpinionClusterSealFileCleanupTest(TestCase):
             invalidated_paths,
             [
                 "/opinions/opinion.pdf",
-                "/contents/opinion.xml",
                 "/harvard/cluster.json",
                 "/harvard/cluster.pdf",
                 "/scan/cluster.xml",

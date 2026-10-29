@@ -2,7 +2,7 @@ import logging
 import re
 from datetime import datetime
 from pathlib import Path
-from typing import TYPE_CHECKING, Literal, Self, assert_never
+from typing import TYPE_CHECKING, Literal, TypeVar
 from urllib.parse import quote
 
 import nh3
@@ -789,8 +789,6 @@ class Docket(AbstractDateTimeModel, DocketSources):
                 non_source_list = self.NON_SCRAPER_SOURCES()
             case self.HARVARD:
                 non_source_list = self.NON_HARVARD_SOURCES()
-            case self.SCANNING_PROJECT:
-                non_source_list = self.NON_SCANNING_PROJECT_SOURCES()
             case _:
                 return
 
@@ -1180,7 +1178,7 @@ class DocketEntry(AbstractDateTimeModel, CSVExportMixin):
         return columns
 
     def get_column_function(self):
-        """Get dict of attrs: function to apply on field value if it needs
+        """Get dict of attrs: fucntion to apply on field value if it needs
         to be pre-processed before being add to csv
 
         returns: dict -- > {attr1: function}"""
@@ -1876,11 +1874,11 @@ class ClaimHistory(AbstractPacerDocument, AbstractPDF, AbstractDateTimeModel):
         return str(Path(root) / bucket / filename)
 
 
-class FederalCourtsQuerySet(models.QuerySet["Court"]):
-    def all(self) -> Self:
+class FederalCourtsQuerySet(models.QuerySet):
+    def all(self) -> models.QuerySet:
         return self.filter(jurisdiction__in=Court.FEDERAL_JURISDICTIONS)
 
-    def all_pacer_courts(self) -> Self:
+    def all_pacer_courts(self) -> models.QuerySet:
         return self.filter(
             Q(
                 jurisdiction__in=[
@@ -1894,7 +1892,7 @@ class FederalCourtsQuerySet(models.QuerySet["Court"]):
             in_use=True,
         ).exclude(pk="scotus")
 
-    def district_or_bankruptcy_pacer_courts(self) -> Self:
+    def district_or_bankruptcy_pacer_courts(self) -> models.QuerySet:
         return self.filter(
             Q(
                 jurisdiction__in=[
@@ -1906,7 +1904,7 @@ class FederalCourtsQuerySet(models.QuerySet["Court"]):
             end_date__isnull=True,
         )
 
-    def appellate_courts(self) -> Self:
+    def appellate_courts(self) -> models.QuerySet:
         return self.filter(
             Q(jurisdiction=Court.FEDERAL_APPELLATE)
             |
@@ -1915,32 +1913,32 @@ class FederalCourtsQuerySet(models.QuerySet["Court"]):
             end_date__isnull=True,
         )
 
-    def bankruptcy_pacer_courts(self) -> Self:
+    def bankruptcy_pacer_courts(self) -> models.QuerySet:
         return self.filter(
             jurisdiction=Court.FEDERAL_BANKRUPTCY, end_date__isnull=True
         )
 
-    def district_courts(self) -> Self:
+    def district_courts(self) -> models.QuerySet:
         return self.filter(jurisdiction=Court.FEDERAL_DISTRICT)
 
-    def bankruptcy_courts(self) -> Self:
+    def bankruptcy_courts(self) -> models.QuerySet:
         return self.filter(jurisdictions__in=Court.BANKRUPTCY_JURISDICTIONS)
 
-    def appellate_courts(self) -> Self:
+    def appellate_courts(self) -> models.QuerySet:
         return self.filter(jurisdiction=Court.FEDERAL_APPELLATE)
 
-    def tribal_courts(self) -> Self:
+    def tribal_courts(self) -> models.QuerySet:
         return self.filter(jurisdictions__in=Court.TRIBAL_JURISDICTIONS)
 
-    def territorial_courts(self) -> Self:
+    def territorial_courts(self) -> models.QuerySet:
         return self.filter(jurisdictions__in=Court.TERRITORY_JURISDICTIONS)
 
-    def military_courts(self) -> Self:
+    def military_courts(self) -> models.QuerySet:
         return self.filter(jurisdictions__in=Court.MILITARY_JURISDICTIONS)
 
 
-class StateCourtsQuerySet(models.QuerySet["Court"]):
-    def all(self) -> Self:
+class StateCourtsQuerySet(models.QuerySet):
+    def all(self) -> models.QuerySet:
         return self.filter(jurisdiction__in=Court.STATE_JURISDICTIONS)
 
 
@@ -2256,7 +2254,7 @@ class Courthouse(models.Model):
         verbose_name_plural = "Courthouses"
 
 
-class ClusterCitationQuerySet[M: OpinionCluster](models.QuerySet[M]):
+class ClusterCitationQuerySet(models.query.QuerySet):
     """Add filtering on citation strings.
 
     Historically we had citations in the db as strings like, "22 U.S. 44". The
@@ -2307,7 +2305,6 @@ class OpinionCluster(AbstractDateTimeModel):
         (2, "Liberal"),
         (3, "Unspecifiable"),
     )
-
     docket = models.ForeignKey(
         Docket,
         help_text="The docket that the opinion cluster is a part of",
@@ -2579,7 +2576,7 @@ class OpinionCluster(AbstractDateTimeModel):
         blank=True,
     )
 
-    objects = ClusterCitationQuerySet[Self].as_manager()
+    objects = ClusterCitationQuerySet.as_manager()
     es_pa_field_tracker = FieldTracker(
         fields=[
             "case_name",
@@ -3088,7 +3085,6 @@ def sort_cites(c):
 OPINION_TEXT_SOURCE_FIELDS = [
     "html_with_citations",
     "xml_harvard",
-    "xml_scan",
     "html_columbia",
     "html_lawbox",
     "html_anon_2020",
@@ -3096,8 +3092,8 @@ OPINION_TEXT_SOURCE_FIELDS = [
 ]
 
 
-class OpinionQuerySet[M: Opinion](models.QuerySet[M]):
-    def with_best_text(self) -> Self:
+class OpinionQuerySet(models.QuerySet):
+    def with_best_text(self):
         """Annotates an Opinion QuerySet with best_text and best_text_source.
 
         To determine the best text, we get the first non-empty value from
@@ -3110,7 +3106,6 @@ class OpinionQuerySet[M: Opinion](models.QuerySet[M]):
         The supported source fields are:
             - html_with_citations (preferred)
             - xml_harvard
-            - xml_scan
             - html_columbia
             - html_lawbox
             - html_anon_2020
@@ -3177,7 +3172,6 @@ class Opinion(AbstractDateTimeModel):
         (ON_MOTION_TO_STRIKE, "On Motion to Strike Cost Bill"),
         (TRIAL_COURT, "Trial Court Document"),
     )
-
     cluster = models.ForeignKey(
         OpinionCluster,
         help_text="The cluster that the opinion is a part of",
@@ -3317,7 +3311,6 @@ class Opinion(AbstractDateTimeModel):
             "html_columbia",
             "html_lawbox",
             "xml_harvard",
-            "xml_scan",
             "html_anon_2020",
             "html",
             "plain_text",
@@ -3335,7 +3328,7 @@ class Opinion(AbstractDateTimeModel):
         related_name="versions",
     )
 
-    objects = OpinionQuerySet[Self].as_manager()
+    objects = OpinionQuerySet.as_manager()
 
     class Meta:
         constraints = [
@@ -3395,7 +3388,11 @@ class Opinion(AbstractDateTimeModel):
                 {"ordering_key": "Ordering key cannot be zero or negative"}
             )
 
-    def save(self, *args, **kwargs) -> None:
+    def save(
+        self,
+        *args: list,
+        **kwargs: dict,
+    ) -> None:
         self.clean()
         super().save(*args, **kwargs)
 
@@ -3730,7 +3727,7 @@ class ParentheticalGroup(models.Model):
         indexes = [models.Index(fields=["score"])]
 
 
-type TaggableType = Docket | DocketEntry | RECAPDocument | Claim
+TaggableType = TypeVar("TaggableType", Docket, DocketEntry, RECAPDocument)
 
 
 @pghistory.track()
@@ -3766,28 +3763,24 @@ class Tag(AbstractDateTimeModel):
         wish to tag.
         :return: A tuple with the tag and whether a new item was created
         """
-        match thing:
-            case Docket():
-                return self.dockets.through.objects.get_or_create(
-                    docket_id=thing.pk, tag_id=self.pk
-                )
-            case DocketEntry():
-                return self.docket_entries.through.objects.get_or_create(
-                    docketentry_id=thing.pk, tag_id=self.pk
-                )
-            case RECAPDocument():
-                return self.recap_documents.through.objects.get_or_create(
-                    recapdocument_id=thing.pk, tag_id=self.pk
-                )
-            case Claim():
-                return self.claims.through.objects.get_or_create(
-                    claim_id=thing.pk, tag_id=self.pk
-                )
-            case _:
-                assert_never(thing)
-                raise NotImplementedError(
-                    "Object type not supported for tagging."
-                )
+        if isinstance(thing, Docket):
+            return self.dockets.through.objects.get_or_create(
+                docket_id=thing.pk, tag_id=self.pk
+            )
+        elif isinstance(thing, DocketEntry):
+            return self.docket_entries.through.objects.get_or_create(
+                docketentry_id=thing.pk, tag_id=self.pk
+            )
+        elif isinstance(thing, RECAPDocument):
+            return self.recap_documents.through.objects.get_or_create(
+                recapdocument_id=thing.pk, tag_id=self.pk
+            )
+        elif isinstance(thing, Claim):
+            return self.claims.through.objects.get_or_create(
+                claim_id=thing.pk, tag_id=self.pk
+            )
+        else:
+            raise NotImplementedError("Object type not supported for tagging.")
 
 
 # class AppellateReview(models.Model):
@@ -4170,7 +4163,7 @@ class CaseTransfer(AbstractDateTimeModel):
             }
         )
         total = qs.count()
-        updated_transfers: list[Self] = []
+        updated_transfers: list[CaseTransfer] = []
         total_updated = 0
 
         for transfer in qs.iterator():

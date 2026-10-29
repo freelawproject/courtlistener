@@ -6,7 +6,7 @@ from pathlib import Path
 
 from django.conf import settings
 
-logger: logging.Logger = logging.getLogger(__name__)
+logger = logging.getLogger(__name__)
 
 BASE_DOWNLOAD_URL = "https://www.archive.org/download"
 
@@ -15,7 +15,7 @@ BASE_DOWNLOAD_URL = "https://www.archive.org/download"
 UNDATED_PATH_SEGMENT = "undated"
 
 
-def get_bucket_name(court: str, pacer_case_id: str | int | None) -> str:
+def get_bucket_name(court, pacer_case_id):
     bucketlist = ["gov", "uscourts", court, str(pacer_case_id)]
     if settings.DEBUG is True:
         bucketlist.insert(0, "dev")
@@ -93,7 +93,7 @@ def scotus_document_number_segments(
     ]
 
 
-def get_docketxml_url(court: str, pacer_case_id: str) -> str:
+def get_docketxml_url(court, pacer_case_id):
     return "{}/{}/{}".format(
         BASE_DOWNLOAD_URL,
         get_bucket_name(court, pacer_case_id),
@@ -101,7 +101,7 @@ def get_docketxml_url(court: str, pacer_case_id: str) -> str:
     )
 
 
-def get_docketxml_url_from_path(path: str) -> str:
+def get_docketxml_url_from_path(path):
     """Similar to above, but uses path of single file to figure out the rest.
 
     E.g. this:
@@ -115,36 +115,30 @@ def get_docketxml_url_from_path(path: str) -> str:
     return f"{BASE_DOWNLOAD_URL}/{bucket}/{filename}"
 
 
-def get_ia_document_url_from_path(
-    path: str, document_number: int, attachment_number: int
-) -> str:
+def get_ia_document_url_from_path(path, document_number, attachment_number):
     """Make an IA URL based on the download path of an item."""
     filename = path.rsplit("/", 1)[-1]
     bucket = ".".join(filename.split(".")[0:4])
     return f"{BASE_DOWNLOAD_URL}/{bucket}/{bucket}.{document_number}.{attachment_number}.pdf"
 
 
-def get_local_document_url_from_path(
-    path: str, document_number: int, attachment_number: int
-) -> str:
+def get_local_document_url_from_path(path, document_number, attachment_number):
     """Make a path to a local copy of a PDF."""
     filename = path.rsplit("/", 1)[-1]
     bucket = ".".join(filename.split(".")[0:4])
     return f"{bucket}.{document_number}.{attachment_number}.pdf"
 
 
-def get_pdf_url(court: str, pacer_case_id: str, filename: str) -> str:
+def get_pdf_url(court, pacer_case_id, filename):
     return f"{BASE_DOWNLOAD_URL}/{get_bucket_name(court, pacer_case_id)}/{filename}"
 
 
-def get_docket_filename(
-    court: str, pacer_case_id: str | None, ext: str
-) -> str:
+def get_docket_filename(court, pacer_case_id, ext):
     return ".".join(
         [
             "gov",
             "uscourts",
-            court,
+            str(court),
             str(pacer_case_id),
             f"docket.{ext}",
         ]
@@ -152,16 +146,13 @@ def get_docket_filename(
 
 
 def get_document_filename(
-    court: str,
-    pacer_case_id: str | None,
-    document_number: str,
-    attachment_number: int | None,
-) -> str:
+    court, pacer_case_id, document_number, attachment_number
+):
     return ".".join(
         [
             "gov",
             "uscourts",
-            court,
+            str(court),
             str(pacer_case_id),
             str(document_number),
             str(attachment_number or 0),
@@ -170,12 +161,10 @@ def get_document_filename(
     )
 
 
-PAGINATION_RE: re.Pattern[str] = re.compile(r"\b(?:Page|Pg)\s+\d+", re.I)
-PAGINATION_COLON_RE: re.Pattern[str] = re.compile(r"\bPage:\s*\d+\b", re.I)
-PAGINATION_PAGE_ID_RE: re.Pattern[str] = re.compile(
-    r"\bPageID\s+#:\s*\d+\b", re.I
-)
-PAGINATION_OF: re.Pattern[str] = re.compile(r"^\d+\s+of\s+\d+$", re.I)
+PAGINATION_RE = re.compile(r"\b(?:Page|Pg)\s+\d+", re.I)
+PAGINATION_COLON_RE = re.compile(r"\bPage:\s*\d+\b", re.I)
+PAGINATION_PAGE_ID_RE = re.compile(r"\bPageID\s+#:\s*\d+\b", re.I)
+PAGINATION_OF = re.compile(r"^\d+\s+of\s+\d+$", re.I)
 
 
 def is_page_line(line: str) -> bool:
@@ -232,7 +221,7 @@ def is_doc_common_header(line: str) -> bool:
     return False
 
 
-def needs_ocr(content: str, page_count: int | None = None) -> bool:
+def needs_ocr(content, page_count: int | None = None) -> bool:
     """Determines if OCR is needed for a PACER PDF.
 
     Every document in PACER (pretty much) has the case number written on the

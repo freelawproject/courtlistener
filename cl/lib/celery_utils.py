@@ -3,7 +3,7 @@ import inspect
 import time
 from collections.abc import Callable
 from datetime import datetime, timedelta
-from typing import Final
+from typing import Any, Final
 
 from celery import Task
 from dateutil import parser
@@ -19,7 +19,7 @@ PRIORITY_SEP: str = "\x06\x16"
 DEFAULT_PRIORITY_STEPS: list[int] = [0, 3, 6, 9]
 
 
-def clear_queue(queue_name: str) -> int:
+def clear_queue(queue_name: str):
     """Empty out a queue, nuking the tasks in it."""
     priority_names = [
         make_queue_name_for_pri(queue_name, pri)
@@ -90,18 +90,18 @@ class CeleryThrottle:
         """
 
         # These variables are Final, i.e., they're consts.
-        self.poll_interval: Final[float] = poll_interval
-        self.queue_name: Final[str] = queue_name
+        self.poll_interval: Final = poll_interval
+        self.queue_name: Final = queue_name
 
         # The only instances variables that changes is the shortage, min and
         # max variables below.
-        self.min: int = min_items
-        self.max: int = min_items * 2
+        self.min = min_items
+        self.max = min_items * 2
 
         # `shortage` stores the number of items that the queue is short by, as
         # compared to `self.max`. At init, the queue is empty, so it's short
         # by the full amount. Fill it up.
-        self.shortage: int = self.max
+        self.shortage = self.max
 
     def update_min_items(self, min_value: int) -> None:
         """Update the minimum items and adjust related parameters.
@@ -134,9 +134,7 @@ class CeleryThrottle:
                 break
 
 
-def throttle_task[**P, R](
-    rate: str, key: str | None = None
-) -> Callable[[Callable[P, R]], Callable[P, R]]:
+def throttle_task(rate: str, key: str | None = None) -> Callable:
     """A decorator for throttling tasks to a given rate.
 
     :param rate: The maximum rate that you want your task to run. Takes the
@@ -147,9 +145,9 @@ def throttle_task[**P, R](
     :return: The decorated function
     """
 
-    def decorator_func(func: Callable[P, R]) -> Callable[P, R]:
+    def decorator_func(func: Callable) -> Callable:
         @functools.wraps(func)
-        def wrapper(*args: P.args, **kwargs: P.kwargs) -> R:
+        def wrapper(*args, **kwargs) -> Any:
             # Inspect the decorated function's parameters to get the task
             # itself and the value of the parameter referenced by key.
             sig = inspect.signature(func)
@@ -286,7 +284,7 @@ def get_task_wait(
     wait until the next open window for processing. If not throttled, returns
     zero (i.e., don't wait).
     """
-    task_sub_key_suffix = f":{key}" if key else ""
+    task_sub_key_suffix = f":{str(key)}" if key else ""
     task_sub_key = f"{task.name}{task_sub_key_suffix}"
     throttle_key = f"celery_throttle:{task_sub_key}"
 

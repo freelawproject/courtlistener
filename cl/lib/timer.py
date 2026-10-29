@@ -1,15 +1,14 @@
 import time
-from collections.abc import Callable
 
 
-def print_timing[**P, R](func: Callable[P, R]) -> Callable[P, R]:
+def print_timing(func):
     """A decorator to print the length of time a function takes to
     complete.
     """
 
-    def wrapper(*args: P.args, **kwargs: P.kwargs) -> R:
+    def wrapper(*arg):
         t1 = time.time()
-        res = func(*args, **kwargs)
+        res = func(*arg)
         t2 = time.time()
         print(f"Completed in {t2 - t1:0.1f} seconds.")
         return res

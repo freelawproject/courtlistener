@@ -1,17 +1,10 @@
-from collections.abc import Callable, Iterable
 from functools import partial
 
 from celery.canvas import chain
 from django.conf import settings
 from django.core.exceptions import FieldDoesNotExist, ObjectDoesNotExist
 from django.db import transaction
-from django.db.models import Model
-from django.db.models.signals import (
-    ModelSignal,
-    m2m_changed,
-    post_delete,
-    post_save,
-)
+from django.db.models.signals import m2m_changed, post_delete, post_save
 from model_utils.tracker import FieldInstanceTracker
 
 from cl.alerts.tasks import (
@@ -56,18 +49,13 @@ from cl.search.tasks import (
     update_children_docs_by_query,
     update_es_document,
 )
-from cl.search.types import (
-    ESDocumentType,
-    ESModelType,
-)
-
-type DocumentModelMapping = dict[str, dict[type[Model], dict]]
+from cl.search.types import ESDocumentClassType, ESModelType
 
 
 def check_fields_that_changed(
-    current_instance: Model,
+    current_instance: ESModelType,
     tracked_set: FieldInstanceTracker,
-    previous_instance: Model | None = None,
+    previous_instance: ESModelType | None = None,
 ) -> list[str]:
     """Identify which fields have changed between two instances of a model or
     between an instance and its previous state.
@@ -123,7 +111,7 @@ def check_fields_that_changed(
 
 
 def updated_fields(
-    instance: Model, es_document: type[ESDocumentType]
+    instance: ESModelType, es_document: ESDocumentClassType
 ) -> list[str]:
     """Look for changes in the tracked fields of an instance.
     :param instance: The instance to check for changed fields.
@@ -173,9 +161,9 @@ def get_fields_to_update(
 
 
 def update_es_documents(
-    main_model: type[ESModelType],
-    es_document: type[ESDocumentType],
-    instance: Model,
+    main_model: ESModelType,
+    es_document: ESDocumentClassType,
+    instance: ESModelType,
     created: bool,
     mapping_fields: dict,
 ) -> None:
@@ -358,9 +346,9 @@ def update_es_documents(
 
 
 def update_remove_m2m_documents(
-    main_model: type[ESModelType],
-    es_document: type[ESDocumentType],
-    instance: Model,
+    main_model: ESModelType,
+    es_document: ESDocumentClassType,
+    instance: ESModelType,
     mapping_fields: dict,
     affected_field: str,
 ) -> None:
@@ -374,7 +362,7 @@ def update_remove_m2m_documents(
     :return: None
     """
     for key, fields_map in mapping_fields.items():
-        if main_model.__name__.lower() != key:
+        if main_model.__name__.lower() != key:  # type: ignore
             # The m2m relationship is not defined in the main model but
             # we use the relationship to add data to the ES documents.
             main_objects = main_model.objects.filter(**{key: instance})
@@ -388,9 +376,9 @@ def update_remove_m2m_documents(
             )
 
 
-def update_m2m_field_in_es_document[DocumentT: ESDocumentType](
-    instance: Model,
-    es_document: type[DocumentT],
+def update_m2m_field_in_es_document(
+    instance: ESModelType,
+    es_document: ESDocumentClassType,
     affected_field: str,
 ) -> None:
     """Update a single field created using a many-to-many relationship.
@@ -429,9 +417,9 @@ def update_m2m_field_in_es_document[DocumentT: ESDocumentType](
 
 
 def update_reverse_related_documents(
-    main_model: type[ESModelType],
-    es_document: type[ESDocumentType],
-    instance: Model,
+    main_model: ESModelType,
+    es_document: ESDocumentClassType,
+    instance: ESModelType,
     query_string: str,
     affected_fields: list[str],
     fields_map: dict[str, str],
@@ -527,9 +515,9 @@ def update_reverse_related_documents(
 
 
 def delete_reverse_related_documents(
-    main_model: type[ESModelType],
-    es_document: type[ESDocumentType],
-    instance: Model,
+    main_model: ESModelType,
+    es_document: ESDocumentClassType,
+    instance: ESModelType,
     query_string: str,
     affected_fields: list[str],
 ) -> None:
@@ -639,7 +627,7 @@ def delete_reverse_related_documents(
 
 
 def allow_es_audio_indexing(
-    instance: Model,
+    instance: ESModelType,
     update_fields: list[str] | None,
 ):
     """Check conditions to abort Elasticsearch indexing for Audio instances.
@@ -670,7 +658,7 @@ def remove_non_judge_person_and_positions_from_index(
     :return: None
     """
     try:
-        if (person := instance.person) is None or person.is_judge:
+        if instance.person.is_judge:
             # The Person is still a Judge, return.
             return
 
@@ -709,12 +697,7 @@ class ESSignalProcessor:
         "update_reverse_related_{}_on_delete"
     )
 
-    def __init__(
-        self,
-        main_model: type[ESModelType],
-        es_document: type[ESDocumentType],
-        documents_model_mapping: DocumentModelMapping,
-    ):
+    def __init__(self, main_model, es_document, documents_model_mapping):
         self.main_model = main_model
         self.es_document = es_document
         self.documents_model_mapping = documents_model_mapping
@@ -773,12 +756,7 @@ class ESSignalProcessor:
         )
 
     @staticmethod
-    def connect_signals(
-        models: Iterable[type[Model]],
-        handler: Callable[..., None],
-        signal_to_uid_mapping: dict[ModelSignal, str],
-        weak: bool = False,
-    ) -> None:
+    def connect_signals(models, handler, signal_to_uid_mapping, weak=False):
         """Helper method to connect signals to a handler for multiple models."""
         for model in models:
             model_name = model.__name__.lower()
@@ -791,17 +769,15 @@ class ESSignalProcessor:
                 )
 
     @elasticsearch_enabled
-    def handle_save[M: Model](
+    def handle_save(
         self,
-        sender: type[M],
-        instance: M | None = None,
+        sender,
+        instance=None,
         created=False,
         update_fields=None,
         **kwargs,
-    ) -> None:
+    ):
         """Receiver function that gets called after an object instance is saved"""
-        if instance is None:
-            raise TypeError("Signals did not send an instance")
 
         if update_fields and "view_count" in update_fields:
             # If the save includes 'view_count' in the update fields, abort
@@ -862,12 +838,8 @@ class ESSignalProcessor:
         )
 
     @elasticsearch_enabled
-    def handle_delete[M: Model](
-        self, sender: type[M], instance: M | None = None, **kwargs
-    ) -> None:
+    def handle_delete(self, sender, instance, **kwargs):
         """Receiver function that gets called after an object instance is deleted"""
-        if instance is None:
-            raise TypeError("Signals did not send an instance")
 
         doc_id, routing_id = get_es_doc_id_and_parent_id(
             self.es_document, instance
@@ -885,13 +857,8 @@ class ESSignalProcessor:
         )
 
     @elasticsearch_enabled
-    def handle_m2m[M: Model](
-        self, sender: type[M], instance: M | None = None, action=None, **kwargs
-    ) -> None:
+    def handle_m2m(self, sender, instance=None, action=None, **kwargs):
         """Receiver function that gets called after a m2m relation is modified"""
-        if instance is None:
-            raise TypeError("Signals did not send an instance")
-
         if action == "post_add" or action == "post_remove":
             mapping_fields = self.documents_model_mapping["m2m"][sender]
             for key, fields_map in mapping_fields.items():
@@ -905,15 +872,10 @@ class ESSignalProcessor:
                 )
 
     @elasticsearch_enabled
-    def handle_reverse_actions[M: Model](
-        self, sender: type[M], instance: M | None = None, **kwargs
-    ) -> None:
+    def handle_reverse_actions(self, sender, instance=None, **kwargs):
         """Receiver function that gets called after a reverse relation is
         created, updated or removed.
         """
-        if instance is None:
-            raise TypeError("Signals did not send an instance")
-
         mapping_fields = self.documents_model_mapping["reverse"][sender]
         for query_string, fields_map in mapping_fields.items():
             match instance:
@@ -954,15 +916,10 @@ class ESSignalProcessor:
             )
 
     @elasticsearch_enabled
-    def handle_reverse_actions_delete[M: Model](
-        self, sender: type[M], instance: M | None = None, **kwargs
-    ) -> None:
+    def handle_reverse_actions_delete(self, sender, instance=None, **kwargs):
         """Receiver function that gets called after a reverse relation is
         removed.
         """
-        if instance is None:
-            raise TypeError("Signals did not send an instance")
-
         mapping_fields = self.documents_model_mapping["reverse-delete"][sender]
         for query_string, fields_map in mapping_fields.items():
             try:

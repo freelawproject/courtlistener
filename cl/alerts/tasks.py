@@ -39,7 +39,6 @@ from cl.api.tasks import (
 from cl.celery_init import app
 from cl.custom_filters.templatetags.text_filters import best_case_name
 from cl.favorites.models import Note, UserTag
-from cl.favorites.utils import build_dual_read_query
 from cl.lib.command_utils import logger
 from cl.lib.decorators import retry
 from cl.lib.redis_utils import (
@@ -196,9 +195,7 @@ def get_docket_notes_and_tags_by_user(
 
     notes = None
     note = (
-        Note.objects.filter(
-            build_dual_read_query(Docket, d_pk), user_id=user_pk
-        )
+        Note.objects.filter(docket_id=d_pk, user_id=user_pk)
         .only("notes")
         .first()
     )
@@ -234,17 +231,7 @@ def make_alert_messages(
         "count": de_count,
         "case_name": case_name,
     }
-    # TODO: Might be good as a TypedDict, but that seems like overkill for now
-    email_context: dict[
-        str,
-        list[DocketEntry]
-        | list[SCOTUSDocketEntry]
-        | int
-        | Docket
-        | None
-        | str
-        | list[UserTag],
-    ] = {
+    email_context = {
         "new_des": new_des,
         "count": de_count,
         "docket": d,
@@ -489,7 +476,7 @@ def send_recap_email_user_not_found(recap_email_recipients: list[str]) -> None:
 
 
 def send_webhook_alert_hits(
-    alert_user: User, hits: list[SearchAlertHitType]
+    alert_user: UserProfile.user, hits: list[SearchAlertHitType]
 ) -> bool:
     """Send webhook alerts for search hits.
     :param alert_user: The user profile object associated with the webhooks.
@@ -500,7 +487,6 @@ def send_webhook_alert_hits(
 
     webhook_sent = False
     for alert, search_type, documents, num_docs in hits:
-        # pyrefly:ignore[missing-attribute]
         user_webhooks = alert_user.webhooks.filter(
             event_type=WebhookEventType.SEARCH_ALERT, enabled=True
         )
@@ -539,7 +525,7 @@ def send_search_alert_emails(
             continue
 
         subject = build_alert_email_subject(hits)
-        alert_user = User.objects.get(pk=user_id)
+        alert_user: UserProfile.user = User.objects.get(pk=user_id)
         context = {
             "hits": hits,
             "hits_limit": settings.SCHEDULED_ALERT_HITS_LIMIT,
@@ -580,39 +566,16 @@ def send_search_alert_emails(
 @retry(IntegrityError, tries=3, delay=0.5, backoff=1)
 def create_schedule_alerts_hits_in_bulk(
     scheduled_hits: list[ScheduledAlertHit],
-) -> int:
+) -> None:
     """Create ScheduledAlertHit records in bulk.
 
-    Hits whose Alert no longer exists are dropped, since a user can delete an
-    alert between the moment it is matched and the moment its hits are written,
-    which would otherwise raise an FK IntegrityError for the whole batch.
-
-    Rows are inserted in batches of settings.SCHEDULED_ALERT_HIT_BATCH_SIZE to
-    bound the memory psycopg uses while building each INSERT. bulk_create wraps
-    a multi-batch insert in its own transaction, so the IntegrityError retry
-    cannot re-insert batches that already committed.
+    Uses bulk_create to persist a list of ScheduledAlertHit instances in a
+    single database operation. Do retries upon IntegrityError.
 
     :param scheduled_hits: A list of ScheduledAlertHit instances to be created.
-    :return: The number of ScheduledAlertHit records created.
+    :return: None
     """
-    if not scheduled_hits:
-        return 0
-
-    existing_alert_ids = set(
-        Alert.objects.filter(
-            pk__in={hit.alert_id for hit in scheduled_hits}
-        ).values_list("pk", flat=True)
-    )
-    hits_to_create = [
-        hit for hit in scheduled_hits if hit.alert_id in existing_alert_ids
-    ]
-    if not hits_to_create:
-        return 0
-
-    ScheduledAlertHit.objects.bulk_create(
-        hits_to_create, batch_size=settings.SCHEDULED_ALERT_HIT_BATCH_SIZE
-    )
-    return len(hits_to_create)
+    ScheduledAlertHit.objects.bulk_create(scheduled_hits)
 
 
 @app.task(ignore_result=True)
@@ -642,6 +605,7 @@ def percolator_response_processing(response: SendAlertsResponse) -> None:
     r = get_redis_interface("CACHE")
     recap_document_hits = [hit.id for hit in rd_alerts_triggered]
     docket_hits = [hit.id for hit in d_alerts_triggered]
+    alerts_triggered_ids = []
     for hit in main_alerts_triggered:
         # Create a deep copy of the original 'document_content' to allow
         # independent highlighting for each alert triggered.
@@ -666,7 +630,7 @@ def percolator_response_processing(response: SendAlertsResponse) -> None:
             # Ignore it.
             continue
 
-        alert_user = alert_triggered.user
+        alert_user: UserProfile.user = alert_triggered.user
         # The (document_type, document_id) pairs to record in the alert_hits
         # Redis sets if this hit ends up being delivered or scheduled.
         alert_set_writes: list[tuple[str, int]] = []
@@ -752,7 +716,7 @@ def percolator_response_processing(response: SendAlertsResponse) -> None:
         webhook_sent = send_webhook_alert_hits(alert_user, hits)
         schedule_alert = not (
             alert_triggered.rate == Alert.REAL_TIME
-            and not alert_user.profile.is_eligible_for_rt_search_alerts  # pyrefly:ignore[missing-attribute]
+            and not alert_user.profile.is_eligible_for_rt_search_alerts
         )
         # Only record the hit in the alert_hits Redis sets if the alert was
         # actually delivered (webhook) or will be scheduled (email).
@@ -787,9 +751,22 @@ def percolator_response_processing(response: SendAlertsResponse) -> None:
                 object_id=object_id,
             )
         )
+        alerts_triggered_ids.append(alert_triggered_id)
 
+    # Filter out scheduled_hits_to_create by alerts that still exist in the
+    # database to prevent an IntegrityError caused by a race condition when
+    # an alert is deleted.
+    existing_ids = set(
+        Alert.objects.filter(pk__in=alerts_triggered_ids).values_list(
+            "pk", flat=True
+        )
+    )
+    scheduled_hits_to_create_filtered = [
+        hit for hit in scheduled_hits_to_create if hit.alert_id in existing_ids
+    ]
     # Create scheduled RT, DAILY, WEEKLY and MONTHLY Alerts in bulk.
-    create_schedule_alerts_hits_in_bulk(scheduled_hits_to_create)
+    if scheduled_hits_to_create_filtered:
+        create_schedule_alerts_hits_in_bulk(scheduled_hits_to_create_filtered)
 
 
 @app.task(

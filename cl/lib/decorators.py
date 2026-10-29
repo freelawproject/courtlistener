@@ -2,107 +2,71 @@ import asyncio
 import logging
 import re
 import time
-from collections.abc import Callable, Coroutine
+from collections.abc import Callable
 from functools import wraps
 from hashlib import md5
-from inspect import iscoroutinefunction
 from math import ceil
-from typing import Any, cast
+from typing import Any, TypeVar
 from urllib.parse import urlparse
 
-from asgiref.sync import sync_to_async
+from asgiref.sync import iscoroutinefunction, sync_to_async
 from django.conf import settings
 from django.core.cache import caches
 from django.core.cache.backends.base import InvalidCacheBackendError
 from django.db import models
-from django.http import HttpResponse
-from django.http.request import HttpRequest
-from django.template.response import SimpleTemplateResponse
 from django.utils.cache import patch_response_headers
 
 from cl.lib.redis_utils import get_redis_interface
-from cl.lib.types import DjangoViewType
 
-logger: logging.Logger = logging.getLogger(__name__)
+logger = logging.getLogger(__name__)
 
 # In-memory cache for tiered_cache decorator (per-process, fastest tier)
 # Data model: {cache_key: (expiry_timestamp, cached_value)}
 # - cache_key: string built from function module, name, and arguments
-# - expiry_timestamp: float, the earlier of time.time() + memory_timeout and
-#   the moment the backing Redis entry lapses, so a memory entry can never
-#   outlive the Redis entry it came from
+# - expiry_timestamp: float (time.time() + timeout) when the entry expires
 # - cached_value: the return value of the decorated function
 _memory_cache: dict[str, tuple[float, Any]] = {}
+
+T = TypeVar("T")
 
 
 def get_tiered_cache_prefix() -> str:
     """Return the Redis key prefix for tiered_cache.
 
     Useful for avoiding test collisions when overridden via mock.
-
-    The ``v2`` suffix marks the payload shape Redis entries carry (see
-    ``tiered_cache``). Bump it whenever that shape changes, so entries written
-    by a previous deploy are ignored rather than misread while they age out.
     """
-    return "tiered:v2"
+    return "tiered"
 
 
-def tiered_cache[**P, R](
-    *,
-    memory_timeout: int,
-    redis_timeout: int,
-) -> Callable[[Callable[P, R]], Callable[P, R]]:
-    """Two-tier caching decorator: memory -> Django cache (Redis) -> function.
+def tiered_cache(
+    timeout: int,
+) -> Callable[[Callable[..., T]], Callable[..., T]]:
+    """Tiered caching decorator: memory -> Django cache (Redis) -> function.
 
-    The tiers are:
+    Implements a three-tier caching strategy for optimal performance:
+    - Tier 1: In-memory dict (fastest, per-process)
+    - Tier 2: Django cache backend (Redis, shared across processes)
+    - Tier 3: Execute the wrapped function (slowest, e.g., DB query)
 
-    - Tier 1: An in-memory dict, per-process and fastest.
-    - Tier 2: The Django cache backend (Redis), shared across processes.
+    The memory cache is checked first for speed, then Redis for cross-process
+    sharing, and finally the function is called if neither has the value.
 
-    Memory is checked first for speed, then Redis for cross-process sharing.
-    If neither has the value, the wrapped function is called and both tiers
-    are populated.
+    The Redis cache timeout is set to 1 second less than the memory cache to
+    prevent a race condition where the memory cache could be refreshed from
+    Redis just before Redis expires, giving memory the full timeout again.
 
-    The memory tier is a per-process front for the shared Redis tier, so
-    ``memory_timeout`` MUST NOT exceed ``redis_timeout``. A misconfigured pair
-    raises ValueError at decoration time, which means at import time for a
-    module-level decorator.
-
-    The ordering also matters for invalidation: ``clear_tiered_cache()``
-    empties Redis for everyone, but only clears the memory tier of the process
-    that calls it. Every other process stays stale for up to
-    ``memory_timeout``.
-
-    :param memory_timeout: Timeout in seconds for the in-memory tier. Must be
-        at least 1 second and no greater than ``redis_timeout``.
-    :param redis_timeout: Timeout in seconds for the Redis tier. Must be at
-        least 1 second.
-    :raises ValueError: If either timeout is under a second, or if the memory
-        timeout is longer than the Redis timeout.
+    :param timeout: Cache timeout in seconds for the memory tier.
     :return: Decorated function with tiered caching.
 
     Example:
-        @tiered_cache(memory_timeout=60, redis_timeout=300)
+        @tiered_cache(timeout=300)
         def get_expensive_data(key: str) -> dict:
             return expensive_db_query(key)
     """
-    if memory_timeout < 1 or redis_timeout < 1:
-        raise ValueError(
-            "tiered_cache timeouts must be at least 1 second, got "
-            f"memory_timeout={memory_timeout}, redis_timeout={redis_timeout}."
-        )
-    if memory_timeout > redis_timeout:
-        raise ValueError(
-            "tiered_cache memory_timeout must not exceed redis_timeout, got "
-            f"memory_timeout={memory_timeout}, redis_timeout={redis_timeout}. "
-            "The memory tier is a per-process front for the shared Redis "
-            "tier; if it outlives Redis, processes never see refreshed "
-            "values."
-        )
 
-    def decorator(func: Callable[P, R]) -> Callable[P, R]:
+    def decorator(func: Callable[..., T]) -> Callable[..., T]:
         @wraps(func)
-        def wrapper(*args: P.args, **kwargs: P.kwargs) -> R:
+        def wrapper(*args: Any, **kwargs: Any) -> T:
             # Build cache key from function name and arguments
             key_parts = [func.__module__, func.__name__]
             key_parts.extend(str(arg) for arg in args)
@@ -119,27 +83,20 @@ def tiered_cache[**P, R](
                 # Expired, remove from memory
                 del _memory_cache[cache_key]
 
-            # Tier 2: Check Django cache (Redis). Entries are
-            # (redis_expiry, value); a bare None is the only miss signal, so
-            # a cached None value still reads as a hit.
+            # Tier 2: Check Django cache (Redis)
             redis_cache = caches["default"]
-            if (entry := redis_cache.get(cache_key)) is not None:
-                redis_expiry, value = entry
+            value = redis_cache.get(cache_key)
+            if value is not None:
                 # Store in memory cache for faster subsequent access
-                _memory_cache[cache_key] = (
-                    min(current_time + memory_timeout, redis_expiry),
-                    value,
-                )
+                _memory_cache[cache_key] = (current_time + timeout, value)
                 return value
 
-            # Cache miss in both tiers: call the function and populate them
+            # Tier 3: Call the function
             value = func(*args, **kwargs)
-            redis_expiry = current_time + redis_timeout
-            redis_cache.set(cache_key, (redis_expiry, value), redis_timeout)
-            _memory_cache[cache_key] = (
-                min(current_time + memory_timeout, redis_expiry),
-                value,
-            )
+
+            # Store in both caches (Redis gets 1 second less to prevent race)
+            redis_cache.set(cache_key, value, timeout - 1)
+            _memory_cache[cache_key] = (current_time + timeout, value)
 
             return value
 
@@ -162,13 +119,13 @@ def clear_tiered_cache() -> None:
         r.delete(*keys)
 
 
-def retry[**P, R](
+def retry(
     ExceptionToCheck: type[Exception] | tuple[type[Exception], ...],
     tries: int = 4,
     delay: float = 3,
     backoff: float = 2,
     logger: logging.Logger | None = None,
-) -> Callable[[Callable[P, R]], Callable[P, R]]:
+) -> Callable:
     """Retry calling the decorated function using an exponential backoff.
 
     https://www.saltycrane.com/blog/2009/11/trying-out-retry-decorator-python/
@@ -196,13 +153,11 @@ def retry[**P, R](
         else:
             print(msg % params)
 
-    def deco_retry(
-        f: Callable[P, R],
-    ) -> Callable[P, R]:
+    def deco_retry(f: Callable) -> Callable:
         if iscoroutinefunction(f):
 
             @wraps(f)
-            async def f_retry(*args: P.args, **kwargs: P.kwargs) -> R:
+            async def f_retry(*args, **kwargs):
                 mtries, mdelay = tries, delay
                 while mtries > 1:
                     try:
@@ -214,11 +169,11 @@ def retry[**P, R](
                         mdelay *= backoff
                 return await f(*args, **kwargs)
 
-            return cast(Callable[P, R], f_retry)  # true decorator
+            return f_retry  # true decorator
         else:
 
             @wraps(f)
-            def f_retry(*args: P.args, **kwargs: P.kwargs) -> R:
+            def f_retry(*args, **kwargs):
                 mtries, mdelay = tries, delay
                 while mtries > 1:
                     try:
@@ -235,16 +190,7 @@ def retry[**P, R](
     return deco_retry
 
 
-def cache_page_ignore_params[
-    **P,
-    Request: HttpRequest,
-    Response: Coroutine[Any, Any, HttpResponse],
-](
-    timeout: int, cache_alias: str = "default"
-) -> Callable[
-    [DjangoViewType[P, Request, Response]],
-    DjangoViewType[P, Request, Coroutine[Any, Any, HttpResponse]],
-]:
+def cache_page_ignore_params(timeout: int, cache_alias: str = "default"):
     """Cache the result of a view while ignoring URL query parameters.
     Ensuring that the cache is consistent for different requests with varying
     query strings.
@@ -261,13 +207,9 @@ def cache_page_ignore_params[
     :return: The decorated view function, caching its response.
     """
 
-    def decorator(
-        view_func: DjangoViewType[P, Request, Response],
-    ) -> DjangoViewType[P, Request, Coroutine[Any, Any, HttpResponse]]:
+    def decorator(view_func):
         @wraps(view_func)
-        async def _wrapped_view(
-            request: Request, *args: P.args, **kwargs: P.kwargs
-        ) -> HttpResponse:
+        async def _wrapped_view(request, *args, **kwargs):
             url_path = urlparse(request.build_absolute_uri()).path
             hash_key = md5(url_path.encode("ascii"), usedforsecurity=False)
 
@@ -304,7 +246,7 @@ def cache_page_ignore_params[
             await sync_to_async(patch_response_headers)(
                 response, cache_timeout=timeout
             )
-            if isinstance(response, SimpleTemplateResponse):
+            if hasattr(response, "render") and callable(response.render):
                 # Render the response before caching it.
                 # Required for TemplateResponse views.
                 response.add_post_render_callback(
@@ -321,14 +263,14 @@ def cache_page_ignore_params[
     return decorator
 
 
-FIELD_DOCSTRING_EXTRACTION_RE: re.Pattern[str] = re.compile(
+FIELD_DOCSTRING_EXTRACTION_RE = re.compile(
     r":(?:var|ivar|cvar)\s+([a-z_][a-z0-9_]*):([^:]+)",
     re.IGNORECASE | re.MULTILINE,
 )
 _SPACES_RE = re.compile(r"\s+")
 
 
-def document_model[M: models.Model](model: type[M]) -> type[M]:
+def document_model(model: type[models.Model]) -> type[models.Model]:
     """
     Decorator for Django models to use docstrings to populate unset
     help_text and db_comment field attributes.
@@ -367,14 +309,18 @@ def document_model[M: models.Model](model: type[M]) -> type[M]:
     return model
 
 
-def time_call[**P, R](
+def time_call[**ParamType, ReturnType](
     fn_logger: logging.Logger,
-) -> Callable[[Callable[P, R]], Callable[P, R]]:
+) -> Callable[
+    [Callable[ParamType, ReturnType]], Callable[ParamType, ReturnType]
+]:
     def decorator(
-        f: Callable[P, R],
-    ) -> Callable[P, R]:
+        f: Callable[ParamType, ReturnType],
+    ) -> Callable[ParamType, ReturnType]:
         @wraps(f)
-        def wrapper(*args: P.args, **kwargs: P.kwargs) -> R:
+        def wrapper(
+            *args: ParamType.args, **kwargs: ParamType.kwargs
+        ) -> ReturnType:
             start = time.perf_counter_ns()
             result = f(*args, **kwargs)
             elapsed = time.perf_counter_ns() - start

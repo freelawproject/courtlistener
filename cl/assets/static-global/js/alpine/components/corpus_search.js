@@ -1,19 +1,48 @@
+const fieldsetIdSeeds = {
+  opinions: 'o-fieldset',
+  recap: 'r-fieldset',
+  oralArgs: 'oa-fieldset',
+  judges: 'p-fieldset',
+};
+
 document.addEventListener('alpine:init', () => {
   /** STORE
    * Values are shared across component instances.
    * */
   Alpine.store('corpusSearch', {
     scopeMenuExpanded: false,
-    selected: '',
+    selected: 'Case Law',
     keywordQuery: '',
-    searchScopes: [],
-    init() {
-      const scopeData = document.getElementById('corpus-search-scopes');
-      this.searchScopes = JSON.parse(scopeData.textContent);
-      this.selected = this.searchScopes[0].label;
-    },
+    searchScopes: [
+      {
+        label: 'Case Law',
+        type: 'o',
+        shortDescription: '10M+ Opinions',
+        fieldset: fieldsetIdSeeds['opinions'],
+      },
+      {
+        label: 'RECAP Archive',
+        type: 'r',
+        shortDescription: '500M+ Records',
+        fieldset: fieldsetIdSeeds['recap'],
+      },
+      {
+        label: 'Oral Arguments',
+        type: 'oa',
+        shortDescription: '90k+ Audio Files',
+        fieldset: fieldsetIdSeeds['oralArgs'],
+      },
+      {
+        label: 'Judges',
+        type: 'p',
+        shortDescription: '15k+ Profiles',
+        fieldset: fieldsetIdSeeds['judges'],
+      },
+    ],
     get selectedScope() {
-      return this.searchScopes.find((scope) => scope.label === this.selected) ?? this.searchScopes[0];
+      const index = this.searchScopes.findIndex((scope) => scope.label === this.selected);
+      if (index === -1) return 'o';
+      return this.searchScopes[index];
     },
   });
 
@@ -40,15 +69,24 @@ document.addEventListener('alpine:init', () => {
       return this.scopeMenuExpanded ? 'transform rotate-180' : '';
     },
     get corpusSearchIdGroup() {
-      const fieldsetIdGroup = this.searchScopes.map((scope) => `${scope.type}-fieldset`);
+      const fieldsetIdGroup = [
+        fieldsetIdSeeds['opinions'],
+        fieldsetIdSeeds['recap'],
+        fieldsetIdSeeds['oralArgs'],
+        fieldsetIdSeeds['judges'],
+      ];
       return ['scope-menu', 'trigger-button', ...fieldsetIdGroup];
     },
     get corpusInputIdGroup() {
       return ['corpus-search-input'];
     },
-    get fieldsetId() {
-      const scope = this.searchScopes.find((scope) => scope.label === this.$el.dataset?.scope);
-      return scope ? this.$id(`${scope.type}-fieldset`) : null;
+    get fieldsetIds() {
+      return {
+        opinions: this.$id(fieldsetIdSeeds['opinions']),
+        recap: this.$id(fieldsetIdSeeds['recap']),
+        oralArgs: this.$id(fieldsetIdSeeds['oralArgs']),
+        judges: this.$id(fieldsetIdSeeds['judges']),
+      };
     },
     get menuId() {
       return this.$id('scope-menu');
@@ -121,7 +159,7 @@ document.addEventListener('alpine:init', () => {
      *  */
     updateFieldsets(newSelected) {
       const updateFieldset = (scope) => {
-        const fieldsetId = this.$id(`${scope.type}-fieldset`);
+        const fieldsetId = this.$id(scope.fieldset);
         const fieldsetEl = document.getElementById(fieldsetId);
         if (!fieldsetEl) return;
         if (newSelected === scope.label) fieldsetEl.removeAttribute('disabled');

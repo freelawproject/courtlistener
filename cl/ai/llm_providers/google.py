@@ -1,9 +1,10 @@
 import json
 import logging
 import mimetypes
+import os
 import tempfile
 from datetime import date
-from typing import Any, NotRequired, TypedDict
+from typing import Any, TypedDict
 
 from google import genai
 from google.genai import types
@@ -28,52 +29,6 @@ SUPPORTED_GEMINI_MODELS: dict[str, date | None] = {
     "gemini-2.5-flash": date(2026, 10, 16),
     "gemini-2.5-flash-lite": date(2026, 10, 16),
 }
-
-
-class BatchTask(TypedDict):
-    """Input for one request in a batch.
-
-    ``input_file_path`` is uploaded to the Google File Service, and
-    ``input_text`` is sent inline. Both may be given, and both are placed
-    before the user prompt.
-    """
-
-    llm_key: str
-    input_file_path: NotRequired[str]
-    input_text: NotRequired[str]
-
-
-class BatchContent(TypedDict):
-    """A user turn in a batch request.
-
-    Narrows the SDK's ``ContentDict``, whose fields are all optional, to the
-    fields that are always populated here.
-    """
-
-    parts: list[types.PartDict]
-    role: str
-
-
-class BatchRequestBody(TypedDict):
-    """The ``GenerateContentRequest`` body of a batch input file line.
-
-    Unlike the SDK's ``InlinedRequestDict``, which targets inline batches,
-    this is the REST request shape that file-based batches expect, where
-    ``cached_content`` sits beside ``contents`` rather than under ``config``.
-    """
-
-    contents: list[BatchContent]
-    cached_content: NotRequired[str]
-
-
-class BatchRequest(TypedDict):
-    """A single line of a batch input JSONL file.
-
-    ``key`` is echoed back on the matching result line.
-    """
-
-    key: str
-    request: BatchRequestBody
 
 
 class ProcessedResult(TypedDict):
@@ -246,22 +201,27 @@ class GoogleGenAIBatchWrapper:
         return cached_content.name
 
     def prepare_batch_requests(
-        self, tasks_data: list[BatchTask], user_prompt: str
-    ) -> list[BatchRequest]:
+        self, tasks_data: list[dict[str, Any]], user_prompt: str
+    ) -> list[dict]:
         """
-        Prepares batch input lines for a batch job from task data.
+        Prepares request dictionaries for a batch job from raw task data.
 
         For each task, it uploads its input file (if provided) to the Google
         File Service and constructs the request payload.
 
-        :param tasks_data: The tasks to build requests for.
+        :param tasks_data: A list of dictionaries, where each dict represents a task.
+                           Each dict must have an 'llm_key', and either an
+                           'input_file_path' or 'input_text'.
         :param user_prompt: The user prompt text to be appended to each request.
-        :return: A list of batch requests ready for JSONL formatting.
+        :return: A list of request dictionaries ready for JSONL formatting.
         """
-        batch_requests: list[BatchRequest] = []
+        batch_requests = []
         for task_data in tasks_data:
-            llm_key = task_data["llm_key"]
-            parts: list[types.PartDict] = []
+            llm_key = task_data.get("llm_key")
+            if not llm_key:
+                continue
+
+            parts = []
             if file_path := task_data.get("input_file_path"):
                 mime_type, _ = mimetypes.guess_type(file_path)
                 if not mime_type:
@@ -287,19 +247,16 @@ class GoogleGenAIBatchWrapper:
 
             parts.append({"text": user_prompt})
 
-            batch_requests.append(
-                {
-                    "key": llm_key,
-                    "request": {
-                        "contents": [{"parts": parts, "role": "user"}]
-                    },
-                }
-            )
+            request_dict = {
+                "key": llm_key,
+                "request": {"contents": [{"parts": parts, "role": "user"}]},
+            }
+            batch_requests.append(request_dict)
         return batch_requests
 
     def execute_batch(
         self,
-        requests: list[BatchRequest],
+        requests: list[dict],
         system_prompt: str | None = None,
         cache_display_name: str | None = "cl-default-cache",
         batch_display_name: str | None = "CourtListener Batch Job",
@@ -310,7 +267,7 @@ class GoogleGenAIBatchWrapper:
 
         Requires ``model_name`` to have been set at construction time.
 
-        :param requests: Batch requests from ``prepare_batch_requests``.
+        :param requests: A list of prepared request dictionaries.
         :param system_prompt: The system prompt text to use for this batch.
         :param cache_display_name: An optional, stable name for the system prompt cache.
         :param batch_display_name: An optional display name for the job in the Google Cloud console.
@@ -333,18 +290,22 @@ class GoogleGenAIBatchWrapper:
         jsonl_content = "\n".join(json.dumps(req) for req in requests)
 
         with tempfile.NamedTemporaryFile(
-            mode="w+", delete_on_close=False, suffix=".jsonl"
+            mode="w+", delete=False, suffix=".jsonl"
         ) as temp_f:
             temp_f.write(jsonl_content)
             temp_f.flush()
+            temp_file_path = temp_f.name
 
+        try:
             jsonl_file = self.client.files.upload(
-                file=temp_f.name,
+                file=temp_file_path,
                 config=types.UploadFileConfig(
                     display_name=batch_display_name,
                     mime_type="application/jsonl",
                 ),
             )
+        finally:
+            os.remove(temp_file_path)
 
         config = types.CreateBatchJobConfig(display_name=batch_display_name)
 

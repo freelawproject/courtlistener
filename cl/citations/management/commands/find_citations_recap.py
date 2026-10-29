@@ -12,6 +12,7 @@ from cl.citations.tasks import (
 from cl.lib.argparse_types import valid_date_time
 from cl.lib.celery_utils import CeleryThrottle
 from cl.lib.command_utils import VerboseCommand
+from cl.lib.types import OptionsType
 from cl.search.models import RECAPDocument
 
 
@@ -114,7 +115,7 @@ class Command(VerboseCommand):
 
             self.log_progress(processed_count, doc.pk)
 
-    def handle(self, *args, **options) -> None:
+    def handle(self, *args: list[str], **options: OptionsType):
         super().handle(*args, **options)
         both_list_and_endpoints = options.get("doc_id") is not None and (
             options.get("start_id") is not None

@@ -28,8 +28,6 @@ CourtListener is migrating from Bootstrap 3 / jQuery to Tailwind v3 / Alpine.js 
 
 `IncrementalNewTemplateMiddleware` swaps templates by prepending `v2_` to the view's template name when the `use_new_design` waffle flag is active. New templates MUST be named accordingly (e.g., `v2_help/index.html`).
 
-Partials a view returns on their own, such as htmx responses, follow the same rule and live under `v2_includes/` (e.g., `includes/foo/button.html` → `v2_includes/foo/button.html`). They are swapped like any other template, but the checks that only make sense for full pages (extending `new_base.html`, registering in `V2PagesRegisterTest`) do not apply to them.
-
 ### Base template
 
 New templates MUST extend `new_base.html` (or another `v2_` template). Only `new_base.html` loads Tailwind, Alpine, and Cotton.
@@ -115,8 +113,6 @@ tag warns in the runserver console while you're on the page, and
 
 Plugins MUST be deferred (`defer=True`).
 
-The tag MUST be called from the component or block that needs the script, never from `footer-scripts`: `new_base.html` prints the registry before that block, and a `require_script` after the registry has printed raises.
-
 ### File organization
 
 | Type | Location |
@@ -136,56 +132,6 @@ Examples:
 - Allowed: `x-data="components.filters"`, `x-on:click="filters.apply"`
 - Not allowed: `x-data="{ open: true }"`, `x-on:click="count++"`
 
-## htmx
-
-v2 uses htmx 2.0.11 from `js/third_party/` (legacy keeps 1.7.0). `new_base.html` does not load it; the component that uses `hx-*` attributes MUST require it at its top, like any other script dependency:
-
-```html
-{% require_script "js/third_party/htmx" defer=True %}
-```
-
-Swapped partials live under `v2_includes/` (see [Naming & middleware](#naming--middleware)).
-
-`<body>` in `new_base.html` carries `hx-headers` with the CSRF token, and htmx elements inherit it: an `hx-post` MUST NOT repeat the header.
-
-### Disabled features
-
-`new_base.html` sets `allowEval` and `allowScriptTags` to `false` for every page, so markup cannot run arbitrary JavaScript:
-
-- `hx-on:*` does not run. Use Alpine `x-on:`; an `HX-Trigger` header dispatches its event on the requesting element.
-- `hx-trigger` filters such as `click[ctrlKey]` are ignored.
-- `js:` / `javascript:` values in `hx-vals` and `hx-headers` are not evaluated. Pass literal JSON.
-- `<script>` tags in a response are removed. Partials MUST NOT ship scripts.
-
-A blocked evaluation fires `htmx:evalDisallowedError` on the element. Reference: https://htmx.org/reference/#config
-
-## View counting
-
-`new_base.html` counts a page view for any view decorated with `track_view_counter` (`cl/favorites/decorators.py`). The decorator sets `track_events` and `event_label` in the context; the base template puts the label and the `increment-event` endpoint on `<body>` as data attributes and requires `js/alpine/composables/view_count.js`, whose `viewCount` store POSTs the label once per page load. A new v2 page needs nothing beyond the decorator on its view. Counting is per page load and per the one object the view names in `tracks`; this mechanism does not count components or secondary objects.
-
-To display the count, bind to the store from any Alpine root. The store only exists on tracked pages, so the element MUST be rendered under `track_events`:
-
-```html
-{% if track_events %}<span x-text="$store.viewCount.value"></span>{% endif %}
-```
-
-`value` is `null` until the response arrives and stays `null` when the request fails; `loaded` is true once it holds a count, for `x-show` gates since the CSP build cannot compare in markup. Failures are logged to the console and never shown to the user. The endpoint returns the count before the current view, and 0 for recognized bots, so `value` excludes the view being recorded.
-
-Cotton components rendered with `only` do not see the page context, so `track_events` is false inside them: pass it explicitly (`:track_events="track_events"`) or render the element from the page template.
-
-Label prefixes are validated by `EventCountSerializer` (`cl/favorites/api_serializers.py`). Tracking a new object type needs a new pattern there, otherwise every request fails with a 400 that only the console reports.
-
-## RECAP extension
-
-`new_base.html` requires `js/alpine/composables/recap_detection.js` on every page. The RECAP extension posts a window message on every page load of `https://www.courtlistener.com/*`; the script recognises it, adds the `recap-installed` class to `<html>` and sets the `recap_installed` cookie for seven days. `new_base.html` renders the class from the cookie on later requests, so pleas do not flash before the message arrives.
-
-To hide an "install RECAP" call to action from users who have the extension, mark the element with `data-recap-plea`. One rule in `input.css` hides every such element under `.recap-installed`; templates MUST NOT add cookie conditionals for it. Server code that needs the signal reads the `recap_installed` cookie from the request.
-
-> 💡 Development tip: The extension only announces itself on production, so simulate it locally from the browser console:
->  ```js
->  window.postMessage({sender: "recap-extension", message_name: "version", message: "dev"}, "*")
->  ```
-
 ## Icons
 
 - Use the `{% svg %}` template tag (defined in `cl/custom_filters/templatetags/svg_tags.py`)
@@ -204,7 +150,7 @@ To hide an "install RECAP" call to action from users who have the extension, mar
 - Internal links: `text-primary-600`
 - External links: `underline`
 - `target="_blank"` MUST include `rel="noopener"` or `rel="noreferrer"` (`noreferrer` alone is sufficient — it implies `noopener`)
-- Do NOT add `nofollow` to editorial links — `nofollow` is for user-generated content and for links into pages we don't want crawled: `noindex` pages (search results, anything rendered with `private=True`) and file downloads, e.g. the per-court search links on the jurisdictions page or the document links in docket entries
+- Do NOT add `nofollow` to editorial links — `nofollow` is only for user-generated content
 
 ## Accessibility
 

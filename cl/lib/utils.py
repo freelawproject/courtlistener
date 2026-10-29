@@ -19,7 +19,7 @@ from cl.search.exception import (
     QueryType,
 )
 
-RELATIVE_DATES_SYNTAX: re.Pattern[str] = re.compile(
+RELATIVE_DATES_SYNTAX = re.compile(
     r"""
     ^\s*                   # Start of string, allow leading whitespaces
     (?:past\s*)?           # Optional 'past'
@@ -43,7 +43,7 @@ class _UNSPECIFIED:
     pass
 
 
-def deepgetattr(obj: object, name: str, default: Any = _UNSPECIFIED) -> Any:
+def deepgetattr(obj, name, default=_UNSPECIFIED):
     """Try to retrieve the given attribute of an object, digging on '.'.
 
     This is an extended getattr, digging deeper if '.' is found.
@@ -512,7 +512,7 @@ def map_to_docket_entry_sorting(sort_string: str) -> str:
         return sort_string
 
 
-def append_value_in_cache(key: str, value: object) -> None:
+def append_value_in_cache(key, value):
     """Append a value to a cached list associated with the given key.
     If the key does not exist, a new list is created and the value is added.
 
@@ -597,7 +597,7 @@ def parse_string_date(date_value: datetime.date | str) -> str | None:
         raise InvalidRelativeDateSyntax(QueryType.FILTER)
 
 
-def create_selenium_driver(keep_alive: bool = True) -> RemoteWebDriver:
+def create_selenium_driver(keep_alive=True) -> RemoteWebDriver:
     options = webdriver.ChromeOptions()
     if settings.SELENIUM_HEADLESS is True:
         options.add_argument("headless")

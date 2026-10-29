@@ -1,20 +1,18 @@
 import os
-from typing import Any
 
-from asgiref.sync import async_to_sync, sync_to_async
 from django.conf import settings
 
 from cl.corpus_importer.tasks import get_pacer_doc_id_with_show_case_doc_url
 from cl.lib.celery_utils import CeleryThrottle
 from cl.lib.command_utils import VerboseCommand, logger
-from cl.lib.pacer_session import log_into_pacer
+from cl.lib.pacer_session import ProxyPacerSession
 from cl.search.models import Court, RECAPDocument
 
 PACER_USERNAME = os.environ.get("PACER_USERNAME", settings.PACER_USERNAME)
 PACER_PASSWORD = os.environ.get("PACER_PASSWORD", settings.PACER_PASSWORD)
 
 
-async def get_pacer_doc_ids(options: dict[str, Any]) -> None:
+def get_pacer_doc_ids(options):
     """Get pacer_doc_ids for any item that needs them."""
     q = options["queue"]
     throttle = CeleryThrottle(queue_name=q)
@@ -28,25 +26,24 @@ async def get_pacer_doc_ids(options: dict[str, Any]) -> None:
         .order_by("pk")
         .values_list("pk", flat=True)
     )
-    if options["start_pk"] > 0:
-        row_pks = row_pks.filter(pk__gte=options["start_pk"])
-    if options["count"] > 0:
-        row_pks = row_pks[: options["count"]]
-
     completed = 0
-    session = None
-    async for row_pk in row_pks.aiterator():
-        await sync_to_async(throttle.maybe_wait)()
-        if session is None or completed % 1000 == 0:
-            session = await log_into_pacer(
+    for row_pk in row_pks:
+        if completed >= options["count"] > 0:
+            break
+        if row_pk < options["start_pk"] > 0:
+            continue
+        throttle.maybe_wait()
+        if completed % 1000 == 0:
+            session = ProxyPacerSession(
                 username=PACER_USERNAME, password=PACER_PASSWORD
             )
+            session.login()
             logger.info(
                 f"Sent {completed} tasks to celery so far. Latest pk: {row_pk}"
             )
-        await sync_to_async(
-            get_pacer_doc_id_with_show_case_doc_url.apply_async
-        )(args=(row_pk, session), queue=q)
+        get_pacer_doc_id_with_show_case_doc_url.apply_async(
+            args=(row_pk, session.cookies), queue=q
+        )
         completed += 1
 
 
@@ -75,4 +72,4 @@ class Command(VerboseCommand):
 
     def handle(self, *args, **options):
         super().handle(*args, **options)
-        async_to_sync(get_pacer_doc_ids)(options)
+        get_pacer_doc_ids(options)

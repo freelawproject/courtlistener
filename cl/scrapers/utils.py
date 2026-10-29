@@ -17,13 +17,11 @@ from cl.corpus_importer.utils import winnow_case_name
 from cl.lib.decorators import retry
 from cl.lib.microservice_utils import microservice
 from cl.lib.storage import S3GlacierInstantRetrievalStorage
-from cl.people_db.lookup_utils import lookup_judges_by_messy_str
 from cl.recap.mergers import find_docket_object
 from cl.search.models import (
     Citation,
     Court,
     Docket,
-    Opinion,
     OpinionCluster,
     OriginatingCourtInformation,
 )
@@ -253,47 +251,9 @@ def case_names_are_too_different(
     """
     new_parts = winnow_case_name(first.lower())
     old_parts = winnow_case_name(second.lower())
-    # or 1 to prevent 0 length minimum
+    # or 1 to prevent 0 lenght minimum
     denominator = min(len(old_parts), len(new_parts)) or 1
     return len(new_parts.intersection(old_parts)) / denominator < threshold
-
-
-def link_judges(cluster: OpinionCluster, opinions: list[Opinion]) -> None:
-    """Link the judges named in a cluster to people in the judges database.
-
-    An opinion's author comes from its `author_str`, or from the cluster's
-    `judges` when the cluster has a single opinion without an author. When `judges` names several people, they are added
-    to the cluster's panel. Call it after the cluster is saved and before
-    the opinions are.
-
-    Caveat: a name that matches more than one person is left unresolved.
-
-    :param cluster: The saved cluster.
-    :param opinions: The cluster's unsaved opinions.
-    :return: None
-    """
-    court_id = cluster.docket.court_id
-    if cluster.judges:
-        candidates = async_to_sync(lookup_judges_by_messy_str)(
-            cluster.judges, court_id, cluster.date_filed
-        )
-        if (
-            len(candidates) == 1
-            and len(opinions) == 1
-            and not opinions[0].author_str
-        ):
-            opinions[0].author = candidates[0]
-        elif len(candidates) > 1:
-            cluster.panel.add(*candidates)
-
-    for opinion in opinions:
-        if not opinion.author_str or opinion.per_curiam:
-            continue
-        candidates = async_to_sync(lookup_judges_by_messy_str)(
-            opinion.author_str, court_id, cluster.date_filed
-        )
-        if len(candidates) == 1:
-            opinion.author = candidates[0]
 
 
 def update_or_create_docket(
@@ -323,11 +283,9 @@ def update_or_create_docket(
         Harvard importer; the Harvard data is considered
         more trustable  and should overwrite an existing docket's data
         Should be False when called from scrapers.
-    :param blocked: If the docket should be blocked, default False. May
-        block an existing docket, but will never unblock one
-    :param date_blocked: The docket date_blocked if it's blocked. Ignored if
-        the existing docket is already blocked.
+    :param blocked: If the docket should be blocked, default False.
     :param case_name_full: The docket case_name_full.
+    :param date_blocked: The docket date_blocked if it's blocked.
     :param date_argued: The docket date_argued if it's an oral argument.
     :param ia_needs_upload: If the docket needs upload to IA, default None.
     :param appeal_from_str: Name (not standardized id) of the lower level court.
@@ -376,17 +334,10 @@ def update_or_create_docket(
     # Update the existing docket with the new values
     docket.add_opinions_source(source)
 
-    # Read before the loop, since the loop may set `docket.blocked`
-    was_blocked = docket.blocked
     for field, value in docket_fields.items():
         # do not use blanket `if not value:`, since
         # blocked and ia_needs_upload are booleans and would be skipped
         if value is None or value == "":
-            continue
-
-        # Never unblock an existing docket, and keep its original
-        # date_blocked
-        if was_blocked and field in ("blocked", "date_blocked"):
             continue
 
         if (

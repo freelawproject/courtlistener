@@ -1,6 +1,5 @@
 import logging
 from collections.abc import Sequence
-from typing import TypeGuard
 
 from eyecite.models import CitationBase, FullCaseCitation
 
@@ -18,7 +17,7 @@ logger = logging.getLogger(__name__)
 
 def unmatched_citation_is_valid(
     citation: CitationBase, self_citations: list[str]
-) -> TypeGuard[FullCaseCitation]:
+) -> bool:
     """Check if an eyecite citation is valid to create an UnmatchedCitation
 
     :param citation: the citation to check for validity
@@ -101,7 +100,7 @@ def update_unmatched_citations_status(
 
 
 def store_unmatched_citations(
-    unmatched_citations: list[FullCaseCitation],
+    unmatched_citations: list[CitationBase],
     citing_object: Opinion | RECAPDocument,
 ) -> None:
     """Bulk create UnmatchedCitation or UnmatchedCitationFromRECAPDocument
@@ -147,7 +146,7 @@ def store_unmatched_citations(
 
 def handle_unmatched_citations(
     citing_object: Opinion | RECAPDocument,
-    unmatched_citations: Sequence[CitationBase],
+    unmatched_citations: list[CitationBase],
     citation_resolutions: dict[
         MatchedResourceType, list[SupportedCitationType]
     ],

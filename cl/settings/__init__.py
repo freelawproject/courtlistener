@@ -1,6 +1,5 @@
 from .django import *
 from .misc import *
-from .project.alerts import *
 from .project.citations import *
 from .project.corpus_importer import *
 from .project.email import *

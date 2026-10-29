@@ -1,13 +1,11 @@
-from datetime import date
-
-from django.db.models import Min, Q, QuerySet
+from django.db.models import Min, Q
 
 from cl.people_db.models import Person
 from cl.search.cluster_sources import ClusterSources
 from cl.search.models import Court, Opinion
 
 
-def get_scotus_judges(d: date) -> QuerySet[Person]:
+def get_scotus_judges(d):
     """Get the panel of scotus judges at a given date."""
     return Person.objects.filter(  # Find all the judges...
         Q(positions__court_id="scotus"),  # In SCOTUS...
@@ -20,18 +18,18 @@ def get_scotus_judges(d: date) -> QuerySet[Person]:
     ).distinct()
 
 
-def get_min_dates() -> dict[str, date]:
+def get_min_dates():
     """returns a dictionary with key-value (courtid, minimum date)"""
     min_dates = {}
     courts = Court.objects.exclude(
         dockets__clusters__source__contains=ClusterSources.COLUMBIA_ARCHIVE
     ).annotate(earliest_date=Min("dockets__clusters__date_filed"))
-    for court in courts.iterator():
+    for court in courts:
         min_dates[court.pk] = court.earliest_date
     return min_dates
 
 
-def get_path_list() -> set[str]:
+def get_path_list():
     """Returns a set of all the local_path values so we can avoid them in
     later imports.
 
@@ -45,16 +43,16 @@ def get_path_list() -> set[str]:
     )
 
 
-def get_courtdates() -> dict[str, date]:
+def get_courtdates():
     """returns a dictionary with key-value (courtid, founding date)"""
     start_dates = {}
-    courts = Court.objects.all()
-    for court in courts.iterator():
+    courts = Court.objects
+    for court in courts:
         start_dates[court.pk] = court.start_date
     return start_dates
 
 
-def get_min_nocite() -> dict[str, date]:
+def get_min_nocite():
     """Return a dictionary indicating the earliest case with no citations for
     every court.
 
@@ -64,6 +62,6 @@ def get_min_nocite() -> dict[str, date]:
     courts = Court.objects.filter(
         dockets__clusters__citations__isnull=True
     ).annotate(earliest_date=Min("dockets__clusters__date_filed"))
-    for court in courts.iterator():
+    for court in courts:
         min_dates[court.pk] = court.earliest_date
     return min_dates

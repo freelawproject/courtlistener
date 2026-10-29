@@ -44,66 +44,6 @@
       padding-top: 1em;
   }
 
-  /* Scanned head matter comes wrapped in <headmatter>, so the Harvard
-     rules above, written for direct children, don't reach it. The
-     caption, from the citation to the decision date, is centered like
-     a printed reporter page; history, attorneys and judges stay as
-     indented paragraphs. */
-  #headmatter > headmatter {
-    text-indent: 0;
-  }
-
-  #headmatter > headmatter > citation,
-  #headmatter > headmatter > p,
-  #headmatter > headmatter > parties,
-  #headmatter > headmatter > docketnumber,
-  #headmatter > headmatter > court,
-  #headmatter > headmatter > decisiondate {
-    display: block;
-    text-align: center;
-    text-indent: 0;
-  }
-
-  #headmatter > headmatter > decisiondate {
-    margin-bottom: 1.5em;
-  }
-
-  /* The parties stand out from the rest of the caption, as in Harvard's
-     head matter: each on its own line, large, with the "v." between */
-  #headmatter > headmatter party {
-    display: block;
-    font-size: 1.6em;
-    line-height: 1.3;
-    margin: 0.2em 0;
-  }
-
-  #headmatter > headmatter separator {
-    display: block;
-    font-style: italic;
-    margin: 0.3em 0;
-  }
-
-  #headmatter > headmatter > parties {
-    margin-bottom: 1em;
-  }
-
-  /* The first party shares its <p> with the reporter citation
-     ("488 Md. 410"), so space sets it apart from the citations above */
-  #headmatter > headmatter > p > party {
-    margin-top: 1.2em;
-  }
-
-  #headmatter > headmatter > history,
-  #headmatter > headmatter > attorneys,
-  #headmatter > headmatter > judges {
-    display: block;
-    text-indent: 2em;
-    /* Tighter than the opinion text, with a gap between blocks, so a
-       long attorneys paragraph reads as one section and not as lines */
-    line-height: 1.5;
-    margin-bottom: 0.8em;
-  }
-
   .jump-links > a{
     position: relative;
     margin: -8px 20px 0 0;
@@ -345,51 +285,6 @@ div.footnote:first-of-type {
     display: inline;
     margin: 0; /* Remove any default margin */
     text-indent: 2em; /* Indents the first line by 2em */
-  }
-
-  /* Scanned opinions mark section titles with <heading>, an element
-     browsers render inline, so it ran into the paragraphs around it.
-     Give it its own line and room above; a subheading right after a
-     heading only needs a little. */
-  .harvard > opinion > heading {
-    display: block;
-    margin-top: 1.5em;
-    margin-bottom: 0.5em;
-    font-size: 1.1em;
-    font-weight: bold;
-    line-height: 1.4;
-    text-align: center;
-    text-indent: 0;
-  }
-
-  .harvard > opinion > heading + heading {
-    margin-top: 0.25em;
-  }
-
-  /* Scanned opinions wrap each image in a <figure>, sometimes with its
-     page number. Center it and keep it inside the column. */
-  .harvard > opinion > figure {
-    margin: 1.5em 0;
-    text-align: center;
-  }
-
-  .harvard > opinion > figure > img {
-    display: block;
-    margin: 0 auto;
-    max-width: 100%;
-    height: auto;
-  }
-
-  /* Scanned lists keep the printed numbers in their text ("1. The
-     court..."), so the browser's own markers would number them twice */
-  .harvard > opinion ol,
-  .harvard > opinion ul {
-    list-style: none;
-    padding-left: 0;
-  }
-
-  .harvard > opinion li {
-    margin-bottom: 0.5em;
   }
 
   /*Important for indenting harvard opinions correctly*/

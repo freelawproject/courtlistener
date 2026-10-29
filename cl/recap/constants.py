@@ -1,5 +1,4 @@
 from datetime import date
-from typing import TypedDict
 
 from cl.search.models import Court
 
@@ -62,19 +61,12 @@ DATASET_SOURCES = (
     ),
 )
 
-
-class _IDBFieldData(TypedDict):
-    sources: list[int]
-    field: str
-    type: type[str] | type[int] | type[date] | type[Court]
-
-
 # All of the field information for the IDB fields:
 #   key name (e.g. 'CIRCUIT'): The name of the column in the IDB.
 #   'sources': The IDB datasets that use this field.
 #   'field': The name of the field in the FjcIntegratedDatabase model.
 #   'type': The type of data in the field.
-IDB_FIELD_DATA: dict[str, _IDBFieldData] = {
+IDB_FIELD_DATA = {
     # Shared
     "CIRCUIT": {
         "sources": [CV_2017, CV_2020, CV_2021, CV_2022, CR_2017],

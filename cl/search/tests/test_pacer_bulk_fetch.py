@@ -1,13 +1,12 @@
 from datetime import timedelta
 from unittest.mock import MagicMock, patch
 
-import httpx
 import time_machine
 from django.core.cache import cache as django_cache
 from django.core.management import call_command
 from django.utils import timezone
 from django.utils.timezone import now
-from httpx import HTTPError
+from requests import HTTPError
 
 from cl.lib.utils import append_value_in_cache
 from cl.recap.factories import PacerFetchQueueFactory
@@ -24,6 +23,7 @@ from cl.search.management.commands.pacer_bulk_fetch import (
 )
 from cl.search.models import RECAPDocument
 from cl.tests.cases import TestCase
+from cl.tests.utils import MockResponse
 from cl.users.factories import UserFactory
 
 
@@ -295,9 +295,9 @@ class PacerBulkFetchUnitTest(TestCase):
         self.command.user = self.user
         self.command.options = {
             "testing": True,
+            "min_page_count": 100,
+            "max_page_count": 10_000,
         }
-        self.command.min_page_count = 100
-        self.command.max_page_count = 10_000
         self.command.interval = 2
         self.command.total_launched = 0
         self.command.max_retries = 1
@@ -327,8 +327,8 @@ class PacerBulkFetchUnitTest(TestCase):
         mock_fetched_cache_key,
     ):
         """Test that identify_documents correctly filters documents based on criteria"""
-        self.command.min_page_count = 200
-        self.command.max_page_count = 300
+        self.command.options["min_page_count"] = 200
+        self.command.options["max_page_count"] = 300
 
         self.command.identify_documents()
 
@@ -352,8 +352,8 @@ class PacerBulkFetchUnitTest(TestCase):
     ):
         """Test that identify_documents correctly filters subdockets"""
 
-        self.command.min_page_count = 200
-        self.command.max_page_count = 300
+        self.command.options["min_page_count"] = 200
+        self.command.options["max_page_count"] = 300
         docket_2 = DocketFactory(court=self.court)
         docket_entries = [
             DocketEntryFactory(docket=docket_2) for _ in range(5)
@@ -469,8 +469,8 @@ class PacerBulkFetchUnitTest(TestCase):
         mock_fetched_cache_key,
     ):
         """Test exclude RECAPDocuments that are likely transcripts"""
-        self.command.min_page_count = 1000
-        self.command.max_page_count = 2000
+        self.command.options["min_page_count"] = 1000
+        self.command.options["max_page_count"] = 2000
 
         # Transcript RDs:
         de_5 = DocketEntryFactory(docket=self.docket, description="")
@@ -511,7 +511,7 @@ class PacerBulkFetchUnitTest(TestCase):
 
         actual_docs = [doc["id"] for doc in self.command.recap_documents]
         self.assertFalse(
-            set(actual_docs), msg="Transcript RDs shouldn't be matched."
+            set(actual_docs), msg="Transcript RDs shoudn't be matched."
         )
 
     @patch(
@@ -781,8 +781,11 @@ class BulkFetchPacerIntegrationTest(TestCase):
 
     @patch(
         "cl.recap.tasks.download_pacer_pdf_by_rd",
-        return_value=(
-            httpx.Response(200, content=b"binary content"),
+        side_effect=lambda z, x, c, v, b, de_seq_num: (
+            MockResponse(
+                200,
+                b"binary content",
+            ),
             "OK",
         ),
     )
@@ -916,8 +919,11 @@ class BulkFetchPacerIntegrationTest(TestCase):
 
     @patch(
         "cl.recap.tasks.download_pacer_pdf_by_rd",
-        return_value=(
-            httpx.Response(200, content=None),
+        side_effect=lambda z, x, c, v, b, de_seq_num: (
+            MockResponse(
+                200,
+                None,
+            ),
             "Document is sealed",
         ),
     )

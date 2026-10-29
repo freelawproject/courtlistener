@@ -91,7 +91,7 @@ def removeLeftMargin(s: str) -> str:
         if numLSpaces < mode:
             # Strip only that number of spaces
             line_out = line[numLSpaces:]
-        else:
+        elif numLSpaces >= mode:
             # Strip off the mode number of spaces
             line_out = line[mode:]
 

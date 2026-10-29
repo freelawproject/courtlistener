@@ -43,10 +43,7 @@ from cl.search.tasks import (
     remove_parent_and_child_docs_by_query,
     update_children_docs_by_query,
 )
-from cl.search.types import (
-    ESDocumentType,
-    EventTable,
-)
+from cl.search.types import ESDocumentClassType, EventTable
 
 
 def compose_redis_key(
@@ -82,9 +79,10 @@ def get_unique_oldest_history_rows(
     range for the given event table, or None if no event table is specified.
     """
 
+    oldest_unique_events = None
     match update_from_event_tables:
         case EventTable.DOCKET:
-            return (
+            oldest_unique_events = (
                 DocketEvent.objects.filter(
                     pgh_id__gte=pk_offset,
                     pgh_created_at__gte=start_date,
@@ -95,7 +93,7 @@ def get_unique_oldest_history_rows(
                 .distinct("id")
             )
         case EventTable.DOCKET_ENTRY:
-            return (
+            oldest_unique_events = (
                 DocketEntryEvent.objects.filter(
                     pgh_id__gte=pk_offset,
                     pgh_created_at__gte=start_date,
@@ -105,7 +103,7 @@ def get_unique_oldest_history_rows(
                 .distinct("id")
             )
         case EventTable.RECAP_DOCUMENT:
-            return (
+            oldest_unique_events = (
                 RECAPDocumentEvent.objects.filter(
                     pgh_id__gte=pk_offset,
                     pgh_created_at__gte=start_date,
@@ -114,10 +112,7 @@ def get_unique_oldest_history_rows(
                 .order_by("id", "pgh_created_at")
                 .distinct("id")
             )
-        case EventTable.UNDEFINED:
-            return None
-        case None:
-            return None
+    return oldest_unique_events
 
 
 def get_documents_to_update_or_remove(
@@ -424,7 +419,7 @@ class Command(VerboseCommand):
         search_type: str,
         chunk_size: int,
         task_to_use: str,
-        es_document: type[ESDocumentType] | None = None,
+        es_document: ESDocumentClassType | None = None,
     ) -> None:
         """Process a queryset and execute tasks based on the specified celery
         task_to_use.

@@ -1,5 +1,4 @@
 from datetime import date
-from typing import Any
 from urllib.parse import quote
 
 from django.contrib import messages
@@ -22,10 +21,7 @@ from cl.alerts.forms import CreateAlertForm
 from cl.alerts.models import Alert
 from cl.donate.models import NeonMembershipLevel
 from cl.lib.bot_detector import is_bot
-from cl.lib.ratelimiter import (
-    ratelimit_deny_list,
-    ratelimiter_unsafe_5_per_d,
-)
+from cl.lib.ratelimiter import ratelimiter_unsafe_5_per_d
 from cl.lib.search_utils import (
     do_es_search,
     make_get_string,
@@ -104,7 +100,6 @@ def home_router(request: HttpRequest) -> HttpResponse:
 
 
 @never_cache
-@ratelimit_deny_list
 def show_results(request: HttpRequest) -> HttpResponse:
     """
     This view can vary significantly, depending on how it is called:
@@ -128,7 +123,7 @@ def show_results(request: HttpRequest) -> HttpResponse:
     get_string_sans_alert = make_get_string(
         request, ["page", "edit_alert", "show_alert_modal"]
     )
-    render_dict: dict[str, Any] = {
+    render_dict = {
         "private": True,
         "get_string": get_string,
         "get_string_sans_alert": get_string_sans_alert,
@@ -138,7 +133,7 @@ def show_results(request: HttpRequest) -> HttpResponse:
     edit_alert = "edit_alert" in request.GET
 
     if request.method == "POST":
-        alert_form_context: dict[str, Any] = {
+        alert_form_context = {
             "data": request.POST,
             "user": request.user,
             "initial": {
@@ -317,7 +312,7 @@ def show_results(request: HttpRequest) -> HttpResponse:
 
 @never_cache
 def advanced(request: HttpRequest, search_type: str) -> HttpResponse:
-    render_dict: dict[str, Any] = {"private": False}
+    render_dict = {"private": False}
     courts = courts_in_use = Court.objects.filter(in_use=True)
 
     if search_type == SEARCH_TYPES.OPINION:
@@ -366,7 +361,7 @@ def es_search(request: HttpRequest) -> HttpResponse:
     :param request: HttpRequest object
     :return: HttpResponse
     """
-    render_dict: dict[str, Any] = {"private": False}
+    render_dict = {"private": False}
     courts = Court.objects.filter(in_use=True)
     render_dict.update({"search_type": "parenthetical"})
     obj_type = SEARCH_TYPES.PARENTHETICAL

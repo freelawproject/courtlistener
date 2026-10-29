@@ -12,7 +12,6 @@ import responses
 from asgiref.sync import async_to_sync, sync_to_async
 from django.conf import settings
 from django.contrib.auth.models import User
-from django.contrib.contenttypes.models import ContentType
 from django.core.exceptions import ValidationError
 from django.core.files.base import ContentFile
 from django.db import connection
@@ -32,14 +31,12 @@ from cl.alerts.factories import AlertFactory
 from cl.alerts.models import Alert
 from cl.api.factories import WebhookFactory
 from cl.api.models import WebhookEvent, WebhookEventType
-from cl.audio.dispatch import dispatch_process_audio_file
 from cl.audio.factories import AudioWithParentsFactory
 from cl.audio.models import Audio
 from cl.citations.models import UnmatchedCitation
 from cl.corpus_importer.tasks import (
     merge_scotus_docket as real_merge_scotus_docket,
 )
-from cl.favorites.factories import NoteFactory
 from cl.lib.crypto import sha1
 from cl.lib.exceptions import ScrapeFailed
 from cl.lib.juriscraper_utils import get_module_by_court_id
@@ -70,7 +67,6 @@ from cl.scrapers.management.commands.merge_opinion_versions import (
     merge_judge_names,
     merge_versions_by_download_url,
     passes_length_ratio_check,
-    update_referencing_objects,
 )
 from cl.scrapers.models import AccountSubscription, Scraper, UrlHash
 from cl.scrapers.tasks import (
@@ -137,10 +133,7 @@ from cl.tests.cases import (
 )
 from cl.tests.fixtures import ONE_SECOND_MP3_BYTES, SMALL_WAV_BYTES
 from cl.tests.utils import AsyncAPIClient
-from cl.users.factories import (
-    UserProfileWithParentsFactory,
-    UserWithChildProfileFactory,
-)
+from cl.users.factories import UserProfileWithParentsFactory
 
 
 class ScraperIngestionTest(ESIndexTestCase, TestCase):
@@ -317,7 +310,7 @@ class ScraperIngestionTest(ESIndexTestCase, TestCase):
             source_to_assign,
         ) in source_assigment_tests:
             with self.subTest(
-                f"Testing {source_to_assign} source assignment.",
+                f"Testing {source_to_assign} source assigment.",
                 expected_sources=expected_sources,
                 non_sources=non_sources,
                 source_to_assign=source_to_assign,
@@ -329,7 +322,7 @@ class ScraperIngestionTest(ESIndexTestCase, TestCase):
                 )
                 for source, expected_source in expected_sources.items():
                     with self.subTest(
-                        f"Testing source {source} assignment.",
+                        f"Testing source {source} assigment.",
                         source=source,
                         expected_source=expected_source,
                     ):
@@ -639,9 +632,6 @@ class ExtractFormattedTextSanitizationTest(TestCase):
         DataError ('PostgreSQL text fields cannot contain NUL (0x00) bytes')?
         """
         texas_document = TexasDocumentFactory.create()
-        texas_document.filepath_local.save(
-            "document.pdf", ContentFile(b"document")
-        )
         # Doctor occasionally returns extracted text containing NUL bytes
         # (e.g. from malformed PDFs). PostgreSQL rejects these in text
         # columns, so the extractor must strip them before saving.
@@ -686,9 +676,6 @@ class ExtractFormattedTextReleasesConnectionTest(TransactionTestCase):
         """Is the DB connection closed when Doctor is called, and reopened
         for the save afterwards?"""
         texas_document = TexasDocumentFactory.create()
-        texas_document.filepath_local.save(
-            "document.pdf", ContentFile(b"document")
-        )
         connection_open_during_doctor_call: list[bool] = []
 
         async def fake_doctor(*args, **kwargs) -> httpx.Response:
@@ -866,7 +853,7 @@ class DupcheckerPressOnTest(TestCase):
         self.dc_not_full_crawl.press_on(*self.press_on_args[:-1], "not a dup")
 
     def test_press_on_with_a_dup_found(self) -> None:
-        """Do we raise the appropriate exceptions when a dup is found?"""
+        """Do we raise the appropiate exceptions when a dup is found?"""
         # First duplicate
         try:
             self.dc_full_crawl.press_on(*self.press_on_args)
@@ -906,7 +893,7 @@ class DupcheckerPressOnTest(TestCase):
             pass  # expected behavior
 
     def test_press_on_with_dup_found_and_older_date(self) -> None:
-        """Do we raise the appropriate exception when a duplicate is found
+        """Do we raise the appropiate exception when a duplicate is found
         and we account for case dates?
         """
         self.dc_not_full_crawl.reset()
@@ -969,20 +956,6 @@ class AudioFileTaskTest(TestCase):
             msg=f"We should end up with the proper duration of about {expected_duration}. "
             f"Instead we got {measured_duration}.",
         )
-
-    def test_completed_processing_allows_redispatch(self) -> None:
-        """Does a successful process_audio_file run free its dispatch lock?
-
-        A lock left behind after success blocks any later dispatch for the
-        same pk until the TTL expires, silently skipping processing.
-        """
-        with mock.patch("cl.lib.celery_utils.get_task_wait") as patched_wait:
-            patched_wait.return_value = 0
-            self.assertTrue(dispatch_process_audio_file(self.audio1.pk))
-            self.assertTrue(
-                dispatch_process_audio_file(self.audio1.pk),
-                msg="Dispatch was skipped after processing completed.",
-            )
 
     def test_audio_conversion(self) -> None:
         """Can we convert wav to audio and update the metadata"""
@@ -1257,84 +1230,6 @@ class ScraperDocketMatchingTest(TestCase):
             docket, self.ca2_docket, "Should match using docket number core"
         )
 
-    def test_does_not_unblock_existing_docket(self) -> None:
-        """Matching an existing docket should never unblock it, nor
-        overwrite its original date_blocked. It may block an unblocked one
-        """
-        original_date = date(2020, 1, 1)
-        new_date = date(2024, 1, 1)
-        cases = [
-            # (description, docket blocked, kwargs, expected blocked,
-            # expected date_blocked)
-            (
-                "blocked docket, blocked=False",
-                True,
-                {"blocked": False},
-                True,
-                original_date,
-            ),
-            (
-                "blocked docket, blocked=True",
-                True,
-                {"blocked": True, "date_blocked": new_date},
-                True,
-                original_date,
-            ),
-            (
-                "unblocked docket, blocked=True",
-                False,
-                {"blocked": True, "date_blocked": new_date},
-                True,
-                new_date,
-            ),
-        ]
-        for i, (
-            description,
-            docket_blocked,
-            kwargs,
-            expected_blocked,
-            expected_date,
-        ) in enumerate(cases):
-            with self.subTest(description):
-                docket_number = f"1 CA-CV 24-000{i}"
-                existing = DocketFactory(
-                    docket_number=docket_number,
-                    case_name="Smith v. Jones",
-                    court=self.ariz,
-                    source=Docket.SCRAPER,
-                    pacer_case_id=None,
-                    blocked=docket_blocked,
-                    date_blocked=original_date if docket_blocked else None,
-                )
-                docket = update_or_create_docket(
-                    "Smith v. Jones",
-                    "",
-                    self.ariz,
-                    docket_number,
-                    Docket.SCRAPER,
-                    False,
-                    **kwargs,
-                )
-                self.assertEqual(docket.pk, existing.pk)
-                self.assertEqual(docket.blocked, expected_blocked)
-                self.assertEqual(docket.date_blocked, expected_date)
-
-        with self.subTest("Harvard, blocked docket, blocked not passed"):
-            self.ca2_docket.blocked = True
-            self.ca2_docket.date_blocked = original_date
-            self.ca2_docket.save()
-            docket = update_or_create_docket(
-                "Garbutt v. Conway",
-                "",
-                self.ca2,
-                "10-1039",
-                Docket.HARVARD,
-                from_harvard=True,
-            )
-            self.assertEqual(docket.pk, self.ca2_docket.pk)
-            self.assertTrue(docket.blocked)
-            self.assertEqual(docket.date_blocked, original_date)
-
 
 class UpdateFromTextCommandTest(TestCase):
     """Test the input processing and DB querying for the command"""
@@ -1376,6 +1271,7 @@ class UpdateFromTextCommandTest(TestCase):
                 source=ClusterSources.COURT_WEBSITE,
             ),
             plain_text="Some text with no matches",
+            id=101,
         )
 
         self.opinion_2022 = OpinionFactory(
@@ -1385,6 +1281,7 @@ class UpdateFromTextCommandTest(TestCase):
                 precedential_status="Unpublished",
                 source=ClusterSources.COURT_WEBSITE,
             ),
+            id=100,
             plain_text="Docket Number: 2022-13\n2022 VT 11",
         )
 
@@ -1398,9 +1295,7 @@ class UpdateFromTextCommandTest(TestCase):
             "cl.scrapers.tasks.get_scraper_object_by_name",
             return_value=test_opinion_scraper.Site(),
         ):
-            cmd.handle(
-                court_id="somepath.sc", opinion_ids=[self.opinion_sc.pk]
-            )
+            cmd.handle(court_id="somepath.sc", opinion_ids=[101])
 
         self.assertFalse(
             any(
@@ -2293,62 +2188,6 @@ class DeleteVersionRelatedObjectsTest(TestCase):
         self.assertEqual(cited_cluster.citation_count, 0)
 
 
-class UpdateReferencingObjectsNotesTest(TestCase):
-    """Tests for Note repointing in update_referencing_objects (#7725).
-
-    Note can't go through the generic single-FK-field handling that the
-    rest of update_referencing_objects()'s referencing_models use, since a
-    Note may be in either the legacy or the GenericForeignKey shape
-    (dual-read) - see repoint_notes() in cl.favorites.utils.
-    """
-
-    def test_repoints_both_note_shapes(self):
-        """A legacy-shaped and a GFK-shaped Note on the version docket are
-        both moved onto the main docket, instead of being left behind to
-        be lost when the version docket is deleted.
-        """
-        main_docket = DocketFactory.create()
-        version_docket = DocketFactory.create()
-
-        legacy_note = NoteFactory(cluster_id=None, docket_id=version_docket)
-        gfk_note = NoteFactory.for_object(version_docket)
-
-        update_referencing_objects(main_docket, version_docket)
-
-        legacy_note.refresh_from_db()
-        gfk_note.refresh_from_db()
-
-        docket_content_type = ContentType.objects.get_for_model(Docket)
-        for note in (legacy_note, gfk_note):
-            # repoint_notes() always writes the new shape, even when the
-            # Note started as legacy.
-            self.assertIsNone(note.docket_id_id)
-            self.assertEqual(note.object_id, main_docket.pk)
-            self.assertEqual(note.content_type, docket_content_type)
-
-    def test_leaves_version_note_when_main_already_has_one(self):
-        """If the same user already has a Note on the main docket, the
-        version docket's Note (in either shape) is left where it is.
-        """
-        main_docket = DocketFactory.create()
-        version_docket = DocketFactory.create()
-        user = UserWithChildProfileFactory.create()
-
-        NoteFactory.for_object(main_docket, user=user)
-        version_gfk_note = NoteFactory.for_object(version_docket, user=user)
-        version_legacy_note = NoteFactory(
-            cluster_id=None, docket_id=version_docket, user=user
-        )
-
-        update_referencing_objects(main_docket, version_docket)
-
-        version_gfk_note.refresh_from_db()
-        version_legacy_note.refresh_from_db()
-
-        self.assertEqual(version_gfk_note.object_id, version_docket.pk)
-        self.assertEqual(version_legacy_note.docket_id_id, version_docket.pk)
-
-
 class DeleteDuplicatesTest(TestCase):
     @classmethod
     def setUpTestData(cls) -> None:
@@ -3005,7 +2844,7 @@ class TexasCaseMailIntegrationTest(TestCase):
 
 @mock.patch("cl.recap.tasks.merge_scotus_docket")
 @mock.patch("cl.recap.tasks.fetch_and_archive_scotus_docket_followup")
-@mock.patch("cl.recap.tasks.SCOTUSEmail", autospec=True)
+@mock.patch("cl.recap.tasks.SCOTUSEmail")
 @mock.patch("cl.recap.tasks.SCOTUSSESStorage")
 class SCOTUSEmailIntegrationTest(TestCase):
     """Integration test for the SCOTUS email processing flow.
@@ -3188,7 +3027,6 @@ class SCOTUSEmailIntegrationTest(TestCase):
         )
 
         mock_email_cls.return_value.email_type = SCOTUSEmailType.DOCKET_ENTRY
-        mock_email_cls.return_value.court_id = "scotus"
         mock_fetch.return_value = {
             "email_type": SCOTUSEmailType.DOCKET_ENTRY.value,
             "data": docket_data,

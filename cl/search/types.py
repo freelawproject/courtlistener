@@ -32,10 +32,9 @@ from cl.search.models import (
     RECAPDocument,
 )
 
-type ESModelType = (
+ESModelType = (
     Citation
     | Docket
-    | DocketEntry
     | Opinion
     | OpinionCluster
     | Parenthetical
@@ -47,20 +46,46 @@ type ESModelType = (
     | RECAPDocument
 )
 
-type ESDocumentType = (
+ESModelClassType = (
+    type[Citation]
+    | type[Docket]
+    | type[DocketEntry]
+    | type[Opinion]
+    | type[OpinionCluster]
+    | type[Parenthetical]
+    | type[ParentheticalGroup]
+    | type[Audio]
+    | type[Person]
+    | type[Position]
+    | type[Education]
+    | type[RECAPDocument]
+    | type[ESRECAPBaseDocument]
+)
+
+ESDocumentInstanceType = (
     AudioDocument
     | ParentheticalGroupDocument
     | AudioPercolator
     | PersonDocument
     | PositionDocument
-    | DocketDocument
+    | ESRECAPDocument
     | OpinionDocument
     | OpinionClusterDocument
-    | ESRECAPDocument
-    | ESRECAPBaseDocument
 )
 
-type ESDocumentNameType = Literal[
+ESDocumentClassType = (
+    type[AudioDocument]
+    | type[ParentheticalGroupDocument]
+    | type[AudioPercolator]
+    | type[PersonDocument]
+    | type[PositionDocument]
+    | type[DocketDocument]
+    | type[OpinionDocument]
+    | type[OpinionClusterDocument]
+    | type[ESRECAPDocument]
+)
+
+ESDocumentNameType = Literal[
     "AudioDocument",
     "ParentheticalGroupDocument",
     "AudioPercolator",
@@ -70,62 +95,9 @@ type ESDocumentNameType = Literal[
     "OpinionDocument",
     "OpinionClusterDocument",
     "ESRECAPDocument",
-    "ESRECAPBaseDocument",
 ]
 
-type ESDictDocument = dict[str, Any]
-
-
-# Apart from utility, this function ensures that types and names match
-def get_es_document_name_for_type(d: ESDocumentType) -> ESDocumentNameType:
-    match d:
-        case AudioDocument():
-            return "AudioDocument"
-        case ParentheticalGroupDocument():
-            return "ParentheticalGroupDocument"
-        case AudioPercolator():
-            return "AudioPercolator"
-        case PersonDocument():
-            return "PersonDocument"
-        case PositionDocument():
-            return "PositionDocument"
-        case DocketDocument():
-            return "DocketDocument"
-        case OpinionDocument():
-            return "OpinionDocument"
-        case OpinionClusterDocument():
-            return "OpinionClusterDocument"
-        case ESRECAPDocument():
-            return "ESRECAPDocument"
-        case ESRECAPBaseDocument():
-            return "ESRECAPBaseDocument"
-
-
-# Apart from utility, this function ensures that types and names match
-def get_es_document_type_for_name(
-    d: ESDocumentNameType,
-) -> type[ESDocumentType]:
-    match d:
-        case "AudioDocument":
-            return AudioDocument
-        case "ParentheticalGroupDocument":
-            return ParentheticalGroupDocument
-        case "AudioPercolator":
-            return AudioPercolator
-        case "PersonDocument":
-            return PersonDocument
-        case "PositionDocument":
-            return PositionDocument
-        case "DocketDocument":
-            return DocketDocument
-        case "OpinionDocument":
-            return OpinionDocument
-        case "OpinionClusterDocument":
-            return OpinionClusterDocument
-        case "ESRECAPDocument":
-            return ESRECAPDocument
-        case "ESRECAPBaseDocument":
-            return ESRECAPBaseDocument
+ESDictDocument = dict[str, Any]
 
 
 @dataclass
@@ -151,7 +123,7 @@ class SaveESDocumentReturn:
     app_label: str
 
 
-type SearchAlertHitType = tuple[Alert, str, list[ESDictDocument], int]
+SearchAlertHitType = tuple[Alert, str, list[ESDictDocument], int]
 
 
 class EventTable(StrEnum):

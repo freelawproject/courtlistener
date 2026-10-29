@@ -1,19 +1,17 @@
 import datetime
 import re
 from collections import OrderedDict
-from collections.abc import Iterable
-from typing import Any
 
 from django import forms
 from django.conf import settings
 from django.core.exceptions import ValidationError
-from django.forms import ChoiceField, DateField, Field
-from django.utils.choices import flatten_choices
+from django.forms import ChoiceField, DateField
 from django.utils.datastructures import MultiValueDictKeyError
 from localflavor.us.us_states import STATE_CHOICES
 
 from cl.lib import widgets
 from cl.lib.courts import get_active_court_from_cache
+from cl.lib.model_helpers import flatten_choices
 from cl.lib.utils import get_array_of_selected_fields
 from cl.people_db.models import PoliticalAffiliation, Position
 from cl.search.fields import (
@@ -40,241 +38,193 @@ OPINION_ORDER_BY_CHOICES = (
 )
 
 
-def blend[F: Field](field: F, *, as_str_types: Iterable[str]) -> F:
-    """Tag a form field with the search types it's displayed for.
-
-    :param field: The form field to tag.
-    :param as_str_types: The search types for which the field should be
-    included in `SearchForm.as_display_dict`.
-    :return: The same field, tagged.
-    """
-    setattr(field, "as_str_types", as_str_types)
-    return field
-
-
 class SearchForm(forms.Form):
     #
     # Blended fields
     #
-    type = blend(
-        forms.ChoiceField(
-            choices=SEARCH_TYPES.NAMES,
-            required=False,
-            initial=SEARCH_TYPES.OPINION,
-            widget=forms.RadioSelect(
-                attrs={"class": "external-input form-control"}
-            ),
+    type = forms.ChoiceField(
+        choices=SEARCH_TYPES.NAMES,
+        required=False,
+        initial=SEARCH_TYPES.OPINION,
+        widget=forms.RadioSelect(
+            attrs={"class": "external-input form-control"}
         ),
-        as_str_types=[],
     )
-    q = blend(
-        forms.CharField(required=False, label="Query"),
-        as_str_types=SEARCH_TYPES.ALL_TYPES,
+    type.as_str_types = []
+    q = forms.CharField(required=False, label="Query")
+    q.as_str_types = SEARCH_TYPES.ALL_TYPES
+    court = forms.CharField(required=False, widget=forms.HiddenInput())
+    court.as_str_types = []
+    order_by = RandomChoiceField(
+        choices=OPINION_ORDER_BY_CHOICES,
+        required=False,
+        label="Result Ordering",
+        initial="score desc",
+        widget=forms.Select(attrs={"class": "external-input form-control"}),
     )
-    court = blend(
-        forms.CharField(required=False, widget=forms.HiddenInput()),
-        as_str_types=[],
-    )
-    order_by = blend(
-        RandomChoiceField(
-            choices=OPINION_ORDER_BY_CHOICES,
-            required=False,
-            label="Result Ordering",
-            initial="score desc",
-            widget=forms.Select(
-                attrs={"class": "external-input form-control"}
-            ),
-        ),
-        as_str_types=[],
-    )
+    order_by.as_str_types = []
 
     #
     # Oral argument and Opinion shared fields
     #
-    judge = blend(
-        forms.CharField(
-            required=False,
-            initial="",
-            label="Judge",
-            widget=forms.TextInput(
-                attrs={
-                    "class": "external-input form-control",
-                    "autocomplete": "off",
-                }
-            ),
+    judge = forms.CharField(
+        required=False,
+        initial="",
+        label="Judge",
+        widget=forms.TextInput(
+            attrs={
+                "class": "external-input form-control",
+                "autocomplete": "off",
+            }
         ),
-        as_str_types=[SEARCH_TYPES.OPINION, SEARCH_TYPES.ORAL_ARGUMENT],
     )
+    judge.as_str_types = [SEARCH_TYPES.OPINION, SEARCH_TYPES.ORAL_ARGUMENT]
 
     # Oral arg, opinion, and RECAP
-    case_name = blend(
-        forms.CharField(
-            required=False,
-            label="Case Name",
-            initial="",
-            widget=forms.TextInput(
-                attrs={
-                    "class": "external-input form-control",
-                    "autocomplete": "off",
-                }
-            ),
+    case_name = forms.CharField(
+        required=False,
+        label="Case Name",
+        initial="",
+        widget=forms.TextInput(
+            attrs={
+                "class": "external-input form-control",
+                "autocomplete": "off",
+            }
         ),
-        as_str_types=[
-            SEARCH_TYPES.OPINION,
-            SEARCH_TYPES.RECAP,
-            SEARCH_TYPES.ORAL_ARGUMENT,
-        ],
     )
-    docket_number = blend(
-        forms.CharField(
-            required=False,
-            label="Docket Number",
-            widget=forms.TextInput(
-                attrs={
-                    "class": "external-input form-control",
-                    "autocomplete": "off",
-                }
-            ),
+    case_name.as_str_types = [
+        SEARCH_TYPES.OPINION,
+        SEARCH_TYPES.RECAP,
+        SEARCH_TYPES.ORAL_ARGUMENT,
+    ]
+    docket_number = forms.CharField(
+        required=False,
+        label="Docket Number",
+        widget=forms.TextInput(
+            attrs={
+                "class": "external-input form-control",
+                "autocomplete": "off",
+            }
         ),
-        as_str_types=[
-            SEARCH_TYPES.OPINION,
-            SEARCH_TYPES.RECAP,
-            SEARCH_TYPES.ORAL_ARGUMENT,
-            SEARCH_TYPES.PARENTHETICAL,
-        ],
     )
+    docket_number.as_str_types = [
+        SEARCH_TYPES.OPINION,
+        SEARCH_TYPES.RECAP,
+        SEARCH_TYPES.ORAL_ARGUMENT,
+        SEARCH_TYPES.PARENTHETICAL,
+    ]
 
     #
     # RECAP fields
     #
-    available_only = blend(
-        forms.BooleanField(
-            label="Only show results with PDFs",
-            label_suffix="",
-            required=False,
-            widget=forms.CheckboxInput(
-                attrs={"class": "external-input form-control left"}
-            ),
+    available_only = forms.BooleanField(
+        label="Only show results with PDFs",
+        label_suffix="",
+        required=False,
+        widget=forms.CheckboxInput(
+            attrs={"class": "external-input form-control left"}
         ),
-        as_str_types=[SEARCH_TYPES.RECAP],
     )
-    description = blend(
-        forms.CharField(
-            required=False,
-            label="Document Description",
-            widget=forms.TextInput(
-                attrs={
-                    "class": "external-input form-control",
-                    "autocomplete": "off",
-                }
-            ),
+    available_only.as_str_types = [SEARCH_TYPES.RECAP]
+    description = forms.CharField(
+        required=False,
+        label="Document Description",
+        widget=forms.TextInput(
+            attrs={
+                "class": "external-input form-control",
+                "autocomplete": "off",
+            }
         ),
-        as_str_types=[SEARCH_TYPES.RECAP],
     )
-    nature_of_suit = blend(
-        forms.CharField(
-            required=False,
-            label="Nature of Suit",
-            widget=forms.TextInput(
-                attrs={
-                    "class": "external-input form-control",
-                    "autocomplete": "off",
-                }
-            ),
+    description.as_str_types = [SEARCH_TYPES.RECAP]
+    nature_of_suit = forms.CharField(
+        required=False,
+        label="Nature of Suit",
+        widget=forms.TextInput(
+            attrs={
+                "class": "external-input form-control",
+                "autocomplete": "off",
+            }
         ),
-        as_str_types=[SEARCH_TYPES.RECAP],
     )
-    cause = blend(
-        forms.CharField(
-            required=False,
-            label="Cause",
-            widget=forms.TextInput(
-                attrs={
-                    "class": "external-input form-control",
-                    "autocomplete": "off",
-                }
-            ),
+    nature_of_suit.as_str_types = [SEARCH_TYPES.RECAP]
+    cause = forms.CharField(
+        required=False,
+        label="Cause",
+        widget=forms.TextInput(
+            attrs={
+                "class": "external-input form-control",
+                "autocomplete": "off",
+            }
         ),
-        as_str_types=[SEARCH_TYPES.RECAP],
     )
-    assigned_to = blend(
-        forms.CharField(
-            required=False,
-            label="Assigned To Judge",
-            widget=forms.TextInput(
-                attrs={
-                    "class": "external-input form-control",
-                    "autocomplete": "off",
-                }
-            ),
+    cause.as_str_types = [SEARCH_TYPES.RECAP]
+    assigned_to = forms.CharField(
+        required=False,
+        label="Assigned To Judge",
+        widget=forms.TextInput(
+            attrs={
+                "class": "external-input form-control",
+                "autocomplete": "off",
+            }
         ),
-        as_str_types=[SEARCH_TYPES.RECAP],
     )
-    referred_to = blend(
-        forms.CharField(
-            required=False,
-            label="Referred To Judge",
-            widget=forms.TextInput(
-                attrs={
-                    "class": "external-input form-control",
-                    "autocomplete": "off",
-                }
-            ),
+    assigned_to.as_str_types = [SEARCH_TYPES.RECAP]
+    referred_to = forms.CharField(
+        required=False,
+        label="Referred To Judge",
+        widget=forms.TextInput(
+            attrs={
+                "class": "external-input form-control",
+                "autocomplete": "off",
+            }
         ),
-        as_str_types=[SEARCH_TYPES.RECAP],
     )
-    document_number = blend(
-        forms.CharField(
-            required=False,
-            label="Document #",
-            widget=forms.TextInput(
-                attrs={
-                    "class": "external-input form-control",
-                    "autocomplete": "off",
-                }
-            ),
+    referred_to.as_str_types = [SEARCH_TYPES.RECAP]
+    document_number = forms.CharField(
+        required=False,
+        label="Document #",
+        widget=forms.TextInput(
+            attrs={
+                "class": "external-input form-control",
+                "autocomplete": "off",
+            }
         ),
-        as_str_types=[SEARCH_TYPES.RECAP],
     )
-    attachment_number = blend(
-        forms.CharField(
-            required=False,
-            label="Attachment #",
-            widget=forms.TextInput(
-                attrs={
-                    "class": "external-input form-control",
-                    "autocomplete": "off",
-                }
-            ),
+    document_number.as_str_types = [SEARCH_TYPES.RECAP]
+    attachment_number = forms.CharField(
+        required=False,
+        label="Attachment #",
+        widget=forms.TextInput(
+            attrs={
+                "class": "external-input form-control",
+                "autocomplete": "off",
+            }
         ),
-        as_str_types=[SEARCH_TYPES.RECAP],
     )
-    party_name = blend(
-        forms.CharField(
-            required=False,
-            label="Party Name",
-            widget=forms.TextInput(
-                attrs={
-                    "class": "external-input form-control",
-                    "autocomplete": "off",
-                },
-            ),
+    attachment_number.as_str_types = [SEARCH_TYPES.RECAP]
+    party_name = forms.CharField(
+        required=False,
+        label="Party Name",
+        widget=forms.TextInput(
+            attrs={
+                "class": "external-input form-control",
+                "autocomplete": "off",
+            },
         ),
-        as_str_types=[SEARCH_TYPES.RECAP],
     )
-    atty_name = blend(
-        forms.CharField(
-            required=False,
-            label="Attorney Name",
-            widget=forms.TextInput(
-                attrs={
-                    "class": "external-input form-control",
-                    "autocomplete": "off",
-                },
-            ),
+    party_name.as_str_types = [SEARCH_TYPES.RECAP]
+    atty_name = forms.CharField(
+        required=False,
+        label="Attorney Name",
+        widget=forms.TextInput(
+            attrs={
+                "class": "external-input form-control",
+                "autocomplete": "off",
+            },
         ),
-        as_str_types=[SEARCH_TYPES.RECAP],
     )
+    atty_name.as_str_types = [SEARCH_TYPES.RECAP]
     firm_name = forms.CharField(
         required=False,
         label="Firm Name",
@@ -289,282 +239,238 @@ class SearchForm(forms.Form):
     #
     # Oral argument fields
     #
-    argued_after = blend(
-        FloorDateOrRelativeField(
-            required=False,
-            label="Argued After",
-            widget=forms.TextInput(
-                attrs={
-                    "placeholder": "MM/DD/YYYY",
-                    "class": "external-input form-control datepicker",
-                    "autocomplete": "off",
-                }
-            ),
+    argued_after = FloorDateOrRelativeField(
+        required=False,
+        label="Argued After",
+        widget=forms.TextInput(
+            attrs={
+                "placeholder": "MM/DD/YYYY",
+                "class": "external-input form-control datepicker",
+                "autocomplete": "off",
+            }
         ),
-        as_str_types=[SEARCH_TYPES.ORAL_ARGUMENT],
     )
-    argued_before = blend(
-        CeilingDateOrRelativeField(
-            required=False,
-            label="Argued Before",
-            widget=forms.TextInput(
-                attrs={
-                    "placeholder": "MM/DD/YYYY",
-                    "class": "external-input form-control datepicker",
-                    "autocomplete": "off",
-                }
-            ),
+    argued_after.as_str_types = [SEARCH_TYPES.ORAL_ARGUMENT]
+    argued_before = CeilingDateOrRelativeField(
+        required=False,
+        label="Argued Before",
+        widget=forms.TextInput(
+            attrs={
+                "placeholder": "MM/DD/YYYY",
+                "class": "external-input form-control datepicker",
+                "autocomplete": "off",
+            }
         ),
-        as_str_types=[SEARCH_TYPES.ORAL_ARGUMENT],
     )
+    argued_before.as_str_types = [SEARCH_TYPES.ORAL_ARGUMENT]
 
     #
     # Opinion fields
     #
-    filed_after = blend(
-        FloorDateOrRelativeField(
-            required=False,
-            label="Filed After",
-            widget=forms.TextInput(
-                attrs={
-                    "placeholder": "MM/DD/YYYY",
-                    "class": "external-input form-control datepicker",
-                    "autocomplete": "off",
-                }
-            ),
+    filed_after = FloorDateOrRelativeField(
+        required=False,
+        label="Filed After",
+        widget=forms.TextInput(
+            attrs={
+                "placeholder": "MM/DD/YYYY",
+                "class": "external-input form-control datepicker",
+                "autocomplete": "off",
+            }
         ),
-        as_str_types=[
-            SEARCH_TYPES.OPINION,
-            SEARCH_TYPES.RECAP,
-            SEARCH_TYPES.PARENTHETICAL,
-        ],
     )
-    filed_before = blend(
-        CeilingDateOrRelativeField(
-            required=False,
-            label="Filed Before",
-            widget=forms.TextInput(
-                attrs={
-                    "placeholder": "MM/DD/YYYY",
-                    "class": "external-input form-control datepicker",
-                    "autocomplete": "off",
-                }
-            ),
+    filed_after.as_str_types = [
+        SEARCH_TYPES.OPINION,
+        SEARCH_TYPES.RECAP,
+        SEARCH_TYPES.PARENTHETICAL,
+    ]
+    filed_before = CeilingDateOrRelativeField(
+        required=False,
+        label="Filed Before",
+        widget=forms.TextInput(
+            attrs={
+                "placeholder": "MM/DD/YYYY",
+                "class": "external-input form-control datepicker",
+                "autocomplete": "off",
+            }
         ),
-        as_str_types=[
-            SEARCH_TYPES.OPINION,
-            SEARCH_TYPES.RECAP,
-            SEARCH_TYPES.PARENTHETICAL,
-        ],
     )
+    filed_before.as_str_types = [
+        SEARCH_TYPES.OPINION,
+        SEARCH_TYPES.RECAP,
+        SEARCH_TYPES.PARENTHETICAL,
+    ]
     # RECAP specific fields
-    entry_date_filed_after = blend(
-        FloorDateOrRelativeField(
-            required=False,
-            label="Entry Filed After",
-            widget=forms.TextInput(
-                attrs={
-                    "placeholder": "MM/DD/YYYY",
-                    "class": "external-input form-control datepicker",
-                    "autocomplete": "off",
-                }
-            ),
+    entry_date_filed_after = FloorDateOrRelativeField(
+        required=False,
+        label="Entry Filed After",
+        widget=forms.TextInput(
+            attrs={
+                "placeholder": "MM/DD/YYYY",
+                "class": "external-input form-control datepicker",
+                "autocomplete": "off",
+            }
         ),
-        as_str_types=[
-            SEARCH_TYPES.RECAP,
-        ],
     )
-    entry_date_filed_before = blend(
-        CeilingDateOrRelativeField(
-            required=False,
-            label="Entry Filed Before",
-            widget=forms.TextInput(
-                attrs={
-                    "placeholder": "MM/DD/YYYY",
-                    "class": "external-input form-control datepicker",
-                    "autocomplete": "off",
-                }
-            ),
+    entry_date_filed_after.as_str_types = [
+        SEARCH_TYPES.RECAP,
+    ]
+    entry_date_filed_before = CeilingDateOrRelativeField(
+        required=False,
+        label="Entry Filed Before",
+        widget=forms.TextInput(
+            attrs={
+                "placeholder": "MM/DD/YYYY",
+                "class": "external-input form-control datepicker",
+                "autocomplete": "off",
+            }
         ),
-        as_str_types=[
-            SEARCH_TYPES.RECAP,
-        ],
     )
+    entry_date_filed_before.as_str_types = [
+        SEARCH_TYPES.RECAP,
+    ]
 
-    citation = blend(
-        forms.CharField(
-            required=False,
-            label="Citation",
-            widget=forms.TextInput(
-                attrs={
-                    "class": "external-input form-control",
-                    "autocomplete": "off",
-                }
-            ),
+    citation = forms.CharField(
+        required=False,
+        label="Citation",
+        widget=forms.TextInput(
+            attrs={
+                "class": "external-input form-control",
+                "autocomplete": "off",
+            }
         ),
-        as_str_types=[SEARCH_TYPES.OPINION],
     )
-    neutral_cite = blend(
-        forms.CharField(
-            required=False,
-            label="Neutral Citation",
-            widget=forms.TextInput(
-                attrs={
-                    "class": "external-input form-control",
-                    "autocomplete": "off",
-                }
-            ),
+    citation.as_str_types = [SEARCH_TYPES.OPINION]
+    neutral_cite = forms.CharField(
+        required=False,
+        label="Neutral Citation",
+        widget=forms.TextInput(
+            attrs={
+                "class": "external-input form-control",
+                "autocomplete": "off",
+            }
         ),
-        as_str_types=[SEARCH_TYPES.OPINION],
     )
-    cited_gt = blend(
-        forms.IntegerField(
-            required=False,
-            label="Min Cites",
-            initial=0,
-            widget=forms.TextInput(
-                attrs={
-                    "class": "external-input form-control",
-                    "autocomplete": "off",
-                }
-            ),
+    neutral_cite.as_str_types = [SEARCH_TYPES.OPINION]
+    cited_gt = forms.IntegerField(
+        required=False,
+        label="Min Cites",
+        initial=0,
+        widget=forms.TextInput(
+            attrs={
+                "class": "external-input form-control",
+                "autocomplete": "off",
+            }
         ),
-        as_str_types=[SEARCH_TYPES.OPINION],
     )
-    cited_lt = blend(
-        forms.IntegerField(
-            required=False,
-            label="Max Cites",
-            initial=100000,
-            widget=forms.TextInput(
-                attrs={
-                    "class": "external-input form-control",
-                    "autocomplete": "off",
-                }
-            ),
+    cited_gt.as_str_types = [SEARCH_TYPES.OPINION]
+    cited_lt = forms.IntegerField(
+        required=False,
+        label="Max Cites",
+        initial=100000,
+        widget=forms.TextInput(
+            attrs={
+                "class": "external-input form-control",
+                "autocomplete": "off",
+            }
         ),
-        as_str_types=[SEARCH_TYPES.OPINION],
     )
+    cited_lt.as_str_types = [SEARCH_TYPES.OPINION]
 
     #
     # Judge fields
     #
-    name = blend(
-        forms.CharField(
-            required=False,
-            label="Name",
-            widget=forms.TextInput(
-                attrs={
-                    "class": "external-input form-control",
-                    "autocomplete": "off",
-                }
-            ),
+    name = forms.CharField(
+        required=False,
+        label="Name",
+        widget=forms.TextInput(
+            attrs={
+                "class": "external-input form-control",
+                "autocomplete": "off",
+            }
         ),
-        as_str_types=[SEARCH_TYPES.PEOPLE],
     )
-    born_after = blend(
-        FloorDateOrRelativeField(
-            required=False,
-            label="Born After",
-            widget=forms.TextInput(
-                attrs={
-                    "placeholder": "MM/DD/YYYY",
-                    "class": "external-input form-control datepicker",
-                    "autocomplete": "off",
-                }
-            ),
+    name.as_str_types = [SEARCH_TYPES.PEOPLE]
+    born_after = FloorDateOrRelativeField(
+        required=False,
+        label="Born After",
+        widget=forms.TextInput(
+            attrs={
+                "placeholder": "MM/DD/YYYY",
+                "class": "external-input form-control datepicker",
+                "autocomplete": "off",
+            }
         ),
-        as_str_types=[SEARCH_TYPES.PEOPLE],
     )
-    born_before = blend(
-        CeilingDateOrRelativeField(
-            required=False,
-            label="Born Before",
-            widget=forms.TextInput(
-                attrs={
-                    "placeholder": "MM/DD/YYYY",
-                    "class": "external-input form-control datepicker",
-                    "autocomplete": "off",
-                }
-            ),
+    born_after.as_str_types = [SEARCH_TYPES.PEOPLE]
+    born_before = CeilingDateOrRelativeField(
+        required=False,
+        label="Born Before",
+        widget=forms.TextInput(
+            attrs={
+                "placeholder": "MM/DD/YYYY",
+                "class": "external-input form-control datepicker",
+                "autocomplete": "off",
+            }
         ),
-        as_str_types=[SEARCH_TYPES.PEOPLE],
     )
-    dob_city = blend(
-        forms.CharField(
-            required=False,
-            label="Birth City",
-            widget=forms.TextInput(
-                attrs={
-                    "class": "external-input form-control",
-                    "autocomplete": "off",
-                }
-            ),
+    born_before.as_str_types = [SEARCH_TYPES.PEOPLE]
+    dob_city = forms.CharField(
+        required=False,
+        label="Birth City",
+        widget=forms.TextInput(
+            attrs={
+                "class": "external-input form-control",
+                "autocomplete": "off",
+            }
         ),
-        as_str_types=[SEARCH_TYPES.PEOPLE],
     )
-    dob_state = blend(
-        forms.ChoiceField(
-            choices=[("", "---------")] + list(STATE_CHOICES),
-            required=False,
-            label="Birth State",
-            widget=forms.Select(
-                attrs={"class": "external-input form-control"}
-            ),
+    dob_city.as_str_types = [SEARCH_TYPES.PEOPLE]
+    dob_state = forms.ChoiceField(
+        choices=[("", "---------")] + list(STATE_CHOICES),
+        required=False,
+        label="Birth State",
+        widget=forms.Select(attrs={"class": "external-input form-control"}),
+    )
+    dob_state.as_str_types = [SEARCH_TYPES.PEOPLE]
+    school = forms.CharField(
+        required=False,
+        label="School Attended",
+        widget=forms.TextInput(
+            attrs={
+                "class": "external-input form-control",
+                "autocomplete": "off",
+            }
         ),
-        as_str_types=[SEARCH_TYPES.PEOPLE],
     )
-    school = blend(
-        forms.CharField(
-            required=False,
-            label="School Attended",
-            widget=forms.TextInput(
-                attrs={
-                    "class": "external-input form-control",
-                    "autocomplete": "off",
-                }
-            ),
+    school.as_str_types = [SEARCH_TYPES.PEOPLE]
+    appointer = forms.CharField(
+        required=False,
+        label="Appointed By",
+        widget=forms.TextInput(
+            attrs={
+                "class": "external-input form-control",
+                "autocomplete": "off",
+            }
         ),
-        as_str_types=[SEARCH_TYPES.PEOPLE],
     )
-    appointer = blend(
-        forms.CharField(
-            required=False,
-            label="Appointed By",
-            widget=forms.TextInput(
-                attrs={
-                    "class": "external-input form-control",
-                    "autocomplete": "off",
-                }
-            ),
-        ),
-        as_str_types=[SEARCH_TYPES.PEOPLE],
+    appointer.as_str_types = [SEARCH_TYPES.PEOPLE]
+    selection_method = forms.ChoiceField(
+        choices=[("", "---------")] + list(Position.SELECTION_METHODS),
+        required=False,
+        label="Selection Method",
+        initial="None",
+        widget=forms.Select(attrs={"class": "external-input form-control"}),
     )
-    selection_method = blend(
-        forms.ChoiceField(
-            choices=[("", "---------")] + list(Position.SELECTION_METHODS),
-            required=False,
-            label="Selection Method",
-            initial="None",
-            widget=forms.Select(
-                attrs={"class": "external-input form-control"}
-            ),
-        ),
-        as_str_types=[SEARCH_TYPES.PEOPLE],
+    selection_method.as_str_types = [SEARCH_TYPES.PEOPLE]
+    political_affiliation = forms.ChoiceField(
+        choices=[("", "---------")]
+        + list(PoliticalAffiliation.POLITICAL_PARTIES),
+        required=False,
+        label="Political Affiliation",
+        initial="None",
+        widget=forms.Select(attrs={"class": "external-input form-control"}),
     )
-    political_affiliation = blend(
-        forms.ChoiceField(
-            choices=[("", "---------")]
-            + list(PoliticalAffiliation.POLITICAL_PARTIES),
-            required=False,
-            label="Political Affiliation",
-            initial="None",
-            widget=forms.Select(
-                attrs={"class": "external-input form-control"}
-            ),
-        ),
-        as_str_types=[SEARCH_TYPES.PEOPLE],
-    )
+    political_affiliation.as_str_types = [SEARCH_TYPES.PEOPLE]
 
     highlight = forms.BooleanField(
         label="Whether to enable highlighting in the Search API.",
@@ -627,15 +533,13 @@ class SearchForm(forms.Form):
                 attrs.update({"checked": "checked"})
             else:
                 initial = False
-            new_field = blend(
-                forms.BooleanField(
-                    label=status[status_index],
-                    required=False,
-                    initial=initial,
-                    widget=forms.CheckboxInput(attrs=attrs),
-                ),
-                as_str_types=[SEARCH_TYPES.OPINION],
+            new_field = forms.BooleanField(
+                label=status[status_index],
+                required=False,
+                initial=initial,
+                widget=forms.CheckboxInput(attrs=attrs),
             )
+            new_field.as_str_types = [SEARCH_TYPES.OPINION]
             self.fields[f"stat_{status[status_index]}"] = new_field
 
     # This is a particularly nasty area of the code due to several factors:
@@ -839,8 +743,7 @@ class SearchForm(forms.Form):
                 value = self.cleaned_data.get(field_name)
                 if value:
                     if isinstance(field, ChoiceField):
-                        # pyrefly:ignore[bad-argument-type] django-stubs types the getter like the setter, but Django normalizes choices to an iterable on assignment
-                        choices = flatten_choices(field.choices)
+                        choices = flatten_choices(self.fields[field_name])
                         value = dict(choices)[value]
                     display_dict[field.label] = value
 
@@ -866,302 +769,246 @@ class CorpusSearchForm(forms.Form):
     #
     # Oral argument and Opinion shared fields
     #
-    judge = blend(
-        forms.CharField(
-            required=False,
-            initial="",
-            label="Judge",
-            label_suffix="",
-            widget=widgets.TextInput(),
-        ),
-        as_str_types=[SEARCH_TYPES.OPINION, SEARCH_TYPES.ORAL_ARGUMENT],
+    judge = forms.CharField(
+        required=False,
+        initial="",
+        label="Judge",
+        label_suffix="",
+        widget=widgets.TextInput(),
     )
+    judge.as_str_types = [SEARCH_TYPES.OPINION, SEARCH_TYPES.ORAL_ARGUMENT]
 
     #
     # Opinion fields
     #
-    filed_after = blend(
-        FloorDateOrRelativeField(
-            required=False,
-            label="Filed After",
-            label_suffix="",
-            widget=widgets.TextInput(attrs={"placeholder": "mm/dd/yyyy"}),
-        ),
-        as_str_types=[
-            SEARCH_TYPES.OPINION,
-            SEARCH_TYPES.RECAP,
-            SEARCH_TYPES.PARENTHETICAL,
-        ],
+    filed_after = FloorDateOrRelativeField(
+        required=False,
+        label="Filed After",
+        label_suffix="",
+        widget=widgets.TextInput(attrs={"placeholder": "mm/dd/yyyy"}),
     )
-    filed_before = blend(
-        CeilingDateOrRelativeField(
-            required=False,
-            label="Filed Before",
-            label_suffix="",
-            widget=widgets.TextInput(attrs={"placeholder": "mm/dd/yyyy"}),
-        ),
-        as_str_types=[
-            SEARCH_TYPES.OPINION,
-            SEARCH_TYPES.RECAP,
-            SEARCH_TYPES.PARENTHETICAL,
-        ],
+    filed_after.as_str_types = [
+        SEARCH_TYPES.OPINION,
+        SEARCH_TYPES.RECAP,
+        SEARCH_TYPES.PARENTHETICAL,
+    ]
+    filed_before = CeilingDateOrRelativeField(
+        required=False,
+        label="Filed Before",
+        label_suffix="",
+        widget=widgets.TextInput(attrs={"placeholder": "mm/dd/yyyy"}),
     )
-    docket_number = blend(
-        forms.CharField(
-            required=False,
-            label="Docket Number",
-            label_suffix="",
-            widget=widgets.TextInput(),
-        ),
-        as_str_types=[
-            SEARCH_TYPES.OPINION,
-            SEARCH_TYPES.RECAP,
-            SEARCH_TYPES.ORAL_ARGUMENT,
-            SEARCH_TYPES.PARENTHETICAL,
-        ],
+    filed_before.as_str_types = [
+        SEARCH_TYPES.OPINION,
+        SEARCH_TYPES.RECAP,
+        SEARCH_TYPES.PARENTHETICAL,
+    ]
+    docket_number = forms.CharField(
+        required=False,
+        label="Docket Number",
+        label_suffix="",
+        widget=widgets.TextInput(),
     )
+    docket_number.as_str_types = [
+        SEARCH_TYPES.OPINION,
+        SEARCH_TYPES.RECAP,
+        SEARCH_TYPES.ORAL_ARGUMENT,
+        SEARCH_TYPES.PARENTHETICAL,
+    ]
 
-    citation = blend(
-        forms.CharField(
-            required=False,
-            label="Citation",
-            label_suffix="",
-            widget=widgets.TextInput(),
-        ),
-        as_str_types=[SEARCH_TYPES.OPINION],
+    citation = forms.CharField(
+        required=False,
+        label="Citation",
+        label_suffix="",
+        widget=widgets.TextInput(),
     )
+    citation.as_str_types = [SEARCH_TYPES.OPINION]
 
-    description = blend(
-        forms.CharField(
-            required=False,
-            label="Document Description",
-            label_suffix="",
-            widget=widgets.TextInput(),
-        ),
-        as_str_types=[SEARCH_TYPES.RECAP],
+    description = forms.CharField(
+        required=False,
+        label="Document Description",
+        label_suffix="",
+        widget=widgets.TextInput(),
     )
+    description.as_str_types = [SEARCH_TYPES.RECAP]
 
-    document_number = blend(
-        forms.CharField(
-            required=False,
-            label="Document Number",
-            label_suffix="",
-            widget=widgets.TextInput(),
-        ),
-        as_str_types=[SEARCH_TYPES.RECAP],
+    document_number = forms.CharField(
+        required=False,
+        label="Document Number",
+        label_suffix="",
+        widget=widgets.TextInput(),
     )
+    document_number.as_str_types = [SEARCH_TYPES.RECAP]
 
-    attachment_number = blend(
-        forms.CharField(
-            required=False,
-            label="Attachment Number",
-            label_suffix="",
-            widget=widgets.TextInput(),
-        ),
-        as_str_types=[SEARCH_TYPES.RECAP],
+    attachment_number = forms.CharField(
+        required=False,
+        label="Attachment Number",
+        label_suffix="",
+        widget=widgets.TextInput(),
     )
+    attachment_number.as_str_types = [SEARCH_TYPES.RECAP]
 
-    assigned_to = blend(
-        forms.CharField(
-            required=False,
-            label="Assigned To Judge",
-            label_suffix="",
-            widget=widgets.TextInput(),
-        ),
-        as_str_types=[SEARCH_TYPES.RECAP],
+    assigned_to = forms.CharField(
+        required=False,
+        label="Assigned To Judge",
+        label_suffix="",
+        widget=widgets.TextInput(),
     )
+    assigned_to.as_str_types = [SEARCH_TYPES.RECAP]
 
-    referred_to = blend(
-        forms.CharField(
-            required=False,
-            label="Referred To Judge",
-            label_suffix="",
-            widget=widgets.TextInput(),
-        ),
-        as_str_types=[SEARCH_TYPES.RECAP],
+    referred_to = forms.CharField(
+        required=False,
+        label="Referred To Judge",
+        label_suffix="",
+        widget=widgets.TextInput(),
     )
+    referred_to.as_str_types = [SEARCH_TYPES.RECAP]
 
-    entry_date_filed_after = blend(
-        FloorDateOrRelativeField(
-            required=False,
-            label="Entry Date",
-            label_suffix="",
-            widget=widgets.TextInput(attrs={"placeholder": "After"}),
-        ),
-        as_str_types=[SEARCH_TYPES.RECAP],
+    entry_date_filed_after = FloorDateOrRelativeField(
+        required=False,
+        label="Entry Date",
+        label_suffix="",
+        widget=widgets.TextInput(attrs={"placeholder": "After"}),
     )
+    entry_date_filed_after.as_str_types = [SEARCH_TYPES.RECAP]
 
-    entry_date_filed_before = blend(
-        CeilingDateOrRelativeField(
-            required=False,
-            label="Entry Date",
-            label_suffix="",
-            widget=widgets.TextInput(attrs={"placeholder": "Before"}),
-        ),
-        as_str_types=[SEARCH_TYPES.RECAP],
+    entry_date_filed_before = CeilingDateOrRelativeField(
+        required=False,
+        label="Entry Date",
+        label_suffix="",
+        widget=widgets.TextInput(attrs={"placeholder": "Before"}),
     )
+    entry_date_filed_before.as_str_types = [SEARCH_TYPES.RECAP]
 
-    nature_of_suit = blend(
-        forms.CharField(
-            required=False,
-            label="Nature of Suit",
-            label_suffix="",
-            widget=widgets.TextInput(),
-        ),
-        as_str_types=[SEARCH_TYPES.RECAP],
+    nature_of_suit = forms.CharField(
+        required=False,
+        label="Nature of Suit",
+        label_suffix="",
+        widget=widgets.TextInput(),
     )
+    nature_of_suit.as_str_types = [SEARCH_TYPES.RECAP]
 
-    party_name = blend(
-        forms.CharField(
-            required=False,
-            label="Party Name",
-            label_suffix="",
-            widget=widgets.TextInput(),
-        ),
-        as_str_types=[SEARCH_TYPES.RECAP],
+    party_name = forms.CharField(
+        required=False,
+        label="Party Name",
+        label_suffix="",
+        widget=widgets.TextInput(),
     )
+    party_name.as_str_types = [SEARCH_TYPES.RECAP]
 
-    atty_name = blend(
-        forms.CharField(
-            required=False,
-            label="Attorney Name",
-            label_suffix="",
-            widget=widgets.TextInput(),
-        ),
-        as_str_types=[SEARCH_TYPES.RECAP],
+    atty_name = forms.CharField(
+        required=False,
+        label="Attorney Name",
+        label_suffix="",
+        widget=widgets.TextInput(),
     )
+    atty_name.as_str_types = [SEARCH_TYPES.RECAP]
 
     #
     # Judge fields
     #
-    name = blend(
-        forms.CharField(
-            required=False,
-            label="Name",
-            label_suffix="",
-            widget=widgets.TextInput(),
-        ),
-        as_str_types=[SEARCH_TYPES.PEOPLE],
+    name = forms.CharField(
+        required=False,
+        label="Name",
+        label_suffix="",
+        widget=widgets.TextInput(),
     )
-    born_after = blend(
-        FloorDateOrRelativeField(
-            required=False,
-            label="Born After",
-            label_suffix="",
-            widget=widgets.TextInput(attrs={"placeholder": "mm/dd/yyyy"}),
-        ),
-        as_str_types=[SEARCH_TYPES.PEOPLE],
+    name.as_str_types = [SEARCH_TYPES.PEOPLE]
+    born_after = FloorDateOrRelativeField(
+        required=False,
+        label="Born After",
+        label_suffix="",
+        widget=widgets.TextInput(attrs={"placeholder": "mm/dd/yyyy"}),
     )
-    born_before = blend(
-        CeilingDateOrRelativeField(
-            required=False,
-            label="Born Before",
-            label_suffix="",
-            widget=widgets.TextInput(attrs={"placeholder": "mm/dd/yyyy"}),
-        ),
-        as_str_types=[SEARCH_TYPES.PEOPLE],
+    born_after.as_str_types = [SEARCH_TYPES.PEOPLE]
+    born_before = CeilingDateOrRelativeField(
+        required=False,
+        label="Born Before",
+        label_suffix="",
+        widget=widgets.TextInput(attrs={"placeholder": "mm/dd/yyyy"}),
     )
+    born_before.as_str_types = [SEARCH_TYPES.PEOPLE]
 
-    dob_city = blend(
-        forms.CharField(
-            required=False,
-            label="Birth City",
-            label_suffix="",
-            widget=widgets.TextInput(),
-        ),
-        as_str_types=[SEARCH_TYPES.PEOPLE],
+    dob_city = forms.CharField(
+        required=False,
+        label="Birth City",
+        label_suffix="",
+        widget=widgets.TextInput(),
     )
-    dob_state = blend(
-        forms.ChoiceField(
-            choices=[("", "")] + list(STATE_CHOICES),
-            required=False,
-            label="Birth State",
-            label_suffix="",
-            widget=widgets.Select(input_text=True),
-        ),
-        as_str_types=[SEARCH_TYPES.PEOPLE],
+    dob_city.as_str_types = [SEARCH_TYPES.PEOPLE]
+    dob_state = forms.ChoiceField(
+        choices=[("", "")] + list(STATE_CHOICES),
+        required=False,
+        label="Birth State",
+        label_suffix="",
+        widget=widgets.Select(input_text=True),
     )
-    school = blend(
-        forms.CharField(
-            required=False,
-            label="School Attended",
-            label_suffix="",
-            widget=widgets.TextInput(),
-        ),
-        as_str_types=[SEARCH_TYPES.PEOPLE],
+    dob_state.as_str_types = [SEARCH_TYPES.PEOPLE]
+    school = forms.CharField(
+        required=False,
+        label="School Attended",
+        label_suffix="",
+        widget=widgets.TextInput(),
     )
-    appointer = blend(
-        forms.CharField(
-            required=False,
-            label="Appointed By",
-            label_suffix="",
-            widget=widgets.TextInput(),
-        ),
-        as_str_types=[SEARCH_TYPES.PEOPLE],
+    school.as_str_types = [SEARCH_TYPES.PEOPLE]
+    appointer = forms.CharField(
+        required=False,
+        label="Appointed By",
+        label_suffix="",
+        widget=widgets.TextInput(),
     )
-    selection_method = blend(
-        forms.ChoiceField(
-            choices=[("", "")] + list(Position.SELECTION_METHODS),
-            required=False,
-            label="Selection Method",
-            label_suffix="",
-            initial="None",
-            widget=widgets.Select(),
-        ),
-        as_str_types=[SEARCH_TYPES.PEOPLE],
+    appointer.as_str_types = [SEARCH_TYPES.PEOPLE]
+    selection_method = forms.ChoiceField(
+        choices=[("", "")] + list(Position.SELECTION_METHODS),
+        required=False,
+        label="Selection Method",
+        label_suffix="",
+        initial="None",
+        widget=widgets.Select(),
     )
-    political_affiliation = blend(
-        forms.ChoiceField(
-            choices=[("", "")] + list(PoliticalAffiliation.POLITICAL_PARTIES),
-            required=False,
-            label="Political Affiliation",
-            label_suffix="",
-            initial="None",
-            widget=widgets.Select(input_text=True),
-        ),
-        as_str_types=[SEARCH_TYPES.PEOPLE],
+    selection_method.as_str_types = [SEARCH_TYPES.PEOPLE]
+    political_affiliation = forms.ChoiceField(
+        choices=[("", "")] + list(PoliticalAffiliation.POLITICAL_PARTIES),
+        required=False,
+        label="Political Affiliation",
+        label_suffix="",
+        initial="None",
+        widget=widgets.Select(input_text=True),
     )
-    argued_after = blend(
-        FloorDateOrRelativeField(
-            required=False,
-            label="Argued After",
-            label_suffix="",
-            widget=widgets.TextInput(attrs={"placeholder": "mm/dd/yyy"}),
-        ),
-        as_str_types=[SEARCH_TYPES.ORAL_ARGUMENT],
+    political_affiliation.as_str_types = [SEARCH_TYPES.PEOPLE]
+    argued_after = FloorDateOrRelativeField(
+        required=False,
+        label="Argued After",
+        label_suffix="",
+        widget=widgets.TextInput(attrs={"placeholder": "mm/dd/yyy"}),
     )
-    argued_before = blend(
-        CeilingDateOrRelativeField(
-            required=False,
-            label="Argued Before",
-            label_suffix="",
-            widget=widgets.TextInput(attrs={"placeholder": "mm/dd/yyy"}),
-        ),
-        as_str_types=[SEARCH_TYPES.ORAL_ARGUMENT],
+    argued_after.as_str_types = [SEARCH_TYPES.ORAL_ARGUMENT]
+    argued_before = CeilingDateOrRelativeField(
+        required=False,
+        label="Argued Before",
+        label_suffix="",
+        widget=widgets.TextInput(attrs={"placeholder": "mm/dd/yyy"}),
     )
-    cause = blend(
-        forms.CharField(
-            required=False,
-            label="Cause",
-            label_suffix="",
-            widget=widgets.TextInput(),
-        ),
-        as_str_types=[SEARCH_TYPES.RECAP],
+    argued_before.as_str_types = [SEARCH_TYPES.ORAL_ARGUMENT]
+    cause = forms.CharField(
+        required=False,
+        label="Cause",
+        label_suffix="",
+        widget=widgets.TextInput(),
     )
+    cause.as_str_types = [SEARCH_TYPES.RECAP]
 
-    available_only = blend(
-        forms.BooleanField(
-            label="Only show results with PDFs",
-            label_suffix="",
-            required=False,
-            widget=forms.CheckboxInput(),
-        ),
-        as_str_types=[SEARCH_TYPES.RECAP],
+    available_only = forms.BooleanField(
+        label="Only show results with PDFs",
+        label_suffix="",
+        required=False,
+        widget=forms.CheckboxInput(),
     )
+    available_only.as_str_types = [SEARCH_TYPES.RECAP]
 
 
 def clean_up_date_formats(
-    cd: dict[str, Any], date_field: str, get_params: dict[str, Any]
+    cd: dict[str, any], date_field: str, get_params: dict[str, any]
 ) -> None:
     """Clean up date formats in a given params dictionary.
 

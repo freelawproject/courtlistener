@@ -143,7 +143,6 @@ from django.utils.timezone import now
 
 from cl.ai.llm_providers.google import (
     SUPPORTED_GEMINI_MODELS,
-    BatchTask,
     GoogleGenAIBatchWrapper,
 )
 from cl.ai.models import (
@@ -192,20 +191,22 @@ def get_s3_file_list(
 
     # Create S3 client with session token support for dev mode
     try:
-        aws_session_token = None
+        client_kwargs = {
+            "service_name": "s3",
+            "aws_access_key_id": key_id,
+            "aws_secret_access_key": secret,
+        }
+
         # In dev mode, add session token if available
         if settings.DEVELOPMENT:
             env = environ.FileAwareEnv()
-            aws_session_token = env("AWS_SESSION_TOKEN", default=None) or env(
+            session_token = env("AWS_SESSION_TOKEN", default=None) or env(
                 "AWS_DEV_SESSION_TOKEN", default=None
             )
+            if session_token:
+                client_kwargs["aws_session_token"] = session_token
 
-        s3_client = boto3.client(
-            "s3",
-            aws_access_key_id=key_id,
-            aws_secret_access_key=secret,
-            aws_session_token=aws_session_token,
-        )
+        s3_client = boto3.client(**client_kwargs)
     except (BotoCoreError, ClientError) as e:
         raise CommandError(f"Failed to create S3 client: {e}")
 
@@ -314,7 +315,7 @@ def create_tasks_from_files(
     files: list[tuple[str, bytes, str]],
     store_files: bool,
     temp_files: list[str],
-) -> list[BatchTask]:
+) -> list[dict]:
     """Create ``LLMTask`` objects from file data and stage temp files.
 
     For each file tuple, an ``LLMTask`` is created and the file content is
@@ -332,9 +333,9 @@ def create_tasks_from_files(
     :param temp_files: Mutable list populated in-place with temporary file
         paths. This ensures the caller can clean them up even if this
         function fails partway through.
-    :returns: One ``BatchTask`` per file.
+    :returns: A list of dicts with ``llm_key`` and ``input_file_path`` keys.
     """
-    tasks_data: list[BatchTask] = []
+    tasks_data: list[dict] = []
 
     for filename, file_content, s3_key in files:
         llm_key = f"scan-batch-{llm_request.pk}-{uuid.uuid4().hex[:12]}"
@@ -352,11 +353,12 @@ def create_tasks_from_files(
             task.save()
             logger.info(f"  - Referenced S3 file: {s3_key}")
 
-        with tempfile.NamedTemporaryFile(
+        temp_file = tempfile.NamedTemporaryFile(
             delete=False, suffix=os.path.splitext(filename)[1]
-        ) as temp_file:
-            temp_files.append(temp_file.name)
-            temp_file.write(file_content)
+        )
+        temp_file.write(file_content)
+        temp_file.close()
+        temp_files.append(temp_file.name)
 
         tasks_data.append(
             {"llm_key": llm_key, "input_file_path": temp_file.name}
@@ -372,7 +374,7 @@ def create_tasks_from_files(
 def submit_batch(
     llm_request: LLMRequest,
     wrapper: GoogleGenAIBatchWrapper,
-    tasks_data: list[BatchTask],
+    tasks_data: list[dict],
     system_prompt: Prompt,
     user_prompt: Prompt,
     cache_name: str,
@@ -388,7 +390,9 @@ def submit_batch(
 
     :param llm_request: The parent request to associate the batch with.
     :param wrapper: Pre-initialised Google GenAI batch wrapper.
-    :param tasks_data: Tasks produced by :func:`create_tasks_from_files`.
+    :param tasks_data: List of dicts with ``llm_key`` and
+        ``input_file_path`` keys produced by
+        :func:`fetch_files_and_create_tasks`.
     :param system_prompt: The system ``Prompt`` object.
     :param user_prompt: The user ``Prompt`` object.
     :param cache_name: Stable display name for the system-prompt cache.
@@ -426,7 +430,8 @@ def cleanup_temp_files(temp_files: list[str]) -> None:
     logger.info("Cleaning up temporary files...")
     for temp_file_path in temp_files:
         try:
-            os.remove(temp_file_path)
+            if os.path.exists(temp_file_path):
+                os.remove(temp_file_path)
         except OSError as e:
             if e.errno != 2:  # errno.ENOENT
                 logger.warning(
@@ -596,11 +601,11 @@ class Command(VerboseCommand):
                 )
             s3_files = filter_already_processed(s3_files, already_processed)
 
+        all_temp_files: list[str] = []
         batch_number = 0
         failed_batches = 0
         try:
             for chunk in chunk_iterator(s3_files, batch_size):
-                temp_files: list[str] = []
                 batch_number += 1
                 batch_name = (
                     f"{request_name} (part {batch_number})"
@@ -628,7 +633,7 @@ class Command(VerboseCommand):
                             llm_request,
                             chunk,
                             store_files,
-                            temp_files,
+                            all_temp_files,
                         )
 
                         submit_batch(
@@ -650,8 +655,6 @@ class Command(VerboseCommand):
                         model,
                     )
                     sentry_sdk.capture_exception(e)
-                finally:
-                    cleanup_temp_files(temp_files)
         except Exception as e:
             logger.exception(
                 "S3 iteration failed after batch %d. s3_path=%s, model=%s",
@@ -661,6 +664,8 @@ class Command(VerboseCommand):
             )
             sentry_sdk.capture_exception(e)
             raise
+        finally:
+            cleanup_temp_files(all_temp_files)
 
         succeeded = batch_number - failed_batches
         logger.info(

@@ -35,7 +35,7 @@ from pathlib import Path
 from typing import Any, ClassVar, Final, assert_never, cast
 
 from django.conf import settings
-from django.db.models import QuerySet
+from django.db.models import Model, QuerySet
 from django.utils import timezone
 from pydantic import BaseModel, ValidationError
 
@@ -270,11 +270,7 @@ class LoadReport:
         return ", ".join(parts)
 
 
-class JKentScrapeLoader[
-    ScrapeType: BaseModel,
-    ScrapeMerger: Merger,
-    ParamType = None,
-](ABC):
+class JKentScrapeLoader[ScrapeType: BaseModel, ParamType = None](ABC):
     """Loads one jkent run database into CourtListener.
 
     :cvar name: The key this loader is registered under in
@@ -302,7 +298,7 @@ class JKentScrapeLoader[
     query: ClassVar[str]
     payload_column: ClassVar[str] = "data_json"
     scrape_model: type[ScrapeType]
-    merger: type[ScrapeMerger]
+    merger: type[Merger[ScrapeType, ParamType, Model]]
     document_model: ClassVar[type[AbstractStateDocument] | None] = None
     private_prefix: ClassVar[str] = ""
 
@@ -1205,7 +1201,7 @@ class JKentScrapeLoader[
         since: datetime,
         wait: WaitOutcome,
     ) -> ExtractionReport:
-        """Gets extraction status for this model since the run started.
+        """Get's extraction status for this model since the run started.
 
         Updates the ledger accordingly.
 

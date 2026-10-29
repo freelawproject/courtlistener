@@ -103,7 +103,7 @@ def update_latest_case_id_and_schedule_iquery_sweep(
             task_to_schedule_count += 1
             # Schedule the next task.
             make_docket_by_iquery_sweep.apply_async(
-                args=(court_id, str(iquery_pacer_case_id_current)),
+                args=(court_id, iquery_pacer_case_id_current),
                 kwargs={"skip_iquery_sweep": True},
                 queue=settings.CELERY_IQUERY_QUEUE,
             )

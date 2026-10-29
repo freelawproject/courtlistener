@@ -32,6 +32,8 @@ from cl.custom_filters.templatetags.text_filters import html_decode
 from cl.lib.elasticsearch_utils import build_es_base_query, do_es_api_query
 from cl.lib.redis_utils import get_redis_interface
 from cl.lib.test_helpers import (
+    CourtTestCase,
+    PeopleTestCase,
     SearchTestCase,
     opinion_document_v4_api_keys,
     opinion_v3_search_api_keys,
@@ -90,7 +92,9 @@ from cl.tests.cases import (
 from cl.users.factories import UserProfileWithParentsFactory
 
 
-class OpinionSearchAPICommonTests(SearchTestCase):
+class OpinionSearchAPICommonTests(
+    CourtTestCase, PeopleTestCase, SearchTestCase
+):
     version_api = "v3"
     skip_common_tests = True
 
@@ -1225,7 +1229,9 @@ class OpinionV4APISearchTest(
 
 @override_flag("store-search-queries", active=True)
 @override_settings(WAFFLE_CACHE_PREFIX="test_opinions_es_search")
-class OpinionsESSearchTest(ESIndexTestCase, SearchTestCase, TestCase):
+class OpinionsESSearchTest(
+    ESIndexTestCase, CourtTestCase, PeopleTestCase, SearchTestCase, TestCase
+):
     @classmethod
     def setUpTestData(cls):
         super().setUpTestData()
@@ -1441,15 +1447,6 @@ class OpinionsESSearchTest(ESIndexTestCase, SearchTestCase, TestCase):
             msg="Wrong number of Jurisdictions shown in Homepage",
         )
 
-    @override_settings(
-        # Use a local cache to prevent parallel running tests from trampling
-        CACHES={
-            "default": {
-                "BACKEND": "django.core.cache.backends.locmem.LocMemCache",
-                "LOCATION": "last-opinions-home-page",
-            },
-        },
-    )
     def test_last_opinions_home_page(self) -> None:
         """Test last opinions in home page"""
         cache.delete("homepage-data-o-es")
@@ -1480,10 +1477,6 @@ class OpinionsESSearchTest(ESIndexTestCase, SearchTestCase, TestCase):
                     factory_related_name="cluster",
                 ),
             )
-        # Clean up on the way out even if an assertion below fails.
-        self.addCleanup(o_1.delete)
-        self.addCleanup(o_2.delete)
-
         r = self.client.get(
             reverse("show_results"),
         )
@@ -1501,6 +1494,9 @@ class OpinionsESSearchTest(ESIndexTestCase, SearchTestCase, TestCase):
             '//span[@id="stat-num-precedential-opinions"]/text()'
         )[0]
         self.assertEqual(int(opinions_count), clusters_count)
+
+        o_1.delete()
+        o_2.delete()
 
     async def test_fail_gracefully(self) -> None:
         """Do we fail gracefully when an invalid search is created?"""
@@ -2979,7 +2975,9 @@ class OpinionSearchJurisdictionRelevancyTest(
 @override_settings(RELATED_MLT_MINTF=1)
 @override_settings(WAFFLE_CACHE_PREFIX="test_related_search_test")
 @override_flag("citing_and_related_enabled", active=True)
-class RelatedSearchTest(ESIndexTestCase, SearchTestCase, TestCase):
+class RelatedSearchTest(
+    ESIndexTestCase, CourtTestCase, PeopleTestCase, SearchTestCase, TestCase
+):
     @classmethod
     def setUpTestData(cls) -> None:
         super().setUpTestData()
@@ -3454,7 +3452,7 @@ class RelatedSearchTest(ESIndexTestCase, SearchTestCase, TestCase):
 
 
 class IndexOpinionDocumentsCommandTest(
-    ESIndexTestCase, SearchTestCase, TestCase
+    ESIndexTestCase, CourtTestCase, PeopleTestCase, SearchTestCase, TestCase
 ):
     """cl_index_parent_and_child_docs command tests for Elasticsearch"""
 
@@ -3927,16 +3925,6 @@ class EsOpinionsIndexingTest(
 
         es_doc = OpinionDocument.get(ES_CHILD_ID(opinion.pk).OPINION)
         self.assertEqual(es_doc.text, "This is a test")
-
-        # Update the scanned XML the way the scanned opinions importer does
-        opinion.xml_scan = "<opinion><p>Scanned &amp; indexed</p></opinion>"
-        opinion.save(update_fields=["xml_scan"])
-
-        es_doc = OpinionDocument.get(ES_CHILD_ID(opinion.pk).OPINION)
-        self.assertEqual(es_doc.text, "Scanned & indexed")
-
-        opinion.xml_scan = ""
-        opinion.save(update_fields=["xml_scan"])
 
         # Update cites field in the opinion record.
         person_2 = PersonFactory.create(
@@ -4685,7 +4673,9 @@ class EsOpinionsIndexingTest(
         self.assertFalse(es_doc.embeddings)
 
 
-class OpinionFeedTest(ESIndexTestCase, SearchTestCase, TestCase):
+class OpinionFeedTest(
+    ESIndexTestCase, CourtTestCase, PeopleTestCase, SearchTestCase, TestCase
+):
     """Tests for Opinion Search Feed"""
 
     def setUp(self) -> None:
@@ -5022,7 +5012,7 @@ class OpinionFeedTest(ESIndexTestCase, SearchTestCase, TestCase):
             o_c.delete()
 
     def test_catch_es_errors(self) -> None:
-        """Can we catch es errors and just render an empty feed?"""
+        """Can we catch es errors and just render an empy feed?"""
 
         # Bad syntax error.
         params = {

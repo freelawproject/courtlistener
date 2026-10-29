@@ -1,8 +1,6 @@
 from collections.abc import Awaitable, Callable
-from inspect import iscoroutinefunction
-from typing import cast
 
-from asgiref.sync import markcoroutinefunction
+from asgiref.sync import iscoroutinefunction, markcoroutinefunction
 from django.http import HttpRequest, HttpResponseBase
 from django.template import TemplateDoesNotExist
 from django.template.loader import get_template
@@ -10,10 +8,6 @@ from django.template.response import TemplateResponse
 from waffle import flag_is_active
 
 from cl.search.forms import CorpusSearchForm
-
-# Templates a view returns on their own (htmx partials) live under this
-# prefix. .github/scripts/frontend_checks.py mirrors it in is_v2_partial.
-V2_PARTIALS_PREFIX = "v2_includes/"
 
 
 class RobotsHeaderMiddleware:
@@ -33,16 +27,9 @@ class RobotsHeaderMiddleware:
     sync_capable = True
     async_capable = True
 
-    def __init__(
-        self,
-        get_response: Callable[
-            [HttpRequest], HttpResponseBase | Awaitable[HttpResponseBase]
-        ],
-    ):
-        self.get_response: Callable[
-            [HttpRequest], HttpResponseBase | Awaitable[HttpResponseBase]
-        ] = get_response
-        self.async_mode: bool = iscoroutinefunction(self.get_response)
+    def __init__(self, get_response: Callable):
+        self.get_response = get_response
+        self.async_mode = iscoroutinefunction(self.get_response)
         if self.async_mode:
             markcoroutinefunction(self)
 
@@ -55,9 +42,7 @@ class RobotsHeaderMiddleware:
         return response
 
     async def __acall__(self, request: HttpRequest) -> HttpResponseBase:
-        response = await cast(
-            Awaitable[HttpResponseBase], self.get_response(request)
-        )
+        response = await self.get_response(request)
         return response
 
     def process_template_response(
@@ -94,14 +79,10 @@ class IncrementalNewTemplateMiddleware:
     TODO: Remove this middleware once new design is completely rolled out.
     """
 
-    def __init__(
-        self, get_response: Callable[[HttpRequest], HttpResponseBase]
-    ):
-        self.get_response: Callable[[HttpRequest], HttpResponseBase] = (
-            get_response
-        )
+    def __init__(self, get_response):
+        self.get_response = get_response
 
-    def __call__(self, request: HttpRequest) -> HttpResponseBase:
+    def __call__(self, request):
         response = self.get_response(request)
         return response
 
@@ -114,9 +95,7 @@ class IncrementalNewTemplateMiddleware:
             return False
         return True
 
-    def process_template_response(
-        self, request: HttpRequest, response: HttpResponseBase
-    ) -> HttpResponseBase | TemplateResponse:
+    def process_template_response(self, request, response):
         if not isinstance(response, TemplateResponse) or response.is_rendered:
             return response
 
@@ -150,13 +129,6 @@ class IncrementalNewTemplateMiddleware:
             return response
 
         response.template_name = new_template_name
-
-        # Partials never render the header, so the search form it needs would
-        # only be wasted work for them. The name decides, not the HX-Request
-        # header: the server knows what it renders, and a boosted full-page
-        # request must still get the form.
-        if not new_template_name.startswith(V2_PARTIALS_PREFIX):
-            # pyrefly:ignore[unsupported-operation] False positive based on Django docs
-            response.context_data["search_form"] = CorpusSearchForm()
+        response.context_data["search_form"] = CorpusSearchForm()
 
         return response

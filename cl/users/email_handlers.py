@@ -3,13 +3,12 @@ import random
 from collections.abc import Sequence
 from datetime import datetime, timedelta
 from email import message
-from email.contentmanager import (
+from email.contentmanager import (  # type: ignore[attr-defined]
     raw_data_manager,
-    set_text_content,  # type:ignore[missing-module-attribute] This is not in typeshed, but it does exist
+    set_text_content,
 )
 from email.policy import SMTPUTF8
 from email.utils import parseaddr
-from typing import cast
 
 from django.conf import settings
 from django.contrib.auth.models import User
@@ -134,19 +133,9 @@ def handle_soft_bounce(
             )
             email_banned = False
             if not created:
+                # If a previous backoff event exists
                 retry_counter = backoff_event.retry_counter
                 next_retry_date = backoff_event.next_retry_date
-                # If a previous backoff event exists. Backoff flags are always
-                # created with both retry fields set; only BAN flags leave
-                # them null.
-                if retry_counter is None:
-                    raise ValueError(
-                        "Backoff event found but retry_counter was None"
-                    )
-                if next_retry_date is None:
-                    raise ValueError(
-                        "Backoff event found but next_retry_date was None"
-                    )
 
                 backoff_threshold = next_retry_date + timedelta(
                     hours=settings.BACKOFF_THRESHOLD  # type: ignore
@@ -362,7 +351,7 @@ def store_message(message: EmailMessage | EmailMultiAlternatives) -> str:
         html_message=html_body,
         headers=headers,
     )
-    return str(email_stored.message_id)
+    return email_stored.message_id
 
 
 def under_backoff_waiting_period(email_address: str) -> bool:
@@ -440,13 +429,8 @@ def get_next_retry_date(recipient: str) -> datetime:
         return now()
 
     if backoff_event.under_waiting_period:
-        # If a previous backoff event exists. Backoff flags are always
-        # created with both retry fields set; only BAN flags leave
-        # them null.
         # Return backoff event next_retry_date and add an extra minute
-        return cast(datetime, backoff_event.next_retry_date) + timedelta(
-            minutes=1
-        )
+        return backoff_event.next_retry_date + timedelta(minutes=1)
 
     # In case we don't have an active backoff event it means that it has
     # expired. In this case we can retry messages as soon as possible.
