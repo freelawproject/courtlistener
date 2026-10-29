@@ -15,6 +15,9 @@ class Migration(migrations.Migration):
     ]
 
     operations = [
+        # A plain AlterField would also drop and re-add the content_type FK;
+        # RunSQL only sets NOT NULL. NoteEvent can use AlterField below since
+        # its FK has db_constraint=False.
         migrations.SeparateDatabaseAndState(
             database_operations=[
                 migrations.RunSQL(
