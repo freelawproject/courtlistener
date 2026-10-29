@@ -31,7 +31,7 @@
     <p>CourtListener provides two types of alerts, Search Alerts that let you follow cases and topics of interest to you, and RECAP Docket Alerts, which let you follow PACER dockets of interest.
     </p>
     <p>
-      <a href="{% url "alert_help" %}" class="btn btn-lg btn-primary">Learn More</a>
+      <a href="{{ WIKI_HELP_URL }}/alerts/" class="btn btn-lg btn-primary">Learn More</a>
     </p>
   </div>
   <div class="hidden-xs col-sm-1 col-md-3"></div>
@@ -42,6 +42,11 @@
       <h2>Search Alerts for Case Law, RECAP and Oral Arguments</h2>
       {% if user.profile.unlimited_docket_alerts %}
         <h3 class="gray caps">🎉 Your account has unlimited search alerts</h3>
+      {% elif not user.profile.is_member %}
+        <p class="gray">
+          Members get more search alerts, including Real Time alerts.
+          <a href="https://free.law/membership/" target="_blank" rel="noopener noreferrer">Join FLP</a>
+        </p>
       {% endif %}
     </div>
     <div class="col-xs-12">
@@ -66,7 +71,12 @@
       {% elif user.profile.email_grants_unlimited_docket_alerts %}
         <h3 class="gray caps">🎉 Your email address provides you unlimited docket alerts</h3>
      {% elif user.profile.is_member %}
-        <h3 class="gray caps">🎉 Being a member provides you unlimited docket alerts</h3>
+        <p class="gray">🎉 As a member you get unlimited docket alerts. Thanks!</p>
+      {% else %}
+        <p class="gray">
+          Members get unlimited docket alerts.
+          <a href="https://free.law/membership/" target="_blank" rel="noopener noreferrer">Join FLP</a>
+        </p>
       {% endif %}
 
       <div class="table-responsive responsive-table-wrapper">
@@ -124,7 +134,7 @@
         </table>
       </div>
       <p><a
-        href="{% url "alert_help" %}"
+        href="{{ WIKI_HELP_URL }}/alerts/docket-alerts-for-pacer"
         class="btn btn-default">Learn More About RECAP Alerts</a></p>
     </div>
   {% endif %}

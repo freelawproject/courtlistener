@@ -101,7 +101,11 @@ class UserProfile(models.Model):
         default=False,
     )
     activation_key = models.CharField(
+        help_text="A single-use key emailed to the user to confirm their "
+        "email address. Blanked once it is spent (GHSA-638g-xf9h-6qcg), so "
+        "it is empty for most accounts.",
         max_length=40,
+        blank=True,
     )
     key_expires = models.DateTimeField(
         help_text="The time and date when the user's activation_key expires",
@@ -143,6 +147,10 @@ class UserProfile(models.Model):
         help_text="If enabled, the user's pending document prayers will be viewable by the public",
         default=False,
     )
+    save_query_history = models.BooleanField(
+        help_text="Should the user's search query history be saved?",
+        default=True,
+    )
 
     @property
     def is_member(self) -> bool:
@@ -179,26 +187,30 @@ class UserProfile(models.Model):
             return True
         return False
 
-    @property
-    def can_make_another_alert(self) -> bool:
+    def can_make_another_alert(self, recap_installed: bool = False) -> bool:
         """Can the user make another alert?
 
         The answer is yes, if any of the following is true:
          - They get unlimited ones
          - They are a member
-         - They are under the threshold
          - Their email domain is unlimited
+         - They are under the free threshold, which the RECAP bonus raises
+           when `recap_installed` is True
 
-        return: True if they can make another alert; else False.
+        :param recap_installed: Whether the user has the RECAP extension, as
+        far as the caller can tell. The value is not verified here.
+        :return: True if they can make another alert; else False.
         """
+        limit = settings.MAX_FREE_DOCKET_ALERTS
+        if recap_installed:
+            limit += settings.DOCKET_ALERT_RECAP_BONUS
         if any(
             [
                 # Place performant checks first
                 self.unlimited_docket_alerts,
                 self.email_grants_unlimited_docket_alerts,
                 self.is_member,
-                self.user.docket_alerts.subscriptions().count()
-                < settings.MAX_FREE_DOCKET_ALERTS,
+                self.user.docket_alerts.subscriptions().count() < limit,
             ]
         ):
             return True
@@ -513,7 +525,9 @@ class FailedEmail(AbstractDateTimeModel):
         return f"Failed Email: {self.stored_email.message_id}"
 
 
-def generate_recap_email(user_profile: UserProfile, append: int = None) -> str:
+def generate_recap_email(
+    user_profile: UserProfile, append: int | None = None
+) -> str:
     username = user_profile.user.username
     recap_email_header = re.sub(r"[^0-9a-zA-Z]+", ".", username) + str(
         append if append is not None else ""

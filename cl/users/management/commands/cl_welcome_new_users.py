@@ -66,7 +66,13 @@ class Command(VerboseCommand):
         txt_template = loader.get_template("emails/welcome_email.txt")
         messages = []
         for recipient in recipients:
-            email_txt = txt_template.render({"name": recipient.first_name})
+            email_txt = txt_template.render(
+                {
+                    "name": recipient.first_name,
+                    # No request context processors here; inject the wiki URL.
+                    "WIKI_HELP_URL": settings.WIKI_HELP_BASE_URL,
+                }
+            )
             messages.append(
                 EmailMultiAlternatives(
                     subject="Welcome to CourtListener and Free Law Project",

@@ -1,3 +1,5 @@
+from abc import abstractmethod
+
 from django.contrib.contenttypes.fields import GenericForeignKey
 from django.contrib.contenttypes.models import ContentType
 from django.db import models
@@ -120,21 +122,35 @@ class AbstractPDF(models.Model):
     class Meta:
         abstract = True
 
+    @abstractmethod
+    def get_pdf_path(self, filename: str, thumbs: bool = False) -> str:
+        """Return the storage path for this document, or for its thumbnail
+        when `thumbs` is True. Used by the `upload_to` callbacks on
+        `filepath_local` and `thumbnail`.
+
+        Django's `ModelBase` is not `ABCMeta`, so the decorator documents the
+        contract and lets MyPy enforce it, but nothing stops a subclass at
+        runtime -- hence the raise.
+        """
+        raise NotImplementedError
+
 
 class AbstractFile(models.Model):
     content_type = models.ForeignKey(ContentType, on_delete=models.CASCADE)
     object_id = models.PositiveIntegerField()
     content_object = GenericForeignKey()
+    # Subclasses define this field with their own storage and upload paths.
+    filepath: models.FileField
 
     class Meta:
         abstract = True
 
     @property
-    def file_contents(self):
+    def file_contents(self) -> str:
         with open(self.filepath.path) as f:
             return f.read()
 
-    def print_file_contents(self):
+    def print_file_contents(self) -> None:
         print(self.file_contents)
 
 

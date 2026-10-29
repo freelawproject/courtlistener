@@ -1,0 +1,25 @@
+{% extends "admin/base_site.html" %}
+
+{% block bodyclass %}{{ block.super }} delete-confirmation{% endblock %}
+
+{% block content %}
+
+    <p>You are about to permanently seal the cluster <strong>{{ cluster }}</strong>.</p>
+
+    <p>This deletes the cluster and records a <strong>ClusterRedirection</strong>, so that
+        existing links to it return a 410 Gone response instead of a 404.</p>
+
+    {% if docket_will_be_deleted %}
+        <p>The associated docket has no other linked content (audio, docket entries, parties,
+            claims, etc.) and <strong>will also be deleted</strong>.</p>
+    {% else %}
+        <p>The associated docket has other linked content and will be <strong>preserved</strong>.</p>
+    {% endif %}
+
+    <form method="post">
+        {% csrf_token %}
+        <input type="submit" value="Yes, seal this cluster">
+        <a role="button" href="{% url 'admin:search_opinioncluster_change' cluster.pk %}" class="button cancel-link">Cancel</a>
+    </form>
+
+{% endblock %}

@@ -1,21 +1,26 @@
 from collections import defaultdict
-from collections.abc import Callable
+from collections.abc import Callable, Coroutine
 from dataclasses import dataclass, field
 from datetime import datetime
-from typing import Any, NotRequired, TypedDict
+from typing import TYPE_CHECKING, Any, Concatenate, NotRequired, TypedDict
 
-from django.http import HttpRequest
+from django.http import HttpRequest, HttpResponse, HttpResponseBase
 from django_elasticsearch_dsl.search import Search
-from elasticsearch.dsl.query import QueryString
+from elasticsearch.dsl.query import Query
 
-from cl.users.models import User
+# This module is imported while Django settings load (via cl.celery_init), so
+# importing models at runtime raises AppRegistryNotReady.
+if TYPE_CHECKING:
+    from cl.users.models import User
 
 CleanData = dict[str, Any]
 TaskData = dict[str, Any]
 
 
 class AuthenticatedHttpRequest(HttpRequest):
-    user: User
+    # Narrowing `user` is the purpose of this class; views that take it are
+    # only reachable once authentication has run.
+    user: "User"  # pyrefly:ignore[bad-override-mutable-attribute]
 
 
 class EmailType(TypedDict, total=False):
@@ -95,7 +100,7 @@ OptionsType = dict[str, str | Callable]
 """
 The following classes provide a homogeneous collection of variables
 as a reusable group. The goal of these classes is to work as
-containers of the data thats coming from a Position queryset.
+containers of the data that's coming from a Position queryset.
 
 - The BasePositionMapping class contains the smallest set of common
 fields that we use in the UI and we need in the API response.
@@ -189,7 +194,7 @@ class BasePositionMapping:
         "predecessor": {"predecessor__name_full_reverse": "predecessor_dict"},
     }
 
-    def get_db_to_dataclass_map(self):
+    def get_db_to_dataclass_map(self) -> dict[str, dict[str, str]]:
         return self.__db_to_dataclass_map
 
 
@@ -197,15 +202,15 @@ class BasePositionMapping:
 class EsMainQueries:
     search_query: Search
     boost_mode: str
-    parent_query: QueryString | None = None
-    child_query: QueryString | None = None
+    parent_query: Query | None = None
+    child_query: Query | None = None
 
 
 @dataclass
 class EsJoinQueries:
-    main_query: QueryString | list
-    parent_query: QueryString | None
-    child_query: QueryString | None
+    main_query: Query | list
+    parent_query: Query | None
+    child_query: Query | None
     has_text_query: bool
 
 
@@ -298,6 +303,30 @@ class ApiPositionMapping(BasePositionMapping):
         },
     }
 
-    def get_db_to_dataclass_map(self):
+    def get_db_to_dataclass_map(self) -> dict[str, dict[str, str]]:
         parent_map = super().get_db_to_dataclass_map()
         return parent_map | self.__db_to_dataclass_map
+
+
+# https://www.aazuspan.dev/blog/type-safety-and-non-empty-tuples-in-python/
+type NonEmptyTuple[T] = tuple[T, *tuple[T, ...]]
+
+type DjangoViewType[
+    **P,
+    Request: HttpRequest,
+    Response: HttpResponse
+    | Coroutine[Any, Any, HttpResponse]
+    | HttpResponseBase
+    | Coroutine[Any, Any, HttpResponseBase],
+] = Callable[Concatenate[Request, P], Response]
+type DjangoViewDecorator[
+    **P,
+    Request: HttpRequest,
+    Response: HttpResponse
+    | Coroutine[Any, Any, HttpResponse]
+    | HttpResponseBase
+    | Coroutine[Any, Any, HttpResponseBase],
+] = Callable[
+    [DjangoViewType[P, Request, Response]],
+    DjangoViewType[P, Request, Response],
+]

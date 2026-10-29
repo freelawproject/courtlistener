@@ -118,7 +118,6 @@ User-agent: MistralAI-User
 Allow: /robots.txt
 Allow: /sitemap.xml
 Allow: /help/
-Allow: /faq/
 Allow: /feeds/
 Allow: /podcasts/
 Allow: /contact/

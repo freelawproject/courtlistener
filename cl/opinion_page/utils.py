@@ -2,39 +2,53 @@ import csv
 import logging
 import traceback
 from dataclasses import dataclass, field
+from datetime import date
 from io import StringIO
-from typing import NotRequired, TypedDict
+from typing import Any, NotRequired, TypedDict, cast
 from zoneinfo import ZoneInfo
 
 import waffle
 from asgiref.sync import sync_to_async
 from django.conf import settings
 from django.contrib.auth.models import AnonymousUser, User
-from django.core.exceptions import ObjectDoesNotExist
-from django.http import HttpRequest
-from django.shortcuts import aget_object_or_404  # type: ignore[attr-defined]
+from django.db.models import QuerySet
+from django.http import Http404, HttpRequest
+from django.shortcuts import aget_object_or_404
 from django.urls import reverse
+from django.utils.formats import date_format
+from django.utils.html import format_html
 from django.utils.http import urlencode
+from django.utils.safestring import SafeString, mark_safe
 from django.utils.timezone import localtime
 from django_elasticsearch_dsl.search import Search
 from elasticsearch.dsl import Q
+from elasticsearch.dsl.response import Response
+from elasticsearch.dsl.response.hit import Hit
 from elasticsearch.exceptions import ApiError, ConnectionTimeout, RequestError
 
 from cl.alerts.models import DocketAlert
 from cl.custom_filters.templatetags.text_filters import best_case_name
-from cl.favorites.forms import NoteForm
-from cl.favorites.models import Note
+from cl.favorites.forms import NoteForm, get_note_form_for
 from cl.lib.bot_detector import is_bot
 from cl.lib.elasticsearch_utils import (
     build_cardinality_count,
     build_join_es_filters,
     build_more_like_this_query,
 )
+from cl.lib.model_helpers import choices_to_csv
 from cl.lib.s3_cache import get_s3_cache, make_s3_cache_key
 from cl.lib.string_utils import trunc
 from cl.lib.types import CleanData
+from cl.opinion_page import docket_entry_sources
+from cl.opinion_page.docket_entry_sources import (
+    DocketEntrySource,
+    MetadataItem,
+    MetadataSection,
+    SourceDocketEntry,
+)
 from cl.people_db.models import Person
 from cl.recap.constants import COURT_TIMEZONES
+from cl.recap.models import FjcIntegratedDatabase
 from cl.search.documents import OpinionClusterDocument
 from cl.search.models import (
     PRECEDENTIAL_STATUS,
@@ -44,26 +58,10 @@ from cl.search.models import (
     DocketEntry,
     OpinionCluster,
     OriginatingCourtInformation,
+    SCOTUSDocketEntry,
 )
 
-logger = logging.getLogger(__name__)
-
-
-class MetadataItem(TypedDict):
-    """Shape of a single item in a metadata description list (see the
-    c-metadata-section cotton component)."""
-
-    label: str
-    value: str
-    url: NotRequired[str]
-    nofollow: NotRequired[bool]
-    is_external: NotRequired[bool]
-    aria_label: NotRequired[str]
-    suffix_text: NotRequired[str]
-    suffix_url: NotRequired[str]
-    suffix_nofollow: NotRequired[bool]
-    suffix_is_external: NotRequired[bool]
-    suffix_aria_label: NotRequired[str]
+logger: logging.Logger = logging.getLogger(__name__)
 
 
 def _person_item(
@@ -92,7 +90,9 @@ def _person_item(
     return None
 
 
-def build_citation_string(obj: Docket | DocketEntry) -> str:
+def build_citation_string(
+    obj: Docket | DocketEntry | SCOTUSDocketEntry,
+) -> str:
     """Build a Bluebook-style citation string for a docket or docket entry.
 
     For dockets: name, docket_number, (court)
@@ -102,7 +102,7 @@ def build_citation_string(obj: Docket | DocketEntry) -> str:
         docket = obj
         date_of_interest = None
         ecf = ""
-    elif isinstance(obj, DocketEntry):
+    elif isinstance(obj, DocketEntry | SCOTUSDocketEntry):
         docket = obj.docket
         date_of_interest = obj.date_filed
         ecf = obj.entry_number
@@ -129,8 +129,21 @@ def build_docket_metadata(
         items.append(
             {
                 "label": "Last Updated",
-                "value": str(
-                    localtime(docket.date_modified, ZoneInfo(timezone_str))
+                "value": date_format(
+                    localtime(docket.date_modified, ZoneInfo(timezone_str)),
+                    "DATETIME_FORMAT",
+                ),
+                # Explains why this date can lag the docket's real
+                # last-filing date.
+                "has_tooltip": True,
+                "tooltip_message": mark_safe(
+                    "This docket was collected as part of the RECAP "
+                    "Project. Therefore, it is updated when users of the "
+                    "RECAP Extension download the docket from PACER. To "
+                    "see the most up to date version of this docket, "
+                    "click the button above to &quot;View on PACER.&quot; "
+                    "The date shown here is <strong>not</strong> the date "
+                    "of the latest filing in this case."
                 ),
             }
         )
@@ -155,7 +168,7 @@ def build_docket_metadata(
         items.append(
             {
                 "label": "Date Certiorari Granted",
-                "value": str(docket.date_cert_granted),
+                "value": date_format(docket.date_cert_granted),
             }
         )
 
@@ -163,38 +176,50 @@ def build_docket_metadata(
         items.append(
             {
                 "label": "Date Certiorari Denied",
-                "value": str(docket.date_cert_denied),
+                "value": date_format(docket.date_cert_denied),
             }
         )
 
     if docket.date_argued:
         items.append(
-            {"label": "Date Argued", "value": str(docket.date_argued)}
+            {"label": "Date Argued", "value": date_format(docket.date_argued)}
         )
 
-    items.append({"label": "Citation", "value": build_citation_string(docket)})
+    items.append(
+        {
+            "label": "Citation",
+            "value": build_citation_string(docket),
+            # Matches the select-all convenience old citation.html had.
+            "one_click_select": True,
+        }
+    )
 
     if docket.date_reargued:
         items.append(
-            {"label": "Date Reargued", "value": str(docket.date_reargued)}
+            {
+                "label": "Date Reargued",
+                "value": date_format(docket.date_reargued),
+            }
         )
 
     if docket.date_reargument_denied:
         items.append(
             {
                 "label": "Date Reargument Denied",
-                "value": str(docket.date_reargument_denied),
+                "value": date_format(docket.date_reargument_denied),
             }
         )
 
     if docket.date_filed:
-        items.append({"label": "Date Filed", "value": str(docket.date_filed)})
+        items.append(
+            {"label": "Date Filed", "value": date_format(docket.date_filed)}
+        )
 
     if docket.date_terminated:
         items.append(
             {
                 "label": "Date Terminated",
-                "value": str(docket.date_terminated),
+                "value": date_format(docket.date_terminated),
             }
         )
 
@@ -202,7 +227,7 @@ def build_docket_metadata(
         items.append(
             {
                 "label": "Date of Last Known Filing",
-                "value": str(docket.date_last_filing),
+                "value": date_format(docket.date_last_filing),
             }
         )
 
@@ -347,6 +372,10 @@ def build_originating_court_metadata(
                     f"Search the RECAP Archive for docket number "
                     f"{og_info.docket_number}"
                 )
+                item["suffix_has_tooltip"] = True
+                item["suffix_tooltip_message"] = (
+                    "Search for this docket number in the RECAP Archive."
+                )
             elif og_info.administrative_link:
                 item["suffix_url"] = og_info.administrative_link
                 item["suffix_is_external"] = True
@@ -370,13 +399,15 @@ def build_originating_court_metadata(
         items.append(ordering_judge)
 
     if og_info.date_filed:
-        items.append({"label": "Date Filed", "value": str(og_info.date_filed)})
+        items.append(
+            {"label": "Date Filed", "value": date_format(og_info.date_filed)}
+        )
 
     if og_info.date_judgment:
         items.append(
             {
                 "label": "Date Order/Judgment",
-                "value": str(og_info.date_judgment),
+                "value": date_format(og_info.date_judgment),
             }
         )
 
@@ -384,24 +415,285 @@ def build_originating_court_metadata(
         items.append(
             {
                 "label": "Date Order/Judgment EOD",
-                "value": str(og_info.date_judgment_eod),
+                "value": date_format(og_info.date_judgment_eod),
             }
         )
 
     if og_info.date_filed_noa:
         items.append(
-            {"label": "Date NOA Filed", "value": str(og_info.date_filed_noa)}
+            {
+                "label": "Date NOA Filed",
+                "value": date_format(og_info.date_filed_noa),
+            }
         )
 
     if og_info.date_received_coa:
         items.append(
             {
                 "label": "Date Rec'd COA",
-                "value": str(og_info.date_received_coa),
+                "value": date_format(og_info.date_received_coa),
             }
         )
 
     return items
+
+
+class IdbRow(TypedDict):
+    """One Field / Value / Hints row of the FJC Integrated Database tab.
+
+    hint is HTML-safe: static copy with links plus the field's choice labels.
+    Rows without a hint omit it.
+    """
+
+    label: str
+    value: str
+    hint: NotRequired[SafeString]
+
+
+def build_idb_rows(idb_data: FjcIntegratedDatabase) -> list[IdbRow]:
+    """Build the Field / Value / Hints rows of the FJC IDB tab.
+
+    Values are display-ready: dates in the site's date format, choice fields
+    as their label, Origin and Jurisdiction as the code followed by the
+    label, and unset fields as "Not Provided".
+    """
+    not_provided = "Not Provided"
+    codebook = "https://www.fjc.gov/research/idb/"
+
+    def show(value: object) -> str:
+        """Formats a value for display, with the fallback for unset ones."""
+        if value is None or value == "":
+            return not_provided
+        if isinstance(value, date):
+            return date_format(value)
+        return str(value)
+
+    def coded(code: object, label: str) -> str:
+        """Formats a choice as its code followed by its label."""
+        return f"({code}) {label}" if code is not None else not_provided
+
+    def possible_values(field_name: str, intro: str = "") -> SafeString:
+        """Lists the field's choices, after an optional intro paragraph."""
+        csv = choices_to_csv(idb_data, field_name)
+        if not intro:
+            return format_html("Possible values: {}.", csv)
+        return format_html("<p>{}</p><p>Possible values: {}.</p>", intro, csv)
+
+    def codebook_link(text: str) -> SafeString:
+        """Links text to the FJC codebook."""
+        return format_html(
+            '<a class="links-external" href="{}">{}</a>', codebook, text
+        )
+
+    return [
+        {
+            "label": "Office Number",
+            "value": show(idb_data.office),
+            "hint": mark_safe(
+                "Office codes are listed in the "
+                '<a class="links-external" href="https://free.law/xlsx/fjc/integrated-database/office-codes.xlsx">'
+                "Guide to Judiciary Policies and Procedures, Appendix A</a>."
+            ),
+        },
+        {
+            "label": "Origin",
+            "value": coded(idb_data.origin, idb_data.get_origin_display()),
+            "hint": possible_values("origin"),
+        },
+        {"label": "Date Filed", "value": show(idb_data.date_filed)},
+        {"label": "Date Terminated", "value": show(idb_data.date_terminated)},
+        {
+            "label": "Jurisdiction",
+            "value": coded(
+                idb_data.jurisdiction, idb_data.get_jurisdiction_display()
+            ),
+            "hint": possible_values(
+                "jurisdiction",
+                "The basis for U.S. district court jurisdiction in the case.",
+            ),
+        },
+        {
+            "label": "Nature of Suit",
+            "value": show(idb_data.get_nature_of_suit_display()),
+        },
+        {
+            "label": "Title",
+            "value": show(idb_data.title),
+            "hint": mark_safe(
+                "The title in the U.S.C. for the cause of this case."
+            ),
+        },
+        {
+            "label": "Section",
+            "value": show(idb_data.section),
+            "hint": mark_safe(
+                "The section in the U.S.C. for the cause of this case."
+            ),
+        },
+        {
+            "label": "Subsection",
+            "value": show(idb_data.subsection),
+            "hint": mark_safe(
+                "The subsection in the U.S.C. for the cause of this case."
+            ),
+        },
+        {
+            "label": "Diversity of Residence",
+            "value": show(idb_data.diversity_of_residence),
+        },
+        {
+            "label": "Class Action Status",
+            "value": show(idb_data.class_action),
+            "hint": mark_safe(
+                "If true, designates that the case involves an allegation by "
+                "the plaintiff that the complaint meets the prerequisites of "
+                '"Class Action" as provided in Rule 23.'
+            ),
+        },
+        {
+            "label": "Termination Class Action Status",
+            "value": show(
+                idb_data.get_termination_class_action_status_display()
+            ),
+            "hint": possible_values("termination_class_action_status"),
+        },
+        {
+            "label": "Monetary Demand",
+            "value": show(idb_data.monetary_demand),
+            "hint": format_html(
+                "The monetary amount sought by the plaintiff (in thousands). "
+                "Amounts less than $500 appear as 1 and amounts over $10k "
+                "appear as 9999. See notes {} for details.",
+                codebook_link("in codebook on FJC website"),
+            ),
+        },
+        {
+            "label": "County of Residence",
+            "value": show(idb_data.county_of_residence),
+            "hint": format_html(
+                "The code for the county of residence for the first listed "
+                "plaintiff (see notes in {}).",
+                codebook_link("codebook on FJC website"),
+            ),
+        },
+        {
+            "label": "Arbitration at Filing",
+            "value": show(idb_data.get_arbitration_at_filing_display()),
+            "hint": possible_values(
+                "arbitration_at_filing",
+                "Only used by courts participating in the Formal Arbitration "
+                "Program.",
+            ),
+        },
+        {
+            "label": "Arbitration at Termination",
+            "value": show(idb_data.get_arbitration_at_termination_display()),
+            "hint": possible_values("arbitration_at_termination"),
+        },
+        {
+            "label": "Multidistrict Litigation Number",
+            "value": show(idb_data.multidistrict_litigation_docket_number),
+            "hint": mark_safe("A four digit multidistrict litigation number."),
+        },
+        {
+            "label": "Plaintiff",
+            "value": show(idb_data.plaintiff),
+            "hint": mark_safe(
+                "The first listed plaintiff in the case. Field truncated to "
+                "30 characters upon extraction by the AOUSC source system."
+            ),
+        },
+        {
+            "label": "Defendant",
+            "value": show(idb_data.defendant),
+            "hint": mark_safe(
+                "The first listed defendant in the case. Field truncated to "
+                "30 characters upon extraction by the AOUSC source system."
+            ),
+        },
+        {
+            "label": "Date of Transfer",
+            "value": show(idb_data.date_transfer),
+            "hint": mark_safe(
+                "The date when the papers for the case were received by the "
+                "receiving district for a transferred case."
+            ),
+        },
+        {
+            "label": "Transfer Docket Number",
+            "value": show(idb_data.transfer_docket_number),
+            "hint": mark_safe(
+                "The docket number of the case in the source district."
+            ),
+        },
+        {
+            "label": "Transfer Origin",
+            "value": show(idb_data.transfer_origin),
+            "hint": mark_safe(
+                "The origin number of the case in the source district."
+            ),
+        },
+        {
+            "label": "Procedural Progress",
+            "value": show(idb_data.get_procedural_progress_display()),
+            "hint": possible_values(
+                "procedural_progress",
+                format_html(
+                    "The point to which the case had progressed when it was "
+                    "disposed of (see notes in {}).",
+                    codebook_link("codebook on FJC website"),
+                ),
+            ),
+        },
+        {
+            "label": "Disposition",
+            "value": show(idb_data.get_disposition_display()),
+            "hint": possible_values(
+                "disposition", "The manner in which the case was disposed of."
+            ),
+        },
+        {
+            "label": "Nature of Judgment",
+            "value": show(idb_data.get_nature_of_judgement_display()),
+            "hint": possible_values(
+                "nature_of_judgement",
+                "Cases disposed of by an entry of a final judgment.",
+            ),
+        },
+        {
+            "label": "Amount Received",
+            "value": show(idb_data.amount_received),
+            "hint": format_html(
+                "Dollar amount received (in thousands) when appropriate. "
+                "Field not uniformally used; {}.",
+                codebook_link("see codebook"),
+            ),
+        },
+        {
+            "label": "Judgment",
+            # The FJC codebook uses 0 and -8 for missing judgment data.
+            "value": (
+                not_provided
+                if idb_data.judgment in (0, -8)
+                else show(idb_data.get_judgment_display())
+            ),
+            "hint": possible_values(
+                "judgment", "Which party the case was disposed in favor of."
+            ),
+        },
+        {
+            "label": "Pro Se",
+            "value": show(idb_data.get_pro_se_display()),
+            "hint": possible_values(
+                "pro_se",
+                format_html(
+                    "The parties that filed pro se in the case. See {} for "
+                    "more details.",
+                    codebook_link("codebook on IDB website"),
+                ),
+            ),
+        },
+    ]
 
 
 def build_docket_tabs(
@@ -412,13 +704,16 @@ def build_docket_tabs(
 ) -> list[dict[str, str]]:
     """Build the tab navigation items for the docket page.
 
-    Each item is a dict with 'label', 'url', and 'key'.
+    Each item is a dict with 'label', 'url', 'key' and 'icon'. 'icon' names a
+    file in cl/assets/static-global/svg/ for the {% svg %} tag; the mobile
+    dropdown ignores it.
     """
     tabs = [
         {
             "label": "Docket Entries",
             "url": docket.get_absolute_url(),
             "key": "entries",
+            "icon": "file_text",
         }
     ]
 
@@ -434,6 +729,7 @@ def build_docket_tabs(
                     },
                 ),
                 "key": "parties",
+                "icon": "group",
             }
         )
 
@@ -449,6 +745,7 @@ def build_docket_tabs(
                     },
                 ),
                 "key": "idb",
+                "icon": "circle_question_mark",
             }
         )
 
@@ -464,6 +761,7 @@ def build_docket_tabs(
                     },
                 ),
                 "key": "authorities",
+                "icon": "court",
             }
         )
 
@@ -488,32 +786,102 @@ def make_docket_title(docket: Docket) -> str:
     return title
 
 
+async def _common_metadata_sections(
+    docket: Docket, og_info: OriginatingCourtInformation | None
+) -> list[MetadataSection]:
+    """Build the metadata sections that apply across every docket source,
+    not just one. build_originating_court_metadata() already returns []
+    when there's nothing to show.
+    """
+    return [
+        {
+            "items": await sync_to_async(build_originating_court_metadata)(
+                docket, og_info
+            ),
+            "title": "Originating Court Information",
+        },
+    ]
+
+
+class CoreDocketDataDict(TypedDict):
+    docket: Docket
+    title: str
+    note_form: NoteForm
+    has_alert: bool
+    timezone: str
+    private: bool
+    docket_source: DocketEntrySource
+    docket_source_url: str | None
+    metadata_sections: list[MetadataSection]
+    parties: bool
+    has_authorities: bool
+    tabs: list[dict[str, str]]
+
+
 async def core_docket_data(
     request: HttpRequest,
     pk: int,
-) -> tuple[Docket, dict[str, bool | str | Docket | NoteForm]]:
-    """Gather the core data for a docket, party, or IDB page."""
+) -> tuple[Docket, CoreDocketDataDict]:
+    """Gather the core data shared by every tab view of a docket.
+
+    The tab navigation is built here so every tab lists the same set,
+    whichever one is active.
+    """
     docket: Docket = await aget_object_or_404(Docket, pk=pk)
+    source = docket.get_entry_source()
+    is_scotus = source is docket_entry_sources.SCOTUS
+
+    # SCOTUS content is made available using a waffle flag:
+    # every docket-related view shares this helper, so access
+    # control resides here.
+    if is_scotus and not await sync_to_async(waffle.flag_is_active)(
+        request, "scotus_docket_page"
+    ):
+        raise Http404("Docket not found.")
+
     title = make_docket_title(docket)
 
-    try:
-        note = await Note.objects.aget(
-            docket_id=docket.pk,
-            user=await request.auser(),  # type: ignore[attr-defined]
-        )
-    except (ObjectDoesNotExist, TypeError):
-        # Not saved in notes or anonymous user
-        note_form = NoteForm(
-            initial={
-                "docket_id": docket.pk,
-                "name": trunc(best_case_name(docket), 100, ellipsis="..."),
-            }
-        )
-    else:
-        note_form = NoteForm(instance=note)
+    note_form = await get_note_form_for(
+        docket,
+        await request.auser(),  # type: ignore[arg-type]
+        trunc(best_case_name(docket), 100, ellipsis="..."),
+    )
 
-    has_alert = await user_has_alert(await request.auser(), docket)  # type: ignore[arg-type]
+    has_alert = await user_has_alert(
+        cast(User | AnonymousUser, await request.auser()), docket
+    )
 
+    timezone_str = COURT_TIMEZONES.get(docket.court_id, "US/Eastern")
+    docket_source = docket.get_entry_source()
+
+    @sync_to_async
+    def _get_og_info(d: Docket) -> OriginatingCourtInformation | None:
+        return getattr(d, "originating_court_information", None)
+
+    og_info = await _get_og_info(docket)
+
+    docket_metadata = await sync_to_async(build_docket_metadata)(
+        docket, timezone_str
+    )
+    # metadata_sections is the source-agnostic shape both docket_tabs.html
+    # and the c-docket-page cotton component render. The core docket
+    # metadata is first by construction, with the source's own items
+    # (e.g. SCOTUS docket metadata) merged into it so they render as one
+    # undivided block; each stack styles that section itself.
+    # Source sections come before the common ones to preserve the
+    # long-standing order: Bankruptcy Information, then Originating
+    # Court Information.
+    metadata_sections: list[MetadataSection] = [
+        {
+            "items": docket_metadata
+            + await sync_to_async(docket_source.metadata_items)(docket)
+        },
+        *await sync_to_async(docket_source.metadata_sections)(docket),
+        *await _common_metadata_sections(docket, og_info),
+    ]
+
+    parties = await docket.parties.aexists()
+    has_authorities = await docket.ahas_authorities()
     return (
         docket,
         {
@@ -521,8 +889,24 @@ async def core_docket_data(
             "title": title,
             "note_form": note_form,
             "has_alert": has_alert,
-            "timezone": COURT_TIMEZONES.get(docket.court_id, "US/Eastern"),
+            "timezone": timezone_str,
             "private": docket.blocked,
+            "docket_source": docket_source,
+            # Resolved here because templates can't call the single-arg
+            # source callable; gates the docket toolbar on every tab.
+            "docket_source_url": await sync_to_async(docket_source.docket_url)(
+                docket
+            ),
+            "metadata_sections": metadata_sections,
+            "parties": parties,
+            "has_authorities": has_authorities,
+            "tabs": build_docket_tabs(
+                docket,
+                parties,
+                # Reads the FK id to avoid fetching the row in async code.
+                bool(docket.idb_data_id),  # pyrefly:ignore[missing-attribute]
+                has_authorities,
+            ),
         },
     )
 
@@ -536,7 +920,9 @@ async def user_has_alert(user: AnonymousUser | User, docket: Docket) -> bool:
     return has_alert
 
 
-def generate_docket_entries_csv_data(docket_entries):
+def generate_docket_entries_csv_data(
+    docket_entries: QuerySet[SourceDocketEntry] | list[SourceDocketEntry],
+) -> str:
     """Get str representing in memory file from docket_entries.
 
     :param docket_entries: List of DocketEntry that implements CSVExportMixin.
@@ -657,14 +1043,14 @@ class RelatedCitingResults:
     )
     sub_opinion_pks: list[int] = field(default_factory=list)
     url_search_params: dict[str, str] = field(default_factory=dict)
-    citing_clusters: list[OpinionClusterDocument] = field(default_factory=list)
+    citing_clusters: list[Hit] = field(default_factory=list)
     citing_cluster_count: int = 0
     timeout: bool = False
 
 
 @dataclass
 class RelatedClusterResults:
-    related_clusters: list[OpinionClusterDocument] = field(
+    related_clusters: Response | list[OpinionClusterDocument] = field(
         default_factory=list
     )
     sub_opinion_pks: list[int] = field(default_factory=list)
@@ -752,7 +1138,9 @@ async def es_get_related_clusters_with_cache(
     )
     try:
         # Execute the Related Query if needed
-        response = related_query.execute()
+        response = await sync_to_async(
+            related_query.execute, thread_sensitive=False
+        )()
         timeout_related = False
     except (ConnectionError, RequestError, ApiError) as e:
         logger.warning("Error getting cited and related clusters: %s", e)
@@ -834,7 +1222,9 @@ async def es_get_cited_clusters_with_cache(
     )
     try:
         # Execute the Related Query if needed
-        response = cited_query.execute()
+        response = await sync_to_async(
+            cited_query.execute, thread_sensitive=False
+        )()
         timeout_cited = False
     except (ConnectionError, RequestError, ApiError) as e:
         logger.warning("Error getting cited and related clusters: %s", e)
@@ -848,10 +1238,10 @@ async def es_get_cited_clusters_with_cache(
         response = None
         timeout_cited = True
 
-    citing_clusters = list(response) if not timeout_cited else []
+    citing_clusters: list[Hit] = list(response) if response is not None else []
     cluster_results.citing_clusters = citing_clusters
     cluster_results.citing_cluster_count = (
-        response.hits.total.value if response is not None else 0
+        cast(Any, response.hits).total.value if response is not None else 0
     )
     cluster_results.timeout = False if citing_clusters else timeout_cited
     if not cluster_results.timeout:
@@ -896,9 +1286,10 @@ async def es_cited_case_count(
     cluster_cites_query = build_cardinality_count(
         cluster_cites_query, "cluster_id"
     )
-    cited_by_count = (
-        cluster_cites_query.execute().aggregations.unique_documents.value
-    )
+    response = await sync_to_async(
+        cluster_cites_query.execute, thread_sensitive=False
+    )()
+    cited_by_count = response.aggregations.unique_documents.value
 
     await cache.aset(
         cache_cited_by_key,
@@ -909,7 +1300,9 @@ async def es_cited_case_count(
     return cited_by_count
 
 
-async def es_related_case_count(cluster_id, sub_opinion_pks: list[str]) -> int:
+async def es_related_case_count(
+    cluster_id: int, sub_opinion_pks: list[str]
+) -> int:
     """Elastic quick related cases count
 
     :param cluster_id: The cluster id of the object
@@ -948,9 +1341,10 @@ async def es_related_case_count(cluster_id, sub_opinion_pks: list[str]) -> int:
     cluster_related_query = build_cardinality_count(
         cluster_related_query, "cluster_id"
     )
-    related_cases_count = (
-        cluster_related_query.execute().aggregations.unique_documents.value
-    )
+    response = await sync_to_async(
+        cluster_related_query.execute, thread_sensitive=False
+    )()
+    related_cases_count = response.aggregations.unique_documents.value
 
     await cache.aset(
         cache_related_cases_key,

@@ -1,7 +1,6 @@
 import json
 import re
 from datetime import date, datetime
-from urllib.parse import urljoin
 
 import httpx
 from asgiref.sync import async_to_sync
@@ -10,9 +9,7 @@ from django.core.files.base import ContentFile
 from django.db.models import Q
 from eyecite.find import get_citations
 from eyecite.tokenizers import HyperscanTokenizer
-from juriscraper import AbstractSite
-from juriscraper.AbstractSite import logger
-from lxml import html
+from juriscraper.AbstractSite import AbstractSite, logger
 from reporters_db import REPORTERS
 
 from cl.citations.utils import map_reporter_db_cite_type
@@ -20,11 +17,13 @@ from cl.corpus_importer.utils import winnow_case_name
 from cl.lib.decorators import retry
 from cl.lib.microservice_utils import microservice
 from cl.lib.storage import S3GlacierInstantRetrievalStorage
+from cl.people_db.lookup_utils import lookup_judges_by_messy_str
 from cl.recap.mergers import find_docket_object
 from cl.search.models import (
     Citation,
     Court,
     Docket,
+    Opinion,
     OpinionCluster,
     OriginatingCourtInformation,
 )
@@ -156,55 +155,6 @@ def get_child_court(child_court_name: str, court_id: str) -> Court | None:
     return child_court
 
 
-async def test_for_meta_redirections(
-    r: httpx.Response,
-) -> tuple[bool, str | None]:
-    """Test for meta data redirections
-
-    :param r: A response object
-    :return:  A boolean and value
-    """
-    response = await microservice(
-        service="buffer-extension",
-        file=r.content,
-        params={"mime": True},
-    )
-    extension = response.text
-
-    if extension == ".html":
-        html_tree = html.fromstring(r.text)
-        try:
-            path = (
-                "//meta[translate(@http-equiv, 'REFSH', 'refsh') = "
-                "'refresh']/@content"
-            )
-            attr = html_tree.xpath(path)[0]
-            wait, text = attr.split(";")
-            if text.lower().startswith("url="):
-                url = text[4:]
-                if not url.startswith("http"):
-                    # Relative URL, adapt
-                    url = urljoin(r.url, url)
-                return True, url
-        except IndexError:
-            return False, None
-    return False, None
-
-
-async def follow_redirections(
-    r: httpx.Response, s: httpx.AsyncClient
-) -> httpx.Response:
-    """
-    Parse and recursively follow meta refresh redirections if they exist until
-    there are no more.
-    """
-    redirected, url = await test_for_meta_redirections(r)
-    if redirected:
-        logger.info(f"Following a meta redirection to: {url.encode()}")
-        r = await follow_redirections(await s.get(url), s)
-    return r
-
-
 @retry(
     (
         httpx.NetworkError,
@@ -303,9 +253,47 @@ def case_names_are_too_different(
     """
     new_parts = winnow_case_name(first.lower())
     old_parts = winnow_case_name(second.lower())
-    # or 1 to prevent 0 lenght minimum
+    # or 1 to prevent 0 length minimum
     denominator = min(len(old_parts), len(new_parts)) or 1
     return len(new_parts.intersection(old_parts)) / denominator < threshold
+
+
+def link_judges(cluster: OpinionCluster, opinions: list[Opinion]) -> None:
+    """Link the judges named in a cluster to people in the judges database.
+
+    An opinion's author comes from its `author_str`, or from the cluster's
+    `judges` when the cluster has a single opinion without an author. When `judges` names several people, they are added
+    to the cluster's panel. Call it after the cluster is saved and before
+    the opinions are.
+
+    Caveat: a name that matches more than one person is left unresolved.
+
+    :param cluster: The saved cluster.
+    :param opinions: The cluster's unsaved opinions.
+    :return: None
+    """
+    court_id = cluster.docket.court_id
+    if cluster.judges:
+        candidates = async_to_sync(lookup_judges_by_messy_str)(
+            cluster.judges, court_id, cluster.date_filed
+        )
+        if (
+            len(candidates) == 1
+            and len(opinions) == 1
+            and not opinions[0].author_str
+        ):
+            opinions[0].author = candidates[0]
+        elif len(candidates) > 1:
+            cluster.panel.add(*candidates)
+
+    for opinion in opinions:
+        if not opinion.author_str or opinion.per_curiam:
+            continue
+        candidates = async_to_sync(lookup_judges_by_messy_str)(
+            opinion.author_str, court_id, cluster.date_filed
+        )
+        if len(candidates) == 1:
+            opinion.author = candidates[0]
 
 
 def update_or_create_docket(
@@ -335,9 +323,11 @@ def update_or_create_docket(
         Harvard importer; the Harvard data is considered
         more trustable  and should overwrite an existing docket's data
         Should be False when called from scrapers.
-    :param blocked: If the docket should be blocked, default False.
+    :param blocked: If the docket should be blocked, default False. May
+        block an existing docket, but will never unblock one
+    :param date_blocked: The docket date_blocked if it's blocked. Ignored if
+        the existing docket is already blocked.
     :param case_name_full: The docket case_name_full.
-    :param date_blocked: The docket date_blocked if it's blocked.
     :param date_argued: The docket date_argued if it's an oral argument.
     :param ia_needs_upload: If the docket needs upload to IA, default None.
     :param appeal_from_str: Name (not standardized id) of the lower level court.
@@ -386,10 +376,17 @@ def update_or_create_docket(
     # Update the existing docket with the new values
     docket.add_opinions_source(source)
 
+    # Read before the loop, since the loop may set `docket.blocked`
+    was_blocked = docket.blocked
     for field, value in docket_fields.items():
         # do not use blanket `if not value:`, since
         # blocked and ia_needs_upload are booleans and would be skipped
         if value is None or value == "":
+            continue
+
+        # Never unblock an existing docket, and keep its original
+        # date_blocked
+        if was_blocked and field in ("blocked", "date_blocked"):
             continue
 
         if (

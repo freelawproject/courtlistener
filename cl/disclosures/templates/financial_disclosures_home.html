@@ -45,7 +45,6 @@
                autocapitalize="off"
                spellcheck="false"
                type="search"
-               tabindex="300"
                placeholder="Search for judges by name..."
                hx-get="{% url 'disclosure_search_typeahead' %}"
                hx-trigger="keyup changed delay:300ms"
@@ -90,7 +89,7 @@
         to add it to our collection.
       </p>
       <p>
-        <a href="{% url 'coverage_fds' %}" class="btn btn-primary btn-lg">
+        <a href="{{ WIKI_COVERAGE_FDS_URL }}" class="btn btn-primary btn-lg">
           See Coverage
         </a>
       </p>

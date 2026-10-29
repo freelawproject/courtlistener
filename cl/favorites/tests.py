@@ -1,4 +1,3 @@
-import time
 from datetime import date, datetime, timedelta
 from http import HTTPStatus
 from unittest.mock import MagicMock, patch
@@ -6,23 +5,30 @@ from unittest.mock import MagicMock, patch
 import time_machine
 from asgiref.sync import sync_to_async
 from django.contrib.auth.hashers import make_password
+from django.contrib.auth.models import User
+from django.contrib.contenttypes.models import ContentType
 from django.core import mail
 from django.core.cache import cache
+from django.db import IntegrityError, transaction
 from django.template.defaultfilters import date as template_date
-from django.test import override_settings
+from django.test import RequestFactory, override_settings
 from django.urls import reverse
 from django.utils import timezone
 from django.utils.timezone import make_naive, now
 from selenium.webdriver.common.by import By
+from selenium.webdriver.support import expected_conditions as EC
+from selenium.webdriver.support.wait import WebDriverWait
 from timeout_decorator import timeout_decorator
 
 from cl.custom_filters.templatetags.pacer import price
+from cl.donate.factories import NeonMembershipFactory
 from cl.donate.models import (
     MembershipPaymentStatus,
     NeonMembership,
     NeonMembershipLevel,
 )
 from cl.favorites.factories import NoteFactory, PrayerFactory
+from cl.favorites.forms import NoteForm
 from cl.favorites.models import (
     DocketTag,
     GenericCount,
@@ -39,12 +45,15 @@ from cl.favorites.utils import (
     delete_prayer,
     get_existing_prayers_in_bulk,
     get_lifetime_prayer_stats,
+    get_note_for_target,
     get_prayer_counts_in_bulk,
     get_top_prayers,
     get_user_prayer_history,
     get_user_prayers,
     prayer_unavailable,
 )
+from cl.favorites.views import get_note
+from cl.lib.pacer_session import SessionData
 from cl.lib.test_helpers import (
     AudioTestCase,
     PrayAndPayTestCase,
@@ -72,6 +81,7 @@ class NoteTest(SimpleUserDataMixin, AudioTestCase):
         cls.docket_2 = DocketFactory(id=2)
         cls.docket_3 = DocketFactory(id=3)
         super().setUpTestData()
+        cls.user = User.objects.get(username="pandora")
         cls.opinion_cluster = OpinionClusterWithParentsFactory(
             docket=cls.docket_1,
             case_name="case name cluster 3",
@@ -85,12 +95,16 @@ class NoteTest(SimpleUserDataMixin, AudioTestCase):
         )
         # Set up some handy variables
         cls.note_cluster_params = {
-            "cluster_id": cls.opinion_cluster.pk,
+            "content_type": ContentType.objects.get_for_model(
+                cls.opinion_cluster
+            ).pk,
+            "object_id": cls.opinion_cluster.pk,
             "name": "foo",
             "notes": "testing notes",
         }
         cls.note_audio_params = {
-            "audio_id": cls.audio_1.pk,
+            "content_type": ContentType.objects.get_for_model(cls.audio_1).pk,
+            "object_id": cls.audio_1.pk,
             "name": "foo",
             "notes": "testing notes",
         }
@@ -120,6 +134,190 @@ class NoteTest(SimpleUserDataMixin, AudioTestCase):
             )
         self.assertEqual(r.status_code, 200)
         self.assertIn("It worked", r.content.decode())
+
+    def test_dual_read_finds_legacy_shaped_note(self) -> None:
+        """A Note saved before #7725 (legacy FK set, content_type null) must
+        still be found by the dual-read lookup, not just new GFK-shaped rows.
+        """
+        legacy_note = NoteFactory(
+            cluster_id=self.opinion_cluster,
+            user=self.user,
+            name="pre-migration note",
+            notes="still here",
+        )
+
+        found = get_note_for_target(
+            type(self.opinion_cluster), self.opinion_cluster.pk, self.user
+        )
+
+        self.assertEqual(found, legacy_note)
+
+    def test_new_note_is_redirect_only_not_dual_write(self) -> None:
+        """A Note created via the real save endpoint today must land
+        entirely in the new content_type/object_id shape -- the legacy
+        FK column for its type is never also populated.
+        """
+        self.assertTrue(
+            self.client.login(username="pandora", password="password")
+        )
+        r = self.client.post(
+            reverse("save_or_update_note"),
+            self.note_cluster_params,
+            follow=True,
+            headers={"x-requested-with": "XMLHttpRequest"},
+        )
+        self.assertEqual(r.status_code, 200)
+
+        note = Note.objects.get(
+            content_type=ContentType.objects.get_for_model(
+                self.opinion_cluster
+            ),
+            object_id=self.opinion_cluster.pk,
+        )
+        self.assertIsNone(note.cluster_id_id)
+
+    def test_editing_a_legacy_note_migrates_it(self) -> None:
+        """Editing a pre-#7725 Note through the real save endpoint ends
+        up with content_type/object_id populated.
+        """
+        legacy_note = NoteFactory(
+            cluster_id=self.opinion_cluster,
+            user=self.user,
+            name="old name",
+            notes="old notes",
+        )
+
+        self.assertTrue(
+            self.client.login(username="pandora", password="password")
+        )
+        r = self.client.post(
+            reverse("save_or_update_note"),
+            {
+                **self.note_cluster_params,
+                "name": "edited name",
+                "notes": "edited notes",
+            },
+            follow=True,
+            headers={"x-requested-with": "XMLHttpRequest"},
+        )
+        self.assertEqual(r.status_code, 200)
+
+        legacy_note.refresh_from_db()
+        self.assertEqual(
+            legacy_note.content_type,
+            ContentType.objects.get_for_model(self.opinion_cluster),
+        )
+        self.assertEqual(legacy_note.object_id, self.opinion_cluster.pk)
+        # The legacy column is left as-is, not cleared.
+        self.assertEqual(legacy_note.cluster_id_id, self.opinion_cluster.pk)
+        self.assertEqual(legacy_note.name, "edited name")
+
+    def test_deleting_noted_object_removes_notes_pointing_at_it(self) -> None:
+        """Deleting a noteable object (#7725) cleans up any Note left
+        pointing at it, regardless of shape.
+        """
+        rd = RECAPDocumentFactory(docket_entry__docket=self.docket_2)
+        other_rd = RECAPDocumentFactory(docket_entry__docket=self.docket_3)
+        gfk_note = NoteFactory.for_object(rd, user=self.user)
+        legacy_note = NoteFactory(
+            cluster_id=self.opinion_cluster, user=self.user
+        )
+        unrelated_note = NoteFactory.for_object(other_rd, user=self.user)
+
+        rd.delete()
+        self.opinion_cluster.delete()
+
+        self.assertFalse(Note.objects.filter(pk=gfk_note.pk).exists())
+        self.assertFalse(Note.objects.filter(pk=legacy_note.pk).exists())
+        self.assertTrue(Note.objects.filter(pk=unrelated_note.pk).exists())
+
+    def test_duplicate_gfk_note_is_rejected(self) -> None:
+        """A second Note for the same (content_type, object_id, user)
+        is rejected.
+        """
+        rd = RECAPDocumentFactory(docket_entry__docket=self.docket_1)
+        NoteFactory.for_object(rd, user=self.user)
+
+        with self.assertRaises(IntegrityError):
+            with transaction.atomic():
+                NoteFactory.for_object(rd, user=self.user)
+
+        other_user = UserFactory()
+        NoteFactory.for_object(rd, user=other_user)
+        self.assertEqual(
+            Note.objects.filter(
+                content_type__isnull=False, object_id=rd.pk
+            ).count(),
+            2,
+        )
+
+    def test_form_prefills_hidden_fields_for_a_legacy_note(
+        self,
+    ) -> None:
+        """NoteForm.__init__ pre-fills content_type/object_id in
+        self.initial when bound to a still-legacy-shaped Note instance,
+        so an unbound (rendered) form already shows the new shape even
+        before anything is saved again.
+        """
+        legacy_note = NoteFactory(
+            cluster_id=self.opinion_cluster, user=self.user
+        )
+
+        form = NoteForm(instance=legacy_note)
+
+        self.assertEqual(
+            form.initial["content_type"],
+            ContentType.objects.get_for_model(self.opinion_cluster).pk,
+        )
+        self.assertEqual(form.initial["object_id"], self.opinion_cluster.pk)
+
+    def test_form_rejects_a_dangling_object_id(self) -> None:
+        """Unlike the legacy FKs (real ForeignKeys, validated by
+        ModelChoiceField), object_id is a plain integer -- nothing stops
+        it from naming a row that doesn't exist unless NoteForm.clean()
+        checks it explicitly.
+        """
+        content_type = ContentType.objects.get_for_model(self.opinion_cluster)
+        form = NoteForm(
+            data={
+                "content_type": content_type.pk,
+                "object_id": 999999999,
+                "name": "foo",
+                "notes": "bar",
+            }
+        )
+
+        self.assertFalse(form.is_valid())
+        self.assertIn("object_id", form.errors)
+
+    def test_get_note_rejects_content_type_outside_noteable_models(
+        self,
+    ) -> None:
+        """A request naming a non-noteable model's ContentType
+        (here, User) must not resolve to a Note -- get_note() is the
+        only thing standing between a client-supplied content_type and
+        attaching a Note to an arbitrary model.
+        """
+        user_content_type = ContentType.objects.get_for_model(User)
+        request = RequestFactory().post(
+            "/notes/create-or-update/",
+            {"content_type": user_content_type.pk, "object_id": self.user.pk},
+        )
+        request.user = self.user
+
+        self.assertIsNone(get_note(request))
+
+    def test_get_note_rejects_non_numeric_identifiers(self) -> None:
+        """content_type/object_id that aren't valid integers -- e.g. the
+        literal string "undefined" -- must return None, not raise.
+        """
+        request = RequestFactory().post(
+            "/notes/create-or-update/",
+            {"content_type": "undefined", "object_id": "undefined"},
+        )
+        request.user = self.user
+
+        self.assertIsNone(get_note(request))
 
 
 class UserNotesTest(BaseSeleniumTest):
@@ -256,7 +454,13 @@ class UserNotesTest(BaseSeleniumTest):
         self.browser.find_element(By.ID, "saveNote").click()
 
         # She now sees the note icon is full on yellow implying it's a note!
-        time.sleep(1)  # Selenium is sometimes faster than JS.
+        # Saving the note is an XHR and the icon only turns gold once it comes
+        # back, so wait for that rather than guessing how long it takes.
+        WebDriverWait(self.browser, SELENIUM_TIMEOUT).until(
+            EC.text_to_be_present_in_element_attribute(
+                (By.CSS_SELECTOR, "#add-note-button i"), "class", "gold"
+            )
+        )
         add_note_button = self.browser.find_element(By.ID, "add-note-button")
         add_note_icon = add_note_button.find_element(By.TAG_NAME, "i")
         self.assertIn("gold", add_note_icon.get_attribute("class"))
@@ -283,7 +487,10 @@ class UserNotesTest(BaseSeleniumTest):
         self.assertIsNone(dropdown_menu.get_attribute("display"))
 
         profile_dropdown.click()
-        time.sleep(1)
+        # The dropdown opens on an animation; wait for the link to be usable.
+        WebDriverWait(self.browser, SELENIUM_TIMEOUT).until(
+            EC.element_to_be_clickable((By.LINK_TEXT, "Notes"))
+        )
         self.click_link_for_new_page("Notes")
 
         # The case is right there with the same name and notes she gave it!
@@ -369,8 +576,13 @@ class UserNotesTest(BaseSeleniumTest):
         self.assertIn("Save", button.text)
         button.click()
 
-        # And notices the change on the page immediately
-        time.sleep(0.5)  # Selenium is too fast.
+        # And notices the change on the page immediately. Saving is an XHR
+        # that rewrites the row, so wait for the new name to land.
+        WebDriverWait(self.browser, SELENIUM_TIMEOUT).until(
+            EC.text_to_be_present_in_element(
+                (By.TAG_NAME, "body"), "Renamed Note"
+            )
+        )
         self.assertIn("Notes", self.browser.title)
         self.assert_text_in_node("Renamed Note", "body")
         self.assert_text_in_node("Modified Notes", "body")
@@ -529,6 +741,44 @@ class APITests(APITestCase):
         await tag.arefresh_from_db()
         self.assertEqual(tag.name, new_name)
 
+    async def test_cannot_modify_or_delete_someone_elses_tag(self) -> None:
+        """Can another user deface, delete, or hijack ownership of a tag
+        they don't own (GHSA-4587-9786-r6vp)?
+        """
+        response = await self.make_a_good_tag(self.client, tag_name="foo")
+        tag_id = response.json()["id"]
+        detail_path = reverse(
+            "UserTag-detail", kwargs={"version": "v4", "pk": tag_id}
+        )
+
+        # Not published yet, so self.client2 can't even see it, let alone
+        # write to it.
+        response = await self.client2.patch(
+            detail_path, {"name": "defaced"}, format="json"
+        )
+        self.assertEqual(response.status_code, HTTPStatus.NOT_FOUND)
+
+        # Publishing makes a tag visible, not writable, to other users.
+        await UserTag.objects.filter(pk=tag_id).aupdate(published=True)
+
+        for method, data in (
+            ("patch", {"name": "defaced"}),
+            ("put", {"name": "hijacked"}),
+        ):
+            response = await getattr(self.client2, method)(
+                detail_path, data, format="json"
+            )
+            self.assertEqual(response.status_code, HTTPStatus.FORBIDDEN)
+
+        response = await self.client2.delete(detail_path)
+        self.assertEqual(response.status_code, HTTPStatus.FORBIDDEN)
+
+        # The tag is untouched: not renamed, not deleted, and ownership
+        # was not reassigned to self.client2's user.
+        tag = await UserTag.objects.aget(pk=tag_id)
+        self.assertEqual(tag.name, "foo")
+        self.assertEqual(tag.user_id, self.pandora.user.pk)
+
     async def test_list_users_tags(self) -> None:
         """Cam we get a user's tags (and not other users tags)?"""
         # make some tags for some users
@@ -595,6 +845,43 @@ class APITests(APITestCase):
             self.client2, docket_to_tag_id, tag_id
         )
         self.assertEqual(response.status_code, HTTPStatus.BAD_REQUEST)
+
+    async def test_cannot_attach_a_different_docket_to_someone_elses_tag(
+        self,
+    ) -> None:
+        """Can a user attach a *new* docket to a tag they don't own?
+
+        Unlike the two cases above, this uses a (docket, tag) pair that's
+        never been used before, so a 400 here can only come from ownership
+        enforcement, not DocketTag's `unique_together` constraint
+        (GHSA-cvh7-rv7v-wx2j-class).
+        """
+        response = await self.make_a_good_tag(self.client, tag_name="foo")
+        tag_id = response.json()["id"]
+
+        # A different user, tagging a docket that this tag has never seen.
+        response = await self.tag_a_docket(
+            self.client2, self.docket_2.pk, tag_id
+        )
+        self.assertEqual(response.status_code, HTTPStatus.BAD_REQUEST)
+        self.assertFalse(
+            await DocketTag.objects.filter(
+                docket_id=self.docket_2.pk, tag_id=tag_id
+            ).aexists()
+        )
+
+        # Same, but with a public tag -- publishing a tag makes it visible,
+        # not writable, to other users.
+        await UserTag.objects.filter(pk=tag_id).aupdate(published=True)
+        response = await self.tag_a_docket(
+            self.client2, self.docket_2.pk, tag_id
+        )
+        self.assertEqual(response.status_code, HTTPStatus.BAD_REQUEST)
+        self.assertFalse(
+            await DocketTag.objects.filter(
+                docket_id=self.docket_2.pk, tag_id=tag_id
+            ).aexists()
+        )
 
     async def test_can_filter_tag_associations_using_docket_id(self) -> None:
         """Test filter for the docket field in the docket-tags endpoint"""
@@ -1361,6 +1648,41 @@ class RECAPPrayAndPay(SimpleUserDataMixin, PrayAndPayTestCase):
         await self.rd_4.arefresh_from_db()
         self.assertEqual(self.rd_4.is_sealed, False)
 
+    async def test_prayers_page_nudges_non_members(self) -> None:
+        """Non-members are offered a way to get more daily prayers."""
+        await self.async_client.alogin(username="pandora", password="password")
+        r = await self.async_client.get(
+            reverse("user_prayers", args=["pandora"])
+        )
+        self.assertContains(r, "Members get more prayers each day.")
+        self.assertContains(r, ">Join FLP</a>")
+
+    async def test_prayers_page_does_not_nudge_members(self) -> None:
+        """Members already have more prayers, so don't ask them to join."""
+        user = await User.objects.aget(username="pandora")
+        await sync_to_async(NeonMembershipFactory)(user=user)
+        await self.async_client.alogin(username="pandora", password="password")
+        r = await self.async_client.get(
+            reverse("user_prayers", args=["pandora"])
+        )
+        self.assertNotContains(r, "Members get more prayers each day.")
+
+    @override_settings(ALLOWED_PRAYER_COUNT=0)
+    async def test_daily_limit_tooltip_mentions_membership(self) -> None:
+        """Only people who could get more prayers are told that members do."""
+        user = await User.objects.aget(username="pandora")
+        await self.async_client.alogin(username="pandora", password="password")
+        url = reverse("create_prayer", args=[self.rd_2.pk])
+
+        r = await self.async_client.post(url, headers={"HX-Request": "true"})
+        self.assertContains(r, "You have reached your daily prayer limit.")
+        self.assertContains(r, "Join FLP to get higher limits.")
+
+        await sync_to_async(NeonMembershipFactory)(user=user)
+        r = await self.async_client.post(url, headers={"HX-Request": "true"})
+        self.assertContains(r, "You have reached your daily prayer limit.")
+        self.assertNotContains(r, "Join FLP to get higher limits.")
+
     async def test_can_we_load_the_top_prayers_page(self) -> None:
         """Does the 'top prayers' page return a successful response?"""
         r = await self.async_client.get(reverse("top_prayers"))
@@ -1611,7 +1933,10 @@ class PrayAndPaySignalTests(PrayAndPayTestCase):
         )
 
 
-@patch("cl.favorites.tasks.get_or_cache_pacer_cookies")
+@patch(
+    "cl.favorites.tasks.get_or_cache_pacer_cookies",
+    return_value=SessionData(None, "http://proxy_1:9090"),
+)
 @patch("cl.favorites.tasks.prayer_unavailable", wraps=prayer_unavailable)
 class PrayAndPayCheckAvailabilityTaskTests(PrayAndPayTestCase):
     @patch(

@@ -2,19 +2,38 @@ from http import HTTPStatus
 from typing import Any, cast
 from unittest.mock import MagicMock, patch
 
-from asgiref.sync import sync_to_async
 from django.contrib.auth.models import User
-from django.core.cache import cache
 from django.http import HttpResponse
-from django.test import override_settings
-from django.urls import reverse
+from django.template import engines
+from django.template.loader import TemplateDoesNotExist, get_template
+from django.test import RequestFactory, override_settings
+from django.urls import resolve, reverse
+from django_cotton.compiler_regex import CottonCompiler
 from lxml.html import fromstring
 from waffle.testutils import override_flag
 
-from cl.audio.factories import AudioWithParentsFactory
 from cl.lib.test_helpers import SimpleUserDataMixin
 from cl.simple_pages.forms import ContactForm
+from cl.simple_pages.sitemap import SimpleSitemap
 from cl.tests.cases import SimpleTestCase, TestCase
+from cl.tests.utils import parse_csp
+
+
+class ChangePasswordWellKnownTests(SimpleTestCase):
+    """Ensure password managers can discover the password-change page."""
+
+    def test_change_password(self) -> None:
+        """The standard URL temporarily redirects to a real password page."""
+        response = self.client.get(reverse("well_known_change_password"))
+
+        self.assertRedirects(
+            response,
+            reverse("password_change"),
+            fetch_redirect_response=False,
+        )
+        self.assertEqual(
+            resolve(response["Location"]).url_name, "password_change"
+        )
 
 
 # Mock the hcaptcha thing so that we're sure it validates during tests
@@ -308,34 +327,34 @@ class PageLoadTestMixin(TestCase):
         return r
 
 
+class SimpleSitemapTest(TestCase):
+    def test_every_sitemap_entry_reverses(self) -> None:
+        """Does every sitemap entry point to a URL name that still exists?
+
+        Regression test for stale entries left behind when a page is
+        removed, like the old contribute page.
+        """
+        sitemap = SimpleSitemap()
+        for item in sitemap.items():
+            with self.subTest(view_name=item["view_name"]):
+                self.assertTrue(sitemap.location(item))
+
+        r = self.client.get(reverse("sitemaps", kwargs={"section": "simple"}))
+        self.assertEqual(r.status_code, HTTPStatus.OK)
+
+
 class SimplePagesTest(PageLoadTestMixin, SimpleUserDataMixin, TestCase):
     async def test_simple_pages(self) -> None:
         """Do all the simple pages load properly?"""
         reverse_params: list[dict[str, Any]] = [
-            # Coverage
-            {"viewname": "coverage"},
-            {"viewname": "coverage_fds"},
-            {"viewname": "coverage_recap"},
-            {"viewname": "coverage_oa"},
             # Info pages
-            {"viewname": "faq"},
-            {"viewname": "feeds_info"},
-            {"viewname": "terms"},
             {"viewname": "robots"},
             # Contact
             {"viewname": "contact"},
             {"viewname": "contact_thanks"},
             # Help pages
             {"viewname": "help_home"},
-            {"viewname": "alert_help"},
-            {"viewname": "delete_help"},
-            {"viewname": "markdown_help"},
-            {"viewname": "advanced_search"},
-            {"viewname": "recap_email_help"},
             {"viewname": "broken_email_help"},
-            {"viewname": "citegeist_help"},
-            {"viewname": "old_terms", "args": ["1"]},
-            {"viewname": "old_terms", "args": ["2"]},
             # Monitoring pages
             {"viewname": "celery_queue_lengths"},
             {"viewname": "heartbeat"},
@@ -371,16 +390,6 @@ class SimplePagesTest(PageLoadTestMixin, SimpleUserDataMixin, TestCase):
         for reverse_param in reverse_params:
             await self.assert_page_loads_ok(reverse_param)
 
-    async def test_oa_minute_count_in_the_coverage_page(self) -> None:
-        "is the minute count rounded in the coverage page?"
-        cache.delete("coverage-data-v3")
-        await sync_to_async(AudioWithParentsFactory)(duration=250)
-        r = await self.async_client.get(reverse("coverage"))
-        self.assertIn("4 minutes of recordings.", r.content.decode())
-        self.assertIn(
-            "with 4 minutes of recordings (and counting).", r.content.decode()
-        )
-
 
 @override_flag("use_new_design", True)
 @override_settings(WAFFLE_CACHE_PREFIX="test_v2_register_waffle")
@@ -395,19 +404,21 @@ class V2PagesRegisterTest(PageLoadTestMixin, SimpleUserDataMixin, TestCase):
     V2_PAGES: list[tuple[dict[str, Any], str]] = [
         # Help pages — (reverse_param, expected v2 template)
         ({"viewname": "help_home"}, "v2_help/index.html"),
-        ({"viewname": "coverage"}, "v2_help/coverage.html"),
-        ({"viewname": "coverage_fds"}, "v2_help/coverage_fds.html"),
-        ({"viewname": "coverage_oa"}, "v2_help/coverage_oa.html"),
-        ({"viewname": "coverage_recap"}, "v2_help/coverage_recap.html"),
-        ({"viewname": "alert_help"}, "v2_help/alert_help.html"),
-        ({"viewname": "tag_notes_help"}, "v2_help/tags_help.html"),
-        ({"viewname": "recap_email_help"}, "v2_help/recap_email_help.html"),
-        ({"viewname": "markdown_help"}, "v2_help/markdown_help.html"),
         # Info pages
-        ({"viewname": "terms"}, "v2_terms/latest.html"),
-        ({"viewname": "citegeist_help"}, "v2_citegeist.html"),
         ({"viewname": "components"}, "v2_components.html"),
+        # API pages
+        ({"viewname": "court_index"}, "v2_jurisdictions.html"),
     ]
+
+    @staticmethod
+    def _get_legacy_counterpart(v2_template: str) -> str | None:
+        """Returns the legacy template a v2 one replaces, None otherwise."""
+        legacy = v2_template.removeprefix("v2_")
+        try:
+            get_template(legacy)
+            return legacy
+        except TemplateDoesNotExist:
+            return None
 
     async def test_v2_pages(self) -> None:
         """Do all registered v2 pages load properly with the redesign flag?"""
@@ -417,6 +428,74 @@ class V2PagesRegisterTest(PageLoadTestMixin, SimpleUserDataMixin, TestCase):
             ):
                 r = await self.assert_page_loads_ok(reverse_param)
                 self.assertTemplateUsed(r, v2_template)
+
+    def test_v2_pages_without_the_flag(self) -> None:
+        """Do registered pages still load for a visitor without the flag?
+
+        Each one falls back to its legacy template, or keeps rendering v2
+        when the redesign left no legacy template behind.
+        """
+        for reverse_param, v2_template in self.V2_PAGES:
+            with (
+                self.subTest("Checking v2 page", reverse_params=reverse_param),
+                override_flag("use_new_design", active=False),
+            ):
+                r = self.client.get(reverse(**reverse_param))
+                self.assertEqual(r.status_code, HTTPStatus.OK)
+                self.assertTemplateUsed(
+                    r, self._get_legacy_counterpart(v2_template) or v2_template
+                )
+
+
+@override_flag("use_new_design", True)
+@override_settings(WAFFLE_CACHE_PREFIX="test_new_base_view_count_waffle")
+class NewBaseViewCountTest(TestCase):
+    """new_base.html only wires view counting for decorated views.
+
+    The tracked side is covered on the docket page in
+    cl/opinion_page/tests.py; this checks the untracked side on a page
+    whose view has no track_view_counter.
+    """
+
+    async def test_untracked_page_sends_no_view_count(self) -> None:
+        """A v2 page whose view is not decorated carries no label, no endpoint
+        and no store, so the browser makes no request."""
+        r = await self.async_client.get(reverse("help_home"))
+        self.assertTemplateUsed(r, "new_base.html")
+        html = r.content.decode()
+        body = next(fromstring(html).iter("body"))
+        self.assertIsNone(body.get("data-view-count-label"))
+        self.assertIsNone(body.get("data-view-count-url"))
+        self.assertNotIn("view_count.js", html)
+
+
+@override_flag("use_new_design", True)
+@override_settings(WAFFLE_CACHE_PREFIX="test_new_base_recap_waffle")
+class NewBaseRecapDetectionTest(TestCase):
+    """new_base.html loads the RECAP extension detector and reflects its cookie.
+
+    The class on <html> is what the stylesheet keys on to hide RECAP pleas;
+    rendering it from the cookie keeps later page loads from flashing them.
+    """
+
+    async def test_detector_is_loaded_on_every_page(self) -> None:
+        """A v2 page requires the detector whether or not the cookie is set."""
+        r = await self.async_client.get(reverse("help_home"))
+        self.assertTemplateUsed(r, "new_base.html")
+        self.assertIn("recap_detection.js", r.content.decode())
+
+    async def test_html_class_follows_the_cookie(self) -> None:
+        """<html> carries recap-installed only when the cookie is present."""
+        r = await self.async_client.get(reverse("help_home"))
+        self.assertNotIn(
+            "recap-installed", fromstring(r.content.decode()).get("class", "")
+        )
+
+        self.async_client.cookies["recap_installed"] = "true"
+        r = await self.async_client.get(reverse("help_home"))
+        self.assertIn(
+            "recap-installed", fromstring(r.content.decode()).get("class", "")
+        )
 
 
 @patch("hcaptcha.fields.hCaptchaField.validate", return_value=True)
@@ -450,6 +529,8 @@ class SealingOrderDetectionTest(SimpleTestCase):
             "sealing",
             "sealed",
             "redacted",
+            "struck",
+            "stricken",
             "pseudonym",
             "anonymity",
             "press coverage",
@@ -625,3 +706,72 @@ class ZohoRoutingTest(SimpleUserDataMixin, TestCase):
         call_kwargs = mock_task.delay.call_args.kwargs
         self.assertEqual(call_kwargs["request_type"], "Sealing Order")
         self.assertEqual(call_kwargs["assignee_id"], "")
+
+
+class ContentSecurityPolicyTest(TestCase):
+    """Tests for the site-wide CSP header configured in cl.settings."""
+
+    async def test_navigation_is_locked_to_our_own_domain(self) -> None:
+        """Do we stop third-party content from sending users elsewhere?
+
+        We publish a lot of HTML that we get from third parties, so we use CSP
+        to keep any forms or <base> tags it contains from pointing at another
+        site.
+        """
+        r = cast(
+            HttpResponse, await self.async_client.get(reverse("help_home"))
+        )
+        directives = parse_csp(r)
+        self.assertEqual(directives["form-action"], ["'self'"])
+        self.assertEqual(directives["base-uri"], ["'self'"])
+
+    async def test_script_nonce_matches_the_rendered_page(self) -> None:
+        """Does the nonce in the header match the one in the HTML?
+
+        If these ever drift apart, every inline script on the site breaks, so
+        check that the nonce plumbing between the middleware and the templates
+        is intact.
+        """
+        r = cast(
+            HttpResponse, await self.async_client.get(reverse("help_home"))
+        )
+        script_src = parse_csp(r)["script-src"]
+        nonces = [
+            value[len("'nonce-") : -len("'")]
+            for value in script_src
+            if value.startswith("'nonce-")
+        ]
+        self.assertEqual(
+            len(nonces), 1, msg=f"Expected one nonce in: {script_src}"
+        )
+        html = r.content.decode()
+        self.assertIn(f'nonce="{nonces[0]}"', html)
+        # A script left with an empty nonce would be refused by the browser,
+        # and the assertion above would still pass on the other scripts.
+        self.assertNotIn('nonce=""', html)
+
+
+class DialogComponentTest(SimpleTestCase):
+    """The c-dialog component renders a trigger only when given one."""
+
+    def render(self, source: str) -> str:
+        """Compiles a Cotton snippet and renders it."""
+        compiled = CottonCompiler().process(source)
+        template = engines["django"].from_string(compiled)
+        return template.render({"request": RequestFactory().get("/")})
+
+    def test_trigger_slot_renders_a_trigger(self) -> None:
+        """Trigger content renders the default trigger button."""
+        html = self.render(
+            '<c-dialog><c-slot name="button_content">Open</c-slot>'
+            '<c-slot name="panel">Body</c-slot></c-dialog>'
+        )
+        self.assertIn('aria-haspopup="dialog"', html)
+
+    def test_without_a_trigger_slot_no_trigger_is_rendered(self) -> None:
+        """A dialog opened by other means, such as an event listener, has no trigger button."""
+        html = self.render(
+            '<c-dialog><c-slot name="panel">Body</c-slot></c-dialog>'
+        )
+        self.assertNotIn('aria-haspopup="dialog"', html)
+        self.assertIn("Body", html)

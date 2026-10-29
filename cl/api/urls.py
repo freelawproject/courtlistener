@@ -200,6 +200,7 @@ for prefix, viewset, basename in router.registry:
     # the "search" route.
     if basename != "search":
         router_v4.register(prefix, viewset, basename)
+router_v4.register(r"api-usage", views.ApiUsageViewSet, basename="api-usage")
 
 # When we finally need to deprecate V3 of the API, the process to remove it, is:
 # - Remove the re_path(r"^api/rest/(?P<version>[v3]+)/", include(router.urls)) below
@@ -210,23 +211,21 @@ for prefix, viewset, basename in router.registry:
 # - Remove V3 documentation.
 urlpatterns = [
     path(
-        "api-auth/",
-        include("rest_framework.urls", namespace="rest_framework"),
+        # Disable DRF's browsable API login page. It lacks necessary
+        # protections our regular login view has.
+        "api-auth/login/",
+        RedirectView.as_view(pattern_name="sign-in", query_string=True),
+        name="drf_login_redirect",
     ),
     re_path(r"^api/rest/(?P<version>[v3]+)/", include(router.urls)),
     re_path(r"^api/rest/(?P<version>[v4]+)/", include(router_v4.urls)),
     path("help/api/jurisdictions/", views.court_index, name="court_index"),
     # Live API endpoints
     path("api/rest/v4/wiki-data/", views.wiki_data, name="wiki_data"),
-    re_path(
-        r"^api/rest/v4/coverage/opinions/",
-        views.coverage_data_opinions,
-        name="coverage_data_opinions",
-    ),
-    re_path(
-        r"^api/rest/v(?P<version>[1234])/coverage/(?P<court>.+)/$",
-        views.coverage_data,
-        name="coverage_data",
+    path(
+        "api/rest/v4/wiki-data/coverage/",
+        views.wiki_coverage_data,
+        name="wiki_coverage_data",
     ),
     re_path(
         r"^api/rest/v(?P<version>[1234])/alert-frequency/(?P<day_count>\d+)/$",

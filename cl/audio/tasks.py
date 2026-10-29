@@ -1,3 +1,4 @@
+from contextlib import ExitStack
 from math import ceil
 
 from asgiref.sync import async_to_sync
@@ -20,6 +21,7 @@ from openai import (
     OpenAI,
     RateLimitError,
     UnprocessableEntityError,
+    omit,
 )
 from sentry_sdk import capture_exception
 
@@ -137,33 +139,35 @@ def transcribe_from_open_ai_api(self, audio_pk: int, dont_retry: bool = False):
     file_name = audio_file.name.split("/")[-1]
     size_mb = audio_file.size / 1_000_000
     # Check size and downsize file if necessary.
-    if size_mb >= 25:
-        audio_response: Response = downsize_audio_file(audio)
-        # Removes the ".mp3" extension from the filename
-        name = file_name.split(".")[0]
-        file = (f"{name}.ogg", audio_response.content, "ogg")
-    else:
-        file = (file_name, audio_file.read(), "mp3")
+    with ExitStack() as stack:
+        if size_mb >= 25:
+            audio_response: Response = downsize_audio_file(audio)
+            # Removes the ".mp3" extension from the filename
+            name = file_name.split(".")[0]
+            file = (f"{name}.ogg", audio_response.content, "ogg")
+        else:
+            # Stream from storage rather than loading the full file into
+            # memory; the httpx-backed openai client reads the handle lazily.
+            fh = stack.enter_context(audio_file.open("rb"))
+            file = (file_name, fh, "mp3")
 
-    # Prevent default openai client retrying
-    with OpenAI(max_retries=0) as client:
-        kwargs = {
-            "file": file,
-            "model": "whisper-1",
-            "language": "en",
-            "response_format": "verbose_json",
-            "timestamp_granularities": ["word", "segment"],
-            "prompt": audio.case_name,
-        }
-
-        # The most common hallucination we have seen is the case name
-        # repeated in a loop. Manual testing showed that not sending
-        # the case name helps to get a clean transcript
-        if audio.stt_status == Audio.STT_HALLUCINATION:
-            kwargs.pop("prompt", "")
+        # Prevent default openai client retrying
+        client = stack.enter_context(OpenAI(max_retries=0))
 
         try:
-            transcript = client.audio.transcriptions.create(**kwargs)
+            transcript = client.audio.transcriptions.create(
+                file=file,
+                model="whisper-1",
+                language="en",
+                response_format="verbose_json",
+                timestamp_granularities=["word", "segment"],
+                # The most common hallucination we have seen is the case name
+                # repeated in a loop. Manual testing showed that not sending
+                # the case name helps to get a clean transcript
+                prompt=omit
+                if audio.stt_status == Audio.STT_HALLUCINATION
+                else audio.case_name,
+            )
         except APIConnectionError as exc:
             # Transient TCP / DNS blip. Usually resolves in seconds, so a
             # short in-task retry is cheaper than waiting a full daemon
@@ -212,11 +216,9 @@ def transcribe_from_open_ai_api(self, audio_pk: int, dont_retry: bool = False):
             capture_exception(e)
             return
 
-        transcript_dict = transcript.to_dict()
-
         with transaction.atomic():
-            audio.stt_transcript = transcript_dict["text"]
-            audio.duration = ceil(transcript_dict["duration"])
+            audio.stt_transcript = transcript.text
+            audio.duration = ceil(transcript.duration)
             audio.stt_source = Audio.STT_OPENAI_WHISPER
 
             if transcription_was_hallucinated(audio):
@@ -229,6 +231,7 @@ def transcribe_from_open_ai_api(self, audio_pk: int, dont_retry: bool = False):
                 audio.stt_status = Audio.STT_COMPLETE
 
             audio.save()
+            transcript_dict = transcript.to_dict()
             metadata = {
                 "segments": transcript_dict["segments"],
                 "words": transcript_dict["words"],

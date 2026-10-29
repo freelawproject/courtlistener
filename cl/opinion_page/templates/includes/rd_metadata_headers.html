@@ -5,7 +5,7 @@
   {% endif %}
   Document
   <a href="{{ rd.docket_entry.docket.get_absolute_url }}?entry_gte={{ rd.document_number }}#entry-{{ rd.document_number }}">
-    #{{ rd.document_number }}</a>{% if rd.document_type == rd.ATTACHMENT %},
+    #{{ rd.document_number }}</a>{% if rd.attachment_number %},
     Attachment #{{ rd.attachment_number }}{% endif %}
 </h3>
 {% if attachments %}
@@ -76,8 +76,8 @@
 
 <div class="v-offset-below-3 v-offset-above-1">
   <div class="btn-group">
-    {% include "includes/add_note_button.html" with form_instance_id=note_form.instance.recap_doc_id %}
+    {% include "includes/add_note_button.html" with form_instance_id=note_form.instance.pk %}
   </div>
   {% include "includes/rd_doc_search_button.html" %}
-  {% include "includes/rd_download_button.html" %}
+  {% include "includes/document_download_button/index.html" %}
 </div>

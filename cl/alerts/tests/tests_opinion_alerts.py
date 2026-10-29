@@ -33,8 +33,6 @@ from cl.donate.models import (
 from cl.lib.date_time import midnight_pt
 from cl.lib.redis_utils import get_redis_interface
 from cl.lib.test_helpers import (
-    CourtTestCase,
-    PeopleTestCase,
     SearchTestCase,
     opinion_v3_search_api_keys,
 )
@@ -61,8 +59,6 @@ from cl.users.factories import UserProfileWithParentsFactory
     NO_MATCH_HL_SIZE=100, PERCOLATOR_OPINIONS_SEARCH_ALERTS_ENABLED=True
 )
 class OpinionAlertsPercolatorTest(
-    CourtTestCase,
-    PeopleTestCase,
     SearchTestCase,
     ESIndexTestCase,
     TestCase,
@@ -371,6 +367,7 @@ class OpinionAlertsPercolatorTest(
                     msg="The event status doesn't match.",
                 )
                 content = webhook_sent.content
+                assert content is not None  # for the type checker
 
                 alert_data_compare = alert_data[
                     content["payload"]["alert"]["id"]

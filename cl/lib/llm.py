@@ -1,19 +1,46 @@
-from typing import IO
+from typing import IO, overload
 
 import instructor
 from openai import OpenAI
+from openai.types.chat import (
+    ChatCompletionContentPartParam,
+    ChatCompletionMessageParam,
+)
 from pydantic import BaseModel
 
 
-def call_llm(
+@overload
+def call_llm[T: BaseModel](
+    *,
     system_prompt: str,
-    user_prompt: str | list[str] | list[dict],
+    user_prompt: str | list[str] | list[ChatCompletionContentPartParam],
+    model: str = ...,
+    response_model: None = None,
+    temperature: float = ...,
+    max_completion_tokens: int = ...,
+    api_key: str | None = ...,
+) -> dict | str: ...
+@overload
+def call_llm[T: BaseModel](
+    *,
+    system_prompt: str,
+    user_prompt: str | list[str] | list[ChatCompletionContentPartParam],
+    model: str = ...,
+    response_model: type[T],
+    temperature: float = ...,
+    max_completion_tokens: int = ...,
+    api_key: str | None = ...,
+) -> T: ...
+def call_llm[T: BaseModel](
+    *,
+    system_prompt: str,
+    user_prompt: str | list[str] | list[ChatCompletionContentPartParam],
     model: str = "openai/gpt-4o-mini",
-    response_model: type[BaseModel] | None = None,
+    response_model: type[T] | None = None,
     temperature: float = 0.0,
     max_completion_tokens: int = 1000,
     api_key: str | None = None,
-) -> BaseModel | dict | str:
+) -> T | dict | str:
     """Call an LLM via Instructor to get structured or raw output
 
     You must set any of these environment variables for some providers:
@@ -31,9 +58,13 @@ def call_llm(
     """
 
     # if api_key is provided, inject it, else fallback to env var
-    client = instructor.from_provider(model, api_key=api_key)
+    client = instructor.from_provider(
+        model, async_client=False, api_key=api_key
+    )
 
-    def to_content_part(x: str | dict) -> dict:
+    def to_content_part(
+        x: str | ChatCompletionContentPartParam,
+    ) -> ChatCompletionContentPartParam:
         if isinstance(x, str):
             return {"type": "text", "text": x}
         # Assume already a valid content part dict, e.g. {"type": "text", "text": "..."}
@@ -44,7 +75,7 @@ def call_llm(
     else:
         user_content = [to_content_part(p) for p in user_prompt]
 
-    messages = [
+    messages: list[ChatCompletionMessageParam] = [
         {"role": "system", "content": system_prompt},
         {"role": "user", "content": user_content},
     ]

@@ -100,8 +100,11 @@ class Command(VerboseCommand):
         df = df.replace(r"^\s+$", np.nan, regex=True)
         for x in textfields:
             df[x] = df[x].replace(np.nan, "", regex=True)
-        df["Professional Career"].replace(
-            to_replace=r";\sno", value=r", no", inplace=True, regex=True
+        # Assign the result back rather than using inplace=True: df[col] is a
+        # temporary Series, so an inplace call on it is chained assignment,
+        # which pandas 3's copy-on-write silently turns into a no-op.
+        df["Professional Career"] = df["Professional Career"].replace(
+            to_replace=r";\sno", value=r", no", regex=True
         )
         for i, row in df.iterrows():
             if i < self.options["offset"]:

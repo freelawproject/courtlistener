@@ -1,0 +1,43 @@
+{% extends "new_base.html" %}
+{% load extras %}
+
+{% block title %}FJC IDB Information for {{ title }} – CourtListener.com{% endblock %}
+{% block og_title %}FJC IDB Information for {{ title }} - CourtListener.com{% endblock %}
+{% block description %}FJC IDB Information for {{ title }} — Brought to you by the RECAP Initiative and Free Law Project, a non-profit dedicated to creating high quality open legal information.{% endblock %}
+{% block og_description %}FJC IDB Information for {{ title }} — Brought to you by the RECAP Initiative and Free Law Project, a non-profit dedicated to creating high quality open legal information.{% endblock %}
+{% block canonical %}{% get_canonical_element %}{% endblock %}
+
+{% block content_wrapper %}
+<div class="bg-greyscale-100">
+  <div class="capped-width pt-4 md:pt-20 pb-35">
+    <c-docket-page
+      :docket="docket"
+      :docket_source="docket_source"
+      active_tab="idb"
+      :metadata_sections="metadata_sections"
+      :tabs="tabs"
+      :has_alert="has_alert"
+      :note_form="note_form"
+    >
+      <p class="text-sm text-greyscale-500 mb-4">Values last updated {{ idb_data.date_modified|date }}</p>
+
+      <c-flex-table
+        caption="FJC Integrated Database values for this docket"
+        :columns="[
+          {'label': 'Field', 'field': 'field'},
+          {'label': 'Value', 'field': 'value'},
+          {'label': 'Hints', 'field': 'hints'},
+        ]"
+      >
+        {% for row in idb_rows %}
+          <tr class="border-b border-b-greyscale-200">
+            <c-flex-cell header valign="top" class="font-semibold w-1/5">{{ row.label }}</c-flex-cell>
+            <c-flex-cell valign="top" class="w-1/5">{{ row.value }}</c-flex-cell>
+            <c-flex-cell valign="top" class="space-y-2">{{ row.hint }}</c-flex-cell>
+          </tr>
+        {% endfor %}
+      </c-flex-table>
+    </c-docket-page>
+  </div>
+</div>
+{% endblock %}

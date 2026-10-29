@@ -32,7 +32,7 @@
          class="search-mode-value"
          value="{% if is_semantic %}true{% endif %}"
          {% if not is_semantic %}disabled{% endif %}>
-  <script nonce="{{ request.csp_nonce }}">
+  <script nonce="{{ csp_nonce }}">
   (function() {
     try {
       if (new URLSearchParams(window.location.search).has('semantic')) return;

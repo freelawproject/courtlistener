@@ -23,18 +23,19 @@ Note: If --limit is greater than --end-row, end row will be ignored
 import argparse
 import os.path
 import time
+from collections.abc import Hashable
+from typing import cast
 
 import pandas as pd
 from django.core.management import BaseCommand
 from pandas import DataFrame
-from pandas.io.parsers import TextFileReader
 
 from cl.corpus_importer.utils import add_citations_to_cluster
 from cl.lib.command_utils import logger
 from cl.search.models import OpinionCluster
 
 
-def load_citations_file(options: dict) -> DataFrame | TextFileReader:
+def load_citations_file(options: dict) -> DataFrame:
     """Load csv file from absolute path
 
     :param options: options passed to command
@@ -43,7 +44,14 @@ def load_citations_file(options: dict) -> DataFrame | TextFileReader:
 
     end_row = None
 
-    dtype_mapping = {"cluster_id": "int", "citation_to_add": "str"}
+    # Use string dtype specifiers ("int"/"str") rather than the builtin type
+    # objects: pandas' typed stubs accept string dtypes but not `type[int]`.
+    # The Hashable key annotation matches read_csv's `Mapping[Hashable, ...]`
+    # dtype parameter (its key type is invariant, so a bare `str` key fails).
+    dtype_mapping: dict[Hashable, str] = {
+        "cluster_id": "int",
+        "citation_to_add": "str",
+    }
 
     if options["end_row"] or options["limit"]:
         end_row = (
@@ -53,12 +61,14 @@ def load_citations_file(options: dict) -> DataFrame | TextFileReader:
         )
 
     data = pd.read_csv(
-        options["csv"],
+        cast(str, options["csv"]),
         names=["cluster_id", "citation_to_add"],
         dtype=dtype_mapping,
         delimiter=",",
-        skiprows=options["start_row"] - 1 if options["start_row"] else None,
-        nrows=end_row,
+        skiprows=cast(int, options["start_row"] - 1)
+        if options["start_row"]
+        else None,
+        nrows=cast(int, end_row),
         na_filter=False,
     )
 
@@ -66,9 +76,7 @@ def load_citations_file(options: dict) -> DataFrame | TextFileReader:
     return data
 
 
-def process_csv_data(
-    data: DataFrame | TextFileReader, delay_s: float, reindex: bool
-) -> None:
+def process_csv_data(data: DataFrame, delay_s: float, reindex: bool) -> None:
     """Process citations from csv file
 
     :param data: rows from csv file

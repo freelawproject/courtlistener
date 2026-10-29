@@ -4,7 +4,7 @@ import logging
 from typing import Any
 
 import requests
-from bs4 import BeautifulSoup
+from bs4 import BeautifulSoup, Tag
 from django.db import transaction
 from juriscraper.lib.string_utils import titlecase
 
@@ -53,8 +53,10 @@ def find_data_fields(soup: BeautifulSoup, field_name: str) -> list:
     :return: list of all fields found
     """
     return soup.find_all(
-        lambda tag: (tag.name == field_name and tag.get("data-type") is None)
-        or tag.get("data-type") == field_name
+        lambda tag: (
+            (tag.name == field_name and tag.get("data-type") is None)
+            or tag.get("data-type") == field_name
+        )
     )
 
 
@@ -157,9 +159,11 @@ def fetch_non_harvard_data(harvard_data: dict[str, Any]) -> dict[str, Any]:
     if find_any_legal_field:
         # We have legal field, then collect all legal and attorneys fields
         find_fields = soup.find_all(
-            lambda tag: tag.get("data-type") == "legal"
-            or (tag.name == "attorneys" and tag.get("data-type") is None)
-            or tag.get("data-type") == "attorneys"
+            lambda tag: (
+                tag.get("data-type") == "legal"
+                or (tag.name == "attorneys" and tag.get("data-type") is None)
+                or tag.get("data-type") == "attorneys"
+            )
         )
         if find_fields:
             # Combine attorneys and legal data-type fields
@@ -310,9 +314,16 @@ def save_headmatter(harvard_data: dict[str, Any]) -> dict[str, Any]:
     headmatter = []
     soup = fix_footnotes(soup)
     index = 0
-    for element in soup.find("casebody").find_all(recursive=False):
+    casebody = soup.find("casebody")
+    assert casebody is not None
+    for element in casebody.find_all(recursive=False):
         element = fix_pagination(element)
-        if element.get("id", "").startswith("b") and index > 0:
+        element_id = element.get("id", "")
+        if (
+            isinstance(element_id, str)
+            and element_id.startswith("b")
+            and index > 0
+        ):
             headmatter.append(f"<br>{str(element)}")
         else:
             headmatter.append(str(element))
@@ -483,7 +494,7 @@ def fetch_cl_opinion_content(sub_opinions: list[Opinion]) -> list[str]:
     return cl_opinions
 
 
-def fix_pagination(soup: BeautifulSoup) -> BeautifulSoup:
+def fix_pagination(soup: Tag) -> Tag:
     """Add pagination to harvard XML
 
     Add star pagination to page number XML/HTML
@@ -511,7 +522,12 @@ def fix_footnotes(soup: BeautifulSoup) -> BeautifulSoup:
         fn["id"] = f"fn{fn.string}_ref"
         fn["class"] = "footnote"
 
-        fnl = soup.find("footnote", {"label": fn.string})
+        # bs4 treats a None attribute value as "attribute absent", which is
+        # spelled False in its typed interface.
+        fnl = soup.find(
+            "footnote",
+            {"label": fn.string if fn.string is not None else False},
+        )
         if fnl:
             obj = f'<a class="footnote" href="#fn{fn.string}_ref">{fn.string}</a>'
             fnl.name = "div"
@@ -533,10 +549,12 @@ def fix_footnotes(soup: BeautifulSoup) -> BeautifulSoup:
         footnotes_div.append(div.extract())
 
     # Append the footnotes_div to the main 'opinion' element or headmatter
-    if not soup.find("opinion"):
-        soup.find("casebody").append(footnotes_div)
+    opinion = soup.find("opinion")
+    if not opinion:
+        casebody = soup.find("casebody")
+        assert casebody is not None
+        casebody.append(footnotes_div)
     else:
-        opinion = soup.find("opinion")
         opinion.append(footnotes_div)
     return soup
 

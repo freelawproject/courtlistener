@@ -1,0 +1,31 @@
+{% load svg_tags %}
+
+{# No check_availability variant: SCOTUS documents are never sealed. #}
+<c-vars
+  document=""
+  variant="button"
+/>
+
+{% if variant == "menu_item" %}
+  <c-menu-button.divider />
+  <c-menu-button.item
+    href="{{ document.external_url }}"
+    target="_blank"
+    rel="nofollow noreferrer noopener"
+    aria-label="From the Supreme Court (opens in new tab)"
+  >
+    From the Supreme Court
+  </c-menu-button.item>
+{% elif variant == "button" %}
+  <c-button
+    variant="outline"
+    href="{{ document.external_url }}"
+    target="_blank"
+    rel="nofollow noreferrer noopener"
+    class="text-sm px-3 py-1.5"
+    aria-label="View on SCOTUS (opens in new tab)"
+  >
+    {% svg "external" class="w-4 h-4" aria_hidden="true" %}
+    View on SCOTUS
+  </c-button>
+{% endif %}

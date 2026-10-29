@@ -876,18 +876,21 @@ class Position(AbstractDateTimeModel):
         return f"{self.pk}: {self.person.name_full} at {self.court_id}"
 
     @property
-    def is_judicial_position(self):
+    def is_judicial_position(self) -> bool:
         """Return True if the position is judicial."""
-        if self.POSITION_TYPE_GROUPS.get(self.position_type) == "Judge":
-            return True
-        return False
+        return (
+            self.position_type is not None
+            and self.POSITION_TYPE_GROUPS.get(self.position_type) == "Judge"
+        )
 
     @property
-    def is_clerkship(self):
+    def is_clerkship(self) -> bool:
         """Return True if the position is a clerkship."""
-        if self.POSITION_TYPE_GROUPS.get(self.position_type) == "Clerkships":
-            return True
-        return False
+        return (
+            self.position_type is not None
+            and self.POSITION_TYPE_GROUPS.get(self.position_type)
+            == "Clerkships"
+        )
 
     @property
     def vote_string(self):
@@ -1290,6 +1293,14 @@ class PartyType(models.Model):
     (It made sense at the time.)
     """
 
+    PRO_SE_UNKNOWN = 0
+    PRO_SE_YES = 1
+    PRO_SE_NO = 2
+    PRO_SE_STATUSES = (
+        (PRO_SE_UNKNOWN, "Unknown"),
+        (PRO_SE_YES, "Yes"),
+        (PRO_SE_NO, "No"),
+    )
     docket = models.ForeignKey(
         "search.Docket",
         related_name="party_types",
@@ -1325,6 +1336,12 @@ class PartyType(models.Model):
         help_text="In a criminal case, the highest offense level at the end "
         "of the case.",
         blank=True,
+    )
+    pro_se = models.SmallIntegerField(
+        help_text="Whether the party is representing themselves (pro se) in "
+        "this docket.",
+        choices=PRO_SE_STATUSES,
+        default=PRO_SE_UNKNOWN,
     )
 
     class Meta:

@@ -11,7 +11,7 @@ import celery
 import httpx
 import openai
 import requests
-from asgiref.sync import async_to_sync
+from asgiref.sync import async_to_sync, sync_to_async
 from bs4 import BeautifulSoup
 from django.apps import apps
 from django.conf import settings
@@ -22,6 +22,7 @@ from juriscraper.lib.exceptions import PacerLoginException
 from juriscraper.pacer import CaseQuery
 from redis import ConnectionError as RedisConnectionError
 
+from cl.audio.dispatch import _release_lock
 from cl.audio.models import Audio
 from cl.celery_init import app
 from cl.citations.tasks import (
@@ -29,10 +30,14 @@ from cl.citations.tasks import (
 )
 from cl.custom_filters.templatetags.text_filters import best_case_name
 from cl.lib.celery_utils import throttle_task
-from cl.lib.exceptions import ScrapeFailed
+from cl.lib.db_tools import release_db_connection
+from cl.lib.exceptions import CourtQueryError, IQuerySaveError, ScrapeFailed
 from cl.lib.juriscraper_utils import get_scraper_object_by_name
 from cl.lib.llm import call_llm_transcription
-from cl.lib.microservice_utils import microservice
+from cl.lib.microservice_utils import (
+    clean_up_recap_document_file,
+    microservice,
+)
 from cl.lib.models import AbstractPDF
 from cl.lib.pacer import map_cl_to_pacer_id
 from cl.lib.pacer_session import ProxyPacerSession, get_or_cache_pacer_cookies
@@ -44,7 +49,7 @@ from cl.lib.storage import (
 )
 from cl.lib.string_utils import trunc
 from cl.lib.utils import is_iter
-from cl.recap.mergers import save_iquery_to_docket
+from cl.recap.mergers import save_iquery_to_docket_base
 from cl.scrapers.management.commands.merge_opinion_versions import (
     get_query_from_url,
     merge_versions_by_text_similarity,
@@ -57,7 +62,7 @@ from cl.search.models import (
     OriginatingCourtInformation,
     RECAPDocument,
 )
-from cl.search.state.texas.models import ProcessingError, TexasDocument
+from cl.search.state.shared import AbstractStateDocument, ProcessingError
 
 logger = logging.getLogger(__name__)
 
@@ -124,7 +129,7 @@ def update_document_from_text(
 
 @app.task(
     bind=True,
-    autoretry_for=(requests.ConnectionError, requests.ReadTimeout),
+    autoretry_for=(httpx.ConnectError, httpx.ReadTimeout),
     max_retries=5,
     retry_backoff=10,
 )
@@ -174,45 +179,61 @@ def extract_opinion_content(
 
     opinion = Opinion.objects.get(pk=pk)
 
-    # Try to extract opinion content without using OCR.
-    response = async_to_sync(microservice)(
-        service="document-extract",
-        item=opinion,
-    )
-    if not response.is_success:
-        logger.error(
-            "Error from document-extract microservice: %s",
-            response.status_code,
-            extra=dict(
-                opinion_id=opinion.id,
-                url=opinion.download_url,
-                local_path=opinion.local_path.name,
-                fingerprint=[
-                    f"{opinion.cluster.docket.court_id}-document-extract-failure"
-                ],
-            ),
+    with opinion.local_path.open(mode="rb") as document_file:
+        # Try to extract opinion content without using OCR.
+        response = async_to_sync(microservice)(
+            service="document-extract",
+            file=document_file,
         )
-        return
+        if not response.is_success:
+            logger.error(
+                "Error from document-extract microservice: %s",
+                response.status_code,
+                extra=dict(
+                    opinion_id=opinion.id,
+                    url=opinion.download_url,
+                    local_path=opinion.local_path.name,
+                    fingerprint=[
+                        f"{opinion.cluster.docket.court_id}-document-extract-failure"
+                    ],
+                ),
+            )
+            return
 
-    data = response.json()
-    content = data["content"]
-    extracted_by_ocr = data["extracted_by_ocr"]
-    # For PDF documents, if there's no content after the extraction without OCR
-    # Let's try to extract using OCR.
-    if (
-        ocr_available
-        and needs_ocr(content)
-        and ".pdf" in str(opinion.local_path)
-    ):
-        ocr_response = async_to_sync(microservice)(
-            service="document-extract-ocr",
-            item=opinion,
-            params={"ocr_available": ocr_available},
-        )
-        if ocr_response.is_success:
-            data = ocr_response.json()
-            content = data["content"]
-            extracted_by_ocr = True
+        data = response.json()
+        content = data["content"]
+        extracted_by_ocr = data["extracted_by_ocr"]
+        # For PDF documents, if there's no content after the extraction without OCR
+        # Let's try to extract using OCR.
+        if (
+            ocr_available
+            and needs_ocr(content)
+            and ".pdf" in str(opinion.local_path)
+        ):
+            document_file.seek(0)
+            ocr_response = async_to_sync(microservice)(
+                service="document-extract-ocr",
+                file=document_file,
+                params={"ocr_available": ocr_available},
+            )
+            if ocr_response.is_success:
+                data = ocr_response.json()
+                content = data["content"]
+                extracted_by_ocr = True
+            else:
+                # Keep the result of the extraction without OCR.
+                logger.error(
+                    "Error from document-extract-ocr microservice: %s",
+                    ocr_response.status_code,
+                    extra=dict(
+                        opinion_id=opinion.id,
+                        url=opinion.download_url,
+                        local_path=opinion.local_path.name,
+                        fingerprint=[
+                            f"{opinion.cluster.docket.court_id}-document-extract-ocr-failure"
+                        ],
+                    ),
+                )
 
     extension = opinion.local_path.name.split(".")[-1]
     opinion.extracted_by_ocr = extracted_by_ocr
@@ -264,7 +285,7 @@ def extract_opinion_content(
 # TODO: Remove after the new extract_opinion_content is deployed.
 @app.task(
     bind=True,
-    autoretry_for=(requests.ConnectionError, requests.ReadTimeout),
+    autoretry_for=(httpx.ConnectError, httpx.ReadTimeout),
     max_retries=5,
     retry_backoff=10,
 )
@@ -314,45 +335,61 @@ def extract_doc_content(
 
     opinion = Opinion.objects.get(pk=pk)
 
-    # Try to extract opinion content without using OCR.
-    response = async_to_sync(microservice)(
-        service="document-extract",
-        item=opinion,
-    )
-    if not response.is_success:
-        logger.error(
-            "Error from document-extract microservice: %s",
-            response.status_code,
-            extra=dict(
-                opinion_id=opinion.id,
-                url=opinion.download_url,
-                local_path=opinion.local_path.name,
-                fingerprint=[
-                    f"{opinion.cluster.docket.court_id}-document-extract-failure"
-                ],
-            ),
+    with opinion.local_path.open(mode="rb") as document_file:
+        # Try to extract opinion content without using OCR.
+        response = async_to_sync(microservice)(
+            service="document-extract",
+            file=document_file,
         )
-        return
+        if not response.is_success:
+            logger.error(
+                "Error from document-extract microservice: %s",
+                response.status_code,
+                extra=dict(
+                    opinion_id=opinion.id,
+                    url=opinion.download_url,
+                    local_path=opinion.local_path.name,
+                    fingerprint=[
+                        f"{opinion.cluster.docket.court_id}-document-extract-failure"
+                    ],
+                ),
+            )
+            return
 
-    data = response.json()
-    content = data["content"]
-    extracted_by_ocr = data["extracted_by_ocr"]
-    # For PDF documents, if there's no content after the extraction without OCR
-    # Let's try to extract using OCR.
-    if (
-        ocr_available
-        and needs_ocr(content)
-        and ".pdf" in str(opinion.local_path)
-    ):
-        ocr_response = async_to_sync(microservice)(
-            service="document-extract-ocr",
-            item=opinion,
-            params={"ocr_available": ocr_available},
-        )
-        if ocr_response.is_success:
-            data = ocr_response.json()
-            content = data["content"]
-            extracted_by_ocr = True
+        data = response.json()
+        content = data["content"]
+        extracted_by_ocr = data["extracted_by_ocr"]
+        # For PDF documents, if there's no content after the extraction without OCR
+        # Let's try to extract using OCR.
+        if (
+            ocr_available
+            and needs_ocr(content)
+            and ".pdf" in str(opinion.local_path)
+        ):
+            document_file.seek(0)
+            ocr_response = async_to_sync(microservice)(
+                service="document-extract-ocr",
+                file=document_file,
+                params={"ocr_available": ocr_available},
+            )
+            if ocr_response.is_success:
+                data = ocr_response.json()
+                content = data["content"]
+                extracted_by_ocr = True
+            else:
+                # Keep the result of the extraction without OCR.
+                logger.error(
+                    "Error from document-extract-ocr microservice: %s",
+                    ocr_response.status_code,
+                    extra=dict(
+                        opinion_id=opinion.id,
+                        url=opinion.download_url,
+                        local_path=opinion.local_path.name,
+                        fingerprint=[
+                            f"{opinion.cluster.docket.court_id}-document-extract-ocr-failure"
+                        ],
+                    ),
+                )
 
     extension = opinion.local_path.name.split(".")[-1]
     opinion.extracted_by_ocr = extracted_by_ocr
@@ -604,27 +641,47 @@ async def extract_formatted_text_document_base(
             processed.append(pk)
             continue
 
-        response = await microservice(
-            service="document-extract",
-            item=rd,
-        )
-        if not response.is_success:
+        # Doctor can take several minutes to answer. An idle Postgres
+        # connection is dropped long before that by network/server idle
+        # timeouts, and the asave() below then fails with "SSL connection has
+        # been closed unexpectedly". Release the connection for the wait;
+        # Django reopens one on the next query.
+        await sync_to_async(release_db_connection)()
+
+        try:
+            document_file = rd.filepath_local.open(mode="rb")
+        except FileNotFoundError:
+            await clean_up_recap_document_file(rd)
             continue
 
-        content = response.json()["content"]
-        extracted_by_ocr = response.json()["extracted_by_ocr"]
-        if strip_html_tags and not str(rd.filepath_local).endswith(".pdf"):
-            content = strip_tags(content)
-        ocr_needed = needs_ocr(content, page_count=rd.page_count)
-        if ocr_available and ocr_needed:
+        # Reuse the downloaded file if extraction needs an OCR fallback.
+        with document_file:
             response = await microservice(
-                service="document-extract-ocr",
-                item=rd,
-                params={"ocr_available": ocr_available},
+                service="document-extract",
+                file=document_file,
             )
-            if response.is_success:
-                content = response.json()["content"]
-                extracted_by_ocr = True
+            if not response.is_success:
+                continue
+
+            content = response.json()["content"]
+            extracted_by_ocr = response.json()["extracted_by_ocr"]
+            if isinstance(rd, AbstractStateDocument) and (
+                pages := response.json().get("page_count")
+            ):
+                rd.page_count = pages
+            if strip_html_tags and not str(rd.filepath_local).endswith(".pdf"):
+                content = strip_tags(content)
+            ocr_needed = needs_ocr(content, page_count=rd.page_count)
+            if ocr_available and ocr_needed:
+                document_file.seek(0)
+                response = await microservice(
+                    service="document-extract-ocr",
+                    file=document_file,
+                    params={"ocr_available": ocr_available},
+                )
+                if response.is_success:
+                    content = response.json()["content"]
+                    extracted_by_ocr = True
 
         has_content = bool(content)
         match has_content, extracted_by_ocr:
@@ -650,8 +707,8 @@ async def extract_formatted_text_document_base(
                 do_extraction=False,
                 update_fields=["ocr_status", "plain_text"],
             )
-        elif isinstance(rd, TexasDocument):
-            update_fields = ["ocr_status", "plain_text"]
+        elif isinstance(rd, AbstractStateDocument):
+            update_fields = ["ocr_status", "plain_text", "page_count"]
             if not has_content:
                 rd.processing_error = ProcessingError.EXTRACTION_FAILURE
                 update_fields.append("processing_error")
@@ -687,8 +744,8 @@ async def extract_pdf_document_base(
 @app.task(
     bind=True,
     autoretry_for=(
-        requests.ConnectionError,
-        requests.ReadTimeout,
+        httpx.ConnectError,
+        httpx.ReadTimeout,
         httpx.TimeoutException,
     ),
     max_retries=3,
@@ -731,14 +788,15 @@ def process_audio_file(self, pk) -> None:
     audio_response.raise_for_status()
     cf = ContentFile(audio_response.content)
     file_name = f"{trunc(best_case_name(audio_obj).lower(), 72)}_cl.mp3"
-    audio_obj.file_with_date = audio_obj.docket.date_argued  # type: ignore[attr-defined]
     audio_obj.local_path_mp3.save(file_name, cf, save=False)
-    audio_obj.duration = float(
-        async_to_sync(microservice)(
-            service="audio-duration",
-            file=audio_response.content,  # type: ignore[arg-type]
-            file_type="mp3",
-        ).text
+    audio_obj.duration = round(
+        float(
+            async_to_sync(microservice)(
+                service="audio-duration",
+                file=audio_response.content,
+                file_type="mp3",
+            ).text
+        )
     )
     audio_obj.processing_complete = True
     audio_obj.save(
@@ -748,6 +806,9 @@ def process_audio_file(self, pk) -> None:
             "processing_complete",
         ]
     )
+    # Free the dispatch lock so a later dispatch for this pk isn't skipped
+    # until the TTL expires. Failed runs keep it, so the TTL acts as backoff.
+    _release_lock("process_audio_file", pk)
     # Transcription dispatch is owned by reenqueue_pending_audio_tasks_daemon.
     # We deliberately do not hand off here — the daemon paces dispatches to
     # stay under OpenAI's safe concurrency.
@@ -761,15 +822,33 @@ def process_audio_file(self, pk) -> None:
     interval_step=5,
 )
 @throttle_task("1/s", key="court_id")
-def update_docket_info_iquery(self, d_pk: int, court_id: str) -> None:
+def update_docket_info_iquery(
+    self: celery.Task, d_pk: int, court_id: str
+) -> None:
+    """Throttled Celery task wrapper for update_docket_info_iquery_base."""
+    try:
+        return async_to_sync(update_docket_info_iquery_base)(d_pk, court_id)
+    except CourtQueryError as exc:
+        logger.warning("%s", exc)
+        if self.request.retries == self.max_retries:
+            return
+        raise self.retry(exc=exc.__cause__)
+    except IQuerySaveError as exc:
+        if self.request.retries == self.max_retries:
+            logger.warning("%s", exc)
+            return
+        logger.info("%s Retrying.", exc)
+        raise self.retry(exc=exc.__cause__)
+
+
+async def update_docket_info_iquery_base(d_pk: int, court_id: str) -> None:
     """Update the docket info from iquery
 
-    :param self: The Celery task
     :param d_pk: The ID of the docket
     :param court_id: The court of the docket. Needed for throttling by court.
     :return: None
     """
-    session_data = get_or_cache_pacer_cookies(
+    session_data = await get_or_cache_pacer_cookies(
         "pacer_scraper",
         settings.PACER_USERNAME,
         password=settings.PACER_PASSWORD,
@@ -780,23 +859,19 @@ def update_docket_info_iquery(self, d_pk: int, court_id: str) -> None:
         password=settings.PACER_PASSWORD,
         proxy=session_data.proxy_address,
     )
-    d = Docket.objects.get(pk=d_pk, court_id=court_id)
+    d = await Docket.objects.aget(pk=d_pk, court_id=court_id)
     report = CaseQuery(map_cl_to_pacer_id(d.court_id), s)
     try:
-        report.query(d.pacer_case_id)
-    except (requests.Timeout, requests.RequestException) as exc:
-        logger.warning(
-            "Timeout or unknown RequestException on iquery crawl. "
-            "Trying again if retries not exceeded."
-        )
-        if self.request.retries == self.max_retries:
-            return
-        raise self.retry(exc=exc)
+        async with s:
+            await report.query(d.pacer_case_id)
+    except httpx.HTTPError as exc:
+        raise CourtQueryError(
+            "Timeout or unknown RequestException on iquery crawl."
+        ) from exc
     if not report.data:
         return
 
-    save_iquery_to_docket(
-        self,
+    await save_iquery_to_docket_base(
         report.data,
         report.response.text,
         d,
@@ -937,109 +1012,117 @@ def subscribe_to_scotus_updates(self: celery.Task, pk: int) -> None:
     docket = Docket.objects.get(pk=pk)
     docket_number = docket.docket_number
 
-    session = requests.Session()
-    session.headers.update(
-        {
-            "User-Agent": "Free Law Project",
-        }
-    )
-
     base_url = "https://file.supremecourt.gov"
     form_url = f"{base_url}/CaseNotification?caseNumber={docket_number}"
-    try:
-        logger.info("Fetching subscription page for case %s", docket_number)
-        response = session.get(form_url, timeout=10)
-        response.raise_for_status()
-        scotus_html = BeautifulSoup(response.content, "html.parser")
-        form = scotus_html.find("form", id="CaseNotificationForm")
-        if not form:
-            raise ScrapeFailed("Could not find the main subscription form.")
-
-        # Collect all form inputs and include the anti-forgery token and CaseNumber
-        payload = {}
-        for input_tag in form.find_all("input"):
-            name = input_tag.get("name")
-            value = input_tag.get("value", "")
-            if name:
-                payload[name] = value
-
-        anti_forgery_token = payload.get("__RequestVerificationToken")
-        if not anti_forgery_token:
-            raise ScrapeFailed("Could not find __RequestVerificationToken.")
-
-        solution, captcha_id = get_scotus_captcha_solution(
-            session, base_url, form_url, anti_forgery_token
-        )
-
-        # Validate Kendo captcha.
-        captcha_validate_url = f"{base_url}/Captcha/validate"
-        validate_payload = {
-            "captchaId": captcha_id,
-            "captcha": solution,
-            "__RequestVerificationToken": anti_forgery_token,
-        }
-        validate_response = session.post(
-            captcha_validate_url,
-            data=validate_payload,
-            headers={
-                "Referer": form_url,
-                "X-Requested-With": "XMLHttpRequest",
-                "Content-Type": "application/x-www-form-urlencoded; charset=UTF-8",
-            },
-            timeout=10,
-        )
-        validate_response.raise_for_status()
-
-        # Kendo validation returns JSON: true or false
-        if validate_response.json() is not True:
-            raise ScrapeFailed(
-                f"CAPTCHA validation failed via AJAX. Response: {validate_response.text}"
-            )
-
-        # Main Form Submission
-        final_submit_url = f"{base_url}{form.get('action')}"
-
-        # Final Payload Update
-        payload.update(
+    with requests.Session() as session:
+        session.headers.update(
             {
-                "Email": settings.SCOTUS_RECAP_EMAIL,
-                "captcha": solution,
-                "SubscribeButton": "Subscribe",
+                "User-Agent": "Free Law Project",
             }
         )
-        # Send the final request
-        post_response = session.post(
-            final_submit_url, data=payload, timeout=10
-        )
-        post_response.raise_for_status()
-
-        if (
-            "Docket Case Notification" in post_response.text
-            and "verification link will be sent" in post_response.text
-        ):
+        try:
             logger.info(
-                "Successfully submitted subscription for case %s. Verification email pending.",
-                docket_number,
+                "Fetching subscription page for case %s", docket_number
             )
-        else:
-            # Try to check other errors from the HTML response and log them...
-            raise ScrapeFailed(
-                f"Main form submission failed for case {docket_number}."
+            response = session.get(form_url, timeout=10)
+            response.raise_for_status()
+            scotus_html = BeautifulSoup(response.content, "html.parser")
+            form = scotus_html.find("form", id="CaseNotificationForm")
+            if not form:
+                raise ScrapeFailed(
+                    "Could not find the main subscription form."
+                )
+
+            # Collect all form inputs and include the anti-forgery token and CaseNumber
+            payload = {}
+            for input_tag in form.find_all("input"):
+                name = input_tag.get("name")
+                value = input_tag.get("value", "")
+                if name:
+                    payload[name] = value
+
+            anti_forgery_token = payload.get("__RequestVerificationToken")
+            if not anti_forgery_token:
+                raise ScrapeFailed(
+                    "Could not find __RequestVerificationToken."
+                )
+
+            solution, captcha_id = get_scotus_captcha_solution(
+                session, base_url, form_url, anti_forgery_token
             )
-    except requests.JSONDecodeError as e:
-        logger.warning(
-            "Failed to decode JSON response during SCOTUS subscription: %s", e
-        )
-        raise ScrapeFailed(f"Failed to decode JSON response: {e}")
-    except openai.APIError as e:
-        logger.warning("OpenAI API error during SCOTUS subscription: %s", e)
-        raise ScrapeFailed(f"OpenAI API error: {e}")
-    except requests.RequestException as e:
-        logger.warning("Network error during SCOTUS subscription: %s", e)
-        raise ScrapeFailed(f"Network error: {e}")
-    except Exception as e:
-        logger.warning("Unexpected error during SCOTUS subscription")
-        raise ScrapeFailed(str(e))
+
+            # Validate Kendo captcha.
+            captcha_validate_url = f"{base_url}/Captcha/validate"
+            validate_payload = {
+                "captchaId": captcha_id,
+                "captcha": solution,
+                "__RequestVerificationToken": anti_forgery_token,
+            }
+            validate_response = session.post(
+                captcha_validate_url,
+                data=validate_payload,
+                headers={
+                    "Referer": form_url,
+                    "X-Requested-With": "XMLHttpRequest",
+                    "Content-Type": "application/x-www-form-urlencoded; charset=UTF-8",
+                },
+                timeout=10,
+            )
+            validate_response.raise_for_status()
+
+            # Kendo validation returns JSON: true or false
+            if validate_response.json() is not True:
+                raise ScrapeFailed(
+                    f"CAPTCHA validation failed via AJAX. Response: {validate_response.text}"
+                )
+
+            # Main Form Submission
+            final_submit_url = f"{base_url}{form.get('action')}"
+
+            # Final Payload Update
+            payload.update(
+                {
+                    "Email": settings.SCOTUS_RECAP_EMAIL,
+                    "captcha": solution,
+                    "SubscribeButton": "Subscribe",
+                }
+            )
+            # Send the final request
+            post_response = session.post(
+                final_submit_url, data=payload, timeout=10
+            )
+            post_response.raise_for_status()
+
+            if (
+                "Docket Case Notification" in post_response.text
+                and "verification link will be sent" in post_response.text
+            ):
+                logger.info(
+                    "Successfully submitted subscription for case %s. Verification email pending.",
+                    docket_number,
+                )
+            else:
+                # Try to check other errors from the HTML response and log them...
+                raise ScrapeFailed(
+                    f"Main form submission failed for case {docket_number}."
+                )
+        except requests.JSONDecodeError as e:
+            logger.warning(
+                "Failed to decode JSON response during SCOTUS subscription: %s",
+                e,
+            )
+            raise ScrapeFailed(f"Failed to decode JSON response: {e}")
+        except openai.APIError as e:
+            logger.warning(
+                "OpenAI API error during SCOTUS subscription: %s", e
+            )
+            raise ScrapeFailed(f"OpenAI API error: {e}")
+        except requests.RequestException as e:
+            logger.warning("Network error during SCOTUS subscription: %s", e)
+            raise ScrapeFailed(f"Network error: {e}")
+        except Exception as e:
+            logger.warning("Unexpected error during SCOTUS subscription")
+            raise ScrapeFailed(str(e))
 
 
 @app.task(

@@ -11,7 +11,6 @@ from django.urls import reverse
 from selenium.webdriver.common.by import By
 from timeout_decorator import timeout_decorator
 
-from cl.search.models import Court
 from cl.tests.base import SELENIUM_TIMEOUT, BaseSeleniumTest
 
 
@@ -19,7 +18,7 @@ from cl.tests.base import SELENIUM_TIMEOUT, BaseSeleniumTest
     MEDIA_ROOT=os.path.join(settings.INSTALL_ROOT, "cl/assets/media/test/")
 )
 class FeedsFunctionalTest(BaseSeleniumTest):
-    """Tests the Feeds page and functionality"""
+    """Tests the feed rendering and functionality"""
 
     fixtures = [
         "test_court.json",
@@ -27,52 +26,6 @@ class FeedsFunctionalTest(BaseSeleniumTest):
         "functest_opinions.json",
         "functest_audio.json",
     ]
-
-    @timeout_decorator.timeout(SELENIUM_TIMEOUT)
-    def test_can_get_to_feeds_from_homepage(self) -> None:
-        """Can we get to the feeds/podcasts page from the homepage?"""
-        self.browser.get(self.live_server_url)
-        link = self.browser.find_element(By.LINK_TEXT, "Feeds")
-        link.click()
-
-        self.assertIn("Feeds", self.browser.title)
-        self.assertIn("/feeds", self.browser.current_url)
-        self.assert_text_in_node("Feeds", "body")
-
-        # Podcasts
-        self.browser.get(self.live_server_url)
-        link = self.browser.find_element(By.LINK_TEXT, "Podcasts")
-        link.click()
-
-        self.assertIn("Podcasts", self.browser.title)
-        self.assertIn("/podcasts", self.browser.current_url)
-        self.assert_text_in_node("Podcasts", "body")
-
-    @timeout_decorator.timeout(SELENIUM_TIMEOUT)
-    def test_feeds_page_shows_jurisdiction_links(self) -> None:
-        """
-        Does the feeds page show all the proper links for each jurisdiction?
-        """
-        courts = Court.objects.filter(in_use=True, has_opinion_scraper=True)
-        self.browser.get(f"{self.live_server_url}{reverse('feeds_info')}")
-        self.assert_text_in_node("Jurisdiction Feeds for Opinions", "body")
-
-        for court in courts:
-            link = self.browser.find_element(By.LINK_TEXT, court.full_name)
-            print(f"Testing link to {court.full_name}...", end=" ")
-            self.assertEqual(
-                link.get_attribute("href"),
-                f"{self.live_server_url}/feed/court/{court.pk}/",
-            )
-            with self.wait_for_page_load(timeout=10):
-                link.click()
-            print("clicked...", end=" ")
-            self.assertIn(
-                'feed xml:lang="en-us" xmlns="http://www.w3.org/2005/Atom"',
-                self.browser.page_source,
-            )
-            self.browser.back()
-            print("✓")
 
     def test_all_jurisdiction_opinion_rss_feeds_usable_in_rss_reader(
         self,

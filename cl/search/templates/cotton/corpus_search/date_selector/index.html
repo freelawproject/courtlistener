@@ -1,6 +1,6 @@
 {% load svg_tags component_tags %}
-{% require_script "js/third_party/flatpickr/flatpickr@4.6.13" %}
-{% require_script "js/third_party/flatpickr/plugins/confirmDate@4.6.13" %}
+{% require_script "js/third_party/flatpickr/flatpickr" %}
+{% require_script "js/third_party/flatpickr/plugins/confirmDate" %}
 {% require_script "js/alpine/components/date_selector.js" %}
 {% require_script "js/alpine/plugins/focus" defer=True %}
 
@@ -46,7 +46,7 @@
       <div class="text-sm font-medium text-greyscale-600" x-bind:id="labelId">{{ label }}</div>
       {% if relative %}
         <a
-          href="{% url "relative_dates" %}"
+          href="{{ WIKI_HELP_URL }}/search/use-relative-date-queries-to-keep-alerts-fresh"
           aria-label="Learn about relative date queries"
         >
           {% svg "circle_question_mark" aria_hidden="true" class="text-greyscale-400" %}

@@ -1,35 +1,310 @@
 import logging
-from datetime import date
-from typing import ClassVar, override
+from collections.abc import Iterable
+from datetime import date, datetime
+from typing import Any, ClassVar, cast, override
+from uuid import UUID
 
 from asgiref.sync import async_to_sync
 from django.db.models import Model, QuerySet
-from juriscraper.state.florida import FloridaCase, FloridaOriginatingCase
+from juriscraper.state.docket import DocketTransfer
+from juriscraper.state.florida import (
+    FloridaCase,
+    FloridaOriginatingCase,
+    FloridaParty,
+    FloridaPartyRepresentative,
+)
+from juriscraper.state.florida import (
+    FloridaDocketEntry as ScrapeFloridaDocketEntry,
+)
+from juriscraper.state.florida import (
+    FloridaDocument as ScrapeFloridaDocument,
+)
 from juriscraper.state.florida.cases import FloridaCourtID
 
+from cl.corpus_importer.state.common.case_transfer import (
+    CaseTransferMerger,
+    CaseTransferRelation,
+    inbound_transfers,
+)
+from cl.corpus_importer.state.common.docket import (
+    DocketEntryRelation,
+    DocketMerger,
+    PartyRelation,
+)
+from cl.corpus_importer.state.common.docket_entry import (
+    AttachmentRelation,
+    DocketEntryMerger,
+    DocumentMerger,
+)
+from cl.corpus_importer.state.common.party import (
+    AttorneyRelation,
+    PartyMerger,
+    PartyTypeMerger,
+    RoleMerger,
+)
 from cl.corpus_importer.state.florida.utils import (
     FL_APPELLATE_COURT_ID,
     FLORIDA_COURT_ID_MAP,
+    FLORIDA_TRANSFER_COURT_ID_MAP,
     make_docket_number_core,
 )
 from cl.corpus_importer.state.merger import (
     Attribute,
+    ManyStrategy,
     Merger,
     OneToOneRelation,
+    RelatedParams,
+    ThroughParameters,
     overwrite,
 )
+from cl.people_db.models import Attorney, Party, PartyType, Role
 from cl.recap.mergers import find_docket_object_query
-from cl.search.models import Docket, OriginatingCourtInformation
+from cl.search.models import (
+    CaseTransfer,
+    Court,
+    Docket,
+    OriginatingCourtInformation,
+)
+from cl.search.state.florida.models import (
+    FloridaDocketEntry,
+    FloridaDocument,
+)
 
 logger = logging.getLogger(__name__)
 
 
-def add_scraper_source(scrape: int | None, db: int | None) -> int:
-    if not db:
-        db = 0
-    if db in Docket.NON_SCRAPER_SOURCES():
-        return db + Docket.SCRAPER
-    return db
+def _florida_representative_role(
+    representative: FloridaPartyRepresentative, params: ThroughParameters[Any]
+) -> int:
+    return Role.ATTORNEY_LEAD if representative.primary_flag else Role.UNKNOWN
+
+
+class FloridaRoleMerger(
+    RoleMerger[FloridaPartyRepresentative, RelatedParams[None]]
+):
+    role: int = Attribute(_florida_representative_role)
+
+
+def _florida_pro_se(party: FloridaParty, params: None) -> int:
+    return PartyType.PRO_SE_YES if party.pro_se_flag else PartyType.PRO_SE_NO
+
+
+class FloridaPartyTypeMerger(
+    PartyTypeMerger[FloridaParty, RelatedParams[None]]
+):
+    pro_se: int = Attribute(_florida_pro_se)
+
+
+def _florida_party_uuid(party: FloridaParty, params: None) -> str:
+    return str(party.party_uuid)
+
+
+class FloridaPartyMerger(PartyMerger[FloridaParty, RelatedParams[None]]):
+    key: ClassVar[Iterable[str]] = ["extra_info"]
+
+    attorneys: list[Attorney] = AttorneyRelation(role=FloridaRoleMerger)
+    extra_info: str = Attribute(_florida_party_uuid)
+
+    def query(self) -> QuerySet[Party]:
+        return super().query().order_by("date_created")
+
+    def resolve_query(self, qs: QuerySet[Party]) -> tuple[bool, Party | None]:
+        results = list(qs)
+        if len(results) == 0:
+            return True, None
+        return True, results[0]
+
+
+def _document_type(document: ScrapeFloridaDocument, params: Any) -> str:
+    return document.document_type or ""
+
+
+def _content_type(document: ScrapeFloridaDocument, params: Any) -> str:
+    m_len = FloridaDocument._meta.get_field("content_type").max_length
+    mime = document.content_type or ""
+    if m_len is not None and len(mime) > m_len:
+        mime = mime[: (m_len - 3)] + "..."
+    return mime
+
+
+class FloridaDocumentMerger(
+    DocumentMerger[
+        ScrapeFloridaDocument,
+        RelatedParams[list[ScrapeFloridaDocketEntry]],
+        FloridaDocument,
+    ]
+):
+    model: ClassVar[type[Model]] = FloridaDocument
+    key: ClassVar[Iterable[str]] = ["link_uuid"]
+
+    document_name: str = Attribute(
+        lambda doc, params: doc.document_name, strategy=overwrite
+    )
+    document_type: str = Attribute(_document_type, strategy=overwrite)
+    content_type: str = Attribute(_content_type, strategy=overwrite)
+    page_count: int | None = Attribute(lambda doc, params: doc.page_count)
+    file_size: int | None = Attribute(lambda doc, params: doc.file_size)
+    link_uuid: UUID = Attribute(
+        lambda doc, params: doc.document_link_uuid, strategy=overwrite
+    )
+
+    def scrape_link_uuids(self) -> list[UUID]:
+        """Shorthand to get the full set of link UUIDs passed as a parameter to the root merger"""
+        return [
+            attachment.document_link_uuid
+            for entry in self.params.params.params
+            for attachment in entry.attachments
+        ]
+
+    def scraped_entry(self) -> ScrapeFloridaDocketEntry | None:
+        """Shorthand to get the scraped docket entry for this attachment"""
+        entry = cast(FloridaDocketEntry, self.params.parent)
+        for scraped_entry in self.params.params.params:
+            if scraped_entry.docket_entry_uuid == entry.docket_entry_uuid:
+                return scraped_entry
+        return None
+
+    @override
+    def query(self) -> QuerySet[FloridaDocument]:
+        by_uuid = self.manager.filter(link_uuid=self.transformed["link_uuid"])[
+            :2
+        ]
+        if len(list(by_uuid)) > 0:
+            return by_uuid
+
+        scraped = self.scraped_entry()
+
+        if (
+            not scraped
+            or [
+                attachment.document_name for attachment in scraped.attachments
+            ].count(self.scrape.document_name)
+            != 1
+        ):
+            # This is a potential new document.
+            return self.manager.none()
+
+        # Stored documents whose link UUID is still in the scrape belong to
+        # those attachments (even if they were renamed), so they can't be the
+        # one replaced. Excluding them also keeps the candidates stable while
+        # sibling attachments merge.
+        candidates = self.manager.filter(
+            document_name=self.scrape.document_name
+        ).exclude(
+            link_uuid__in=[
+                attachment.document_link_uuid
+                for attachment in scraped.attachments
+            ]
+        )
+
+        if len(list(candidates)) != 1:
+            return self.manager.none()
+        return candidates
+
+    @override
+    def resolve_query(
+        self, qs: QuerySet[FloridaDocument]
+    ) -> tuple[bool, FloridaDocument | None]:
+        link_uuid: UUID = self.transformed["link_uuid"]
+
+        scraped = self.scraped_entry()
+        if (
+            scraped is not None
+            and [a.document_link_uuid for a in scraped.attachments].count(
+                link_uuid
+            )
+            > 1
+        ):
+            logger.error(
+                "Multiple scraped attachments with link UUID %s in docket entry %s",
+                link_uuid,
+                cast(FloridaDocketEntry, self.params.parent).docket_entry_uuid,
+            )
+            return False, None
+
+        return super().resolve_query(qs)
+
+
+# Retrieved 2026-07-29
+FLORIDA_ENTRY_STATUS_MAP: dict[str, int] = {
+    "stricken": FloridaDocketEntry.STATUS_STRICKEN,
+    "vacated": FloridaDocketEntry.STATUS_VACATED,
+    "docketed": FloridaDocketEntry.STATUS_DOCKETED,
+}
+
+
+def _entry_status(entry: ScrapeFloridaDocketEntry, params: Any) -> int:
+    """Map Florida's `entry_status` string to CL's integer mirror."""
+    status = FLORIDA_ENTRY_STATUS_MAP.get(
+        entry.entry_status.lower().strip("*")
+    )
+    if status is None:
+        logger.error(
+            "Unrecognized Florida docket entry status: %s", entry.entry_status
+        )
+        return FloridaDocketEntry.STATUS_UNKNOWN
+    return status
+
+
+def _submitted_by_name(entry: ScrapeFloridaDocketEntry, params: Any) -> str:
+    # Florida sends a list, but every entry we've seen has a single submitter.
+    return entry.submitted_by[0].display_name if entry.submitted_by else ""
+
+
+def _submitted_by_id(
+    entry: ScrapeFloridaDocketEntry, params: RelatedParams[Any]
+) -> int | None:
+    """Resolve the submitter to a party on this docket, matching on name the
+    way `PartyMerger` does. Submitters are often court staff rather than case
+    parties, so finding no match is expected and leaves the FK null."""
+    name = _submitted_by_name(entry, params)
+    if not name:
+        return None
+    docket = cast(Docket, params.parent)
+    return (
+        docket.parties.filter(name=name).values_list("pk", flat=True).first()
+    )
+
+
+class FloridaDocketEntryMerger(
+    DocketEntryMerger[
+        ScrapeFloridaDocketEntry,
+        list[ScrapeFloridaDocketEntry],
+        FloridaDocketEntry,
+    ]
+):
+    model: ClassVar[type[Model]] = FloridaDocketEntry
+    key: ClassVar[Iterable[str]] = ["docket_entry_uuid"]
+
+    # Florida's CL field is a DateTimeField, so override the base's
+    # date-only mapping with the scrape's full timestamp. Annotated as the
+    # base's `date` because an override can't narrow the declared type.
+    date_filed: date = Attribute(
+        lambda e, params: e.datetime_filed, strategy=overwrite
+    )
+    date_submitted: datetime = Attribute(
+        lambda e, params: e.date_submitted, strategy=overwrite
+    )
+    entry_type_raw: str = Attribute(
+        lambda e, params: e.entry_type_raw, strategy=overwrite
+    )
+    entry_name: str = Attribute(
+        lambda e, params: e.entry_name, strategy=overwrite
+    )
+    description: str = Attribute(
+        lambda e, params: e.entry_description, strategy=overwrite
+    )
+    status: int = Attribute(_entry_status, strategy=overwrite)
+    submitted_by_name: str = Attribute(_submitted_by_name, strategy=overwrite)
+    # Keep a party we resolved on an earlier scrape rather than clearing it
+    # when this scrape can't find a match.
+    submitted_by_id: int | None = Attribute(_submitted_by_id)
+    docket_entry_uuid: UUID = Attribute(
+        lambda e, params: e.docket_entry_uuid, strategy=overwrite
+    )
+    documents: list[FloridaDocument] = AttachmentRelation(
+        FloridaDocumentMerger, strategy=ManyStrategy.REPLACE
+    )
 
 
 def _date_last_filing(docket_data: FloridaCase, params: None) -> date | None:
@@ -56,7 +331,11 @@ def _appeal_from_str(docket_data: FloridaCase, params: None) -> str | None:
 
 
 class FloridaOriginatingCourtInformationMerger(
-    Merger[FloridaOriginatingCase, None, OriginatingCourtInformation]
+    Merger[
+        FloridaOriginatingCase,
+        RelatedParams[list[ScrapeFloridaDocketEntry]],
+        OriginatingCourtInformation,
+    ]
 ):
     model: ClassVar[type[Model]] = OriginatingCourtInformation
 
@@ -87,7 +366,48 @@ def _originating_case(
     return docket_data.originating_cases[0]
 
 
-class FloridaDocketMerger(Merger[FloridaCase, None, Docket]):
+def _origin_court_id(transfer: DocketTransfer, params: Any) -> str | None:
+    return FLORIDA_TRANSFER_COURT_ID_MAP.get(transfer.court_id)
+
+
+class FloridaCaseTransferMerger(CaseTransferMerger[DocketTransfer, None]):
+    origin_court_id: str = Attribute(_origin_court_id, strategy=overwrite)
+
+
+def _florida_transfers(
+    docket_data: FloridaCase, params: None
+) -> list[DocketTransfer]:
+    """Filter a case's transfers down to the ones whose far-side court has a
+    CourtListener counterpart in the DB. Skipped transfers are logged but do
+    not fail the merge.
+
+    :param docket_data: The scraped Florida case.
+    :return: The transfers to merge."""
+    transferable: list[DocketTransfer] = []
+    transfers: list[DocketTransfer] = inbound_transfers(docket_data, params)
+    for transfer in transfers:
+        court_id = FLORIDA_TRANSFER_COURT_ID_MAP.get(transfer.court_id)
+        if court_id is None:
+            logger.info(
+                "Skipping CaseTransfer for Florida docket %s: no matching court for Juriscraper court %s",
+                docket_data.docket_number,
+                transfer.court_id,
+            )
+            continue
+        if not Court.objects.filter(pk=court_id).exists():
+            logger.error(
+                "Court with ID %s not found while creating CaseTransfer for Florida docket %s",
+                court_id,
+                docket_data.docket_number,
+            )
+            continue
+        transferable.append(transfer)
+    return transferable
+
+
+class FloridaDocketMerger(
+    DocketMerger[FloridaCase, list[ScrapeFloridaDocketEntry]]
+):
     model: ClassVar[type[Model]] = Docket
 
     atomic = True
@@ -96,34 +416,9 @@ class FloridaDocketMerger(Merger[FloridaCase, None, Docket]):
         lambda d, params: FLORIDA_COURT_ID_MAP[d.court_id],
         strategy=overwrite,
     )
-    source: int = Attribute(
-        lambda _, params: Docket.SCRAPER,
-        strategy=add_scraper_source,
-    )
-    date_filed: date | None = Attribute(
-        lambda d, params: d.date_filed,
-        strategy=overwrite,
-    )
     date_last_filing: date | None = Attribute(
         _date_last_filing,
         strategy=overwrite,
-    )
-    case_name: str = Attribute(
-        lambda d, params: d.case_name, strategy=overwrite
-    )
-    case_name_full: str = Attribute(
-        lambda d, params: d.case_name_full,
-        strategy=overwrite,
-    )
-    case_name_short: str = Attribute(
-        lambda d, params: d.case_name, strategy=overwrite
-    )
-    docket_number: str = Attribute(
-        lambda d, params: d.docket_number,
-        strategy=overwrite,
-    )
-    docket_number_raw: str = Attribute(
-        lambda d, params: d.docket_number, strategy=overwrite
     )
     docket_number_core: str = Attribute(
         lambda d, params: make_docket_number_core(
@@ -146,6 +441,18 @@ class FloridaDocketMerger(Merger[FloridaCase, None, Docket]):
         )
     )
 
+    parties: list[Party] = PartyRelation(
+        FloridaPartyMerger, party_type=FloridaPartyTypeMerger
+    )
+
+    florida_docket_entries: list[FloridaDocketEntry] = DocketEntryRelation(
+        FloridaDocketEntryMerger
+    )
+
+    case_transfer_destination_docket: list[CaseTransfer] = (
+        CaseTransferRelation(FloridaCaseTransferMerger, _florida_transfers)
+    )
+
     @override
     def query(self) -> QuerySet[Docket]:
         supreme_court_id = FLORIDA_COURT_ID_MAP[
@@ -165,6 +472,7 @@ class FloridaDocketMerger(Merger[FloridaCase, None, Docket]):
             federal_dn_judge_initials_assigned=None,
             federal_dn_judge_initials_referred=None,
             skip_dn_core_confirmation=True,
+            cheap_count=False,
         )
 
         if court_id == supreme_court_id:
@@ -180,6 +488,7 @@ class FloridaDocketMerger(Merger[FloridaCase, None, Docket]):
                 federal_dn_judge_initials_assigned=None,
                 federal_dn_judge_initials_referred=None,
                 skip_dn_core_confirmation=True,
+                cheap_count=False,
             )
 
         return query_narrow
