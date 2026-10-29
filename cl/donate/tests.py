@@ -22,6 +22,10 @@ from cl.donate.factories import (
     NeonMembershipFactory,
     NeonWebhookEventFactory,
 )
+from cl.donate.management.commands.sync_neon_memberships import (
+    SyncResult,
+    sync_membership_from_neon,
+)
 from cl.donate.models import (
     MembershipPaymentStatus,
     NeonMembership,
@@ -1686,6 +1690,78 @@ class SyncNeonMembershipsCommandTest(TestCase):
         # CANCELED record must not be reported as an error.
         self.mock_logger.error.assert_not_called()
         self.assert_membership_untouched()
+
+    def test_same_term_repairs_unpaid_record(self) -> None:
+        """Applies Neon's paid record for our own term when we are unpaid."""
+        # A failed renewal stored the new term's future end date, and the
+        # retry then succeeded in Neon under the same membership and term.
+        self.membership.termination_date = now() + timedelta(days=300)
+        same_term = self.membership.termination_date.date().isoformat()
+        for payment_status in (
+            MembershipPaymentStatus.FAILED,
+            MembershipPaymentStatus.PENDING,
+        ):
+            with self.subTest(payment_status=payment_status):
+                self.membership.payment_status = payment_status
+                self.membership.save()
+                APIThrottle.objects.filter(user=self.user).delete()
+                self.mock_tag_zoho.reset_mock()
+                neon_membership = make_neon_membership(
+                    membership_id="100",
+                    level_name="CL Membership - Tier 1",
+                    term_end_date=same_term,
+                )
+
+                result = sync_membership_from_neon(
+                    self.membership, neon_membership
+                )
+
+                self.assertEqual(result, SyncResult.UPDATED)
+                self.membership.refresh_from_db()
+                self.assertEqual(
+                    self.membership.payment_status,
+                    MembershipPaymentStatus.SUCCEEDED,
+                )
+                self.assertTrue(self.membership.is_active)
+                self.assertEqual(
+                    self.get_membership_rates(), sorted(TIER_1_RATES)
+                )
+                self.mock_tag_zoho.delay.assert_called_once_with(
+                    self.user.pk, NeonMembershipLevel.TIER_1
+                )
+
+    def test_same_or_older_term_is_otherwise_unchanged(self) -> None:
+        """Ignores a paid same-term record, and an older term even if unpaid."""
+        self.membership.termination_date = now() + timedelta(days=300)
+        same_term = self.membership.termination_date.date().isoformat()
+        older_term = (now() + timedelta(days=100)).date().isoformat()
+        for payment_status, term_end_date in (
+            (MembershipPaymentStatus.SUCCEEDED, same_term),
+            (MembershipPaymentStatus.FAILED, older_term),
+            (MembershipPaymentStatus.SUCCEEDED, older_term),
+        ):
+            with self.subTest(
+                payment_status=payment_status, term_end_date=term_end_date
+            ):
+                self.membership.payment_status = payment_status
+                self.membership.save()
+                neon_membership = make_neon_membership(
+                    membership_id="100",
+                    level_name="CL Membership - Tier 1",
+                    term_end_date=term_end_date,
+                )
+
+                result = sync_membership_from_neon(
+                    self.membership, neon_membership
+                )
+
+                self.assertEqual(result, SyncResult.UNCHANGED)
+                self.membership.refresh_from_db()
+                self.assertEqual(
+                    self.membership.payment_status, payment_status
+                )
+                self.assertEqual(self.get_membership_rates(), [])
+                self.mock_tag_zoho.delay.assert_not_called()
 
     def test_deletes_stale_membership_neon_confirms_unchanged(self) -> None:
         """Deletes a week-old lapse Neon matches, and only its MEMBERSHIP throttles."""

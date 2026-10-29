@@ -112,13 +112,16 @@ def sync_membership_from_neon(
     date, its payment status is marked SUCCEEDED, and the user's
     MEMBERSHIP-source API throttles are rebuilt for the new level.
 
-    Only a SUCCEEDED Neon membership whose term ends in the future, and later
-    than the local record, is applied. A record that is no newer than ours is
-    reported as unchanged so the caller can decide whether to delete the
-    local row. Memberships still PENDING or FAILED in Neon are left alone to
-    be re-checked on the next run. Anything else (no term end date, a
-    cancelled or refunded membership, an unknown level, an EDU membership
-    without a ``.edu`` email) is skipped and logged for a human.
+    Only SUCCEEDED memberships with a future term end date are applied.
+    A membership is updated when its term end date is later than the local
+    one, or when the dates match but the local payment status is not
+    SUCCEEDED. This also repairs renewals that succeeded after a failed
+    charge. A record that is no newer than ours is reported as unchanged so
+    the caller can decide whether to delete the local row. Memberships still
+    PENDING or FAILED in Neon are left alone to be re-checked on the next run.
+    Anything else (no term end date, a cancelled or refunded membership, an
+    unknown level, an EDU membership without a ``.edu`` email) is skipped and
+    logged for a human.
 
     The caller loads memberships once per run, so by the time we write, a
     webhook may already have changed or deleted the row. In that case the
@@ -157,12 +160,21 @@ def sync_membership_from_neon(
         if membership.termination_date
         else None
     )
-    if new_date < timezone.localdate() or (
-        current_date and new_date <= current_date
+    # Use the current time zone, matching NeonMembership.is_active.
+    if new_date < timezone.localdate():
+        # The Neon membership has expired.
+        return SyncResult.UNCHANGED
+
+    if current_date and new_date < current_date:
+        # Older than the term we already store.
+        return SyncResult.UNCHANGED
+
+    if (
+        current_date
+        and new_date == current_date
+        and membership.payment_status == MembershipPaymentStatus.SUCCEEDED
     ):
-        # Neon's record grants nothing beyond what we already have: it is
-        # either expired as well or the same term we already stored. Dates
-        # are compared in the current time zone, like NeonMembership.is_active.
+        # The term is unchanged and payment has already succeeded.
         return SyncResult.UNCHANGED
 
     if status in NEON_STATUSES_IN_PROGRESS:
