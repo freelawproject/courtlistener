@@ -10,6 +10,7 @@ from django.contrib.auth.models import User
 from django.contrib.contenttypes.models import ContentType
 from django.core.mail import EmailMultiAlternatives, get_connection, send_mail
 from django.db import IntegrityError, transaction
+from django.db.models import QuerySet
 from django.template import loader
 from django.urls import reverse
 from django.utils.timezone import now
@@ -204,7 +205,7 @@ def get_docket_notes_and_tags_by_user(
 
 def make_alert_messages(
     d: Docket,
-    new_des: list[DocketEntry],
+    new_des: QuerySet[DocketEntry],
     da_recipients: list[DocketAlertRecipient],
 ) -> list[EmailMultiAlternatives]:
     """Make docket alert messages that can be sent to users
@@ -227,7 +228,7 @@ def make_alert_messages(
     }
     # TODO: Might be good as a TypedDict, but that seems like overkill for now
     email_context: dict[
-        str, list[DocketEntry] | int | Docket | None | str | list[UserTag]
+        str, QuerySet[DocketEntry] | int | Docket | None | str | list[UserTag]
     ] = {
         "new_des": new_des,
         "count": de_count,
@@ -356,9 +357,7 @@ def send_alert_and_webhook(
     if des_pks is not None:
         new_des = DocketEntry.objects.filter(pk__in=des_pks)
     else:
-        new_des = list(
-            DocketEntry.objects.filter(date_created__gte=since, docket=d)
-        )
+        new_des = DocketEntry.objects.filter(date_created__gte=since, docket=d)
         des_pks = [de.pk for de in new_des]
     if len(new_des) == 0 and not recap_email_user_only:
         # No new docket entries.
