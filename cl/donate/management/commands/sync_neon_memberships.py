@@ -16,8 +16,11 @@ the member to lose access until Neon successfully retries the payment.
 If the success webhook is missed, this command restores the membership.
 
 Memberships that Neon confirms are no longer active are deleted after
-a week. Their history is retained by pghistory, and any subsequent renewal
-creates a new local record through the createMembership webhook.
+a week: lapsed ones a week past their termination date, and unpaid ones a
+week after they last changed, since Neon keeps reporting a FAILED membership
+while it retries the payment and stops once the renewal is gone. Their
+history is retained by pghistory, and any subsequent renewal creates a new
+local record through the createMembership webhook.
 """
 
 import logging
@@ -274,13 +277,13 @@ def sync_membership_from_neon(
     return SyncResult.UPDATED
 
 
-def delete_expired_membership(membership: NeonMembership) -> bool:
-    """Delete an expired membership and its membership-based API throttles.
+def delete_membership(membership: NeonMembership, reason: str) -> bool:
+    """Delete a dead membership and its membership-based API throttles.
 
-    Only call this after Neon confirms there is no active membership.
-    Manual throttles are preserved, and pghistory keeps the deleted record.
-    If the user renews later, the createMembership webhook recreates the
-    record from scratch.
+    Only call this with a reason from ``get_membership_deletion_reason``,
+    i.e. after Neon confirmed there is nothing to keep. Manual throttles are
+    preserved, and pghistory keeps the deleted record. If the user renews
+    later, the createMembership webhook recreates the record from scratch.
 
     The delete only happens if no webhook changed or removed the row since
     it was loaded; otherwise the webhook had newer data and nothing is
@@ -288,7 +291,8 @@ def delete_expired_membership(membership: NeonMembership) -> bool:
     rather than cleared, since clearing it costs a Redis scan and the
     membership was already inactive.
 
-    :param membership: The expired membership to delete.
+    :param membership: The membership to delete.
+    :param reason: Why it is being deleted, for the log line.
     :return: True if the membership was deleted, False if a webhook got
         there first.
     """
@@ -305,13 +309,62 @@ def delete_expired_membership(membership: NeonMembership) -> bool:
             return False
         clear_membership_throttles(membership.user, clear_cache=False)
     logger.info(
-        "Deleted expired membership for user %s: it ended on %s and Neon "
-        "had nothing newer.",
+        "Deleted membership for user %s: %s.",
         membership.user.username,
-        membership.termination_date
-        and timezone.localdate(membership.termination_date),
+        reason,
     )
     return True
+
+
+def get_membership_deletion_reason(
+    membership: NeonMembership,
+    neon_membership: dict[str, Any] | None,
+    result: SyncResult,
+    delete_before: datetime | None,
+) -> str | None:
+    """Return why a membership qualifies for deletion, or None to keep it.
+
+    A membership qualifies for deletion in either of these cases:
+    - Its term ended before ``delete_before``, and Neon confirms the
+      membership is unchanged or has no newer record.
+    - Its payment status is not SUCCEEDED, Neon no longer returns the
+      membership, and the local record has not changed since
+      ``delete_before``.
+
+    Neon can continue reporting a FAILED membership as active while
+    retrying a charge. If the membership disappears from Neon's response,
+    the renewal is no longer active. The age threshold helps avoid deleting
+    the record while a retry may still be in progress.
+
+    A Neon record that is older than the local record does not qualify for
+    deletion, since it does not establish that the local membership is
+    inactive.
+
+    :param membership: The local membership that was checked.
+    :param neon_membership: What Neon returned for the account, if anything.
+    :param result: The outcome of the check so far.
+    :param delete_before: The age threshold, or None when deletion is off.
+    :return: A short reason for the deletion log line, or None to keep.
+    """
+    if result is not SyncResult.UNCHANGED or delete_before is None:
+        return None
+    if (
+        membership.termination_date
+        and membership.termination_date < delete_before
+    ):
+        ended = timezone.localdate(membership.termination_date)
+        return f"it ended on {ended} and Neon had nothing newer"
+    if (
+        neon_membership is None
+        and membership.payment_status != MembershipPaymentStatus.SUCCEEDED
+        and membership.date_modified < delete_before
+    ):
+        since = timezone.localdate(membership.date_modified)
+        return (
+            f"its renewal payment has not succeeded since {since} and Neon "
+            "reports no active membership"
+        )
+    return None
 
 
 def check_membership(
@@ -319,19 +372,19 @@ def check_membership(
     membership: NeonMembership,
     delete_before: datetime | None,
 ) -> SyncResult:
-    """Check one expired membership against Neon and apply what it finds.
+    """Check one lapsed or unpaid membership against Neon and apply what it finds.
 
     Fetches the account's primary active membership, syncs it into the local
-    record when it is newer, and deletes the local record when Neon confirms
-    the lapse and the membership ended before ``delete_before``. A failed
-    Neon request is logged and reported as FAILED so the caller can move on
-    to the next member; any other exception propagates to the caller.
+    record when it is newer or newly paid, and deletes the local record when
+    ``get_membership_deletion_reason`` says Neon confirmed it is dead. A
+    failed Neon request is logged and reported as FAILED so the caller can
+    move on to the next member; any other exception propagates to the caller.
 
     :param client: The Neon API client.
     :param membership: The local membership to check, with its user and
         profile loaded.
-    :param delete_before: Delete confirmed lapses that ended before this
-        instant, or None to never delete.
+    :param delete_before: Delete confirmed lapses that ended, or unpaid
+        records that last changed, before this instant; None never deletes.
     :return: What happened to the membership.
     """
     user = membership.user
@@ -362,13 +415,10 @@ def check_membership(
     else:
         result = sync_membership_from_neon(membership, neon_membership)
 
-    if (
-        result is SyncResult.UNCHANGED
-        and delete_before is not None
-        and membership.termination_date
-        and membership.termination_date < delete_before
-        and delete_expired_membership(membership)
-    ):
+    reason = get_membership_deletion_reason(
+        membership, neon_membership, result, delete_before
+    )
+    if reason and delete_membership(membership, reason):
         return SyncResult.DELETED
     return result
 
@@ -386,13 +436,14 @@ def sync_memberships(
     Sentry, and counted as FAILED.
 
     Memberships confirmed to have no active membership are deleted once
-    they have been expired for at least delete_after_days. Set this value
-    to 0 to disable deletion.
+    they have been expired, or unpaid and unchanged, for at least
+    delete_after_days. Set this value to 0 to disable deletion.
 
     :param min_hours: See `get_memberships_to_check`.
     :param max_days: See `get_memberships_to_check`.
-    :param delete_after_days: Age in days past the termination date after
-        which a confirmed-expired membership is deleted. 0 disables deletion.
+    :param delete_after_days: Age in days, past the termination date or past
+        an unpaid record's last change, after which a membership Neon
+        confirms is gone is deleted. 0 disables deletion.
     :return: How many memberships ended in each ``SyncResult``.
     """
     client = NeonClient()
@@ -451,10 +502,12 @@ class Command(VerboseCommand):
             type=int,
             default=7,
             help="Delete expired memberships that Neon confirms have nothing "
-            "newer once they expired at least this many days ago. Must be "
-            "greater than NEON_MEMBERSHIP_GRACE_PERIOD_DAYS so members are "
-            "never deleted while still inside the grace period. 0 disables "
-            "deletion. Default: 7.",
+            "newer once they expired at least this many days ago, and unpaid "
+            "memberships Neon no longer reports at all once they have gone "
+            "unchanged for as long. Must be greater than "
+            "NEON_MEMBERSHIP_GRACE_PERIOD_DAYS so members are never deleted "
+            "while still inside the grace period. 0 disables deletion. "
+            "Default: 7.",
         )
 
     def handle(self, *args, **options):

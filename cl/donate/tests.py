@@ -1787,6 +1787,68 @@ class SyncNeonMembershipsCommandTest(TestCase):
             self.membership.payment_status, MembershipPaymentStatus.FAILED
         )
 
+    def test_deletes_unpaid_renewal_neon_no_longer_reports(self) -> None:
+        """Deletes a week-old failed renewal once Neon has no membership for it."""
+        self.make_unpaid_renewal(MembershipPaymentStatus.FAILED, 10)
+        for rate, source in (
+            ("10/min", APIThrottle.Source.MEMBERSHIP),
+            ("500/day", APIThrottle.Source.MANUAL),
+        ):
+            APIThrottle.objects.create(
+                user=self.user,
+                throttle_type=ThrottleType.API,
+                rate=rate,
+                source=source,
+            )
+        self.mock_get_membership.return_value = None
+        out = StringIO()
+
+        call_command("sync_neon_memberships", stdout=out)
+
+        self.assertFalse(
+            NeonMembership.objects.filter(pk=self.membership.pk).exists()
+        )
+        remaining = list(
+            APIThrottle.objects.filter(user=self.user).values_list(
+                "rate", "source"
+            )
+        )
+        self.assertEqual(remaining, [("500/day", APIThrottle.Source.MANUAL)])
+        self.mock_tag_zoho.delay.assert_not_called()
+        self.assertIn("1 deleted", out.getvalue())
+
+    def test_keeps_unpaid_renewal_until_delete_threshold(self) -> None:
+        """Keeps an unpaid renewal Neon dropped until it is old enough to delete."""
+        self.mock_get_membership.return_value = None
+        for modified_days_ago, options in (
+            (3, {}),
+            (10, {"delete_after_days": 0}),
+            (10, {"delete_after_days": 30}),
+        ):
+            with self.subTest(
+                modified_days_ago=modified_days_ago, options=options
+            ):
+                self.make_unpaid_renewal(
+                    MembershipPaymentStatus.FAILED, modified_days_ago
+                )
+
+                call_command("sync_neon_memberships", **options)
+
+                self.assert_membership_untouched()
+
+    def test_keeps_unpaid_renewal_when_neon_has_older_term(self) -> None:
+        """Keeps a failed renewal whose account still has an active older term."""
+        self.make_unpaid_renewal(MembershipPaymentStatus.FAILED, 10)
+        self.mock_get_membership.return_value = make_neon_membership(
+            membership_id="99",
+            level_name="CL Membership - Tier 1",
+            term_end_date=(now() + timedelta(days=100)).date().isoformat(),
+        )
+
+        call_command("sync_neon_memberships")
+
+        self.assert_membership_untouched()
+
     def test_same_term_repairs_unpaid_record(self) -> None:
         """Applies Neon's paid record for our own term when we are unpaid."""
         # A failed renewal stored the new term's future end date, and the
