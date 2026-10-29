@@ -189,8 +189,6 @@ INSTALLED_APPS = [
     "rest_framework",
     "rest_framework.authtoken",
     "oauth2_provider",
-    # Before allauth, so its templates override allauth's.
-    "cl.sso",
     "allauth",
     "allauth.account",
     "allauth.socialaccount",
@@ -226,6 +224,7 @@ INSTALLED_APPS = [
     "cl.search",
     "cl.simple_pages",
     "cl.sitemaps_infinite",
+    "cl.sso",
     "cl.stats",
     "cl.users",
     "cl.visualizations",

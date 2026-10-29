@@ -8,6 +8,11 @@
 # constraint on verified addresses that existing data can violate.
 ACCOUNT_UNIQUE_EMAIL = False
 
+# Keep allauth's addresses in its own account_emailaddress table. Its
+# migrations otherwise lowercase every auth_user.email, and the email bounce
+# and SES ban checks match addresses exactly.
+ACCOUNT_USER_MODEL_EMAIL_FIELD = None
+
 # allauth refuses email login methods when emails aren't unique. Nothing uses
 # allauth's password login anyway; this only satisfies its system checks.
 ACCOUNT_LOGIN_METHODS = {"username"}
