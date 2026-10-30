@@ -188,14 +188,22 @@ def delete_cluster_files(cluster: OpinionCluster, delete_docket: bool) -> None:
     deleted_filepaths = []
 
     for opinion in cluster.sub_opinions.all():
-        if not opinion.local_path:
-            continue
-        path = opinion.local_path.name
-        # save=False: the Opinion row is about to be deleted by the
-        # caller's cascade anyway, so there's no point writing this
-        # change back to a row that won't exist a moment later.
-        opinion.local_path.delete(save=False)
-        deleted_filepaths.append(path)
+        # OpinionContent rows are cascade deleted with their opinion
+        field_files = [opinion.local_path] + [
+            content.local_path
+            for content in opinion.contents.exclude(local_path="").only(
+                "local_path"
+            )
+        ]
+        for field_file in field_files:
+            if not field_file:
+                continue
+            path = field_file.name
+            # save=False: the rows are about to be deleted by the caller's
+            # cascade anyway, so there's no point writing this change back
+            # to a row that won't exist a moment later.
+            field_file.delete(save=False)
+            deleted_filepaths.append(path)
 
     cluster_file_fields = [
         field.name
@@ -222,11 +230,10 @@ def delete_cluster_files(cluster: OpinionCluster, delete_docket: bool) -> None:
 
 
 def _note_blockers_for_cluster(cluster: OpinionCluster) -> QuerySet[Note]:
-    """Notes blocking cluster/docket deletion, dual-read aware (#7725).
+    """Notes blocking cluster/docket deletion.
 
     Checks both the cluster and its docket -- a Note can be attached to
-    either. Replaces .note_set, which is blind to Notes in the new
-    content_type/object_id shape.
+    either.
 
     :param cluster: The OpinionCluster being considered for sealing.
     :return: A queryset of Notes attached to the cluster or its docket.

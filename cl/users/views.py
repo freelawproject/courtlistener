@@ -52,7 +52,7 @@ from cl.api.utils import (
 from cl.api.views import parse_throttle_rate_for_template
 from cl.custom_filters.decorators import check_honeypot
 from cl.favorites.forms import NoteForm
-from cl.favorites.utils import NOTEABLE_MODELS, get_noted_object
+from cl.favorites.utils import NOTEABLE_MODELS
 from cl.lib.auth import filter_by_email
 from cl.lib.crypto import generate_activation_key
 from cl.lib.ratelimiter import (
@@ -192,19 +192,21 @@ def view_notes(request: AuthenticatedHttpRequest) -> HttpResponse:
     each is attached to (docket, opinion, oral argument, or RECAP
     document).
     """
-    notes = request.user.notes.all().order_by("pk")
+    notes = request.user.notes.prefetch_related("content_object").order_by(
+        "pk"
+    )
     note_forms: OrderedDict[str, list[tuple[NoteForm, models.Model]]] = (
         OrderedDict((label, []) for label in NOTEABLE_MODELS.values())
     )
     for note in notes:
-        target = get_noted_object(note)
+        target = note.content_object
         if target is None:
             continue
         bucket = NOTEABLE_MODELS.get(type(target))
         if bucket is None:
             continue
         # Carried alongside the form so the template can build a link/
-        # icon without knowing which storage shape this Note is in.
+        # icon for the noted object.
         note_forms[bucket].append((NoteForm(instance=note), target))
     docket_search_url = (
         "/?type=r&q=xxx AND docket_id:("
@@ -703,6 +705,8 @@ def confirm_email(request, activation_key):
     for up in ups:
         if up.email_confirmed:
             confirmed_accounts_count += 1
+        if up.key_expires is None:
+            raise TypeError("Found user with key with no expiration")
         if up.key_expires < now():
             expired_key_count += 1
 

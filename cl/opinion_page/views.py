@@ -95,7 +95,7 @@ from cl.opinion_page.forms import (
     TennWorkCompClUploadForm,
 )
 from cl.opinion_page.utils import (
-    build_docket_tabs,
+    build_idb_rows,
     core_docket_data,
     es_cited_case_count,
     es_get_cited_clusters_with_cache,
@@ -319,15 +319,7 @@ async def redirect_og_lookup(request: HttpRequest) -> HttpResponse:
         filepath_local=file_path
     ).prefetch_related("docket_entry")
 
-    if not await rd_filter.aexists():
-        # We couldn't find the URL. Redirect back to AWS, but be sure to serve
-        # the file this time. Ideally this doesn't happen, but let's be ready
-        # in case it does.
-        return HttpResponseRedirect(
-            f"https://storage.courtlistener.com/{file_path}?no-og=1"
-        )
-    else:
-        rd = await rd_filter.afirst()
+    if (rd := await rd_filter.afirst()) is not None:
         return await view_recap_document(
             request,
             docket_id=rd.docket_entry.docket_id,
@@ -335,6 +327,13 @@ async def redirect_og_lookup(request: HttpRequest) -> HttpResponse:
             att_num=rd.attachment_number,
             is_og_bot=True,
         )
+
+    # We couldn't find the URL. Redirect back to AWS, but be sure to serve
+    # the file this time. Ideally this doesn't happen, but let's be ready
+    # in case it does.
+    return HttpResponseRedirect(
+        f"https://storage.courtlistener.com/{file_path}?no-og=1"
+    )
 
 
 async def redirect_docket_recap(
@@ -442,25 +441,16 @@ async def view_docket(
             doc.prayer_count = prayer_counts.get(doc.id, 0)
             doc.prayer_exists = existing_prayers.get(doc.id, False)
 
-    parties = await docket.parties.aexists()
-    has_idb_data = bool(docket.idb_data_id)
-    has_authorities = await docket.ahas_authorities()
-
     return TemplateResponse(
         request,
         "docket.html",
         context
         | {
-            "parties": parties,
-            "authorities": has_authorities,
             "docket_entries": paginated_entries,
             "sort_order_asc": sort_order_asc,
             "form": form,
             "filters_applied": form.has_filters(),
             "get_string": make_get_string(request),
-            "tabs": build_docket_tabs(
-                docket, parties, has_idb_data, has_authorities
-            ),
         },
     )
 
@@ -567,9 +557,9 @@ async def docket_idb_data(
         "docket_idb_data.html",
         context
         | {
-            # Needed to show/hide parties tab.
-            "parties": await docket.parties.aexists(),
             "docket_entries": await docket.docket_entries.aexists(),
+            "idb_data": idb_data,
+            "idb_rows": build_idb_rows(idb_data),
             "origin_csv": choices_to_csv(idb_data, "origin"),
             "jurisdiction_csv": choices_to_csv(idb_data, "jurisdiction"),
             "arbitration_csv": choices_to_csv(
@@ -598,7 +588,7 @@ async def docket_authorities(
     slug: str,
 ) -> HttpResponse:
     docket, context = await core_docket_data(request, docket_id)
-    if not await docket.ahas_authorities():
+    if not context["has_authorities"]:
         raise Http404("No authorities data for this docket at this time")
 
     return TemplateResponse(
@@ -606,8 +596,6 @@ async def docket_authorities(
         "docket_authorities.html",
         context
         | {
-            # Needed to show/hide parties tab.
-            "parties": await docket.parties.aexists(),
             "docket_entries": await docket.docket_entries.aexists(),
             "authorities": docket.authority_opinions.distinct(),
         },
@@ -1070,6 +1058,7 @@ async def get_opinions_queryset(
                 "html",
                 "plain_text",
                 "xml_harvard",
+                "xml_scan",
                 "html_lawbox",
                 "html_columbia",
                 "html_anon_2020",

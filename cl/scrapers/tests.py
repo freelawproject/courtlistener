@@ -32,6 +32,7 @@ from cl.alerts.factories import AlertFactory
 from cl.alerts.models import Alert
 from cl.api.factories import WebhookFactory
 from cl.api.models import WebhookEvent, WebhookEventType
+from cl.audio.dispatch import dispatch_process_audio_file
 from cl.audio.factories import AudioWithParentsFactory
 from cl.audio.models import Audio
 from cl.citations.models import UnmatchedCitation
@@ -969,6 +970,20 @@ class AudioFileTaskTest(TestCase):
             f"Instead we got {measured_duration}.",
         )
 
+    def test_completed_processing_allows_redispatch(self) -> None:
+        """Does a successful process_audio_file run free its dispatch lock?
+
+        A lock left behind after success blocks any later dispatch for the
+        same pk until the TTL expires, silently skipping processing.
+        """
+        with mock.patch("cl.lib.celery_utils.get_task_wait") as patched_wait:
+            patched_wait.return_value = 0
+            self.assertTrue(dispatch_process_audio_file(self.audio1.pk))
+            self.assertTrue(
+                dispatch_process_audio_file(self.audio1.pk),
+                msg="Dispatch was skipped after processing completed.",
+            )
+
     def test_audio_conversion(self) -> None:
         """Can we convert wav to audio and update the metadata"""
         audio_obj = Audio.objects.get(pk=self.audio2.id)
@@ -1241,6 +1256,84 @@ class ScraperDocketMatchingTest(TestCase):
         self.assertEqual(
             docket, self.ca2_docket, "Should match using docket number core"
         )
+
+    def test_does_not_unblock_existing_docket(self) -> None:
+        """Matching an existing docket should never unblock it, nor
+        overwrite its original date_blocked. It may block an unblocked one
+        """
+        original_date = date(2020, 1, 1)
+        new_date = date(2024, 1, 1)
+        cases = [
+            # (description, docket blocked, kwargs, expected blocked,
+            # expected date_blocked)
+            (
+                "blocked docket, blocked=False",
+                True,
+                {"blocked": False},
+                True,
+                original_date,
+            ),
+            (
+                "blocked docket, blocked=True",
+                True,
+                {"blocked": True, "date_blocked": new_date},
+                True,
+                original_date,
+            ),
+            (
+                "unblocked docket, blocked=True",
+                False,
+                {"blocked": True, "date_blocked": new_date},
+                True,
+                new_date,
+            ),
+        ]
+        for i, (
+            description,
+            docket_blocked,
+            kwargs,
+            expected_blocked,
+            expected_date,
+        ) in enumerate(cases):
+            with self.subTest(description):
+                docket_number = f"1 CA-CV 24-000{i}"
+                existing = DocketFactory(
+                    docket_number=docket_number,
+                    case_name="Smith v. Jones",
+                    court=self.ariz,
+                    source=Docket.SCRAPER,
+                    pacer_case_id=None,
+                    blocked=docket_blocked,
+                    date_blocked=original_date if docket_blocked else None,
+                )
+                docket = update_or_create_docket(
+                    "Smith v. Jones",
+                    "",
+                    self.ariz,
+                    docket_number,
+                    Docket.SCRAPER,
+                    False,
+                    **kwargs,
+                )
+                self.assertEqual(docket.pk, existing.pk)
+                self.assertEqual(docket.blocked, expected_blocked)
+                self.assertEqual(docket.date_blocked, expected_date)
+
+        with self.subTest("Harvard, blocked docket, blocked not passed"):
+            self.ca2_docket.blocked = True
+            self.ca2_docket.date_blocked = original_date
+            self.ca2_docket.save()
+            docket = update_or_create_docket(
+                "Garbutt v. Conway",
+                "",
+                self.ca2,
+                "10-1039",
+                Docket.HARVARD,
+                from_harvard=True,
+            )
+            self.assertEqual(docket.pk, self.ca2_docket.pk)
+            self.assertTrue(docket.blocked)
+            self.assertEqual(docket.date_blocked, original_date)
 
 
 class UpdateFromTextCommandTest(TestCase):
@@ -2201,59 +2294,51 @@ class DeleteVersionRelatedObjectsTest(TestCase):
 
 
 class UpdateReferencingObjectsNotesTest(TestCase):
-    """Tests for Note repointing in update_referencing_objects (#7725).
+    """Tests for Note repointing in update_referencing_objects.
 
     Note can't go through the generic single-FK-field handling that the
-    rest of update_referencing_objects()'s referencing_models use, since a
-    Note may be in either the legacy or the GenericForeignKey shape
-    (dual-read) - see repoint_notes() in cl.favorites.utils.
+    rest of update_referencing_objects()'s referencing_models use, since it
+    points at its object through a GenericForeignKey - see repoint_notes()
+    in cl.favorites.utils.
     """
 
-    def test_repoints_both_note_shapes(self):
-        """A legacy-shaped and a GFK-shaped Note on the version docket are
-        both moved onto the main docket, instead of being left behind to
-        be lost when the version docket is deleted.
+    def test_repoints_notes(self):
+        """Every user's Note on the version object is moved onto the main
+        one, instead of being left behind to be lost when the version is
+        deleted.
         """
-        main_docket = DocketFactory.create()
-        version_docket = DocketFactory.create()
+        for factory in (DocketFactory, OpinionClusterWithParentsFactory):
+            with self.subTest(model=factory._meta.model.__name__):
+                main_object = factory.create()
+                version_object = factory.create()
+                notes = [
+                    NoteFactory(content_object=version_object),
+                    NoteFactory(content_object=version_object),
+                ]
 
-        legacy_note = NoteFactory(cluster_id=None, docket_id=version_docket)
-        gfk_note = NoteFactory.for_object(version_docket)
+                update_referencing_objects(main_object, version_object)
 
-        update_referencing_objects(main_docket, version_docket)
-
-        legacy_note.refresh_from_db()
-        gfk_note.refresh_from_db()
-
-        docket_content_type = ContentType.objects.get_for_model(Docket)
-        for note in (legacy_note, gfk_note):
-            # repoint_notes() always writes the new shape, even when the
-            # Note started as legacy.
-            self.assertIsNone(note.docket_id_id)
-            self.assertEqual(note.object_id, main_docket.pk)
-            self.assertEqual(note.content_type, docket_content_type)
+                content_type = ContentType.objects.get_for_model(main_object)
+                for note in notes:
+                    note.refresh_from_db()
+                    self.assertEqual(note.object_id, main_object.pk)
+                    self.assertEqual(note.content_type, content_type)
 
     def test_leaves_version_note_when_main_already_has_one(self):
         """If the same user already has a Note on the main docket, the
-        version docket's Note (in either shape) is left where it is.
+        version docket's Note is left where it is.
         """
         main_docket = DocketFactory.create()
         version_docket = DocketFactory.create()
         user = UserWithChildProfileFactory.create()
 
-        NoteFactory.for_object(main_docket, user=user)
-        version_gfk_note = NoteFactory.for_object(version_docket, user=user)
-        version_legacy_note = NoteFactory(
-            cluster_id=None, docket_id=version_docket, user=user
-        )
+        NoteFactory(content_object=main_docket, user=user)
+        version_note = NoteFactory(content_object=version_docket, user=user)
 
         update_referencing_objects(main_docket, version_docket)
 
-        version_gfk_note.refresh_from_db()
-        version_legacy_note.refresh_from_db()
-
-        self.assertEqual(version_gfk_note.object_id, version_docket.pk)
-        self.assertEqual(version_legacy_note.docket_id_id, version_docket.pk)
+        version_note.refresh_from_db()
+        self.assertEqual(version_note.object_id, version_docket.pk)
 
 
 class DeleteDuplicatesTest(TestCase):
@@ -3095,6 +3180,7 @@ class SCOTUSEmailIntegrationTest(TestCase):
         )
 
         mock_email_cls.return_value.email_type = SCOTUSEmailType.DOCKET_ENTRY
+        mock_email_cls.return_value.court_id = "scotus"
         mock_fetch.return_value = {
             "email_type": SCOTUSEmailType.DOCKET_ENTRY.value,
             "data": docket_data,

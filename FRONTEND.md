@@ -54,6 +54,14 @@ Sync notice format:
 {% endcomment %}
 ```
 
+### Keep data shaping in the backend
+
+Templates render; they SHOULD know as little as possible about the data they show. Anything tightly coupled to the data (which fields a page lists, their labels, how a value is formatted or what it falls back to) belongs in the view or a backend helper. The helper hands the template a list of plain, typed items and the template loops over them with `{% for %}`. The loop still runs on the server, so this is entirely within the SSR model.
+
+- Shape items as `TypedDict`s in a builder next to the view, and pass the template one context key. Precedents: `build_docket_metadata` and `build_idb_rows` in `cl/opinion_page/utils.py`
+- Copy that needs markup, such as a hint with a link, is built with `format_html` so interpolated values are escaped. Static copy MAY use `mark_safe`
+- Templates SHOULD NOT read model attributes field by field for tabular data. A misspelled attribute in a template renders as empty with no error, while the same access in Python is type checked
+
 ## Cotton components
 
 - Live in `templates/cotton/`, snake_case filenames
@@ -169,11 +177,22 @@ To display the count, bind to the store from any Alpine root. The store only exi
 {% if track_events %}<span x-text="$store.viewCount.value"></span>{% endif %}
 ```
 
-`value` is `null` until the response arrives and stays `null` when the request fails. Failures are logged to the console and never shown to the user. The endpoint returns the count before the current view, and 0 for recognized bots, so `value` excludes the view being recorded.
+`value` is `null` until the response arrives and stays `null` when the request fails; `loaded` is true once it holds a count, for `x-show` gates since the CSP build cannot compare in markup. Failures are logged to the console and never shown to the user. The endpoint returns the count before the current view, and 0 for recognized bots, so `value` excludes the view being recorded.
 
 Cotton components rendered with `only` do not see the page context, so `track_events` is false inside them: pass it explicitly (`:track_events="track_events"`) or render the element from the page template.
 
 Label prefixes are validated by `EventCountSerializer` (`cl/favorites/api_serializers.py`). Tracking a new object type needs a new pattern there, otherwise every request fails with a 400 that only the console reports.
+
+## RECAP extension
+
+`new_base.html` requires `js/alpine/composables/recap_detection.js` on every page. The RECAP extension posts a window message on every page load of `https://www.courtlistener.com/*`; the script recognises it, adds the `recap-installed` class to `<html>` and sets the `recap_installed` cookie for seven days. `new_base.html` renders the class from the cookie on later requests, so pleas do not flash before the message arrives.
+
+To hide an "install RECAP" call to action from users who have the extension, mark the element with `data-recap-plea`. One rule in `input.css` hides every such element under `.recap-installed`; templates MUST NOT add cookie conditionals for it. Server code that needs the signal reads the `recap_installed` cookie from the request.
+
+> 💡 Development tip: The extension only announces itself on production, so simulate it locally from the browser console:
+>  ```js
+>  window.postMessage({sender: "recap-extension", message_name: "version", message: "dev"}, "*")
+>  ```
 
 ## Icons
 

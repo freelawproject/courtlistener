@@ -17,7 +17,7 @@ from django.core.files.base import ContentFile
 from django.core.management import call_command
 from django.db import IntegrityError, transaction
 from django.http import QueryDict
-from django.test import Client, RequestFactory, override_settings
+from django.test import AsyncClient, Client, RequestFactory, override_settings
 from django.urls import reverse
 from django.utils.timezone import now
 from elasticsearch.dsl import Q
@@ -45,7 +45,7 @@ from cl.lib.indexing_utils import log_last_document_indexed
 from cl.lib.redis_utils import get_redis_interface
 from cl.lib.search_utils import merge_form_with_courts
 from cl.lib.storage import clobbering_get_name
-from cl.lib.test_helpers import CourtTestCase, PeopleTestCase
+from cl.lib.test_helpers import PeopleTestCase
 from cl.lib.utils import (
     cleanup_main_query,
     get_child_court_ids_for_parents,
@@ -83,6 +83,9 @@ from cl.search.factories import (
 from cl.search.forms import SearchForm
 from cl.search.llm_models import CleanDocketNumber, DocketItem
 from cl.search.management.commands import populate_docket_number_raw
+from cl.search.management.commands.cl_compute_token_count import (
+    get_clean_opinion_text,
+)
 from cl.search.management.commands.cl_index_parent_and_child_docs import (
     get_unique_oldest_history_rows,
 )
@@ -109,7 +112,13 @@ from cl.search.models import (
 from cl.search.tasks import get_es_doc_id_and_parent_id, index_dockets_in_bulk
 from cl.search.types import EventTable
 from cl.tests.base import SELENIUM_TIMEOUT, BaseSeleniumTest
-from cl.tests.cases import ESIndexTestCase, TestCase, TransactionTestCase
+from cl.tests.cases import (
+    AuthenticatedClientMixin,
+    ESIndexTestCase,
+    SimpleTestCase,
+    TestCase,
+    TransactionTestCase,
+)
 from cl.tests.utils import get_with_wait
 from cl.users.factories import UserProfileWithParentsFactory
 
@@ -480,7 +489,7 @@ class RECAPDocumentValidationTest(TestCase):
     "cl.lib.courts.get_cache_key_for_court_list",
     return_value="common_search:minimal-court-list",
 )
-class ESCommonSearchTest(ESIndexTestCase, TestCase):
+class ESCommonSearchTest(AuthenticatedClientMixin, ESIndexTestCase, TestCase):
     @classmethod
     def setUpTestData(cls):
         cls.rebuild_index("search.OpinionCluster")
@@ -1581,8 +1590,19 @@ class ESCommonSearchTest(ESIndexTestCase, TestCase):
         self.assertEqual(body["lte"], "2025-05-10T23:59:59Z")
 
 
-class SearchAPIV4CommonTest(ESIndexTestCase, TestCase):
+class SearchAPIV4CommonTest(
+    AuthenticatedClientMixin, ESIndexTestCase, TestCase
+):
     """Common tests for the Search API V4 endpoints."""
+
+    async def test_anonymous_users_are_rejected(self) -> None:
+        """Do anonymous requests to the v4 Search API get a 401?"""
+        anonymous_client = AsyncClient()
+        r = await anonymous_client.get(
+            reverse("search-list", kwargs={"version": "v4"}),
+            {"type": SEARCH_TYPES.OPINION, "q": "lorem"},
+        )
+        self.assertEqual(r.status_code, HTTPStatus.UNAUTHORIZED)
 
     async def test_es_general_bad_request_error_(self) -> None:
         """Can we properly raise the ElasticBadRequestError exception?"""
@@ -2129,6 +2149,9 @@ class SaveSearchQueryTest(TestCase):
         self.source_error_message = (
             f"Saved wrong `engine` value, expected {SearchQuery.WEBSITE}"
         )
+        # The v4 Search API requires authentication. Only log in for the API
+        # tests so the website tests keep exercising anonymous searches.
+        self.api_user = UserProfileWithParentsFactory().user
 
     @staticmethod
     def normalize_query(query, replace_space=False):
@@ -2191,6 +2214,7 @@ class SaveSearchQueryTest(TestCase):
 
     def test_search_api_v4_query_saving(self) -> None:
         """Do we save queries on all V4 Search endpoints"""
+        self.client.force_login(self.api_user)
         for query in self.base_searches:
             url = f"{reverse('search-list', kwargs={'version': 'v4'})}?{query}"
             self.client.get(url)
@@ -2216,6 +2240,7 @@ class SaveSearchQueryTest(TestCase):
 
     def test_failed_es_search_v4_api_queries(self) -> None:
         """Do we flag failed v4 API queries properly?"""
+        self.client.force_login(self.api_user)
         query = "type=r&q=contains/sproximity token"
         url = f"{reverse('search-list', kwargs={'version': 'v4'})}?{query}"
         r = self.client.get(url)
@@ -2982,9 +3007,7 @@ class ESIndexingTasksUtils(TestCase):
     "cl.search.management.commands.sweep_indexer.compose_indexer_redis_key",
     return_value="es_sweep_indexer:log_test",
 )
-class SweepIndexerCommandTest(
-    CourtTestCase, PeopleTestCase, ESIndexTestCase, TestCase
-):
+class SweepIndexerCommandTest(PeopleTestCase, ESIndexTestCase, TestCase):
     """sweep_indexer command tests for Elasticsearch"""
 
     @classmethod
@@ -3652,6 +3675,17 @@ class OpinionQuerySetWithBestTextTest(TestCase):
             html_anon_2020="Other version",
             html="Other version",
         )
+        cls.opinion_xml_scan = OpinionFactory(
+            cluster=cls.opinion_cluster_1,
+            plain_text="Plain text fallback 7",
+            html_with_citations="",
+            html_columbia="Other version",
+            html_lawbox="Other version",
+            xml_harvard="",
+            xml_scan="XML scan content",
+            html_anon_2020="Other version",
+            html="Other version",
+        )
         cls.opinion_html_anon_2020 = OpinionFactory(
             cluster=cls.opinion_cluster_1,
             plain_text="Plain text fallback 5",
@@ -3714,6 +3748,10 @@ class OpinionQuerySetWithBestTextTest(TestCase):
         self.assertEqual(o_xml_harvard.best_text, "XML harvard content")
         self.assertEqual(o_xml_harvard.best_text_source, "xml_harvard")
 
+        o_xml_scan = qs.get(pk=self.opinion_xml_scan.pk)
+        self.assertEqual(o_xml_scan.best_text, "XML scan content")
+        self.assertEqual(o_xml_scan.best_text_source, "xml_scan")
+
         self.assertEqual(o_html_anon.best_text, "HTML anon 2020 content")
         self.assertEqual(o_html_anon.best_text_source, "html_anon_2020")
 
@@ -3722,6 +3760,22 @@ class OpinionQuerySetWithBestTextTest(TestCase):
 
         self.assertEqual(o_plain_text.best_text, "Plain text fallback")
         self.assertEqual(o_plain_text.best_text_source, "plain_text")
+
+
+class OpinionScanTextTest(SimpleTestCase):
+    """Tests for the text taken from scanned opinion XML."""
+
+    def test_token_count_text_from_xml_scan(self) -> None:
+        """Is the scanned XML used as the opinion text for token counts?"""
+        opinion = Opinion(xml_scan="<opinion><p>Scanned text</p></opinion>")
+        self.assertEqual(get_clean_opinion_text(opinion), "Scanned text")
+
+    def test_prepare_text_from_xml_scan(self) -> None:
+        """Is the scanned XML indexed as plain text?"""
+        opinion = Opinion(xml_scan="<opinion><p>Smith &amp; Co.</p></opinion>")
+        self.assertEqual(
+            OpinionDocument().prepare_text(opinion), "Smith & Co."
+        )
 
 
 class AdminActionsTest(TestCase):
