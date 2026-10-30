@@ -1103,6 +1103,60 @@ def run_checks(
                 )
             )
 
+    # Dangling references: a template the diff deletes or renames (promoting
+    # a page from wip_ to v2_ is a rename) breaks every template that still
+    # extends or includes it by its old name, with a TemplateDoesNotExist.
+    removed_paths = [p for p, s in file_statuses.items() if s == "D"]
+    if removed_paths:
+        findings += _check_dangling_references(repo_root, removed_paths)
+
+    return findings
+
+
+def _check_dangling_references(
+    repo_root: Path, removed_paths: list[str]
+) -> list[Finding]:
+    """Find templates that extend or include a template the diff removes.
+
+    A name still provided by another app's templates/ directory is not
+    reported, since Django resolves it there.
+    """
+    templates = {
+        path: name
+        for path in repo_root.glob("cl/**/*.html")
+        if (name := _template_name(str(path.relative_to(repo_root))))
+    }
+    available = set(templates.values())
+    removed = {
+        name
+        for path in removed_paths
+        if (name := _template_name(path)) and name not in available
+    }
+    if not removed:
+        return []
+
+    tag_re = re.compile(r'{%\s*(extends|include)\s+["\']([^"\']+)["\']')
+    findings = []
+    for path in sorted(templates):
+        try:
+            lines = path.read_text(encoding="utf-8").splitlines()
+        except (OSError, UnicodeDecodeError):
+            continue
+        for i, line in enumerate(lines, 1):
+            for m in tag_re.finditer(line):
+                tag, name = m.groups()
+                if name not in removed:
+                    continue
+                findings.append(
+                    Finding(
+                        str(path.relative_to(repo_root)),
+                        i,
+                        "check_dangling_template_reference",
+                        FAIL,
+                        f'{tag} "{name}" — that template was deleted or '
+                        "renamed in this change; point this at its new name",
+                    )
+                )
     return findings
 
 
@@ -1180,6 +1234,18 @@ def _legacy_counterpart(path: str) -> str | None:
         if legacy := _swap_template_prefix(path, prefix, add=False):
             return legacy
     return None
+
+
+def _template_name(path: str) -> str | None:
+    """Return the name Django loads an HTML template by, None otherwise.
+
+    Example: cl/foo/templates/wip_help/index.html → wip_help/index.html
+    """
+    parts = Path(path).parts
+    if not path.endswith(".html") or "templates" not in parts:
+        return None
+    idx = parts.index("templates")
+    return "/".join(parts[idx + 1 :]) or None
 
 
 # ---------------------------------------------------------------------------

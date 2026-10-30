@@ -556,6 +556,66 @@ class WipCounterpartTest(unittest.TestCase):
         )
 
 
+class DanglingReferenceTest(unittest.TestCase):
+    """Templates must not keep using a template the diff removes."""
+
+    # A promotion as main() reports it: the new path renamed, the old deleted.
+    PROMOTION = {V2_TEMPLATE_FILE: "R100", WIP_TEMPLATE_FILE: "D"}
+    OTHER_PAGE = "cl/foo/templates/wip_other/index.html"
+
+    def _dangling(
+        self, files: dict[str, str], changed: dict[str, str]
+    ) -> list[tuple[str, int, str]]:
+        """Run the checks and keep only the dangling-reference findings."""
+        return [
+            (f.file, f.line, f.severity)
+            for f in _findings_on(files, changed, linted=list(files))
+            if f.check == "check_dangling_template_reference"
+        ]
+
+    def test_reference_to_promoted_template_fails(self) -> None:
+        """An include of the old wip_ name breaks once the page is promoted."""
+        findings = self._dangling(
+            {
+                V2_TEMPLATE_FILE: V2_TEMPLATE_BODY,
+                self.OTHER_PAGE: """
+                    {% extends "new_base.html" %}
+                    {% include "wip_help/index.html" %}
+                    """,
+            },
+            self.PROMOTION,
+        )
+        self.assertEqual(
+            findings, [(self.OTHER_PAGE, 2, frontend_checks.FAIL)]
+        )
+
+    def test_updated_reference_passes(self) -> None:
+        """Pointing the include at the new v2_ name fixes it."""
+        findings = self._dangling(
+            {
+                V2_TEMPLATE_FILE: V2_TEMPLATE_BODY,
+                self.OTHER_PAGE: """
+                    {% extends "new_base.html" %}
+                    {% include "v2_help/index.html" %}
+                    """,
+            },
+            self.PROMOTION,
+        )
+        self.assertEqual(findings, [])
+
+    def test_name_still_provided_elsewhere_passes(self) -> None:
+        """Django still finds the name in another app's templates/ directory."""
+        findings = self._dangling(
+            {
+                V2_TEMPLATE_FILE: V2_TEMPLATE_BODY,
+                "cl/bar/templates/wip_help/index.html": V2_TEMPLATE_BODY,
+                self.OTHER_PAGE: '{% include "wip_help/index.html" %}',
+            },
+            self.PROMOTION,
+        )
+        self.assertEqual(findings, [])
+
+
 class RenamedLegacyTemplateTest(unittest.TestCase):
     """``main()`` treats the old side of a rename as a deleted file."""
 
