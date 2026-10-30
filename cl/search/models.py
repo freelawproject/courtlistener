@@ -4254,6 +4254,7 @@ class SCOTUSDocketEntry(AbstractDateTimeModel, CSVExportMixin):
     docket = models.ForeignKey(
         "search.Docket",
         on_delete=models.CASCADE,
+        related_name="scotus_docket_entries",
     )
     entry_number = models.IntegerField(
         null=True,
@@ -4286,7 +4287,9 @@ class SCOTUSDocument(AbstractDateTimeModel, AbstractPDF):
     """
 
     docket_entry = models.ForeignKey(
-        SCOTUSDocketEntry, on_delete=models.CASCADE
+        SCOTUSDocketEntry,
+        on_delete=models.CASCADE,
+        related_name="scotus_documents",
     )
     description = models.TextField(blank=True)
     document_number = models.IntegerField(
