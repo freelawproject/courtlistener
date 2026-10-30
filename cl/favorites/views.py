@@ -2,7 +2,7 @@ from asgiref.sync import sync_to_async
 from django.contrib import messages
 from django.contrib.auth.decorators import login_required
 from django.contrib.auth.models import User
-from django.core.exceptions import ObjectDoesNotExist
+from django.contrib.contenttypes.models import ContentType
 from django.core.paginator import EmptyPage, PageNotAnInteger, Paginator
 from django.db import IntegrityError
 from django.http import (
@@ -21,10 +21,12 @@ from cl.favorites.forms import NoteForm
 from cl.favorites.models import DocketTag, Note, Prayer, UserTag
 from cl.favorites.selectors import prayer_eligible
 from cl.favorites.utils import (
+    NOTEABLE_MODELS,
     create_prayer,
     delete_prayer,
     get_existing_prayers_in_bulk,
     get_lifetime_prayer_stats,
+    get_note_for_target,
     get_top_prayers,
     get_user_prayer_history,
     get_user_prayers,
@@ -34,34 +36,35 @@ from cl.search.models import RECAPDocument
 from cl.users.models import UserProfile
 
 
-def get_note(request: HttpRequest) -> HttpResponse:
-    audio_pk = request.POST.get("audio_id")
-    cluster_pk = request.POST.get("cluster_id")
-    docket_pk = request.POST.get("docket_id")
-    recap_doc_pk = request.POST.get("recap_doc_id")
-    user = request.user
-    if audio_pk and audio_pk != "undefined":
-        try:
-            note = Note.objects.get(audio_id=audio_pk, user=user)
-        except ObjectDoesNotExist:
-            note = Note()
-    elif cluster_pk and cluster_pk != "undefined":
-        try:
-            note = Note.objects.get(cluster_id=cluster_pk, user=user)
-        except ObjectDoesNotExist:
-            note = Note()
-    elif docket_pk and docket_pk != "undefined":
-        try:
-            note = Note.objects.get(docket_id=docket_pk, user=user)
-        except ObjectDoesNotExist:
-            note = Note()
-    elif recap_doc_pk and recap_doc_pk != "undefined":
-        try:
-            note = Note.objects.get(recap_doc_id=recap_doc_pk, user=user)
-        except ObjectDoesNotExist:
-            note = Note()
-    else:
-        note = None
+def get_note(request: HttpRequest) -> Note | None:
+    """Look up the requesting user's Note for the object named in POST data.
+
+    :param request: The request, expected to carry ``content_type`` (a
+        ContentType pk) and ``object_id`` in POST data, identifying the
+        noted object.
+    :return: The user's Note for that object (dual-read, see
+        resolve_legacy_object()), a blank unsaved Note if the object is
+        valid but has no Note yet, or None if content_type/object_id are
+        missing, invalid, or don't resolve to a model in NOTEABLE_MODELS.
+    """
+    content_type_pk = request.POST.get("content_type")
+    raw_object_id = request.POST.get("object_id")
+    if not content_type_pk or not raw_object_id:
+        return None
+
+    try:
+        content_type = ContentType.objects.get_for_id(int(content_type_pk))
+        object_id = int(raw_object_id)
+    except (ContentType.DoesNotExist, ValueError):
+        return None
+
+    model_class = content_type.model_class()
+    if model_class not in NOTEABLE_MODELS:
+        return None
+
+    note = get_note_for_target(model_class, object_id, request.user)
+    if note is None:
+        note = Note()
     return note
 
 
@@ -256,17 +259,17 @@ async def create_prayer_view(
             "User have reached your daily request limit"
         )
 
-    recap_document = await RECAPDocument.objects.aget(id=recap_document)
+    recap_document_obj = await RECAPDocument.objects.aget(id=recap_document)
 
     # Call the create_prayer async function
-    await create_prayer(user, recap_document)
+    await create_prayer(user, recap_document_obj)
     if is_htmx_request:
         return TemplateResponse(
             request,
             "includes/pray_and_pay_htmx/pray_button.html",
             {
                 "prayer_exists": True,
-                "document_id": recap_document.pk,
+                "document_id": recap_document_obj.pk,
                 "count": 0,
                 "daily_limit_reached": False,
                 "regular_size": regular_size,
@@ -281,10 +284,10 @@ async def delete_prayer_view(
     request: HttpRequest, recap_document: int
 ) -> HttpResponse:
     user = request.user
-    recap_document = await RECAPDocument.objects.aget(id=recap_document)
+    recap_document_obj = await RECAPDocument.objects.aget(id=recap_document)
 
     # Call the delete_prayer async function
-    await delete_prayer(user, recap_document)
+    await delete_prayer(user, recap_document_obj)
     regular_size = bool(request.POST.get("regular_size"))
     source = request.POST.get("source", "")
     if request.headers.get("hx-request"):
@@ -293,7 +296,7 @@ async def delete_prayer_view(
             "includes/pray_and_pay_htmx/pray_button.html",
             {
                 "prayer_exists": False,
-                "document_id": recap_document.pk,
+                "document_id": recap_document_obj.pk,
                 "count": 0,
                 "regular_size": regular_size,
                 "should_swap": True if source != "user_prayer_list" else False,

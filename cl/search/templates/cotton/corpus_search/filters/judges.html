@@ -2,7 +2,7 @@
 
 <c-vars request search_form form_prefix/>
 
-<fieldset x-bind:id="fieldsetIds.judges" class="contents" x-show="isActiveScope" x-cloak data-scope="Judges">
+<fieldset x-bind:id="fieldsetId" class="contents" x-show="isActiveScope" x-cloak data-scope="Judges">
   <legend class="sr-only">Judges filters</legend>
 
   <c-corpus-search.filters.input :search_form="search_form" field_name="name" namespace="judges" :form_prefix="form_prefix" only/>

@@ -10,7 +10,7 @@ updates:
       - dependency-name: selenium
       # Ignore all patch updates.
       - dependency-name: '*'
-        update-types: [ "version-update:semver-patch" ]
+        update-types: ["version-update:semver-patch"]
 
   - package-ecosystem: "github-actions"
     directory: "/"

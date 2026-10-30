@@ -13,10 +13,12 @@ import time
 from datetime import date, datetime, timedelta
 from typing import Any, cast
 
+import httpx
 import requests
+from asgiref.sync import async_to_sync, sync_to_async
 from celery import chain
 from django.conf import settings
-from django.core.management.base import BaseCommand, CommandError
+from django.core.management.base import CommandError
 from juriscraper.state.texas.tames import TAMESScraper
 from lxml import etree
 
@@ -32,6 +34,7 @@ from cl.scrapers.management.commands.back_scrape_dockets import (
     RateLimitedRequestManager,
     save_docket_response,
 )
+from cl.scrapers.management.utils import StatePollCommand
 from cl.scrapers.models import AccountSubscription, Scraper
 
 REDIS_KEY = "tames:polling:last_seen_cases"
@@ -74,9 +77,9 @@ def verify_subscription_success(html: str) -> tuple[bool, str]:
     # The message may be directly in the span or inside a <font> child.
     font_children = cast(list[etree._Element], span.xpath("font"))
     if font_children:
-        message = font_children[0].text or ""
+        message = cast(str, font_children[0].text) or ""
     else:
-        message = span.text or ""
+        message = cast(str, span.text) or ""
     message = message.strip()
 
     if not message:
@@ -232,40 +235,20 @@ def subscribe_pending_cases(redis, tames_user: dict[str, str]) -> None:
     )
 
 
-class Command(BaseCommand):
+class Command(StatePollCommand):
     help = (
         "Continuously polls TAMES for new cases and backfills "
         "when changes are detected."
     )
 
     def add_arguments(self, parser) -> None:
-        parser.add_argument(
-            "--polling-delay",
-            type=int,
-            default=60,
-            help="Minutes to sleep between poll cycles.",
-        )
-        parser.add_argument(
-            "--case-backfill-days",
-            type=int,
-            default=1,
-            help="Number of days to look back for backfill.",
-        )
+        super().add_arguments(parser)
         parser.add_argument(
             "--poll-window-days",
             type=int,
             default=7,
             help=(
                 "Window size for polling search query in days (default: 7)."
-            ),
-        )
-        parser.add_argument(
-            "--courts",
-            default=None,
-            help=(
-                "Comma-separated list of TAMES court IDs to poll "
-                "(e.g., texas_cossup,texas_coa01). "
-                "Defaults to all TAMES courts."
             ),
         )
         parser.add_argument(
@@ -293,9 +276,9 @@ class Command(BaseCommand):
     def handle(self, *args: Any, **options: Any) -> None:
         global shutdown_requested
 
-        if not settings.TAMES_USER:  # type: ignore[misc]
+        if not settings.TAMES_USER:
             raise CommandError("TAMES_USER must be set.")
-        tames_user: dict[str, str] = json.loads(settings.TAMES_USER)  # type: ignore[misc]
+        tames_user: dict[str, str] = json.loads(settings.TAMES_USER)
 
         redis = get_redis_interface("CACHE")
         courts = (
@@ -325,23 +308,27 @@ class Command(BaseCommand):
 
         logger.info("TAMES poller stopped.")
 
-    def _poll_cycle(
+    @async_to_sync
+    async def _poll_cycle(
         self,
         options: dict[str, Any],
         redis,
         courts: list[str] | None,
         tames_user: dict[str, str],
     ) -> None:
+        """Poll and backfill cases using one event loop for HTTP sessions."""
         today = date.today()
         poll_start = today - timedelta(days=options["poll_window_days"])
 
-        cached_raw = redis.get(REDIS_KEY)
+        cached_raw = await sync_to_async(redis.get, thread_sensitive=False)(
+            REDIS_KEY
+        )
         cached_urls: set[str] = (
             set(json.loads(cached_raw)) if cached_raw else set()
         )
         found_stop = False
 
-        with (
+        async with (
             RateLimitedRequestManager(
                 requests_per_second=options["search_rate"],
                 max_backoff_seconds=options["max_backoff"],
@@ -353,7 +340,7 @@ class Command(BaseCommand):
         ):
             scraper = TAMESScraper(request_manager=search_request_manager)
             fresh_cases = []
-            for case in scraper.backfill(
+            async for case in scraper.backfill(
                 courts or scraper.COURT_IDS, (poll_start, today)
             ):
                 fresh_cases.append(case)
@@ -364,7 +351,7 @@ class Command(BaseCommand):
 
             if cached_urls and fresh_urls == cached_urls:
                 logger.info("No new cases detected. Skipping backfill.")
-                subscribe_pending_cases(redis, tames_user)
+                await sync_to_async(subscribe_pending_cases)(redis, tames_user)
                 return
 
             logger.info(
@@ -384,7 +371,7 @@ class Command(BaseCommand):
             )
 
             case_count = 0
-            for case in backfill_scraper.backfill(
+            async for case in backfill_scraper.backfill(
                 courts or backfill_scraper.COURT_IDS,
                 (backfill_start, today),
             ):
@@ -406,14 +393,16 @@ class Command(BaseCommand):
 
                 court_code = case.get("court_code", "")
                 try:
-                    case_response = case_request_manager.get(case_url)
-                    bucket, base_key = save_docket_response(
+                    case_response = await case_request_manager.get(case_url)
+                    bucket, base_key = await sync_to_async(
+                        save_docket_response
+                    )(
                         case_response,
                         SCRAPER_CLASS_NAME,
                         dict(case),
                         court_code or "unknown_court",
                     )
-                except requests.RequestException:
+                except httpx.HTTPError:
                     logger.exception("Failed to fetch case URL %s", case_url)
                     continue
 
@@ -425,7 +414,7 @@ class Command(BaseCommand):
                     },
                     sort_keys=True,
                 )
-                chain(
+                workflow = chain(
                     texas_corpus_download_task.si(
                         (bucket, f"{base_key}.html"),
                         (bucket, f"{base_key}_meta.json"),
@@ -433,7 +422,8 @@ class Command(BaseCommand):
                     texas_ingest_docket_task.s(
                         subscription_data=subscription_data,
                     ),
-                ).apply_async()
+                )
+                await sync_to_async(workflow.apply_async)()
 
                 case_count += 1
 
@@ -454,10 +444,10 @@ class Command(BaseCommand):
                         "No cached_urls found, possible gap if this isn't the first run."
                     )
 
-        subscribe_pending_cases(redis, tames_user)
+        await sync_to_async(subscribe_pending_cases)(redis, tames_user)
 
         # -- Update Redis ------------------------------------------------------
-        redis.set(
+        await sync_to_async(redis.set, thread_sensitive=False)(
             REDIS_KEY,
             json.dumps(list(fresh_urls)),
             ex=REDIS_TTL,

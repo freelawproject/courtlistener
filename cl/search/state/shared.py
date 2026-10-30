@@ -207,7 +207,7 @@ class AbstractStateDocument(AbstractPDF):
         """Run the OCR extraction task for this document.
 
         :param queue: The queue to use for the extraction task.
-        :return: True if dispatch occured, else False."""
+        :return: True if dispatch occurred, else False."""
         from cl.scrapers.tasks import extract_formatted_text_document
 
         if (
