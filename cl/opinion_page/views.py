@@ -524,7 +524,6 @@ async def view_parties(
             "party_groups": await sync_to_async(build_party_groups)(
                 party_types
             ),
-            "docket_entries": await docket.docket_entries.aexists(),
         },
     )
 
