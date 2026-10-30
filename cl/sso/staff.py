@@ -5,7 +5,7 @@ from dataclasses import dataclass, field
 from allauth.socialaccount.models import SocialAccount
 from django.conf import settings
 from django.contrib.auth.models import User
-from django.db.models import Q
+from django.db.models import Q, QuerySet
 from rest_framework.authtoken.models import Token
 
 from cl.sso.models import Organization
@@ -26,7 +26,7 @@ class StaffSSOReport:
     notes: list[str] = field(default_factory=list)
 
 
-def staff_accounts():
+def staff_accounts() -> QuerySet[User]:
     """Active accounts that can use the Django admin.
 
     These are the accounts SSO_REQUIRED_FOR_STAFF applies to.
@@ -40,7 +40,7 @@ def staff_accounts():
     )
 
 
-def permission_holders():
+def permission_holders() -> QuerySet[User]:
     """Active non-staff accounts holding permissions, e.g. API write access.
 
     :return: Accounts with a permission granted directly or through a group.

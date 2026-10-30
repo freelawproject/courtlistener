@@ -1,4 +1,5 @@
 from datetime import timedelta
+from typing import Any
 
 from allauth.account.signals import user_logged_in as allauth_user_logged_in
 from django.contrib.auth.models import User
@@ -17,7 +18,7 @@ from cl.sso.throttles import sync_user_throttles
 
 @receiver(allauth_user_logged_in, dispatch_uid="sso_logged_in")
 def handle_sso_login(
-    sender, request: HttpRequest, user: User, **kwargs
+    sender: Any, request: HttpRequest, user: User, **kwargs: Any
 ) -> None:
     """Finish an SSO login: mark the session, shorten it, and log it.
 
@@ -49,7 +50,7 @@ def handle_sso_login(
 
 @receiver(user_logged_in, dispatch_uid="sso_audit_password_login")
 def audit_password_login(
-    sender, request: HttpRequest | None, user: User, **kwargs
+    sender: Any, request: HttpRequest | None, user: User, **kwargs: Any
 ) -> None:
     """Log successful password sign-ins.
 
@@ -72,10 +73,10 @@ def audit_password_login(
 
 @receiver(user_login_failed, dispatch_uid="sso_audit_failed_login")
 def audit_failed_login(
-    sender,
-    credentials: dict,
+    sender: Any,
+    credentials: dict[str, Any],
     request: HttpRequest | None = None,
-    **kwargs,
+    **kwargs: Any,
 ) -> None:
     """Log failed password checks, from the sign-in page or HTTP Basic.
 
@@ -106,7 +107,9 @@ def audit_failed_login(
     dispatch_uid="sso_membership_removed",
 )
 def handle_membership_removed(
-    sender, instance: OrganizationMembership, **kwargs
+    sender: type[OrganizationMembership],
+    instance: OrganizationMembership,
+    **kwargs: Any,
 ) -> None:
     """Take away organization API rates when somebody leaves.
 

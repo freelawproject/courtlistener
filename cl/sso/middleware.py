@@ -1,4 +1,6 @@
 import time
+from collections.abc import Callable
+from typing import Any
 
 from asgiref.sync import iscoroutinefunction, sync_to_async
 from django.conf import settings
@@ -65,7 +67,9 @@ def enforce_sso_session(request: HttpRequest) -> HttpResponse | None:
 
 
 @sync_and_async_middleware
-def SSOSessionMiddleware(get_response):
+def SSOSessionMiddleware(
+    get_response: Callable[[HttpRequest], Any],
+) -> Callable[[HttpRequest], Any]:
     """Run ``enforce_sso_session`` on every request.
 
     Supports both sync and async views, so it doesn't force async views

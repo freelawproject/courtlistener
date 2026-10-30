@@ -16,6 +16,7 @@ from django.core import mail
 from django.core.exceptions import ValidationError
 from django.core.management import call_command
 from django.db import connection
+from django.http import HttpResponse
 from django.test import RequestFactory
 from django.test.utils import CaptureQueriesContext
 from django.urls import (
@@ -284,7 +285,9 @@ class OIDCLoginTest(SSOFixtureMixin, TestCase):
         self.create_neon_account = neon.start()
         self.addCleanup(neon.stop)
 
-    def _log_in_via_idp(self, idp: FakeIdP, next_url: str = "/alerts/"):
+    def _log_in_via_idp(
+        self, idp: FakeIdP, next_url: str = "/alerts/"
+    ) -> HttpResponse:
         """Run the browser side of an OIDC login and return the callback.
 
         On-commit callbacks (emails, throttle syncs) run as they would in
@@ -778,7 +781,7 @@ class TileSignInTest(SSOFixtureMixin, TestCase):
         )
         self.url = reverse("sso_oidc_initiate", kwargs={"provider_id": "acme"})
 
-    def _click_tile(self, method: str = "get", **params: str):
+    def _click_tile(self, method: str = "get", **params: str) -> HttpResponse:
         """Follow the IdP's link here, then complete the login at the IdP.
 
         :param method: "get" for a link, "post" for a form.

@@ -2,6 +2,7 @@ import csv
 
 from django.contrib import admin, messages
 from django.db.models import Count, Q, QuerySet
+from django.forms import BaseInlineFormSet, ModelForm
 from django.http import HttpRequest, HttpResponse
 from django.utils.html import format_html_join
 from django.utils.safestring import mark_safe
@@ -113,7 +114,13 @@ class OrganizationAdmin(admin.ModelAdmin):
         limit = "∞" if obj.seat_limit is None else obj.seat_limit
         return f"{getattr(obj, 'seat_count', 0)} / {limit}"
 
-    def save_related(self, request, form, formsets, change) -> None:
+    def save_related(
+        self,
+        request: HttpRequest,
+        form: ModelForm,
+        formsets: list[BaseInlineFormSet],
+        change: bool,
+    ) -> None:
         """Re-sync members' API throttles after the organization changes.
 
         The organization's level decides its members' API rates, so a
