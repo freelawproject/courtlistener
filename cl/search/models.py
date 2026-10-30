@@ -941,14 +941,9 @@ class Docket(AbstractDateTimeModel, DocketSources):
         """Return the DocketAlertSource config for this docket's court -
         RECAP/PACER by default, with per-court overrides.
         """
-        from cl.alerts.docket_alert_sources import (
-            _ALERT_SOURCES_BY_COURT_ID,
-            RECAP_ALERT_SOURCE,
-        )
+        from cl.alerts.docket_alert_sources import get_alert_source_for_court
 
-        return _ALERT_SOURCES_BY_COURT_ID.get(
-            self.court_id, RECAP_ALERT_SOURCE
-        )
+        return get_alert_source_for_court(self.court_id)
 
     @property
     def pacer_alias_url(self):

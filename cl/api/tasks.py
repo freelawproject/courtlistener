@@ -4,6 +4,7 @@ from elasticsearch.dsl.response import Hit
 from rest_framework.renderers import JSONRenderer
 
 from cl.alerts.api_serializers import SearchAlertSerializerModel
+from cl.alerts.docket_alert_sources import get_alert_source_for_court
 from cl.alerts.models import Alert
 from cl.api.models import (
     Webhook,
@@ -14,7 +15,6 @@ from cl.api.models import (
 from cl.api.utils import generate_webhook_key_content
 from cl.api.webhooks import send_webhook_event
 from cl.celery_init import app
-from cl.corpus_importer.api_serializers import DocketEntrySerializer
 from cl.favorites.api_serializers import PrayerSerializer
 from cl.favorites.models import Prayer
 from cl.lib.elasticsearch_utils import set_child_docs_and_score
@@ -25,7 +25,7 @@ from cl.search.api_serializers import (
     V3OpinionESResultSerializer,
 )
 from cl.search.api_utils import ResultObject
-from cl.search.models import SEARCH_TYPES, DocketEntry
+from cl.search.models import SEARCH_TYPES
 from cl.search.types import ESDictDocument
 
 
@@ -53,11 +53,20 @@ def send_test_webhook_event(
 def send_docket_alert_webhook_events(
     des_pks: list[int],
     webhook_recipients_pks: list[int],
+    court_id: str | None = None,
 ) -> None:
-    """POSTS the DocketAlert to the recipients webhook(s)
+    """POST the docket-alert payload to each recipient's enabled webhook.
 
-    :param des_pks: The list of docket entries primary keys.
-    :param webhook_recipients_pks: A list of User pks to send the webhook to.
+    Entry pks are resolved through the court's alert source so SCOTUS (and
+    later state) rows are not looked up on DocketEntry, whose pks can collide.
+
+    :param des_pks: Primary keys of the new docket entries to include.
+    :param webhook_recipients_pks: User pks whose DOCKET_ALERT webhooks should
+        receive the event.
+    :param court_id: Court id used to select the alert source. None keeps the
+        RECAP lookup so two-argument Celery messages (old workers, or RECAP
+        producers that omit it during a rolling deploy) still serialize
+        correctly.
     :return: None
     """
 
@@ -66,10 +75,11 @@ def send_docket_alert_webhook_events(
         user_id__in=webhook_recipients_pks,
         enabled=True,
     )
-    docket_entries = DocketEntry.objects.filter(pk__in=des_pks)
-    serialized_docket_entries = []
-    for de in docket_entries:
-        serialized_docket_entries.append(DocketEntrySerializer(de).data)
+    source = get_alert_source_for_court(court_id)
+    serialized_docket_entries = [
+        source.webhook_serializer(de).data
+        for de in source.entries_by_pk(des_pks)
+    ]
 
     for webhook in webhooks:
         post_content = {
