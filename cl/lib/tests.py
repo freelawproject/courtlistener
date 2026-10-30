@@ -3075,6 +3075,12 @@ class IncrementalNewTemplateMiddlewareTest(TestCase):
                     continue
                 response = self.process(legacy)
                 self.assertEqual(response.template_name, expected)
+                # Only a swapped full page renders the new header and its
+                # search form; a page left on legacy isn't handed one.
+                self.assertEqual(
+                    "search_form" in (response.context_data or {}),
+                    expected != legacy,
+                )
 
     @override_flag(WIP_PROPS["flag"], True)
     def test_v2_page_unaffected_by_wip_flag(self) -> None:
