@@ -1,5 +1,5 @@
 version = 1
-revision = 3
+revision = 5
 requires-python = "==3.13.*"
 resolution-markers = [
     "platform_python_implementation == 'PyPy' and sys_platform == 'win32'",
@@ -362,6 +362,7 @@ dependencies = [
     { name = "disposable-email-domains" },
     { name = "django" },
     { name = "django-admin-cursor-paginator" },
+    { name = "django-allauth", extra = ["saml", "socialaccount"] },
     { name = "django-cache-memoize" },
     { name = "django-cors-headers" },
     { name = "django-cotton" },
@@ -480,6 +481,7 @@ requires-dist = [
     { name = "disposable-email-domains" },
     { name = "django", specifier = ">=6.0.8,<6.1" },
     { name = "django-admin-cursor-paginator", specifier = ">=0.1.7" },
+    { name = "django-allauth", extras = ["saml", "socialaccount"], specifier = ">=65.20.0" },
     { name = "django-cache-memoize" },
     { name = "django-cors-headers", specifier = ">=4.9.0" },
     { name = "django-cotton", specifier = ">=2.7.2" },
@@ -829,6 +831,29 @@ dependencies = [
     { name = "django" },
 ]
 sdist = { url = "https://files.pythonhosted.org/packages/9c/b7/df95bba044d589242764eaf4eaad60e7c5cac13197e95f732faeaf72cdb8/django_admin_cursor_paginator-0.1.7.tar.gz", hash = "sha256:a35d89670635cff60ad6b601dd89973c7955f740315535ed92022f854ecb117f", size = 10200, upload-time = "2025-10-26T10:18:37.061Z" }
+
+[[package]]
+name = "django-allauth"
+version = "65.20.0"
+source = { registry = "https://pypi.org/simple" }
+dependencies = [
+    { name = "asgiref" },
+    { name = "django" },
+]
+sdist = { url = "https://files.pythonhosted.org/packages/a5/5f/b69a68c09c41a0c2f235996fa47aba3eb88c0810bcfc823d22459c3e235f/django_allauth-65.20.0.tar.gz", hash = "sha256:54019cd2860eef707eaaef241a6598149d2d3b6bd7e78d175089b27d57cd8d83", size = 2301827, upload-time = "2026-10-16T11:23:48.232Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/1e/86/7aa7601e64ba7bda498466ab1a8af9aa568d0f51fa106d9eb46d8a4c5a30/django_allauth-65.20.0-py3-none-any.whl", hash = "sha256:83e22cb65b742d28c49e22a2dbfb475d5ceabc844f16b7a8a5c6a2676e612e9e", size = 2077399, upload-time = "2026-10-16T11:23:44.684Z" },
+]
+
+[package.optional-dependencies]
+saml = [
+    { name = "python3-saml" },
+]
+socialaccount = [
+    { name = "oauthlib" },
+    { name = "pyjwt", extra = ["crypto"] },
+    { name = "requests" },
+]
 
 [[package]]
 name = "django-browser-reload"
@@ -1779,6 +1804,15 @@ wheels = [
 ]
 
 [[package]]
+name = "isodate"
+version = "0.7.2"
+source = { registry = "https://pypi.org/simple" }
+sdist = { url = "https://files.pythonhosted.org/packages/54/4d/e940025e2ce31a8ce1202635910747e5a87cc3a6a6bb2d00973375014749/isodate-0.7.2.tar.gz", hash = "sha256:4cd1aa0f43ca76f4a6c6c0292a85f40b35ec2e43e315b59f06e6d32171a953e6", size = 29705, upload-time = "2024-10-08T23:04:11.5Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/15/aa/0aca39a37d3c7eb941ba736ede56d689e7be91cab5d9ca846bde3999eba6/isodate-0.7.2-py3-none-any.whl", hash = "sha256:28009937d8031054830160fce6d409ed342816b543597cece116d966c6d99e15", size = 22320, upload-time = "2024-10-08T23:04:09.501Z" },
+]
+
+[[package]]
 name = "itypes"
 version = "1.2.0"
 source = { registry = "https://pypi.org/simple" }
@@ -2666,6 +2700,20 @@ wheels = [
 ]
 
 [[package]]
+name = "pyjwt"
+version = "2.15.1"
+source = { registry = "https://pypi.org/simple" }
+sdist = { url = "https://files.pythonhosted.org/packages/43/ea/5194e52748b0da83d71e082d75496eaec6e58f419f5e184786ded517e6a9/pyjwt-2.15.1.tar.gz", hash = "sha256:4f259e80cdfb6b3fc18a7de51fd1ef9ec79652f25019bae68975ca2468a34df8", size = 121252, upload-time = "2026-09-28T18:40:42.598Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/50/ca/44de4e75f8aadc457f0634be3b542815078ded46dca30efb960edeecad6e/pyjwt-2.15.1-py3-none-any.whl", hash = "sha256:42d59d631f7768a1028a64c7ff581a9bf7519804daf91fc5b6c56e30eec5e193", size = 33860, upload-time = "2026-09-28T18:40:41.429Z" },
+]
+
+[package.optional-dependencies]
+crypto = [
+    { name = "cryptography" },
+]
+
+[[package]]
 name = "pyopenssl"
 version = "26.4.0"
 source = { registry = "https://pypi.org/simple" }
@@ -2835,6 +2883,20 @@ source = { registry = "https://pypi.org/simple" }
 sdist = { url = "https://files.pythonhosted.org/packages/15/7f/96c2b9de6024353177dc6139c33730d5ac25877bc33215515d6b95b84555/python_stdnum-2.2.tar.gz", hash = "sha256:e95fcfa858a703d4a40130cb3eaac133c60d8808a7f3c98efeedac968c2479b9", size = 1311813, upload-time = "2026-01-04T19:36:16.753Z" }
 wheels = [
     { url = "https://files.pythonhosted.org/packages/2f/61/aa32d9c79f83a2fae033cd6496fb2a24aba918d31c73704271dfcfb48375/python_stdnum-2.2-py3-none-any.whl", hash = "sha256:bdf98fd117a0ca152e4047aa8ad254bae63853d4e915ddd4e0effb33ba0e9260", size = 1193213, upload-time = "2026-01-04T19:36:14.812Z" },
+]
+
+[[package]]
+name = "python3-saml"
+version = "1.16.0"
+source = { registry = "https://pypi.org/simple" }
+dependencies = [
+    { name = "isodate" },
+    { name = "lxml" },
+    { name = "xmlsec" },
+]
+sdist = { url = "https://files.pythonhosted.org/packages/5d/98/6e0268c3a9893af3d4c5cf670183e0314cd6b5cb034a612d6a7cc5060df8/python3-saml-1.16.0.tar.gz", hash = "sha256:97c9669aecabc283c6e5fb4eb264f446b6e006f5267d01c9734f9d8bffdac133", size = 83468, upload-time = "2023-10-09T10:37:43.128Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/07/14/49d9828443b58bd5cc80a454c91b0f867fbf36a24975d501945e6cb9e32f/python3_saml-1.16.0-py3-none-any.whl", hash = "sha256:20b97d11b04f01ee22e98f4a38242e2fea2e28fbc7fbc9bdd57cab5ac7fc2d0d", size = 76155, upload-time = "2023-10-09T10:40:34.001Z" },
 ]
 
 [[package]]
@@ -3736,6 +3798,26 @@ dependencies = [
 sdist = { url = "https://files.pythonhosted.org/packages/c7/79/12135bdf8b9c9367b8701c2c19a14c913c120b882d50b014ca0d38083c2c/wsproto-1.3.2.tar.gz", hash = "sha256:b86885dcf294e15204919950f666e06ffc6c7c114ca900b060d6e16293528294", size = 50116, upload-time = "2025-11-20T18:18:01.871Z" }
 wheels = [
     { url = "https://files.pythonhosted.org/packages/a4/f5/10b68b7b1544245097b2a1b8238f66f2fc6dcaeb24ba5d917f52bd2eed4f/wsproto-1.3.2-py3-none-any.whl", hash = "sha256:61eea322cdf56e8cc904bd3ad7573359a242ba65688716b0710a5eb12beab584", size = 24405, upload-time = "2025-11-20T18:18:00.454Z" },
+]
+
+[[package]]
+name = "xmlsec"
+version = "1.3.17"
+source = { registry = "https://pypi.org/simple" }
+dependencies = [
+    { name = "lxml" },
+]
+sdist = { url = "https://files.pythonhosted.org/packages/49/14/538b75379e6ab8f688f14d8663e2ab138d9c778bac4999d155b5f33c71c1/xmlsec-1.3.17.tar.gz", hash = "sha256:f3fac9ae679f66585925cc00c5f6839ae36c1d03157619571dee18acc05b9c01", size = 115637, upload-time = "2025-11-11T16:20:46.019Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/f4/25/d0c03351bbf776f2272d602272ca9d759d48f0f4e90707987098abb48e14/xmlsec-1.3.17-cp313-cp313-macosx_10_13_x86_64.whl", hash = "sha256:672e41dc7962da4ce84b67aa1c3a008338e3b88332f5484b9911b91cee0997ed", size = 3450899, upload-time = "2025-11-11T16:20:00.29Z" },
+    { url = "https://files.pythonhosted.org/packages/50/6e/00db758c40d42ae2d43603552262b1027c02bbac934be26425e820c63c0f/xmlsec-1.3.17-cp313-cp313-macosx_11_0_arm64.whl", hash = "sha256:72fc6d336dd68d62822c6536ff4b2453fda94ea652eddb4a958ac97b16ac7001", size = 3846790, upload-time = "2025-11-11T16:20:01.515Z" },
+    { url = "https://files.pythonhosted.org/packages/4b/91/00cd12243f5f8cccec23e0d9946379861b954bf98c52d3f68b9eb565ba76/xmlsec-1.3.17-cp313-cp313-manylinux_2_26_aarch64.manylinux_2_28_aarch64.whl", hash = "sha256:ae88c3aaab5704adfdbce913b3a18db1eb96c49c970657cc01c0d1c420ffdec3", size = 4427662, upload-time = "2025-11-11T16:20:02.931Z" },
+    { url = "https://files.pythonhosted.org/packages/77/64/d198a8109c11124b01abbd34167dd951896b12392ccfc3f12c40eb3f0c35/xmlsec-1.3.17-cp313-cp313-manylinux_2_26_x86_64.manylinux_2_28_x86_64.whl", hash = "sha256:79b471fdd1d3a92b80907828eaa809f6e34023583488b1b8dc3f951529e7a2f8", size = 4170229, upload-time = "2025-11-11T16:20:04.244Z" },
+    { url = "https://files.pythonhosted.org/packages/75/a9/3e061f10d0d921102a55b4c0442c8c5af4e01e175ea1584774eeef2e50aa/xmlsec-1.3.17-cp313-cp313-manylinux_2_38_riscv64.manylinux_2_39_riscv64.whl", hash = "sha256:040f28a7aacfdb467df46d423e4af05569e9376bc8c7f6416b0761e16a0e3d0b", size = 3877622, upload-time = "2025-11-11T16:20:05.593Z" },
+    { url = "https://files.pythonhosted.org/packages/37/1a/b8a71915bf1d59944d815c92e77a06e9c2dc4dc855a44a3127c86b0dd7f2/xmlsec-1.3.17-cp313-cp313-musllinux_1_2_aarch64.whl", hash = "sha256:67717fe5151df68987a1387cba11ba28ce19b3bb9a2d10d650277cd910e510e7", size = 4464934, upload-time = "2025-11-11T16:20:07.358Z" },
+    { url = "https://files.pythonhosted.org/packages/b1/0f/4b9057c6049137256bb972d114d2858fc8b24e72c97e05e26a00d2db8ed2/xmlsec-1.3.17-cp313-cp313-musllinux_1_2_x86_64.whl", hash = "sha256:9bb6faa4ae0268204cfa6b0c0de1c9121eb606eea8c66c7d7ce62e89a17f9efa", size = 4215150, upload-time = "2025-11-11T16:20:10.008Z" },
+    { url = "https://files.pythonhosted.org/packages/95/6b/a2e8bc2f94b90c2904007663c8162423fadd3cd98b7ca1632b66dcdc31cb/xmlsec-1.3.17-cp313-cp313-win_amd64.whl", hash = "sha256:66fe5aaccf68fb85fe0b64277e3f594d6b01ddefb98ef1ceb0a666652d6ec580", size = 2445890, upload-time = "2025-11-11T16:20:11.575Z" },
+    { url = "https://files.pythonhosted.org/packages/8c/df/27210baa675eb9e5d80ed43e80d865be8fbf6148ea464d2b4d4ad1ba9f01/xmlsec-1.3.17-cp313-cp313-win_arm64.whl", hash = "sha256:5319d0bdaf9e597a0ba8dfb3840c4ae57e51f462e7620953f32b07df6267f2ba", size = 2261424, upload-time = "2025-11-11T16:20:12.88Z" },
 ]
 
 [[package]]
