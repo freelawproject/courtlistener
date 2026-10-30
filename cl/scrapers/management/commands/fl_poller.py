@@ -365,8 +365,7 @@ class Command(FLScrapeCommand, StatePollCommand):
             ):
                 match page:
                     case PaginationFailed() as e:
-                        # PaginationFailed is returned, not raised; the real
-                        # error with its traceback is on `exc`
+                        # the real error and its traceback are on `exc`
                         logger.error(
                             "Failed to get page: %r", e, exc_info=e.exc
                         )

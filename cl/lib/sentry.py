@@ -1,10 +1,4 @@
-"""Sentry helpers: classify events in `before_send` and tag scraper work
-
-Errors from juriscraper, eyecite and CourtListener share one Sentry project.
-`fingerprint_sentry_error` decides how each event groups and who owns it,
-and `set_scraper_tags` records which court and which kind of work an event
-came from.
-"""
+"""Sentry helpers: classify events in `before_send` and tag scraper work"""
 
 import logging
 import socket
@@ -27,10 +21,9 @@ OWNER_BY_PREFIX = (
 CLASSIFIED_PREFIXES = tuple(prefix for prefix, _ in OWNER_BY_PREFIX)
 SCRAPER_PREFIXES = ("juriscraper.", "eyecite.")
 
-# EAI_AGAIN and ENETUNREACH: the cluster could not resolve or route, which
-# is an infrastructure problem, not a scraper one
+# EAI_AGAIN and ENETUNREACH: the cluster could not resolve or route
 TRANSIENT_NETWORK_ERRNOS = {-3, 101}
-# EAI_NONAME and EAI_NODATA: the name does not exist, so the court moved
+# EAI_NONAME and EAI_NODATA: the name does not exist
 MISSING_NAME_ERRNOS = {-2, -5}
 
 
@@ -39,15 +32,12 @@ def set_scraper_tags(
 ) -> None:
     """Tag every event captured in the current isolation scope
 
-    Celery opens one isolation scope per task and the scrape commands fork
-    one per court, so the tags stay with that unit of work. Call it as soon
-    as the court is known.
+    Celery opens one scope per task and the scrape commands one per court.
 
     :param court_id: the CourtListener court pk, if known
-    :param kind: what the code is doing: "opinions", "oral_args",
-        "backscrape", "extract-from-text", "email", "pacer", "state-docket"
-    :param owner: default owner for events that `fingerprint_sentry_error`
-        does not classify on its own
+    :param kind: "opinions", "oral_args", "backscrape", "extract-from-text",
+        "email", "pacer" or "state-docket"
+    :param owner: default owner for events that `_classify` does not rule on
     """
     scope = sentry_sdk.get_isolation_scope()
     scope.set_tag("scrape_kind", kind)
@@ -61,28 +51,11 @@ def fingerprint_sentry_error(
 ) -> dict[str, Any]:
     """`before_send` hook: set the fingerprint and owner of each event
 
-    A `fingerprint` key in a log call's `extra` always wins, for example
-    `logger.error(..., extra={"fingerprint": [court_id, "citation-not-found"]})`.
-
-    Exceptions that passed through juriscraper or eyecite, or that happened
-    inside tagged scraper work, are grouped by cause instead of by stack:
-    one issue per host and status for HTTP errors, one per host for DNS and
-    transport errors (only when juriscraper made the request, so a timeout
-    from an internal service is not blamed on a court), the fingerprint the
-    exception carries when juriscraper set one, and otherwise the raising
-    module, exception type and function, so a deploy that edits a line no
-    longer opens a new issue. Only explicit causes (`raise ... from`) are
-    followed, so a bug inside an except block is not filed under the error
-    it was handling.
-
-    A fingerprint already on the event, for example the one the Celery
-    integration sets for soft time limits, is left alone.
-
-    Logged events from juriscraper without a fingerprint are grouped by
-    scraper and message instead of by the attached stack.
-
-    Any failure inside the hook returns the event unchanged; the hook must
-    never drop an event.
+    A `fingerprint` in a log call's `extra` wins, then a fingerprint already
+    on the event. Exceptions from scraper work are grouped by cause (host and
+    status, DNS, transport, the fingerprint juriscraper set, or the raising
+    frame), following explicit `raise ... from` causes only. Any failure in
+    the hook returns the event unchanged.
 
     :param event: event dict to be sent to Sentry
     :param hint: dict with extra information about the event
@@ -91,8 +64,7 @@ def fingerprint_sentry_error(
     try:
         return _classify(event, hint)
     except Exception:
-        # WARNING, not ERROR: an error log here would become another event
-        # that runs this hook again
+        # an ERROR log here would become another event that runs this hook
         logger.warning("Sentry event classification failed", exc_info=True)
         return event
 
@@ -131,12 +103,7 @@ def _classify(event: dict[str, Any], hint: dict[str, Any]) -> dict[str, Any]:
 def _set_owner_from_logger(
     event: dict[str, Any], tags: dict[str, Any]
 ) -> None:
-    """Inside tagged scraper work, a CourtListener log call is CourtListener's
-
-    The scope default is "juriscraper", which is right for exceptions that
-    the rules below do not classify, but wrong for `logger.error` calls in
-    CourtListener code such as the document-extract failure.
-    """
+    """A `cl.*` log call inside tagged scraper work is CourtListener's"""
     if "scrape_kind" not in tags:
         return
     if str(event.get("logger", "")).startswith("cl."):
@@ -164,11 +131,9 @@ def _classify_log_event(
 
 
 def _exception_chain(exc: BaseException) -> list[BaseException]:
-    """The exception and its explicit causes, outermost first
+    """The exception and its explicit `raise ... from` causes, outermost first
 
-    Only `raise ... from` links are followed. The implicit context of an
-    exception raised inside an except block is the error that was being
-    handled, not the cause of the new one.
+    The implicit `__context__` is the error being handled, not the cause.
     """
     chain: list[BaseException] = []
     current: BaseException | None = exc
@@ -197,8 +162,7 @@ def _touches_scraper(tb: TracebackType | None) -> bool:
 
 
 def _raising_frame(tb: TracebackType | None) -> tuple[str, str]:
-    """The innermost frame in our code, so lxml or dateutil frames called
-    from a scraper are attributed to the scraper"""
+    """The innermost frame in our code, past lxml or dateutil frames"""
     frames = _frames(tb)
     for module, function in reversed(frames):
         if module.startswith(CLASSIFIED_PREFIXES):
@@ -231,11 +195,9 @@ def _classify_exception(
 ) -> tuple[list[str], str, dict[str, str]]:
     """Fingerprint, owner and extra tags for an exception chain
 
-    Rules apply in order to the whole chain, innermost cause first, so a
-    CourtListener wrapper raised from an HTTP error is still grouped by host
-    and status. The HTTP, DNS and transport rules only apply when juriscraper
-    made the request; a request to an internal service that fails inside
-    tagged work falls through to the raising-frame rule.
+    Rules apply to the whole chain, innermost cause first. The network rules
+    apply only when juriscraper made the request, so an internal service
+    failure is not blamed on a court.
     """
     causes = list(reversed(chain))
     network_causes = causes if touches_scraper else []
@@ -283,9 +245,7 @@ def _classify_exception(
         if fingerprint := getattr(exc, "sentry_fingerprint", None):
             owner = getattr(exc, "sentry_owner", None) or "juriscraper"
             return [str(part) for part in fingerprint], owner, {}
-        # juriscraper releases before `sentry_fingerprint` existed log this
-        # error themselves with this fingerprint; match it so the exception
-        # and the log land in the same issue
+        # older juriscraper releases log this error with this fingerprint
         if type(exc).__name__ == "UnexpectedContentTypeError" and tags.get(
             "court_id"
         ):

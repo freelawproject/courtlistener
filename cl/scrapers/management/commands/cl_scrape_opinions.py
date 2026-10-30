@@ -486,8 +486,7 @@ class Command(ScraperCommand):
         """
         package, module = module_string.rsplit(".", 1)
         mod = __import__(f"{package}.{module}", globals(), locals(), [module])
-        # The court id comes from the Site, not the module name: delaware.py
-        # reports "del", because "del" cannot be a module name
+        # delaware.py reports "del", which cannot be a module name
         court_id = mod.Site().court_id.split(".")[-1].split("_")[0]
         set_scraper_tags(court_id, self.scrape_kind)
         if not Court.objects.get(id=court_id).has_opinion_scraper:
@@ -519,9 +518,8 @@ class Command(ScraperCommand):
                 sys.exit(1)
 
             module_string = module_strings[i]
-            # One Sentry scope per court, so every event raised or logged
-            # while scraping it, by juriscraper too, says which court it was.
-            # The fingerprint is set in cl.lib.sentry, not here.
+            # one Sentry scope per court, so juriscraper's own events say
+            # which court they came from
             with isolation_scope() as scope:
                 scope.set_tag(
                     "scraper", module_string.removeprefix("juriscraper.")

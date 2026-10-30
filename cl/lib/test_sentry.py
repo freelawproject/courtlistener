@@ -51,8 +51,7 @@ class _RaisingResponse:
 
 
 def in_juriscraper(raiser: Callable[[], Any]) -> Callable[[], Any]:
-    """Make `raiser` fail with a juriscraper frame on the stack, the way a
-    real request made by a scraper does"""
+    """Make `raiser` fail with a juriscraper frame on the stack"""
     return lambda: check_empty_downloaded_file(_RaisingResponse(raiser), URL)
 
 
@@ -291,8 +290,7 @@ class ScraperTagsTest(SimpleTestCase):
         async def read_tags() -> dict[str, str]:
             return dict(sentry_sdk.get_isolation_scope()._tags)
 
-        # Other tests may have tagged the process-wide scope already; the
-        # forked scope must not change it
+        # the forked scope must not change the process-wide scope
         before = dict(sentry_sdk.get_isolation_scope()._tags)
         with sentry_sdk.isolation_scope():
             set_scraper_tags("ky", "opinions")
