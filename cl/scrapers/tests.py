@@ -588,6 +588,59 @@ class IngestionTest(TestCase):
         image_opinion.refresh_from_db()
         self.assertIn("intelligence", image_opinion.plain_text.lower())
 
+    @mock.patch("cl.scrapers.tasks.logger")
+    @mock.patch(
+        "cl.scrapers.tasks.find_citations_and_parentheticals_for_opinion_by_pks"
+    )
+    @mock.patch("cl.scrapers.tasks.find_and_merge_versions")
+    @mock.patch("cl.scrapers.tasks.needs_ocr", return_value=True)
+    @mock.patch("cl.scrapers.tasks.microservice", new_callable=mock.AsyncMock)
+    def test_failed_ocr_uses_initial_extraction_response(
+        self,
+        microservice_mock,
+        needs_ocr_mock,
+        find_and_merge_mock,
+        citations_mock,
+        logger_mock,
+    ) -> None:
+        """If the OCR fallback fails, keep the extraction without OCR.
+
+        The opinion is still saved from the first extraction's response
+        instead of reading page_count from the OCR error body, and the OCR
+        failure is logged.
+        """
+        image_opinion = Opinion.objects.get(pk=self.image_opinion.pk)
+        microservice_mock.side_effect = [
+            httpx.Response(
+                200,
+                json={
+                    "content": "",
+                    "extracted_by_ocr": False,
+                    "page_count": 1,
+                    "err": "",
+                },
+            ),
+            httpx.Response(500, json={"detail": "OCR service unavailable"}),
+        ]
+
+        extract_opinion_content(image_opinion.pk, ocr_available=True)
+
+        image_opinion.refresh_from_db()
+        self.assertFalse(image_opinion.extracted_by_ocr)
+        self.assertEqual(image_opinion.page_count, 1)
+        find_and_merge_mock.delay.assert_called_once_with(pk=image_opinion.pk)
+        citations_mock.apply_async.assert_called_once()
+        ocr_errors = [
+            c
+            for c in logger_mock.error.call_args_list
+            if c.args
+            and c.args[0] == "Error from document-extract-ocr microservice: %s"
+        ]
+        self.assertEqual(
+            len(ocr_errors), 1, msg=logger_mock.error.call_args_list
+        )
+        self.assertEqual(ocr_errors[0].args[1], 500)
+
     def test_text_based_pdf(self) -> None:
         """Can we ingest a text based pdf file?"""
         pdf_opinion = Opinion.objects.get(pk=self.pdf_opinion.pk)
