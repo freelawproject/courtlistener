@@ -226,13 +226,6 @@
       "severity": "error"
     },
     {
-      "column": 39,
-      "path": "cl/alerts/tasks.py",
-      "name": "bad-argument-type",
-      "concise_description": "Argument `QuerySet[DocketEntry, DocketEntry] | list[DocketEntry]` is not assignable to parameter `new_des` with type `list[DocketEntry]` in function `make_alert_messages`",
-      "severity": "error"
-    },
-    {
       "column": 23,
       "path": "cl/alerts/utils.py",
       "name": "missing-attribute",
@@ -3219,41 +3212,6 @@
       "path": "cl/search/api_views.py",
       "name": "bad-argument-type",
       "concise_description": "Argument `ESList` is not assignable to parameter `queryset` with type `QuerySet[@_, @_]` in function `rest_framework.pagination.PageNumberPagination.paginate_queryset`",
-      "severity": "error"
-    },
-    {
-      "column": 24,
-      "path": "cl/search/api_views.py",
-      "name": "missing-attribute",
-      "concise_description": "Object of type `type[AudioDocument] | type[DocketDocument] | type[DocketESResultSerializer] | type[OAESResultSerializer] | type[OpinionClusterDocument] | type[OpinionClusterESResultSerializer] | type[PersonDocument] | type[PersonESResultSerializer] | type[RECAPDocumentESResultSerializer] | type[RECAPESResultSerializer]` has no attribute `search`",
-      "severity": "error"
-    },
-    {
-      "column": 13,
-      "path": "cl/search/api_views.py",
-      "name": "bad-argument-count",
-      "concise_description": "Expected 0 positional arguments, got 1 in function `cl.search.documents.AudioDocument.__init__`",
-      "severity": "error"
-    },
-    {
-      "column": 27,
-      "path": "cl/search/api_views.py",
-      "name": "unexpected-keyword",
-      "concise_description": "Unexpected keyword argument `many` in function `cl.search.documents.AudioDocument.__init__`",
-      "severity": "error"
-    },
-    {
-      "column": 38,
-      "path": "cl/search/api_views.py",
-      "name": "unexpected-keyword",
-      "concise_description": "Unexpected keyword argument `context` in function `cl.search.documents.AudioDocument.__init__`",
-      "severity": "error"
-    },
-    {
-      "column": 13,
-      "path": "cl/search/api_views.py",
-      "name": "bad-argument-type",
-      "concise_description": "Argument `ReturnDict[Unknown, Unknown] | Any` is not assignable to parameter `data` with type `list[dict[Unknown, Unknown]]` in function `cl.api.pagination.ESCursorPagination.get_paginated_response`",
       "severity": "error"
     },
     {

@@ -1,6 +1,7 @@
 import datetime
 import logging
 from collections import defaultdict
+from collections.abc import Sequence
 from http import HTTPStatus
 from typing import Any
 
@@ -14,6 +15,7 @@ from django.utils.timezone import now
 from rest_framework import mixins, serializers, viewsets
 from rest_framework.request import Request
 from rest_framework.response import Response
+from rest_framework.throttling import BaseThrottle
 
 from cl.api.utils import (
     apply_membership_throttles,
@@ -49,6 +51,13 @@ class MembershipWebhookViewSet(
     mixins.CreateModelMixin, viewsets.GenericViewSet
 ):
     permission_classes = [AllowNeonWebhook]
+    # Neon posts from a few fixed addresses with no API user, so the
+    # default anonymous throttles count every webhook it sends against a
+    # single ident and start refusing them with 429 once the daily or
+    # per-minute limit is hit. AllowNeonWebhook checks the shared token
+    # before any throttle runs, so skipping throttles opens nothing to
+    # anyone else.
+    throttle_classes: Sequence[type[BaseThrottle]] = []
     serializer_class = NeonMembershipWebhookSerializer
     queryset = NeonMembership.objects.all()
 
