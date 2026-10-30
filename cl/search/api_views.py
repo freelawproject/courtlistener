@@ -43,6 +43,7 @@ from cl.search.api_serializers import (
     RECAPDocumentESResultSerializer,
     RECAPDocumentSerializer,
     RECAPESResultSerializer,
+    ScotusDocketMetadataSerializer,
     TagSerializer,
     V3OAESResultSerializer,
     V3OpinionESResultSerializer,
@@ -64,6 +65,7 @@ from cl.search.filters import (
     OpinionFilter,
     OpinionsCitedFilter,
     RECAPDocumentFilter,
+    ScotusDocketMetadataFilter,
 )
 from cl.search.forms import SearchForm
 from cl.search.models import (
@@ -78,6 +80,7 @@ from cl.search.models import (
     OpinionsCited,
     OriginatingCourtInformation,
     RECAPDocument,
+    ScotusDocketMetadata,
     Tag,
 )
 
@@ -241,6 +244,28 @@ class RECAPDocumentViewSet(
         .prefetch_related("tags")
         .order_by("-id")
     )
+
+
+class BaseSourceReadOnlyViewSet(
+    LoggingMixin,
+    NoFilterCacheListMixin,
+    DeferredFieldsMixin,
+    viewsets.ReadOnlyModelViewSet,
+):
+    """Base read-only viewset for models of a single docket source."""
+
+    permission_classes = (DjangoModelPermissions,)
+    ordering = "-id"
+    ordering_fields: tuple[str, ...] = ("id", "date_created", "date_modified")
+    cursor_ordering_fields = ["id", "date_created", "date_modified"]
+
+
+class ScotusDocketMetadataViewSet(BaseSourceReadOnlyViewSet):
+    """SCOTUS-specific docket metadata."""
+
+    serializer_class = ScotusDocketMetadataSerializer
+    filterset_class = ScotusDocketMetadataFilter
+    queryset = ScotusDocketMetadata.objects.order_by("-id")
 
 
 class CourtViewSet(LoggingMixin, DeferredFieldsMixin, viewsets.ModelViewSet):
