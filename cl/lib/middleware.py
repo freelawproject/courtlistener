@@ -12,7 +12,7 @@ from waffle import flag_is_active
 from cl.search.forms import CorpusSearchForm
 
 # Templates a view returns on their own (htmx partials) live under this
-# prefix. .github/scripts/frontend_checks.py mirrors it in is_v2_partial.
+# prefix. .github/scripts/frontend_checks.py mirrors it in is_redesign_partial.
 V2_PARTIALS_PREFIX = "v2_includes/"
 # Unfinished redesign pages use this prefix instead of "v2_" and are only
 # served to visitors with both "use_new_design" and this flag active.

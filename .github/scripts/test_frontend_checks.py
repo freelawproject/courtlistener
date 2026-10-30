@@ -23,13 +23,15 @@ V2_TEMPLATE_FILE = "cl/foo/templates/v2_help/index.html"
 LEGACY_TEMPLATE_FILE = "cl/foo/templates/help/index.html"
 V2_TEMPLATE_BODY = '{% extends "new_base.html" %}'
 V2_PARTIAL_FILE = "cl/foo/templates/v2_includes/help/button.html"
+WIP_TEMPLATE_FILE = "cl/foo/templates/wip_help/index.html"
+WIP_PARTIAL_FILE = "cl/foo/templates/wip_includes/help/button.html"
 
 
-def _run_checks_on(
+def _findings_on(
     files: dict[str, str],
     changed: dict[str, str] | None = None,
     linted: list[str] | None = None,
-) -> list[tuple[str, int, str]]:
+) -> list[frontend_checks.Finding]:
     """Lint a temp repo containing ``files`` (``{repo-relative path: content}``).
 
     ``changed`` is the ``{path: git status}`` diff, simulating
@@ -37,7 +39,8 @@ def _run_checks_on(
     in ``changed`` that is missing from ``files`` stands for a deleted file.
     ``linted`` is the subset of ``changed`` handed to the checks, the way
     ``main()`` only hands over HTML and input.css; it defaults to all of it.
-    Returns ``(file, line, check)`` per finding, in report order.
+    Returns the findings in report order. Use it when a test needs a
+    finding's severity or message; otherwise use ``_run_checks_on``.
     """
     changed = changed or dict.fromkeys(files, "M")
     with tempfile.TemporaryDirectory() as tmp:
@@ -48,10 +51,20 @@ def _run_checks_on(
             path.write_text(
                 textwrap.dedent(content).lstrip("\n"), encoding="utf-8"
             )
-        findings = frontend_checks.run_checks(
+        return frontend_checks.run_checks(
             linted if linted is not None else list(changed), root, changed
         )
-    return [(f.file, f.line, f.check) for f in findings]
+
+
+def _run_checks_on(
+    files: dict[str, str],
+    changed: dict[str, str] | None = None,
+    linted: list[str] | None = None,
+) -> list[tuple[str, int, str]]:
+    """Like ``_findings_on``, but returns ``(file, line, check)`` per finding."""
+    return [
+        (f.file, f.line, f.check) for f in _findings_on(files, changed, linted)
+    ]
 
 
 class SkipFileDirectiveTest(unittest.TestCase):
@@ -261,12 +274,274 @@ class V2RegisterTest(unittest.TestCase):
         self.assertEqual(findings, [])
 
     def test_modified_v2_template_needs_no_registration(self) -> None:
-        """Only additions and copies of v2 templates ask for registration."""
+        """Only additions, copies and renames of v2 templates ask for registration."""
         findings = _run_checks_on(
             {V2_TEMPLATE_FILE: V2_TEMPLATE_BODY},
             changed={V2_TEMPLATE_FILE: "M"},
         )
         self.assertEqual(findings, [])
+
+    def test_promoted_template_points_to_v2_registry(self) -> None:
+        """A rename into v2_, such as a promotion from wip_, asks for V2_PAGES."""
+        findings = _findings_on(
+            {V2_TEMPLATE_FILE: V2_TEMPLATE_BODY},
+            changed={V2_TEMPLATE_FILE: "R100"},
+        )
+        self.assertEqual(
+            [(f.file, f.check) for f in findings],
+            [(V2_TEMPLATE_FILE, "check_v2_register")],
+        )
+        self.assertIn("V2PagesRegisterTest.V2_PAGES", findings[0].message)
+
+
+class WipTemplateTest(unittest.TestCase):
+    """wip_ templates are held to the same checks as v2_ ones."""
+
+    def test_wip_page_gets_the_v2_checks(self) -> None:
+        """New-stack rules apply to an unfinished page too."""
+        findings = _run_checks_on(
+            {
+                WIP_TEMPLATE_FILE: """
+                    {% extends "new_base.html" %}
+                    <script>$('.pray').click();</script>
+                    """
+            }
+        )
+        self.assertEqual(findings, [(WIP_TEMPLATE_FILE, 2, "check_jquery")])
+
+    def test_wip_page_is_not_a_legacy_template(self) -> None:
+        """Cotton in a wip_ template is not reported as new-stack leakage."""
+        findings = _run_checks_on(
+            {
+                WIP_TEMPLATE_FILE: """
+                    {% extends "new_base.html" %}
+                    <c-button>Pray</c-button>
+                    """
+            }
+        )
+        self.assertEqual(findings, [])
+
+    def test_added_wip_page_needs_base_and_registration(self) -> None:
+        """The page-only checks fire for a WIP page, registered in WIP_PAGES."""
+        findings = _findings_on(
+            {WIP_TEMPLATE_FILE: "<c-button>Pray</c-button>"},
+            changed={WIP_TEMPLATE_FILE: "A"},
+        )
+        self.assertEqual(
+            [(f.file, f.line, f.check) for f in findings],
+            [
+                (WIP_TEMPLATE_FILE, 1, "check_extends_new_base"),
+                (WIP_TEMPLATE_FILE, 1, "check_v2_register"),
+            ],
+        )
+        self.assertIn("V2PagesRegisterTest.WIP_PAGES", findings[1].message)
+
+    def test_added_wip_partial_skips_the_page_only_checks(self) -> None:
+        """A partial under wip_includes/ needs no base template or registration."""
+        findings = _run_checks_on(
+            {WIP_PARTIAL_FILE: "<c-button>Pray</c-button>"},
+            changed={WIP_PARTIAL_FILE: "A"},
+        )
+        self.assertEqual(findings, [])
+
+    def test_wip_page_may_extend_wip_or_v2(self) -> None:
+        """Unfinished pages may build on other unfinished or finished ones."""
+        for parent in ("wip_help/base.html", "v2_help/base.html"):
+            with self.subTest(parent):
+                findings = _run_checks_on(
+                    {WIP_TEMPLATE_FILE: f'{{% extends "{parent}" %}}'}
+                )
+                self.assertEqual(findings, [])
+
+
+class WipDependencyTest(unittest.TestCase):
+    """Finished v2_ templates must not pull in unfinished wip_ ones."""
+
+    def test_check_wip_dependency(self) -> None:
+        """Only extends/include of a template named with the wip_ prefix is reported."""
+        cases = {
+            '{% extends "wip_help/base.html" %}': [1],
+            "{% include 'wip_includes/card.html' %}": [1],
+            '{% include "help/wip_card.html" %}': [],
+            '{% extends "new_base.html" %}': [],
+            '{% include "v2_includes/swip_card.html" %}': [],
+            '<a href="/wip_help/">Help</a>': [],
+        }
+        for line, expected in cases.items():
+            with self.subTest(line):
+                self.assertEqual(
+                    [
+                        n
+                        for n, _ in frontend_checks.check_wip_dependency(
+                            [line]
+                        )
+                    ],
+                    expected,
+                )
+
+    def test_wip_flag_block_gates_wip_references(self) -> None:
+        """A wip_ include is allowed only in the WIP flag's opted-in branch."""
+        cases = {
+            "gated": (
+                """
+                {% flag "use_wip_design" %}
+                  {% include "wip_includes/card.html" %}
+                {% endflag %}
+                """,
+                [],
+            ),
+            "single-quoted flag name": (
+                """
+                {% flag 'use_wip_design' %}{% include "wip_includes/card.html" %}{% endflag %}
+                """,
+                [],
+            ),
+            "else branch is ungated": (
+                """
+                {% flag "use_wip_design" %}
+                  {% include "wip_includes/card.html" %}
+                {% else %}
+                  {% include "wip_includes/card.html" %}
+                {% endflag %}
+                """,
+                [4],
+            ),
+            "after the block ends": (
+                """
+                {% flag "use_wip_design" %}{% endflag %}
+                {% include "wip_includes/card.html" %}
+                """,
+                [2],
+            ),
+            "another flag does not gate": (
+                """
+                {% flag "use_new_design" %}
+                  {% include "wip_includes/card.html" %}
+                {% endflag %}
+                """,
+                [2],
+            ),
+            "an inner waffle switch's else stays gated": (
+                """
+                {% flag "use_wip_design" %}
+                  {% switch "some_switch" %}{% else %}
+                    {% include "wip_includes/card.html" %}
+                  {% endswitch %}
+                {% endflag %}
+                """,
+                [],
+            ),
+            "an inner if's else stays gated": (
+                """
+                {% flag "use_wip_design" %}
+                  {% if user.is_staff %}
+                    {% include "wip_includes/card.html" %}
+                  {% else %}
+                    {% include "wip_includes/card.html" %}
+                  {% endif %}
+                {% endflag %}
+                """,
+                [],
+            ),
+        }
+        for label, (template, expected) in cases.items():
+            with self.subTest(label):
+                lines = textwrap.dedent(template).strip("\n").splitlines()
+                self.assertEqual(
+                    [
+                        n
+                        for n, _ in frontend_checks.check_wip_dependency(lines)
+                    ],
+                    expected,
+                )
+
+    def test_v2_page_extending_wip_fails(self) -> None:
+        """A wip_ parent passes the base check but fails the dependency check."""
+        findings = _findings_on(
+            {V2_TEMPLATE_FILE: '{% extends "wip_help/base.html" %}'}
+        )
+        self.assertEqual(
+            [(f.file, f.line, f.check, f.severity) for f in findings],
+            [
+                (
+                    V2_TEMPLATE_FILE,
+                    1,
+                    "check_wip_dependency",
+                    frontend_checks.FAIL,
+                )
+            ],
+        )
+
+
+class WipCounterpartTest(unittest.TestCase):
+    """Legacy templates and their wip_ counterparts stay in sync."""
+
+    def test_wip_counterpart_needs_sync_notice(self) -> None:
+        """A changed WIP template asks for the notice on its legacy twin."""
+        findings = _run_checks_on(
+            {
+                LEGACY_TEMPLATE_FILE: "<div></div>",
+                WIP_TEMPLATE_FILE: V2_TEMPLATE_BODY,
+            },
+            changed={WIP_TEMPLATE_FILE: "M"},
+        )
+        self.assertEqual(
+            findings, [(LEGACY_TEMPLATE_FILE, 1, "check_sync_notice")]
+        )
+
+    def test_legacy_change_asks_for_every_counterpart(self) -> None:
+        """Each unchanged v2_ and wip_ twin of a legacy template is reported."""
+        findings = _findings_on(
+            {
+                LEGACY_TEMPLATE_FILE: "behind the use_new_design waffle flag.",
+                V2_TEMPLATE_FILE: V2_TEMPLATE_BODY,
+                WIP_TEMPLATE_FILE: V2_TEMPLATE_BODY,
+            },
+            changed={LEGACY_TEMPLATE_FILE: "M"},
+        )
+        self.assertEqual(
+            [(f.file, f.check) for f in findings],
+            [(LEGACY_TEMPLATE_FILE, "check_v2_counterpart_updated")] * 2,
+        )
+        self.assertIn(V2_TEMPLATE_FILE, findings[0].message)
+        self.assertIn(WIP_TEMPLATE_FILE, findings[1].message)
+
+    def test_deleted_legacy_with_only_wip_counterpart_fails(self) -> None:
+        """The page would be a 404 for everyone not opted into the WIP flag."""
+        findings = _findings_on(
+            {WIP_TEMPLATE_FILE: V2_TEMPLATE_BODY},
+            changed={LEGACY_TEMPLATE_FILE: "D"},
+        )
+        self.assertEqual(
+            [(f.file, f.check, f.severity) for f in findings],
+            [
+                (
+                    LEGACY_TEMPLATE_FILE,
+                    "check_legacy_template_deleted",
+                    frontend_checks.FAIL,
+                )
+            ],
+        )
+
+    def test_deleted_legacy_with_v2_and_wip_only_warns(self) -> None:
+        """v2_ takes over for everyone else, so it's the usual release warning."""
+        findings = _findings_on(
+            {
+                V2_TEMPLATE_FILE: V2_TEMPLATE_BODY,
+                WIP_TEMPLATE_FILE: V2_TEMPLATE_BODY,
+            },
+            changed={LEGACY_TEMPLATE_FILE: "D"},
+        )
+        self.assertEqual(
+            [(f.file, f.check, f.severity) for f in findings],
+            [
+                (
+                    LEGACY_TEMPLATE_FILE,
+                    "check_legacy_template_deleted",
+                    frontend_checks.WARN,
+                )
+            ],
+        )
 
 
 THIRD_PARTY = "cl/assets/static-global/js/third_party/"

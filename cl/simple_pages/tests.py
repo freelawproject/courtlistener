@@ -12,6 +12,7 @@ from django_cotton.compiler_regex import CottonCompiler
 from lxml.html import fromstring
 from waffle.testutils import override_flag
 
+from cl.lib.middleware import WIP_PROPS
 from cl.lib.test_helpers import SimpleUserDataMixin
 from cl.simple_pages.forms import ContactForm
 from cl.simple_pages.sitemap import SimpleSitemap
@@ -399,6 +400,9 @@ class V2PagesRegisterTest(PageLoadTestMixin, SimpleUserDataMixin, TestCase):
     Adding a page here is part of the definition of done for a
     redesigned template. The homepage is excluded — it has dedicated
     tests in cl/search/tests/test_v2_pages.py.
+
+    Unfinished pages go in WIP_PAGES instead, and move to V2_PAGES when
+    their template is promoted from the WIP prefix to v2_.
     """
 
     V2_PAGES: list[tuple[dict[str, Any], str]] = [
@@ -410,10 +414,15 @@ class V2PagesRegisterTest(PageLoadTestMixin, SimpleUserDataMixin, TestCase):
         ({"viewname": "court_index"}, "v2_jurisdictions.html"),
     ]
 
+    # (reverse_param, expected WIP template)
+    WIP_PAGES: list[tuple[dict[str, Any], str]] = []
+
     @staticmethod
-    def _get_legacy_counterpart(v2_template: str) -> str | None:
-        """Returns the legacy template a v2 one replaces, None otherwise."""
-        legacy = v2_template.removeprefix("v2_")
+    def _get_legacy_counterpart(new_template: str) -> str | None:
+        """Returns the legacy template a v2 or WIP one replaces, None otherwise."""
+        legacy = new_template.removeprefix("v2_").removeprefix(
+            WIP_PROPS["prefix"]
+        )
         try:
             get_template(legacy)
             return legacy
@@ -445,6 +454,36 @@ class V2PagesRegisterTest(PageLoadTestMixin, SimpleUserDataMixin, TestCase):
                 self.assertTemplateUsed(
                     r, self._get_legacy_counterpart(v2_template) or v2_template
                 )
+
+    @override_flag(WIP_PROPS["flag"], active=True)
+    def test_wip_pages(self) -> None:
+        """Do all registered WIP pages load with both redesign flags?"""
+        for reverse_param, wip_template in self.WIP_PAGES:
+            with self.subTest(
+                "Checking WIP page", reverse_params=reverse_param
+            ):
+                r = self.client.get(reverse(**reverse_param))
+                self.assertEqual(r.status_code, HTTPStatus.OK)
+                self.assertTemplateUsed(r, wip_template)
+
+    @override_flag(WIP_PROPS["flag"], active=False)
+    def test_wip_pages_without_the_wip_flag(self) -> None:
+        """Do registered WIP pages stay hidden with only use_new_design?
+
+        Each one falls back to its legacy template, or is a 404 when the
+        page has no legacy template to fall back to.
+        """
+        for reverse_param, wip_template in self.WIP_PAGES:
+            with self.subTest(
+                "Checking WIP page", reverse_params=reverse_param
+            ):
+                r = self.client.get(reverse(**reverse_param))
+                legacy = self._get_legacy_counterpart(wip_template)
+                if legacy is None:
+                    self.assertEqual(r.status_code, HTTPStatus.NOT_FOUND)
+                    continue
+                self.assertEqual(r.status_code, HTTPStatus.OK)
+                self.assertTemplateUsed(r, legacy)
 
 
 @override_flag("use_new_design", True)
