@@ -10,7 +10,7 @@ Rules here are enforced by CI (`frontend_checks.py`). If this doc and the script
 
 CourtListener is migrating from Bootstrap 3 / jQuery to Tailwind v3 / Alpine.js / Cotton. Both stacks coexist.
 
-**Before writing any frontend code, determine which stack you're working in.** Check whether the template extends `base.html` (legacy) or `new_base.html` (new), or whether a `v2_` counterpart exists. If unclear, ask. The two stacks use different technologies and conventions — mixing them causes subtle, hard-to-debug breakage.
+**Before writing any frontend code, determine which stack you're working in.** Check whether the template extends `base.html` (legacy) or `new_base.html` (new), or whether a `v2_` or `wip_` counterpart exists. If unclear, ask. The two stacks use different technologies and conventions — mixing them causes subtle, hard-to-debug breakage.
 
 | | Legacy | New (redesign) |
 |---|---|---|
@@ -18,7 +18,7 @@ CourtListener is migrating from Bootstrap 3 / jQuery to Tailwind v3 / Alpine.js 
 | CSS framework | Bootstrap 3 | Tailwind CSS |
 | JS framework | jQuery | Alpine.js |
 | Reusable fragments | `{% include %}` | Cotton components (`<c-...>`) |
-| Template prefix | `templates/<app>/` | `templates/v2_<app>/` |
+| Template prefix | `templates/<app>/` | `templates/v2_<app>/` (`templates/wip_<app>/` while [unfinished](#unfinished-wip-pages)) |
 
 **Do not mix stacks.** Legacy templates stay on Bootstrap/jQuery. New templates stay on Tailwind/Alpine/Cotton.
 
@@ -30,16 +30,45 @@ CourtListener is migrating from Bootstrap 3 / jQuery to Tailwind v3 / Alpine.js 
 
 Partials a view returns on their own, such as htmx responses, follow the same rule and live under `v2_includes/` (e.g., `includes/foo/button.html` → `v2_includes/foo/button.html`). They are swapped like any other template, but the checks that only make sense for full pages (extending `new_base.html`, registering in `V2PagesRegisterTest`) do not apply to them.
 
+### Unfinished (WIP) pages
+
+A page that isn't fully functional yet MUST use the `wip_` prefix instead of `v2_` (e.g., `wip_help/index.html`, partials under `wip_includes/`). The middleware serves it only when both `use_new_design` and `use_wip_design` are active, so people can choose to see finished pages only, or WIP pages too:
+
+| Flags active | Page with a `wip_` template gets |
+|---|---|
+| `use_new_design` + `use_wip_design` | the `wip_` template, even if a `v2_` one exists |
+| Only one of them, or none | what it would get without the `wip_` template; a 404 if it has no `v2_` or legacy template |
+
+WIP templates follow every rule for `v2_` templates, and CI checks them the same way. Register each WIP page in `V2PagesRegisterTest.WIP_PAGES`, not `V2_PAGES`.
+
+A `v2_` template MUST NOT extend or include a `wip_` template: only the template a view returns is swapped, so a WIP template pulled in by a finished one reaches everyone with `use_new_design`. To work on one section of a finished page, gate the include instead. The `{% else %}` branch is what everyone else sees, so it MUST NOT reference `wip_` templates:
+
+```html
+{% load waffle_tags %}
+{% flag "use_wip_design" %}
+  {% include "wip_includes/help/new_section.html" %}
+{% else %}
+  {% include "v2_includes/help/section.html" %}
+{% endflag %}
+```
+
+To mark a page as finished, promote it:
+1. `git mv` the template from `wip_` to `v2_` (e.g., `wip_help/index.html` → `v2_help/index.html`), along with its partials
+2. Move its entry from `WIP_PAGES` to `V2_PAGES` with the new template name
+3. Update the path in the legacy template's sync notice
+4. Point every `{% extends %}` or `{% include %}` of the old `wip_` names to the new `v2_` ones
+
 ### Base template
 
-New templates MUST extend `new_base.html` (or another `v2_` template). Only `new_base.html` loads Tailwind, Alpine, and Cotton.
+New templates MUST extend `new_base.html` (or another `v2_` or `wip_` template). Only `new_base.html` loads Tailwind, Alpine, and Cotton.
 
 ### Legacy ↔ v2 sync
 
-When a legacy template has a `v2_` counterpart:
-- The legacy template MUST have a sync-notice comment at the top referencing the waffle flag
+When a legacy template has a `v2_` or `wip_` counterpart:
+- The legacy template MUST have a sync-notice comment at the top referencing the waffle flag. Use the block below for both prefixes, changing only the path: CI looks for its exact wording
 - Changes to either version MUST be mirrored in the other for content/behavior parity (implementation details can differ by stack)
 - Deleting the legacy template makes the `v2_` version live for everyone, regardless of the waffle flag. Only do it once the v2 page is production-ready
+- A legacy template whose only counterpart is `wip_` MUST NOT be deleted: the page would be a 404 for everyone not opted into WIP pages. Promote it first
 
 Sync notice format:
 ```html
@@ -49,7 +78,7 @@ Sync notice format:
 ║ This template has a new version behind the use_new_design waffle flag.  ║
 ║                                                                         ║
 ║ When modifying this template, please also update the new version at:    ║
-║ <path to v2_ template>                                                  ║
+║ <path to v2_ or wip_ template>                                          ║
 ╚══════════════════════════════════════════════════════════════════════════╝
 {% endcomment %}
 ```
@@ -152,7 +181,7 @@ v2 uses htmx 2.0.11 from `js/third_party/` (legacy keeps 1.7.0). `new_base.html`
 {% require_script "js/third_party/htmx" defer=True %}
 ```
 
-Swapped partials live under `v2_includes/` (see [Naming & middleware](#naming--middleware)).
+Swapped partials live under `v2_includes/`, or `wip_includes/` while unfinished (see [Naming & middleware](#naming--middleware)).
 
 `<body>` in `new_base.html` carries `hx-headers` with the CSRF token, and htmx elements inherit it: an `hx-post` MUST NOT repeat the header.
 
@@ -227,7 +256,8 @@ To hide an "install RECAP" call to action from users who have the extension, mar
 The rules in this doc are enforced as hard errors that block merge. See `frontend_checks.py` for the full list. Additional CI checks not covered above:
 
 **Warnings** (annotated on PR, doesn't block):
-- `{% include %}` in v2 templates (use Cotton components; known exceptions exist)
+- `{% include %}` in v2/WIP templates (use Cotton components; known exceptions exist)
+- New or renamed v2/WIP page template without a change to `V2PagesRegisterTest`
 - New cotton component without a component library entry
 - `x-data` without a corresponding `{% require_script %}`
 - Placeholder text (TODO, TBD, FIXME, Lorem ipsum)
