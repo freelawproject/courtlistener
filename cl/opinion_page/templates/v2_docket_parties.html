@@ -19,6 +19,8 @@
       :has_alert="has_alert"
       :note_form="note_form"
     >
+      {# The card edges replace the first heading's top padding and the last party's divider. #}
+      <div class="[&>section:first-child>h2]:pt-0 [&>section:last-child>div:last-child>*]:border-b-0">
       {% for group in party_groups %}
         <section class="text-sm text-greyscale-800">
           <h2 class="flex items-center gap-3 py-6 md:pl-3 border-b border-greyscale-200">
@@ -30,9 +32,9 @@
             {# One grid per party. On desktop the party cell spans the "Represented By:" row and the first attorney row; later attorney rows get an empty left cell. #}
             {# Dividers: each attorney row and the criminal block draw one under their two columns; the party's last row, or the party cell itself when there are no attorneys, extends it across all three. On mobile only the firm and criminal cells draw it. #}
             <div class="grid grid-cols-1 md:grid-cols-3">
-              <div class="py-4 md:py-6 space-y-1 border-greyscale-200{% if party.attorneys %} md:row-span-2{% endif %}{% if not party.criminal %}{% if not party.attorneys %} border-b{% elif party.attorneys|length == 1 %} md:border-b{% endif %}{% endif %}">
+              <div class="py-4 md:py-6 md:pr-6 space-y-1 border-greyscale-200{% if party.attorneys %} md:row-span-2{% endif %}{% if not party.criminal %}{% if not party.attorneys %} border-b{% elif party.attorneys|length == 1 %} md:border-b{% endif %}{% endif %}">
                 <h3 class="text-md md:pl-3">
-                  {{ party.name|safe }}
+                  {{ party.name }}
                   {% if perms.people_db.change_party %}
                     <a href="{% url 'admin:people_db_party_change' party.pk %}" class="inline-block align-middle ml-1 text-greyscale-500 hover:text-greyscale-700 focus-visible:ring-2 focus-visible:ring-primary-400 focus-visible:outline-none rounded" aria-label="Edit {{ party.name }}" title="Edit {{ party.name }}">{% svg "edit" class="w-4 h-4" aria_hidden="true" %}</a>
                   {% endif %}
@@ -51,9 +53,9 @@
 
               {% for attorney in party.attorneys %}
                 {% if not forloop.first %}<div class="hidden md:block {% if forloop.last and not party.criminal %}border-b border-greyscale-200{% endif %}"></div>{% endif %}
-                <div class="py-4 space-y-1 md:border-b border-greyscale-200">
+                <div class="py-4 md:pr-6 space-y-1 md:border-b border-greyscale-200">
                   <p>
-                    {{ attorney.name|safe }}
+                    {{ attorney.name }}
                     {% if perms.people_db.change_attorney %}
                       <a href="{% url 'admin:people_db_attorney_change' attorney.pk %}" class="inline-block align-middle ml-1 text-greyscale-500 hover:text-greyscale-700 focus-visible:ring-2 focus-visible:ring-primary-400 focus-visible:outline-none rounded" aria-label="Edit {{ attorney.name }}" title="Edit {{ attorney.name }}">{% svg "edit" class="w-4 h-4" aria_hidden="true" %}</a>
                     {% endif %}
@@ -65,12 +67,14 @@
                 <div class="py-4 border-b border-greyscale-200 space-y-2">
                   {% for firm in attorney.firms %}
                     <div class="space-y-1">
-                      <p>
-                        {{ firm.name }}
-                        {% if perms.people_db.change_attorneyorganization %}
-                          <a href="{% url 'admin:people_db_attorneyorganization_change' firm.pk %}" class="inline-block align-middle ml-1 text-greyscale-500 hover:text-greyscale-700 focus-visible:ring-2 focus-visible:ring-primary-400 focus-visible:outline-none rounded" aria-label="Edit {{ firm.name }}" title="Edit {{ firm.name }}">{% svg "edit" class="w-4 h-4" aria_hidden="true" %}</a>
-                        {% endif %}
-                      </p>
+                      {% if firm.name %}
+                        <p>
+                          {{ firm.name }}
+                          {% if perms.people_db.change_attorneyorganization %}
+                            <a href="{% url 'admin:people_db_attorneyorganization_change' firm.pk %}" class="inline-block align-middle ml-1 text-greyscale-500 hover:text-greyscale-700 focus-visible:ring-2 focus-visible:ring-primary-400 focus-visible:outline-none rounded" aria-label="Edit {{ firm.name }}" title="Edit {{ firm.name }}">{% svg "edit" class="w-4 h-4" aria_hidden="true" %}</a>
+                          {% endif %}
+                        </p>
+                      {% endif %}
                       {% for line in firm.address_lines %}<p class="italic">{{ line }}</p>{% endfor %}
                     </div>
                   {% endfor %}
@@ -115,6 +119,7 @@
           {% endfor %}
         </section>
       {% endfor %}
+      </div>
     </c-docket-page>
   </div>
 </div>
