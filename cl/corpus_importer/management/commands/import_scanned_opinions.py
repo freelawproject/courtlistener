@@ -101,6 +101,16 @@ DECIDED_DATE_RE = re.compile(
 FILED_DATE_RE = re.compile(
     rf"\bfiled\b{DATE_LABEL_SEPARATOR}({FULL_DATE_PATTERN})", re.IGNORECASE
 )
+# Dates labeled as the oral argument date, e.g. "Argued September 18, 2025"
+# or "Argued and Submitted Oct. 3, 2023". Reargument dates, spelled
+# "Reargued", "Re-argued", "Re argued" or "Re- argued" when OCR splits the
+# word, don't match.
+ARGUED_DATE_RE = re.compile(
+    r"\b(?<!re[\s\-\u2013])(?<!re[\-\u2013]\s)argued"
+    rf"(?:\s+and\s+submitted)?\b{DATE_LABEL_SEPARATOR}"
+    rf"({FULL_DATE_PATTERN})",
+    re.IGNORECASE,
+)
 # The "No." or "Case No." printed before docket numbers
 DOCKET_NUMBER_PREFIX_RE = re.compile(
     r"^(?:case\s+)?nos?(?:\.\s*|\s+)", re.IGNORECASE
@@ -196,6 +206,7 @@ class ScanCase:
     docket_number: str
     court: Court
     date_filed: date
+    date_argued: date | None
     parsed_citations: list[FullCaseCitation]
     judges: str
     body_characters: str
@@ -553,6 +564,21 @@ def get_precedential_status(
     return PRECEDENTIAL_STATUS.PUBLISHED
 
 
+def parse_date_text(date_text: str) -> date | None:
+    """Parse a complete date matched by `FULL_DATE_PATTERN`.
+
+    :param date_text: The date, e.g. "Sept. 3, 2024" or "5/22/2024".
+    :return: The date, or None if it doesn't exist, e.g. an OCR error like
+        "Feb. 30, 2024".
+    """
+    # Normalize "Sept." since dateutil only knows "Sep"
+    date_text = re.sub(r"(?i)\bsept\b", "Sep", date_text)
+    try:
+        return convert_date_string(date_text)
+    except (ValueError, OverflowError):
+        return None
+
+
 def get_date_filed(soup: BeautifulSoup) -> date | None:
     """Parse the decision date of the scanned opinion.
 
@@ -574,13 +600,25 @@ def get_date_filed(soup: BeautifulSoup) -> date | None:
     ):
         for text in texts:
             for match in date_re.finditer(text):
-                # Normalize "Sept." since dateutil only knows "Sep"
-                date_text = re.sub(r"(?i)\bsept\b", "Sep", match.group(group))
-                try:
-                    return convert_date_string(date_text)
-                except (ValueError, OverflowError):
-                    # e.g. an OCR error like "Feb. 30, 2024"
-                    continue
+                if parsed := parse_date_text(match.group(group)):
+                    return parsed
+    return None
+
+
+def get_date_argued(soup: BeautifulSoup) -> date | None:
+    """Parse the oral argument date of the scanned opinion.
+
+    Books print it labeled "Argued", usually in an `<otherdate>` element,
+    e.g. "Argued September 18, 2025", or with the decision date, e.g.
+    "Argued Oct. 3, 2023. Decided May 22, 2024."
+
+    :param soup: The parsed XML.
+    :return: The first valid argued date, or None if there is none.
+    """
+    for element in soup.select("otherdate, decisiondate"):
+        for match in ARGUED_DATE_RE.finditer(element.get_text(" ")):
+            if parsed := parse_date_text(match.group(1)):
+                return parsed
     return None
 
 
@@ -738,6 +776,7 @@ def parse_scan_xml(
         docket_number=get_docket_number(soup),
         court=court,
         date_filed=date_filed,
+        date_argued=get_date_argued(soup),
         parsed_citations=cites,
         judges=get_judges(soup),
         precedential_status=get_precedential_status(soup, cites),
@@ -1245,12 +1284,38 @@ def add_scanned_opinions(
     return plan.new_opinions
 
 
+def fill_date_argued(docket: Docket, scan_case: ScanCase) -> bool:
+    """Set the docket's date_argued from the scan, if the docket has none.
+
+    A differing date already on the docket is kept and logged.
+
+    :param docket: The docket of the cluster the scan is merged into.
+    :param scan_case: The parsed scanned opinion.
+    :return: True if the docket's date_argued was set, so it must be saved.
+    """
+    if not scan_case.date_argued:
+        return False
+    if docket.date_argued:
+        if docket.date_argued != scan_case.date_argued:
+            logger.debug(
+                "Docket %s keeps its date_argued %s instead of the scan's %s",
+                docket.pk,
+                docket.date_argued,
+                scan_case.date_argued,
+            )
+        return False
+    logger.info("Filling empty date_argued of docket %s", docket.pk)
+    docket.date_argued = scan_case.date_argued
+    return True
+
+
 def merge_into_cluster(
     cluster: OpinionCluster, plan: OpinionMergePlan, scan_case: ScanCase
 ) -> None:
     """Merge a scanned opinion into an existing cluster.
 
-    Adds missing citations, fills empty cluster fields, creates the scanned
+    Adds missing citations, fills empty cluster fields and the docket's
+    date_argued, creates the scanned
     opinions and makes the cluster's opinions their versions as the plan
     says, stores the XML, and updates the cluster and docket sources.
 
@@ -1298,7 +1363,10 @@ def merge_into_cluster(
         docket.source = Docket.merge_sources(
             docket.source, Docket.SCANNING_PROJECT
         )
-        docket.save(update_fields=["source"])
+        docket_update_fields = ["source"]
+        if fill_date_argued(docket, scan_case):
+            docket_update_fields.append("date_argued")
+        docket.save(update_fields=docket_update_fields)
 
         opinions = add_scanned_opinions(cluster, plan, scan_case)
         queue_citation_finding([opinion.pk for opinion in opinions])
@@ -1343,10 +1411,15 @@ def add_new_case(scan_case: ScanCase) -> OpinionCluster:
                 docket_number=scan_case.docket_number,
                 docket_number_raw=scan_case.docket_number,
                 court=scan_case.court,
+                date_argued=scan_case.date_argued,
                 ia_needs_upload=False,
             )
         elif docket.pk:
             logger.info("Using existing docket %s", docket.pk)
+            # Keep the date of a docket from another source, like a merge
+            fill_date_argued(docket, scan_case)
+        else:
+            docket.date_argued = scan_case.date_argued
         docket.save()
 
         cluster = OpinionCluster(
