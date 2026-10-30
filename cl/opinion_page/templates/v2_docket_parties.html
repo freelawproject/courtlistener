@@ -21,7 +21,7 @@
     >
       {% for group in party_groups %}
         <section class="text-sm text-greyscale-800">
-          <h2 class="flex items-center gap-3 py-6 pl-3 border-b border-greyscale-200">
+          <h2 class="flex items-center gap-3 py-6 md:pl-3 border-b border-greyscale-200">
             {% svg "person" class="w-6 h-6 text-greyscale-500" aria_hidden="true" %}
             {{ group.name }}
           </h2>
@@ -30,20 +30,20 @@
             {# One grid per party. On desktop the party cell spans the "Represented By:" row and the first attorney row; later attorney rows get an empty left cell. #}
             {# Dividers: each attorney row and the criminal block draw one under their two columns; the party's last row, or the party cell itself when there are no attorneys, extends it across all three. On mobile only the firm and criminal cells draw it. #}
             <div class="grid grid-cols-1 md:grid-cols-3">
-              <div class="py-6 space-y-1 border-greyscale-200{% if party.attorneys %} md:row-span-2{% endif %}{% if not party.criminal %}{% if not party.attorneys %} border-b{% elif party.attorneys|length == 1 %} md:border-b{% endif %}{% endif %}">
-                <h3 class="text-md pl-3">
+              <div class="py-4 md:py-6 space-y-1 border-greyscale-200{% if party.attorneys %} md:row-span-2{% endif %}{% if not party.criminal %}{% if not party.attorneys %} border-b{% elif party.attorneys|length == 1 %} md:border-b{% endif %}{% endif %}">
+                <h3 class="text-md md:pl-3">
                   {{ party.name|safe }}
                   {% if perms.people_db.change_party %}
                     <a href="{% url 'admin:people_db_party_change' party.pk %}" class="inline-block align-middle ml-1 text-greyscale-500 hover:text-greyscale-700 focus-visible:ring-2 focus-visible:ring-primary-400 focus-visible:outline-none rounded" aria-label="Edit {{ party.name }}" title="Edit {{ party.name }}">{% svg "edit" class="w-4 h-4" aria_hidden="true" %}</a>
                   {% endif %}
                 </h3>
                 {% if party.date_terminated %}
-                  <p class="italic pl-3">Terminated ({{ party.date_terminated }})</p>
+                  <p class="italic md:pl-3">Terminated ({{ party.date_terminated }})</p>
                 {% endif %}
               </div>
 
               {% if party.attorneys %}
-                <p class="pt-6 text-md font-semibold text-greyscale-900">Represented By:</p>
+                <p class="pt-4 md:pt-6 text-md font-semibold text-greyscale-900">Represented By:</p>
                 <div class="hidden md:block"></div>
               {% else %}
                 <div class="hidden md:block md:col-span-2 border-b border-greyscale-200"></div>
@@ -91,7 +91,7 @@
                       <c-description-details>{{ party.criminal.highest_offense_level_terminated }}</c-description-details>
                     </c-description-item>
                   </c-description-list>
-                  <div class="mt-4">
+                  <div class="mt-4 [&_tr:last-child]:border-b-0">
                     <c-flex-table
                       caption="Criminal charges for {{ party.name }}"
                       :columns="[
