@@ -472,6 +472,18 @@ class WipDependencyTest(unittest.TestCase):
             ],
         )
 
+    def test_shared_templates_including_wip_fail(self) -> None:
+        """new_base.html and Cotton components render inside finished pages."""
+        for path in (
+            "cl/assets/templates/new_base.html",
+            "cl/assets/templates/cotton/header.html",
+        ):
+            with self.subTest(path):
+                findings = _run_checks_on(
+                    {path: '{% include "wip_includes/header.html" %}'}
+                )
+                self.assertEqual(findings, [(path, 1, "check_wip_dependency")])
+
 
 class WipCounterpartTest(unittest.TestCase):
     """Legacy templates and their wip_ counterparts stay in sync."""
@@ -542,6 +554,48 @@ class WipCounterpartTest(unittest.TestCase):
                 )
             ],
         )
+
+
+class RenamedLegacyTemplateTest(unittest.TestCase):
+    """``main()`` treats the old side of a rename as a deleted file."""
+
+    def _main(
+        self, name_status: str, files: dict[str, str]
+    ) -> tuple[int, str]:
+        """Run ``main()`` on a temp repo holding ``files``; return its exit
+        code and output."""
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            for rel_path, content in files.items():
+                path = root / rel_path
+                path.parent.mkdir(parents=True, exist_ok=True)
+                path.write_text(content, encoding="utf-8")
+            changed = root / "changed_files.txt"
+            changed.write_text(name_status, encoding="utf-8")
+            argv = ["frontend_checks.py", "--repo-root", tmp]
+            argv += ["--changed-files", str(changed)]
+            out = io.StringIO()
+            with mock.patch("sys.argv", argv), contextlib.redirect_stdout(out):
+                code = frontend_checks.main()
+        return code, out.getvalue()
+
+    def test_legacy_moved_to_wip_fails(self) -> None:
+        """The page would be a 404 for everyone not opted into WIP pages."""
+        code, out = self._main(
+            f"R100\t{LEGACY_TEMPLATE_FILE}\t{WIP_TEMPLATE_FILE}\n",
+            {WIP_TEMPLATE_FILE: V2_TEMPLATE_BODY},
+        )
+        self.assertEqual(code, 1)
+        self.assertIn("[check_legacy_template_deleted]", out)
+
+    def test_legacy_moved_to_v2_warns(self) -> None:
+        """Moving it to v2_ releases the page, like deleting the legacy file."""
+        code, out = self._main(
+            f"R100\t{LEGACY_TEMPLATE_FILE}\t{V2_TEMPLATE_FILE}\n",
+            {V2_TEMPLATE_FILE: V2_TEMPLATE_BODY},
+        )
+        self.assertEqual(code, 0)
+        self.assertIn("[check_legacy_template_deleted]", out)
 
 
 THIRD_PARTY = "cl/assets/static-global/js/third_party/"

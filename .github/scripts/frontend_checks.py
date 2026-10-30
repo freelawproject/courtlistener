@@ -140,6 +140,16 @@ def is_legacy_template(path: str) -> bool:
     return True
 
 
+def renders_in_finished_pages(path: str) -> bool:
+    """A template finished pages render: v2_ templates, new_base.html and
+    Cotton components. Anything wip_ they pull in reaches those pages too."""
+    return (
+        is_v2_template(path)
+        or path.endswith("new_base.html")
+        or is_cotton_component(path)
+    )
+
+
 def is_input_css(path: str) -> bool:
     return path == "cl/assets/tailwind/input.css"
 
@@ -463,13 +473,14 @@ def check_extends_new_base(lines: list[str]) -> list[tuple[int, str]]:
 
 
 def check_wip_dependency(lines: list[str]) -> list[tuple[int, str]]:
-    """v2_ templates must not extend or include wip_ templates ungated.
+    """Templates finished pages render must not use wip_ templates ungated.
 
     Only the template a view returns is swapped, so a wip_ template pulled in
-    by a v2_ one would be served to everyone with the redesign flag, finished
-    or not. Inside a {% flag "use_wip_design" %} block it only renders for
-    visitors opted into WIP pages, so it's allowed there, but not in that
-    block's {% else %} branch, which everyone else sees.
+    by a v2_ one, new_base.html or a Cotton component would be served to
+    everyone with the redesign flag, finished or not. Inside a
+    {% flag "use_wip_design" %} block it only renders for visitors opted
+    into WIP pages, so it's allowed there, but not in that block's
+    {% else %} branch, which everyone else sees.
     """
     results = []
     tag_re = re.compile(r"{%\s*(\w+)(.*?)%}", re.IGNORECASE)
@@ -499,8 +510,8 @@ def check_wip_dependency(lines: list[str]) -> list[tuple[int, str]]:
                 results.append(
                     (
                         i,
-                        f'{tag} "{name}" — v2_ templates must not depend on '
-                        f"wip_ templates outside a "
+                        f'{tag} "{name}" — templates finished pages render '
+                        f"must not depend on wip_ templates outside a "
                         f'{{% flag "{WIP_FLAG}" %}} block; gate it or '
                         f"promote it to v2_ first",
                     )
@@ -856,7 +867,8 @@ V2_PAGE_CHECKS = [
     (check_extends_new_base, FAIL),
 ]
 
-# Finished pages only; wip_ templates may build on each other.
+# Templates finished pages render (see renders_in_finished_pages); wip_
+# templates may build on each other.
 V2_ONLY_CHECKS = [
     (check_wip_dependency, FAIL),
 ]
@@ -941,7 +953,7 @@ def run_checks(
         if is_redesign_template(filepath):
             _apply_checks(V2_CHECKS, lines, filepath, findings)
 
-        if is_v2_template(filepath):
+        if renders_in_finished_pages(filepath):
             _apply_checks(V2_ONLY_CHECKS, lines, filepath, findings)
 
         if is_redesign_template(filepath) and not is_redesign_partial(
@@ -1317,6 +1329,10 @@ def main() -> int:
         # A rename also removes its old path; a copy leaves it untouched.
         if status.startswith("R") and len(parts) == 3:
             diff_paths.append(parts[1])
+            # Report the old path as deleted, so moving a legacy template
+            # to wip_ or v2_ gets the same checks as deleting it.
+            file_statuses[parts[1]] = "D"
+            changed_files.append(parts[1])
 
     # Filter to relevant files
     relevant = [
