@@ -157,12 +157,15 @@ def social_user(sociallogin: SocialLogin) -> User:
 def asserted_email(sociallogin: SocialLogin) -> str:
     """Return the address the IdP vouched for, lowercased.
 
+    allauth never copies it onto ``sociallogin.user``, because
+    ACCOUNT_USER_MODEL_EMAIL_FIELD is None.
+
     :param sociallogin: The pending login.
     :return: The address, or "" if the IdP sent none.
     """
     if sociallogin.email_addresses:
         return sociallogin.email_addresses[0].email.strip().lower()
-    return (getattr(sociallogin.user, "email", "") or "").strip().lower()
+    return ""
 
 
 def generate_username(email: str) -> str:

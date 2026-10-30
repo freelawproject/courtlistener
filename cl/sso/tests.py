@@ -16,6 +16,7 @@ from django.core import mail
 from django.core.exceptions import ValidationError
 from django.core.management import call_command
 from django.db import connection
+from django.test import RequestFactory
 from django.test.utils import CaptureQueriesContext
 from django.urls import (
     NoReverseMatch,
@@ -38,7 +39,7 @@ from cl.sso.factories import (
     SocialAppFactory,
     SSOConnectionFactory,
 )
-from cl.sso.linking import get_connection
+from cl.sso.linking import asserted_email, get_connection
 from cl.sso.membership import EffectiveMembership, get_effective_membership
 from cl.sso.models import (
     AuthEvent,
@@ -579,6 +580,40 @@ class OIDCLoginTest(SSOFixtureMixin, TestCase):
 
         self.assertEqual(r.status_code, 403)
         self.assertNotSignedIn()
+
+
+class SAMLEmailTest(TestCase):
+    """The address a SAML response carries."""
+
+    def test_saml_address_reaches_the_login(self) -> None:
+        """Is the IdP's address found in an attribute or the NameID?
+
+        allauth's SAML provider has no ``extract_email_addresses``. The
+        address only reaches ``email_addresses`` because allauth moves the
+        mapped ``email`` field there, which must keep working with
+        ACCOUNT_USER_MODEL_EMAIL_FIELD set to None.
+        """
+        app = SocialAppFactory.create(
+            provider="saml", provider_id="acme-saml", client_id="acme"
+        )
+        provider = app.get_provider(RequestFactory().get("/"))
+        email_attribute = "urn:oid:0.9.2342.19200300.100.1.3"
+        email_format = "urn:oasis:names:tc:SAML:1.1:nameid-format:emailAddress"
+        for label, attributes, nameid_format in (
+            ("attribute", {email_attribute: ["Ada@Acme.test"]}, "persistent"),
+            ("NameID", {}, email_format),
+        ):
+            with self.subTest(label):
+                response = mock.Mock()
+                response.get_attributes.return_value = attributes
+                response.get_nameid.return_value = "Ada@Acme.test"
+                response.get_nameid_format.return_value = nameid_format
+
+                sociallogin = provider.sociallogin_from_response(
+                    RequestFactory().get("/"), response
+                )
+
+                self.assertEqual(asserted_email(sociallogin), "ada@acme.test")
 
 
 class EffectiveMembershipTest(TestCase):
