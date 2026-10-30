@@ -17,6 +17,10 @@ from django.utils.timezone import make_aware, now
 
 from cl.api.constants import TIER_1_RATES, TIER_2_RATES
 from cl.api.models import APIThrottle, ThrottleType
+from cl.api.utils import (
+    CloudFrontAnonRateThrottle,
+    ExceptionalUserRateThrottle,
+)
 from cl.donate.api_views import MembershipWebhookViewSet
 from cl.donate.factories import (
     NeonMembershipFactory,
@@ -867,6 +871,43 @@ class MembershipWebhookTest(TestCase):
 
         # Verify regular user account is updated with Neon data
         self.assertEqual(user_profile.neon_account_id, "1246")
+
+    @override_settings(
+        CACHES={
+            "default": {
+                "BACKEND": "django.core.cache.backends.locmem.LocMemCache",
+                "LOCATION": "membership-webhook-throttle-test",
+            }
+        }
+    )
+    @patch(
+        "cl.donate.api_views.MembershipWebhookViewSet._handle_membership_creation",
+    )
+    def test_webhook_is_never_rate_limited(self, mock_creation) -> None:
+        """Neon's webhook bursts must get 201s, whatever the API throttles say."""
+        # Neon posts from a few fixed addresses with no API user, so in
+        # production every webhook counts against one ident's "anon" and
+        # "user" buckets. Tighten both to a single request: if the viewset
+        # consulted either throttle, every call after the first would be 429.
+        self.data["eventTrigger"] = "createMembership"
+        rates = {"anon": "1/day", "user": "1/day"}
+        client = Client()
+        with (
+            patch.object(CloudFrontAnonRateThrottle, "THROTTLE_RATES", rates),
+            patch.object(ExceptionalUserRateThrottle, "THROTTLE_RATES", rates),
+        ):
+            for version in ("v3", "v4"):
+                url = reverse(
+                    "membership-webhooks-list", kwargs={"version": version}
+                )
+                for attempt in (1, 2):
+                    with self.subTest(version=version, attempt=attempt):
+                        r = client.post(
+                            url,
+                            data=self.data,
+                            content_type="application/json",
+                        )
+                        self.assertEqual(r.status_code, HTTPStatus.CREATED)
 
 
 class ProfileMembershipTest(TestCase):
