@@ -23,6 +23,7 @@ CELERY_QUEUES = (
     "inception_s3",
     "iquery",
     "recap_fetch",
+    "search_alerts",
 )
 
 # This can be useful in a dev environment:
