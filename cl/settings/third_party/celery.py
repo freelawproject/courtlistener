@@ -8,6 +8,9 @@ CELERY_ETL_TASK_QUEUE = env("CELERY_ETL_TASK_QUEUE", default="celery")
 CELERY_PACER_FETCH_QUEUE = env("CELERY_PACER_FETCH_QUEUE", default="celery")
 CELERY_FEEDS_QUEUE = env("CELERY_FEEDS_QUEUE", default="feeds")
 CELERY_IQUERY_QUEUE = env("CELERY_IQUERY_QUEUE", default="celery")
+CELERY_SEARCH_ALERTS_QUEUE = env(
+    "CELERY_SEARCH_ALERTS_QUEUE", default="search_alerts"
+)
 CELERY_QUEUES = (
     "batch0",
     "batch1",
