@@ -13,8 +13,8 @@
   tab_content_id="tab-content"
 />
 
-<div>
-{% if perms.search|has_any_perm:"docket" %}
+<div class="flex flex-col gap-9">
+  {% if perms.search|has_any_perm:"docket" %}
   <div class="flex justify-end mb-2" x-data>
     <c-button variant="dark" size="sm" href="{% url 'admin:search_docket_change' docket.pk %}">
       {% svg "edit" class="w-3.5 h-3.5" aria_hidden="true" %}
@@ -27,207 +27,232 @@
 {% endif %}
 
 {# Filed date eyebrow #}
-{% if docket.date_filed %}
-  <c-eyebrow class="mb-2">Filed: {{ docket.date_filed }}</c-eyebrow>
-{% endif %}
-
-{# Title and court #}
-<hgroup>
-  {# select-all makes each value a one-click selection for copying, as the legacy page does. #}
-  <h1 data-type="search.Docket" data-id="{{ docket.pk }}">
-    <span class="select-all cursor-text">{{ docket|best_case_name|safe|v_wrapper }}</span>
-    {% if docket.docket_number %}
-      (<span class="select-all cursor-text whitespace-nowrap">{{ docket.docket_number }}</span>)
-    {% endif %}
-  </h1>
-  {% if docket.court %}
-    <p class="text-display-xs font-semibold text-greyscale-900">{{ docket.court }}</p>
+  {% if docket.date_filed %}
+    <c-eyebrow>Filed: {{ docket.date_filed }}</c-eyebrow>
   {% endif %}
-</hgroup>
 
-{% if perms.search.change_docket and docket.blocked %}
-  <span class="inline-block px-3 py-1 text-sm font-semibold text-red-700 bg-red-100 border border-red-300 rounded-lg">Blocked</span>
-{% endif %}
+  {# Title and court #}
+  <div>
+    {# select-all makes each value a one-click selection for copying, as the legacy page does. #}
+    <h1 data-type="search.Docket" data-id="{{ docket.pk }}">
+      <span class="select-all cursor-text">{{ docket|best_case_name|safe|v_wrapper }}</span>
+      {% if docket.docket_number %}
+        (<span class="select-all cursor-text whitespace-nowrap">{{ docket.docket_number }}</span>)
+      {% endif %}
+    </h1>
+    {% if docket.court %}
+      <p class="text-display-xs font-semibold text-greyscale-900">{{ docket.court }}</p>
+    {% endif %}
 
-{# Action buttons — Note and Tags are placeholders. #}
-{# TODO: Wire up Add a Note and Tags button interactivity. #}
-<div class="flex flex-wrap gap-2 mt-4">
-  <c-button variant="outline">
-    {% svg "bookmark" class="w-4 h-4" aria_hidden="true" %}
-    Add a Note
-  </c-button>
-  <c-button variant="outline">
-    {% svg "tag" class="w-4 h-4" aria_hidden="true" %}
-    Tags
-  </c-button>
-  {% if docket_source_url %}
-  <c-menu-button
-    button_variant="outline"
-    widget_aria_label="Docket alerts menu"
-    menu_aria_label="Alert options"
-  >
-    <c-slot name="button_content">
-      {# Swap target: the toggle response replaces this span's contents. #}
-      <span id="docket-alert-label-{{ docket.pk }}" class="contents">
-        <c-docket-alert-label :has_alert="has_alert" />
-      </span>
-      <span
-        class="transition-transform duration-200 group-aria-[expanded=true]:rotate-180 flex justify-center items-center w-4 h-4"
-        aria-hidden="true"
-      >{% svg "chevron" class="w-full h-full text-greyscale-400" %}</span>
-    </c-slot>
-    <c-slot name="menu_content">
-      {% if user.is_authenticated %}
+    {% if docket_source_url and user.is_authenticated %}
+      {# Quota dialog, rendered closed. A refused toggle fires docket-alert-quota-reached, which opens it, and fills the alert count out of band. #}
+      <c-dialog
+        x-on:docket-alert-quota-reached.window="open"
+        panel_class="p-6 rounded-2xl max-w-[706px] gap-6 max-md:absolute max-md:bottom-0 max-md:rounded-b-none max-md:max-w-full"
+        dialog_class="items-center"
+      >
+        <c-slot name="panel">
+          <h2 x-dialog:title class="text-display-xs font-semibold text-greyscale-900">Please Become a Member <span data-recap-plea>or Install RECAP</span> to Make More Alerts</h2>
+          <div class="flex flex-col gap-3" x-dialog:description>
+            <p class="text-sm text-greyscale-800">Docket alerts are an advanced feature of CourtListener. Members can create unlimited docket alerts. If you are not a member, we allow <strong>{{ MAX_FREE_DOCKET_ALERTS|apnumber }}</strong> alerts and give a bonus of <strong>{{ DOCKET_ALERT_RECAP_BONUS|apnumber }}</strong> alerts to anybody with the RECAP Extension installed.</p>
+            {# Filled by the toggle response. #}
+            <p class="text-sm text-greyscale-800">You currently have <strong id="docket-alert-quota-count-{{ docket.pk }}"></strong> alerts. To create additional alerts, please <span data-recap-plea>install the RECAP Extension or </span>become a Member.</p>
+            <p class="text-sm text-greyscale-800">We can sometimes provide need-based exceptions to these rules. If you might need an exception, <a href="{% url 'contact' %}" class="links">please let us know</a>.</p>
+          </div>
+          <div class="flex flex-row flex-wrap justify-end gap-2">
+            <c-button variant="outline" x-on:click="close">Close</c-button>
+            <c-button variant="outline" href="https://free.law/recap/" data-recap-plea>Install RECAP</c-button>
+            <c-button variant="primary" autofocus href="https://free.law/membership/">Become a Member</c-button>
+          </div>
+        </c-slot>
+      </c-dialog>
+    {% endif %}
+  </div>
+
+  {% if perms.search.change_docket and docket.blocked %}
+    <span class="self-start px-3 py-1 text-sm font-semibold text-red-700 bg-red-100 border border-red-300 rounded-lg">Blocked</span>
+  {% endif %}
+
+  {# Action buttons — Note and Tags are placeholders. #}
+  {# TODO: Wire up Add a Note and Tags button interactivity. #}
+  <div class="flex flex-wrap gap-2">
+    <c-button variant="outline">
+      {% svg "bookmark" class="w-4 h-4" aria_hidden="true" %}
+      Add a Note
+    </c-button>
+    <c-button variant="outline">
+      {% svg "tag" class="w-4 h-4" aria_hidden="true" %}
+      Tags
+    </c-button>
+    {% if docket_source_url %}
+    <c-menu-button
+      button_variant="outline"
+      widget_aria_label="Docket alerts menu"
+      menu_aria_label="Alert options"
+    >
+      <c-slot name="button_content">
+        {# Swap target: the toggle response replaces this span's contents. #}
+        <span id="docket-alert-label-{{ docket.pk }}" class="contents">
+          <c-docket-alert-label :has_alert="has_alert" />
+        </span>
+        <span
+          class="transition-transform duration-200 group-aria-[expanded=true]:rotate-180 flex justify-center items-center w-4 h-4"
+          aria-hidden="true"
+        >{% svg "chevron" class="w-full h-full text-greyscale-400" %}</span>
+      </c-slot>
+      <c-slot name="menu_content">
+        {% if user.is_authenticated %}
+          <c-menu-button.item
+            tag="button"
+            hx-post="{% url 'toggle_docket_alert' %}"
+            hx-vals='{"id": "{{ docket.pk }}"}'
+            hx-swap="none"
+            hx-disabled-elt="this"
+            x-on:docket-alert-quota-reached="closeAndFocusTrigger"
+          >
+            <span id="docket-alert-toggle-{{ docket.pk }}" class="contents">
+              <c-docket-alert-label :has_alert="has_alert" icon_class="w-4 h-4 text-greyscale-500" />
+            </span>
+          </c-menu-button.item>
+        {% else %}
+          <c-menu-button.item
+            href="{% url 'sign-in' %}?next={{ request.get_full_path|urlencode }}"
+            icon="bell"
+            icon_class="w-4 h-4 text-greyscale-500"
+            rel="nofollow"
+          >
+            Get Alerts
+          </c-menu-button.item>
+        {% endif %}
         <c-menu-button.item
-          tag="button"
-          hx-post="{% url 'toggle_docket_alert' %}"
-          hx-vals='{"id": "{{ docket.pk }}"}'
-          hx-swap="none"
-          hx-disabled-elt="this"
-          x-on:docket-alert-quota-reached="closeAndFocusTrigger"
-        >
-          <span id="docket-alert-toggle-{{ docket.pk }}" class="contents">
-            <c-docket-alert-label :has_alert="has_alert" icon_class="w-4 h-4 text-greyscale-500" />
-          </span>
-        </c-menu-button.item>
-      {% else %}
-        <c-menu-button.item
-          href="{% url 'sign-in' %}?next={{ request.get_full_path|urlencode }}"
-          icon="bell"
+          href="{% url 'docket_feed' docket.pk %}"
+          icon="rss"
           icon_class="w-4 h-4 text-greyscale-500"
           rel="nofollow"
         >
-          Get Alerts
+          Subscribe with RSS
         </c-menu-button.item>
-      {% endif %}
-      <c-menu-button.item
-        href="{% url 'docket_feed' docket.pk %}"
-        icon="rss"
-        icon_class="w-4 h-4 text-greyscale-500"
-        rel="nofollow"
+        <c-menu-button.item
+          href="{% url 'new_docket_alert' %}?pacer_case_id={{ docket.pacer_case_id }}&court_id={{ docket.court_id }}"
+          icon="forward"
+          icon_class="w-4 h-4 text-greyscale-500"
+          rel="nofollow"
+        >
+          Share Alert Link
+        </c-menu-button.item>
+        <c-menu-button.item
+          href="{{ WIKI_HELP_URL }}/alerts/docket-alerts-for-pacer"
+          icon="circle_question_mark"
+          icon_class="w-4 h-4 text-greyscale-500"
+        >
+          Learn More
+        </c-menu-button.item>
+      </c-slot>
+    </c-menu-button>
+    {# Announces the toggle's outcome; the response swaps its contents. #}
+    <span id="docket-alert-status-{{ docket.pk }}" role="status" class="sr-only"></span>
+    {% endif %}
+    <c-docket-source-button :docket="docket" :docket_source="docket_source" />
+    {% if user.is_authenticated %}
+      <c-button
+        variant="outline"
+        hx-get="{% url 'view_download_docket' docket.id %}"
+        hx-swap="none"
       >
-        Subscribe with RSS
-      </c-menu-button.item>
-      <c-menu-button.item
-        href="{% url 'new_docket_alert' %}?pacer_case_id={{ docket.pacer_case_id }}&court_id={{ docket.court_id }}"
-        icon="forward"
-        icon_class="w-4 h-4 text-greyscale-500"
-        rel="nofollow"
-      >
-        Share Alert Link
-      </c-menu-button.item>
-      <c-menu-button.item
-        href="{{ WIKI_HELP_URL }}/alerts/docket-alerts-for-pacer"
-        icon="circle_question_mark"
-        icon_class="w-4 h-4 text-greyscale-500"
-      >
-        Learn More
-      </c-menu-button.item>
-    </c-slot>
-  </c-menu-button>
-  {# Announces the toggle's outcome; the response swaps its contents. #}
-  <span id="docket-alert-status-{{ docket.pk }}" role="status" class="sr-only"></span>
-  {% endif %}
-  <c-docket-source-button :docket="docket" :docket_source="docket_source" />
-  {% if user.is_authenticated %}
-    <c-button
-      variant="outline"
-      hx-get="{% url 'view_download_docket' docket.id %}"
-      hx-swap="none"
-    >
-      Export entries CSV
-    </c-button>
-  {% endif %}
-</div>
-{% if docket_source_url and user.is_authenticated %}
-  {# Quota dialog, rendered closed. A refused toggle fires docket-alert-quota-reached, which opens it, and fills the alert count out of band. #}
-  <c-dialog
-    x-on:docket-alert-quota-reached.window="open"
-    panel_class="p-6 rounded-2xl max-w-[706px] gap-6 max-md:absolute max-md:bottom-0 max-md:rounded-b-none max-md:max-w-full"
-    dialog_class="items-center"
-  >
-    <c-slot name="panel">
-      <h2 x-dialog:title class="text-display-xs font-semibold text-greyscale-900">Please Become a Member <span data-recap-plea>or Install RECAP</span> to Make More Alerts</h2>
-      <div class="flex flex-col gap-3" x-dialog:description>
-        <p class="text-sm text-greyscale-800">Docket alerts are an advanced feature of CourtListener. Members can create unlimited docket alerts. If you are not a member, we allow <strong>{{ MAX_FREE_DOCKET_ALERTS|apnumber }}</strong> alerts and give a bonus of <strong>{{ DOCKET_ALERT_RECAP_BONUS|apnumber }}</strong> alerts to anybody with the RECAP Extension installed.</p>
-        {# Filled by the toggle response. #}
-        <p class="text-sm text-greyscale-800">You currently have <strong id="docket-alert-quota-count-{{ docket.pk }}"></strong> alerts. To create additional alerts, please <span data-recap-plea>install the RECAP Extension or </span>become a Member.</p>
-        <p class="text-sm text-greyscale-800">We can sometimes provide need-based exceptions to these rules. If you might need an exception, <a href="{% url 'contact' %}" class="links">please let us know</a>.</p>
-      </div>
-      <div class="flex flex-row flex-wrap justify-end gap-2">
-        <c-button variant="outline" x-on:click="close">Close</c-button>
-        <c-button variant="outline" href="https://free.law/recap/" data-recap-plea>Install RECAP</c-button>
-        <c-button variant="primary" autofocus href="https://free.law/membership/">Become a Member</c-button>
-      </div>
-    </c-slot>
-  </c-dialog>
-{% endif %}
-
-{# A section with no items renders nothing. #}
-{% for section in metadata_sections %}
-  <c-metadata-section
-    :items="section.items"
-    :title="section.title"
-    list_class="{% if forloop.first %}grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mt-4{% endif %}"
-  />
-{% endfor %}
-
-{# ORAL ARGUMENT RECORDINGS #}
-{% with recordings=docket.audio_files.all %}
-{% if recordings %}
-  <h2 class="mt-6">Oral Argument Recordings</h2>
-  <ul>
-    {% for af in recordings %}
-      <li>
-        <div class="flex items-start gap-3">
-          {% if perms.audio.change_audio %}
-            <c-button variant="dark" size="sm" href="{% url 'admin:audio_audio_change' af.pk %}" title="Edit {{ af|best_case_name }}">{% svg "edit" class="w-4 h-4" aria_hidden="true" %}<span class="sr-only">Edit {{ af|best_case_name }}</span></c-button>
-          {% endif %}
-          <div>
-            <a class="links" href="{{ af.get_absolute_url }}{% querystring %}">
-              {{ af|best_case_name|safe|v_wrapper }}
-            </a>
-            <div>{{ af.docket.date_argued|default_if_none:"" }}</div>
-          </div>
-        </div>
-      </li>
-    {% endfor %}
-  </ul>
-{% endif %}
-{% endwith %}
-
-</div>
-
-{# TAB NAVIGATION #}
-{# Desktop nav links — always render #}
-<nav class="hidden md:flex gap-1 mt-8 overflow-x-auto scrollbar-none" aria-label="Docket sections">
-  {% for tab in tabs %}
-    <a href="{{ tab.url }}"
-       {% if active_tab == tab.key %}aria-current="page"{% endif %}
-       class="flex items-center gap-1 px-5 py-3 text-sm font-normal rounded-t-2xl whitespace-nowrap focus-visible:ring-2 focus-visible:ring-primary-400 focus-visible:outline-none {% if active_tab == tab.key %}bg-white text-greyscale-900{% else %}bg-greyscale-50 text-greyscale-600{% endif %}">
-      {# Some tab icons hardcode their fill and have several paths, so the wrapper sizes and recolors them. #}
-      <span class="flex items-center justify-center w-4 h-4 shrink-0 [&_path]:fill-current" aria-hidden="true">{% svg tab.icon class="w-full h-full" %}</span>
-      {{ tab.label }}
-    </a>
-  {% endfor %}
-</nav>
-
-{# Mobile section indicator — dropdown for multiple tabs, heading for single tab #}
-{% if tabs|length > 1 %}
-  <div class="bg-greyscale-100 rounded-t-2xl md:hidden pt-3 px-4 mt-8" x-data="docketPage">
-    <select x-on:change="navigateToSelected" aria-label="Select docket section" class="w-full">
-      {% for tab in tabs %}
-        <option value="{{ tab.url }}" {% if active_tab == tab.key %}selected{% endif %}>{{ tab.label }}</option>
-      {% endfor %}
-    </select>
+        Export entries CSV
+      </c-button>
+    {% endif %}
   </div>
-{% else %}
-  <h2 class="md:hidden mt-8 bg-white rounded-t-2xl px-4 py-3 text-sm font-medium text-greyscale-900">
-    {{ tabs.0.label }}
-  </h2>
-{% endif %}
 
-{# Tab content — always render #}
-<div id="{{ tab_content_id }}" class="bg-white rounded-b-2xl md:rounded-tr-2xl p-4">
-  {{ slot }}
+  <div class="flex flex-col gap-8">
+    {# A section with no items renders nothing. #}
+    {% for section in metadata_sections %}
+      {% if forloop.first %}
+        <c-metadata-section
+          :items="section.items"
+          :title="section.title"
+          list_class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4"
+        />
+      {% else %}
+        <c-metadata-section
+          :items="section.items"
+          :title="section.title"
+        />
+      {% endif %}
+    {% endfor %}
+  </div>
+
+  {# ORAL ARGUMENT RECORDINGS #}
+  {% with recordings=docket.audio_files.all %}
+  {% if recordings %}
+    <section aria-labelledby="oral-argument-recordings" class="flex flex-col gap-3">
+      <h2 id="oral-argument-recordings">Oral Argument Recordings</h2>{# frontend-checks-skip-line: check_hardcoded_ids #}
+      <ul>
+        {% for af in recordings %}
+          <li>
+            <div class="flex items-start gap-3">
+              {% if perms.audio.change_audio %}
+                <c-button
+                  variant="dark"
+                  size="sm"
+                  href="{% url 'admin:audio_audio_change' af.pk %}"
+                  title="Edit {{ af|best_case_name }}"
+                >
+                  {% svg "edit" class="w-4 h-4" aria_hidden="true" %}
+                  <span class="sr-only">Edit {{ af|best_case_name }}</span>
+                </c-button>
+              {% endif %}
+              <div>
+                <a class="links" href="{{ af.get_absolute_url }}{% querystring %}">
+                  {{ af|best_case_name|safe|v_wrapper }}
+                </a>
+                <div>{{ af.docket.date_argued|default_if_none:"" }}</div>
+              </div>
+            </div>
+          </li>
+        {% endfor %}
+      </ul>
+    </section>
+  {% endif %}
+  {% endwith %}
+
+  <div>
+    {# TAB NAVIGATION #}
+    {# Desktop nav links — always render #}
+    <nav class="hidden md:flex gap-1 overflow-x-auto scrollbar-none" aria-label="Docket sections">
+      {% for tab in tabs %}
+        <a
+          href="{{ tab.url }}"
+          {% if active_tab == tab.key %}aria-current="page"{% endif %}
+          class="flex items-center gap-1 px-5 py-3 text-sm font-normal rounded-t-2xl whitespace-nowrap focus-visible:ring-2 focus-visible:ring-primary-400 focus-visible:outline-none {% if active_tab == tab.key %}bg-white text-greyscale-900{% else %}bg-greyscale-50 text-greyscale-600{% endif %}"
+        >
+          {# Some tab icons hardcode their fill and have several paths, so the wrapper sizes and recolors them. #}
+          <span class="flex items-center justify-center w-4 h-4 shrink-0 [&_path]:fill-current" aria-hidden="true">{% svg tab.icon class="w-full h-full" %}</span>
+          {{ tab.label }}
+        </a>
+      {% endfor %}
+    </nav>
+
+    {# Tab content — always render #}
+    <section id="{{ tab_content_id }}" aria-labelledby="{{ tab_content_id }}-heading" class="bg-white rounded-b-2xl max-md:rounded-t-2xl md:rounded-tr-2xl p-4">
+      {# Names the section at every width. It's only visible on mobile with a single tab, where no tab bar or dropdown shows the label. #}
+      <h2 id="{{ tab_content_id }}-heading" class="{% if tabs|length > 1 %}sr-only{% else %}md:sr-only text-md font-medium text-greyscale-900{% endif %}">
+        {% for tab in tabs %}{% if tab.key == active_tab %}{{ tab.label }}{% endif %}{% endfor %}
+      </h2>
+      {# Mobile section indicator — dropdown for multiple tabs #}
+      <div class="md:hidden pb-5">
+        {% if tabs|length > 1 %}
+          <div x-data="docketPage">
+            <select x-on:change="navigateToSelected" aria-label="Select docket section" class="w-full">
+              {% for tab in tabs %}
+                <option value="{{ tab.url }}" {% if active_tab == tab.key %}selected{% endif %}>{{ tab.label }}</option>
+              {% endfor %}
+            </select>
+          </div>
+        {% endif %}
+      </div>
+
+      {{ slot }}
+    </section>
+  </div>
 </div>

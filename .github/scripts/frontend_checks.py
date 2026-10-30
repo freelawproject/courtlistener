@@ -1120,10 +1120,10 @@ def format_summary_markdown(findings: list[Finding]) -> str:
             "Links in redesign templates need Tailwind styling classes. Common fixes:"
         )
         lines.append(
-            '- Add classes directly: `<a class="text-primary-600 hover:underline" ...>`'
+            '- Add classes directly: `<a class="links" ...>`, or `links-external` for external links'
         )
         lines.append(
-            '- Style from a parent using [descendant selectors](https://tailwindcss.com/docs/hover-focus-and-other-states#styling-based-on-descendants): `<div class="[&_a]:text-primary-600 [&_a]:hover:underline">`'
+            '- Style from a parent using [descendant selectors](https://tailwindcss.com/docs/hover-focus-and-other-states#styling-based-on-descendants): `<div class="[&_a]:links">`'
         )
         lines.append("")
 

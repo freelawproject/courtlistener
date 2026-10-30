@@ -26,6 +26,7 @@
         {'href': '#dialog', 'text': 'Dialog'},
         {'href': '#callout', 'text': 'Callout'},
         {'href': '#button', 'text': 'Button'},
+        {'href': '#form-input', 'text': 'Form input'},
         {'href': '#menu-button', 'text': 'Menu button'},
         {'href': '#pagination', 'text': 'Pagination'},
         {'href': '#filter-drawer', 'text': 'Filter drawer'},
@@ -1278,6 +1279,50 @@ Sample code here.
     </c-expansion-panel>
   </c-layout-with-navigation.section>
 
+  {# FORM INPUT #}
+  <section class="max-w-full w-full border-t-2 border-greyscale-200" x-intersect.margin.-100px="show" id="form-input">
+    <h2 class="mt-6 mb-3">Form input</h2>
+    <p>Renders one field of a Django form: its label, the input, and any validation errors. The input's id is built from <code>form_prefix</code>, <code>namespace</code> and <code>field_name</code>, so a form rendered twice on one page, like the docket filter's desktop and mobile layouts, keeps its ids unique. A field with errors gets a red border, <code>aria-invalid</code>, and an <code>aria-describedby</code> that points at its error message.</p>
+
+    <h4 class="mt-3">Demo</h4>
+    <div class="w-48">
+      <c-form.input :form="demo_filter_form" field_name="entry_gte" form_prefix="demo" only />
+    </div>
+
+    <c-library.list title="Props" only>
+      <c-library.item only>
+        <c-slot name="label"><code>:form</code></c-slot>
+        <c-slot name="description">The Django form that holds the field.</c-slot>
+      </c-library.item>
+      <c-library.item only>
+        <c-slot name="label"><code>field_name</code></c-slot>
+        <c-slot name="description">Name of the field to render.</c-slot>
+      </c-library.item>
+      <c-library.item only>
+        <c-slot name="label"><code>form_prefix</code></c-slot>
+        <c-slot name="description">Start of the input's id, unique per rendering of the form, e.g. <code>desktop</code> and <code>mobile</code>.</c-slot>
+      </c-library.item>
+      <c-library.item optional only>
+        <c-slot name="label"><code>namespace</code></c-slot>
+        <c-slot name="description">Middle of the input's id, e.g. the search type in the corpus search filters. Default: empty.</c-slot>
+      </c-library.item>
+      <c-library.item optional only>
+        <c-slot name="label"><code>:hide_label</code></c-slot>
+        <c-slot name="description">Bool — hides the label visually but keeps it for screen readers.</c-slot>
+      </c-library.item>
+    </c-library.list>
+
+    <c-library.list title="Slots" only>
+      <p>No slots</p>
+    </c-library.list>
+
+    <c-expansion-panel title="Code">
+      <c-code>
+&lt;c-form.input :form="form" field_name="entry_gte" form_prefix="desktop" :hide_label="True" only /&gt;
+      </c-code>
+    </c-expansion-panel>
+  </section>
+
   {# MENU BUTTON #}
   <section class="max-w-full w-full border-t-2 border-greyscale-200" x-intersect.margin.-100px="show" id="menu-button">
     <h2 class="mt-6 mb-3">Menu button</h2>
@@ -1815,11 +1860,11 @@ Sample code here.
   {# DOCKET FILTER #}
   <section class="max-w-full w-full border-t-2 border-greyscale-200" x-intersect.margin.-100px="show" id="docket-filter">
     <h2 class="mt-6 mb-3">Docket filter</h2>
-    <p>Page-specific filter toolbar for docket entries. Includes search, date range (Flatpickr), document number range, sort toggle, and prev/next navigation. On mobile, filter fields move into a <code>&lt;c-filter-drawer&gt;</code> with an "Apply" button.</p>
+    <p>Page-specific filter toolbar for docket entries. Includes search, date range (Flatpickr), document number range, sort toggle, and prev/next navigation. On mobile, the search and the filter fields move into <code>&lt;c-docket-filter.dialog&gt;</code>, which has an "Apply" button. Both layouts render the same <code>&lt;c-docket-filter.form&gt;</code>, which drops empty fields from the submitted URL.</p>
     <p>The search box is its own GET form to the RECAP search page, separate from the filters. The docket scope travels in a hidden <code>q</code> seeded with <code>docket_id:N</code>, and the visible input is unnamed, so the scope is never shown and clearing the box can't widen the search. On submit, <code>docket_filter.js</code> merges the typed terms into the hidden <code>q</code> as <code>(terms) AND docket_id:N</code>. An empty box, or a browser without JavaScript, submits the term-less docket search.</p>
 
     <h4 class="mt-3">Demo</h4>
-    <p class="text-sm text-greyscale-600 mb-2">Desktop toolbar shown below. Resize below <code>md</code> breakpoint (768px) to see the mobile layout with search, prev/next, and filter drawer trigger.</p>
+    <p class="text-sm text-greyscale-600 mb-2">Desktop toolbar shown below. Resize below <code>md</code> breakpoint (768px) to see the mobile layout with the Filter button, sort, and prev/next.</p>
     <c-docket-filter
       :docket="demo_docket"
       :form="demo_filter_form"
@@ -1854,6 +1899,18 @@ Sample code here.
         <c-slot name="label"><code>c-docket-filter.search-form</code></c-slot>
         <c-slot name="description">The "Search this docket" form described above, rendered once per layout. Must sit inside the <code>docketFilter</code> root, which supplies the submit handler and the scope.</c-slot>
       </c-library.item>
+      <c-library.item only>
+        <c-slot name="label"><code>c-docket-filter.form</code></c-slot>
+        <c-slot name="description">The filter form with the Filed and Documents ranges, shared by both layouts. Its slot holds the controls each layout adds after the ranges. Must sit inside the <code>docketFilter</code> root, which supplies the handler that drops empty fields.</c-slot>
+      </c-library.item>
+      <c-library.item only>
+        <c-slot name="label"><code>c-docket-filter.dialog</code></c-slot>
+        <c-slot name="description">The mobile layout: a Filter button that opens a dialog with the search form and the filter form. It opens on its own when the filters have errors. Reads <code>form</code> and <code>sort_order_asc</code> from the parent's context.</c-slot>
+      </c-library.item>
+      <c-library.item only>
+        <c-slot name="label"><code>c-docket-filter.errors</code></c-slot>
+        <c-slot name="description">The "There were errors applying your filters." notice, shown with the toolbar and inside the dialog. Renders nothing when the form is valid.</c-slot>
+      </c-library.item>
     </c-library.list>
 
     <c-library.list title="c-docket-filter.search-form props" only>
@@ -1868,6 +1925,39 @@ Sample code here.
       <c-library.item optional only>
         <c-slot name="label"><code>class</code></c-slot>
         <c-slot name="description">CSS classes forwarded to the <code>&lt;form&gt;</code>.</c-slot>
+      </c-library.item>
+    </c-library.list>
+
+    <c-library.list title="c-docket-filter.form props" only>
+      <c-library.item only>
+        <c-slot name="label"><code>:form</code></c-slot>
+        <c-slot name="description">DocketEntryFilterForm instance.</c-slot>
+      </c-library.item>
+      <c-library.item optional only>
+        <c-slot name="label"><code>layout</code></c-slot>
+        <c-slot name="description"><code>"desktop"</code> or <code>"mobile"</code>. Picks the ranges' styling and doubles as the inputs' id prefix. Default: <code>"desktop"</code>.</c-slot>
+      </c-library.item>
+      <c-library.item only>
+        <c-slot name="label">Default slot</c-slot>
+        <c-slot name="description">The layout's own controls, rendered inside the form after the ranges.</c-slot>
+      </c-library.item>
+    </c-library.list>
+
+    <c-library.list title="c-docket-filter.dialog props" only>
+      <c-library.item only>
+        <c-slot name="label"><code>:docket</code></c-slot>
+        <c-slot name="description">The docket, passed on to the dialog's search form.</c-slot>
+      </c-library.item>
+    </c-library.list>
+
+    <c-library.list title="c-docket-filter.errors props" only>
+      <c-library.item only>
+        <c-slot name="label"><code>:form</code></c-slot>
+        <c-slot name="description">The filter form whose errors trigger the notice.</c-slot>
+      </c-library.item>
+      <c-library.item optional only>
+        <c-slot name="label"><code>class</code></c-slot>
+        <c-slot name="description">CSS classes for the notice's <code>&lt;p&gt;</code>.</c-slot>
       </c-library.item>
     </c-library.list>
 
@@ -1887,6 +1977,11 @@ Sample code here.
   ...
   &lt;c-docket-filter.search-form :docket="docket" input_id="de-search-mobile" class="flex-1" /&gt;
 &lt;/div&gt;
+
+{% templatetag opencomment %} Each layout renders the shared filter form and adds its own controls in the slot {% templatetag closecomment %}
+&lt;c-docket-filter.form :form="form" layout="desktop"&gt;
+  ...sort, prev/next, hidden submit...
+&lt;/c-docket-filter.form&gt;
       </c-code>
     </c-expansion-panel>
   </section>
