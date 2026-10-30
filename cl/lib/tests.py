@@ -14,7 +14,7 @@ from django.core.cache import cache
 from django.core.exceptions import ValidationError
 from django.core.files.base import ContentFile
 from django.core.files.uploadedfile import SimpleUploadedFile
-from django.http import HttpResponse
+from django.http import Http404, HttpResponse
 from django.template.response import TemplateResponse
 from django.test import RequestFactory, override_settings
 from django.urls import ResolverMatch, reverse
@@ -42,6 +42,7 @@ from cl.lib.file_validation import (
 from cl.lib.filesizes import convert_size_to_bytes
 from cl.lib.middleware import (
     V2_PARTIALS_PREFIX,
+    WIP_PROPS,
     IncrementalNewTemplateMiddleware,
 )
 from cl.lib.mime_types import lookup_mime_type
@@ -3020,6 +3021,86 @@ class IncrementalNewTemplateMiddlewareTest(TestCase):
             response = self.process("includes/foo/button.html")
         self.assertEqual(
             response.template_name, f"{V2_PARTIALS_PREFIX}foo/button.html"
+        )
+        self.assertNotIn("search_form", response.context_data or {})
+
+    def test_template_selection_by_flags(self) -> None:
+        """Does each mix of templates and flags pick the right template?
+
+        No WIP template exists in the repo yet, and the ones that do are
+        renamed to v2_ once finished, so the template lookup is stubbed to
+        decide which versions of the page exist in each case.
+        """
+        prefix = WIP_PROPS["prefix"]
+        legacy, v2, wip = "foo.html", "v2_foo.html", f"{prefix}foo.html"
+        # (templates that exist, use_new_design, WIP flag, expected template)
+        # An expected template of None means the middleware raises Http404.
+        cases: list[tuple[set[str], bool, bool, str | None]] = [
+            # Legacy + WIP: only both flags reach the WIP template.
+            ({legacy, wip}, True, True, wip),
+            ({legacy, wip}, True, False, legacy),
+            ({legacy, wip}, False, True, legacy),
+            ({legacy, wip}, False, False, legacy),
+            # WIP-only: there's no template to fall back to.
+            ({wip}, True, True, wip),
+            ({wip}, True, False, None),
+            ({wip}, False, True, None),
+            ({wip}, False, False, None),
+            # WIP wins over v2 for opted-in visitors only.
+            ({legacy, v2, wip}, True, True, wip),
+            ({legacy, v2, wip}, True, False, v2),
+            # v2 pages ignore the WIP flag.
+            ({legacy, v2}, True, True, v2),
+            ({legacy, v2}, False, True, legacy),
+            ({v2}, False, True, v2),
+        ]
+        for existing, new_design, wip_design, expected in cases:
+            with (
+                self.subTest(
+                    existing=sorted(existing),
+                    use_new_design=new_design,
+                    wip_flag=wip_design,
+                ),
+                override_flag("use_new_design", active=new_design),
+                override_flag(WIP_PROPS["flag"], active=wip_design),
+                patch.object(
+                    IncrementalNewTemplateMiddleware,
+                    "template_exists",
+                    side_effect=existing.__contains__,
+                ),
+            ):
+                if expected is None:
+                    with self.assertRaises(Http404):
+                        self.process(legacy)
+                    continue
+                response = self.process(legacy)
+                self.assertEqual(response.template_name, expected)
+
+    @override_flag(WIP_PROPS["flag"], True)
+    def test_v2_page_unaffected_by_wip_flag(self) -> None:
+        """Does a real v2 page still get its v2 template with both flags on?"""
+        response = self.process("homepage.html")
+        self.assertEqual(response.template_name, "v2_homepage.html")
+
+    @override_flag(WIP_PROPS["flag"], True)
+    def test_swapped_wip_partial_skips_the_search_form(self) -> None:
+        """A swapped partial under the WIP partials prefix gets no search form.
+
+        No legacy/WIP partial pair exists in the repo yet, so the lookup is
+        stubbed to make one.
+        """
+        with patch.object(
+            IncrementalNewTemplateMiddleware,
+            "template_exists",
+            side_effect={
+                "includes/foo/button.html",
+                f"{WIP_PROPS['partials_prefix']}foo/button.html",
+            }.__contains__,
+        ):
+            response = self.process("includes/foo/button.html")
+        self.assertEqual(
+            response.template_name,
+            f"{WIP_PROPS['partials_prefix']}foo/button.html",
         )
         self.assertNotIn("search_form", response.context_data or {})
 
