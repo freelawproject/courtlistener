@@ -717,7 +717,7 @@ class PartyAttorney(TypedDict):
 
     roles are display-ready lines, the raw PACER role when known and the
     choice label otherwise, each followed by its action date in parentheses.
-    Roles of unknown type are left out.
+    A role with neither reads "None". Roles of unknown type are left out.
     """
 
     pk: int
@@ -786,10 +786,9 @@ def build_party_groups(party_types: Iterable[PartyType]) -> list[PartyGroup]:
         ]
 
     def role_line(role: Role) -> str:
-        """Formats a role as its name followed by the action date, if any.
-        Empty for roles with neither a raw value nor a known type."""
-        name = role.role_raw or role.get_role_display() or ""
-        if name and role.date_action:
+        """Formats a role as its name followed by the action date, if any."""
+        name = role.role_raw or str(role.get_role_display())
+        if role.date_action:
             return f"{name} ({date_format(role.date_action)})"
         return name
 
@@ -818,8 +817,8 @@ def build_party_groups(party_types: Iterable[PartyType]) -> list[PartyGroup]:
                     ],
                 },
             )
-            if role.role != Role.UNKNOWN and (line := role_line(role)):
-                item["roles"].append(line)
+            if role.role != Role.UNKNOWN:
+                item["roles"].append(role_line(role))
         return list(by_attorney.values())
 
     def criminal_info(party_type: PartyType) -> PartyCriminalInfo | None:
@@ -918,7 +917,7 @@ def build_docket_tabs(
                     },
                 ),
                 "key": "parties",
-                "icon": "group",
+                "icon": "people",
             }
         )
 

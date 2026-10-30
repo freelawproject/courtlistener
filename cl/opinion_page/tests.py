@@ -4032,7 +4032,7 @@ class BuildDocketTabsTest(SimpleTestCase):
             icons,
             {
                 "entries": "file_text",
-                "parties": "group",
+                "parties": "people",
                 "idb": "circle_question_mark",
                 "authorities": "court",
             },
@@ -4262,8 +4262,8 @@ class DocketPartiesContextTest(TestCase):
     async def test_attorneys_are_display_ready(self) -> None:
         """Attorneys come sorted by name with their firm's address as lines.
         Role lines use the raw PACER value when set and the choice label
-        otherwise, followed by the action date; unknown and untyped roles
-        are left out."""
+        otherwise, followed by the action date; a role with neither reads
+        "None" and unknown roles are left out."""
         groups = await self.get_party_groups()
         attorneys = groups[1]["parties"][0]["attorneys"]
         self.assertEqual(
@@ -4279,6 +4279,7 @@ class DocketPartiesContextTest(TestCase):
                 "Lead attorney",
                 "PRO HAC VICE",
                 "TERMINATED: 06/03/2021 (June 3, 2021)",
+                "None",
             ],
         )
         self.assertEqual(
@@ -4294,7 +4295,7 @@ class DocketPartiesContextTest(TestCase):
                 }
             ],
         )
-        self.assertEqual(other["roles"], [])
+        self.assertEqual(other["roles"], ["None"])
 
     async def test_criminal_data_only_for_parties_that_have_it(self) -> None:
         """A party with counts, complaints or offense levels gets the
