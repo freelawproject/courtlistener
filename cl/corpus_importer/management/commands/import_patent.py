@@ -137,5 +137,7 @@ class Command(VerboseCommand):
     def handle(self, *args, **options):
         logger.info(f"Using PACER username: {PACER_USERNAME}")
         if PACER_USERNAME == "mlissner.flp":
-            raise "This is for a client. Do not use FLP credentials"
+            raise AssertionError(
+                "This is for a client. Do not use FLP credentials"
+            )
         get_dockets(options)

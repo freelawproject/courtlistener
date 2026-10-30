@@ -54,7 +54,7 @@ DRY_RUN = False
 
 
 def explain_version_differences(
-    opinions: list[Opinion | int],
+    opinions: list[Opinion] | list[int],
     text_field: str = "plain_text",
     verbose: bool = False,
 ) -> None:

@@ -44,11 +44,14 @@ def oxford_join(items, conjunction="and", separator=",", autoescape=True):
                 s = item
             elif i == (num_items - 1):
                 # Last item.
+                # pyrefly: ignore [unbound-name]
                 s += f"{separator} {conjunction} {item}"
             else:
                 # Items in the middle
+                # pyrefly: ignore [unbound-name]
                 s += f"{separator} {item}"
 
+    # pyrefly: ignore [unbound-name]
     return mark_safe(s)
 
 

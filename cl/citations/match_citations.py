@@ -187,7 +187,7 @@ def do_resolve_citations(
                 # refer to it as a citing document.
                 c.citing_document = citing_object
             else:
-                raise "Unknown citing type."
+                raise TypeError("Unknown citing type")
 
     # Call and return eyecite's resolve_citations() function
     return resolve_citations(
