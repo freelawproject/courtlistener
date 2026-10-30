@@ -798,9 +798,8 @@ def build_party_groups(party_types: Iterable[PartyType]) -> list[PartyGroup]:
         roles = sorted(party.roles.all(), key=lambda role: role.attorney.name)
         for role in roles:
             attorney = role.attorney
-            item = by_attorney.setdefault(
-                attorney.pk,
-                {
+            if attorney.pk not in by_attorney:
+                by_attorney[attorney.pk] = {
                     "pk": attorney.pk,
                     "name": attorney.name,
                     "phone": attorney.phone,
@@ -815,10 +814,9 @@ def build_party_groups(party_types: Iterable[PartyType]) -> list[PartyGroup]:
                         # Set by the view's prefetch to_attr.
                         for firm in attorney.firms_in_docket  # pyrefly:ignore[missing-attribute]
                     ],
-                },
-            )
+                }
             if role.role != Role.UNKNOWN:
-                item["roles"].append(role_line(role))
+                by_attorney[attorney.pk]["roles"].append(role_line(role))
         return list(by_attorney.values())
 
     def criminal_info(party_type: PartyType) -> PartyCriminalInfo | None:
