@@ -22,7 +22,7 @@ from django.utils.functional import SimpleLazyObject
 from django_ratelimit.exceptions import Ratelimited
 from django_ratelimit.middleware import RatelimitMiddleware
 from requests.cookies import RequestsCookieJar
-from waffle.testutils import override_flag
+from waffle.testutils import override_flag, override_switch
 
 from cl.lib.auth import filter_by_email
 from cl.lib.courts import (
@@ -41,6 +41,8 @@ from cl.lib.file_validation import (
 )
 from cl.lib.filesizes import convert_size_to_bytes
 from cl.lib.middleware import (
+    MAINTENANCE_MODE_RETRY_AFTER,
+    MAINTENANCE_MODE_SWITCH,
     V2_PARTIALS_PREFIX,
     IncrementalNewTemplateMiddleware,
 )
@@ -3123,3 +3125,44 @@ class RatelimitedViewTest(SimpleTestCase):
             cast(HttpResponse, response).status_code,
             HTTPStatus.TOO_MANY_REQUESTS,
         )
+
+
+@override_settings(WAFFLE_CACHE_PREFIX="MaintenanceModeMiddlewareTest")
+class MaintenanceModeMiddlewareTest(TestCase):
+    """The maintenance-mode switch blocks traffic before any view runs."""
+
+    @override_switch(MAINTENANCE_MODE_SWITCH, active=False)
+    def test_switch_off_serves_pages(self) -> None:
+        """Pages render normally while the switch is off."""
+        r = self.client.get(reverse("help_home"))
+        self.assertEqual(r.status_code, HTTPStatus.OK)
+
+    @override_switch(MAINTENANCE_MODE_SWITCH, active=True)
+    def test_switch_on_returns_503(self) -> None:
+        """A page request gets a 503 with retry and no-store headers."""
+        r = self.client.get(reverse("help_home"))
+        self.assertEqual(r.status_code, HTTPStatus.SERVICE_UNAVAILABLE)
+        self.assertEqual(r["Retry-After"], MAINTENANCE_MODE_RETRY_AFTER)
+        self.assertIn("no-store", r["Cache-Control"])
+
+    @override_switch(MAINTENANCE_MODE_SWITCH, active=True)
+    def test_exempt_paths_stay_open(self) -> None:
+        """Admin and monitoring URLs are never blocked."""
+        for url_name in (
+            "admin:index",
+            "health_check",
+            "prometheus-django-metrics",
+        ):
+            with self.subTest(url_name=url_name):
+                r = self.client.get(reverse(url_name))
+                self.assertNotEqual(
+                    r.status_code, HTTPStatus.SERVICE_UNAVAILABLE
+                )
+
+    @override_switch(MAINTENANCE_MODE_SWITCH, active=True)
+    def test_async_requests_are_blocked(self) -> None:
+        """The ASGI path returns the same 503."""
+        # override_switch does ORM work, so the test stays synchronous and
+        # drives the async client through async_to_sync instead.
+        r = async_to_sync(self.async_client.get)(reverse("help_home"))
+        self.assertEqual(r.status_code, HTTPStatus.SERVICE_UNAVAILABLE)
