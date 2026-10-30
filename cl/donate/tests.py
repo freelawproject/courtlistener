@@ -1,4 +1,7 @@
+import threading
+import time
 from collections import defaultdict
+from collections.abc import Callable
 from datetime import UTC, date, datetime, timedelta
 from http import HTTPStatus
 from io import StringIO
@@ -10,8 +13,10 @@ from asgiref.sync import sync_to_async
 from django.core import mail
 from django.core.management import call_command
 from django.core.management.base import CommandError
+from django.db import connection
 from django.test import override_settings
 from django.test.client import AsyncClient, Client
+from django.test.utils import CaptureQueriesContext
 from django.urls import reverse
 from django.utils.timezone import make_aware, now
 
@@ -20,11 +25,17 @@ from cl.api.models import APIThrottle, ThrottleType
 from cl.api.utils import (
     CloudFrontAnonRateThrottle,
     ExceptionalUserRateThrottle,
+    apply_membership_throttles,
 )
+from cl.donate import api_views
 from cl.donate.api_views import MembershipWebhookViewSet
 from cl.donate.factories import (
     NeonMembershipFactory,
     NeonWebhookEventFactory,
+)
+from cl.donate.management.commands.sync_neon_memberships import (
+    SyncResult,
+    sync_membership_from_neon,
 )
 from cl.donate.models import (
     MembershipPaymentStatus,
@@ -34,7 +45,7 @@ from cl.donate.models import (
 )
 from cl.lib.neon_utils import NeonClient
 from cl.lib.test_helpers import UserProfileWithParentsFactory
-from cl.tests.cases import SimpleTestCase, TestCase
+from cl.tests.cases import SimpleTestCase, TestCase, TransactionTestCase
 from cl.users.models import UserProfile
 from cl.users.utils import create_stub_account
 
@@ -529,6 +540,54 @@ class MembershipWebhookTest(TestCase):
     @patch.object(
         MembershipWebhookViewSet, "_store_webhook_payload", return_value=None
     )
+    def test_update_membership_locks_row(self, mock_store_webhook) -> None:
+        """updateMembership must lock the row it reads before saving it, and
+        lock the User first, both with FOR NO KEY UPDATE.
+
+        During an upgrade Neon sends createMembership and updateMembership
+        at nearly the same time. Without a row lock the update handler can
+        save stale data over the upgrade or crash if the row changes between
+        its reads. createMembership locks the User first, so this handler
+        must too, or the two can deadlock. FOR UPDATE on the User would
+        instead deadlock with sync_neon_memberships, whose APIThrottle
+        foreign key check takes FOR KEY SHARE on the User.
+        """
+        NeonMembership.objects.create(
+            user=self.user_profile.user,
+            neon_id="12345",
+            level=NeonMembershipLevel.TIER_1,
+        )
+        self.data["eventTrigger"] = "updateMembership"
+        self.data["data"]["membership"]["membershipName"] = (
+            "CL Membership - Tier 4"
+        )
+
+        with CaptureQueriesContext(connection) as ctx:
+            r = Client().post(
+                reverse("membership-webhooks-list", kwargs={"version": "v4"}),
+                data=self.data,
+                content_type="application/json",
+            )
+
+        self.assertEqual(r.status_code, HTTPStatus.CREATED)
+        locked_tables = [
+            table
+            for q in ctx.captured_queries
+            if "FOR NO KEY UPDATE" in q["sql"]
+            for table in ("auth_user", "donate_neonmembership")
+            if f'FROM "{table}"' in q["sql"]
+        ]
+        self.assertEqual(
+            locked_tables,
+            ["auth_user", "donate_neonmembership"],
+            msg=ctx.captured_queries,
+        )
+        membership = NeonMembership.objects.get(neon_id="12345")
+        self.assertEqual(membership.level, NeonMembershipLevel.TIER_4)
+
+    @patch.object(
+        MembershipWebhookViewSet, "_store_webhook_payload", return_value=None
+    )
     async def test_can_update_pending_membership(
         self, mock_store_webhook
     ) -> None:
@@ -908,6 +967,240 @@ class MembershipWebhookTest(TestCase):
                             content_type="application/json",
                         )
                         self.assertEqual(r.status_code, HTTPStatus.CREATED)
+
+
+class MembershipWebhookConcurrencyTest(TransactionTestCase):
+    """Overlapping writers to one user's membership must not deadlock.
+
+    Each test runs two writers (Neon webhooks or the sync_neon_memberships
+    command) from separate threads, so they run in separate database
+    transactions. The first one pauses partway through, holding its row
+    locks, while the second one starts.
+    """
+
+    def setUp(self) -> None:
+        self.user_profile = UserProfileWithParentsFactory(
+            user__email="test_concurrency@email.com"
+        )
+        self.user_profile.neon_account_id = "1234"
+        self.user_profile.save()
+        self.user = self.user_profile.user
+        NeonMembership.objects.create(
+            user=self.user,
+            neon_id="12345",
+            level=NeonMembershipLevel.TIER_1,
+        )
+        apply_membership_throttles(self.user, NeonMembershipLevel.TIER_1)
+
+    @staticmethod
+    def _payload(trigger: str, membership_id: str, name: str) -> dict:
+        """Build a Neon membership webhook payload for this user."""
+        return {
+            "eventTrigger": trigger,
+            "eventTimestamp": "2026-10-23T03:42:59.000-06:00",
+            "data": {
+                "membership": {
+                    "membershipId": membership_id,
+                    "accountId": "1234",
+                    "membershipName": name,
+                    "termEndDate": "2027-10-23-05:00",
+                    "status": "SUCCEEDED",
+                }
+            },
+        }
+
+    @staticmethod
+    def _webhook(payload: dict) -> Callable[[], int]:
+        """Return a callable that posts a webhook and returns its status."""
+
+        def post() -> int:
+            return (
+                Client()
+                .post(
+                    reverse(
+                        "membership-webhooks-list", kwargs={"version": "v4"}
+                    ),
+                    data=payload,
+                    content_type="application/json",
+                )
+                .status_code
+            )
+
+        return post
+
+    def _race(
+        self,
+        first: Callable[[], object],
+        second: Callable[[], object],
+        pause_target: tuple[object, str],
+        pause_after: bool,
+    ) -> dict[str, object]:
+        """Run two writers concurrently and return their outcomes.
+
+        The first writer pauses at pause_target, an (object, attribute)
+        pair to patch, while holding its locks. The second writer starts
+        once the first has paused.
+
+        :param first: The writer that runs first.
+        :param second: The writer that runs once the first has paused.
+        :param pause_target: The patch() target to pause at.
+        :param pause_after: Pause after the target returns if True, else
+        before calling it.
+        :return: Each writer's return value, or the exception it raised.
+        """
+        first_paused = threading.Event()
+        outcomes: dict[str, object] = {}
+
+        def pause() -> None:
+            # Only pause the first writer, which runs before the second one
+            # starts.
+            if not first_paused.is_set():
+                first_paused.set()
+                # Give the second writer time to take any locks it can.
+                time.sleep(1)
+
+        def run(name: str, writer: Callable[[], object]) -> None:
+            try:
+                if name == "second":
+                    first_paused.wait(timeout=10)
+                outcomes[name] = writer()
+            except Exception as e:
+                outcomes[name] = e
+            finally:
+                connection.close()
+
+        target, attr = pause_target
+        wrapped = getattr(target, attr)
+
+        def paused(*args, **kwargs):
+            if not pause_after:
+                pause()
+            result = wrapped(*args, **kwargs)
+            if pause_after:
+                pause()
+            return result
+
+        with patch.object(target, attr, paused):
+            threads = [
+                threading.Thread(target=run, args=("first", first)),
+                threading.Thread(target=run, args=("second", second)),
+            ]
+            for thread in threads:
+                thread.start()
+            for thread in threads:
+                thread.join(timeout=30)
+        return outcomes
+
+    @patch.object(
+        MembershipWebhookViewSet, "_store_webhook_payload", return_value=None
+    )
+    @patch("cl.donate.api_views.tag_zoho_record_for_membership")
+    def test_create_and_update_do_not_deadlock(
+        self, mock_zoho, mock_store_webhook
+    ) -> None:
+        """An upgrade's createMembership and updateMembership can overlap.
+
+        createMembership pauses after locking the User. updateMembership
+        must wait for that lock instead of locking the membership first.
+        """
+        outcomes = self._race(
+            self._webhook(
+                self._payload(
+                    "createMembership", "12346", "CL Membership - Tier 4"
+                )
+            ),
+            self._webhook(
+                self._payload(
+                    "updateMembership", "12345", "CL Membership - Tier 1"
+                )
+            ),
+            (MembershipWebhookViewSet, "_get_member_record"),
+            pause_after=True,
+        )
+
+        self.assertEqual(
+            outcomes,
+            {"first": HTTPStatus.CREATED, "second": HTTPStatus.CREATED},
+        )
+        membership = NeonMembership.objects.get(user=self.user)
+        self.assertEqual(membership.neon_id, "12346")
+        self.assertEqual(membership.level, NeonMembershipLevel.TIER_4)
+
+    @patch.object(
+        MembershipWebhookViewSet, "_store_webhook_payload", return_value=None
+    )
+    @patch("cl.donate.api_views.tag_zoho_record_for_membership")
+    def test_create_and_delete_do_not_deadlock(
+        self, mock_zoho, mock_store_webhook
+    ) -> None:
+        """deleteMembership must also lock the User before the membership.
+
+        createMembership pauses after saving the membership and before
+        rewriting the throttle rows. A deleteMembership that cleared the
+        throttle rows before locking the membership would deadlock with it.
+        """
+        outcomes = self._race(
+            self._webhook(
+                self._payload(
+                    "createMembership", "12346", "CL Membership - Tier 4"
+                )
+            ),
+            self._webhook(
+                self._payload(
+                    "deleteMembership", "12345", "CL Membership - Tier 1"
+                )
+            ),
+            (api_views, "apply_membership_throttles"),
+            pause_after=False,
+        )
+
+        self.assertEqual(
+            outcomes,
+            {"first": HTTPStatus.CREATED, "second": HTTPStatus.CREATED},
+        )
+        membership = NeonMembership.objects.get(user=self.user)
+        self.assertEqual(membership.neon_id, "12346")
+
+    @patch.object(
+        MembershipWebhookViewSet, "_store_webhook_payload", return_value=None
+    )
+    @patch("cl.donate.api_views.tag_zoho_record_for_membership")
+    @patch(
+        "cl.donate.management.commands.sync_neon_memberships"
+        ".tag_zoho_record_for_membership"
+    )
+    def test_create_and_sync_do_not_deadlock(
+        self, mock_sync_zoho, mock_zoho, mock_store_webhook
+    ) -> None:
+        """createMembership and sync_neon_memberships can overlap.
+
+        createMembership pauses after locking the User. The sync then
+        updates the membership and rebuilds its throttles, whose foreign
+        key check locks the User at commit. createMembership's User lock
+        must not block that check.
+        """
+        membership = NeonMembership.objects.get(user=self.user)
+        outcomes = self._race(
+            self._webhook(
+                self._payload(
+                    "createMembership", "12346", "CL Membership - Tier 4"
+                )
+            ),
+            lambda: sync_membership_from_neon(
+                membership, make_neon_membership()
+            ),
+            (MembershipWebhookViewSet, "_get_member_record"),
+            pause_after=True,
+        )
+
+        self.assertEqual(
+            outcomes,
+            {"first": HTTPStatus.CREATED, "second": SyncResult.UPDATED},
+        )
+        # The webhook ran last, so its data wins.
+        membership.refresh_from_db()
+        self.assertEqual(membership.neon_id, "12346")
+        self.assertEqual(membership.level, NeonMembershipLevel.TIER_4)
 
 
 class ProfileMembershipTest(TestCase):
