@@ -1,13 +1,16 @@
 from collections.abc import Awaitable, Callable
+from http import HTTPStatus
 from inspect import iscoroutinefunction
 from typing import cast
 
-from asgiref.sync import markcoroutinefunction
-from django.http import HttpRequest, HttpResponseBase
+from asgiref.sync import markcoroutinefunction, sync_to_async
+from django.http import HttpRequest, HttpResponse, HttpResponseBase
 from django.template import TemplateDoesNotExist
 from django.template.loader import get_template
 from django.template.response import TemplateResponse
-from waffle import flag_is_active
+from django.urls import reverse
+from django.utils.cache import add_never_cache_headers
+from waffle import flag_is_active, switch_is_active
 
 from cl.search.forms import CorpusSearchForm
 
@@ -159,4 +162,92 @@ class IncrementalNewTemplateMiddleware:
             # pyrefly:ignore[unsupported-operation] False positive based on Django docs
             response.context_data["search_form"] = CorpusSearchForm()
 
+        return response
+
+
+MAINTENANCE_MODE_SWITCH = "maintenance-mode"
+# Seconds clients and crawlers are told to wait before retrying.
+MAINTENANCE_MODE_RETRY_AFTER = "3600"
+
+
+def maintenance_mode_is_active() -> bool:
+    """Check whether the maintenance-mode Waffle switch is active."""
+    return switch_is_active(MAINTENANCE_MODE_SWITCH)
+
+
+class MaintenanceModeMiddleware:
+    """Return 503 responses while maintenance mode is enabled.
+
+    This middleware runs before SessionMiddleware to avoid database work
+    for requests blocked by maintenance mode.
+
+    The admin remains accessible so maintenance mode can be disabled.
+    The monitoring prefix is also exempt to keep ALB health checks and
+    Prometheus scrapes working. Otherwise, failing health checks would
+    cause the ALB to remove pods from service, delaying recovery.
+
+    Behind CloudFront, the response body is replaced by the static S3
+    5xx page. The response defined here is therefore only visible on
+    direct or local access.
+    """
+
+    sync_capable = True
+    async_capable = True
+
+    def __init__(
+        self,
+        get_response: Callable[
+            [HttpRequest], HttpResponseBase | Awaitable[HttpResponseBase]
+        ],
+    ):
+        self.get_response: Callable[
+            [HttpRequest], HttpResponseBase | Awaitable[HttpResponseBase]
+        ] = get_response
+        self.async_mode: bool = iscoroutinefunction(self.get_response)
+        if self.async_mode:
+            markcoroutinefunction(self)
+        # Resolve these paths here so the URLconf can load lazily.
+        # Exempt the entire monitoring prefix, not just the health check.
+        monitoring_root = reverse("health_check").strip("/").split("/")[0]
+        self.exempt_prefixes: tuple[str, ...] = (
+            reverse("admin:index"),
+            f"/{monitoring_root}/",
+        )
+
+    def __call__(
+        self, request: HttpRequest
+    ) -> HttpResponseBase | Awaitable[HttpResponseBase]:
+        if self.async_mode:
+            return self.__acall__(request)
+
+        if self._is_exempt(request) or not maintenance_mode_is_active():
+            return self.get_response(request)
+
+        return self._unavailable()
+
+    async def __acall__(self, request: HttpRequest) -> HttpResponseBase:
+        if (
+            self._is_exempt(request)
+            or not await sync_to_async(maintenance_mode_is_active)()
+        ):
+            return await cast(
+                Awaitable[HttpResponseBase], self.get_response(request)
+            )
+
+        return self._unavailable()
+
+    def _is_exempt(self, request: HttpRequest) -> bool:
+        """Check whether the request is exempt from maintenance mode."""
+        return request.path.startswith(self.exempt_prefixes)
+
+    @staticmethod
+    def _unavailable() -> HttpResponse:
+        """Build the 503 response returned during maintenance."""
+        response = HttpResponse(
+            "CourtListener is down for maintenance. Please try again shortly.",
+            status=HTTPStatus.SERVICE_UNAVAILABLE,
+            content_type="text/plain",
+            headers={"Retry-After": MAINTENANCE_MODE_RETRY_AFTER},
+        )
+        add_never_cache_headers(response)
         return response
