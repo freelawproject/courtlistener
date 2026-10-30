@@ -7,7 +7,10 @@ import httpx
 import sentry_sdk
 from asgiref.sync import async_to_sync
 from juriscraper.lib.exceptions import UnexpectedContentTypeError
-from juriscraper.lib.utils import check_download_url
+from juriscraper.lib.utils import (
+    check_download_url,
+    check_empty_downloaded_file,
+)
 
 from cl.lib.sentry import fingerprint_sentry_error, set_scraper_tags
 from cl.tests.cases import SimpleTestCase
@@ -35,6 +38,24 @@ def raise_http_status(status: int) -> None:
     raise httpx.HTTPStatusError("bad", request=request, response=response)
 
 
+class _RaisingResponse:
+    """A response whose body raises, so the error happens inside juriscraper"""
+
+    def __init__(self, raiser: Callable[[], Any]) -> None:
+        self._raiser = raiser
+
+    @property
+    def content(self) -> bytes:
+        self._raiser()
+        return b""
+
+
+def in_juriscraper(raiser: Callable[[], Any]) -> Callable[[], Any]:
+    """Make `raiser` fail with a juriscraper frame on the stack, the way a
+    real request made by a scraper does"""
+    return lambda: check_empty_downloaded_file(_RaisingResponse(raiser), URL)
+
+
 def raise_key_error() -> None:
     raise KeyError("case_names")
 
@@ -51,7 +72,8 @@ class SentryClassifierTest(SimpleTestCase):
 
     def test_http_status_error_groups_by_host_and_status(self) -> None:
         event = classify(
-            lambda: raise_http_status(502), {"scrape_kind": "opinions"}
+            in_juriscraper(lambda: raise_http_status(502)),
+            {"scrape_kind": "opinions"},
         )
         self.assertEqual(
             event["fingerprint"],
@@ -67,7 +89,7 @@ class SentryClassifierTest(SimpleTestCase):
 
         def wrap() -> None:
             try:
-                raise_http_status(403)
+                in_juriscraper(lambda: raise_http_status(403))()
             except httpx.HTTPStatusError as exc:
                 raise RuntimeError("Blocked by court") from exc
 
@@ -87,11 +109,15 @@ class SentryClassifierTest(SimpleTestCase):
                 "fail", request=httpx.Request("GET", URL)
             ) from exc
 
-        event = classify(lambda: raise_gaierror(-3), {"scrape_kind": "x"})
+        event = classify(
+            in_juriscraper(lambda: raise_gaierror(-3)), {"scrape_kind": "x"}
+        )
         self.assertEqual(event["fingerprint"], ["cluster-network", "-3"])
         self.assertEqual(event["tags"]["owner"], "infra")
 
-        event = classify(lambda: raise_gaierror(-2), {"scrape_kind": "x"})
+        event = classify(
+            in_juriscraper(lambda: raise_gaierror(-2)), {"scrape_kind": "x"}
+        )
         self.assertEqual(
             event["fingerprint"], ["scraper-dns", "www.courts.example.gov"]
         )
@@ -101,12 +127,75 @@ class SentryClassifierTest(SimpleTestCase):
         def raise_timeout() -> None:
             raise httpx.ReadTimeout("slow", request=httpx.Request("GET", URL))
 
-        event = classify(raise_timeout, {"scrape_kind": "opinions"})
+        event = classify(
+            in_juriscraper(raise_timeout), {"scrape_kind": "opinions"}
+        )
         self.assertEqual(
             event["fingerprint"],
             ["scraper-network", "ReadTimeout", "www.courts.example.gov"],
         )
         self.assertEqual(event["tags"]["owner"], "court-site")
+
+    def test_internal_service_errors_are_not_blamed_on_the_court(self) -> None:
+        """A doctor timeout inside a tagged task has no juriscraper frame"""
+
+        def raise_timeout() -> None:
+            raise httpx.ReadTimeout(
+                "slow", request=httpx.Request("GET", "http://cl-doctor:5050")
+            )
+
+        event = classify(raise_timeout, {"scrape_kind": "extract-from-text"})
+        self.assertEqual(
+            event["fingerprint"],
+            ["cl.lib.test_sentry", "ReadTimeout", "raise_timeout"],
+        )
+        self.assertEqual(event["tags"]["owner"], "courtlistener")
+
+    def test_bug_inside_except_block_is_not_grouped_by_the_handled_error(
+        self,
+    ) -> None:
+        def buggy_handler() -> None:
+            try:
+                in_juriscraper(lambda: raise_http_status(404))()
+            except httpx.HTTPStatusError:
+                raise KeyError("case_names")
+
+        event = classify(buggy_handler, {"scrape_kind": "opinions"})
+        self.assertEqual(
+            event["fingerprint"],
+            ["cl.lib.test_sentry", "KeyError", "buggy_handler"],
+        )
+        self.assertEqual(event["tags"]["owner"], "courtlistener")
+
+    def test_existing_fingerprint_is_kept(self) -> None:
+        """The Celery integration fingerprints soft time limits itself"""
+        event = {
+            "fingerprint": ["celery", "SoftTimeLimitExceeded", "task"],
+            "tags": {"scrape_kind": "pacer"},
+            "extra": {},
+        }
+        result = fingerprint_sentry_error(event, {"exc_info": None})
+        self.assertEqual(
+            result["fingerprint"], ["celery", "SoftTimeLimitExceeded", "task"]
+        )
+
+    def test_courtlistener_log_in_tagged_work_is_owned_by_courtlistener(
+        self,
+    ) -> None:
+        event = {
+            "logger": "cl.scrapers.tasks",
+            "logentry": {"message": "Error from document-extract: %s"},
+            "tags": {
+                "scrape_kind": "extract-from-text",
+                "owner": "juriscraper",
+            },
+            "extra": {"fingerprint": ["ky-document-extract-failure"]},
+        }
+        result = fingerprint_sentry_error(event, {})
+        self.assertEqual(result["tags"]["owner"], "courtlistener")
+        self.assertEqual(
+            result["fingerprint"], ["ky-document-extract-failure"]
+        )
 
     def test_exception_fingerprint_attribute(self) -> None:
         """juriscraper sets sentry_fingerprint on the exception"""

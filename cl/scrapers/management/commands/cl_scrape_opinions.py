@@ -476,19 +476,20 @@ class Command(ScraperCommand):
             await site.parse()
             await self.scrape_court(site, options["full_crawl"])
 
-    def scrape_module(
-        self, module_string: str, court_id: str, options: dict
-    ) -> bool:
+    def scrape_module(self, module_string: str, options: dict) -> bool:
         """Import one juriscraper module and scrape it
 
         :param module_string: the full module path, e.g.
             "juriscraper.opinions.united_states.state.ky"
-        :param court_id: the CourtListener court pk
         :param options: the command options
         :return: False when the court is disabled, True otherwise
         """
         package, module = module_string.rsplit(".", 1)
         mod = __import__(f"{package}.{module}", globals(), locals(), [module])
+        # The court id comes from the Site, not the module name: delaware.py
+        # reports "del", because "del" cannot be a module name
+        court_id = mod.Site().court_id.split(".")[-1].split("_")[0]
+        set_scraper_tags(court_id, self.scrape_kind)
         if not Court.objects.get(id=court_id).has_opinion_scraper:
             logger.info(f"{court_id} is currently disabled.")
             return False
@@ -518,7 +519,6 @@ class Command(ScraperCommand):
                 sys.exit(1)
 
             module_string = module_strings[i]
-            court_id = module_string.split(".")[-1].split("_")[0]
             # One Sentry scope per court, so every event raised or logged
             # while scraping it, by juriscraper too, says which court it was.
             # The fingerprint is set in cl.lib.sentry, not here.
@@ -526,11 +526,9 @@ class Command(ScraperCommand):
                 scope.set_tag(
                     "scraper", module_string.removeprefix("juriscraper.")
                 )
-                set_scraper_tags(court_id, self.scrape_kind)
+                set_scraper_tags(None, self.scrape_kind)
                 try:
-                    enabled = self.scrape_module(
-                        module_string, court_id, options
-                    )
+                    enabled = self.scrape_module(module_string, options)
                 except Exception as e:
                     capture_exception(e)
                     logger.debug(traceback.format_exc())

@@ -67,9 +67,16 @@ def fingerprint_sentry_error(
     Exceptions that passed through juriscraper or eyecite, or that happened
     inside tagged scraper work, are grouped by cause instead of by stack:
     one issue per host and status for HTTP errors, one per host for DNS and
-    transport errors, the fingerprint the exception carries when juriscraper
-    set one, and otherwise the raising module, exception type and function,
-    so a deploy that edits a line no longer opens a new issue.
+    transport errors (only when juriscraper made the request, so a timeout
+    from an internal service is not blamed on a court), the fingerprint the
+    exception carries when juriscraper set one, and otherwise the raising
+    module, exception type and function, so a deploy that edits a line no
+    longer opens a new issue. Only explicit causes (`raise ... from`) are
+    followed, so a bug inside an except block is not filed under the error
+    it was handling.
+
+    A fingerprint already on the event, for example the one the Celery
+    integration sets for soft time limits, is left alone.
 
     Logged events from juriscraper without a fingerprint are grouped by
     scraper and message instead of by the attached stack.
@@ -91,13 +98,16 @@ def fingerprint_sentry_error(
 
 
 def _classify(event: dict[str, Any], hint: dict[str, Any]) -> dict[str, Any]:
-    if fingerprint := event.get("extra", {}).pop("fingerprint", []):
-        event["fingerprint"] = fingerprint
-        return event
-
     tags = event.get("tags")
     if not isinstance(tags, dict):
         tags = {}
+    _set_owner_from_logger(event, tags)
+
+    if fingerprint := event.get("extra", {}).pop("fingerprint", []):
+        event["fingerprint"] = fingerprint
+        return event
+    if event.get("fingerprint"):
+        return event
 
     exc_info = hint.get("exc_info")
     if not exc_info:
@@ -108,12 +118,30 @@ def _classify(event: dict[str, Any], hint: dict[str, Any]) -> dict[str, Any]:
     if "scrape_kind" not in tags and not touches_scraper:
         return event
 
-    fingerprint, owner, extra_tags = _classify_exception(chain, tags)
+    fingerprint, owner, extra_tags = _classify_exception(
+        chain, tags, touches_scraper
+    )
     event["fingerprint"] = fingerprint
     tags["owner"] = owner
     tags.update(extra_tags)
     event["tags"] = tags
     return event
+
+
+def _set_owner_from_logger(
+    event: dict[str, Any], tags: dict[str, Any]
+) -> None:
+    """Inside tagged scraper work, a CourtListener log call is CourtListener's
+
+    The scope default is "juriscraper", which is right for exceptions that
+    the rules below do not classify, but wrong for `logger.error` calls in
+    CourtListener code such as the document-extract failure.
+    """
+    if "scrape_kind" not in tags:
+        return
+    if str(event.get("logger", "")).startswith("cl."):
+        tags["owner"] = "courtlistener"
+        event["tags"] = tags
 
 
 def _classify_log_event(
@@ -136,17 +164,17 @@ def _classify_log_event(
 
 
 def _exception_chain(exc: BaseException) -> list[BaseException]:
-    """The exception and its causes, outermost first, as Python displays them"""
+    """The exception and its explicit causes, outermost first
+
+    Only `raise ... from` links are followed. The implicit context of an
+    exception raised inside an except block is the error that was being
+    handled, not the cause of the new one.
+    """
     chain: list[BaseException] = []
     current: BaseException | None = exc
     while current is not None and current not in chain:
         chain.append(current)
-        if current.__cause__ is not None:
-            current = current.__cause__
-        elif not current.__suppress_context__:
-            current = current.__context__
-        else:
-            current = None
+        current = current.__cause__
     return chain
 
 
@@ -199,17 +227,20 @@ def _host_from_chain(chain: list[BaseException], tags: dict[str, Any]) -> str:
 
 
 def _classify_exception(
-    chain: list[BaseException], tags: dict[str, Any]
+    chain: list[BaseException], tags: dict[str, Any], touches_scraper: bool
 ) -> tuple[list[str], str, dict[str, str]]:
     """Fingerprint, owner and extra tags for an exception chain
 
     Rules apply in order to the whole chain, innermost cause first, so a
     CourtListener wrapper raised from an HTTP error is still grouped by host
-    and status.
+    and status. The HTTP, DNS and transport rules only apply when juriscraper
+    made the request; a request to an internal service that fails inside
+    tagged work falls through to the raising-frame rule.
     """
     causes = list(reversed(chain))
+    network_causes = causes if touches_scraper else []
 
-    for exc in causes:
+    for exc in network_causes:
         if isinstance(exc, httpx.HTTPStatusError):
             host = exc.request.url.host
             status = str(exc.response.status_code)
@@ -227,7 +258,7 @@ def _classify_exception(
                 {"host": host, "http_status": status},
             )
 
-    for exc in causes:
+    for exc in network_causes:
         if not isinstance(exc, OSError) or exc.errno is None:
             continue
         if exc.errno in TRANSIENT_NETWORK_ERRNOS:
@@ -239,7 +270,7 @@ def _classify_exception(
             host = _host_from_chain(chain, tags)
             return ["scraper-dns", host], "court-site", {"host": host}
 
-    for exc in causes:
+    for exc in network_causes:
         if isinstance(exc, httpx.TransportError | urllib.error.URLError):
             host = _host_from_chain(chain, tags)
             return (
