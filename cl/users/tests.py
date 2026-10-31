@@ -1130,28 +1130,20 @@ class ProfileTest(SimpleUserDataMixin, TestCase):
         would silently pull results from the wrong docket whenever the two
         happen to collide.
         """
-        note_shapes = {
-            "legacy": lambda user, rd: NoteFactory(
-                user=user, cluster_id=None, recap_doc_id=rd
-            ),
-            "generic": lambda user, rd: NoteFactory.for_object(rd, user=user),
-        }
-        for shape, make_note in note_shapes.items():
-            with self.subTest(shape=shape):
-                profile = UserProfileWithParentsFactory()
-                rd = RECAPDocumentFactory()
-                make_note(profile.user, rd)
+        profile = UserProfileWithParentsFactory()
+        rd = RECAPDocumentFactory()
+        NoteFactory(content_object=rd, user=profile.user)
 
-                self.assertTrue(
-                    self.client.login(
-                        username=profile.user.username, password="password"
-                    )
-                )
-                r = self.client.get(reverse("profile_notes"))
-                self.assertEqual(
-                    r.context["recap_search_url"],
-                    f"/?type=r&q=xxx AND id:({rd.pk})",
-                )
+        self.assertTrue(
+            self.client.login(
+                username=profile.user.username, password="password"
+            )
+        )
+        r = self.client.get(reverse("profile_notes"))
+        self.assertEqual(
+            r.context["recap_search_url"],
+            f"/?type=r&q=xxx AND id:({rd.pk})",
+        )
 
 
 class NotesPageDeadLinkTest(TestCase):
