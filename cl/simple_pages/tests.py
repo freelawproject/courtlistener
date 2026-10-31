@@ -470,6 +470,21 @@ class V2PagesRegisterTest(PageLoadTestMixin, SimpleUserDataMixin, TestCase):
                 )
 
     @override_flag(WIP_PROPS["flag"], active=True)
+    def test_v2_pages_with_the_wip_flag(self) -> None:
+        """Do registered v2 pages load for visitors opted into WIP pages?
+
+        This is the only test that renders the flag-gated WIP sections of a
+        finished page, so a broken WIP include in one fails here instead of
+        only for opted-in visitors.
+        """
+        for reverse_param, _ in self.V2_PAGES:
+            with self.subTest(
+                "Checking v2 page", reverse_params=reverse_param
+            ):
+                r = self.client.get(reverse(**reverse_param))
+                self.assertEqual(r.status_code, HTTPStatus.OK)
+
+    @override_flag(WIP_PROPS["flag"], active=True)
     def test_wip_pages(self) -> None:
         """Do all registered WIP pages load with both redesign flags?"""
         for reverse_param, wip_template in self.WIP_PAGES:
