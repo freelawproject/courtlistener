@@ -2347,13 +2347,6 @@
       "severity": "error"
     },
     {
-      "column": 12,
-      "path": "cl/recap/tasks.py",
-      "name": "bad-return",
-      "concise_description": "Returned type `tuple[dict[Unknown, Unknown] | None, bytes]` is not assignable to declared return type `tuple[dict[str, bool | list[DocketType] | str] | None, str]`",
-      "severity": "error"
-    },
-    {
       "column": 27,
       "path": "cl/recap/tasks.py",
       "name": "missing-attribute",
@@ -2613,24 +2606,10 @@
       "severity": "error"
     },
     {
-      "column": 36,
-      "path": "cl/recap/tasks.py",
-      "name": "bad-argument-type",
-      "concise_description": "Argument `bytes` is not assignable to parameter `text` with type `str` in function `juriscraper.state.texas.email.TamesEmail._parse_text`",
-      "severity": "error"
-    },
-    {
       "column": 37,
       "path": "cl/recap/tasks.py",
       "name": "bad-argument-type",
       "concise_description": "Argument `dict[str, None] | TexasCourtOfAppealsDocket | TexasCourtOfCriminalAppealsDocket | TexasSupremeCourtDocket` is not assignable to parameter `docket_data` with type `TexasCourtOfAppealsDocket | TexasCourtOfCriminalAppealsDocket | TexasSupremeCourtDocket` in function `cl.corpus_importer.tasks.merge_texas_docket`",
-      "severity": "error"
-    },
-    {
-      "column": 30,
-      "path": "cl/recap/tasks.py",
-      "name": "bad-argument-type",
-      "concise_description": "Argument `bytes` is not assignable to parameter `text` with type `str` in function `juriscraper.scotus.scotus_email.SCOTUSEmail._parse_text`",
       "severity": "error"
     },
     {
