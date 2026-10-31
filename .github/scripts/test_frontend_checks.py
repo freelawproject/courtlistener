@@ -380,40 +380,33 @@ class WipDependencyTest(unittest.TestCase):
                 )
 
     def test_wip_flag_block_gates_wip_references(self) -> None:
-        """A wip_ include is allowed only in the WIP flag's opted-in branch."""
+        """A wip_ include is allowed only in both redesign flags' opted-in branches."""
         cases = {
-            "gated": (
+            "gated by both flags": (
+                """
+                {% flag "use_new_design" %}{% flag "use_wip_design" %}
+                  {% include "wip_includes/card.html" %}
+                {% endflag %}{% endflag %}
+                """,
+                [],
+            ),
+            "flags nested the other way round": (
+                """
+                {% flag 'use_wip_design' %}{% flag 'use_new_design' %}
+                  {% include "wip_includes/card.html" %}
+                {% endflag %}{% endflag %}
+                """,
+                [],
+            ),
+            "the WIP flag alone does not gate": (
                 """
                 {% flag "use_wip_design" %}
                   {% include "wip_includes/card.html" %}
                 {% endflag %}
-                """,
-                [],
-            ),
-            "single-quoted flag name": (
-                """
-                {% flag 'use_wip_design' %}{% include "wip_includes/card.html" %}{% endflag %}
-                """,
-                [],
-            ),
-            "else branch is ungated": (
-                """
-                {% flag "use_wip_design" %}
-                  {% include "wip_includes/card.html" %}
-                {% else %}
-                  {% include "wip_includes/card.html" %}
-                {% endflag %}
-                """,
-                [4],
-            ),
-            "after the block ends": (
-                """
-                {% flag "use_wip_design" %}{% endflag %}
-                {% include "wip_includes/card.html" %}
                 """,
                 [2],
             ),
-            "another flag does not gate": (
+            "use_new_design alone does not gate": (
                 """
                 {% flag "use_new_design" %}
                   {% include "wip_includes/card.html" %}
@@ -421,25 +414,51 @@ class WipDependencyTest(unittest.TestCase):
                 """,
                 [2],
             ),
+            "the WIP flag's else branch is ungated": (
+                """
+                {% flag "use_new_design" %}{% flag "use_wip_design" %}
+                  {% include "wip_includes/card.html" %}
+                {% else %}
+                  {% include "wip_includes/card.html" %}
+                {% endflag %}{% endflag %}
+                """,
+                [4],
+            ),
+            "use_new_design's else branch is ungated": (
+                """
+                {% flag "use_wip_design" %}{% flag "use_new_design" %}
+                {% else %}
+                  {% include "wip_includes/card.html" %}
+                {% endflag %}{% endflag %}
+                """,
+                [3],
+            ),
+            "after the blocks end": (
+                """
+                {% flag "use_new_design" %}{% flag "use_wip_design" %}{% endflag %}{% endflag %}
+                {% include "wip_includes/card.html" %}
+                """,
+                [2],
+            ),
             "an inner waffle switch's else stays gated": (
                 """
-                {% flag "use_wip_design" %}
+                {% flag "use_new_design" %}{% flag "use_wip_design" %}
                   {% switch "some_switch" %}{% else %}
                     {% include "wip_includes/card.html" %}
                   {% endswitch %}
-                {% endflag %}
+                {% endflag %}{% endflag %}
                 """,
                 [],
             ),
             "an inner if's else stays gated": (
                 """
-                {% flag "use_wip_design" %}
+                {% flag "use_new_design" %}{% flag "use_wip_design" %}
                   {% if user.is_staff %}
                     {% include "wip_includes/card.html" %}
                   {% else %}
                     {% include "wip_includes/card.html" %}
                   {% endif %}
-                {% endflag %}
+                {% endflag %}{% endflag %}
                 """,
                 [],
             ),

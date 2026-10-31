@@ -92,8 +92,11 @@ def _parse_line_skips(lines: list[str]) -> dict[int, set[str]]:
 V2_PREFIX = "v2_"
 WIP_PREFIX = "wip_"
 REDESIGN_PREFIXES = (V2_PREFIX, WIP_PREFIX)
-# Mirrors the WIP flag in cl/lib/middleware.py.
+# Mirror the redesign flags in cl/lib/middleware.py. A wip_ include in a
+# finished page must be gated by both.
+NEW_DESIGN_FLAG = "use_new_design"
 WIP_FLAG = "use_wip_design"
+WIP_GATE_FLAGS = {NEW_DESIGN_FLAG, WIP_FLAG}
 # Django and waffle block tags that can take an {% else %} branch.
 ELSE_BLOCK_TAGS = {"if", "ifchanged", "flag", "switch", "sample"}
 
@@ -477,41 +480,47 @@ def check_wip_dependency(lines: list[str]) -> list[tuple[int, str]]:
 
     Only the template a view returns is swapped, so a wip_ template pulled in
     by a v2_ one, new_base.html or a Cotton component would be served to
-    everyone with the redesign flag, finished or not. Inside a
-    {% flag "use_wip_design" %} block it only renders for visitors opted
-    into WIP pages, so it's allowed there, but not in that block's
-    {% else %} branch, which everyone else sees.
+    everyone with the redesign flag, finished or not. Inside both a
+    {% flag "use_new_design" %} and a {% flag "use_wip_design" %} block it
+    only renders for visitors opted into WIP pages, so it's allowed there,
+    but not in either block's {% else %} branch, which everyone else sees.
+    The WIP flag alone is not enough: pages with no legacy template are
+    served to everyone, and the WIP flag only counts with use_new_design.
     """
     results = []
     tag_re = re.compile(r"{%\s*(\w+)(.*?)%}", re.IGNORECASE)
     name_re = re.compile(r'^\s*["\']([^"\']*)["\']')
     # One entry per open block that can have an {% else %}, so each else is
-    # paired with its own block: "wip" for the WIP flag's opted-in branch,
-    # "wip_else" for its else branch, and "other" for anything else.
+    # paired with its own block: the flag's name for the opted-in branch of
+    # a redesign flag, and "other" for anything else, including the else
+    # branch of a redesign flag.
     blocks: list[str] = []
     for i, line in enumerate(lines, 1):
         for m in tag_re.finditer(line):
             tag, args = m.group(1), m.group(2)
             name = n.group(1) if (n := name_re.match(args)) else ""
             if tag in ELSE_BLOCK_TAGS:
-                is_wip_flag = tag == "flag" and name == WIP_FLAG
-                blocks.append("wip" if is_wip_flag else "other")
+                is_gate = tag == "flag" and name in WIP_GATE_FLAGS
+                blocks.append(name if is_gate else "other")
             elif tag.removeprefix("end") in ELSE_BLOCK_TAGS:
                 if blocks:
                     blocks.pop()
             elif tag == "else":
-                if blocks and blocks[-1] == "wip":
-                    blocks[-1] = "wip_else"
+                if blocks:
+                    blocks[-1] = "other"
             elif tag in ("extends", "include"):
                 # Template names are relative to templates/, so a WIP one
                 # always starts with the prefix (wip_help/x.html).
-                if not name.startswith(WIP_PREFIX) or "wip" in blocks:
+                if not name.startswith(WIP_PREFIX) or WIP_GATE_FLAGS <= set(
+                    blocks
+                ):
                     continue
                 results.append(
                     (
                         i,
                         f'{tag} "{name}" — templates finished pages render '
-                        f"must not depend on wip_ templates outside a "
+                        f"must not depend on wip_ templates outside both a "
+                        f'{{% flag "{NEW_DESIGN_FLAG}" %}} and a '
                         f'{{% flag "{WIP_FLAG}" %}} block; gate it or '
                         f"promote it to v2_ first",
                     )
