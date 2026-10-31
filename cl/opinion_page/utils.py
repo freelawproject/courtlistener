@@ -787,7 +787,7 @@ def build_party_groups(party_types: Iterable[PartyType]) -> list[PartyGroup]:
 
     def role_line(role: Role) -> str:
         """Formats a role as its name followed by the action date, if any."""
-        name = role.role_raw or str(role.get_role_display())
+        name = role.role_raw or role.get_role_display() or none
         if role.date_action:
             return f"{name} ({date_format(role.date_action)})"
         return name
