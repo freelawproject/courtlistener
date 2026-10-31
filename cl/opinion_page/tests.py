@@ -1,5 +1,6 @@
 import asyncio
 import datetime
+import json
 import os
 import re
 import shutil
@@ -4299,19 +4300,23 @@ class DocketPageV2TemplateTest(TestCase):
         self.assertIn(" defer", tag.group(0))
         self.assertIn('nonce="', tag.group(0))
 
-    async def test_v2_body_carries_the_csrf_header_for_htmx(self) -> None:
-        """Every hx-post inherits the CSRF token from the body's hx-headers."""
+    async def test_v2_body_carries_the_htmx_headers(self) -> None:
+        """Every htmx request inherits the body's hx-headers.
+
+        They carry the CSRF token, and the design header that gets v2
+        partials back from IncrementalNewTemplateMiddleware.
+        """
         r = await self.async_client.get(
             reverse("view_docket", args=[self.docket.pk, self.docket.slug])
         )
         body = re.search(r"<body[^>]*>", r.content.decode())
         self.assertIsNotNone(body)
-        header = re.search(
-            r'hx-headers=\'\{"X-CSRFToken": "([^"]*)"\}\'', body.group(0)
-        )
-        self.assertIsNotNone(header)
+        hx_headers = re.search(r"hx-headers='([^']*)'", body.group(0))
+        self.assertIsNotNone(hx_headers)
+        headers = json.loads(hx_headers.group(1))
+        self.assertEqual(headers["X-CL-Design"], "v2")
         # The length rules out Django's NOTPROVIDED placeholder.
-        token = header.group(1)
+        token = headers["X-CSRFToken"]
         self.assertEqual(len(token), CSRF_TOKEN_LENGTH)
         self.assertTrue(token.isalnum())
 
