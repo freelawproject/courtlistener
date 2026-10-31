@@ -9,6 +9,7 @@ from unittest.mock import MagicMock, patch
 import httpx
 import time_machine
 from asgiref.sync import async_to_sync
+from django.conf import settings
 from django.contrib.auth.models import AnonymousUser, User
 from django.core.cache import cache
 from django.core.exceptions import ValidationError
@@ -40,6 +41,7 @@ from cl.lib.file_validation import (
     validate_file_size,
 )
 from cl.lib.filesizes import convert_size_to_bytes
+from cl.lib.microservice_utils import doctor_auth_headers, microservice
 from cl.lib.middleware import (
     V2_PARTIALS_PREFIX,
     IncrementalNewTemplateMiddleware,
@@ -3123,3 +3125,49 @@ class RatelimitedViewTest(SimpleTestCase):
             cast(HttpResponse, response).status_code,
             HTTPStatus.TOO_MANY_REQUESTS,
         )
+
+
+class TestDoctorAuthHeaders(SimpleTestCase):
+    """The doctor bearer token goes to doctor and nowhere else."""
+
+    def test_only_doctor_gets_the_token(self) -> None:
+        """Doctor URLs get the header; other services and lookalike hosts
+        never do, and a blank token sends nothing anywhere."""
+        doctor_url = settings.MICROSERVICE_URLS["page-count"]["url"]
+        cases = [
+            ("s3cret", doctor_url, {"Authorization": "Bearer s3cret"}),
+            (
+                "s3cret",
+                settings.MICROSERVICE_URLS["inception-text"]["url"],
+                {},
+            ),
+            ("s3cret", f"{settings.DOCTOR_HOST}1/extract/doc/text/", {}),
+            ("s3cret", f"{settings.DOCTOR_HOST}.other/x/", {}),
+            ("", doctor_url, {}),
+        ]
+        for token, url, expected in cases:
+            with (
+                self.subTest(token=token, url=url),
+                override_settings(DOCTOR_AUTH_TOKEN=token),
+            ):
+                self.assertEqual(doctor_auth_headers(url), expected)
+
+    @override_settings(DOCTOR_AUTH_TOKEN="s3cret")
+    def test_microservice_sends_it_on_the_wire(self) -> None:
+        """The header reaches the request microservice() builds."""
+        seen: list[httpx.Request] = []
+
+        def respond(request: httpx.Request) -> httpx.Response:
+            """Record the request and answer like page-count would."""
+            seen.append(request)
+            return httpx.Response(200, text="1")
+
+        def client(**kwargs: object) -> httpx.AsyncClient:
+            """Stand in for AsyncClient, answering from respond()."""
+            return httpx.AsyncClient(transport=httpx.MockTransport(respond))
+
+        with patch("cl.lib.microservice_utils.AsyncClient", client):
+            async_to_sync(microservice)(
+                service="page-count", file=b"%PDF-", file_type="pdf"
+            )
+        self.assertEqual(seen[0].headers["Authorization"], "Bearer s3cret")
