@@ -2968,13 +2968,16 @@ class TieredCacheTest(SimpleTestCase):
 class IncrementalNewTemplateMiddlewareTest(TestCase):
     """Template swapping for pages that are mid-redesign."""
 
-    def process(self, template_name: str) -> TemplateResponse:
+    def process(
+        self, template_name: str, headers: dict[str, str] | None = None
+    ) -> TemplateResponse:
         """Runs an unrendered TemplateResponse through the middleware.
 
         :param template_name: The template the view would have rendered.
+        :param headers: Request headers, such as the ones htmx sends.
         """
         middleware = IncrementalNewTemplateMiddleware(lambda request: None)
-        request = RequestFactory().get("/")
+        request = RequestFactory().get("/", headers=headers)
         response = TemplateResponse(request, template_name, {})
         return middleware.process_template_response(request, response)
 
@@ -3022,6 +3025,55 @@ class IncrementalNewTemplateMiddlewareTest(TestCase):
             response.template_name, f"{V2_PARTIALS_PREFIX}foo/button.html"
         )
         self.assertNotIn("search_form", response.context_data or {})
+
+    def test_htmx_partial_follows_the_design_header(self) -> None:
+        """A flagged htmx request gets the partial for the page that sent it.
+
+        Flagged users can still be on legacy pages, whose htmx code expects
+        the legacy partial back. Only v2 pages send the design header.
+        """
+        cases = [
+            (
+                "v2 page",
+                {"X-CL-Design": "v2"},
+                f"{V2_PARTIALS_PREFIX}foo/button.html",
+            ),
+            ("legacy page", {}, "includes/foo/button.html"),
+        ]
+        for page, design_header, expected in cases:
+            with (
+                self.subTest(page=page),
+                patch.object(
+                    IncrementalNewTemplateMiddleware,
+                    "template_exists",
+                    return_value=True,
+                ),
+            ):
+                response = self.process(
+                    "includes/foo/button.html",
+                    headers={"HX-Request": "true", **design_header},
+                )
+                self.assertEqual(response.template_name, expected)
+
+    @override_flag("use_new_design", False)
+    def test_htmx_design_header_wins_over_the_flag(self) -> None:
+        """An unflagged htmx request from a v2 page still gets the v2 partial.
+
+        v2-only pages are served to everyone, so the header, not the flag,
+        says which partial the page can use.
+        """
+        with patch.object(
+            IncrementalNewTemplateMiddleware,
+            "template_exists",
+            return_value=True,
+        ):
+            response = self.process(
+                "includes/foo/button.html",
+                headers={"HX-Request": "true", "X-CL-Design": "v2"},
+            )
+        self.assertEqual(
+            response.template_name, f"{V2_PARTIALS_PREFIX}foo/button.html"
+        )
 
 
 class FilterByEmailTest(TestCase):

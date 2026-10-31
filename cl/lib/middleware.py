@@ -91,6 +91,13 @@ class IncrementalNewTemplateMiddleware:
     v2 templates that do not have a legacy counterpart are assumed to be
     available for **everyone**.
 
+    htmx requests are swapped by the "X-CL-Design" header instead of the
+    flag. `new_base.html` sends it with value "v2" on every htmx request
+    from a v2 page, so a partial always matches the page that asked for it.
+    A flagged user on a page that is still legacy gets the legacy partial.
+    Endpoints called by both stacks should return the legacy template name
+    and let this middleware swap it.
+
     TODO: Remove this middleware once new design is completely rolled out.
     """
 
@@ -139,10 +146,16 @@ class IncrementalNewTemplateMiddleware:
 
         # Checking flag_is_active hits the db, so be sure to short-circuit for cheaper
         # evaluations first
-        if self.template_exists(old_template) and not flag_is_active(
-            request, "use_new_design"
-        ):
-            return response
+        if self.template_exists(old_template):
+            if request.headers.get("Hx-Request"):
+                # A partial must match the page already in the browser, and
+                # only v2 pages mark their htmx requests (see new_base.html).
+                expects_v2 = request.headers.get("X-CL-Design") == "v2"
+            else:
+                expects_v2 = flag_is_active(request, "use_new_design")
+
+            if not expects_v2:
+                return response
 
         new_template_name = f"v2_{old_template}"
 
