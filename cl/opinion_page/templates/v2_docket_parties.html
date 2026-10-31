@@ -29,9 +29,9 @@
           </h2>
 
           {% for party in group.parties %}
-            {# One grid per party: the party on the left, "Represented By:" with the attorney rows and the criminal block stacked on the right. The stack draws the lines between its rows; the grid's own border closes the party. #}
-            <div class="grid grid-cols-1 md:grid-cols-3 border-b border-greyscale-200">
-              <div class="py-4 md:py-6 md:pr-6 space-y-1">
+            {# One grid per party: the party on the left, "Represented By:" with the attorney rows and the criminal block stacked on the right. The grid owns the top padding and the closing border; each element only pads below itself, and the stack draws the lines between its rows. #}
+            <div class="grid grid-cols-1 md:grid-cols-3 pt-4 md:pt-6 border-b border-greyscale-200">
+              <div class="pb-4 md:pb-6 md:pr-6 space-y-1">
                 <h3 class="text-md md:pl-3">
                   {{ party.name }}
                   {% if perms.people_db.change_party %}
@@ -44,14 +44,14 @@
               </div>
 
               {% if party.attorneys or party.criminal %}
-                <div class="md:col-span-2">
+                <div class="md:col-span-2 pt-4 md:pt-0">
                   {% if party.attorneys %}
-                    <p class="pt-4 md:pt-6 text-md font-semibold text-greyscale-900">Represented By:</p>
+                    <p class="pb-4 text-md font-semibold text-greyscale-900">Represented By:</p>
                   {% endif %}
                   <div class="divide-y divide-greyscale-200">
                     {% for attorney in party.attorneys %}
-                      <div class="grid grid-cols-1 md:grid-cols-2">
-                        <div class="py-4 md:pr-6 space-y-1">
+                      <div class="grid grid-cols-1 md:grid-cols-2 gap-y-8 py-4 first:pt-0">
+                        <div class="md:pr-6 space-y-1">
                           <p>
                             {{ attorney.name }}
                             {% if perms.people_db.change_attorney %}
@@ -62,7 +62,7 @@
                           {% if attorney.fax %}<p>Fax: {{ attorney.fax }}</p>{% endif %}
                           {% for role in attorney.roles %}<p>{{ role }}</p>{% endfor %}
                         </div>
-                        <div class="py-4 space-y-2">
+                        <div class="space-y-2">
                           {% for firm in attorney.firms %}
                             <div class="space-y-1">
                               {% if firm.name %}
@@ -81,7 +81,7 @@
                     {% endfor %}
 
                     {% if party.criminal %}
-                      <div class="py-4">
+                      <div class="py-4 first:pt-0">
                         <p class="text-md font-semibold text-greyscale-900">Criminal Charges:</p>
                         <c-description-list class="mt-2 flex flex-col gap-1">
                           <c-description-item class="flex flex-wrap gap-x-1">
