@@ -1,4 +1,6 @@
+from dataclasses import dataclass
 from http import HTTPStatus
+from typing import cast
 
 from django.db.models import Prefetch
 from django.http.response import Http404
@@ -448,37 +450,73 @@ class SearchViewSet(LoggingMixin, viewsets.ViewSet):
         )
 
 
-class SearchV4ViewSet(LoggingMixin, viewsets.ViewSet):
-    # Default permissions use Django permissions, so here we AllowAny,
-    # but folks will need to log in to get past the thresholds.
-    permission_classes = (permissions.AllowAny,)
+@dataclass(kw_only=True, frozen=True)
+class _ESResultSerializer[Document, Serializer]:
+    document: type[Document]
+    serializer: type[Serializer]
 
-    supported_search_types = {
-        SEARCH_TYPES.RECAP: {
-            "document_class": DocketDocument,
-            "serializer_class": RECAPESResultSerializer,
-        },
-        SEARCH_TYPES.DOCKETS: {
-            "document_class": DocketDocument,
-            "serializer_class": DocketESResultSerializer,
-        },
-        SEARCH_TYPES.RECAP_DOCUMENT: {
-            "document_class": DocketDocument,
-            "serializer_class": RECAPDocumentESResultSerializer,
-        },
-        SEARCH_TYPES.OPINION: {
-            "document_class": OpinionClusterDocument,
-            "serializer_class": OpinionClusterESResultSerializer,
-        },
-        SEARCH_TYPES.PEOPLE: {
-            "document_class": PersonDocument,
-            "serializer_class": PersonESResultSerializer,
-        },
-        SEARCH_TYPES.ORAL_ARGUMENT: {
-            "document_class": AudioDocument,
-            "serializer_class": OAESResultSerializer,
-        },
-    }
+
+@dataclass(kw_only=True, frozen=True)
+class _ESResultSerializers:
+    recap: _ESResultSerializer[
+        DocketDocument,
+        RECAPESResultSerializer,
+    ]
+    docket: _ESResultSerializer[
+        DocketDocument,
+        DocketESResultSerializer,
+    ]
+    recap_document: _ESResultSerializer[
+        DocketDocument,
+        RECAPDocumentESResultSerializer,
+    ]
+    opinion: _ESResultSerializer[
+        OpinionClusterDocument,
+        OpinionClusterESResultSerializer,
+    ]
+    person: _ESResultSerializer[
+        PersonDocument,
+        PersonESResultSerializer,
+    ]
+    oral_argument: _ESResultSerializer[
+        AudioDocument,
+        OAESResultSerializer,
+    ]
+
+
+class SearchV4ViewSet(LoggingMixin, viewsets.ViewSet):
+    # Search results aren't backed by a model, so the project-wide
+    # DjangoModelPermissions default doesn't apply. Require authentication
+    # to prevent anonymous crawlers from spreading expensive queries across
+    # multiple IPs and overloading Elasticsearch.
+    permission_classes = (permissions.IsAuthenticated,)
+
+    search_serializers = _ESResultSerializers(
+        recap=_ESResultSerializer(
+            document=DocketDocument,
+            serializer=RECAPESResultSerializer,
+        ),
+        docket=_ESResultSerializer(
+            document=DocketDocument,
+            serializer=DocketESResultSerializer,
+        ),
+        recap_document=_ESResultSerializer(
+            document=DocketDocument,
+            serializer=RECAPDocumentESResultSerializer,
+        ),
+        opinion=_ESResultSerializer(
+            document=OpinionClusterDocument,
+            serializer=OpinionClusterESResultSerializer,
+        ),
+        person=_ESResultSerializer(
+            document=PersonDocument,
+            serializer=PersonESResultSerializer,
+        ),
+        oral_argument=_ESResultSerializer(
+            document=AudioDocument,
+            serializer=OAESResultSerializer,
+        ),
+    )
 
     def execute_es_search(self, cleaned_data, request) -> Response:
         """
@@ -492,10 +530,25 @@ class SearchV4ViewSet(LoggingMixin, viewsets.ViewSet):
             errors.
         """
         search_type = cleaned_data["type"]
-        supported_search_type = self.supported_search_types.get(search_type)
-        if not supported_search_type:
-            raise NotFound(detail="Search type not found or not supported.")
-        search_query = supported_search_type["document_class"].search()
+        match search_type:
+            case SEARCH_TYPES.RECAP:
+                result_serializer = self.search_serializers.recap
+            case SEARCH_TYPES.DOCKETS:
+                result_serializer = self.search_serializers.docket
+            case SEARCH_TYPES.RECAP_DOCUMENT:
+                result_serializer = self.search_serializers.recap_document
+            case SEARCH_TYPES.OPINION:
+                result_serializer = self.search_serializers.opinion
+            case SEARCH_TYPES.PEOPLE:
+                result_serializer = self.search_serializers.person
+            case SEARCH_TYPES.ORAL_ARGUMENT:
+                result_serializer = self.search_serializers.oral_argument
+            case _:
+                raise NotFound(
+                    detail="Search type not found or not supported."
+                )
+
+        search_query = result_serializer.document.search()
 
         paginator = ESCursorPagination()
         cleaned_data["request_date"] = (
@@ -522,13 +575,15 @@ class SearchV4ViewSet(LoggingMixin, viewsets.ViewSet):
             results_page, paginator.cursor, cached_response
         )
 
-        serializer_class = supported_search_type["serializer_class"]
+        serializer_class = result_serializer.serializer
         serializer = serializer_class(
             results_page, many=True, context={"request": request}
         )
-        return paginator.get_paginated_response(
-            serializer.data, cached_response
-        )
+        # Because of `many=True`, above, the serializer produces a `list[dict]`
+        # Note: this isn't precisely a `list[dict]` it is actually a
+        # `ReturnList[ReturnDict]`
+        result_list = cast(list[dict], serializer.data)
+        return paginator.get_paginated_response(result_list, cached_response)
 
     def list(self, request, *args, **kwargs):
         search_form = SearchForm(request.GET, request=request)

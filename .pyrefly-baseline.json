@@ -226,13 +226,6 @@
       "severity": "error"
     },
     {
-      "column": 39,
-      "path": "cl/alerts/tasks.py",
-      "name": "bad-argument-type",
-      "concise_description": "Argument `QuerySet[DocketEntry, DocketEntry] | list[DocketEntry]` is not assignable to parameter `new_des` with type `list[DocketEntry]` in function `make_alert_messages`",
-      "severity": "error"
-    },
-    {
       "column": 23,
       "path": "cl/alerts/utils.py",
       "name": "missing-attribute",
@@ -1171,41 +1164,6 @@
       "severity": "error"
     },
     {
-      "column": 9,
-      "path": "cl/donate/api_views.py",
-      "name": "missing-attribute",
-      "concise_description": "Object of class `NoneType` has no attribute `level`",
-      "severity": "error"
-    },
-    {
-      "column": 9,
-      "path": "cl/donate/api_views.py",
-      "name": "missing-attribute",
-      "concise_description": "Object of class `NoneType` has no attribute `termination_date`",
-      "severity": "error"
-    },
-    {
-      "column": 9,
-      "path": "cl/donate/api_views.py",
-      "name": "missing-attribute",
-      "concise_description": "Object of class `NoneType` has no attribute `payment_status`",
-      "severity": "error"
-    },
-    {
-      "column": 9,
-      "path": "cl/donate/api_views.py",
-      "name": "missing-attribute",
-      "concise_description": "Object of class `NoneType` has no attribute `save`",
-      "severity": "error"
-    },
-    {
-      "column": 36,
-      "path": "cl/donate/api_views.py",
-      "name": "missing-attribute",
-      "concise_description": "Object of class `NoneType` has no attribute `user`",
-      "severity": "error"
-    },
-    {
       "column": 20,
       "path": "cl/donate/api_views.py",
       "name": "missing-attribute",
@@ -1388,41 +1346,6 @@
       "severity": "error"
     },
     {
-      "column": 9,
-      "path": "cl/lib/document_serializer.py",
-      "name": "bad-override",
-      "concise_description": "Class member `NullableListField.to_representation` overrides parent class `ListField` in an inconsistent manner",
-      "severity": "error"
-    },
-    {
-      "column": 26,
-      "path": "cl/lib/document_serializer.py",
-      "name": "missing-attribute",
-      "concise_description": "Object of class `DocumentSerializer` has no attribute `Meta`",
-      "severity": "error"
-    },
-    {
-      "column": 27,
-      "path": "cl/lib/document_serializer.py",
-      "name": "missing-attribute",
-      "concise_description": "Object of class `DocumentSerializer` has no attribute `Meta`",
-      "severity": "error"
-    },
-    {
-      "column": 33,
-      "path": "cl/lib/document_serializer.py",
-      "name": "missing-attribute",
-      "concise_description": "Object of class `DocumentSerializer` has no attribute `Meta`",
-      "severity": "error"
-    },
-    {
-      "column": 28,
-      "path": "cl/lib/document_serializer.py",
-      "name": "missing-attribute",
-      "concise_description": "Object of class `DocumentSerializer` has no attribute `Meta`",
-      "severity": "error"
-    },
-    {
       "column": 17,
       "path": "cl/lib/elasticsearch_utils.py",
       "name": "missing-attribute",
@@ -1465,269 +1388,17 @@
       "severity": "error"
     },
     {
-      "column": 18,
-      "path": "cl/lib/import_lib.py",
-      "name": "not-iterable",
-      "concise_description": "Type `Manager[Unknown]` is not iterable",
-      "severity": "error"
-    },
-    {
-      "column": 21,
-      "path": "cl/lib/migration_utils.py",
-      "name": "missing-attribute",
-      "concise_description": "Class `Deserializer` has no class attribute `_get_model_from_node`",
-      "severity": "error"
-    },
-    {
-      "column": 41,
-      "path": "cl/lib/model_helpers.py",
-      "name": "unbound-name",
-      "concise_description": "`d` may be uninitialized",
-      "severity": "error"
-    },
-    {
-      "column": 41,
-      "path": "cl/lib/model_helpers.py",
-      "name": "missing-attribute",
-      "concise_description": "Object of class `NoneType` has no attribute `year`",
-      "severity": "error"
-    },
-    {
-      "column": 50,
-      "path": "cl/lib/model_helpers.py",
-      "name": "missing-attribute",
-      "concise_description": "Object of class `NoneType` has no attribute `month`",
-      "severity": "error"
-    },
-    {
-      "column": 64,
-      "path": "cl/lib/model_helpers.py",
-      "name": "missing-attribute",
-      "concise_description": "Object of class `NoneType` has no attribute `day`",
-      "severity": "error"
-    },
-    {
       "column": 19,
-      "path": "cl/lib/models.py",
-      "name": "missing-attribute",
-      "concise_description": "Object of class `AbstractFile` has no attribute `filepath`",
-      "severity": "error"
-    },
-    {
-      "column": 5,
-      "path": "cl/lib/pacer.py",
-      "name": "missing-attribute",
-      "concise_description": "Object of class `NoneType` has no attribute `add_recap_source`",
-      "severity": "error"
-    },
-    {
-      "column": 8,
-      "path": "cl/lib/pacer.py",
-      "name": "missing-attribute",
-      "concise_description": "Object of class `NoneType` has no attribute `nature_of_suit`",
-      "severity": "error"
-    },
-    {
-      "column": 9,
-      "path": "cl/lib/pacer.py",
-      "name": "missing-attribute",
-      "concise_description": "Object of class `NoneType` has no attribute `docket_number_raw`",
-      "severity": "error"
-    },
-    {
-      "column": 9,
-      "path": "cl/lib/pacer.py",
-      "name": "missing-attribute",
-      "concise_description": "Object of class `NoneType` has no attribute `save`",
-      "severity": "error"
-    },
-    {
-      "column": 13,
-      "path": "cl/lib/pacer.py",
-      "name": "missing-attribute",
-      "concise_description": "Object of class `NoneType` has no attribute `pk`",
-      "severity": "error"
-    },
-    {
-      "column": 13,
-      "path": "cl/lib/pacer.py",
-      "name": "missing-attribute",
-      "concise_description": "Object of class `NoneType` has no attribute `get_absolute_url`",
-      "severity": "error"
-    },
-    {
-      "column": 48,
-      "path": "cl/lib/pacer.py",
-      "name": "missing-attribute",
-      "concise_description": "Object of class `ForeignObjectRel` has no attribute `max_length`",
-      "severity": "error"
-    },
-    {
-      "column": 13,
-      "path": "cl/lib/pacer.py",
-      "name": "missing-attribute",
-      "concise_description": "No attribute `RepeatedLabelError` in module `usaddress`",
-      "severity": "error"
-    },
-    {
-      "column": 16,
-      "path": "cl/lib/paginators.py",
-      "name": "missing-attribute",
-      "concise_description": "Object of class `ESPaginator` has no attribute `_get_page`",
-      "severity": "error"
-    },
-    {
-      "column": 24,
-      "path": "cl/lib/podcast.py",
-      "name": "missing-attribute",
-      "concise_description": "Object of class `iTunesPodcastsFeedGenerator` has no attribute `_version`",
-      "severity": "error"
-    },
-    {
-      "column": 13,
-      "path": "cl/lib/search_utils.py",
-      "name": "missing-attribute",
-      "concise_description": "Object of class `Court` has no attribute `checked`",
-      "severity": "error"
-    },
-    {
-      "column": 13,
-      "path": "cl/lib/search_utils.py",
-      "name": "missing-attribute",
-      "concise_description": "Object of class `Court` has no attribute `checked`",
-      "severity": "error"
-    },
-    {
-      "column": 9,
-      "path": "cl/lib/search_utils.py",
-      "name": "missing-attribute",
-      "concise_description": "Object of class `BoundField` has no attribute `count`",
-      "severity": "error"
-    },
-    {
-      "column": 19,
-      "path": "cl/lib/test_helpers.py",
-      "name": "missing-attribute",
-      "concise_description": "Class `PeopleTestCase` has no class attribute `court_1`",
-      "severity": "error"
-    },
-    {
-      "column": 19,
-      "path": "cl/lib/test_helpers.py",
-      "name": "missing-attribute",
-      "concise_description": "Class `PeopleTestCase` has no class attribute `court_2`",
-      "severity": "error"
-    },
-    {
-      "column": 22,
-      "path": "cl/lib/test_helpers.py",
-      "name": "missing-attribute",
-      "concise_description": "Class `SearchTestCase` has no class attribute `court_2`",
-      "severity": "error"
-    },
-    {
-      "column": 22,
-      "path": "cl/lib/test_helpers.py",
-      "name": "missing-attribute",
-      "concise_description": "Class `SearchTestCase` has no class attribute `court_2`",
-      "severity": "error"
-    },
-    {
-      "column": 22,
-      "path": "cl/lib/test_helpers.py",
-      "name": "missing-attribute",
-      "concise_description": "Class `SearchTestCase` has no class attribute `court_1`",
-      "severity": "error"
-    },
-    {
-      "column": 41,
-      "path": "cl/lib/test_helpers.py",
-      "name": "missing-attribute",
-      "concise_description": "Class `SearchTestCase` has no class attribute `person_2`",
-      "severity": "error"
-    },
-    {
-      "column": 20,
-      "path": "cl/lib/test_helpers.py",
-      "name": "missing-attribute",
-      "concise_description": "Class `SearchTestCase` has no class attribute `person_2`",
-      "severity": "error"
-    },
-    {
-      "column": 20,
-      "path": "cl/lib/test_helpers.py",
-      "name": "missing-attribute",
-      "concise_description": "Class `SearchTestCase` has no class attribute `person_2`",
-      "severity": "error"
-    },
-    {
-      "column": 37,
-      "path": "cl/lib/test_helpers.py",
-      "name": "missing-attribute",
-      "concise_description": "Class `SearchTestCase` has no class attribute `person_2`",
-      "severity": "error"
-    },
-    {
-      "column": 20,
-      "path": "cl/lib/test_helpers.py",
-      "name": "missing-attribute",
-      "concise_description": "Class `SearchTestCase` has no class attribute `person_2`",
-      "severity": "error"
-    },
-    {
-      "column": 20,
-      "path": "cl/lib/test_helpers.py",
-      "name": "missing-attribute",
-      "concise_description": "Class `SearchTestCase` has no class attribute `person_2`",
-      "severity": "error"
-    },
-    {
-      "column": 20,
-      "path": "cl/lib/test_helpers.py",
-      "name": "missing-attribute",
-      "concise_description": "Class `SearchTestCase` has no class attribute `person_2`",
-      "severity": "error"
-    },
-    {
-      "column": 20,
-      "path": "cl/lib/test_helpers.py",
-      "name": "missing-attribute",
-      "concise_description": "Class `SearchTestCase` has no class attribute `person_2`",
-      "severity": "error"
-    },
-    {
-      "column": 18,
       "path": "cl/lib/zoho.py",
       "name": "missing-attribute",
-      "concise_description": "Object of class `NoneType` has no attribute `get_value`",
-      "severity": "error"
-    },
-    {
-      "column": 16,
-      "path": "cl/lib/zoho.py",
-      "name": "missing-attribute",
-      "concise_description": "Object of class `NoneType` has no attribute `get_value`",
+      "concise_description": "Object of class `User` has no attribute `profile`",
       "severity": "error"
     },
     {
       "column": 19,
       "path": "cl/lib/zoho.py",
       "name": "missing-attribute",
-      "concise_description": "Object of class `NoneType` has no attribute `get_value`",
-      "severity": "error"
-    },
-    {
-      "column": 20,
-      "path": "cl/lib/zoho.py",
-      "name": "unsupported-operation",
-      "concise_description": "`None` is not subscriptable",
-      "severity": "error"
-    },
-    {
-      "column": 16,
-      "path": "cl/lib/zoho.py",
-      "name": "missing-attribute",
-      "concise_description": "Object of class `NoneType` has no attribute `token`",
+      "concise_description": "Object of class `User` has no attribute `profile`",
       "severity": "error"
     },
     {
@@ -1910,13 +1581,6 @@
       "path": "cl/opinion_page/utils.py",
       "name": "missing-attribute",
       "concise_description": "Object of class `SCOTUSDocketEntry` has no attribute `recap_documents`",
-      "severity": "error"
-    },
-    {
-      "column": 25,
-      "path": "cl/opinion_page/views.py",
-      "name": "missing-attribute",
-      "concise_description": "Object of class `Docket` has no attribute `idb_data_id`",
       "severity": "error"
     },
     {
@@ -2218,13 +1882,6 @@
       "path": "cl/recap/management/commands/monitor_pacer_websites.py",
       "name": "missing-attribute",
       "concise_description": "Object of class `Manager` has no attribute `all_pacer_courts`",
-      "severity": "error"
-    },
-    {
-      "column": 12,
-      "path": "cl/recap/management/commands/nightly_pacer_updates.py",
-      "name": "bad-return",
-      "concise_description": "Returned type `set[str | Any]` is not assignable to declared return type `set[int]`",
       "severity": "error"
     },
     {
@@ -3075,13 +2732,6 @@
       "severity": "error"
     },
     {
-      "column": 9,
-      "path": "cl/scrapers/management/commands/cl_scrape_opinions.py",
-      "name": "missing-attribute",
-      "concise_description": "Object of class `Opinion` has no attribute `file_with_date`",
-      "severity": "error"
-    },
-    {
       "column": 12,
       "path": "cl/scrapers/management/commands/cl_scrape_opinions.py",
       "name": "bad-return",
@@ -3096,10 +2746,10 @@
       "severity": "error"
     },
     {
-      "column": 5,
+      "column": 46,
       "path": "cl/scrapers/management/commands/cl_scrape_oral_arguments.py",
-      "name": "missing-attribute",
-      "concise_description": "Object of class `Audio` has no attribute `file_with_date`",
+      "name": "bad-argument-type",
+      "concise_description": "Argument `date | None` is not assignable to parameter `d` with type `date` in function `cl.lib.import_lib.get_scotus_judges`",
       "severity": "error"
     },
     {
@@ -3562,41 +3212,6 @@
       "path": "cl/search/api_views.py",
       "name": "bad-argument-type",
       "concise_description": "Argument `ESList` is not assignable to parameter `queryset` with type `QuerySet[@_, @_]` in function `rest_framework.pagination.PageNumberPagination.paginate_queryset`",
-      "severity": "error"
-    },
-    {
-      "column": 24,
-      "path": "cl/search/api_views.py",
-      "name": "missing-attribute",
-      "concise_description": "Object of type `type[AudioDocument] | type[DocketDocument] | type[DocketESResultSerializer] | type[OAESResultSerializer] | type[OpinionClusterDocument] | type[OpinionClusterESResultSerializer] | type[PersonDocument] | type[PersonESResultSerializer] | type[RECAPDocumentESResultSerializer] | type[RECAPESResultSerializer]` has no attribute `search`",
-      "severity": "error"
-    },
-    {
-      "column": 13,
-      "path": "cl/search/api_views.py",
-      "name": "bad-argument-count",
-      "concise_description": "Expected 0 positional arguments, got 1 in function `cl.search.documents.AudioDocument.__init__`",
-      "severity": "error"
-    },
-    {
-      "column": 27,
-      "path": "cl/search/api_views.py",
-      "name": "unexpected-keyword",
-      "concise_description": "Unexpected keyword argument `many` in function `cl.search.documents.AudioDocument.__init__`",
-      "severity": "error"
-    },
-    {
-      "column": 38,
-      "path": "cl/search/api_views.py",
-      "name": "unexpected-keyword",
-      "concise_description": "Unexpected keyword argument `context` in function `cl.search.documents.AudioDocument.__init__`",
-      "severity": "error"
-    },
-    {
-      "column": 13,
-      "path": "cl/search/api_views.py",
-      "name": "bad-argument-type",
-      "concise_description": "Argument `ReturnDict[Unknown, Unknown] | Any` is not assignable to parameter `data` with type `list[dict[Unknown, Unknown]]` in function `cl.api.pagination.ESCursorPagination.get_paginated_response`",
       "severity": "error"
     },
     {
@@ -4216,20 +3831,6 @@
       "severity": "error"
     },
     {
-      "column": 33,
-      "path": "cl/search/tasks.py",
-      "name": "missing-attribute",
-      "concise_description": "Object of type `Audio | Citation | Docket | DocketEntry | Education | Opinion | OpinionCluster | Parenthetical | ParentheticalGroup | Person | Position | RECAPDocument` has no attribute `person`",
-      "severity": "error"
-    },
-    {
-      "column": 21,
-      "path": "cl/search/tasks.py",
-      "name": "missing-attribute",
-      "concise_description": "Object of type `Audio | Citation | Docket | DocketEntry | Education | Opinion | OpinionCluster | Parenthetical | ParentheticalGroup | Person | Position | RECAPDocument` has no attribute `person`",
-      "severity": "error"
-    },
-    {
       "column": 45,
       "path": "cl/search/tasks.py",
       "name": "bad-argument-type",
@@ -4244,52 +3845,10 @@
       "severity": "error"
     },
     {
-      "column": 55,
-      "path": "cl/search/tasks.py",
-      "name": "bad-argument-type",
-      "concise_description": "Argument `Audio | Citation | Docket | DocketEntry | Education | Opinion | OpinionCluster | Parenthetical | ParentheticalGroup | Person | Position | RECAPDocument` is not assignable to parameter `position` with type `Position` in function `person_first_time_indexing`",
-      "severity": "error"
-    },
-    {
-      "column": 20,
-      "path": "cl/search/tasks.py",
-      "name": "missing-attribute",
-      "concise_description": "Object of type `Audio | Citation | Docket | DocketEntry | Education | Opinion | OpinionCluster | Parenthetical | ParentheticalGroup | Person | Position | RECAPDocument` has no attribute `is_judge`",
-      "severity": "error"
-    },
-    {
-      "column": 33,
-      "path": "cl/search/tasks.py",
-      "name": "missing-attribute",
-      "concise_description": "Object of type `Audio | Citation | Docket | DocketEntry | Education | Opinion | OpinionCluster | Parenthetical | ParentheticalGroup | Person | Position | RECAPDocument` has no attribute `docket_entry`",
-      "severity": "error"
-    },
-    {
-      "column": 42,
-      "path": "cl/search/tasks.py",
-      "name": "missing-attribute",
-      "concise_description": "Object of type `Audio | Citation | Docket | DocketEntry | Education | Opinion | OpinionCluster | Parenthetical | ParentheticalGroup | Person | Position | RECAPDocument` has no attribute `docket_entry`",
-      "severity": "error"
-    },
-    {
       "column": 32,
       "path": "cl/search/tasks.py",
       "name": "unexpected-keyword",
       "concise_description": "Unexpected keyword argument `meta` in function `cl.search.documents.DocketDocument.__init__`",
-      "severity": "error"
-    },
-    {
-      "column": 33,
-      "path": "cl/search/tasks.py",
-      "name": "missing-attribute",
-      "concise_description": "Object of type `Audio | Citation | Docket | DocketEntry | Education | Opinion | OpinionCluster | Parenthetical | ParentheticalGroup | Person | Position | RECAPDocument` has no attribute `cluster`",
-      "severity": "error"
-    },
-    {
-      "column": 43,
-      "path": "cl/search/tasks.py",
-      "name": "missing-attribute",
-      "concise_description": "Object of type `Audio | Citation | Docket | DocketEntry | Education | Opinion | OpinionCluster | Parenthetical | ParentheticalGroup | Person | Position | RECAPDocument` has no attribute `cluster`",
       "severity": "error"
     },
     {
@@ -4363,17 +3922,10 @@
       "severity": "error"
     },
     {
-      "column": 32,
-      "path": "cl/search/tasks.py",
-      "name": "missing-attribute",
-      "concise_description": "Object of type `Audio | Citation | Docket | DocketEntry | Education | Opinion | OpinionCluster | Parenthetical | ParentheticalGroup | Person | Position | RECAPDocument` has no attribute `docket`",
-      "severity": "error"
-    },
-    {
       "column": 44,
       "path": "cl/search/tasks.py",
       "name": "bad-argument-type",
-      "concise_description": "Argument `int | Unknown` is not assignable to parameter `id` with type `str` in function `elasticsearch.dsl._sync.document.Document.exists`",
+      "concise_description": "Argument `int` is not assignable to parameter `id` with type `str` in function `elasticsearch.dsl._sync.document.Document.exists`",
       "severity": "error"
     },
     {
@@ -4458,6 +4010,13 @@
       "path": "cl/search/tasks.py",
       "name": "bad-argument-type",
       "concise_description": "Argument `Literal['']` is not assignable to parameter `meta` with type `ApiResponseMeta` in function `elastic_transport._exceptions.ApiError.__init__`",
+      "severity": "error"
+    },
+    {
+      "column": 49,
+      "path": "cl/search/tasks.py",
+      "name": "bad-argument-type",
+      "concise_description": "Argument `int` is not assignable to parameter `id` with type `str` in function `elasticsearch.dsl._sync.document.Document.exists`",
       "severity": "error"
     },
     {

@@ -35,7 +35,7 @@ from cl.search.models import (
     Opinion,
     SearchQuery,
 )
-from cl.tests.cases import ESIndexTestCase, TestCase
+from cl.tests.cases import AuthenticatedClientMixin, ESIndexTestCase, TestCase
 
 
 def mock_read_from_s3(file_path, r):
@@ -282,7 +282,7 @@ class OpinionEmbeddingIndexingTests(ESIndexTestCase, TestCase):
 @override_settings(KNN_SEARCH_ENABLED=True)
 @override_settings(WAFFLE_CACHE_PREFIX="test_semantic_search_opinion")
 @mock.patch("cl.lib.elasticsearch_utils.microservice")
-class SemanticSearchTests(ESIndexTestCase, TestCase):
+class SemanticSearchTests(AuthenticatedClientMixin, ESIndexTestCase, TestCase):
     @classmethod
     def setUpTestData(cls):
         """Set up test index and test data."""

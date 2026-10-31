@@ -25,18 +25,15 @@ from django.core.exceptions import ValidationError
 from django.core.files.base import ContentFile, File
 from django.core.files.uploadedfile import SimpleUploadedFile
 from django.db import IntegrityError, transaction
+from django.db.models import Case, Value, When
 from django.db.models.fields.files import FieldFile
 from django.utils.timezone import now
 from juriscraper.lib.exceptions import PacerLoginException, ParsingException
 from juriscraper.lib.string_utils import CaseNameTweaker, harmonize
 from juriscraper.pacer import (
-    ACMSAttachmentPage,
     AcmsCaseSearch,
     ACMSDocketReport,
     AppellateDocketReport,
-    CaseQuery,
-    ClaimsRegister,
-    DocketHistoryReport,
     DocketReport,
     PossibleCaseNumberApi,
     S3NotificationEmail,
@@ -136,6 +133,15 @@ from cl.recap.models import (
     PacerFetchQueue,
     PacerHtmlFiles,
     ProcessingQueue,
+)
+from cl.recap.parsers import (
+    parse_acms_attachment_json,
+    parse_acms_json,
+    parse_appellate_text,
+    parse_case_query_page_text,
+    parse_claims_register_text,
+    parse_docket_history_text,
+    parse_docket_text,
 )
 from cl.recap.utils import (
     find_subdocket_atts_rds_from_data,
@@ -699,12 +705,6 @@ async def process_recap_zip(pk: int) -> dict[str, list[int] | list[Task]]:
             }
 
 
-def parse_docket_text(court_id, text):
-    report = DocketReport(court_id)
-    report._parse_text(text)
-    return report.data
-
-
 async def process_recap_docket(pk):
     """Process an uploaded docket from the RECAP API endpoint.
 
@@ -1052,12 +1052,6 @@ async def process_recap_attachment(
     return pq_status, msg, rds_affected
 
 
-def parse_claims_register_text(court_id, text):
-    report = ClaimsRegister(court_id)
-    report._parse_text(text)
-    return report.data
-
-
 async def process_recap_claims_register(pk):
     """Merge bankruptcy claims registry HTML into RECAP
 
@@ -1166,12 +1160,6 @@ async def process_recap_claims_register(pk):
     await associate_related_instances(pq, d_id=d.pk)
     await mark_pq_successful(pq)
     return {"docket_pk": d.pk}
-
-
-def parse_docket_history_text(court_id, text):
-    report = DocketHistoryReport(court_id)
-    report._parse_text(text)
-    return report.data
 
 
 async def process_recap_docket_history_report(pk):
@@ -1284,12 +1272,6 @@ async def process_recap_docket_history_report(pk):
         "docket_pk": d.pk,
         "content_updated": bool(rds_created or content_updated),
     }
-
-
-def parse_case_query_page_text(court_id, text):
-    report = CaseQuery(court_id)
-    report._parse_text(text)
-    return report.data
 
 
 async def process_case_query_page(pk):
@@ -1405,24 +1387,6 @@ async def process_case_query_page(pk):
         "docket_pk": d.pk,
         "content_updated": content_updated,
     }
-
-
-def parse_appellate_text(court_id, text):
-    report = AppellateDocketReport(court_id)
-    report._parse_text(text)
-    return report.data
-
-
-def parse_acms_attachment_json(court_id, json):
-    report = ACMSAttachmentPage(court_id)
-    report._parse_text(json)
-    return report.data
-
-
-def parse_acms_json(court_id, json):
-    report = ACMSDocketReport(court_id)
-    report._parse_text(json)
-    return report.data
 
 
 async def process_recap_appellate_docket(pk):
@@ -3144,19 +3108,58 @@ def download_pacer_pdf_and_save_to_pq(
     if pacer_doc_id is None:
         pacer_doc_id = ""
     with transaction.atomic():
-        (
-            pq,
-            created,
-        ) = ProcessingQueue.objects.get_or_create(
-            uploader_id=user_pk,
-            pacer_doc_id=pacer_doc_id,
-            pacer_case_id=pacer_case_id,
-            court_id=court_id,
-            upload_type=UPLOAD_TYPE.PDF,
-            date_created__gt=cutoff_date,
-            defaults={"source": PROCESSING_QUEUE_SOURCE.EMAIL},
+        # Notifications for the same document from different recap.email
+        # subscribers all run as the same user, so they match the same PQ
+        # rows and can be processed at the same time. get_or_create isn't
+        # safe here: without a unique constraint, concurrent tasks can each
+        # create a row, and a later retry then fails with
+        # MultipleObjectsReturned. Instead, lock and reuse one match.
+        #
+        # Concurrent tasks can still each create a PQ, since
+        # select_for_update() only locks rows that already exist. So prefer
+        # a PQ that didn't fail: if a task is retried after storing the PDF
+        # in its own PQ, picking another notification's failed PQ would retry
+        # a free look that's already used up, mark the document as sealed,
+        # and never use the PDF we have.
+        pq = (
+            ProcessingQueue.objects.select_for_update()
+            .filter(
+                uploader_id=user_pk,
+                pacer_doc_id=pacer_doc_id,
+                pacer_case_id=pacer_case_id,
+                court_id=court_id,
+                upload_type=UPLOAD_TYPE.PDF,
+                date_created__gt=cutoff_date,
+            )
+            .order_by(
+                Case(
+                    When(status=PROCESSING_STATUS.FAILED, then=Value(1)),
+                    default=Value(0),
+                ),
+                "pk",
+            )
+            .first()
         )
-        if created and magic_number and not is_bankr_short_doc_id:
+        created = pq is None
+        if pq is None:
+            pq = ProcessingQueue.objects.create(
+                uploader_id=user_pk,
+                pacer_doc_id=pacer_doc_id,
+                pacer_case_id=pacer_case_id,
+                court_id=court_id,
+                upload_type=UPLOAD_TYPE.PDF,
+                source=PROCESSING_QUEUE_SOURCE.EMAIL,
+            )
+        # Also download into an existing PQ whose earlier attempt failed. That
+        # attempt may have come from another subscriber's notification without
+        # a magic number. A failed PQ combined with our magic number would
+        # otherwise be read as a sealed document (#7940).
+        should_download = (
+            magic_number
+            and not is_bankr_short_doc_id
+            and (created or pq.status == PROCESSING_STATUS.FAILED)
+        )
+        if should_download:
             response, r_msg = async_to_sync(download_pdf_by_magic_number)(
                 court_id,
                 pacer_doc_id,
@@ -3176,6 +3179,9 @@ def download_pacer_pdf_and_save_to_pq(
                 )
                 cf = ContentFile(response.content)
                 pq.filepath_local.save(file_name, cf, save=False)
+                # Clear the failure left by an earlier attempt, if any.
+                pq.status = PROCESSING_STATUS.ENQUEUED
+                pq.error_message = ""
                 pq.save()
                 return pq
 
@@ -3183,7 +3189,7 @@ def download_pacer_pdf_and_save_to_pq(
             r_msg = "Invalid short pacer_doc_id for bankruptcy court."
         if not magic_number:
             r_msg = "No magic number available to download the document."
-        if created:
+        if created or should_download:
             async_to_sync(mark_pq_status)(
                 pq, r_msg, PROCESSING_STATUS.FAILED, "error_message"
             )

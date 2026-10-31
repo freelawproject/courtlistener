@@ -811,14 +811,14 @@ class ProfileTest(SimpleUserDataMixin, TestCase):
                 stripe_customer_id="cus_test",
             )
 
-            legacy_note = NoteFactory(user=profile.user)
-            legacy_note.notes = "edited"
-            legacy_note.save()
-            gfk_note = NoteFactory.for_object(
-                RECAPDocumentFactory(), user=profile.user
-            )
-            gfk_note.notes = "edited"
-            gfk_note.save()
+            for note in (
+                NoteFactory(user=profile.user),
+                NoteFactory(
+                    content_object=RECAPDocumentFactory(), user=profile.user
+                ),
+            ):
+                note.notes = "edited"
+                note.save()
 
             # Prayers, throttle overrides and stats events, edited so that
             # each one also leaves pghistory rows behind.
@@ -1138,8 +1138,8 @@ class NotesPageDeadLinkTest(TestCase):
             docket_entry=entry, attachment_number=None
         )
         self.assertEqual(document.get_absolute_url(), "")
-        note = NoteFactory.for_object(
-            document, user=user.user, name="edge case note"
+        note = NoteFactory(
+            content_object=document, user=user.user, name="edge case note"
         )
 
         self.assertTrue(

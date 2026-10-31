@@ -28,7 +28,11 @@ if TYPE_CHECKING:
     from django.test.client import _MonkeyPatchedWSGIResponse
 
 from cl.alerts.constants import LEGACY_MEMBERSHIP_HELP_URL
-from cl.alerts.factories import AlertFactory, DocketAlertWithParentsFactory
+from cl.alerts.factories import (
+    AlertFactory,
+    DocketAlertFactory,
+    DocketAlertWithParentsFactory,
+)
 from cl.alerts.forms import CreateAlertForm
 from cl.alerts.management.commands.cl_send_scheduled_alerts import (
     DAYS_TO_DELETE,
@@ -86,6 +90,7 @@ from cl.search.factories import (
     CourtFactory,
     DocketEntryFactory,
     DocketFactory,
+    OpinionClusterFactory,
     OpinionWithParentsFactory,
     RECAPDocumentFactory,
 )
@@ -1099,7 +1104,7 @@ class UnlimitedAlertsTest(TestCase):
         """Can a user create an alert?"""
         up = UserProfileWithParentsFactory()
         self.assertTrue(
-            up.can_make_another_alert,
+            up.can_make_another_alert(),
             msg="User with no alerts cannot make its first alert.",
         )
 
@@ -1111,8 +1116,28 @@ class UnlimitedAlertsTest(TestCase):
         )
 
         self.assertTrue(
-            up.can_make_another_alert,
+            up.can_make_another_alert(),
             msg="User with one alert cannot make another.",
+        )
+
+    @override_settings(MAX_FREE_DOCKET_ALERTS=0, DOCKET_ALERT_RECAP_BONUS=1)
+    def test_recap_bonus_raises_the_free_limit(self) -> None:
+        """The RECAP bonus adds to the free limit only when it is claimed."""
+        up = UserProfileWithParentsFactory()
+        self.assertFalse(
+            up.can_make_another_alert(),
+            msg="Got the bonus without claiming RECAP.",
+        )
+        self.assertTrue(
+            up.can_make_another_alert(recap_installed=True),
+            msg="Claiming RECAP did not raise the limit.",
+        )
+        DocketAlertWithParentsFactory(
+            user=up.user, docket__source=Docket.RECAP
+        )
+        self.assertFalse(
+            up.can_make_another_alert(recap_installed=True),
+            msg="The bonus allowed more alerts than the raised limit.",
         )
 
     @override_settings(MAX_FREE_DOCKET_ALERTS=0)
@@ -1128,7 +1153,7 @@ class UnlimitedAlertsTest(TestCase):
             msg="Grantlist allowed even though email should not be on list.",
         )
         self.assertFalse(
-            up.can_make_another_alert,
+            up.can_make_another_alert(),
             msg="Was able to make alerts even though the max free "
             "alerts was overridden to zero.",
         )
@@ -1138,7 +1163,7 @@ class UnlimitedAlertsTest(TestCase):
                 msg="Grantlist denied even though email should be allowed. ",
             )
             self.assertTrue(
-                up.can_make_another_alert,
+                up.can_make_another_alert(),
                 msg="Unable to make an alert even though user's email is "
                 "granted unlimited docket alerts",
             )
@@ -3151,6 +3176,10 @@ class ToggleDocketAlertHtmxTest(TestCase):
             headers={"HX-Request": "true"},
         )
 
+    def count_id(self) -> str:
+        """The id attribute of the quota dialog's alert count on the docket page."""
+        return f'id="docket-alert-quota-count-{self.docket.pk}"'
+
     def subscriptions(self) -> int:
         """How many active alerts the user has on the docket."""
         return DocketAlert.objects.filter(
@@ -3174,10 +3203,13 @@ class ToggleDocketAlertHtmxTest(TestCase):
         self.assertTemplateUsed(r, self.FRAGMENT)
         self.assertEqual(self.subscriptions(), 1)
         self.assertTrue(r.context["has_alert"])
+        self.assertFalse(r.context["quota_reached"])
+        self.assertNotIn("HX-Trigger-After-Swap", r)
         self.assertContains(r, f'id="docket-alert-label-{self.docket.pk}"')
         self.assertContains(r, f'id="docket-alert-toggle-{self.docket.pk}"')
         self.assertContains(r, f'id="docket-alert-status-{self.docket.pk}"')
         self.assertContains(r, 'hx-swap-oob="innerHTML"', count=3)
+        self.assertNotContains(r, self.count_id())
 
     def test_htmx_disables_the_alert(self) -> None:
         """Toggling a subscribed docket unsubscribes it."""
@@ -3189,11 +3221,21 @@ class ToggleDocketAlertHtmxTest(TestCase):
 
     @override_settings(MAX_FREE_DOCKET_ALERTS=0)
     def test_htmx_refuses_to_subscribe_over_quota(self) -> None:
-        """A user at quota gets no alert, even without the page's dialog."""
+        """A user at quota gets the quota dialog instead of an alert.
+
+        The partial fills the dialog's alert count out of band, and the
+        header is what opens the dialog on the page.
+        """
         r = self.toggle()
         self.assertEqual(r.status_code, HTTPStatus.OK)
         self.assertEqual(self.subscriptions(), 0)
         self.assertFalse(r.context["has_alert"])
+        self.assertTrue(r.context["quota_reached"])
+        self.assertEqual(r.context["subscription_count"], 0)
+        self.assertEqual(
+            r["HX-Trigger-After-Swap"], "docket-alert-quota-reached"
+        )
+        self.assertContains(r, f'{self.count_id()} hx-swap-oob="innerHTML"')
 
     @override_settings(MAX_FREE_DOCKET_ALERTS=1)
     def test_htmx_allows_disabling_at_quota(self) -> None:
@@ -3202,6 +3244,39 @@ class ToggleDocketAlertHtmxTest(TestCase):
         r = self.toggle()
         self.assertEqual(self.subscriptions(), 0)
         self.assertFalse(r.context["has_alert"])
+        self.assertFalse(r.context["quota_reached"])
+
+    @override_settings(MAX_FREE_DOCKET_ALERTS=1)
+    def test_quota_dialog_reports_the_current_count(self) -> None:
+        """The dialog's count is the user's live subscription total."""
+        DocketAlertFactory(
+            user=self.profile.user, docket=DocketFactory(source=Docket.RECAP)
+        )
+        r = self.toggle()
+        self.assertTrue(r.context["quota_reached"])
+        self.assertEqual(r.context["subscription_count"], 1)
+
+    @override_settings(MAX_FREE_DOCKET_ALERTS=0, DOCKET_ALERT_RECAP_BONUS=1)
+    def test_recap_cookie_grants_the_bonus(self) -> None:
+        """A truthy recap_installed cookie raises the quota by the RECAP bonus; absent or empty, the free limit applies."""
+        r = self.toggle()
+        self.assertTrue(r.context["quota_reached"])
+        self.assertEqual(self.subscriptions(), 0)
+
+        self.client.cookies["recap_installed"] = ""
+        r = self.toggle()
+        self.assertTrue(r.context["quota_reached"])
+        self.assertEqual(self.subscriptions(), 0)
+
+        self.client.cookies["recap_installed"] = "true"
+        r = self.toggle()
+        self.assertFalse(r.context["quota_reached"])
+        self.assertEqual(self.subscriptions(), 1)
+
+        self.docket = DocketFactory(source=Docket.RECAP)
+        r = self.toggle()
+        self.assertTrue(r.context["quota_reached"])
+        self.assertEqual(r.context["subscription_count"], 1)
 
     def test_htmx_without_id_is_a_bad_request(self) -> None:
         """A missing or malformed docket id is the caller's error.
@@ -3498,29 +3573,27 @@ class DocketAlertGetNotesTagsTests(TestCase):
         cls.docket_3 = DocketFactory(
             court=cls.court,
         )
-        cls.docket_4 = DocketFactory(
-            court=cls.court,
-        )
         cls.note_docket_1_user_1 = NoteFactory(
             user=cls.user_1,
-            docket_id=cls.docket_1,
+            content_object=cls.docket_1,
             notes="Note 1 Test",
-        )
-        # GFK-shaped note (#7725) -- proves the lookup isn't legacy-only.
-        cls.note_docket_4_user_1 = NoteFactory.for_object(
-            cls.docket_4,
-            user=cls.user_1,
-            notes="Note 4 Test",
         )
         cls.note_docket_2_user_1 = NoteFactory(
             user=cls.user_1,
-            docket_id=cls.docket_2,
+            content_object=cls.docket_2,
             notes="",
         )
         cls.note_docket_1_user_2 = NoteFactory(
             user=cls.user_2,
-            docket_id=cls.docket_1,
+            content_object=cls.docket_1,
             notes="Note 2 Test",
+        )
+        cls.note_cluster_same_pk_user_1 = NoteFactory(
+            user=cls.user_1,
+            content_object=OpinionClusterFactory(
+                id=cls.docket_3.pk, docket=cls.docket_1
+            ),
+            notes="Note on a cluster sharing docket_3's pk",
         )
 
         cls.orphan_tag_user_1 = UserTagFactory(user=cls.user_1, name="orphan")
@@ -3569,16 +3642,10 @@ class DocketAlertGetNotesTagsTests(TestCase):
             notes_docket_3_user_1,
             tags_docket_3_user_1,
         ) = get_docket_notes_and_tags_by_user(self.docket_3.pk, self.user_1.pk)
+        # user_1's note on the cluster sharing docket_3's pk isn't a docket
+        # note, so it must not show up here.
         self.assertEqual(notes_docket_3_user_1, None)
         self.assertEqual(tags_docket_3_user_1, [])
-
-        # GFK-shaped note (#7725) -- must be found too, not just legacy ones.
-        (
-            notes_docket_4_user_1,
-            tags_docket_4_user_1,
-        ) = get_docket_notes_and_tags_by_user(self.docket_4.pk, self.user_1.pk)
-        self.assertEqual(notes_docket_4_user_1, "Note 4 Test")
-        self.assertEqual(tags_docket_4_user_1, [])
 
 
 @mock.patch("cl.search.tasks.percolator_alerts_models_supported", new=[Audio])
