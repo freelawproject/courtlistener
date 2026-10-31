@@ -1,0 +1,21 @@
+{% extends "base.html" %}
+
+{% block title %}Continue to {{ organization.name }} – CourtListener.com{% endblock %}
+
+{% block footer-scripts %}{% endblock %}
+{% block sidebar %}{% endblock %}
+
+{% block content %}
+  <div class="col-xs-1 col-sm-2 col-md-3"></div>
+  <div class="col-xs-10 col-sm-8 col-md-6 well">
+    <h2>Sign In with {{ organization.name }}</h2>
+    <p>{{ organization.name }} uses single sign-on for CourtListener. Continue to your organization's sign-in page, then you'll come back here.</p>
+    {# The IdP login must be started with a POST; see SOCIALACCOUNT_LOGIN_ON_GET. #}
+    <form action="{{ login_url }}" method="post">{% csrf_token %}
+      <input type="hidden" name="next" value="{{ next }}">
+      <button type="submit" class="btn btn-primary btn-lg">Continue to {{ organization.name }}</button>
+    </form>
+    <p class="v-offset-above-2"><a href="{% url "sso_start" %}">Use a different email address</a></p>
+  </div>
+  <div class="col-xs-1 col-sm-2 col-md-3"></div>
+{% endblock %}

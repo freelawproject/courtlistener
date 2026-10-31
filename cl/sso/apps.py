@@ -6,3 +6,7 @@ class SSOConfig(AppConfig):
 
     name = "cl.sso"
     verbose_name = "Single sign-on"
+
+    def ready(self) -> None:
+        """Connect the app's signal handlers."""
+        from cl.sso import signals  # noqa: F401

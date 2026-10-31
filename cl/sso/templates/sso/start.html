@@ -1,0 +1,37 @@
+{% extends "base.html" %}
+
+{% block title %}Sign In with Single Sign-On – CourtListener.com{% endblock %}
+{% block description %}
+  Sign into CourtListener through your organization's single sign-on.
+{% endblock %}
+
+{% block footer-scripts %}{% endblock %}
+{% block sidebar %}{% endblock %}
+
+{% block content %}
+  <div class="col-xs-1 col-sm-2 col-md-3"></div>
+  <div class="col-xs-10 col-sm-8 col-md-6 well">
+    <h2>Sign In with Single Sign-On</h2>
+    {% if no_sso_domain %}
+      <p class="alert alert-warning">
+        {{ no_sso_domain }} doesn't use single sign-on with CourtListener.
+        <a href="{% url 'sign-in' %}?next={{ next|urlencode }}">Sign in with your password</a> instead.
+      </p>
+    {% endif %}
+    <p>If your organization uses single sign-on (SSO) with CourtListener, enter your work email address to continue to your organization's sign-in page.</p>
+
+    <form action="{% url "sso_start" %}" method="post">{% csrf_token %}
+      <div class="form-group{% if form.email.errors %} has-error{% endif %}">
+        <label for="{{ form.email.id_for_label }}">{{ form.email.label }}</label>
+        {{ form.email }}
+        {% for error in form.email.errors %}
+          <p class="help-block">{{ error }}</p>
+        {% endfor %}
+      </div>
+      <input type="hidden" name="next" value="{{ next }}">
+      <button type="submit" class="btn btn-primary btn-lg">Continue</button>
+    </form>
+    <p class="v-offset-above-2"><a href="{% url 'sign-in' %}?next={{ next|urlencode }}">Sign in with a username and password</a></p>
+  </div>
+  <div class="col-xs-1 col-sm-2 col-md-3"></div>
+{% endblock %}
