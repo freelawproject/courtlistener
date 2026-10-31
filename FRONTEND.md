@@ -41,13 +41,15 @@ A page that isn't fully functional yet MUST use the `wip_` prefix instead of `v2
 
 WIP templates follow every rule for `v2_` templates, and CI checks them the same way. Register each WIP page in `V2PagesRegisterTest.WIP_PAGES`, not `V2_PAGES`.
 
-A `v2_` template MUST NOT extend or include a `wip_` template: only the template a view returns is swapped, so a WIP template pulled in by a finished one reaches everyone with `use_new_design`. To work on one section of a finished page, gate the include instead. The `{% else %}` branch is what everyone else sees, so it MUST NOT reference `wip_` templates:
+A `v2_` template MUST NOT extend or include a `wip_` template: only the template a view returns is swapped, so a WIP template pulled in by a finished one reaches everyone with `use_new_design`. To work on one section of a finished page, gate the include with both flags instead. The WIP flag alone is not enough: a `v2_` page with no legacy template is served to everyone, and the WIP flag only counts together with `use_new_design`. The `{% else %}` branches are what everyone else sees, so they MUST NOT reference `wip_` templates:
 
 ```html
 {% load waffle_tags %}
-{% flag "use_wip_design" %}
+{% flag "use_new_design" %}{% flag "use_wip_design" %}
   {% include "wip_includes/help/new_section.html" %}
 {% else %}
+  {% include "v2_includes/help/section.html" %}
+{% endflag %}{% else %}
   {% include "v2_includes/help/section.html" %}
 {% endflag %}
 ```
