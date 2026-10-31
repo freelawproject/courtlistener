@@ -41,7 +41,7 @@ A page that isn't fully functional yet MUST use the `wip_` prefix instead of `v2
 
 WIP templates follow every rule for `v2_` templates, and CI checks them the same way. Register each WIP page in `V2PagesRegisterTest.WIP_PAGES`, not `V2_PAGES`.
 
-A `v2_` template MUST NOT extend or include a `wip_` template: only the template a view returns is swapped, so a WIP template pulled in by a finished one reaches everyone with `use_new_design`. To work on one section of a finished page, gate the include with both flags instead. The WIP flag alone is not enough: a `v2_` page with no legacy template is served to everyone, and the WIP flag only counts together with `use_new_design`. The `{% else %}` branches are what everyone else sees, so they MUST NOT reference `wip_` templates:
+Templates that finished pages render (`v2_` templates, `new_base.html` and Cotton components) MUST NOT extend or include a `wip_` template: only the template a view returns is swapped, so a WIP template pulled in by one of them reaches everyone with `use_new_design`. To work on one section of a finished page, gate the include with both flags instead. The WIP flag alone is not enough: a `v2_` page with no legacy template is served to everyone, and the WIP flag only counts together with `use_new_design`. The `{% else %}` branches are what everyone else sees, so they MUST NOT reference `wip_` templates:
 
 ```html
 {% load waffle_tags %}
@@ -54,11 +54,15 @@ A `v2_` template MUST NOT extend or include a `wip_` template: only the template
 {% endflag %}
 ```
 
+A page that only has a `wip_` template is a 404 for everyone not opted in, so finished pages MUST NOT link to it outside a gate like the one above, and it MUST NOT be added to a sitemap.
+
+A partial a view returns on its own, such as an htmx response, is swapped by its own request, not by the page that loads it. Once it has a `wip_includes/` version, opted-in visitors get that version on every page that loads it, finished pages included. Give a partial a WIP version only when the finished pages that load it still work with it.
+
 To mark a page as finished, promote it:
 1. `git mv` the template from `wip_` to `v2_` (e.g., `wip_help/index.html` → `v2_help/index.html`), along with its partials
 2. Move its entry from `WIP_PAGES` to `V2_PAGES` with the new template name
 3. Update the path in the legacy template's sync notice
-4. Point every `{% extends %}` or `{% include %}` of the old `wip_` names to the new `v2_` ones
+4. Point every `{% extends %}` or `{% include %}` of the old `wip_` names to the new `v2_` ones. CI fails while any template still uses a name the change deletes or renames
 
 ### Base template
 
@@ -264,7 +268,7 @@ The rules in this doc are enforced as hard errors that block merge. See `fronten
 - `x-data` without a corresponding `{% require_script %}`
 - Placeholder text (TODO, TBD, FIXME, Lorem ipsum)
 - Raw CSS properties in `input.css` (prefer `@apply`)
-- Legacy template deleted while its `v2_` counterpart exists (the v2 page goes live for everyone)
+- Legacy template deleted or renamed while its `v2_` counterpart exists (the v2 page goes live for everyone)
 
 **Skipping a check** (only the checks listed in `SKIPPABLE_CHECKS` in `frontend_checks.py`; security, accessibility and architecture checks cannot be skipped). Use the check name shown in brackets in the CI annotation, e.g. `[check_raw_css]`:
 - Whole file: `{# frontend-checks-skip: check_name, other_check #}` anywhere in a template, or `/* frontend-checks-skip: check_name */` in CSS
