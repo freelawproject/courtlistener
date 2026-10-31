@@ -4,7 +4,7 @@ from typing import TYPE_CHECKING
 from django.apps import (  # Must use apps.get_model() to avoid circular import issue
     apps,
 )
-from django.db.models import Sum
+from django.db.models import Q, Sum
 from django.template.defaultfilters import slugify
 from django.utils.functional import keep_lazy_text
 from eyecite.models import CitationBase, FullCaseCitation, ShortCaseCitation
@@ -217,6 +217,71 @@ def chunk_text(text: str, chunk_size: int):
         start += chunk_size
 
 
+# The Opinion text sources tried, in order, when building
+# ``html_with_citations``. The first non-empty field wins, so a source is only
+# used when every field above it is empty. Note that ``html_lawbox`` outranks
+# only scraped content (``html``) and ``plain_text``: the Harvard, Columbia,
+# scanning-project and anonymous-archive corpora all take precedence over it.
+CITATION_SOURCE_FIELDS: tuple[str, ...] = (
+    "xml_harvard",
+    "xml_scan",
+    "html_anon_2020",
+    "html_columbia",
+    "html_lawbox",
+    "html",
+    "plain_text",
+)
+
+#: The sources that outrank ``html_lawbox``. If any of these is non-empty on an
+#: Opinion, its ``html_with_citations`` was *not* derived from ``html_lawbox``.
+FIELDS_PREFERRED_OVER_LAWBOX: tuple[str, ...] = CITATION_SOURCE_FIELDS[
+    : CITATION_SOURCE_FIELDS.index("html_lawbox")
+]
+
+
+def lawbox_is_citation_source_filter() -> Q:
+    """Build a filter for Opinions whose ``html_with_citations`` derives from
+    ``html_lawbox``.
+
+    This is the database-level mirror of :func:`lawbox_is_citation_source` and
+    reuses the same ordering as :func:`make_get_citations_kwargs`, so the two
+    cannot drift apart. Evaluating it in SQL also keeps the text columns out of
+    Python, which matters when a caller is scanning a corpus-wide set of
+    Opinions.
+
+    Use it to decide whether re-running citation annotation for a repaired
+    ``html_lawbox`` is worthwhile: an opinion that prefers another corpus would
+    just regenerate the same ``html_with_citations`` from that other source.
+
+    :return: A ``Q`` object matching Opinions with a non-empty ``html_lawbox``
+        and no higher-priority text source.
+    """
+    preferred_empty = Q()
+    for field in FIELDS_PREFERRED_OVER_LAWBOX:
+        # These TextFields are blank rather than null in this schema, but stay
+        # permissive: make_get_citations_kwargs treats None and "" alike.
+        preferred_empty &= Q(**{f"{field}__isnull": True}) | Q(**{field: ""})
+    return preferred_empty & ~Q(html_lawbox="")
+
+
+def lawbox_is_citation_source(opinion: "Opinion") -> bool:
+    """Whether ``opinion``'s ``html_with_citations`` is derived from
+    ``html_lawbox``.
+
+    In-memory mirror of :func:`lawbox_is_citation_source_filter`, for callers
+    that already hold an Opinion and for tests.
+
+    :param opinion: The Opinion to inspect.
+    :return: True if ``html_lawbox`` is the source annotation uses (or would
+        use) for this opinion.
+    """
+    if not getattr(opinion, "html_lawbox", None):
+        return False
+    return not any(
+        getattr(opinion, field, None) for field in FIELDS_PREFERRED_OVER_LAWBOX
+    )
+
+
 def make_get_citations_kwargs(
     document: "RECAPDocument | Opinion", chunk_size: int = 200_000
 ) -> list[dict]:
@@ -230,15 +295,7 @@ def make_get_citations_kwargs(
     :return: a list dict kwargs for `get_citations`
     """
     segments = []
-    for attr in [
-        "xml_harvard",
-        "xml_scan",
-        "html_anon_2020",
-        "html_columbia",
-        "html_lawbox",
-        "html",
-        "plain_text",
-    ]:
+    for attr in CITATION_SOURCE_FIELDS:
         text = getattr(document, attr, None)
         if not text:
             continue
