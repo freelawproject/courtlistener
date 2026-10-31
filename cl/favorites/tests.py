@@ -3,7 +3,7 @@ from http import HTTPStatus
 from unittest.mock import MagicMock, patch
 
 import time_machine
-from asgiref.sync import sync_to_async
+from asgiref.sync import async_to_sync, sync_to_async
 from django.contrib.auth.hashers import make_password
 from django.contrib.auth.models import User
 from django.contrib.contenttypes.models import ContentType
@@ -19,6 +19,7 @@ from selenium.webdriver.common.by import By
 from selenium.webdriver.support import expected_conditions as EC
 from selenium.webdriver.support.wait import WebDriverWait
 from timeout_decorator import timeout_decorator
+from waffle.testutils import override_flag
 
 from cl.custom_filters.templatetags.pacer import price
 from cl.donate.factories import NeonMembershipFactory
@@ -1597,6 +1598,39 @@ class RECAPPrayAndPay(SimpleUserDataMixin, PrayAndPayTestCase):
         r = await self.async_client.post(url, headers={"HX-Request": "true"})
         self.assertContains(r, "You have reached your daily prayer limit.")
         self.assertNotContains(r, "Join FLP to get higher limits.")
+
+    # Sync on purpose: a method-level override_flag writes to the DB, which
+    # raises SynchronousOnlyOperation inside an async test.
+    @override_flag("use_new_design", active=True)
+    def test_pray_button_template(self) -> None:
+        """Flagged users get the partial for the page they clicked Pray on.
+
+        The design middleware swaps templates by flag alone, so without the
+        v2 form's ``design`` field a legacy page would get v2 markup back.
+        """
+        self.client.login(username="pandora", password="password")
+        url = reverse("create_prayer", args=[self.rd_2.pk])
+        legacy = "includes/pray_and_pay_htmx/pray_button.html"
+        v2 = "v2_includes/pray_and_pay_htmx/pray_button_new.html"
+
+        with self.subTest("legacy page"):
+            r = self.client.post(url, headers={"HX-Request": "true"})
+            self.assertTemplateUsed(r, legacy)
+            self.assertTemplateNotUsed(r, v2)
+
+        with self.subTest("v2 page"):
+            r = self.client.post(
+                url, {"design": "v2"}, headers={"HX-Request": "true"}
+            )
+            self.assertTemplateUsed(r, v2)
+            self.assertTemplateNotUsed(r, legacy)
+            count = async_to_sync(get_prayer_counts_in_bulk)([self.rd_2]).get(
+                self.rd_2.pk, 0
+            )
+            self.assertContains(
+                r,
+                f"Pray-and-pay: request this document. {count} requests so far.",
+            )
 
     async def test_can_we_load_the_top_prayers_page(self) -> None:
         """Does the 'top prayers' page return a successful response?"""
