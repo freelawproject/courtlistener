@@ -28,7 +28,7 @@ CourtListener is migrating from Bootstrap 3 / jQuery to Tailwind v3 / Alpine.js 
 
 `IncrementalNewTemplateMiddleware` swaps templates by prepending `v2_` to the view's template name when the `use_new_design` waffle flag is active. New templates MUST be named accordingly (e.g., `v2_help/index.html`).
 
-Partials a view returns on their own, such as htmx responses, follow the same rule and live under `v2_includes/` (e.g., `includes/foo/button.html` → `v2_includes/foo/button.html`). They are swapped like any other template, but the checks that only make sense for full pages (extending `new_base.html`, registering in `V2PagesRegisterTest`) do not apply to them.
+Partials a view returns on their own, such as htmx responses, follow the same rule and live under `v2_includes/` (e.g., `includes/foo/button.html` → `v2_includes/foo/button.html`). They are swapped like any other template, except that htmx requests are swapped by the page's design header instead of the flag (see [Partials shared by both stacks](#partials-shared-by-both-stacks)). The checks that only make sense for full pages (extending `new_base.html`, registering in `V2PagesRegisterTest`) do not apply to them.
 
 ### Base template
 
@@ -154,7 +154,14 @@ v2 uses htmx 2.0.11 from `js/third_party/` (legacy keeps 1.7.0). `new_base.html`
 
 Swapped partials live under `v2_includes/` (see [Naming & middleware](#naming--middleware)).
 
-`<body>` in `new_base.html` carries `hx-headers` with the CSRF token, and htmx elements inherit it: an `hx-post` MUST NOT repeat the header.
+`<body>` in `new_base.html` carries `hx-headers` with the CSRF token and the design header `X-CL-Design: v2`, and htmx elements inherit both: an `hx-post` MUST NOT repeat them.
+
+### Partials shared by both stacks
+
+For htmx requests, `IncrementalNewTemplateMiddleware` serves the `v2_includes/` partial only when the request carries `X-CL-Design: v2`, whatever the `use_new_design` flag says. A flagged user can still be on a legacy page, whose htmx code expects the legacy partial back, so the partial has to match the page that sent the request. Full-page requests still follow the flag.
+
+- An endpoint called from both legacy and v2 pages MUST return the legacy template name and let the middleware swap it. It MUST NOT choose the template itself, for example by checking the flag or a form field.
+- An element MUST NOT drop the header with `hx-disinherit`; its requests would then get the legacy partial.
 
 ### Disabled features
 
