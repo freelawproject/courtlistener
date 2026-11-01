@@ -598,7 +598,7 @@ dev = [
     { name = "django-debug-toolbar", specifier = ">=8.0.0" },
     { name = "django-stubs", specifier = ">=6.1.0" },
     { name = "django-tailwind", extras = ["reload"], specifier = "~=4.5.0" },
-    { name = "djangorestframework-stubs", specifier = ">=3.16.6" },
+    { name = "djangorestframework-stubs", specifier = ">=3.18.1" },
     { name = "exrex", specifier = ">=0.12.0" },
     { name = "lxml-stubs", specifier = ">=0.5.1" },
     { name = "pandas-stubs", specifier = "~=3.0.5" },
@@ -1266,18 +1266,16 @@ wheels = [
 
 [[package]]
 name = "djangorestframework-stubs"
-version = "3.16.6"
+version = "3.18.1"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "django-stubs" },
-    { name = "requests" },
     { name = "types-pyyaml" },
-    { name = "types-requests" },
     { name = "typing-extensions" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/38/ed/6e16dbe8e79af9d2cdbcbd89553e59d18ecab7e9820ebb751085fc29fc0e/djangorestframework_stubs-3.16.6.tar.gz", hash = "sha256:b8d3e73604280f69c628ff7900f0e84703d9ff47cd050fccb5f751438e4c5813", size = 32274, upload-time = "2025-12-03T22:26:23.238Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/6b/71/a7727b07e0433da02fb1ea22994f492ecb437a1fe7be5bf952dbb545a0f5/djangorestframework_stubs-3.18.1.tar.gz", hash = "sha256:65ed4a9ea094616759a2cba4fe0ad85efe25b471b28281b790bfefb46704c64a", size = 32439, upload-time = "2026-08-25T22:49:27.506Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/93/e3/d75f9e06d13d7fe8ed25473627c277992b7fad80747a4eaa1c7faa97e09e/djangorestframework_stubs-3.16.6-py3-none-any.whl", hash = "sha256:9bf2e5c83478edca3b8eb5ffd673737243ade16ce4b47b633a4ea62fe6924331", size = 56506, upload-time = "2025-12-03T22:26:21.88Z" },
+    { url = "https://files.pythonhosted.org/packages/f7/1c/e266828fe2b78484651667976f8539e47b4e511a266424b890f613c6b7ad/djangorestframework_stubs-3.18.1-py3-none-any.whl", hash = "sha256:a2021f45f7759b493504c2a721f112ec4fd677753590c1ba346f4ebfb49a7f03", size = 55685, upload-time = "2026-08-25T22:49:26.178Z" },
 ]
 
 [[package]]
