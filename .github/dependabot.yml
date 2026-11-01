@@ -4,19 +4,43 @@ updates:
     directory: "/"
     schedule:
       interval: monthly
-    open-pull-requests-limit: 10
+    open-pull-requests-limit: 5
+    # Wait a few days after a release before proposing it, so yanked or
+    # compromised releases are caught first. Security updates ignore this.
+    cooldown:
+      default-days: 3
     ignore:
       # Ignore all tooling (it can get old, it's mature enough)
       - dependency-name: selenium
       # Ignore all patch updates.
       - dependency-name: '*'
         update-types: ["version-update:semver-patch"]
+    groups:
+      # Security fixes of any version land together in one PR.
+      security:
+        applies-to: security-updates
+        patterns:
+          - '*'
+      # All non-major updates land together in one PR. Major updates are not
+      # grouped, so each gets its own PR.
+      non-major:
+        applies-to: version-updates
+        update-types:
+          - minor
+          - patch
 
   - package-ecosystem: "github-actions"
     directory: "/"
     schedule:
       interval: monthly
+    cooldown:
+      default-days: 3
     groups:
       core:
         patterns:
           - 'actions/*' # The core actions offered by GitHub
+      # Everything else: non-major updates together, majors get their own PRs.
+      non-major:
+        update-types:
+          - minor
+          - patch
