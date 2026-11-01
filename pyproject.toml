@@ -92,7 +92,7 @@ dependencies = [
   "ipython>=9.17.1",
   "dateparser==1.4.2",
   "types-dateparser>=1.2.2.20250809",
-  "uvicorn[standard]>=0.52.3",
+  "uvicorn[standard]>=0.54.0",
   "daphne>=4.2.2",
   "httpx[http2]>=0.28.1",
   "django-model-utils>=5.0.0",
