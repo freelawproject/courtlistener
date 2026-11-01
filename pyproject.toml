@@ -91,7 +91,7 @@ dependencies = [
   "selenium>=4.48.0",
   "ipython>=9.17.1",
   "dateparser==1.4.2",
-  "types-dateparser>=1.2.2.20250809",
+  "types-dateparser>=1.4.3.20260907",
   "uvicorn[standard]>=0.52.3",
   "daphne>=4.2.2",
   "httpx[http2]>=0.28.1",
