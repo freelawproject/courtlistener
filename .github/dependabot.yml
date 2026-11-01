@@ -4,7 +4,11 @@ updates:
     directory: "/"
     schedule:
       interval: monthly
-    open-pull-requests-limit: 10
+    open-pull-requests-limit: 5
+    # Wait a few days after a release before proposing it, so yanked or
+    # compromised releases are caught first. Security updates ignore this.
+    cooldown:
+      default-days: 3
     ignore:
       # Ignore all tooling (it can get old, it's mature enough)
       - dependency-name: selenium
@@ -29,6 +33,8 @@ updates:
     directory: "/"
     schedule:
       interval: monthly
+    cooldown:
+      default-days: 3
     groups:
       core:
         patterns:
