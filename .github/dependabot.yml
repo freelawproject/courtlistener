@@ -11,6 +11,19 @@ updates:
       # Ignore all patch updates.
       - dependency-name: '*'
         update-types: ["version-update:semver-patch"]
+    groups:
+      # Security fixes of any version land together in one PR.
+      security:
+        applies-to: security-updates
+        patterns:
+          - '*'
+      # All non-major updates land together in one PR. Major updates are not
+      # grouped, so each gets its own PR.
+      non-major:
+        applies-to: version-updates
+        update-types:
+          - minor
+          - patch
 
   - package-ecosystem: "github-actions"
     directory: "/"
@@ -20,3 +33,8 @@ updates:
       core:
         patterns:
           - 'actions/*' # The core actions offered by GitHub
+      # Everything else: non-major updates together, majors get their own PRs.
+      non-major:
+        update-types:
+          - minor
+          - patch
