@@ -65,10 +65,10 @@
       "severity": "error"
     },
     {
-      "column": 16,
+      "column": 24,
       "path": "cl/ai/llm_providers/google.py",
-      "name": "bad-return",
-      "concise_description": "Returned type `list[dict[str, str | Any | None]]` is not assignable to declared return type `list[ProcessedResult]`",
+      "name": "bad-assignment",
+      "concise_description": "`Unknown | None` is not assignable to TypedDict key `key` with type `str`",
       "severity": "error"
     },
     {
@@ -244,13 +244,6 @@
       "path": "cl/alerts/utils.py",
       "name": "missing-attribute",
       "concise_description": "Object of class `list` has no attribute `hits`",
-      "severity": "error"
-    },
-    {
-      "column": 12,
-      "path": "cl/alerts/utils.py",
-      "name": "bad-return",
-      "concise_description": "Returned type `tuple[str, str | None, tuple[dict[Unknown, Unknown], dict[str, Any], dict[str, Any]] | tuple[dict[Unknown, Unknown], None, None] | None]` is not assignable to declared return type `tuple[str, str | None, tuple[dict[str, Any], dict[str, Any], dict[str, Any]] | None]`",
       "severity": "error"
     },
     {
@@ -856,13 +849,6 @@
       "severity": "error"
     },
     {
-      "column": 19,
-      "path": "cl/corpus_importer/management/commands/import_patent.py",
-      "name": "bad-raise",
-      "concise_description": "Expression `\"This is for a client. Do not use FLP credentials\"` has type `Literal['This is for a client. Do not use FLP credentials']`, expected `BaseException`",
-      "severity": "error"
-    },
-    {
       "column": 39,
       "path": "cl/corpus_importer/management/commands/list_of_creditors_project.py",
       "name": "bad-argument-type",
@@ -1077,27 +1063,6 @@
       "path": "cl/custom_filters/templatetags/extras.py",
       "name": "bad-argument-type",
       "concise_description": "Argument `datetime | None` is not assignable to parameter `value` with type `datetime` in function `django.utils.timezone.make_aware`",
-      "severity": "error"
-    },
-    {
-      "column": 17,
-      "path": "cl/custom_filters/templatetags/text_filters.py",
-      "name": "unbound-name",
-      "concise_description": "`s` is uninitialized",
-      "severity": "error"
-    },
-    {
-      "column": 17,
-      "path": "cl/custom_filters/templatetags/text_filters.py",
-      "name": "unbound-name",
-      "concise_description": "`s` is uninitialized",
-      "severity": "error"
-    },
-    {
-      "column": 22,
-      "path": "cl/custom_filters/templatetags/text_filters.py",
-      "name": "unbound-name",
-      "concise_description": "`s` may be uninitialized",
       "severity": "error"
     },
     {
@@ -2224,7 +2189,7 @@
       "column": 28,
       "path": "cl/recap/tasks.py",
       "name": "bad-assignment",
-      "concise_description": "`Unknown | None` is not assignable to attribute `pacer_case_id` with type `str`",
+      "concise_description": "`Any | None` is not assignable to attribute `pacer_case_id` with type `str`",
       "severity": "error"
     },
     {
@@ -2637,7 +2602,7 @@
       "column": 45,
       "path": "cl/recap/tasks.py",
       "name": "bad-argument-type",
-      "concise_description": "Argument `dict[str, str] | str` is not assignable to parameter `report_data` with type `dict[str, Any]` in function `cl.corpus_importer.tasks.merge_scotus_docket`",
+      "concise_description": "Argument `dict[str, str] | dict[str, Any] | str` is not assignable to parameter `report_data` with type `dict[str, Any]` in function `cl.corpus_importer.tasks.merge_scotus_docket`",
       "severity": "error"
     },
     {
@@ -2778,34 +2743,6 @@
       "path": "cl/scrapers/management/commands/delete_duplicates.py",
       "name": "missing-attribute",
       "concise_description": "Class `ClusterSources` has no class attribute `parts_to_source_mapper`",
-      "severity": "error"
-    },
-    {
-      "column": 17,
-      "path": "cl/scrapers/management/commands/merge_opinion_versions.py",
-      "name": "missing-attribute",
-      "concise_description": "Object of class `int` has no attribute `id`",
-      "severity": "error"
-    },
-    {
-      "column": 14,
-      "path": "cl/scrapers/management/commands/merge_opinion_versions.py",
-      "name": "missing-attribute",
-      "concise_description": "Object of class `int` has no attribute `id`",
-      "severity": "error"
-    },
-    {
-      "column": 31,
-      "path": "cl/scrapers/management/commands/merge_opinion_versions.py",
-      "name": "missing-attribute",
-      "concise_description": "Object of class `int` has no attribute `cluster_id`",
-      "severity": "error"
-    },
-    {
-      "column": 31,
-      "path": "cl/scrapers/management/commands/merge_opinion_versions.py",
-      "name": "missing-attribute",
-      "concise_description": "Object of class `int` has no attribute `cluster_id`",
       "severity": "error"
     },
     {
