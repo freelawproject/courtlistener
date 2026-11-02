@@ -90,7 +90,9 @@ def _parse_line_skips(lines: list[str]) -> dict[int, set[str]]:
 # A check over the lines of one file, returning (line number, message) pairs.
 type FileCheck = Callable[[list[str]], list[tuple[int, str]]]
 
-_code_block_re = re.compile(r"(<c-code\b[^>]*>)(.*?)(</c-code>)", re.DOTALL)
+_code_block_re = re.compile(
+    r"(<c-code\b[^>]*(?<!/)>)(.*?)(</c-code>)", re.DOTALL
+)
 _checks_inside_code_blocks: set[FileCheck] = set()
 
 

@@ -223,6 +223,22 @@ class CodeExampleTest(unittest.TestCase):
             findings, [(V2_TEMPLATE_FILE, 4, "check_include_in_v2")]
         )
 
+    def test_self_closing_tag_opens_no_block(self) -> None:
+        """A ``<c-code />`` leaves the markup after it visible to the checks."""
+        findings = _run_checks_on(
+            {
+                V2_TEMPLATE_FILE: """
+                    {% extends "new_base.html" %}
+                    <c-code />
+                    <div tabindex="2"></div>
+                    <c-code>
+                    &lt;div x-data="dropdown"&gt;
+                    </c-code>
+                    """
+            }
+        )
+        self.assertEqual(findings, [(V2_TEMPLATE_FILE, 3, "check_tabindex")])
+
     def test_markup_outside_the_block_keeps_its_line_number(self) -> None:
         """Real code after a block is still checked and reported where it is."""
         cases = {
@@ -272,10 +288,12 @@ class AlsoChecksInsideCodeBlocksTest(unittest.TestCase):
 
         @frontend_checks.also_checks_inside_code_blocks
         def check_decorated(lines: list[str]) -> list[tuple[int, str]]:
+            """Record the lines a decorated check receives."""
             seen["decorated"] = lines
             return []
 
         def check_plain(lines: list[str]) -> list[tuple[int, str]]:
+            """Record the lines an undecorated check receives."""
             seen["plain"] = lines
             return []
 
