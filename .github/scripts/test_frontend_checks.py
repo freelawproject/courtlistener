@@ -164,10 +164,10 @@ class SkipLineDirectiveTest(unittest.TestCase):
 
 
 class CodeExampleTest(unittest.TestCase):
-    """Markup inside ``<c-code>`` is documentation, not template code."""
+    """Markup inside ``<c-code>`` is shown as code and never checked."""
 
     def test_examples_are_not_linted(self) -> None:
-        """Escaped usage examples raise no finding, whatever the block's shape."""
+        """Escaped markup in a block raises no finding, whatever the block's shape."""
         cases = {
             "multi-line": """
                 {% extends "new_base.html" %}
@@ -193,7 +193,7 @@ class CodeExampleTest(unittest.TestCase):
                 self.assertEqual(_run_checks_on({V2_TEMPLATE_FILE: body}), [])
 
     def test_markup_outside_the_block_keeps_its_line_number(self) -> None:
-        """Real code after an example is still checked and reported where it is."""
+        """Real code after a block is still checked and reported where it is."""
         findings = _run_checks_on(
             {
                 V2_TEMPLATE_FILE: """

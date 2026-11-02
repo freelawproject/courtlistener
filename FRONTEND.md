@@ -238,4 +238,4 @@ The rules in this doc are enforced as hard errors that block merge. See `fronten
 - Whole file: `{# frontend-checks-skip: check_name, other_check #}` anywhere in a template, or `/* frontend-checks-skip: check_name */` in CSS
 - Single line: end the offending line with `{# frontend-checks-skip-line: check_name #}` in templates or `/* frontend-checks-skip-line: check_name */` in CSS, like `eslint-disable-line`
 
-Markup inside `<c-code>` blocks (the usage examples of the component library) is never linted.
+Checks never look inside `<c-code>` blocks, whose content is shown as code. Django tags inside a block still render, so write them with `{% templatetag %}` or wrap them in `{% verbatim %}`.
