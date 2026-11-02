@@ -87,8 +87,8 @@ def _parse_line_skips(lines: list[str]) -> dict[int, set[str]]:
 # <c-code> blocks
 # ---------------------------------------------------------------------------
 
-# TypeAlias "FileCheck": A check over the lines of one file, returning (line number, message) pairs.
-FileCheck = Callable[[list[str]], list[tuple[int, str]]]
+# A check over the lines of one file, returning (line number, message) pairs.
+type FileCheck = Callable[[list[str]], list[tuple[int, str]]]
 
 _code_block_re = re.compile(r"(<c-code\b[^>]*>)(.*?)(</c-code>)", re.DOTALL)
 _checks_inside_code_blocks: set[FileCheck] = set()
@@ -431,7 +431,6 @@ def check_inline_xdata(lines: list[str]) -> list[tuple[int, str]]:
     return results
 
 
-@also_checks_inside_code_blocks
 def check_extends_new_base(lines: list[str]) -> list[tuple[int, str]]:
     """v2_ templates must extend new_base.html or another v2_ template."""
     results = []
@@ -848,10 +847,11 @@ def _apply_checks(
     ``lines`` has the content of ``<c-code>`` blocks emptied and is what a
     check normally sees; ``raw_lines`` is the file as written, handed only
     to checks marked with ``also_checks_inside_code_blocks``. Honors
-    file-level and same-line skip directives for SKIPPABLE_CHECKS.
+    file-level and same-line skip directives for SKIPPABLE_CHECKS, read
+    from ``raw_lines`` so a directive inside a block still counts.
     """
-    skip_checks = _parse_skip_checks(lines)
-    line_skips = _parse_line_skips(lines)
+    skip_checks = _parse_skip_checks(raw_lines)
+    line_skips = _parse_line_skips(raw_lines)
     for fn, severity in checks:
         if fn.__name__ in skip_checks:
             continue

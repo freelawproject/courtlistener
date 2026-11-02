@@ -162,9 +162,23 @@ class SkipLineDirectiveTest(unittest.TestCase):
             ],
         )
 
+    def test_directive_inside_a_code_block_still_applies(self) -> None:
+        """A directive next to a live tag inside ``<c-code>`` silences its check."""
+        findings = _run_checks_on(
+            {
+                V2_TEMPLATE_FILE: """
+                    {% extends "new_base.html" %}
+                    <c-code>
+                    {% include "x.html" %} {# frontend-checks-skip-line: check_include_in_v2 #}
+                    </c-code>
+                    """
+            }
+        )
+        self.assertEqual(findings, [])
+
 
 class CodeExampleTest(unittest.TestCase):
-    """Markup inside ``<c-code>`` is shown as code and never checked."""
+    """Markup inside ``<c-code>`` is shown as code; Django tags inside still run."""
 
     def test_examples_are_not_linted(self) -> None:
         """Escaped markup in a block raises no finding, whatever the block's shape."""
@@ -173,7 +187,7 @@ class CodeExampleTest(unittest.TestCase):
                 {% extends "new_base.html" %}
                 <c-code>
                 &lt;div x-data="dropdown"&gt;
-                  {% include "x.html" %}
+                  &lt;button tabindex="2"&gt;
                 &lt;/div&gt;
                 </c-code>
                 """,
@@ -192,23 +206,95 @@ class CodeExampleTest(unittest.TestCase):
             with self.subTest(shape):
                 self.assertEqual(_run_checks_on({V2_TEMPLATE_FILE: body}), [])
 
-    def test_markup_outside_the_block_keeps_its_line_number(self) -> None:
-        """Real code after a block is still checked and reported where it is."""
+    def test_include_check_is_decorated(self) -> None:
+        """A live ``{% include %}`` inside a block is reported."""
         findings = _run_checks_on(
             {
                 V2_TEMPLATE_FILE: """
                     {% extends "new_base.html" %}
                     <c-code>
                     &lt;div x-data="dropdown"&gt;
+                    {% include "x.html" %}
                     </c-code>
-                    <div x-data="dropdown"></div>
                     """
             }
         )
         self.assertEqual(
-            findings,
-            [(V2_TEMPLATE_FILE, 5, "check_xdata_without_require_script")],
+            findings, [(V2_TEMPLATE_FILE, 4, "check_include_in_v2")]
         )
+
+    def test_markup_outside_the_block_keeps_its_line_number(self) -> None:
+        """Real code after a block is still checked and reported where it is."""
+        cases = {
+            "one-line opening tag": (
+                """
+                {% extends "new_base.html" %}
+                <c-code>
+                &lt;div x-data="dropdown"&gt;
+                </c-code>
+                <div x-data="dropdown"></div>
+                """,
+                5,
+            ),
+            "multi-line opening tag": (
+                """
+                {% extends "new_base.html" %}
+                <c-code
+                  disable_copy
+                  class="mt-2">
+                &lt;div x-data="dropdown"&gt;
+                </c-code>
+                <div x-data="dropdown"></div>
+                """,
+                7,
+            ),
+        }
+        for shape, (body, line) in cases.items():
+            with self.subTest(shape):
+                self.assertEqual(
+                    _run_checks_on({V2_TEMPLATE_FILE: body}),
+                    [
+                        (
+                            V2_TEMPLATE_FILE,
+                            line,
+                            "check_xdata_without_require_script",
+                        )
+                    ],
+                )
+
+
+class AlsoChecksInsideCodeBlocksTest(unittest.TestCase):
+    """The decorator decides which version of a file a check receives."""
+
+    def test_decorated_check_gets_the_raw_lines(self) -> None:
+        """A decorated check sees the file as written; any other check sees the blocks emptied."""
+        seen: dict[str, list[str]] = {}
+
+        @frontend_checks.also_checks_inside_code_blocks
+        def check_decorated(lines: list[str]) -> list[tuple[int, str]]:
+            seen["decorated"] = lines
+            return []
+
+        def check_plain(lines: list[str]) -> list[tuple[int, str]]:
+            seen["plain"] = lines
+            return []
+
+        self.addCleanup(
+            frontend_checks._checks_inside_code_blocks.discard, check_decorated
+        )
+        raw_lines = ["<c-code>", '&lt;div x-data="dropdown"&gt;', "</c-code>"]
+        frontend_checks._apply_checks(
+            [
+                (check_decorated, frontend_checks.WARN),
+                (check_plain, frontend_checks.WARN),
+            ],
+            frontend_checks._blank_code_blocks(raw_lines),
+            raw_lines,
+            V2_TEMPLATE_FILE,
+            [],
+        )
+        self.assertEqual(seen["decorated"], raw_lines)
+        self.assertEqual(seen["plain"], ["<c-code>", "", "</c-code>"])
 
 
 class LegacyTemplateDeletedTest(unittest.TestCase):
