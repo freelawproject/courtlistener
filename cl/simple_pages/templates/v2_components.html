@@ -36,6 +36,7 @@
         {'href': '#docket-source-button', 'text': 'Docket source button'},
         {'href': '#docket-source-attribution', 'text': 'Docket source attribution'},
         {'href': '#docket-alert-label', 'text': 'Docket alert label'},
+        {'href': '#pray-button', 'text': 'Pray button'},
         {'href': '#docket-entry-rows', 'text': 'Docket entry rows'},
         {'href': '#document-source-link', 'text': 'Document source link'},
         {'href': '#docket-filter', 'text': 'Docket filter'},
@@ -1727,6 +1728,62 @@ Sample code here.
     <c-expansion-panel title="Code">
       <c-code>
 &lt;c-docket-alert-label :has_alert="has_alert" icon_class="w-4 h-4 text-greyscale-500" /&gt;
+      </c-code>
+    </c-expansion-panel>
+  </section>
+
+  {# PRAY BUTTON #}
+  <section class="max-w-full w-full border-t-2 border-greyscale-200" x-intersect.margin.-100px="show" id="pray-button-form">
+    <h2 class="mt-6 mb-3">Pray button</h2>
+    <p>The pray-and-pay button for one RECAP document: the request count and a 🙏 that adds or removes the user's request. Signed-out users get a link to sign in instead. Pages use <code>&lt;c-pray-button&gt;</code>, which wraps this form with the screen reader status region; the htmx response renders this form again on its own to replace the old one.</p>
+
+    <h4 class="mt-3">Demo</h4>
+    <div class="my-4 flex flex-row gap-6 rounded-lg border border-greyscale-200 p-4 text-sm">
+      <div class="flex flex-col items-start gap-1">
+        <c-pray-button-form document_id="1" :count="0" />
+        <span class="text-xs text-greyscale-500">Not requested</span>
+      </div>
+      <div class="flex flex-col items-start gap-1">
+        <c-pray-button-form document_id="2" :count="1" :prayer_exists="True" />
+        <span class="text-xs text-greyscale-500">Requested</span>
+      </div>
+      <div class="flex flex-col items-start gap-1">
+        <c-pray-button-form document_id="3" :count="5" :daily_limit_reached="True" />
+        <span class="text-xs text-greyscale-500">Daily limit reached</span>
+      </div>
+    </div>
+
+    <c-library.list title="Props" only>
+      <c-library.item only>
+        <c-slot name="label"><code>document_id</code></c-slot>
+        <c-slot name="description">The RECAP document's id. Builds the create and delete URLs and the form's id, which the htmx response targets.</c-slot>
+      </c-library.item>
+      <c-library.item optional only>
+        <c-slot name="label"><code>:count</code></c-slot>
+        <c-slot name="description">How many requests the document has. Defaults to <code>0</code>.</c-slot>
+      </c-library.item>
+      <c-library.item optional only>
+        <c-slot name="label"><code>:prayer_exists</code></c-slot>
+        <c-slot name="description">Whether the user has already requested the document. Shows the filled button, and clicking removes the request.</c-slot>
+      </c-library.item>
+      <c-library.item optional only>
+        <c-slot name="label"><code>:daily_limit_reached</code></c-slot>
+        <c-slot name="description">Whether the user hit their daily request limit. Shows a warning icon next to the button.</c-slot>
+      </c-library.item>
+    </c-library.list>
+
+    <c-library.list title="Slots" only>
+      <p>No slots</p>
+    </c-library.list>
+
+    <c-expansion-panel title="Code">
+      <c-code>
+&lt;c-pray-button-form
+  :document_id="document_id"
+  :count="count"
+  :prayer_exists="prayer_exists"
+  :daily_limit_reached="daily_limit_reached"
+/&gt;
       </c-code>
     </c-expansion-panel>
   </section>
