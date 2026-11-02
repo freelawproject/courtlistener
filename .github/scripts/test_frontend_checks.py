@@ -163,6 +163,54 @@ class SkipLineDirectiveTest(unittest.TestCase):
         )
 
 
+class CodeExampleTest(unittest.TestCase):
+    """Markup inside ``<c-code>`` is documentation, not template code."""
+
+    def test_examples_are_not_linted(self) -> None:
+        """Escaped usage examples raise no finding, whatever the block's shape."""
+        cases = {
+            "multi-line": """
+                {% extends "new_base.html" %}
+                <c-code>
+                &lt;div x-data="dropdown"&gt;
+                  {% include "x.html" %}
+                &lt;/div&gt;
+                </c-code>
+                """,
+            "single-line": """
+                {% extends "new_base.html" %}
+                <c-code>&lt;div x-data="dropdown"&gt;</c-code>
+                """,
+            "with attributes": """
+                {% extends "new_base.html" %}
+                <c-code disable_copy class="mt-2">
+                &lt;div x-data="dropdown"&gt;
+                </c-code>
+                """,
+        }
+        for shape, body in cases.items():
+            with self.subTest(shape):
+                self.assertEqual(_run_checks_on({V2_TEMPLATE_FILE: body}), [])
+
+    def test_markup_outside_the_block_keeps_its_line_number(self) -> None:
+        """Real code after an example is still checked and reported where it is."""
+        findings = _run_checks_on(
+            {
+                V2_TEMPLATE_FILE: """
+                    {% extends "new_base.html" %}
+                    <c-code>
+                    &lt;div x-data="dropdown"&gt;
+                    </c-code>
+                    <div x-data="dropdown"></div>
+                    """
+            }
+        )
+        self.assertEqual(
+            findings,
+            [(V2_TEMPLATE_FILE, 5, "check_xdata_without_require_script")],
+        )
+
+
 class LegacyTemplateDeletedTest(unittest.TestCase):
     """Deleting a legacy template makes its v2 counterpart live for everyone."""
 

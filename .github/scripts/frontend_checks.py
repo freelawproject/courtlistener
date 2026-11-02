@@ -796,6 +796,24 @@ CSS_CHECKS = [
 ]
 
 
+# Usage examples in the component library are escaped markup inside <c-code>,
+# not template code, so no check should read them.
+_code_example_re = re.compile(r"(<c-code\b[^>]*>)(.*?)(</c-code>)", re.DOTALL)
+
+
+def _blank_code_examples(lines: list[str]) -> list[str]:
+    """Return ``lines`` with the content of every ``<c-code>`` block emptied.
+
+    The opening and closing tags stay and the line count is preserved, so
+    findings on the rest of the file keep their line numbers.
+    """
+    content = _code_example_re.sub(
+        lambda m: m.group(1) + "\n" * m.group(2).count("\n") + m.group(3),
+        "\n".join(lines),
+    )
+    return content.split("\n")
+
+
 def _apply_checks(
     checks: list[tuple],
     lines: list[str],
@@ -804,8 +822,10 @@ def _apply_checks(
 ) -> None:
     """Run a list of (check_fn, severity) pairs and collect findings.
 
-    Honors file-level and same-line skip directives for SKIPPABLE_CHECKS.
+    Honors file-level and same-line skip directives for SKIPPABLE_CHECKS and
+    ignores the ``<c-code>`` usage examples of the component library.
     """
+    lines = _blank_code_examples(lines)
     skip_checks = _parse_skip_checks(lines)
     line_skips = _parse_line_skips(lines)
     for fn, severity in checks:
