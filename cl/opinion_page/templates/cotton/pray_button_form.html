@@ -28,7 +28,7 @@
       type="submit"
       variant="{% if prayer_exists %}primary{% else %}outline{% endif %}"
       class="text-sm px-2 py-1"
-      aria-label="{% if prayer_exists %}Pray-and-pay: remove your request for this document.{% else %}Pray-and-pay: request this document. {{ count }} requests so far.{% endif %}"
+      aria-label="{% if prayer_exists %}Pray-and-pay: remove your request for this document.{% else %}Pray-and-pay: request this document. {{ count }} request{{ count|pluralize }} so far.{% endif %}"
     >
       <span>{{ count }}</span> <span aria-hidden="true">🙏</span>
     </c-button>
@@ -48,7 +48,7 @@
     variant="outline"
     href="{% url 'sign-in' %}?next={{ request.get_full_path|urlencode }}"
     class="text-sm px-2 py-1"
-    aria-label="Pray-and-pay: sign in to request this document. {{ count }} requests so far."
+    aria-label="Pray-and-pay: sign in to request this document. {{ count }} request{{ count|pluralize }} so far."
   >
     {{ count }} <span aria-hidden="true">🙏</span>
   </c-button>
