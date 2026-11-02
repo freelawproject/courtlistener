@@ -65,11 +65,11 @@
                         <div class="space-y-2">
                           {% for firm in attorney.firms %}
                             <div class="space-y-1">
-                              {% if firm.name %}
+                              {% if firm.name or perms.people_db.change_attorneyorganization %}
                                 <p>
                                   {{ firm.name }}
                                   {% if perms.people_db.change_attorneyorganization %}
-                                    <a href="{% url 'admin:people_db_attorneyorganization_change' firm.pk %}" class="inline-block align-middle ml-1 text-greyscale-500 hover:text-greyscale-700 focus-visible:ring-2 focus-visible:ring-primary-400 focus-visible:outline-none rounded" aria-label="Edit {{ firm.name }}" title="Edit {{ firm.name }}">{% svg "edit" class="w-4 h-4" aria_hidden="true" %}</a>
+                                    <a href="{% url 'admin:people_db_attorneyorganization_change' firm.pk %}" class="inline-block align-middle ml-1 text-greyscale-500 hover:text-greyscale-700 focus-visible:ring-2 focus-visible:ring-primary-400 focus-visible:outline-none rounded" aria-label="Edit {{ firm.name|default:'firm' }}" title="Edit {{ firm.name|default:'firm' }}">{% svg "edit" class="w-4 h-4" aria_hidden="true" %}</a>
                                   {% endif %}
                                 </p>
                               {% endif %}

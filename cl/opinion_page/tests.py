@@ -4340,10 +4340,14 @@ class DocketPartiesV2TemplateTest(TestCase):
             state="DC",
             zip_code="20036",
         )
+        # PACER contact blocks without a recipient line leave the firm nameless.
+        cls.nameless_firm = AttorneyOrganizationFactory(
+            lookup_key="nameless", name="", address1="625 Indiana Avenue, NW"
+        )
         cls.attorney = AttorneyFactory(
             name="Sasha Samberg-Champion",
             docket=cls.docket,
-            organizations=[cls.firm],
+            organizations=[cls.firm, cls.nameless_firm],
         )
         cls.party = PartyFactory(
             name="AMERICAN ASSOCIATION OF LAW LIBRARIES",
@@ -4405,7 +4409,7 @@ class DocketPartiesV2TemplateTest(TestCase):
 
     async def test_edit_links_follow_the_change_permissions(self) -> None:
         """Only users who may change parties, attorneys and firms get the
-        link to each admin page."""
+        link to each admin page, nameless firms included."""
         admin_urls = [
             reverse("admin:people_db_party_change", args=[self.party.pk]),
             reverse(
@@ -4414,6 +4418,10 @@ class DocketPartiesV2TemplateTest(TestCase):
             reverse(
                 "admin:people_db_attorneyorganization_change",
                 args=[self.firm.pk],
+            ),
+            reverse(
+                "admin:people_db_attorneyorganization_change",
+                args=[self.nameless_firm.pk],
             ),
         ]
         content = (await self.get_page()).content.decode()
@@ -4424,6 +4432,7 @@ class DocketPartiesV2TemplateTest(TestCase):
         content = (await self.get_page()).content.decode()
         for url in admin_urls:
             self.assertIn(url, content)
+        self.assertIn('aria-label="Edit firm"', content)
 
 
 @override_settings(WAFFLE_CACHE_PREFIX="test_docket_page_v2_waffle")
