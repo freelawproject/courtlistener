@@ -515,6 +515,7 @@ class OIDCLoginTest(SSOFixtureMixin, TestCase):
         planted = UserProfileWithParentsFactory.create(
             email_confirmed=False, user__email=f"ada@{DOMAIN}"
         ).user
+        # nosemgrep: python.django.security.audit.unvalidated-password.unvalidated-password
         planted.set_password("planted-password")
         planted.save()
         old_token = Token.objects.get(user=planted).key
