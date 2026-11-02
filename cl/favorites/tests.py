@@ -11,6 +11,7 @@ from django.core import mail
 from django.core.cache import cache
 from django.db import IntegrityError, transaction
 from django.template.defaultfilters import date as template_date
+from django.template.defaultfilters import pluralize
 from django.test import RequestFactory, override_settings
 from django.urls import reverse
 from django.utils import timezone
@@ -1601,6 +1602,7 @@ class RECAPPrayAndPay(SimpleUserDataMixin, PrayAndPayTestCase):
 
     # Sync on purpose: a method-level override_flag writes to the DB, which
     # raises SynchronousOnlyOperation inside an async test.
+    @override_settings(WAFFLE_CACHE_PREFIX="test_pray_button_template_waffle")
     @override_flag("use_new_design", active=True)
     def test_pray_button_template(self) -> None:
         """Flagged users get the partial for the page they clicked Pray on.
@@ -1618,7 +1620,7 @@ class RECAPPrayAndPay(SimpleUserDataMixin, PrayAndPayTestCase):
             self.assertTemplateUsed(r, legacy)
             self.assertTemplateNotUsed(r, v2)
 
-        with self.subTest("v2 page"):
+        with self.subTest("v2 page, request added"):
             r = self.client.post(
                 url, {"design": "v2"}, headers={"HX-Request": "true"}
             )
@@ -1628,8 +1630,22 @@ class RECAPPrayAndPay(SimpleUserDataMixin, PrayAndPayTestCase):
                 self.rd_2.pk, 0
             )
             self.assertContains(
+                r, f"Request added. {count} request{pluralize(count)} so far."
+            )
+
+        with self.subTest("v2 page, request removed"):
+            r = self.client.post(
+                reverse("delete_prayer", args=[self.rd_2.pk]),
+                {"design": "v2"},
+                headers={"HX-Request": "true"},
+            )
+            self.assertTemplateUsed(r, v2)
+            count = async_to_sync(get_prayer_counts_in_bulk)([self.rd_2]).get(
+                self.rd_2.pk, 0
+            )
+            self.assertContains(
                 r,
-                f"Pray-and-pay: request this document. {count} requests so far.",
+                f"Request removed. {count} request{pluralize(count)} so far.",
             )
 
     async def test_can_we_load_the_top_prayers_page(self) -> None:
