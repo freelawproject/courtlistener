@@ -1,6 +1,6 @@
 import csv
 
-from django.contrib import admin, messages
+from django.contrib import admin
 from django.db.models import Count, Q, QuerySet
 from django.forms import BaseInlineFormSet, ModelForm
 from django.http import HttpRequest, HttpResponse
@@ -94,7 +94,7 @@ class OrganizationAdmin(admin.ModelAdmin):
         OrganizationMembershipInline,
         SSOEmailExceptionInline,
     )
-    actions = ("export_members", "sync_throttles")
+    actions = ("export_members",)
 
     def get_queryset(self, request: HttpRequest) -> QuerySet[Organization]:
         """Annotate seat counts so the list page doesn't query per row."""
@@ -166,15 +166,6 @@ class OrganizationAdmin(admin.ModelAdmin):
                 ]
             )
         return response
-
-    @admin.action(description="Re-sync members' API throttles")
-    def sync_throttles(
-        self, request: HttpRequest, queryset: QuerySet[Organization]
-    ) -> None:
-        """Bring members' API rates in line with their organization's level."""
-        for organization in queryset:
-            sync_organization_throttles(organization)
-        self.message_user(request, "Throttles synced.", messages.SUCCESS)
 
 
 @admin.register(AuthEvent)
