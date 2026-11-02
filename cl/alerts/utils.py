@@ -151,14 +151,16 @@ def create_percolator_search_query(
     return s
 
 
+type _DocumentsToPercolate = tuple[
+    ESDictDocument, ESDictDocument | None, ESDictDocument | None
+]
+
+
 def percolate_es_document(
     document_id: str,
     percolator_index: str,
     document_index: str | None = None,
-    documents_to_percolate: (
-        tuple[ESDictDocument, ESDictDocument | None, ESDictDocument | None]
-        | None
-    ) = None,
+    documents_to_percolate: _DocumentsToPercolate | None = None,
     app_label: str | None = None,
     main_search_after: int | None = None,
     rd_search_after: int | None = None,
@@ -716,11 +718,7 @@ def select_es_document_fields(
 
 def prepare_percolator_content(
     app_label: str, document_id: str
-) -> tuple[
-    str,
-    str | None,
-    tuple[ESDictDocument, ESDictDocument, ESDictDocument] | None,
-]:
+) -> tuple[str, str | None, _DocumentsToPercolate | None]:
     """Prepare percolator content for different according to the app_label.
 
     It returns the percolator index name and the ES document index where the
@@ -738,14 +736,17 @@ def prepare_percolator_content(
     or None if no dict documents to percolate.
     """
 
-    es_document_index = None
-    documents_to_percolate = None
+    percolator_index: str
+    es_document_index: str | None
+    documents_to_percolate: _DocumentsToPercolate | None
     match app_label:
         case "audio.Audio":
             percolator_index = AudioPercolator._index._name
             es_document_index = AudioDocument._index._name
+            documents_to_percolate = None
         case "search.Docket":
             percolator_index = RECAPPercolator._index._name
+            es_document_index = None
             model = apps.get_model(app_label)
             docket = model.objects.get(pk=document_id)
             document_content_plain = DocketDocumentPlain().prepare(docket)
@@ -757,6 +758,7 @@ def prepare_percolator_content(
             )
         case "search.RECAPDocument":
             percolator_index = RECAPPercolator._index._name
+            es_document_index = None
             model = apps.get_model(app_label)
             rd = model.objects.get(pk=document_id)
             document_content_plain = ESRECAPDocumentPlain().prepare(rd)
@@ -785,6 +787,7 @@ def prepare_percolator_content(
 
         case "search.Opinion":
             percolator_index = OpinionPercolator._index._name
+            es_document_index = None
             model = apps.get_model(app_label)
             opinion = model.objects.get(pk=document_id)
             document_content_plain = ESOpinionDocumentPlain().prepare(opinion)

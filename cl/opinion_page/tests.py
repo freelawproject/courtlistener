@@ -36,6 +36,7 @@ from django.test.client import AsyncClient
 from django.test.utils import CaptureQueriesContext
 from django.urls import reverse
 from django.utils.html import escape
+from django.utils.safestring import SafeString
 from django_cotton.compiler_regex import CottonCompiler
 from factory import RelatedFactory
 from lxml.etree import _Attrib, _Element
@@ -81,6 +82,7 @@ from cl.opinion_page.forms import (
 from cl.opinion_page.utils import (
     build_docket_metadata,
     build_docket_tabs,
+    build_idb_rows,
     build_originating_court_metadata,
     es_cited_case_count,
     es_get_cited_clusters_with_cache,
@@ -107,8 +109,10 @@ from cl.recap.factories import (
     AppellateAttachmentPageFactory,
     DocketEntriesDataFactory,
     DocketEntryDataFactory,
+    FjcIntegratedDatabaseFactory,
 )
 from cl.recap.mergers import add_docket_entries, merge_attachment_page_data
+from cl.recap.models import FjcIntegratedDatabase
 from cl.search.factories import (
     CitationWithParentsFactory,
     CourtFactory,
@@ -117,7 +121,9 @@ from cl.search.factories import (
     OpinionClusterWithChildrenAndParentsFactory,
     OpinionClusterWithParentsFactory,
     OpinionFactory,
+    OpinionsCitedByRECAPDocumentFactory,
     OpinionsCitedWithParentsFactory,
+    OpinionWithParentsFactory,
     RECAPAttachmentFactory,
     RECAPDocumentFactory,
     SCOTUSDocketEntryFactory,
@@ -3675,6 +3681,80 @@ class ClusterRedirectionTest(TestCase):
         )
 
 
+class BuildIdbRowsTest(SimpleTestCase):
+    """Test the build_idb_rows helper function."""
+
+    def test_every_field_gets_a_row(self) -> None:
+        """One row per IDB field, Office Number first and Pro Se last."""
+        rows = build_idb_rows(FjcIntegratedDatabaseFactory.build())
+        self.assertEqual(len(rows), 28)
+        self.assertEqual(rows[0]["label"], "Office Number")
+        self.assertEqual(rows[-1]["label"], "Pro Se")
+
+    def test_values_are_display_ready(self) -> None:
+        """Dates use the site format, choice fields show their label, coded
+        fields show code and label, False and 0 are values, and unset fields
+        fall back."""
+        idb_data = FjcIntegratedDatabaseFactory.build(
+            office="3",
+            origin=FjcIntegratedDatabase.ORIG,
+            date_filed=date(2016, 4, 21),
+            jurisdiction=None,
+            class_action=False,
+            monetary_demand=0,
+            pro_se=FjcIntegratedDatabase.PRO_SE_NONE,
+        )
+        values = {
+            row["label"]: row["value"] for row in build_idb_rows(idb_data)
+        }
+        self.assertEqual(values["Office Number"], "3")
+        self.assertEqual(values["Origin"], "(1) Original Proceeding")
+        self.assertEqual(values["Date Filed"], "April 21, 2016")
+        self.assertEqual(values["Jurisdiction"], "Not Provided")
+        self.assertEqual(values["Class Action Status"], "False")
+        self.assertEqual(values["Monetary Demand"], "0")
+        self.assertEqual(values["Date Terminated"], "Not Provided")
+        self.assertEqual(
+            values["Pro Se"], "No pro se plaintiffs or defendants"
+        )
+
+    def test_judgment_missing_codes_fall_back(self) -> None:
+        """Judgment shows "Not Provided" for the FJC missing-data codes, the
+        label for a known choice and the raw number for an unknown code."""
+        cases = [
+            (0, "Not Provided"),
+            (-8, "Not Provided"),
+            (FjcIntegratedDatabase.PLAINTIFF, "Plaintiff"),
+            (9, "9"),
+        ]
+        for judgment, expected in cases:
+            with self.subTest(judgment=judgment):
+                idb_data = FjcIntegratedDatabaseFactory.build(
+                    judgment=judgment
+                )
+                values = {
+                    row["label"]: row["value"]
+                    for row in build_idb_rows(idb_data)
+                }
+                self.assertEqual(values["Judgment"], expected)
+
+    def test_hints_are_safe_markup_with_the_choices(self) -> None:
+        """Hints carry their links unescaped and list the field's choices."""
+        hints = {
+            row["label"]: row.get("hint")
+            for row in build_idb_rows(FjcIntegratedDatabaseFactory.build())
+        }
+        self.assertIsInstance(hints["Office Number"], SafeString)
+        self.assertIn("<a ", hints["Office Number"])
+        self.assertIn(
+            "Denied or Granted", hints["Termination Class Action Status"]
+        )
+        self.assertIn(
+            "Formal Arbitration Program", hints["Arbitration at Filing"]
+        )
+        self.assertIsNone(hints["Date Filed"])
+
+
 class BuildDocketMetadataTest(TestCase):
     """Test the build_docket_metadata helper function."""
 
@@ -3976,6 +4056,101 @@ class BuildDocketTabsTest(SimpleTestCase):
             tabs = build_docket_tabs(docket, False, True, False)
             keys = [t["key"] for t in tabs]
             self.assertEqual(keys, ["entries", "idb"])
+
+
+class DocketTabViewsTest(TestCase):
+    """Context every tab view of a docket shares, whichever stack renders it."""
+
+    @classmethod
+    def setUpTestData(cls) -> None:
+        cls.court = CourtFactory(id="canb", jurisdiction="FB")
+        cls.docket = DocketFactory(
+            court=cls.court,
+            source=Docket.RECAP,
+            idb_data=FjcIntegratedDatabaseFactory(),
+        )
+        party = PartyFactory.build()
+        party.save()
+        PartyTypeFactory(docket=cls.docket, party=party)
+        OpinionsCitedByRECAPDocumentFactory(
+            citing_document=RECAPDocumentFactory(
+                docket_entry=DocketEntryFactory(docket=cls.docket)
+            ),
+            cited_opinion=OpinionWithParentsFactory(),
+        )
+
+    async def test_every_tab_view_gets_the_full_tab_list(self) -> None:
+        """Each tab view hands the template the same navigation, so a tab
+        never disappears depending on which one is active."""
+        for url_name in (
+            "view_docket",
+            "docket_parties",
+            "docket_idb_data",
+            "docket_authorities",
+        ):
+            with self.subTest(view=url_name):
+                r = await self.async_client.get(
+                    reverse(url_name, args=[self.docket.pk, self.docket.slug])
+                )
+                self.assertEqual(r.status_code, HTTPStatus.OK)
+                keys = [tab["key"] for tab in r.context["tabs"]]
+                self.assertEqual(
+                    keys, ["entries", "parties", "idb", "authorities"]
+                )
+
+
+@override_settings(WAFFLE_CACHE_PREFIX="test_docket_idb_v2_waffle")
+@override_flag("use_new_design", active=True)
+class DocketIdbV2TemplateTest(TestCase):
+    """The v2 FJC Integrated Database tab.
+
+    `WAFFLE_CACHE_PREFIX` isolates the flag cache from parallel workers, as
+    in DocketPageV2TemplateTest.
+    """
+
+    @classmethod
+    def setUpTestData(cls) -> None:
+        cls.court = CourtFactory(id="canb", jurisdiction="FB")
+        cls.docket = DocketFactory(
+            court=cls.court,
+            source=Docket.RECAP,
+            idb_data=FjcIntegratedDatabaseFactory(
+                office="3",
+                origin=FjcIntegratedDatabase.ORIG,
+                date_filed=date(2016, 4, 21),
+            ),
+        )
+
+    async def get_page(self) -> HttpResponse:
+        """Requests the IDB tab and checks it rendered through the v2 template."""
+        r = await self.async_client.get(
+            reverse(
+                "docket_idb_data",
+                args=[self.docket.pk, self.docket.slug],
+            )
+        )
+        self.assertEqual(r.status_code, HTTPStatus.OK)
+        self.assertTemplateUsed(r, "v2_docket_idb_data.html")
+        return r
+
+    async def test_renders_the_idb_values(self) -> None:
+        """Set fields, choice displays and the fallback for unset fields all
+        come through the table."""
+        content = (await self.get_page()).content.decode()
+        self.assertIn("(1) Original Proceeding", content)
+        self.assertIn("April 21, 2016", content)
+        self.assertIn("Not Provided", content)
+
+    async def test_idb_tab_is_current(self) -> None:
+        """The tab navigation marks the IDB tab as the current page."""
+        content = (await self.get_page()).content.decode()
+        current = [
+            el
+            for el in fromstring(content).iter("a")
+            if el.get("aria-current") == "page"
+        ]
+        self.assertEqual(len(current), 1)
+        self.assertIn("FJC Integrated Database", current[0].text_content())
 
 
 @override_settings(WAFFLE_CACHE_PREFIX="test_docket_page_v2_waffle")
@@ -4670,12 +4845,66 @@ class DocketEntryRowsV2Test(TestCase):
             escape(docket_entry_sources.RECAP.empty_message), content
         )
 
+    def export_link(self, html: str) -> _Element:
+        """The Export entries CSV link, rendered for every user state."""
+        links = [
+            a
+            for a in fromstring(html).iter("a")
+            if " ".join(a.text_content().split()).startswith(
+                "Export entries CSV"
+            )
+        ]
+        self.assertEqual(len(links), 1)
+        return links[0]
+
     async def test_csv_export_for_authenticated_user(self) -> None:
-        """CSV export button should render for authenticated users."""
+        """A signed-in user gets the download link, fetched in place by Alpine.
+
+        The view answers 501 and 429, so the page declares a message for each
+        plus a fallback.
+        """
         user = await sync_to_async(UserWithChildProfileFactory)()
         await sync_to_async(self.async_client.force_login)(user)
+        link = self.export_link(await self._get_docket_page())
+        download_path = reverse(
+            "view_download_docket", kwargs={"docket_id": self.docket.pk}
+        )
+        self.assertEqual(link.get("href"), download_path)
+        self.assertEqual(link.get("rel"), "nofollow")
+        self.assertEqual(link.get("x-on:click.prevent"), "start")
+        self.assertIsNone(link.get("hx-get"))
+        self.assertNotIn("sign in required", link.text_content())
+        component = link.xpath('ancestor::*[@x-data="download"]')
+        self.assertEqual(len(component), 1)
+        for key in (
+            "data-error-message-501",
+            "data-error-message-429",
+            "data-error-message-default",
+        ):
+            self.assertTrue(component[0].get(key), key)
+        alerts = component[0].xpath('.//*[@role="alert"]')
+        self.assertEqual(
+            [alert.get("x-text") for alert in alerts], ["errorMessage"]
+        )
+
+    async def test_csv_export_for_anonymous_user(self) -> None:
+        """A visitor gets a plain link to sign in and come back to this docket."""
         content = await self._get_docket_page()
-        self.assertIn("Export entries CSV", content)
+        download_path = reverse(
+            "view_download_docket", kwargs={"docket_id": self.docket.pk}
+        )
+        self.assertNotIn(download_path, content)
+        link = self.export_link(content)
+        docket_path = reverse(
+            "view_docket", args=[self.docket.pk, self.docket.slug]
+        )
+        self.assertEqual(
+            link.get("href"), f"{reverse('sign-in')}?next={docket_path}"
+        )
+        self.assertEqual(link.get("rel"), "nofollow")
+        self.assertIsNone(link.get("x-on:click.prevent"))
+        self.assertIsNone(link.get("hx-get"))
+        self.assertIn("sign in required", link.text_content())
 
     async def test_entries_use_option_d_semantic_markup(self) -> None:
         """Entries render as an <ol> of <li>, with <dl> for metadata and a nested <ul> for RECAP documents."""
