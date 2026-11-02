@@ -238,4 +238,4 @@ The rules in this doc are enforced as hard errors that block merge. See `fronten
 - Whole file: `{# frontend-checks-skip: check_name, other_check #}` anywhere in a template, or `/* frontend-checks-skip: check_name */` in CSS
 - Single line: end the offending line with `{# frontend-checks-skip-line: check_name #}` in templates or `/* frontend-checks-skip-line: check_name */` in CSS, like `eslint-disable-line`
 
-Checks never look inside `<c-code>` blocks, whose content is shown as code. Django tags inside a block still render, so write them with `{% templatetag %}` or wrap them in `{% verbatim %}`.
+Checks do not look inside `<c-code>` blocks, whose content is shown as code. Django tags inside a block still render, so the `{% include %}` check does read them: show a tag with `{% templatetag %}` or wrap it in `{% verbatim %}`.
