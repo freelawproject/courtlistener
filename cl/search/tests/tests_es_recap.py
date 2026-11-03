@@ -70,6 +70,7 @@ from cl.search.es_docket_sources import (
     RECAP_ES_SOURCE,
     SCOTUS_ES_SOURCE,
     SOURCE_BY_MODEL,
+    recap_search_courts,
 )
 from cl.search.factories import (
     BankruptcyInformationFactory,
@@ -93,6 +94,7 @@ from cl.search.management.commands.fix_rd_broken_links import (
 )
 from cl.search.models import (
     SEARCH_TYPES,
+    Court,
     Docket,
     DocketEvent,
     OpinionsCitedByRECAPDocument,
@@ -6828,6 +6830,71 @@ class ESDocketSourcesTest(TestCase):
         ScotusDocketMetadataFactory(docket=docket)
         docket.refresh_from_db()
         self.assertTrue(SCOTUS_ES_SOURCE.ready_to_index(docket))
+
+
+class RECAPSearchCourtsTest(TestCase):
+    """recap_search_courts() offers the PACER courts plus the courts the
+    other docket sources add, such as SCOTUS."""
+
+    @classmethod
+    def setUpTestData(cls) -> None:
+        """Create PACER, SCOTUS and state courts."""
+        for court_id, jurisdiction in [
+            ("scotus", Court.FEDERAL_APPELLATE),
+            ("ca1", Court.FEDERAL_APPELLATE),
+            ("cand", Court.FEDERAL_DISTRICT),
+            ("ohio", Court.STATE_SUPREME),
+        ]:
+            CourtFactory(id=court_id, jurisdiction=jurisdiction, end_date=None)
+
+    def test_recap_search_courts_add_source_courts(self) -> None:
+        """SCOTUS joins the PACER courts in the search list, courts that are
+        neither PACER nor claimed by a source stay out, and
+        all_pacer_courts(), used by PACER scrapers and uploads, keeps
+        excluding SCOTUS."""
+        search_ids = set(recap_search_courts().values_list("pk", flat=True))
+        self.assertLessEqual({"scotus", "ca1", "cand"}, search_ids)
+        self.assertNotIn("ohio", search_ids)
+        self.assertNotIn(
+            "scotus",
+            Court.federal_courts.all_pacer_courts().values_list(
+                "pk", flat=True
+            ),
+        )
+
+
+class RECAPSearchCourtPickerTest(ESIndexTestCase, TestCase):
+    """The RECAP search pages render SCOTUS in the court picker."""
+
+    @classmethod
+    def setUpClass(cls) -> None:
+        """Build the Docket index the results page searches."""
+        super().setUpClass()
+        cls.rebuild_index("search.Docket")
+
+    @classmethod
+    def setUpTestData(cls) -> None:
+        """Create SCOTUS and a circuit court for the Federal Appellate tab."""
+        for court_id in ["scotus", "ca1"]:
+            CourtFactory(
+                id=court_id,
+                jurisdiction=Court.FEDERAL_APPELLATE,
+                end_date=None,
+            )
+
+    def test_recap_pages_offer_scotus_in_federal_appellate_tab(self) -> None:
+        """Both the RECAP results page and the RECAP advanced search page
+        render a SCOTUS checkbox in the Federal Appellate tab."""
+        for url in [
+            f"{reverse('show_results')}?type={SEARCH_TYPES.RECAP}",
+            reverse("advanced_r"),
+        ]:
+            with self.subTest(url=url):
+                r = self.client.get(url)
+                self.assertEqual(r.status_code, HTTPStatus.OK)
+                federal_ids = {c.pk for c in r.context["courts"]["federal"]}
+                self.assertIn("scotus", federal_ids)
+                self.assertContains(r, 'id="id_scotus"')
 
 
 class SCOTUSESIndexingSignalTest(
