@@ -40,7 +40,7 @@ from cl.sso.factories import (
     SocialAppFactory,
     SSOConnectionFactory,
 )
-from cl.sso.linking import asserted_email, get_connection
+from cl.sso.linking import asserted_email, get_connection, join_organization
 from cl.sso.membership import EffectiveMembership, get_effective_membership
 from cl.sso.models import (
     AuthEvent,
@@ -557,6 +557,18 @@ class OIDCLoginTest(SSOFixtureMixin, TestCase):
         self.assertFalse(membership.has_seat)
         self.assertIsNone(get_effective_membership(user))
         self.assertTrue(any("seat" in m.subject.lower() for m in mail.outbox))
+
+    def test_seat_check_locks_the_organization(self) -> None:
+        """Is the organization locked while a limited seat is handed out?"""
+        self.org.seat_limit = 1
+        self.org.save()
+        user = self._confirmed_user()
+
+        with CaptureQueriesContext(connection) as queries:
+            membership = join_organization(user, self.org)
+
+        self.assertTrue(membership.has_seat)
+        self.assertTrue(any("FOR UPDATE" in q["sql"] for q in queries))
 
     def test_inactive_linked_account_is_refused(self) -> None:
         """Is a deactivated account kept out even with a linked identity?"""

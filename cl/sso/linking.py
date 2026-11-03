@@ -362,6 +362,12 @@ def join_organization(
         defaults={"source": MembershipSource.SSO, "has_seat": False},
     )
     gained_seat = False
+    if not membership.has_seat and organization.seat_limit is not None:
+        # Lock the organization so simultaneous sign-ins can't both take the
+        # last seat.
+        Organization.objects.select_for_update().filter(
+            pk=organization.pk
+        ).first()
     if not membership.has_seat and organization.has_free_seat():
         membership.has_seat = True
         gained_seat = True
