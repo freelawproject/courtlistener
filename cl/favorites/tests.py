@@ -1613,7 +1613,7 @@ class RECAPPrayAndPay(SimpleUserDataMixin, PrayAndPayTestCase):
         self.client.login(username="pandora", password="password")
         url = reverse("create_prayer", args=[self.rd_2.pk])
         legacy = "includes/pray_and_pay_htmx/pray_button.html"
-        v2 = "v2_includes/pray_and_pay_htmx/pray_button_new.html"
+        v2 = "v2_includes/pray_and_pay_htmx/pray_button.html"
 
         with self.subTest("legacy page"):
             r = self.client.post(url, headers={"HX-Request": "true"})
