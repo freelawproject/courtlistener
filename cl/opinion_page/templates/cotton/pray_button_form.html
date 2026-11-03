@@ -18,8 +18,6 @@
     {% endif %}
     hx-target="this"
     hx-swap="outerHTML"
-    {# Asks the view for the v2 partial; the design middleware does not differentiate this form from the legacy one. This may become obsolete once the new design is fully implemented. #}
-    hx-vals='{"design": "v2"}'
     class="inline-flex items-center gap-1 min-w-14"
   >
     {# The id lets htmx restore keyboard focus to the new button after the swap. #}
