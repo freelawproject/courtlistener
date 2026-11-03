@@ -61,10 +61,3 @@ SSO_REQUIRED_FOR_STAFF = env.bool("SSO_REQUIRED_FOR_STAFF", default=False)
 # How often an existing session is re-checked against the SSO policy, so
 # turning on enforcement ends password sessions within this many seconds.
 SSO_POLICY_RECHECK_SECONDS = env.int("SSO_POLICY_RECHECK_SECONDS", default=300)
-
-# How recently somebody must have signed in through their IdP to skip a
-# password re-prompt (e.g. deleting their account) on an account that has
-# no password.
-SSO_REAUTHENTICATION_SECONDS = env.int(
-    "SSO_REAUTHENTICATION_SECONDS", default=60 * 15
-)
