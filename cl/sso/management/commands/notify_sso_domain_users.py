@@ -1,4 +1,6 @@
 import argparse
+import logging
+from collections import Counter
 from typing import Any
 
 from django.contrib.auth.models import User
@@ -7,8 +9,10 @@ from django.core.management.base import CommandError
 
 from cl.lib.command_utils import VerboseCommand
 from cl.sso.emails import emails
-from cl.sso.models import OrganizationDomain
-from cl.sso.policy import sso_start_url
+from cl.sso.models import Enforcement, OrganizationDomain
+from cl.sso.policy import enabled_connection, sso_start_url
+
+logger = logging.getLogger(__name__)
 
 
 class Command(VerboseCommand):
@@ -56,25 +60,56 @@ class Command(VerboseCommand):
             .exclude(socialaccount__provider__in=provider_ids)
             .order_by("pk")
         )
+        exempt = {
+            e.lower()
+            for e in organization.email_exceptions.values_list(
+                "email", flat=True
+            )
+        }
+        users = [u for u in users if u.email.lower() not in exempt]
+        # SSO links only one account per address, so shared addresses go to
+        # support instead.
+        counts = Counter(u.email.lower() for u in users)
+        shared = sorted(e for e, n in counts.items() if n > 1)
+        users = [u for u in users if counts[u.email.lower()] == 1]
         self.stdout.write(
-            f"{users.count()} confirmed account(s) on {domain} not yet "
+            f"{len(users)} confirmed account(s) on {domain} not yet "
             "linked to SSO."
         )
+        if shared:
+            self.stdout.write(
+                "Skipped, more than one account: " + ", ".join(shared)
+            )
         if not options["send"]:
             self.stdout.write("Dry run; pass --send to email them.")
             return
-        email = emails["firm_now_uses_sso"]
-        for user in users:
-            send_mail(
-                email["subject"] % organization.name,
-                email["body"]
-                % (
-                    user.first_name or user.username,
-                    organization.name,
-                    sso_start_url(email=user.email),
-                    user.username,
-                ),
-                email["from_email"],
-                [user.email],
+        if (
+            domain.enforcement == Enforcement.OFF
+            or enabled_connection(organization) is None
+        ):
+            raise CommandError(
+                f"{domain} doesn't offer SSO yet. Turn on enforcement and "
+                "enable a connection first."
             )
-        self.stdout.write("Sent.")
+        email = emails["firm_now_uses_sso"]
+        failed = []
+        for user in users:
+            try:
+                send_mail(
+                    email["subject"] % organization.name,
+                    email["body"]
+                    % (
+                        user.first_name or user.username,
+                        organization.name,
+                        sso_start_url(email=user.email),
+                        user.username,
+                    ),
+                    email["from_email"],
+                    [user.email],
+                )
+            except Exception:
+                logger.exception("Couldn't email %s", user.email)
+                failed.append(user.email)
+        self.stdout.write(f"Sent {len(users) - len(failed)}.")
+        if failed:
+            self.stdout.write("Failed: " + ", ".join(failed))

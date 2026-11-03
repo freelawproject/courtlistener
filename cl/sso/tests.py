@@ -14,7 +14,7 @@ from django.conf import settings
 from django.contrib.auth.models import User
 from django.core import mail
 from django.core.exceptions import ValidationError
-from django.core.management import call_command
+from django.core.management import CommandError, call_command
 from django.db import connection
 from django.http import HttpResponse
 from django.test import RequestFactory
@@ -51,6 +51,7 @@ from cl.sso.models import (
     OrganizationDomain,
     OrganizationMembership,
     SSOConnection,
+    SSOEmailException,
 )
 from cl.sso.sessions import SSO_ORGANIZATION_KEY
 from cl.sso.throttles import sync_user_throttles
@@ -1050,6 +1051,9 @@ class NotifyDomainUsersTest(SSOFixtureMixin, TestCase):
         ).user
         UserProfileWithParentsFactory.create(user__email="bob@other.test")
 
+        self.domain.enforcement = Enforcement.OPTIONAL
+        self.domain.save()
+
         out = StringIO()
         call_command("notify_sso_domain_users", DOMAIN, stdout=out)
         self.assertIn("1 confirmed account(s)", out.getvalue())
@@ -1057,6 +1061,59 @@ class NotifyDomainUsersTest(SSOFixtureMixin, TestCase):
 
         call_command("notify_sso_domain_users", DOMAIN, "--send", stdout=out)
         self.assertEqual([m.to for m in mail.outbox], [[user.email]])
+
+    def test_skips_exceptions_and_shared_addresses(self) -> None:
+        """Are exempt and shared addresses left out?"""
+        self.domain.enforcement = Enforcement.OPTIONAL
+        self.domain.save()
+        SSOEmailException.objects.create(
+            organization=self.org, email=f"Contractor@{DOMAIN}"
+        )
+        for email in [
+            f"contractor@{DOMAIN}",
+            f"ada@{DOMAIN}",
+            f"ada@{DOMAIN}",
+        ]:
+            UserProfileWithParentsFactory.create(user__email=email)
+        user = UserProfileWithParentsFactory.create(
+            user__email=f"bob@{DOMAIN}"
+        ).user
+
+        out = StringIO()
+        call_command("notify_sso_domain_users", DOMAIN, "--send", stdout=out)
+
+        self.assertIn(f"ada@{DOMAIN}", out.getvalue())
+        self.assertEqual([m.to for m in mail.outbox], [[user.email]])
+
+    def test_refuses_to_send_when_sso_is_off(self) -> None:
+        """Does --send stop when the domain doesn't offer SSO?"""
+        UserProfileWithParentsFactory.create(user__email=f"ada@{DOMAIN}")
+
+        with self.assertRaises(CommandError):
+            call_command(
+                "notify_sso_domain_users", DOMAIN, "--send", stdout=StringIO()
+            )
+        self.assertEqual(len(mail.outbox), 0)
+
+    def test_keeps_sending_after_a_failure(self) -> None:
+        """Does one failed email leave the rest sent?"""
+        self.domain.enforcement = Enforcement.OPTIONAL
+        self.domain.save()
+        for name in ["ada", "bob"]:
+            UserProfileWithParentsFactory.create(
+                user__email=f"{name}@{DOMAIN}"
+            )
+        command = "cl.sso.management.commands.notify_sso_domain_users"
+        with mock.patch(
+            f"{command}.send_mail", side_effect=[Exception, 1]
+        ) as send:
+            out = StringIO()
+            call_command(
+                "notify_sso_domain_users", DOMAIN, "--send", stdout=out
+            )
+
+        self.assertEqual(send.call_count, 2)
+        self.assertIn(f"Failed: ada@{DOMAIN}", out.getvalue())
 
 
 class AdminTest(SSOFixtureMixin, TestCase):
