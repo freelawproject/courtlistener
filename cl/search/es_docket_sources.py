@@ -8,6 +8,7 @@ from dataclasses import dataclass
 
 from django.db import models
 
+from cl.search.constants import SCOTUS_COURT_IDS
 from cl.search.models import (
     BankruptcyInformation,
     Docket,
@@ -65,7 +66,7 @@ def _scotus_docket_belongs(docket: Docket) -> bool:
     ScotusDocketMetadata is what keeps the Docket belonging on every
     save after the first.
     """
-    if docket.court_id != "scotus":
+    if docket.court_id not in SCOTUS_COURT_IDS:
         return False
     return (
         getattr(docket, "_index_in_es", False)

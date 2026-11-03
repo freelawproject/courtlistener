@@ -1,9 +1,10 @@
 """Per-source configuration for fetching and rendering docket entries.
 
-The source instances (``RECAP``, ``SCOTUS``) and the ``BY_COURT_ID`` map are
-meant to be read through the module, as ``docket_entry_sources.RECAP``, so
-they stay visually distinct from the unrelated docket *data* sources in
-``cl.search.docket_sources`` (``Docket.RECAP_SOURCES()``, ``Docket.RECAP``).
+The source instances (``RECAP``, ``SCOTUS``), the ``BY_COURT_ID`` map and
+``source_for_court_id`` are meant to be read through the module, as
+``docket_entry_sources.RECAP``, so they stay visually distinct from the
+unrelated docket *data* sources in ``cl.search.docket_sources``
+(``Docket.RECAP_SOURCES()``, ``Docket.RECAP``).
 """
 
 from collections.abc import Awaitable, Callable, Iterable
@@ -15,6 +16,7 @@ from django.urls import reverse
 from django.utils.formats import date_format
 
 from cl.custom_filters.templatetags.extras import http_url
+from cl.search.constants import SCOTUS_COURT_IDS
 from cl.search.models import (
     Docket,
     DocketEntry,
@@ -154,7 +156,7 @@ class DocketEntrySource:
     """Describes how to fetch, sort, and display docket entries and
     documents for one 'flavor' of docket. RECAP/PACER is the default;
     SCOTUS is the first override. A future state-specific model plugs in
-    by adding one more instance and a court_id mapping below.
+    by adding one more instance and mapping its court ids below.
 
     ``empty_message`` is the sentence shown in place of the entry list
     when the docket has no entries at all. It carries no wrapper, so the
@@ -501,6 +503,13 @@ SCOTUS: DocketEntrySource = DocketEntrySource(
     admin_document_label="SCOTUS Document",
 )
 
-# Courts whose dockets use a source other than RECAP. Docket.get_entry_source
+# Courts whose dockets use a source other than RECAP. source_for_court_id
 # falls back to RECAP for any court not listed here.
-BY_COURT_ID: dict[str, DocketEntrySource] = {"scotus": SCOTUS}
+BY_COURT_ID: dict[str, DocketEntrySource] = {
+    court_id: SCOTUS for court_id in SCOTUS_COURT_IDS
+}
+
+
+def source_for_court_id(court_id: str) -> DocketEntrySource:
+    """Return the DocketEntrySource of a court's dockets, RECAP by default."""
+    return BY_COURT_ID.get(court_id, RECAP)
