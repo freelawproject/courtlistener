@@ -1255,6 +1255,25 @@ class DocketAlertScotusTest(TestCase):
         self.assertIn("First entry", body)
         self.assertIn("Second entry", body)
 
+    @mock.patch("cl.alerts.tasks.send_docket_alert_webhook_events")
+    def test_scotus_webhooks_are_gated_by_setting(self, mock_webhooks) -> None:
+        """Does the SCOTUS alert email go out while its webhook is only
+        queued when SCOTUS_DOCKET_ALERT_WEBHOOKS_ENABLED is on?"""
+        de = SCOTUSDocketEntryFactory(docket=self.docket)
+        SCOTUSDocumentFactory(docket_entry=de)
+        for enabled in (False, True):
+            with (
+                self.subTest(webhooks_enabled=enabled),
+                override_settings(
+                    SCOTUS_DOCKET_ALERT_WEBHOOKS_ENABLED=enabled
+                ),
+            ):
+                mail.outbox.clear()
+                mock_webhooks.reset_mock()
+                send_alert_and_webhook(self.docket.pk, self.before)
+                self.assertEqual(len(mail.outbox), 1)
+                self.assertEqual(mock_webhooks.delay.called, enabled)
+
 
 class DisableDocketAlertTest(TestCase):
     """Do old docket alerts get disabled or alerted properly?"""
