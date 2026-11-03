@@ -1847,6 +1847,90 @@ class DocketEntrySourceTest(TestCase):
         duplicates = [c for c, n in Counter(court_ids).items() if n > 1]
         self.assertEqual([], duplicates)
 
+    def test_initial_document_buttons_use_one_query_per_source(self) -> None:
+        """Each source answers for several dockets with one query."""
+        recap_ids, scotus_ids = [], []
+        for n in range(3):
+            entry = DocketEntryFactory(
+                docket=DocketFactory(
+                    court=self.recap_court, source=Docket.RECAP
+                ),
+                entry_number=1,
+            )
+            RECAPDocumentFactory(
+                docket_entry=entry,
+                document_number="1",
+                document_type=RECAPDocument.PACER_DOCUMENT,
+                pacer_doc_id=f"98765{n}",
+            )
+            recap_ids.append(entry.docket_id)
+            document = SCOTUSDocumentFactory(
+                docket_entry__docket__court=self.scotus_court,
+                attachment_number=1,
+                url="https://www.supremecourt.gov/DocketPDF/24/24-1/a.pdf",
+            )
+            scotus_ids.append(document.docket_entry.docket_id)
+        for source, docket_ids in [
+            (docket_entry_sources.RECAP, recap_ids),
+            (docket_entry_sources.SCOTUS, scotus_ids),
+        ]:
+            with self.subTest(source=source.component):
+                with self.assertNumQueries(1):
+                    buttons = source.initial_document_buttons(docket_ids)
+                self.assertEqual(set(docket_ids), set(buttons))
+
+    def test_scotus_initial_document_is_first_attachment_of_earliest_entry(
+        self,
+    ) -> None:
+        """The SCOTUS initial document is the first attachment of the earliest
+        entry, linked to our copy when we have it. A docket with no documents
+        gets no button."""
+        sample_file = SimpleUploadedFile("scotus_filename.pdf", b"file")
+        docket = DocketFactory(court=self.scotus_court)
+        # Create the later entry and the second attachment first, so a lower
+        # pk can't make them the initial document.
+        later_entry = SCOTUSDocketEntryFactory(
+            docket=docket,
+            sequence_number="2024-02-01.001",
+            date_filed=datetime.date(2024, 2, 1),
+        )
+        SCOTUSDocumentFactory(
+            docket_entry=later_entry,
+            attachment_number=1,
+            filepath_local=sample_file,
+        )
+        first_entry = SCOTUSDocketEntryFactory(
+            docket=docket,
+            sequence_number="2024-01-01.001",
+            date_filed=datetime.date(2024, 1, 1),
+        )
+        SCOTUSDocumentFactory(
+            docket_entry=first_entry,
+            attachment_number=2,
+            filepath_local=sample_file,
+        )
+        initial_document = SCOTUSDocumentFactory(
+            docket_entry=first_entry,
+            attachment_number=1,
+            filepath_local=sample_file,
+        )
+        empty_docket = DocketFactory(court=self.scotus_court)
+
+        buttons = docket_entry_sources.SCOTUS.initial_document_buttons(
+            [docket.pk, empty_docket.pk]
+        )
+
+        self.assertEqual(
+            {
+                docket.pk: docket_entry_sources.InitialDocumentButton(
+                    initial_document.get_absolute_url(),
+                    None,
+                    "Initial Document",
+                )
+            },
+            buttons,
+        )
+
     def test_scotus_source_callables_execute_without_raising(self) -> None:
         entry = SCOTUSDocketEntryFactory(docket=self.scotus_docket)
         document = SCOTUSDocumentFactory(docket_entry=entry)
