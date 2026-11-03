@@ -9,7 +9,7 @@ from django.utils.safestring import SafeText, mark_safe
 from cl.lib.date_time import midnight_pt
 from cl.opinion_page.docket_entry_sources import SourceDocketEntry
 from cl.opinion_page.utils import make_docket_title
-from cl.search.models import Docket, DocketEntry, SCOTUSDocketEntry
+from cl.search.models import Docket
 
 
 class DocketFeed(Feed):
@@ -43,9 +43,7 @@ class DocketFeed(Feed):
         except Docket.DoesNotExist:
             raise Http404("Unable to find docket")
 
-    def items(
-        self, obj: Docket
-    )  -> QuerySet[SourceDocketEntry]:
+    def items(self, obj: Docket) -> QuerySet[SourceDocketEntry]:
         """Return the docket's 30 most recent dated entries for the feed."""
         source = obj.get_entry_source()
         return (
@@ -89,9 +87,7 @@ class DocketFeed(Feed):
     def item_pubdate(self, item: SourceDocketEntry) -> datetime:
         return midnight_pt(item.date_filed)
 
-    def item_enclosure_url(
-        self, item: SourceDocketEntry
-    ) -> str | None:
+    def item_enclosure_url(self, item: SourceDocketEntry) -> str | None:
         if not item.entry_number:
             return None
 
