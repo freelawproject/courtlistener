@@ -18,10 +18,10 @@ def sync_user_throttles(user: User, clear_cache: bool = True) -> None:
     pass False and clear it once at the end.
     """
     membership = get_effective_membership(user)
-    if membership is None:
-        clear_membership_throttles(user)
-        return
-    apply_membership_throttles(user, membership.level, clear_cache=clear_cache)
+    if membership is None or not apply_membership_throttles(
+        user, membership.level, clear_cache=clear_cache
+    ):
+        clear_membership_throttles(user, clear_cache=clear_cache)
 
 
 def sync_organization_throttles(organization: Organization) -> None:

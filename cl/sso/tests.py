@@ -697,6 +697,24 @@ class EffectiveMembershipTest(TestCase):
             ).exists()
         )
 
+    def test_unmapped_level_clears_throttles(self) -> None:
+        """Does a level without API rates drop the old level's rates?"""
+        OrganizationMembershipFactory.create(
+            organization=self.org, user=self.user
+        )
+        sync_user_throttles(self.user)
+        self.assertTrue(APIThrottle.objects.filter(user=self.user).exists())
+
+        self.org.membership_level = NeonMembershipLevel.BASIC
+        self.org.save()
+        sync_user_throttles(self.user)
+
+        self.assertFalse(
+            APIThrottle.objects.filter(
+                user=self.user, source=APIThrottle.Source.MEMBERSHIP
+            ).exists()
+        )
+
 
 class SSOStartViewTest(SSOFixtureMixin, TestCase):
     """The "sign in with SSO" page."""
