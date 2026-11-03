@@ -27,7 +27,6 @@ from django.urls import (
     reverse,
 )
 from django.utils import timezone
-from rest_framework.authtoken.models import Token
 
 from cl.api.models import APIThrottle
 from cl.donate.factories import NeonMembershipFactory
@@ -504,37 +503,24 @@ class OIDCLoginTest(SSOFixtureMixin, TestCase):
         self.assertNotSignedIn()
         self.assertFalse(SocialAccount.objects.filter(uid="new-hire").exists())
 
-    def test_unconfirmed_account_is_claimed(self) -> None:
-        """Is an unconfirmed account at the address linked, not duplicated?
+    def test_unconfirmed_accounts_are_not_linked(self) -> None:
+        """Does an unconfirmed account at the address get passed over?
 
-        Sign-up refuses a second account per address, so SSO does too. The
-        account may have been registered by somebody else, so its password
-        and API token stop working, and support is told.
+        It may have been planted by somebody else, so a new account is made
+        and support is told about the duplicate.
         """
         planted = UserProfileWithParentsFactory.create(
             email_confirmed=False, user__email=f"ada@{DOMAIN}"
         ).user
-        # nosemgrep: python.django.security.audit.unvalidated-password.unvalidated-password
-        planted.set_password("planted-password")
-        planted.save()
-        old_token = Token.objects.get(user=planted).key
 
         r = self._log_in_via_idp(FakeIdP(sub="s-1", email=planted.email))
 
         self.assertRedirects(r, "/alerts/", fetch_redirect_response=False)
-        self.assertSignedInAs(planted)
-        self.assertEqual(SocialAccount.objects.get(uid="s-1").user, planted)
-        self.assertEqual(
-            User.objects.filter(email__iexact=planted.email).count(), 1
-        )
-        planted.refresh_from_db()
-        self.assertTrue(planted.profile.email_confirmed)
-        self.assertFalse(planted.has_usable_password())
-        self.assertNotEqual(Token.objects.get(user=planted).key, old_token)
+        new_user = SocialAccount.objects.get(uid="s-1").user
+        self.assertNotEqual(new_user.pk, planted.pk)
+        self.assertSignedInAs(new_user)
         self.assertTrue(
-            AuthEvent.objects.filter(
-                user=planted, outcome=AuthOutcome.FLAGGED
-            ).exists()
+            AuthEvent.objects.filter(outcome=AuthOutcome.FLAGGED).exists()
         )
         self.assertTrue(
             any("duplicate accounts" in m.subject for m in mail.outbox)

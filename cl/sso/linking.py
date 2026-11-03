@@ -32,7 +32,6 @@ from django.db.models import F
 from django.http import HttpRequest
 from django.template.response import TemplateResponse
 from django.utils import timezone
-from rest_framework.authtoken.models import Token
 
 from cl.lib.auth import filter_by_email
 from cl.lib.AuthenticationBackend import accounts_for_email
@@ -251,23 +250,6 @@ def create_account(sociallogin: SocialLogin, email: str) -> User:
     return user
 
 
-def claim_unconfirmed_account(user: User) -> User:
-    """Hand an unconfirmed account to the person the IdP vouched for.
-
-    Somebody else may have registered it, so anything they could still sign
-    in with goes: the password (which also ends their sessions) and the API
-    token. The person can set a new password by resetting it.
-
-    :param user: The unconfirmed account holding the address.
-    :return: The account, ready to link.
-    """
-    user.set_unusable_password()
-    user.save(update_fields=["password"])
-    Token.objects.filter(user=user).delete()
-    Token.objects.create(user=user)
-    return user
-
-
 def flag_for_support(
     request: HttpRequest,
     connection: SSOConnection,
@@ -347,27 +329,15 @@ def find_or_create_account(
     if stub is not None:
         return upgrade_stub(stub, sociallogin, email), AuthOutcome.CREATED
 
-    # Sign-up refuses a second account for an address (#7854), so neither
-    # does SSO. The IdP's word confirms the address the way a password reset
-    # would, so the person gets the account, minus the old credentials.
-    unconfirmed = list(
-        accounts_for_email(email).order_by(
-            F("last_login").desc(nulls_last=True), "-pk"
-        )
-    )
-    if unconfirmed:
-        user = claim_unconfirmed_account(unconfirmed[0])
+    user = create_account(sociallogin, email)
+    if accounts_for_email(email).exclude(pk=user.pk).exists():
         flag_for_support(
             request,
             connection,
             user,
-            f"SSO linked an unconfirmed account ({len(unconfirmed)} held "
-            "this address) and removed its password and API token, in case "
-            "somebody else registered it.",
+            "Unconfirmed accounts already used this address, so SSO made a "
+            "new account instead of linking one of them.",
         )
-        return user, AuthOutcome.LINKED
-
-    user = create_account(sociallogin, email)
     if not settings.DEVELOPMENT:
         transaction.on_commit(lambda: create_neon_account.delay(user.pk))
     return user, AuthOutcome.CREATED
