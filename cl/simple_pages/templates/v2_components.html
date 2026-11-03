@@ -1738,7 +1738,7 @@ Sample code here.
     <p>The pray-and-pay button for one RECAP document: the request count and a 🙏 that adds or removes the user's request. Signed-out users get a link to sign in instead. Pages use <code>&lt;c-pray-button&gt;</code>, which wraps this form with the screen reader status region; the htmx response renders this form again on its own to replace the old one.</p>
 
     <h4 class="mt-3">Demo</h4>
-    <div class="my-4 flex flex-row gap-6 rounded-lg border border-greyscale-200 p-4 text-sm">
+    <div class="my-4 flex flex-row gap-6 rounded-lg border border-greyscale-200 p-4 text-sm" inert>
       <div class="flex flex-col items-start gap-1">
         <c-pray-button-form document_id="1" :count="0" />
         <span class="text-xs text-greyscale-500">Not requested</span>
