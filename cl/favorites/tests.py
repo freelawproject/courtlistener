@@ -1607,13 +1607,15 @@ class RECAPPrayAndPay(SimpleUserDataMixin, PrayAndPayTestCase):
     def test_pray_button_template(self) -> None:
         """Flagged users get the partial for the page they clicked Pray on.
 
-        The design middleware swaps templates by flag alone, so without the
-        v2 form's ``design`` field a legacy page would get v2 markup back.
+        The design middleware picks the htmx partial by the X-CL-Design
+        header that v2 pages send, not by the flag, so a flagged user on a
+        page that is still legacy gets the legacy partial back.
         """
         self.client.login(username="pandora", password="password")
         url = reverse("create_prayer", args=[self.rd_2.pk])
         legacy = "includes/pray_and_pay_htmx/pray_button.html"
         v2 = "v2_includes/pray_and_pay_htmx/pray_button.html"
+        v2_headers = {"HX-Request": "true", "X-CL-Design": "v2"}
 
         with self.subTest("legacy page"):
             r = self.client.post(url, headers={"HX-Request": "true"})
@@ -1621,9 +1623,7 @@ class RECAPPrayAndPay(SimpleUserDataMixin, PrayAndPayTestCase):
             self.assertTemplateNotUsed(r, v2)
 
         with self.subTest("v2 page, request added"):
-            r = self.client.post(
-                url, {"design": "v2"}, headers={"HX-Request": "true"}
-            )
+            r = self.client.post(url, headers=v2_headers)
             self.assertTemplateUsed(r, v2)
             self.assertTemplateNotUsed(r, legacy)
             count = async_to_sync(get_prayer_counts_in_bulk)([self.rd_2]).get(
@@ -1636,8 +1636,7 @@ class RECAPPrayAndPay(SimpleUserDataMixin, PrayAndPayTestCase):
         with self.subTest("v2 page, request removed"):
             r = self.client.post(
                 reverse("delete_prayer", args=[self.rd_2.pk]),
-                {"design": "v2"},
-                headers={"HX-Request": "true"},
+                headers=v2_headers,
             )
             self.assertTemplateUsed(r, v2)
             count = async_to_sync(get_prayer_counts_in_bulk)([self.rd_2]).get(
