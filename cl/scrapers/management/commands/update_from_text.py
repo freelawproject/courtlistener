@@ -23,7 +23,7 @@ def rerun_extract_from_text(
     Reruns `update_document_from_text` from the scraper flow, saving changes
 
     `update_document_from_text` calls `Site.extract_from_text` and assigns
-    any changes to the proper objets, in place, but they are not saved.
+    any changes to the proper objects, in place, but they are not saved.
     This method saves the ones with actual changes
 
     :param opinion: the Opinion on which to apply extract_from_text

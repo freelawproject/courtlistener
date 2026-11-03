@@ -2,9 +2,11 @@ import datetime
 from unittest import mock
 
 from asgiref.sync import async_to_sync
+from django.core import mail
 from django.core.files.base import ContentFile
-from django.test import TestCase
+from django.test import TestCase, override_settings
 
+from cl.alerts.models import DocketAlert
 from cl.corpus_importer.tasks import (
     add_scotus_docket_entries,
     download_qp_scotus_pdf,
@@ -40,7 +42,9 @@ from cl.search.models import (
     ScotusDocketMetadata,
     SCOTUSDocument,
 )
+from cl.settings import COURT_REQUEST_USER_AGENT
 from cl.tests.cases import TestCase as CLTestCase
+from cl.users.factories import UserFactory
 
 
 class ScotusDocketMergeTest(TestCase):
@@ -199,7 +203,14 @@ class ScotusDocketMergeTest(TestCase):
         ).first()
 
         self.assertEqual(rd_att_1.url, att_1["document_url"])
-        self.assertTrue(rd_att_1.filepath_local)
+        bucket = f"gov.uscourts.{self.court.pk}.{docket.pk}"
+        self.assertEqual(
+            rd_att_1.filepath_local.name,
+            f"recap/{bucket}/{bucket}.2015-08-19."
+            f"{rd_att_1.document_number}.{rd_att_1.attachment_number or 0}.pdf",
+            "Filed in its docket's directory, named for the day its entry was "
+            "filed and for its document and attachment numbers.",
+        )
         self.assertEqual(rd_att_1.page_count, 1)
         self.assertIsNotNone(rd_att_1.sha1)
         self.assertIn("UNITED", rd_att_1.plain_text)
@@ -532,6 +543,96 @@ class ScotusDocketMergeTest(TestCase):
             "Source should be compounded with SCRAPER.",
         )
 
+    @override_settings(SCOTUS_ALERTS_ENABLED=True)
+    def test_merge_scotus_docket_triggers_docket_alert_for_a_new_entry(
+        self,
+    ) -> None:
+        """Does merging a SCOTUS docket with a new entry notify current
+        subscribers?"""
+        existing = DocketFactory(
+            court=self.court, docket_number="24-201", source=Docket.SCRAPER
+        )
+        user = UserFactory()
+        DocketAlert.objects.create(docket=existing, user=user)
+
+        docket_entries = [
+            SCOTUSDocketEntryDataFactory(
+                description="Petition for a writ of certiorari filed.",
+                date_filed=datetime.date(2025, 6, 2),
+                document_number=None,
+                attachments=[],
+            )
+        ]
+        data = ScotusDocketDataFactory(
+            docket_number="24-201",
+            docket_entries=docket_entries,
+            parties=[],
+        )
+        docket, _, _ = merge_scotus_docket(data, download_file=False)
+
+        self.assertEqual(docket.pk, existing.pk)
+        self.assertEqual(len(mail.outbox), 1)
+        self.assertEqual(mail.outbox[0].to, [user.email])
+
+    @override_settings(SCOTUS_ALERTS_ENABLED=True)
+    def test_merge_scotus_docket_does_not_alert_when_nothing_is_new(
+        self,
+    ) -> None:
+        """Re-merging an already-seen entry shouldn't notify subscribers --
+        only a newly created SCOTUSDocketEntry triggers the alert."""
+        existing = DocketFactory(
+            court=self.court, docket_number="24-202", source=Docket.SCRAPER
+        )
+        user = UserFactory()
+        DocketAlert.objects.create(docket=existing, user=user)
+
+        docket_entries = [
+            SCOTUSDocketEntryDataFactory(
+                description="Petition for a writ of certiorari filed.",
+                date_filed=datetime.date(2025, 6, 2),
+                document_number=None,
+                attachments=[],
+            )
+        ]
+        data = ScotusDocketDataFactory(
+            docket_number="24-202",
+            docket_entries=docket_entries,
+            parties=[],
+        )
+        merge_scotus_docket(data, download_file=False)
+        mail.outbox.clear()
+
+        # Re-merge the exact same entry -- it already exists.
+        merge_scotus_docket(data, download_file=False)
+        self.assertEqual(len(mail.outbox), 0)
+
+    @mock.patch("cl.corpus_importer.tasks.enqueue_docket_alert")
+    def test_merge_scotus_docket_skips_alerts_when_disabled(
+        self, mock_enqueue
+    ) -> None:
+        """With SCOTUS_ALERTS_ENABLED off (the default), a new entry
+        notifies nobody and doesn't even take the alert semaphore."""
+        existing = DocketFactory(
+            court=self.court, docket_number="24-203", source=Docket.SCRAPER
+        )
+        DocketAlert.objects.create(docket=existing, user=UserFactory())
+
+        data = ScotusDocketDataFactory(
+            docket_number="24-203",
+            docket_entries=[
+                SCOTUSDocketEntryDataFactory(
+                    date_filed=datetime.date(2025, 6, 2),
+                    document_number=None,
+                    attachments=[],
+                )
+            ],
+            parties=[],
+        )
+        merge_scotus_docket(data, download_file=False)
+
+        self.assertEqual(len(mail.outbox), 0)
+        mock_enqueue.assert_not_called()
+
     def test_merge_scotus_docket_source_compounds_recap(self) -> None:
         """Merging into a RECAP docket compounds with SCRAPER."""
         existing = DocketFactory(
@@ -574,42 +675,43 @@ class ScotusDocketMergeTest(TestCase):
         mock_get,
         mock_is_pdf,
     ) -> None:
-        """Confirm the SCOTUS QP PDF is downloaded and stored."""
-
-        docket = DocketFactory.create(court=self.court)
-        scotus_meta = ScotusDocketMetadata.objects.create(
-            docket=docket,
-            questions_presented_url="https://www.supremecourt.gov/qp.pdf",
-        )
-        self.assertFalse(scotus_meta.questions_presented_file)
-
+        """Confirm the SCOTUS QP PDF is downloaded and stored in its docket's
+        directory, named for the docket's filing date or as undated."""
         # Mock the response from requests.get
         mock_response = mock.Mock()
         mock_response.iter_content.return_value = [b"fake pdf content"]
         mock_response.raise_for_status.return_value = None
         mock_get.return_value.__enter__.return_value = mock_response
 
-        download_qp_scotus_pdf.delay(docket.id)
+        for date_filed, stamp in (
+            (datetime.date(2024, 7, 30), "2024-07-30"),
+            (None, "undated"),
+        ):
+            with self.subTest(stamp=stamp):
+                mock_get.reset_mock()
+                docket = DocketFactory.create(
+                    court=self.court, date_filed=date_filed
+                )
+                scotus_meta = ScotusDocketMetadata.objects.create(
+                    docket=docket,
+                    questions_presented_url="https://www.supremecourt.gov/qp.pdf",
+                )
+                self.assertFalse(scotus_meta.questions_presented_file)
 
-        mock_get.assert_called_once_with(
-            scotus_meta.questions_presented_url,
-            stream=True,
-            timeout=60,
-            headers={"User-Agent": "Free Law Project"},
-        )
+                download_qp_scotus_pdf.delay(docket.id)
 
-        scotus_meta.refresh_from_db()
-
-        # Confirm the file was stored
-        self.assertTrue(scotus_meta.questions_presented_file)
-        self.assertTrue(
-            scotus_meta.questions_presented_file.name.startswith(
-                f"recap/gov.uscourts.scotus.{docket.pk}/"
-            )
-        )
-        self.assertTrue(
-            scotus_meta.questions_presented_file.name.endswith(".qp.pdf")
-        )
+                mock_get.assert_called_once_with(
+                    scotus_meta.questions_presented_url,
+                    stream=True,
+                    timeout=60,
+                    headers={"User-Agent": COURT_REQUEST_USER_AGENT},
+                )
+                scotus_meta.refresh_from_db()
+                bucket = f"gov.uscourts.{self.court.pk}.{docket.pk}"
+                self.assertEqual(
+                    scotus_meta.questions_presented_file.name,
+                    f"recap/{bucket}/{bucket}.{stamp}.qp.pdf",
+                )
 
     def test_merge_scotus_docket_resolves_relative_qp_url(self) -> None:
         """Confirm relative questions_presented URLs (e.g.

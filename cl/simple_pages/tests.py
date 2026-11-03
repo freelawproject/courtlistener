@@ -4,9 +4,11 @@ from unittest.mock import MagicMock, patch
 
 from django.contrib.auth.models import User
 from django.http import HttpResponse
+from django.template import engines
 from django.template.loader import TemplateDoesNotExist, get_template
-from django.test import override_settings
-from django.urls import reverse
+from django.test import RequestFactory, override_settings
+from django.urls import resolve, reverse
+from django_cotton.compiler_regex import CottonCompiler
 from lxml.html import fromstring
 from waffle.testutils import override_flag
 
@@ -15,6 +17,23 @@ from cl.simple_pages.forms import ContactForm
 from cl.simple_pages.sitemap import SimpleSitemap
 from cl.tests.cases import SimpleTestCase, TestCase
 from cl.tests.utils import parse_csp
+
+
+class ChangePasswordWellKnownTests(SimpleTestCase):
+    """Ensure password managers can discover the password-change page."""
+
+    def test_change_password(self) -> None:
+        """The standard URL temporarily redirects to a real password page."""
+        response = self.client.get(reverse("well_known_change_password"))
+
+        self.assertRedirects(
+            response,
+            reverse("password_change"),
+            fetch_redirect_response=False,
+        )
+        self.assertEqual(
+            resolve(response["Location"]).url_name, "password_change"
+        )
 
 
 # Mock the hcaptcha thing so that we're sure it validates during tests
@@ -387,6 +406,8 @@ class V2PagesRegisterTest(PageLoadTestMixin, SimpleUserDataMixin, TestCase):
         ({"viewname": "help_home"}, "v2_help/index.html"),
         # Info pages
         ({"viewname": "components"}, "v2_components.html"),
+        # API pages
+        ({"viewname": "court_index"}, "v2_jurisdictions.html"),
     ]
 
     @staticmethod
@@ -424,6 +445,57 @@ class V2PagesRegisterTest(PageLoadTestMixin, SimpleUserDataMixin, TestCase):
                 self.assertTemplateUsed(
                     r, self._get_legacy_counterpart(v2_template) or v2_template
                 )
+
+
+@override_flag("use_new_design", True)
+@override_settings(WAFFLE_CACHE_PREFIX="test_new_base_view_count_waffle")
+class NewBaseViewCountTest(TestCase):
+    """new_base.html only wires view counting for decorated views.
+
+    The tracked side is covered on the docket page in
+    cl/opinion_page/tests.py; this checks the untracked side on a page
+    whose view has no track_view_counter.
+    """
+
+    async def test_untracked_page_sends_no_view_count(self) -> None:
+        """A v2 page whose view is not decorated carries no label, no endpoint
+        and no store, so the browser makes no request."""
+        r = await self.async_client.get(reverse("help_home"))
+        self.assertTemplateUsed(r, "new_base.html")
+        html = r.content.decode()
+        body = next(fromstring(html).iter("body"))
+        self.assertIsNone(body.get("data-view-count-label"))
+        self.assertIsNone(body.get("data-view-count-url"))
+        self.assertNotIn("view_count.js", html)
+
+
+@override_flag("use_new_design", True)
+@override_settings(WAFFLE_CACHE_PREFIX="test_new_base_recap_waffle")
+class NewBaseRecapDetectionTest(TestCase):
+    """new_base.html loads the RECAP extension detector and reflects its cookie.
+
+    The class on <html> is what the stylesheet keys on to hide RECAP pleas;
+    rendering it from the cookie keeps later page loads from flashing them.
+    """
+
+    async def test_detector_is_loaded_on_every_page(self) -> None:
+        """A v2 page requires the detector whether or not the cookie is set."""
+        r = await self.async_client.get(reverse("help_home"))
+        self.assertTemplateUsed(r, "new_base.html")
+        self.assertIn("recap_detection.js", r.content.decode())
+
+    async def test_html_class_follows_the_cookie(self) -> None:
+        """<html> carries recap-installed only when the cookie is present."""
+        r = await self.async_client.get(reverse("help_home"))
+        self.assertNotIn(
+            "recap-installed", fromstring(r.content.decode()).get("class", "")
+        )
+
+        self.async_client.cookies["recap_installed"] = "true"
+        r = await self.async_client.get(reverse("help_home"))
+        self.assertIn(
+            "recap-installed", fromstring(r.content.decode()).get("class", "")
+        )
 
 
 @patch("hcaptcha.fields.hCaptchaField.validate", return_value=True)
@@ -677,3 +749,29 @@ class ContentSecurityPolicyTest(TestCase):
         # A script left with an empty nonce would be refused by the browser,
         # and the assertion above would still pass on the other scripts.
         self.assertNotIn('nonce=""', html)
+
+
+class DialogComponentTest(SimpleTestCase):
+    """The c-dialog component renders a trigger only when given one."""
+
+    def render(self, source: str) -> str:
+        """Compiles a Cotton snippet and renders it."""
+        compiled = CottonCompiler().process(source)
+        template = engines["django"].from_string(compiled)
+        return template.render({"request": RequestFactory().get("/")})
+
+    def test_trigger_slot_renders_a_trigger(self) -> None:
+        """Trigger content renders the default trigger button."""
+        html = self.render(
+            '<c-dialog><c-slot name="button_content">Open</c-slot>'
+            '<c-slot name="panel">Body</c-slot></c-dialog>'
+        )
+        self.assertIn('aria-haspopup="dialog"', html)
+
+    def test_without_a_trigger_slot_no_trigger_is_rendered(self) -> None:
+        """A dialog opened by other means, such as an event listener, has no trigger button."""
+        html = self.render(
+            '<c-dialog><c-slot name="panel">Body</c-slot></c-dialog>'
+        )
+        self.assertNotIn('aria-haspopup="dialog"', html)
+        self.assertIn("Body", html)

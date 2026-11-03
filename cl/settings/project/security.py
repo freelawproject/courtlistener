@@ -37,6 +37,13 @@ if DEVELOPMENT:
     SESSION_COOKIE_SECURE = False
     CSRF_COOKIE_SECURE = False
     SESSION_COOKIE_DOMAIN = None
+    # Serving the dev server through an HTTPS proxy or tunnel: allow its
+    # origin(s) for CSRF checks and trust its scheme header.
+    CSRF_TRUSTED_ORIGINS: list[str] = env.list(
+        "CSRF_TRUSTED_ORIGINS", default=[]
+    )
+    if CSRF_TRUSTED_ORIGINS:
+        SECURE_PROXY_SSL_HEADER = ("HTTP_X_FORWARDED_PROTO", "https")
     if not TESTING:
         # Install django-debug-toolbar
         INSTALLED_APPS.append("debug_toolbar")

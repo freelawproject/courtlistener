@@ -2,13 +2,25 @@ from django.conf import settings
 from django.contrib import messages
 from django.contrib.auth.models import User
 from django.db import transaction
+from rest_framework.authtoken.models import Token
 
 from cl.alerts.models import AlertEvent, DocketAlertEvent
-from cl.api.models import WebhookHistoryEvent
-from cl.favorites.models import DocketTagEvent, NoteEvent, UserTagEvent
+from cl.api.models import (
+    APIThrottleEvent,
+    WebhookHistoryEvent,
+)
+from cl.favorites.models import (
+    DocketTagEvent,
+    NoteEvent,
+    PrayerEvent,
+    UserTagEvent,
+)
 from cl.lib.crypto import md5
+from cl.lib.decorators import tiered_cache
 from cl.lib.types import EmailType
 from cl.users.models import (
+    UserGroupsEvent,
+    UserPermissionsEvent,
     UserProfile,
     UserProfileBarMembershipEvent,
     UserProfileEvent,
@@ -99,31 +111,49 @@ def convert_to_stub_account(user: User) -> User:
 
 
 def delete_user_assets(user: User) -> None:
-    """Delete any associated data from a user account and profile"""
+    """Delete any associated data from a user account and profile
+
+    This removes the user's live assets (alerts, notes, prayers, API
+    credentials, etc.) and then purges the pghistory event rows that reference
+    them, so the deletion itself leaves no trace in the history tables. The
+    user and profile rows are not deleted here; `convert_to_stub_account`
+    blanks those afterwards.
+
+    :param user: The user whose assets should be deleted.
+    :return: None
+    """
 
     # Store user_tags before deleting the user-related objects.
     user_tags = user.user_tags.all()
     user_tags_ids = [user_tag.pk for user_tag in user_tags]
 
     user.alerts.all().delete()
-    user.webhooks.all().delete()
+    user.api_throttles.all().delete()
     user.docket_alerts.all().delete()
-    user.notes.all().delete()
-    user_tags.delete()
-    user.search_queries.all().delete()
     user.emails.all().delete()
+    user.events.all().delete()
+    user.notes.all().delete()
+    user.prayers.all().delete()
     user.scotus_maps.all().delete()
+    user.search_queries.all().delete()
+    Token.objects.filter(user=user).delete()
+    user_tags.delete()
+    user.webhooks.all().delete()
     # Donations are financial records we need to keep, so disable the
     # recurring ones rather than deleting them.
     user.monthly_donations.all().update(enabled=False)
 
     # After deleting user-related objects, nuke history objects related to the
     # user so that events generated due to delete() are also removed.
-    DocketAlertEvent.objects.filter(user_id=user.pk).delete()
     AlertEvent.objects.filter(user_id=user.pk).delete()
-    NoteEvent.objects.filter(user_id=user.pk).delete()
-    UserTagEvent.objects.filter(user_id=user.pk).delete()
+    APIThrottleEvent.objects.filter(user_id=user.pk).delete()
+    DocketAlertEvent.objects.filter(user_id=user.pk).delete()
     DocketTagEvent.objects.filter(tag__id__in=user_tags_ids).delete()
+    NoteEvent.objects.filter(user_id=user.pk).delete()
+    PrayerEvent.objects.filter(user_id=user.pk).delete()
+    UserGroupsEvent.objects.filter(user_id=user.pk).delete()
+    UserPermissionsEvent.objects.filter(user_id=user.pk).delete()
+    UserTagEvent.objects.filter(user_id=user.pk).delete()
     WebhookHistoryEvent.objects.filter(user_id=user.pk).delete()
 
 
@@ -267,6 +297,38 @@ emails: dict[str, EmailType] = {
         "We're always happy to hear from you.",
         "from_email": settings.DEFAULT_FROM_EMAIL,
     },
+    # Sent instead of creating a second account when somebody signs up with an
+    # address that already has one. The HTTP response never says the address
+    # is taken, so this email is the only place the address owner learns that.
+    "account_already_exists": {
+        "subject": "You already have an account on CourtListener.com",
+        "body": "Hello,\n\n"
+        ""
+        "Somebody — probably you — just tried to create a new CourtListener "
+        "account using this email address. An account with this address "
+        "already exists, so we did not create a second one.\n\n"
+        ""
+        "You do not need a new account. To get back into the one you already "
+        "have, sign in with this email address and your password:\n\n"
+        ""
+        "    https://www.courtlistener.com%s\n\n"
+        ""
+        "If you have forgotten your password, you can reset it here:\n\n"
+        ""
+        "    https://www.courtlistener.com%s\n\n"
+        ""
+        "If this was not you, you can ignore this email. No changes were made "
+        "to your account.\n\n"
+        ""
+        "Thanks for using our site,\n\n"
+        ""
+        "The Free Law Project Team\n\n"
+        "-------\n"
+        "For questions or comments, please visit our contact page, "
+        "https://www.courtlistener.com/contact/\n"
+        "We're always happy to hear from you.",
+        "from_email": settings.DEFAULT_FROM_EMAIL,
+    },
     "email_not_confirmed": {
         "subject": "Please confirm your account on %s",
         "body": "Hello, %s,\n\n"
@@ -368,3 +430,18 @@ message_dict = {
         "message": "Your password was changed successfully",
     },
 }
+
+
+@tiered_cache(memory_timeout=60, redis_timeout=60 * 5)
+def is_search_history_on_cached(user_pk: int) -> bool:
+    """Return whether the user wants their search queries saved.
+
+    Cached for five minutes, so changes may take that long to apply. Intended
+    for the API; website requests should read the profile directly.
+
+    :param user_pk: The primary key of the user.
+    :return: True if the user's search queries should be saved.
+    """
+    return UserProfile.objects.values_list(
+        "save_query_history", flat=True
+    ).get(user_id=user_pk)

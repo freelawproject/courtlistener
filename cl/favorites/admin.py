@@ -15,10 +15,7 @@ class NoteInline(admin.TabularInline):
     extra = 1
     raw_id_fields = (
         "user",
-        "cluster_id",
-        "audio_id",
-        "docket_id",
-        "recap_doc_id",
+        "content_type",
     )
 
 
@@ -33,14 +30,12 @@ class NoteAdmin(admin.ModelAdmin):
     list_display = (
         "id",
         "user",
-        "cluster_id",
+        "content_type",
+        "object_id",
     )
     raw_id_fields = (
         "user",
-        "cluster_id",
-        "audio_id",
-        "docket_id",
-        "recap_doc_id",
+        "content_type",
     )
 
 

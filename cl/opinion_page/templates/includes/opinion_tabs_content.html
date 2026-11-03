@@ -441,6 +441,11 @@
                           <div class="serif-text harvard">{{ sub_opinion.html_with_citations|safe }}</div>
                          {% elif sub_opinion.xml_harvard  %}
                               <div class="serif-text harvard">{{ sub_opinion.xml_harvard|safe }}</div>
+                        {# Scanned XML has the same shape as Harvard's, so it uses its styles #}
+                        {% elif sub_opinion.xml_scan and sub_opinion.html_with_citations %}
+                          <div class="serif-text harvard">{{ sub_opinion.html_with_citations|safe }}</div>
+                        {% elif sub_opinion.xml_scan %}
+                          <div class="serif-text harvard">{{ sub_opinion.xml_scan|safe }}</div>
                         {% elif sub_opinion.html_with_citations %}
                           {% if cluster.source == "C" %}
                         {# It's a PDF with no HTML enrichment#}

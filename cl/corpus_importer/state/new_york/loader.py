@@ -4,13 +4,12 @@ import logging
 import sqlite3
 from typing import Any
 
-from django.db.models import Model
 from juriscraper.state.docket import DocketEntryType, DocketType, PartyType
 
 from cl.corpus_importer.state.loader import JKentScrapeLoader, UnusableScrape
-from cl.corpus_importer.state.merger import Merger
 from cl.corpus_importer.state.new_york.mergers import NYCoADocketMerger
 from cl.corpus_importer.state.new_york.nycourts_gov import NYCoACase
+from cl.corpus_importer.state.new_york.storage import PRIVATE_PREFIX
 from cl.search.state.new_york.models import NYCoADocument
 
 logger = logging.getLogger(__name__)
@@ -301,15 +300,16 @@ ORDER BY docket.docket_number
 """
 
 
-class NYCoACourtPassLoader(JKentScrapeLoader[NYCoACase]):
+class NYCoACourtPassLoader(JKentScrapeLoader[NYCoACase, NYCoADocketMerger]):
     """Loads a Court-PASS run into CourtListener."""
 
     name = "nycoa"
     query = QUERY
     payload_column = "payload"
     scrape_model = NYCoACase
-    merger: type[Merger[NYCoACase, None, Model]] = NYCoADocketMerger
+    merger = NYCoADocketMerger
     document_model = NYCoADocument
+    private_prefix = PRIVATE_PREFIX
 
     @staticmethod
     def _refuse_unread_file_list(

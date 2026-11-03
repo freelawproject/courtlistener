@@ -675,6 +675,13 @@ class TestComponentTags(SimpleTestCase):
         with self.assertRaises(TemplateSyntaxError):
             require_script(self.context, "js/foo.js", defer=False)
 
+    def test_requiring_after_render_raises(self) -> None:
+        """A script required after the registry printed would be dropped, so it raises."""
+        require_script(self.context, "js/foo.js")
+        self._render()
+        with self.assertRaises(TemplateSyntaxError):
+            require_script(self.context, "js/bar.js")
+
     def test_scripts_are_deduplicated(self) -> None:
         """Repeated requires render a single script tag."""
         require_script(self.context, "js/foo.js")

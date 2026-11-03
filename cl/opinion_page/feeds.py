@@ -7,6 +7,7 @@ from django.utils.feedgenerator import Atom1Feed
 from django.utils.safestring import SafeText, mark_safe
 
 from cl.lib.date_time import midnight_pt
+from cl.opinion_page.docket_entry_sources import SourceDocketEntry
 from cl.opinion_page.utils import make_docket_title
 from cl.search.models import Docket, DocketEntry, SCOTUSDocketEntry
 
@@ -44,7 +45,7 @@ class DocketFeed(Feed):
 
     def items(
         self, obj: Docket
-    ) -> QuerySet[DocketEntry] | QuerySet[SCOTUSDocketEntry]:
+    )  -> QuerySet[SourceDocketEntry]:
         """Return the docket's 30 most recent dated entries for the feed."""
         source = obj.get_entry_source()
         return (
@@ -58,7 +59,7 @@ class DocketFeed(Feed):
             .order_by(*source.order_by_desc)[:30]
         )
 
-    def item_title(self, item: DocketEntry | SCOTUSDocketEntry) -> SafeText:
+    def item_title(self, item: SourceDocketEntry) -> SafeText:
         docket_title = make_docket_title(item.docket)
         entry_number = item.entry_number
         if entry_number:
@@ -67,33 +68,36 @@ class DocketFeed(Feed):
             preface = f"Minute entry from {item.date_filed}"
         return mark_safe(f"{preface} in {docket_title}")
 
-    def item_description(self, item: DocketEntry | SCOTUSDocketEntry) -> str:
+    def item_description(self, item: SourceDocketEntry) -> str:
         try:
             # main_docs comes from the source's main_docs_prefetch()
+            # to_attr, which pyrefly can't see.
+            # pyrefly: ignore[missing-attribute]
             main_doc = item.main_docs[0]
         except IndexError:
             # No doc associated with entry
             return item.description
         return item.description or main_doc.description
 
-    def item_link(self, item: DocketEntry | SCOTUSDocketEntry) -> str:
+    def item_link(self, item: SourceDocketEntry) -> str:
         if item.entry_number:
             anchor = f"entry-{item.entry_number}"
         else:
             anchor = f"minute-entry-{item.pk}"
         return f"{item.docket.get_absolute_url()}?order_by=desc#{anchor}"
 
-    def item_pubdate(self, item: DocketEntry | SCOTUSDocketEntry) -> datetime:
+    def item_pubdate(self, item: SourceDocketEntry) -> datetime:
         return midnight_pt(item.date_filed)
 
     def item_enclosure_url(
-        self, item: DocketEntry | SCOTUSDocketEntry
+        self, item: SourceDocketEntry
     ) -> str | None:
         if not item.entry_number:
             return None
 
         # If we don't have a representative document, abort.
         try:
+            # pyrefly: ignore[missing-attribute]
             main_doc = item.main_docs[0]
         except IndexError:
             # No docs with entry

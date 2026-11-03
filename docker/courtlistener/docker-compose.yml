@@ -13,7 +13,7 @@ services:
 
   # Database (postgresql)
   # During tests this will be automatically migrated for you, but in regular
-  # use, you will have ot migrate it yourself. See DEVELOPING.md
+  # use, you will have to migrate it yourself. See DEVELOPING.md
   cl-postgresql:
     container_name: cl-postgres
     build:

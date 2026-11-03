@@ -1,8 +1,10 @@
 import json
+from datetime import timedelta
 from http import HTTPStatus
 from pathlib import Path
 from unittest import mock
 
+import httpx
 from asgiref.sync import async_to_sync, sync_to_async
 from django.conf import settings
 from django.contrib.auth.hashers import make_password
@@ -35,6 +37,7 @@ from cl.recap.models import (
     ProcessingQueue,
 )
 from cl.recap.tasks import (
+    download_pacer_pdf_and_save_to_pq,
     get_and_copy_recap_attachment_docs,
     mark_pq_successful,
     set_rd_sealed_status,
@@ -1354,8 +1357,8 @@ class RecapEmailDocketAlerts(TestCase, SearchAlertsAssertions):
 
     @mock.patch(
         "cl.recap.tasks.download_pdf_by_magic_number",
-        side_effect=lambda z, x, c, v, b, d, e, a: (
-            MockResponse(200, b""),
+        return_value=(
+            httpx.Response(200, content=b"Hello World"),
             "OK",
         ),
     )
@@ -1364,9 +1367,9 @@ class RecapEmailDocketAlerts(TestCase, SearchAlertsAssertions):
         side_effect=lambda *args, **kwargs: MockResponse(200, mock_raw=True),
     )
     @mock.patch(
-        "cl.recap.tasks.requests.get",
-        side_effect=lambda *args, **kwargs: MockResponse(
-            200, mock_bucket_open("nyed_123019137279.html", "r", True)
+        "cl.recap.tasks.httpx.AsyncClient.get",
+        return_value=httpx.Response(
+            200, content=mock_bucket_open("nyed_123019137279.html", "r", True)
         ),
     )
     async def test_new_recap_email_with_attachments(
@@ -1937,15 +1940,15 @@ class RecapEmailDocketAlerts(TestCase, SearchAlertsAssertions):
     )
     @mock.patch(
         "cl.recap.tasks.download_pdf_by_magic_number",
-        side_effect=lambda z, x, c, v, b, d, e, a: (
-            MockResponse(200, b"Hello World"),
+        return_value=(
+            httpx.Response(200, content=b"Hello World"),
             "OK",
         ),
     )
     @mock.patch(
-        "cl.recap.tasks.requests.get",
-        side_effect=lambda *args, **kwargs: MockResponse(
-            200, mock_bucket_open("jpml_85001321035.html", "r", True)
+        "cl.recap.tasks.httpx.AsyncClient.get",
+        return_value=httpx.Response(
+            200, content=mock_bucket_open("jpml_85001321035.html", "r", True)
         ),
     )
     @mock.patch(
@@ -2249,9 +2252,9 @@ class RecapEmailDocketAlerts(TestCase, SearchAlertsAssertions):
         side_effect=lambda *args, **kwargs: MockResponse(200, mock_raw=True),
     )
     @mock.patch(
-        "cl.recap.tasks.requests.get",
-        side_effect=lambda *args, **kwargs: MockResponse(
-            200, mock_bucket_open("nyed_123019137279.html", "r", True)
+        "cl.recap.tasks.httpx.AsyncClient.get",
+        return_value=httpx.Response(
+            200, content=mock_bucket_open("nyed_123019137279.html", "r", True)
         ),
     )
     async def test_mark_as_sealed_nef_documents_not_available_from_magic_link(
@@ -3390,10 +3393,10 @@ class GetDocumentNumberForAppellateDocuments(TestCase):
 
     @mock.patch(
         "cl.recap.tasks.download_pdf_by_magic_number",
-        side_effect=lambda z, x, c, v, b, d, e, a: (
-            MockResponse(
+        return_value=(
+            httpx.Response(
                 200,
-                mock_bucket_open("nda_document.pdf", "rb", True),
+                content=mock_bucket_open("nda_document.pdf", "rb", True),
             ),
             "OK",
         ),
@@ -3428,10 +3431,10 @@ class GetDocumentNumberForAppellateDocuments(TestCase):
 
     @mock.patch(
         "cl.recap.tasks.download_pdf_by_magic_number",
-        side_effect=lambda z, x, c, v, b, d, e, a: (
-            MockResponse(
+        return_value=(
+            httpx.Response(
                 200,
-                mock_bucket_open(
+                content=mock_bucket_open(
                     "gov.uscourts.ca8.17-2543.00803263743.0.pdf", "rb", True
                 ),
             ),
@@ -3475,10 +3478,10 @@ class GetDocumentNumberForAppellateDocuments(TestCase):
 
     @mock.patch(
         "cl.recap.tasks.download_pdf_by_magic_number",
-        side_effect=lambda z, x, c, v, b, d, e, a: (
-            MockResponse(
+        return_value=(
+            httpx.Response(
                 200,
-                mock_bucket_open(
+                content=mock_bucket_open(
                     "gov.uscourts.ca8.17-2543.00803263743.0.pdf", "rb", True
                 ),
             ),
@@ -3521,8 +3524,8 @@ class GetDocumentNumberForAppellateDocuments(TestCase):
 
     @mock.patch(
         "cl.recap.tasks.download_pdf_by_magic_number",
-        side_effect=lambda z, x, c, v, b, d, e, a: (
-            MockResponse(200, b""),
+        return_value=(
+            httpx.Response(200, content=b""),
             "OK",
         ),
     )
@@ -3560,8 +3563,8 @@ class GetDocumentNumberForAppellateDocuments(TestCase):
 
     @mock.patch(
         "cl.recap.tasks.download_pdf_by_magic_number",
-        side_effect=lambda z, x, c, v, b, d, e, a: (
-            MockResponse(200, b""),
+        return_value=(
+            httpx.Response(200, content=b""),
             "OK",
         ),
     )
@@ -3610,7 +3613,7 @@ class GetDocumentNumberForAppellateDocuments(TestCase):
 
     @mock.patch(
         "cl.recap.tasks.download_pdf_by_magic_number",
-        side_effect=lambda z, x, c, v, b, d, e, a: (
+        return_value=(
             None,
             "Document not available from magic link.",
         ),
@@ -3784,13 +3787,13 @@ class GetDocumentNumberForAppellateDocuments(TestCase):
         )
 
 
-def mock_method_set_rd_sealed_status(
+async def mock_method_set_rd_sealed_status(
     rd: RECAPDocument, magic_number: str | None, potentially_sealed: bool
 ) -> None:
     if rd.document_type == RECAPDocument.PACER_DOCUMENT:
-        set_rd_sealed_status(rd, magic_number, potentially_sealed=True)
+        await set_rd_sealed_status(rd, magic_number, potentially_sealed=True)
         return
-    return set_rd_sealed_status(rd, magic_number, potentially_sealed)
+    return await set_rd_sealed_status(rd, magic_number, potentially_sealed)
 
 
 @mock.patch("cl.recap.tasks.enqueue_docket_alert", return_value=True)
@@ -3880,14 +3883,14 @@ class RecapEmailContentReplication(TestCase):
     )
     @mock.patch(
         "cl.recap.tasks.download_pdf_by_magic_number",
-        side_effect=lambda z, x, c, v, b, d, e, a: (
-            MockResponse(200, b"Hello World"),
+        return_value=(
+            httpx.Response(200, content=b"Hello World"),
             "OK",
         ),
     )
     @mock.patch(
-        "cl.recap.tasks.requests.get",
-        side_effect=lambda *args, **kwargs: MockResponse(200, b"Att content."),
+        "cl.recap.tasks.httpx.AsyncClient.get",
+        return_value=httpx.Response(200, content=b"Att content."),
     )
     async def test_nef_subdocket_replication_no_att(
         self,
@@ -4026,14 +4029,14 @@ class RecapEmailContentReplication(TestCase):
     )
     @mock.patch(
         "cl.recap.tasks.download_pdf_by_magic_number",
-        side_effect=lambda z, x, c, v, b, d, e, a: (
-            MockResponse(200, b"Hello World"),
+        return_value=(
+            httpx.Response(200, content=b"Hello World"),
             "OK",
         ),
     )
     @mock.patch(
-        "cl.recap.tasks.requests.get",
-        side_effect=lambda *args, **kwargs: MockResponse(200, b"Att content."),
+        "cl.recap.tasks.httpx.AsyncClient.get",
+        return_value=httpx.Response(200, content=b"Att content."),
     )
     async def test_source_field_set_for_email_and_replication_pqs(
         self,
@@ -4105,14 +4108,14 @@ class RecapEmailContentReplication(TestCase):
     )
     @mock.patch(
         "cl.recap.tasks.download_pdf_by_magic_number",
-        side_effect=lambda z, x, c, v, b, d, e, a: (
-            MockResponse(200, b"Hello World"),
+        return_value=(
+            httpx.Response(200, content=b"Hello World"),
             "OK",
         ),
     )
     @mock.patch(
-        "cl.recap.tasks.requests.get",
-        side_effect=lambda *args, **kwargs: MockResponse(200, b"Att content."),
+        "cl.recap.tasks.httpx.AsyncClient.get",
+        return_value=httpx.Response(200, content=b"Att content."),
     )
     async def test_multi_nef_subdocket_replication(
         self,
@@ -4314,14 +4317,14 @@ class RecapEmailContentReplication(TestCase):
     )
     @mock.patch(
         "cl.recap.tasks.download_pdf_by_magic_number",
-        side_effect=lambda z, x, c, v, b, d, e, a: (
-            MockResponse(200, b"Hello World"),
+        return_value=(
+            httpx.Response(200, content=b"Hello World"),
             "OK",
         ),
     )
     @mock.patch(
-        "cl.recap.tasks.requests.get",
-        side_effect=lambda *args, **kwargs: MockResponse(200, b"Att content."),
+        "cl.recap.tasks.httpx.AsyncClient.get",
+        return_value=httpx.Response(200, content=b"Att content."),
     )
     async def test_avoid_triggering_replication_for_minute_entries(
         self,
@@ -4468,8 +4471,8 @@ class RecapEmailContentReplication(TestCase):
 
     @mock.patch(
         "cl.recap.tasks.download_pdf_by_magic_number",
-        side_effect=lambda z, x, c, v, b, d, e, a: (
-            MockResponse(200, b"Hello World"),
+        return_value=(
+            httpx.Response(200, content=b"Hello World"),
             "OK",
         ),
     )
@@ -4479,7 +4482,7 @@ class RecapEmailContentReplication(TestCase):
     )
     @mock.patch(
         "cl.recap.tasks.set_rd_sealed_status",
-        side_effect=mock_method_set_rd_sealed_status,
+        wraps=mock_method_set_rd_sealed_status,
     )
     async def test_replication_sealed_document_with_no_sealed_attachments(
         self,
@@ -4725,14 +4728,14 @@ class RecapEmailContentReplication(TestCase):
     )
     @mock.patch(
         "cl.recap.tasks.download_pdf_by_magic_number",
-        side_effect=lambda z, x, c, v, b, d, e, a: (
-            MockResponse(200, b"Hello World"),
+        return_value=(
+            httpx.Response(200, content=b"Hello World"),
             "OK",
         ),
     )
     @mock.patch(
-        "cl.recap.tasks.requests.get",
-        side_effect=lambda *args, **kwargs: MockResponse(200, b"Att content."),
+        "cl.recap.tasks.httpx.AsyncClient.get",
+        return_value=httpx.Response(200, content=b"Att content."),
     )
     async def test_recap_email_avoid_replication_on_pdf_available(
         self,
@@ -4820,4 +4823,145 @@ class RecapEmailContentReplication(TestCase):
             await all_pqs_created.acount(),
             1,
             msg="Wrong number of ProcessingQueues.",
+        )
+
+
+class DownloadPacerPdfAndSaveToPQTest(TestCase):
+    """Tests for how download_pacer_pdf_and_save_to_pq reuses PQ rows when
+    several notifications for the same document are processed."""
+
+    @classmethod
+    def setUpTestData(cls):
+        cls.court = CourtFactory(id="dcd", jurisdiction="FD")
+        cls.user = User.objects.get(username="recap-email")
+
+    def setUp(self) -> None:
+        self.cutoff = now() - timedelta(minutes=1)
+
+    def _download(self, magic_number: str | None) -> ProcessingQueue:
+        """Run download_pacer_pdf_and_save_to_pq for the test document."""
+        pq = download_pacer_pdf_and_save_to_pq(
+            self.court.pk,
+            SessionData(cookies={}),
+            self.cutoff,
+            magic_number,
+            "291053",
+            "045012335794",
+            self.user.pk,
+            False,
+        )
+        if pq.filepath_local:
+            self.addCleanup(pq.filepath_local.delete, save=False)
+        return pq
+
+    @mock.patch("cl.recap.tasks.download_pdf_by_magic_number")
+    def test_magic_number_retries_pq_failed_without_one(
+        self, mock_download
+    ) -> None:
+        """A notification with a magic number must download into a PQ that
+        failed because another notification had no magic number (#7940).
+        Otherwise the failed PQ plus the magic number marks it as sealed.
+        """
+        mock_download.return_value = (MockResponse(200, b"%PDF-1.4"), "")
+
+        pq_no_magic = self._download(None)
+        self.assertEqual(pq_no_magic.status, PROCESSING_STATUS.FAILED)
+        mock_download.assert_not_called()
+
+        pq_magic = self._download("37784612")
+        mock_download.assert_called_once()
+        self.assertEqual(pq_magic.pk, pq_no_magic.pk)
+        self.assertNotEqual(pq_magic.status, PROCESSING_STATUS.FAILED)
+        self.assertEqual(pq_magic.error_message, "")
+        self.assertTrue(pq_magic.filepath_local)
+
+    @mock.patch(
+        "cl.recap.tasks.download_pdf_by_magic_number",
+        return_value=(None, "Document not available from magic link."),
+    )
+    def test_failed_magic_download_keeps_pq_failed(
+        self, mock_download
+    ) -> None:
+        """If the retried download also fails, the PQ stays failed with the
+        new error so the document can still be treated as sealed."""
+        self._download(None)
+        pq = self._download("37784612")
+
+        mock_download.assert_called_once()
+        self.assertEqual(pq.status, PROCESSING_STATUS.FAILED)
+        self.assertEqual(
+            pq.error_message, "Document not available from magic link."
+        )
+
+    @mock.patch(
+        "cl.recap.tasks.download_pdf_by_magic_number",
+        # The free look was already used by the first attempt.
+        return_value=(None, "Document not available from magic link."),
+    )
+    def test_retry_prefers_pq_with_pdf_over_failed_pq(
+        self, mock_download
+    ) -> None:
+        """A retried task must reuse its own PQ that holds the PDF, not an
+        older failed one.
+
+        Two notifications processed at once can each create a PQ: one fails
+        without a magic number, the other stores the PDF. If the second task
+        is retried before its RD save commits, picking the failed PQ would
+        retry a free look that's already used up and mark the document as
+        sealed.
+        """
+        failed_pq = ProcessingQueue.objects.create(
+            uploader=self.user,
+            pacer_doc_id="045012335794",
+            pacer_case_id="291053",
+            court=self.court,
+            upload_type=UPLOAD_TYPE.PDF,
+            source=PROCESSING_QUEUE_SOURCE.EMAIL,
+            status=PROCESSING_STATUS.FAILED,
+            error_message="No magic number available to download the document.",
+        )
+        pq_with_pdf = ProcessingQueue.objects.create(
+            uploader=self.user,
+            pacer_doc_id="045012335794",
+            pacer_case_id="291053",
+            court=self.court,
+            upload_type=UPLOAD_TYPE.PDF,
+            source=PROCESSING_QUEUE_SOURCE.EMAIL,
+        )
+        pq_with_pdf.filepath_local.save(
+            "test.pdf", ContentFile(b"%PDF-1.4"), save=True
+        )
+        self.addCleanup(pq_with_pdf.filepath_local.delete, save=False)
+        self.assertLess(failed_pq.pk, pq_with_pdf.pk)
+
+        pq = self._download("37784612")
+
+        self.assertEqual(pq.pk, pq_with_pdf.pk)
+        mock_download.assert_not_called()
+        failed_pq.refresh_from_db()
+        self.assertEqual(failed_pq.status, PROCESSING_STATUS.FAILED)
+
+    def test_duplicate_pqs_reuse_oldest(self) -> None:
+        """Concurrent notifications can each create a PQ row. Lookups must
+        reuse the oldest one instead of raising MultipleObjectsReturned."""
+        pqs = [
+            ProcessingQueue.objects.create(
+                uploader=self.user,
+                pacer_doc_id="045012335794",
+                pacer_case_id="291053",
+                court=self.court,
+                upload_type=UPLOAD_TYPE.PDF,
+                source=PROCESSING_QUEUE_SOURCE.EMAIL,
+            )
+            for _ in range(2)
+        ]
+
+        pq = self._download(None)
+
+        self.assertEqual(pq.pk, min(p.pk for p in pqs))
+        self.assertEqual(
+            ProcessingQueue.objects.filter(
+                pacer_doc_id="045012335794"
+            ).count(),
+            2,
         )

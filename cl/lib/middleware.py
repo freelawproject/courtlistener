@@ -1,6 +1,8 @@
 from collections.abc import Awaitable, Callable
+from inspect import iscoroutinefunction
+from typing import cast
 
-from asgiref.sync import iscoroutinefunction, markcoroutinefunction
+from asgiref.sync import markcoroutinefunction
 from django.http import HttpRequest, HttpResponseBase
 from django.template import TemplateDoesNotExist
 from django.template.loader import get_template
@@ -8,6 +10,10 @@ from django.template.response import TemplateResponse
 from waffle import flag_is_active
 
 from cl.search.forms import CorpusSearchForm
+
+# Templates a view returns on their own (htmx partials) live under this
+# prefix. .github/scripts/frontend_checks.py mirrors it in is_v2_partial.
+V2_PARTIALS_PREFIX = "v2_includes/"
 
 
 class RobotsHeaderMiddleware:
@@ -27,9 +33,16 @@ class RobotsHeaderMiddleware:
     sync_capable = True
     async_capable = True
 
-    def __init__(self, get_response: Callable):
-        self.get_response = get_response
-        self.async_mode = iscoroutinefunction(self.get_response)
+    def __init__(
+        self,
+        get_response: Callable[
+            [HttpRequest], HttpResponseBase | Awaitable[HttpResponseBase]
+        ],
+    ):
+        self.get_response: Callable[
+            [HttpRequest], HttpResponseBase | Awaitable[HttpResponseBase]
+        ] = get_response
+        self.async_mode: bool = iscoroutinefunction(self.get_response)
         if self.async_mode:
             markcoroutinefunction(self)
 
@@ -42,7 +55,9 @@ class RobotsHeaderMiddleware:
         return response
 
     async def __acall__(self, request: HttpRequest) -> HttpResponseBase:
-        response = await self.get_response(request)
+        response = await cast(
+            Awaitable[HttpResponseBase], self.get_response(request)
+        )
         return response
 
     def process_template_response(
@@ -76,13 +91,24 @@ class IncrementalNewTemplateMiddleware:
     v2 templates that do not have a legacy counterpart are assumed to be
     available for **everyone**.
 
+    htmx requests are swapped by the "X-CL-Design" header instead of the
+    flag. `new_base.html` sends it with value "v2" on every htmx request
+    from a v2 page, so a partial always matches the page that asked for it.
+    A flagged user on a page that is still legacy gets the legacy partial.
+    Endpoints called by both stacks should return the legacy template name
+    and let this middleware swap it.
+
     TODO: Remove this middleware once new design is completely rolled out.
     """
 
-    def __init__(self, get_response):
-        self.get_response = get_response
+    def __init__(
+        self, get_response: Callable[[HttpRequest], HttpResponseBase]
+    ):
+        self.get_response: Callable[[HttpRequest], HttpResponseBase] = (
+            get_response
+        )
 
-    def __call__(self, request):
+    def __call__(self, request: HttpRequest) -> HttpResponseBase:
         response = self.get_response(request)
         return response
 
@@ -95,7 +121,9 @@ class IncrementalNewTemplateMiddleware:
             return False
         return True
 
-    def process_template_response(self, request, response):
+    def process_template_response(
+        self, request: HttpRequest, response: HttpResponseBase
+    ) -> HttpResponseBase | TemplateResponse:
         if not isinstance(response, TemplateResponse) or response.is_rendered:
             return response
 
@@ -118,10 +146,16 @@ class IncrementalNewTemplateMiddleware:
 
         # Checking flag_is_active hits the db, so be sure to short-circuit for cheaper
         # evaluations first
-        if self.template_exists(old_template) and not flag_is_active(
-            request, "use_new_design"
-        ):
-            return response
+        if self.template_exists(old_template):
+            if request.headers.get("Hx-Request"):
+                # A partial must match the page already in the browser, and
+                # only v2 pages mark their htmx requests (see new_base.html).
+                expects_v2 = request.headers.get("X-CL-Design") == "v2"
+            else:
+                expects_v2 = flag_is_active(request, "use_new_design")
+
+            if not expects_v2:
+                return response
 
         new_template_name = f"v2_{old_template}"
 
@@ -129,6 +163,13 @@ class IncrementalNewTemplateMiddleware:
             return response
 
         response.template_name = new_template_name
-        response.context_data["search_form"] = CorpusSearchForm()
+
+        # Partials never render the header, so the search form it needs would
+        # only be wasted work for them. The name decides, not the HX-Request
+        # header: the server knows what it renders, and a boosted full-page
+        # request must still get the form.
+        if not new_template_name.startswith(V2_PARTIALS_PREFIX):
+            # pyrefly:ignore[unsupported-operation] False positive based on Django docs
+            response.context_data["search_form"] = CorpusSearchForm()
 
         return response

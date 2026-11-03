@@ -1,17 +1,21 @@
+from typing import Any
+from xml.sax.xmlreader import AttributesImpl
+
 from django.utils.feedgenerator import Rss201rev2Feed
+from django.utils.xmlutils import SimplerXMLGenerator
 
 
 # For more details on the Podcast "Spec" see:
 # https://help.apple.com/itc/podcasts_connect/#/itcb54353390
 class iTunesPodcastsFeedGenerator(Rss201rev2Feed):
-    def rss_attributes(self):
+    def rss_attributes(self) -> dict[str, str]:
         return {
-            "version": self._version,
+            **super().rss_attributes(),
             "xmlns:atom": "https://www.w3.org/2005/Atom",
             "xmlns:itunes": "https://www.itunes.com/dtds/podcast-1.0.dtd",
         }
 
-    def add_root_elements(self, handler):
+    def add_root_elements(self, handler: SimplerXMLGenerator) -> None:
         super().add_root_elements(handler)
         handler.addQuickElement("itunes:subtitle", self.feed["subtitle"])
         handler.addQuickElement("itunes:author", self.feed["author_name"])
@@ -19,7 +23,7 @@ class iTunesPodcastsFeedGenerator(Rss201rev2Feed):
         handler.addQuickElement(
             "itunes:explicit", self.feed["iTunes_explicit"]
         )
-        handler.startElement("itunes:owner", {})
+        handler.startElement("itunes:owner", AttributesImpl({}))
         handler.addQuickElement("itunes:name", self.feed["iTunes_name"])
         handler.addQuickElement("itunes:email", self.feed["iTunes_email"])
         handler.endElement("itunes:owner")
@@ -30,7 +34,9 @@ class iTunesPodcastsFeedGenerator(Rss201rev2Feed):
             "itunes:category", None, {"text": "Government & Organizations"}
         )
 
-    def add_item_elements(self, handler, item):
+    def add_item_elements(
+        self, handler: SimplerXMLGenerator, item: dict[str, Any]
+    ) -> None:
         super().add_item_elements(handler, item)
         handler.addQuickElement("itunes:duration", item["duration"])
         handler.addQuickElement("itunes:explicit", item["explicit"])

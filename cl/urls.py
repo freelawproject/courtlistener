@@ -75,6 +75,11 @@ urlpatterns = [
     path("", include("cl.sitemaps_infinite.urls")),
     # Redirects
     path(
+        ".well-known/change-password",
+        RedirectView.as_view(pattern_name="password_change"),
+        name="well_known_change_password",
+    ),
+    path(
         "donate/",
         RedirectView.as_view(url="https://free.law/donate/"),
     ),
