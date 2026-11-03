@@ -162,14 +162,14 @@ logger = logging.getLogger(__name__)
 cnt = CaseNameTweaker()
 
 
-def retrieve_email_from_queue(message_id: str, bucket: S3Storage) -> bytes:
+def retrieve_email_from_queue(message_id: str, bucket: S3Storage) -> str:
     """
     Attempt to retrieve and decode an email from an S3 bucket.
 
     :param message_id: The ID of the message to retrieve.
     :param bucket: The S3 bucket to retrieve the email from.
 
-    :return: The decoded email as a bytes object.
+    :return: The decoded email
 
     :raise FileNotFoundError:
     """
