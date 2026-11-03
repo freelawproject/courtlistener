@@ -59,12 +59,26 @@ from cl.people_db.factories import (
 from cl.search.admin import RECAPDocumentAdmin
 from cl.search.api_serializers import (
     DocketESResultSerializer,
+    OAESResultSerializer,
+    OpinionClusterESResultSerializer,
+    PersonESResultSerializer,
     RECAPDocumentESResultSerializer,
     RECAPESResultSerializer,
 )
 from cl.search.api_utils import CursorESList
-from cl.search.api_views import SearchV4ViewSet
-from cl.search.documents import ES_CHILD_ID, DocketDocument, ESRECAPDocument
+from cl.search.api_views import (
+    SearchV4ViewSet,
+    _ESResultSerializer,
+    _ESResultSerializers,
+)
+from cl.search.documents import (
+    ES_CHILD_ID,
+    AudioDocument,
+    DocketDocument,
+    ESRECAPDocument,
+    OpinionClusterDocument,
+    PersonDocument,
+)
 from cl.search.factories import (
     BankruptcyInformationFactory,
     CourtFactory,
@@ -96,6 +110,7 @@ from cl.search.tasks import (
 )
 from cl.search.types import EventTable
 from cl.tests.cases import (
+    AuthenticatedClientMixin,
     CountESTasksTestCase,
     ESIndexTestCase,
     TestCase,
@@ -3362,7 +3377,7 @@ class RECAPSearchTest(RECAPSearchTestCase, ESIndexTestCase, TestCase):
 
 
 class RECAPSearchDecayRelevancyTest(
-    ESIndexTestCase, V4SearchAPIAssertions, TestCase
+    AuthenticatedClientMixin, ESIndexTestCase, V4SearchAPIAssertions, TestCase
 ):
     """
     RECAP Search Decay Relevancy  Tests
@@ -4396,7 +4411,11 @@ class RECAPESResultSerializerTest(RECAPESResultSerializer):
 
 
 class RECAPSearchAPIV4Test(
-    RECAPSearchAPICommonTests, ESIndexTestCase, TestCase, V4SearchAPIAssertions
+    AuthenticatedClientMixin,
+    RECAPSearchAPICommonTests,
+    ESIndexTestCase,
+    TestCase,
+    V4SearchAPIAssertions,
 ):
     """
     RECAP Search API V4 Tests
@@ -4842,27 +4861,33 @@ class RECAPSearchAPIV4Test(
     @override_settings(SEARCH_API_PAGE_SIZE=1)
     @mock.patch.object(
         SearchV4ViewSet,
-        "supported_search_types",
-        {
-            SEARCH_TYPES.RECAP: {
-                "document_class": SearchV4ViewSet.supported_search_types[
-                    SEARCH_TYPES.RECAP
-                ]["document_class"],
-                "serializer_class": RECAPESResultSerializerTest,
-            },
-            SEARCH_TYPES.DOCKETS: {
-                "document_class": SearchV4ViewSet.supported_search_types[
-                    SEARCH_TYPES.DOCKETS
-                ]["document_class"],
-                "serializer_class": DocketESResultSerializerTest,
-            },
-            SEARCH_TYPES.RECAP_DOCUMENT: {
-                "document_class": SearchV4ViewSet.supported_search_types[
-                    SEARCH_TYPES.RECAP_DOCUMENT
-                ]["document_class"],
-                "serializer_class": RECAPDocumentESResultSerializerTest,
-            },
-        },
+        "search_serializers",
+        _ESResultSerializers(
+            recap=_ESResultSerializer(
+                document=DocketDocument,
+                serializer=RECAPESResultSerializerTest,
+            ),
+            docket=_ESResultSerializer(
+                document=DocketDocument,
+                serializer=DocketESResultSerializerTest,
+            ),
+            recap_document=_ESResultSerializer(
+                document=DocketDocument,
+                serializer=RECAPDocumentESResultSerializerTest,
+            ),
+            opinion=_ESResultSerializer(
+                document=OpinionClusterDocument,
+                serializer=OpinionClusterESResultSerializer,
+            ),
+            person=_ESResultSerializer(
+                document=PersonDocument,
+                serializer=PersonESResultSerializer,
+            ),
+            oral_argument=_ESResultSerializer(
+                document=AudioDocument,
+                serializer=OAESResultSerializer,
+            ),
+        ),
     )
     @mock.patch(
         "cl.search.api_utils.set_results_highlights",
@@ -4985,27 +5010,33 @@ class RECAPSearchAPIV4Test(
     @override_settings(SEARCH_API_PAGE_SIZE=1)
     @mock.patch.object(
         SearchV4ViewSet,
-        "supported_search_types",
-        {
-            SEARCH_TYPES.RECAP: {
-                "document_class": SearchV4ViewSet.supported_search_types[
-                    SEARCH_TYPES.RECAP
-                ]["document_class"],
-                "serializer_class": RECAPESResultSerializerTest,
-            },
-            SEARCH_TYPES.DOCKETS: {
-                "document_class": SearchV4ViewSet.supported_search_types[
-                    SEARCH_TYPES.DOCKETS
-                ]["document_class"],
-                "serializer_class": DocketESResultSerializerTest,
-            },
-            SEARCH_TYPES.RECAP_DOCUMENT: {
-                "document_class": SearchV4ViewSet.supported_search_types[
-                    SEARCH_TYPES.RECAP_DOCUMENT
-                ]["document_class"],
-                "serializer_class": RECAPDocumentESResultSerializerTest,
-            },
-        },
+        "search_serializers",
+        _ESResultSerializers(
+            recap=_ESResultSerializer(
+                document=DocketDocument,
+                serializer=RECAPESResultSerializerTest,
+            ),
+            docket=_ESResultSerializer(
+                document=DocketDocument,
+                serializer=DocketESResultSerializerTest,
+            ),
+            recap_document=_ESResultSerializer(
+                document=DocketDocument,
+                serializer=RECAPDocumentESResultSerializerTest,
+            ),
+            opinion=_ESResultSerializer(
+                document=OpinionClusterDocument,
+                serializer=OpinionClusterESResultSerializer,
+            ),
+            person=_ESResultSerializer(
+                document=PersonDocument,
+                serializer=PersonESResultSerializer,
+            ),
+            oral_argument=_ESResultSerializer(
+                document=AudioDocument,
+                serializer=OAESResultSerializer,
+            ),
+        ),
     )
     @mock.patch(
         "cl.search.api_utils.set_results_highlights",
