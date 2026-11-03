@@ -161,7 +161,7 @@ Swapped partials live under `v2_includes/` (see [Naming & middleware](#naming--m
 For htmx requests, `IncrementalNewTemplateMiddleware` serves the `v2_includes/` partial only when the request carries `X-CL-Design: v2`, whatever the `use_new_design` flag says. A flagged user can still be on a legacy page, whose htmx code expects the legacy partial back, so the partial has to match the page that sent the request. Full-page requests still follow the flag.
 
 - An endpoint called from both legacy and v2 pages MUST return the legacy template name and let the middleware swap it. It MUST NOT choose the template itself, for example by checking the flag or a form field.
-- An element MUST NOT drop the header with `hx-disinherit`; its requests would then get the legacy partial.
+- An element in v2 templates/includes MUST NOT drop the inherited headers with `hx-disinherit` or `hx-headers="unset"`; its requests would then get the legacy partial.
 
 ### Disabled features
 
