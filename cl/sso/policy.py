@@ -164,7 +164,6 @@ def requirement_for_user(user: User) -> SSORequirement | None:
         ).first()
         # Without a staff organization there is nowhere to send staff, and
         # refusing their passwords would lock everybody out of the admin.
-        # check_staff_sso reports this misconfiguration.
         if staff_org is not None:
             return SSORequirement(
                 organization=staff_org,

@@ -54,7 +54,6 @@ from cl.sso.models import (
     SSOConnection,
 )
 from cl.sso.sessions import SSO_ORGANIZATION_KEY
-from cl.sso.staff import build_staff_sso_report
 from cl.sso.throttles import sync_user_throttles
 from cl.tests.cases import SimpleTestCase, TestCase
 from cl.users.factories import UserFactory, UserProfileWithParentsFactory
@@ -1035,38 +1034,6 @@ class SSOConnectionTest(TestCase):
             social_app=SocialAppFactory.create(provider_id="shared")
         )
         self.assertIsNone(get_connection(sociallogin))
-
-
-class StaffReportTest(TestCase):
-    """The staff-MFA report and its management command."""
-
-    def test_unlinked_staff_reported(self) -> None:
-        """Is a staff account that can't sign in through the IdP flagged?"""
-        org = OrganizationFactory.create(is_staff_organization=True)
-        SSOConnectionFactory.create(organization=org)
-        staff = UserProfileWithParentsFactory.create(user__is_staff=True).user
-
-        report = build_staff_sso_report()
-
-        self.assertIn(staff, report.unlinked)
-        self.assertTrue(any("aren't linked" in p for p in report.problems))
-
-    def test_linked_staff_not_reported(self) -> None:
-        """Is a linked staff account left out of the problems?"""
-        org = OrganizationFactory.create(is_staff_organization=True)
-        connection = SSOConnectionFactory.create(organization=org)
-        staff = UserProfileWithParentsFactory.create(user__is_staff=True).user
-        SocialAccount.objects.create(
-            user=staff, provider=connection.provider_id, uid="flp-1"
-        )
-        report = build_staff_sso_report()
-        self.assertNotIn(staff, report.unlinked)
-
-    def test_command_runs(self) -> None:
-        """Does check_staff_sso print the report?"""
-        out = StringIO()
-        call_command("check_staff_sso", stdout=out)
-        self.assertIn("staff organization", out.getvalue())
 
 
 class NotifyDomainUsersTest(SSOFixtureMixin, TestCase):

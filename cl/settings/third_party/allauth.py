@@ -55,15 +55,8 @@ SOCIALACCOUNT_PROVIDERS = {
 
 # Require staff and superusers to sign in through the staff organization's
 # IdP (Organization.is_staff_organization). Turn on only after every staff
-# account is linked; run the check_staff_sso command first.
+# account is linked.
 SSO_REQUIRED_FOR_STAFF = env.bool("SSO_REQUIRED_FOR_STAFF", default=False)
-
-# Accounts that aren't people (e.g. upload bots) and authenticate with API
-# tokens. check_staff_sso skips them when looking for unlinked staff, and
-# flags any that still has a usable password.
-SSO_SERVICE_ACCOUNT_USERNAMES = env.list(
-    "SSO_SERVICE_ACCOUNT_USERNAMES", default=[]
-)
 
 # How often an existing session is re-checked against the SSO policy, so
 # turning on enforcement ends password sessions within this many seconds.
