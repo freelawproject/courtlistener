@@ -10,16 +10,17 @@ document.addEventListener('alpine:init', () => {
       }
       this.isOpen = true;
       // One message at a time: every other open toast on the page closes.
-      this.$root.dispatchEvent(new CustomEvent('toast-opened', { bubbles: true }));
+      this.$dispatch('toast-opened');
     },
     /** Closes this toast when another one opens. */
     replace(event) {
-      if (event.target !== this.$root && this.isOpen) {
+      if (this.isOpen && !this.$root.contains(event.target)) {
         this.close();
       }
     },
     close() {
-      const focusWasInside = this.$root.contains(document.activeElement);
+      const region = this.$root.querySelector('[role="status"]');
+      const focusWasInside = region.contains(document.activeElement);
       this.isOpen = false;
       if (focusWasInside && this.opener?.isConnected) {
         this.opener.focus({ preventScroll: true });
