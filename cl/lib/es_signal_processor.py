@@ -57,8 +57,8 @@ from cl.search.tasks import (
     update_es_document,
 )
 from cl.search.types import (
-    ESDocumentClassType,
-    ESModelClassType,
+    ESDocumentType,
+    ESModelType,
 )
 
 type DocumentModelMapping = dict[str, dict[type[Model], dict]]
@@ -123,7 +123,7 @@ def check_fields_that_changed(
 
 
 def updated_fields(
-    instance: Model, es_document: ESDocumentClassType
+    instance: Model, es_document: type[ESDocumentType]
 ) -> list[str]:
     """Look for changes in the tracked fields of an instance.
     :param instance: The instance to check for changed fields.
@@ -173,8 +173,8 @@ def get_fields_to_update(
 
 
 def update_es_documents(
-    main_model: ESModelClassType,
-    es_document: ESDocumentClassType,
+    main_model: type[ESModelType],
+    es_document: type[ESDocumentType],
     instance: Model,
     created: bool,
     mapping_fields: dict,
@@ -358,8 +358,8 @@ def update_es_documents(
 
 
 def update_remove_m2m_documents(
-    main_model: ESModelClassType,
-    es_document: ESDocumentClassType,
+    main_model: type[ESModelType],
+    es_document: type[ESDocumentType],
     instance: Model,
     mapping_fields: dict,
     affected_field: str,
@@ -388,9 +388,9 @@ def update_remove_m2m_documents(
             )
 
 
-def update_m2m_field_in_es_document(
+def update_m2m_field_in_es_document[DocumentT: ESDocumentType](
     instance: Model,
-    es_document: ESDocumentClassType,
+    es_document: type[DocumentT],
     affected_field: str,
 ) -> None:
     """Update a single field created using a many-to-many relationship.
@@ -429,8 +429,8 @@ def update_m2m_field_in_es_document(
 
 
 def update_reverse_related_documents(
-    main_model: ESModelClassType,
-    es_document: ESDocumentClassType,
+    main_model: type[ESModelType],
+    es_document: type[ESDocumentType],
     instance: Model,
     query_string: str,
     affected_fields: list[str],
@@ -527,8 +527,8 @@ def update_reverse_related_documents(
 
 
 def delete_reverse_related_documents(
-    main_model: ESModelClassType,
-    es_document: ESDocumentClassType,
+    main_model: type[ESModelType],
+    es_document: type[ESDocumentType],
     instance: Model,
     query_string: str,
     affected_fields: list[str],
@@ -711,8 +711,8 @@ class ESSignalProcessor:
 
     def __init__(
         self,
-        main_model,
-        es_document,
+        main_model: type[ESModelType],
+        es_document: type[ESDocumentType],
         documents_model_mapping: DocumentModelMapping,
     ):
         self.main_model = main_model
