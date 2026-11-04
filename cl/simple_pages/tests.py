@@ -12,6 +12,7 @@ from django_cotton.compiler_regex import CottonCompiler
 from lxml.html import fromstring
 from waffle.testutils import override_flag
 
+from cl.custom_filters.templatetags.svg_tags import svg
 from cl.lib.test_helpers import SimpleUserDataMixin
 from cl.simple_pages.forms import ContactForm
 from cl.simple_pages.sitemap import SimpleSitemap
@@ -796,9 +797,19 @@ class ToastComponentTest(SimpleTestCase):
         self.assertIn("Link copied", html)
         self.assertEqual(html.count("<svg"), 1)
 
+    @staticmethod
+    def icon(name: str) -> str:
+        """The markup the toast renders for a named icon."""
+        return svg(name, **{"class": "size-5", "aria_hidden": "true"})
+
     def test_variant_adds_its_icon_and_description_its_text(self) -> None:
-        """Each variant adds a second svg; the description renders when given."""
-        for variant in ("info", "success", "warning"):
+        """Each variant adds its own icon; the description renders when given."""
+        variant_icons = {
+            "info": "info",
+            "success": "circle_check",
+            "warning": "triangle_exclamation",
+        }
+        for variant, icon in variant_icons.items():
             with self.subTest(variant=variant):
                 html = self.render(
                     f'<c-toast variant="{variant}" title="Docket blocked"'
@@ -806,15 +817,21 @@ class ToastComponentTest(SimpleTestCase):
                 )
                 self.assertIn("No longer indexed", html)
                 self.assertEqual(html.count("<svg"), 2)
+                self.assertIn(self.icon(icon), html)
+
+    def test_unknown_variant_renders_no_icon(self) -> None:
+        """A variant outside the presets renders neither an icon nor its slot."""
+        html = self.render('<c-toast variant="error" title="Oops" />')
+        self.assertEqual(html.count("<svg"), 1)
+        self.assertNotIn('<span class="shrink-0', html)
 
     def test_icon_prop_replaces_the_variant_icon(self) -> None:
         """A named icon renders instead of the variant's, as the only icon."""
         html = self.render(
             '<c-toast variant="success" title="Alert created" icon="bell" />'
         )
-        self.assertEqual(html.count("<svg"), 2)
-        self.assertNotIn("circle_check", html)
-        self.assertIn('role="img"', html)
+        self.assertIn(self.icon("bell"), html)
+        self.assertNotIn(self.icon("circle_check"), html)
 
     def test_trigger_slot_renders_inside_the_root(self) -> None:
         """A trigger slot renders; a toast opened by an event has none."""
@@ -854,7 +871,8 @@ class ComponentsToastDemoTest(TestCase):
         self.assertEqual(
             r["HX-Trigger-After-Settle"], "toast-demo-server-ready"
         )
-        self.assertContains(r, 'id="toast-demo-server" hx-swap-oob="true"')
+        self.assertContains(r, 'id="toast-demo-server"')
+        self.assertContains(r, 'hx-swap-oob="true"')
 
     def test_other_requests_get_the_page(self) -> None:
         """Another name, or a request that is not htmx, renders the library."""
