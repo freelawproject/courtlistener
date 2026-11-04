@@ -18,9 +18,9 @@
 {% with suffix=outline|yesno:"_outline,," %}
 {% with icon_name=name|add:suffix classes="shrink-0 "|add:size_class|add:" "|add:class %}
   {% if label %}
-    {% svg icon_name class=classes aria_label=label|escape %}
+    {% svg icon_name class=classes|escape aria_label=label|escape %}
   {% else %}
-    {% svg icon_name class=classes aria_hidden="true" %}
+    {% svg icon_name class=classes|escape aria_hidden="true" %}
   {% endif %}
 {% endwith %}
 {% endwith %}

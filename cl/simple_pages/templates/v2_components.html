@@ -1282,7 +1282,7 @@ Sample code here.
   {# ICON #}
   <section class="max-w-full w-full border-t-2 border-greyscale-200" x-intersect.margin.-100px="show" id="icon">
     <h2 class="mt-6 mb-3">Icon</h2>
-    <p>An icon from <code>cl/assets/static-global/svg/</code>, drawn in the surrounding text colour. The component sets the size, picks the filled or outline variant, and hides the icon from assistive technology unless it has a label. A one-off icon that needs none of this can keep using the <code>{% templatetag openblock %} svg {% templatetag closeblock %}</code> tag.</p>
+    <p>An icon from <code>cl/assets/static-global/svg/</code>, drawn in the surrounding text colour. The component sets the size, picks the filled or outline variant, and hides the icon from assistive technology unless it has a label. A one-off icon that needs none of this can keep using the <code>{% templatetag openblock %} svg {% templatetag closeblock %}</code> tag. The component only takes the props below and drops any other attribute, such as an <code>id</code> or an Alpine binding, so use the tag when the <code>&lt;svg&gt;</code> needs one.</p>
 
     <h4 class="mt-3">Demo</h4>
 

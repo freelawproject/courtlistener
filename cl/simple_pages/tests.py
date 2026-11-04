@@ -817,6 +817,17 @@ class IconComponentTest(SimpleTestCase):
         self.assertIn('aria-label="A &quot;b&quot; &lt;c&gt; &amp; d"', html)
         self.assertNotIn("<c>", html)
 
+    def test_bound_class_is_escaped(self) -> None:
+        """A class bound from the context can't add attributes to the icon."""
+        icon = fromstring(
+            self.render(
+                '<c-icon name="chevron" :class="classes" />',
+                {"classes": '" onload="alert(1)'},
+            )
+        )
+        self.assertIsNone(icon.get("onload"))
+        self.assertIn('onload="alert(1)', icon.get("class"))
+
     def test_outline_selects_the_outline_file(self) -> None:
         """The outline flag swaps the plain icon for its _outline file."""
         cases = [
