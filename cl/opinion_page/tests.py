@@ -3540,6 +3540,27 @@ class DocketEntryFileDownload(TestCase):
         response = self.client.get(download_path)
         self.assertRedirects(response, redirect_path)
 
+    @mock.patch(
+        "django_ratelimit.decorators.is_ratelimited", return_value=False
+    )
+    def test_anonymous_requests_do_not_count_against_limit(
+        self, mock_is_ratelimited: MagicMock
+    ) -> None:
+        """The export's limit is shared by everyone, so only signed-in
+        requests may count against it; anonymous ones are sent to sign in
+        first.
+        """
+        download_path = reverse(
+            "view_download_docket", kwargs={"docket_id": self.mocked_docket.id}
+        )
+        response = self.client.get(download_path)
+        self.assertEqual(response.status_code, HTTPStatus.FOUND)
+        mock_is_ratelimited.assert_not_called()
+
+        self.client.login(username=self.user.username, password="password")
+        self.client.get(download_path)
+        mock_is_ratelimited.assert_called_once()
+
     @override_settings(
         WAFFLE_CACHE_PREFIX="test_csv_export_scotus_docket_waffle"
     )
