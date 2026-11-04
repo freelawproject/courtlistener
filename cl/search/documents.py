@@ -1443,6 +1443,10 @@ class ESRECAPDocument(
     def prepare_capital_case(
         self, instance: RECAPDocument | SCOTUSDocument
     ) -> bool | None:
+        """Return the SCOTUS docket's capital_case flag; empty for other
+        sources."""
+        if not isinstance(instance, SCOTUSDocument):
+            return None
         scotus_metadata = getattr(
             instance.docket_entry.docket, "scotus_metadata", None
         )
@@ -1588,6 +1592,8 @@ class DocketDocument(
             return instance.bankruptcy_information.trustee_str
 
     def prepare_capital_case(self, instance: Docket) -> bool | None:
+        """Return the docket's SCOTUS capital_case flag; empty for dockets
+        without SCOTUS metadata."""
         scotus_metadata = getattr(instance, "scotus_metadata", None)
         return scotus_metadata.capital_case if scotus_metadata else None
 

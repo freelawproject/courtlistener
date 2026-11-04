@@ -588,6 +588,8 @@ class BaseRECAPDocumentESResultSerializer(DocumentSerializer):
             "pacer_case_id",
             "plain_text",
             "docket_id",
+            # SCOTUS fields aren't exposed until the SCOTUS search API (#8153).
+            "capital_case",
         )
 
 
@@ -630,6 +632,8 @@ class BaseDocketESResultSerializer(DocumentSerializer):
             "court_exact",
             "timestamp",
             "date_created",
+            # SCOTUS fields aren't exposed until the SCOTUS search API (#8153).
+            "capital_case",
         )
 
 
@@ -849,6 +853,7 @@ class V3RECAPDocumentESResultSerializer(DocumentSerializer):
             "cites",
             "pacer_doc_id",
             "trustee_str",
+            "capital_case",
         )
 
 
