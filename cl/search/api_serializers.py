@@ -2,6 +2,7 @@ from datetime import UTC
 from typing import Any
 
 from django.conf import settings
+from django.db.models import Model
 from elasticsearch.dsl.response import Hit
 from rest_framework import serializers
 from rest_framework.serializers import ModelSerializer
@@ -262,12 +263,28 @@ class SCOTUSDocumentSerializer(BaseSourceDocumentSerializer):
         fields = "__all__"
 
 
-class NestedSCOTUSDocumentSerializer(SCOTUSDocumentSerializer):
-    """A SCOTUS document nested in its entry, without the entry link."""
+class SCOTUSDocumentListSerializer(SCOTUSDocumentSerializer):
+    """A SCOTUS document for list pages.
+
+    It leaves out plain_text, which can be a whole PDF's text; only the
+    document detail endpoint returns it.
+    """
 
     class Meta:
         model = SCOTUSDocument
-        exclude = ("docket_entry",)
+        exclude = ("plain_text",)
+
+
+class NestedSCOTUSDocumentSerializer(SCOTUSDocumentSerializer):
+    """A SCOTUS document nested in its entry.
+
+    It leaves out the entry link and plain_text, which only the document
+    detail endpoint returns.
+    """
+
+    class Meta:
+        model = SCOTUSDocument
+        exclude = ("docket_entry", "plain_text")
 
 
 class SCOTUSDocketEntrySerializer(BaseSourceDocketEntrySerializer):
@@ -280,6 +297,24 @@ class SCOTUSDocketEntrySerializer(BaseSourceDocketEntrySerializer):
     class Meta:
         model = SCOTUSDocketEntry
         fields = "__all__"
+
+    def get_deferred_model_fields(
+        self,
+    ) -> tuple[list[str], dict[str, tuple[type[Model], list[str]]]]:
+        """Also defer the nested documents' plain_text.
+
+        The nested documents never include it, so DeferredFieldsMixin
+        shouldn't read it from the database either.
+        """
+        top_fields, nested_to_defer = super().get_deferred_model_fields()
+        _, document_fields = nested_to_defer.get(
+            "scotus_documents", (SCOTUSDocument, [])
+        )
+        nested_to_defer["scotus_documents"] = (
+            SCOTUSDocument,
+            list({*document_fields, "plain_text"}),
+        )
+        return top_fields, nested_to_defer
 
 
 class CourtSerializer(

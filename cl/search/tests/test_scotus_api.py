@@ -62,6 +62,10 @@ DOCUMENT_KEYS = {
     "thumbnail_status",
 }
 
+# The keys of a SCOTUS document on list pages and nested in its entry, which
+# leave out plain_text.
+LISTED_DOCUMENT_KEYS = DOCUMENT_KEYS - {"plain_text"}
+
 
 class ScotusAPITestCase(TestCase):
     """Shared SCOTUS data for the API tests.
@@ -263,7 +267,7 @@ class ScotusAPISerializationTest(ScotusAPITestCase):
         )
         for doc in nested:
             with self.subTest(document=doc["id"]):
-                self.assertEqual(set(doc), DOCUMENT_KEYS)
+                self.assertEqual(set(doc), LISTED_DOCUMENT_KEYS)
 
         r = await self.async_client.get(
             self.detail_path("scotusdocketentry", self.entry_no_docs.pk)
@@ -429,9 +433,9 @@ class ScotusAPIDynamicFieldsTest(ScotusAPITestCase):
                 {"id"},
             ),
             (
-                {"omit": "scotus_documents__plain_text"},
+                {"omit": "scotus_documents__description"},
                 ENTRY_KEYS,
-                DOCUMENT_KEYS - {"plain_text"},
+                LISTED_DOCUMENT_KEYS - {"description"},
             ),
         ]
         for params, entry_keys, document_keys in cases:
@@ -442,6 +446,79 @@ class ScotusAPIDynamicFieldsTest(ScotusAPITestCase):
                 self.assertEqual(set(data), entry_keys)
                 for doc in data["scotus_documents"]:
                     self.assertEqual(set(doc), document_keys)
+
+
+class ScotusAPIPlainTextTest(ScotusAPITestCase):
+    """Only the document detail endpoint returns, or reads, plain_text.
+
+    plain_text can be a whole PDF's text, so a page of documents with it can
+    exhaust the server's memory.
+    """
+
+    def setUp(self) -> None:
+        """Log in as a plain user."""
+        self.client.force_login(self.user)
+
+    def get_documents(
+        self, path: str, params: dict[str, str]
+    ) -> tuple[list[dict], list[str]]:
+        """Return the documents a request serializes, top-level or nested,
+        and the SQL it ran against the SCOTUS documents table.
+        """
+        with CaptureQueriesContext(connection) as ctx:
+            r = self.client.get(path, params)
+        self.assertEqual(r.status_code, HTTPStatus.OK)
+        data = r.json()
+        rows = data.get("results", [data])
+        documents = [
+            document
+            for row in rows
+            for document in row.get("scotus_documents", [row])
+        ]
+        sql = [
+            query["sql"]
+            for query in ctx.captured_queries
+            if '"search_scotusdocument"' in query["sql"]
+        ]
+        return documents, sql
+
+    def test_lists_and_nested_documents_leave_out_plain_text(self) -> None:
+        """Do lists and nested documents leave out plain_text, even when the
+        fields param asks for it, without reading it from the database?
+        """
+        entry_path = self.detail_path("scotusdocketentry", self.entry.pk)
+        cases = [
+            (self.list_path("scotusdocument"), {}),
+            (self.list_path("scotusdocketentry"), {}),
+            (entry_path, {}),
+            (entry_path, {"omit": "scotus_documents__description"}),
+            (
+                entry_path,
+                {
+                    "fields": "id,scotus_documents__id,scotus_documents__plain_text"
+                },
+            ),
+        ]
+        for path, params in cases:
+            with self.subTest(path=path, params=params):
+                documents, sql = self.get_documents(path, params)
+                self.assertTrue(documents)
+                for document in documents:
+                    self.assertNotIn("plain_text", document)
+                for query in sql:
+                    self.assertNotIn('"plain_text"', query)
+
+    def test_document_detail_returns_plain_text(self) -> None:
+        """Does the document detail endpoint still return plain_text?"""
+        SCOTUSDocument.objects.filter(pk=self.attachment_1.pk).update(
+            plain_text="The text of the petition."
+        )
+        documents, _ = self.get_documents(
+            self.detail_path("scotusdocument", self.attachment_1.pk), {}
+        )
+        self.assertEqual(
+            documents[0]["plain_text"], "The text of the petition."
+        )
 
 
 @mock.patch(
