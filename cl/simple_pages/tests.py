@@ -12,6 +12,7 @@ from django_cotton.compiler_regex import CottonCompiler
 from lxml.html import fromstring
 from waffle.testutils import override_flag
 
+from cl.custom_filters.templatetags.svg_tags import svg
 from cl.lib.test_helpers import SimpleUserDataMixin
 from cl.simple_pages.forms import ContactForm
 from cl.simple_pages.sitemap import SimpleSitemap
@@ -775,3 +776,95 @@ class DialogComponentTest(SimpleTestCase):
         )
         self.assertNotIn('aria-haspopup="dialog"', html)
         self.assertIn("Body", html)
+
+
+class IconComponentTest(SimpleTestCase):
+    """The c-icon component sizes the icon, picks its variant and sets its
+    accessibility attributes."""
+
+    def render(
+        self, source: str, context: dict[str, Any] | None = None
+    ) -> str:
+        """Compiles a Cotton snippet and renders it."""
+        compiled = CottonCompiler().process(source)
+        template = engines["django"].from_string(compiled)
+        return template.render(context or {})
+
+    def path_data(self, html: str) -> list[str]:
+        """Returns the drawing data of every path in the given SVG markup."""
+        return fromstring(html).xpath("//path/@d")
+
+    def test_icon_is_hidden_from_assistive_technology_by_default(self) -> None:
+        """An icon without a label is decorative."""
+        icon = fromstring(self.render('<c-icon name="chevron" />'))
+        self.assertEqual(icon.get("aria-hidden"), "true")
+        self.assertIsNone(icon.get("aria-label"))
+
+    def test_label_gives_the_icon_an_accessible_name(self) -> None:
+        """A labelled icon is named and not hidden."""
+        icon = fromstring(
+            self.render('<c-icon name="chevron" label="Next page" />')
+        )
+        self.assertEqual(icon.get("aria-label"), "Next page")
+        self.assertIsNone(icon.get("aria-hidden"))
+
+    def test_bound_label_is_escaped(self) -> None:
+        """A label bound from the context can't break out of its attribute."""
+        html = self.render(
+            '<c-icon name="chevron" :label="name" />',
+            {"name": 'A "b" <c> & d'},
+        )
+        self.assertIn('aria-label="A &quot;b&quot; &lt;c&gt; &amp; d"', html)
+        self.assertNotIn("<c>", html)
+
+    def test_outline_selects_the_outline_file(self) -> None:
+        """The outline flag swaps the plain icon for its _outline file."""
+        cases = [
+            ('<c-icon name="bell" />', "bell"),
+            ('<c-icon name="bell" outline />', "bell_outline"),
+        ]
+        for source, expected_file in cases:
+            with self.subTest(source=source):
+                self.assertEqual(
+                    self.path_data(self.render(source)),
+                    self.path_data(svg(expected_file)),
+                )
+
+    def test_size_sets_the_size_class(self) -> None:
+        """Each size maps to its class, and anything else gets the default."""
+        cases = {
+            "sm": "size-4",
+            "md": "size-5",
+            "lg": "size-6",
+            "": "size-4",
+            "xs": "size-4",
+        }
+        for size, expected_class in cases.items():
+            with self.subTest(size=size):
+                icon = fromstring(
+                    self.render(f'<c-icon name="chevron" size="{size}" />')
+                )
+                self.assertEqual(
+                    icon.get("class").split(), ["shrink-0", expected_class]
+                )
+
+    def test_class_is_added_after_the_size_class(self) -> None:
+        """Extra classes keep the size class and follow it."""
+        icon = fromstring(
+            self.render(
+                '<c-icon name="chevron" size="sm" class="rotate-90" />'
+            )
+        )
+        self.assertEqual(
+            icon.get("class").split(), ["shrink-0", "size-4", "rotate-90"]
+        )
+
+    def test_custom_size_leaves_sizing_to_class(self) -> None:
+        """A custom size sets no size class, so the caller's size can't
+        compete with one."""
+        icon = fromstring(
+            self.render(
+                '<c-icon name="chevron" size="custom" class="size-3" />'
+            )
+        )
+        self.assertEqual(icon.get("class").split(), ["shrink-0", "size-3"])
