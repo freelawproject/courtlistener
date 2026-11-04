@@ -76,9 +76,26 @@ from cl.lib.storage import IncrementingAWSMediaStorage, S3PrivateUUIDStorage
 from cl.lib.string_utils import get_token_count_from_string, trunc
 from cl.search.cluster_sources import ClusterSources
 from cl.search.docket_sources import DocketSources
-from cl.search.state.florida.models import *
-from cl.search.state.new_york.models import *
-from cl.search.state.texas.models import *
+
+# State models are re-exported so Django registers them with the search app.
+from cl.search.state.florida.models import (
+    FloridaDocketEntry as FloridaDocketEntry,
+)
+from cl.search.state.florida.models import FloridaDocument as FloridaDocument
+from cl.search.state.new_york.models import (
+    NYCoADocketEntry as NYCoADocketEntry,
+)
+from cl.search.state.new_york.models import (
+    NYCoADocketIssue as NYCoADocketIssue,
+)
+from cl.search.state.new_york.models import (
+    NYCoADocketMetadata as NYCoADocketMetadata,
+)
+from cl.search.state.new_york.models import NYCoADocument as NYCoADocument
+from cl.search.state.texas.models import (
+    TexasDocketEntry as TexasDocketEntry,
+)
+from cl.search.state.texas.models import TexasDocument as TexasDocument
 from cl.users.models import User
 
 if TYPE_CHECKING:
