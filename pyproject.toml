@@ -170,7 +170,6 @@ lint.ignore = [
   # if-else-block-instead-of-if-exp
   "SIM108",
   # To fix:
-  "E722",
   "E731",
   "F403",
   "F811",
