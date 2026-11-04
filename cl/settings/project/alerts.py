@@ -13,3 +13,10 @@ env = environ.FileAwareEnv()
 SCHEDULED_ALERT_HIT_BATCH_SIZE = env.int(
     "SCHEDULED_ALERT_HIT_BATCH_SIZE", default=100
 )
+
+##########################
+# SCOTUS docket alerts   #
+##########################
+# Temporary kill switch: keeps SCOTUS docket alerts from firing until their
+# email templates and webhook payloads are ready.
+SCOTUS_ALERTS_ENABLED = env.bool("SCOTUS_ALERTS_ENABLED", default=False)
