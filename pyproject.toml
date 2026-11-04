@@ -171,5 +171,4 @@ lint.ignore = [
   "SIM108",
   # To fix:
   "F403",
-  "UP008",
 ]
