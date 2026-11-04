@@ -396,7 +396,7 @@ async def download_recap_item(
                 headers={"User-Agent": "Free Law Project"},
             )
         r.raise_for_status()
-    except TimeoutException as e:
+    except TimeoutException:
         logger.warning(f"    Timed out attempting to get: {url}\n")
     except HTTPError as e:
         logger.warning(f"    Unable to get {url}\nException was:\n{e}")

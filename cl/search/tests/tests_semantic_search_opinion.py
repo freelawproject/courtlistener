@@ -56,7 +56,7 @@ class OpinionEmbeddingIndexingTests(ESIndexTestCase, TestCase):
             id="canb",
             jurisdiction="FB",
         )
-        with cls.captureOnCommitCallbacks(execute=True) as callbacks:
+        with cls.captureOnCommitCallbacks(execute=True):
             cls.opinion_cluster_2 = OpinionClusterFactory(
                 docket=DocketFactory(
                     court=cls.court,
@@ -68,7 +68,7 @@ class OpinionEmbeddingIndexingTests(ESIndexTestCase, TestCase):
 
     def test_opinion_embeddings_field(self) -> None:
         """Test index embeddings into an opinion document."""
-        with self.captureOnCommitCallbacks(execute=True) as callbacks:
+        with self.captureOnCommitCallbacks(execute=True):
             opinion_cluster_1 = OpinionClusterFactory(
                 docket=DocketFactory(
                     court=self.court,
@@ -303,7 +303,7 @@ class SemanticSearchTests(AuthenticatedClientMixin, ESIndexTestCase, TestCase):
         )
 
         # Create opinions and clusters
-        with cls.captureOnCommitCallbacks(execute=True) as callbacks:
+        with cls.captureOnCommitCallbacks(execute=True):
             cls.opinion_2 = OpinionFactory(
                 cluster=OpinionClusterFactory(
                     docket=DocketFactory(

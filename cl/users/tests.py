@@ -3693,7 +3693,7 @@ class EmailBrokenTest(ESIndexTestCase, TestCase):
         user.password = make_password("password")
         await user.asave()
         # Authenticate user
-        login = await self.async_client.alogin(
+        await self.async_client.alogin(
             username=user.username, password="password"
         )
         r = await self.async_client.get(path)
@@ -3744,7 +3744,7 @@ class EmailBrokenTest(ESIndexTestCase, TestCase):
         user.email = "complaint@simulator.amazonses.com"
         user.password = make_password("password")
         await user.asave()
-        login = await self.async_client.alogin(
+        await self.async_client.alogin(
             username=user.username, password="password"
         )
         r = await self.async_client.get(path)
@@ -3778,7 +3778,7 @@ class EmailBrokenTest(ESIndexTestCase, TestCase):
         user.password = make_password("password")
         await user.asave()
         # Authenticate user
-        login = await self.async_client.alogin(
+        await self.async_client.alogin(
             username=user.username, password="password"
         )
         r = await self.async_client.get(path)
@@ -3821,7 +3821,7 @@ class EmailBrokenTest(ESIndexTestCase, TestCase):
         # email error.
         user.email = "new@simulator.amazonses.com"
         await user.asave()
-        login = await self.async_client.alogin(
+        await self.async_client.alogin(
             username=user.username, password="password"
         )
 
