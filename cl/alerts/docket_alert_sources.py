@@ -95,7 +95,7 @@ def _scotus_entries_by_pk(des_pks: list[int]) -> QuerySet:
     """Return the SCOTUSDocketEntry rows matching the given pks."""
     return _with_email_relations(
         SCOTUSDocketEntry.objects.filter(pk__in=des_pks),
-        "scotusdocument_set",
+        "scotus_documents",
         SCOTUSDocument,
     )
 
@@ -107,7 +107,7 @@ def _scotus_entries_since(docket: Docket, since: datetime) -> QuerySet:
         SCOTUSDocketEntry.objects.filter(
             date_created__gte=since, docket=docket
         ),
-        "scotusdocument_set",
+        "scotus_documents",
         SCOTUSDocument,
     )
 

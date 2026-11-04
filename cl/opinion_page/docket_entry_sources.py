@@ -452,7 +452,7 @@ def _scotus_main_docs_prefetch() -> Prefetch:
     A SCOTUS entry has no designated main document, so its lowest
     attachment_number stands in."""
     return Prefetch(
-        "scotusdocument_set",
+        "scotus_documents",
         queryset=SCOTUSDocument.objects.defer("plain_text").order_by(
             "attachment_number", "date_created"
         )[:1],
