@@ -1,5 +1,5 @@
 {% extends "new_base.html" %}
-{% load static svg_tags %}
+{% load static svg_tags component_tags %}
 
 {% block title %}Components Library - CourtListener.com{% endblock %}
 
@@ -30,6 +30,7 @@
         {'href': '#pagination', 'text': 'Pagination'},
         {'href': '#filter-drawer', 'text': 'Filter drawer'},
         {'href': '#banner', 'text': 'Banner'},
+        {'href': '#toast', 'text': 'Toast'},
       ]},
       {'href': '#page-shells', 'text': 'Page shells', 'children': [
         {'href': '#docket-page', 'text': 'Docket page'},
@@ -1566,6 +1567,121 @@ Sample code here.
           link_text="Go to Case"&gt;
           &lt;p&gt;It looks like you're trying to search for &lt;strong&gt;Miranda v. Arizona,&lt;/strong&gt; from 1966.&lt;/p&gt;
         &lt;/c-banner&gt;
+      </c-code>
+    </c-expansion-panel>
+  </section>
+
+  {# TOAST #}
+  {% require_script "js/third_party/htmx" defer=True %}
+  <section class="max-w-full w-full border-t-2 border-greyscale-200" x-intersect.margin.-100px="show" id="toast">
+    <h2 class="mt-6 mb-3">Toast</h2>
+    <p>A persistent notification at the bottom of the viewport, announced by a <code>role="status"</code> live region. It renders closed and opens in one of three ways: a control in its <code>trigger</code> slot calls <code>open</code>, a page script dispatches the window event named in the toast's <code>x-on</code> listener, or an htmx response triggers that event. Use the slot for a single control with nothing else to do; raise an event when the decision lives in a script or on the server. The user closes it with the button or <kbd>Escape</kbd>, and only one toast is open at a time.</p>
+    <h4 class="mt-3">With htmx</h4>
+    <p>A view names the outcome in an <code>HX-Trigger</code> header and the toast listens for that name; a generic error toast can listen for <code>htmx:response-error</code>. For request-time content, the view renders the toast in a partial swapped in out of band and opens it with <code>HX-Trigger-After-Settle</code>; the page must already load the toast script.</p>
+
+    <h3 class="mt-3">Demo</h3>
+
+    <h4 class="mt-3">Variants</h4>
+    <p class="text-sm text-greyscale-600 mb-2">Each button is its toast's <code>trigger</code> slot.</p>
+    <div class="flex flex-wrap gap-3 items-center">
+      <c-toast title="Link copied">
+        <c-slot name="trigger"><c-button variant="primary" x-on:click="open">Plain</c-button></c-slot>
+      </c-toast>
+      <c-toast variant="info" title="A new version of this page is available" description="Reload to see it.">
+        <c-slot name="trigger"><c-button variant="primary" x-on:click="open">Info</c-button></c-slot>
+      </c-toast>
+      <c-toast variant="success" title="Docket blocked" description="Search engines will no longer index this docket.">
+        <c-slot name="trigger"><c-button variant="primary" x-on:click="open">Success</c-button></c-slot>
+        <c-button variant="outline" size="sm">Undo</c-button>
+      </c-toast>
+      <c-toast variant="warning" title="Something went wrong" description="Please try again.">
+        <c-slot name="trigger"><c-button variant="primary" x-on:click="open">Warning</c-button></c-slot>
+      </c-toast>
+    </div>
+
+    <h4 class="mt-3">Custom icon</h4>
+    <div class="flex flex-wrap gap-3 items-center">
+      <c-toast title="Alert created" description="You will get an email when this docket changes." icon="bell">
+        <c-slot name="trigger"><c-button variant="primary" x-on:click="open">Custom icon</c-button></c-slot>
+      </c-toast>
+    </div>
+
+    <h4 class="mt-3">Rendered by the server</h4>
+    <p class="text-sm text-greyscale-600 mb-2">An htmx request; the response is a partial with the current time, swapped over the placeholder below.</p>
+    <div class="flex flex-wrap gap-3 items-center">
+      <c-button variant="primary" hx-get="{% url 'components' %}?toast=server" hx-swap="none">Server-rendered</c-button>
+    </div>
+    <div id="toast-demo-server" class="contents"></div>
+
+    <h4 class="mt-3">Opened by a failed request</h4>
+    <p class="text-sm text-greyscale-600 mb-2">An htmx request to a URL that returns 404; htmx also logs it to the console.</p>
+    <div class="flex flex-wrap gap-3 items-center">
+      <c-button variant="primary" hx-get="{% url 'components' %}missing/" hx-swap="none">Failing request</c-button>
+    </div>
+    <c-toast variant="warning" title="Something went wrong" description="Please try again." x-on:htmx:response-error.window="open" />
+
+    <c-library.list title="Props" only>
+      <c-library.item only>
+        <c-slot name="label"><code>title</code></c-slot>
+        <c-slot name="description">Main text of the toast.</c-slot>
+      </c-library.item>
+      <c-library.item optional only>
+        <c-slot name="label"><code>description</code></c-slot>
+        <c-slot name="description">Secondary text shown under the title.</c-slot>
+      </c-library.item>
+      <c-library.item optional only>
+        <c-slot name="label"><code>variant</code></c-slot>
+        <c-slot name="description">Preset that adds the matching icon before the title. Options: <code>info</code>, <code>success</code>, <code>warning</code>. When omitted, no icon is shown.</c-slot>
+      </c-library.item>
+      <c-library.item optional only>
+        <c-slot name="label"><code>icon</code></c-slot>
+        <c-slot name="description">Name of an svg icon shown before the title instead of the variant's.</c-slot>
+      </c-library.item>
+    </c-library.list>
+
+    <c-library.list title="Slots" only>
+      <c-library.item optional only>
+        <c-slot name="label"><code>trigger</code></c-slot>
+        <c-slot name="description">A control rendered in place that opens the toast with <code>x-on:click="open"</code>. Omit it when an event opens the toast.</c-slot>
+      </c-library.item>
+      <c-library.item optional only>
+        <c-slot name="label">Default</c-slot>
+        <c-slot name="description">Content shown after the text, before the close button, such as an action button.</c-slot>
+      </c-library.item>
+    </c-library.list>
+
+    <c-expansion-panel title="Code">
+      <c-code>
+&lt;!-- Variants: each opened by its trigger slot --&gt;
+&lt;c-toast title="Link copied"&gt;
+  &lt;c-slot name="trigger"&gt;&lt;c-button variant="primary" x-on:click="open"&gt;Plain&lt;/c-button&gt;&lt;/c-slot&gt;
+&lt;/c-toast&gt;
+&lt;c-toast variant="success" title="Docket blocked" description="Search engines will no longer index this docket."&gt;
+  &lt;c-slot name="trigger"&gt;&lt;c-button variant="primary" x-on:click="open"&gt;Success&lt;/c-button&gt;&lt;/c-slot&gt;
+  &lt;c-button variant="outline" size="sm"&gt;Undo&lt;/c-button&gt;
+&lt;/c-toast&gt;
+
+&lt;!-- Custom icon --&gt;
+&lt;c-toast title="Alert created" description="You will get an email when this docket changes." icon="bell"&gt;
+  &lt;c-slot name="trigger"&gt;&lt;c-button variant="primary" x-on:click="open"&gt;Custom icon&lt;/c-button&gt;&lt;/c-slot&gt;
+&lt;/c-toast&gt;
+
+&lt;!-- Rendered by the server: the page keeps a box-less placeholder and loads the toast script;
+     the view returns the partial with HX-Trigger-After-Settle: docket-block-toast-ready --&gt;
+&lt;c-button variant="primary" hx-post="{% templatetag openblock %} url 'block_item' {% templatetag closeblock %}" hx-swap="none"&gt;Block this docket&lt;/c-button&gt;
+&lt;div id="docket-block-toast" class="contents"&gt;&lt;/div&gt;
+{% templatetag opencomment %} v2_includes/docket_block/toast.html {% templatetag closecomment %}
+&lt;c-toast id="docket-block-toast" hx-swap-oob="true" variant="success" title="Blocked {% templatetag openvariable %} blocked {% templatetag closevariable %} of {% templatetag openvariable %} total {% templatetag closevariable %} dockets" x-on:docket-block-toast-ready.window="open" /&gt;
+
+&lt;!-- Opened by a failed request: any htmx request on the page --&gt;
+&lt;c-toast variant="warning" title="Something went wrong" description="Please try again." x-on:htmx:response-error.window="open" /&gt;
+
+&lt;!-- Not in the demo: opened from the page's script, e.g. this.$dispatch('action-not-allowed') in a method of its Alpine component --&gt;
+&lt;c-toast variant="warning" title="This action is not allowed" x-on:action-not-allowed.window="open" /&gt;
+
+&lt;!-- Not in the demo: the view answers the request with the header HX-Trigger: docket-blocked --&gt;
+&lt;c-button variant="outline" hx-post="{% templatetag openblock %} url 'block_item' {% templatetag closeblock %}" hx-swap="none"&gt;Block this docket&lt;/c-button&gt;
+&lt;c-toast variant="success" title="Docket blocked" x-on:docket-blocked.window="open" /&gt;
       </c-code>
     </c-expansion-panel>
   </section>
