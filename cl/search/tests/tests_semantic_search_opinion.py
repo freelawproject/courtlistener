@@ -10,7 +10,7 @@ from asgiref.sync import async_to_sync
 from django.conf import settings
 from django.core.management import call_command
 from django.http import HttpResponse
-from django.test import TestCase, override_settings
+from django.test import override_settings
 from django.urls import reverse
 from elasticsearch.dsl import Document
 from lxml import html as lhtml

@@ -839,10 +839,6 @@ class Docket(AbstractDateTimeModel, DocketSources):
         )
         return build_authority_opinions_query(opinions)
 
-    def add_scraper_source(self) -> None:
-        if self.source in self.NON_SCRAPER_SOURCES():
-            self.source = self.source + self.SCRAPER
-
     def add_idb_source(self):
         if self.source in self.NON_IDB_SOURCES():
             self.source = self.source + self.IDB
@@ -1908,15 +1904,6 @@ class FederalCourtsQuerySet(models.QuerySet["Court"]):
                 ]
             )
             | Q(pk__in=["cit", "jpml", "uscfc"]),
-            end_date__isnull=True,
-        )
-
-    def appellate_courts(self) -> Self:
-        return self.filter(
-            Q(jurisdiction=Court.FEDERAL_APPELLATE)
-            |
-            # Court of Appeals for Veterans Claims uses appellate PACER
-            Q(pk__in=["cavc"]),
             end_date__isnull=True,
         )
 

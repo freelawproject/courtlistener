@@ -94,10 +94,7 @@ from cl.lib.ratelimiter import (
     make_failed_login_key,
 )
 from cl.lib.redis_utils import get_redis_interface
-from cl.lib.test_helpers import (
-    SimpleUserDataMixin,
-    UserProfileWithParentsFactory,
-)
+from cl.lib.test_helpers import SimpleUserDataMixin
 from cl.search.factories import (
     CourtFactory,
     DocketFactory,
