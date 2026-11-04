@@ -27,7 +27,7 @@
       role="none"
     >
       <div class="ml-1 text-sm font-sans flex justify-start items-center">
-        {% svg "ellipse" x_show="hasNestedItems" x_bind__fill="markerClass" data_intersect_target=item.href aria_hidden="true" %}
+        {% svg "ellipse" x_show="hasNestedItems" x_bind__fill="markerClass" data_intersect_target=item.href class="text-greyscale-200" aria_hidden="true" %}
         <a
           x-bind:class="itemClass"
           title="{{ item.text }}"
@@ -133,7 +133,7 @@
           class="py-2.5 px-2 hover:bg-greyscale-100 rounded-md flex flex-row justify-between"
         >
           <span class="truncate font-medium text-sm text-greyscale-600" x-text="option.text"></span>
-          {% svg "check" x_show="isVisible" x_bind__data_intersect_target="option.href" aria_hidden="true" %}
+          {% svg "check" x_show="isVisible" x_bind__data_intersect_target="option.href" class="text-primary-600" aria_hidden="true" %}
         </a>
 
         <template
