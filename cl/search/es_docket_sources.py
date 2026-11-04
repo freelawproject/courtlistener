@@ -1,16 +1,22 @@
 """Per-source configuration for the shared Elasticsearch signal-processing
 machinery in cl.lib.es_signal_processor and the ES indexing tasks in
-cl.search.tasks.
+cl.search.tasks. Each source's court_ids also feed the RECAP search court
+picker.
 """
 
 from collections.abc import Callable
 from dataclasses import dataclass
+from typing import cast
 
 from django.db import models
+from django.db.models import QuerySet
 
+from cl.search.constants import SCOTUS_COURT_IDS
 from cl.search.models import (
     BankruptcyInformation,
+    Court,
     Docket,
+    FederalCourtsQuerySet,
     RECAPDocument,
     ScotusDocketMetadata,
     SCOTUSDocument,
@@ -43,6 +49,11 @@ class ESDocketSource:
     ``metadata_model`` is the optional docket-level metadata model whose
     changes should cascade to the Docket (and its documents) in ES (e.g.
     BankruptcyInformation for RECAP, ScotusDocketMetadata for SCOTUS).
+
+    ``court_ids`` are the courts whose dockets belong to this source, taken
+    from the court-id constants in cl.search.constants. recap_search_courts()
+    adds them to the PACER courts in the RECAP search court picker. Empty for
+    RECAP, whose courts are the PACER ones.
     """
 
     docket_entries_related_name: str
@@ -51,6 +62,7 @@ class ESDocketSource:
     docket_belongs: Callable[[Docket], bool]
     metadata_model: type[models.Model] | None = None
     ready_to_index: Callable[[Docket], bool] = lambda docket: True
+    court_ids: frozenset[str] = frozenset()
 
 
 def _scotus_docket_belongs(docket: Docket) -> bool:
@@ -65,7 +77,7 @@ def _scotus_docket_belongs(docket: Docket) -> bool:
     ScotusDocketMetadata is what keeps the Docket belonging on every
     save after the first.
     """
-    if docket.court_id != "scotus":
+    if docket.court_id not in SCOTUS_COURT_IDS:
         return False
     return (
         getattr(docket, "_index_in_es", False)
@@ -96,6 +108,7 @@ SCOTUS_ES_SOURCE = ESDocketSource(
     docket_belongs=_scotus_docket_belongs,
     metadata_model=ScotusDocketMetadata,
     ready_to_index=_scotus_ready_to_index,
+    court_ids=SCOTUS_COURT_IDS,
 )
 
 # Every known source, used wherever the shared code needs to loop over all
@@ -116,3 +129,21 @@ SOURCE_BY_MODEL: dict[type[models.Model], ESDocketSource] = {
         if source.metadata_model is not None
     },
 }
+
+
+def recap_search_courts() -> QuerySet[Court]:
+    """Return the courts offered in the RECAP search court picker: the
+    PACER courts plus the ones every other registered source adds. Use it
+    only for search; PACER-specific code (scrapers, uploads) must keep
+    using all_pacer_courts(), which excludes non-PACER courts like SCOTUS.
+    """
+    source_court_ids = [
+        court_id for source in ALL_ES_SOURCES for court_id in source.court_ids
+    ]
+    # federal_courts is typed as a plain Manager, which hides the
+    # FederalCourtsQuerySet methods from the type checker.
+    federal_courts = cast(FederalCourtsQuerySet, Court.federal_courts)
+    return (
+        Court.objects.filter(pk__in=source_court_ids, in_use=True)
+        | federal_courts.all_pacer_courts()
+    )

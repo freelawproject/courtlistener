@@ -4258,13 +4258,6 @@
       "severity": "error"
     },
     {
-      "column": 40,
-      "path": "cl/search/views.py",
-      "name": "missing-attribute",
-      "concise_description": "Object of class `Manager` has no attribute `all_pacer_courts`",
-      "severity": "error"
-    },
-    {
       "column": 41,
       "path": "cl/search/views.py",
       "name": "bad-argument-type",
@@ -4276,13 +4269,6 @@
       "path": "cl/search/views.py",
       "name": "bad-argument-type",
       "concise_description": "Argument `ESSearchResult` is not assignable to parameter `search_results` with type `dict[Unknown, Unknown]` in function `cl.lib.search_utils.store_search_query`",
-      "severity": "error"
-    },
-    {
-      "column": 25,
-      "path": "cl/search/views.py",
-      "name": "missing-attribute",
-      "concise_description": "Object of class `Manager` has no attribute `all_pacer_courts`",
       "severity": "error"
     },
     {

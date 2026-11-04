@@ -4,6 +4,7 @@ import os
 import re
 import shutil
 import threading
+from collections import Counter
 from datetime import date
 from http import HTTPStatus
 from itertools import product
@@ -109,6 +110,7 @@ from cl.recap.factories import (
     DocketEntryDataFactory,
 )
 from cl.recap.mergers import add_docket_entries, merge_attachment_page_data
+from cl.search.es_docket_sources import ALL_ES_SOURCES
 from cl.search.factories import (
     CitationWithParentsFactory,
     CourtFactory,
@@ -1807,8 +1809,8 @@ class ViewRecapDocketTest(TestCase):
 
 
 class DocketEntrySourceTest(TestCase):
-    """The per-court config that lets view_docket entries
-    without hardcoding RECAP-only model names.
+    """The per-court DocketEntrySource config: which source serves each
+    court and what each source returns.
     """
 
     @classmethod
@@ -1831,6 +1833,19 @@ class DocketEntrySourceTest(TestCase):
         self.assertIs(
             self.recap_docket.get_entry_source(), docket_entry_sources.RECAP
         )
+
+    def test_every_es_source_court_has_a_display_source(self) -> None:
+        """Courts listed by a non-RECAP ES source don't fall back to the RECAP
+        display, and no court is listed by two ES sources."""
+        court_ids = [c for s in ALL_ES_SOURCES for c in s.court_ids]
+        for court_id in court_ids:
+            with self.subTest(court_id=court_id):
+                self.assertIsNot(
+                    docket_entry_sources.source_for_court_id(court_id),
+                    docket_entry_sources.RECAP,
+                )
+        duplicates = [c for c, n in Counter(court_ids).items() if n > 1]
+        self.assertEqual([], duplicates)
 
     def test_scotus_source_callables_execute_without_raising(self) -> None:
         entry = SCOTUSDocketEntryFactory(docket=self.scotus_docket)
