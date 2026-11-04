@@ -4,7 +4,10 @@ document.addEventListener('alpine:init', () => {
     /** Element focused when the toast opened, so closing it from the keyboard does not drop focus to the body. */
     opener: null,
     open() {
-      this.opener = document.activeElement;
+      // Re-opening keeps the original opener: focus may now be inside the toast itself.
+      if (!this.isOpen) {
+        this.opener = document.activeElement;
+      }
       this.isOpen = true;
       // One message at a time: every other open toast on the page closes.
       this.$root.dispatchEvent(new CustomEvent('toast-opened', { bubbles: true }));
