@@ -368,6 +368,8 @@ def join_organization(
         Organization.objects.select_for_update().filter(
             pk=organization.pk
         ).first()
+        # Another sign-in by this person may have taken the seat meanwhile.
+        membership.refresh_from_db(fields=["has_seat"])
     if not membership.has_seat and organization.has_free_seat():
         membership.has_seat = True
         gained_seat = True

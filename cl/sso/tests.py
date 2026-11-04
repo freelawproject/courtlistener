@@ -570,6 +570,26 @@ class OIDCLoginTest(SSOFixtureMixin, TestCase):
         self.assertTrue(membership.has_seat)
         self.assertTrue(any("FOR UPDATE" in q["sql"] for q in queries))
 
+    def test_seat_is_rechecked_after_the_lock(self) -> None:
+        """Is a seat granted by a simultaneous sign-in kept?"""
+        self.org.seat_limit = 1
+        self.org.save()
+        user = self._confirmed_user()
+        OrganizationMembershipFactory.create(
+            organization=self.org, user=user, has_seat=True
+        )
+        stale = OrganizationMembership.objects.get(user=user)
+        stale.has_seat = False
+
+        with mock.patch.object(
+            OrganizationMembership.objects,
+            "get_or_create",
+            return_value=(stale, False),
+        ):
+            join_organization(user, self.org)
+
+        self.assertTrue(OrganizationMembership.objects.get(user=user).has_seat)
+
     def test_inactive_linked_account_is_refused(self) -> None:
         """Is a deactivated account kept out even with a linked identity?"""
         user = self._confirmed_user(user__is_active=False)
