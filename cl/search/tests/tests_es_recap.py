@@ -2708,6 +2708,76 @@ class RECAPSearchTest(RECAPSearchTestCase, ESIndexTestCase, TestCase):
         for docket in dockets_to_remove:
             docket.delete()
 
+    def test_initial_document_buttons_on_mixed_page(self) -> None:
+        """Confirm a results page with RECAP and SCOTUS dockets gives each
+        docket the initial document button of its own source."""
+        scotus_court = CourtFactory(id="scotus", jurisdiction="F")
+        district_court = CourtFactory(id="cand", jurisdiction="FD")
+        dockets_to_remove = []
+        with self.captureOnCommitCallbacks(execute=True):
+            recap_entry = DocketEntryFactory(
+                docket=DocketFactory(
+                    court=district_court,
+                    case_name="Lorem Mixed Page Recap",
+                    source=Docket.RECAP,
+                ),
+                entry_number=1,
+                date_filed=datetime.date(2015, 8, 19),
+            )
+            recap_document = RECAPDocumentFactory(
+                docket_entry=recap_entry,
+                document_number="1",
+                document_type=RECAPDocument.PACER_DOCUMENT,
+                is_available=False,
+                pacer_doc_id="234564",
+            )
+            scotus_docket = DocketFactory(
+                court=scotus_court, case_name="Lorem Mixed Page Scotus"
+            )
+            ScotusDocketMetadataFactory(docket=scotus_docket)
+            scotus_document = SCOTUSDocumentFactory(
+                docket_entry__docket=scotus_docket,
+                docket_entry__date_filed=datetime.date(2024, 1, 1),
+                attachment_number=1,
+                url="https://www.supremecourt.gov/DocketPDF/24/24-2/a.pdf",
+            )
+            dockets_to_remove.extend([recap_entry.docket, scotus_docket])
+
+        cd = {"type": SEARCH_TYPES.RECAP, "q": '"Lorem Mixed Page"'}
+        r = async_to_sync(self._test_article_count)(cd, 2, "mixed page")
+        tree = html.fromstring(r.content.decode())
+        buttons = {}
+        for article in tree.xpath("//article"):
+            title = article.xpath("./h3/a")[0].text_content().strip()
+            button = article.xpath(
+                ".//a[contains(@class, 'initial-document')]"
+            )
+            buttons[title] = (
+                (button[0].get("href"), button[0].text_content().strip())
+                if button
+                else (None, None)
+            )
+        expected = {
+            "Lorem Mixed Page Recap": (
+                recap_document.pacer_url,
+                "Buy Initial Document",
+            ),
+            "Lorem Mixed Page Scotus": (
+                scotus_document.url,
+                "Initial Document",
+            ),
+        }
+        for case_name, expected_button in expected.items():
+            with self.subTest(case_name=case_name):
+                title = next(
+                    (t for t in buttons if t.startswith(case_name)), None
+                )
+                self.assertIsNotNone(title, f"{case_name} not in results")
+                self.assertEqual(expected_button, buttons[title])
+
+        for docket in dockets_to_remove:
+            docket.delete()
+
     async def test_get_results_from_paginator(self) -> None:
         """Assert Paginator Page objects are handled as expected."""
 

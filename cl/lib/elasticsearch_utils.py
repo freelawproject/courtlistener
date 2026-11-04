@@ -56,6 +56,7 @@ from cl.lib.utils import (
     parse_string_date,
     perform_special_character_replacements,
 )
+from cl.opinion_page import docket_entry_sources
 from cl.people_db.models import Position
 from cl.search.constants import (
     ALERTS_HL_TAG,
@@ -2096,87 +2097,28 @@ def merge_unavailable_fields_on_parent_document(
             request_type == "frontend"
         ):
             # Merge initial document button to the frontend search results.
-            docket_ids = {doc["docket_id"] for doc in results}
-            # This query retrieves initial documents considering two
-            # possibilities:
-            # 1. For district, bankruptcy, and appellate entries where we don't know
-            #    if the entry contains attachments, it considers:
-            #    document_number=1 and attachment_number=None and document_type=PACER_DOCUMENT
-            #    This represents the main document with document_number 1.
-            # 2. For appellate entries where the attachment page has already been
-            #    merged, it considers:
-            #    document_number=1 and attachment_number=1 and document_type=ATTACHMENT
-            #    This represents document_number 1 that has been converted to an attachment.
-
-            appellate_court_ids = (
-                Court.federal_courts.appellate_courts().values_list(
-                    "pk", flat=True
+            # Group the page's dockets by source, so each source answers
+            # with one query.
+            docket_ids_by_source: defaultdict[
+                docket_entry_sources.DocketEntrySource, set[int]
+            ] = defaultdict(set)
+            for result in results:
+                source = docket_entry_sources.source_for_court_id(
+                    result["court_id"]
                 )
-            )
-            initial_documents = (
-                RECAPDocument.objects.filter(
-                    QObject(
-                        QObject(
-                            attachment_number=None,
-                            document_type=RECAPDocument.PACER_DOCUMENT,
-                        )
-                        | QObject(
-                            attachment_number=1,
-                            document_type=RECAPDocument.ATTACHMENT,
-                            docket_entry__docket__court_id__in=appellate_court_ids,
-                        )
-                    ),
-                    docket_entry__docket_id__in=docket_ids,
-                    document_number="1",
-                )
-                .select_related(
-                    "docket_entry",
-                    "docket_entry__docket",
-                    "docket_entry__docket__court",
-                )
-                .only(
-                    "pk",
-                    "document_type",
-                    "document_number",
-                    "attachment_number",
-                    "pacer_doc_id",
-                    "is_available",
-                    "filepath_local",
-                    "docket_entry__docket_id",
-                    "docket_entry__docket__slug",
-                    "docket_entry__docket__pacer_case_id",
-                    "docket_entry__docket__court__jurisdiction",
-                    "docket_entry__docket__court_id",
-                )
-            )
-
+                docket_ids_by_source[source].add(result["docket_id"])
             initial_documents_in_page: dict[
-                int, tuple[str | None, str | None, str]
+                int, docket_entry_sources.InitialDocumentButton
             ] = {}
-            for initial_document in initial_documents:
-                if initial_document.has_valid_pdf:
-                    # Initial Document available
-                    initial_documents_in_page[
-                        initial_document.docket_entry.docket_id
-                    ] = (
-                        initial_document.get_absolute_url(),
-                        None,
-                        "Initial Document",
-                    )
-                else:
-                    # Initial Document not available. Buy button.
-                    initial_documents_in_page[
-                        initial_document.docket_entry.docket_id
-                    ] = (
-                        None,
-                        initial_document.pacer_url,
-                        "Buy Initial Document",
-                    )
+            for source, docket_ids in docket_ids_by_source.items():
+                initial_documents_in_page.update(
+                    source.initial_document_buttons(docket_ids)
+                )
 
             for result in results:
                 document_url, buy_document_url, text_button = (
                     initial_documents_in_page.get(
-                        result.docket_id, (None, None, "")
+                        result["docket_id"], (None, None, "")
                     )
                 )
                 result["initial_document_url"] = document_url
