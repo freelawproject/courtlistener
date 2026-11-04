@@ -3,41 +3,41 @@
 
 <c-vars title variant="" description="" icon="" />
 
-{# The root is box-less so a closed toast takes no space wherever the page puts it. The live region is always in the DOM and the toast is inserted into it on open, so assistive technology announces it. #}
+{# The root is box-less so a closed toast takes no space wherever the page puts it. The panel stays in the DOM, hidden until open, so htmx binds any hx-* control in the slot at page load; the live region announces it when it shows. #}
 <div x-data="toast" class="contents" x-on:toast-opened.window="replace" {{ attrs }}>
   {{ trigger }}
   <div role="status" class="fixed inset-x-4 bottom-4 z-50 flex justify-center pointer-events-none">
-    <template x-if="isOpen">
-      <div
-        class="pointer-events-auto flex w-full max-w-2xl items-center gap-4 rounded-lg bg-greyscale-900 py-2 pl-2.5 pr-3 text-sm shadow-lg"
-        x-on:keydown.escape.stop="close"
-      >
-        {% if icon or variant == "warning" or variant == "success" or variant == "info" %}
-          <span class="shrink-0 text-greyscale-100">
-            {% if icon %}
-              {% svg icon class="size-5" aria_hidden="true" %}
-            {% elif variant == "warning" %}
-              {% svg "triangle_exclamation" class="size-5" aria_hidden="true" %}
-            {% elif variant == "success" %}
-              {% svg "circle_check" class="size-5" aria_hidden="true" %}
-            {% elif variant == "info" %}
-              {% svg "info" class="size-5" aria_hidden="true" %}
-            {% endif %}
-          </span>
-        {% endif %}
-        <div class="flex-1 min-w-0">
-          <p class="font-medium text-greyscale-100">{{ title }}</p>
-          {% if description %}<p class="text-greyscale-400">{{ description }}</p>{% endif %}
-        </div>
-        {% if slot.strip %}<div class="flex shrink-0 items-center gap-2">{{ slot }}</div>{% endif %}
-        <c-button
-          class="shrink-0 rounded-full p-1.5 text-greyscale-400 outline-none hover:bg-greyscale-800 hover:text-greyscale-100 focus-visible:ring-4 focus-visible:ring-greyscale-600"
-          x-on:click="close"
-          aria-label="Close"
-        >
-          {% svg "cross" class="size-5" aria_hidden="true" %}
-        </c-button>
+    <div
+      x-show="isOpen"
+      x-cloak
+      class="pointer-events-auto flex w-full max-w-2xl items-center gap-4 rounded-lg bg-greyscale-900 py-2 pl-2.5 pr-3 text-sm shadow-lg"
+      x-on:keydown.escape.stop="close"
+    >
+      {% if icon or variant == "warning" or variant == "success" or variant == "info" %}
+        <span class="shrink-0 text-greyscale-100">
+          {% if icon %}
+            {% svg icon class="size-5" aria_hidden="true" %}
+          {% elif variant == "warning" %}
+            {% svg "triangle_exclamation" class="size-5" aria_hidden="true" %}
+          {% elif variant == "success" %}
+            {% svg "circle_check" class="size-5" aria_hidden="true" %}
+          {% elif variant == "info" %}
+            {% svg "info" class="size-5" aria_hidden="true" %}
+          {% endif %}
+        </span>
+      {% endif %}
+      <div class="flex-1 min-w-0">
+        <p class="font-medium text-greyscale-100">{{ title }}</p>
+        {% if description %}<p class="text-greyscale-400">{{ description }}</p>{% endif %}
       </div>
-    </template>
+      {% if slot.strip %}<div class="flex shrink-0 items-center gap-2">{{ slot }}</div>{% endif %}
+      <c-button
+        class="shrink-0 rounded-full p-1.5 text-greyscale-400 outline-none hover:bg-greyscale-800 hover:text-greyscale-100 focus-visible:ring-4 focus-visible:ring-greyscale-600"
+        x-on:click="close"
+        aria-label="Close"
+      >
+        {% svg "cross" class="size-5" aria_hidden="true" %}
+      </c-button>
+    </div>
   </div>
 </div>
