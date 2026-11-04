@@ -7,10 +7,13 @@ Run with pytest from the repo root (no Django or database needed):
 
 from __future__ import annotations
 
+import contextlib
+import io
 import tempfile
 import textwrap
 import unittest
 from pathlib import Path
+from unittest import mock
 
 import frontend_checks
 
@@ -264,6 +267,126 @@ class V2RegisterTest(unittest.TestCase):
             changed={V2_TEMPLATE_FILE: "M"},
         )
         self.assertEqual(findings, [])
+
+
+THIRD_PARTY = "cl/assets/static-global/js/third_party/"
+ALPINE = "cl/assets/static-global/js/alpine/"
+
+
+def _vendored_findings(diff_paths: list[str]) -> list[tuple[str, str]]:
+    """``(file, check)`` per finding from the vendored-README check."""
+    return [
+        (f.file, f.check)
+        for f in frontend_checks.check_vendored_js_readme(diff_paths)
+    ]
+
+
+class VendoredJsReadmeTest(unittest.TestCase):
+    """Upstream JS changes must come with an update to that directory's README."""
+
+    def test_upstream_change_without_readme_fails(self) -> None:
+        """A changed upstream file with no README change is a FAIL."""
+        findings = frontend_checks.check_vendored_js_readme(
+            [f"{THIRD_PARTY}htmx.js"]
+        )
+        self.assertEqual(
+            [(f.file, f.severity) for f in findings],
+            [(f"{THIRD_PARTY}README.md", frontend_checks.FAIL)],
+        )
+
+    def test_upstream_change_with_readme_passes(self) -> None:
+        """Touching the same directory's README is enough."""
+        self.assertEqual(
+            _vendored_findings(
+                [f"{THIRD_PARTY}htmx.js", f"{THIRD_PARTY}README.md"]
+            ),
+            [],
+        )
+
+    def test_nested_upstream_file_counts(self) -> None:
+        """Files in subdirectories, like flatpickr plugins, count too."""
+        self.assertEqual(
+            _vendored_findings(
+                [f"{THIRD_PARTY}flatpickr/plugins/confirmDate.js"]
+            ),
+            [(f"{THIRD_PARTY}README.md", "check_vendored_js_readme")],
+        )
+
+    def test_each_directory_needs_its_own_readme(self) -> None:
+        """The other directory's README doesn't cover a change."""
+        self.assertEqual(
+            _vendored_findings(
+                [f"{ALPINE}alpinejscsp.js", f"{THIRD_PARTY}README.md"]
+            ),
+            [(f"{ALPINE}README.md", "check_vendored_js_readme")],
+        )
+
+    def test_alpine_plugins_are_upstream(self) -> None:
+        """Official Alpine plugins live in the vendored directory."""
+        self.assertEqual(
+            _vendored_findings([f"{ALPINE}plugins/focus.js"]),
+            [(f"{ALPINE}README.md", "check_vendored_js_readme")],
+        )
+
+    def test_our_alpine_code_is_ignored(self) -> None:
+        """components/ and composables/ are our code, not upstream."""
+        self.assertEqual(
+            _vendored_findings(
+                [
+                    f"{ALPINE}components/date_selector.js",
+                    f"{ALPINE}composables/focus_trap.js",
+                ]
+            ),
+            [],
+        )
+
+    def test_readme_only_change_passes(self) -> None:
+        """Editing just the README is fine."""
+        self.assertEqual(_vendored_findings([f"{ALPINE}README.md"]), [])
+
+    def test_other_js_is_out_of_scope(self) -> None:
+        """Legacy scripts outside the two directories are never checked."""
+        self.assertEqual(
+            _vendored_findings(["cl/assets/static-global/js/base.js"]), []
+        )
+
+
+class VendoredJsReadmeMainTest(unittest.TestCase):
+    """``main()`` reads renames from ``--name-status`` and runs the check
+    even when no template or CSS file changed."""
+
+    def _main(self, name_status: str) -> int:
+        with tempfile.TemporaryDirectory() as tmp:
+            changed = Path(tmp) / "changed_files.txt"
+            changed.write_text(name_status, encoding="utf-8")
+            argv = ["frontend_checks.py", "--repo-root", tmp]
+            argv += ["--changed-files", str(changed)]
+            with (
+                mock.patch("sys.argv", argv),
+                contextlib.redirect_stdout(io.StringIO()),
+            ):
+                return frontend_checks.main()
+
+    def test_rename_inside_vendored_dir_fails(self) -> None:
+        """An R100 rename with no README change makes the job fail."""
+        old = f"{THIRD_PARTY}flatpickr/flatpickr@4.6.13.js"
+        new = f"{THIRD_PARTY}flatpickr/flatpickr.js"
+        self.assertEqual(self._main(f"R100\t{old}\t{new}\n"), 1)
+
+    def test_moving_a_file_out_counts_for_the_old_directory(self) -> None:
+        """The old side of a rename is checked as well as the new one."""
+        old = f"{THIRD_PARTY}htmx.js"
+        self.assertEqual(
+            self._main(f"R100\t{old}\tcl/assets/static-global/js/htmx.js\n"),
+            1,
+        )
+
+    def test_rename_with_readme_passes(self) -> None:
+        """The same rename plus a README change exits cleanly."""
+        old = f"{THIRD_PARTY}flatpickr/flatpickr@4.6.13.js"
+        new = f"{THIRD_PARTY}flatpickr/flatpickr.js"
+        name_status = f"R100\t{old}\t{new}\nM\t{THIRD_PARTY}README.md\n"
+        self.assertEqual(self._main(name_status), 0)
 
 
 if __name__ == "__main__":

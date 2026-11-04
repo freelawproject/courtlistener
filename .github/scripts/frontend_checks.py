@@ -2,7 +2,8 @@
 """Automated frontend checks for CourtListener PR reviews.
 
 Runs checks on changed template and CSS files to enforce frontend
-conventions. Called by the frontend-lint GitHub Actions workflow.
+conventions, and checks that changes to vendored JS are recorded in that
+directory's README. Called by the frontend-lint GitHub Actions workflow.
 
 Input file must be in git --name-status format (STATUS\\tPATH per line).
 """
@@ -118,6 +119,24 @@ def is_legacy_template(path: str) -> bool:
 
 def is_input_css(path: str) -> bool:
     return path == "cl/assets/tailwind/input.css"
+
+
+# ---------------------------------------------------------------------------
+# Vendored JS directories
+# ---------------------------------------------------------------------------
+
+# Each directory holds upstream code and a README listing every package
+# vendored there, with its version and source.
+VENDORED_JS_DIRS = (
+    "cl/assets/static-global/js/third_party/",
+    "cl/assets/static-global/js/alpine/",
+)
+
+# Our own code inside a vendored directory; changing it needs no README entry.
+VENDORED_JS_OWN_CODE = (
+    "cl/assets/static-global/js/alpine/components/",
+    "cl/assets/static-global/js/alpine/composables/",
+)
 
 
 # ---------------------------------------------------------------------------
@@ -964,6 +983,46 @@ def run_checks(
     return findings
 
 
+def check_vendored_js_readme(diff_paths: list[str]) -> list[Finding]:
+    """Fail when upstream files in a vendored JS directory change but that
+    directory's README doesn't.
+
+    ``diff_paths`` is every path in the diff, including the old side of a
+    rename, so moving a file into or out of a directory counts for both.
+    """
+    findings = []
+    for vendored_dir in VENDORED_JS_DIRS:
+        readme = f"{vendored_dir}README.md"
+        upstream_changes = sorted(
+            {
+                path
+                for path in diff_paths
+                if path.startswith(vendored_dir)
+                and path != readme
+                and not path.startswith(VENDORED_JS_OWN_CODE)
+            }
+        )
+        if not upstream_changes or readme in diff_paths:
+            continue
+        shown = ", ".join(
+            path.removeprefix(vendored_dir) for path in upstream_changes[:3]
+        )
+        if len(upstream_changes) > 3:
+            shown += f" and {len(upstream_changes) - 3} more"
+        findings.append(
+            Finding(
+                readme,
+                1,
+                "check_vendored_js_readme",
+                FAIL,
+                f"Upstream files in {vendored_dir} changed ({shown}) but "
+                f"{readme} did not — record each package's version and "
+                "source there",
+            )
+        )
+    return findings
+
+
 def _swap_template_prefix(path: str, *, add_v2: bool) -> str | None:
     """Swap between legacy and v2_ template paths.
 
@@ -1115,6 +1174,7 @@ def main() -> int:
     raw = Path(args.changed_files).read_text()
 
     changed_files = []
+    diff_paths: list[str] = []
     file_statuses: dict[str, str] = {}
     for line in raw.splitlines():
         line = line.strip()
@@ -1131,6 +1191,10 @@ def main() -> int:
         path = parts[-1]
         file_statuses[path] = status
         changed_files.append(path)
+        diff_paths.append(path)
+        # A rename also removes its old path; a copy leaves it untouched.
+        if status.startswith("R") and len(parts) == 3:
+            diff_paths.append(parts[1])
 
     # Filter to relevant files
     relevant = [
@@ -1140,10 +1204,11 @@ def main() -> int:
         and not any(fnmatch.fnmatch(f, g) for g in args.skip_files)
     ]
 
-    if not relevant:
+    findings = check_vendored_js_readme(diff_paths)
+    if not relevant and not findings:
         return 0
-
-    findings = run_checks(relevant, repo_root, file_statuses)
+    if relevant:
+        findings += run_checks(relevant, repo_root, file_statuses)
 
     if not findings:
         print("All frontend checks passed.")

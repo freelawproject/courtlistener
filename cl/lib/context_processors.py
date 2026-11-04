@@ -1,5 +1,5 @@
 import random
-from typing import cast
+from typing import Never, TypedDict, cast
 
 from django.conf import settings
 from django.contrib.auth.models import User
@@ -10,7 +10,26 @@ from cl.search.models import SEARCH_TYPES
 from cl.users.models import EMAIL_NOTIFICATIONS, FLAG_TYPES, EmailFlag
 
 
-def inject_settings(request):
+class _SettingsInjection(TypedDict):
+    DEBUG: bool
+    MIN_DONATION: dict[str, int]
+    MAX_ALERT_RESULTS_PER_DAY: int
+    MAX_FREE_DOCKET_ALERTS: int
+    DOCKET_ALERT_RECAP_BONUS: int
+    SEARCH_TYPES: type[SEARCH_TYPES]
+    WIKI_API_URL: str
+    WIKI_HELP_URL: str
+    WIKI_TERMS_URL: str
+    WIKI_REMOVAL_URL: str
+    WIKI_COVERAGE_URL: str
+    WIKI_COVERAGE_FDS_URL: str
+    WIKI_COVERAGE_OA_URL: str
+    WIKI_COVERAGE_OPINIONS_URL: str
+    WIKI_COVERAGE_RECAP_URL: str
+    WIKI_COVERAGE_SCOTUS_URL: str
+
+
+def inject_settings(request: HttpRequest) -> _SettingsInjection:
     """Use this function to inject specific settings into every page."""
     return {
         "DEBUG": settings.DEBUG,
@@ -91,7 +110,7 @@ info_tips = (
 )
 
 
-def inject_random_tip(request):
+def inject_random_tip(request: HttpRequest) -> dict[str, str]:
     return {"TIP": random.choice(info_tips)}
 
 
@@ -118,9 +137,14 @@ TRANSIENT = {
 }
 
 
+class _EmailBanStatus(TypedDict):
+    EMAIL_BAN_PERMANENT: bool
+    EMAIL_BAN_REASON: str
+
+
 def inject_email_ban_status(
     request: HttpRequest,
-) -> dict[str, str | bool]:
+) -> _EmailBanStatus | dict[Never, Never]:
     """This function injects the status of the user's email address.
 
     :param request: Contains the user for checking if their email is valid.

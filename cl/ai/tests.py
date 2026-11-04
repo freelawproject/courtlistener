@@ -10,6 +10,8 @@ from django.core.management.base import CommandError
 from google.genai.types import JobState
 
 from cl.ai.llm_providers.google import (
+    BatchRequest,
+    BatchTask,
     GoogleGenAIBatchWrapper,
     _ResponseValidator,
 )
@@ -208,7 +210,7 @@ class GoogleGenAIBatchWrapperTest(SimpleTestCase):
         mock_client_class.return_value = mock_client_instance
 
         wrapper = GoogleGenAIBatchWrapper(api_key="test-key")
-        tasks_data = [
+        tasks_data: list[BatchTask] = [
             {
                 "llm_key": "task-1",
                 "input_file_path": "/fake/path/test.pdf",
@@ -245,7 +247,7 @@ class GoogleGenAIBatchWrapperTest(SimpleTestCase):
         mock_client_class.return_value = mock_client_instance
 
         wrapper = GoogleGenAIBatchWrapper(api_key="test-key")
-        tasks_data = [
+        tasks_data: list[BatchTask] = [
             {
                 "llm_key": "task-2",
                 "input_text": "This is a sample document text.",
@@ -270,26 +272,6 @@ class GoogleGenAIBatchWrapperTest(SimpleTestCase):
         mock_client_instance.files.upload.assert_not_called()
 
     @patch("cl.ai.llm_providers.google.genai.Client")
-    def test_prepare_batch_requests_skips_missing_key(self, mock_client_class):
-        """Test that requests without llm_key are skipped."""
-        mock_client_instance = MagicMock()
-        mock_client_class.return_value = mock_client_instance
-
-        wrapper = GoogleGenAIBatchWrapper(api_key="test-key")
-        tasks_data = [
-            {"input_text": "No key provided"},
-            {"llm_key": "task-3", "input_text": "Has key"},
-        ]
-
-        result = wrapper.prepare_batch_requests(
-            tasks_data=tasks_data, user_prompt="Process this"
-        )
-
-        # Only one request should be created
-        self.assertEqual(len(result), 1)
-        self.assertEqual(result[0]["key"], "task-3")
-
-    @patch("cl.ai.llm_providers.google.genai.Client")
     def test_execute_batch_without_cache(self, mock_client_class):
         """Test executing a batch without system prompt caching."""
         # Setup mock batch job response
@@ -309,7 +291,7 @@ class GoogleGenAIBatchWrapperTest(SimpleTestCase):
         wrapper = GoogleGenAIBatchWrapper(
             api_key="test-key", model_name="gemini-3.1-pro-preview"
         )
-        requests = [
+        requests: list[BatchRequest] = [
             {
                 "key": "req-1",
                 "request": {
@@ -359,7 +341,7 @@ class GoogleGenAIBatchWrapperTest(SimpleTestCase):
         wrapper = GoogleGenAIBatchWrapper(
             api_key="test-key", model_name="gemini-3.1-pro-preview"
         )
-        requests = [
+        requests: list[BatchRequest] = [
             {
                 "key": "req-2",
                 "request": {
