@@ -14,12 +14,13 @@ logger = logging.getLogger(__name__)
 async def get_or_create_parenthetical_groups(
     cluster: OpinionCluster,
 ) -> QuerySet[ParentheticalGroup, ParentheticalGroup]:
-    """
-    Given a cluster, return its existing ParentheticalGroup's from the database
-    or compute and store new ones if they do not yet exist or need to be updated.
+    """Given a cluster, return its existing ParentheticalGroup's from the database or compute and store new ones if they do not yet exist or need to be updated.
 
-    :param cluster: An OpinionCluster object
-    :return: A list of ParentheticalGroup's for the given cluster
+    Args:
+        cluster: An OpinionCluster object
+
+    Returns:
+        A list of ParentheticalGroup's for the given cluster
     """
     if await cluster.parentheticals.filter(group__isnull=True).acount():
         await atomic_create_parenthetical_groups(cluster)
@@ -33,11 +34,10 @@ def atomic_create_parenthetical_groups(cluster: OpinionCluster) -> None:
 
 
 def create_parenthetical_groups(cluster: OpinionCluster) -> None:
-    """
-    Given a cluster, (re)computes the parenthetical groups for its parentheticals
-    and stores them in the database
+    """Given a cluster, (re)computes the parenthetical groups for its parentheticals and stores them in the database.
 
-    :param cluster: An OpinionCluster object
+    Args:
+        cluster: An OpinionCluster object
     """
     parentheticals = list(cluster.parentheticals)
     computed_groups = compute_parenthetical_groups(parentheticals)
@@ -55,7 +55,7 @@ def create_parenthetical_groups(cluster: OpinionCluster) -> None:
 
 
 def disconnect_parenthetical_group_signals() -> None:
-    """Disconnect ParentheticalGroup ES indexing on save and delete
+    """Disconnect ParentheticalGroup ES indexing on save and delete.
 
     Useful for batch `citations.commands.find_citations` jobs, that use the
     `find_citations_and_parentheticals_for_opinion_by_pks`
@@ -82,7 +82,7 @@ def disconnect_parenthetical_group_signals() -> None:
 
 
 def reconnect_parenthetical_group_signals() -> None:
-    """Reconnect ParentheticalGroup ES indexing on save and delete
+    """Reconnect ParentheticalGroup ES indexing on save and delete.
 
     Useful for batch `find_citations` jobs
     """

@@ -263,7 +263,6 @@ class CourtMatchingTest(SimpleTestCase):
 
     def test_get_fed_court_object_from_string(self) -> None:
         """Can we get the correct federal courts?"""
-
         pairs = (
             {"q": "Eastern District of New York", "a": "nyed"},
             {"q": "Northern District of New York", "a": "nynd"},
@@ -282,7 +281,6 @@ class CourtMatchingTest(SimpleTestCase):
 
     def test_get_appellate_court_object_from_string(self) -> None:
         """Can we get the correct federal appellate courts?"""
-
         pairs = (
             {"q": "U. S. Court of Appeals for the Ninth Circuit", "a": "ca9"},
             {
@@ -373,7 +371,7 @@ class PacerDocketParserTest(TestCase):
         self.assertEqual(att_rd.docket_entry.recap_documents.all().count(), 2)
 
     def test_party_parsing(self) -> None:
-        """Can we parse an XML docket and get good results in the DB"""
+        """Can we parse an XML docket and get good results in the DB."""
         self.assertEqual(self.docket.parties.all().count(), self.NUM_PARTIES)
 
         petro = self.docket.parties.get(name__contains="Petro")
@@ -402,7 +400,6 @@ class PacerDocketParserTest(TestCase):
     )
     def test_get_and_save_free_document_report(self, mock_cookies) -> None:
         """Test the retrieval and storage of free document report data."""
-
         with patch(
             "cl.corpus_importer.tasks.FreeOpinionReport",
             new=FakeFreeOpinionReport,
@@ -425,8 +422,7 @@ class PacerDocketParserTest(TestCase):
 
 
 class FreeOpinionExcludedCourtsTest(SimpleTestCase):
-    """The free-opinion exclusion set defers to juriscraper and unions our own
-    operational exclusions, rather than hardcoding a list that drifts."""
+    """The free-opinion exclusion set defers to juriscraper and unions our own operational exclusions, rather than hardcoding a list that drifts."""
 
     def test_defers_to_juriscraper_and_unions_operational(self) -> None:
         # Every court juriscraper can't fetch must also be skipped here, and we
@@ -686,8 +682,7 @@ class ScrapeFreeOpinionsLoopTest(TestCase):
 
 
 class FreeOpinionAlreadyAvailableTest(TestCase):
-    """A document that RECAP already has must still reach the opinion
-    ingestion task when the free opinion report lists it later."""
+    """A document that RECAP already has must still reach the opinion ingestion task when the free opinion report lists it later."""
 
     @classmethod
     def setUpTestData(cls) -> None:
@@ -721,7 +716,8 @@ class FreeOpinionAlreadyAvailableTest(TestCase):
     def make_row(self) -> PACERFreeDocumentRow:
         """Build the free opinion report row for the existing document.
 
-        :return: The saved PACERFreeDocumentRow.
+        Returns:
+            The saved PACERFreeDocumentRow.
         """
         return PACERFreeDocumentRow.objects.create(
             court_id="nysd",
@@ -822,8 +818,7 @@ class FreeOpinionAlreadyAvailableTest(TestCase):
         mock_llm,
         mock_find_citations,
     ) -> None:
-        """The full get_pdfs chain must turn an available document into an
-        opinion without buying it again."""
+        """The full get_pdfs chain must turn an available document into an opinion without buying it again."""
         mock_extract.return_value.json.return_value = {
             "content": "See Doe v. Roe, 671 F. Supp. 3d 387 (S.D.N.Y. 2023).",
             "extracted_by_ocr": False,
@@ -871,9 +866,7 @@ class FreeOpinionAlreadyAvailableTest(TestCase):
 
 
 class GetQuarterTest(SimpleTestCase):
-    """Can we properly figure out when the quarter that we're currently in
-    began?
-    """
+    """Can we properly figure out when the quarter that we're currently in began?"""
 
     def test_january(self) -> None:
         self.assertEqual(
@@ -999,7 +992,7 @@ class ImporterTransportTest(SimpleTestCase):
 
 @pytest.mark.django_db
 class IAUploaderTest(TestCase):
-    """Tests related to uploading docket content to the Internet Archive"""
+    """Tests related to uploading docket content to the Internet Archive."""
 
     @classmethod
     def setUpTestData(cls) -> None:
@@ -1053,7 +1046,7 @@ class IAUploaderTest(TestCase):
         )
 
     def test_num_queries_ok(self) -> None:
-        """Have we regressed the number of queries it takes to make the JSON
+        """Have we regressed the number of queries it takes to make the JSON.
 
         It's very easy to use the DRF in a way that generates a LOT of queries.
         Let's avoid that.
@@ -1070,12 +1063,11 @@ class IAUploaderTest(TestCase):
 
 class HarvardTests(TestCase):
     def setUp(self):
-        """Setup harvard tests
+        """Setup harvard tests.
 
         This setup is a little distinct from normal ones.  Here we are actually
         setting up our patches which are used by the majority of the tests.
         Each one can be used or turned off.  See the teardown for more.
-        :return:
         """
         super().setUp()
         self.make_filepath_patch = patch(
@@ -1106,7 +1098,7 @@ class HarvardTests(TestCase):
             CourtFactory.create(id=court)
 
     def tearDown(self) -> None:
-        """Tear down patches and remove added objects"""
+        """Tear down patches and remove added objects."""
         self.make_filepath_patch.stop()
         self.read_json_patch.stop()
         self.find_court_patch.stop()
@@ -1114,10 +1106,13 @@ class HarvardTests(TestCase):
         super().tearDown()
 
     def _get_cite(self, case_law) -> Citation:
-        """Fetch first citation added to case
+        """Fetch first citation added to case.
 
-        :param case_law: Case object
-        :return: First citation found
+        Args:
+            case_law: Case object
+
+        Returns:
+            First citation found
         """
         cites = eyecite.get_citations(
             case_law["citations"][0]["cite"], tokenizer=HYPERSCAN_TOKENIZER
@@ -1225,7 +1220,6 @@ Appeals, No. 19667-4-III, October 31, 2002. Denied September 30, 2003."
 
     def test_existing_docket_lookup(self):
         """Can we update an existing docket instead of creating a new one?"""
-
         case_law = CaseLawFactory()
         DocketFactory(
             docket_number=case_law["docket_number"],
@@ -1253,7 +1247,6 @@ Appeals, No. 19667-4-III, October 31, 2002. Denied September 30, 2003."
 
     def test_new_bankruptcy_case(self):
         """Can we add a bankruptcy court?"""
-
         # Disable court_func patch to test ability to identify bank. ct.
         self.find_court_patch.stop()
 
@@ -1362,8 +1355,7 @@ delivered the opinion of the Court.</p></opinion> </casebody>'
         )
 
     def test_xml_harvard_extraction(self):
-        """Did we successfully not remove page citations while
-        processing other elements?"""
+        """Did we successfully not remove page citations while processing other elements?"""
         data = """
 <casebody firstpage="1" lastpage="2">
 <opinion type="majority">Everybody <page-number citation-index="1" \
@@ -1384,7 +1376,7 @@ label="194">*194</page-number>
         self.assertEqual(opinions[0].xml_harvard.count("</page-number>"), 2)
 
     def test_same_citation_different_case(self):
-        """Same case name, different opinion - based on a BTA bug"""
+        """Same case name, different opinion - based on a BTA bug."""
         case_law = CaseLawFactory()
         self.read_json_func.return_value = case_law
         self.assertSuccessfulParse(1)
@@ -1412,8 +1404,7 @@ label="194">*194</page-number>
         self.assertEqual(str(cite), "7 Ct. Cl. 65")
 
     def test_no_volume_citation(self):
-        """Can we handle an opinion that contains a citation without a
-        volume?"""
+        """Can we handle an opinion that contains a citation without a volume?"""
         citations = [
             "Miller's Notebook, 179",
         ]
@@ -1424,10 +1415,7 @@ label="194">*194</page-number>
         self.assertSuccessfulParse(1)
 
     def test_case_name_winnowing_comparison(self):
-        """
-        Test removing "United States" from case names and check if there is an
-        overlap between two case names.
-        """
+        """Test removing "United States" from case names and check if there is an overlap between two case names."""
         case_name_full = (
             "UNITED STATES of America, Plaintiff-Appellee, "
             "v. Wayne VINSON, Defendant-Appellant "
@@ -1442,10 +1430,7 @@ label="194">*194</page-number>
         self.assertEqual(len(overlap), 0)
 
     def test_case_names_with_abbreviations(self):
-        """
-        Test what happens when the case name contains abbreviations
-        """
-
+        """Test what happens when the case name contains abbreviations."""
         # Check against itself, there must be an overlap
         case_1_data = {
             "case_name_full": "In the matter of S.J.S., a minor child. "
@@ -1527,8 +1512,7 @@ class CorpusImporterManagementCommmandsTests(TestCase):
         cls.judge_2.positions.add(position_2)
 
     def test_normalize_author_str(self):
-        """Normalize author_str field in opinions in Person object"""
-
+        """Normalize author_str field in opinions in Person object."""
         # Create opinion cluster with opinion and docket
         cluster = (
             OpinionClusterWithChildrenAndParentsFactory(
@@ -1564,8 +1548,7 @@ class CorpusImporterManagementCommmandsTests(TestCase):
         )
 
     def test_normalize_panel_str(self):
-        """Normalize judges string field into panel field(m2m)"""
-
+        """Normalize judges string field into panel field(m2m)."""
         cluster = OpinionClusterWithParentsFactory(
             docket=DocketFactory(
                 court=self.court,
@@ -1599,9 +1582,7 @@ class CorpusImporterManagementCommmandsTests(TestCase):
     },
 )
 class CleanUpMisMatchedDockets(TestCase):
-    """Test find_and_fix_mis_matched_dockets method that finds and fixes mis
-    matched opinion dockets added by Harvard importer.
-    """
+    """Test find_and_fix_mis_matched_dockets method that finds and fixes mis matched opinion dockets added by Harvard importer."""
 
     @classmethod
     def setUpTestData(cls):
@@ -1644,7 +1625,6 @@ class CleanUpMisMatchedDockets(TestCase):
 
     def test_find_mis_matched_docket(self, mock_download_ia):
         """Test only find and report mis matched dockets."""
-
         dockets = Docket.objects.all()
         self.assertEqual(dockets.count(), 2)
         mis_matched_dockets = find_and_fix_mis_matched_dockets(fix=False)
@@ -1652,8 +1632,7 @@ class CleanUpMisMatchedDockets(TestCase):
         self.assertEqual(dockets.count(), 2)
 
     def test_find_and_fix_mis_matched_dockets(self, mock_download_ia):
-        """Test find and fix mis matched dockets"""
-
+        """Test find and fix mis matched dockets."""
         cluster = self.cluster[0]
         mis_matched_docket = cluster.docket
         dockets = Docket.objects.all()
@@ -1676,21 +1655,19 @@ class CleanUpMisMatchedDockets(TestCase):
 
 class HarvardMergerTests(TestCase):
     def setUp(self):
-        """Setup harvard merger tests"""
+        """Setup harvard merger tests."""
         self.read_json_patch = patch(
             "cl.corpus_importer.management.commands.harvard_merge.read_json"
         )
         self.read_json_func = self.read_json_patch.start()
 
     def tearDown(self) -> None:
-        """Tear down patches and remove added objects"""
+        """Tear down patches and remove added objects."""
         Docket.objects.all().delete()
         self.read_json_patch.stop()
 
     def test_merger(self):
-        """Can we identify opinions correctly even when they are slightly
-        different"""
-
+        """Can we identify opinions correctly even when they are slightly different."""
         case_data = {
             "name": "CANNON v. THE STATE",
             "name_abbreviation": "Cannon v. State",
@@ -1764,8 +1741,7 @@ class HarvardMergerTests(TestCase):
         )
 
     def test_non_overlapping(self):
-        """Can we find fields that need merging"""
-
+        """Can we find fields that need merging."""
         case_data = {
             "casebody": {
                 "data": '<casebody> <attorneys><page-number citation-index="1" label="758">*758</page-number><em>B. B. Giles, </em>for plaintiff in error.</attorneys>\n  <attorneys id="b796-5"><em>Lindley W. Gamp, solicitor, John A. Boyhin, solicitor-general,. Durwood T. Bye, </em>contra.</attorneys>\n  <opinion type="majority"> a simple opinion</opinion>\n</casebody>\n',
@@ -1798,7 +1774,7 @@ class HarvardMergerTests(TestCase):
         self.assertEqual(clean_dictionary, {}, msg="Attorneys are the same")
 
     def test_docket_number_merger(self):
-        """Can we choose the correct docket number"""
+        """Can we choose the correct docket number."""
         docket = DocketFactory(docket_number="17-3000")
         cluster = OpinionClusterWithParentsFactory(id=4, docket=docket)
         updated_docket_number = merge_docket_numbers(
@@ -1810,8 +1786,7 @@ class HarvardMergerTests(TestCase):
         self.assertEqual(docket.docket_number, "Master Docket 17-3000L")
 
     def test_sources_query(self):
-        """Test query for Non Harvard Sources"""
-
+        """Test query for Non Harvard Sources."""
         OpinionClusterFactory(
             source=ClusterSources.COLUMBIA_ARCHIVE,
             docket=DocketFactory(source=Docket.COLUMBIA),
@@ -1887,9 +1862,7 @@ class HarvardMergerTests(TestCase):
         self.assertEqual([1, 4, 5], list(sorted(cluster_ids)))
 
     def test_add_opinions_without_authors_in_cl(self):
-        """Can we add opinions and update empty author_str fields via
-        the Harvard merger?"""
-
+        """Can we add opinions and update empty author_str fields via the Harvard merger?"""
         cluster = OpinionClusterWithMultipleOpinionsFactory(
             source=ClusterSources.COLUMBIA_ARCHIVE,
             docket=DocketFactory(source=Docket.COLUMBIA),
@@ -1945,9 +1918,7 @@ class HarvardMergerTests(TestCase):
         self.assertEqual(cluster.docket.source, Docket.HARVARD_AND_COLUMBIA)
 
     def test_add_opinions_with_authors_in_cl(self):
-        """Can we update an opinion and leave author_str alone if already
-        assigned"""
-
+        """Can we update an opinion and leave author_str alone if already assigned."""
         cluster = OpinionClusterWithMultipleOpinionsFactory(
             source=ClusterSources.COLUMBIA_ARCHIVE,
             docket=DocketFactory(source=Docket.COLUMBIA),
@@ -2000,7 +1971,6 @@ class HarvardMergerTests(TestCase):
 
     def test_merge_overlap_judges(self):
         """Can we merge overlap judge names?"""
-
         for item in [
             # Format: (cl judge, harvard prepared data, expected output)
             # CL item #4575556
@@ -2047,7 +2017,6 @@ class HarvardMergerTests(TestCase):
 
     def test_merge_overlap_casenames(self):
         """Can we merge overlap case names?"""
-
         for item in [
             # CL item #4571581
             (
@@ -2136,7 +2105,6 @@ class HarvardMergerTests(TestCase):
 
     def test_merge_date_filed(self):
         """Can we merge date filed?"""
-
         # Item format: (harvard_decision_date, cl date_filed, expected output)
         for item in [
             # CL item #4549197
@@ -2160,7 +2128,6 @@ class HarvardMergerTests(TestCase):
 
     def test_update_docket_source(self):
         """Can we update docket source?"""
-
         docket_1 = DocketFactory(source=Docket.RECAP)
         cluster_1 = OpinionClusterWithParentsFactory(docket=docket_1)
         update_docket_source(cluster_1)
@@ -2179,7 +2146,6 @@ class HarvardMergerTests(TestCase):
 
     def test_update_cluster_source(self):
         """Can we update cluster source?"""
-
         cluster_1 = OpinionClusterWithParentsFactory(
             source=ClusterSources.COURT_WEBSITE
         )
@@ -2222,8 +2188,7 @@ class HarvardMergerTests(TestCase):
         )
 
     def test_judge_name_extraction(self):
-        """Can we extract out judges properly"""
-
+        """Can we extract out judges properly."""
         test_pairs = [
             (
                 # Test if we are tripped up by multiple judge names in tag
@@ -2301,8 +2266,7 @@ class HarvardMergerTests(TestCase):
             self.assertEqual(pair[1], author_str, msg=f"Failed: {pair[1]}")
 
     def test_panel_extraction(self):
-        """Can we extract out judges properly"""
-
+        """Can we extract out judges properly."""
         test_pairs = [
             (
                 # Test if we are tripped up by multiple judge names in tag
@@ -2342,7 +2306,6 @@ class HarvardMergerTests(TestCase):
 
     def test_process_harvard_data(self):
         """Can we correctly parse the data from json harvard?"""
-
         case_data = {
             "name": "CANNON v. THE STATE",
             "name_abbreviation": "Cannon v. State",
@@ -2390,7 +2353,7 @@ class HarvardMergerTests(TestCase):
 
 class TexasMergerTest(TestCase):
     def setUp(self):
-        """Set up texas merger tests"""
+        """Set up texas merger tests."""
         self.download_task_patch = patch(
             "cl.corpus_importer.tasks.download_texas_document.si"
         )
@@ -2406,7 +2369,7 @@ class TexasMergerTest(TestCase):
 
     @classmethod
     def setUpTestData(cls):
-        """Create test data for Texas merger tests"""
+        """Create test data for Texas merger tests."""
         cls.texas_sc = CourtFactory.create(id="tex")
         cls.texas_cca = CourtFactory.create(id="texcrimapp")
         cls.texas_coa1 = CourtFactory.create(id="txctapp1")
@@ -2424,7 +2387,7 @@ class TexasMergerTest(TestCase):
         )
 
     def tearDown(self):
-        """Tear down patches"""
+        """Tear down patches."""
         self.download_task_patch.stop()
         self.extract_document_patch.stop()
         self.download_document_patch.stop()
@@ -2682,9 +2645,7 @@ class TexasMergerTest(TestCase):
     def test_merge_texas_document_plaintext_extraction(
         self, ext_mock, pcs_mock, throttle_mock
     ):
-        """
-        Ensure plaintext extraction is triggered by `merge_texas_document`.
-        """
+        """Ensure plaintext extraction is triggered by `merge_texas_document`."""
         pcs_mock.return_value = httpx.Response(200, text="1")
         # Stop the mocks just for this test
         self.download_task_patch.stop()
@@ -2929,8 +2890,7 @@ class TexasMergerTest(TestCase):
         assert existing_entry_1.disposition == "First entry"
 
     def test_merge_texas_docket_entry_single_match_updates_entry(self):
-        """When exactly one entry matches by date/type/brief, update it even
-        with different sequence number."""
+        """When exactly one entry matches by date/type/brief, update it even with different sequence number."""
         existing_entry = TexasDocketEntryFactory.create(
             docket=self.docket_coa1,
             date_filed=date.fromisoformat("2025-01-04"),
@@ -3429,8 +3389,7 @@ class TexasMergerTest(TestCase):
     def test_html_download_and_extraction_strips_tags(
         self, ext_mock, microservice_mock, throttle_mock
     ):
-        """Does an HTML document get downloaded with text extracted and
-        HTML tags stripped, ending with OCR_UNNECESSARY?"""
+        """Does an HTML document get downloaded with text extracted and HTML tags stripped, ending with OCR_UNNECESSARY?"""
         from tempfile import NamedTemporaryFile
 
         from asgiref.sync import async_to_sync
@@ -3898,7 +3857,6 @@ class TexasMergerTest(TestCase):
 
     def test_merge_texas_case_transfers_multiple(self):
         """Can we correctly handle multiple appellate transfers on one docket?"""
-
         aci = TexasAppellateCourtInfoDictFactory(
             court_id=CourtID.FIRST_COURT_OF_APPEALS.value, _n_cases=3
         )
@@ -4204,9 +4162,7 @@ class ScrapeIqueryPagesTest(TestCase):
                 self.r.delete(*key)
 
     def test_compute_next_binary_probe(self, mock_cookies):
-        """Confirm the method compute_next_binary_probe generates the expected
-        probe pattern based on the initial variables."""
-
+        """Confirm the method compute_next_binary_probe generates the expected probe pattern based on the initial variables."""
         highest_known_pacer_case_id = 0
         probe_pattern = []
         for i in range(18):
@@ -4269,8 +4225,7 @@ class ScrapeIqueryPagesTest(TestCase):
             self.assertEqual(actual - jitter_applied, expected)
 
     def test_jitter_is_capped(self, mock_cookies):
-        """Confirm that jitter can't be greater than IQUERY_MAX_PROBE"""
-
+        """Confirm that jitter can't be greater than IQUERY_MAX_PROBE."""
         jitter = compute_binary_probe_jitter(testing=False)
         self.assertTrue(jitter < settings.IQUERY_MAX_PROBE)
 
@@ -4280,7 +4235,6 @@ class ScrapeIqueryPagesTest(TestCase):
     )
     def test_iquery_pages_probe_task(self, mock_cookies):
         """Test probe_or_scrape_iquery_pages task."""
-
         dockets = Docket.objects.filter(court_id=self.court_cand.pk)
         self.assertEqual(dockets.count(), 0)
         r = get_redis_interface("CACHE")
@@ -4326,7 +4280,6 @@ class ScrapeIqueryPagesTest(TestCase):
     )
     def test_iquery_pages_probe_nysd(self, mock_cookies):
         """Test probe_or_scrape_iquery_pages."""
-
         dockets = Docket.objects.filter(court_id=self.court_nysd.pk)
         self.assertEqual(dockets.count(), 0)
         r = get_redis_interface("CACHE")
@@ -4405,9 +4358,11 @@ class ScrapeIqueryPagesTest(TestCase):
         new=FakeCaseQueryReport,
     )
     def test_iquery_pages_probe_court_down(self, mock_cookies):
-        """Test a court is down or has blocked us. Abort the scrape and set a
-        long wait equals to IQUERY_COURT_BLOCKED_WAIT."""
+        """Test a court is down or has blocked us.
 
+        Abort the scrape and set a long wait equals to
+        IQUERY_COURT_BLOCKED_WAIT.
+        """
         r = get_redis_interface("CACHE")
         # Simulate a highest_known_pacer_case_id  = 8
         r.hset("iquery:highest_known_pacer_case_id", self.court_gamb.pk, 8)
@@ -4434,9 +4389,11 @@ class ScrapeIqueryPagesTest(TestCase):
     )
     @patch("cl.corpus_importer.tasks.logger")
     def test_iquery_pages_probe_court_timeout(self, mock_logger, mock_cookies):
-        """Test a CaseQuery request times out. Abort the task after an iquery
-        page retrieval fails after individual retries."""
+        """Test a CaseQuery request times out.
 
+        Abort the task after an iquery page retrieval fails after individual
+        retries.
+        """
         r = get_redis_interface("CACHE")
         # Simulate a highest_known_pacer_case_id  = 8
         r.hset("iquery:highest_known_pacer_case_id", self.court_hib.pk, 8)
@@ -4466,9 +4423,7 @@ class ScrapeIqueryPagesTest(TestCase):
         new=FakeCaseQueryReport,
     )
     def test_probe_iquery_pages_daemon(self, mock_cookies):
-        """Test probe_iquery_pages_daemon by providing an initial and final
-        pacer_case_ids to scrape."""
-
+        """Test probe_iquery_pages_daemon by providing an initial and final pacer_case_ids to scrape."""
         dockets = Docket.objects.all()
         self.assertEqual(dockets.count(), 0)
         r = get_redis_interface("CACHE")
@@ -4505,10 +4460,7 @@ class ScrapeIqueryPagesTest(TestCase):
     def test_probe_iquery_pages_daemon_court_down_and_timeout(
         self, mock_logger, mock_cookies
     ):
-        """Test probe_iquery_pages_daemon when a court has blocked us or
-        is the requests are timing out.
-        """
-
+        """Test probe_iquery_pages_daemon when a court has blocked us or is the requests are timing out."""
         dockets = Docket.objects.all()
         self.assertEqual(dockets.count(), 0)
         r = get_redis_interface("CACHE")
@@ -4572,9 +4524,7 @@ class ScrapeIqueryPagesTest(TestCase):
     def test_update_latest_case_id_and_schedule_iquery_sweep_integration(
         self, mock_cookies
     ):
-        """Test if the latest pacer_case_id is kept up to date upon docket
-        creation and if the iquery retrieval is performed properly.
-        """
+        """Test if the latest pacer_case_id is kept up to date upon docket creation and if the iquery retrieval is performed properly."""
         # Connect handle_update_latest_case_id_and_schedule_iquery_sweep signal
         # with a unique dispatch_uid for this test
         test_dispatch_uid = (
@@ -4845,9 +4795,7 @@ class ScrapeIqueryPagesTest(TestCase):
             )
 
     def test_compute_blocked_court_wait(self, mock_cookies):
-        """Confirm the method compute_blocked_court_wait generates the expected
-        waiting pattern based on the block attempt."""
-
+        """Confirm the method compute_blocked_court_wait generates the expected waiting pattern based on the block attempt."""
         wait_pattern = []
         total_accumulated_time_pattern = []
         for i in range(settings.IQUERY_COURT_BLOCKED_MAX_ATTEMPTS):
@@ -4887,12 +4835,7 @@ class ScrapeIqueryPagesTest(TestCase):
     def test_probe_iquery_pages_daemon_court_blocked_max_attempts(
         self, mock_logger, mock_cookies
     ):
-        """Test probe_iquery_pages_daemon when a court has blocked us for
-        several hours. After IQUERY_COURT_BLOCKED_MAX_ATTEMPTS is reached, an
-        alert via an error should be triggered so manual intervention can be
-        taken.
-        """
-
+        """Test probe_iquery_pages_daemon when a court has blocked us for several hours. After IQUERY_COURT_BLOCKED_MAX_ATTEMPTS is reached, an alert via an error should be triggered so manual intervention can be taken."""
         r = get_redis_interface("CACHE")
         r.hset("iquery:highest_known_pacer_case_id", self.court_gamb.pk, 0)
 
@@ -4964,10 +4907,7 @@ class ScrapeIqueryPagesTest(TestCase):
     def test_probe_iquery_pages_daemon_court_got_stuck(
         self, mock_logger_daemon, mock_logger, mock_cookies
     ):
-        """Test probe_iquery_pages_daemon when the probe daemon got stuck in a
-        court after IQUERY_EMPTY_PROBES_LIMIT_HOURS are reached.
-        """
-
+        """Test probe_iquery_pages_daemon when the probe daemon got stuck in a court after IQUERY_EMPTY_PROBES_LIMIT_HOURS are reached."""
         r = get_redis_interface("CACHE")
         r.hset("iquery:highest_known_pacer_case_id", self.court_cacd.pk, 0)
 
@@ -5055,10 +4995,7 @@ class ScrapeIqueryPagesTest(TestCase):
     def test_probe_iquery_pages_daemon_special_court_got_stuck(
         self, mock_logger, mock_cookies
     ):
-        """Test probe_iquery_pages_daemon when the probe daemon got stuck in a
-        special court after its hardcoded limit is reached.
-        """
-
+        """Test probe_iquery_pages_daemon when the probe daemon got stuck in a special court after its hardcoded limit is reached."""
         r = get_redis_interface("CACHE")
         r.hset("iquery:highest_known_pacer_case_id", self.court_vib.pk, 0)
 
@@ -5145,9 +5082,9 @@ class ScrapeIqueryPagesTest(TestCase):
         self, mock_logger_daemon, mock_logger, mock_cookies
     ):
         """Test probe_iquery_pages_daemon ignores empty probes on weekends.
+
         Courts typically do not publish new cases on weekends.
         """
-
         r = get_redis_interface("CACHE")
         r.hset("iquery:highest_known_pacer_case_id", self.court_cacd.pk, 0)
 
@@ -5208,9 +5145,7 @@ class ScrapeIqueryPagesTest(TestCase):
     def test_prevent_update_docket_info_iquery_from_triggering_sweeps(
         self, mock_cookies
     ):
-        """Confirm that update_latest_case_id_and_schedule_iquery_sweep is not
-        called by update_docket_info_iquery task.
-        """
+        """Confirm that update_latest_case_id_and_schedule_iquery_sweep is not called by update_docket_info_iquery task."""
         # Connect handle_update_latest_case_id_and_schedule_iquery_sweep signal
         # with a unique dispatch_uid for this test
         test_dispatch_uid = (
@@ -5300,7 +5235,6 @@ class ScrapeIqueryPagesTest(TestCase):
 
     def test_nightly_pacer_updates_queries(self, mock_cookies):
         """Test nightly_pacer_updates command queries."""
-
         d_1 = DocketFactory(
             source=Docket.RECAP,
             court=self.court_canb,
@@ -5491,10 +5425,7 @@ class ScrapeIqueryPagesTest(TestCase):
     def test_perform_fixed_sweeps_when_court_is_not_up_to_date(
         self, mock_cookies
     ):
-        """Confirm that the iquery probe command performs a fixed sweep when it
-        is known that there is a more recent pacer_case_id in DB.
-        """
-
+        """Confirm that the iquery probe command performs a fixed sweep when it is known that there is a more recent pacer_case_id in DB."""
         with override_settings(IQUERY_SWEEP_UPLOADS_SIGNAL_ENABLED=False):
             today = date.today()
             DocketFactory(
@@ -5642,7 +5573,7 @@ class ScrapeIqueryPagesTest(TestCase):
 
 class WestCitationImportTest(TestCase):
     def test_parse_citation(self) -> None:
-        """Test parse citation for federal and journal citations"""
+        """Test parse citation for federal and journal citations."""
         correct_response = [
             {
                 "volume": "238",
@@ -5802,8 +5733,7 @@ class AWSManifestTest(TestCase):
         self.assertEqual(str(timestamp_now), timestamp_from_cache)
 
     def test_can_get_recent_records_from_nested_models(self):
-        """Verifies get_monthly_record_ids_by_type returns records updated
-        directly or through related models."""
+        """Verifies get_monthly_record_ids_by_type returns records updated directly or through related models."""
         last_export_timestamp = datetime.now() - timedelta(weeks=1)
         school = SchoolFactory(name="New York Law School")
         # Create older Person records with associated nested objects
@@ -5902,7 +5832,7 @@ class AWSManifestTest(TestCase):
         self.assertNotIn(person_7.id, record_ids)
 
     def test_get_monthly_harvard_non_ocr_opinions(self):
-        """Verifies retrieval of Harvard Law, non-OCR opinion IDs"""
+        """Verifies retrieval of Harvard Law, non-OCR opinion IDs."""
         last_export_timestamp = datetime.now() - timedelta(weeks=1)
         # Create opinions with different sources and OCR status before the
         # timestamp
@@ -5973,8 +5903,7 @@ class AWSManifestTest(TestCase):
         self.assertNotIn(opinion_4.id, record_ids)
 
     def test_can_get_recent_records_from_flat_models(self):
-        """Verifies get_monthly_record_ids_by_type returns records created or
-        updated after a timestamp for flat models."""
+        """Verifies get_monthly_record_ids_by_type returns records created or updated after a timestamp for flat models."""
         last_export_timestamp = datetime.now() - timedelta(weeks=1)
 
         # Create some old audio records
@@ -6063,7 +5992,7 @@ class LlmTest(TestCase):
     def test_classify_opinion_case_name_task_updates_fields(
         self, mock_call_llm
     ):
-        """Verifies that the classify_opinion_case_name_task updates OpinionCluster fields correctly"""
+        """Verifies that the classify_opinion_case_name_task updates OpinionCluster fields correctly."""
         mock_call_llm.return_value = self.valid_response
 
         classify_case_name_by_llm(self.opinion_cluster.pk, self.recap_doc.pk)
@@ -6083,10 +6012,7 @@ class LlmTest(TestCase):
     def test_classify_opinion_case_name_task_retries_on_ratelimit(
         self, mock_retry, mock_call_llm
     ):
-        """Tests that the task retries once when call_llm raises a RateLimitError,
-        then proceeds successfully with a valid response on retry.
-        """
-
+        """Tests that the task retries once when call_llm raises a RateLimitError, then proceeds successfully with a valid response on retry."""
         error_body = b'{"error":{"message":"Rate limit exceeded","type":"rate_limit_exceeded"}}'
         mock_response = MockResponse(429, error_body)
         setattr(mock_response, "request", {})
@@ -6140,10 +6066,7 @@ class LlmTest(TestCase):
     def test_classify_case_name_by_llm_handles_validation_error(
         self, mock_logger, mock_call_llm
     ):
-        """Test that classify_case_name_by_llm catches Pydantic ValidationError from call_llm and handles it correctly
-        by logging and returning without an exception
-        """
-
+        """Test that classify_case_name_by_llm catches Pydantic ValidationError from call_llm and handles it correctly by logging and returning without an exception."""
         mock_call_llm.side_effect = ValidationError.from_exception_data(
             "Invalid data", line_errors=[]
         )

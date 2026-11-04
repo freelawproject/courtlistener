@@ -17,7 +17,9 @@ from cl.search.models import SCOTUSDocument
 
 def compose_redis_key() -> str:
     """Compose a Redis key for SCOTUS PDF download log.
-    :return: A Redis key as a string.
+
+    Returns:
+        A Redis key as a string.
     """
     return "scotus_pdf_download:log"
 
@@ -33,11 +35,11 @@ def download_scotus_pdfs(
     Queries SCOTUSDocument instances that have no filepath_local,
     then schedules a download task for each.
 
-    :param download_queue: The celery queue for download tasks.
-    :param delay: Seconds to sleep between scheduling tasks.
-    :param download_order: Sort order for the queryset by pk ("asc" or "desc").
-    :param auto_resume: Resume from last pk stored in Redis.
-    :return: None
+    Args:
+        download_queue: The celery queue for download tasks.
+        delay: Seconds to sleep between scheduling tasks.
+        download_order: Sort order for the queryset by pk ("asc" or "desc").
+        auto_resume: Resume from last pk stored in Redis.
     """
     desc = download_order == "desc"
     docs = SCOTUSDocument.objects.filter(filepath_local="").values_list(
@@ -92,11 +94,11 @@ def extract_scotus_pdfs(
     page_count exceeding page_limit are skipped, allowing smaller documents
     to be processed first.
 
-    :param extraction_queue: The celery queue for extraction tasks.
-    :param chunk_size: The number of items to extract per celery task batch.
-    :param delay: Seconds to sleep between scheduling tasks.
-    :param page_limit: Skip documents with more pages than this value.
-    :return: None
+    Args:
+        extraction_queue: The celery queue for extraction tasks.
+        chunk_size: The number of items to extract per celery task batch.
+        delay: Seconds to sleep between scheduling tasks.
+        page_limit: Skip documents with more pages than this value.
     """
     docs = (
         SCOTUSDocument.objects.exclude(filepath_local="")

@@ -40,16 +40,18 @@ def get_cut_off_date(
     sweep_index: bool = False,
     custom_date: bool = False,
 ) -> date | datetime | None:
-    """Given a rate of dly, wly or mly and a date, returns the date after for
-    building a daterange filter.
-    :param rate: The alert rate to send Alerts.
-    :param d: The datetime alerts are run.
-    :param sweep_index: True if this is being used to trigger alerts using the
-    sweep index.
-    :param custom_date: If true, send alerts on a custom date.
-    :return: The cut-off date or None.
-    """
+    """Given a rate of dly, wly or mly and a date, returns the date after for building a daterange filter.
 
+    Args:
+        rate: The alert rate to send Alerts.
+        d: The datetime alerts are run.
+        sweep_index: True if this is being used to trigger alerts using the
+            sweep index.
+        custom_date: If true, send alerts on a custom date.
+
+    Returns:
+        The cut-off date or None.
+    """
     if rate == Alert.REAL_TIME and not sweep_index:
         # Set cut_off_date to the datetime when RT alerts are sent minus
         # (REAL_TIME_ALERTS_SENDING_RATE + 1) seconds, considering that RT alerts
@@ -87,10 +89,13 @@ def merge_alert_child_documents(
     documents: list[ESDictDocument],
 ) -> ESDictDocument:
     """Merge multiple child hits within the same main document.
-    :param documents: A list of document hits.
-    :return: A document dictionary where documents has been merged.
-    """
 
+    Args:
+        documents: A list of document hits.
+
+    Returns:
+        A document dictionary where documents has been merged.
+    """
     main_document = documents[0].copy()
     child_docs: list[ESDictDocument] = []
     for doc in documents:
@@ -110,10 +115,9 @@ def merge_alert_child_documents(
 def query_and_send_alerts_by_rate(rate: str) -> None:
     """Query and send alerts per user.
 
-    :param rate: The alert rate to send Alerts.
-    :return: None
+    Args:
+        rate: The alert rate to send Alerts.
     """
-
     alerts_sent_count = 0
     now_time = datetime.now()
     # Get unique alert users with scheduled alert hits
@@ -242,11 +246,13 @@ def delete_scheduled_hits_in_batches(
     ``batch_size``. Deleted rows drop out of the filter, so re-querying
     eventually empties the queryset and ends the loop.
 
-    :param hits: The queryset of ScheduledAlertHit rows to delete.
-    :param batch_size: The maximum number of rows to delete per batch.
-    :return: The total number of rows deleted.
-    """
+    Args:
+        hits: The queryset of ScheduledAlertHit rows to delete.
+        batch_size: The maximum number of rows to delete per batch.
 
+    Returns:
+        The total number of rows deleted.
+    """
     total_deleted = 0
     while batch_pks := list(hits.values_list("pk", flat=True)[:batch_size]):
         deleted, _ = ScheduledAlertHit.objects.filter(
@@ -259,9 +265,9 @@ def delete_scheduled_hits_in_batches(
 def delete_old_scheduled_alerts() -> int:
     """Delete Scheduled alerts older than DAYS_TO_DELETE days.
 
-    :return: The number of deleted scheduled hit alerts.
+    Returns:
+        The number of deleted scheduled hit alerts.
     """
-
     # Delete SENT ScheduledAlertHits after DAYS_TO_DELETE
     sent_older_than = datetime.now() - timedelta(days=DAYS_TO_DELETE)
     logger.info("Deleting SENT hits older than %s...", sent_older_than.date())

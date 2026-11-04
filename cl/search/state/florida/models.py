@@ -38,9 +38,12 @@ FLORIDA_TIMEZONE = ZoneInfo("America/New_York")
 def florida_local_date(value: datetime | None) -> date | None:
     """Convert a Florida ACIS timestamp to the court's local filing date.
 
-    :param value: A timezone-aware datetime as stored on FloridaDocketEntry,
-        or None when the entry is undated.
-    :return: The date in Florida's timezone, or None.
+    Args:
+        value: A timezone-aware datetime as stored on FloridaDocketEntry,
+            or None when the entry is undated.
+
+    Returns:
+        The date in Florida's timezone, or None.
     """
     if value is None:
         return None
@@ -53,10 +56,13 @@ SLOW_SOLVE_THRESHOLD_MS: float = 5_000
 
 
 class AltchaData(BaseModel):
-    """The API path of the document being requested. A solved token is only accepted for
-    this path.
+    """The API path of the document being requested.
 
-    :ivar resource: The URL path of the document, without host or query."""
+    A solved token is only accepted for this path.
+
+    Attributes:
+        resource: The URL path of the document, without host or query.
+    """
 
     resource: str
 
@@ -71,7 +77,8 @@ class AltchaData(BaseModel):
         """Request a fresh challenge for `resource` from ACIS.
 
         Returns `None` when the endpoint answers 204, which means the gate is
-        switched off and the document can be fetched with its bare URL."""
+        switched off and the document can be fetched with its bare URL.
+        """
         response = httpx.get(
             CHALLENGE_URL,
             params={"resource": self.resource},
@@ -90,9 +97,11 @@ class AltchaData(BaseModel):
 class AltchaChallengeSolution(BaseModel):
     """The solution to an altcha proof-of-work challenge.
 
-    :ivar counter: The counter value whose derived key matched the prefix.
-    :ivar derived_key: The full derived key for that counter, hex encoded.
-    :ivar time: How long solving took, in milliseconds."""
+    Attributes:
+        counter: The counter value whose derived key matched the prefix.
+        derived_key: The full derived key for that counter, hex encoded.
+        time: How long solving took, in milliseconds.
+    """
 
     counter: int
     derived_key: str = Field(alias="derivedKey")
@@ -104,7 +113,8 @@ class AltchaChallengeParameters(BaseModel):
 
     Fields are declared in the order the server serializes them. The server's
     signature covers this object, so the token we send back has to reproduce
-    it byte for byte."""
+    it byte for byte.
+    """
 
     algorithm: str
     cost: int
@@ -123,21 +133,23 @@ MAX_ATTEMPT_TIME: float = 30.0
 class AltchaChallenge(BaseModel):
     """A proof-of-work challenge as returned by the ACIS challenge endpoint.
 
-    :ivar parameters: The challenge to solve.
-    :ivar signature: The server's signature over `parameters`, echoed back
-        unchanged in the token."""
+    Attributes:
+        parameters: The challenge to solve.
+        signature: The server's signature over `parameters`, echoed back
+            unchanged in the token.
+    """
 
     parameters: AltchaChallengeParameters
     signature: str
 
     def solve(self) -> AltchaChallengeSolution | None:
-        """Brute-force the counter whose PBKDF2 key starts with the challenge's
-        key prefix, the way the ACIS frontend does.
+        """Brute-force the counter whose PBKDF2 key starts with the challenge's key prefix, the way the ACIS frontend does.
 
         The server chose the counter, so there is no bound to search up to;
         the loop gives up after `MAX_ATTEMPT_TIME` seconds and returns `None`.
         Only `PBKDF2/SHA-256` is supported; any other algorithm raises
-        `NotImplementedError`."""
+        `NotImplementedError`.
+        """
         if self.parameters.algorithm != "PBKDF2/SHA-256":
             raise NotImplementedError
         nonce_bytes = bytes.fromhex(self.parameters.nonce)
@@ -170,19 +182,18 @@ class AltchaChallenge(BaseModel):
 
 
 class AltchaChallengeResponse(BaseModel):
-    """A solved challenge, ready to be encoded into the `altcha` query
-    parameter of a document URL.
+    """A solved challenge, ready to be encoded into the `altcha` query parameter of a document URL.
 
-    :ivar challenge: The challenge as received from the server.
-    :ivar solution: Our answer to it."""
+    Attributes:
+        challenge: The challenge as received from the server.
+        solution: Our answer to it.
+    """
 
     challenge: AltchaChallenge
     solution: AltchaChallengeSolution
 
     def encode(self) -> str:
-        """Serialize to the token the server expects: base64 of the compact
-        JSON, using the server's own key names and key order so its signature
-        over the challenge parameters still verifies."""
+        """Serialize to the token the server expects: base64 of the compact JSON, using the server's own key names and key order so its signature over the challenge parameters still verifies."""
         return base64.b64encode(
             self.model_dump_json(by_alias=True).encode()
         ).decode()
@@ -191,21 +202,21 @@ class AltchaChallengeResponse(BaseModel):
 @pghistory.track()
 @document_model
 class FloridaDocketEntry(AbstractDateTimeModel, CSVExportMixin):
-    """
-    Represents a docket entry in a Florida docket.
+    """Represents a docket entry in a Florida docket.
 
-    :ivar docket: The Docket this entry is associated with.
-    :ivar date_filed: The filing date indicated by Florida ACIS
-    :ivar date_submitted: Pulled directly from Florida results
-    :ivar entry_type: Mirror of Juriscraper `DocketEntryType` enum.
-    :ivar entry_type_raw: Value of `entry_type_raw` in Juriscraper results. Pulled from Florida API with no modification.
-    :ivar entry_name: Pulled directly from Florida results
-    :ivar description: Pulled directly from Florida results
-    :ivar submitted_by: FK to the case party that submitted this document may be null if the party cannot be found.
-    :ivar submitted_by_name: The name of the party that submitted this entry.
-    :ivar status: Mapped from Florida's `entry_status` field. Can be "stricken",
-    "vacated", or "docketed", or "unknown".
-    :ivar docket_entry_uuid: Pulled directly from Florida results
+    Attributes:
+        docket: The Docket this entry is associated with.
+        date_filed: The filing date indicated by Florida ACIS
+        date_submitted: Pulled directly from Florida results
+        entry_type: Mirror of Juriscraper `DocketEntryType` enum.
+        entry_type_raw: Value of `entry_type_raw` in Juriscraper results. Pulled from Florida API with no modification.
+        entry_name: Pulled directly from Florida results
+        description: Pulled directly from Florida results
+        submitted_by: FK to the case party that submitted this document may be null if the party cannot be found.
+        submitted_by_name: The name of the party that submitted this entry.
+        status: Mapped from Florida's `entry_status` field. Can be "stricken",
+            "vacated", or "docketed", or "unknown".
+        docket_entry_uuid: Pulled directly from Florida results
     """
 
     STATUS_STRICKEN = 0
@@ -265,15 +276,15 @@ class FloridaDocketEntry(AbstractDateTimeModel, CSVExportMixin):
 @pghistory.track()
 @document_model
 class FloridaDocument(AbstractDateTimeModel, AbstractStateDocument):
-    """
-    Represents an attachment to a Florida docket entry.
+    """Represents an attachment to a Florida docket entry.
 
-    :ivar docket_entry: The Docket entry this document is associated with.
-    :ivar content_type: The MIME type indicated by Florida ACIS
-    :ivar document_name: The name of the document in Florida ACIS
-    :ivar document_type: The type of the document in Florida ACIS
-    :ivar link_uuid: The attachment link UUID retrieved from Florida ACIS. Used to generate document download URL.
-    :ivar url: Download URL for attachment. Derived from uuid and link_uuid. Stored for safety.
+    Attributes:
+        docket_entry: The Docket entry this document is associated with.
+        content_type: The MIME type indicated by Florida ACIS
+        document_name: The name of the document in Florida ACIS
+        document_type: The type of the document in Florida ACIS
+        link_uuid: The attachment link UUID retrieved from Florida ACIS. Used to generate document download URL.
+        url: Download URL for attachment. Derived from uuid and link_uuid. Stored for safety.
     """
 
     docket_entry = models.ForeignKey(
@@ -287,9 +298,7 @@ class FloridaDocument(AbstractDateTimeModel, AbstractStateDocument):
     link_uuid = models.UUIDField()
 
     def build_url(self) -> str | None:
-        """Requests parameters for and computes the altcha proof-of-work token for Florida documents, returning the URL
-        with the token appended."""
-
+        """Requests parameters for and computes the altcha proof-of-work token for Florida documents, returning the URL with the token appended."""
         scheme, netloc, path, params, query, fragment = urlparse(self.url)
 
         try:
@@ -360,7 +369,7 @@ class FloridaDocument(AbstractDateTimeModel, AbstractStateDocument):
 
     @classmethod
     def extractable_extensions(cls) -> NonEmptyTuple[str]:
-        """Extensions that can be sent to text extraction"""
+        """Extensions that can be sent to text extraction."""
         return (
             ".pdf",
             ".html",
@@ -387,6 +396,5 @@ class FloridaDocument(AbstractDateTimeModel, AbstractStateDocument):
         ]
 
     def path_date_filed(self) -> date | None:
-        """ACIS entry timestamps are stored in UTC, so convert to Florida's
-        local calendar day before it goes into the storage path."""
+        """ACIS entry timestamps are stored in UTC, so convert to Florida's local calendar day before it goes into the storage path."""
         return florida_local_date(self.docket_entry.date_filed)

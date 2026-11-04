@@ -13,7 +13,9 @@ from cl.search.tasks import create_opinion_text_embeddings, save_embeddings
 
 def compose_redis_key() -> str:
     """Compose a Redis key based on the search type for embedding log.
-    :return: A Redis key as a string.
+
+    Returns:
+        A Redis key as a string.
     """
     return f"{SEARCH_TYPES.OPINION}_inception_embedding:log"
 
@@ -100,11 +102,12 @@ class Command(VerboseCommand):
     ) -> None:
         """Send a batch of items for embedding creation and saving to S3.
 
-        :param batch: A list of Opinion IDs representing the batch to process.
-        :param embedding_queue: The name of the queue to process the embedding task.
-        :param upload_queue: The name of the queue to process the saving task.
-        :param database: The database to be used during processing.
-        :return: None.
+        Args:
+            batch: A list of Opinion IDs representing the batch to process.
+            embedding_queue: The name of the queue to process the embedding task.
+            upload_queue: The name of the queue to process the saving task.
+            database: The database to be used during processing.
+            device: The device to run the embedding model on.
         """
         self.throttle.maybe_wait()
         chain(

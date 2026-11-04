@@ -370,7 +370,7 @@ test_patterns = {
 
 
 class FakeCaseQueryResponse:
-    """Mock a Fake CaseQuery Request Response"""
+    """Mock a Fake CaseQuery Request Response."""
 
     def __init__(self, text):
         self.text = text

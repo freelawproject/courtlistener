@@ -9,13 +9,15 @@ from cl.recap.constants import COURT_TIMEZONES
 def convert_to_court_timezone(
     court_id: str, datetime_filed: datetime
 ) -> datetime:
-    """Convert a docket entry datetime filed to the court timezone it belongs
-    to.
+    """Convert a docket entry datetime filed to the court timezone it belongs to.
 
-    :param datetime_filed: The docket entry datetime filed
-    :param court_id: The court id to which docket entries belong, used for
-    timezone conversion.
-    :return: A datetime object in the court timezone.
+    Args:
+        datetime_filed: The docket entry datetime filed
+        court_id: The court id to which docket entries belong, used for
+            timezone conversion.
+
+    Returns:
+        A datetime object in the court timezone.
     """
     court_timezone = pytz.timezone(COURT_TIMEZONES.get(court_id, "US/Eastern"))
     return datetime_filed.astimezone(court_timezone)
@@ -24,8 +26,7 @@ def convert_to_court_timezone(
 def localize_date_and_time(
     court_id: str, date_filed: date | datetime
 ) -> tuple[date, time | None]:
-    """Localize the date and time into local court timezone, split it into
-    date and time.
+    """Localize the date and time into local court timezone, split it into date and time.
 
     If given a "naive datetime" (no timezone information), assume the
     time is in the court's local time. and return timezone-aware date
@@ -33,9 +34,12 @@ def localize_date_and_time(
     to the court's local timezone and return timezone-aware date and
     time objects.
 
-    :param court_id: The court_id to get the timezone from.
-    :param date_filed: The date or datetime instance provided by the source.
-    :return: A tuple of date_filed and time_filed or None if no time available.
+    Args:
+        court_id: The court_id to get the timezone from.
+        date_filed: The date or datetime instance provided by the source.
+
+    Returns:
+        A tuple of date_filed and time_filed or None if no time available.
     """
     if isinstance(date_filed, datetime):
         if is_naive(date_filed):
@@ -57,11 +61,13 @@ def localize_naive_datetime_to_court_timezone(
 ) -> datetime:
     """Convert a naive datetime to the provided court timezone it belongs to.
 
-    :param naive_datetime: The naive datetime to localize.
-    :param court_id: The court_id to get the timezone from.
-    :return: A datetime object in the court timezone.
-    """
+    Args:
+        naive_datetime: The naive datetime to localize.
+        court_id: The court_id to get the timezone from.
 
+    Returns:
+        A datetime object in the court timezone.
+    """
     court_timezone = pytz.timezone(COURT_TIMEZONES.get(court_id, "US/Eastern"))
     d = court_timezone.localize(naive_datetime)
     return d

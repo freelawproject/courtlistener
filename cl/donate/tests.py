@@ -136,9 +136,7 @@ class MembershipWebhookTest(TestCase):
     async def test_create_membership_fires_zoho_tag_task(
         self, mock_store_webhook, mock_tag_task
     ) -> None:
-        """createMembership webhooks enqueue the Zoho tag task with the
-        new membership's level so the user's Zoho record gets the
-        appropriate tag."""
+        """CreateMembership webhooks enqueue the Zoho tag task with the new membership's level so the user's Zoho record gets the appropriate tag."""
         self.data["eventTrigger"] = "createMembership"
         r = await self.async_client.post(
             reverse("membership-webhooks-list", kwargs={"version": "v3"}),
@@ -1181,7 +1179,7 @@ class MembershipWebhookThrottleSyncTest(TestCase):
     async def test_create_membership_webhook_assigns_throttles(
         self, mock_store_webhook
     ) -> None:
-        """createMembership writes Tier 1 MEMBERSHIP rates for the user."""
+        """CreateMembership writes Tier 1 MEMBERSHIP rates for the user."""
         self.data["eventTrigger"] = "createMembership"
 
         r = await self.async_client.post(
@@ -1242,7 +1240,7 @@ class MembershipWebhookThrottleSyncTest(TestCase):
     async def test_update_membership_webhook_replaces_throttles(
         self, mock_store_webhook
     ) -> None:
-        """updateMembership replaces the previous tier's MEMBERSHIP rates."""
+        """UpdateMembership replaces the previous tier's MEMBERSHIP rates."""
         await NeonMembership.objects.acreate(
             user=self.user_profile.user,
             neon_id="12345",
@@ -1290,7 +1288,7 @@ class MembershipWebhookThrottleSyncTest(TestCase):
     async def test_delete_membership_webhook_clears_throttles(
         self, mock_store_webhook
     ) -> None:
-        """deleteMembership clears MEMBERSHIP rows; MANUAL rows survive."""
+        """DeleteMembership clears MEMBERSHIP rows; MANUAL rows survive."""
         await NeonMembership.objects.acreate(
             user=self.user_profile.user,
             neon_id="12345",

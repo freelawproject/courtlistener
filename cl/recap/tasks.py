@@ -163,15 +163,17 @@ cnt = CaseNameTweaker()
 
 
 def retrieve_email_from_queue(message_id: str, bucket: S3Storage) -> str:
-    """
-    Attempt to retrieve and decode an email from an S3 bucket.
+    """Attempt to retrieve and decode an email from an S3 bucket.
 
-    :param message_id: The ID of the message to retrieve.
-    :param bucket: The S3 bucket to retrieve the email from.
+    Args:
+        message_id: The ID of the message to retrieve.
+        bucket: The S3 bucket to retrieve the email from.
 
-    :return: The decoded email
+    Returns:
+        The decoded email
 
-    :raise FileNotFoundError:
+    Raises:
+        FileNotFoundError:
     """
     # Try to read the file using utf-8.
     # If it fails, fallback on iso-8859-1
@@ -230,8 +232,8 @@ async def process_recap_upload(pq: ProcessingQueue) -> None:
 def do_pacer_fetch(fq: PacerFetchQueue):
     """Process a request made by a user to get an item from PACER.
 
-    :param fq: The PacerFetchQueue item to process
-    :return: None
+    Args:
+        fq: The PacerFetchQueue item to process
     """
     result = None
     match fq.request_type:
@@ -267,8 +269,11 @@ def do_pacer_fetch(fq: PacerFetchQueue):
 async def mark_pq_successful(pq: ProcessingQueue) -> tuple[int, str]:
     """Mark the processing queue item as successfully completed.
 
-    :param pq: The ProcessingQueue object to manipulate
-    :return: A two tuple, the PQ status, the PQ error message.
+    Args:
+        pq: The ProcessingQueue object to manipulate
+
+    Returns:
+        A two tuple, the PQ status, the PQ error message.
     """
     # Ditch the original file
     await sync_to_async(pq.filepath_local.delete)(save=False)
@@ -303,19 +308,18 @@ async def associate_related_instances(
 ) -> None:
     """Associate the related upload instances.
 
-    :param pq: The ProcessingQueue or EmailProcessingQueue object to manipulate
-    :param d_id: The docket PK to associate with this upload. Either the docket
-    that the RECAPDocument is associated with, or the docket that was uploaded.
-    :param de_id: The docket entry to associate with this upload. Only applies
-    to document uploads, which are associated with docket entries.
-    :param rd_id: The RECAPDocument PK to associate with this upload. Only
-    applies to document uploads (obviously). If the pq is a EmailProcessingQueue
-    this param accepts a list of RDs Pks.
-    :param model_name: The name of the model that the rd_id list should point
-        to. Only used when pq is EmailProcessingQueue.
-    :return: None
+    Args:
+        pq: The ProcessingQueue or EmailProcessingQueue object to manipulate
+        d_id: The docket PK to associate with this upload. Either the docket
+            that the RECAPDocument is associated with, or the docket that was uploaded.
+        de_id: The docket entry to associate with this upload. Only applies
+            to document uploads, which are associated with docket entries.
+        rd_id: The RECAPDocument PK to associate with this upload. Only
+            applies to document uploads (obviously). If the pq is a EmailProcessingQueue
+            this param accepts a list of RDs Pks.
+        model_name: The name of the model that the rd_id list should point
+            to. Only used when pq is EmailProcessingQueue.
     """
-
     if isinstance(pq, EmailProcessingQueue):
         if rd_id is None:
             logger.error(
@@ -353,11 +357,14 @@ async def mark_pq_status(
 ) -> tuple[int, str]:
     """Mark the processing queue item as some process, and log the message.
 
-    :param pq: The processing or fetch queue item to manipulate.
-    :param msg: The message to log and to save to pq's error_message field.
-    :param status: A pq status code as defined on the ProcessingQueue model.
-    :param message_property_name: The message property to attach the msg argument to.
-    :return: A two tuple, the PQ status, the PQ error message.
+    Args:
+        pq: The processing or fetch queue item to manipulate.
+        msg: The message to log and to save to pq's error_message field.
+        status: A pq status code as defined on the ProcessingQueue model.
+        message_property_name: The message property to attach the msg argument to.
+
+    Returns:
+        A two tuple, the PQ status, the PQ error message.
     """
     if msg:
         logger.info(msg)
@@ -370,9 +377,12 @@ async def mark_pq_status(
 async def process_recap_pdf(pk, subdocket_replication: bool = False):
     """Process an uploaded PDF from the RECAP API endpoint.
 
-    :param pk: The PK of the processing queue item you want to work on.
-    :param subdocket_replication: Whether this task is related to subdocket replication.
-    :return: A RECAPDocument object that was created or updated.
+    Args:
+        pk: The PK of the processing queue item you want to work on.
+        subdocket_replication: Whether this task is related to subdocket replication.
+
+    Returns:
+        A RECAPDocument object that was created or updated.
     """
     """Save a RECAP PDF to the database."""
     pq = await ProcessingQueue.objects.aget(pk=pk)
@@ -600,16 +610,19 @@ async def process_recap_pdf(pk, subdocket_replication: bool = False):
 
 
 async def process_recap_zip(pk: int) -> dict[str, list[int] | list[Task]]:
-    """Process a zip uploaded from a PACER district court
+    """Process a zip uploaded from a PACER district court.
 
     The general process is to use our existing infrastructure. We open the zip,
     identify the documents inside, and then associate them with the rest of our
     collection.
 
-    :param self: A celery task object
-    :param pk: The PK of the ProcessingQueue object to process
-    :return: A list of new PQ's that were created, one per PDF that was
-    enqueued.
+    Args:
+        self: A celery task object
+        pk: The PK of the ProcessingQueue object to process
+
+    Returns:
+        A list of new PQ's that were created, one per PDF that was
+        enqueued.
     """
     pq = await ProcessingQueue.objects.aget(pk=pk)
     await mark_pq_status(pq, "", PROCESSING_STATUS.IN_PROGRESS)
@@ -708,9 +721,12 @@ async def process_recap_zip(pk: int) -> dict[str, list[int] | list[Task]]:
 async def process_recap_docket(pk):
     """Process an uploaded docket from the RECAP API endpoint.
 
-    :param pk: The primary key of the processing queue item you want to work
-    on.
-    :returns: A dict of the form:
+    Args:
+        pk: The primary key of the processing queue item you want to work
+            on.
+
+    Returns:
+        A dict of the form:
 
         {
             // The PK of the docket that's created or updated
@@ -828,8 +844,11 @@ async def get_att_data_from_pq(
 ) -> tuple[ProcessingQueue, dict, str | None]:
     """Extract attachment data from a ProcessingQueue object.
 
-    :param pq: The ProcessingQueue object.
-    :return: A tuple containing the updated pq, att_data, and text.
+    Args:
+        pq: The ProcessingQueue object.
+
+    Returns:
+        A tuple containing the updated pq, att_data, and text.
     """
     try:
         with pq.filepath_local.open("rb") as file:
@@ -855,14 +874,15 @@ async def get_att_data_from_pq(
 async def find_subdocket_att_page_rds(
     pk: int,
 ) -> list[tuple[int, bool]]:
-    """Look for RECAP Documents that belong to subdockets, and create a PQ
-    object for each additional attachment page that requires processing.
+    """Look for RECAP Documents that belong to subdockets, and create a PQ object for each additional attachment page that requires processing.
 
-    :param pk: Primary key of the processing queue item.
-    :return: A two-tuple containing a list of ProcessingQueue pks to process,
-    and a boolean indicating whether the PQ belongs to subdocket replication.
+    Args:
+        pk: Primary key of the processing queue item.
+
+    Returns:
+        A two-tuple containing a list of ProcessingQueue pks to process,
+        and a boolean indicating whether the PQ belongs to subdocket replication.
     """
-
     pq = await ProcessingQueue.objects.aget(pk=pk)
     pq, att_data, text = await get_att_data_from_pq(pq)
     if not att_data:
@@ -912,14 +932,15 @@ async def find_subdocket_att_page_rds(
 async def find_subdocket_pdf_rds(
     pk: int,
 ) -> list[tuple[int, bool]]:
-    """Look for RECAP Documents that belong to subdockets, and create a PQ
-    object for each additional PDF upload that requires processing.
+    """Look for RECAP Documents that belong to subdockets, and create a PQ object for each additional PDF upload that requires processing.
 
-    :param pk: Primary key of the processing queue item.
-    :return: A two-tuple containing a list of ProcessingQueue pks to process,
-    and a boolean indicating whether the PQ belongs to subdocket replication.
+    Args:
+        pk: Primary key of the processing queue item.
+
+    Returns:
+        A two-tuple containing a list of ProcessingQueue pks to process,
+        and a boolean indicating whether the PQ belongs to subdocket replication.
     """
-
     pq = await ProcessingQueue.objects.aget(pk=pk)
     main_rds_qs = get_main_rds(pq.court_id, pq.pacer_doc_id).exclude(
         is_available=True
@@ -996,16 +1017,18 @@ async def process_recap_attachment(
 ) -> tuple[int, str, list[RECAPDocument]]:
     """Process an uploaded attachment page from the RECAP API endpoint.
 
-    :param pk: The primary key of the processing queue item you want to work on
-    :param tag_names: A list of tag names to add to all items created or
-    modified in this function.
-    :param document_number: The main RECAP document number. If provided use it
-    to merge the attachments instead of using the one from the attachment page.
-    :param subdocket_replication: Whether this process is related to subdocket replication.
-    :return: Tuple indicating the status of the processing and a related
-    message
-    """
+    Args:
+        pk: The primary key of the processing queue item you want to work on
+        tag_names: A list of tag names to add to all items created or
+            modified in this function.
+        document_number: The main RECAP document number. If provided use it
+            to merge the attachments instead of using the one from the attachment page.
+        subdocket_replication: Whether this process is related to subdocket replication.
 
+    Returns:
+        Tuple indicating the status of the processing and a related
+        message
+    """
     pq = await ProcessingQueue.objects.aget(pk=pk)
     await mark_pq_status(pq, "", PROCESSING_STATUS.IN_PROGRESS)
     logger.info("Processing RECAP item (debug is: %s): %s", pq.debug, pq)
@@ -1053,12 +1076,10 @@ async def process_recap_attachment(
 
 
 async def process_recap_claims_register(pk):
-    """Merge bankruptcy claims registry HTML into RECAP
+    """Merge bankruptcy claims registry HTML into RECAP.
 
-    :param pk: The primary key of the processing queue item you want to work on
-    :type pk: int
-    :return: None
-    :rtype: None
+    Args:
+        pk: The primary key of the processing queue item you want to work on
     """
     pq = await ProcessingQueue.objects.aget(pk=pk)
     if pq.debug:
@@ -1165,8 +1186,11 @@ async def process_recap_claims_register(pk):
 async def process_recap_docket_history_report(pk):
     """Process the docket history report.
 
-    :param pk: The primary key of the processing queue item you want to work on
-    :returns: A dict indicating whether the docket needs re-indexing.
+    Args:
+        pk: The primary key of the processing queue item you want to work on
+
+    Returns:
+        A dict indicating whether the docket needs re-indexing.
     """
     start_time = now()
     pq = await ProcessingQueue.objects.aget(pk=pk)
@@ -1277,10 +1301,12 @@ async def process_recap_docket_history_report(pk):
 async def process_case_query_page(pk):
     """Process the case query (iquery.pl) page.
 
-    :param pk: The primary key of the processing queue item you want to work on
-    :returns: A dict indicating whether the docket needs re-indexing.
-    """
+    Args:
+        pk: The primary key of the processing queue item you want to work on
 
+    Returns:
+        A dict indicating whether the docket needs re-indexing.
+    """
     pq = await ProcessingQueue.objects.aget(pk=pk)
     await mark_pq_status(pq, "", PROCESSING_STATUS.IN_PROGRESS)
     logger.info("Processing RECAP item (debug is: %s): %s", pq.debug, pq)
@@ -1392,9 +1418,12 @@ async def process_case_query_page(pk):
 async def process_recap_appellate_docket(pk):
     """Process an uploaded appellate docket from the RECAP API endpoint.
 
-    :param pk: The primary key of the processing queue item you want to work
-    on.
-    :returns: A dict of the form:
+    Args:
+        pk: The primary key of the processing queue item you want to work
+            on.
+
+    Returns:
+        A dict of the form:
 
         {
             // The PK of the docket that's created or updated
@@ -1516,9 +1545,12 @@ async def process_recap_appellate_docket(pk):
 async def process_recap_acms_docket(pk):
     """Process uploaded ACMS appellate docket JSON from the RECAP API endpoint.
 
-    :param pk: The primary key of the processing queue item you want to work
-    on.
-    :returns: A dict of the form:
+    Args:
+        pk: The primary key of the processing queue item you want to work
+            on.
+
+    Returns:
+        A dict of the form:
 
         {
             // The PK of the docket that's created or updated
@@ -1641,9 +1673,13 @@ async def process_recap_acms_appellate_attachment(
     pk: int,
 ) -> tuple[int, str, list[RECAPDocument]] | None:
     """Process an uploaded appellate attachment page.
-    :param pk: The primary key of the processing queue item you want to work on
-    :return: Tuple indicating the status of the processing, a related
-    message and the recap documents affected.
+
+    Args:
+        pk: The primary key of the processing queue item you want to work on
+
+    Returns:
+        Tuple indicating the status of the processing, a related
+        message and the recap documents affected.
     """
     pq = await ProcessingQueue.objects.aget(pk=pk)
     await mark_pq_status(pq, "", PROCESSING_STATUS.IN_PROGRESS)
@@ -1731,12 +1767,14 @@ async def process_recap_appellate_attachment(
 ) -> tuple[int, str, list[RECAPDocument]] | None:
     """Process an uploaded appellate attachment page.
 
-    :param self: The Celery task
-    :param pk: The primary key of the processing queue item you want to work on
-    :return: Tuple indicating the status of the processing, a related
-    message and the recap documents affected.
-    """
+    Args:
+        self: The Celery task
+        pk: The primary key of the processing queue item you want to work on
 
+    Returns:
+        Tuple indicating the status of the processing, a related
+        message and the recap documents affected.
+    """
     pq = await ProcessingQueue.objects.aget(pk=pk)
     await mark_pq_status(pq, "", PROCESSING_STATUS.IN_PROGRESS)
     logger.info("Processing RECAP item (debug is: %s): %s", pq.debug, pq)
@@ -1839,12 +1877,16 @@ def process_recap_appellate_case_query_result_page(self, pk):
 
 @app.task
 def create_new_docket_from_idb(idb_row):
-    """Create a new docket for the IDB item found. Populate it with all
-    applicable fields.
+    """Create a new docket for the IDB item found.
 
-    :param idb_row: An FjcIntegratedDatabase object with which to create a
-    Docket.
-    :return Docket: The created Docket object.
+    Populate it with all applicable fields.
+
+    Args:
+        idb_row: An FjcIntegratedDatabase object with which to create a
+            Docket.
+
+    Returns:
+        Docket: The created Docket object.
     """
     case_name = f"{idb_row.plaintiff} v. {idb_row.defendant}"
     d = Docket(
@@ -1877,10 +1919,10 @@ def create_new_docket_from_idb(idb_row):
 def merge_docket_with_idb(d, idb_row):
     """Merge an existing docket with an idb_row.
 
-    :param d: A Docket object pk to update.
-    :param idb_row: A FjcIntegratedDatabase object to use as a source for
-    updates.
-    :return None
+    Args:
+        d: A Docket object pk to update.
+        idb_row: A FjcIntegratedDatabase object to use as a source for
+            updates.
     """
     d.add_idb_source()
     d.idb_data = idb_row
@@ -1902,12 +1944,14 @@ def merge_docket_with_idb(d, idb_row):
 
 
 def do_heuristic_match(idb_row, ds):
-    """Use cosine similarity of case names from the IDB to try to find a match
-    out of several possibilities in the DB.
+    """Use cosine similarity of case names from the IDB to try to find a match out of several possibilities in the DB.
 
-    :param idb_row: The FJC IDB row to match against
-    :param ds: A list of Dockets that might match
-    :returns: The best-matching Docket in ds if possible, else None
+    Args:
+        idb_row: The FJC IDB row to match against
+        ds: A list of Dockets that might match
+
+    Returns:
+        The best-matching Docket in ds if possible, else None
     """
     case_names = []
     for d in ds:
@@ -1941,13 +1985,10 @@ def do_heuristic_match(idb_row, ds):
 
 @app.task
 def create_or_merge_from_idb_chunk(idb_chunk):
-    """Take a chunk of IDB rows and either merge them into the Docket table or
-    create new items for them in the docket table.
+    """Take a chunk of IDB rows and either merge them into the Docket table or create new items for them in the docket table.
 
-    :param idb_chunk: A list of FjcIntegratedDatabase PKs
-    :type idb_chunk: list
-    :return: None
-    :rtype: None
+    Args:
+        idb_chunk: A list of FjcIntegratedDatabase PKs
     """
     for idb_pk in idb_chunk:
         idb_row = FjcIntegratedDatabase.objects.get(pk=idb_pk)
@@ -1988,9 +2029,9 @@ def create_or_merge_from_idb_chunk(idb_chunk):
 def update_docket_from_hidden_api(data):
     """Update the docket based on the result of a lookup in the hidden API.
 
-    :param data: A dict as returned by get_pacer_case_id_and_title
-    or None if looking up the item failed.
-    :return None
+    Args:
+        data: A dict as returned by get_pacer_case_id_and_title
+            or None if looking up the item failed.
     """
     if data is None:
         return None
@@ -2030,20 +2071,22 @@ def fetch_pacer_doc_by_rd_base(
     magic_number: str | None = None,
     omit_page_count: bool = False,
 ) -> int | None:
-    """Fetch a PACER PDF by rd_pk
+    """Fetch a PACER PDF by rd_pk.
 
     This is very similar to get_pacer_doc_by_rd, except that it manages
     status as it proceeds and it gets the cookie info from redis.
 
-    :param self: The celery task.
-    :param rd_pk: The PK of the RECAP Document to get.
-    :param fq_pk: The PK of the RECAP Fetch Queue to update.
-    :param magic_number: The magic number to fetch PACER documents for free
-    this is an optional field, only used by RECAP Email documents
-    :param omit_page_count: If true, omit requesting the page_count from doctor
-    :return: The RECAPDocument PK
-    """
+    Args:
+        self: The celery task.
+        rd_pk: The PK of the RECAP Document to get.
+        fq_pk: The PK of the RECAP Fetch Queue to update.
+        magic_number: The magic number to fetch PACER documents for free
+            this is an optional field, only used by RECAP Email documents
+        omit_page_count: If true, omit requesting the page_count from doctor
 
+    Returns:
+        The RECAPDocument PK
+    """
     rd = RECAPDocument.objects.get(pk=rd_pk)
     fq = PacerFetchQueue.objects.get(pk=fq_pk)
     pacer_doc_id = rd.pacer_doc_id
@@ -2172,14 +2215,17 @@ def fetch_pacer_doc_by_rd_base(
 def fetch_pacer_doc_by_rd(
     self, rd_pk: int, fq_pk: int, magic_number: str | None = None
 ) -> int | None:
-    """Celery task wrapper for fetch_pacer_doc_by_rd_base
+    """Celery task wrapper for fetch_pacer_doc_by_rd_base.
 
-    :param self: The celery task.
-    :param rd_pk: The PK of the RECAP Document to get.
-    :param fq_pk: The PK of the RECAP Fetch Queue to update.
-    :param magic_number: The magic number to fetch PACER documents for free
-    this is an optional field, only used by RECAP Email documents
-    :return: The RECAPDocument PK
+    Args:
+        self: The celery task.
+        rd_pk: The PK of the RECAP Document to get.
+        fq_pk: The PK of the RECAP Fetch Queue to update.
+        magic_number: The magic number to fetch PACER documents for free
+            this is an optional field, only used by RECAP Email documents
+
+    Returns:
+        The RECAPDocument PK
     """
     return fetch_pacer_doc_by_rd_base(self, rd_pk, fq_pk, magic_number)
 
@@ -2200,16 +2246,15 @@ def fetch_pacer_doc_by_rd_and_mark_fq_completed(
     magic_number: str | None = None,
     omit_page_count: bool = False,
 ) -> None:
-    """Celery task wrapper for fetch_pacer_doc_by_rd_base, which also marks
-    the FQ as completed if the fetch is successful.
+    """Celery task wrapper for fetch_pacer_doc_by_rd_base, which also marks the FQ as completed if the fetch is successful.
 
-    :param self: The celery task.
-    :param rd_pk: The PK of the RECAP Document to get.
-    :param fq_pk: The PK of the RECAP Fetch Queue to update.
-    :param magic_number: The magic number to fetch PACER documents for free
-    this is an optional field, only used by RECAP Email documents
-    :param omit_page_count: If true, omit requesting the page_count from doctor.
-    :return: None
+    Args:
+        self: The celery task.
+        rd_pk: The PK of the RECAP Document to get.
+        fq_pk: The PK of the RECAP Fetch Queue to update.
+        magic_number: The magic number to fetch PACER documents for free
+            this is an optional field, only used by RECAP Email documents
+        omit_page_count: If true, omit requesting the page_count from doctor.
     """
     fetched_rd_pk = fetch_pacer_doc_by_rd_base(
         self, rd_pk, fq_pk, magic_number, omit_page_count=omit_page_count
@@ -2233,18 +2278,20 @@ def fetch_pacer_doc_by_rd_and_mark_fq_completed(
 )
 @transaction.atomic
 def fetch_attachment_page(self: Task, fq_pk: int) -> list[tuple[int, bool]]:
-    """Fetch a PACER attachment page by rd_pk
+    """Fetch a PACER attachment page by rd_pk.
 
     This is very similar to process_recap_attachment, except that it manages
     status as it proceeds and it gets the cookie info from redis.
 
-    :param self: The celery task
-    :param fq_pk: The PK of the RECAP Fetch Queue to update.
-    :return: A two-tuple containing a list of ProcessingQueue pks to replicate
-    to subdockcets and a boolean indicating whether the PQ belongs to subdocket
-    replication.
-    """
+    Args:
+        self: The celery task
+        fq_pk: The PK of the RECAP Fetch Queue to update.
 
+    Returns:
+        A two-tuple containing a list of ProcessingQueue pks to replicate
+        to subdockcets and a boolean indicating whether the PQ belongs to subdocket
+        replication.
+    """
     fq = PacerFetchQueue.objects.get(pk=fq_pk)
     rd = fq.recap_document
     if rd is None:
@@ -2425,13 +2472,12 @@ def replicate_fq_att_page_to_subdocket_rds(
 ) -> None:
     """Replicate Attachment page to subdocket RECAPDocuments.
 
-    :param self: The celery task
-    :param pq_ids_to_process: A two-tuple containing a list of ProcessingQueue
-    pks to process, and a boolean indicating whether the PQ belongs to subdocket
-    replication.
-    :return: None
+    Args:
+        self: The celery task
+        pq_ids_to_process: A two-tuple containing a list of ProcessingQueue
+            pks to process, and a boolean indicating whether the PQ belongs to subdocket
+            replication.
     """
-
     for pq_pk in pq_ids_to_process:
         # TODO: Remove backward compatibility logic once this is deployed.
         if isinstance(pq_pk, tuple):
@@ -2452,20 +2498,22 @@ def replicate_fq_pdf_to_subdocket_rds(
 ) -> None:
     """Replicate a PDF to subdocket RECAPDocuments.
 
-    :param self: The celery task
-    :param pq_ids_to_process: A list of PQ IDs that require replication to sub-dockets.
-    :return: None
+    Args:
+        self: The celery task
+        pq_ids_to_process: A list of PQ IDs that require replication to sub-dockets.
     """
-
     for pq_pk in pq_ids_to_process:
         async_to_sync(process_recap_pdf)(pq_pk)
 
 
 def get_fq_docket_kwargs(fq):
-    """Gather the kwargs for the Juriscraper DocketReport from the fq object
+    """Gather the kwargs for the Juriscraper DocketReport from the fq object.
 
-    :param fq: The PacerFetchQueue object
-    :return: A dict of the kwargs we can send to the DocketReport
+    Args:
+        fq: The PacerFetchQueue object
+
+    Returns:
+        A dict of the kwargs we can send to the DocketReport
     """
     return {
         "doc_num_start": fq.de_number_start,
@@ -2479,11 +2527,13 @@ def get_fq_docket_kwargs(fq):
 
 
 def get_fq_appellate_docket_kwargs(fq: PacerFetchQueue):
-    """Gather the kwargs for the Juriscraper AppellateDocketReport from the fq
-    object
+    """Gather the kwargs for the Juriscraper AppellateDocketReport from the fq object.
 
-    :param fq: The PacerFetchQueue object
-    :return: A dict of the kwargs we can send to the DocketReport
+    Args:
+        fq: The PacerFetchQueue object
+
+    Returns:
+        A dict of the kwargs we can send to the DocketReport
     """
     return {
         "show_docket_entries": True,
@@ -2499,14 +2549,16 @@ def get_fq_appellate_docket_kwargs(fq: PacerFetchQueue):
 
 
 async def fetch_pacer_case_id_and_title(s, fq, court_id):
-    """Use PACER's hidden API to learn the pacer_case_id of a case
+    """Use PACER's hidden API to learn the pacer_case_id of a case.
 
-    :param s: A PacerSession object to use
-    :param fq: The PacerFetchQueue object to use
-    :param court_id: The CL ID of the court
-    :return: A dict of the new information or an empty dict if it fails
+    Args:
+        s: A PacerSession object to use
+        fq: The PacerFetchQueue object to use
+        court_id: The CL ID of the court
+
+    Returns:
+        A dict of the new information or an empty dict if it fails
     """
-
     if (fq.docket_id and not fq.docket.pacer_case_id) or fq.docket_number:
         # We lack the pacer_case_id either on the docket or from the
         # submission. Look it up.
@@ -2534,12 +2586,15 @@ async def create_or_update_docket_data_from_fetch(
 ) -> _CreateUpdateDocketFromFetchDict:
     """Creates or updates docket data in the database from fetched data.
 
-    :param fq: The PacerFetchQueue record associated with this fetch.
-    :param court_id: The CL ID of the court.
-    :param pacer_case_id: The pacer_case_id of the docket, if known.
-    :param report: The BaseDocketReport object containing the fetched data.
-    :param docket_data: A dictionary containing the parsed docket data.
-    :return: a dict with information about the docket and the new data
+    Args:
+        fq: The PacerFetchQueue record associated with this fetch.
+        court_id: The CL ID of the court.
+        pacer_case_id: The pacer_case_id of the docket, if known.
+        report: The BaseDocketReport object containing the fetched data.
+        docket_data: A dictionary containing the parsed docket data.
+
+    Returns:
+        a dict with information about the docket and the new data
     """
     if fq.docket_id:
         d = await Docket.objects.aget(pk=fq.docket_id)
@@ -2569,13 +2624,16 @@ async def fetch_docket_by_pacer_case_id(
     pacer_case_id: str,
     fq: PacerFetchQueue,
 ) -> _CreateUpdateDocketFromFetchDict:
-    """Download the docket from PACER and merge it into CL
+    """Download the docket from PACER and merge it into CL.
 
-    :param session: A PacerSession object to work with
-    :param court_id: The CL ID of the court
-    :param pacer_case_id: The pacer_case_id of the docket, if known
-    :param fq: The PacerFetchQueue object
-    :return: a dict with information about the docket and the new data
+    Args:
+        session: A PacerSession object to work with
+        court_id: The CL ID of the court
+        pacer_case_id: The pacer_case_id of the docket, if known
+        fq: The PacerFetchQueue object
+
+    Returns:
+        a dict with information about the docket and the new data
     """
     report = DocketReport(map_cl_to_pacer_id(court_id), session)
     await report.query(pacer_case_id, **get_fq_docket_kwargs(fq))
@@ -2597,11 +2655,15 @@ async def purchase_appellate_docket_by_docket_number(
 ) -> _CreateUpdateDocketFromFetchDict:
     """Purchases and processes an appellate docket from PACER by docket number.
 
-    :param session: A PacerSession object to work with
-    :param court_id: The CL ID of the court
-    :param docket_number: The docket number of the appellate case.
-    :param fq: The PacerFetchQueue object
-    :return: a dict with information about the docket and the new data
+    Args:
+        session: A PacerSession object to work with
+        court_id: The CL ID of the court
+        docket_number: The docket number of the appellate case.
+        fq: The PacerFetchQueue object
+        **kwargs: Unused.
+
+    Returns:
+        a dict with information about the docket and the new data
     """
     acms_case_id = None
 
@@ -2670,13 +2732,17 @@ def fetch_appellate_docket(
 async def fetch_appellate_docket_base(
     fq_pk: int,
 ) -> _CreateUpdateDocketFromFetchDict | None:
-    """Fetches an appellate docket from PACER using the docket number
-    associated with the provided Fetch Queue record to attempt the purchase.
+    """Fetches an appellate docket from PACER using the docket number associated with the provided Fetch Queue record to attempt the purchase.
 
-    :param fq_pk: The PK of the Fetch Queue to update.
-    :return: Docket metadata on success, or None for a terminal failure.
-    :raises CourtQueryError: A query failed; the caller controls retries and
-    updates the fetch status accordingly.
+    Args:
+        fq_pk: The PK of the Fetch Queue to update.
+
+    Returns:
+        Docket metadata on success, or None for a terminal failure.
+
+    Raises:
+        CourtQueryError: A query failed; the caller controls retries and
+            updates the fetch status accordingly.
     """
     fq = await PacerFetchQueue.objects.select_related("docket").aget(pk=fq_pk)
     court_id = fq.court_id or getattr(fq.docket, "court_id", None)
@@ -2784,15 +2850,20 @@ def fetch_docket(
 async def fetch_docket_base(
     fq_pk: int,
 ) -> _CreateUpdateDocketFromFetchDict | None:
-    """Fetch a docket from PACER
+    """Fetch a docket from PACER.
 
     This mirrors code elsewhere that gets dockets, but manages status as it
     goes through the process.
 
-    :param fq_pk: The PK of the RECAP Fetch Queue to update.
-    :return: Docket metadata on success, or None for a terminal failure.
-    :raises CourtQueryError: A query failed; the caller controls retries and
-    updates the fetch status accordingly.
+    Args:
+        fq_pk: The PK of the RECAP Fetch Queue to update.
+
+    Returns:
+        Docket metadata on success, or None for a terminal failure.
+
+    Raises:
+        CourtQueryError: A query failed; the caller controls retries and
+            updates the fetch status accordingly.
     """
     fq = await PacerFetchQueue.objects.select_related("docket").aget(pk=fq_pk)
     court_id = fq.court_id or getattr(fq.docket, "court_id", None)
@@ -2891,13 +2962,13 @@ def mark_fq_successful(fq_pk):
 
 
 async def mark_fq_status(fq, msg, status):
-    """Update the PacerFetchQueue item with the status and message provided
+    """Update the PacerFetchQueue item with the status and message provided.
 
-    :param fq: The PacerFetchQueue item to update
-    :param msg: The message to associate
-    :param status: The status code to associate. If SUCCESSFUL, date_completed
-    is set as well.
-    :return: None
+    Args:
+        fq: The PacerFetchQueue item to update
+        msg: The message to associate
+        status: The status code to associate. If SUCCESSFUL, date_completed
+            is set as well.
     """
     fq.message = msg
     fq.status = status
@@ -2912,11 +2983,13 @@ def get_recap_email_recipients(
 ) -> list[str]:
     """Get the recap.email recipients from the email_recipients list.
 
-    :param email_recipients: List of dicts that contains the notification
-    email recipients in the format: "name": name, "email_addresses": [""]
-    :return: List of recap.email addresses
-    """
+    Args:
+        email_recipients: List of dicts that contains the notification
+            email recipients in the format: "name": name, "email_addresses": [""]
 
+    Returns:
+        List of recap.email addresses
+    """
     # Select only @recap.email addresses
     recap_email_recipients = [
         recap_email.lower()
@@ -2929,14 +3002,15 @@ def get_recap_email_recipients(
 async def get_attachment_page_by_url(
     att_page_url: str, court_id: str
 ) -> str | None:
-    """Get the attachment page report for recap.email documents without being
-    logged into PACER.
+    """Get the attachment page report for recap.email documents without being logged into PACER.
 
-    :param att_page_url: The free look link url to the attachment page
-    :param court_id: The court ID we're working with
-    :return: The HTML page text or None if it's not a valid attachment page
+    Args:
+        att_page_url: The free look link url to the attachment page
+        court_id: The court ID we're working with
+
+    Returns:
+        The HTML page text or None if it's not a valid attachment page
     """
-
     logger.info(
         "Querying the email notice attachment page endpoint at URL: %s",
         att_page_url,
@@ -2955,19 +3029,18 @@ async def get_attachment_page_by_url(
 async def set_rd_sealed_status(
     rd: RECAPDocument, magic_number: str | None, potentially_sealed: bool
 ) -> None:
-    """Set RD is_sealed status according to the following conditions:
+    """Set RD is_sealed status according to the following conditions.
 
     If potentially_sealed is false, set as not sealed.
     If potentially_sealed is True and there magic_number, set as sealed.
     If potentially_sealed is True and no magic_number available, check on PACER
     if the document is sealed.
 
-    :param rd: The RECAPDocument to set is sealed status.
-    :param magic_number: The magic number if available.
-    :param potentially_sealed: Weather the RD might be sealed or not.
-    :return: None
+    Args:
+        rd: The RECAPDocument to set is sealed status.
+        magic_number: The magic number if available.
+        potentially_sealed: Weather the RD might be sealed or not.
     """
-
     await rd.arefresh_from_db()
     if not rd.pacer_doc_id:
         return
@@ -2993,17 +3066,18 @@ async def save_pacer_doc_from_pq(
     pq: ProcessingQueue,
     magic_number: str | None,
 ) -> int | None:
-    """Save the PDF binary previously downloaded and stored in a PQ object to
-    the corresponding RECAPDocument.
+    """Save the PDF binary previously downloaded and stored in a PQ object to the corresponding RECAPDocument.
 
-    :param self: The parent celery task
-    :param rd: The RECAP Document to get.
-    :param fq: The RECAP Fetch Queue to update.
-    :param pq: The ProcessingQueue that contains the PDF document.
-    :param magic_number: The magic number to fetch PACER documents for free.
-    :return: The RECAPDocument PK
+    Args:
+        self: The parent celery task
+        rd: The RECAP Document to get.
+        fq: The RECAP Fetch Queue to update.
+        pq: The ProcessingQueue that contains the PDF document.
+        magic_number: The magic number to fetch PACER documents for free.
+
+    Returns:
+        The RECAPDocument PK
     """
-
     if rd.is_available:
         msg = "PDF already marked as 'is_available'. Doing nothing."
         await mark_fq_status(fq, msg, PROCESSING_STATUS.SUCCESSFUL)
@@ -3043,18 +3117,16 @@ async def save_pacer_doc_from_pq(
 
 
 def is_short_bankr_doc_id(pacer_doc_id: str | None, court_id: str) -> bool:
-    """Check if the given pacer_doc_id is considered "short" in a bankruptcy
-    court. This type of pacer_doc_id appears in bankruptcy NEFs, possibly when
-    the document is sealed or unavailable at the time the email is delivered.
-    We should avoid fetching these kinds of unavailable documents or
-    attachment pages.
+    """Check if the given pacer_doc_id is considered "short" in a bankruptcy court. This type of pacer_doc_id appears in bankruptcy NEFs, possibly when the document is sealed or unavailable at the time the email is delivered. We should avoid fetching these kinds of unavailable documents or attachment pages.
 
-    :param pacer_doc_id: The pacer_doc_id.
-    :param court_id: The court ID.
-    :return: True if the document ID is 4 characters and belongs to a
-    bankruptcy court, otherwise False.
+    Args:
+        pacer_doc_id: The pacer_doc_id.
+        court_id: The court ID.
+
+    Returns:
+        True if the document ID is 4 characters and belongs to a
+        bankruptcy court, otherwise False.
     """
-
     return (
         pacer_doc_id is not None
         and len(pacer_doc_id) == 4
@@ -3076,34 +3148,32 @@ def download_pacer_pdf_and_save_to_pq(
     is_bankr_short_doc_id: bool = False,
     acms: bool = False,
 ) -> ProcessingQueue:
-    """Try to download a PACER document from the notification via the magic
-    link and store it in a ProcessingQueue object. So it can be copied to every
-    Case/RECAPDocument (multi-docket NEFs). In case of a failure/retry in any
-    following step, the one-look PACER document will be already stored in the
-    PQ object. Increasing the reliability of saving PACER documents.
+    """Try to download a PACER document from the notification via the magic link and store it in a ProcessingQueue object. So it can be copied to every Case/RECAPDocument (multi-docket NEFs). In case of a failure/retry in any following step, the one-look PACER document will be already stored in the PQ object. Increasing the reliability of saving PACER documents.
 
-    :param court_id: A CourtListener court ID to query the free document.
-    :param session_data: A SessionData object containing the session's cookies
-    and proxy.
-    :param cutoff_date: The datetime from which we should query
-     ProcessingQueue objects, the datetime the EmailProcessingQueue was
-     created, for both the main and attachment RECAPDocuments.
-    :param magic_number: The magic number to fetch PACER documents for free.
-    :param pacer_case_id: The pacer_case_id to query the free document.
-    :param pacer_doc_id: The pacer_doc_id to query the free document.
-    :param user_pk: The user to associate with the ProcessingQueue object when
-     it's created.
-    :param appellate: Whether the download belongs to an appellate court.
-    :param attachment_number: The RECAPDocument attachment_number in case the
-     request belongs to an attachment document.
-    :param de_seq_num: The sequential number assigned by the PACER system to
-     identify the docket entry within a case.
-    :param is_bankr_short_doc_id: A boolean indicating whether the pacer_doc_id
-     is a bad short bankruptcy doc ID.
-    :param acms: Whether the download belongs to an ACMS notification.
-    :return: The ProcessingQueue object that's created or returned if existed.
+    Args:
+        court_id: A CourtListener court ID to query the free document.
+        session_data: A SessionData object containing the session's cookies
+            and proxy.
+        cutoff_date: The datetime from which we should query
+            ProcessingQueue objects, the datetime the EmailProcessingQueue was
+            created, for both the main and attachment RECAPDocuments.
+        magic_number: The magic number to fetch PACER documents for free.
+        pacer_case_id: The pacer_case_id to query the free document.
+        pacer_doc_id: The pacer_doc_id to query the free document.
+        user_pk: The user to associate with the ProcessingQueue object when
+            it's created.
+        appellate: Whether the download belongs to an appellate court.
+        attachment_number: The RECAPDocument attachment_number in case the
+            request belongs to an attachment document.
+        de_seq_num: The sequential number assigned by the PACER system to
+            identify the docket entry within a case.
+        is_bankr_short_doc_id: A boolean indicating whether the pacer_doc_id
+            is a bad short bankruptcy doc ID.
+        acms: Whether the download belongs to an ACMS notification.
+
+    Returns:
+        The ProcessingQueue object that's created or returned if existed.
     """
-
     # If pacer_doc_id is None, probably a minute entry, set it to ""
     if pacer_doc_id is None:
         pacer_doc_id = ""
@@ -3208,25 +3278,23 @@ def get_and_copy_recap_attachment_docs(
     cutoff_date: datetime,
     de_seq_num: str | None = None,
 ) -> list[ProcessingQueue]:
-    """Download and copy the corresponding PACER PDF to all the notification
-    RECAPDocument attachments, including support for multi-docket NEFs.
+    """Download and copy the corresponding PACER PDF to all the notification RECAPDocument attachments, including support for multi-docket NEFs.
 
-    :param self: The parent celery task.
-    :param att_rds: A list for RECAPDocument attachments to process.
-    :param court_id: A CourtListener court ID to query the free document.
-    :param magic_number: The magic number to fetch PACER documents for free.
-    :param pacer_case_id: The pacer_case_id to query the free document.
-    :param user_pk: The user to associate with the ProcessingQueue object.
-    :param cutoff_date: The datetime from which ProcessingQueue objects can be
-     reused, the datetime the EmailProcessingQueue was created. This prevents
-     reusing stale PQs from previous notifications whose file was already
-     deleted, while still allowing reuse within this notification's run,
-     retries and multi-docket NEFs.
-    :param de_seq_num: The sequential number assigned by the PACER system to
-     identify the docket entry within a case.
-    :return: None
+    Args:
+        self: The parent celery task.
+        att_rds: A list for RECAPDocument attachments to process.
+        court_id: A CourtListener court ID to query the free document.
+        magic_number: The magic number to fetch PACER documents for free.
+        pacer_case_id: The pacer_case_id to query the free document.
+        user_pk: The user to associate with the ProcessingQueue object.
+        cutoff_date: The datetime from which ProcessingQueue objects can be
+            reused, the datetime the EmailProcessingQueue was created. This prevents
+            reusing stale PQs from previous notifications whose file was already
+            deleted, while still allowing reuse within this notification's run,
+            retries and multi-docket NEFs.
+        de_seq_num: The sequential number assigned by the PACER system to
+            identify the docket entry within a case.
     """
-
     session_data = async_to_sync(get_pacer_cookie_from_cache)(user_pk)
     appellate = False
     unique_pqs = []
@@ -3268,15 +3336,16 @@ def open_and_validate_email_notification(
     self: Task,
     epq: EmailProcessingQueue,
 ) -> tuple[dict[str, str | bool | list[DocketType]] | None, str]:
-    """Open and read a recap.email notification from S3, then validate if it's
-    a valid NEF or NDA.
+    """Open and read a recap.email notification from S3, then validate if it's a valid NEF or NDA.
 
-    :param self: The Celery task
-    :param epq: The EmailProcessingQueue object.
-    :return: A two tuple of a dict containing the notification data if valid
-    or None otherwise, the raw notification body to store in next steps.
+    Args:
+        self: The Celery task
+        epq: The EmailProcessingQueue object.
+
+    Returns:
+        A two tuple of a dict containing the notification data if valid
+        or None otherwise, the raw notification body to store in next steps.
     """
-
     try:
         body = retrieve_email_from_queue(
             epq.message_id, RecapEmailSESStorage()
@@ -3319,16 +3388,18 @@ async def fetch_attachment_data(
     dockets_updated: list[DocketUpdatedData],
     user_pk: int,
 ) -> str:
-    """Fetch the attachment page data for the main document in the
-    recap.email notification.
+    """Fetch the attachment page data for the main document in the recap.email notification.
 
-    :param document_url: The document URL including the magic number to get the
-     attachment page without being logged into PACER.
-    :param court_id: The court ID we're working with.
-    :param dockets_updated: A list of DocketUpdatedData containing the dockets
-    to merge the attachments in.
-    :param user_pk: The user to associate with the ProcessingQueue object.
-    :return: The HTML page text.
+    Args:
+        document_url: The document URL including the magic number to get the
+            attachment page without being logged into PACER.
+        court_id: The court ID we're working with.
+        dockets_updated: A list of DocketUpdatedData containing the dockets
+            to merge the attachments in.
+        user_pk: The user to associate with the ProcessingQueue object.
+
+    Returns:
+        The HTML page text.
     """
     session_data = await get_pacer_cookie_from_cache(user_pk)
     # Try to fetch the attachment page without being logged into PACER using
@@ -3356,16 +3427,17 @@ def merge_rd_attachments(
     dockets_updated: list[DocketUpdatedData],
     user_pk: int,
 ) -> list[RECAPDocument]:
-    """Merge the attachment data into the dockets returned by the recap.email
-    notification.
+    """Merge the attachment data into the dockets returned by the recap.email notification.
 
-    :param att_report_text: The attachment page report text.
-    :param dockets_updated: A list of DocketUpdatedData containing the dockets
-    to merge the attachments in.
-    :param user_pk: The user to associate with the ProcessingQueue object.
-    :return: A list of RECAPDocuments modified or created during the process
+    Args:
+        att_report_text: The attachment page report text.
+        dockets_updated: A list of DocketUpdatedData containing the dockets
+            to merge the attachments in.
+        user_pk: The user to associate with the ProcessingQueue object.
+
+    Returns:
+        A list of RECAPDocuments modified or created during the process
     """
-
     all_attachment_rds = []
     for docket_entry in dockets_updated:
         # Merge the attachments for each docket/recap document
@@ -3400,25 +3472,22 @@ def replicate_recap_email_to_subdockets(
     att_report_text: str | None,
     att_pqs: list[ProcessingQueue],
 ) -> None:
-    """Replicate recap.email content to subdockets no mentioned in the
-    email notification.
+    """Replicate recap.email content to subdockets no mentioned in the email notification.
 
     - Replication of main PDF to subdockets.
     - Replication of attachment page to subdockets.
     - Replication of attachment PDFs to subdockets.
 
-    :param user_pk: The User ID.
-    :param court_id: The Court ID.
-    :param pacer_doc_id: The PACER document ID from the main document.
-    :param unique_case_ids: A list of unique PACER case IDs to exclude.
-    :param main_pdf_filepath: The filepath to the main PDF document.
-    :param att_report_text: The attachment page report text.
-    :param att_pqs: A list of attachment PQ objects from attachments that require
-    replication.
-
-    :return: None
+    Args:
+        user_pk: The User ID.
+        court_id: The Court ID.
+        pacer_doc_id: The PACER document ID from the main document.
+        unique_case_ids: A list of unique PACER case IDs to exclude.
+        main_pdf_filepath: The filepath to the main PDF document.
+        att_report_text: The attachment page report text.
+        att_pqs: A list of attachment PQ objects from attachments that require
+            replication.
     """
-
     main_pdf_binary_content = None
     if main_pdf_filepath:
         with main_pdf_filepath:
@@ -3485,10 +3554,13 @@ async def get_acms_pacer_case_id(
 ) -> str | None:
     """Fetch the ACMS PACER case ID for a given court and docket number.
 
-    :param session_data: The PACER session data used to authenticate the request.
-    :param court_id: The Court ID.
-    :param docket_number: The docket_number to query.
-    :return: The PACER case ID as a string if found, otherwise None.
+    Args:
+        session_data: The PACER session data used to authenticate the request.
+        court_id: The Court ID.
+        docket_number: The docket_number to query.
+
+    Returns:
+        The PACER case ID as a string if found, otherwise None.
     """
     async with ProxyPacerSession(
         cookies=session_data.cookies, proxy=session_data.proxy_address
@@ -3514,14 +3586,16 @@ async def get_acms_pacer_case_id(
 def process_recap_email(
     self: Task, epq_pk: int, user_pk: int
 ) -> list[int] | None:
-    """Processes a recap.email when it comes in, fetches the free document and
-    triggers docket alerts and webhooks.
+    """Processes a recap.email when it comes in, fetches the free document and triggers docket alerts and webhooks.
 
-    :param self: The task
-    :param epq_pk: The EmailProcessingQueue object pk
-    :param user_pk: The API user that sent this notification
-    :return: An optional list to pass to the next task with recap documents pks
-     that were downloaded
+    Args:
+        self: The task
+        epq_pk: The EmailProcessingQueue object pk
+        user_pk: The API user that sent this notification
+
+    Returns:
+        An optional list to pass to the next task with recap documents pks
+        that were downloaded
     """
     epq = EmailProcessingQueue.objects.get(pk=epq_pk)
     async_to_sync(mark_pq_status)(
@@ -3862,14 +3936,11 @@ def do_recap_document_fetch(epq: EmailProcessingQueue, user: User) -> None:
     retry_backoff_max=60 * 60,
 )
 def process_texas_email(self: Task, epq_pk: int) -> None:
-    """
-    Task to process an email added to the queue by the .../tx/tames/alert\
-    endpoint. If the email is a case notification email, fetch the docket page\
-    and return the scraped data. Otherwise, set an error in the processing\
-    queue indicating the email type was unrecognized.
+    """Task to process an email added to the queue by the .../tx/tames/alert endpoint. If the email is a case notification email, fetch the docket page and return the scraped data. Otherwise, set an error in the processing queue indicating the email type was unrecognized.
 
-    :param self: The Celery task
-    :param epq_pk: The PK of the EmailProcessingQueue object to process
+    Args:
+        self: The Celery task
+        epq_pk: The PK of the EmailProcessingQueue object to process
     """
     epq = EmailProcessingQueue.objects.get(pk=epq_pk)
 
@@ -4021,14 +4092,16 @@ def fetch_and_archive_scotus_docket_followup(
     followup_url: str,
     timeout: float = 10.0,
 ) -> dict[str, str | dict[str, str]]:
-    """Fetch the SCOTUS docket follow-up URL, archive the raw HTML in S3,
-    and parse it.
+    """Fetch the SCOTUS docket follow-up URL, archive the raw HTML in S3, and parse it.
 
-    :param court_id: The ID of the court from the ``SCOTUSEmail`` object
-    :param notification: The ``SCOTUSNotificationEmail`` object from the ``SCOTUSEmail["data"]`` field
-    :param followup_url: The URL to send the followup request to
-    :param timeout: HTTP timeout in seconds.
-    :return: A dict with ``email_type`` and ``data`` keys, matching the shape
+    Args:
+        court_id: The ID of the court from the ``SCOTUSEmail`` object
+        notification: The ``SCOTUSNotificationEmail`` object from the ``SCOTUSEmail["data"]`` field
+        followup_url: The URL to send the followup request to
+        timeout: HTTP timeout in seconds.
+
+    Returns:
+        A dict with ``email_type`` and ``data`` keys, matching the shape
         returned by ``SCOTUSEmail.handle_email``.
     """
     with httpx.Client(follow_redirects=True, http2=True) as client:
@@ -4065,16 +4138,18 @@ def fetch_and_archive_scotus_docket_followup(
     retry_backoff_max=60 * 60,
 )
 def process_scotus_email(self: Task, epq_pk: int) -> None:
-    """Task to process an email added to the queue from the
-    "scrapers/scotus-email" endpoint. If the email is a case notification
+    """Task to process an email added to the queue from the "scrapers/scotus-email" endpoint.
+
+    If the email is a case notification
     email, fetch the docket page and return the scraped data.
     If the email is a confirmation email, fetch the confirmation page,
     throwing an error if it indicates that subscription confirmation failed.
     Otherwise, set an error in the processing queue indicating the email
     type was unrecognized.
 
-    :param self: The Celery task
-    :param epq_pk: The PK of the EmailProcessingQueue object to process
+    Args:
+        self: The Celery task
+        epq_pk: The PK of the EmailProcessingQueue object to process
     """
     epq = EmailProcessingQueue.objects.get(pk=epq_pk)
     async_to_sync(mark_pq_status)(
@@ -4180,7 +4255,8 @@ def check_pdf_redactions(rd_pk: int) -> None:
 
     Runs as a background Celery task so it doesn't block PDF ingestion.
 
-    :param rd_pk: The PK of the RECAPDocument to check
+    Args:
+        rd_pk: The PK of the RECAPDocument to check
     """
     rd = RECAPDocument.objects.get(pk=rd_pk)
     try:

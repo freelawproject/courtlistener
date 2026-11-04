@@ -214,10 +214,7 @@ class ProcessingQueueSourceChoicesTest(SimpleTestCase):
 
 
 class ManagementCommandPqSourceTest(TestCase):
-    """PQs created by internal management commands
-    do not have their source set explicitly, they're
-    expected to fall back to the model's UNKNOWN default.
-    """
+    """PQs created by internal management commands do not have their source set explicitly, they're expected to fall back to the model's UNKNOWN default."""
 
     @classmethod
     def setUpTestData(cls):
@@ -388,9 +385,7 @@ class RecapUploadsTest(TestCase):
         mock.assert_called()
 
     async def test_uploading_a_pdf_sets_extension_source(self, mock):
-        """A PQ created through the extension/API upload endpoint should be
-        tagged with source=EXTENSION.
-        """
+        """A PQ created through the extension/API upload endpoint should be tagged with source=EXTENSION."""
         r = await self.async_client.post(self.path, self.data)
         self.assertEqual(r.status_code, HTTPStatus.CREATED)
 
@@ -399,10 +394,7 @@ class RecapUploadsTest(TestCase):
         self.assertEqual(pq.source, PROCESSING_QUEUE_SOURCE.EXTENSION)
 
     async def test_client_submitted_source_is_ignored(self, mock):
-        """A client-submitted `source` value should be ignored; the PQ
-        should still be tagged with source=EXTENSION, set server-side by
-        the view.
-        """
+        """A client-submitted `source` value should be ignored; the PQ should still be tagged with source=EXTENSION, set server-side by the view."""
         self.data["source"] = PROCESSING_QUEUE_SOURCE.REPLICATION
         r = await self.async_client.post(self.path, self.data)
         self.assertEqual(r.status_code, HTTPStatus.CREATED)
@@ -543,9 +535,7 @@ class RecapUploadsTest(TestCase):
         self.assertEqual(r.status_code, HTTPStatus.BAD_REQUEST)
 
     async def test_district_court_in_appellate_upload_fails(self, mock):
-        """If you send a district court to an appellate endpoint, does it
-        fail?
-        """
+        """If you send a district court to an appellate endpoint, does it fail?"""
         self.data.update({"upload_type": UPLOAD_TYPE.APPELLATE_DOCKET})
         del self.data["pacer_doc_id"]
         del self.data["document_number"]
@@ -553,9 +543,7 @@ class RecapUploadsTest(TestCase):
         self.assertEqual(r.status_code, HTTPStatus.BAD_REQUEST)
 
     async def test_appellate_court_in_district_upload_fails(self, mock):
-        """If you send appellate court info to a distric court, does it
-        fail?
-        """
+        """If you send appellate court info to a distric court, does it fail?"""
         self.data.update(
             {"upload_type": UPLOAD_TYPE.DOCKET, "court": "scotus"}
         )
@@ -664,13 +652,11 @@ class RecapUploadsTest(TestCase):
         self.assertEqual(r.status_code, HTTPStatus.OK)
 
     async def test_uploading_an_appellate_attachment_page(self, mock):
-        """Can we upload an appellate attachment page and have it be saved
-        correctly?
+        """Can we upload an appellate attachment page and have it be saved correctly?
 
         Note that this works fine even though we're not actually uploading a
         docket due to the mock.
         """
-
         self.data.update(
             {
                 "upload_type": UPLOAD_TYPE.APPELLATE_ATTACHMENT_PAGE,
@@ -690,13 +676,11 @@ class RecapUploadsTest(TestCase):
         self.assertEqual(r.status_code, HTTPStatus.OK)
 
     def test_processing_an_appellate_attachment_page(self, mock_upload):
-        """Can we process an appellate attachment and transform the main recap
-        document to an attachment correctly?
+        """Can we process an appellate attachment and transform the main recap document to an attachment correctly?
 
         Note that this works fine even though we're not actually uploading a
         docket due to the mock.
         """
-
         d = DocketFactory(
             source=Docket.RECAP,
             court=self.court_appellate,
@@ -762,10 +746,7 @@ class RecapUploadsTest(TestCase):
     def test_reprocess_appellate_docket_after_adding_attachments(
         self, mock_upload
     ):
-        """Can we reprocess an appellate docket page after adding attachments
-        and avoid creating the main recap document again?
-        """
-
+        """Can we reprocess an appellate docket page after adding attachments and avoid creating the main recap document again?"""
         d = DocketFactory(
             source=Docket.RECAP,
             court=self.court_appellate,
@@ -820,11 +801,7 @@ class RecapUploadsTest(TestCase):
     def test_match_appellate_main_rd_with_attachments_and_no_att_data(
         self, mock_upload
     ):
-        """Can we match the main RECAPDocument when merging an appellate docket
-        entry from a docket sheet after a PDF upload has added attachments,
-        but before the attachment page for the entry is available?
-        """
-
+        """Can we match the main RECAPDocument when merging an appellate docket entry from a docket sheet after a PDF upload has added attachments, but before the attachment page for the entry is available?"""
         d = DocketFactory(
             source=Docket.RECAP,
             court=self.court_appellate,
@@ -916,9 +893,7 @@ class RecapUploadsTest(TestCase):
         self.assertEqual(main_rd.attachment_number, 1)
 
     def test_avoid_merging_att_zero_on_pdf_uploads(self, mock_upload):
-        """Confirm that a RECAP PDF upload containing attachment number 0
-        matches the main RD."""
-
+        """Confirm that a RECAP PDF upload containing attachment number 0 matches the main RD."""
         d = DocketFactory(
             source=Docket.RECAP,
             court=self.court_appellate,
@@ -963,10 +938,7 @@ class RecapUploadsTest(TestCase):
     def test_avoid_updating_doc_num_on_appellate_pdf_uploads(
         self, mock_upload
     ):
-        """Confirm that a RECAP PDF upload from an appellate court that doesn't
-        use regular numbers. We avoid updating the document_number from the PQ.
-        """
-
+        """Confirm that a RECAP PDF upload from an appellate court that doesn't use regular numbers. We avoid updating the document_number from the PQ."""
         de = DocketEntryFactory(
             docket__court=self.court_appellate,
             entry_number=4505578698,
@@ -1039,10 +1011,7 @@ class RecapUploadsTest(TestCase):
         self.assertEqual(att_2.document_number, "04505578698")
 
     def test_update_doc_num_on_regular_pdf_uploads(self, mock_upload):
-        """Confirm that on RECAP PDF uploads containing regular document_number.
-        document_number is being updated from the PQ.
-        """
-
+        """Confirm that on RECAP PDF uploads containing regular document_number. document_number is being updated from the PQ."""
         # Appellate entry
         de = DocketEntryFactory(
             docket__court=self.court_appellate,
@@ -1139,10 +1108,7 @@ class RecapUploadsTest(TestCase):
     def test_fix_scrambled_document_number_during_attachment_merge(
         self, mock_upload
     ):
-        """Confirm a RD document with a wrong document_number is matched and
-        fixed during an attachment page merge.
-        """
-
+        """Confirm a RD document with a wrong document_number is matched and fixed during an attachment page merge."""
         de = DocketEntryFactory(
             docket__court=self.court_appellate,
             entry_number=4505578698,
@@ -1196,13 +1162,11 @@ class RecapUploadsTest(TestCase):
         self.assertEqual(att_1.document_number, "04505578698")
 
     async def test_uploading_a_case_query_result_page(self, mock):
-        """Can we upload a case query result page and have it be saved
-        correctly?
+        """Can we upload a case query result page and have it be saved correctly?
 
         Note that this works fine even though we're not actually uploading a
         base case query advanced page due to the mock.
         """
-
         self.data.update(
             {
                 "upload_type": UPLOAD_TYPE.CASE_QUERY_RESULT_PAGE,
@@ -1222,8 +1186,7 @@ class RecapUploadsTest(TestCase):
         self.assertEqual(r.status_code, HTTPStatus.OK)
 
     async def test_uploading_an_appellate_case_query_result_page(self, mock):
-        """Can we upload an appellate case query result page and have it be
-        saved correctly?
+        """Can we upload an appellate case query result page and have it be saved correctly?
 
         Note that this works fine even though we're not actually uploading a
         case query page due to the mock.
@@ -1287,7 +1250,6 @@ class RecapUploadsTest(TestCase):
         Note that this works fine even though we're not actually uploading a
         docket due to the mock.
         """
-
         pq = ProcessingQueue.objects.create(
             court=self.ca2,
             uploader=self.user,
@@ -1438,11 +1400,7 @@ class RecapUploadsTest(TestCase):
         )
 
     def test_match_recap_document_with_wrong_pacer_doc_id(self, mock_upload):
-        """Confirm that when an existing RECAPDocument has an invalid
-        pacer_doc_id, we can still match it after excluding the pacer_doc_id
-        from the lookup.
-        """
-
+        """Confirm that when an existing RECAPDocument has an invalid pacer_doc_id, we can still match it after excluding the pacer_doc_id from the lookup."""
         de_data = DocketEntriesDataFactory(
             docket_entries=[
                 RECAPEmailDocketEntryDataFactory(
@@ -1480,12 +1438,7 @@ class RecapUploadsTest(TestCase):
     def test_match_recap_document_with_wrong_pacer_doc_id_duplicated(
         self, mock_upload
     ):
-        """Confirm that when an existing RECAPDocument has an invalid
-        pacer_doc_id, we can still match it after excluding the pacer_doc_id
-        from the lookup, even if there is more than one PACER_DOCUMENT that
-        belongs to the docket entry.
-        """
-
+        """Confirm that when an existing RECAPDocument has an invalid pacer_doc_id, we can still match it after excluding the pacer_doc_id from the lookup, even if there is more than one PACER_DOCUMENT that belongs to the docket entry."""
         de_data = DocketEntriesDataFactory(
             docket_entries=[
                 RECAPEmailDocketEntryDataFactory(
@@ -1530,10 +1483,7 @@ class RecapUploadsTest(TestCase):
         )
 
     def test_bad_attachment_page_upload_fails_gracefully(self, mock_upload):
-        """Confirm that a bad attachment page upload fails gracefully with the
-        appropriate status and error message.
-        """
-
+        """Confirm that a bad attachment page upload fails gracefully with the appropriate status and error message."""
         # Create an initial PQ.
         pq = ProcessingQueue.objects.create(
             court=self.court,
@@ -1643,10 +1593,7 @@ class ReplicateRecapUploadsTest(TestCase):
         )
 
     def test_processing_subdocket_case_attachment_page(self):
-        """Can we replicate an attachment page upload from a subdocket case
-        to its corresponding RD across all related dockets?
-        """
-
+        """Can we replicate an attachment page upload from a subdocket case to its corresponding RD across all related dockets?"""
         # Add the docket entry to every case.
         async_to_sync(add_docket_entries)(
             self.d_1, self.de_data_2["docket_entries"]
@@ -1840,10 +1787,7 @@ class ReplicateRecapUploadsTest(TestCase):
         )
 
     def test_source_field_set_on_attachment_page_replicas(self):
-        """The original PQ that triggers an attachment page upload keeps its
-        original source, and the replica PQs created for matching subdocket
-        cases are tagged REPLICATION.
-        """
+        """The original PQ that triggers an attachment page upload keeps its original source, and the replica PQs created for matching subdocket cases are tagged REPLICATION."""
         for d in (self.d_1, self.d_2, self.d_3):
             async_to_sync(add_docket_entries)(
                 d, self.de_data_2["docket_entries"]
@@ -1876,11 +1820,7 @@ class ReplicateRecapUploadsTest(TestCase):
         )
 
     def test_process_attachments_for_subdocket_pq_with_missing_main_rd(self):
-        """Confirm that if the RD related to the initial PQ is missing,
-        we can still process attachments for subdocket cases where the
-        main RD matches.
-        """
-
+        """Confirm that if the RD related to the initial PQ is missing, we can still process attachments for subdocket cases where the main RD matches."""
         # Add the docket entry only to d_1.
         async_to_sync(add_docket_entries)(
             self.d_1, self.de_data_2["docket_entries"]
@@ -1954,10 +1894,7 @@ class ReplicateRecapUploadsTest(TestCase):
 
     @mock.patch("cl.recap.tasks.extract_pdf_document_base")
     def test_processing_subdocket_case_pdf_upload(self, mock_extract):
-        """Can we duplicate a PDF document upload from a subdocket case to the
-        corresponding RD across all related dockets?
-        """
-
+        """Can we duplicate a PDF document upload from a subdocket case to the corresponding RD across all related dockets?"""
         # Add the docket entry to every case.
         async_to_sync(add_docket_entries)(
             self.d_1, self.de_data_2["docket_entries"]
@@ -2097,10 +2034,7 @@ class ReplicateRecapUploadsTest(TestCase):
 
     @mock.patch("cl.scrapers.tasks.extract_pdf_document_base")
     def test_source_field_set_on_pdf_upload_replicas(self, mock_extract):
-        """The original PQ that triggers a PDF upload keeps its original
-        source, and the replica PQs created for matching subdocket cases are
-        tagged REPLICATION.
-        """
+        """The original PQ that triggers a PDF upload keeps its original source, and the replica PQs created for matching subdocket cases are tagged REPLICATION."""
         for d in (self.d_1, self.d_2, self.d_3):
             async_to_sync(add_docket_entries)(
                 d, self.de_data_2["docket_entries"]
@@ -2135,8 +2069,8 @@ class ReplicateRecapUploadsTest(TestCase):
     def test_source_field_not_overwritten_when_pacer_case_id_inferred(
         self, mock_extract
     ):
-        """find_subdocket_pdf_rds sets subdocket_replication=True on the
-        *original* PQ when it has to infer a pacer_case_id for it.
+        """find_subdocket_pdf_rds sets subdocket_replication=True on the *original* PQ when it has to infer a pacer_case_id for it.
+
         That flag must not be confused with the new source field:
         the original PQ's source must remain untouched, only the
         new replica PQs should be tagged REPLICATION.
@@ -2180,10 +2114,7 @@ class ReplicateRecapUploadsTest(TestCase):
     def test_processing_subdocket_case_pdf_attachment_upload(
         self, mock_extract
     ):
-        """Can we duplicate a PDF attachment document upload from a subdocket
-        case to the corresponding RD across all related dockets?
-        """
-
+        """Can we duplicate a PDF attachment document upload from a subdocket case to the corresponding RD across all related dockets?"""
         # Add the docket entry to every case.
         async_to_sync(add_docket_entries)(
             self.d_1, self.de_data_2["docket_entries"]
@@ -2313,10 +2244,7 @@ class ReplicateRecapUploadsTest(TestCase):
         mock_is_pacer_court_accessible,
         mock_get_att_report_by_rd,
     ):
-        """Can we replicate an attachment page Fetch API purchase from a
-        subdocket case to its corresponding RD across all related dockets?
-        """
-
+        """Can we replicate an attachment page Fetch API purchase from a subdocket case to its corresponding RD across all related dockets?"""
         # Add the docket entry to every case.
         async_to_sync(add_docket_entries)(
             self.d_1, self.de_data_2["docket_entries"]
@@ -2509,11 +2437,7 @@ class ReplicateRecapUploadsTest(TestCase):
         mock_is_pacer_court_accessible,
         mock_get_att_report_by_rd,
     ):
-        """An attachment page Fetch Queue purchase doesn't create a PQ for
-        the fetched document itself (fetch_attachment_page merges the data
-        directly). Every PQ it creates is a subdocket replica, so all of
-        them must be tagged REPLICATION.
-        """
+        """An attachment page Fetch Queue purchase doesn't create a PQ for the fetched document itself (fetch_attachment_page merges the data directly). Every PQ it creates is a subdocket replica, so all of them must be tagged REPLICATION."""
         for d in (self.d_1, self.d_2, self.d_3):
             async_to_sync(add_docket_entries)(
                 d, self.de_data_2["docket_entries"]
@@ -2570,9 +2494,7 @@ class ReplicateRecapUploadsTest(TestCase):
         mock_is_pacer_court_accessible,
         mock_get_att_report_by_rd,
     ):
-        """Attachment page replication is currently not supported for appellate
-        subdockets.
-        """
+        """Attachment page replication is currently not supported for appellate subdockets."""
         # Add the docket entry to every case.
         async_to_sync(add_docket_entries)(
             self.d_1_a, self.de_data_2["docket_entries"]
@@ -2688,7 +2610,6 @@ class ReplicateRecapUploadsTest(TestCase):
         mock_court_accessible,
     ):
         """Can we replicate a PDF document from a fetch request to subdockets?"""
-
         # Add the docket entry to every case.
         dockets = [self.d_1, self.d_2, self.d_3]
         for d in dockets:
@@ -2804,11 +2725,7 @@ class ReplicateRecapUploadsTest(TestCase):
         mock_download_pacer_pdf_by_rd,
         mock_court_accessible,
     ):
-        """A PDF Fetch Queue purchase doesn't create a PQ for the fetched
-        document itself (fetch_pacer_doc_by_rd_base writes straight to the
-        RECAPDocument). Every PQ it creates is a subdocket replica, so all
-        of them must be tagged REPLICATION.
-        """
+        """A PDF Fetch Queue purchase doesn't create a PQ for the fetched document itself (fetch_pacer_doc_by_rd_base writes straight to the RECAPDocument). Every PQ it creates is a subdocket replica, so all of them must be tagged REPLICATION."""
         for d in (self.d_1, self.d_2, self.d_3):
             async_to_sync(add_docket_entries)(
                 d, self.de_data_2["docket_entries"]
@@ -2835,7 +2752,7 @@ class ReplicateRecapUploadsTest(TestCase):
 
     @mock.patch("cl.recap.tasks.extract_pdf_document_base")
     def test_avoid_replication_on_pdf_available(self, mock_extract):
-        """Confirm that replication for RDs where the PDF is already available is omitted"""
+        """Confirm that replication for RDs where the PDF is already available is omitted."""
         # Add the docket entry to every case.
         async_to_sync(add_docket_entries)(
             self.d_1, self.de_data_2["docket_entries"]
@@ -2904,7 +2821,7 @@ class ReplicateRecapUploadsTest(TestCase):
     return_value=SessionData(None, "http://proxy_1:9090"),
 )
 class RecapDocketFetchApiTest(TestCase):
-    """Tests for the RECAP docket Fetch API
+    """Tests for the RECAP docket Fetch API.
 
     The general approach here is to use mocks to separate out the serialization
     and API tests from the processing logic tests.
@@ -3257,9 +3174,7 @@ class RecapDocketFetchApiTest(TestCase):
     def test_fetch_docket_send_alert(
         self, mock_court_accessible, mock_cookies
     ) -> None:
-        """
-        Does a docket alert is triggered when fetching a docket from PACER?
-        """
+        """Does a docket alert is triggered when fetching a docket from PACER?"""
         fq = PacerFetchQueue.objects.create(
             user=self.user,
             request_type=REQUEST_TYPE.DOCKET,
@@ -3317,8 +3232,7 @@ class RecapFetchApiSerializationTestCase(TestCase):
         serialized_fq.save()
 
     def test_check_required_fields_for_docket_purchase(self, mock):
-        """do we correctly identify invalid docket requests?"""
-
+        """Do we correctly identify invalid docket requests?"""
         del self.fetch_attributes["docket"]  # Remove a required field
         serialized_fq = PacerFetchQueueSerializer(
             data=self.fetch_attributes,
@@ -3444,7 +3358,6 @@ class RecapFetchApiSerializationTestCase(TestCase):
 
     def test_recap_fetch_validate_court(self, mock):
         """Can we properly validate the court_id?"""
-
         non_pacer_docket = DocketFactory(
             source=Docket.RECAP,
             court_id=self.court_federal_special.pk,
@@ -3575,9 +3488,7 @@ class RecapFetchApiSerializationTestCase(TestCase):
     }
 )
 class PacerFetchAPIThrottleTest(TestCase):
-    """The Fetch API runs on its own FetchRateThrottle, not the global
-    per-user API throttle. See #7503.
-    """
+    """The Fetch API runs on its own FetchRateThrottle, not the global per-user API throttle. See #7503."""
 
     def setUp(self) -> None:
         clear_tiered_cache()
@@ -3631,11 +3542,7 @@ class PacerFetchAPIThrottleTest(TestCase):
 
 
 class PacerFetchQueueScopedAccessTest(TestCase):
-    """The Fetch Queue API supports only create/list/retrieve, scoped to the
-    requesting user's own rows -- no one can see or edit another user's
-    fetch requests, and PATCH/PUT/DELETE aren't routed to the viewset at
-    all. See GHSA-5f8h-qjq5-6h64.
-    """
+    """The Fetch Queue API supports only create/list/retrieve, scoped to the requesting user's own rows -- no one can see or edit another user's fetch requests, and PATCH/PUT/DELETE aren't routed to the viewset at all. See GHSA-5f8h-qjq5-6h64."""
 
     @classmethod
     def setUpTestData(cls) -> None:
@@ -3670,8 +3577,7 @@ class PacerFetchQueueScopedAccessTest(TestCase):
     async def test_non_owner_cannot_see_another_users_fetch_request(
         self,
     ) -> None:
-        """A stranger's retrieve 404s, and their list never surfaces
-        someone else's row, since get_queryset() scopes to request.user."""
+        """A stranger's retrieve 404s, and their list never surfaces someone else's row, since get_queryset() scopes to request.user."""
         rando_client = await sync_to_async(make_client)(self.rando.user.pk)
 
         response = await rando_client.get(self.url)
@@ -3682,8 +3588,7 @@ class PacerFetchQueueScopedAccessTest(TestCase):
         self.assertEqual(response.json()["results"], [])
 
     async def test_patch_put_delete_are_not_allowed_for_anyone(self) -> None:
-        """PATCH/PUT/DELETE 405 for every caller, owner included -- these
-        actions simply aren't routed to this viewset."""
+        """PATCH/PUT/DELETE 405 for every caller, owner included -- these actions simply aren't routed to this viewset."""
         owner_client = await sync_to_async(make_client)(self.owner.user.pk)
         rando_client = await sync_to_async(make_client)(self.rando.user.pk)
 
@@ -4063,11 +3968,7 @@ class RecapPdfFetchApiTest(TestCase):
     def test_add_custom_message_for_attachment_pages(
         self, mock_download_method, mock_court_accessible, mock_get_cookies
     ):
-        """
-        Checks if a custom message is added when the download_pacer_pdf_by_rd
-        function returns an error indicating an attachment page was found
-        instead of a PDF.
-        """
+        """Checks if a custom message is added when the download_pacer_pdf_by_rd function returns an error indicating an attachment page was found instead of a PDF."""
         self.appellate_rd.is_available = False
         self.appellate_rd.save()
 
@@ -4091,7 +3992,7 @@ class RecapPdfFetchApiTest(TestCase):
     def test_tweaks_doc_id_for_attachment_purchases(
         self, mock_download_method, mock_court_accessible, mock_get_cookies
     ):
-        "Are we updating the doc_id for appellate attachment purchases?"
+        """Are we updating the doc_id for appellate attachment purchases?"""
         self.appellate_rd.is_available = False
         self.appellate_rd.save()
 
@@ -4236,9 +4137,7 @@ class RecapAttPageFetchApiTest(TestCase):
         self.assertIn("Unable to find cached cookies", self.fq.message)
 
     def test_fetch_att_page_rd_deleted(self, mock_court_accessible) -> None:
-        """Is the FQ marked as failed if its RD is deleted before the task
-        runs?
-        """
+        """Is the FQ marked as failed if its RD is deleted before the task runs?"""
         self.rd.delete()
 
         result = do_pacer_fetch(self.fq)
@@ -4454,9 +4353,7 @@ class ProcessingQueueApiFilterTest(TestCase):
 
 
 def mock_bucket_open(message_id, r, read_file=False):
-    """This function mocks bucket.open() method in order to call a
-    recap.email notification fixture.
-    """
+    """This function mocks bucket.open() method in order to call a recap.email notification fixture."""
     test_dir = Path(settings.INSTALL_ROOT) / "cl" / "recap" / "test_assets"
     if read_file:
         with open(test_dir / message_id, "rb") as file:
@@ -4466,8 +4363,9 @@ def mock_bucket_open(message_id, r, read_file=False):
 
 
 class DebugRecapUploadtest(TestCase):
-    """Test uploads with debug set to True. Do these uploads avoid causing
-    problems?
+    """Test uploads with debug set to True.
+
+    Do these uploads avoid causing problems?
     """
 
     def setUp(self) -> None:
@@ -4609,7 +4507,7 @@ class RecapPdfTaskTest(TestCase):
 
     @mock.patch("cl.recap.tasks.extract_pdf_document_base")
     def test_recap_document_already_exists(self, mock_extract):
-        """We already have everything"""
+        """We already have everything."""
         # Update self.rd so it looks like it is already all good.
         self.rd.is_available = True
         cf = ContentFile(self.file_content)
@@ -4678,8 +4576,7 @@ class RecapPdfTaskTest(TestCase):
         self.assertFalse(self.pq.filepath_local)
 
     def test_nothing_already_exists(self) -> None:
-        """If a PDF is uploaded but there's no recap document and no docket do
-        we fail?
+        """If a PDF is uploaded but there's no recap document and no docket do we fail?
 
         In practice, this shouldn't happen.
         """
@@ -4809,9 +4706,7 @@ class RecapZipTaskTest(TestCase):
 
     @mock.patch("cl.recap.tasks.extract_pdf_document.si")
     def test_zip_children_inherit_extension_source(self, mock_extract):
-        """The PQs created for each file inside an uploaded zip should be
-        tagged EXTENSION, same as the parent zip upload.
-        """
+        """The PQs created for each file inside an uploaded zip should be tagged EXTENSION, same as the parent zip upload."""
         pq = ProcessingQueue.objects.get(id=self.pq.id)
         pq.source = PROCESSING_QUEUE_SOURCE.EXTENSION
         pq.save()
@@ -4827,8 +4722,11 @@ class RecapZipTaskTest(TestCase):
     def _make_zip_pq(self, members: dict[str, bytes]) -> ProcessingQueue:
         """Build a DOCUMENT_ZIP PQ whose zip holds the given members.
 
-        :param members: Mapping of file name inside the zip to its bytes.
-        :return: The ProcessingQueue to hand to process_recap_zip().
+        Args:
+            members: Mapping of file name inside the zip to its bytes.
+
+        Returns:
+            The ProcessingQueue to hand to process_recap_zip().
         """
         buffer = BytesIO()
         with ZipFile(buffer, "w") as archive:
@@ -4942,9 +4840,7 @@ class RecapAddAttorneyTest(TestCase):
         self.assertEqual(a.roles.all().count(), 2)
 
     def test_no_contact_info_another_already_exists(self) -> None:
-        """If we lack contact info, and such a atty already exists (without
-        contact info), do we properly consider them different people?
-        """
+        """If we lack contact info, and such a atty already exists (without contact info), do we properly consider them different people?"""
         new_a = Attorney.objects.create(name=self.atty_name)
         self.atty["contact"] = ""
         a_pk = add_attorney(self.atty, self.p, self.d)
@@ -4967,8 +4863,7 @@ class RecapAddAttorneyTest(TestCase):
         self.assertNotIn(r, roles)
 
     def test_atty_org_race_condition_in_atomic_block(self) -> None:
-        """Does add_attorney handle AttorneyOrganization IntegrityError
-        within an outer atomic transaction?
+        """Does add_attorney handle AttorneyOrganization IntegrityError within an outer atomic transaction?
 
         Simulates the race condition where another process creates the
         AttorneyOrganization between our .get() and .create(). The
@@ -5019,9 +4914,7 @@ class RecapAddAttorneyTest(TestCase):
 
 
 class DocketCaseNameUpdateTest(SimpleTestCase):
-    """Do we properly handle the nine cases of incoming case name
-    information?
-    """
+    """Do we properly handle the nine cases of incoming case name information?"""
 
     def setUp(self) -> None:
         self.d = Docket()
@@ -5077,8 +4970,7 @@ class DocketCaseNameUpdateTest(SimpleTestCase):
 
 
 class TerminatedEntitiesTest(TestCase):
-    """Do we handle things properly when new and old data have terminated
-    entities (attorneys & parties)?
+    """Do we handle things properly when new and old data have terminated entities (attorneys & parties)?
 
     There are four possibilities we need to handle properly:
 
@@ -5164,9 +5056,7 @@ class TerminatedEntitiesTest(TestCase):
         self.new_party_data = [self.new_powell_data, self.new_mccarthy_data]
 
     def test_new_has_terminated_entities(self) -> None:
-        """Do we update all existing data when scraped data has terminated
-        entities?
-        """
+        """Do we update all existing data when scraped data has terminated entities?"""
         add_parties_and_attorneys(self.d, self.new_party_data)
         # Docket should have two parties, Powell and McCarthy. This
         # implies that extraneous_p has been removed.
@@ -5177,9 +5067,7 @@ class TerminatedEntitiesTest(TestCase):
         self.assertEqual(role_count, 1)
 
     def test_new_lacks_terminated_entities_old_lacks_too(self) -> None:
-        """Do we update all existing data when there aren't terminated entities
-        at play?
-        """
+        """Do we update all existing data when there aren't terminated entities at play?"""
         self.new_mccarthy_data["date_terminated"] = None
         add_parties_and_attorneys(self.d, self.new_party_data)
 
@@ -5192,8 +5080,7 @@ class TerminatedEntitiesTest(TestCase):
         self.assertEqual(role_count, 1)
 
     def test_new_lacks_terminated_entities_old_has_them(self) -> None:
-        """Do we update things properly when old has terminated parties, but
-        new lacks them?
+        """Do we update things properly when old has terminated parties, but new lacks them?
 
         Do we disassociate extraneous parties that aren't in the new data and
         aren't terminated?
@@ -5253,7 +5140,7 @@ class RecapMinuteEntriesTest(TestCase):
         )
 
     def make_pq(self, filename="azd.html", upload_type=UPLOAD_TYPE.DOCKET):
-        """Make a simple pq object for processing"""
+        """Make a simple pq object for processing."""
         path = self.make_path(filename)
         with open(path, "rb") as f:
             f = SimpleUploadedFile(filename, f.read())
@@ -5303,9 +5190,7 @@ class RecapMinuteEntriesTest(TestCase):
     def test_multiple_numberless_entries_multiple_times(
         self, mock_rss_cache_key
     ) -> None:
-        """Do we get the right number of entries when we add multiple
-        numberless entries multiple times?
-        """
+        """Do we get the right number of entries when we add multiple numberless entries multiple times?"""
         expected_entry_count = 25
         pq = self.make_pq("azd_multiple_unnumbered.html")
         returned_data = async_to_sync(process_recap_docket)(pq.pk)
@@ -5355,10 +5240,7 @@ class RecapMinuteEntriesTest(TestCase):
     def test_dhr_merges_separate_docket_entries(
         self, mock_rss_cache_key
     ) -> None:
-        """Does the docket history report merge separate minute entries if
-        one entry has a short description, and the other has a long
-        description?
-        """
+        """Does the docket history report merge separate minute entries if one entry has a short description, and the other has a long description?"""
         # Create two unnumbered docket entries, one with a short description
         # and one with a long description. Then see what happens when you try
         # to add a DHR result (it should merge them).
@@ -5410,7 +5292,6 @@ class RecapMinuteEntriesTest(TestCase):
         self, mock_enqueue_de, mock_rss_cache_key
     ) -> None:
         """Can we ingest Appellate RSS feeds?"""
-
         court_ca10 = CourtFactory(id="ca10", jurisdiction="F")
         rss_feed = PacerRssFeed(court_ca10.pk)
         with open(self.make_path("rss_ca10.xml"), "rb") as f:
@@ -5427,9 +5308,7 @@ class RecapMinuteEntriesTest(TestCase):
     def test_appellate_merge_rss_feed_with_case_id(
         self, mock_enqueue_de, mock_rss_cache_key
     ) -> None:
-        """Can we merge an Appellate RSS feeds into an existing docket with
-        pacer_case_id?
-        """
+        """Can we merge an Appellate RSS feeds into an existing docket with pacer_case_id?"""
         court_ca10 = CourtFactory(id="ca10", jurisdiction="F")
         docket = DocketFactory(
             case_name="Navarette v. Horton, et al",
@@ -5454,9 +5333,7 @@ class RecapMinuteEntriesTest(TestCase):
     def test_appellate_merge_rss_feed_no_case_id(
         self, mock_enqueue_de, mock_rss_cache_key
     ) -> None:
-        """Can we merge an Appellate RSS feeds into a docket with no
-        pacer_case_id?
-        """
+        """Can we merge an Appellate RSS feeds into a docket with no pacer_case_id?"""
         court_ca10 = CourtFactory(id="ca10", jurisdiction="F")
         docket = DocketFactory(
             case_name="Navarette v. Horton, et al",
@@ -5481,10 +5358,7 @@ class RecapMinuteEntriesTest(TestCase):
     def test_retain_existing_values_in_absent_rss_fields(
         self, mock_enqueue_de, mock_rss_cache_key
     ) -> None:
-        """Confirm that when 'assigned_to_str' and 'referred_to_str' fields
-        are not present in an RSS Feed, pre-existing values in these fields are
-        retained and not cleared.
-        """
+        """Confirm that when 'assigned_to_str' and 'referred_to_str' fields are not present in an RSS Feed, pre-existing values in these fields are retained and not cleared."""
         court_ca10 = CourtFactory(id="ca10", jurisdiction="F")
         docket = DocketFactory(
             case_name="Navarette v. Horton, et al",
@@ -5510,9 +5384,7 @@ class RecapMinuteEntriesTest(TestCase):
     def test_avoid_deleting_short_description(
         self, mock_rss_cache_key
     ) -> None:
-        """Test that merging identical docket entries without a
-        short_description does not delete or overwrite the existing short_description
-        """
+        """Test that merging identical docket entries without a short_description does not delete or overwrite the existing short_description."""
         court_ca10 = CourtFactory(id="ca10", jurisdiction="F")
         rss_feed = PacerRssFeed(court_ca10.pk)
         with open(self.make_path("rss_ca10.xml"), "rb") as f:
@@ -5549,9 +5421,7 @@ class RecapMinuteEntriesTest(TestCase):
         self.assertEqual(rd.description, "Case termination for COA")
 
     def test_rss_ingestion_cache(self, mock_rss_cache_key) -> None:
-        """Test that cached (already seen) RSS items are skipped during the RSS
-        ingestion process.
-        """
+        """Test that cached (already seen) RSS items are skipped during the RSS ingestion process."""
         court = CourtFactory(id="ca10", jurisdiction="F")
         rss_feed = PacerRssFeed(court.pk)
         with open(self.make_path("rss_ca10.xml"), "rb") as f:
@@ -5903,10 +5773,7 @@ class RecapDocketTaskTest(TestCase):
         self.assertEqual(self.pq.docket_id, existing_d.pk)
 
     def test_add_recap_source(self) -> None:
-        """Is the RECAP source properly added to a docket originally added from
-        a different source?
-        """
-
+        """Is the RECAP source properly added to a docket originally added from a different source?"""
         non_recap_sources = generate_docket_target_sources(
             Docket.NON_RECAP_SOURCES(), Docket.RECAP
         )
@@ -5953,10 +5820,7 @@ class RecapDocketTaskTest(TestCase):
                     )
 
     def test_add_idb_anon_2020_source(self) -> None:
-        """Is the IDB and ANON_2020 source properly added to a docket
-        originally added from a different source?
-        """
-
+        """Is the IDB and ANON_2020 source properly added to a docket originally added from a different source?"""
         non_idb_sources = generate_docket_target_sources(
             Docket.NON_IDB_SOURCES(), Docket.IDB
         )
@@ -6054,9 +5918,7 @@ class RecapDocketTaskTest(TestCase):
         side_effect=clobbering_get_name,
     )
     def test_orphan_documents_are_added(self, mock) -> None:
-        """If there's a pq that exists but previously wasn't processed, do we
-        clean it up after we finish adding the docket?
-        """
+        """If there's a pq that exists but previously wasn't processed, do we clean it up after we finish adding the docket?"""
         pq = ProcessingQueue.objects.create(
             court_id="scotus",
             uploader=self.user,
@@ -6075,9 +5937,7 @@ class RecapDocketTaskTest(TestCase):
 
     @override_switch(PROCESS_ORPHAN_DOCUMENTS_SWITCH, active=False)
     def test_orphan_documents_skipped_when_switch_is_off(self) -> None:
-        """Failed PDF PQs must be left untouched when the orphan-documents
-        switch is disabled.
-        """
+        """Failed PDF PQs must be left untouched when the orphan-documents switch is disabled."""
         pq = ProcessingQueue.objects.create(
             court_id="scotus",
             uploader=self.user,
@@ -6095,11 +5955,7 @@ class RecapDocketTaskTest(TestCase):
         self.assertEqual(pq.status, PROCESSING_STATUS.FAILED)
 
     def test_avoid_overwriting_nature_of_suit_in_free_opinions(self) -> None:
-        """Test avoid updating the nature_of_suit from FreeOpinionReport if
-        the docket already has a nature_of_suit set, since this value doesn't
-        change. See issue #3878.
-        """
-
+        """Test avoid updating the nature_of_suit from FreeOpinionReport if the docket already has a nature_of_suit set, since this value doesn't change. See issue #3878."""
         test_cases = [
             ("810 copyright", "copyright"),
             ("", "social welfare"),
@@ -6142,11 +5998,7 @@ class RecapDocketTaskTest(TestCase):
     def test_avoid_overwriting_nature_of_suit_in_update_docket_metadata(
         self,
     ) -> None:
-        """Test avoid updating the nature_of_suit from update_docket_metadata
-         if the docket already has a nature_of_suit set, since this value doesn't
-        change. See issue #3878.
-        """
-
+        """Test avoid updating the nature_of_suit from update_docket_metadata if the docket already has a nature_of_suit set, since this value doesn't change. See issue #3878."""
         test_cases = [
             ("810 copyright", "copyright"),
             ("", "social welfare"),
@@ -6189,10 +6041,7 @@ class RecapDocketTaskTest(TestCase):
     def test_merge_docket_number_components(
         self,
     ) -> None:
-        """Confirm docket_number components are properly merged into the
-        docket instance.
-        """
-
+        """Confirm docket_number components are properly merged into the docket instance."""
         d = DocketFactory.create(
             source=Docket.DEFAULT,
             pacer_case_id="12345",
@@ -6223,11 +6072,7 @@ class RecapDocketTaskTest(TestCase):
     def test_clean_up_docket_judge_fields(
         self,
     ) -> None:
-        """Ensure the referred_to or assigned_to fields are cleared if the
-        referred_to_str or assigned_to_str fields are changed and the judges
-        don't exist in people_db.
-        """
-
+        """Ensure the referred_to or assigned_to fields are cleared if the referred_to_str or assigned_to_str fields are changed and the judges don't exist in people_db."""
         d = DocketFactory.create(
             source=Docket.DEFAULT,
             pacer_case_id="12345",
@@ -6363,10 +6208,10 @@ class RecapDocketTaskTest(TestCase):
         self,
     ) -> None:
         """Ensure the command clean_up_docket_judges works correct.
+
         The referred_to or assigned_to fields are cleared if the
         referred_to_str or assigned_to_str judges don't exist in people_db.
         """
-
         d = DocketFactory.create(
             source=Docket.DEFAULT,
             pacer_case_id="12345",
@@ -6439,8 +6284,7 @@ class RecapDocketAttachmentTaskTest(TestCase):
         RECAPDocument.objects.all().delete()
 
     def test_attachments_get_created(self):
-        """Do attachments get created if we have a RECAPDocument to match
-        on?"""
+        """Do attachments get created if we have a RECAPDocument to match on?"""
         async_to_sync(process_recap_docket)(self.pq.pk)
         num_attachments_to_create = 3
         self.assertEqual(
@@ -6460,10 +6304,7 @@ class RecapDocketAttachmentTaskTest(TestCase):
         self,
         mock_webhook_post,
     ):
-        """Confirm that attachment 0 is properly set as the Main document if
-        the docket entry's pacer_doc_id does not match the Main document's
-        pacer_doc_id on creation.
-        """
+        """Confirm that attachment 0 is properly set as the Main document if the docket entry's pacer_doc_id does not match the Main document's pacer_doc_id on creation."""
         docket = DocketFactory(
             source=Docket.RECAP,
             court=self.court,
@@ -6519,10 +6360,7 @@ class RecapDocketAttachmentTaskTest(TestCase):
         self,
         mock_webhook_post,
     ):
-        """Confirm that attachment 0 is properly set as the Main document if
-        the docket entry's pacer_doc_id does not match the Main document's
-        pacer_doc_id on an existing document.
-        """
+        """Confirm that attachment 0 is properly set as the Main document if the docket entry's pacer_doc_id does not match the Main document's pacer_doc_id on an existing document."""
         docket = DocketFactory(
             source=Docket.RECAP,
             court=self.court,
@@ -6603,10 +6441,7 @@ class RecapDocketAttachmentTaskTest(TestCase):
         self,
         mock_webhook_post,
     ):
-        """Confirm that attachment data can be properly merged when the current
-        main_rd pacer_doc_id mismatches the main document's pacer_doc_id from
-        the attachment page.
-        """
+        """Confirm that attachment data can be properly merged when the current main_rd pacer_doc_id mismatches the main document's pacer_doc_id from the attachment page."""
         docket = DocketFactory(
             source=Docket.RECAP,
             court=self.court,
@@ -6794,9 +6629,7 @@ class RecapDocketAppellateTaskTest(TestCase):
 
 
 class RecapCriminalDataUploadTaskTest(TestCase):
-    """Can we handle it properly when criminal data is uploaded as part of
-    a docket?
-    """
+    """Can we handle it properly when criminal data is uploaded as part of a docket?"""
 
     def setUp(self) -> None:
         self.user = User.objects.get(username="recap")
@@ -6820,9 +6653,7 @@ class RecapCriminalDataUploadTaskTest(TestCase):
         Docket.objects.all().delete()
 
     def test_criminal_data_gets_created(self) -> None:
-        """Does the criminal data appear in the DB properly when we process
-        the docket?
-        """
+        """Does the criminal data appear in the DB properly when we process the docket?"""
         async_to_sync(process_recap_docket)(self.pq.pk)
         expected_criminal_count_count = 1
         self.assertEqual(
@@ -6873,8 +6704,7 @@ class RecapAttachmentPageTaskTest(TestCase):
         ).delete()
 
     def test_attachments_get_created(self):
-        """Do attachments get created if we have a RECAPDocument to match
-        on?"""
+        """Do attachments get created if we have a RECAPDocument to match on?"""
         async_to_sync(process_recap_attachment)(self.pq.pk)
         num_attachments_to_create = 3
         self.assertEqual(
@@ -6972,7 +6802,7 @@ class IdbImportTest(SimpleTestCase):
 
 
 class IdbMergeTest(TestCase):
-    """Can we successfully do heuristic matching"""
+    """Can we successfully do heuristic matching."""
 
     @classmethod
     def setUpTestData(cls):
@@ -7007,7 +6837,6 @@ class IdbMergeTest(TestCase):
 
     def test_merge_from_idb_chunk(self) -> None:
         """Can we successfully merge a chunk of IDB data?"""
-
         self.assertEqual(Docket.objects.count(), 2)
         self.assertEqual(
             Docket.objects.get(id=self.docket_1.id).nature_of_suit, ""
@@ -7027,9 +6856,7 @@ class IdbMergeTest(TestCase):
 
 
 class TestRecapDocumentsExtractContentCommand(TestCase):
-    """Test extraction for missed recap documents that need content
-    extraction.
-    """
+    """Test extraction for missed recap documents that need content extraction."""
 
     def setUp(self) -> None:
         d = Docket.objects.create(
@@ -7045,7 +6872,6 @@ class TestRecapDocumentsExtractContentCommand(TestCase):
 
     def test_extract_missed_recap_documents(self):
         """Can we extract only recap documents that need content extraction?"""
-
         # RD is_available and has a valid PDF, needs extraction.
         rd = RECAPDocument.objects.create(
             docket_entry=self.de,
@@ -7101,9 +6927,7 @@ class TestRecapDocumentsExtractContentCommand(TestCase):
         side_effect=lambda mode: exec("raise FileNotFoundError"),
     )
     def test_clean_up_recap_document_file(self, mock_open):
-        """Can we clean up the recap document file-related fields after a
-        failed extraction due to a missing file in storage?"""
-
+        """Can we clean up the recap document file-related fields after a failed extraction due to a missing file in storage?"""
         # RD is_available and has a valid PDF, needs extraction.
         date_upload = datetime.now(UTC)
         RECAPDocument.objects.create(
@@ -7196,7 +7020,7 @@ class CheckCourtConnectivityTest(TestCase):
     return_value=False,
 )
 class WebhooksRetries(TestCase):
-    """Test WebhookEvents retries"""
+    """Test WebhookEvents retries."""
 
     @classmethod
     def setUpTestData(cls):
@@ -7278,11 +7102,7 @@ class WebhooksRetries(TestCase):
         mock_pacer_court_accessible,
         mock_get_document_number_from_confirmation_page,
     ):
-        """Verifies if the WebhookEvent next retry date is computed properly
-        based on the exponential backoff retry policy defined in cl.api.utils
-        get_next_webhook_retry_date.
-        """
-
+        """Verifies if the WebhookEvent next retry date is computed properly based on the exponential backoff retry policy defined in cl.api.utils get_next_webhook_retry_date."""
         fake_now = now()
         # Run tests for each possible try counter and expected elapsed time
         # (try_counter, elapsed_time_minutes)
@@ -7315,9 +7135,7 @@ class WebhooksRetries(TestCase):
         mock_pacer_court_accessible,
         mock_get_document_number_from_confirmation_page,
     ):
-        """This test checks if WebhookEvent that its parent Webhook is disabled
-        it won't be retried.
-        """
+        """This test checks if WebhookEvent that its parent Webhook is disabled it won't be retried."""
         fake_now = now()
         webhook_e1 = WebhookEventFactory(
             webhook=self.webhook_disabled,
@@ -7349,9 +7167,7 @@ class WebhooksRetries(TestCase):
         mock_pacer_court_accessible,
         mock_get_document_number_from_confirmation_page,
     ):
-        """This test checks if only a WebhookEvent in ENQUEUED_RETRY status and
-        if its next_retry_date is equal to or lower than now can be retried.
-        """
+        """This test checks if only a WebhookEvent in ENQUEUED_RETRY status and if its next_retry_date is equal to or lower than now can be retried."""
         fake_now = now()
         webhook_e1 = WebhookEventFactory(
             webhook=self.webhook,
@@ -7450,10 +7266,7 @@ class WebhooksRetries(TestCase):
         mock_pacer_court_accessible,
         mock_get_document_number_from_confirmation_page,
     ):
-        """This test checks if a WebhookEvent is properly considered for retry
-        or marked as successful based on the received HTTP status code.
-        """
-
+        """This test checks if a WebhookEvent is properly considered for retry or marked as successful based on the received HTTP status code."""
         fake_now = now()
         webhook_e1 = WebhookEventFactory(
             webhook=self.webhook,
@@ -7504,9 +7317,7 @@ class WebhooksRetries(TestCase):
         mock_get_document_number_from_confirmation_page,
         mock_download_pacer_pdf_by_rd,
     ):
-        """This test verifies if a WebhookEvent is properly enqueued for retry
-        after receiving an HttpResponse with a failure status code.
-        """
+        """This test verifies if a WebhookEvent is properly enqueued for retry after receiving an HttpResponse with a failure status code."""
         with mock.patch(
             "cl.api.webhooks.requests.post",
             side_effect=lambda *args, **kwargs: MockResponse(
@@ -7576,10 +7387,7 @@ class WebhooksRetries(TestCase):
         mock_get_document_number_from_confirmation_page,
         mock_download_pacer_pdf_by_rd,
     ):
-        """This test verifies if a WebhookEvent is properly enqueued for retry
-        after a network failure when trying to send the webhook.
-        """
-
+        """This test verifies if a WebhookEvent is properly enqueued for retry after a network failure when trying to send the webhook."""
         with mock.patch(
             "cl.api.webhooks.requests.post",
             side_effect=requests.ConnectionError("Connection Error"),
@@ -7647,10 +7455,7 @@ class WebhooksRetries(TestCase):
         mock_get_document_number_from_confirmation_page,
         mock_download_pacer_pdf_by_rd,
     ):
-        """This test verifies if a WebhookEvent is properly updated after a
-        successful delivery.
-        """
-
+        """This test verifies if a WebhookEvent is properly updated after a successful delivery."""
         with mock.patch(
             "cl.api.webhooks.requests.post",
             side_effect=lambda *args, **kwargs: MockResponse(
@@ -7713,11 +7518,7 @@ class WebhooksRetries(TestCase):
         mock_get_document_number_from_confirmation_page,
         mock_download_pacer_pdf_by_rd,
     ):
-        """This test checks if a recap.email notification comes in and its
-        WebhookEvent fails it's properly retried accordingly to the retry
-        policy.
-        """
-
+        """This test checks if a recap.email notification comes in and its WebhookEvent fails it's properly retried accordingly to the retry policy."""
         with mock.patch(
             "cl.api.webhooks.requests.post",
             side_effect=lambda *args, **kwargs: MockResponse(
@@ -7841,14 +7642,12 @@ class WebhooksRetries(TestCase):
         mock_pacer_court_accessible,
         mock_get_document_number_from_confirmation_page,
     ):
-        """Can we properly email failing webhook events and disable webhooks
-        if max retries are expired?
+        """Can we properly email failing webhook events and disable webhooks if max retries are expired?
 
         Failing webhook event notifications should only be sent based on the
         oldest Enqueued for retry WebhookEvent. Avoiding notifying every
         failing webhook event.
         """
-
         fake_now = now()
         webhook_e1 = WebhookEventFactory(
             webhook=self.webhook,
@@ -7950,14 +7749,12 @@ class WebhooksRetries(TestCase):
         mock_pacer_court_accessible,
         mock_get_document_number_from_confirmation_page,
     ):
-        """Can we avoid retrying failing webhook events if they are older than
-        HOURS_WEBHOOKS_CUT_OFF? They should be marked as failed.
+        """Can we avoid retrying failing webhook events if they are older than HOURS_WEBHOOKS_CUT_OFF? They should be marked as failed.
 
         Retry counter for failing webhook events created within the last
         HOURS_WEBHOOKS_CUT_OFF should be restarted to 0 once the parent webhook
         endpoint is re-enabled
         """
-
         fake_now = now()
         # Today - HOURS_WEBHOOKS_CUT_OFF hours
         fake_now_minus_2 = fake_now - timedelta(hours=HOURS_WEBHOOKS_CUT_OFF)
@@ -8087,11 +7884,7 @@ class WebhooksRetries(TestCase):
         mock_pacer_court_accessible,
         mock_get_document_number_from_confirmation_page,
     ):
-        """Can we properly continue emailing failing webhook events emails
-        after the oldest webhook event is delivered but then the webhook
-        endpoint continues failing?
-        """
-
+        """Can we properly continue emailing failing webhook events emails after the oldest webhook event is delivered but then the webhook endpoint continues failing?"""
         fake_now = now()
         webhook_e1 = WebhookEventFactory(
             webhook=self.webhook,
@@ -8231,7 +8024,6 @@ class WebhooksRetries(TestCase):
 
         The delete_old_webhook_events is only executed once a day at 12:00 UTC.
         """
-
         fake_days_ago = now() - timedelta(days=DAYS_TO_DELETE + 1)
         with time_machine.travel(fake_days_ago, tick=False):
             webhook_e1 = WebhookEventFactory(
@@ -8278,9 +8070,7 @@ class WebhooksRetries(TestCase):
         mock_pacer_court_accessible,
         mock_get_document_number_from_confirmation_page,
     ):
-        """Can we send a notification to users if one of their webhooks is
-        still disabled, one, two and three days after?
-        """
+        """Can we send a notification to users if one of their webhooks is still disabled, one, two and three days after?"""
         # Enable disabled_webhook to avoid interfering with this test
         Webhook.objects.filter(pk=self.webhook_disabled.id).update(
             enabled=True
@@ -8369,7 +8159,7 @@ class WebhooksRetries(TestCase):
     return_value=SessionData(None, "http://proxy_1:9090"),
 )
 class RecapFetchWebhooksTest(TestCase):
-    """Test RECAP Fetch Webhooks"""
+    """Test RECAP Fetch Webhooks."""
 
     @classmethod
     def setUpTestData(cls):
@@ -8414,7 +8204,6 @@ class RecapFetchWebhooksTest(TestCase):
         self, mock_court_accessible, mock_cookies
     ):
         """Can we send a webhook event when a docket RECAP fetch completed?"""
-
         fq = PacerFetchQueueFactory(
             user=self.user_profile.user,
             request_type=REQUEST_TYPE.DOCKET,
@@ -8497,10 +8286,7 @@ class RecapFetchWebhooksTest(TestCase):
     def test_recap_attachment_page_webhook(
         self, mock_court_accessible, mock_cookies
     ):
-        """Can we send a webhook event when an attachment page RECAP fetch
-        completed?
-        """
-
+        """Can we send a webhook event when an attachment page RECAP fetch completed?"""
         fq = PacerFetchQueueFactory(
             user=self.user_profile.user,
             request_type=REQUEST_TYPE.ATTACHMENT_PAGE,
@@ -8561,7 +8347,6 @@ class RecapFetchWebhooksTest(TestCase):
         self, mock_court_accessible, mock_cookies, mock_download_pdf
     ):
         """Can we send a webhook event when a PDF RECAP fetch completed?"""
-
         fq = PacerFetchQueueFactory(
             user=self.user_profile.user,
             request_type=REQUEST_TYPE.PDF,
@@ -8608,9 +8393,7 @@ class RecapFetchWebhooksTest(TestCase):
 
 
 class CalculateRecapsSequenceNumbersTest(TestCase):
-    """Test calculate_recap_sequence_numbers considering docket entries court
-    timezone.
-    """
+    """Test calculate_recap_sequence_numbers considering docket entries court timezone."""
 
     @classmethod
     def setUpTestData(cls):
@@ -8698,8 +8481,7 @@ class CalculateRecapsSequenceNumbersTest(TestCase):
         )
 
     def test_get_order_of_docket(self):
-        """Test get_order_of_docket method"""
-
+        """Test get_order_of_docket method."""
         order_asc = get_order_of_docket(self.de_date_asc["docket_entries"])
         self.assertEqual(order_asc, "asc")
 
@@ -8709,10 +8491,7 @@ class CalculateRecapsSequenceNumbersTest(TestCase):
         self.assertEqual(order_desc, "desc")
 
     def test_calculate_recap_sequence_numbers(self):
-        """Does calculate_recap_sequence_numbers method works properly using
-        court timezone when time is available?
-        """
-
+        """Does calculate_recap_sequence_numbers method works properly using court timezone when time is available?"""
         async_to_sync(add_docket_entries)(
             self.d_nyed, self.de_datetime_desc["docket_entries"]
         )
@@ -8766,9 +8545,7 @@ class CalculateRecapsSequenceNumbersTest(TestCase):
 
 
 class LookupDocketsTest(TestCase):
-    """Test find_docket_object lookups work properly, avoid overwriting
-    dockets with identical docket_number_core if they are different cases.
-    """
+    """Test find_docket_object lookups work properly, avoid overwriting dockets with identical docket_number_core if they are different cases."""
 
     @classmethod
     def setUpTestData(cls):
@@ -8826,10 +8603,7 @@ class LookupDocketsTest(TestCase):
         )
 
     def test_case_id_and_docket_number_core_lookup(self):
-        """Confirm if lookup by pacer_case_id and docket_number_core works
-        properly.
-        """
-
+        """Confirm if lookup by pacer_case_id and docket_number_core works properly."""
         d = async_to_sync(find_docket_object)(
             self.court.pk,
             "12345",
@@ -8848,10 +8622,7 @@ class LookupDocketsTest(TestCase):
         )
 
     def test_case_id_and_docket_number_no_match(self):
-        """Confirm if when a lookup by pacer_case_id and docket_number doesn't
-        match a new Docket is created instead.
-        """
-
+        """Confirm if when a lookup by pacer_case_id and docket_number doesn't match a new Docket is created instead."""
         dockets = Docket.objects.all()
         self.assertEqual(dockets.count(), 4)
         d = async_to_sync(find_docket_object)(
@@ -8874,7 +8645,6 @@ class LookupDocketsTest(TestCase):
 
     def test_case_id_lookup(self):
         """Confirm if lookup by only pacer_case_id works properly."""
-
         d = async_to_sync(find_docket_object)(
             self.court.pk,
             "54321",
@@ -8894,7 +8664,6 @@ class LookupDocketsTest(TestCase):
 
     def test_docket_number_core_lookup(self):
         """Confirm if lookup by only docket_number_core works properly."""
-
         d = async_to_sync(find_docket_object)(
             self.court.pk,
             None,
@@ -8914,7 +8683,6 @@ class LookupDocketsTest(TestCase):
 
     def test_docket_number_lookup(self):
         """Confirm if lookup by only docket_number works properly."""
-
         d = async_to_sync(find_docket_object)(
             self.court.pk,
             None,
@@ -8933,10 +8701,7 @@ class LookupDocketsTest(TestCase):
         )
 
     def test_avoid_overwrite_docket_by_number_core(self):
-        """Can we avoid overwriting a docket when we got two identical
-        docket_number_core in the same court, but they are different dockets?
-        """
-
+        """Can we avoid overwriting a docket when we got two identical docket_number_core in the same court, but they are different dockets?"""
         d = async_to_sync(find_docket_object)(
             self.court.pk,
             self.docket_data["docket_entries"][0]["pacer_case_id"],
@@ -8956,10 +8721,7 @@ class LookupDocketsTest(TestCase):
         )
 
     def test_avoid_overwrite_docket_by_number_core_multiple_results(self):
-        """Can we avoid overwriting a docket when we got multiple results for a
-        docket_number_core in the same court but they are different dockets?
-        """
-
+        """Can we avoid overwriting a docket when we got multiple results for a docket_number_core in the same court but they are different dockets?"""
         DocketFactory(
             case_name="Young v. State",
             docket_number="No. 3:17-CV-01477",
@@ -8987,9 +8749,7 @@ class LookupDocketsTest(TestCase):
         )
 
     def test_lookup_by_normalized_docket_number_case(self):
-        """Can we match a docket which its docket number case is different
-        from the incoming data?
-        """
+        """Can we match a docket which its docket number case is different from the incoming data?"""
         d = DocketFactory(
             case_name="Young v. State",
             docket_number="No. 3:18-MJ-01477",
@@ -9020,13 +8780,13 @@ class LookupDocketsTest(TestCase):
 
     def test_lookup_by_docket_number_components(self):
         """Can we match a docket using the components of the docket number?
+
         If two or more dockets are found without a matching pacer_case_id, and
         they are matched by docket_number or docket_number_core, use the
         components of the docket number as a last resort to find the correct
         match. If a single docket is matched, and it contains DN components use
         them to confirm the docket matched is the right one.
         """
-
         # Single docket doesn't match.
         d_1 = DocketFactory(
             case_name="Young v. State",
@@ -9151,10 +8911,7 @@ class LookupDocketsTest(TestCase):
         self.assertEqual(docket_matched.pk, d_3.pk)
 
     def test_avoid_lookup_by_docket_number_components(self):
-        """If either the docket or the docket_data contains None values for
-        DN components. Avoid using them to match the docket.
-        """
-
+        """If either the docket or the docket_data contains None values for DN components. Avoid using them to match the docket."""
         # Dockets in DB contains docket_number components but the incoming data
         # doesn't.
         oldest_d = DocketFactory(
@@ -9231,10 +8988,7 @@ class LookupDocketsTest(TestCase):
         self.assertEqual(docket_matched.pk, oldest_d_1.pk)
 
     def test_avoid_duplicating_dockets_with_no_pacer_case_id(self):
-        """Confirm we can match an existing docket with no pacer_case_id by
-        docket_number_core when lookup includes a pacer_case_id.
-        """
-
+        """Confirm we can match an existing docket with no pacer_case_id by docket_number_core when lookup includes a pacer_case_id."""
         d_1 = DocketFactory(
             case_name="Wright v. State",
             docket_number="20-10394",
@@ -9322,16 +9076,13 @@ class LookupDocketsTest(TestCase):
 
 
 class CleanUpDuplicateAppellateEntries(TestCase):
-    """Test clean_up_duplicate_appellate_entries method that finds and clean
-    duplicated entries after a court enables document numbers.
-    """
+    """Test clean_up_duplicate_appellate_entries method that finds and clean duplicated entries after a court enables document numbers."""
 
     @mock.patch(
         "cl.recap.management.commands.remove_appellate_entries_with_long_numbers.logger"
     )
     def test_clean_duplicate_appellate_entries(self, mock_logger):
-        """Test clean duplicated entries by document number and description"""
-
+        """Test clean duplicated entries by document number and description."""
         court = CourtFactory(id="ca5", jurisdiction="F")
         docket = DocketFactory(
             court=court,
@@ -9436,10 +9187,7 @@ class CleanUpDuplicateAppellateEntries(TestCase):
         "cl.recap.management.commands.remove_appellate_entries_with_long_numbers.logger"
     )
     def test_skip_entries_before_date(self, mock_logger):
-        """Test skip looking for duplicated entries created before the date
-        the court enabled document numbers
-        """
-
+        """Test skip looking for duplicated entries created before the date the court enabled document numbers."""
         court = CourtFactory(id="ca11", jurisdiction="F")
         docket = DocketFactory(
             court=court,
@@ -9470,9 +9218,7 @@ class CleanUpDuplicateAppellateEntries(TestCase):
 
 
 class RemoveDuplicatedMinuteEntries(TestCase):
-    """Test remove duplicated minute entries while avoid deleting those who
-    are not duplicates in the same day.
-    """
+    """Test remove duplicated minute entries while avoid deleting those who are not duplicates in the same day."""
 
     @classmethod
     def setUpTestData(cls):
@@ -9490,9 +9236,7 @@ class RemoveDuplicatedMinuteEntries(TestCase):
         self,
         mock_webhook_post,
     ):
-        """Confirm non duplicated entries are not deleted when merging the
-        docket history report.
-        """
+        """Confirm non duplicated entries are not deleted when merging the docket history report."""
         docket_entries = DocketEntry.objects.all()
         self.assertEqual(docket_entries.count(), 0)
 
@@ -9561,9 +9305,7 @@ class RemoveDuplicatedMinuteEntries(TestCase):
         self,
         mock_webhook_post,
     ):
-        """Confirm that we can remove minute entries that are in fact
-        duplicated.
-        """
+        """Confirm that we can remove minute entries that are in fact duplicated."""
         docket_entries = DocketEntry.objects.all()
         self.assertEqual(docket_entries.count(), 0)
 
@@ -9731,8 +9473,7 @@ class BadRedactionCheckTest(TestCase):
 
 
 class ReprocessFailedEPQTest(TestCase):
-    """Test that the reprocess_failed_epq admin action routes each email
-    source to the matching processing task."""
+    """Test that the reprocess_failed_epq admin action routes each email source to the matching processing task."""
 
     @classmethod
     def setUpTestData(cls):

@@ -12,16 +12,14 @@ from cl.search.models import Docket, DocketEntry, RECAPDocument
 def clean_up_duplicate_appellate_entries(
     courts_ids: list[str], after_date: datetime | None, clean: bool
 ) -> None:
-    """Find and clean duplicated appellate entries after courts enabled
-    document numbers.
+    """Find and clean duplicated appellate entries after courts enabled document numbers.
 
-    :param courts_ids: The list of court IDs to search for duplicate entries.
-    :param after_date: Optional. Search for duplicate entries after this date.
-    :param clean: True if a cleanup should be performed, or False to only
-    report how many entries will be cleaned.
-    :return: None
+    Args:
+        courts_ids: The list of court IDs to search for duplicate entries.
+        after_date: Optional. Search for duplicate entries after this date.
+        clean: True if a cleanup should be performed, or False to only
+            report how many entries will be cleaned.
     """
-
     # Default dates when courts enabled document numbers, used to look for
     # duplicates after these dates.
     default_after_date_times = {"ca5": "2023-01-08", "ca11": "2022-10-01"}

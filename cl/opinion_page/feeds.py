@@ -12,8 +12,10 @@ from cl.search.models import Docket, DocketEntry, RECAPDocument
 
 
 class DocketFeed(Feed):
-    """This feed returns the results of a search feed. It lacks a second
-    argument in the method b/c it gets its search query from a GET request.
+    """This feed returns the results of a search feed.
+
+    It lacks a second argument in the method b/c it gets its search query from
+    a GET request.
     """
 
     feed_type = Atom1Feed
