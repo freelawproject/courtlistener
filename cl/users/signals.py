@@ -2,9 +2,9 @@ import json
 import logging
 import random
 from datetime import timedelta
-from enum import Enum
+from enum import StrEnum
 from pathlib import PurePosixPath
-from typing import Any
+from typing import Any, assert_never
 
 from django.conf import settings
 from django.core.files.base import ContentFile
@@ -30,7 +30,7 @@ from cl.users.tasks import notify_new_or_updated_webhook
 logger = logging.getLogger(__name__)
 
 
-class SESEventType(str, Enum):
+class SESEventType(StrEnum):
     BOUNCE = "bounce"
     COMPLAINT = "complaint"
 
@@ -69,6 +69,7 @@ def store_bounce_or_complaint_obj(
             dir_name = "bounces"
             storing_rate = settings.BOUNCES_STORE_RATE
         case _:
+            assert_never(obj_type)
             return None
 
     if random.random() >= storing_rate or not email_recipient:
