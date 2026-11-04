@@ -20,8 +20,7 @@ document.addEventListener('alpine:init', () => {
       }
     },
     close() {
-      const region = this.$root.querySelector('[role="status"]');
-      const focusWasInside = region.contains(document.activeElement);
+      const focusWasInside = this.$refs.region.contains(document.activeElement);
       this.isOpen = false;
       if (focusWasInside && this.opener?.isConnected) {
         this.opener.focus({ preventScroll: true });

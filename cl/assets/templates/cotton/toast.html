@@ -6,7 +6,7 @@
 {# The root is box-less so a closed toast takes no space wherever the page puts it. The panel stays in the DOM, hidden until open, so htmx binds any hx-* control in the slot at page load; the live region announces it when it shows. #}
 <div x-data="toast" class="contents" x-on:toast-opened.window="replace" {{ attrs }}>
   {{ trigger }}
-  <div role="status" class="fixed inset-x-4 bottom-4 z-50 flex justify-center pointer-events-none">
+  <div x-ref="region" role="status" class="fixed inset-x-4 bottom-4 z-50 flex justify-center pointer-events-none">
     <div
       x-show="isOpen"
       x-cloak
