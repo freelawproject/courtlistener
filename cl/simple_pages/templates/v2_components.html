@@ -1575,9 +1575,9 @@ Sample code here.
   {% require_script "js/third_party/htmx" defer=True %}
   <section class="max-w-full w-full border-t-2 border-greyscale-200" x-intersect.margin.-100px="show" id="toast">
     <h2 class="mt-6 mb-3">Toast</h2>
-    <p>A persistent notification at the bottom of the viewport, announced by a <code>role="status"</code> live region. It renders closed and opens in one of three ways: a control in its <code>trigger</code> slot calls <code>open</code>, a page script dispatches the window event named in the toast's <code>x-on</code> listener, or an htmx response triggers that event. Use the slot for a single control with nothing else to do; raise an event when the decision lives in a script or on the server. The user closes it with the button or <kbd>Escape</kbd>, and only one toast is open at a time.</p>
+    <p>A persistent notification at the bottom of the viewport, announced by a <code>role="status"</code> live region. Its root is box-less and takes no <code>class</code>. It renders closed and opens in one of three ways: a control in its <code>trigger</code> slot calls <code>open</code>, a page script dispatches the window event named in the toast's <code>x-on</code> listener, or an htmx response triggers that event. Use the slot for a single control with nothing else to do; raise an event when the decision lives in a script or on the server. The user closes it with the button, or with <kbd>Escape</kbd> while focus is inside it, and only one toast is open at a time.</p>
     <h4 class="mt-3">With htmx</h4>
-    <p>A view names the outcome in an <code>HX-Trigger</code> header and the toast listens for that name; a generic error toast can listen for <code>htmx:response-error</code>. For request-time content, the view renders the toast in a partial swapped in out of band and opens it with <code>HX-Trigger-After-Settle</code>; the page must already load the toast script.</p>
+    <p>A view names the outcome in an <code>HX-Trigger</code> header and the toast listens for that name; a generic error toast can listen for <code>htmx:response-error</code>. For request-time content, the view renders the toast in a partial swapped in out of band and opens it with <code>HX-Trigger-After-Settle</code>; the page must require the toast script itself, since a partial cannot load scripts.</p>
 
     <h3 class="mt-3">Demo</h3>
 
@@ -1666,8 +1666,9 @@ Sample code here.
   &lt;c-slot name="trigger"&gt;&lt;c-button variant="primary" x-on:click="open"&gt;Custom icon&lt;/c-button&gt;&lt;/c-slot&gt;
 &lt;/c-toast&gt;
 
-&lt;!-- Rendered by the server: the page keeps a box-less placeholder and loads the toast script;
+&lt;!-- Rendered by the server: the page requires the toast script and keeps a box-less placeholder;
      the view returns the partial with HX-Trigger-After-Settle: docket-block-toast-ready --&gt;
+{% templatetag openblock %} require_script "js/alpine/components/toast.js" {% templatetag closeblock %}
 &lt;c-button variant="primary" hx-post="{% templatetag openblock %} url 'block_item' {% templatetag closeblock %}" hx-swap="none"&gt;Block this docket&lt;/c-button&gt;
 &lt;div id="docket-block-toast" class="contents"&gt;&lt;/div&gt;
 {% templatetag opencomment %} v2_includes/docket_block/toast.html {% templatetag closecomment %}
