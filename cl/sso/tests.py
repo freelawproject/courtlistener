@@ -1117,6 +1117,22 @@ class NotifyDomainUsersTest(SSOFixtureMixin, TestCase):
         self.assertIn(f"ada@{DOMAIN}", out.getvalue())
         self.assertEqual([m.to for m in mail.outbox], [[user.email]])
 
+    def test_skips_addresses_shared_with_a_linked_account(self) -> None:
+        """Is an unlinked account left out when a linked one shares it?"""
+        self.domain.enforcement = Enforcement.OPTIONAL
+        self.domain.save()
+        for _ in range(2):
+            user = UserProfileWithParentsFactory.create(
+                user__email=f"ada@{DOMAIN}"
+            ).user
+        SocialAccount.objects.create(user=user, provider="acme", uid="s-1")
+
+        out = StringIO()
+        call_command("notify_sso_domain_users", DOMAIN, "--send", stdout=out)
+
+        self.assertIn(f"ada@{DOMAIN}", out.getvalue())
+        self.assertEqual(len(mail.outbox), 0)
+
     def test_refuses_to_send_when_sso_is_off(self) -> None:
         """Does --send stop when the domain doesn't offer SSO?"""
         UserProfileWithParentsFactory.create(user__email=f"ada@{DOMAIN}")
