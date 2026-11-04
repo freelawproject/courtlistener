@@ -1,5 +1,5 @@
 from datetime import date
-from typing import Any
+from typing import Any, TypedDict
 
 from asgiref.sync import async_to_sync, sync_to_async
 from django.core.files.base import ContentFile
@@ -29,9 +29,14 @@ from cl.search.models import Court, Docket
 cnt = CaseNameTweaker()
 
 
+class _OAItemDict(TypedDict):
+    docket: Docket
+    audio_file: Audio
+
+
 @transaction.atomic
 def save_everything(
-    items: dict[str, Docket | Audio],
+    items: _OAItemDict,
     backscrape: bool = False,
 ) -> None:
     docket, af = items["docket"], items["audio_file"]
@@ -81,6 +86,7 @@ def make_objects(
     )
 
     audio_file = Audio(
+        docket=docket,
         judges=item.get("judges", ""),
         source=item.get("cluster_source") or ClusterSources.COURT_WEBSITE,
         case_name=item["case_names"],
@@ -96,7 +102,6 @@ def make_objects(
     if extension not in [".mp3", ".wma"]:
         extension = f".{item['download_urls'].lower().rsplit('.', 1)[1]}"
     file_name = trunc(item["case_names"].lower(), 75) + extension
-    audio_file.file_with_date = docket.date_argued
     audio_file.local_path_original_file.save(file_name, cf, save=False)
     check_duplicate_ingestion(audio_file.local_path_original_file.name)
     return docket, audio_file

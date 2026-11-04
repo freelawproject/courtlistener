@@ -4,9 +4,8 @@ django-oauth-toolkit 3.4 added ``Application.registration_source`` and its
 own migration (``oauth2_provider.0019``) only backfills it from a field that
 never shipped, so every application that existed before the upgrade lands on
 the ``manual`` default. Applications created through our ``/o/register/``
-endpoint are the ones with no owner and ``skip_authorization`` off, the same
-rule ``cl.oauth.cleanup_utils`` uses to find them, so those are relabeled
-``dcr``. In-house applications have an owner or skip authorization and stay
+endpoint are the ones with no owner and ``skip_authorization`` off, so those
+are relabeled ``dcr``. In-house applications have an owner or skip authorization and stay
 ``manual``.
 """
 

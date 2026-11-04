@@ -1,11 +1,12 @@
 import html
 import re
+from typing import Literal, TypedDict, overload
 
 from django.template import Library
 from django.template.defaultfilters import stringfilter
 from django.utils.encoding import force_str
 from django.utils.html import conditional_escape
-from django.utils.safestring import SafeData, mark_safe
+from django.utils.safestring import SafeData, SafeString, mark_safe
 
 register = Library()
 
@@ -43,11 +44,14 @@ def oxford_join(items, conjunction="and", separator=",", autoescape=True):
                 s = item
             elif i == (num_items - 1):
                 # Last item.
+                # pyrefly: ignore [unbound-name]
                 s += f"{separator} {conjunction} {item}"
             else:
                 # Items in the middle
+                # pyrefly: ignore [unbound-name]
                 s += f"{separator} {item}"
 
+    # pyrefly: ignore [unbound-name]
     return mark_safe(s)
 
 
@@ -115,8 +119,25 @@ def compress_whitespace(text, autoescape=None):
     return mark_safe(" ".join(text.split()))
 
 
+class _NaturalDurationDict(TypedDict):
+    d: int
+    h: int
+    m: int
+    s: int
+
+
+@overload
+def naturalduration(
+    seconds: int | str, *, autoescape=..., as_dict: Literal[True]
+) -> _NaturalDurationDict: ...
+@overload
+def naturalduration(
+    seconds: int | str, *, autoescape=..., as_dict: bool = ...
+) -> SafeString: ...
 @register.filter(needs_autoescape=True)
-def naturalduration(seconds, autoescape=None, as_dict=False):
+def naturalduration(
+    seconds: int | str, *, autoescape=None, as_dict: bool = False
+) -> _NaturalDurationDict | SafeString:
     """Convert a duration in seconds to a duration in hours, minutes, seconds.
 
     For example:

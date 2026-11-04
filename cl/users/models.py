@@ -187,26 +187,30 @@ class UserProfile(models.Model):
             return True
         return False
 
-    @property
-    def can_make_another_alert(self) -> bool:
+    def can_make_another_alert(self, recap_installed: bool = False) -> bool:
         """Can the user make another alert?
 
         The answer is yes, if any of the following is true:
          - They get unlimited ones
          - They are a member
-         - They are under the threshold
          - Their email domain is unlimited
+         - They are under the free threshold, which the RECAP bonus raises
+           when `recap_installed` is True
 
-        return: True if they can make another alert; else False.
+        :param recap_installed: Whether the user has the RECAP extension, as
+        far as the caller can tell. The value is not verified here.
+        :return: True if they can make another alert; else False.
         """
+        limit = settings.MAX_FREE_DOCKET_ALERTS
+        if recap_installed:
+            limit += settings.DOCKET_ALERT_RECAP_BONUS
         if any(
             [
                 # Place performant checks first
                 self.unlimited_docket_alerts,
                 self.email_grants_unlimited_docket_alerts,
                 self.is_member,
-                self.user.docket_alerts.subscriptions().count()
-                < settings.MAX_FREE_DOCKET_ALERTS,
+                self.user.docket_alerts.subscriptions().count() < limit,
             ]
         ):
             return True

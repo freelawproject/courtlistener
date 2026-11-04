@@ -48,3 +48,6 @@ cl/settings/google_auth.json
 
 .vscode/*
 /.history
+
+# Local archive built by scripts/gather-test-reports.py
+/.test-reports/

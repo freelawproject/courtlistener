@@ -1,4 +1,5 @@
 import json
+from typing import Any
 
 import networkx
 from django.contrib.auth.models import User
@@ -271,7 +272,7 @@ class SCOTUSMap(AbstractDateTimeModel):
 
     async def to_json(self, g):
         """Make a JSON representation of a NetworkX graph of the data."""
-        j = {
+        j: dict[str, Any] = {
             "meta": {
                 "donate": "Please consider donating to support more projects "
                 "from Free Law Project",
