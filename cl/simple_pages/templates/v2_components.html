@@ -1577,7 +1577,7 @@ Sample code here.
     <h2 class="mt-6 mb-3">Toast</h2>
     <p>A persistent notification at the bottom of the viewport, announced by a <code>role="status"</code> live region. Its root is box-less and takes no <code>class</code>. It renders closed and opens in one of three ways: a control in its <code>trigger</code> slot calls <code>open</code>, a page script dispatches the window event named in the toast's <code>x-on</code> listener, or an htmx response triggers that event. Use the slot for a single control with nothing else to do; raise an event when the decision lives in a script or on the server. The user closes it with the button, or with <kbd>Escape</kbd> while focus is inside it, and only one toast is open at a time.</p>
     <h4 class="mt-3">With htmx</h4>
-    <p>A view names the outcome in an <code>HX-Trigger</code> header and the toast listens for that name; a generic error toast can listen for <code>htmx:response-error</code>. For request-time content, the view renders the toast in a partial swapped in out of band and opens it with <code>HX-Trigger-After-Settle</code>; the page must require the toast script itself, since a partial cannot load scripts.</p>
+    <p>A view names the outcome in an <code>HX-Trigger</code> header and the toast listens for that name. A failed request fires <code>htmx:response-error</code>: listen without <code>.window</code> on a toast whose trigger slot holds the requester to react only to that request, or with <code>.window</code> for one generic error toast per page. For request-time content, the view renders the toast in a partial swapped in out of band and opens it with <code>HX-Trigger-After-Settle</code>; the page must require the toast script itself, since a partial cannot load scripts.</p>
 
     <h3 class="mt-3">Demo</h3>
 
@@ -1614,11 +1614,12 @@ Sample code here.
     <div id="toast-demo-server" class="contents"></div>
 
     <h4 class="mt-3">Opened by a failed request</h4>
-    <p class="text-sm text-greyscale-600 mb-2">An htmx request to a URL that returns 404; htmx also logs it to the console.</p>
+    <p class="text-sm text-greyscale-600 mb-2">The trigger's htmx request goes to a URL that returns 404; the listener has no <code>.window</code>, so only this toast's own request opens it. htmx also logs the failure to the console.</p>
     <div class="flex flex-wrap gap-3 items-center">
-      <c-button variant="primary" hx-get="{% url 'components' %}missing/" hx-swap="none">Failing request</c-button>
+      <c-toast variant="warning" title="Something went wrong" description="Please try again." x-on:htmx:response-error="open">
+        <c-slot name="trigger"><c-button variant="primary" hx-get="{% url 'components' %}missing/" hx-swap="none">Failing request</c-button></c-slot>
+      </c-toast>
     </div>
-    <c-toast variant="warning" title="Something went wrong" description="Please try again." x-on:htmx:response-error.window="open" />
 
     <c-library.list title="Props" only>
       <c-library.item only>
@@ -1674,7 +1675,12 @@ Sample code here.
 {% templatetag opencomment %} v2_includes/docket_block/toast.html {% templatetag closecomment %}
 &lt;c-toast id="docket-block-toast" hx-swap-oob="true" variant="success" title="Blocked {% templatetag openvariable %} blocked {% templatetag closevariable %} of {% templatetag openvariable %} total {% templatetag closevariable %} dockets" x-on:docket-block-toast-ready.window="open" /&gt;
 
-&lt;!-- Opened by a failed request: any htmx request on the page --&gt;
+&lt;!-- Opened by a failed request: only this toast's own request --&gt;
+&lt;c-toast variant="warning" title="Could not block this docket" description="Please try again." x-on:htmx:response-error="open"&gt;
+  &lt;c-slot name="trigger"&gt;&lt;c-button variant="outline" hx-post="{% templatetag openblock %} url 'block_item' {% templatetag closeblock %}" hx-swap="none"&gt;Block this docket&lt;/c-button&gt;&lt;/c-slot&gt;
+&lt;/c-toast&gt;
+
+&lt;!-- Not in the demo: one generic error toast for any failed request on the page --&gt;
 &lt;c-toast variant="warning" title="Something went wrong" description="Please try again." x-on:htmx:response-error.window="open" /&gt;
 
 &lt;!-- Not in the demo: opened from the page's script, e.g. this.$dispatch('action-not-allowed') in a method of its Alpine component --&gt;

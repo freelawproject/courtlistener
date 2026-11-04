@@ -844,6 +844,19 @@ class ToastComponentTest(SimpleTestCase):
             'x-on:click="open"', self.render('<c-toast title="Saved" />')
         )
 
+    def test_action_container_renders_only_with_content(self) -> None:
+        """A trigger slot written on its own lines leaves no empty action box."""
+        with_trigger = self.render(
+            '<c-toast title="Saved">\n'
+            '  <c-slot name="trigger"><button x-on:click="open">Show</button></c-slot>\n'
+            "</c-toast>"
+        )
+        self.assertNotIn("shrink-0 items-center gap-2", with_trigger)
+        with_action = self.render(
+            '<c-toast title="Saved"><button>Undo</button></c-toast>'
+        )
+        self.assertIn("shrink-0 items-center gap-2", with_action)
+
     def test_undeclared_attributes_land_on_the_root(self) -> None:
         """A listener passed to the component opens the toast from an event."""
         html = self.render(
