@@ -1,7 +1,9 @@
 import re
+from collections.abc import Iterable
 from datetime import date
 from typing import Any, cast
 
+from django.db.models import Model
 from elastic_transport import ApiResponseMeta
 from elasticsearch.dsl import connections
 from elasticsearch.exceptions import ConflictError
@@ -11,7 +13,9 @@ from cl.lib.command_utils import logger
 from cl.lib.date_time import midnight_pt
 
 
-def extract_field_values(m2m_list, field):
+def extract_field_values[M: Model](
+    m2m_list: Iterable[M], field: str
+) -> list[M]:
     """Extracts values from a list of objects.
 
     This function iterates over a list of objects, extracts the specified field value
@@ -39,12 +43,12 @@ def extract_field_values(m2m_list, field):
 class InvalidDocumentError(Exception):
     """The document could not be formed"""
 
-    def __init__(self, message):
+    def __init__(self, message: str) -> None:
         Exception.__init__(self, message)
 
 
 # Used to nuke null and control characters.
-null_map = dict.fromkeys(
+null_map: dict[int, None] = dict.fromkeys(
     list(range(0, 10)) + list(range(11, 13)) + list(range(14, 32))
 )
 

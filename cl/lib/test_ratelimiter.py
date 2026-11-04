@@ -8,10 +8,13 @@ decorated view directly would pass either way.
 
 import asyncio
 import socket
+from collections.abc import Coroutine
 from http import HTTPStatus
+from typing import Any
 from unittest import mock
 
 from django.core.cache import cache
+from django.core.handlers.wsgi import WSGIRequest
 from django.http import HttpRequest, HttpResponse
 from django.test import RequestFactory, override_settings
 from django.urls import path
@@ -20,7 +23,7 @@ from redis import ConnectionError
 
 from cl.lib import ratelimiter
 from cl.lib.ratelimiter import (
-    View,
+    RatelimitDecorator,
     get_ip_for_ratelimiter,
     get_ratelimit_ident,
     get_viewer_ip,
@@ -30,11 +33,18 @@ from cl.lib.ratelimiter import (
     ratelimit_deny_list,
     should_bypass_ratelimit,
 )
+from cl.lib.types import DjangoViewType
 from cl.tests.cases import SimpleTestCase
 
-one_per_hour = make_ratelimiter(key=get_ip_for_ratelimiter, rate="1/h")
-two_per_hour = make_ratelimiter(key=get_ip_for_ratelimiter, rate="2/h")
-five_per_hour = make_ratelimiter(key=get_ip_for_ratelimiter, rate="5/h")
+one_per_hour: RatelimitDecorator = make_ratelimiter(
+    key=get_ip_for_ratelimiter, rate="1/h"
+)
+two_per_hour: RatelimitDecorator = make_ratelimiter(
+    key=get_ip_for_ratelimiter, rate="2/h"
+)
+five_per_hour: RatelimitDecorator = make_ratelimiter(
+    key=get_ip_for_ratelimiter, rate="5/h"
+)
 
 
 @two_per_hour
@@ -146,7 +156,7 @@ class AllowlistTest(SimpleTestCase):
     def setUp(self) -> None:
         super().setUp()
         cache.clear()
-        self.request = RequestFactory().get("/", headers=VIEWER)
+        self.request: WSGIRequest = RequestFactory().get("/", headers=VIEWER)
 
     def test_a_yes_is_looked_up_once(self) -> None:
         with mock.patch.object(
@@ -342,13 +352,19 @@ class DenyListTest(SimpleTestCase):
     def setUp(self) -> None:
         super().setUp()
         cache.clear()
-        self.request = RequestFactory().get("/", headers=VIEWER)
+        self.request: WSGIRequest = RequestFactory().get("/", headers=VIEWER)
         # Stands in for the allowlist's cache during a Redis outage.
-        self.dead_cache = mock.Mock()
+        self.dead_cache: mock.Mock = mock.Mock()
         self.dead_cache.get.side_effect = ConnectionError
 
     @staticmethod
-    def _decorate(view: View) -> View:
+    def _decorate[
+        **P,
+        Request: HttpRequest,
+        Response: HttpResponse | Coroutine[Any, Any, HttpResponse],
+    ](
+        view: DjangoViewType[P, Request, Response],
+    ) -> DjangoViewType[P, Request, Response]:
         """Wrap a view in a deny list whose limiter really counts.
 
         ratelimiter_all_1000_per_h no-ops under test, which would leave nothing

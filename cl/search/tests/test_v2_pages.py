@@ -12,8 +12,6 @@ from waffle.testutils import override_flag
 
 from cl.lib import widgets
 from cl.lib.test_helpers import (
-    CourtTestCase,
-    PeopleTestCase,
     RECAPSearchTestCase,
     SearchTestCase,
     SimpleUserDataMixin,
@@ -472,14 +470,20 @@ class CorpusSearchFormTest(SimpleUserDataMixin, TestCase):
 
 @override_flag("use_new_design", True)
 @patch("cl.search.utils.get_redis_interface")
-@override_settings(WAFFLE_CACHE_PREFIX="test_homepage_stats_waffle")
-class HomepageStatsTest(
-    RECAPSearchTestCase,
-    CourtTestCase,
-    PeopleTestCase,
-    SearchTestCase,
-    TestCase,
-):
+@override_settings(
+    WAFFLE_CACHE_PREFIX="test_homepage_stats_waffle",
+    # get_v2_homepage_stats is @cache_memoize'd into the default cache, which
+    # is Redis and so shared by every --parallel worker. Another worker can
+    # repopulate it between our invalidate() and our request, so give this
+    # class a process-local cache instead.
+    CACHES={
+        "default": {
+            "BACKEND": "django.core.cache.backends.locmem.LocMemCache",
+            "LOCATION": "homepage-stats",
+        },
+    },
+)
+class HomepageStatsTest(RECAPSearchTestCase, SearchTestCase, TestCase):
     """Stats tests that checks values displayed correspond with actual data in the DB.
 
     Skips Redis to keep this test scoped to DB queries.

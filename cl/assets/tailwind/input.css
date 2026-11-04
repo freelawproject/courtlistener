@@ -59,6 +59,9 @@
   [x-cloak] {
     display: none !important;
   }
+  .recap-installed [data-recap-plea] {
+    @apply hidden;
+  }
   input[type="checkbox"] {
     @apply relative appearance-none flex-shrink-0 w-5 h-5 rounded border border-greyscale-300 bg-white; /* base checkbox */
     @apply checked:border-primary-600 checked:bg-primary-600 indeterminate:border-primary-600 indeterminate:bg-primary-600; /* checked or indeterminate */
@@ -180,6 +183,7 @@
   .flatpickr-day.nextMonthDay.selected,
   .flatpickr-day.prevMonthDay.selected,
   .flatpickr-day.today.selected,
+  .flatpickr-day.selected:focus,
   .flatpickr-day.selected {
     @apply bg-primary-600 hover:bg-primary-700 border-none hover:text-white after:bg-greyscale-25;
   }
