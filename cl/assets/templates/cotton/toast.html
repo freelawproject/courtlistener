@@ -29,7 +29,7 @@
           <p class="font-medium text-greyscale-100">{{ title }}</p>
           {% if description %}<p class="text-greyscale-400">{{ description }}</p>{% endif %}
         </div>
-        {% if slot %}<div class="flex shrink-0 items-center gap-2">{{ slot }}</div>{% endif %}
+        {% if slot.strip %}<div class="flex shrink-0 items-center gap-2">{{ slot }}</div>{% endif %}
         <c-button
           class="shrink-0 rounded-full p-1.5 text-greyscale-400 outline-none hover:bg-greyscale-800 hover:text-greyscale-100 focus-visible:ring-4 focus-visible:ring-greyscale-600"
           x-on:click="close"
