@@ -4,18 +4,16 @@ from unittest.mock import MagicMock, patch
 
 from django.contrib.auth.models import User
 from django.http import HttpResponse
-from django.template import engines
 from django.template.loader import TemplateDoesNotExist, get_template
-from django.test import RequestFactory, override_settings
+from django.test import override_settings
 from django.urls import resolve, reverse
-from django_cotton.compiler_regex import CottonCompiler
 from lxml.html import fromstring
 from waffle.testutils import override_flag
 
 from cl.lib.test_helpers import SimpleUserDataMixin
 from cl.simple_pages.forms import ContactForm
 from cl.simple_pages.sitemap import SimpleSitemap
-from cl.tests.cases import SimpleTestCase, TestCase
+from cl.tests.cases import CottonComponentMixin, SimpleTestCase, TestCase
 from cl.tests.utils import parse_csp
 
 
@@ -751,13 +749,8 @@ class ContentSecurityPolicyTest(TestCase):
         self.assertNotIn('nonce=""', html)
 
 
-class ButtonComponentTest(SimpleTestCase):
+class ButtonComponentTest(CottonComponentMixin, SimpleTestCase):
     """The c-button busy state, keyed on aria-busy for buttons and links alike."""
-
-    def render(self, source: str) -> str:
-        """Compiles a Cotton snippet and renders it."""
-        compiled = CottonCompiler().process(source)
-        return engines["django"].from_string(compiled).render({})
 
     def test_busy_keeps_the_label_and_hides_the_spinner_from_assistive_technology(
         self,
@@ -772,7 +765,7 @@ class ButtonComponentTest(SimpleTestCase):
             '<c-button variant="primary" href="#" aria-busy="true">Save</c-button>',
         ):
             with self.subTest(source=source):
-                element = fromstring(self.render(source))
+                element = fromstring(self.render_component(source))
                 self.assertEqual(element.get("aria-busy"), "true")
                 spinners = element.xpath('.//*[local-name()="svg"]')
                 self.assertEqual(len(spinners), 1)
@@ -780,18 +773,12 @@ class ButtonComponentTest(SimpleTestCase):
                 self.assertEqual(element.text_content().strip(), "Save")
 
 
-class DialogComponentTest(SimpleTestCase):
+class DialogComponentTest(CottonComponentMixin, SimpleTestCase):
     """The c-dialog component renders a trigger only when given one."""
-
-    def render(self, source: str) -> str:
-        """Compiles a Cotton snippet and renders it."""
-        compiled = CottonCompiler().process(source)
-        template = engines["django"].from_string(compiled)
-        return template.render({"request": RequestFactory().get("/")})
 
     def test_trigger_slot_renders_a_trigger(self) -> None:
         """Trigger content renders the default trigger button."""
-        html = self.render(
+        html = self.render_component(
             '<c-dialog><c-slot name="button_content">Open</c-slot>'
             '<c-slot name="panel">Body</c-slot></c-dialog>'
         )
@@ -799,7 +786,7 @@ class DialogComponentTest(SimpleTestCase):
 
     def test_without_a_trigger_slot_no_trigger_is_rendered(self) -> None:
         """A dialog opened by other means, such as an event listener, has no trigger button."""
-        html = self.render(
+        html = self.render_component(
             '<c-dialog><c-slot name="panel">Body</c-slot></c-dialog>'
         )
         self.assertNotIn('aria-haspopup="dialog"', html)
