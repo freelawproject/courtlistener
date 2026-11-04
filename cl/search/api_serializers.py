@@ -590,6 +590,8 @@ class BaseRECAPDocumentESResultSerializer(DocumentSerializer):
             "docket_id",
             # SCOTUS fields aren't exposed until the SCOTUS search API (#8153).
             "capital_case",
+            "uid",
+            "docket_entry_uid",
         )
 
 
@@ -854,6 +856,8 @@ class V3RECAPDocumentESResultSerializer(DocumentSerializer):
             "pacer_doc_id",
             "trustee_str",
             "capital_case",
+            "uid",
+            "docket_entry_uid",
         )
 
 

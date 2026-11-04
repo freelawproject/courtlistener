@@ -79,6 +79,10 @@ from cl.search.documents import (
     OpinionClusterDocument,
     PersonDocument,
 )
+from cl.search.es_docket_sources import (
+    ALL_ES_SOURCES,
+    SCOTUS_ES_SOURCE,
+)
 from cl.search.factories import (
     BankruptcyInformationFactory,
     CourtFactory,
@@ -6724,6 +6728,45 @@ class ESRECAPDocumentSCOTUSCompatibilityTest(TestCase):
         self.assertEqual(prepared["cites"], [citation.cited_opinion_id])
         self.assertEqual(prepared["short_description"], rd.description)
         self.assertEqual(prepared["docket_id"], docket.pk)
+
+    def test_es_id_and_uid_share_the_source_namespace(self) -> None:
+        """Each source's ES _id comes from its own ES_CHILD_ID property, and
+        SCOTUS's _id prefix is its uid_namespace plus "d" (for document)."""
+        child_ids = [
+            getattr(ES_CHILD_ID(42), source.child_id_property)
+            for source in ALL_ES_SOURCES
+        ]
+        self.assertEqual(len(child_ids), len(set(child_ids)))
+        self.assertEqual(ES_CHILD_ID(42).RECAP, "rd_42")
+        self.assertEqual(
+            ES_CHILD_ID(42).SCOTUS, f"{SCOTUS_ES_SOURCE.uid_namespace}d_42"
+        )
+
+    def test_ids_are_namespaced_for_scotus_only(self) -> None:
+        """RECAP documents keep the integer id and docket_entry_id; SCOTUS
+        documents leave them empty and use the namespaced uid fields, so the
+        two sources' pks can't collide."""
+        scotus_document = SCOTUSDocumentFactory(
+            docket_entry__docket__court=self.court
+        )
+        rd = RECAPDocumentFactory(docket_entry=DocketEntryFactory())
+
+        scotus = ESRECAPDocument().prepare(scotus_document)
+        recap = ESRECAPDocument().prepare(rd)
+
+        with self.subTest("SCOTUS"):
+            self.assertIsNone(scotus["id"])
+            self.assertIsNone(scotus["docket_entry_id"])
+            self.assertEqual(f"scotus_{scotus_document.pk}", scotus["uid"])
+            self.assertEqual(
+                f"scotus_{scotus_document.docket_entry_id}",
+                scotus["docket_entry_uid"],
+            )
+        with self.subTest("RECAP"):
+            self.assertEqual(rd.pk, recap["id"])
+            self.assertEqual(rd.docket_entry_id, recap["docket_entry_id"])
+            self.assertIsNone(recap["uid"])
+            self.assertIsNone(recap["docket_entry_uid"])
 
 
 class RECAPFeedTest(RECAPSearchTestCase, ESIndexTestCase, TestCase):
