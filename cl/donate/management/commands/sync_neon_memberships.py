@@ -1,42 +1,47 @@
 """Reconcile local memberships with Neon to recover missed webhooks.
 
 This command checks local memberships against the Neon API. When a renewal
-webhook is missed, it updates the local membership and rebuilds the member's
-API throttles.
+webhook is missed, it syncs the membership and rebuilds the member's API
+throttles.
 
-Neon merges duplicate accounts. The old account ID keeps answering, with the
-surviving account's record, but lists no memberships. So the command resolves
-the account before reading its memberships and adopts the surviving ID when
-it differs. An account that is gone, or whose survivor already belongs to
-another local user, is reported for a human and left alone.
+Neon merges duplicate accounts. The old account ID continues to resolve,
+but returns the surviving account's record without listing its memberships.
+To handle this, the command resolves each account before fetching its
+memberships and adopts the surviving account ID when it differs. If the
+account no longer exists, or its surviving account belongs to another local
+user, the command reports the issue for manual investigation and leaves the
+local record untouched.
 
-A member can also hold a duplicate account that Neon has not merged yet, with
-the membership bought under the one we don't store. When the account lists no
-memberships, the membership we store is fetched by ID and the account that
-holds it is adopted under the same rules.
+An account may also have an unmerged duplicate under which the membership
+was purchased. If the stored account has no memberships, the command fetches
+the local membership from Neon by ID and adopts the account that owns it,
+subject to the same ownership checks.
 
 Members retain their benefits for NEON_MEMBERSHIP_GRACE_PERIOD_DAYS after
-their termination date. To allow time to recover missed renewals before
-access expires, the command selects memberships by their raw termination
-date rather than when their benefits end.
+their termination date. To recover missed renewals before access expires,
+the command selects memberships based on their raw termination date rather
+than the date their benefits end.
 
 Memberships whose payment status is not SUCCEEDED are also checked,
 regardless of their termination date. A failed auto-renewal can leave a
 membership with a future term end date but a FAILED payment status, causing
-the member to lose access until Neon successfully retries the payment.
-If the success webhook is missed, this command restores the membership.
-These rows are checked for the same window after their last change that
-expired rows get after their termination date, so a renewal Neon has given
-up on is not polled daily for the rest of its term.
+the member to lose access until Neon successfully retries the payment. If
+the success webhook is missed, this command restores the membership.
 
-When Neon instead confirms the payment is dead, because the membership is
-CANCELED or REFUNDED, FAILED with a failed payment, or gone altogether, and
-the local record has not changed for a week, the local record is marked
-FAILED. That revokes benefits a PENDING record was still granting while
-keeping the row and its Neon ID, so a late success still matches.
+These records are subject to the same polling window as expired memberships,
+measured from their last modification rather than their termination date.
+This prevents repeatedly polling renewals that Neon has already given up on
+for the remainder of their term.
 
-Memberships that Neon confirms are no longer active are deleted after
-a week. Their history is retained by pghistory, and any subsequent renewal
+When Neon confirms that a payment is no longer recoverable (the membership
+is CANCELED or REFUNDED, or is FAILED with a failed payment), the command
+marks the local record FAILED if it has remained unchanged for a week. This
+revokes benefits that a PENDING record might still be granting while
+preserving the row and its Neon ID, so a late success webhook can still
+match it.
+
+Memberships that Neon confirms are no longer active are deleted after a
+week. Their history is retained by pghistory, and any subsequent renewal
 creates a new local record through the createMembership webhook.
 """
 
