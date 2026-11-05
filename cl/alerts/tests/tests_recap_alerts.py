@@ -55,6 +55,7 @@ from cl.recap.mergers import (
     add_parties_and_attorneys,
 )
 from cl.search.documents import (
+    ES_CHILD_ID,
     DocketDocument,
     RECAPPercolator,
     RECAPSweepDocument,
@@ -68,6 +69,7 @@ from cl.search.factories import (
     OpinionClusterFactory,
     OpinionFactory,
     RECAPDocumentFactory,
+    SCOTUSDocumentFactory,
 )
 from cl.search.models import Docket, RECAPDocument
 from cl.search.tasks import (
@@ -2678,6 +2680,56 @@ class RECAPAlertsSweepIndexTest(
         docket.delete()
         docket_only_alert.delete()
         docket_2.delete()
+
+
+class SCOTUSRECAPAlertsSweepIndexTest(ESIndexTestCase, TestCase):
+    """Confirm scheduled RECAP alerts leave SCOTUS content out."""
+
+    @classmethod
+    def setUpTestData(cls):
+        cls.rebuild_index("search.Docket")
+
+    def setUp(self):
+        super().setUp()
+        self.r = get_redis_interface("CACHE")
+        self.r.delete("alert_sweep:task_id")
+        RECAPSweepDocument._index.delete(ignore=404)
+        RECAPSweepDocument.init()
+
+    def test_sweep_index_skips_scotus(self) -> None:
+        """Search alerts don't support SCOTUS yet, so the daily sweep index
+        gets RECAP content changed that day but not SCOTUS content."""
+        # Minus two hours to avoid Daylight Saving Time transitions.
+        today = midnight_pt(now().date()) - datetime.timedelta(hours=2)
+        with (
+            time_machine.travel(
+                today - datetime.timedelta(days=1), tick=False
+            ),
+            self.captureOnCommitCallbacks(execute=True),
+        ):
+            SCOTUSDocumentFactory(
+                docket_entry__docket__court=CourtFactory(id="scotus")
+            )
+            rd = RECAPDocumentFactory(
+                docket_entry__docket__court=CourtFactory(id="ca1"),
+                docket_entry__docket__source=Docket.RECAP,
+            )
+
+        with time_machine.travel(today, tick=False):
+            index_daily_recap_documents(
+                self.r,
+                DocketDocument._index._name,
+                RECAPSweepDocument,
+                get_day_before_query_date(),
+                testing=True,
+            )
+
+        # Only the RECAP docket and document; no SCOTUS docket or document.
+        swept_ids = {hit.meta.id for hit in RECAPSweepDocument.search().scan()}
+        self.assertEqual(
+            swept_ids,
+            {str(rd.docket_entry.docket_id), ES_CHILD_ID(rd.pk).RECAP},
+        )
 
 
 @override_settings(PERCOLATOR_RECAP_SEARCH_ALERTS_ENABLED=True)
