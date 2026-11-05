@@ -17,6 +17,7 @@ from rest_framework.request import Request
 from rest_framework.response import Response
 from rest_framework.utils.urls import replace_query_param
 
+from cl.lib.elasticsearch_utils import get_cardinality_count
 from cl.search.api_utils import CursorESList
 from cl.search.models import SEARCH_TYPES
 from cl.search.types import ESCursor
@@ -444,8 +445,12 @@ class ESCursorPagination(BasePagination):
         :return: An integer representing the number of results matching the query.
         """
 
-        approximate_count = (
-            self.results_count_approximate.aggregations.unique_documents.value
+        if self.results_count_approximate is None:
+            raise RuntimeError(
+                "paginate_queryset must run before the response is built."
+            )
+        approximate_count = get_cardinality_count(
+            self.results_count_approximate.aggregations
         )
         return (
             self.results_count_exact
@@ -460,7 +465,11 @@ class ESCursorPagination(BasePagination):
         matching the query.
         """
 
-        return self.child_results_count.aggregations.unique_documents.value
+        if self.child_results_count is None:
+            raise RuntimeError(
+                "paginate_queryset must run before the response is built."
+            )
+        return get_cardinality_count(self.child_results_count.aggregations)
 
     def has_next(self) -> bool:
         """Determines if there is a next page based on the search_after key

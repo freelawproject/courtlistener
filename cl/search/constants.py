@@ -273,6 +273,13 @@ cardinality_query_unique_ids = {
     SEARCH_TYPES.PARENTHETICAL: "id",
 }
 
+# SCOTUS documents have no id (it's RECAP-only), so their uid is counted and
+# used as a sort tiebreaker alongside it. Each pair needs matching keys in
+# build_sort_results' order_by_map.
+cardinality_query_extra_unique_ids = {
+    SEARCH_TYPES.RECAP_DOCUMENT: "uid",
+}
+
 
 date_decay_relevance_types = {
     SEARCH_TYPES.OPINION: {
