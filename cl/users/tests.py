@@ -94,10 +94,7 @@ from cl.lib.ratelimiter import (
     make_failed_login_key,
 )
 from cl.lib.redis_utils import get_redis_interface
-from cl.lib.test_helpers import (
-    SimpleUserDataMixin,
-    UserProfileWithParentsFactory,
-)
+from cl.lib.test_helpers import SimpleUserDataMixin
 from cl.search.factories import (
     CourtFactory,
     DocketFactory,
@@ -3528,7 +3525,7 @@ class EmailBrokenTest(ESIndexTestCase, TestCase):
         user.password = make_password("password")
         await user.asave()
         # Authenticate user
-        login = await self.async_client.alogin(
+        await self.async_client.alogin(
             username=user.username, password="password"
         )
         r = await self.async_client.get(path)
@@ -3576,7 +3573,7 @@ class EmailBrokenTest(ESIndexTestCase, TestCase):
         user.email = "complaint@simulator.amazonses.com"
         user.password = make_password("password")
         await user.asave()
-        login = await self.async_client.alogin(
+        await self.async_client.alogin(
             username=user.username, password="password"
         )
         r = await self.async_client.get(path)
@@ -3605,7 +3602,7 @@ class EmailBrokenTest(ESIndexTestCase, TestCase):
         user.password = make_password("password")
         await user.asave()
         # Authenticate user
-        login = await self.async_client.alogin(
+        await self.async_client.alogin(
             username=user.username, password="password"
         )
         r = await self.async_client.get(path)
@@ -3648,7 +3645,7 @@ class EmailBrokenTest(ESIndexTestCase, TestCase):
         # email error.
         user.email = "new@simulator.amazonses.com"
         await user.asave()
-        login = await self.async_client.alogin(
+        await self.async_client.alogin(
             username=user.username, password="password"
         )
 

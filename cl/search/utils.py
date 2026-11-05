@@ -40,7 +40,7 @@ def get_redis_stat_sum(
 @cache_memoize(5 * 60)
 def get_v2_homepage_stats():
     """Get all stats displayed in the new homepage and return them as a dict."""
-    ten_days_ago = make_aware(datetime.today() - timedelta(days=10), UTC)
+    make_aware(datetime.today() - timedelta(days=10), UTC)
 
     # Get stats from Redis (new system)
     alerts_in_last_ten = get_redis_stat_sum(

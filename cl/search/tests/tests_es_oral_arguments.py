@@ -143,7 +143,7 @@ class OASearchAPICommonTests(AudioESTestCase):
             "case_name": "jose",
         }
         # API
-        r = await self._test_api_results_count(search_params, 1, "case_name")
+        await self._test_api_results_count(search_params, 1, "case_name")
 
     @skip_if_common_tests_skipped
     async def test_oa_docket_number_filtering(self) -> None:
@@ -166,7 +166,7 @@ class OASearchAPICommonTests(AudioESTestCase):
             "court": f"{self.docket_3.court_id}",
         }
         # API
-        r = await self._test_api_results_count(search_params, 2, "court")
+        await self._test_api_results_count(search_params, 2, "court")
 
     @skip_if_common_tests_skipped
     async def test_oa_date_argued_filtering(self) -> None:
@@ -196,7 +196,7 @@ class OASearchAPICommonTests(AudioESTestCase):
         }
 
         # API
-        r = await self._test_api_results_count(
+        await self._test_api_results_count(
             search_params, 2, "case_name + query"
         )
 
@@ -208,7 +208,7 @@ class OASearchAPICommonTests(AudioESTestCase):
             "type": SEARCH_TYPES.ORAL_ARGUMENT,
         }
         # API
-        r = await self._test_api_results_count(
+        await self._test_api_results_count(
             search_params, 1, "case_name + judge + query"
         )
 
@@ -223,7 +223,7 @@ class OASearchAPICommonTests(AudioESTestCase):
             "type": SEARCH_TYPES.ORAL_ARGUMENT,
         }
         # API
-        r = await self._test_api_results_count(
+        await self._test_api_results_count(
             search_params, 1, "case_name + judge + query"
         )
 
@@ -326,7 +326,7 @@ class OAV3SearchAPITests(
     def test_oa_results_pagination(self, mock_abort_audio) -> None:
         created_audios = []
         audios_to_create = 20
-        with self.captureOnCommitCallbacks(execute=True) as callbacks:
+        with self.captureOnCommitCallbacks(execute=True):
             for _ in range(audios_to_create):
                 audio = AudioFactory.create(
                     docket_id=self.audio_3.docket.pk,
@@ -370,9 +370,7 @@ class OAV3SearchAPITests(
             "order_by": "random_123 desc",
         }
         # API
-        r = await self._test_api_results_count(
-            search_params, 2, "random sorting"
-        )
+        await self._test_api_results_count(search_params, 2, "random sorting")
 
     async def test_oa_results_highlights(self) -> None:
         """Confirm snippet is properly highlighted."""
@@ -1804,7 +1802,7 @@ class OASearchTestElasticSearch(ESIndexTestCase, AudioESTestCase, TestCase):
     def test_oa_results_pagination(self, mock_abort_audio) -> None:
         created_audios = []
         audios_to_create = 20
-        with self.captureOnCommitCallbacks(execute=True) as callbacks:
+        with self.captureOnCommitCallbacks(execute=True):
             for _ in range(audios_to_create):
                 audio = AudioFactory.create(
                     docket_id=self.audio_3.docket.pk,

@@ -616,8 +616,12 @@ def make_rd_title(rd: RECAPDocument | SCOTUSDocument) -> str:
     )
 
 
-@ratelimiter_all_10_per_h
+# login_required goes first so that anonymous requests are redirected to sign
+# in without counting against the limit. The limit is keyed by path, so all
+# users share it, and anonymous traffic could otherwise block a docket's export
+# for everyone.
 @login_required
+@ratelimiter_all_10_per_h
 def download_docket_entries_csv(
     request: HttpRequest, docket_id: int
 ) -> HttpResponse:

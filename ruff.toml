@@ -33,14 +33,6 @@ lint.ignore = [
   "D106",
   # overload-with-docstring
   "D418",
-  # To fix:
-  "E722",
-  "E731",
-  "F403",
-  "F811",
-  "F821",
-  "F841",
-  "UP008",
 ]
 
 [lint.pydocstyle]
@@ -51,6 +43,9 @@ docstring-code-format = true
 
 [lint.per-file-ignores]
 "**/__init__.py" = ["D104"]
+# Django reads settings as module attributes, so the settings package
+# aggregates its submodules with star imports.
+"cl/settings/__init__.py" = ["F403"]
 "**/tests/**" = ["D100", "D101", "D102", "D103", "D107"]
 "**/test_*.py" = ["D100", "D101", "D102", "D103", "D107"]
 "**/tests.py" = ["D100", "D101", "D102", "D103", "D107"]

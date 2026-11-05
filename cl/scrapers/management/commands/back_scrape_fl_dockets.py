@@ -177,7 +177,7 @@ class Command(StateBackScrapeCommand, FLScrapeCommand):
     date_range_required: ClassVar[bool] = False
 
     def add_arguments(self, parser: CommandParser):
-        super(Command, self).add_arguments(parser)
+        super().add_arguments(parser)
 
         parser.add_argument(
             "--full-scrape",

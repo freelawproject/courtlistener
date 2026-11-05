@@ -313,7 +313,7 @@ class RECAPAlertsSweepIndexTest(
                 date_filed=datetime.date(2024, 8, 19),
                 description="MOTION for Leave to File Amicus Curiae Lorem Served",
             )
-            rd = RECAPDocumentFactory(
+            RECAPDocumentFactory(
                 docket_entry=alert_de,
                 description="Motion to File",
                 document_number="1",
@@ -358,7 +358,7 @@ class RECAPAlertsSweepIndexTest(
                 date_filed=datetime.date(2024, 8, 19),
                 description="MOTION for Leave to File Amicus Curiae Lorem Served",
             )
-            rd_2 = RECAPDocumentFactory(
+            RECAPDocumentFactory(
                 docket_entry=alert_de_2,
                 description="Motion to File Lorem",
                 document_number="2",
@@ -397,7 +397,7 @@ class RECAPAlertsSweepIndexTest(
                 date_filed=datetime.date(2024, 8, 19),
                 description="MOTION for Leave to File Amicus Curiae Lorem Served",
             )
-            rd_old = RECAPDocumentFactory(
+            RECAPDocumentFactory(
                 docket_entry=alert_de_old,
                 description="Motion to File",
                 document_number="1",
@@ -1062,7 +1062,7 @@ class RECAPAlertsSweepIndexTest(
             time_machine.travel(self.mock_date_indexing, tick=False),
             self.captureOnCommitCallbacks(execute=True),
         ):
-            rd_4 = RECAPDocumentFactory(
+            RECAPDocumentFactory(
                 docket_entry=alert_de,
                 description="Hearing new",
                 document_number="3",
@@ -2114,7 +2114,7 @@ class RECAPAlertsSweepIndexTest(
                 description="MOTION for Leave to File Amicus Curiae Lorem Served",
             )
 
-            rd_1 = RECAPDocumentFactory(
+            RECAPDocumentFactory(
                 docket_entry=alert_de,
                 description="Motion to File 1",
                 document_number="1",
@@ -4195,7 +4195,7 @@ class RECAPAlertsPercolatorTest(
                 date_filed=datetime.date(2024, 8, 19),
                 description="MOTION for Leave to File Amicus Curiae Lorem Served",
             )
-            rd = RECAPDocumentFactory(
+            RECAPDocumentFactory(
                 docket_entry=alert_de,
                 description="Motion to File",
                 document_number="1",

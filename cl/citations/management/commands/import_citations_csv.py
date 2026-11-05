@@ -102,7 +102,7 @@ class Command(BaseCommand):
     help = "Add citations to clusters using a csv file"
 
     def __init__(self, *args, **kwargs):
-        super(Command, self).__init__(*args, **kwargs)
+        super().__init__(*args, **kwargs)
 
     def existing_path_type(self, path: str):
         """Validate file path exists.

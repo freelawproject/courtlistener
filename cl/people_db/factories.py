@@ -121,7 +121,6 @@ class AttorneyFactory(DjangoModelFactory):
         model = Attorney
 
     name = Faker("name")
-    docket = None
 
     @post_generation
     def docket(self, create, extracted, **kwargs):
@@ -161,7 +160,6 @@ class PartyFactory(DjangoModelFactory):
         model = Party
 
     name = Faker("name")
-    docket = None
 
     @post_generation
     def docket(self, create, extracted, **kwargs):

@@ -76,9 +76,26 @@ from cl.lib.storage import IncrementingAWSMediaStorage, S3PrivateUUIDStorage
 from cl.lib.string_utils import get_token_count_from_string, trunc
 from cl.search.cluster_sources import ClusterSources
 from cl.search.docket_sources import DocketSources
-from cl.search.state.florida.models import *
-from cl.search.state.new_york.models import *
-from cl.search.state.texas.models import *
+
+# State models are re-exported so Django registers them with the search app.
+from cl.search.state.florida.models import (
+    FloridaDocketEntry as FloridaDocketEntry,
+)
+from cl.search.state.florida.models import FloridaDocument as FloridaDocument
+from cl.search.state.new_york.models import (
+    NYCoADocketEntry as NYCoADocketEntry,
+)
+from cl.search.state.new_york.models import (
+    NYCoADocketIssue as NYCoADocketIssue,
+)
+from cl.search.state.new_york.models import (
+    NYCoADocketMetadata as NYCoADocketMetadata,
+)
+from cl.search.state.new_york.models import NYCoADocument as NYCoADocument
+from cl.search.state.texas.models import (
+    TexasDocketEntry as TexasDocketEntry,
+)
+from cl.search.state.texas.models import TexasDocument as TexasDocument
 from cl.users.models import User
 
 if TYPE_CHECKING:
@@ -833,10 +850,6 @@ class Docket(AbstractDateTimeModel, DocketSources):
             citing_documents__citing_document__docket_entry__docket_id=self.pk
         )
         return build_authority_opinions_query(opinions)
-
-    def add_scraper_source(self) -> None:
-        if self.source in self.NON_SCRAPER_SOURCES():
-            self.source = self.source + self.SCRAPER
 
     def add_idb_source(self):
         if self.source in self.NON_IDB_SOURCES():
@@ -1896,15 +1909,6 @@ class FederalCourtsQuerySet(models.QuerySet["Court"]):
                 ]
             )
             | Q(pk__in=["cit", "jpml", "uscfc"]),
-            end_date__isnull=True,
-        )
-
-    def appellate_courts(self) -> Self:
-        return self.filter(
-            Q(jurisdiction=Court.FEDERAL_APPELLATE)
-            |
-            # Court of Appeals for Veterans Claims uses appellate PACER
-            Q(pk__in=["cavc"]),
             end_date__isnull=True,
         )
 

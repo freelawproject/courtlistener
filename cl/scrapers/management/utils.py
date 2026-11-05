@@ -100,7 +100,7 @@ class StateBackScrapeCommand(BaseCommand):
     date_range_required: ClassVar[bool] = True
 
     def add_arguments(self, parser: CommandParser):
-        super(StateBackScrapeCommand, self).add_arguments(parser)
+        super().add_arguments(parser)
         parser.add_argument(
             "--backscrape-start",
             dest="backscrape_start",
@@ -132,7 +132,7 @@ class StateBackScrapeCommand(BaseCommand):
 
 class StatePollCommand(BaseCommand):
     def add_arguments(self, parser: CommandParser):
-        super(StatePollCommand, self).add_arguments(parser)
+        super().add_arguments(parser)
         parser.add_argument(
             "--polling-delay",
             type=int,

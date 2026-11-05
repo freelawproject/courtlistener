@@ -848,7 +848,7 @@ class DupcheckerPressOnTest(TestCase):
 
         docket = DocketFactory()
         cluster = OpinionClusterFactory(docket=docket)
-        opinion = OpinionFactory(sha1=self.dup_hash, cluster=cluster)
+        OpinionFactory(sha1=self.dup_hash, cluster=cluster)
 
     def test_press_on_no_dup(self) -> None:
         """Does the DupChecker raises no error when seeing a new hash?"""
@@ -1071,7 +1071,7 @@ class ScrapeCitationsTest(TestCase):
         self.hash = "1234" * 10
         self.hashes = [self.hash, self.hash, self.hash, "111"]
 
-        court = CourtFactory(id="md")
+        CourtFactory(id="md")
         docket = DocketFactory(
             case_name="Attorney Grievance v. Taniform",
             docket_number="40ag/21",
@@ -1080,7 +1080,7 @@ class ScrapeCitationsTest(TestCase):
             pacer_case_id=None,
         )
         self.cluster = OpinionClusterFactory(docket=docket)
-        opinion = OpinionFactory(sha1=self.hash, cluster=self.cluster)
+        OpinionFactory(sha1=self.hash, cluster=self.cluster)
 
     def test_citation_scraper(self):
         """Test if citation scraper creates a citation or ignores duplicates."""
@@ -1550,7 +1550,7 @@ class OpinionVersionTest(ESIndexTestCase, TransactionTestCase):
             docket=not_comparable_docket, source=ClusterSources.COURT_WEBSITE
         )
 
-        main_citation = CitationWithParentsFactory.create(
+        CitationWithParentsFactory.create(
             cluster=main_cluster, volume="10000", reporter="U.S.", page="1"
         )
         repeated_citation = CitationWithParentsFactory.create(
@@ -2180,7 +2180,7 @@ class OpinionVersionTest(ESIndexTestCase, TransactionTestCase):
             sha1="yyy",
         )
 
-        opinion = OpinionFactory.create(
+        OpinionFactory.create(
             cluster=OpinionClusterFactory(
                 docket=main_docket, source=ClusterSources.COURT_WEBSITE
             ),

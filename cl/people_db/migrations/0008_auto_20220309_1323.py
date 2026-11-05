@@ -3,7 +3,6 @@
 # Badly named migration. Just does a noop addition of MENA to the choices var.
 
 from django.db import migrations, models
-import django.db.models.deletion
 
 
 class Migration(migrations.Migration):
