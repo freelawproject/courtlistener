@@ -1756,7 +1756,7 @@ Sample code here.
     <c-library.list title="Props" only>
       <c-library.item only>
         <c-slot name="label"><code>document_id</code></c-slot>
-        <c-slot name="description">The RECAP document's id. Builds the create and delete URLs and the form's id, which the htmx response targets.</c-slot>
+        <c-slot name="description">The RECAP document's id. Builds the create and delete URLs and the button's id, which lets htmx return keyboard focus to the new button after the swap. Must match the <code>document_id</code> given to <code>&lt;c-pray-button&gt;</code>, whose status region the htmx response updates by the same id.</c-slot>
       </c-library.item>
       <c-library.item optional only>
         <c-slot name="label"><code>:count</code></c-slot>

@@ -10,7 +10,6 @@
 
 {% if request.user.is_authenticated %}
   <form
-    id="pray_{{ document_id }}"
     {% if prayer_exists %}
       hx-post="{% url 'delete_prayer' document_id %}"
     {% else %}
