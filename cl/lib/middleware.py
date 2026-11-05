@@ -107,6 +107,13 @@ class IncrementalNewTemplateMiddleware:
     **everyone** with both flags enabled, and raise Http404 for everyone
     else, since there is no template they are allowed to see.
 
+    htmx requests are swapped by the "X-CL-Design" header instead of the
+    flag. `new_base.html` sends it with value "v2" on every htmx request
+    from a v2 page, so a partial always matches the page that asked for it.
+    A flagged user on a page that is still legacy gets the legacy partial.
+    Endpoints called by both stacks should return the legacy template name
+    and let this middleware swap it.
+
     TODO: Remove this middleware once new design is completely rolled out.
     """
 
@@ -154,29 +161,31 @@ class IncrementalNewTemplateMiddleware:
             return response
 
         # Checking flag_is_active hits the db, so be sure to short-circuit for cheaper
-        # evaluations first. Past this gate, either "use_new_design" is active or
-        # the legacy template is missing, in which case the flag was never checked.
+        # evaluations first
         old_template_exists = self.template_exists(old_template)
-        if old_template_exists and not flag_is_active(
-            request, "use_new_design"
-        ):
-            return response
+        if old_template_exists:
+            if request.headers.get("Hx-Request"):
+                # A partial must match the page already in the browser, and
+                # only v2 pages mark their htmx requests (see new_base.html).
+                expects_v2 = request.headers.get("X-CL-Design") == "v2"
+            else:
+                expects_v2 = flag_is_active(request, "use_new_design")
+
+            if not expects_v2:
+                return response
 
         v2_template_name = f"v2_{old_template}"
         wip_template_name = f"{WIP_PROPS['prefix']}{old_template}"
         v2_template_exists = self.template_exists(v2_template_name)
         wip_template_exists = self.template_exists(wip_template_name)
 
-        # The WIP flag only counts together with "use_new_design". When the
-        # legacy template exists, the gate above already confirmed that flag;
-        # otherwise it was skipped and has to be checked here. The WIP flag goes
-        # last so pages without a WIP template never evaluate it.
+        # The WIP flag only counts together with "use_new_design", which is
+        # checked here because the gate above may have let the request
+        # through on the design header instead. Both flags go last so pages
+        # without a WIP template never evaluate them.
         if (
             wip_template_exists
-            and (
-                old_template_exists
-                or flag_is_active(request, "use_new_design")
-            )
+            and flag_is_active(request, "use_new_design")
             and flag_is_active(request, WIP_PROPS["flag"])
         ):
             new_template_name = wip_template_name
