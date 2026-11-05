@@ -21,13 +21,14 @@ from cl.search.models import Court, Docket, Opinion
 
 
 def make_item(case):
-    """Make an import item for our save everything function
+    """Make an import item for our save everything function.
 
-    :param case: Case data received from the court.
-    :return: Case information.
-    :type: dict
+    Args:
+        case: Case data received from the court.
+
+    Returns:
+        dict: Case information.
     """
-
     judges = case["judge"]
     first_name = judges.split(" ")[0].title()
 
@@ -71,14 +72,14 @@ def import_tn_corpus(
     file: IO,
     ocr_available: bool,
 ) -> None:
-    """Import TN Corpus
+    """Import TN Corpus.
 
-    :param log: Should we view logging info
-    :param skip_until: Label ID, if any, to process first, else False to
-    indicate no skipping.
-    :param file: Location of our overriding data json file
-    :param ocr_available: Whether you can do OCR during the import
-    :return: None
+    Args:
+        log: Should we view logging info
+        skip_until: Label ID, if any, to process first, else False to
+            indicate no skipping.
+        file: Location of our overriding data json file
+        ocr_available: Whether you can do OCR during the import
     """
     ready = False if skip_until else True
 

@@ -62,8 +62,7 @@ class MembershipWebhookViewSet(
     queryset = NeonMembership.objects.all()
 
     def create(self, request: Request, *args, **kwargs):
-        """
-        Processes membership webhooks received from Neon CRM.
+        """Processes membership webhooks received from Neon CRM.
 
         This method handles POST requests containing JSON data from Neon CRM.
         It extracts relevant information from the data and updates the
@@ -71,6 +70,8 @@ class MembershipWebhookViewSet(
 
         Args:
             request (Request): A request object containing the webhook data.
+            *args: Unused.
+            **kwargs: Unused.
 
         Returns:
             Response: A HttpResponse object with status code 200 if successful,
@@ -98,8 +99,7 @@ class MembershipWebhookViewSet(
         return Response(status=HTTPStatus.CREATED)
 
     def _get_address_from_neon_response(self, addresses: list[dict[str, str]]):
-        """
-        Retrieves an address from the Neon response.
+        """Retrieves an address from the Neon response.
 
         Args:
             addresses: An array of dictionaries representing addresses.
@@ -121,8 +121,7 @@ class MembershipWebhookViewSet(
         }
 
     def _get_member_record(self, account_id: str) -> User:
-        """
-        Retrieves a user record associated with a Neon CRM account ID.
+        """Retrieves a user record associated with a Neon CRM account ID.
 
         This method attempts to find a matching Django user in two ways:
 
@@ -188,8 +187,7 @@ class MembershipWebhookViewSet(
 
     @staticmethod
     def _get_membership_data(webhook_data: dict[str, Any]) -> dict[str, str]:
-        """
-        Extracts relevant membership information from a Neon webhook payload.
+        """Extracts relevant membership information from a Neon webhook payload.
 
         Args:
             webhook_data (dict[str, str]): The payload received from a Neon
@@ -241,10 +239,7 @@ class MembershipWebhookViewSet(
 
     @staticmethod
     def _map_trigger_value(trigger_event: str) -> int:
-        """
-        Maps a string trigger event received from a Neon webhook to the
-        corresponding integer value representing the trigger event type in
-        the NeonWebhookEvent model.
+        """Maps a string trigger event received from a Neon webhook to the corresponding integer value representing the trigger event type in the NeonWebhookEvent model.
 
         Args:
             trigger_event (str): The string representing the trigger event

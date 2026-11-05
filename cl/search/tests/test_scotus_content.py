@@ -65,7 +65,6 @@ class ScotusDocketMergeTest(TestCase):
         self, mock_get, mock_logger_info
     ) -> None:
         """Confirm SCOTUS data is merged into Docket and metadata."""
-
         att_1 = SCOTUSAttachmentDataFactory(
             description="Main 1", document_number=23453
         )
@@ -421,7 +420,6 @@ class ScotusDocketMergeTest(TestCase):
 
     def test_merge_scotus_docket_updates_existing_docket(self) -> None:
         """Confirm merging again updates an existing SCOTUS docket."""
-
         data = ScotusDocketDataFactory(
             docket_number="23A1434",
             case_name="Old Name",
@@ -476,9 +474,7 @@ class ScotusDocketMergeTest(TestCase):
     def test_scotus_merger_matches_entry_that_gained_attachments(
         self,
     ) -> None:
-        """Confirm an entry merged before it had attachments is matched, not
-        duplicated, when re-merged with attachments and a document number."""
-
+        """Confirm an entry merged before it had attachments is matched, not duplicated, when re-merged with attachments and a document number."""
         docket = DocketFactory(court=self.court, source=Docket.SCRAPER)
         entry_data = {
             "description": "Petition for a writ of certiorari filed.",
@@ -547,8 +543,7 @@ class ScotusDocketMergeTest(TestCase):
     def test_merge_scotus_docket_triggers_docket_alert_for_a_new_entry(
         self,
     ) -> None:
-        """Does merging a SCOTUS docket with a new entry notify current
-        subscribers?"""
+        """Does merging a SCOTUS docket with a new entry notify current subscribers?"""
         existing = DocketFactory(
             court=self.court, docket_number="24-201", source=Docket.SCRAPER
         )
@@ -578,8 +573,7 @@ class ScotusDocketMergeTest(TestCase):
     def test_merge_scotus_docket_does_not_alert_when_nothing_is_new(
         self,
     ) -> None:
-        """Re-merging an already-seen entry shouldn't notify subscribers --
-        only a newly created SCOTUSDocketEntry triggers the alert."""
+        """Re-merging an already-seen entry shouldn't notify subscribers -- only a newly created SCOTUSDocketEntry triggers the alert."""
         existing = DocketFactory(
             court=self.court, docket_number="24-202", source=Docket.SCRAPER
         )
@@ -610,8 +604,7 @@ class ScotusDocketMergeTest(TestCase):
     def test_merge_scotus_docket_skips_alerts_when_disabled(
         self, mock_enqueue
     ) -> None:
-        """With SCOTUS_ALERTS_ENABLED off (the default), a new entry
-        notifies nobody and doesn't even take the alert semaphore."""
+        """With SCOTUS_ALERTS_ENABLED off (the default), a new entry notifies nobody and doesn't even take the alert semaphore."""
         existing = DocketFactory(
             court=self.court, docket_number="24-203", source=Docket.SCRAPER
         )
@@ -655,7 +648,6 @@ class ScotusDocketMergeTest(TestCase):
 
     def test_merge_scotus_docket_missing_docket_number(self) -> None:
         """Confirm ValueError is raised when docket_number is missing."""
-
         data = ScotusDocketDataFactory(
             case_name="New SCOTUS Case Name",
             docket_number=None,
@@ -675,8 +667,7 @@ class ScotusDocketMergeTest(TestCase):
         mock_get,
         mock_is_pdf,
     ) -> None:
-        """Confirm the SCOTUS QP PDF is downloaded and stored in its docket's
-        directory, named for the docket's filing date or as undated."""
+        """Confirm the SCOTUS QP PDF is downloaded and stored in its docket's directory, named for the docket's filing date or as undated."""
         # Mock the response from requests.get
         mock_response = mock.Mock()
         mock_response.iter_content.return_value = [b"fake pdf content"]
@@ -714,10 +705,7 @@ class ScotusDocketMergeTest(TestCase):
                 )
 
     def test_merge_scotus_docket_resolves_relative_qp_url(self) -> None:
-        """Confirm relative questions_presented URLs (e.g.
-        "../qp/14-00556qp.pdf" found in 14-556.html) are resolved to
-        absolute URLs when stored in ScotusDocketMetadata."""
-
+        """Confirm relative questions_presented URLs (e.g. "../qp/14-00556qp.pdf" found in 14-556.html) are resolved to absolute URLs when stored in ScotusDocketMetadata."""
         report_data = ScotusDocketDataFactory(
             questions_presented="../qp/14-00556qp.pdf",
             docket_entries=[],
@@ -737,7 +725,6 @@ class ScotusDocketMergeTest(TestCase):
         mock_logger_info,
     ) -> None:
         """Confirm download is skipped when questions_presented_file exists."""
-
         docket = DocketFactory.create(court=self.court)
         scotus_meta = ScotusDocketMetadata.objects.create(
             docket=docket,
@@ -843,9 +830,7 @@ class ScotusDocketMergeTest(TestCase):
     def test_merge_scotus_document_triggers_download_correctly(
         self, mock_chain
     ) -> None:
-        """Confirm PDF download is triggered only when document is new or
-        filename changes."""
-
+        """Confirm PDF download is triggered only when document is new or filename changes."""
         docket = DocketFactory(
             court=self.court,
             docket_number="23-1435",
@@ -952,9 +937,7 @@ class ScotusDocketMergeTest(TestCase):
     def test_merge_scotus_document_skips_download_when_flag_is_false(
         self, mock_chain
     ) -> None:
-        """Confirm no download chain is triggered when download_file=False,
-        even for newly created documents or filename changes."""
-
+        """Confirm no download chain is triggered when download_file=False, even for newly created documents or filename changes."""
         att_1 = SCOTUSAttachmentDataFactory(
             description="Main 1", document_number=23453
         )
@@ -990,8 +973,7 @@ class ScotusDocketMergeTest(TestCase):
     def test_find_docket_object_matches_same_docket_regardless_of_order(
         self,
     ) -> None:
-        """Confirm that find_docket_object consistently matches the same
-        docket when multiple NN-NNNN numbers appear in different orders.
+        """Confirm that find_docket_object consistently matches the same docket when multiple NN-NNNN numbers appear in different orders.
 
         The lexicographic sorting in clean_scotus_docket_number ensures
         the same docket_number_core is always produced.
@@ -1029,9 +1011,7 @@ class ScotusDocketMergeTest(TestCase):
 
 
 class ScotusDocketUrlPropertyTest(CLTestCase):
-    """#7584: Docket.scotus_docket_url builds the public case-page link,
-    mirroring the existing pacer_docket_url property's location/shape.
-    """
+    """#7584: Docket.scotus_docket_url builds the public case-page link, mirroring the existing pacer_docket_url property's location/shape."""
 
     @classmethod
     def setUpTestData(cls) -> None:

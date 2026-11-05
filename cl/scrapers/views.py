@@ -17,13 +17,13 @@ from cl.search.models import Court
 
 @dataclass
 class EmailProcessingTask:
-    """
-    Stores information about how to process an incoming state update email.
+    """Stores information about how to process an incoming state update email.
 
-    :ivar task: The task to send the email to be processed by.
-    :ivar source: The source of the email to be processed.
-    :ivar username: The username of the User to set as the uploader of the\
-        email.
+    Attributes:
+        task: The task to send the email to be processed by.
+        source: The source of the email to be processed.
+        username: The username of the User to set as the uploader of the\
+            email.
     """
 
     task: Task

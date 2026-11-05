@@ -54,10 +54,13 @@ def compose_redis_key(
 ) -> str:
     """Compose a Redis key based on the search type for indexing log.
 
-    :param search_type: The type of search.
-    :param event_doc_type: An optional EventTable enum member specifying the
-    document type being processed.
-    :return: A Redis key as a string.
+    Args:
+        search_type: The type of search.
+        event_doc_type: An optional EventTable enum member specifying the
+            document type being processed.
+
+    Returns:
+        A Redis key as a string.
     """
     if event_doc_type:
         return f"es_{search_type}_{event_doc_type}_indexing:log"
@@ -70,18 +73,19 @@ def get_unique_oldest_history_rows(
     pk_offset: int,
     update_from_event_tables: EventTable | None,
 ) -> QuerySet | None:
-    """Retrieve the oldest unique history rows within a given date range for
-    specified event tables.
+    """Retrieve the oldest unique history rows within a given date range for specified event tables.
 
-    :param start_date: The start date for filtering the history rows.
-    :param end_date: The end date for filtering the history rows.
-    :param pk_offset: The PK offset to start from.
-    :param update_from_event_tables: An optional EventTable member to specify
-    the type of event table from which to retrieve history rows.
-    :return: A QuerySet of the oldest unique events within the specified date
-    range for the given event table, or None if no event table is specified.
+    Args:
+        start_date: The start date for filtering the history rows.
+        end_date: The end date for filtering the history rows.
+        pk_offset: The PK offset to start from.
+        update_from_event_tables: An optional EventTable member to specify
+            the type of event table from which to retrieve history rows.
+
+    Returns:
+        A QuerySet of the oldest unique events within the specified date
+        range for the given event table, or None if no event table is specified.
     """
-
     match update_from_event_tables:
         case EventTable.DOCKET:
             return (
@@ -126,20 +130,21 @@ def get_documents_to_update_or_remove(
     event_doc_type: EventTable | None,
     chunk_size: int,
 ) -> tuple[list[int], list[tuple[int, list[str]]], list[int]]:
-    """Determines the documents to update or remove based on changes in
-    specified fields.
+    """Determines the documents to update or remove based on changes in specified fields.
 
-    :param events_to_update: A queryset of the event table instances to update.
-    :param search_type: The search type related to the update/remove action.
-    :param event_doc_type: An optional EventTable enum member specifying the
-    document type to be processed.
-    :param chunk_size: The number of items to retrieve from DB at a time.
-    :return: A four tuple containing, a list of strings containing the fields
-    to be updated, a list containing IDs of parent documents to update, a list
-    containing IDs of child documents to update, a list containing IDs of
-    documents to delete.
+    Args:
+        events_to_update: A queryset of the event table instances to update.
+        search_type: The search type related to the update/remove action.
+        event_doc_type: An optional EventTable enum member specifying the
+            document type to be processed.
+        chunk_size: The number of items to retrieve from DB at a time.
+
+    Returns:
+        A four tuple containing, a list of strings containing the fields
+        to be updated, a list containing IDs of parent documents to update, a list
+        containing IDs of child documents to update, a list containing IDs of
+        documents to delete.
     """
-
     match search_type:
         case SEARCH_TYPES.RECAP if event_doc_type == EventTable.DOCKET:
             tracked_set = Docket.es_rd_field_tracker
@@ -426,21 +431,19 @@ class Command(VerboseCommand):
         task_to_use: str,
         es_document: type[ESDocumentType] | None = None,
     ) -> None:
-        """Process a queryset and execute tasks based on the specified celery
-        task_to_use.
+        """Process a queryset and execute tasks based on the specified celery task_to_use.
 
-        :param items: Iterable of items to process. Items can be a simple
-        iterable of IDs or a tuple of (ID, changed_fields) for cases requiring
-        field changes.
-        :param count: Total number of items expected to process.
-        :param search_type: The search type related to the update/remove action.
-        :param chunk_size: The number of items to process in a single chunk.
-        :param task_to_use: The name of the celery task to execute.
-        :param es_document: Optional: The ES document class for checking
-        document existence in ES.
-        :return: None
+        Args:
+            items: Iterable of items to process. Items can be a simple
+                iterable of IDs or a tuple of (ID, changed_fields) for cases requiring
+                field changes.
+            count: Total number of items expected to process.
+            search_type: The search type related to the update/remove action.
+            chunk_size: The number of items to process in a single chunk.
+            task_to_use: The name of the celery task to execute.
+            es_document: Optional: The ES document class for checking
+                document existence in ES.
         """
-
         event_doc_type = EventTable(
             self.options.get("update_from_event_tables", "")
         )
@@ -553,9 +556,9 @@ class Command(VerboseCommand):
     ) -> None:
         """Index documents that have changed based on the model history tables.
 
-        :param events_to_update: A queryset of the event table instances to update
-        :param search_type: The search type related to the update/remove action.
-        :return: None
+        Args:
+            events_to_update: A queryset of the event table instances to update
+            search_type: The search type related to the update/remove action.
         """
         event_doc_type = EventTable(
             self.options.get("update_from_event_tables", "")

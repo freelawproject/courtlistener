@@ -16,9 +16,7 @@ from cl.search.models import (
 
 @dataclass(frozen=True)
 class DocketAlertSource:
-    """Describes how one "flavor" of docket resolves the entries a docket
-    alert should notify about, and which templates render its email.
-    RECAP/PACER is the default; SCOTUS is the first override.
+    """Describes how one "flavor" of docket resolves the entries a docket alert should notify about, and which templates render its email. RECAP/PACER is the default; SCOTUS is the first override.
 
     ``entries_by_pk`` resolves a precise list of entry pks into a queryset --
     used for RECAP's recap.email re-notify case, where the caller already
@@ -40,16 +38,13 @@ class DocketAlertSource:
 def _with_email_relations(
     qs: QuerySet, documents_attr: str, document_model: type[AbstractPDF]
 ) -> QuerySet:
-    """Preload what a docket alert email renders -- each entry's docket (with
-    its court, which DocketEntry.datetime_filed reads for the timezone) and
-    documents, minus their potentially huge plain_text -- in a fixed number
-    of queries, however many entries there are. Re-rendering the evaluated
-    entries, as make_alert_messages does per recipient, adds no queries.
+    """Preload what a docket alert email renders -- each entry's docket (with its court, which DocketEntry.datetime_filed reads for the timezone) and documents, minus their potentially huge plain_text -- in a fixed number of queries, however many entries there are. Re-rendering the evaluated entries, as make_alert_messages does per recipient, adds no queries.
 
-    :param qs: The entries queryset.
-    :param documents_attr: The entry model's reverse accessor to its
-    documents, e.g. "recap_documents".
-    :param document_model: The document model behind `documents_attr`.
+    Args:
+        qs: The entries queryset.
+        documents_attr: The entry model's reverse accessor to its
+            documents, e.g. "recap_documents".
+        document_model: The document model behind `documents_attr`.
     """
     return qs.select_related("docket__court").prefetch_related(
         Prefetch(
@@ -101,8 +96,7 @@ def _scotus_entries_by_pk(des_pks: list[int]) -> QuerySet:
 
 
 def _scotus_entries_since(docket: Docket, since: datetime) -> QuerySet:
-    """Return the docket's SCOTUSDocketEntry rows created at or after
-    `since`."""
+    """Return the docket's SCOTUSDocketEntry rows created at or after `since`."""
     return _with_email_relations(
         SCOTUSDocketEntry.objects.filter(
             date_created__gte=since, docket=docket

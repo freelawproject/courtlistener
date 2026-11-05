@@ -24,6 +24,7 @@ from cl.search.types import ESCursor
 
 class VersionBasedPagination(PageNumberPagination):
     """The base paginator for handling V3 and V4 DB endpoints.
+
     This supports CursorPagination for V4 endpoints when sorting by "id" or
     "date_created". It uses PageNumberPagination for V3 endpoints and for V4
     endpoints when sorting by fields that don't support CursorPagination.
@@ -56,11 +57,11 @@ class VersionBasedPagination(PageNumberPagination):
     def do_v4_cursor_pagination(self):
         """Determine if v4 cursor pagination should be applied.
 
-        :return: A two tuple containing:
-        - A boolean indicating if cursor pagination should be applied.
-        - The requested ordering key if applicable.
+        Returns:
+            A two tuple containing:
+            - A boolean indicating if cursor pagination should be applied.
+            - The requested ordering key if applicable.
         """
-
         requested_ordering = self.request.query_params.get(
             "order_by", self.ordering
         )
@@ -79,11 +80,7 @@ class VersionBasedPagination(PageNumberPagination):
         )
 
     def paginate_queryset(self, queryset, request, view=None):
-        """
-        Paginate a queryset if required, either returning a
-        page object, or `None` if pagination is not configured for this view.
-        """
-
+        """Paginate a queryset if required, either returning a page object, or `None` if pagination is not configured for this view."""
         if hasattr(view, "ordering"):
             self.ordering = view.ordering
         if hasattr(view, "cursor_ordering_fields"):
@@ -132,16 +129,18 @@ class VersionBasedPagination(PageNumberPagination):
     def handle_shallow_only_page_number_pagination(
         self, request: Request, queryset: QuerySet
     ) -> list | None:
-        """A paginator that blocks deep pagination
+        """A paginator that blocks deep pagination.
 
          Thank you MuckRock for this contribution.
 
-        :param self: The VersionBasedPagination instance.
-        :param request: The DRF Request object.
-        :param queryset: The Django QuerySet to be paginated.
-        :return: A paginated list of query results.
-        """
+        Args:
+            self: The VersionBasedPagination instance.
+            request: The DRF Request object.
+            queryset: The Django QuerySet to be paginated.
 
+        Returns:
+            A paginated list of query results.
+        """
         page_size = self.get_page_size(request)
         if not page_size:
             return None
@@ -181,15 +180,17 @@ class VersionBasedPagination(PageNumberPagination):
         queryset: QuerySet,
         view,
     ) -> list | None:
-        """Handle cursor pagination for database queries based on the request and
-         ordering.
+        """Handle cursor pagination for database queries based on the request and ordering.
 
-        :param self: The VersionBasedPagination instance.
-        :param request: The DRF Request object.
-        :param requested_ordering: The field by which the queryset should be ordered.
-        :param queryset: The Django QuerySet to be paginated.
-        :param view: The view instance from which this method is called.
-        :return: A paginated list of query results.
+        Args:
+            self: The VersionBasedPagination instance.
+            request: The DRF Request object.
+            requested_ordering: The field by which the queryset should be ordered.
+            queryset: The Django QuerySet to be paginated.
+            view: The view instance from which this method is called.
+
+        Returns:
+            A paginated list of query results.
         """
         if self.cursor_query_param in request.query_params:
             cursor = self.cursor_paginator.decode_cursor(request)
@@ -208,9 +209,12 @@ class VersionBasedPagination(PageNumberPagination):
     def determine_cursor_position_type(position: str) -> str:
         """Determine the type of given string.
 
-        :param position: The input cursor to classify.
-        :return: A string indicating the type of the input
-        ('int', 'date', or 'unknown').
+        Args:
+            position: The input cursor to classify.
+
+        Returns:
+            A string indicating the type of the input
+            ('int', 'date', or 'unknown').
         """
         # Check if it's an integer.
         if position.isdigit():
@@ -227,11 +231,13 @@ class VersionBasedPagination(PageNumberPagination):
 
     @staticmethod
     def generate_all_cursor_fields(cursor_fields: list[str]) -> list[str]:
-        """Generates a list of all cursor fields, including the original
-        fields and their reversed counterparts with a "-" prefix.
+        """Generates a list of all cursor fields, including the original fields and their reversed counterparts with a "-" prefix.
 
-        :param cursor_fields: A list of strings representing the original cursor fields.
-        :return: A new list containing both the original and reversed cursor fields.
+        Args:
+            cursor_fields: A list of strings representing the original cursor fields.
+
+        Returns:
+            A new list containing both the original and reversed cursor fields.
         """
         return cursor_fields + [f"-{field}" for field in cursor_fields]
 
@@ -246,9 +252,7 @@ class BigPagination(VersionBasedPagination):
 
 
 class ESCursorPagination(BasePagination):
-    """Custom pagination class to handle ES cursor pagination, based in the ES
-    search_after param.
-    """
+    """Custom pagination class to handle ES cursor pagination, based in the ES search_after param."""
 
     request = None
     es_list_instance = None
@@ -288,15 +292,17 @@ class ESCursorPagination(BasePagination):
     ) -> tuple[list[defaultdict], bool]:
         """Paginate the Elasticsearch query and retrieve the results.
 
-        :param es_list_instance: Instance of CursorESList used to execute
-        and paginate the Elasticsearch query.
-        :param request: The current DRF request object.
-        :param view: The DRF view instance.
-        :return: A two-tuple containing:
+        Args:
+            es_list_instance: Instance of CursorESList used to execute
+                and paginate the Elasticsearch query.
+            request: The current DRF request object.
+            view: The DRF view instance.
+
+        Returns:
+            A two-tuple containing:
             - A list of result items.
             - A boolean indicating whether the results came from cache.
         """
-
         self.es_list_instance = es_list_instance
         self.es_list_instance.set_pagination(
             self.cursor, settings.SEARCH_API_PAGE_SIZE
@@ -319,12 +325,14 @@ class ESCursorPagination(BasePagination):
     ) -> Response:
         """Generate a custom paginated response using the provided data.
 
-        :param data: A list of serialized result dictionaries e.
-        :param cached_response: Boolean indicating whether the response
-        originated from cache.
-        :return: A DRF Response object containing pagination metadata.
-        """
+        Args:
+            data: A list of serialized result dictionaries e.
+            cached_response: Boolean indicating whether the response
+                originated from cache.
 
+        Returns:
+            A DRF Response object containing pagination metadata.
+        """
         base_response = {
             "count": self.get_results_count(),
             "next": self.get_next_link(cached_response),
@@ -338,9 +346,7 @@ class ESCursorPagination(BasePagination):
         return Response(base_response)
 
     def get_next_link(self, cached_response: bool) -> str | None:
-        """Constructs the URL for the next page based on the current page's
-        last item.
-        """
+        """Constructs the URL for the next page based on the current page's last item."""
         search_after_sort_key = (
             self.es_list_instance.get_search_after_sort_key(cached_response)
         )
@@ -359,9 +365,7 @@ class ESCursorPagination(BasePagination):
         return self.encode_cursor(cursor)
 
     def get_previous_link(self, cached_response: bool) -> str | None:
-        """Constructs the URL for the next page based on the current page's
-        last item.
-        """
+        """Constructs the URL for the next page based on the current page's last item."""
         reverse_search_after_sort_key = (
             self.es_list_instance.get_reverse_search_after_sort_key(
                 cached_response
@@ -383,7 +387,6 @@ class ESCursorPagination(BasePagination):
 
     def decode_cursor(self, request: Request) -> ESCursor | None:
         """Given a request with a cursor, return a `ESCursor` instance."""
-
         encoded = request.query_params.get(self.cursor_query_param)
         if encoded is None:
             return None
@@ -437,13 +440,11 @@ class ESCursorPagination(BasePagination):
         )
 
     def get_results_count(self) -> int:
-        """Provides the count of results based on either the main query count
-         hits or the cardinality query, if the results hits exceed the
-         ELASTICSEARCH_MAX_RESULT_COUNT.
+        """Provides the count of results based on either the main query count hits or the cardinality query, if the results hits exceed the ELASTICSEARCH_MAX_RESULT_COUNT.
 
-        :return: An integer representing the number of results matching the query.
+        Returns:
+            An integer representing the number of results matching the query.
         """
-
         approximate_count = (
             self.results_count_approximate.aggregations.unique_documents.value
         )
@@ -456,16 +457,15 @@ class ESCursorPagination(BasePagination):
 
     def get_child_results_count(self) -> int:
         """Provides the count of child documents based on a cardinality query.
-        :return: An integer representing the number of child documents
-        matching the query.
-        """
 
+        Returns:
+            An integer representing the number of child documents
+            matching the query.
+        """
         return self.child_results_count.aggregations.unique_documents.value
 
     def has_next(self) -> bool:
-        """Determines if there is a next page based on the search_after key
-        and results count.
-        """
+        """Determines if there is a next page based on the search_after key and results count."""
         if not self.cursor or not self.cursor.reverse:
             # If this is the first page or if going forward, check if the
             # number of results on the page exceeds the page size.
@@ -476,9 +476,7 @@ class ESCursorPagination(BasePagination):
         return True
 
     def has_prev(self) -> bool:
-        """Determines if there is a next page based on the search_after key
-        and results count.
-        """
+        """Determines if there is a next page based on the search_after key and results count."""
         # Check if it's the first page or if there are no results on the page.
         if self.cursor is None:
             return False

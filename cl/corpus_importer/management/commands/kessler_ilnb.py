@@ -30,7 +30,7 @@ TAG_FINALS = "ILNB-KESSLER-FINAL"
 
 
 def get_dockets(options):
-    """Download the dockets described in the CSV"""
+    """Download the dockets described in the CSV."""
     f = options["file"]
     reader = csv.DictReader(f)
     q = options["queue"]

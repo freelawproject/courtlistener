@@ -87,9 +87,7 @@ def new_homepage(request: HttpRequest) -> HttpResponse:
 
 @never_cache
 def home_router(request: HttpRequest) -> HttpResponse:
-    """
-    This is a router view to determine which view to use for a given request depending
-    on the waffle flag `use_new_design`.
+    """This is a router view to determine which view to use for a given request depending on the waffle flag `use_new_design`.
 
     - When the flag is inactive, we use the legacy `show_results` view as-is.
     - When the flag is active, we determine the view based on request params/method.
@@ -106,8 +104,8 @@ def home_router(request: HttpRequest) -> HttpResponse:
 @never_cache
 @ratelimit_deny_list
 def show_results(request: HttpRequest) -> HttpResponse:
-    """
-    This view can vary significantly, depending on how it is called:
+    """This view can vary significantly, depending on how it is called.
+
      - In its most simple form, it is called via GET and without any
        parameters.
         --> This loads the homepage.
@@ -362,9 +360,13 @@ def advanced(request: HttpRequest, search_type: str) -> HttpResponse:
 
 @waffle_flag("parenthetical-search")
 def es_search(request: HttpRequest) -> HttpResponse:
-    """Display elasticsearch search page based on type passed as url param
-    :param request: HttpRequest object
-    :return: HttpResponse
+    """Display elasticsearch search page based on type passed as url param.
+
+    Args:
+        request: HttpRequest object
+
+    Returns:
+        HttpResponse.
     """
     render_dict: dict[str, Any] = {"private": False}
     courts = Court.objects.filter(in_use=True)

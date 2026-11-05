@@ -32,7 +32,7 @@ logger = logging.getLogger(__name__)
 
 
 async def about(request: HttpRequest) -> HttpResponse:
-    """Loads the about page"""
+    """Loads the about page."""
     return TemplateResponse(request, "about.html", {"private": False})
 
 
@@ -49,14 +49,17 @@ async def broken_email_help(request: HttpRequest) -> HttpResponse:
 
 
 async def get_coverage_data_fds(bust_cache: bool = False) -> dict[str, int]:
-    """Get stats on the disclosure data
+    """Get stats on the disclosure data.
 
     Attempt the cache if possible.
 
-    :param bust_cache: If True, skip the cache and recompute fresh counts,
-        e.g. when a caller's own cache was just busted and needs this data
-        to actually be current rather than up to a week stale.
-    :return: A dict mapping item types to their counts.
+    Args:
+        bust_cache: If True, skip the cache and recompute fresh counts,
+            e.g. when a caller's own cache was just busted and needs this data
+            to actually be current rather than up to a week stale.
+
+    Returns:
+        A dict mapping item types to their counts.
     """
     coverage_key = "coverage-data.fd3"
     coverage_data = None if bust_cache else await cache.aget(coverage_key)
@@ -89,9 +92,7 @@ async def contact(
     template_data: dict[str, ContactForm | str | bool] | None = None,
     initial: dict[str, str] | None = None,
 ) -> HttpResponse:
-    """This is a fairly run-of-the-mill contact form, except that it can be
-    overridden in various ways so that its logic can be called from other
-    functions.
+    """This is a fairly run-of-the-mill contact form, except that it can be overridden in various ways so that its logic can be called from other functions.
 
     We also use a field called phone_number in place of the subject field to
     defeat spam.

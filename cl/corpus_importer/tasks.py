@@ -247,12 +247,15 @@ def generate_ia_json(
     d_pk: int,
     database: str = "default",
 ) -> tuple[Docket, str]:
-    """Generate JSON for upload to Internet Archive
+    """Generate JSON for upload to Internet Archive.
 
-    :param d_pk: The PK of the docket to generate JSON for
-    :param database: The name of the database to use for the queries
-    :return: A tuple of the docket object requested and a string of json data
-    to upload.
+    Args:
+        d_pk: The PK of the docket to generate JSON for
+        database: The name of the database to use for the queries
+
+    Returns:
+        A tuple of the docket object requested and a string of json data
+        to upload.
     """
     # This is a pretty highly optimized query that minimizes the hits to the DB
     # when generating a docket JSON rendering, regardless of how many related
@@ -329,9 +332,10 @@ def generate_ia_json(
 def save_ia_docket_to_disk(self, d_pk: int, output_directory: str) -> None:
     """For each docket given, save it to disk.
 
-    :param self: The celery task
-    :param d_pk: The PK of the docket to serialize to disk
-    :param output_directory: The location to save the docket's JSON
+    Args:
+        self: The celery task
+        d_pk: The PK of the docket to serialize to disk
+        output_directory: The location to save the docket's JSON
     """
     _, j = generate_ia_json(d_pk)
     with open(os.path.join(output_directory, f"{d_pk}.json"), "w") as f:
@@ -340,7 +344,7 @@ def save_ia_docket_to_disk(self, d_pk: int, output_directory: str) -> None:
 
 @app.task(bind=True, ignore_result=True)
 def upload_recap_json(self, pk: int, database: str = "default") -> None:
-    """Make a JSON object for a RECAP docket and upload it to IA"""
+    """Make a JSON object for a RECAP docket and upload it to IA."""
     d, json_str = generate_ia_json(pk, database=database)
 
     file_name = get_docket_filename(d.court_id, d.pacer_case_id, "json")
@@ -448,14 +452,17 @@ async def get_and_save_free_document_report_base(
 ) -> tuple[int, int]:
     """Download the Free document report and save it to the DB.
 
-    :param court_id: A pacer court id.
-    :param start: a date object representing the first day to get results.
-    :param end: a date object representing the last day to get results.
-    :param log_id: a PACERFreeDocumentLog object id
-    :param day_span: how many days each PACER sub-query should cover. Smaller
-    values produce more, smaller requests, which is friendlier to proxy
-    read timeouts.
-    :return: The status code of the scrape
+    Args:
+        court_id: A pacer court id.
+        start: a date object representing the first day to get results.
+        end: a date object representing the last day to get results.
+        log_id: a PACERFreeDocumentLog object id
+        day_span: how many days each PACER sub-query should cover. Smaller
+            values produce more, smaller requests, which is friendlier to proxy
+            read timeouts.
+
+    Returns:
+        The status code of the scrape
     """
     msg = ""
     try:
@@ -584,13 +591,16 @@ def process_free_opinion_result(
     court_id: str,
     cnt: CaseNameTweaker,
 ) -> TaskData | None:
-    """Add data from a free opinion report to our DB
+    """Add data from a free opinion report to our DB.
 
-    :param self: The celery task
-    :param row_pk: The pk of the PACERFreeDocumentRow to get
-    :param court_id: The court where the item was found, used for throttling
-    :param cnt: A case name tweaker, since they're expensive to initialize
-    :return a dict containing the free document row, the court id, etc.
+    Args:
+        self: The celery task
+        row_pk: The pk of the PACERFreeDocumentRow to get
+        court_id: The court where the item was found, used for throttling
+        cnt: A case name tweaker, since they're expensive to initialize
+
+    Returns:
+        a dict containing the free document row, the court id, etc.
     """
     try:
         result = PACERFreeDocumentRow.objects.get(pk=row_pk)
@@ -730,20 +740,21 @@ def get_and_process_free_pdf(
     court_id: str,
     citation_queue: str | None = None,
 ) -> TaskData | None:
-    """Get a PDF from a PACERFreeDocumentRow object
+    """Get a PDF from a PACERFreeDocumentRow object.
 
-    :param self: The celery task
-    :param data: The returned results from the previous task, takes the form
-    of:
-        {'result': <PACERFreeDocumentRow> object,
-         'rd_pk': rd.pk,
-         'pacer_court_id': result.court_id,
-         'skip_pdf_download': bool}
-    :param row_pk: The PACERFreeDocumentRow operate on
-    :param court_id: The court_id (used for throttling).
-    :param citation_queue: Celery queue for the citation-extraction task the
-    RECAPDocument post_save signal enqueues after text extraction. Lets batch
-    jobs keep that work off the default queue.
+    Args:
+        self: The celery task
+        data: The returned results from the previous task, takes the form
+            of:
+            {'result': <PACERFreeDocumentRow> object,
+             'rd_pk': rd.pk,
+             'pacer_court_id': result.court_id,
+             'skip_pdf_download': bool}
+        row_pk: The PACERFreeDocumentRow operate on
+        court_id: The court_id (used for throttling).
+        citation_queue: Celery queue for the citation-extraction task the
+            RECAPDocument post_save signal enqueues after text extraction. Lets batch
+            jobs keep that work off the default queue.
     """
     if data is None:
         return None
@@ -915,7 +926,7 @@ def upload_to_ia(
     media_type: str,
     description: str,
 ) -> list[requests.Response] | None:
-    """Upload an item and its files to the Internet Archive
+    """Upload an item and its files to the Internet Archive.
 
     On the Internet Archive there are Items and files. Items have a global
     identifier, and files go inside the item:
@@ -928,24 +939,26 @@ def upload_to_ia(
     maximize the number of files uploaded to an Item at a time, rather
     than uploading each file in a separate go.
 
-    :param self: The celery task
-    :param identifier: The global identifier within IA for the item you wish to
-    work with.
-    :param files: This is a weird parameter from the IA library. It can accept:
-     - str: A path to the file to upload
-     - list: A list of paths to files or of file objects
-     - dict: A filename to file object/path mapping. It's unclear if a list of
-       these can be provided as an argument!
-    :param title: The title of the item in IA
-    :param collection: The collection to add the item to in IA
-    :param court_id: The court ID info for the item
-    :param source_url: A URL link where the item can found
-    :param media_type: The IA mediatype value for the item
-    :param description: A description of the item
+    Args:
+        self: The celery task
+        identifier: The global identifier within IA for the item you wish to
+            work with.
+        files: This is a weird parameter from the IA library. It can accept:
+            - str: A path to the file to upload
+            - list: A list of paths to files or of file objects
+            - dict: A filename to file object/path mapping. It's unclear if a list of
+            these can be provided as an argument!
+        title: The title of the item in IA
+        collection: The collection to add the item to in IA
+        court_id: The court ID info for the item
+        source_url: A URL link where the item can found
+        media_type: The IA mediatype value for the item
+        description: A description of the item
 
-    :rtype: list or None
-    :returns: List of response objects, one per file, or None if an error
-    occurred.
+    Returns:
+        List of response objects, one per file, or None if an error
+        occurred.
+        list or None
     """
     try:
         # Before pushing files, check if the endpoint is overloaded. This is
@@ -1051,11 +1064,13 @@ def delete_pacer_row(data: TaskData, pk: int) -> list[int]:
 def make_fjc_idb_lookup_params(
     item: FjcIntegratedDatabase,
 ) -> dict[str, str | None]:
-    """Given an IDB row, generate good params for looking up that item in the
-    PossibleCaseNumberApi.
+    """Given an IDB row, generate good params for looking up that item in the PossibleCaseNumberApi.
 
-    :param item: The FjcIntegratedDatabase row you wish to work with.
-    :returns: A dict with params you can pass to get_pacer_case_id_and_title.
+    Args:
+        item: The FjcIntegratedDatabase row you wish to work with.
+
+    Returns:
+        A dict with params you can pass to get_pacer_case_id_and_title.
     """
     params = {
         "office_number": item.office if item.office else None,
@@ -1129,8 +1144,9 @@ async def get_pacer_case_id_and_title_base(
     office_number: str | None = None,
     docket_number_letters: str | None = None,
 ) -> TaskData | None:
-    """Get the pacer_case_id and title values for a district court docket. Use
-    heuristics to disambiguate the results.
+    """Get the pacer_case_id and title values for a district court docket.
+
+    Use heuristics to disambiguate the results.
 
     office_number and docket_number_letters are only needed when they are not
     already part of the docket_number passed in. Multiple parameters are needed
@@ -1138,28 +1154,31 @@ async def get_pacer_case_id_and_title_base(
     have this data all separated out, so it helps not to try to recreate docket
     numbers from data that comes all pulled apart.
 
-    :param pass_through: This data will be passed through as a key to the
-    returned dict for downstream tasks to receive.
-    :param docket_number: The docket number to look up. This is a flexible
-    field that accepts a variety of docket number styles.
-    :param court_id: The CourtListener court ID for the docket number
-    :param session_data: A SessionData object containing the session's cookies
-    and proxy.
-    :param user_pk: The PK of a user making the request. This can be provided
-    instead of the cookies parameter. If so, this will get the user's cookies
-    from redis instead of passing them in as an argument.
-    :param case_name: The case name to use for disambiguation. Disambiguation
-    is done in Juriscraper using edit distance.
-    :param office_number: The number (or letter) where the case took place.
-    Typically, this is in the beginning of the docket number before the colon.
-    This will be used for disambiguation. If you passed it as part of the
-    docket number, it is not needed here.
-    :param docket_number_letters: These are the letters, (cv, cr, md, etc.)
-    that may appear in a docket number. This is used for disambiguation. If
-    you passed these letters in the docket number, you do not need to pass
-    these letters again here.
-    :return: The dict formed by the PossibleCaseNumberApi lookup if a good
-    value is identified, else None. The dict takes the form of:
+    Args:
+        pass_through: This data will be passed through as a key to the
+            returned dict for downstream tasks to receive.
+        docket_number: The docket number to look up. This is a flexible
+            field that accepts a variety of docket number styles.
+        court_id: The CourtListener court ID for the docket number
+        session_data: A SessionData object containing the session's cookies
+            and proxy.
+        user_pk: The PK of a user making the request. This can be provided
+            instead of the cookies parameter. If so, this will get the user's cookies
+            from redis instead of passing them in as an argument.
+        case_name: The case name to use for disambiguation. Disambiguation
+            is done in Juriscraper using edit distance.
+        office_number: The number (or letter) where the case took place.
+            Typically, this is in the beginning of the docket number before the colon.
+            This will be used for disambiguation. If you passed it as part of the
+            docket number, it is not needed here.
+        docket_number_letters: These are the letters, (cv, cr, md, etc.)
+            that may appear in a docket number. This is used for disambiguation. If
+            you passed these letters in the docket number, you do not need to pass
+            these letters again here.
+
+    Returns:
+        The dict formed by the PossibleCaseNumberApi lookup if a good
+        value is identified, else None. The dict takes the form of:
         {
             'docket_number': force_unicode(node.xpath('./@number')[0]),
             'pacer_case_id': force_unicode(node.xpath('./@id')[0]),
@@ -1248,17 +1267,20 @@ async def do_case_query_by_pacer_case_id_base(
     session_data: SessionData,
     tag_names: list[str] | None = None,
 ) -> TaskData | None:
-    """Run a case query (iquery.pl) query on a case and save the data
+    """Run a case query (iquery.pl) query on a case and save the data.
 
-    :param data: A dict containing at least the following: {
-        'pacer_case_id': The internal pacer case ID for the item.
-    }
-    :param court_id: A courtlistener court ID
-    :param session_data: A SessionData object containing the session's cookies
-    and proxy.
-    :param tag_names: A list of tag names to associate with the docket when
-    saving it in the DB.
-    :return: A dict with the pacer_case_id and docket_pk values.
+    Args:
+        data: A dict containing at least the following: {
+            'pacer_case_id': The internal pacer case ID for the item.
+            }
+        court_id: A courtlistener court ID
+        session_data: A SessionData object containing the session's cookies
+            and proxy.
+        tag_names: A list of tag names to associate with the docket when
+            saving it in the DB.
+
+    Returns:
+        A dict with the pacer_case_id and docket_pk values.
     """
     if data is None:
         logger.info("Empty data argument. Exiting.")
@@ -1339,12 +1361,15 @@ def filter_docket_by_tags(
     This is useful for if you're running a bulk download a second time and want
     to avoid downloading items you already purchased in the previous run.
 
-    :param self: The celery task
-    :param data: The data from the previous task in the chain
-    :param tags: A list of tag names.
-    :param court_id: The CL court ID for the item.
-    :return: None if a tagged docket is found, else passes through the data
-    parameter.
+    Args:
+        self: The celery task
+        data: The data from the previous task in the chain
+        tags: A list of tag names.
+        court_id: The CL court ID for the item.
+
+    Returns:
+        None if a tagged docket is found, else passes through the data
+        parameter.
     """
     if data is None:
         logger.info("Empty data argument. Terminating chains and exiting.")
@@ -1376,11 +1401,13 @@ async def query_case_query_report(
 ) -> tuple[dict[str, Any], str]:
     """Query the iquery page for a given PACER case ID.
 
-    :param court_id: A CL court ID where we'll look things up.
-    :param pacer_case_id: The Pacer Case ID to lookup.
-    :return: A two tuple, the report data and the report HTML text.
-    """
+    Args:
+        court_id: A CL court ID where we'll look things up.
+        pacer_case_id: The Pacer Case ID to lookup.
 
+    Returns:
+        A two tuple, the report data and the report HTML text.
+    """
     session_data = await get_or_cache_pacer_cookies(
         "pacer_scraper",
         settings.PACER_USERNAME,
@@ -1408,22 +1435,23 @@ def make_docket_by_iquery_base(
     log_results_redis: bool = False,
     skip_iquery_sweep: bool = False,
 ) -> int | None:
-    """
-    Using the iquery endpoint, create or update a docket
+    """Using the iquery endpoint, create or update a docket.
 
-    :param self: The celery task
-    :param court_id: A CL court ID where we'll look things up
-    :param pacer_case_id: The pacer_case_id to use to look up the case
-    :param using: The database to use for the docket lookup
-    :param tag_names: A list of strings that should be added to the docket as
-    tags
-    :param log_results_redis: Log results in redis for the ready mix project
-    :param skip_iquery_sweep: Whether to avoid triggering the iquery sweep
-    signal. Useful for ignoring reports added by the probe daemon or the iquery
-    sweep itself.
-    :return: None if failed, else the ID of the created/updated docket
-    """
+    Args:
+        self: The celery task
+        court_id: A CL court ID where we'll look things up
+        pacer_case_id: The pacer_case_id to use to look up the case
+        using: The database to use for the docket lookup
+        tag_names: A list of strings that should be added to the docket as
+            tags
+        log_results_redis: Log results in redis for the ready mix project
+        skip_iquery_sweep: Whether to avoid triggering the iquery sweep
+            signal. Useful for ignoring reports added by the probe daemon or the iquery
+            sweep itself.
 
+    Returns:
+        None if failed, else the ID of the created/updated docket
+    """
     try:
         report_data, report_text = async_to_sync(query_case_query_report)(
             court_id, pacer_case_id
@@ -1499,24 +1527,23 @@ def make_docket_by_iquery(
     log_results_redis: bool = False,
     skip_iquery_sweep: bool = True,
 ) -> int | None:
-    """
-    make_docket_by_iquery_base wrapper without throttling for its use in bulk
-    imports to avoid Celery runaways when used in combination with
-    CeleryThrottle.
+    """make_docket_by_iquery_base wrapper without throttling for its use in bulk imports to avoid Celery runaways when used in combination with CeleryThrottle.
 
-    :param self: The celery task
-    :param court_id: A CL court ID where we'll look things up
-    :param pacer_case_id: The pacer_case_id to use to look up the case
-    :param using: The database to use for the docket lookup
-    :param tag_names: A list of strings that should be added to the docket as
-    tags
-    :param log_results_redis: Log results in redis for the ready mix project
-    :param skip_iquery_sweep:  Whether to avoid triggering the iquery sweep
-    signal. Useful for ignoring reports added by the probe daemon or the iquery
-    sweep itself.
-    :return: None if failed, else the ID of the created/updated docket
-    """
+    Args:
+        self: The celery task
+        court_id: A CL court ID where we'll look things up
+        pacer_case_id: The pacer_case_id to use to look up the case
+        using: The database to use for the docket lookup
+        tag_names: A list of strings that should be added to the docket as
+            tags
+        log_results_redis: Log results in redis for the ready mix project
+        skip_iquery_sweep: Whether to avoid triggering the iquery sweep
+            signal. Useful for ignoring reports added by the probe daemon or the iquery
+            sweep itself.
 
+    Returns:
+        None if failed, else the ID of the created/updated docket
+    """
     return make_docket_by_iquery_base(
         self,
         court_id,
@@ -1546,23 +1573,23 @@ def make_docket_by_iquery_sweep(
     log_results_redis: bool = False,
     skip_iquery_sweep: bool = False,
 ) -> int | None:
-    """
-     make_docket_by_iquery_base wrapper with court throttling for its use in
-     the iquery sweep signal.
+    """make_docket_by_iquery_base wrapper with court throttling for its use in the iquery sweep signal.
 
-    :param self: The celery task
-    :param court_id: A CL court ID where we'll look things up
-    :param pacer_case_id: The pacer_case_id to use to look up the case
-    :param using: The database to use for the docket lookup
-    :param tag_names: A list of strings that should be added to the docket as
-    tags
-    :param log_results_redis: Log results in redis for the ready mix project
-    :param skip_iquery_sweep: Whether to avoid triggering the iquery sweep
-    signal. Useful for ignoring reports added by the probe daemon or the iquery
-    sweep itself.
-    :return: None if failed, else the ID of the created/updated docket
-    """
+    Args:
+        self: The celery task
+        court_id: A CL court ID where we'll look things up
+        pacer_case_id: The pacer_case_id to use to look up the case
+        using: The database to use for the docket lookup
+        tag_names: A list of strings that should be added to the docket as
+            tags
+        log_results_redis: Log results in redis for the ready mix project
+        skip_iquery_sweep: Whether to avoid triggering the iquery sweep
+            signal. Useful for ignoring reports added by the probe daemon or the iquery
+            sweep itself.
 
+    Returns:
+        None if failed, else the ID of the created/updated docket
+    """
     return make_docket_by_iquery_base(
         self,
         court_id,
@@ -1578,15 +1605,16 @@ def make_docket_by_iquery_sweep(
 def query_iquery_page(
     court_id: str, pacer_case_id: str
 ) -> None | tuple[dict[str, Any], str]:
-    """A small wrapper to query the iquery page for a given PACER case ID to
-    support retries via the @retry decorator in case of a failure.
+    """A small wrapper to query the iquery page for a given PACER case ID to support retries via the @retry decorator in case of a failure.
 
-    :param court_id: A CL court ID where we'll look things up.
-    :param pacer_case_id: The Pacer Case ID to lookup.
-    :return: A two tuple, False and None if not a valid report or the report data
-    and the report HTML text.
+    Args:
+        court_id: A CL court ID where we'll look things up.
+        pacer_case_id: The Pacer Case ID to lookup.
+
+    Returns:
+        A two tuple, False and None if not a valid report or the report data
+        and the report HTML text.
     """
-
     report_data, report_text = async_to_sync(query_case_query_report)(
         court_id, pacer_case_id
     )
@@ -1610,16 +1638,13 @@ def probe_or_scrape_iquery_pages(
     latest_know_case_id_db: str | None,
     testing: bool = False,
 ) -> None:
-    """
-    Using the iquery endpoint, to perform forward probing and retrieve the
-    highest watermark we can scrape. Or perform a fixed sweep in case the
-    court hasn't caught up yet.
+    """Using the iquery endpoint, to perform forward probing and retrieve the highest watermark we can scrape. Or perform a fixed sweep in case the court hasn't caught up yet.
 
-    :param self: The celery task
-    :param court_id: A CL court ID where we'll look things up.
-    :param latest_know_case_id_db: The latest known pacer case ID from DB if available.
-    :param testing: A boolean indicating whether this was called from tests.
-    :return: None
+    Args:
+        self: The celery task
+        court_id: A CL court ID where we'll look things up.
+        latest_know_case_id_db: The latest known pacer case ID from DB if available.
+        testing: A boolean indicating whether this was called from tests.
     """
     from cl.corpus_importer.signals import (
         update_latest_case_id_and_schedule_iquery_sweep,
@@ -1893,24 +1918,26 @@ async def get_docket_by_pacer_case_id_base(
     tag_names: str | None = None,
     **kwargs,
 ) -> TaskData | None:
-    """Get a docket by PACER case id, CL court ID, and a collection of kwargs
-    that can be passed to the DocketReport query.
+    """Get a docket by PACER case id, CL court ID, and a collection of kwargs that can be passed to the DocketReport query.
 
     For details of acceptable parameters, see DocketReport.query()
 
-    :param data: A dict containing:
-        Required: 'pacer_case_id': The internal case ID of the item in PACER.
-        Optional: 'docket_pk': The ID of the docket to work on to avoid lookups
-                  if it's known in advance.
-    :param court_id: A courtlistener court ID.
-    :param session_data: A SessionData object containing the session's cookies
-    and proxy.
-    :param docket_pk: The PK of the docket to update. Can also be provided in
-    the data param, above.
-    :param tag_names: A list of tag names that should be stored with the item
-    in the DB.
-    :param kwargs: A variety of keyword args to pass to DocketReport.query().
-    :return: A dict indicating if we need to update the search engine.
+    Args:
+        data: A dict containing:
+            Required: 'pacer_case_id': The internal case ID of the item in PACER.
+            Optional: 'docket_pk': The ID of the docket to work on to avoid lookups
+                      if it's known in advance.
+        court_id: A courtlistener court ID.
+        session_data: A SessionData object containing the session's cookies
+            and proxy.
+        docket_pk: The PK of the docket to update. Can also be provided in
+            the data param, above.
+        tag_names: A list of tag names that should be stored with the item
+            in the DB.
+        kwargs: A variety of keyword args to pass to DocketReport.query().
+
+    Returns:
+        A dict indicating if we need to update the search engine.
     """
     if data is None:
         logger.info("Empty data argument. Exiting.")
@@ -2021,18 +2048,18 @@ async def get_appellate_docket_by_docket_number_base(
     tag_names: list[str] | None = None,
     **kwargs,
 ) -> TaskData | None:
-    """Get a docket by docket number, CL court ID, and a collection of kwargs
-    that can be passed to the DocketReport query.
+    """Get a docket by docket number, CL court ID, and a collection of kwargs that can be passed to the DocketReport query.
 
     For details of acceptable parameters, see DocketReport.query()
 
-    :param docket_number: The docket number of the case.
-    :param court_id: A courtlistener/PACER appellate court ID.
-    :param session_data: A SessionData object containing the session's cookies
-    and proxy.
-    :param tag_names: The tag name that should be stored with the item in the
-    DB, if desired.
-    :param kwargs: A variety of keyword args to pass to DocketReport.query().
+    Args:
+        docket_number: The docket number of the case.
+        court_id: A courtlistener/PACER appellate court ID.
+        session_data: A SessionData object containing the session's cookies
+            and proxy.
+        tag_names: The tag name that should be stored with the item in the
+            DB, if desired.
+        kwargs: A variety of keyword args to pass to DocketReport.query().
     """
     s = ProxyPacerSession(
         cookies=session_data.cookies, proxy=session_data.proxy_address
@@ -2096,10 +2123,13 @@ async def get_att_report_by_rd(
 ) -> ACMSAttachmentPage | AppellateAttachmentPage | AttachmentPage | None:
     """Method to get the attachment report for the item in PACER.
 
-    :param rd: The RECAPDocument object to use as a source.
-    :param session_data: A SessionData object containing the session's cookies
-    and proxy.
-    :return: The attachment report populated with the results
+    Args:
+        rd: The RECAPDocument object to use as a source.
+        session_data: A SessionData object containing the session's cookies
+            and proxy.
+
+    Returns:
+        The attachment report populated with the results
     """
     if not rd.pacer_doc_id:
         return None
@@ -2146,11 +2176,14 @@ def get_attachment_page_by_rd(
 ) -> ACMSAttachmentPage | AppellateAttachmentPage | AttachmentPage | None:
     """Get the attachment page for the item in PACER.
 
-    :param self: The celery task
-    :param rd_pk: The PK of a RECAPDocument object to use as a source.
-    :param session_data: A SessionData object containing the session's cookies
-    and proxy.
-    :return: The attachment report populated with the results
+    Args:
+        self: The celery task
+        rd_pk: The PK of a RECAPDocument object to use as a source.
+        session_data: A SessionData object containing the session's cookies
+            and proxy.
+
+    Returns:
+        The attachment report populated with the results
     """
     rd = RECAPDocument.objects.get(pk=rd_pk)
     if not rd.pacer_doc_id:
@@ -2216,15 +2249,16 @@ async def get_bankr_claims_registry_base(
     session_data: SessionData,
     tag_names: list[str] | None = None,
 ) -> TaskData | None:
-    """Get the bankruptcy claims registry for a docket
+    """Get the bankruptcy claims registry for a docket.
 
-    :param data: A dict of data containing, primarily, a key to 'docket_pk' for
-    the docket for which we want to get the registry. Other keys will be
-    ignored.
-    :param session_data: A SessionData object containing the session's cookies
-    and proxy.
-    :param tag_names: A list of tag names that should be stored with the claims
-    registry information in the DB.
+    Args:
+        data: A dict of data containing, primarily, a key to 'docket_pk' for
+            the docket for which we want to get the registry. Other keys will be
+            ignored.
+        session_data: A SessionData object containing the session's cookies
+            and proxy.
+        tag_names: A list of tag names that should be stored with the claims
+            registry information in the DB.
     """
     if data is None or data.get("docket_pk") is None:
         logger.warning("Empty data argument or parameter. Exiting.")
@@ -2280,14 +2314,16 @@ def create_attachment_pq(
     Note that the PQ returned hasn't been persisted in the database.
     It must be saved in a subsequent step.
 
-    :param rd_pk: The pk of the RECAPDocument.
-    :param user_pk: The pk of the User uploading the attachment.
-    :param source: The PROCESSING_QUEUE_SOURCE value to tag this PQ with.
-    Defaults to UNKNOWN since this helper is also used by internal
-    management-command scripts that don't have a more specific source.
-    :return: A ProcessingQueue instance for the attachment upload.
-    """
+    Args:
+        rd_pk: The pk of the RECAPDocument.
+        user_pk: The pk of the User uploading the attachment.
+        source: The PROCESSING_QUEUE_SOURCE value to tag this PQ with.
+            Defaults to UNKNOWN since this helper is also used by internal
+            management-command scripts that don't have a more specific source.
 
+    Returns:
+        A ProcessingQueue instance for the attachment upload.
+    """
     rd = RECAPDocument.objects.get(pk=rd_pk)
     user = User.objects.get(pk=user_pk)
     pq = ProcessingQueue(
@@ -2313,16 +2349,18 @@ def save_attachment_pq_object(
     This is a helper shim to convert attachment page results into processing
     queue objects that can be processed by our standard pipeline.
 
-    :param self: The celery task
-    :param attachment_report: An AttachmentPage object that's already queried
-    a page and populated its data attribute.
-    :param rd_pk: The RECAP document that the attachment page is associated
-    with
-    :param user_pk: The user to associate with the ProcessingQueue object when
-    it's created.
-    :return: The pk of the ProcessingQueue object that's created.
-    """
+    Args:
+        self: The celery task
+        attachment_report: An AttachmentPage object that's already queried
+            a page and populated its data attribute.
+        rd_pk: The RECAP document that the attachment page is associated
+            with
+        user_pk: The user to associate with the ProcessingQueue object when
+            it's created.
 
+    Returns:
+        The pk of the ProcessingQueue object that's created.
+    """
     pq = create_attachment_pq(
         rd_pk,
         user_pk,
@@ -2339,17 +2377,18 @@ def save_attachment_pq_from_text(
     user_pk: int,
     att_report_text: str,
 ) -> int:
-    """Create an item in the processing queue for an attachment page from the
-    att report text.
+    """Create an item in the processing queue for an attachment page from the att report text.
 
-    :param rd_pk: The RECAP document that the attachment page is associated
-    with
-    :param user_pk: The user to associate with the ProcessingQueue object when
-    it's created.
-    :param att_report_text: The attachment page report text.
-    :return: The pk of the ProcessingQueue object that's created.
+    Args:
+        rd_pk: The RECAP document that the attachment page is associated
+            with
+        user_pk: The user to associate with the ProcessingQueue object when
+            it's created.
+        att_report_text: The attachment page report text.
+
+    Returns:
+        The pk of the ProcessingQueue object that's created.
     """
-
     pq = create_attachment_pq(
         rd_pk,
         user_pk,
@@ -2369,14 +2408,17 @@ async def download_acms_pdf_by_rd(
 ) -> tuple[Response | None, str]:
     """Download a PDF document from ACMS given its entry and document IDs.
 
-    :param court_id: The court ID,
-    :param acms_entry_id: The ACMS docket entry ID.
-    :param acms_doc_id: The ACMS document ID to download.
-    :param session_data: A SessionData object containing the session's cookies
-        and proxy information.
-    :return: A two-tuple of requests.Response object usually containing a PDF,
-    or None if that wasn't possible, and a string representing the error if
-    there was one.
+    Args:
+        court_id: The court ID,
+        acms_entry_id: The ACMS docket entry ID.
+        acms_doc_id: The ACMS document ID to download.
+        session_data: A SessionData object containing the session's cookies
+            and proxy information.
+
+    Returns:
+        A two-tuple of requests.Response object usually containing a PDF,
+        or None if that wasn't possible, and a string representing the error if
+        there was one.
     """
     pacer_court_id = map_cl_to_pacer_id(court_id)
     async with ProxyPacerSession(
@@ -2394,20 +2436,22 @@ async def download_pacer_pdf_by_rd(
     magic_number: str | None = None,
     de_seq_num: int | None = None,
 ) -> tuple[Response | None, str]:
-    """Using a RECAPDocument object ID, download the PDF if it doesn't already
-    exist.
+    """Using a RECAPDocument object ID, download the PDF if it doesn't already exist.
 
-    :param rd_pk: The PK of the RECAPDocument to download
-    :param pacer_case_id: The internal PACER case ID number
-    :param pacer_doc_id: The internal PACER document ID to download
-    :param session_data: A SessionData object containing the session's cookies
-    and proxy.
-    :param magic_number: The magic number to fetch PACER documents for free
-    this is an optional field, only used by RECAP Email documents
-    :param de_seq_num: The docket entry's PACER sequence number, if known.
-    :return: A two-tuple of httpx.Response object usually containing a PDF,
-    or None if that wasn't possible, and a string representing the error if
-    there was one.
+    Args:
+        rd_pk: The PK of the RECAPDocument to download
+        pacer_case_id: The internal PACER case ID number
+        pacer_doc_id: The internal PACER document ID to download
+        session_data: A SessionData object containing the session's cookies
+            and proxy.
+        magic_number: The magic number to fetch PACER documents for free
+            this is an optional field, only used by RECAP Email documents
+        de_seq_num: The docket entry's PACER sequence number, if known.
+
+    Returns:
+        A two-tuple of httpx.Response object usually containing a PDF,
+        or None if that wasn't possible, and a string representing the error if
+        there was one.
     """
     rd = await RECAPDocument.objects.aget(pk=rd_pk)
     de = await DocketEntry.objects.aget(id=rd.docket_entry_id)
@@ -2452,19 +2496,22 @@ async def download_pdf_by_magic_number(
 ) -> tuple[Response | None, str]:
     """Small wrapper to fetch a PACER PDF document by magic number.
 
-    :param court_id: A CourtListener court ID to query the free document.
-    :param pacer_doc_id: The pacer_doc_id to query the free document.
-    :param pacer_case_id: The pacer_case_id to query the free document.
-    :param session_data: A SessionData object containing the session's cookies
-    and proxy.
-    :param magic_number: The magic number to fetch PACER documents for free.
-    :param appellate: Whether the download belongs to an appellate court.
-    :param de_seq_num: The sequential number assigned by the PACER system to
-     identify the docket entry within a case.
-    :param acms: Whether the download belongs to an ACMS notification.
-    :return: A two-tuple of httpx.Response object usually containing a PDF,
-    or None if that wasn't possible, and a string representing the error if
-    there was one.
+    Args:
+        court_id: A CourtListener court ID to query the free document.
+        pacer_doc_id: The pacer_doc_id to query the free document.
+        pacer_case_id: The pacer_case_id to query the free document.
+        session_data: A SessionData object containing the session's cookies
+            and proxy.
+        magic_number: The magic number to fetch PACER documents for free.
+        appellate: Whether the download belongs to an appellate court.
+        de_seq_num: The sequential number assigned by the PACER system to
+            identify the docket entry within a case.
+        acms: Whether the download belongs to an ACMS notification.
+
+    Returns:
+        A two-tuple of httpx.Response object usually containing a PDF,
+        or None if that wasn't possible, and a string representing the error if
+        there was one.
     """
     async with ProxyPacerSession(
         cookies=session_data.cookies, proxy=session_data.proxy_address
@@ -2486,11 +2533,13 @@ async def get_document_number_from_confirmation_page(
 ) -> str:
     """Get the PACER document number from the PACER download confirmation page.
 
-    :param court_id: A CourtListener court ID to query the confirmation page.
-    :param pacer_doc_id: The pacer_doc_id to query the confirmation page.
-    :return: The PACER document number is available or an empty string if not.
-    """
+    Args:
+        court_id: A CourtListener court ID to query the confirmation page.
+        pacer_doc_id: The pacer_doc_id to query the confirmation page.
 
+    Returns:
+        The PACER document number is available or an empty string if not.
+    """
     recap_email_user = await User.objects.aget(username="recap-email")
     session_data = await get_or_cache_pacer_cookies(
         recap_email_user.pk, settings.PACER_USERNAME, settings.PACER_PASSWORD
@@ -2510,17 +2559,18 @@ async def get_document_number_for_appellate(
     pq: ProcessingQueue,
     acms: bool = False,
 ) -> str:
-    """A wrapper to get the PACER document number either from the download
-    confirmation page or from the PDF document.
+    """A wrapper to get the PACER document number either from the download confirmation page or from the PDF document.
 
-    :param court_id: A CourtListener court ID to query the confirmation page.
-    :param pacer_doc_id: The pacer_doc_id to query the confirmation page.
-    :param pq: The ProcessingQueue that contains the PDF document.
-    :param acms: Whether the download belongs to an ACMS notification.
-    :return: The PACER document number if available or an
-    empty string if not.
+    Args:
+        court_id: A CourtListener court ID to query the confirmation page.
+        pacer_doc_id: The pacer_doc_id to query the confirmation page.
+        pq: The ProcessingQueue that contains the PDF document.
+        acms: Whether the download belongs to an ACMS notification.
+
+    Returns:
+        The PACER document number if available or an
+        empty string if not.
     """
-
     pdf_bytes = None
     document_number = ""
 
@@ -2607,13 +2657,16 @@ async def get_document_number_for_appellate(
 
 async def is_pacer_doc_sealed(court_id: str, pacer_doc_id: str) -> bool:
     """Check if a pacer doc is sealed, querying the document in PACER.
+
     If a receipt is returned the document is not sealed, otherwise is sealed.
 
-    :param court_id: A CourtListener court ID to query the confirmation page.
-    :param pacer_doc_id: The pacer_doc_id to query the confirmation page.
-    :return: True if the document is sealed on PACER, False otherwise.
-    """
+    Args:
+        court_id: A CourtListener court ID to query the confirmation page.
+        pacer_doc_id: The pacer_doc_id to query the confirmation page.
 
+    Returns:
+        True if the document is sealed on PACER, False otherwise.
+    """
     recap_email_user = await User.objects.aget(username="recap-email")
     session_data = await get_or_cache_pacer_cookies(
         recap_email_user.pk, settings.PACER_USERNAME, settings.PACER_PASSWORD
@@ -2629,16 +2682,16 @@ async def is_pacer_doc_sealed(court_id: str, pacer_doc_id: str) -> bool:
 async def is_docket_entry_sealed(
     court_id: str, case_id: str, doc_id: str | None
 ) -> bool:
-    """Check if a docket entry is sealed, querying the download confirmation
-    page in PACER. If a receipt is returned the docket entry is not sealed,
-    otherwise is sealed.
+    """Check if a docket entry is sealed, querying the download confirmation page in PACER. If a receipt is returned the docket entry is not sealed, otherwise is sealed.
 
-    :param court_id: A CourtListener court ID to query the confirmation page.
-    :param case_id: The pacer_case_id to use to look up the case:
-    :param doc_id: The pacer_doc_id to query the confirmation page.
-    :return: True if the entry is sealed on PACER, False otherwise.
+    Args:
+        court_id: A CourtListener court ID to query the confirmation page.
+        case_id: The pacer_case_id to use to look up the case:
+        doc_id: The pacer_doc_id to query the confirmation page.
+
+    Returns:
+        True if the entry is sealed on PACER, False otherwise.
     """
-
     # If doc_id is None, it’s probably a minute entry.
     if not doc_id:
         return False
@@ -2668,21 +2721,23 @@ async def update_rd_metadata(
 ) -> tuple[bool, str]:
     """After querying PACER and downloading a document, save it to the DB.
 
-    :param rd_pk: The primary key of the RECAPDocument to work on
-    :param pdf_bytes: The byte array of the PDF.
-    :param r_msg: A message from the download function about an error that was
-    encountered.
-    :param court_id: A CourtListener court ID to use for file names.
-    :param pacer_case_id: The pacer_case_id to use in error logs.
-    :param pacer_doc_id: The pacer_doc_id to use in error logs.
-    :param document_number: The docket entry number for use in file names.
-    :param attachment_number: The attachment number (if applicable) for use in
-    file names.
-    :param omit_page_count: If true, omit requesting the page_count from doctor.
-    :return: A two-tuple of a boolean indicating success and a corresponding
-    error/success message string.
-    """
+    Args:
+        rd_pk: The primary key of the RECAPDocument to work on
+        pdf_bytes: The byte array of the PDF.
+        r_msg: A message from the download function about an error that was
+            encountered.
+        court_id: A CourtListener court ID to use for file names.
+        pacer_case_id: The pacer_case_id to use in error logs.
+        pacer_doc_id: The pacer_doc_id to use in error logs.
+        document_number: The docket entry number for use in file names.
+        attachment_number: The attachment number (if applicable) for use in
+            file names.
+        omit_page_count: If true, omit requesting the page_count from doctor.
 
+    Returns:
+        A two-tuple of a boolean indicating success and a corresponding
+        error/success message string.
+    """
     rd = await RECAPDocument.objects.aget(pk=rd_pk)
     if not pdf_bytes:
         if r_msg and "An attachment page was returned instead" in r_msg:
@@ -2729,13 +2784,13 @@ async def update_rd_metadata(
 
 
 def add_tags(rd: RECAPDocument, tag_name: str | None) -> None:
-    """Add tags to a tree of objects starting with the RECAPDocument
+    """Add tags to a tree of objects starting with the RECAPDocument.
 
     Adds the tag to the RECAPDocument, Docket Entry, and Docket.
 
-    :param rd: The RECAPDocument where we begin the chain
-    :param tag_name: The name of the tag to add
-    :return None
+    Args:
+        rd: The RECAPDocument where we begin the chain
+        tag_name: The name of the tag to add
     """
     if tag_name is not None:
         tag, _ = Tag.objects.get_or_create(name=tag_name)
@@ -2761,12 +2816,15 @@ def get_pacer_doc_by_rd(
 ) -> int | None:
     """A simple method for getting the PDF associated with a RECAPDocument.
 
-    :param self: The bound celery task
-    :param rd_pk: The PK for the RECAPDocument object
-    :param session_data: A SessionData object containing the session's cookies
-    and proxy.
-    :param tag: The name of a tag to apply to any modified items
-    :return: The RECAPDocument PK
+    Args:
+        self: The bound celery task
+        rd_pk: The PK for the RECAPDocument object
+        session_data: A SessionData object containing the session's cookies
+            and proxy.
+        tag: The name of a tag to apply to any modified items
+
+    Returns:
+        The RECAPDocument PK
     """
     rd = RECAPDocument.objects.get(pk=rd_pk)
 
@@ -2823,22 +2881,21 @@ def get_pacer_doc_by_rd_and_description(
     fallback_to_main_doc: bool = False,
     tag_name: list[str] | None = None,
 ) -> None:
-    """Using a RECAPDocument object ID and a description of a document, get the
-    document from PACER.
+    """Using a RECAPDocument object ID and a description of a document, get the document from PACER.
 
     This function was originally meant to get civil cover sheets, but can be
     repurposed as needed.
 
-    :param self: The celery task
-    :param rd_pk: The PK of a RECAPDocument object to use as a source.
-    :param description_re: A compiled regular expression to search against the
-    description provided by the attachment page.
-    :param session_data: A SessionData object containing the session's cookies
-    and proxy.
-    :param fallback_to_main_doc: Should we grab the main doc if none of the
-    attachments match the regex?
-    :param tag_name: A tag name to apply to any downloaded content.
-    :return: None
+    Args:
+        self: The celery task
+        rd_pk: The PK of a RECAPDocument object to use as a source.
+        description_re: A compiled regular expression to search against the
+            description provided by the attachment page.
+        session_data: A SessionData object containing the session's cookies
+            and proxy.
+        fallback_to_main_doc: Should we grab the main doc if none of the
+            attachments match the regex?
+        tag_name: A tag name to apply to any downloaded content.
     """
     rd = RECAPDocument.objects.get(pk=rd_pk)
     att_report = get_attachment_page_by_rd(self, rd_pk, session_data)
@@ -2954,11 +3011,12 @@ async def get_pacer_doc_id_with_show_case_doc_url_base(
     rd_pk: int,
     session_data: SessionData,
 ) -> None:
-    """use the show_case_doc URL to get pacer_doc_id values.
+    """Use the show_case_doc URL to get pacer_doc_id values.
 
-    :param rd_pk: The pk of the RECAPDocument you want to get.
-    :param session_data: A SessionData object containing the session's cookies
-    and proxy.
+    Args:
+        rd_pk: The pk of the RECAPDocument you want to get.
+        session_data: A SessionData object containing the session's cookies
+            and proxy.
     """
     rd = await RECAPDocument.objects.select_related(
         "docket_entry__docket"
@@ -2996,7 +3054,8 @@ def make_csv_file(
 ) -> None:
     """Generate a CSV based on the data of the txt files.
 
-    :return: None, The function saves a CSV file in disk.
+    Returns:
+        None, The function saves a CSV file in disk.
     """
     import pandas as pd  # Only import pandas if function is called.
 
@@ -3070,21 +3129,18 @@ async def query_and_save_list_of_creditors_base(
     i: int,
     row: dict,
 ) -> None:
-    """Query a list of creditors report from PACER, then save the report as
-    HTML and pipe-limited text files and convert them to CSVs.
+    """Query a list of creditors report from PACER, then save the report as HTML and pipe-limited text files and convert them to CSVs.
 
-    :param session_data: A SessionData object containing the session's cookies
-    and proxy.
-    :param court_id: The court_id for the bankruptcy court.
-    :param d_number_file_name: The docket number to use as file name.
-    :param docket_number: The docket number of the case.
-    :param html_file: The path to the HTML file where the report will be saved.
-    :param i: The row index of the case in the input CSV file.
-    :param row: The CSV row content.
-
-    :return: None
+    Args:
+        session_data: A SessionData object containing the session's cookies
+            and proxy.
+        court_id: The court_id for the bankruptcy court.
+        d_number_file_name: The docket number to use as file name.
+        docket_number: The docket number of the case.
+        html_file: The path to the HTML file where the report will be saved.
+        i: The row index of the case in the input CSV file.
+        row: The CSV row content.
     """
-
     async with ProxyPacerSession(
         cookies=session_data.cookies, proxy=session_data.proxy_address
     ) as s:
@@ -3234,10 +3290,13 @@ async def query_and_save_list_of_creditors_base(
     logger=logger,
 )
 def extract_recap_document_for_opinions(rd: RECAPDocument) -> HttpxResponse:
-    """Call recap-extract from doctor with retries
+    """Call recap-extract from doctor with retries.
 
-    :param rd: the recap document to extract
-    :return: Response object
+    Args:
+        rd: the recap document to extract
+
+    Returns:
+        Response object
     """
     response = async_to_sync(microservice)(
         service="recap-extract",
@@ -3255,17 +3314,20 @@ def recap_document_into_opinions(
     recap_document_id: int | None = None,
     skip_citation_finding: bool = False,
 ) -> TaskData | None:
-    """Ingest recap document into Opinions
+    """Ingest recap document into Opinions.
 
-    :param task_data: dictionary that will contain the recap_document_id,
-        if called inside a chain() on the scraper_pacer_free_opinions
-        command. This task should be chained after the PDF has
-        been downloaded from PACER
-    :param recap_document_id: The document id to inspect and import
-    :param skip_citation_finding: send true when calling from bulk work command
-        to prevent overloading the queues with single-opinion tasks
+    Args:
+        self: The bound Celery task.
+        task_data: dictionary that will contain the recap_document_id,
+            if called inside a chain() on the scraper_pacer_free_opinions
+            command. This task should be chained after the PDF has
+            been downloaded from PACER
+        recap_document_id: The document id to inspect and import
+        skip_citation_finding: send true when calling from bulk work command
+            to prevent overloading the queues with single-opinion tasks
 
-    :return: The same `task_data` that came as input
+    Returns:
+        The same `task_data` that came as input
     """
     if not recap_document_id and task_data:
         recap_document_id = task_data["rd_pk"]
@@ -3387,7 +3449,7 @@ def recap_document_into_opinions(
     retry_kwargs={"max_retries": 5},
 )
 def classify_case_name_by_llm(self, cluster_pk: int, recap_document_id: int):
-    """Use LLM to extract and verify the correct case name for an opinion ingested from Recap
+    """Use LLM to extract and verify the correct case name for an opinion ingested from Recap.
 
     This task fetches an OpinionCluster instance, extracts the first 2000 characters of the first
     related sub_opinion's text, and obtains the docket title from the associated docket
@@ -3397,11 +3459,11 @@ def classify_case_name_by_llm(self, cluster_pk: int, recap_document_id: int):
     normalized case name information. If valid, it updates the OpinionCluster object with the
     extracted case name.
 
-    :param self: The Celery task instance
-    :param cluster_pk: Primary key of the OpinionCluster object to process
-    :param recap_document_id: RECAPDocument id
+    Args:
+        self: The Celery task instance
+        cluster_pk: Primary key of the OpinionCluster object to process
+        recap_document_id: RECAPDocument id
     """
-
     # The case-name LLM call requires a funded OpenAI key. In local
     # development the dev key has no quota, so skip the call and leave the
     # scraped case name untouched. Tests (TESTING=True) still run the real
@@ -3487,11 +3549,14 @@ def classify_case_name_by_llm(self, cluster_pk: int, recap_document_id: int):
 
 
 def is_pdf(response: Response | requests.Response) -> bool:
-    """Check if an HTTP response wraps a PDF file using the
-    "Content-Type" header.
+    """Check if an HTTP response wraps a PDF file using the "Content-Type" header.
 
-    :param response: The HTTPX or requests response to check.
-    :return: Whether the response is a PDF file."""
+    Args:
+        response: The HTTPX or requests response to check.
+
+    Returns:
+        Whether the response is a PDF file.
+    """
     return (
         # HTTP header names are case-insensitive; real requests.Response
         # uses CaseInsensitiveDict, but plain dicts (e.g. in tests) don't,
@@ -3511,15 +3576,17 @@ def download_document_in_stream(
     temp_prefix: str = "scotus_",
     require_pdf: bool = True,
 ) -> Iterator[tuple[IO[bytes], str] | None]:
-    """Download a file in stream and yield a temporary file to avoid using
-    too much memory.
+    """Download a file in stream and yield a temporary file to avoid using too much memory.
 
-    :param url: The URL to download from.
-    :param identifier: An identifier for logging (docket_id, rd.pk, etc.)
-    :param temp_prefix: Prefix for the temporary file name.
-    :param require_pdf: If True, abort when Content-Type is not
-        application/pdf. Set to False to accept any file type.
-    :yields: A (NamedTemporaryFile, sha1_hex) tuple, or None if the
+    Args:
+        url: The URL to download from.
+        identifier: An identifier for logging (docket_id, rd.pk, etc.)
+        temp_prefix: Prefix for the temporary file name.
+        require_pdf: If True, abort when Content-Type is not
+            application/pdf. Set to False to accept any file type.
+
+    Yields:
+        A (NamedTemporaryFile, sha1_hex) tuple, or None if the
         download failed or the content-type check failed.
     """
 
@@ -3575,8 +3642,9 @@ def download_qp_scotus_pdf(self, docket_id: int) -> None:
     questions_presented_url, validates that the response is a PDF, and stores
     it in the questions_presented_file field.
 
-    :param: docket_id: The related Docket ID
-    :return: None
+    Args:
+        self: The bound Celery task.
+        docket_id: The related Docket ID
     """
     try:
         docket = Docket.objects.get(pk=docket_id)
@@ -3637,10 +3705,12 @@ def download_qp_scotus_pdf(self, docket_id: int) -> None:
 def enrich_scotus_attachments(docket_entries: list[dict[str, Any]]) -> None:
     """Add sequential attachment numbers and pacer_doc_id to SCOTUS attachments.
 
-    :param docket_entries: A list of docket entry dictionaries.
-    :return: None. The input list is changed in place.
-    """
+    Args:
+        docket_entries: A list of docket entry dictionaries.
 
+    Returns:
+        None. The input list is changed in place.
+    """
     for entry in docket_entries:
         attachments = entry.setdefault("attachments", [])
         main_doc_short_desc = (
@@ -3666,12 +3736,15 @@ def merge_scotus_document(
     not. Then, if the document is new or the filename has changed,
     fetch the attachment PDF, store it, and compute metadata.
 
-    :param docket_entry: The docket entry this attachment belongs to.
-    :param doc_data: The attachment data to merge.
-    :param download_file: Whether to trigger the PDF download and extraction
-    chain. Set to False when bulk importing to avoid overwhelming Celery
-    workers.
-    :return: Tuple with entries:
+    Args:
+        docket_entry: The docket entry this attachment belongs to.
+        doc_data: The attachment data to merge.
+        download_file: Whether to trigger the PDF download and extraction
+            chain. Set to False when bulk importing to avoid overwhelming Celery
+            workers.
+
+    Returns:
+        Tuple with entries:
         - A flag indicating whether the document was created.
         - The pk of the SCOTUSDocument object.
     """
@@ -3724,11 +3797,14 @@ def merge_scotus_docket_entry(
 ) -> tuple[bool, int | None, list[int]]:
     """Merges a SCOTUS docket entry into CL.
 
-    :param docket: The docket this entry belongs to.
-    :param sequence_number: The sequence number of the docket entry.
-    :param input_docket_entry: The docket entry being merged.
-    :param download_file: Whether to trigger PDF download and extraction.
-    :return: Tuple with the following entries:
+    Args:
+        docket: The docket this entry belongs to.
+        sequence_number: The sequence number of the docket entry.
+        input_docket_entry: The docket entry being merged.
+        download_file: Whether to trigger PDF download and extraction.
+
+    Returns:
+        Tuple with the following entries:
         - A flag which is set to true when the SCOTUSDocketEntry was created.
         - The pk of the updated SCOTUSDocketEntry object.
         - A list of PKs of SCOTUSDocument objects that were created or updated.
@@ -3834,10 +3910,13 @@ def add_scotus_docket_entries(
 ) -> tuple[list[int], bool]:
     """Add or update SCOTUS docket entries for a docket.
 
-    :param docket: The Docket to add entries to.
-    :param docket_entries: List of docket entry dicts from the scraper.
-    :param download_file: Whether to trigger PDF download and extraction.
-    :return: A two-tuple: a list of PKs of SCOTUSDocument objects that were
+    Args:
+        docket: The Docket to add entries to.
+        docket_entries: List of docket entry dicts from the scraper.
+        download_file: Whether to trigger PDF download and extraction.
+
+    Returns:
+        A two-tuple: a list of PKs of SCOTUSDocument objects that were
         created or updated across all entries, and whether any
         SCOTUSDocketEntry was newly created (there's something to alert
         subscribers about).
@@ -3881,11 +3960,14 @@ def merge_scotus_docket(
     If any docket entry was newly created, this also triggers a docket
     alert to current subscribers.
 
-    :param report_data: A dictionary containing parsed SCOTUS docket data.
-    :param download_file: Whether to trigger PDF download and extraction.
-    :return: A three-tuple: the created or updated Docket instance, whether
-    the QP file should be downloaded, and a list of PKs of SCOTUSDocument
-    objects that were created or updated.
+    Args:
+        report_data: A dictionary containing parsed SCOTUS docket data.
+        download_file: Whether to trigger PDF download and extraction.
+
+    Returns:
+        A three-tuple: the created or updated Docket instance, whether
+        the QP file should be downloaded, and a list of PKs of SCOTUSDocument
+        objects that were created or updated.
     """
     with transaction.atomic():
         court = Court.objects.get(pk="scotus")
@@ -4030,10 +4112,13 @@ def process_scotus_docket(
     triggers the asynchronous download of related PDFs, and controls task
     chaining behavior based on whether new RECAPDocument records were created.
 
-    :param self: The Celery task instance.
-    :param report_data: Parsed SCOTUS docket report data.
-    :param download_file: Whether to trigger PDF download and extraction.
-    :return: The primary key of the merged Docket.
+    Args:
+        self: The Celery task instance.
+        report_data: Parsed SCOTUS docket report data.
+        download_file: Whether to trigger PDF download and extraction.
+
+    Returns:
+        The primary key of the merged Docket.
     """
     docket, download_qp, _ = merge_scotus_docket(
         report_data, download_file=download_file
@@ -4050,9 +4135,10 @@ def process_scotus_docket(
 def download_scotus_document_pdf(self: Task, doc_pk: int) -> int | None:
     """Download a PDF for a SCOTUS document.
 
-    :param self: The Celery task instance
-    :param doc_pk: The primary key of the SCOTUSDocument instance
-        to update the attachment for.
+    Args:
+        self: The Celery task instance
+        doc_pk: The primary key of the SCOTUSDocument instance
+            to update the attachment for.
     """
     try:
         # The document's storage path is built from its docket, so fetch that
@@ -4121,12 +4207,14 @@ def download_and_parse_scotus_docket(
 ) -> dict[str, Any] | None:
     """Download a SCOTUS docket file from S3 and parse it.
 
-    :param self: The Celery task instance.
-    :param bucket: The S3 bucket name.
-    :param s3_key: The S3 key for the docket file.
-    :return: Parsed docket data dict.
-    """
+    Args:
+        self: The Celery task instance.
+        bucket: The S3 bucket name.
+        s3_key: The S3 key for the docket file.
 
+    Returns:
+        Parsed docket data dict.
+    """
     logger.info("Downloading and parsing SCOTUS file: %s.", s3_key)
     storage = AWSMediaStorage(bucket_name=bucket)
     with storage.open(s3_key, "rb") as f:
@@ -4149,12 +4237,10 @@ def download_and_parse_scotus_docket(
 
 
 def ingest_scotus_docket(docket_data: dict[str, Any]) -> None:
-    """Trigger the SCOTUS docket ingestion task that processes a SCOTUS
-    docket report, downloads and merges related documents, and extracts
-    document text from the resulting PDFs.
+    """Trigger the SCOTUS docket ingestion task that processes a SCOTUS docket report, downloads and merges related documents, and extracts document text from the resulting PDFs.
 
-    :param docket_data: Parsed SCOTUS docket report data.
-    :return: None.
+    Args:
+        docket_data: Parsed SCOTUS docket report data.
     """
     process_scotus_docket.delay(docket_data)
 
@@ -4166,10 +4252,13 @@ def _download_texas_document(texas_document_pk: int) -> int | None:
     performed for PDFs. Non-PDF documents are marked as OCR_UNNECESSARY.
     Extraction is only dispatched for extractable types.
 
-    :param texas_document_pk: The primary key of the TexasDocument instance to
-    update the attachment for.
-    :return: The primary key of the downloaded TexasDocument instance, or None
-    if the process failed.
+    Args:
+        texas_document_pk: The primary key of the TexasDocument instance to
+            update the attachment for.
+
+    Returns:
+        The primary key of the downloaded TexasDocument instance, or None
+        if the process failed.
     """
     document = TexasDocument.download(texas_document_pk)
     return document.pk if document else None
@@ -4184,10 +4273,13 @@ def _download_texas_document(texas_document_pk: int) -> int | None:
 def download_texas_document(self: Task, texas_document_pk: int) -> int | None:
     """Throttled version of the Texas document download task.
 
-    :param self: The Celery task instance.
-    :param texas_document_pk: The primary key of the TexasDocument instance.
-    :return: The primary key of the downloaded TexasDocument instance, or None
-    if the process failed.
+    Args:
+        self: The Celery task instance.
+        texas_document_pk: The primary key of the TexasDocument instance.
+
+    Returns:
+        The primary key of the downloaded TexasDocument instance, or None
+        if the process failed.
     """
     return _download_texas_document(texas_document_pk)
 
@@ -4199,14 +4291,14 @@ def merge_texas_trial_court_data(
     docket: Docket,
     docket_data: TexasCourtOfCriminalAppealsDocket | TexasSupremeCourtDocket,
 ) -> MergeResult:
-    """
-    Create or update a TrialCourtData object to capture trial court information
-    for Texas SC and CCA cases.
+    """Create or update a TrialCourtData object to capture trial court information for Texas SC and CCA cases.
 
-    :param docket: The docket in the SC or CCA.
-    :param docket_data: The scraped docket data.
+    Args:
+        docket: The docket in the SC or CCA.
+        docket_data: The scraped docket data.
 
-    :return: The result of the attempted merge operation.
+    Returns:
+        The result of the attempted merge operation.
     """
     originating_court = docket_data["originating_court"]
     if originating_court["court_type"] == CourtType.APPELLATE.value:
@@ -4283,12 +4375,14 @@ def merge_texas_trial_court_data(
 
 
 def merge_case_transfer(case_transfer: CaseTransfer) -> MergeResult:
-    """Merges a CaseTransfer object in the database by first checking if it can
-    be used to update an existing object, and if not, creating a new object (if
-    necessary).
+    """Merges a CaseTransfer object in the database by first checking if it can be used to update an existing object, and if not, creating a new object (if necessary).
 
-    :param case_transfer: The CaseTransfer object to be merged.
-    :return: The result of this merge attempt."""
+    Args:
+        case_transfer: The CaseTransfer object to be merged.
+
+    Returns:
+        The result of this merge attempt.
+    """
     logger.info(
         "Merging CaseTransfer from docket %s in court %s to docket %s in court %s on %s with type %s.",
         case_transfer.origin_docket_number,
@@ -4372,11 +4466,13 @@ def merge_texas_document(
     different, fetch the attachment PDF, store it, compute metadata, and
     mark the document as available.
 
-    :param docket_entry: The docket entry this attachment belongs to.
-    :param input_document: The attachment to merge.
-    :param download_attachments: Whether to download docket entry attachments.
+    Args:
+        docket_entry: The docket entry this attachment belongs to.
+        input_document: The attachment to merge.
+        download_attachments: Whether to download docket entry attachments.
 
-    :return: The result of the merge operation.
+    Returns:
+        The result of the merge operation.
     """
     try:
         texas_document = TexasDocument.objects.get(
@@ -4440,14 +4536,16 @@ def merge_texas_docket_entry(
 ) -> MergeResult:
     """Merges a Texas docket entry into CL.
 
-    :param docket: The docket this entry belongs to.
-    :param sequence_number: The sequence number of the docket entry.
-    :param case_event: The docket entry information being merged.
-    :param appellate_brief: Appellate brief information if the docket entry is
-        an appellate brief, None otherwise.
-    :param download_attachments: Whether to download docket entry attachments.
+    Args:
+        docket: The docket this entry belongs to.
+        sequence_number: The sequence number of the docket entry.
+        case_event: The docket entry information being merged.
+        appellate_brief: Appellate brief information if the docket entry is
+            an appellate brief, None otherwise.
+        download_attachments: Whether to download docket entry attachments.
 
-    :return: The result of the merge operation.
+    Returns:
+        The result of the merge operation.
     """
     logger.info(
         "Merging TexasDocketEntry with sequence number %s into Docket %s",
@@ -4542,16 +4640,16 @@ def merge_texas_docket_entries(
     | list[TexasSupremeCourtAppellateBrief],
     download_attachments: bool = True,
 ) -> MergeResult:
-    """
-    Merges a list of Texas case events and Texas appellate briefs for a given
-    docket into CL.
+    """Merges a list of Texas case events and Texas appellate briefs for a given docket into CL.
 
-    :param docket: The parent docket.
-    :param case_events: Scraped case events.
-    :param appellate_briefs: Scraped appellate briefs.
-    :param download_attachments: Whether to download attachments.
+    Args:
+        docket: The parent docket.
+        case_events: Scraped case events.
+        appellate_briefs: Scraped appellate briefs.
+        download_attachments: Whether to download attachments.
 
-    :return: The result of the merge operation.
+    Returns:
+        The result of the merge operation.
     """
     brief_iter = iter(appellate_briefs)
     next_brief = next(brief_iter, None)
@@ -4591,9 +4689,12 @@ def normalize_texas_parties(
     This allows reuse of the existing add_parties_and_attorneys() method for
     Texas court data.
 
-    :param parties: List of party dicts in Texas format.
-    :returns: List of party dicts in PACER-like format compatible with
-    add_parties_and_attorneys()
+    Args:
+        parties: List of party dicts in Texas format.
+
+    Returns:
+        List of party dicts in PACER-like format compatible with
+        add_parties_and_attorneys()
     """
     return [
         {
@@ -4619,19 +4720,18 @@ def normalize_texas_parties(
 def texas_docket_has_valid_appellate_info(
     docket_data: TexasCourtOfCriminalAppealsDocket | TexasSupremeCourtDocket,
 ) -> bool:
-    """
-    Helper method returning whether a scraped Texas docket has appellate case
-    info.
+    """Helper method returning whether a scraped Texas docket has appellate case info.
 
     Checks that the docket court is not an appellate court (cases in appellate
     courts cannot be appealed to appellate courts) and that the "appeals_court"
     entry of docket data is filled in.
 
-    :param docket_data: The scraped docket data.
+    Args:
+        docket_data: The scraped docket data.
 
-    :return: Whether the docket has appellate case information.
+    Returns:
+        Whether the docket has appellate case information.
     """
-
     return docket_data["appeals_court"]["court_id"] != CourtID.UNKNOWN.value
 
 
@@ -4663,10 +4763,11 @@ def is_texas_docket(
     | TexasCourtOfCriminalAppealsDocket
     | TexasSupremeCourtDocket
 ]:
-    """
-    `TexasCommonScraper` may fail successfully. In which case it returns an
-    empty `dict`. This cannot be readily distinguished from `TypedDict`. This
-    enables type narrowing to happen for `TexasCommonScraper` as-is.
+    """`TexasCommonScraper` may fail successfully.
+
+    In which case it returns an empty `dict`. This cannot be readily
+    distinguished from `TypedDict`. This enables type narrowing to happen for
+    `TexasCommonScraper` as-is.
     """
     return "court_type" in d
 
@@ -4681,9 +4782,12 @@ def merge_texas_parties(
     them along with their associated attorneys into the docket using
     add_parties_and_attorneys().
 
-    :param docket: The docket to which parties and attorneys should be added.
-    :param parties: The parties involved in the Texas case.
-    :return: A MergeResult indicating the operation succeeded. Note that
+    Args:
+        docket: The docket to which parties and attorneys should be added.
+        parties: The parties involved in the Texas case.
+
+    Returns:
+        A MergeResult indicating the operation succeeded. Note that
         create and update flags are always False and pk is always None since
         add_parties_and_attorneys does not return this information.
     """
@@ -4699,10 +4803,13 @@ def merge_texas_docket_originating_court(
 ) -> MergeResult:
     """Merge originating court information into the given Texas docket.
 
-    :param docket: The docket to add the originating court to.
-    :param docket_data: The docket data from Juriscraper.
-    :return: The result of the merge operation."""
+    Args:
+        docket: The docket to add the originating court to.
+        docket_data: The docket data from Juriscraper.
 
+    Returns:
+        The result of the merge operation.
+    """
     if is_texas_supreme_docket(
         docket_data
     ) and texas_docket_has_valid_appellate_info(docket_data):
@@ -4767,9 +4874,7 @@ def merge_texas_case_transfers(
     | TexasCourtOfCriminalAppealsDocket
     | TexasSupremeCourtDocket,
 ) -> MergeResult:
-    """This method creates or updates up any `CaseTransfer` objects which point to
-    or originate from a given docket to capture appeal and work sharing
-    information.
+    """This method creates or updates up any `CaseTransfer` objects which point to or originate from a given docket to capture appeal and work sharing information.
 
     If a `CaseTransfer` exists with the same origin and destination docket
     numbers and court fields as one we want to create, update the origin or
@@ -4778,9 +4883,13 @@ def merge_texas_case_transfers(
     information and complete the information at a later time (or never if the
     origin/destination is a court we don't scrape).
 
-    :param docket: The docket to add the appeal information to.
-    :param docket_data: The docket data from Juriscraper.
-    :return: The result of the CaseTransfer merge operation"""
+    Args:
+        docket: The docket to add the appeal information to.
+        docket_data: The docket data from Juriscraper.
+
+    Returns:
+        The result of the CaseTransfer merge operation
+    """
     logger.info(
         "Determining transfers for docket %s in court %s...",
         docket.docket_number,
@@ -4969,10 +5078,13 @@ def merge_texas_docket(
 ) -> MergeResult:
     """Merges scraped data from a Texas docket into the `Docket` table.
 
-    :param docket_data: The scraped Texas docket data.
-    :param download_attachments: Whether to download docket entry attachments.
+    Args:
+        docket_data: The scraped Texas docket data.
+        download_attachments: Whether to download docket entry attachments.
 
-    :return: The result of the merge operation."""
+    Returns:
+        The result of the merge operation.
+    """
     court_id = texas_js_court_id_to_court_id(docket_data["court_id"])
     docket_number = docket_data["docket_number"]
     logger.info("Merging Texas docket %s", docket_number)
@@ -5117,19 +5229,19 @@ def texas_ingest_docket_task(
     download_attachments: bool = True,
     subscription_data: str | None = None,
 ) -> MergeResult:
-    """
-    Task to parse and merge a Texas docket.
+    """Task to parse and merge a Texas docket.
 
-    :param task: The Celery task.
+    Args:
+        task: The Celery task.
+        i: Tuple with the following entries:
+            - Bytes string to parse.
+            - Docket metadata.
+        download_attachments: Whether to download docket entry attachments.
+        subscription_data: Optional JSON string to add to the pending
+            subscriptions Redis SET when a new docket is created.
 
-    :param i: Tuple with the following entries:
-    - Bytes string to parse.
-    - Docket metadata.
-    :param download_attachments: Whether to download docket entry attachments.
-    :param subscription_data: Optional JSON string to add to the pending
-        subscriptions Redis SET when a new docket is created.
-
-    :return: The result of the merge operation.
+    Returns:
+        The result of the merge operation.
     """
     content, meta = i
     logger.info("Attempting to parse Texas docket %s...", meta.case_number)
@@ -5190,10 +5302,14 @@ def default_corpus_download_task(
 ) -> tuple[bytes, str, str]:
     """Downloads a scraped file from S3 and returns it for parsing.
 
-    :param bucket: S3 bucket name.
-    :param s3_key: S3 key to download file from.
-    :return: Tuple with entries: Bytes of downloaded file, the bucket
-    parameter, and the s3_key parameter."""
+    Args:
+        bucket: S3 bucket name.
+        s3_key: S3 key to download file from.
+
+    Returns:
+        Tuple with entries: Bytes of downloaded file, the bucket
+        parameter, and the s3_key parameter.
+    """
     logger.info("Downloading file from S3: %s", s3_key)
     storage = AWSMediaStorage(bucket_name=bucket)
     with storage.open(s3_key, "rb") as f:
@@ -5217,13 +5333,15 @@ def texas_corpus_download_task(
 ) -> tuple[bytes, TexasDocketMeta]:
     """Downloads a scraped file from S3 and returns it for parsing.
 
-    :param docket: Tuple of S3 bucket name and key where docket HTML is stored.
+    Args:
+        docket: Tuple of S3 bucket name and key where docket HTML is stored.
+        docket_meta: Tuple of S3 bucket name and key where docket metadata\
+            is stored.
 
-    :param docket_meta: Tuple of S3 bucket name and key where docket metadata\
-        is stored.
-
-    :return: Tuple with entries: Bytes of downloaded file, dictionary with\
-        response headers, and docket metadata."""
+    Returns:
+        Tuple with entries: Bytes of downloaded file, dictionary with\
+        response headers, and docket metadata.
+    """
     storage = AWSMediaStorage(bucket_name=docket[0])
     logger.info(
         "Downloading docket HTML from S3: (Bucket: %s; Path: %s)",
@@ -5258,13 +5376,16 @@ def texas_corpus_download_task(
 def fl_corpus_download_task(bucket: str, key: str) -> tuple[bytes, str, str]:
     """Downloads a scraped file from S3 and returns it for parsing.
 
-    :param bucket: S3 bucket name docket data is stored.
-    :param key: S3 key where docket data is stored
+    Args:
+        bucket: S3 bucket name docket data is stored.
+        key: S3 key where docket data is stored
 
-    :return: Tuple of:
-    - The bytes of the parsed JSON retrieved from S3
-    - The bucket name
-    - The S3 key"""
+    Returns:
+        Tuple of:
+        - The bytes of the parsed JSON retrieved from S3
+        - The bucket name
+        - The S3 key
+    """
     storage = AWSMediaStorage(bucket_name=bucket)
     logger.info(
         "Downloading docket JSON from S3: (Bucket: %s; Path: %s)",
@@ -5289,11 +5410,14 @@ def download_fl_document(self: Task, fl_document_pk: int) -> int | None:
     Accepts any file type. PDF-specific processing (page count) is only
     performed for PDFs.
 
-    :param self: The Celery task instance.
-    :param fl_document_pk: The primary key of the `FloridaDocument` instance to
-    update the attachment for.
-    :return: The primary key of the downloaded `FloridaDocument` instance, or None
-    if the process failed.
+    Args:
+        self: The Celery task instance.
+        fl_document_pk: The primary key of the `FloridaDocument` instance to
+            update the attachment for.
+
+    Returns:
+        The primary key of the downloaded `FloridaDocument` instance, or None
+        if the process failed.
     """
     document = FloridaDocument.download(fl_document_pk)
     return document.pk if document else None
@@ -5305,19 +5429,19 @@ def fl_ingest_docket_task(
     download_result: tuple[bytes | FloridaCase, str, str],
     download_attachments: bool = True,
 ) -> MergeResult[Any]:
-    """
-    Task to parse and merge a Florida docket.
+    """Task to parse and merge a Florida docket.
 
-    :param task: The Celery task.
+    Args:
+        task: The Celery task.
+        download_result: Tuple of:
+            - The bytes of the parsed JSON retrieved from S3 or the fully parsed case.
+            - The S3 bucket this case was retrieved from. Used for error messages. May be blank for tasks spawned from the
+            poller daemon as we don't have a good way to access the bucket there.
+            - The S3 key this case was retrieved from. Used for error messages.
+        download_attachments: Whether to download docket entry attachments.
 
-    :param download_result: Tuple of:
-    - The bytes of the parsed JSON retrieved from S3 or the fully parsed case.
-    - The S3 bucket this case was retrieved from. Used for error messages. May be blank for tasks spawned from the
-    poller daemon as we don't have a good way to access the bucket there.
-    - The S3 key this case was retrieved from. Used for error messages.
-    :param download_attachments: Whether to download docket entry attachments.
-
-    :return: The result of the merge operation.
+    Returns:
+        The result of the merge operation.
     """
     case_bytes, bucket, key = download_result
     if isinstance(case_bytes, bytes):
@@ -5384,12 +5508,16 @@ def download_state_document(
 ) -> int | None:
     """Celery task to download the file for a state document and store it in S3.
 
-    :param model_name: The name of the state document model (must be a subclass of `AbstractStateDocument`).
-    :param pk: The primary key of the object to download.
-    :param skip_extraction: Skip the extraction step.
-    :param extraction_queue: The celery queue to use for OCR extraction.
+    Args:
+        self: The bound Celery task.
+        model_name: The name of the state document model (must be a subclass of `AbstractStateDocument`).
+        pk: The primary key of the object to download.
+        skip_extraction: Skip the extraction step.
+        extraction_queue: The celery queue to use for OCR extraction.
 
-    :return: The pk of the downloaded document, or None if the download failed."""
+    Returns:
+        The pk of the downloaded document, or None if the download failed.
+    """
     model = apps.get_model(model_name)
     # Any model passed in should already be an `AbstractStateDocument`. Verify it for the type checker.
     assert issubclass(model, AbstractStateDocument)
@@ -5426,15 +5554,17 @@ def merge_state_scrape_row(
     rejected; one that never reached a verdict is recorded as errored, since
     only the latter is worth re-running the load over.
 
-    :param loader: The name the docket's loader is registered under in
-        `cl.corpus_importer.state.registry`.
-    :param row: The docket's row number in the run database's query, which is
-        what the ledger and the load's report name it by.
-    :param payload: The scrape, as the loader's `scrape_model` serialized it.
-    :param run_key: The Redis key the run's ledger hangs off.
-    :param extract: Whether to dispatch text extraction for the documents the
-        merge writes.
-    :param extraction_queue: The celery queue to extract on.
+    Args:
+        self: The bound Celery task.
+        loader: The name the docket's loader is registered under in
+            `cl.corpus_importer.state.registry`.
+        row: The docket's row number in the run database's query, which is
+            what the ledger and the load's report name it by.
+        payload: The scrape, as the loader's `scrape_model` serialized it.
+        run_key: The Redis key the run's ledger hangs off.
+        extract: Whether to dispatch text extraction for the documents the
+            merge writes.
+        extraction_queue: The celery queue to extract on.
     """
     ledger = LoadLedger(run_key)
     try:

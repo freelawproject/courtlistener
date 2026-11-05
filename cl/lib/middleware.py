@@ -17,7 +17,7 @@ V2_PARTIALS_PREFIX = "v2_includes/"
 
 
 class RobotsHeaderMiddleware:
-    """Adds x-robots-tag HTTP header to any request that has `private=True`
+    """Adds x-robots-tag HTTP header to any request that has `private=True`.
 
     There's some evidence and good logic to support the idea that using the
     x-robots-tag HTTP header uses less of a site's "crawl budget" than
@@ -79,9 +79,7 @@ class RobotsHeaderMiddleware:
 
 
 class IncrementalNewTemplateMiddleware:
-    """
-    Checks waffle flag for new design and changes the old template
-    with the new one if it exists.
+    """Checks waffle flag for new design and changes the old template with the new one if it exists.
 
     To identify the new template we prepend "v2_" to the old template name.
     Note this means if the old template_name includes a dir, like

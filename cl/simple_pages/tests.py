@@ -186,8 +186,7 @@ class ContactTest(SimpleUserDataMixin, TestCase):
     async def test_spam_message_is_rejected(
         self, mock_captcha: MagicMock, mock_task: MagicMock
     ) -> None:
-        """Do we reject it if people put a phone number in the phone_number
-        field?
+        """Do we reject it if people put a phone number in the phone_number field?
 
         We should! The phone_number field is labeled as the Subject field in the
         UI. Anything putting a phone number in here is a bot to be rejected.
@@ -287,7 +286,7 @@ class ContactTest(SimpleUserDataMixin, TestCase):
 
 class PageLoadTestMixin(TestCase):
     def assert_page_title_in_html(self, content: str) -> None:
-        """Make sure a page has a valid HTML title"""
+        """Make sure a page has a valid HTML title."""
         html_tree = fromstring(content)
         title = cast(list[str], html_tree.xpath("//title/text()"))
         self.assertGreater(
@@ -304,9 +303,12 @@ class PageLoadTestMixin(TestCase):
     async def assert_page_loads_ok(self, reverse_param: dict) -> HttpResponse:
         """Does a page load properly?
 
-        :param reverse_param: Params that can be sent to Django's reverse
-        function to get a URL path.
-        :return: The response object.
+        Args:
+            reverse_param: Params that can be sent to Django's reverse
+                function to get a URL path.
+
+        Returns:
+            The response object.
         """
         path = reverse(**reverse_param)
         r = await self.async_client.get(path)
@@ -458,8 +460,7 @@ class NewBaseViewCountTest(TestCase):
     """
 
     async def test_untracked_page_sends_no_view_count(self) -> None:
-        """A v2 page whose view is not decorated carries no label, no endpoint
-        and no store, so the browser makes no request."""
+        """A v2 page whose view is not decorated carries no label, no endpoint and no store, so the browser makes no request."""
         r = await self.async_client.get(reverse("help_home"))
         self.assertTemplateUsed(r, "new_base.html")
         html = r.content.decode()

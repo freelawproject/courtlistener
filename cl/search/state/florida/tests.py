@@ -46,8 +46,7 @@ REFUSED_URL = "https://acis-api.test/refused"
 
 
 def challenge_response(status: int, **kwargs) -> httpx.Response:
-    """Build an `httpx.Response` for the challenge endpoint that supports
-    `raise_for_status`, which needs the request attached."""
+    """Build an `httpx.Response` for the challenge endpoint that supports `raise_for_status`, which needs the request attached."""
     return httpx.Response(
         status, request=httpx.Request("GET", CHALLENGE_URL), **kwargs
     )
@@ -71,7 +70,8 @@ class AltchaTokenTest(SimpleTestCase):
         """Is the token byte-for-byte what the ACIS frontend submits?
 
         The server's signature covers the challenge parameters, so the
-        encoding has to preserve the server's key names and key order."""
+        encoding has to preserve the server's key names and key order.
+        """
         solution = AltchaChallengeSolution.model_validate(SOLUTION_JSON)
 
         token = AltchaChallengeResponse(
@@ -82,8 +82,7 @@ class AltchaTokenTest(SimpleTestCase):
 
 
 class DocumentDownloadTest(TestCase):
-    """`FloridaDocument.download` against the ACIS gate, with only the network
-    and microservices mocked."""
+    """`FloridaDocument.download` against the ACIS gate, with only the network and microservices mocked."""
 
     def setUp(self) -> None:
         self.document = FloridaDocumentFactory.create(
@@ -124,8 +123,7 @@ class DocumentDownloadTest(TestCase):
         return urlparse(self.document_get.call_args.args[0])
 
     def test_download_appends_solved_token(self) -> None:
-        """Does a download request the challenge for the document's path,
-        solve it, and fetch the document with the encoded token appended?"""
+        """Does a download request the challenge for the document's path, solve it, and fetch the document with the encoded token appended?"""
         self.challenge_get.return_value = challenge_response(
             200, json=CHALLENGE_JSON
         )
@@ -157,8 +155,7 @@ class DocumentDownloadTest(TestCase):
         )
 
     def test_download_logs_token_failures_and_skips(self) -> None:
-        """When retrieving or solving the challenge raises, is the error
-        logged and the document skipped rather than the task failing?"""
+        """When retrieving or solving the challenge raises, is the error logged and the document skipped rather than the task failing?"""
         failures = {
             "challenge endpoint error": challenge_response(500),
             "malformed challenge": challenge_response(200, json={"bad": 1}),
@@ -179,8 +176,7 @@ class DocumentDownloadTest(TestCase):
                 )
 
     def test_download_logs_refusals_distinctly(self) -> None:
-        """Does a 403 from either the challenge endpoint or the document
-        fetch go to the dedicated refusal logger, and nowhere else?"""
+        """Does a 403 from either the challenge endpoint or the document fetch go to the dedicated refusal logger, and nowhere else?"""
         ok_challenge = challenge_response(200, json=CHALLENGE_JSON)
         refused_document = mock.Mock(status_code=403)
         refused_document.request.url = REFUSED_URL
@@ -217,8 +213,7 @@ class DocumentDownloadTest(TestCase):
                 self.assertFalse(self.document.filepath_local)
 
     def test_download_retries_transient_challenge_failures(self) -> None:
-        """Is a dropped connection to the challenge endpoint retried rather
-        than costing us the document?"""
+        """Is a dropped connection to the challenge endpoint retried rather than costing us the document?"""
         self.challenge_get.side_effect = [
             httpx.ConnectTimeout("slow gate"),
             challenge_response(200, json=CHALLENGE_JSON),
@@ -230,8 +225,7 @@ class DocumentDownloadTest(TestCase):
         self.assertEqual(self.challenge_get.call_count, 2)
 
     def test_download_logs_other_fetch_errors_generically(self) -> None:
-        """Is a non-403 HTTP error on the document fetch logged as an ordinary
-        failure and the document skipped?"""
+        """Is a non-403 HTTP error on the document fetch logged as an ordinary failure and the document skipped?"""
         self.challenge_get.return_value = challenge_response(
             200, json=CHALLENGE_JSON
         )
@@ -247,8 +241,7 @@ class DocumentDownloadTest(TestCase):
         self.logger.error.assert_not_called()
 
     def test_download_without_gate_uses_bare_url(self) -> None:
-        """When the challenge endpoint reports the gate is off (204), is the
-        stored URL fetched unchanged?"""
+        """When the challenge endpoint reports the gate is off (204), is the stored URL fetched unchanged?"""
         self.challenge_get.return_value = challenge_response(204)
 
         result = FloridaDocument.download(self.document.pk)

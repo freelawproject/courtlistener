@@ -520,7 +520,7 @@ class AudioPercolator(AudioDocumentBase):
 
 
 class ES_CHILD_ID:
-    """Returns an ID for its use in ES child documents"""
+    """Returns an ID for its use in ES child documents."""
 
     def __init__(self, instance_id: int):
         self.instance_id = instance_id
@@ -1643,9 +1643,11 @@ class DocketDocument(
 
 
 class DocketDocumentPlain(DocketDocument):
-    """This class is used for Docket document percolation. Here, we can
-    control whether to include parties based on
-    the MAX_ATTORNEYS_TO_PERCOLATE setting."""
+    """This class is used for Docket document percolation.
+
+    Here, we can control whether to include parties based on the
+    MAX_ATTORNEYS_TO_PERCOLATE setting.
+    """
 
     def prepare_parties(self, instance: Docket) -> _DocketDocumentPartyDict:
         out = {
@@ -2494,7 +2496,7 @@ class RECAPPercolator(
 class OpinionPercolator(
     OpinionClusterDocument, OpinionDocument, PreparePercolatorQueryMixin
 ):
-    """Opinions Percolator index"""
+    """Opinions Percolator index."""
 
     rate = fields.KeywordField(attr="rate")
     percolator_query = PercolatorField()
@@ -2509,9 +2511,7 @@ class OpinionPercolator(
 
 
 class ESOpinionDocumentPlain(OpinionClusterDocument, OpinionDocument):
-    """Document class for preparing Opinions to be percolated into the
-    OpinionPercolator index.
-    """
+    """Document class for preparing Opinions to be percolated into the OpinionPercolator index."""
 
     def prepare_non_participating_judge_ids(self, instance):
         return list(

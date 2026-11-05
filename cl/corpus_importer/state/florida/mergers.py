@@ -149,7 +149,7 @@ class FloridaDocumentMerger(
     )
 
     def scrape_link_uuids(self) -> list[UUID]:
-        """Shorthand to get the full set of link UUIDs passed as a parameter to the root merger"""
+        """Shorthand to get the full set of link UUIDs passed as a parameter to the root merger."""
         return [
             attachment.document_link_uuid
             for entry in self.params.params.params
@@ -157,7 +157,7 @@ class FloridaDocumentMerger(
         ]
 
     def scraped_entry(self) -> ScrapeFloridaDocketEntry | None:
-        """Shorthand to get the scraped docket entry for this attachment"""
+        """Shorthand to get the scraped docket entry for this attachment."""
         entry = cast(FloridaDocketEntry, self.params.parent)
         for scraped_entry in self.params.params.params:
             if scraped_entry.docket_entry_uuid == entry.docket_entry_uuid:
@@ -254,9 +254,7 @@ def _submitted_by_name(entry: ScrapeFloridaDocketEntry, params: Any) -> str:
 def _submitted_by_id(
     entry: ScrapeFloridaDocketEntry, params: RelatedParams[Any]
 ) -> int | None:
-    """Resolve the submitter to a party on this docket, matching on name the
-    way `PartyMerger` does. Submitters are often court staff rather than case
-    parties, so finding no match is expected and leaves the FK null."""
+    """Resolve the submitter to a party on this docket, matching on name the way `PartyMerger` does. Submitters are often court staff rather than case parties, so finding no match is expected and leaves the FK null."""
     name = _submitted_by_name(entry, params)
     if not name:
         return None
@@ -377,12 +375,15 @@ class FloridaCaseTransferMerger(CaseTransferMerger[DocketTransfer, None]):
 def _florida_transfers(
     docket_data: FloridaCase, params: None
 ) -> list[DocketTransfer]:
-    """Filter a case's transfers down to the ones whose far-side court has a
-    CourtListener counterpart in the DB. Skipped transfers are logged but do
-    not fail the merge.
+    """Filter a case's transfers down to the ones whose far-side court has a CourtListener counterpart in the DB. Skipped transfers are logged but do not fail the merge.
 
-    :param docket_data: The scraped Florida case.
-    :return: The transfers to merge."""
+    Args:
+        docket_data: The scraped Florida case.
+        params: Unused.
+
+    Returns:
+        The transfers to merge.
+    """
     transferable: list[DocketTransfer] = []
     transfers: list[DocketTransfer] = inbound_transfers(docket_data, params)
     for transfer in transfers:

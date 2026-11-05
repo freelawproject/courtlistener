@@ -189,7 +189,7 @@ class Webhook(AbstractDateTimeModel):
 
 
 class WEBHOOK_EVENT_STATUS:
-    """WebhookEvent Status Types"""
+    """WebhookEvent Status Types."""
 
     IN_PROGRESS = 0
     ENQUEUED_RETRY = 1

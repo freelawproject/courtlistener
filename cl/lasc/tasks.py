@@ -49,11 +49,9 @@ class LASCLoginInProgress(Exception):
 
 
 async def login_to_court() -> None:
-    """Set the login cookies in redis for an LASC user
+    """Set the login cookies in redis for an LASC user.
 
     Replace any existing cookies in redis.
-
-    :return: None
     """
     r = get_redis_interface("CACHE")
     # Give yourself a few minutes to log in
@@ -76,13 +74,13 @@ async def login_to_court() -> None:
 
 
 async def establish_good_login() -> None:
-    """Make sure that we have good login credentials for LASC in redis
+    """Make sure that we have good login credentials for LASC in redis.
 
     Checks the Login Status for LASC.  If no status is found runs login
     function to store good keys in redis.
 
-    :raises LASCLoginInProgress: Another worker is currently logging in.
-    :return: None
+    Raises:
+        LASCLoginInProgress: Another worker is currently logging in.
     """
     r = get_redis_interface("CACHE")
     status = await sync_to_async(r.get)(LASC_SESSION_STATUS_KEY)
@@ -94,9 +92,10 @@ async def establish_good_login() -> None:
 
 
 async def make_lasc_search() -> LASCSearch:
-    """Create a logged-in LASCSearch object with cookies pulled from cache
+    """Create a logged-in LASCSearch object with cookies pulled from cache.
 
-    :return: LASCSearch object
+    Returns:
+        LASCSearch object
     """
     r = get_redis_interface("CACHE", decode_responses=False)
     cookie_bytes = await sync_to_async(r.get)(LASC_SESSION_COOKIE_KEY)
@@ -125,8 +124,11 @@ def download_pdf(self: Task, pdf_pk: int) -> None:
 async def download_pdf_base(pdf_pk: int) -> None:
     """Downloads the PDF associated with the PDF DB Object ID passed in.
 
-    :param pdf_pk: The primary key of the QueuedPDF object we are downloading
-    :return: None; object is saved to DB and filesystem
+    Args:
+        pdf_pk: The primary key of the QueuedPDF object we are downloading
+
+    Returns:
+        None; object is saved to DB and filesystem
     """
     await establish_good_login()
 
@@ -182,13 +184,13 @@ def save_downloaded_pdf(
 
 
 def add_case(case_id, case_data, original_data):
-    """Adds a new case to the cl.lasc database
+    """Adds a new case to the cl.lasc database.
 
-    :param case_id: A full LASC case_id
-    :param case_data: Parsed data representing a docket as returned by
-    Juriscraper
-    :param original_data: The original JSON object as a str
-    :return: None
+    Args:
+        case_id: A full LASC case_id
+        case_data: Parsed data representing a docket as returned by
+            Juriscraper
+        original_data: The original JSON object as a str
     """
     logger.info("Adding LASC case %s", case_id)
     with transaction.atomic():
@@ -238,10 +240,10 @@ def add_or_update_case_db(self: Task, case_id: str) -> None:
 
 
 async def add_or_update_case_db_base(case_id: str) -> None:
-    """Add a case from the LASC MAP using an authenticated session object
+    """Add a case from the LASC MAP using an authenticated session object.
 
-    :param case_id: The case ID to download, for example, '19STCV25157;SS;CV'
-    :return: None
+    Args:
+        case_id: The case ID to download, for example, '19STCV25157;SS;CV'
     """
     await establish_good_login()
     lasc = await make_lasc_search()
@@ -283,10 +285,13 @@ async def add_or_update_case_db_base(case_id: str) -> None:
 
 
 def latest_sha(case_id):
-    """Get the latest SHA1 for a case by case_id
+    """Get the latest SHA1 for a case by case_id.
 
-    :param case_id: The semicolon-delimited lasc ID for the case
-    :return: The SHA1 for the case
+    Args:
+        case_id: The semicolon-delimited lasc ID for the case
+
+    Returns:
+        The SHA1 for the case
     """
     docket = Docket.objects.get(case_id=case_id)
     o_id = LASCJSON(content_object=docket).object_id
@@ -294,14 +299,14 @@ def latest_sha(case_id):
 
 
 def update_case(lasc, clean_data):
-    """Update an existing case with new data
+    """Update an existing case with new data.
 
     Method currently deletes and replaces the data on the system except for
     lasc_docket and connections for older json and pdf files.
 
-    :param lasc: A LASCSearch object
-    :param clean_data: A normalized data dictionary
-    :return: None
+    Args:
+        lasc: A LASCSearch object
+        clean_data: A normalized data dictionary
     """
     case_id = make_case_id(clean_data)
     with transaction.atomic():
@@ -356,11 +361,11 @@ def update_case(lasc, clean_data):
     retry_backoff=15,
 )
 def add_case_from_filepath(filepath):
-    """Add case to database from filepath
+    """Add case to database from filepath.
 
-    :param self: The celery object
-    :param filepath: Filepath string to where the item is stored
-    :return: None
+    Args:
+        self: The celery object
+        filepath: Filepath string to where the item is stored
     """
     query = LASCSearch(None)
     with open(filepath) as f:
@@ -397,11 +402,9 @@ def fetch_date_range(self: Task, start: date, end: date) -> None:
 async def fetch_date_range_base(start: date, end: date) -> None:
     """Queries LASC for one week or less range and returns the cases filed.
 
-    :param start: The date you want to start searching for cases
-    :type start: datetime
-    :param end: The date you want to stop searching for cases
-    :type end: datetime
-    :return: None
+    Args:
+        start: The date you want to start searching for cases
+        end: The date you want to stop searching for cases
     """
     await establish_good_login()
     lasc = await make_lasc_search()
@@ -437,13 +440,12 @@ async def fetch_date_range_base(start: date, end: date) -> None:
 
 
 def save_json(data, content_obj):
-    """
-    Save json string to file and generate SHA1.
+    """Save json string to file and generate SHA1.
 
-    :param data: JSON response cleaned
-    :param content_obj: The content object associated with the JSON file in
-    the DB
-    :return: None
+    Args:
+        data: JSON response cleaned
+        content_obj: The content object associated with the JSON file in
+            the DB
     """
     json_file = LASCJSON(content_object=content_obj)
     json_file.sha1 = sha1_of_json_data(data)
