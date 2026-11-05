@@ -93,7 +93,7 @@ from cl.search.documents import (
     PersonDocument,
     PositionDocument,
 )
-from cl.search.es_docket_sources import SOURCE_BY_MODEL
+from cl.search.es_docket_sources import SOURCE_BY_MODEL, skips_percolation
 from cl.search.forms import SearchForm
 from cl.search.models import (
     SEARCH_TYPES,
@@ -226,6 +226,9 @@ def es_save_document(
         # Abort task the instance is not found in DB.
         self.request.chain = None
         return None
+    skip_percolator_request = skip_percolator_request or skips_percolation(
+        instance
+    )
     match app_label:
         case "people_db.Position":
             parent_id = getattr(instance.person, "pk", None)
@@ -540,6 +543,9 @@ def update_es_document(
     main_model_instance = get_instance_from_db(main_instance_id, main_model)
     if not main_model_instance:
         return
+    skip_percolator_request = skip_percolator_request or skips_percolation(
+        main_model_instance
+    )
 
     es_doc = get_doc_from_es(es_document, main_model_instance)
     if not es_doc:

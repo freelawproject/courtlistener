@@ -126,3 +126,12 @@ SOURCE_BY_MODEL: dict[type[models.Model], ESDocketSource] = {
         if source.metadata_model is not None
     },
 }
+
+
+def skips_percolation(instance: models.Model) -> bool:
+    """True for a SCOTUS Docket, so callers must skip its percolator
+    request. Temporary: remove once search alerts support SCOTUS.
+    """
+    return isinstance(instance, Docket) and SCOTUS_ES_SOURCE.docket_belongs(
+        instance
+    )

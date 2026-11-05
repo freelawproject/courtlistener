@@ -7163,6 +7163,85 @@ class SCOTUSESIndexingSignalTest(
             ESRECAPDocument.exists(id=ES_CHILD_ID(doc_b.pk).SCOTUS)
         )
 
+    def _recap_and_scotus_documents_sharing_a_pk(
+        self,
+    ) -> tuple[RECAPDocument, SCOTUSDocument]:
+        """Index a RECAPDocument and a SCOTUSDocument with the same pk.
+        """
+        shared_pk = 987650
+        rd = RECAPDocumentFactory(
+            pk=shared_pk,
+            docket_entry=DocketEntryFactory(
+                docket__court=CourtFactory(), docket__source=Docket.RECAP
+            ),
+            description="RECAP description",
+        )
+        scotus_document = SCOTUSDocumentFactory(
+            pk=shared_pk, docket_entry__docket__court=self.court
+        )
+        return rd, scotus_document
+
+    def test_entry_change_leaves_recap_document_with_same_pk_alone(
+        self,
+    ) -> None:
+        """A SCOTUSDocketEntry change updates its SCOTUSDocument's ES
+        entry, not the RECAPDocument's that shares its pk."""
+        rd, scotus_document = self._recap_and_scotus_documents_sharing_a_pk()
+        entry = scotus_document.docket_entry
+
+        entry.description = "SCOTUS entry description"
+        entry.save()
+
+        scotus_hit = ESRECAPDocument.get(
+            id=ES_CHILD_ID(scotus_document.pk).SCOTUS
+        )
+        self.assertEqual(scotus_hit.description, "SCOTUS entry description")
+        rd_hit = ESRECAPDocument.get(id=ES_CHILD_ID(rd.pk).RECAP)
+        self.assertEqual(rd_hit.description, rd.docket_entry.description)
+
+    def test_delete_leaves_recap_document_with_same_pk_alone(self) -> None:
+        """Deleting a SCOTUSDocument removes its own ES entry, not the
+        RECAPDocument's that shares its pk."""
+        rd, scotus_document = self._recap_and_scotus_documents_sharing_a_pk()
+
+        scotus_document.delete()
+
+        self.assertFalse(ESRECAPDocument.exists(id=ES_CHILD_ID(rd.pk).SCOTUS))
+        self.assertTrue(ESRECAPDocument.exists(id=ES_CHILD_ID(rd.pk).RECAP))
+
+    def test_scotus_dockets_are_not_sent_to_the_percolator(self) -> None:
+        """Search alerts don't support SCOTUS yet, so a SCOTUS Docket's ES
+        save or update returns nothing to percolate, unlike a RECAP
+        Docket's."""
+        # Not indexed yet: es_save_document only percolates a first write.
+        with override_settings(ELASTICSEARCH_DISABLED=True):
+            scotus_docket = ScotusDocketMetadataFactory(
+                docket=DocketFactory(court=self.court, source=Docket.SCRAPER)
+            ).docket
+            recap_docket = DocketFactory(
+                court=CourtFactory(), source=Docket.RECAP
+            )
+
+        for docket, percolates in [
+            (scotus_docket, False),
+            (recap_docket, True),
+        ]:
+            with self.subTest(source=docket.source):
+                saved = es_save_document(
+                    docket.pk, "search.Docket", DocketDocument.__name__
+                )
+                # Same arguments as a Docket's own field change.
+                updated = update_es_document(
+                    DocketDocument.__name__,
+                    ["case_name"],
+                    ("search.Docket", docket.pk),
+                    ("search.Docket", docket.pk),
+                    {"case_name": ["caseName"]},
+                )
+
+                self.assertEqual(saved is not None, percolates)
+                self.assertEqual(updated is not None, percolates)
+
     def test_docket_entry_id_change_triggers_full_reprepare(self) -> None:
         """Reparenting a SCOTUSDocument to a SCOTUSDocketEntry on a
         different Docket triggers a full re-.prepare() via the
