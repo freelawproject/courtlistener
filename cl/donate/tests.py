@@ -1641,8 +1641,8 @@ class SyncNeonMembershipsCommandTest(TestCase):
             NeonMembershipFactory(
                 user=profile.user, termination_date=now() - expired_for
             )
-        # Unpaid rows are selected by their last change instead, under the
-        # same lower bound, and the same termination date upper bound.
+        # Unpaid rows are selected by their last change instead, with the
+        # same lower and upper bounds applied to that date.
         for account_id, payment_status, term_offset, modified_ago in (
             (
                 "unpaid",
@@ -1661,6 +1661,12 @@ class SyncNeonMembershipsCommandTest(TestCase):
                 MembershipPaymentStatus.FAILED,
                 timedelta(days=-100),
                 timedelta(days=3),
+            ),
+            (
+                "unpaid-stale",
+                MembershipPaymentStatus.FAILED,
+                timedelta(days=300),
+                timedelta(days=91),
             ),
             (
                 "paid-future",
@@ -1682,14 +1688,26 @@ class SyncNeonMembershipsCommandTest(TestCase):
 
         # Deletion is off so every run sees the same records.
         for options, expected_account_ids in (
-            ({}, {"1234", "unpaid"}),
+            ({}, {"1234", "unpaid", "unpaid-old-term"}),
             (
                 {"max_days_expired": 0},
-                {"1234", "too-old", "unpaid", "unpaid-old-term"},
+                {
+                    "1234",
+                    "too-old",
+                    "unpaid",
+                    "unpaid-old-term",
+                    "unpaid-stale",
+                },
             ),
             (
                 {"min_hours_expired": 0, "max_days_expired": 30},
-                {"1234", "too-recent", "unpaid", "unpaid-recent"},
+                {
+                    "1234",
+                    "too-recent",
+                    "unpaid",
+                    "unpaid-recent",
+                    "unpaid-old-term",
+                },
             ),
         ):
             with self.subTest(options=options):

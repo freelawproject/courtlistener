@@ -25,6 +25,9 @@ regardless of their termination date. A failed auto-renewal can leave a
 membership with a future term end date but a FAILED payment status, causing
 the member to lose access until Neon successfully retries the payment.
 If the success webhook is missed, this command restores the membership.
+These rows are checked for the same window after their last change that
+expired rows get after their termination date, so a renewal Neon has given
+up on is not polled daily for the rest of its term.
 
 When Neon instead confirms the payment is dead, because the membership is
 CANCELED or REFUNDED, FAILED with a failed payment, or gone altogether, and
@@ -181,14 +184,15 @@ def get_memberships_to_check(
 
     The lower bound gives Neon time to process auto-renewals, retry failed
     charges and deliver the matching webhooks before we poll. The upper
-    bound on termination date keeps the number of Neon API calls per daily
-    run proportional to recent activity, including records the command
-    can't fix and would otherwise re-check forever.
+    bound keeps the number of Neon API calls per daily run proportional to
+    recent activity, including records the command can't fix and would
+    otherwise re-check forever: expired rows age out by termination date,
+    unpaid rows by their last change, which marking a row FAILED refreshes.
 
     :param min_hours: Minimum hours since the membership expired, or since
            an unpaid membership last changed.
-    :param max_days: Maximum days since the termination date, or None for
-           no upper limit.
+    :param max_days: Maximum days since the termination date, or since an
+           unpaid membership last changed, or None for no upper limit.
     :return: Memberships ordered by termination date, with the user and
            profile loaded.
     """
@@ -198,13 +202,14 @@ def get_memberships_to_check(
     unpaid = ~Q(payment_status=MembershipPaymentStatus.SUCCEEDED) & Q(
         date_modified__lt=lower
     )
-    queryset = NeonMembership.objects.filter(expired | unpaid)
     if max_days is not None:
-        queryset = queryset.filter(
-            termination_date__gte=right_now - timedelta(days=max_days)
-        )
-    return queryset.select_related("user__profile").order_by(
-        "termination_date"
+        upper = right_now - timedelta(days=max_days)
+        expired &= Q(termination_date__gte=upper)
+        unpaid &= Q(date_modified__gte=upper)
+    return (
+        NeonMembership.objects.filter(expired | unpaid)
+        .select_related("user__profile")
+        .order_by("termination_date")
     )
 
 
@@ -827,11 +832,10 @@ class Command(VerboseCommand):
             "--max-days-expired",
             type=int,
             default=90,
-            help="Only check memberships whose termination date is at most "
-            "this many days in the past, bounding the number of Neon API "
-            "calls per run. Unpaid memberships with a future term always "
-            "qualify. Pass 0 to remove the limit for a full clean-up. "
-            "Default: 90.",
+            help="Only check memberships whose termination date, or whose "
+            "unpaid record's last change, is at most this many days in the "
+            "past, bounding the number of Neon API calls per run. Pass 0 to "
+            "remove the limit for a full clean-up. Default: 90.",
         )
         parser.add_argument(
             "--delete-after-days",
