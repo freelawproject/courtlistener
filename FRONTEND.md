@@ -32,7 +32,7 @@ Partials a view returns on their own, such as htmx responses, follow the same ru
 
 ### Unfinished (WIP) pages
 
-A page that isn't fully functional yet MUST use the `wip_` prefix instead of `v2_` (e.g., `wip_help/index.html`, partials under `wip_includes/`). The middleware serves it only when both `use_new_design` and `use_wip_design` are active, so people can choose to see finished pages only, or WIP pages too:
+A page that isn't fully functional yet MUST use the `wip_` prefix instead of `v2_` (e.g., `wip_help/index.html`). The middleware serves it only when both `use_new_design` and `use_wip_design` are active, so people can choose to see finished pages only, or WIP pages too:
 
 | Flags active | Page with a `wip_` template gets |
 |---|---|
@@ -41,32 +41,18 @@ A page that isn't fully functional yet MUST use the `wip_` prefix instead of `v2
 
 WIP templates follow every rule for `v2_` templates, and CI checks them the same way. Register each WIP page in `V2PagesRegisterTest.WIP_PAGES`, not `V2_PAGES`.
 
-Templates that finished pages render (`v2_` templates, `new_base.html` and Cotton components) MUST NOT extend or include a `wip_` template: only the template a view returns is swapped, so a WIP template pulled in by one of them reaches everyone with `use_new_design`. To work on one section of a finished page, gate the include with both flags instead. The WIP flag alone is not enough: a `v2_` page with no legacy template is served to everyone, and the WIP flag only counts together with `use_new_design`. The `{% else %}` branches are what everyone else sees, so they MUST NOT reference `wip_` templates:
+WIP is for whole pages only. Templates MUST NOT extend or include a `wip_` template: only the template a view returns is swapped, so a WIP template pulled in by another one reaches everyone who sees that one. Partials have no WIP version, so they stay under `v2_includes/`.
 
-```html
-{% load waffle_tags %}
-{% flag "use_new_design" %}{% flag "use_wip_design" %}
-  {% include "wip_includes/help/new_section.html" %}
-{% else %}
-  {% include "v2_includes/help/section.html" %}
-{% endflag %}{% else %}
-  {% include "v2_includes/help/section.html" %}
-{% endflag %}
-```
-
-A page that only has a `wip_` template is a 404 for everyone not opted in, so finished pages MUST NOT link to it outside a gate like the one above, and it MUST NOT be added to a sitemap.
-
-A partial a view returns on its own, such as an htmx response, is swapped by its own request, not by the page that loads it. Once it has a `wip_includes/` version, opted-in visitors get that version on every page that loads it, finished pages included. Give a partial a WIP version only when the finished pages that load it still work with it.
+A page that only has a `wip_` template is a 404 for everyone not opted in, so finished pages MUST NOT link to it.
 
 To mark a page as finished, promote it:
-1. `git mv` the template from `wip_` to `v2_` (e.g., `wip_help/index.html` → `v2_help/index.html`), along with its partials
+1. `git mv` the template from `wip_` to `v2_` (e.g., `wip_help/index.html` → `v2_help/index.html`)
 2. Move its entry from `WIP_PAGES` to `V2_PAGES` with the new template name
 3. Update the path in the legacy template's sync notice
-4. Point every `{% extends %}` or `{% include %}` of the old `wip_` names to the new `v2_` ones. CI fails while any template still uses a name the change deletes or renames
 
 ### Base template
 
-New templates MUST extend `new_base.html` (or another `v2_` or `wip_` template). Only `new_base.html` loads Tailwind, Alpine, and Cotton.
+New templates MUST extend `new_base.html` (or another `v2_` template). Only `new_base.html` loads Tailwind, Alpine, and Cotton.
 
 ### Legacy ↔ v2 sync
 
@@ -187,7 +173,7 @@ v2 uses htmx 2.0.11 from `js/third_party/` (legacy keeps 1.7.0). `new_base.html`
 {% require_script "js/third_party/htmx" defer=True %}
 ```
 
-Swapped partials live under `v2_includes/`, or `wip_includes/` while unfinished (see [Naming & middleware](#naming--middleware)).
+Swapped partials live under `v2_includes/` (see [Naming & middleware](#naming--middleware)).
 
 `<body>` in `new_base.html` carries `hx-headers` with the CSRF token and the design header `X-CL-Design: v2`, and htmx elements inherit both: an `hx-post` MUST NOT repeat them.
 
