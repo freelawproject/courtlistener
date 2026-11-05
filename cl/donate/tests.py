@@ -2250,6 +2250,37 @@ class SyncNeonMembershipsCommandTest(TestCase):
                 self.mock_tag_zoho.delay.assert_not_called()
                 self.assertIn("0 deleted, 1 revoked", out.getvalue())
 
+    def test_never_revokes_a_lapsed_row(self) -> None:
+        """A PENDING row whose term has ended keeps its grace period."""
+        # Neon says the term was paid but is over; the lapsed rule deletes
+        # the row a week after the term end, and revoking earlier would cut
+        # the grace period short.
+        self.membership.termination_date = now() - timedelta(days=2)
+        self.membership.payment_status = MembershipPaymentStatus.PENDING
+        self.membership.save()
+        NeonMembership.objects.filter(pk=self.membership.pk).update(
+            date_modified=now() - timedelta(days=10)
+        )
+        self.membership.refresh_from_db()
+        self.assertTrue(self.membership.is_active)
+        for label, memberships in (
+            ("paid term that just ended", [self.same_term_from_neon()]),
+            ("no membership at all", []),
+        ):
+            with self.subTest(label=label):
+                self.mock_list_memberships.return_value = memberships
+                out = StringIO()
+
+                call_command("sync_neon_memberships", stdout=out)
+
+                self.membership.refresh_from_db()
+                self.assertEqual(
+                    self.membership.payment_status,
+                    MembershipPaymentStatus.PENDING,
+                )
+                self.assertTrue(self.membership.is_active)
+                self.assertIn("0 deleted, 0 revoked", out.getvalue())
+
     def test_keeps_pending_row_until_revoke_threshold(self) -> None:
         """Leaves a PENDING row alone until it is old enough, or when off."""
         self.mock_list_memberships.return_value = []

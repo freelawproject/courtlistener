@@ -35,10 +35,10 @@ for the remainder of their term.
 
 When Neon confirms that a payment is no longer recoverable (the membership
 is CANCELED or REFUNDED, or is FAILED with a failed payment), the command
-marks the local record FAILED if it has remained unchanged for a week. This
-revokes benefits that a PENDING record might still be granting while
-preserving the row and its Neon ID, so a late success webhook can still
-match it.
+marks the local record FAILED if its term is still running and it has
+remained unchanged for a week. This revokes benefits that a PENDING record
+might still be granting while preserving the row and its Neon ID, so a late
+success webhook can still match it.
 
 Memberships that Neon confirms are no longer active are deleted after a
 week. Their history is retained by pghistory, and any subsequent renewal
@@ -756,10 +756,17 @@ def check_membership(
             return SyncResult.DELETED
         return result
 
+    # Only a term still running is revoked. A lapsed one already grants
+    # nothing past the grace period, which must not be cut short, and the
+    # deletion above settles it a week after it ended.
     if (
         neon_status is NeonStatus.DEAD
         and membership.payment_status != MembershipPaymentStatus.FAILED
         and membership.date_modified < delete_before
+        and (
+            membership.termination_date is None
+            or membership.termination_date >= timezone.now()
+        )
     ):
         if revoke_membership(membership):
             return SyncResult.REVOKED
