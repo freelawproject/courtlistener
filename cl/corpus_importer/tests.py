@@ -2518,7 +2518,7 @@ class TexasMergerTest(TestCase):
         original_docket_entries = [
             e["pk"] for e in TexasDocketEntry.objects.all().values("pk")
         ]
-        merge_result = merge_texas_docket(docket_dict)
+        merge_texas_docket(docket_dict)
 
         docket_entries = list(
             TexasDocketEntry.objects.exclude(
@@ -3907,7 +3907,7 @@ class TexasMergerTest(TestCase):
             is_direct_appeal=False,
         )
 
-        result = merge_texas_case_transfers(self.docket_coa1, docket_data)
+        merge_texas_case_transfers(self.docket_coa1, docket_data)
         transfers = CaseTransfer.objects.all()
         self.assertEqual(transfers.count(), 3)
         source_dns = set(aci["case_number"])
@@ -4486,7 +4486,7 @@ class ScrapeIqueryPagesTest(TestCase):
         r.set(f"iquery:court_wait:{self.court_vib.pk}", 1000, ex=3600)
         r.set(f"iquery:court_wait:{self.court_mowd.pk}", 1000, ex=3600)
 
-        with patch("cl.lib.decorators.time.sleep") as mock_sleep:
+        with patch("cl.lib.decorators.time.sleep"):
             call_command(
                 "probe_iquery_pages_daemon",
                 testing_iterations=1,
@@ -4915,7 +4915,7 @@ class ScrapeIqueryPagesTest(TestCase):
         for expected_wait in tests:
             with self.subTest(expected_wait=expected_wait):
                 r.delete(f"iquery:court_wait:{self.court_gamb.pk}")
-                with patch("cl.lib.decorators.time.sleep") as mock_sleep:
+                with patch("cl.lib.decorators.time.sleep"):
                     call_command(
                         "probe_iquery_pages_daemon",
                         testing_iterations=1,
@@ -4928,7 +4928,7 @@ class ScrapeIqueryPagesTest(TestCase):
 
         # Test one more attempt. The alert error should be triggered.
         r.delete(f"iquery:court_wait:{self.court_gamb.pk}")
-        with patch("cl.lib.decorators.time.sleep") as mock_sleep:
+        with patch("cl.lib.decorators.time.sleep"):
             call_command(
                 "probe_iquery_pages_daemon",
                 testing_iterations=1,
@@ -4995,7 +4995,7 @@ class ScrapeIqueryPagesTest(TestCase):
                 r.delete(f"iquery:court_wait:{self.court_cacd.pk}")
                 with (
                     time_machine.travel(monday_local, tick=False),
-                    patch("cl.lib.decorators.time.sleep") as mock_sleep,
+                    patch("cl.lib.decorators.time.sleep"),
                 ):
                     call_command(
                         "probe_iquery_pages_daemon",
@@ -5019,7 +5019,7 @@ class ScrapeIqueryPagesTest(TestCase):
         r.delete(f"iquery:court_wait:{self.court_cacd.pk}")
         with (
             time_machine.travel(monday_local, tick=False),
-            patch("cl.lib.decorators.time.sleep") as mock_sleep,
+            patch("cl.lib.decorators.time.sleep"),
         ):
             call_command(
                 "probe_iquery_pages_daemon",
@@ -5086,7 +5086,7 @@ class ScrapeIqueryPagesTest(TestCase):
                 r.delete(f"iquery:court_wait:{self.court_vib.pk}")
                 with (
                     time_machine.travel(monday_local, tick=False),
-                    patch("cl.lib.decorators.time.sleep") as mock_sleep,
+                    patch("cl.lib.decorators.time.sleep"),
                 ):
                     call_command(
                         "probe_iquery_pages_daemon",
@@ -5106,7 +5106,7 @@ class ScrapeIqueryPagesTest(TestCase):
         r.delete(f"iquery:court_wait:{self.court_vib.pk}")
         with (
             time_machine.travel(monday_local, tick=False),
-            patch("cl.lib.decorators.time.sleep") as mock_sleep,
+            patch("cl.lib.decorators.time.sleep"),
         ):
             call_command(
                 "probe_iquery_pages_daemon",
@@ -5180,7 +5180,7 @@ class ScrapeIqueryPagesTest(TestCase):
                 weekend_day = sunday_local if test % 2 == 0 else saturday_local
                 with (
                     time_machine.travel(weekend_day, tick=False),
-                    patch("cl.lib.decorators.time.sleep") as mock_sleep,
+                    patch("cl.lib.decorators.time.sleep"),
                 ):
                     call_command(
                         "probe_iquery_pages_daemon",
@@ -5431,7 +5431,7 @@ class ScrapeIqueryPagesTest(TestCase):
     def test_get_latest_pacer_case_id_for_courts(self, mock_cookies):
         """Test get_latest_pacer_case_id_for_courts helper."""
         today = date.today()
-        d_canb_old = DocketFactory(
+        DocketFactory(
             court=self.court_canb,
             appeal_from=None,
             source=Docket.RECAP,
@@ -5445,7 +5445,7 @@ class ScrapeIqueryPagesTest(TestCase):
             pacer_case_id="43000",
             date_filed=today,
         )
-        d_cand_old = DocketFactory(
+        DocketFactory(
             court=self.court_cand,
             appeal_from=None,
             source=Docket.RECAP,
@@ -5536,7 +5536,7 @@ class ScrapeIqueryPagesTest(TestCase):
             override_settings(
                 IQUERY_SWEEP_UPLOADS_SIGNAL_ENABLED=True, IQUERY_FIXED_SWEEP=10
             ),
-            patch("cl.lib.decorators.time.sleep") as mock_sleep,
+            patch("cl.lib.decorators.time.sleep"),
             patch(
                 "cl.corpus_importer.tasks.query_iquery_page",
                 return_value=({}, ""),
@@ -5572,7 +5572,7 @@ class ScrapeIqueryPagesTest(TestCase):
             override_settings(
                 IQUERY_SWEEP_UPLOADS_SIGNAL_ENABLED=True, IQUERY_FIXED_SWEEP=10
             ),
-            patch("cl.lib.decorators.time.sleep") as mock_sleep,
+            patch("cl.lib.decorators.time.sleep"),
             patch(
                 "cl.corpus_importer.tasks.query_iquery_page",
                 return_value=({}, ""),
@@ -5611,7 +5611,7 @@ class ScrapeIqueryPagesTest(TestCase):
                     IQUERY_SWEEP_UPLOADS_SIGNAL_ENABLED=True,
                     IQUERY_FIXED_SWEEP=10,
                 ),
-                patch("cl.lib.decorators.time.sleep") as mock_sleep,
+                patch("cl.lib.decorators.time.sleep"),
                 self.captureOnCommitCallbacks(execute=True),
             ):
                 call_command(

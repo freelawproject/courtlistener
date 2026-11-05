@@ -1277,7 +1277,7 @@ class RecapUploadsTest(TestCase):
         )
         del self.data["pacer_doc_id"]
         r = await self.async_client.post(self.path, self.data)
-        j = json.loads(r.content)
+        json.loads(r.content)
 
         self.assertEqual(r.status_code, HTTPStatus.CREATED)
 
@@ -7319,7 +7319,7 @@ class WebhooksRetries(TestCase):
         it won't be retried.
         """
         fake_now = now()
-        webhook_e1 = WebhookEventFactory(
+        WebhookEventFactory(
             webhook=self.webhook_disabled,
             content="{'message': 'ok_1'}",
             event_status=WEBHOOK_EVENT_STATUS.ENQUEUED_RETRY,
@@ -7359,26 +7359,26 @@ class WebhooksRetries(TestCase):
             event_status=WEBHOOK_EVENT_STATUS.ENQUEUED_RETRY,
             next_retry_date=fake_now + timedelta(minutes=3),
         )
-        webhook_e1_debug = WebhookEventFactory(
+        WebhookEventFactory(
             webhook=self.webhook,
             content="{'message': 'ok_1'}",
             event_status=WEBHOOK_EVENT_STATUS.ENQUEUED_RETRY,
             next_retry_date=fake_now + timedelta(minutes=3),
             debug=True,
         )
-        webhook_e2 = WebhookEventFactory(
+        WebhookEventFactory(
             webhook=self.webhook,
             content="{'message': 'ok_2'}",
             event_status=WEBHOOK_EVENT_STATUS.SUCCESSFUL,
             next_retry_date=fake_now + timedelta(minutes=3),
         )
-        webhook_e3 = WebhookEventFactory(
+        WebhookEventFactory(
             webhook=self.webhook,
             content="{'message': 'ok_3'}",
             event_status=WEBHOOK_EVENT_STATUS.IN_PROGRESS,
             next_retry_date=fake_now + timedelta(minutes=3),
         )
-        webhook_e4 = WebhookEventFactory(
+        WebhookEventFactory(
             webhook=self.webhook,
             content="{'message': 'ok_4'}",
             event_status=WEBHOOK_EVENT_STATUS.FAILED,
@@ -8234,10 +8234,10 @@ class WebhooksRetries(TestCase):
 
         fake_days_ago = now() - timedelta(days=DAYS_TO_DELETE + 1)
         with time_machine.travel(fake_days_ago, tick=False):
-            webhook_e1 = WebhookEventFactory(
+            WebhookEventFactory(
                 webhook=self.webhook,
             )
-            webhook_e2 = WebhookEventFactory(
+            WebhookEventFactory(
                 webhook=self.webhook,
             )
 

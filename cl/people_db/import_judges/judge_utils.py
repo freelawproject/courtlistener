@@ -276,13 +276,6 @@ def get_aba(abastr):
 
 
 def get_select(state, year):
-    select_dict = {
-        "P": "e_part",
-        "NP": "e_non_part",
-        "G": "a_gov",
-        "L": "a_legis",
-        "M": "a_gov",
-    }
     return "P"
 
 
