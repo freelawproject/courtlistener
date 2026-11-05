@@ -1357,7 +1357,11 @@ class ESRECAPDocument(
         if instance.filepath_local:
             return instance.filepath_local.name
 
-    def prepare_is_available(self, instance):
+    def prepare_is_available(self, instance: SourceDocument) -> bool | None:
+        """Index whether the document's file is available."""
+        # SCOTUS maps filepath_local changes to is_available. Without a
+        # prepare method, partial updates would copy the filepath_local
+        # value into is_available.
         return instance.is_available
 
     def prepare_absolute_url(self, instance):
