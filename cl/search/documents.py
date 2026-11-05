@@ -1635,6 +1635,8 @@ class DocketDocument(
     def prepare_capital_case(self, instance: Docket) -> bool | None:
         """Return the docket's SCOTUS capital_case flag; empty for dockets
         without SCOTUS metadata."""
+        if instance.court_id != "scotus":
+            return None
         scotus_metadata = getattr(instance, "scotus_metadata", None)
         return scotus_metadata.capital_case if scotus_metadata else None
 
