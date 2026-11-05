@@ -26,6 +26,12 @@ membership with a future term end date but a FAILED payment status, causing
 the member to lose access until Neon successfully retries the payment.
 If the success webhook is missed, this command restores the membership.
 
+When Neon instead confirms the payment is dead, because the membership is
+CANCELED or REFUNDED, FAILED with a failed payment, or gone altogether, and
+the local record has not changed for a week, the local record is marked
+FAILED. That revokes benefits a PENDING record was still granting while
+keeping the row and its Neon ID, so a late success still matches.
+
 Memberships that Neon confirms are no longer active are deleted after
 a week. Their history is retained by pghistory, and any subsequent renewal
 creates a new local record through the createMembership webhook.
@@ -76,17 +82,89 @@ class SyncResult(Enum):
     SKIPPED = "skipped"
     # Neon confirmed the lapse and the local record was deleted.
     DELETED = "deleted"
+    # Neon confirmed the payment is dead and the local record was marked
+    # FAILED, revoking its benefits while keeping the row.
+    REVOKED = "revoked"
     # The check itself failed (Neon request error or an unexpected error);
     # nothing was written and the record is retried on the next run.
     FAILED = "failed"
 
 
-# Neon membership statuses the command understands. SUCCEEDED is the only
-# state copied locally. PENDING and FAILED mean a payment is still being
-# processed or retried, so the local record is left alone and re-checked on
-# the next run. Anything else is reported for manual review.
+class NeonStatus(Enum):
+    """What a Neon membership record means for the local row."""
+
+    # Paid; the record can be synced into the local row.
+    SUCCEEDED = "succeeded"
+    # A payment is still being processed or retried; wait for the next run.
+    IN_PROGRESS = "in_progress"
+    # Neon has given up on the payment, or has no membership at all.
+    DEAD = "dead"
+    # A status the command does not handle; reported for a human.
+    UNEXPECTED = "unexpected"
+
+
 NEON_STATUS_SUCCEEDED = "SUCCEEDED"
-NEON_STATUSES_IN_PROGRESS = frozenset({"PENDING", "FAILED"})
+# Statuses that end a membership for good.
+NEON_STATUSES_DEAD = frozenset({"CANCELED", "REFUNDED"})
+# The paymentStatus of a FAILED membership once Neon has given up on it. Any
+# other value (Processing, Pending...) means a retry is still in flight.
+NEON_PAYMENT_FAILED = "Failed"
+
+
+def get_payment_status(record: dict[str, Any]) -> str:
+    """Return the first payment's status, or "" if no payments exist.
+
+    Neon returns payments in no guaranteed order, and the list may include
+    earlier failed attempts for a renewal that eventually succeeded.
+    Therefore, this value is only used for logging and interpreting FAILED
+    memberships. It must not be used to determine whether a SUCCEEDED
+    membership has been paid.
+
+    :param record: A membership record as returned by the Neon API.
+    :return: The first payment's status, or "" if no payments exist.
+    """
+    payments = record.get("payments") or []
+    return (payments[0].get("paymentStatus") or "") if payments else ""
+
+
+def get_term_end(record: dict[str, Any]) -> date | None:
+    """Return the membership's term end date in the current time zone.
+
+    :param record: A membership record as returned by the Neon API.
+    :return: The localized term end date, or None if the record has no term end.
+    """
+    term_end = record.get("termEndDate")
+    if not term_end:
+        return None
+    return timezone.localdate(parse_neon_date(term_end))
+
+
+def classify_neon_status(record: dict[str, Any]) -> NeonStatus:
+    """Classify a Neon membership record for local synchronization.
+
+    A FAILED membership is considered dead only when its payment status
+    is ``Failed``. While the payment is still ``Processing``, Neon may
+    retry the charge, which typically succeeds within about a day.
+
+    PENDING memberships are considered in progress regardless of their
+    payment status.
+
+    :param record: A membership record as returned by the Neon API.
+    :return: The classification; see ``NeonStatus``.
+    """
+    match record.get("status"):
+        case "SUCCEEDED":
+            return NeonStatus.SUCCEEDED
+        case status if status in NEON_STATUSES_DEAD:
+            return NeonStatus.DEAD
+        case "FAILED":
+            if get_payment_status(record) == NEON_PAYMENT_FAILED:
+                return NeonStatus.DEAD
+            return NeonStatus.IN_PROGRESS
+        case "PENDING":
+            return NeonStatus.IN_PROGRESS
+        case _:
+            return NeonStatus.UNEXPECTED
 
 
 def get_memberships_to_check(
@@ -160,10 +238,8 @@ def select_membership_to_sync(
     for record in memberships:
         if record.get("status") != NEON_STATUS_SUCCEEDED:
             continue
-        if not (term_end := record.get("termEndDate")):
-            continue
-        end = timezone.localdate(parse_neon_date(term_end))
-        if end < today:
+        end = get_term_end(record)
+        if end is None or end < today:
             continue
         term_start = record.get("termStartDate")
         start = (
@@ -197,11 +273,11 @@ def sync_membership_from_neon(
     one, or when the dates match but the local payment status is not
     SUCCEEDED. This also repairs renewals that succeeded after a failed
     charge. A record that is no newer than ours is reported as unchanged so
-    the caller can decide whether to delete the local row. Memberships still
-    PENDING or FAILED in Neon are left alone to be re-checked on the next run.
-    Anything else (no term end date, a cancelled or refunded membership, an
-    unknown level, an EDU membership without a ``.edu`` email) is skipped and
-    logged for a human.
+    the caller can decide whether to delete the local row. Only call this
+    with a record that ``classify_neon_status`` reports as SUCCEEDED; the
+    caller handles the other statuses. Anything else here (no term end
+    date, an unknown level, an EDU membership without a ``.edu`` email) is
+    skipped and logged for a human.
 
     The caller loads memberships once per run, so by the time we write, a
     webhook may already have changed or deleted the row. In that case the
@@ -214,12 +290,7 @@ def sync_membership_from_neon(
     user = membership.user
     neon_id = str(neon_membership["id"])
     status = neon_membership.get("status")
-    # ``payments`` is an unordered list that can include earlier failed
-    # attempts of a renewal that eventually succeeded.
-    payments = neon_membership.get("payments") or []
-    raw_payment_status = (
-        (payments[0].get("paymentStatus") or "") if payments else ""
-    )
+    raw_payment_status = get_payment_status(neon_membership)
 
     term_end_date = neon_membership.get("termEndDate")
     if not term_end_date:
@@ -256,29 +327,6 @@ def sync_membership_from_neon(
     ):
         # The term is unchanged and payment has already succeeded.
         return SyncResult.UNCHANGED
-
-    if status in NEON_STATUSES_IN_PROGRESS:
-        logger.warning(
-            "Neon membership %s for user %s is %s (paymentStatus %r); "
-            "leaving the local record for the next run.",
-            neon_id,
-            user.username,
-            status,
-            raw_payment_status,
-        )
-        return SyncResult.SKIPPED
-
-    if status != NEON_STATUS_SUCCEEDED:
-        logger.error(
-            "Neon membership %s for user %s has unexpected status %s "
-            "(paymentStatus %r, termEndDate %s); skipping.",
-            neon_id,
-            user.username,
-            status,
-            raw_payment_status,
-            term_end_date,
-        )
-        return SyncResult.SKIPPED
 
     level_name = neon_membership["membershipLevel"]["name"]
     level = NeonMembershipLevel.TYPES_INVERTED.get(level_name)
@@ -377,6 +425,135 @@ def delete_expired_membership(membership: NeonMembership) -> bool:
         and timezone.localdate(membership.termination_date),
     )
     return True
+
+
+def revoke_membership(membership: NeonMembership) -> bool:
+    """Revoke a membership's benefits after Neon confirms payment failure.
+
+    The membership row and its Neon ID are preserved so late success
+    webhooks can still find it and subsequent syncs can continue checking
+    its status. Only ``payment_status`` changes, which is what
+    ``NeonMembership.is_active`` uses to determine whether benefits apply.
+
+    Membership throttles are left unchanged because the override lookup
+    only considers active memberships. The override cache is also left
+    to expire naturally, as it does when a membership is deleted.
+
+    Before updating, verify that the row has not been modified or deleted
+    since it was loaded. If a webhook has already updated it, leave the
+    newer data untouched.
+
+    :param membership: The membership to revoke.
+    :return: True if the membership was marked FAILED, False if a webhook
+        modified or deleted it first.
+    """
+    with transaction.atomic():
+        locked = (
+            NeonMembership.objects.select_for_update(no_key=True)
+            .filter(
+                pk=membership.pk,
+                date_modified=membership.date_modified,
+            )
+            .first()
+        )
+
+        if locked is None:
+            logger.info(
+                "Membership for user %s changed or was deleted by a webhook "
+                "since this run started; skipping revocation.",
+                membership.user.username,
+            )
+            return False
+
+        locked.payment_status = MembershipPaymentStatus.FAILED
+        locked.save(update_fields=["payment_status", "date_modified"])
+
+    logger.info(
+        "Revoked benefits for user %s: Neon confirms payment failure for "
+        "membership %s.",
+        membership.user.username,
+        membership.neon_id,
+    )
+    return True
+
+
+def apply_neon_record(
+    membership: NeonMembership, record: dict[str, Any] | None
+) -> tuple[SyncResult, NeonStatus]:
+    """Apply the selected Neon record and return its sync outcome.
+
+    A record whose term has ended is considered dead regardless of its
+    status. This check takes precedence over status classification so an
+    expired canceled membership is not reported as unexpected.
+
+    SUCCEEDED records are synced through ``sync_membership_from_neon``.
+    IN_PROGRESS records are left for the next run, DEAD records are left
+    unchanged for the caller to handle, and UNEXPECTED records are logged
+    for manual investigation.
+
+    :param membership: The local membership being checked.
+    :param record: The record selected by ``select_membership_to_sync``,
+        or None if Neon has no memberships for the account.
+    :return: The sync outcome and the record's classification.
+    """
+    user = membership.user
+
+    if record is None:
+        logger.debug("Neon has no memberships for user %s.", user.username)
+        return SyncResult.UNCHANGED, NeonStatus.DEAD
+
+    neon_id = str(record["id"])
+    status = record.get("status")
+    payment_status = get_payment_status(record)
+    term_end = get_term_end(record)
+
+    if term_end is not None and term_end < timezone.localdate():
+        logger.debug(
+            "Neon membership %s for user %s ended on %s.",
+            neon_id,
+            user.username,
+            term_end,
+        )
+        return SyncResult.UNCHANGED, NeonStatus.DEAD
+
+    neon_status = classify_neon_status(record)
+
+    match neon_status:
+        case NeonStatus.SUCCEEDED:
+            return sync_membership_from_neon(membership, record), neon_status
+
+        case NeonStatus.IN_PROGRESS:
+            logger.warning(
+                "Neon membership %s for user %s is %s (paymentStatus %r); "
+                "leaving the local record for the next run.",
+                neon_id,
+                user.username,
+                status,
+                payment_status,
+            )
+            return SyncResult.SKIPPED, neon_status
+
+        case NeonStatus.DEAD:
+            logger.debug(
+                "Neon membership %s for user %s is %s (paymentStatus %r).",
+                neon_id,
+                user.username,
+                status,
+                payment_status,
+            )
+            return SyncResult.UNCHANGED, neon_status
+
+        case _:
+            logger.error(
+                "Neon membership %s for user %s has unexpected status %s "
+                "(paymentStatus %r, termEndDate %s); skipping.",
+                neon_id,
+                user.username,
+                status,
+                payment_status,
+                record.get("termEndDate"),
+            )
+            return SyncResult.SKIPPED, neon_status
 
 
 def adopt_neon_account(
@@ -511,15 +688,18 @@ def check_membership(
     Picks the membership worth syncing (see ``select_membership_to_sync``),
     syncs it into the local record when it is newer or newly paid, and
     deletes the local record when Neon confirms the lapse and the
-    membership ended before ``delete_before``. A failed Neon request is
-    logged and reported as FAILED so the caller can move on to the next
-    member; any other exception propagates to the caller.
+    membership ended before ``delete_before``. When Neon instead confirms
+    the payment is dead on a term still running, and the record has not
+    changed since ``delete_before``, the record is marked FAILED. A failed
+    Neon request is logged and reported as FAILED so the caller can move on
+    to the next member; any other exception propagates to the caller.
 
     :param client: The Neon API client.
     :param membership: The local membership to check, with its user and
         profile loaded.
-    :param delete_before: Delete confirmed lapses that ended before this
-        instant, or None to never delete.
+    :param delete_before: Delete confirmed lapses that ended, and revoke
+        dead unpaid records that last changed, before this instant; None
+        never deletes or revokes.
     :return: What happened to the membership.
     """
     user = membership.user
@@ -553,20 +733,26 @@ def check_membership(
         return SyncResult.FAILED
 
     neon_membership = select_membership_to_sync(memberships)
-    if neon_membership is None:
-        logger.debug("Neon has no memberships for user %s.", user.username)
-        result = SyncResult.UNCHANGED
-    else:
-        result = sync_membership_from_neon(membership, neon_membership)
+    result, neon_status = apply_neon_record(membership, neon_membership)
+    if delete_before is None:
+        return result
 
     if (
         result is SyncResult.UNCHANGED
-        and delete_before is not None
         and membership.termination_date
         and membership.termination_date < delete_before
-        and delete_expired_membership(membership)
     ):
-        return SyncResult.DELETED
+        if delete_expired_membership(membership):
+            return SyncResult.DELETED
+        return result
+
+    if (
+        neon_status is NeonStatus.DEAD
+        and membership.payment_status != MembershipPaymentStatus.FAILED
+        and membership.date_modified < delete_before
+    ):
+        if revoke_membership(membership):
+            return SyncResult.REVOKED
     return result
 
 
@@ -583,13 +769,17 @@ def sync_memberships(
     Sentry, and counted as FAILED.
 
     Memberships confirmed to have no active membership are deleted once
-    they have been expired for at least delete_after_days. Set this value
-    to 0 to disable deletion.
+    they have been expired for at least delete_after_days. Unpaid
+    memberships whose payment Neon confirms is dead are marked FAILED once
+    they have gone unchanged for as long. Set this value to 0 to disable
+    both.
 
     :param min_hours: See `get_memberships_to_check`.
     :param max_days: See `get_memberships_to_check`.
     :param delete_after_days: Age in days past the termination date after
-        which a confirmed-expired membership is deleted. 0 disables deletion.
+        which a confirmed-expired membership is deleted, and past the last
+        change after which a confirmed-dead unpaid one is marked FAILED. 0
+        disables both.
     :return: How many memberships ended in each ``SyncResult``.
     """
     client = NeonClient()
@@ -648,10 +838,12 @@ class Command(VerboseCommand):
             type=int,
             default=7,
             help="Delete expired memberships that Neon confirms have nothing "
-            "newer once they expired at least this many days ago. Must be "
-            "greater than NEON_MEMBERSHIP_GRACE_PERIOD_DAYS so members are "
-            "never deleted while still inside the grace period. 0 disables "
-            "deletion. Default: 7.",
+            "newer once they expired at least this many days ago, and mark "
+            "unpaid memberships FAILED once Neon confirms the payment is "
+            "dead and they have gone unchanged for as long. Must be greater "
+            "than NEON_MEMBERSHIP_GRACE_PERIOD_DAYS so members are never "
+            "deleted while still inside the grace period. 0 disables both. "
+            "Default: 7.",
         )
 
     def handle(self, *args, **options):
@@ -675,6 +867,7 @@ class Command(VerboseCommand):
             f"Checked {sum(counts.values())} memberships: "
             f"{counts[SyncResult.UPDATED]} updated, "
             f"{counts[SyncResult.DELETED]} deleted, "
+            f"{counts[SyncResult.REVOKED]} revoked, "
             f"{counts[SyncResult.SKIPPED]} skipped, "
             f"{counts[SyncResult.FAILED]} failed."
         )
