@@ -3527,7 +3527,7 @@ class RemoveContentFromESCommandTest(ESIndexTestCase, TestCase):
             precedential_status="Errata",
             docket=self.recap_docket,
         )
-        opinion_1 = OpinionFactory.create(
+        OpinionFactory.create(
             extracted_by_ocr=False,
             cluster=opinion_cluster_1,
             type="020lead",
@@ -3965,7 +3965,7 @@ class LLMCleanDocketNumberTests(TransactionTestCase):
             self.model_response,  # Second mini model response
         ]
 
-        with mock.patch("cl.lib.decorators.time.sleep") as mock_sleep:
+        with mock.patch("cl.lib.decorators.time.sleep"):
             call_command(
                 "llm_clean_docket_number_daemon",
                 testing_iterations=1,
