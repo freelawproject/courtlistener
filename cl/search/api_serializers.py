@@ -2,6 +2,7 @@ from datetime import UTC
 from typing import Any
 
 from django.conf import settings
+from django.db.models import Model
 from elasticsearch.dsl.response import Hit
 from rest_framework import serializers
 from rest_framework.serializers import ModelSerializer
@@ -52,7 +53,9 @@ from cl.search.models import (
     OpinionsCited,
     OriginatingCourtInformation,
     RECAPDocument,
+    SCOTUSDocketEntry,
     ScotusDocketMetadata,
+    SCOTUSDocument,
     Tag,
 )
 from cl.search.types import ESDictDocument
@@ -206,6 +209,36 @@ class FullDocketSerializer(DocketSerializer):
     docket_entries = DocketEntrySerializer(many=True, read_only=True)
 
 
+class BaseSourceDocumentSerializer(
+    RetrieveFilteredFieldsMixin,
+    NestedDynamicFieldsMixin,
+    HyperlinkedModelSerializerWithId,
+):
+    """Base serializer for the documents of a docket source.
+
+    The model must inherit AbstractPDF and provide an is_available property
+    and get_absolute_url().
+    """
+
+    filepath_local = serializers.FileField(use_url=True, read_only=True)
+    absolute_url = serializers.CharField(
+        source="get_absolute_url", read_only=True
+    )
+    is_available = serializers.BooleanField(read_only=True)
+
+
+class BaseSourceDocketEntrySerializer(
+    RetrieveFilteredFieldsMixin,
+    NestedDynamicFieldsMixin,
+    HyperlinkedModelSerializerWithId,
+):
+    """Base serializer for the docket entries of a docket source."""
+
+    docket = serializers.HyperlinkedRelatedField(
+        view_name="docket-detail", read_only=True
+    )
+
+
 class ScotusDocketMetadataSerializer(
     RetrieveFilteredFieldsMixin,
     NestedDynamicFieldsMixin,
@@ -220,6 +253,68 @@ class ScotusDocketMetadataSerializer(
     class Meta:
         model = ScotusDocketMetadata
         fields = "__all__"
+
+
+class SCOTUSDocumentSerializer(BaseSourceDocumentSerializer):
+    """A SCOTUS document, with a link to its docket entry."""
+
+    class Meta:
+        model = SCOTUSDocument
+        fields = "__all__"
+
+
+class SCOTUSDocumentListSerializer(SCOTUSDocumentSerializer):
+    """A SCOTUS document for list pages.
+
+    It leaves out plain_text, which can be a whole PDF's text; only the
+    document detail endpoint returns it.
+    """
+
+    class Meta:
+        model = SCOTUSDocument
+        exclude = ("plain_text",)
+
+
+class NestedSCOTUSDocumentSerializer(SCOTUSDocumentSerializer):
+    """A SCOTUS document nested in its entry.
+
+    It leaves out the entry link and plain_text, which only the document
+    detail endpoint returns.
+    """
+
+    class Meta:
+        model = SCOTUSDocument
+        exclude = ("docket_entry", "plain_text")
+
+
+class SCOTUSDocketEntrySerializer(BaseSourceDocketEntrySerializer):
+    """A SCOTUS docket entry with its documents nested."""
+
+    scotus_documents = NestedSCOTUSDocumentSerializer(
+        many=True, read_only=True
+    )
+
+    class Meta:
+        model = SCOTUSDocketEntry
+        fields = "__all__"
+
+    def get_deferred_model_fields(
+        self,
+    ) -> tuple[list[str], dict[str, tuple[type[Model], list[str]]]]:
+        """Also defer the nested documents' plain_text.
+
+        The nested documents never include it, so DeferredFieldsMixin
+        shouldn't read it from the database either.
+        """
+        top_fields, nested_to_defer = super().get_deferred_model_fields()
+        _, document_fields = nested_to_defer.get(
+            "scotus_documents", (SCOTUSDocument, [])
+        )
+        nested_to_defer["scotus_documents"] = (
+            SCOTUSDocument,
+            list({*document_fields, "plain_text"}),
+        )
+        return top_fields, nested_to_defer
 
 
 class CourtSerializer(

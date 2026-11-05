@@ -2,7 +2,7 @@ from dataclasses import dataclass
 from http import HTTPStatus
 from typing import cast
 
-from django.db.models import Prefetch
+from django.db.models import Prefetch, QuerySet
 from django.http.response import Http404
 from django.urls import reverse
 from rest_framework import pagination, permissions, response, viewsets
@@ -43,7 +43,10 @@ from cl.search.api_serializers import (
     RECAPDocumentESResultSerializer,
     RECAPDocumentSerializer,
     RECAPESResultSerializer,
+    SCOTUSDocketEntrySerializer,
     ScotusDocketMetadataSerializer,
+    SCOTUSDocumentListSerializer,
+    SCOTUSDocumentSerializer,
     TagSerializer,
     V3OAESResultSerializer,
     V3OpinionESResultSerializer,
@@ -65,7 +68,9 @@ from cl.search.filters import (
     OpinionFilter,
     OpinionsCitedFilter,
     RECAPDocumentFilter,
+    SCOTUSDocketEntryFilter,
     ScotusDocketMetadataFilter,
+    SCOTUSDocumentFilter,
 )
 from cl.search.forms import SearchForm
 from cl.search.models import (
@@ -80,7 +85,9 @@ from cl.search.models import (
     OpinionsCited,
     OriginatingCourtInformation,
     RECAPDocument,
+    SCOTUSDocketEntry,
     ScotusDocketMetadata,
+    SCOTUSDocument,
     Tag,
 )
 
@@ -266,6 +273,56 @@ class ScotusDocketMetadataViewSet(BaseSourceReadOnlyViewSet):
     serializer_class = ScotusDocketMetadataSerializer
     filterset_class = ScotusDocketMetadataFilter
     queryset = ScotusDocketMetadata.objects.order_by("-id")
+
+
+class SCOTUSDocketEntryViewSet(BaseSourceReadOnlyViewSet):
+    """SCOTUS docket entries, with their documents nested."""
+
+    serializer_class = SCOTUSDocketEntrySerializer
+    filterset_class = SCOTUSDocketEntryFilter
+    ordering_fields = (
+        *BaseSourceReadOnlyViewSet.ordering_fields,
+        "date_filed",
+        "entry_number",
+        "sequence_number",
+    )
+    # Prefetch by name, not with a Prefetch object: DeferredFieldsMixin adds
+    # its own Prefetch for the fields and omit params, and Django rejects two
+    # Prefetches of one relation with different querysets. The serializer
+    # has the mixin always defer the documents' plain_text.
+    queryset = (
+        SCOTUSDocketEntry.objects.select_related("docket")
+        .prefetch_related("scotus_documents")
+        .order_by("-id")
+    )
+
+
+class SCOTUSDocumentViewSet(BaseSourceReadOnlyViewSet):
+    """Documents filed in SCOTUS docket entries."""
+
+    serializer_class = SCOTUSDocumentSerializer
+    filterset_class = SCOTUSDocumentFilter
+    ordering_fields = (
+        *BaseSourceReadOnlyViewSet.ordering_fields,
+        "document_number",
+    )
+    # The docket is needed to build absolute_url.
+    queryset = SCOTUSDocument.objects.select_related(
+        "docket_entry__docket"
+    ).order_by("-id")
+
+    def get_serializer_class(self) -> type[SCOTUSDocumentSerializer]:
+        """Return a serializer without plain_text for list pages."""
+        if self.action == "list":
+            return SCOTUSDocumentListSerializer
+        return SCOTUSDocumentSerializer
+
+    def get_queryset(self) -> QuerySet[SCOTUSDocument]:
+        """Return the documents, not loading plain_text for list pages."""
+        queryset = super().get_queryset()
+        if self.action == "list":
+            return queryset.defer("plain_text")
+        return queryset
 
 
 class CourtViewSet(LoggingMixin, DeferredFieldsMixin, viewsets.ModelViewSet):

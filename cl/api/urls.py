@@ -208,6 +208,16 @@ router_v4.register(
     search_views.ScotusDocketMetadataViewSet,
     basename="scotusdocketmetadata",
 )
+router_v4.register(
+    r"scotus-docket-entries",
+    search_views.SCOTUSDocketEntryViewSet,
+    basename="scotusdocketentry",
+)
+router_v4.register(
+    r"scotus-documents",
+    search_views.SCOTUSDocumentViewSet,
+    basename="scotusdocument",
+)
 
 # When we finally need to deprecate V3 of the API, the process to remove it, is:
 # - Remove the re_path(r"^api/rest/(?P<version>[v3]+)/", include(router.urls)) below
