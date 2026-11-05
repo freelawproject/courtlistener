@@ -33,6 +33,7 @@ from cl.favorites.utils import (
     get_user_prayers,
 )
 from cl.lib.http import is_ajax
+from cl.lib.types import AuthenticatedHttpRequest
 from cl.search.models import RECAPDocument
 from cl.users.models import UserProfile
 
@@ -237,7 +238,7 @@ async def open_prayers(request: HttpRequest) -> HttpResponse:
 
 @login_required
 async def create_prayer_view(
-    request: HttpRequest, recap_document: int
+    request: AuthenticatedHttpRequest, recap_document: int
 ) -> HttpResponse:
     user = request.user
     is_htmx_request = request.headers.get("hx-request", False)
@@ -258,25 +259,44 @@ async def create_prayer_view(
                     "daily_limit_reached": True,
                     "regular_size": regular_size,
                     "should_swap": True,
+                    "outcome": "limit",
+                    "document_number": recap_document_obj.document_number,
+                    "attachment_number": recap_document_obj.attachment_number,
                 },
             )
         return HttpResponseServerError(
             "User have reached your daily request limit"
         )
 
-    # Call the create_prayer async function
-    await create_prayer(user, recap_document_obj)
+    prayer = await create_prayer(user, recap_document_obj)
     if is_htmx_request:
+        # create_prayer returns None both for a duplicate and for a document
+        # that became available, so check the DB to tell them apart.
+        prayer_exists = (
+            prayer is not None
+            or await Prayer.objects.filter(
+                user=user, recap_document=recap_document_obj
+            ).aexists()
+        )
+        if prayer:
+            outcome = "added"
+        elif prayer_exists:
+            outcome = "already_added"
+        else:
+            outcome = "not_added"
         # Fetch after creation so the new prayer is included in the count.
         prayer_counts = await get_prayer_counts_in_bulk([recap_document_obj])
         return TemplateResponse(
             request,
             "includes/pray_and_pay_htmx/pray_button.html",
             {
-                "prayer_exists": True,
+                "prayer_exists": prayer_exists,
                 "document_id": recap_document_obj.pk,
                 "count": prayer_counts.get(recap_document_obj.pk, 0),
                 "daily_limit_reached": False,
+                "outcome": outcome,
+                "document_number": recap_document_obj.document_number,
+                "attachment_number": recap_document_obj.attachment_number,
                 "regular_size": regular_size,
                 "should_swap": True,
             },
@@ -286,26 +306,42 @@ async def create_prayer_view(
 
 @login_required
 async def delete_prayer_view(
-    request: HttpRequest, recap_document: int
+    request: AuthenticatedHttpRequest, recap_document: int
 ) -> HttpResponse:
     user = request.user
     recap_document_obj = await RECAPDocument.objects.aget(id=recap_document)
 
-    # Call the delete_prayer async function
-    await delete_prayer(user, recap_document_obj)
+    deleted = await delete_prayer(user, recap_document_obj)
     regular_size = bool(request.POST.get("regular_size"))
     source = request.POST.get("source", "")
     if request.headers.get("hx-request"):
+        # delete_prayer only deletes waiting prayers, so a False result can
+        # mean the prayer was already gone or that it was already granted.
+        prayer_exists = (
+            not deleted
+            and await Prayer.objects.filter(
+                user=user, recap_document=recap_document_obj
+            ).aexists()
+        )
+        if deleted:
+            outcome = "removed"
+        elif prayer_exists:
+            outcome = "not_removed"
+        else:
+            outcome = "already_removed"
         prayer_counts = await get_prayer_counts_in_bulk([recap_document_obj])
         return TemplateResponse(
             request,
             "includes/pray_and_pay_htmx/pray_button.html",
             {
-                "prayer_exists": False,
+                "prayer_exists": prayer_exists,
                 "document_id": recap_document_obj.pk,
                 "count": prayer_counts.get(recap_document_obj.pk, 0),
                 "regular_size": regular_size,
                 "should_swap": True if source != "user_prayer_list" else False,
+                "outcome": outcome,
+                "document_number": recap_document_obj.document_number,
+                "attachment_number": recap_document_obj.attachment_number,
             },
             headers={"HX-Trigger": "prayersListChanged"},
         )

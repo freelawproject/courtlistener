@@ -3,15 +3,15 @@ from http import HTTPStatus
 from unittest.mock import MagicMock, patch
 
 import time_machine
-from asgiref.sync import async_to_sync, sync_to_async
+from asgiref.sync import sync_to_async
 from django.contrib.auth.hashers import make_password
 from django.contrib.auth.models import User
 from django.contrib.contenttypes.models import ContentType
 from django.core import mail
 from django.core.cache import cache
 from django.db import IntegrityError, transaction
+from django.http import HttpResponse
 from django.template.defaultfilters import date as template_date
-from django.template.defaultfilters import pluralize
 from django.test import RequestFactory, override_settings
 from django.urls import reverse
 from django.utils import timezone
@@ -66,13 +66,22 @@ from cl.search.factories import (
     OpinionFactory,
     RECAPDocumentFactory,
 )
-from cl.search.models import PRECEDENTIAL_STATUS
+from cl.search.models import PRECEDENTIAL_STATUS, RECAPDocument
 from cl.search.utils import get_homepage_stats
 from cl.tests.base import SELENIUM_TIMEOUT, BaseSeleniumTest
 from cl.tests.cases import APITestCase, TestCase
 from cl.tests.fakes import FakeAvailableConfirmationPage, FakeConfirmationPage
 from cl.tests.utils import make_client
 from cl.users.factories import UserFactory, UserProfileWithParentsFactory
+
+
+def text_of(response: HttpResponse) -> str:
+    """Return the response body with whitespace runs collapsed to one space.
+
+    Template line breaks split messages across lines, so use this to assert
+    on a full sentence.
+    """
+    return " ".join(response.content.decode().split())
 
 
 class NoteTest(SimpleUserDataMixin, AudioTestCase):
@@ -1610,41 +1619,149 @@ class RECAPPrayAndPay(SimpleUserDataMixin, PrayAndPayTestCase):
         The design middleware picks the htmx partial by the X-CL-Design
         header that v2 pages send, not by the flag, so a flagged user on a
         page that is still legacy gets the legacy partial back.
+
+        Each subtest uses its own document and starts it with another user's
+        prayer, so the announced count has to move for the test to pass.
         """
         self.client.login(username="pandora", password="password")
-        url = reverse("create_prayer", args=[self.rd_2.pk])
+        pandora = User.objects.get(username="pandora")
         legacy = "includes/pray_and_pay_htmx/pray_button.html"
         v2 = "v2_includes/pray_and_pay_htmx/pray_button.html"
         v2_headers = {"HX-Request": "true", "X-CL-Design": "v2"}
 
         with self.subTest("legacy page"):
-            r = self.client.post(url, headers={"HX-Request": "true"})
+            r = self.client.post(
+                reverse("create_prayer", args=[self.rd_2.pk]),
+                headers={"HX-Request": "true"},
+            )
             self.assertTemplateUsed(r, legacy)
             self.assertTemplateNotUsed(r, v2)
 
         with self.subTest("v2 page, request added"):
-            r = self.client.post(url, headers=v2_headers)
-            self.assertTemplateUsed(r, v2)
-            self.assertTemplateNotUsed(r, legacy)
-            count = async_to_sync(get_prayer_counts_in_bulk)([self.rd_2]).get(
-                self.rd_2.pk, 0
+            PrayerFactory(
+                user=self.user, recap_document=self.rd_3, status=Prayer.WAITING
             )
-            self.assertContains(
-                r, f"Request added. {count} request{pluralize(count)} so far."
-            )
-
-        with self.subTest("v2 page, request removed"):
             r = self.client.post(
-                reverse("delete_prayer", args=[self.rd_2.pk]),
+                reverse("create_prayer", args=[self.rd_3.pk]),
                 headers=v2_headers,
             )
             self.assertTemplateUsed(r, v2)
-            count = async_to_sync(get_prayer_counts_in_bulk)([self.rd_2]).get(
-                self.rd_2.pk, 0
+            self.assertTemplateNotUsed(r, legacy)
+            self.assertTrue(
+                Prayer.objects.filter(
+                    user=pandora, recap_document=self.rd_3
+                ).exists()
             )
-            self.assertContains(
-                r,
-                f"Request removed. {count} request{pluralize(count)} so far.",
+            self.assertIn(
+                "Your prayer for document 3 was added. 2 prayers so far.",
+                text_of(r),
+            )
+
+        with self.subTest("v2 page, request removed"):
+            PrayerFactory(
+                user=self.user, recap_document=self.rd_4, status=Prayer.WAITING
+            )
+            PrayerFactory(
+                user=pandora, recap_document=self.rd_4, status=Prayer.WAITING
+            )
+            r = self.client.post(
+                reverse("delete_prayer", args=[self.rd_4.pk]),
+                headers=v2_headers,
+            )
+            self.assertTemplateUsed(r, v2)
+            self.assertFalse(
+                Prayer.objects.filter(
+                    user=pandora, recap_document=self.rd_4
+                ).exists()
+            )
+            self.assertIn(
+                "Your prayer for document 4 was removed. 1 prayer so far.",
+                text_of(r),
+            )
+
+    @override_settings(WAFFLE_CACHE_PREFIX="test_pray_button_status_waffle")
+    @override_flag("use_new_design", active=True)
+    def test_pray_button_status_messages(self) -> None:
+        """The v2 status message names the document and the real outcome.
+
+        Added and removed are covered by test_pray_button_template; these are
+        the cases where the click didn't change anything.
+        """
+        self.client.login(username="pandora", password="password")
+        pandora = User.objects.get(username="pandora")
+        v2_headers = {"HX-Request": "true", "X-CL-Design": "v2"}
+
+        def post(view: str, rd: RECAPDocument) -> str:
+            r = self.client.post(
+                reverse(view, args=[rd.pk]), headers=v2_headers
+            )
+            return text_of(r)
+
+        with self.subTest("already added"):
+            PrayerFactory(
+                user=pandora, recap_document=self.rd_5, status=Prayer.WAITING
+            )
+            self.assertIn(
+                "Your prayer for document 5 was already added. 1 prayer so far.",
+                post("create_prayer", self.rd_5),
+            )
+
+        with self.subTest("not added, document available"):
+            self.assertIn(
+                "Your prayer for document 1 wasn't added because the document "
+                "is already available. 0 prayers so far.",
+                post("create_prayer", self.rd_1),
+            )
+
+        with self.subTest("not added, daily limit"):
+            with self.settings(ALLOWED_PRAYER_COUNT=0):
+                text = post("create_prayer", self.rd_6)
+            self.assertIn(
+                "Your prayer for document 6 wasn't added because you reached "
+                "your daily limit. 0 prayers so far.",
+                text,
+            )
+
+        with self.subTest("already removed"):
+            self.assertIn(
+                "Your prayer for document 2 was already removed. 0 prayers so far.",
+                post("delete_prayer", self.rd_2),
+            )
+
+        with self.subTest("not removed, already granted"):
+            PrayerFactory(
+                user=pandora, recap_document=self.rd_3, status=Prayer.GRANTED
+            )
+            self.assertIn(
+                "Your prayer for document 3 can't be removed because it was "
+                "already granted. 0 prayers so far.",
+                post("delete_prayer", self.rd_3),
+            )
+            self.assertTrue(
+                Prayer.objects.filter(
+                    user=pandora, recap_document=self.rd_3
+                ).exists()
+            )
+
+        with self.subTest("attachment label"):
+            rd = RECAPDocumentFactory(
+                document_number="7",
+                attachment_number=2,
+                document_type=RECAPDocument.ATTACHMENT,
+                is_available=False,
+            )
+            self.assertIn(
+                "Your prayer for document 7, attachment 2 was added. 1 prayer so far.",
+                post("create_prayer", rd),
+            )
+
+        with self.subTest("no document number"):
+            rd = RECAPDocumentFactory(is_available=False)
+            # The factory fills in a blank document_number, so clear it after.
+            RECAPDocument.objects.filter(pk=rd.pk).update(document_number="")
+            self.assertIn(
+                "Your prayer for this document was added. 1 prayer so far.",
+                post("create_prayer", rd),
             )
 
     async def test_can_we_load_the_top_prayers_page(self) -> None:
