@@ -1398,6 +1398,15 @@ class SyncNeonMembershipsCommandTest(TestCase):
             level=NeonMembershipLevel.TIER_1,
             termination_date=now() - timedelta(days=5),
         )
+        # Neon answers with the account's own ID unless a test says it was
+        # merged into another one.
+        account_patcher = patch.object(
+            NeonClient,
+            "get_account_by_id",
+            side_effect=lambda account_id: {"accountId": account_id},
+        )
+        self.mock_get_account = account_patcher.start()
+        self.addCleanup(account_patcher.stop)
         patcher = patch.object(NeonClient, "get_primary_active_membership")
         self.mock_get_membership = patcher.start()
         self.addCleanup(patcher.stop)
@@ -1644,6 +1653,72 @@ class SyncNeonMembershipsCommandTest(TestCase):
                 self.assertEqual(
                     self.called_account_ids(), expected_account_ids
                 )
+
+    def test_adopts_surviving_account_after_neon_merge(self) -> None:
+        """Stores the account Neon merged ours into, then syncs under it."""
+        # Neon answers a merged-away account with the surviving account's
+        # record, so the only signal is a different accountId in the body.
+        self.mock_get_account.side_effect = lambda _: {"accountId": "5678"}
+        self.mock_get_membership.return_value = make_neon_membership()
+
+        call_command("sync_neon_memberships")
+
+        self.mock_get_account.assert_called_once_with("1234")
+        self.user_profile.refresh_from_db()
+        self.assertEqual(self.user_profile.neon_account_id, "5678")
+        self.mock_get_membership.assert_called_once_with("5678")
+        self.membership.refresh_from_db()
+        self.assertEqual(self.membership.neon_id, "200")
+        self.mock_logger.error.assert_not_called()
+
+    def test_reports_merge_into_another_users_account(self) -> None:
+        """Stops when the surviving account already belongs to another user."""
+        UserProfileWithParentsFactory(neon_account_id="5678")
+        self.mock_get_account.side_effect = lambda _: {"accountId": "5678"}
+        out = StringIO()
+
+        call_command("sync_neon_memberships", stdout=out)
+
+        self.user_profile.refresh_from_db()
+        self.assertEqual(self.user_profile.neon_account_id, "1234")
+        self.mock_get_membership.assert_not_called()
+        self.mock_logger.error.assert_called_once()
+        self.assert_membership_untouched()
+        self.assertIn("1 skipped", out.getvalue())
+
+    def test_reports_missing_neon_account(self) -> None:
+        """Stops and reports when Neon no longer has the account at all."""
+        self.mock_get_account.side_effect = requests.HTTPError(
+            response=MagicMock(status_code=HTTPStatus.NOT_FOUND)
+        )
+        out = StringIO()
+
+        call_command("sync_neon_memberships", stdout=out)
+
+        self.mock_get_membership.assert_not_called()
+        self.mock_logger.error.assert_called_once()
+        self.assert_membership_untouched()
+        self.assertIn("1 skipped", out.getvalue())
+
+    def test_retries_account_lookup_errors_next_run(self) -> None:
+        """Counts a failed account lookup as FAILED and touches nothing."""
+        for error in (
+            requests.ConnectionError("boom"),
+            requests.HTTPError(
+                response=MagicMock(
+                    status_code=HTTPStatus.INTERNAL_SERVER_ERROR
+                )
+            ),
+        ):
+            with self.subTest(error=type(error).__name__):
+                self.mock_get_account.side_effect = error
+                out = StringIO()
+
+                call_command("sync_neon_memberships", stdout=out)
+
+                self.mock_get_membership.assert_not_called()
+                self.assert_membership_untouched()
+                self.assertIn("1 failed", out.getvalue())
 
     def test_skips_user_without_neon_account_id(self) -> None:
         """Never calls Neon for a member whose profile has no account id."""

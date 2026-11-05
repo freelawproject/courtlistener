@@ -4,6 +4,12 @@ This command checks local memberships against the Neon API. When a renewal
 webhook is missed, it updates the local membership and rebuilds the member's
 API throttles.
 
+Neon merges duplicate accounts. The old account ID keeps answering, with the
+surviving account's record, but lists no memberships. So the command resolves
+the account before reading its memberships and adopts the surviving ID when
+it differs. An account that is gone, or whose survivor already belongs to
+another local user, is reported for a human and left alone.
+
 Members retain their benefits for NEON_MEMBERSHIP_GRACE_PERIOD_DAYS after
 their termination date. To allow time to recover missed renewals before
 access expires, the command selects memberships by their raw termination
@@ -27,6 +33,7 @@ import logging
 from collections import Counter
 from datetime import datetime, timedelta
 from enum import Enum
+from http import HTTPStatus
 from typing import Any
 
 import requests
@@ -48,6 +55,7 @@ from cl.donate.models import (
 from cl.donate.utils import parse_neon_date
 from cl.lib.command_utils import VerboseCommand
 from cl.lib.neon_utils import NeonClient
+from cl.users.models import UserProfile
 from cl.users.tasks import tag_zoho_record_for_membership
 
 logger = logging.getLogger(__name__)
@@ -367,6 +375,86 @@ def get_membership_deletion_reason(
     return None
 
 
+def adopt_neon_account(membership: NeonMembership, account_id: str) -> bool:
+    """Point the member's profile at a different Neon account ID.
+
+    Used when Neon reports that the account we store was merged into another
+    one. Refuses when a different profile already holds the new ID: the
+    webhook handler looks users up by it, and ``neon_account_id`` is not
+    unique, so a second holder would make that lookup ambiguous. The refusal
+    is logged at ERROR for a human to merge the local accounts.
+
+    :param membership: The membership whose user's profile is updated.
+    :param account_id: The Neon account ID to store.
+    :return: True if the profile now carries the new ID.
+    """
+    user = membership.user
+    profile: UserProfile = user.profile  # type: ignore
+    holder = (
+        UserProfile.objects.filter(neon_account_id=account_id)
+        .exclude(pk=profile.pk)
+        .values_list("user__username", flat=True)
+        .first()
+    )
+    if holder:
+        logger.error(
+            "Neon merged account %s into %s, which belongs to user %s, not "
+            "%s; skipping until the local accounts are merged.",
+            profile.neon_account_id,
+            account_id,
+            holder,
+            user.username,
+        )
+        return False
+    logger.info(
+        "Neon merged account %s into %s for user %s; updating the profile.",
+        profile.neon_account_id,
+        account_id,
+        user.username,
+    )
+    profile.neon_account_id = account_id
+    profile.save(update_fields=["neon_account_id"])
+    return True
+
+
+def resolve_neon_account(
+    client: NeonClient, membership: NeonMembership
+) -> str | None:
+    """Return the Neon account ID to use for a member, repairing a merge.
+
+    Neon answers a merged-away account ID with the surviving account's
+    record, which carries a different ``accountId``; the old ID still
+    answers but lists no memberships, so the surviving ID is adopted. An
+    account Neon no longer has at all is reported for a human. Transport
+    and server errors propagate so the caller can retry on the next run.
+
+    :param client: The Neon API client.
+    :param membership: The local membership, with its user and profile
+        loaded.
+    :return: The account ID to use, or None when the row must be skipped.
+    """
+    user = membership.user
+    profile: UserProfile = user.profile  # type: ignore
+    try:
+        account = client.get_account_by_id(profile.neon_account_id)
+    except requests.HTTPError as e:
+        if (
+            e.response is None
+            or e.response.status_code != HTTPStatus.NOT_FOUND
+        ):
+            raise
+        logger.error(
+            "Neon account %s for user %s no longer exists; skipping.",
+            profile.neon_account_id,
+            user.username,
+        )
+        return None
+    account_id = str(account["accountId"])
+    if account_id == profile.neon_account_id:
+        return account_id
+    return account_id if adopt_neon_account(membership, account_id) else None
+
+
 def check_membership(
     client: NeonClient,
     membership: NeonMembership,
@@ -374,11 +462,13 @@ def check_membership(
 ) -> SyncResult:
     """Check one lapsed or unpaid membership against Neon and apply what it finds.
 
-    Fetches the account's primary active membership, syncs it into the local
-    record when it is newer or newly paid, and deletes the local record when
-    ``get_membership_deletion_reason`` says Neon confirmed it is dead. A
-    failed Neon request is logged and reported as FAILED so the caller can
-    move on to the next member; any other exception propagates to the caller.
+    Resolves the member's Neon account first, adopting the surviving ID when
+    Neon merged ours away. Then fetches the account's primary active
+    membership, syncs it into the local record when it is newer or newly
+    paid, and deletes the local record when ``get_membership_deletion_reason``
+    says Neon confirmed it is dead. A failed Neon request is logged and
+    reported as FAILED so the caller can move on to the next member; any
+    other exception propagates to the caller.
 
     :param client: The Neon API client.
     :param membership: The local membership to check, with its user and
@@ -388,8 +478,8 @@ def check_membership(
     :return: What happened to the membership.
     """
     user = membership.user
-    account_id = user.profile.neon_account_id  # type: ignore
-    if not account_id:
+    profile: UserProfile = user.profile  # type: ignore
+    if not profile.neon_account_id:
         logger.warning(
             "User %s has a membership but no Neon account ID; skipping.",
             user.username,
@@ -397,11 +487,14 @@ def check_membership(
         return SyncResult.SKIPPED
 
     try:
+        account_id = resolve_neon_account(client, membership)
+        if account_id is None:
+            return SyncResult.SKIPPED
         neon_membership = client.get_primary_active_membership(account_id)
     except requests.RequestException as e:
         logger.warning(
             "Neon API request failed for account %s (user %s): %s",
-            account_id,
+            profile.neon_account_id,
             user.username,
             e,
         )

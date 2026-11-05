@@ -35,12 +35,17 @@ class NeonClient:
             settings.NEON_ORG_ID, settings.NEON_API_KEY
         )
 
-    def get_account_by_id(self, account_id: int) -> dict:
+    def get_account_by_id(self, account_id: str) -> dict:
         """
         Retrieves account data using the Neon API and the provided account ID.
 
+        Neon answers an account that was merged into another one with HTTP
+        222 and the surviving account's record, whose ``accountId`` differs
+        from the one requested. Callers that store account IDs should compare
+        the two and adopt the new one, as Neon's docs recommend.
+
         Args:
-            account_id (int): The ID of the account to retrieve.
+            account_id (str): The ID of the account to retrieve.
         """
         response = requests.get(
             f"{NEON_API_URL}/accounts/{account_id}",
