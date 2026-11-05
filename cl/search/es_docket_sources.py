@@ -16,6 +16,9 @@ from cl.search.models import (
     SCOTUSDocument,
 )
 
+# The document models an ESDocketSource can index.
+type SourceDocument = RECAPDocument | SCOTUSDocument
+
 
 @dataclass(frozen=True)
 class ESDocketSource:
@@ -43,6 +46,11 @@ class ESDocketSource:
     ``metadata_model`` is the optional docket-level metadata model whose
     changes should cascade to the Docket (and its documents) in ES (e.g.
     BankruptcyInformation for RECAP, ScotusDocketMetadata for SCOTUS).
+
+    ``uid_namespace`` prefixes the searchable ``uid`` and
+    ``docket_entry_uid`` fields of this source's documents (e.g. "scotus"
+    gives "scotus_123"). None for RECAP, whose documents keep the integer
+    ``id`` and ``docket_entry_id`` fields instead.
     """
 
     docket_entries_related_name: str
@@ -51,6 +59,7 @@ class ESDocketSource:
     docket_belongs: Callable[[Docket], bool]
     metadata_model: type[models.Model] | None = None
     ready_to_index: Callable[[Docket], bool] = lambda docket: True
+    uid_namespace: str | None = None
 
 
 def _scotus_docket_belongs(docket: Docket) -> bool:
@@ -96,6 +105,7 @@ SCOTUS_ES_SOURCE = ESDocketSource(
     docket_belongs=_scotus_docket_belongs,
     metadata_model=ScotusDocketMetadata,
     ready_to_index=_scotus_ready_to_index,
+    uid_namespace="scotus",
 )
 
 # Every known source, used wherever the shared code needs to loop over all
