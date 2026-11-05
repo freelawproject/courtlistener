@@ -221,7 +221,7 @@ def view_notes(request: AuthenticatedHttpRequest) -> HttpResponse:
         + ")"
     )
     recap_search_url = (
-        "/?type=r&q=xxx AND docket_entry_id:("
+        "/?type=r&q=xxx AND id:("
         + " OR ".join(
             str(target.pk)
             for _, target in note_forms["Documents"]
@@ -370,7 +370,6 @@ def view_settings(request: AuthenticatedHttpRequest) -> HttpResponse:
     profile_form = ProfileForm(request.POST or None, instance=up)
     if profile_form.is_valid() and user_form.is_valid():
         user_cd = user_form.cleaned_data
-        profile_cd = profile_form.cleaned_data
         new_email = user_cd["email"]
         changed_email = old_email != new_email
         if changed_email:
