@@ -1,3 +1,4 @@
+from http import HTTPStatus
 from typing import Any, NotRequired, TypedDict
 
 import requests
@@ -114,6 +115,31 @@ class NeonClient:
         )
         response.raise_for_status()
         return response.json().get("memberships") or []
+
+    def get_membership(self, membership_id: str) -> dict[str, Any] | None:
+        """
+        Retrieves one membership record by its ID.
+
+        The record names the account that currently holds the membership in
+        ``accountId``, which can differ from the account it was bought under
+        when Neon merged accounts, or when a member has a duplicate account.
+
+        Args:
+            membership_id (str): The ID of the Neon membership.
+
+        Returns:
+            dict[str, Any] | None: The membership record, or None when Neon
+            has no membership with that ID.
+        """
+        response = requests.get(
+            f"{NEON_API_URL}/memberships/{membership_id}",
+            auth=self._basic,
+            timeout=self._timeout,
+        )
+        if response.status_code == HTTPStatus.NOT_FOUND:
+            return None
+        response.raise_for_status()
+        return response.json()
 
     def search_account_by_email(self, email: str) -> list[dict[str, str]]:
         """

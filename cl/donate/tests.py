@@ -1339,11 +1339,12 @@ def make_neon_membership(
     payment_status: str = "Succeeded",
     status: str | None = "SUCCEEDED",
     term_start_date: str | None = None,
+    account_id: str = "1234",
 ) -> dict:
     """Build a membership record shaped like the Neon API returns it."""
     return {
         "id": membership_id,
-        "accountId": "1234",
+        "accountId": account_id,
         "membershipLevel": {"id": "2", "name": level_name},
         "termStartDate": term_start_date,
         "termEndDate": term_end_date,
@@ -1384,6 +1385,31 @@ class NeonClientMembershipTest(SimpleTestCase):
                     },
                 )
 
+    @patch("cl.lib.neon_utils.requests.get")
+    def test_gets_membership_or_none_when_missing(self, mock_get) -> None:
+        """Returns the record, None on a 404, and raises on other errors."""
+        neon_membership = make_neon_membership()
+        for status_code, expected in (
+            (HTTPStatus.OK, neon_membership),
+            (HTTPStatus.NOT_FOUND, None),
+        ):
+            with self.subTest(status_code=status_code):
+                mock_get.return_value = MagicMock(
+                    status_code=status_code,
+                    **{"json.return_value": neon_membership},
+                )
+                result = NeonClient().get_membership("200")
+                self.assertEqual(result, expected)
+                self.assertTrue(
+                    mock_get.call_args.args[0].endswith("/memberships/200")
+                )
+        mock_get.return_value = MagicMock(
+            status_code=HTTPStatus.INTERNAL_SERVER_ERROR,
+            **{"raise_for_status.side_effect": requests.HTTPError("500")},
+        )
+        with self.assertRaises(requests.HTTPError):
+            NeonClient().get_membership("200")
+
 
 @override_settings(NEON_MEMBERSHIP_GRACE_PERIOD_DAYS=2)
 @time_machine.travel(datetime(2026, 10, 9, 12, 0, tzinfo=UTC), tick=False)
@@ -1418,6 +1444,13 @@ class SyncNeonMembershipsCommandTest(TestCase):
         patcher = patch.object(NeonClient, "get_account_memberships")
         self.mock_list_memberships = patcher.start()
         self.addCleanup(patcher.stop)
+        # Looked up only when the account lists nothing; by default Neon no
+        # longer has the membership either.
+        membership_patcher = patch.object(
+            NeonClient, "get_membership", return_value=None
+        )
+        self.mock_get_membership = membership_patcher.start()
+        self.addCleanup(membership_patcher.stop)
         zoho_patcher = patch(
             "cl.donate.management.commands.sync_neon_memberships"
             ".tag_zoho_record_for_membership"
@@ -1832,6 +1865,77 @@ class SyncNeonMembershipsCommandTest(TestCase):
         self.assertEqual(self.membership.neon_id, "200")
         self.assertTrue(self.membership.is_active)
         self.assertEqual(self.get_membership_rates(), sorted(TIER_2_RATES))
+
+    def test_discovers_account_through_stored_membership(self) -> None:
+        """Adopts the account holding our membership when ours lists nothing."""
+        # A duplicate account Neon has not merged yet: the renewal was bought
+        # under it, so the account we store is empty.
+        self.mock_list_memberships.side_effect = [[], [make_neon_membership()]]
+        self.mock_get_membership.return_value = make_neon_membership(
+            membership_id="100", account_id="5678"
+        )
+
+        call_command("sync_neon_memberships")
+
+        self.mock_get_membership.assert_called_once_with("100")
+        self.assertEqual(
+            [c.args[0] for c in self.mock_list_memberships.call_args_list],
+            ["1234", "5678"],
+        )
+        self.user_profile.refresh_from_db()
+        self.assertEqual(self.user_profile.neon_account_id, "5678")
+        self.membership.refresh_from_db()
+        self.assertEqual(self.membership.neon_id, "200")
+        self.assertTrue(self.membership.is_active)
+        self.mock_logger.error.assert_not_called()
+
+    def test_discovery_changes_nothing_without_a_better_account(self) -> None:
+        """Leaves the profile alone when the lookup gives no other account."""
+        self.mock_list_memberships.return_value = []
+        for label, record in (
+            ("membership gone from Neon", None),
+            ("same account", make_neon_membership(membership_id="100")),
+        ):
+            with self.subTest(label=label):
+                self.mock_list_memberships.reset_mock()
+                self.mock_get_membership.return_value = record
+
+                call_command("sync_neon_memberships")
+
+                self.mock_get_membership.assert_called_with("100")
+                self.mock_list_memberships.assert_called_once_with("1234")
+                self.user_profile.refresh_from_db()
+                self.assertEqual(self.user_profile.neon_account_id, "1234")
+                self.assert_membership_untouched()
+
+    def test_discovery_needs_a_stored_membership_id(self) -> None:
+        """Never looks up a membership when the local row has no neon_id."""
+        self.membership.neon_id = ""
+        self.membership.save()
+        self.mock_list_memberships.return_value = []
+
+        call_command("sync_neon_memberships")
+
+        self.mock_get_membership.assert_not_called()
+        self.mock_list_memberships.assert_called_once_with("1234")
+
+    def test_discovery_stops_when_another_user_holds_the_account(self) -> None:
+        """Reports, and skips, a holding account that belongs to another user."""
+        UserProfileWithParentsFactory(neon_account_id="5678")
+        self.mock_list_memberships.return_value = []
+        self.mock_get_membership.return_value = make_neon_membership(
+            membership_id="100", account_id="5678"
+        )
+        out = StringIO()
+
+        call_command("sync_neon_memberships", stdout=out)
+
+        self.mock_list_memberships.assert_called_once_with("1234")
+        self.user_profile.refresh_from_db()
+        self.assertEqual(self.user_profile.neon_account_id, "1234")
+        self.mock_logger.error.assert_called_once()
+        self.assert_membership_untouched()
+        self.assertIn("1 skipped", out.getvalue())
 
     def test_skips_user_without_neon_account_id(self) -> None:
         """Never calls Neon for a member whose profile has no account id."""
