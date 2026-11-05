@@ -336,26 +336,42 @@ class WipTemplateTest(unittest.TestCase):
         )
         self.assertIn("V2PagesRegisterTest.WIP_PAGES", findings[1].message)
 
-    def test_added_wip_partial_skips_the_page_only_checks(self) -> None:
-        """A partial under wip_includes/ needs no base template or registration."""
+    def test_wip_partial_is_checked_as_a_page(self) -> None:
+        """WIP is limited to whole pages, so wip_includes/ is not a partial.
+
+        A file there gets the page-only checks, which a partial can't pass.
+        """
         findings = _run_checks_on(
             {WIP_PARTIAL_FILE: "<c-button>Pray</c-button>"},
             changed={WIP_PARTIAL_FILE: "A"},
         )
-        self.assertEqual(findings, [])
+        self.assertEqual(
+            findings,
+            [
+                (WIP_PARTIAL_FILE, 1, "check_extends_new_base"),
+                (WIP_PARTIAL_FILE, 1, "check_v2_register"),
+            ],
+        )
 
-    def test_wip_page_may_extend_wip_or_v2(self) -> None:
-        """Unfinished pages may build on other unfinished or finished ones."""
-        for parent in ("wip_help/base.html", "v2_help/base.html"):
+    def test_wip_page_may_only_extend_v2(self) -> None:
+        """WIP pages build on finished pages, never on other WIP ones."""
+        cases = {
+            "v2_help/base.html": [],
+            "wip_help/base.html": [
+                (WIP_TEMPLATE_FILE, 1, "check_wip_dependency"),
+                (WIP_TEMPLATE_FILE, 1, "check_extends_new_base"),
+            ],
+        }
+        for parent, expected in cases.items():
             with self.subTest(parent):
                 findings = _run_checks_on(
                     {WIP_TEMPLATE_FILE: f'{{% extends "{parent}" %}}'}
                 )
-                self.assertEqual(findings, [])
+                self.assertEqual(findings, expected)
 
 
 class WipDependencyTest(unittest.TestCase):
-    """Finished v2_ templates must not pull in unfinished wip_ ones."""
+    """No template may extend or include a wip_ template."""
 
     def test_check_wip_dependency(self) -> None:
         """Only extends/include of a template named with the wip_ prefix is reported."""
@@ -379,103 +395,8 @@ class WipDependencyTest(unittest.TestCase):
                     expected,
                 )
 
-    def test_wip_flag_block_gates_wip_references(self) -> None:
-        """A wip_ include is allowed only in both redesign flags' opted-in branches."""
-        cases = {
-            "gated by both flags": (
-                """
-                {% flag "use_new_design" %}{% flag "use_wip_design" %}
-                  {% include "wip_includes/card.html" %}
-                {% endflag %}{% endflag %}
-                """,
-                [],
-            ),
-            "flags nested the other way round": (
-                """
-                {% flag 'use_wip_design' %}{% flag 'use_new_design' %}
-                  {% include "wip_includes/card.html" %}
-                {% endflag %}{% endflag %}
-                """,
-                [],
-            ),
-            "the WIP flag alone does not gate": (
-                """
-                {% flag "use_wip_design" %}
-                  {% include "wip_includes/card.html" %}
-                {% endflag %}
-                """,
-                [2],
-            ),
-            "use_new_design alone does not gate": (
-                """
-                {% flag "use_new_design" %}
-                  {% include "wip_includes/card.html" %}
-                {% endflag %}
-                """,
-                [2],
-            ),
-            "the WIP flag's else branch is ungated": (
-                """
-                {% flag "use_new_design" %}{% flag "use_wip_design" %}
-                  {% include "wip_includes/card.html" %}
-                {% else %}
-                  {% include "wip_includes/card.html" %}
-                {% endflag %}{% endflag %}
-                """,
-                [4],
-            ),
-            "use_new_design's else branch is ungated": (
-                """
-                {% flag "use_wip_design" %}{% flag "use_new_design" %}
-                {% else %}
-                  {% include "wip_includes/card.html" %}
-                {% endflag %}{% endflag %}
-                """,
-                [3],
-            ),
-            "after the blocks end": (
-                """
-                {% flag "use_new_design" %}{% flag "use_wip_design" %}{% endflag %}{% endflag %}
-                {% include "wip_includes/card.html" %}
-                """,
-                [2],
-            ),
-            "an inner waffle switch's else stays gated": (
-                """
-                {% flag "use_new_design" %}{% flag "use_wip_design" %}
-                  {% switch "some_switch" %}{% else %}
-                    {% include "wip_includes/card.html" %}
-                  {% endswitch %}
-                {% endflag %}{% endflag %}
-                """,
-                [],
-            ),
-            "an inner if's else stays gated": (
-                """
-                {% flag "use_new_design" %}{% flag "use_wip_design" %}
-                  {% if user.is_staff %}
-                    {% include "wip_includes/card.html" %}
-                  {% else %}
-                    {% include "wip_includes/card.html" %}
-                  {% endif %}
-                {% endflag %}{% endflag %}
-                """,
-                [],
-            ),
-        }
-        for label, (template, expected) in cases.items():
-            with self.subTest(label):
-                lines = textwrap.dedent(template).strip("\n").splitlines()
-                self.assertEqual(
-                    [
-                        n
-                        for n, _ in frontend_checks.check_wip_dependency(lines)
-                    ],
-                    expected,
-                )
-
     def test_v2_page_extending_wip_fails(self) -> None:
-        """A wip_ parent passes the base check but fails the dependency check."""
+        """A wip_ parent fails both the dependency and the base check."""
         findings = _findings_on(
             {V2_TEMPLATE_FILE: '{% extends "wip_help/base.html" %}'}
         )
@@ -487,15 +408,22 @@ class WipDependencyTest(unittest.TestCase):
                     1,
                     "check_wip_dependency",
                     frontend_checks.FAIL,
-                )
+                ),
+                (
+                    V2_TEMPLATE_FILE,
+                    1,
+                    "check_extends_new_base",
+                    frontend_checks.FAIL,
+                ),
             ],
         )
 
-    def test_shared_templates_including_wip_fail(self) -> None:
-        """new_base.html and Cotton components render inside finished pages."""
+    def test_any_template_including_wip_fails(self) -> None:
+        """The check isn't limited to redesign templates."""
         for path in (
             "cl/assets/templates/new_base.html",
             "cl/assets/templates/cotton/header.html",
+            LEGACY_TEMPLATE_FILE,
         ):
             with self.subTest(path):
                 findings = _run_checks_on(

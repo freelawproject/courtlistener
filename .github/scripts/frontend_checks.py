@@ -92,13 +92,6 @@ def _parse_line_skips(lines: list[str]) -> dict[int, set[str]]:
 V2_PREFIX = "v2_"
 WIP_PREFIX = "wip_"
 REDESIGN_PREFIXES = (V2_PREFIX, WIP_PREFIX)
-# Mirror the redesign flags in cl/lib/middleware.py. A wip_ include in a
-# finished page must be gated by both.
-NEW_DESIGN_FLAG = "use_new_design"
-WIP_FLAG = "use_wip_design"
-WIP_GATE_FLAGS = {NEW_DESIGN_FLAG, WIP_FLAG}
-# Django and waffle block tags that can take an {% else %} branch.
-ELSE_BLOCK_TAGS = {"if", "ifchanged", "flag", "switch", "sample"}
 
 
 def is_v2_template(path: str) -> bool:
@@ -114,17 +107,14 @@ def is_redesign_template(path: str) -> bool:
     return is_v2_template(path) or is_wip_template(path)
 
 
-def is_redesign_partial(path: str) -> bool:
-    """A v2_ or wip_ partial rendered on its own, such as an htmx response.
+def is_v2_partial(path: str) -> bool:
+    """A v2 partial rendered on its own, such as an htmx response.
 
     Partials have no page URL and no base template, so the page-only
-    checks do not apply to them. Everything else about redesign templates
-    does. The prefixes mirror V2_PARTIALS_PREFIX and the WIP partials
-    prefix in cl/lib/middleware.py.
+    checks do not apply to them. Everything else about v2 templates does.
+    The prefix mirrors V2_PARTIALS_PREFIX in cl/lib/middleware.py.
     """
-    return is_redesign_template(path) and any(
-        f"templates/{prefix}includes/" in path for prefix in REDESIGN_PREFIXES
-    )
+    return is_v2_template(path) and "templates/v2_includes/" in path
 
 
 def is_cotton_component(path: str) -> bool:
@@ -141,16 +131,6 @@ def is_legacy_template(path: str) -> bool:
     if path.endswith("new_base.html"):
         return False
     return True
-
-
-def renders_in_finished_pages(path: str) -> bool:
-    """A template finished pages render: v2_ templates, new_base.html and
-    Cotton components. Anything wip_ they pull in reaches those pages too."""
-    return (
-        is_v2_template(path)
-        or path.endswith("new_base.html")
-        or is_cotton_component(path)
-    )
 
 
 def is_input_css(path: str) -> bool:
@@ -430,10 +410,7 @@ def check_inline_xdata(lines: list[str]) -> list[tuple[int, str]]:
 
 
 def check_extends_new_base(lines: list[str]) -> list[tuple[int, str]]:
-    """Redesign templates must extend new_base.html or another v2_/wip_ one.
-
-    Whether a v2_ template may extend a wip_ one is check_wip_dependency's job.
-    """
+    """Redesign templates must extend new_base.html or a v2_ template."""
     results = []
     extends_re = re.compile(r'{%\s*extends\s+["\']([^"\']+)["\']\s*%}')
 
@@ -451,14 +428,12 @@ def check_extends_new_base(lines: list[str]) -> list[tuple[int, str]]:
         m = extends_re.search(stripped)
         if m:
             parent = m.group(1)
-            if parent != "new_base.html" and not any(
-                prefix in parent for prefix in REDESIGN_PREFIXES
-            ):
+            if parent != "new_base.html" and V2_PREFIX not in parent:
                 results.append(
                     (
                         i,
                         f'extends "{parent}" — v2_/wip_ templates must extend '
-                        f'"new_base.html" or another v2_/wip_ template',
+                        f'"new_base.html" or a v2_ template',
                     )
                 )
         else:
@@ -466,8 +441,7 @@ def check_extends_new_base(lines: list[str]) -> list[tuple[int, str]]:
                 (
                     i,
                     "v2_/wip_ template does not have {% extends %} as first "
-                    "directive — must extend new_base.html or a v2_/wip_ "
-                    "template",
+                    "directive — must extend new_base.html or a v2_ template",
                 )
             )
         # Only check the first meaningful line
@@ -476,53 +450,27 @@ def check_extends_new_base(lines: list[str]) -> list[tuple[int, str]]:
 
 
 def check_wip_dependency(lines: list[str]) -> list[tuple[int, str]]:
-    """Templates finished pages render must not use wip_ templates ungated.
+    """No template may extend or include a wip_ template.
 
-    Only the template a view returns is swapped, so a wip_ template pulled in
-    by a v2_ one, new_base.html or a Cotton component would be served to
-    everyone with the redesign flag, finished or not. Inside both a
-    {% flag "use_new_design" %} and a {% flag "use_wip_design" %} block it
-    only renders for visitors opted into WIP pages, so it's allowed there,
-    but not in either block's {% else %} branch, which everyone else sees.
-    The WIP flag alone is not enough: pages with no legacy template are
-    served to everyone, and the WIP flag only counts with use_new_design.
+    WIP is limited to whole pages, which the middleware swaps in for the
+    template a view returns. A wip_ template pulled in by another one is
+    never swapped, so it would reach everyone who sees that template.
     """
     results = []
-    tag_re = re.compile(r"{%\s*(\w+)(.*?)%}", re.IGNORECASE)
-    name_re = re.compile(r'^\s*["\']([^"\']*)["\']')
-    # One entry per open block that can have an {% else %}, so each else is
-    # paired with its own block: the flag's name for the opted-in branch of
-    # a redesign flag, and "other" for anything else, including the else
-    # branch of a redesign flag.
-    blocks: list[str] = []
+    tag_re = re.compile(
+        r'{%\s*(extends|include)\s+["\']([^"\']*)["\']', re.IGNORECASE
+    )
     for i, line in enumerate(lines, 1):
         for m in tag_re.finditer(line):
-            tag, args = m.group(1), m.group(2)
-            name = n.group(1) if (n := name_re.match(args)) else ""
-            if tag in ELSE_BLOCK_TAGS:
-                is_gate = tag == "flag" and name in WIP_GATE_FLAGS
-                blocks.append(name if is_gate else "other")
-            elif tag.removeprefix("end") in ELSE_BLOCK_TAGS:
-                if blocks:
-                    blocks.pop()
-            elif tag == "else":
-                if blocks:
-                    blocks[-1] = "other"
-            elif tag in ("extends", "include"):
-                # Template names are relative to templates/, so a WIP one
-                # always starts with the prefix (wip_help/x.html).
-                if not name.startswith(WIP_PREFIX) or WIP_GATE_FLAGS <= set(
-                    blocks
-                ):
-                    continue
+            tag, name = m.groups()
+            # Template names are relative to templates/, so a WIP one always
+            # starts with the prefix (wip_help/x.html).
+            if name.startswith(WIP_PREFIX):
                 results.append(
                     (
                         i,
-                        f'{tag} "{name}" — templates finished pages render '
-                        f"must not depend on wip_ templates outside both a "
-                        f'{{% flag "{NEW_DESIGN_FLAG}" %}} and a '
-                        f'{{% flag "{WIP_FLAG}" %}} block; gate it or '
-                        f"promote it to v2_ first",
+                        f'{tag} "{name}" — templates must not extend or '
+                        "include wip_ templates; WIP is limited to whole pages",
                     )
                 )
     return results
@@ -859,6 +807,7 @@ HTML_CHECKS = [
     (check_tabnabbing, FAIL),
     (check_tabindex, FAIL),
     (check_placeholder_text, WARN),
+    (check_wip_dependency, FAIL),
 ]
 
 V2_CHECKS = [
@@ -874,12 +823,6 @@ V2_CHECKS = [
 # Only full pages extend a base template; partials (v2_includes/) don't.
 V2_PAGE_CHECKS = [
     (check_extends_new_base, FAIL),
-]
-
-# Templates finished pages render (see renders_in_finished_pages); wip_
-# templates may build on each other.
-V2_ONLY_CHECKS = [
-    (check_wip_dependency, FAIL),
 ]
 
 COTTON_CHECKS = [
@@ -962,12 +905,7 @@ def run_checks(
         if is_redesign_template(filepath):
             _apply_checks(V2_CHECKS, lines, filepath, findings)
 
-        if renders_in_finished_pages(filepath):
-            _apply_checks(V2_ONLY_CHECKS, lines, filepath, findings)
-
-        if is_redesign_template(filepath) and not is_redesign_partial(
-            filepath
-        ):
+        if is_redesign_template(filepath) and not is_v2_partial(filepath):
             _apply_checks(V2_PAGE_CHECKS, lines, filepath, findings)
 
             # Renames count too: promoting a page from wip_ to v2_ is one,
