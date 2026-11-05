@@ -31,7 +31,7 @@ local record through the createMembership webhook.
 
 import logging
 from collections import Counter
-from datetime import datetime, timedelta
+from datetime import date, datetime, timedelta
 from enum import Enum
 from http import HTTPStatus
 from typing import Any
@@ -126,6 +126,58 @@ def get_memberships_to_check(
     return queryset.select_related("user__profile").order_by(
         "termination_date"
     )
+
+
+def select_membership_to_sync(
+    memberships: list[dict[str, Any]],
+) -> dict[str, Any] | None:
+    """Pick the record worth syncing from an account's membership history.
+
+    A SUCCEEDED membership whose term is running today takes precedence,
+    with the latest term end winning when multiple terms overlap.
+
+    Neon charges auto-renewals early and lists the next term first, so
+    the newest paid record may not have started yet. Applying it too
+    early could advance the term end or membership level.
+
+    If no paid term is currently running, the earliest upcoming paid
+    term wins. This handles renewals purchased after a gap.
+
+    If no paid term is available, return the newest record regardless
+    of status. Its status helps distinguish an ongoing renewal attempt
+    from an account that has fully lapsed.
+
+    :param memberships: The account's memberships, newest first, as
+        returned by ``NeonClient.get_account_memberships``.
+    :return: The record to hand to ``sync_membership_from_neon``, or None
+        when the account has no memberships.
+    """
+    today = timezone.localdate()
+    running: list[tuple[date, dict[str, Any]]] = []
+    upcoming: list[tuple[date, dict[str, Any]]] = []
+    for record in memberships:
+        if record.get("status") != NEON_STATUS_SUCCEEDED:
+            continue
+        if not (term_end := record.get("termEndDate")):
+            continue
+        end = timezone.localdate(parse_neon_date(term_end))
+        if end < today:
+            continue
+        term_start = record.get("termStartDate")
+        start = (
+            timezone.localdate(parse_neon_date(term_start))
+            if term_start
+            else None
+        )
+        if start is None or start <= today:
+            running.append((end, record))
+        else:
+            upcoming.append((start, record))
+    if running:
+        return max(running, key=lambda pair: pair[0])[1]
+    if upcoming:
+        return min(upcoming, key=lambda pair: pair[0])[1]
+    return memberships[0] if memberships else None
 
 
 def sync_membership_from_neon(
@@ -463,10 +515,11 @@ def check_membership(
     """Check one lapsed or unpaid membership against Neon and apply what it finds.
 
     Resolves the member's Neon account first, adopting the surviving ID when
-    Neon merged ours away. Then fetches the account's primary active
-    membership, syncs it into the local record when it is newer or newly
-    paid, and deletes the local record when ``get_membership_deletion_reason``
-    says Neon confirmed it is dead. A failed Neon request is logged and
+    Neon merged ours away. Then lists the account's memberships, picks the
+    one worth syncing (see ``select_membership_to_sync``), syncs it into the
+    local record when it is newer or newly paid, and deletes the local
+    record when ``get_membership_deletion_reason`` says Neon confirmed it
+    is dead. A failed Neon request is logged and
     reported as FAILED so the caller can move on to the next member; any
     other exception propagates to the caller.
 
@@ -490,7 +543,7 @@ def check_membership(
         account_id = resolve_neon_account(client, membership)
         if account_id is None:
             return SyncResult.SKIPPED
-        neon_membership = client.get_primary_active_membership(account_id)
+        memberships = client.get_account_memberships(account_id)
     except requests.RequestException as e:
         logger.warning(
             "Neon API request failed for account %s (user %s): %s",
@@ -500,10 +553,9 @@ def check_membership(
         )
         return SyncResult.FAILED
 
+    neon_membership = select_membership_to_sync(memberships)
     if neon_membership is None:
-        logger.debug(
-            "Neon reports no active membership for user %s.", user.username
-        )
+        logger.debug("Neon has no memberships for user %s.", user.username)
         result = SyncResult.UNCHANGED
     else:
         result = sync_membership_from_neon(membership, neon_membership)
