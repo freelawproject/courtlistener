@@ -543,8 +543,14 @@ class ScotusDocketMergeTest(TestCase):
             "Source should be compounded with SCRAPER.",
         )
 
+    # The enqueue semaphore lives in Redis, which parallel test workers
+    # share while each has its own DB, so docket pks repeat across workers.
+    # A key left by another worker would block the alert, so mock it.
+    @mock.patch(
+        "cl.corpus_importer.tasks.enqueue_docket_alert", return_value=True
+    )
     def test_merge_scotus_docket_triggers_docket_alert_for_a_new_entry(
-        self,
+        self, mock_enqueue: mock.MagicMock
     ) -> None:
         """Does merging a SCOTUS docket with a new entry notify current
         subscribers?"""
@@ -570,11 +576,15 @@ class ScotusDocketMergeTest(TestCase):
         docket, _, _ = merge_scotus_docket(data, download_file=False)
 
         self.assertEqual(docket.pk, existing.pk)
+        mock_enqueue.assert_called_once_with(existing.pk)
         self.assertEqual(len(mail.outbox), 1)
         self.assertEqual(mail.outbox[0].to, [user.email])
 
+    @mock.patch(
+        "cl.corpus_importer.tasks.enqueue_docket_alert", return_value=True
+    )
     def test_merge_scotus_docket_does_not_alert_when_nothing_is_new(
-        self,
+        self, mock_enqueue: mock.MagicMock
     ) -> None:
         """Re-merging an already-seen entry shouldn't notify subscribers --
         only a newly created SCOTUSDocketEntry triggers the alert."""
@@ -603,6 +613,8 @@ class ScotusDocketMergeTest(TestCase):
         # Re-merge the exact same entry -- it already exists.
         merge_scotus_docket(data, download_file=False)
         self.assertEqual(len(mail.outbox), 0)
+        # Only the first merge found something new to alert about.
+        mock_enqueue.assert_called_once_with(existing.pk)
 
     def test_merge_scotus_docket_source_compounds_recap(self) -> None:
         """Merging into a RECAP docket compounds with SCRAPER."""
