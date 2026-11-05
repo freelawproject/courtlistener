@@ -2136,7 +2136,7 @@ class DynamicFieldsMixin:
         separated (?fields=id,name,url,email).
 
         """
-        fields = super(DynamicFieldsMixin, self).fields
+        fields = super().fields
 
         if not hasattr(self, "_context"):
             # We are being called before a request cycle

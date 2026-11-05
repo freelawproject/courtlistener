@@ -1409,24 +1409,10 @@
       "severity": "error"
     },
     {
-      "column": 23,
-      "path": "cl/opinion_page/feeds.py",
-      "name": "missing-attribute",
-      "concise_description": "Object of class `DocketEntry` has no attribute `main_docs`",
-      "severity": "error"
-    },
-    {
       "column": 28,
       "path": "cl/opinion_page/feeds.py",
       "name": "bad-argument-type",
       "concise_description": "Argument `date | None` is not assignable to parameter `d` with type `date` in function `cl.lib.date_time.midnight_pt`",
-      "severity": "error"
-    },
-    {
-      "column": 23,
-      "path": "cl/opinion_page/feeds.py",
-      "name": "missing-attribute",
-      "concise_description": "Object of class `DocketEntry` has no attribute `main_docs`",
       "severity": "error"
     },
     {
