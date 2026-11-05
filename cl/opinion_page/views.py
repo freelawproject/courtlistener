@@ -625,8 +625,12 @@ def make_rd_title(rd: RECAPDocument | SCOTUSDocument) -> str:
     )
 
 
-@ratelimiter_all_10_per_h
+# login_required goes first so that anonymous requests are redirected to sign
+# in without counting against the limit. The limit is keyed by path, so all
+# users share it, and anonymous traffic could otherwise block a docket's export
+# for everyone.
 @login_required
+@ratelimiter_all_10_per_h
 def download_docket_entries_csv(
     request: HttpRequest, docket_id: int
 ) -> HttpResponse:
@@ -652,8 +656,9 @@ def download_docket_entries_csv(
         # still raise a error 500.
         if docket.get_entry_source() is docket_entry_sources.RECAP:
             raise
-        # A handled 501 triggers the existing "There was a problem. Try
-        # again later." message in export-csv.js instead of crashing.
+        # A handled 501 shows an error message instead of crashing: the
+        # generic one in legacy's export-csv.js, the status-keyed one in the
+        # v2 download composable.
         return HttpResponse(status=501)
     response: HttpResponse = HttpResponse(csv_content, content_type="text/csv")
     response["Content-Disposition"] = f'attachment; filename="{filename}"'

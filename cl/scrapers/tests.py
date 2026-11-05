@@ -858,7 +858,7 @@ class DupcheckerPressOnTest(TestCase):
 
         docket = DocketFactory()
         cluster = OpinionClusterFactory(docket=docket)
-        opinion = OpinionFactory(sha1=self.dup_hash, cluster=cluster)
+        OpinionFactory(sha1=self.dup_hash, cluster=cluster)
 
     def test_press_on_no_dup(self) -> None:
         """Does the DupChecker raises no error when seeing a new hash?"""
@@ -1086,7 +1086,7 @@ class ScrapeCitationsTest(TestCase):
         self.hash = "1234" * 10
         self.hashes = [self.hash, self.hash, self.hash, "111"]
 
-        court = CourtFactory(id="md")
+        CourtFactory(id="md")
         docket = DocketFactory(
             case_name="Attorney Grievance v. Taniform",
             docket_number="40ag/21",
@@ -1095,7 +1095,7 @@ class ScrapeCitationsTest(TestCase):
             pacer_case_id=None,
         )
         self.cluster = OpinionClusterFactory(docket=docket)
-        opinion = OpinionFactory(sha1=self.hash, cluster=self.cluster)
+        OpinionFactory(sha1=self.hash, cluster=self.cluster)
 
     def test_citation_scraper(self):
         """Test if citation scraper creates a citation or ignores duplicates"""
@@ -1571,7 +1571,7 @@ class OpinionVersionTest(ESIndexTestCase, TransactionTestCase):
             docket=not_comparable_docket, source=ClusterSources.COURT_WEBSITE
         )
 
-        main_citation = CitationWithParentsFactory.create(
+        CitationWithParentsFactory.create(
             cluster=main_cluster, volume="10000", reporter="U.S.", page="1"
         )
         repeated_citation = CitationWithParentsFactory.create(
@@ -2204,7 +2204,7 @@ class OpinionVersionTest(ESIndexTestCase, TransactionTestCase):
             sha1="yyy",
         )
 
-        opinion = OpinionFactory.create(
+        OpinionFactory.create(
             cluster=OpinionClusterFactory(
                 docket=main_docket, source=ClusterSources.COURT_WEBSITE
             ),
@@ -2294,59 +2294,51 @@ class DeleteVersionRelatedObjectsTest(TestCase):
 
 
 class UpdateReferencingObjectsNotesTest(TestCase):
-    """Tests for Note repointing in update_referencing_objects (#7725).
+    """Tests for Note repointing in update_referencing_objects.
 
     Note can't go through the generic single-FK-field handling that the
-    rest of update_referencing_objects()'s referencing_models use, since a
-    Note may be in either the legacy or the GenericForeignKey shape
-    (dual-read) - see repoint_notes() in cl.favorites.utils.
+    rest of update_referencing_objects()'s referencing_models use, since it
+    points at its object through a GenericForeignKey - see repoint_notes()
+    in cl.favorites.utils.
     """
 
-    def test_repoints_both_note_shapes(self):
-        """A legacy-shaped and a GFK-shaped Note on the version docket are
-        both moved onto the main docket, instead of being left behind to
-        be lost when the version docket is deleted.
+    def test_repoints_notes(self):
+        """Every user's Note on the version object is moved onto the main
+        one, instead of being left behind to be lost when the version is
+        deleted.
         """
-        main_docket = DocketFactory.create()
-        version_docket = DocketFactory.create()
+        for factory in (DocketFactory, OpinionClusterWithParentsFactory):
+            with self.subTest(model=factory._meta.model.__name__):
+                main_object = factory.create()
+                version_object = factory.create()
+                notes = [
+                    NoteFactory(content_object=version_object),
+                    NoteFactory(content_object=version_object),
+                ]
 
-        legacy_note = NoteFactory(cluster_id=None, docket_id=version_docket)
-        gfk_note = NoteFactory.for_object(version_docket)
+                update_referencing_objects(main_object, version_object)
 
-        update_referencing_objects(main_docket, version_docket)
-
-        legacy_note.refresh_from_db()
-        gfk_note.refresh_from_db()
-
-        docket_content_type = ContentType.objects.get_for_model(Docket)
-        for note in (legacy_note, gfk_note):
-            # repoint_notes() always writes the new shape, even when the
-            # Note started as legacy.
-            self.assertIsNone(note.docket_id_id)
-            self.assertEqual(note.object_id, main_docket.pk)
-            self.assertEqual(note.content_type, docket_content_type)
+                content_type = ContentType.objects.get_for_model(main_object)
+                for note in notes:
+                    note.refresh_from_db()
+                    self.assertEqual(note.object_id, main_object.pk)
+                    self.assertEqual(note.content_type, content_type)
 
     def test_leaves_version_note_when_main_already_has_one(self):
         """If the same user already has a Note on the main docket, the
-        version docket's Note (in either shape) is left where it is.
+        version docket's Note is left where it is.
         """
         main_docket = DocketFactory.create()
         version_docket = DocketFactory.create()
         user = UserWithChildProfileFactory.create()
 
-        NoteFactory.for_object(main_docket, user=user)
-        version_gfk_note = NoteFactory.for_object(version_docket, user=user)
-        version_legacy_note = NoteFactory(
-            cluster_id=None, docket_id=version_docket, user=user
-        )
+        NoteFactory(content_object=main_docket, user=user)
+        version_note = NoteFactory(content_object=version_docket, user=user)
 
         update_referencing_objects(main_docket, version_docket)
 
-        version_gfk_note.refresh_from_db()
-        version_legacy_note.refresh_from_db()
-
-        self.assertEqual(version_gfk_note.object_id, version_docket.pk)
-        self.assertEqual(version_legacy_note.docket_id_id, version_docket.pk)
+        version_note.refresh_from_db()
+        self.assertEqual(version_note.object_id, version_docket.pk)
 
 
 class DeleteDuplicatesTest(TestCase):

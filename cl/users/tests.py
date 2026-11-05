@@ -94,10 +94,7 @@ from cl.lib.ratelimiter import (
     make_failed_login_key,
 )
 from cl.lib.redis_utils import get_redis_interface
-from cl.lib.test_helpers import (
-    SimpleUserDataMixin,
-    UserProfileWithParentsFactory,
-)
+from cl.lib.test_helpers import SimpleUserDataMixin
 from cl.search.factories import (
     CourtFactory,
     DocketFactory,
@@ -811,14 +808,14 @@ class ProfileTest(SimpleUserDataMixin, TestCase):
                 stripe_customer_id="cus_test",
             )
 
-            legacy_note = NoteFactory(user=profile.user)
-            legacy_note.notes = "edited"
-            legacy_note.save()
-            gfk_note = NoteFactory.for_object(
-                RECAPDocumentFactory(), user=profile.user
-            )
-            gfk_note.notes = "edited"
-            gfk_note.save()
+            for note in (
+                NoteFactory(user=profile.user),
+                NoteFactory(
+                    content_object=RECAPDocumentFactory(), user=profile.user
+                ),
+            ):
+                note.notes = "edited"
+                note.save()
 
             # Prayers, throttle overrides and stats events, edited so that
             # each one also leaves pghistory rows behind.
@@ -1121,6 +1118,30 @@ class ProfileTest(SimpleUserDataMixin, TestCase):
                     else:
                         self.assertEqual(vals["direction"], "up")
 
+    def test_recap_search_url_uses_document_id_not_docket_entry_id(
+        self,
+    ) -> None:
+        """Does the "Search Notes" link for RECAP documents key off the
+        document's own id, not its parent DocketEntry's? RECAPDocument and
+        DocketEntry have independent pk sequences, so using the wrong field
+        would silently pull results from the wrong docket whenever the two
+        happen to collide.
+        """
+        profile = UserProfileWithParentsFactory()
+        rd = RECAPDocumentFactory()
+        NoteFactory(content_object=rd, user=profile.user)
+
+        self.assertTrue(
+            self.client.login(
+                username=profile.user.username, password="password"
+            )
+        )
+        r = self.client.get(reverse("profile_notes"))
+        self.assertEqual(
+            r.context["recap_search_url"],
+            f"/?type=r&q=xxx AND id:({rd.pk})",
+        )
+
 
 class NotesPageDeadLinkTest(TestCase):
     """A noted object with no page of its own yet must not render as a
@@ -1138,8 +1159,8 @@ class NotesPageDeadLinkTest(TestCase):
             docket_entry=entry, attachment_number=None
         )
         self.assertEqual(document.get_absolute_url(), "")
-        note = NoteFactory.for_object(
-            document, user=user.user, name="edge case note"
+        note = NoteFactory(
+            content_object=document, user=user.user, name="edge case note"
         )
 
         self.assertTrue(
@@ -3672,7 +3693,7 @@ class EmailBrokenTest(ESIndexTestCase, TestCase):
         user.password = make_password("password")
         await user.asave()
         # Authenticate user
-        login = await self.async_client.alogin(
+        await self.async_client.alogin(
             username=user.username, password="password"
         )
         r = await self.async_client.get(path)
@@ -3723,7 +3744,7 @@ class EmailBrokenTest(ESIndexTestCase, TestCase):
         user.email = "complaint@simulator.amazonses.com"
         user.password = make_password("password")
         await user.asave()
-        login = await self.async_client.alogin(
+        await self.async_client.alogin(
             username=user.username, password="password"
         )
         r = await self.async_client.get(path)
@@ -3757,7 +3778,7 @@ class EmailBrokenTest(ESIndexTestCase, TestCase):
         user.password = make_password("password")
         await user.asave()
         # Authenticate user
-        login = await self.async_client.alogin(
+        await self.async_client.alogin(
             username=user.username, password="password"
         )
         r = await self.async_client.get(path)
@@ -3800,7 +3821,7 @@ class EmailBrokenTest(ESIndexTestCase, TestCase):
         # email error.
         user.email = "new@simulator.amazonses.com"
         await user.asave()
-        login = await self.async_client.alogin(
+        await self.async_client.alogin(
             username=user.username, password="password"
         )
 
