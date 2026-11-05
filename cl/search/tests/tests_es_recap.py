@@ -93,7 +93,6 @@ from cl.search.factories import (
     OpinionsCitedByRECAPDocumentFactory,
     OpinionWithParentsFactory,
     RECAPDocumentFactory,
-    SCOTUSDocketEntryFactory,
     ScotusDocketMetadataFactory,
     SCOTUSDocumentFactory,
 )
@@ -111,6 +110,13 @@ from cl.search.models import (
     DocketEvent,
     OpinionsCitedByRECAPDocument,
     RECAPDocument,
+    SCOTUSDocketEntry,
+    ScotusDocketMetadata,
+    SCOTUSDocument,
+)
+from cl.search.signals import (
+    docket_field_mapping,
+    scotus_document_field_mapping,
 )
 from cl.search.tasks import (
     es_save_document,
@@ -6777,54 +6783,38 @@ class ESRECAPDocumentSCOTUSCompatibilityTest(TestCase):
             self.assertIsNone(recap["docket_entry_uid"])
 
 
-class SCOTUSFieldTrackerTest(TestCase):
-    """Confirm the FieldTrackers added for #8020 (ScotusDocketMetadata,
-    SCOTUSDocketEntry, SCOTUSDocument) track the fields the ES signal
-    mapping depends on -- entirely at the model level, no ES or
-    signals involved.
+class SCOTUSFieldTrackerTest(SimpleTestCase):
+    """Confirm the FieldTrackers added for #8020 track exactly the fields
+    the SCOTUS ES signal mappings depend on.
     """
 
-    def setUp(self) -> None:
-        self.court = CourtFactory(id="scotus", jurisdiction="F")
-
-    def test_scotus_document_tracks_docket_entry_id(self) -> None:
-        """Must include docket_entry_id, or reparenting a
-        SCOTUSDocument would never trigger the mapping's ["prepare"]
-        sentinel -- leaving its ES entry on the old docket forever."""
-        entry_a = SCOTUSDocketEntryFactory(docket__court=self.court)
-        entry_b = SCOTUSDocketEntryFactory(docket__court=self.court)
-        document = SCOTUSDocumentFactory(docket_entry=entry_a)
-
-        document.docket_entry = entry_b
-
-        self.assertIn(
-            "docket_entry_id", document.es_rd_field_tracker.changed()
-        )
-
-    def test_scotus_docket_entry_tracks_mapped_fields(self) -> None:
-        """Tracks every field scotus_document_field_mapping depends on
-        (description, entry_number, date_filed)."""
-        entry = SCOTUSDocketEntryFactory(docket__court=self.court)
-
-        entry.description = "updated"
-        entry.entry_number = 999
-        entry.date_filed = datetime.date(2020, 1, 1)
-
-        changed = entry.es_rd_field_tracker.changed()
-        self.assertIn("description", changed)
-        self.assertIn("entry_number", changed)
-        self.assertIn("date_filed", changed)
-
-    def test_scotus_docket_metadata_tracks_capital_case(self) -> None:
-        """Tracks capital_case."""
-        docket = DocketFactory(court=self.court, source=Docket.DEFAULT)
-        metadata = ScotusDocketMetadataFactory(
-            docket=docket, capital_case=False
-        )
-
-        metadata.capital_case = True
-
-        self.assertIn("capital_case", metadata.es_rd_field_tracker.changed())
+    def test_trackers_match_the_es_signal_mappings(self) -> None:
+        """A mapped field missing from its tracker would never trigger an
+        ES update, and a tracked field missing from the mapping is dead
+        weight."""
+        cases = [
+            (
+                SCOTUSDocument,
+                scotus_document_field_mapping["save"][SCOTUSDocument]["self"],
+            ),
+            (
+                SCOTUSDocketEntry,
+                scotus_document_field_mapping["save"][SCOTUSDocketEntry][
+                    "docket_entry"
+                ],
+            ),
+            (
+                ScotusDocketMetadata,
+                docket_field_mapping["reverse"][ScotusDocketMetadata][
+                    "scotus_metadata"
+                ],
+            ),
+        ]
+        for model, fields_map in cases:
+            with self.subTest(model=model.__name__):
+                self.assertEqual(
+                    set(model.es_rd_field_tracker.fields), set(fields_map)
+                )
 
 
 class ESDocketSourcesTest(SimpleTestCase):
