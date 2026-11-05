@@ -244,7 +244,8 @@ async def create_prayer_view(
     is_htmx_request = request.headers.get("hx-request", False)
     regular_size = bool(request.POST.get("regular_size"))
     recap_document_obj = await RECAPDocument.objects.aget(id=recap_document)
-    if not (await prayer_eligible(request.user))[0]:
+    is_eligible, _ = await prayer_eligible(user)
+    if not is_eligible:
         if is_htmx_request:
             prayer_counts = await get_prayer_counts_in_bulk(
                 [recap_document_obj]
@@ -268,7 +269,9 @@ async def create_prayer_view(
             "User have reached your daily request limit"
         )
 
-    prayer = await create_prayer(user, recap_document_obj)
+    prayer = await create_prayer(
+        user, recap_document_obj, is_eligible=is_eligible
+    )
     if is_htmx_request:
         # create_prayer returns None both for a duplicate and for a document
         # that became available, so check the DB to tell them apart.
