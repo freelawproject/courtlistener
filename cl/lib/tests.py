@@ -3091,28 +3091,6 @@ class IncrementalNewTemplateMiddlewareTest(TestCase):
         response = self.process("homepage.html")
         self.assertEqual(response.template_name, "v2_homepage.html")
 
-    @override_flag(WIP_PROPS["flag"], True)
-    def test_swapped_wip_partial_skips_the_search_form(self) -> None:
-        """A swapped partial under the WIP partials prefix gets no search form.
-
-        No legacy/WIP partial pair exists in the repo yet, so the lookup is
-        stubbed to make one.
-        """
-        with patch.object(
-            IncrementalNewTemplateMiddleware,
-            "template_exists",
-            side_effect={
-                "includes/foo/button.html",
-                f"{WIP_PROPS['partials_prefix']}foo/button.html",
-            }.__contains__,
-        ):
-            response = self.process("includes/foo/button.html")
-        self.assertEqual(
-            response.template_name,
-            f"{WIP_PROPS['partials_prefix']}foo/button.html",
-        )
-        self.assertNotIn("search_form", response.context_data or {})
-
     def test_htmx_partial_follows_the_design_header(self) -> None:
         """A flagged htmx request gets the partial for the page that sent it.
 

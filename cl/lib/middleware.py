@@ -20,7 +20,6 @@ V2_PARTIALS_PREFIX = "v2_includes/"
 WIP_PROPS = {
     "flag": "use_wip_design",
     "prefix": "wip_",
-    "partials_prefix": "wip_includes/",
 }
 
 
@@ -205,9 +204,7 @@ class IncrementalNewTemplateMiddleware:
         # only be wasted work for them. The name decides, not the HX-Request
         # header: the server knows what it renders, and a boosted full-page
         # request must still get the form.
-        if not new_template_name.startswith(
-            (V2_PARTIALS_PREFIX, WIP_PROPS["partials_prefix"])
-        ):
+        if not new_template_name.startswith(V2_PARTIALS_PREFIX):
             # pyrefly:ignore[unsupported-operation] False positive based on Django docs
             response.context_data["search_form"] = CorpusSearchForm()
 
