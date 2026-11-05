@@ -2497,7 +2497,6 @@ class SearchAlertsWebhooksTest(
             url="https://example.com/",
             enabled=True,
         )
-        unpublished_status = PRECEDENTIAL_STATUS.UNPUBLISHED
         with cls.captureOnCommitCallbacks(execute=True):
             cls.search_alert_oa = AlertFactory(
                 user=cls.user_profile.user,
@@ -2827,7 +2826,7 @@ class PrayAndPayAlertsWebhooksTest(TestCase):
             ),
         ):
             # Create a WAITING prayer (shouldn't create webhook)
-            prayer = PrayerFactory(
+            PrayerFactory(
                 user=self.user_profile.user,
                 recap_document=rd,
                 status=Prayer.WAITING,

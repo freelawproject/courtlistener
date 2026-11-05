@@ -137,13 +137,18 @@ def human_sort[T: str | tuple[str, Any]](
     TODO: The `tuple[str, Any]` is almost certainly wrong and should be a
         `dict[str, Any]`, but this requires verification.
     """
-    convert = lambda text: int(text) if text.isdigit() else text
+
+    def convert(text):
+        return int(text) if text.isdigit() else text
+
     if key:
-        sorter = lambda item: [
-            convert(c) for c in re.split("([0-9]+)", item[key])
-        ]
+
+        def sorter(item):
+            return [convert(c) for c in re.split("([0-9]+)", item[key])]
     else:
-        sorter = lambda item: [convert(c) for c in re.split("([0-9]+)", item)]
+
+        def sorter(item):
+            return [convert(c) for c in re.split("([0-9]+)", item)]
 
     return sorted(unordered_list, key=sorter)
 
