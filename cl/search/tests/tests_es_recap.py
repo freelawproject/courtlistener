@@ -59,12 +59,26 @@ from cl.people_db.factories import (
 from cl.search.admin import RECAPDocumentAdmin
 from cl.search.api_serializers import (
     DocketESResultSerializer,
+    OAESResultSerializer,
+    OpinionClusterESResultSerializer,
+    PersonESResultSerializer,
     RECAPDocumentESResultSerializer,
     RECAPESResultSerializer,
 )
 from cl.search.api_utils import CursorESList
-from cl.search.api_views import SearchV4ViewSet
-from cl.search.documents import ES_CHILD_ID, DocketDocument, ESRECAPDocument
+from cl.search.api_views import (
+    SearchV4ViewSet,
+    _ESResultSerializer,
+    _ESResultSerializers,
+)
+from cl.search.documents import (
+    ES_CHILD_ID,
+    AudioDocument,
+    DocketDocument,
+    ESRECAPDocument,
+    OpinionClusterDocument,
+    PersonDocument,
+)
 from cl.search.es_docket_sources import (
     ALL_ES_SOURCES,
     RECAP_ES_SOURCE,
@@ -106,6 +120,7 @@ from cl.search.tasks import (
 )
 from cl.search.types import EventTable
 from cl.tests.cases import (
+    AuthenticatedClientMixin,
     CountESTasksTestCase,
     ESIndexTestCase,
     SimpleTestCase,
@@ -3373,7 +3388,7 @@ class RECAPSearchTest(RECAPSearchTestCase, ESIndexTestCase, TestCase):
 
 
 class RECAPSearchDecayRelevancyTest(
-    ESIndexTestCase, V4SearchAPIAssertions, TestCase
+    AuthenticatedClientMixin, ESIndexTestCase, V4SearchAPIAssertions, TestCase
 ):
     """
     RECAP Search Decay Relevancy  Tests
@@ -4162,7 +4177,6 @@ class RECAPSearchAPIV3Test(
             "assignedTo",
             "assigned_to_id",
             "attachment_number",
-            "capital_case",
             "caseName",
             "cause",
             "court",
@@ -4408,7 +4422,11 @@ class RECAPESResultSerializerTest(RECAPESResultSerializer):
 
 
 class RECAPSearchAPIV4Test(
-    RECAPSearchAPICommonTests, ESIndexTestCase, TestCase, V4SearchAPIAssertions
+    AuthenticatedClientMixin,
+    RECAPSearchAPICommonTests,
+    ESIndexTestCase,
+    TestCase,
+    V4SearchAPIAssertions,
 ):
     """
     RECAP Search API V4 Tests
@@ -4508,6 +4526,23 @@ class RECAPSearchAPIV4Test(
             recap_document_v4_api_keys,
             v4_recap_meta_keys,
         )
+
+    async def test_capital_case_not_in_api_results(self) -> None:
+        """capital_case isn't exposed in V4 RECAP results yet: not on the
+        docket, its nested documents, or RECAP document results. The SCOTUS
+        search API (#8153) adds it."""
+        search_params = {
+            "type": SEARCH_TYPES.RECAP,
+            "q": f"id:{self.rd_api.pk}",
+        }
+        r = await self._test_api_results_count(search_params, 1, "type r")
+        docket_result = r.data["results"][0]
+        self.assertNotIn("capital_case", docket_result)
+        self.assertNotIn("capital_case", docket_result["recap_documents"][0])
+
+        search_params["type"] = SEARCH_TYPES.RECAP_DOCUMENT
+        r = await self._test_api_results_count(search_params, 1, "type rd")
+        self.assertNotIn("capital_case", r.data["results"][0])
 
     async def test_results_api_empty_fields(self) -> None:
         """Confirm empty fields values in V4 RECAP Search API results."""
@@ -4854,27 +4889,33 @@ class RECAPSearchAPIV4Test(
     @override_settings(SEARCH_API_PAGE_SIZE=1)
     @mock.patch.object(
         SearchV4ViewSet,
-        "supported_search_types",
-        {
-            SEARCH_TYPES.RECAP: {
-                "document_class": SearchV4ViewSet.supported_search_types[
-                    SEARCH_TYPES.RECAP
-                ]["document_class"],
-                "serializer_class": RECAPESResultSerializerTest,
-            },
-            SEARCH_TYPES.DOCKETS: {
-                "document_class": SearchV4ViewSet.supported_search_types[
-                    SEARCH_TYPES.DOCKETS
-                ]["document_class"],
-                "serializer_class": DocketESResultSerializerTest,
-            },
-            SEARCH_TYPES.RECAP_DOCUMENT: {
-                "document_class": SearchV4ViewSet.supported_search_types[
-                    SEARCH_TYPES.RECAP_DOCUMENT
-                ]["document_class"],
-                "serializer_class": RECAPDocumentESResultSerializerTest,
-            },
-        },
+        "search_serializers",
+        _ESResultSerializers(
+            recap=_ESResultSerializer(
+                document=DocketDocument,
+                serializer=RECAPESResultSerializerTest,
+            ),
+            docket=_ESResultSerializer(
+                document=DocketDocument,
+                serializer=DocketESResultSerializerTest,
+            ),
+            recap_document=_ESResultSerializer(
+                document=DocketDocument,
+                serializer=RECAPDocumentESResultSerializerTest,
+            ),
+            opinion=_ESResultSerializer(
+                document=OpinionClusterDocument,
+                serializer=OpinionClusterESResultSerializer,
+            ),
+            person=_ESResultSerializer(
+                document=PersonDocument,
+                serializer=PersonESResultSerializer,
+            ),
+            oral_argument=_ESResultSerializer(
+                document=AudioDocument,
+                serializer=OAESResultSerializer,
+            ),
+        ),
     )
     @mock.patch(
         "cl.search.api_utils.set_results_highlights",
@@ -4997,27 +5038,33 @@ class RECAPSearchAPIV4Test(
     @override_settings(SEARCH_API_PAGE_SIZE=1)
     @mock.patch.object(
         SearchV4ViewSet,
-        "supported_search_types",
-        {
-            SEARCH_TYPES.RECAP: {
-                "document_class": SearchV4ViewSet.supported_search_types[
-                    SEARCH_TYPES.RECAP
-                ]["document_class"],
-                "serializer_class": RECAPESResultSerializerTest,
-            },
-            SEARCH_TYPES.DOCKETS: {
-                "document_class": SearchV4ViewSet.supported_search_types[
-                    SEARCH_TYPES.DOCKETS
-                ]["document_class"],
-                "serializer_class": DocketESResultSerializerTest,
-            },
-            SEARCH_TYPES.RECAP_DOCUMENT: {
-                "document_class": SearchV4ViewSet.supported_search_types[
-                    SEARCH_TYPES.RECAP_DOCUMENT
-                ]["document_class"],
-                "serializer_class": RECAPDocumentESResultSerializerTest,
-            },
-        },
+        "search_serializers",
+        _ESResultSerializers(
+            recap=_ESResultSerializer(
+                document=DocketDocument,
+                serializer=RECAPESResultSerializerTest,
+            ),
+            docket=_ESResultSerializer(
+                document=DocketDocument,
+                serializer=DocketESResultSerializerTest,
+            ),
+            recap_document=_ESResultSerializer(
+                document=DocketDocument,
+                serializer=RECAPDocumentESResultSerializerTest,
+            ),
+            opinion=_ESResultSerializer(
+                document=OpinionClusterDocument,
+                serializer=OpinionClusterESResultSerializer,
+            ),
+            person=_ESResultSerializer(
+                document=PersonDocument,
+                serializer=PersonESResultSerializer,
+            ),
+            oral_argument=_ESResultSerializer(
+                document=AudioDocument,
+                serializer=OAESResultSerializer,
+            ),
+        ),
     )
     @mock.patch(
         "cl.search.api_utils.set_results_highlights",
@@ -6690,6 +6737,45 @@ class ESRECAPDocumentSCOTUSCompatibilityTest(TestCase):
         self.assertEqual(prepared["short_description"], rd.description)
         self.assertEqual(prepared["docket_id"], docket.pk)
 
+    def test_es_id_and_uid_share_the_source_namespace(self) -> None:
+        """Each source's ES _id comes from its own ES_CHILD_ID property, and
+        SCOTUS's _id prefix is its uid_namespace plus "d" (for document)."""
+        child_ids = [
+            getattr(ES_CHILD_ID(42), source.child_id_property)
+            for source in ALL_ES_SOURCES
+        ]
+        self.assertEqual(len(child_ids), len(set(child_ids)))
+        self.assertEqual(ES_CHILD_ID(42).RECAP, "rd_42")
+        self.assertEqual(
+            ES_CHILD_ID(42).SCOTUS, f"{SCOTUS_ES_SOURCE.uid_namespace}d_42"
+        )
+
+    def test_ids_are_namespaced_for_scotus_only(self) -> None:
+        """RECAP documents keep the integer id and docket_entry_id; SCOTUS
+        documents leave them empty and use the namespaced uid fields, so the
+        two sources' pks can't collide."""
+        scotus_document = SCOTUSDocumentFactory(
+            docket_entry__docket__court=self.court
+        )
+        rd = RECAPDocumentFactory(docket_entry=DocketEntryFactory())
+
+        scotus = ESRECAPDocument().prepare(scotus_document)
+        recap = ESRECAPDocument().prepare(rd)
+
+        with self.subTest("SCOTUS"):
+            self.assertIsNone(scotus["id"])
+            self.assertIsNone(scotus["docket_entry_id"])
+            self.assertEqual(f"scotus_{scotus_document.pk}", scotus["uid"])
+            self.assertEqual(
+                f"scotus_{scotus_document.docket_entry_id}",
+                scotus["docket_entry_uid"],
+            )
+        with self.subTest("RECAP"):
+            self.assertEqual(rd.pk, recap["id"])
+            self.assertEqual(rd.docket_entry_id, recap["docket_entry_id"])
+            self.assertIsNone(recap["uid"])
+            self.assertIsNone(recap["docket_entry_uid"])
+
 
 class SCOTUSFieldTrackerTest(TestCase):
     """Confirm the FieldTrackers added for #8020 (ScotusDocketMetadata,
@@ -6745,13 +6831,6 @@ class ESDocketSourcesTest(SimpleTestCase):
     """Confirm the per-source ES docket configuration added for #8020
     (cl.search.es_docket_sources) is internally consistent.
     """
-
-    def test_scotus_child_id_has_its_own_prefix(self) -> None:
-        """ES_CHILD_ID.SCOTUS must differ from .RECAP, or a
-        RECAPDocument and a SCOTUSDocument sharing a pk would collide
-        on the same ES _id."""
-        self.assertEqual(ES_CHILD_ID(42).RECAP, "rd_42")
-        self.assertEqual(ES_CHILD_ID(42).SCOTUS, "sd_42")
 
     def test_all_sources_resolve_back_to_themselves_in_source_by_model(
         self,

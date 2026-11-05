@@ -50,6 +50,7 @@ from cl.search.constants import (
     SEARCH_RECAP_HL_FIELDS,
     o_type_index_map,
 )
+from cl.search.es_docket_sources import SOURCE_BY_MODEL, SourceDocument
 from cl.search.es_indices import (
     opinion_index,
     oral_arguments_index,
@@ -538,7 +539,7 @@ class ES_CHILD_ID:
     def SCOTUS(self) -> str:
         # Own prefix because SCOTUSDocument's pk sequence is independent
         # from RECAPDocument's -- sharing one could collide on the same _id.
-        return f"sd_{self.instance_id}"
+        return f"scotusd_{self.instance_id}"
 
     @property
     def OPINION(self) -> str:
@@ -1197,8 +1198,13 @@ class RECAPBaseDocument(Document):
 
 
 class ESRECAPBaseDocument(DSLDocument):
-    id = fields.IntegerField(attr="pk")
-    docket_entry_id = fields.IntegerField(attr="docket_entry.pk")
+    # id and docket_entry_id hold RECAP pks only. Other sources' pks would
+    # collide with them, so those documents use uid and docket_entry_uid,
+    # prefixed with their ESDocketSource.uid_namespace (e.g. "scotus_123").
+    id = fields.IntegerField()
+    docket_entry_id = fields.IntegerField()
+    uid = fields.KeywordField()
+    docket_entry_uid = fields.KeywordField()
     description = fields.TextField(
         attr="docket_entry.description",
         analyzer="text_en_splitting_cl",
@@ -1449,13 +1455,46 @@ class ESRECAPDocument(
     def prepare_pacer_case_id(self, instance):
         return instance.docket_entry.docket.pacer_case_id
 
-    def prepare_capital_case(
-        self, instance: RECAPDocument | SCOTUSDocument
-    ) -> bool | None:
+    def prepare_capital_case(self, instance: SourceDocument) -> bool | None:
+        """Return the SCOTUS docket's capital_case flag; empty for other
+        sources."""
+        if not isinstance(instance, SCOTUSDocument):
+            return None
         scotus_metadata = getattr(
             instance.docket_entry.docket, "scotus_metadata", None
         )
         return scotus_metadata.capital_case if scotus_metadata else None
+
+    def prepare_id(self, instance: SourceDocument) -> int | None:
+        """Return the RECAPDocument pk; empty for other sources (see
+        prepare_uid)."""
+        if not isinstance(instance, RECAPDocument):
+            return None
+        return instance.pk
+
+    def prepare_docket_entry_id(self, instance: SourceDocument) -> int | None:
+        """Return the DocketEntry pk; empty for other sources (see
+        prepare_docket_entry_uid)."""
+        if not isinstance(instance, RECAPDocument):
+            return None
+        return instance.docket_entry_id
+
+    def prepare_uid(self, instance: SourceDocument) -> str | None:
+        """Return the pk prefixed with the source's uid_namespace, e.g.
+        "scotus_123"; empty for sources without one, like RECAP."""
+        source = SOURCE_BY_MODEL.get(type(instance))
+        if not source or not source.uid_namespace:
+            return None
+        return f"{source.uid_namespace}_{instance.pk}"
+
+    def prepare_docket_entry_uid(self, instance: SourceDocument) -> str | None:
+        """Return the docket entry pk prefixed with the source's
+        uid_namespace, e.g. "scotus_321"; empty for sources without one,
+        like RECAP."""
+        source = SOURCE_BY_MODEL.get(type(instance))
+        if not source or not source.uid_namespace:
+            return None
+        return f"{source.uid_namespace}_{instance.docket_entry_id}"
 
 
 class DocketBaseDocument(DSLDocument):
@@ -1597,6 +1636,10 @@ class DocketDocument(
             return instance.bankruptcy_information.trustee_str
 
     def prepare_capital_case(self, instance: Docket) -> bool | None:
+        """Return the docket's SCOTUS capital_case flag; empty for dockets
+        without SCOTUS metadata."""
+        if instance.court_id != "scotus":
+            return None
         scotus_metadata = getattr(instance, "scotus_metadata", None)
         return scotus_metadata.capital_case if scotus_metadata else None
 

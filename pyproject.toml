@@ -116,6 +116,7 @@ dependencies = [
   "django-prometheus>=2.5.0",
   "google-genai>=2.25.0",
   "django-oauth-toolkit==3.4.1",
+  "django-allauth[saml,socialaccount]>=65.20.0",
 ]
 
 [dependency-groups]

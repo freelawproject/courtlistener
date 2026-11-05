@@ -28,7 +28,7 @@ CourtListener is migrating from Bootstrap 3 / jQuery to Tailwind v3 / Alpine.js 
 
 `IncrementalNewTemplateMiddleware` swaps templates by prepending `v2_` to the view's template name when the `use_new_design` waffle flag is active. New templates MUST be named accordingly (e.g., `v2_help/index.html`).
 
-Partials a view returns on their own, such as htmx responses, follow the same rule and live under `v2_includes/` (e.g., `includes/foo/button.html` → `v2_includes/foo/button.html`). They are swapped like any other template, but the checks that only make sense for full pages (extending `new_base.html`, registering in `V2PagesRegisterTest`) do not apply to them.
+Partials a view returns on their own, such as htmx responses, follow the same rule and live under `v2_includes/` (e.g., `includes/foo/button.html` → `v2_includes/foo/button.html`). They are swapped like any other template, except that htmx requests are swapped by the page's design header instead of the flag (see [Partials shared by both stacks](#partials-shared-by-both-stacks)). The checks that only make sense for full pages (extending `new_base.html`, registering in `V2PagesRegisterTest`) do not apply to them.
 
 ### Base template
 
@@ -53,6 +53,14 @@ Sync notice format:
 ╚══════════════════════════════════════════════════════════════════════════╝
 {% endcomment %}
 ```
+
+### Keep data shaping in the backend
+
+Templates render; they SHOULD know as little as possible about the data they show. Anything tightly coupled to the data (which fields a page lists, their labels, how a value is formatted or what it falls back to) belongs in the view or a backend helper. The helper hands the template a list of plain, typed items and the template loops over them with `{% for %}`. The loop still runs on the server, so this is entirely within the SSR model.
+
+- Shape items as `TypedDict`s in a builder next to the view, and pass the template one context key. Precedents: `build_docket_metadata` and `build_idb_rows` in `cl/opinion_page/utils.py`
+- Copy that needs markup, such as a hint with a link, is built with `format_html` so interpolated values are escaped. Static copy MAY use `mark_safe`
+- Templates SHOULD NOT read model attributes field by field for tabular data. A misspelled attribute in a template renders as empty with no error, while the same access in Python is type checked
 
 ## Cotton components
 
@@ -146,7 +154,14 @@ v2 uses htmx 2.0.11 from `js/third_party/` (legacy keeps 1.7.0). `new_base.html`
 
 Swapped partials live under `v2_includes/` (see [Naming & middleware](#naming--middleware)).
 
-`<body>` in `new_base.html` carries `hx-headers` with the CSRF token, and htmx elements inherit it: an `hx-post` MUST NOT repeat the header.
+`<body>` in `new_base.html` carries `hx-headers` with the CSRF token and the design header `X-CL-Design: v2`, and htmx elements inherit both: an `hx-post` MUST NOT repeat them.
+
+### Partials shared by both stacks
+
+For htmx requests, `IncrementalNewTemplateMiddleware` serves the `v2_includes/` partial only when the request carries `X-CL-Design: v2`, whatever the `use_new_design` flag says. A flagged user can still be on a legacy page, whose htmx code expects the legacy partial back, so the partial has to match the page that sent the request. Full-page requests still follow the flag.
+
+- An endpoint called from both legacy and v2 pages MUST return the legacy template name and let the middleware swap it. It MUST NOT choose the template itself, for example by checking the flag or a form field.
+- An element in v2 templates/includes MUST NOT drop the inherited headers with `hx-disinherit` or `hx-headers="unset"`; its requests would then get the legacy partial.
 
 ### Disabled features
 
