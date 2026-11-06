@@ -7457,6 +7457,7 @@ class SCOTUSESIndexingSignalTest(
 
 
 @override_flag("scotus_docket_page", active=True)
+@override_settings(WAFFLE_CACHE_PREFIX="SCOTUSRECAPSearchTest")
 class SCOTUSRECAPSearchTest(
     AuthenticatedClientMixin, ESIndexTestCase, TestCase
 ):
