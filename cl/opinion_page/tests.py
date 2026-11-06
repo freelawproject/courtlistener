@@ -110,7 +110,13 @@ from cl.people_db.factories import (
     PositionFactory,
     RoleFactory,
 )
-from cl.people_db.models import CriminalCount, Person, Role
+from cl.people_db.models import (
+    CriminalCount,
+    Party,
+    PartyType,
+    Person,
+    Role,
+)
 from cl.recap.factories import (
     AppellateAttachmentFactory,
     AppellateAttachmentPageFactory,
@@ -4500,6 +4506,16 @@ class DocketPartiesContextTest(TestCase):
             name="Plaintiff",
             date_terminated=date(2016, 4, 21),
         )
+        # PACER names arrive with HTML entities in them.
+        PartyTypeFactory(
+            docket=cls.docket,
+            party=PartyFactory(
+                name="M&amp;B CAPITAL ADVISERS",
+                docket=cls.docket,
+                attorneys=[cls.other],
+            ),
+            name="Plaintiff",
+        )
         defendant_type = PartyTypeFactory(
             docket=cls.docket,
             party=PartyFactory(
@@ -4524,15 +4540,17 @@ class DocketPartiesContextTest(TestCase):
         return r.context["party_groups"]
 
     async def test_parties_group_by_type_in_name_order(self) -> None:
-        """One group per party type, types and parties in name order, with
-        the party's termination date in the site format or empty."""
+        """One group per party type, types and parties in name order, names
+        unescaped, with the party's termination date in the site format or
+        empty."""
         groups = await self.get_party_groups()
         self.assertEqual(
             [group["name"] for group in groups], ["Defendant", "Plaintiff"]
         )
         defendant, plaintiff = (group["parties"][0] for group in groups)
         self.assertEqual(
-            plaintiff["name"], "AMERICAN ASSOCIATION OF LAW LIBRARIES"
+            [party["name"] for party in groups[1]["parties"]],
+            ["AMERICAN ASSOCIATION OF LAW LIBRARIES", "M&B CAPITAL ADVISERS"],
         )
         self.assertEqual(plaintiff["date_terminated"], "April 21, 2016")
         self.assertEqual(defendant["date_terminated"], "")
@@ -4566,6 +4584,7 @@ class DocketPartiesContextTest(TestCase):
                 {
                     "pk": self.firm.pk,
                     "name": "Relman Colfax",
+                    "label": "Relman Colfax",
                     "address_lines": [
                         "1225 19th St. NW",
                         "Washington, DC 20036",
@@ -4595,6 +4614,68 @@ class DocketPartiesContextTest(TestCase):
         )
         self.assertEqual(criminal["highest_offense_level_opening"], "Felony")
         self.assertEqual(criminal["highest_offense_level_terminated"], "None")
+
+
+@override_settings(WAFFLE_CACHE_PREFIX="test_docket_parties_pages_waffle")
+class DocketPartiesPaginationTest(TestCase):
+    """Both designs of the parties tab serve 1,000 party types per page."""
+
+    @classmethod
+    def setUpTestData(cls) -> None:
+        cls.docket = DocketFactory(
+            court=CourtFactory(id="canb", jurisdiction="FB"),
+            source=Docket.RECAP,
+        )
+        # Bulk inserts: the factories would create an attorney and a firm
+        # per party, far more than a page boundary needs.
+        parties = Party.objects.bulk_create(
+            Party(name=f"PARTY {i:04d}") for i in range(1001)
+        )
+        PartyType.objects.bulk_create(
+            PartyType(
+                docket=cls.docket,
+                party=party,
+                name="Defendant" if i < 1000 else "Plaintiff",
+            )
+            for i, party in enumerate(parties)
+        )
+
+    def get_page(self, page: int) -> HttpResponse:
+        """Requests one page of the parties tab."""
+        url = reverse(
+            "docket_parties", args=[self.docket.pk, self.docket.slug]
+        )
+        r = self.client.get(url, {"page": page})
+        self.assertEqual(r.status_code, HTTPStatus.OK)
+        return r
+
+    @override_flag("use_new_design", active=True)
+    def test_v2_pages_the_party_types(self) -> None:
+        """The v2 tab renders one page of parties and its pager."""
+        r = self.get_page(1)
+        self.assertTemplateUsed(r, "v2_docket_parties.html")
+        groups = r.context["party_groups"]
+        self.assertEqual([group["name"] for group in groups], ["Defendant"])
+        self.assertEqual(len(groups[0]["parties"]), 1000)
+        self.assertEqual(r.context["parties_paginator"].paginator.num_pages, 2)
+
+        r = self.get_page(2)
+        groups = r.context["party_groups"]
+        self.assertEqual([group["name"] for group in groups], ["Plaintiff"])
+        self.assertEqual(groups[0]["parties"][0]["name"], "PARTY 1000")
+
+    @override_flag("use_new_design", active=False)
+    def test_legacy_pages_the_party_types(self) -> None:
+        """The legacy tab gets its parties grouped by type for one page."""
+        r = self.get_page(2)
+        self.assertTemplateUsed(r, "docket_parties.html")
+        self.assertTemplateNotUsed(r, "v2_docket_parties.html")
+        self.assertEqual(list(r.context["parties"]), ["Plaintiff"])
+        self.assertEqual(
+            [pt.party.name for pt in r.context["parties"]["Plaintiff"]],
+            ["PARTY 1000"],
+        )
+        self.assertEqual(r.context["parties_paginator"].number, 2)
 
 
 @override_settings(WAFFLE_CACHE_PREFIX="test_docket_parties_v2_waffle")
@@ -4710,7 +4791,9 @@ class DocketPartiesV2TemplateTest(TestCase):
         content = (await self.get_page()).content.decode()
         for url in admin_urls:
             self.assertIn(url, content)
-        self.assertIn('aria-label="Edit firm"', content)
+        self.assertIn(
+            f'aria-label="Edit firm {self.nameless_firm.pk}"', content
+        )
 
 
 @override_settings(WAFFLE_CACHE_PREFIX="test_docket_page_v2_waffle")
