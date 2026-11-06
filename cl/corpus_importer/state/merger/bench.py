@@ -100,7 +100,7 @@ def many_attr_merger() -> type[Merger[None, None, Docket]]:
 
 @dataclass(frozen=True)
 class DocketParams:
-    """Parameters for the docket mergers below. `court_id` is picked up by the default transform of the `court_id` attribute."""
+    """Parameters for the docket mergers below. `court_id` is read by the transform of the `court_id` attribute."""
 
     court_id: str
 
@@ -166,7 +166,7 @@ class DocketMerger(Merger[Scrape, DocketParams, Docket]):
     model: ClassVar[type[Model]] = Docket
     key: ClassVar[Iterable[str]] = ["court_id", "docket_number"]
 
-    court_id: str = Attribute(transform=lambda scrape, params: scrape)
+    court_id: str = Attribute(transform=lambda scrape, params: params.court_id)
     source: int = Attribute(default=DocketSources.SCRAPER)
     docket_number: str = Attribute(
         transform=lambda d, params: d["docket_number"]
@@ -233,7 +233,7 @@ class SpecificationBench:
     def bench_attr_transform_default_object_params(
         self, benchmark: BenchmarkFixture
     ):
-        spec = Attribute(transform=lambda scrape, params: scrape)
+        spec = Attribute(transform=lambda scrape, params: params.court_id)
         spec.name = "court_id"
 
         benchmark(spec.transform, None, DocketParams(court_id=STUB_COURT.pk))
