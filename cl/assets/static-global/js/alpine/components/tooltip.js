@@ -4,6 +4,8 @@ document.addEventListener('alpine:init', () => {
    *
    * Hovering shows the message; clicking, tapping, Enter or Space pins it
    * open. Escape, a click outside, or focus leaving the component closes it.
+   * The message is copied into a live region on open so screen readers
+   * announce it.
    */
   Alpine.data('tooltip', () => ({
     hovered: false,
@@ -13,6 +15,19 @@ document.addEventListener('alpine:init', () => {
     /** Whether the tooltip is showing, from hover or from a pin. */
     get isOpen() {
       return this.hovered || this.pinned;
+    },
+
+    /** Shows or removes the message whenever the tooltip opens or closes. */
+    init() {
+      this.$watch('isOpen', (open) => {
+        if (!open) {
+          this.$refs.live.replaceChildren();
+          return;
+        }
+        // The live region is empty while closed, so this is new content and
+        // screen readers announce it.
+        this.$refs.live.append(this.$refs.message.content.cloneNode(true));
+      });
     },
 
     /** Opens on hover, cancelling a hide that is still waiting. */
