@@ -53,7 +53,7 @@ class DocumentMerger[
     ParamType,
     M: AbstractStateDocument,
 ](Merger[DocType, RelatedParams[ParamType], M], abstract=True):
-    url: str = Attribute(_document_url, strategy=overwrite)
+    url: str = Attribute(transform=_document_url, strategy=overwrite)
 
     @override
     def needs_update(self) -> bool:
@@ -96,7 +96,7 @@ def AttachmentRelation(
 ) -> list[Any]:
     return OneToManyRelation(
         merger,
-        transform,
+        Attribute(transform=transform),
         strategy=strategy,
     )
 
@@ -106,6 +106,8 @@ class DocketEntryMerger[
     ParamType,
     M: Model,
 ](Merger[EntryType, RelatedParams[ParamType], M], abstract=True):
-    date_filed: date = Attribute(_entry_date_filed, strategy=overwrite)
-    entry_type: int = Attribute(_entry_type, strategy=overwrite)
+    date_filed: date = Attribute(
+        transform=_entry_date_filed, strategy=overwrite
+    )
+    entry_type: int = Attribute(transform=_entry_type, strategy=overwrite)
     documents: list[Any] = AttachmentRelation()

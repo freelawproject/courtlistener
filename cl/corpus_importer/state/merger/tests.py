@@ -149,7 +149,7 @@ class BaseMergerTest(TestCase):
 
             court: Court = Attribute(default=self.court)
             source: int = Attribute(default=DocketSources.SCRAPER)
-            docket_number: str = Attribute(test_mapping)
+            docket_number: str = Attribute(transform=test_mapping)
 
             def query(self) -> QuerySet[Docket]:
                 return Docket.objects.none()
@@ -170,7 +170,7 @@ class BaseMergerTest(TestCase):
         ):
             model: ClassVar[type[Model]] = OriginatingCourtInformation
 
-            docket_number: str = Attribute(lambda d, params: d["sr"])
+            docket_number: str = Attribute(transform=lambda d, params: d["sr"])
 
             @classmethod
             def get_existing(
@@ -187,7 +187,7 @@ class BaseMergerTest(TestCase):
             originating_court_information: OriginatingCourtInformation = (
                 OneToOneRelation(
                     TestRelatedMerger,
-                    lambda d, params: d["mctest"],
+                    Attribute(transform=lambda d, params: d["mctest"]),
                 )
             )
 
@@ -214,7 +214,9 @@ class BaseMergerTest(TestCase):
         ):
             model: ClassVar[type[Model]] = TrialCourtData
 
-            docket_number_trial: str = Attribute(lambda d, params: d["dn"])
+            docket_number_trial: str = Attribute(
+                transform=lambda d, params: d["dn"]
+            )
 
         class TestMerger(Merger[dict[str, Any], None, Docket]):
             model: ClassVar[type[Model]] = Docket
@@ -223,7 +225,8 @@ class BaseMergerTest(TestCase):
             source: int = Attribute(default=DocketSources.SCRAPER)
             docket_number: str = Attribute(default=tc.docket.docket_number)
             trialcourtdata: TrialCourtData = OneToOneRelation(
-                TestRelatedMerger, lambda d, params: d["trial"]
+                TestRelatedMerger,
+                Attribute(transform=lambda d, params: d["trial"]),
             )
 
             def query(self) -> QuerySet[Docket]:
@@ -251,7 +254,9 @@ class BaseMergerTest(TestCase):
         ):
             model: ClassVar[type[Model]] = TrialCourtData
 
-            docket_number_trial: str = Attribute(lambda d, params: d["dn"])
+            docket_number_trial: str = Attribute(
+                transform=lambda d, params: d["dn"]
+            )
 
         class TestMerger(Merger[dict[str, Any], None, Docket]):
             model: ClassVar[type[Model]] = Docket
@@ -260,7 +265,8 @@ class BaseMergerTest(TestCase):
             source: int = Attribute(default=DocketSources.SCRAPER)
             docket_number: str = Attribute(default=tc.docket.docket_number)
             trialcourtdata: TrialCourtData = OneToOneRelation(
-                TestRelatedMerger, lambda d, params: d["trial"]
+                TestRelatedMerger,
+                Attribute(transform=lambda d, params: d["trial"]),
             )
 
             def query(self) -> QuerySet[Docket]:
@@ -282,7 +288,7 @@ class BaseMergerTest(TestCase):
         ):
             model: ClassVar[type[Model]] = DocketEntry
 
-            description: str = Attribute(lambda d, params: d["df"])
+            description: str = Attribute(transform=lambda d, params: d["df"])
 
         with self.assertRaises(TypeError):
 
@@ -290,7 +296,8 @@ class BaseMergerTest(TestCase):
                 model: ClassVar[type[Model]] = Docket
 
                 docket_entries: list[DocketEntry] = OneToOneRelation(
-                    TestRelatedMerger
+                    TestRelatedMerger,
+                    Attribute(transform=lambda scrape, params: scrape),
                 )
 
     @merger_test(expected_query_count=5)
@@ -300,7 +307,7 @@ class BaseMergerTest(TestCase):
         ):
             model: ClassVar[type[Model]] = DocketEntry
 
-            description: str = Attribute(lambda d, params: d["df"])
+            description: str = Attribute(transform=lambda d, params: d["df"])
 
             def query(self) -> QuerySet[DocketEntry]:
                 return DocketEntry.objects.none()
@@ -313,7 +320,7 @@ class BaseMergerTest(TestCase):
             docket_number: str = Attribute(default=self.docket_number + "New")
             docket_entries: list[DocketEntry] = OneToManyRelation(
                 TestRelatedMerger,
-                lambda d, params: d["mctest"],
+                Attribute(transform=lambda d, params: d["mctest"]),
             )
 
             def query(self) -> QuerySet[Docket]:
@@ -351,9 +358,9 @@ class BaseMergerTest(TestCase):
         ):
             model: ClassVar[type[Model]] = Person
 
-            name_first: str = Attribute(lambda d, params: d["first"])
-            name_last: str = Attribute(lambda d, params: d["last"])
-            slug: str = Attribute(lambda d, params: d["slug"])
+            name_first: str = Attribute(transform=lambda d, params: d["first"])
+            name_last: str = Attribute(transform=lambda d, params: d["last"])
+            slug: str = Attribute(transform=lambda d, params: d["slug"])
             key = ["slug"]
 
             @classmethod
@@ -370,7 +377,7 @@ class BaseMergerTest(TestCase):
             docket_number: str = Attribute(default="M2M-SIMPLE")
             panel: list[Person] = ManyToManyRelation(
                 TestPersonMerger,
-                transform=lambda d, params: d["panel"],
+                Attribute(transform=lambda d, params: d["panel"]),
             )
 
             def query(self) -> QuerySet[Docket]:
@@ -402,7 +409,7 @@ class BaseMergerTest(TestCase):
             model: ClassVar[type[Model]] = Party
             key: ClassVar[Iterable[str]] = ["name"]
 
-            name: str = Attribute(lambda d, params: d["name"])
+            name: str = Attribute(transform=lambda d, params: d["name"])
 
         class TestPartyTypeMerger(
             Merger[dict[str, str], ThroughParameters[None], PartyType]
@@ -410,7 +417,7 @@ class BaseMergerTest(TestCase):
             model: ClassVar[type[Model]] = PartyType
             key: ClassVar[Iterable[str]] = ["name"]
 
-            name: str = Attribute(lambda d, params: d["type"])
+            name: str = Attribute(transform=lambda d, params: d["type"])
 
         class TestMerger(Merger[dict[str, Any], None, Docket]):
             model: ClassVar[type[Model]] = Docket
@@ -420,8 +427,8 @@ class BaseMergerTest(TestCase):
             docket_number: str = Attribute(default="M2M-THROUGH")
             parties: list[Party] = ManyToManyRelation(
                 TestPartyMerger,
+                Attribute(transform=lambda d, params: d["parties"]),
                 TestPartyTypeMerger,
-                lambda d, params: d["parties"],
             )
 
             def query(self) -> QuerySet[Docket]:
@@ -466,9 +473,9 @@ class BaseMergerTest(TestCase):
             model: ClassVar[type[Model]] = Person
             key: ClassVar[Iterable[str]] = ["slug"]
 
-            name_first: str = Attribute(lambda d, params: d["first"])
-            name_last: str = Attribute(lambda d, params: d["last"])
-            slug: str = Attribute(lambda d, params: d["slug"])
+            name_first: str = Attribute(transform=lambda d, params: d["first"])
+            name_last: str = Attribute(transform=lambda d, params: d["last"])
+            slug: str = Attribute(transform=lambda d, params: d["slug"])
 
         class TestMerger(Merger[dict[str, Any], None, Docket]):
             model: ClassVar[type[Model]] = Docket
@@ -478,7 +485,7 @@ class BaseMergerTest(TestCase):
             docket_number: str = Attribute(default=tc.docket.docket_number)
             panel: list[Person] = ManyToManyRelation(
                 TestPersonMerger,
-                transform=lambda d, params: d["panel"],
+                Attribute(transform=lambda d, params: d["panel"]),
                 strategy=ManyStrategy.DISASSOCIATE,
             )
 
@@ -519,14 +526,14 @@ class BaseMergerTest(TestCase):
             model: ClassVar[type[Model]] = Party
             key: ClassVar[Iterable[str]] = ["name"]
 
-            name: str = Attribute(lambda d, params: d["name"])
+            name: str = Attribute(transform=lambda d, params: d["name"])
 
         class TestPartyTypeMerger(
             Merger[dict[str, str], ThroughParameters[None], PartyType]
         ):
             model: ClassVar[type[Model]] = PartyType
 
-            name: str = Attribute(lambda d, params: d["type"])
+            name: str = Attribute(transform=lambda d, params: d["type"])
 
         class TestMerger(Merger[dict[str, Any], None, Docket]):
             model: ClassVar[type[Model]] = Docket
@@ -536,8 +543,8 @@ class BaseMergerTest(TestCase):
             docket_number: str = Attribute(default=tc.docket.docket_number)
             parties: list[Party] = ManyToManyRelation(
                 TestPartyMerger,
+                Attribute(transform=lambda d, params: d["parties"]),
                 TestPartyTypeMerger,
-                lambda d, params: d["parties"],
                 strategy=ManyStrategy.DISASSOCIATE,
             )
 
@@ -579,14 +586,14 @@ class BaseMergerTest(TestCase):
             model: ClassVar[type[Model]] = Party
             key: ClassVar[Iterable[str]] = ["name"]
 
-            name: str = Attribute(lambda d, params: d["name"])
+            name: str = Attribute(transform=lambda d, params: d["name"])
 
         class TestPartyTypeMerger(
             Merger[dict[str, str], ThroughParameters[None], PartyType]
         ):
             model: ClassVar[type[Model]] = PartyType
 
-            name: str = Attribute(lambda d, params: d["type"])
+            name: str = Attribute(transform=lambda d, params: d["type"])
 
         class TestMerger(Merger[dict[str, Any], None, Docket]):
             model: ClassVar[type[Model]] = Docket
@@ -596,8 +603,8 @@ class BaseMergerTest(TestCase):
             docket_number: str = Attribute(default=tc.docket.docket_number)
             parties: list[Party] = ManyToManyRelation(
                 TestPartyMerger,
+                Attribute(transform=lambda d, params: d["parties"]),
                 TestPartyTypeMerger,
-                lambda d, params: d["parties"],
             )
 
             def query(self) -> QuerySet[Docket]:
@@ -628,7 +635,7 @@ class BaseMergerTest(TestCase):
             model: ClassVar[type[Model]] = DocketEntry
             key: ClassVar[Iterable[str]] = ["description"]
 
-            description: str = Attribute(lambda d, params: d["df"])
+            description: str = Attribute(transform=lambda d, params: d["df"])
 
             @staticmethod
             def validate(scrape: dict[str, str]) -> bool:
@@ -642,7 +649,7 @@ class BaseMergerTest(TestCase):
             docket_number: str = Attribute(default=tc.docket.docket_number)
             docket_entries: list[DocketEntry] = OneToManyRelation(
                 TestRelatedMerger,
-                lambda d, params: d["entries"],
+                Attribute(transform=lambda d, params: d["entries"]),
             )
 
             def query(self) -> QuerySet[Docket]:
@@ -684,14 +691,14 @@ class BaseMergerTest(TestCase):
             model: ClassVar[type[Model]] = Party
             key: ClassVar[Iterable[str]] = ["name"]
 
-            name: str = Attribute(lambda d, params: d["name"])
+            name: str = Attribute(transform=lambda d, params: d["name"])
 
         class TestPartyTypeMerger(
             Merger[dict[str, str], ThroughParameters[None], PartyType]
         ):
             model: ClassVar[type[Model]] = PartyType
 
-            name: str = Attribute(lambda d, params: d["type"])
+            name: str = Attribute(transform=lambda d, params: d["type"])
 
         class TestMerger(Merger[dict[str, Any], None, Docket]):
             model: ClassVar[type[Model]] = Docket
@@ -701,8 +708,8 @@ class BaseMergerTest(TestCase):
             docket_number: str = Attribute(default=tc.docket.docket_number)
             parties: list[Party] = ManyToManyRelation(
                 TestPartyMerger,
+                Attribute(transform=lambda d, params: d["parties"]),
                 TestPartyTypeMerger,
-                lambda d, params: d["parties"],
             )
 
             def query(self) -> QuerySet[Docket]:
@@ -741,7 +748,7 @@ class BaseMergerTest(TestCase):
             court: Court = Attribute(default=self.court)
             docket_number: str = Attribute(default="ABCDEFGH")
             assigned_to_str: str = Attribute(
-                lambda d, params: params["assigned_to_str"]
+                transform=lambda d, params: params["assigned_to_str"]
             )
 
         ats = "test"

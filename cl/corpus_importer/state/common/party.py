@@ -29,7 +29,7 @@ class RoleMerger[AttyType: ScrapeRepresentative, ParamType](
 ):
     model: ClassVar[type[Model]] = Role
 
-    docket: Docket = Attribute(_role_docket)
+    docket: Docket = Attribute(transform=_role_docket)
 
 
 def _representative_name(
@@ -43,7 +43,7 @@ class AttorneyMerger[AttyType: ScrapeRepresentative, ParamType](
 ):
     model: ClassVar[type[Model]] = Attorney
 
-    name: str = Attribute(_representative_name)
+    name: str = Attribute(transform=_representative_name)
 
     def query(self) -> QuerySet[Attorney]:
         # Attorneys have no natural key, so treat the name as unique within
@@ -71,7 +71,10 @@ def AttorneyRelation(
     transform: Callable[[Any, Any], list[Any]] = _party_representatives,
 ) -> list[Attorney]:
     return ManyToManyRelation(
-        attorney, role, transform, strategy=ManyStrategy.DISASSOCIATE
+        attorney,
+        Attribute(transform=transform),
+        role,
+        strategy=ManyStrategy.DISASSOCIATE,
     )
 
 
@@ -82,7 +85,7 @@ class PartyMerger[PType: ScrapeParty[ScrapeRepresentative], ParamType](
     key: ClassVar[Iterable[str]] = ["name"]
 
     attorneys: list[Attorney] = AttorneyRelation()
-    name: str = Attribute(_party_name)
+    name: str = Attribute(transform=_party_name)
 
     def query(self) -> QuerySet[Party]:
         """Find the party by its natural key within the parent docket.
@@ -105,4 +108,4 @@ class PartyTypeMerger[PType: ScrapeParty[ScrapeRepresentative], ParamType](
 ):
     model: ClassVar[type[Model]] = PartyType
 
-    name: str = Attribute(_party_type_name)
+    name: str = Attribute(transform=_party_type_name)

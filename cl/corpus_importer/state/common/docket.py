@@ -55,7 +55,10 @@ def PartyRelation(
     existing links and roles.
     """
     return ManyToManyRelation(
-        merger, party_type, transform, strategy=ManyStrategy.DISASSOCIATE
+        merger,
+        Attribute(transform=transform),
+        party_type,
+        strategy=ManyStrategy.DISASSOCIATE,
     )
 
 
@@ -67,7 +70,7 @@ def DocketEntryRelation(
 ) -> list[Any]:
     return OneToManyRelation(
         merger,
-        transform,
+        Attribute(transform=transform),
         strategy=strategy,
     )
 
@@ -80,28 +83,28 @@ class DocketMerger[DType: ScrapeDocket[Any, Any, Any], ParamType](
     atomic = True
 
     source: int = Attribute(
-        lambda _, params: Docket.SCRAPER,
+        transform=lambda _, params: Docket.SCRAPER,
         strategy=add_scraper_source,
     )
     date_filed: date | None = Attribute(
-        lambda d, params: d.date_filed,
+        transform=lambda d, params: d.date_filed,
         strategy=overwrite,
     )
     case_name: str = Attribute(
-        lambda d, params: d.case_name, strategy=overwrite
+        transform=lambda d, params: d.case_name, strategy=overwrite
     )
     case_name_full: str = Attribute(
-        lambda d, params: d.case_name_full,
+        transform=lambda d, params: d.case_name_full,
         strategy=overwrite,
     )
     case_name_short: str = Attribute(
-        lambda d, params: d.case_name_short, strategy=overwrite
+        transform=lambda d, params: d.case_name_short, strategy=overwrite
     )
     docket_number: str = Attribute(
-        lambda d, params: d.docket_number,
+        transform=lambda d, params: d.docket_number,
         strategy=overwrite,
     )
     docket_number_raw: str = Attribute(
-        lambda d, params: d.docket_number, strategy=overwrite
+        transform=lambda d, params: d.docket_number, strategy=overwrite
     )
     parties: list[Party] = PartyRelation()

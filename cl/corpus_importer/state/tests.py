@@ -244,9 +244,11 @@ class LoaderTestCase(TestCase):
             court: Court = Attribute(default=test_court)
             source: int = Attribute(default=DocketSources.SCRAPER)
             docket_number: str = Attribute(
-                lambda scrape, params: scrape.docket_number
+                transform=lambda scrape, params: scrape.docket_number
             )
-            case_name: str = Attribute(lambda scrape, params: scrape.case_name)
+            case_name: str = Attribute(
+                transform=lambda scrape, params: scrape.case_name
+            )
 
             def query(self) -> QuerySet[Docket]:
                 return Docket.objects.filter(

@@ -98,7 +98,7 @@ def _transfer_type(transfer: DocketTransfer, params: Any) -> int:
 
 
 def _destination_court_id(scrape: Any, params: RelatedParams[Any]) -> str:
-    return cast(str, cast(Docket, params.parent).court_id)
+    return cast(Docket, params.parent).court_id
 
 
 def _destination_docket_number(scrape: Any, params: RelatedParams[Any]) -> str:
@@ -137,20 +137,24 @@ class CaseTransferMerger[TransferType: DocketTransfer, ParamType](
     ]
 
     destination_docket_id: int = Attribute(
-        _destination_docket_id,
+        transform=_destination_docket_id,
         strategy=overwrite_if_present,
     )
     origin_docket_number: str = Attribute(
-        _origin_docket_number, strategy=overwrite
+        transform=_origin_docket_number, strategy=overwrite
     )
-    transfer_type: int = Attribute(_transfer_type, strategy=overwrite)
+    transfer_type: int = Attribute(
+        transform=_transfer_type, strategy=overwrite
+    )
     destination_court_id: str = Attribute(
-        _destination_court_id, strategy=overwrite
+        transform=_destination_court_id, strategy=overwrite
     )
     destination_docket_number: str = Attribute(
-        _destination_docket_number, strategy=overwrite
+        transform=_destination_docket_number, strategy=overwrite
     )
-    transfer_date: date | None = Attribute(_transfer_date, strategy=overwrite)
+    transfer_date: date | None = Attribute(
+        transform=_transfer_date, strategy=overwrite
+    )
 
     @override
     def query(self) -> QuerySet[CaseTransfer]:
@@ -167,11 +171,8 @@ class CaseTransferMerger[TransferType: DocketTransfer, ParamType](
         # `self.manager` is the parent docket's reverse FK manager, so it would
         # constrain the lookup to `destination_docket = parent` and hide the
         # very partial transfers this method exists to find.
-        candidates = cast(
-            QuerySet[CaseTransfer],
-            CaseTransfer.objects.filter(
-                **{name: self.transformed[name] for name in self.key}
-            ),
+        candidates = CaseTransfer.objects.filter(
+            **{name: self.transformed[name] for name in self.key}
         )
         fillable = candidates.filter(destination_docket__isnull=True)
         if fillable.exists():
@@ -187,6 +188,6 @@ def CaseTransferRelation(
 ) -> list[CaseTransfer]:
     return OneToManyRelation(
         merger,
-        transform,
+        Attribute(transform=transform),
         strategy=strategy,
     )
