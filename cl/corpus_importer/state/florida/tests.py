@@ -6,6 +6,7 @@ from unittest import mock
 from uuid import uuid4
 
 import httpx
+import requests
 from juriscraper.state.docket import (
     DocketEntryType as ScrapeDocketEntryType,
 )
@@ -61,7 +62,11 @@ from cl.search.state.florida.models import (
     FloridaDocketEntry,
     FloridaDocument,
 )
-from cl.search.state.shared import DocketEntryType, ProcessingError
+from cl.search.state.shared import (
+    CourtRefused,
+    DocketEntryType,
+    ProcessingError,
+)
 from cl.tests.cases import TestCase
 
 
@@ -1940,6 +1945,57 @@ class FloridaDocumentDownloadTest(TestCase):
             fl_document.pk,
             "fl_",
             require_pdf=False,
+        )
+        fl_document.refresh_from_db()
+        self.assertFalse(fl_document.filepath_local)
+        self.extract_document_mock.assert_not_called()
+
+    @mock.patch("cl.lib.microservice_utils.doc_page_count_service")
+    @mock.patch("cl.scrapers.utils.get_extension", return_value=".pdf")
+    def test_download_refusal_is_retried(
+        self,
+        ext_mock: mock.Mock,
+        pcs_mock: mock.Mock,
+    ) -> None:
+        """Is a 403 from the court retried, and the file stored once the
+        court relents? A refusal is a transient block on our requests, not a
+        sealed document, so one must not cost us the file."""
+        fl_document = FloridaDocumentModelFactory.create()
+        pcs_mock.return_value = httpx.Response(200, text="1")
+        refused = requests.HTTPError(response=mock.Mock(status_code=403))
+
+        with NamedTemporaryFile(suffix=".tmp") as tmp:
+            tmp.write(b"fake pdf data")
+            tmp.flush()
+            tmp.seek(0)
+            self.download_document_mock.return_value.__enter__.side_effect = [
+                refused,
+                (tmp, "pdfsha1"),
+            ]
+
+            download_fl_document.apply(args=(fl_document.pk,))
+
+        self.assertEqual(self.download_document_mock.call_count, 2)
+        fl_document.refresh_from_db()
+        self.assertTrue(fl_document.filepath_local)
+        self.assertEqual(fl_document.sha1, "pdfsha1")
+        self.extract_document_mock.assert_called_once()
+
+    def test_download_refusal_fails_after_retries(self) -> None:
+        """Does a court that keeps refusing eventually fail the task with the
+        refusal, rather than retrying forever or passing silently?"""
+        fl_document = FloridaDocumentModelFactory.create()
+        self.download_document_mock.return_value.__enter__.side_effect = (
+            requests.HTTPError(response=mock.Mock(status_code=403))
+        )
+
+        result = download_fl_document.apply(args=(fl_document.pk,))
+
+        self.assertTrue(result.failed())
+        self.assertIsInstance(result.result, CourtRefused)
+        self.assertEqual(
+            self.download_document_mock.call_count,
+            download_fl_document.max_retries + 1,
         )
         fl_document.refresh_from_db()
         self.assertFalse(fl_document.filepath_local)
