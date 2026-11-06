@@ -5457,6 +5457,28 @@ class DocketFilterPaginationWiringTest(TestCase):
         ]
         self.assertEqual(checked, ["desc"])
 
+    async def test_mobile_dialog_carries_current_order_by(self) -> None:
+        """The mobile filter dialog has no sort control, so its hidden
+        order_by input must always carry the current order. Otherwise an
+        ascending view submitted from the dialog falls back to the signed-in
+        user's profile default and silently flips to descending."""
+        profile = await sync_to_async(UserProfileWithParentsFactory)(
+            docket_default_order_desc=True
+        )
+        await self.async_client.aforce_login(profile.user)
+        for order in ("asc", "desc"):
+            with self.subTest(order=order):
+                r = await self._get_docket_and_verify_v2(
+                    data={"order_by": order}
+                )
+                hidden = [
+                    el.get("value")
+                    for el in fromstring(r.content.decode()).iter("input")
+                    if el.get("type") == "hidden"
+                    and el.get("name") == "order_by"
+                ]
+                self.assertEqual(hidden, [order])
+
     async def test_pagination_nav_renders_with_multiple_pages(self) -> None:
         """The bottom <c-pagination> only renders its <nav> when
         `page_obj.has_other_pages` is truthy. Create enough entries to
