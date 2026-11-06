@@ -139,16 +139,18 @@ class AbstractFile(models.Model):
     content_type = models.ForeignKey(ContentType, on_delete=models.CASCADE)
     object_id = models.PositiveIntegerField()
     content_object = GenericForeignKey()
+    # Subclasses define this field with their own storage and upload paths.
+    filepath: models.FileField
 
     class Meta:
         abstract = True
 
     @property
-    def file_contents(self):
+    def file_contents(self) -> str:
         with open(self.filepath.path) as f:
             return f.read()
 
-    def print_file_contents(self):
+    def print_file_contents(self) -> None:
         print(self.file_contents)
 
 

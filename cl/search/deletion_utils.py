@@ -4,10 +4,11 @@ Sealing means something slightly different for each: a RECAPDocument keeps
 its row (flagged `is_sealed`) with its files scrubbed, while sealing an
 OpinionCluster hard-deletes the cluster/opinion rows outright and leaves a
 ClusterRedirection behind so the old URLs 410. What they share is the need
-to clean the underlying files out of S3, Internet Archive, and CloudFront
-so nothing is left reachable after the seal. Centralizing that here, rather
-than in the admin, means callers just invoke a function instead of
-re-implementing storage/CDN cleanup themselves.
+to clean the underlying files out of S3, Internet Archive, and CloudFront,
+and to drop the citations mined from the sealed text, so nothing is left
+reachable after the seal. Centralizing that here, rather than in the
+admin, means callers just invoke a function instead of re-implementing
+storage/CDN cleanup themselves.
 
 Also holds the deletion-blocker checks that gate OpinionCluster sealing:
 since sealing hard-deletes the cluster (and maybe its docket), anything
@@ -16,6 +17,7 @@ check lives alongside the delete it protects rather than in the admin.
 """
 
 import time
+from collections.abc import Callable
 from typing import Any
 from urllib import parse
 
@@ -27,10 +29,18 @@ from django.db.models import FileField, Q, QuerySet
 from django.urls import reverse
 from requests import Response
 
+from cl.favorites.models import Note
+from cl.favorites.utils import get_notes_for
 from cl.lib.cloud_front import invalidate_cloudfront
 from cl.lib.decorators import retry
 from cl.lib.models import THUMBNAIL_STATUSES
-from cl.search.models import CaseTransfer, ClusterRedirection, OpinionCluster
+from cl.search.models import (
+    CaseTransfer,
+    ClusterRedirection,
+    OpinionCluster,
+    RECAPDocument,
+)
+from cl.search.tasks import update_es_document
 from cl.visualizations.models import SCOTUSMap
 
 
@@ -53,6 +63,48 @@ def delete_from_ia(url: str) -> Response:
             "x-archive-cascade-delete": "1",
         },
         timeout=60,
+    )
+
+
+def delete_document_citations(rd: RECAPDocument) -> None:
+    """Delete the case law citations mined from a RECAPDocument's text.
+
+    Meant for documents that are being sealed: their text is scrubbed, so
+    the citations extracted from it have to go too. Left in place, the
+    sealed filing keeps appearing in its docket's authorities and in the
+    "Cited By" lists of the opinions it referenced, and the leftover rows
+    show up as related objects if the document is later deleted outright.
+
+    Also pushes the now-empty `cites` list into the document's
+    Elasticsearch child document. Saving the RECAPDocument doesn't do that:
+    ES only tracks changes to the document's own fields, not to this
+    relation. Documents that had no citations to begin with are left
+    alone, ES included.
+
+    :param rd: The RECAPDocument whose citations should be removed.
+    :return: None
+    """
+    # Both kinds of citation come from the same scrubbed text, so drop them
+    # together or not at all.
+    with transaction.atomic():
+        deleted_cited = rd.cited_opinions.all().delete()[0]
+        deleted_unmatched = rd.unmatched_citations.all().delete()[0]
+    if not (deleted_cited or deleted_unmatched):
+        # Nothing changed, so ES has nothing to catch up on. Callers seal
+        # whole querysets at a time, so bailing here saves a Celery task
+        # and an ES write for every document that had no citations.
+        return
+    if settings.ELASTICSEARCH_DISABLED:
+        # The indexing signals check this too, so honoring it here keeps
+        # sealing usable with ES turned off instead of half-indexing.
+        return
+    update_es_document.delay(
+        "ESRECAPDocument",
+        ["cites"],
+        ("search.RECAPDocument", rd.pk),
+        # Losing citations is not something anybody should be alerted
+        # about, so don't send the updated document to the percolator.
+        skip_percolator_request=True,
     )
 
 
@@ -102,6 +154,10 @@ def seal_documents(queryset: QuerySet) -> list[str]:
         rd.ocr_status = None
         rd.save()
 
+        # Runs after save() so its ES update isn't clobbered by the
+        # re-indexing that save() triggers.
+        delete_document_citations(rd)
+
     # Do a CloudFront invalidation
     invalidate_cloudfront([f"/{path}" for path in deleted_filepaths])
 
@@ -132,14 +188,22 @@ def delete_cluster_files(cluster: OpinionCluster, delete_docket: bool) -> None:
     deleted_filepaths = []
 
     for opinion in cluster.sub_opinions.all():
-        if not opinion.local_path:
-            continue
-        path = opinion.local_path.name
-        # save=False: the Opinion row is about to be deleted by the
-        # caller's cascade anyway, so there's no point writing this
-        # change back to a row that won't exist a moment later.
-        opinion.local_path.delete(save=False)
-        deleted_filepaths.append(path)
+        # OpinionContent rows are cascade deleted with their opinion
+        field_files = [opinion.local_path] + [
+            content.local_path
+            for content in opinion.contents.exclude(local_path="").only(
+                "local_path"
+            )
+        ]
+        for field_file in field_files:
+            if not field_file:
+                continue
+            path = field_file.name
+            # save=False: the rows are about to be deleted by the caller's
+            # cascade anyway, so there's no point writing this change back
+            # to a row that won't exist a moment later.
+            field_file.delete(save=False)
+            deleted_filepaths.append(path)
 
     cluster_file_fields = [
         field.name
@@ -165,13 +229,23 @@ def delete_cluster_files(cluster: OpinionCluster, delete_docket: bool) -> None:
     invalidate_cloudfront([f"/{path}" for path in deleted_filepaths])
 
 
+def _note_blockers_for_cluster(cluster: OpinionCluster) -> QuerySet[Note]:
+    """Notes blocking cluster/docket deletion.
+
+    Checks both the cluster and its docket -- a Note can be attached to
+    either.
+
+    :param cluster: The OpinionCluster being considered for sealing.
+    :return: A queryset of Notes attached to the cluster or its docket.
+    """
+    return get_notes_for(cluster).union(get_notes_for(cluster.docket))
+
+
 # nosemgrep: python.lang.bad-return-outside-function
-SEAL_BLOCKERS_MAP = {
+SEAL_BLOCKERS_MAP: dict[str, Callable[[OpinionCluster], Any]] = {
     # These prevent cluster deletion
     "favorites.UserTag": lambda cluster: cluster.docket.user_tags,
-    "favorites.Note": lambda cluster: cluster.docket.note_set.all().union(
-        cluster.note_set.all()
-    ),
+    "favorites.Note": _note_blockers_for_cluster,
     "alerts.DocketAlert": lambda cluster: cluster.docket.alerts,
     "visualizations.SCOTUSMap": lambda cluster: SCOTUSMap.objects.filter(
         Q(cluster_start=cluster)

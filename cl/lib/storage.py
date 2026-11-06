@@ -1,11 +1,23 @@
 import itertools
 import os
 import uuid
+from collections.abc import Callable
+from typing import Any
 
+from asgiref.sync import sync_to_async
 from django.conf import settings
+from django.core.files.base import File
 from django.core.files.storage import Storage
 from storages.backends.s3 import S3ManifestStaticStorage, S3Storage
 from storages.backends.s3boto3 import S3Boto3Storage
+
+
+@sync_to_async
+def read_file_bytes(file: File) -> bytes:
+    """Read a Django file in binary mode and close it."""
+    with file:
+        file.open(mode="rb")
+        return file.read()
 
 
 def clobbering_get_name(
@@ -59,6 +71,8 @@ class AWSMediaStorage(S3Storage):
 
     location = ""
     file_overwrite = True
+    # Populated by django-storages from AWS_S3_OBJECT_PARAMETERS.
+    object_parameters: dict[str, str]
 
     def get_object_parameters(self, name: str) -> dict[str, str]:
         # Set extremely long caches b/c we hash our content anyway
@@ -104,6 +118,40 @@ class TexasEmailSESStorage(S3Storage):
     bucket_name = "texas-email"
 
 
+class ScanningFinalXmlStorage(S3Storage):
+    """Read-only S3 storage for the scanning portal's private bucket.
+
+    import_scanned_opinions reads the final XML of the approved opinions
+    from it, at export/{scan id}/{opinion id}.xml. The bucket belongs to
+    the scanning portal, so it can have a read-only user of its own.
+    """
+
+    default_acl = "private"
+    bucket_name = settings.SCANNING_BUCKET_NAME
+    # Populated by django-storages from the settings and the kwargs.
+    access_key: str | None
+    security_token: str | None
+    region_name = settings.SCANNING_BUCKET_REGION
+    querystring_auth = True
+
+    def __init__(self, **kwargs: Any) -> None:
+        """Use the scanning portal's read-only keys when they are set.
+
+        :param kwargs: The S3Storage settings; explicit keys take precedence.
+        """
+        if settings.SCANNING_AWS_ACCESS_KEY_ID:
+            kwargs.setdefault(
+                "access_key", settings.SCANNING_AWS_ACCESS_KEY_ID
+            )
+            kwargs.setdefault(
+                "secret_key", settings.SCANNING_AWS_SECRET_ACCESS_KEY
+            )
+            # django-storages reads AWS_SESSION_TOKEN from the environment.
+            # It belongs to the default keys, and S3 rejects it with these.
+            kwargs.setdefault("security_token", None)
+        super().__init__(**kwargs)
+
+
 class S3PrivateLLMStorage(S3Storage):
     """Private S3 storage for LLM-related files (inputs, responses, batch
     results). Uses private ACL to keep internal processing files
@@ -143,9 +191,19 @@ class S3GlacierInstantRetrievalStorage(S3Storage):
     default_acl = "private"
     bucket_name = settings.AWS_PRIVATE_STORAGE_BUCKET_NAME
     file_overwrite = True
+    # Populated by django-storages from AWS_S3_OBJECT_PARAMETERS.
+    object_parameters: dict[str, str]
 
-    def __init__(self, naming_strategy=get_name_by_incrementing, **settings):
-        self.naming_strategy = naming_strategy
+    def __init__(
+        self,
+        naming_strategy: Callable[
+            [Storage, str, int | None], str
+        ] = get_name_by_incrementing,
+        **settings: Any,
+    ) -> None:
+        self.naming_strategy: Callable[[Storage, str, int | None], str] = (
+            naming_strategy
+        )
         super().__init__(**settings)
 
     def get_object_parameters(self, name: str) -> dict[str, str]:
@@ -176,6 +234,8 @@ class S3IntelligentTieringStorage(S3Storage):
 
     location = ""
     file_overwrite = True
+    # Populated by django-storages from AWS_S3_OBJECT_PARAMETERS.
+    object_parameters: dict[str, str]
 
     def get_object_parameters(self, name: str) -> dict[str, str]:
         params = self.object_parameters.copy()

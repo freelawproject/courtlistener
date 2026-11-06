@@ -26,7 +26,7 @@ from cl.search.tasks import (
     index_parent_and_child_docs,
     index_parent_or_child_docs_in_es,
 )
-from cl.search.types import ESDocumentClassType
+from cl.search.types import ESDocumentType
 
 supported_models = settings.ELASTICSEARCH_SWEEP_INDEXER_MODELS  # type: ignore
 r = get_redis_interface("CACHE")
@@ -119,7 +119,7 @@ def find_starting_model(target_model: str) -> int | None:
         return None
 
 
-def get_es_doc_id(es_document: ESDocumentClassType, instance_id: int) -> int:
+def get_es_doc_id(es_document: type[ESDocumentType], instance_id: int) -> int:
     """Retrieve the Elasticsearch document ID according to their es_document.
 
     :param es_document: The ES document class type.
@@ -337,7 +337,7 @@ class Command(VerboseCommand):
         app_label: str,
         task_to_use: str,
         task_params: tuple[
-            Literal["parent", "child"], str, ESDocumentClassType
+            Literal["parent", "child"], str, type[ESDocumentType]
         ],
     ) -> None:
         """Process a queryset and execute tasks based on the specified indexing

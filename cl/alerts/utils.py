@@ -2,7 +2,7 @@ import copy
 from dataclasses import dataclass
 from datetime import date, datetime
 from enum import Enum, auto
-from typing import Any
+from typing import Any, cast
 from urllib.parse import parse_qs
 
 from django.apps import apps
@@ -76,7 +76,7 @@ from cl.search.forms import SearchForm
 from cl.search.models import SEARCH_TYPES, Docket
 from cl.search.types import (
     ESDictDocument,
-    ESModelClassType,
+    ESDocumentType,
     PercolatorResponses,
     SearchAlertHitType,
 )
@@ -129,12 +129,14 @@ class InvalidDateError(Exception):
 
 
 def create_percolator_search_query(
-    index_name: str, final_query: Query, search_after: int | None = None
+    index_name: str,
+    final_query: Query | None,
+    search_after: int | None = None,
 ):
     """Create an Elasticsearch search query with pagination.
 
     :param index_name: The name of the Elasticsearch index to search.
-    :param final_query: Elasticsearch DSL Query object.
+    :param final_query: Elasticsearch DSL Query object, or None.
     :param search_after: An optional parameter for search_after pagination.
     :return: An Elasticsearch search object with the specified query and pagination settings.
     """
@@ -149,14 +151,16 @@ def create_percolator_search_query(
     return s
 
 
+type _DocumentsToPercolate = tuple[
+    ESDictDocument, ESDictDocument | None, ESDictDocument | None
+]
+
+
 def percolate_es_document(
     document_id: str,
     percolator_index: str,
     document_index: str | None = None,
-    documents_to_percolate: (
-        tuple[ESDictDocument, ESDictDocument | None, ESDictDocument | None]
-        | None
-    ) = None,
+    documents_to_percolate: _DocumentsToPercolate | None = None,
     app_label: str | None = None,
     main_search_after: int | None = None,
     rd_search_after: int | None = None,
@@ -329,7 +333,9 @@ def fetch_all_search_alerts_results(
     """
 
     def get_search_after(response: Response | None) -> Any:
-        if response and response.hits.hits:
+        # TODO: Response.hits is annotated upstream as a plain list, but at runtime
+        # it is an AttrList that also exposes the raw `hits` payload.
+        if response and cast(Any, response.hits).hits:
             return response.hits[-1].meta.sort
         return None
 
@@ -558,15 +564,15 @@ def has_document_alert_hit_been_triggered(
     return r.sismember(alert_key, document_id)
 
 
-def build_plain_percolator_query(cd: CleanData) -> Query:
+def build_plain_percolator_query(cd: CleanData) -> Query | None:
     """Build a plain query based on the provided clean data for its use in the
     Percolator
 
     :param cd: The query CleanedData.
-    :return: An ES Query object representing the built query.
+    :return: An ES Query object representing the built query, or None for search
+    types the Percolator does not support.
     """
 
-    plain_query = []
     match cd["type"]:
         case (
             SEARCH_TYPES.RECAP
@@ -604,25 +610,25 @@ def build_plain_percolator_query(cd: CleanData) -> Query:
                         "Indexing match-all queries is not supported."
                     )
                 case [[], _]:
-                    plain_query = Q(
+                    return Q(
                         "bool",
                         should=string_query,
                         minimum_should_match=1,
                     )
                 case [_, []]:
-                    plain_query = Q(
+                    return Q(
                         "bool",
                         filter=parent_filters,
                     )
                 case [_, _]:
-                    plain_query = Q(
+                    return Q(
                         "bool",
                         filter=parent_filters,
                         should=string_query,
                         minimum_should_match=1,
                     )
 
-    return plain_query
+    return None
 
 
 def transform_percolator_child_document(
@@ -686,7 +692,7 @@ def get_field_names(mapping_dict):
 
 
 def select_es_document_fields(
-    es_document_class: ESModelClassType,
+    es_document_class: type[ESDocumentType],
     main_document: ESDictDocument,
     fields_to_ignore: set[str],
 ) -> ESDictDocument:
@@ -712,11 +718,7 @@ def select_es_document_fields(
 
 def prepare_percolator_content(
     app_label: str, document_id: str
-) -> tuple[
-    str,
-    str | None,
-    tuple[ESDictDocument, ESDictDocument, ESDictDocument] | None,
-]:
+) -> tuple[str, str | None, _DocumentsToPercolate | None]:
     """Prepare percolator content for different according to the app_label.
 
     It returns the percolator index name and the ES document index where the
@@ -734,14 +736,17 @@ def prepare_percolator_content(
     or None if no dict documents to percolate.
     """
 
-    es_document_index = None
-    documents_to_percolate = None
+    percolator_index: str
+    es_document_index: str | None
+    documents_to_percolate: _DocumentsToPercolate | None
     match app_label:
         case "audio.Audio":
             percolator_index = AudioPercolator._index._name
             es_document_index = AudioDocument._index._name
+            documents_to_percolate = None
         case "search.Docket":
             percolator_index = RECAPPercolator._index._name
+            es_document_index = None
             model = apps.get_model(app_label)
             docket = model.objects.get(pk=document_id)
             document_content_plain = DocketDocumentPlain().prepare(docket)
@@ -753,6 +758,7 @@ def prepare_percolator_content(
             )
         case "search.RECAPDocument":
             percolator_index = RECAPPercolator._index._name
+            es_document_index = None
             model = apps.get_model(app_label)
             rd = model.objects.get(pk=document_id)
             document_content_plain = ESRECAPDocumentPlain().prepare(rd)
@@ -781,6 +787,7 @@ def prepare_percolator_content(
 
         case "search.Opinion":
             percolator_index = OpinionPercolator._index._name
+            es_document_index = None
             model = apps.get_model(app_label)
             opinion = model.objects.get(pk=document_id)
             document_content_plain = ESOpinionDocumentPlain().prepare(opinion)

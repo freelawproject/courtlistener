@@ -1,15 +1,14 @@
 from dataclasses import dataclass
 
+from celery import Task
 from django.contrib.auth.models import User
 from rest_framework import serializers, status
 from rest_framework.exceptions import ValidationError
-from rest_framework.relations import PrimaryKeyRelatedField
 from rest_framework.response import Response
 from rest_framework.serializers import ModelSerializer
 from rest_framework.viewsets import ModelViewSet
 
 from cl.api.utils import EmailProcessingQueueAPIUsersWithView, LoggingMixin
-from cl.celery_init import app
 from cl.recap.filters import EmailProcessingQueueFilter
 from cl.recap.models import EmailProcessingQueue, EmailSource
 from cl.recap.tasks import process_scotus_email, process_texas_email
@@ -27,7 +26,7 @@ class EmailProcessingTask:
         email.
     """
 
-    task: app.Task
+    task: Task
     source: int
     username: str
 
@@ -47,7 +46,7 @@ class StateEmailProcessingQueueSerializer(ModelSerializer):
     uploader = serializers.HiddenField(
         default=serializers.CurrentUserDefault(),
     )
-    court: PrimaryKeyRelatedField[Court] = serializers.PrimaryKeyRelatedField(
+    court = serializers.PrimaryKeyRelatedField(
         queryset=Court.state_courts.all(),
         html_cutoff=500,  # Show all values in HTML view.
         required=True,
@@ -151,7 +150,7 @@ class StateEmailEndpoint(LoggingMixin, ModelViewSet):
 class SCOTUSEmailProcessingQueueSerializer(
     StateEmailProcessingQueueSerializer
 ):
-    court: PrimaryKeyRelatedField[Court] = serializers.PrimaryKeyRelatedField(
+    court = serializers.PrimaryKeyRelatedField(
         queryset=Court.objects.filter(pk="scotus"),
         required=True,
     )

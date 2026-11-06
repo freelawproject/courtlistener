@@ -13,10 +13,8 @@
                     <h2 id="save-note-title">Save Note</h2>
                 {% endif %}
                 <form action="" method="POST">{% csrf_token %}
-                    {{ note_form.cluster_id }}
-                    {{ note_form.audio_id }}
-                    {{ note_form.docket_id }}
-                    {{ note_form.recap_doc_id }}
+                    {{ note_form.content_type }}
+                    {{ note_form.object_id }}
                     <div class="form-group">
                         <label for="id_name">Name</label>
                         {{ note_form.name }}

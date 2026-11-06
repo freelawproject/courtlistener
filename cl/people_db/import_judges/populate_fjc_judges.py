@@ -141,16 +141,12 @@ def transform_bankruptcy(string):
     string_list = re.split("<BR>|;|<br>", string_list)
     bankruptcy_list = [
         (
-            None
-            if a is None
-            else (
-                re.split(r"\,+\s+(?=\d)+", a, 1)
-                if not any(month in a for month in month_list)
-                else re.split(
-                    r",+\s+(?=June|March|January|February|April|May|July|August|September|October|November|December|Fall|Spring)+",
-                    a,
-                    1,
-                )
+            re.split(r"\,+\s+(?=\d)+", a, 1)
+            if not any(month in a for month in month_list)
+            else re.split(
+                r",+\s+(?=June|March|January|February|April|May|July|August|September|October|November|December|Fall|Spring)+",
+                a,
+                1,
             )
         )
         for a in string_list
@@ -524,7 +520,7 @@ def make_federal_judge(item, testing=False):
             degyear = item[f"Degree Year{school_str}"]
             try:
                 int(degyear)
-            except:
+            except Exception:
                 degyear = None
             school = get_school(schoolname)
             if school is not None:
@@ -573,7 +569,7 @@ def make_federal_judge(item, testing=False):
         else:
             try:
                 start_year = int(start_year)
-            except:
+            except Exception:
                 continue
             date_start = date(start_year, 1, 1)
             date_start_granularity = GRANULARITY_YEAR

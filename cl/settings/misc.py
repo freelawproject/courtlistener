@@ -106,3 +106,8 @@ CHARS_THRESHOLD_OCR_PER_PAGE = env.int(
 SCOTUS_RECAP_EMAIL = env(
     "SCOTUS_RECAP_EMAIL", default="notifications@scotus.recap.email"
 )
+
+# User agent for requests from Courtlistener to court websites
+COURT_REQUEST_USER_AGENT = env(
+    "REQUEST_USER_AGENT", default="Courtlistener (Free Law Project)"
+)

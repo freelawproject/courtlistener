@@ -66,7 +66,8 @@ class NYCoADocketEntryFactory(DjangoModelFactory):
     )
 
     @post_generation
-    def party(obj, create, extracted, **kwargs):
+    # pyrefly:ignore[invalid-annotation] factory_boy passes the model instance
+    def party(obj: NYCoADocketEntry, create, extracted, **kwargs):
         """Attach a filing party tied to the entry's docket, since
         PartyFactory's default attorney requires a docket."""
         if not create:
@@ -82,11 +83,11 @@ class NYCoADocumentFactory(DjangoModelFactory):
     docket_entry = SubFactory(NYCoADocketEntryFactory)
     file_name = Sequence(lambda n: f"SmithvJones-app-Smith-brf-{n + 1}.pdf")
     content_type = "application/pdf"
-    available = Faker("boolean", chance_of_getting_true=75)
     doc_role = Faker("word")
     doc_party = Faker("name")
     doc_type = Faker("word")
     page_count = Faker("pyint")
+    sha256 = Faker("sha256")
     # Not a column; assigning the constant exercises the model's setter.
     url = COURT_PASS_DOCUMENT_URL
     volume = LazyAttribute(

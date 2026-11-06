@@ -37,6 +37,7 @@ from cl.recap.filters import (
     ProcessingQueueFilter,
 )
 from cl.recap.models import (
+    PROCESSING_QUEUE_SOURCE,
     EmailProcessingQueue,
     EmailSource,
     FjcIntegratedDatabase,
@@ -73,7 +74,10 @@ class PacerProcessingQueueViewSet(LoggingMixin, ModelViewSet):
 
     @async_to_sync
     async def perform_create(self, serializer):
-        pq = await sync_to_async(serializer.save)(uploader=self.request.user)
+        pq = await sync_to_async(serializer.save)(
+            uploader=self.request.user,
+            source=PROCESSING_QUEUE_SOURCE.EXTENSION,
+        )
         recap_upload_task = asyncio.create_task(process_recap_upload(pq))
         # Inhibit upload task cancellation on disconnect by catching and
         # blocking the asyncio.CancelledError from propagating to the ASGI
