@@ -162,14 +162,14 @@ logger = logging.getLogger(__name__)
 cnt = CaseNameTweaker()
 
 
-def retrieve_email_from_queue(message_id: str, bucket: S3Storage) -> bytes:
+def retrieve_email_from_queue(message_id: str, bucket: S3Storage) -> str:
     """
     Attempt to retrieve and decode an email from an S3 bucket.
 
     :param message_id: The ID of the message to retrieve.
     :param bucket: The S3 bucket to retrieve the email from.
 
-    :return: The decoded email as a bytes object.
+    :return: The decoded email
 
     :raise FileNotFoundError:
     """
@@ -190,7 +190,7 @@ async def process_recap_upload(pq: ProcessingQueue) -> None:
     process them accordingly.
     """
     if pq.upload_type == UPLOAD_TYPE.DOCKET:
-        docket = await process_recap_docket(pq.pk)
+        await process_recap_docket(pq.pk)
     elif pq.upload_type == UPLOAD_TYPE.ATTACHMENT_PAGE:
         sub_docket_att_page_pks = await find_subdocket_att_page_rds(pq.pk)
         for pq_pk, subdocket_replication in sub_docket_att_page_pks:
@@ -202,9 +202,9 @@ async def process_recap_upload(pq: ProcessingQueue) -> None:
         for pq_pk, subdocket_replication in sub_docket_pdf_pks:
             await process_recap_pdf(pq_pk, subdocket_replication)
     elif pq.upload_type == UPLOAD_TYPE.DOCKET_HISTORY_REPORT:
-        docket = await process_recap_docket_history_report(pq.pk)
+        await process_recap_docket_history_report(pq.pk)
     elif pq.upload_type == UPLOAD_TYPE.APPELLATE_DOCKET:
-        docket = await process_recap_appellate_docket(pq.pk)
+        await process_recap_appellate_docket(pq.pk)
     elif pq.upload_type == UPLOAD_TYPE.APPELLATE_ATTACHMENT_PAGE:
         await process_recap_appellate_attachment(pq.pk)
     elif pq.upload_type == UPLOAD_TYPE.CLAIMS_REGISTER:
@@ -212,7 +212,7 @@ async def process_recap_upload(pq: ProcessingQueue) -> None:
     elif pq.upload_type == UPLOAD_TYPE.DOCUMENT_ZIP:
         await process_recap_zip(pq.pk)
     elif pq.upload_type == UPLOAD_TYPE.CASE_QUERY_PAGE:
-        docket = await process_case_query_page(pq.pk)
+        await process_case_query_page(pq.pk)
     elif pq.upload_type == UPLOAD_TYPE.APPELLATE_CASE_QUERY_PAGE:
         await sync_to_async(process_recap_appellate_case_query_page)(pq.pk)
     elif pq.upload_type == UPLOAD_TYPE.CASE_QUERY_RESULT_PAGE:
@@ -224,7 +224,7 @@ async def process_recap_upload(pq: ProcessingQueue) -> None:
     elif pq.upload_type == UPLOAD_TYPE.ACMS_ATTACHMENT_PAGE:
         await process_recap_acms_appellate_attachment(pq.pk)
     elif pq.upload_type == UPLOAD_TYPE.ACMS_DOCKET_JSON:
-        docket = await process_recap_acms_docket(pq.pk)
+        await process_recap_acms_docket(pq.pk)
 
 
 def do_pacer_fetch(fq: PacerFetchQueue):
@@ -1714,7 +1714,7 @@ async def process_recap_acms_appellate_attachment(
             pq, msg, PROCESSING_STATUS.FAILED
         )
         return pq_status, msg, []
-    except RECAPDocument.DoesNotExist as exc:
+    except RECAPDocument.DoesNotExist:
         msg = "Could not find docket to associate with attachment metadata"
         pq_status, msg = await mark_pq_status(
             pq, msg, PROCESSING_STATUS.FAILED

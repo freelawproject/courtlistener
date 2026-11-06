@@ -1,5 +1,6 @@
 {% load component_tags extras humanize svg_tags text_filters tz %}
 {% require_script "js/alpine/components/docket_page.js" %}
+{% require_script "js/alpine/composables/download.js" %}
 {% require_script "js/third_party/htmx" defer=True %}
 
 <c-vars
@@ -130,12 +131,34 @@
   {% endif %}
   <c-docket-source-button :docket="docket" :docket_source="docket_source" />
   {% if user.is_authenticated %}
+    <div
+      x-data="download"
+      data-error-message-501="CSV export is not available for this docket's source."
+      data-error-message-429="This docket's export limit was reached. Try again later."
+      data-error-message-default="There was a problem. Try again later."
+      class="flex flex-wrap items-center gap-2"
+    >
+      <c-button
+        variant="outline"
+        href="{% url 'view_download_docket' docket.id %}"
+        rel="nofollow"
+        x-on:click.prevent="start"
+        x-bind:aria-busy="busy"
+      >
+        {% svg "download" class="w-4 h-4" aria_hidden="true" %}
+        Export entries CSV
+      </c-button>
+      <span x-show="errorMessage" x-text="errorMessage" x-cloak role="alert" class="text-sm text-red-600"></span>
+    </div>
+  {% else %}
     <c-button
       variant="outline"
-      hx-get="{% url 'view_download_docket' docket.id %}"
-      hx-swap="none"
+      href="{% url 'sign-in' %}?next={{ request.get_full_path|urlencode }}"
+      rel="nofollow"
     >
+      {% svg "download" class="w-4 h-4" aria_hidden="true" %}
       Export entries CSV
+      <span class="sr-only">(sign in required)</span>
     </c-button>
   {% endif %}
 </div>
