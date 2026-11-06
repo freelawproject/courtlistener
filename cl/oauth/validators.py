@@ -2,10 +2,38 @@ from collections.abc import Callable
 from typing import Any
 
 from oauth2_provider.oauth2_validators import OAuth2Validator
+from waffle import switch_is_active
+
+# While on, the token endpoint refuses refreshes from applications that
+# were registered through the retired DCR endpoint, so their users
+# reconnect through the MCP server instead.
+DCR_REFRESH_SWITCH = "refuse-dcr-refresh"
 
 
 class CourtListenerOAuth2Validator(OAuth2Validator):
-    """Adds the standard OIDC ``email`` and ``profile`` claims."""
+    """Adds the standard OIDC ``email`` and ``profile`` claims and winds
+    down the applications left behind by Dynamic Client Registration.
+    """
+
+    def validate_refresh_token(
+        self,
+        refresh_token: str,
+        client: Any,
+        request: Any,
+        *args: Any,
+        **kwargs: Any,
+    ) -> bool:
+        """Answer ``invalid_grant`` to a DCR application's refresh once
+        ``DCR_REFRESH_SWITCH`` is on, so the client starts over with a
+        fresh authorization; other applications are unaffected."""
+        if (
+            client.registration_source == client.RegistrationSource.DCR
+            and switch_is_active(DCR_REFRESH_SWITCH)
+        ):
+            return False
+        return super().validate_refresh_token(
+            refresh_token, client, request, *args, **kwargs
+        )
 
     # Request-free signature is how DOT opts claims into discovery.
     def get_additional_claims(  # pyrefly: ignore[bad-override]

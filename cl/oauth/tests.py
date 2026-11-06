@@ -17,11 +17,14 @@ from oauth2_provider.models import (
     get_access_token_model,
     get_application_model,
     get_grant_model,
+    get_refresh_token_model,
     set_token_value,
 )
 from rest_framework.authtoken.models import Token
+from waffle.testutils import override_switch
 
 from cl.oauth.factories import ApplicationFactory
+from cl.oauth.validators import DCR_REFRESH_SWITCH
 from cl.tests.cases import APITestCase, TestCase
 from cl.tests.utils import parse_csp
 from cl.users.factories import UserFactory, UserProfileWithParentsFactory
@@ -29,6 +32,7 @@ from cl.users.factories import UserFactory, UserProfileWithParentsFactory
 Application = get_application_model()
 Grant = get_grant_model()
 AccessToken = get_access_token_model()
+RefreshToken = get_refresh_token_model()
 
 
 class OAuthMetadataTest(APITestCase):
@@ -552,3 +556,66 @@ class IntrospectionSubTest(APITestCase):
 
     def test_inactive_token_has_no_sub(self):
         self.assertEqual(self._introspect("nope"), {"active": False})
+
+
+class DCRRefreshRefusalTest(TestCase):
+    """With ``DCR_REFRESH_SWITCH`` on, the token endpoint answers
+    ``invalid_grant`` to refreshes from applications registered through
+    the retired DCR endpoint, so those clients start over with a fresh
+    authorization. Applications registered by hand are unaffected, and
+    so is everything while the switch is off.
+    """
+
+    @classmethod
+    def setUpTestData(cls) -> None:
+        cls.user = UserFactory()
+        cls.dcr_app = ApplicationFactory(
+            client_type=Application.CLIENT_PUBLIC,
+            registration_source=Application.RegistrationSource.DCR,
+        )
+        cls.manual_app = ApplicationFactory(
+            client_type=Application.CLIENT_PUBLIC
+        )
+
+    def _refresh(self, application):
+        """Mint a refresh token for *application* and spend it."""
+        raw = f"refresh-{application.pk}"
+        access = AccessToken(
+            user=self.user,
+            application=application,
+            scope="api",
+            expires=now() + timedelta(hours=1),
+        )
+        set_token_value(access, f"access-{application.pk}")
+        access.save()
+        refresh = RefreshToken(
+            user=self.user, application=application, access_token=access
+        )
+        set_token_value(refresh, raw)
+        refresh.save()
+        return self.client.post(
+            reverse("oauth2_provider:token"),
+            {
+                "grant_type": "refresh_token",
+                "refresh_token": raw,
+                "client_id": application.client_id,
+            },
+        )
+
+    @override_switch(DCR_REFRESH_SWITCH, active=True)
+    def test_dcr_app_refresh_is_refused(self):
+        r = self._refresh(self.dcr_app)
+        self.assertEqual(r.status_code, 400, r.content)
+        self.assertEqual(r.json()["error"], "invalid_grant")
+
+    @override_switch(DCR_REFRESH_SWITCH, active=True)
+    def test_manual_app_refresh_still_works(self):
+        r = self._refresh(self.manual_app)
+        self.assertEqual(r.status_code, 200, r.content)
+        self.assertIn("access_token", r.json())
+
+    @override_switch(DCR_REFRESH_SWITCH, active=False)
+    def test_switch_off_leaves_dcr_apps_alone(self):
+        r = self._refresh(self.dcr_app)
+        self.assertEqual(r.status_code, 200, r.content)
+        self.assertIn("access_token", r.json())
