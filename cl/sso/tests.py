@@ -1213,6 +1213,19 @@ class AdminTest(SSOFixtureMixin, TestCase):
                 self.assertEqual(r.status_code, 200)
                 self.assertContains(r, self.org.name)
 
+    def test_seat_count_with_a_domain_search(self) -> None:
+        """Is each seat counted once when the search matches two domains?"""
+        OrganizationDomainFactory.create(
+            organization=self.org, domain=f"mail.{DOMAIN}"
+        )
+        OrganizationMembershipFactory.create(organization=self.org)
+
+        r = self.client.get(
+            reverse("admin:sso_organization_changelist"), {"q": DOMAIN}
+        )
+
+        self.assertContains(r, "1 / ")
+
     def test_connection_shows_idp_urls(self) -> None:
         """Does the organization page list each connection's IdP URLs?"""
         r = self.client.get(

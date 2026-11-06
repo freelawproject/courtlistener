@@ -1,6 +1,7 @@
 import csv
 
 from django.contrib import admin
+from django.db import transaction
 from django.db.models import Count, Q, QuerySet
 from django.forms import BaseInlineFormSet, ModelForm
 from django.http import HttpRequest, HttpResponse
@@ -102,8 +103,12 @@ class OrganizationAdmin(admin.ModelAdmin):
             super()
             .get_queryset(request)
             .annotate(
+                # distinct, since searching by domain joins the domains and
+                # would count each seat once per matching domain.
                 seat_count=Count(
-                    "memberships", filter=Q(memberships__has_seat=True)
+                    "memberships",
+                    filter=Q(memberships__has_seat=True),
+                    distinct=True,
                 )
             )
         )
