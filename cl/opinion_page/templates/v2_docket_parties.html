@@ -22,8 +22,8 @@
       {# The card edges replace the first heading's top padding and the last party's divider. #}
       <div class="[&>section:first-child>h2]:pt-0 [&>section:last-child>div:last-child]:border-b-0">
       {% for group in party_groups %}
-        <section class="text-sm text-greyscale-800">
-          <h2 class="flex items-center gap-3 py-6 md:pl-3 border-b border-greyscale-200">
+        <section class="text-sm text-greyscale-800" aria-labelledby="{{ group.name|slugify }}-heading">
+          <h2 id="{{ group.name|slugify }}-heading" class="flex items-center gap-3 py-6 md:pl-3 border-b border-greyscale-200">
             {% svg "person" class="w-6 h-6 text-greyscale-500" aria_hidden="true" %}
             {{ group.name }}
           </h2>
