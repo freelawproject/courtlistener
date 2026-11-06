@@ -1,13 +1,19 @@
 from .base import (
+    Merger,
+    auto_now_fields,
+)
+from .parameters import (
+    RelatedParams,
+    ThroughParameters,
+)
+from .specifications import (
     Attribute,
     ManyStrategy,
     ManyToManyRelation,
-    Merger,
     OneToManyRelation,
     OneToOneRelation,
-    RelatedParams,
-    ThroughParameters,
-    auto_now_fields,
+)
+from .strategy import (
     overwrite,
     overwrite_if_present,
 )

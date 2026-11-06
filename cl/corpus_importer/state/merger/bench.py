@@ -32,14 +32,18 @@ from cl.search.models import (
 )
 
 from .base import (
-    Attribute,
-    ManyToManyRelation,
     Merger,
     MergerSpecRegistry,
-    OneToManyRelation,
-    OneToOneRelation,
     RelatedParams,
     ThroughParameters,
+)
+from .specifications import (
+    Attribute,
+    ManyToManyRelation,
+    OneToManyRelation,
+    OneToOneRelation,
+)
+from .strategy import (
     overwrite,
     overwrite_if_present,
 )
