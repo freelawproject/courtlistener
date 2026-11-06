@@ -67,7 +67,7 @@ from cl.lib.test_helpers import (
     SimpleUserDataMixin,
     SitemapTest,
 )
-from cl.opinion_page import docket_entry_sources
+from cl.opinion_page import docket_entry_sources, forms_v2
 from cl.opinion_page.docket_entry_sources import (
     _recap_document_detail_url,
     _scotus_document_detail_url,
@@ -5210,7 +5210,7 @@ class DocketFilterRenderTestCase(TestCase):
         cls.docket = DocketFactory(court=cls.court, source=Docket.RECAP)
         cls.empty_page = Paginator([], 100).get_page(1)
 
-    def _render(self, form: DocketEntryFilterForm) -> str:
+    def _render(self, form: forms_v2.DocketEntryFilterForm) -> str:
         # Render via a wrapper template that invokes <c-docket-filter> as a
         # child component, instead of rendering
         # cotton/docket_filter/index.html directly — the latter declares
@@ -5260,7 +5260,7 @@ class DocketFilterErrorDialogTest(DocketFilterRenderTestCase):
     def _render_root(self, query: str) -> _Element | None:
         request = RequestFactory().get(f"/{query}")
         request.user = AnonymousUser()
-        form = DocketEntryFilterForm(request.GET, request=request)
+        form = forms_v2.DocketEntryFilterForm(request.GET, request=request)
         form.is_valid()
         html = self._render(form)
         for el in fromstring(html).iter():
@@ -5281,7 +5281,7 @@ class DocketFilterErrorDialogTest(DocketFilterRenderTestCase):
     def test_dialog_opens_on_window_event(self) -> None:
         request = RequestFactory().get("/")
         request.user = AnonymousUser()
-        form = DocketEntryFilterForm(request.GET, request=request)
+        form = forms_v2.DocketEntryFilterForm(request.GET, request=request)
         dialog = self._find_by_attr(
             self._render(form), "x-on:open-filter-dialog.window"
         )
@@ -5308,7 +5308,7 @@ class DocketFilterSearchScopeTest(DocketFilterRenderTestCase):
         the submit hook that merges them."""
         request = RequestFactory().get("/")
         request.user = AnonymousUser()
-        form = DocketEntryFilterForm(request.GET, request=request)
+        form = forms_v2.DocketEntryFilterForm(request.GET, request=request)
 
         tree = fromstring(self._render(form))
         # docket_filter.js reads the pristine scope from here on every
