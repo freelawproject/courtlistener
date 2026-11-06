@@ -547,7 +547,7 @@ class JKentScrapeLoader[
                 yield prepared
 
     @classmethod
-    def merge_one(cls, scrape: ScrapeType) -> MergeResult[Any]:
+    def merge_one(cls, scrape: ScrapeType) -> MergeResult:
         """Merge a single scrape, then publish its files.
 
         Runs in celery worker.
@@ -559,7 +559,7 @@ class JKentScrapeLoader[
         return result
 
     @classmethod
-    def merge_payload(cls, payload: str) -> tuple[str, MergeResult[Any]]:
+    def merge_payload(cls, payload: str) -> tuple[str, MergeResult]:
         """Merge one dispatched row, given the payload celery carried.
 
         Args:
@@ -579,7 +579,7 @@ class JKentScrapeLoader[
         return cls.label(scrape), cls.merge_one(scrape)
 
     @classmethod
-    def publish_files(cls, docket: Docket) -> MergeResult[int]:
+    def publish_files(cls, docket: Docket) -> MergeResult:
         """Move each of a docket's files from private to public.
 
         A file goes where the document says it belongs, which for a state
@@ -671,9 +671,7 @@ class JKentScrapeLoader[
         return documents.exclude(filepath_local__startswith=cls.private_prefix)
 
     @classmethod
-    def dispatch_extraction(
-        cls, result: MergeResult[Any], queue: str
-    ) -> set[int]:
+    def dispatch_extraction(cls, result: MergeResult, queue: str) -> set[int]:
         """Sends doc pks to celery queue for extraction.
 
         Args:

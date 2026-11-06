@@ -362,7 +362,7 @@ class FloridaOriginatingCourtInformationMerger(
 
 
 def _originating_case(
-    docket_data: FloridaCase, params: None
+    docket_data: FloridaCase, params: list[ScrapeFloridaDocketEntry]
 ) -> FloridaOriginatingCase | None:
     if docket_data.court_id != FloridaCourtID.SUPREME_COURT.value:
         return None

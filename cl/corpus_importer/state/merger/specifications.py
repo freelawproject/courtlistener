@@ -37,20 +37,27 @@ if typing.TYPE_CHECKING:
 
 logger = logging.getLogger(__name__)
 
+type Transformer[Scrape, Params, Transformed] = Callable[
+    [Scrape, Params], Transformed
+]
+type Strategy[Scrape, Existing, Output = Scrape | Existing] = Callable[
+    [Scrape, Existing], Output
+]
 
-class MergerSpecification[ScrapeType, ParamType, OutputType]:
+
+class MergerSpecification[Scrape, Params, Output]:
     __slots__: tuple[str, ...] = "name", "transform", "default"
 
     def __init__(
         self,
         *,
-        transform: Callable[[ScrapeType, ParamType], OutputType] | None = None,
-        default: OutputType,
+        transform: Transformer[Scrape, Params, Output] | None = None,
+        default: Output,
     ):
-        self.transform: Callable[[ScrapeType, ParamType], OutputType] = (
+        self.transform: Transformer[Scrape, Params, Output] = (
             transform or self._default_transform
         )
-        self.default: OutputType = default
+        self.default: Output = default
         self.name: str = ""
 
     def run_validation(
@@ -89,9 +96,7 @@ class MergerSpecification[ScrapeType, ParamType, OutputType]:
         self.name = name
         owner.__registry__.register(self)
 
-    def _default_transform(
-        self, scrape: ScrapeType, params: ParamType
-    ) -> OutputType:
+    def _default_transform(self, scrape: Scrape, params: Params) -> Output:
         if params is None:
             return self.default
         if isinstance(params, dict):
@@ -99,8 +104,8 @@ class MergerSpecification[ScrapeType, ParamType, OutputType]:
         return getattr(params, self.name, self.default)
 
 
-class AttributeMerger[ScrapeType, ParamType, TransformType](
-    MergerSpecification[ScrapeType, ParamType, TransformType | None]
+class AttributeMerger[Scrape, Params, Transform](
+    MergerSpecification[Scrape, Params, Transform | None]
 ):
     """Class encapsulating logic for merging a single attribute from a scrape into a DB object.
 
@@ -114,56 +119,50 @@ class AttributeMerger[ScrapeType, ParamType, TransformType](
 
     def __init__(
         self,
-        transform: Callable[[ScrapeType, ParamType], TransformType]
-        | None = None,
-        strategy: Callable[
-            [TransformType | None, TransformType | None],
-            TransformType | None,
+        transform: Transformer[Scrape, Params, Transform] | None = None,
+        strategy: Strategy[
+            Transform | None,
+            Transform | None,
         ] = overwrite_if_present,
         *,
-        default: TransformType | None = None,
+        default: Transform | None = None,
     ):
         super().__init__(transform=transform, default=default)
-        self.strategy: Callable[
-            [TransformType | None, TransformType | None],
-            TransformType | None,
-        ] = strategy
+        self.strategy: Strategy[Transform | None, Transform | None] = strategy
 
 
-def Attribute[TransformType](
-    transform: Callable[[Any, Any], TransformType] | None = None,
-    strategy: Callable[
-        [Any, Any], TransformType | None
+def Attribute[Scrape, Params, Transform](
+    transform: Transformer[Any, Any, Any] | None = None,
+    strategy: Strategy[
+        Transform | None, Transform | None
     ] = overwrite_if_present,
     *,
-    default: TransformType | None = None,
+    default: Transform | None = None,
 ) -> Any:
     return AttributeMerger(transform, strategy, default=default)
 
 
 class RelatedMerger[
-    ScrapeType,
-    ParamType,
-    ChildType,
-    OutputType,
+    Scrape,
+    Params,
+    Output,
+    Child,
     RM: Model,
 ](
-    MergerSpecification[ScrapeType, ParamType, OutputType],
+    MergerSpecification[Scrape, Params, Output],
     ABC,
 ):
     __slots__ = ("merger",)
 
     def __init__(
         self,
-        merger: type[Merger[ChildType, RelatedParams[ParamType], RM]],
-        transform: Callable[[ScrapeType, ParamType], OutputType] | None = None,
+        merger: type[Merger[Child, RelatedParams[Params], RM]],
+        transform: Transformer[Scrape, Params, Output] | None = None,
         *,
-        default: OutputType,
+        default: Output,
     ):
         super().__init__(transform=transform, default=default)
-        self.merger: type[Merger[ChildType, RelatedParams[ParamType], RM]] = (
-            merger
-        )
+        self.merger: type[Merger[Child, RelatedParams[Params], RM]] = merger
 
     def validate(self, field: Field | ForeignObjectRel) -> list[Exception]:
         errors = super().validate(field)
@@ -192,16 +191,16 @@ class RelatedMerger[
 
     @abstractmethod
     def merge(
-        self, parent: RM | None, scrape: ScrapeType, params: ParamType
-    ) -> MergeResult[Any]: ...
+        self, parent: RM | None, scrape: Scrape, params: Params
+    ) -> MergeResult: ...
 
 
-class OneToOneMerger[ScrapeType, ParamType, ChildType, RM: Model](
+class OneToOneMerger[Scrape, Params, Child, RM: Model](
     RelatedMerger[
-        ScrapeType,
-        ParamType,
-        ChildType,
-        ChildType | None,
+        Scrape,
+        Params,
+        Child | None,
+        Child,
         RM,
     ]
 ):
@@ -211,9 +210,8 @@ class OneToOneMerger[ScrapeType, ParamType, ChildType, RM: Model](
 
     def __init__(
         self,
-        merger: type[Merger[ChildType, RelatedParams[ParamType], RM]],
-        transform: Callable[[ScrapeType, ParamType], ChildType | None]
-        | None = None,
+        merger: type[Merger[Child, RelatedParams[Params], RM]],
+        transform: Transformer[Scrape, Params, Child | None] | None = None,
     ):
         super().__init__(merger=merger, transform=transform, default=None)
         self.forward: bool = True
@@ -231,8 +229,8 @@ class OneToOneMerger[ScrapeType, ParamType, ChildType, RM: Model](
         return errors
 
     def merge(
-        self, parent: RM | None, scrape: ScrapeType, params: ParamType
-    ) -> MergeResult[Any]:
+        self, parent: RM | None, scrape: Scrape, params: Params
+    ) -> MergeResult:
         """Run the merge method on the appropriate inputs for the given relationship."""
         merger_input = self.transform(scrape, params)
         if merger_input is None:
@@ -262,9 +260,9 @@ class OneToOneMerger[ScrapeType, ParamType, ChildType, RM: Model](
         ).merge()
 
 
-def OneToOneRelation[ParamType, ChildType, RM: Model](
-    merger: type[Merger[ChildType, RelatedParams[ParamType], RM]],
-    transform: Callable[..., ChildType | None] | None = None,
+def OneToOneRelation[Scrape, Params, Child, RM: Model](
+    merger: type[Merger[Child, RelatedParams[Params], RM]],
+    transform: Transformer[Scrape, Params, Child | None] | None = None,
 ) -> Any:
     return OneToOneMerger(merger, transform)
 
@@ -280,8 +278,8 @@ class ManyStrategy(Enum):
     """Remove associations to values absent from the new data but keep the objects themselves in the DB"""
 
 
-class NToManyMerger[ScrapeType, ParamType, ChildType, RM: Model](
-    RelatedMerger[ScrapeType, ParamType, ChildType, Sequence[ChildType], RM],
+class NToManyMerger[Scrape, Params, Child, RM: Model](
+    RelatedMerger[Scrape, Params, Sequence[Child], Child, RM],
     ABC,
 ):
     """Class encapsulating logic for merging an N-to-many relationship."""
@@ -290,9 +288,8 @@ class NToManyMerger[ScrapeType, ParamType, ChildType, RM: Model](
 
     def __init__(
         self,
-        merger: type[Merger[ChildType, RelatedParams[ParamType], RM]],
-        transform: Callable[[ScrapeType, ParamType], Sequence[ChildType]]
-        | None = None,
+        merger: type[Merger[Child, RelatedParams[Params], RM]],
+        transform: Transformer[Scrape, Params, Sequence[Child]] | None = None,
         *,
         strategy: ManyStrategy = ManyStrategy.REPLACE,
     ):
@@ -300,8 +297,8 @@ class NToManyMerger[ScrapeType, ParamType, ChildType, RM: Model](
         self.strategy: ManyStrategy = strategy
 
     def _transform_result_and_manager(
-        self, parent: RM | None, scrape: ScrapeType, params: ParamType
-    ) -> tuple[Sequence[ChildType], MergeResult[Any], RelatedManager[Any]]:
+        self, parent: RM | None, scrape: Scrape, params: Params
+    ) -> tuple[Sequence[Child], MergeResult, RelatedManager[Any]]:
         related_manager: RelatedManager[Any] = getattr(parent, self.name)
         transformed = self.transform(scrape, params)
         if isinstance(transformed, (str, bytes)):
@@ -313,8 +310,8 @@ class NToManyMerger[ScrapeType, ParamType, ChildType, RM: Model](
         return transformed, MergeResult.unnecessary(), related_manager
 
     def merge(
-        self, parent: RM | None, scrape: ScrapeType, params: ParamType
-    ) -> MergeResult[Any]:
+        self, parent: RM | None, scrape: Scrape, params: Params
+    ) -> MergeResult:
         """Run the merge method on the appropriate inputs for the given relationship."""
         if parent is None:
             logger.error("Parent not provided for N to many merging")
@@ -355,8 +352,8 @@ class NToManyMerger[ScrapeType, ParamType, ChildType, RM: Model](
         return result
 
 
-class OneToManyMerger[ScrapeType, ParamType, ChildType, RM: Model](
-    NToManyMerger[ScrapeType, ParamType, ChildType, RM]
+class OneToManyMerger[Scrape, Params, Child, RM: Model](
+    NToManyMerger[Scrape, Params, Child, RM]
 ):
     """Class encapsulating logic for merging a one-to-many relationship.
 
@@ -374,9 +371,9 @@ class OneToManyMerger[ScrapeType, ParamType, ChildType, RM: Model](
         return errors
 
 
-def OneToManyRelation[ParamType, ChildType, RM: Model](
-    merger: type[Merger[ChildType, RelatedParams[ParamType], RM]],
-    transform: Callable[..., Sequence[ChildType]] | None = None,
+def OneToManyRelation[Scrape, Params, Child, RM: Model](
+    merger: type[Merger[Child, RelatedParams[Params], RM]],
+    transform: Transformer[Scrape, Params, Sequence[Child]] | None = None,
     *,
     strategy: ManyStrategy = ManyStrategy.REPLACE,
 ) -> Any:
@@ -384,12 +381,12 @@ def OneToManyRelation[ParamType, ChildType, RM: Model](
 
 
 class ManyToManyMerger[
-    ScrapeType,
-    TransformType,
+    Scrape,
+    Params,
+    Transform,
     ThruM: Model,
     RM: Model,
-    ParamType,
-](NToManyMerger[ScrapeType, ParamType, TransformType, RM]):
+](NToManyMerger[Scrape, Params, Transform, RM]):
     """Class encapsulating logic for merging a many-to-many relationship.
 
     A scrape whose transform yields no children is treated as a partial
@@ -403,12 +400,10 @@ class ManyToManyMerger[
 
     def __init__(
         self,
-        merger: type[Merger[TransformType, RelatedParams[ParamType], RM]],
-        through: type[
-            Merger[TransformType, ThroughParameters[ParamType], ThruM]
-        ]
+        merger: type[Merger[Transform, RelatedParams[Params], RM]],
+        through: type[Merger[Transform, ThroughParameters[Params], ThruM]]
         | None = None,
-        transform: Callable[[ScrapeType, ParamType], Sequence[TransformType]]
+        transform: Transformer[Scrape, Params, Sequence[Transform]]
         | None = None,
         *,
         strategy: ManyStrategy = ManyStrategy.REPLACE,
@@ -416,8 +411,7 @@ class ManyToManyMerger[
     ):
         super().__init__(merger, transform, strategy=strategy)
         self.through: (
-            type[Merger[TransformType, ThroughParameters[ParamType], ThruM]]
-            | None
+            type[Merger[Transform, ThroughParameters[Params], ThruM]] | None
         ) = through
         self.through_strategy: ManyStrategy = through_strategy
 
@@ -446,8 +440,8 @@ class ManyToManyMerger[
         return errors
 
     def merge(
-        self, parent: RM | None, scrape: ScrapeType, params: ParamType
-    ) -> MergeResult[Any]:
+        self, parent: RM | None, scrape: Scrape, params: Params
+    ) -> MergeResult:
         """Run the merge method on the appropriate inputs for the given relationship."""
         if parent is None:
             logger.error("%s: No parent model specified", self.name)
@@ -472,7 +466,7 @@ class ManyToManyMerger[
         )
         result |= init_result
         mergers_with_output: list[
-            Merger[TransformType, RelatedParams[ParamType], RM]
+            Merger[Transform, RelatedParams[Params], RM]
         ] = []
         children_to_keep: set[Any] = set()
         for child_merger in child_mergers:
@@ -537,11 +531,11 @@ class ManyToManyMerger[
         return result
 
 
-def ManyToManyRelation[ParamType, ChildType, ThruM: Model, RM: Model](
-    merger: type[Merger[ChildType, RelatedParams[ParamType], RM]],
-    through: type[Merger[ChildType, ThroughParameters[ParamType], ThruM]]
+def ManyToManyRelation[Scrape, Params, Child, ThruM: Model, RM: Model](
+    merger: type[Merger[Child, RelatedParams[Params], RM]],
+    through: type[Merger[Child, ThroughParameters[Params], ThruM]]
     | None = None,
-    transform: Callable[[Any, Any], Sequence[ChildType]] | None = None,
+    transform: Transformer[Scrape, Params, Sequence[Child]] | None = None,
     *,
     strategy: ManyStrategy = ManyStrategy.REPLACE,
     through_strategy: ManyStrategy = ManyStrategy.REPLACE,

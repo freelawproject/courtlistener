@@ -208,7 +208,9 @@ class NYCoADocumentMerger[ParamType](
         strategy=overwrite,
     )
     filepath_local: str = Attribute(
-        lambda doc, params: doc.local_path, strategy=_keep_stored_file
+        lambda doc, params: doc.local_path,
+        # pyrefly:ignore[bad-argument-type]
+        strategy=_keep_stored_file,
     )
     sha256: str = Attribute(
         lambda doc, params: doc.content_hash, strategy=_keep_downloaded
@@ -218,7 +220,7 @@ class NYCoADocumentMerger[ParamType](
     )
 
     @override
-    def merge_one(self) -> tuple[MergeResult[Any], NYCoADocument | None]:
+    def merge_one(self) -> tuple[MergeResult, NYCoADocument | None]:
         """Settle which path to store for the file, then write the document.
 
         Returns:
@@ -423,7 +425,7 @@ class NYCoADocketEntryMerger[ParamType](
     )
 
     @override
-    def merge_one(self) -> tuple[MergeResult[Any], NYCoADocketEntry | None]:
+    def merge_one(self) -> tuple[MergeResult, NYCoADocketEntry | None]:
         """Merge the filing, then drop any document it no longer serves a file for.
 
         Returns:
@@ -847,7 +849,7 @@ class NYCoADocketMerger(DocketMerger[NYCoACase, None]):
     )
 
     @override
-    def merge_one(self) -> tuple[MergeResult[Any], Docket | None]:
+    def merge_one(self) -> tuple[MergeResult, Docket | None]:
         """Merge the case, then delete the files of the documents it removed.
 
         Returns:
