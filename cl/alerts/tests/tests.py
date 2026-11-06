@@ -1183,7 +1183,7 @@ class DocketAlertSourceTest(TestCase):
                 "SCOTUS",
                 SCOTUS_ALERT_SOURCE,
                 self.scotus_docket,
-                "scotusdocument_set",
+                "scotus_documents",
             ),
         ]
         for source_name, source, docket, docs_attr in cases:
