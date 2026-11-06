@@ -48,25 +48,25 @@
         {# Filter button below is the form's only submit, and filter changes #}
         {# reset to page 1. #}
         {# Right-aligned from md up, so it gets padding for spacing instead of a divider, which would sit beside it rather than after the sort. #}
-        <div class="flex items-end gap-1 md:ml-auto md:pl-[--divided-row-gap]">
+        <div class="flex items-center h-10 gap-2 md:ml-auto md:pl-[--divided-row-gap]">
           {% if page_obj.has_previous %}
-            <c-button variant="outline" href="{% querystring page=page_obj.previous_page_number %}" title="Previous page" class="gap-2">
+            <c-button variant="outline" size="sm" href="{% querystring page=page_obj.previous_page_number %}" title="Previous page" class="gap-2">
               {% svg "chevron" class="w-4 h-4 rotate-90" aria_hidden="true" %}
               <span class="hidden sm:inline">Prev</span>
             </c-button>
           {% else %}
-            <c-button variant="outline" disabled aria-disabled="true" title="Previous page" class="gap-2">
+            <c-button variant="outline" size="sm" disabled aria-disabled="true" title="Previous page" class="gap-2">
               {% svg "chevron" class="w-4 h-4 rotate-90" aria_hidden="true" %}
               <span class="hidden sm:inline">Prev</span>
             </c-button>
           {% endif %}
           {% if page_obj.has_next %}
-            <c-button variant="outline" href="{% querystring page=page_obj.next_page_number %}" title="Next page" class="gap-2">
+            <c-button variant="outline" size="sm" href="{% querystring page=page_obj.next_page_number %}" title="Next page" class="gap-2">
               <span class="hidden sm:inline">Next</span>
               {% svg "chevron" class="w-4 h-4 -rotate-90" aria_hidden="true" %}
             </c-button>
           {% else %}
-            <c-button variant="outline" disabled aria-disabled="true" title="Next page" class="gap-2">
+            <c-button variant="outline" size="sm" disabled aria-disabled="true" title="Next page" class="gap-2">
               <span class="hidden sm:inline">Next</span>
               {% svg "chevron" class="w-4 h-4 -rotate-90" aria_hidden="true" %}
             </c-button>
