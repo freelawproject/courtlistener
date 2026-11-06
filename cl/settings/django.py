@@ -137,6 +137,7 @@ TEMPLATES = [
                 "cl.lib.context_processors.inject_settings",
                 "cl.lib.context_processors.inject_random_tip",
                 "cl.lib.context_processors.inject_email_ban_status",
+                "cl.sso.context_processors.allauth_pages_are_private",
             ),
             "debug": DEBUG,
         },

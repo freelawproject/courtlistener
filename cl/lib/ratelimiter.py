@@ -208,6 +208,10 @@ ratelimiter_unsafe_10_per_m: RatelimitDecorator = make_ratelimiter(
     rate="10/m" if "test" not in sys.argv else None,
     method=UNSAFE,
 )
+ratelimiter_all_10_per_m: RatelimitDecorator = make_ratelimiter(
+    key=get_ip_for_ratelimiter,
+    rate="10/m" if "test" not in sys.argv else None,
+)
 ratelimiter_all_10_per_h: RatelimitDecorator = make_ratelimiter(
     key=get_path_to_make_key,
     rate="10/h" if "test" not in sys.argv else None,

@@ -1,0 +1,22 @@
+{% extends "base.html" %}
+{% comment %}
+Overrides allauth's page for a GET to an SSO login URL. The login has to be
+started with a POST, so this asks the person to confirm with a button.
+{% endcomment %}
+
+{% block title %}Sign In with {{ provider.name }} – CourtListener.com{% endblock %}
+
+{% block footer-scripts %}{% endblock %}
+{% block sidebar %}{% endblock %}
+
+{% block content %}
+  <div class="col-xs-1 col-sm-2 col-md-3"></div>
+  <div class="col-xs-10 col-sm-8 col-md-6 well">
+    <h2>Sign In with {{ provider.name }}</h2>
+    <p>Continue to {{ provider.name }}'s sign-in page, then you'll come back here.</p>
+    <form method="post">{% csrf_token %}
+      <button type="submit" class="btn btn-primary btn-lg">Continue</button>
+    </form>
+  </div>
+  <div class="col-xs-1 col-sm-2 col-md-3"></div>
+{% endblock %}
