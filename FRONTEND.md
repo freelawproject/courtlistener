@@ -45,6 +45,8 @@ WIP is for whole pages only. Templates MUST NOT extend or include a `wip_` templ
 
 A page that only has a `wip_` template is a 404 for everyone not opted in, so finished pages MUST NOT link to it.
 
+The 404 hides the rendered page, not the view: the middleware swaps the template after the view has run, and only for responses that render a template. A view behind a WIP-only page MUST NOT have side effects, such as saving data or sending email, unless it checks both flags itself.
+
 To mark a page as finished, promote it:
 1. `git mv` the template from `wip_` to `v2_` (e.g., `wip_help/index.html` → `v2_help/index.html`)
 2. Move its entry from `WIP_PAGES` to `V2_PAGES` with the new template name
