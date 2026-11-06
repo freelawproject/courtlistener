@@ -1,5 +1,6 @@
 # Code for importing Centralia structured opinion extractions into the DB
 import logging
+from enum import StrEnum
 from typing import Any
 
 from juriscraper.lib.string_utils import titlecase
@@ -7,6 +8,10 @@ from juriscraper.lib.string_utils import titlecase
 from cl.search.models import Opinion
 
 logger = logging.getLogger(__name__)
+
+# Courts whose opinion clusters may be ingested via Centralia's structured
+# extraction. Kept narrow while the integration is being rolled out.
+CENTRALIA_ENABLED_COURTS = {"scotus"}
 
 # The only verdict centralia gives that means "fully accounted for, nothing
 # to look at". Its other three -- ``scanned`` (no text layer), ``review``
@@ -18,6 +23,18 @@ INGESTIBLE_STATUS = "valid"
 # structured read likely lost whole pages. Centralia legitimately drops
 # running headers and page furniture, so the bar is deliberately low.
 MIN_TEXT_COVERAGE = 0.5
+
+
+class StructuredExtractionStatus(StrEnum):
+    """Outcome of running Centralia's structured extraction on a cluster."""
+
+    # Doctor or Centralia returned an error
+    ERROR = "error"
+    # The read failed the quality checks, so the opinion was left untouched
+    SKIPPED = "skipped"
+    # Dry runs only: the read passed the quality checks but was not saved
+    WOULD_INGEST = "would_ingest"
+    INGESTED = "ingested"
 
 
 # Centralia's opinion kind -> CL opinion type.
