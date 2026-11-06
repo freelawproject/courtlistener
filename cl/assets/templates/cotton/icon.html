@@ -1,0 +1,26 @@
+{% load svg_tags %}
+
+{# Icon from cl/assets/static-global/svg/: sizes it, picks the filled or outline variant and hides it from assistive technology unless it has a label. #}
+<c-vars
+  name=""
+  size=""
+  outline=""
+  label=""
+  class=""
+/>
+
+{# Tag arguments can't hold if/else, so the size class is stored with firstof…as, which stays set after the if block closes. "custom" leaves it empty so a size passed in class doesn't compete with one set here. #}
+{% if size == "custom" %}{% firstof "" as size_class %}
+{% elif size == "md" %}{% firstof "size-5" as size_class %}
+{% elif size == "lg" %}{% firstof "size-6" as size_class %}
+{% else %}{% firstof "size-4" as size_class %}{% endif %}
+
+{% with suffix=outline|yesno:"_outline,," %}
+{% with icon_name=name|add:suffix classes="shrink-0 "|add:size_class|add:" "|add:class %}
+  {% if label %}
+    {% svg icon_name class=classes|escape aria_label=label|escape %}
+  {% else %}
+    {% svg icon_name class=classes|escape aria_hidden="true" %}
+  {% endif %}
+{% endwith %}
+{% endwith %}

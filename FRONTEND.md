@@ -204,6 +204,7 @@ To hide an "install RECAP" call to action from users who have the extension, mar
 ## Icons
 
 - Use the `{% svg %}` template tag (defined in `cl/custom_filters/templatetags/svg_tags.py`)
+- Use `<c-icon>` instead when callers would otherwise repeat size classes or colour overrides, or when the icon switches between its filled and outline variants with state. A plain one-off icon can keep using `{% svg %}`
 - Icons live in `cl/assets/static-global/svg/`
 - New templates MUST NOT use Font Awesome classes
 
