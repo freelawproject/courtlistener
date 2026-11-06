@@ -1,0 +1,9 @@
+{# Replaces the library page's placeholder out of band; the HX-Trigger-After-Settle header on the response opens it. #}
+<c-toast
+  id="toast-demo-server"
+  hx-swap-oob="true"
+  variant="info"
+  title="Rendered by the server"
+  description="The server rendered this toast at {{ rendered_at }}, with content only it knew."
+  x-on:toast-demo-server-ready.window="open"
+/>
