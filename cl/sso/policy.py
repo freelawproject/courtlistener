@@ -7,6 +7,7 @@ this module, so the rules live in one place.
 
 from dataclasses import dataclass
 
+from allauth.socialaccount.models import SocialAccount
 from django.conf import settings
 from django.contrib.auth.models import User
 from django.urls import reverse
@@ -16,7 +17,6 @@ from django.utils.safestring import SafeString
 
 from cl.sso.models import (
     Enforcement,
-    MembershipSource,
     Organization,
     OrganizationDomain,
     SSOConnection,
@@ -149,8 +149,8 @@ def requirement_for_user(user: User) -> SSORequirement | None:
     - Staff SSO is required (SSO_REQUIRED_FOR_STAFF) and the account is
       staff or a superuser. They must use the staff organization's IdP.
     - Its address is covered by ``requirement_for_email``.
-    - It was linked by SSO to an organization that requires SSO on any of
-      its domains. Moving the account to another address doesn't let a
+    - It is linked to an IdP of an organization that requires SSO on any
+      of its domains. Moving the account to another address doesn't let a
       linked person get around their organization's policy.
 
     :param user: The account.
@@ -174,10 +174,10 @@ def requirement_for_user(user: User) -> SSORequirement | None:
     if user.email and (requirement := requirement_for_email(user.email)):
         return requirement
 
+    providers = SocialAccount.objects.filter(user=user).values("provider")
     linked_org = (
         Organization.objects.filter(
-            memberships__user=user,
-            memberships__source=MembershipSource.SSO,
+            connections__social_app__provider_id__in=providers,
             domains__enforcement=Enforcement.REQUIRED,
             domains__verified_at__isnull=False,
         )

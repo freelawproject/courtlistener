@@ -53,6 +53,11 @@ from cl.sso.models import (
     SSOConnection,
     SSOEmailException,
 )
+from cl.sso.policy import (
+    RequirementReason,
+    SSORequirement,
+    requirement_for_user,
+)
 from cl.sso.sessions import SSO_ORGANIZATION_KEY
 from cl.sso.throttles import sync_user_throttles
 from cl.tests.cases import SimpleTestCase, TestCase
@@ -1108,6 +1113,27 @@ class SSOConnectionTest(TestCase):
             social_app=SocialAppFactory.create(provider_id="shared")
         )
         self.assertIsNone(get_connection(sociallogin))
+
+
+class RequirementForUserTest(SSOFixtureMixin, TestCase):
+    """requirement_for_user's rule for linked accounts."""
+
+    def test_linked_account_must_use_sso(self) -> None:
+        """Does an IdP link count, whatever the membership's source?"""
+        self.require_sso()
+        user = UserFactory.create(email="ada@personal.test")
+        OrganizationMembershipFactory.create(
+            organization=self.org, user=user, source=MembershipSource.MANUAL
+        )
+        self.assertIsNone(requirement_for_user(user))
+
+        SocialAccount.objects.create(user=user, provider="acme", uid="s-1")
+
+        requirement = requirement_for_user(user)
+        self.assertIsNotNone(requirement)
+        requirement = cast(SSORequirement, requirement)
+        self.assertEqual(requirement.organization, self.org)
+        self.assertEqual(requirement.reason, RequirementReason.LINKED)
 
 
 class NotifyDomainUsersTest(SSOFixtureMixin, TestCase):
