@@ -14,6 +14,7 @@ from cl.corpus_importer.centralia import (
     CENTRALIA_ENABLED_COURTS,
     StructuredExtractionStatus,
     check_structured_extraction,
+    compare_structured_extraction,
     merge_structured_opinion_into_cl_opinion,
 )
 from cl.lib.command_utils import VerboseCommand, logger
@@ -74,6 +75,7 @@ def extract_structured_opinion(
     opinion: Opinion,
     allow_pending: bool = False,
     dry_run: bool = False,
+    compare: bool = False,
     queue: str = "batch1",
 ) -> dict[str, Any]:
     """Extract an opinion's PDF with Centralia and store the result.
@@ -99,14 +101,20 @@ def extract_structured_opinion(
     released yet.
     :param dry_run: Whether to only call Centralia and run the quality
     checks, without saving anything or finding citations.
+    :param compare: Whether to add character and citation count metrics
+    comparing the opinion's current content with the extraction. Slow, as it
+    runs eyecite on both.
     :param queue: The Celery queue for the citation-finding task.
     :return: A dict with the "cluster_id", the StructuredExtractionStatus as
-    "status" and the "reason" for it.
+    "status", the "reason" for it, and the "metrics" from
+    compare_structured_extraction (empty unless `compare` is set and Doctor
+    succeeded).
     """
     result: dict[str, Any] = {
         "cluster_id": opinion.cluster_id,
         "status": StructuredExtractionStatus.ERROR,
         "reason": "",
+        "metrics": {},
     }
     court_id = opinion.cluster.docket.court_id
     log_extra = {
@@ -148,6 +156,10 @@ def extract_structured_opinion(
         )
         return result
 
+    if compare:
+        # Before merging, which replaces the opinion's current content
+        result["metrics"] = compare_structured_extraction(opinion, data)
+
     if dry_run:
         mergeable, result["reason"] = check_structured_extraction(
             opinion, data
@@ -184,8 +196,9 @@ class Command(VerboseCommand):
     Only courts in CENTRALIA_ENABLED_COURTS, and clusters scraped from a
     court website with exactly one opinion, are processed.
 
-    Use --dry-run on a small sample first: it calls Centralia and reports
-    what would be ingested, without changing the database.
+    Use --dry-run with --compare on a small sample first: it calls Centralia
+    and reports what would be ingested, with character and citation counts
+    for the current and extracted content, without changing the database.
 
     Doctor errors are reported and make the command exit with an error once
     every cluster is processed. Other errors stop it immediately.
@@ -231,6 +244,14 @@ class Command(VerboseCommand):
             "save anything or find citations.",
         )
         parser.add_argument(
+            "--compare",
+            action="store_true",
+            default=False,
+            help="Report character and citation counts for each cluster's "
+            "current content and for the extraction. Slow, as it runs "
+            "eyecite on both.",
+        )
+        parser.add_argument(
             "--allow-pending",
             action="store_true",
             default=False,
@@ -269,14 +290,16 @@ class Command(VerboseCommand):
                 opinion,
                 allow_pending=options["allow_pending"],
                 dry_run=options["dry_run"],
+                compare=options["compare"],
                 queue=options["queue"],
             )
             results.append(result)
             logger.info(
-                "Cluster %s: %s (%s)",
+                "Cluster %s: %s (%s) %s",
                 result["cluster_id"],
                 result["status"],
                 result["reason"],
+                result["metrics"],
             )
 
         self.report(results, options["dry_run"])
@@ -291,7 +314,7 @@ class Command(VerboseCommand):
             )
 
     def report(self, results: list[dict[str, Any]], dry_run: bool) -> None:
-        """Write the outcome counts.
+        """Write the outcome counts and the comparison metrics.
 
         :param results: The extract_structured_opinion return values.
         :param dry_run: Whether nothing was saved.
@@ -304,3 +327,37 @@ class Command(VerboseCommand):
         )
         for status in StructuredExtractionStatus:
             self.stdout.write(f"  {status}: {statuses[status]}")
+
+        compared = [r for r in results if r["metrics"]]
+        if not compared:
+            return
+        totals = Counter()
+        for result in compared:
+            totals.update(result["metrics"])
+        self.stdout.write(f"Comparison over {len(compared)} cluster(s):")
+        for kind in ("chars", "citations"):
+            old, new = totals[f"old_{kind}"], totals[f"new_{kind}"]
+            ratio = f"{new / old:.1%}" if old else "n/a"
+            self.stdout.write(
+                f"  {kind}: current {old}, extracted {new} ({ratio})"
+            )
+
+        # Fewer citations in the extraction is the clearest sign that a read
+        # lost or garbled content, so list those clusters for review.
+        fewer_citations = [
+            r
+            for r in compared
+            if r["metrics"]["new_citations"] < r["metrics"]["old_citations"]
+        ]
+        if fewer_citations:
+            self.stdout.write(
+                f"Extraction found fewer citations in "
+                f"{len(fewer_citations)} cluster(s):"
+            )
+            for result in fewer_citations:
+                metrics = result["metrics"]
+                self.stdout.write(
+                    f"  cluster {result['cluster_id']} ({result['status']}): "
+                    f"{metrics['old_citations']} -> "
+                    f"{metrics['new_citations']}"
+                )

@@ -3,8 +3,11 @@ import logging
 from enum import StrEnum
 from typing import Any
 
+from eyecite import get_citations
 from juriscraper.lib.string_utils import titlecase
 
+from cl.citations.tasks import HYPERSCAN_TOKENIZER
+from cl.citations.utils import make_get_citations_kwargs
 from cl.search.models import Opinion
 
 logger = logging.getLogger(__name__)
@@ -181,6 +184,53 @@ def check_structured_extraction(
             "supported"
         )
     return True, reason
+
+
+def count_citations(document: Opinion) -> int:
+    """Count the citations eyecite finds in an opinion, without saving any.
+
+    Reads the same field, with the same cleanup, as the citation finder, so
+    the count matches what find_citations_and_parentheticals_for_opinion_by_pks
+    would extract before resolving. Citations are not resolved, so the count
+    includes citations to cases that are not in CL.
+
+    :param document: The opinion to read. It may be unsaved.
+    :return: The number of citations found.
+    """
+    return sum(
+        len(get_citations(tokenizer=HYPERSCAN_TOKENIZER, **kwargs))
+        for kwargs in make_get_citations_kwargs(document)
+    )
+
+
+def compare_structured_extraction(
+    opinion: Opinion, data: dict[str, Any]
+) -> dict[str, int]:
+    """Compare an opinion's current content with a structured extraction.
+
+    Meant for quality control: run it before merging, since merging replaces
+    the opinion's current content. Citation counting runs eyecite on both
+    versions, so this is too slow to run on every ingest.
+
+    :param opinion: The opinion as currently stored.
+    :param data: A successful response payload from Doctor's structured
+    opinion endpoint.
+    :return: The character counts of the current `plain_text` and of the
+    extracted text, and the number of citations eyecite finds in the
+    opinion's current content and in the extracted HTML.
+    """
+    extracted = Opinion(
+        html="".join(
+            _wrap(writing.get("html") or "")
+            for writing in data.get("opinions") or []
+        )
+    )
+    return {
+        "old_chars": len(opinion.plain_text or ""),
+        "new_chars": _payload_text_length(data),
+        "old_citations": count_citations(opinion),
+        "new_citations": count_citations(extracted),
+    }
 
 
 def merge_structured_opinion_into_cl_opinion(
