@@ -1282,29 +1282,34 @@ Sample code here.
   {# FORM INPUT #}
   <section class="max-w-full w-full border-t-2 border-greyscale-200" x-intersect.margin.-100px="show" id="form-input">
     <h2 class="mt-6 mb-3">Form input</h2>
-    <p>Renders one field of a Django form: its label, the input, and any validation errors. The input's id is built from <code>form_prefix</code>, <code>namespace</code> and <code>field_name</code>, so a form rendered twice on one page, like the docket filter's desktop and mobile layouts, keeps its ids unique. A field with errors gets a red border, <code>aria-invalid</code>, and an <code>aria-describedby</code> that points at its error message.</p>
+    <p>Renders one field of a Django form: its label, the input, and any validation errors. The field is looked up as <code>form[field_name]</code>. The input's id is <code>form_prefix</code>, <code>namespace</code> and <code>field_name</code> joined with underscores, skipping empty parts; <code>form_prefix</code> only matters when the same form is rendered more than once on a page, such as the docket filter's desktop and mobile layouts. A field with errors gets a red border, <code>aria-invalid</code>, and an <code>aria-describedby</code> pointing at the error element, whose id is the field id plus <code>-error</code>.</p>
+    <p>The component owns the label, the id and the error message. Everything about the input itself (its widget, classes, placeholder, type and validation) is the Django form field's job and lives in the form class; new-stack widget classes must live in a <code>forms_v2.py</code> module for Tailwind to see them. There is no disabled prop: a field Django marks <code>disabled</code> renders disabled, but the component has no styling for it. The component is for Django form fields only; a text input outside a form uses the <code>input-text</code> class directly.</p>
 
     <h4 class="mt-3">Demo</h4>
     <div class="w-48">
       <c-form.input :form="demo_filter_form" field_name="entry_gte" form_prefix="demo" only />
     </div>
+    <h5 class="mt-3">Error state</h5>
+    <div class="w-48">
+      <c-form.input :form="demo_invalid_filter_form" field_name="entry_gte" form_prefix="demo_invalid" only />
+    </div>
 
     <c-library.list title="Props" only>
       <c-library.item only>
         <c-slot name="label"><code>:form</code></c-slot>
-        <c-slot name="description">The Django form that holds the field.</c-slot>
+        <c-slot name="description">The Django form; the field is read as <code>form[field_name]</code>.</c-slot>
       </c-library.item>
       <c-library.item only>
         <c-slot name="label"><code>field_name</code></c-slot>
-        <c-slot name="description">Name of the field to render.</c-slot>
+        <c-slot name="description">Name of the field on the form. Last part of the input's id.</c-slot>
       </c-library.item>
-      <c-library.item only>
+      <c-library.item optional only>
         <c-slot name="label"><code>form_prefix</code></c-slot>
-        <c-slot name="description">Start of the input's id, unique per rendering of the form, e.g. <code>desktop</code> and <code>mobile</code>.</c-slot>
+        <c-slot name="description">First part of the input's id. Set it when the same form is rendered more than once on a page, e.g. <code>desktop</code> and <code>mobile</code>. Default: empty.</c-slot>
       </c-library.item>
       <c-library.item optional only>
         <c-slot name="label"><code>namespace</code></c-slot>
-        <c-slot name="description">Middle of the input's id, e.g. the search type in the corpus search filters. Default: empty.</c-slot>
+        <c-slot name="description">Middle part of the input's id, e.g. the search type in the corpus search filters. Default: empty.</c-slot>
       </c-library.item>
       <c-library.item optional only>
         <c-slot name="label"><code>:hide_label</code></c-slot>
@@ -1319,6 +1324,7 @@ Sample code here.
     <c-expansion-panel title="Code">
       <c-code>
 &lt;c-form.input :form="form" field_name="entry_gte" form_prefix="desktop" :hide_label="True" only /&gt;
+&lt;c-form.input :form="form" field_name="entry_gte" only /&gt;
       </c-code>
     </c-expansion-panel>
   </section>
