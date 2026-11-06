@@ -54,7 +54,7 @@
 {% endblock %}
 
 {% block footer-scripts %}
-<script type="text/javascript" nonce="{{ request.csp_nonce }}">
+<script type="text/javascript" nonce="{{ csp_nonce }}">
   $("#reset-token-form").on("submit", function () {
     $("#reset-token-btn").prop("disabled", true).text("Resetting…");
   });

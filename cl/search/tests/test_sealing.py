@@ -14,13 +14,18 @@ from django.core.exceptions import PermissionDenied
 from django.test import Client, RequestFactory
 from django.urls import reverse
 
+from cl.citations.factories import (
+    UnmatchedCitationFromRECAPDocumentFactory,
+)
 from cl.favorites.factories import NoteFactory, UserTagFactory
 from cl.search.admin import OpinionClusterAdmin, RECAPDocumentAdmin
 from cl.search.deletion_utils import (
     check_blocking_relations,
+    delete_document_citations,
     get_blocking_relations,
     get_deletion_blockers,
     seal_cluster,
+    seal_documents,
 )
 from cl.search.documents import ES_CHILD_ID, DocketDocument
 from cl.search.factories import (
@@ -31,7 +36,10 @@ from cl.search.factories import (
     DocketFactory,
     OpinionClusterFactory,
     OpinionClusterWithParentsFactory,
+    OpinionContentFactory,
     OpinionFactory,
+    OpinionsCitedByRECAPDocumentFactory,
+    OpinionWithParentsFactory,
     RECAPDocumentFactory,
     SCOTUSDocketEntryFactory,
     TrialCourtDataFactory,
@@ -40,12 +48,15 @@ from cl.search.models import (
     PRECEDENTIAL_STATUS,
     ClusterRedirection,
     Docket,
+    Opinion,
     OpinionCluster,
+    OpinionsCitedByRECAPDocument,
     RECAPDocument,
     ScotusDocketMetadata,
 )
 from cl.search.state.florida.factories import FloridaDocketEntryFactory
 from cl.search.state.texas.factories import TexasDocketEntryFactory
+from cl.search.tasks import index_related_cites_fields
 from cl.tests.cases import (
     CountESTasksTestCase,
     ESIndexTestCase,
@@ -116,7 +127,7 @@ class OpinionClusterSealClustersActionTest(TestCase):
         # The cluster has an user note
         cls.note_cluster_3_user_1 = NoteFactory(
             user=cls.user_1,
-            cluster_id=cls.cluster_3,
+            content_object=cls.cluster_3,
             notes="Note Test",
         )
 
@@ -472,7 +483,12 @@ class OpinionClusterSealFileCleanupTest(TestCase):
             filepath_xml_scan="scan/cluster.xml",
             filepath_pdf_scan="scan/cluster.pdf",
         )
-        OpinionFactory(cluster=cluster, local_path="opinions/opinion.pdf")
+        opinion = OpinionFactory(
+            cluster=cluster, local_path="opinions/opinion.pdf"
+        )
+        OpinionContentFactory(
+            opinion=opinion, local_path="contents/opinion.xml"
+        )
 
         seal_cluster(cluster, delete_docket=True)
 
@@ -491,6 +507,7 @@ class OpinionClusterSealFileCleanupTest(TestCase):
             invalidated_paths,
             [
                 "/opinions/opinion.pdf",
+                "/contents/opinion.xml",
                 "/harvard/cluster.json",
                 "/harvard/cluster.pdf",
                 "/scan/cluster.xml",
@@ -653,6 +670,93 @@ class RECAPDocumentSealActionESTest(
         self.assertEqual(rd_2_doc.plain_text, "")
         self.assertEqual(rd_2_doc.page_count, None)
         self.assertEqual(rd_2_doc.filepath_local, None)
+
+        # Clean up index.
+        docket.delete()
+
+    @mock.patch("cl.search.deletion_utils.time.sleep")
+    @mock.patch("cl.search.deletion_utils.delete_from_ia")
+    @mock.patch("cl.search.deletion_utils.invalidate_cloudfront")
+    def test_seal_documents_removes_citations(
+        self, mock_invalidate_cloudfront, mock_delete_from_ia, mock_sleep
+    ):
+        """Confirm that sealing a RECAPDocument drops the citations mined
+        from its text, in the DB and in ES."""
+
+        docket = DocketFactory(
+            court=self.court,
+            pacer_case_id="qwerty",
+            docket_number="12-cv-02354",
+            case_name="Vargas v. Wilkins",
+            source=Docket.RECAP,
+        )
+        de = DocketEntryFactory(docket=docket, entry_number=1)
+        rd = RECAPDocumentFactory(
+            docket_entry=de,
+            document_number="1",
+            is_available=True,
+            plain_text="Citing 1 U.S. 1 and 2 U.S. 2.",
+        )
+        opinion = OpinionWithParentsFactory()
+        OpinionsCitedByRECAPDocumentFactory(
+            citing_document=rd,
+            cited_opinion=opinion,
+            depth=1,
+        )
+        UnmatchedCitationFromRECAPDocumentFactory(citing_recapdocument=rd)
+        # Mirror production: the citation rows are pushed into ES by this
+        # task, not by saving the RECAPDocument.
+        index_related_cites_fields.delay(
+            OpinionsCitedByRECAPDocument.__name__, rd.pk
+        )
+
+        # Confirm the citations are there to begin with:
+        self.assertTrue(rd.cited_opinions.exists())
+        self.assertTrue(rd.unmatched_citations.exists())
+        rd_doc = DocketDocument.get(id=ES_CHILD_ID(rd.pk).RECAP)
+        self.assertEqual(list(rd_doc.cites), [opinion.pk])
+
+        # Seal the document. The admin action is just a thin wrapper around
+        # this, so call it directly.
+        seal_documents(RECAPDocument.objects.filter(pk=rd.pk))
+
+        # Confirm DB cleanup:
+        self.assertFalse(rd.cited_opinions.exists())
+        self.assertFalse(rd.unmatched_citations.exists())
+        # Only the linkage goes away; the cited opinion itself must stay.
+        self.assertTrue(Opinion.objects.filter(pk=opinion.pk).exists())
+
+        # Confirm ES cleanup:
+        rd_doc = DocketDocument.get(id=ES_CHILD_ID(rd.pk).RECAP)
+        self.assertEqual(list(rd_doc.cites), [])
+
+        # Clean up index.
+        docket.delete()
+        opinion.cluster.docket.delete()
+
+    @mock.patch("cl.search.deletion_utils.update_es_document")
+    def test_uncited_documents_skip_the_es_update(self, mock_update_es):
+        """Confirm that a document with no citations doesn't enqueue an ES
+        update, since sealing runs over whole querysets at a time."""
+
+        docket = DocketFactory(
+            court=self.court,
+            pacer_case_id="asdfgh",
+            docket_number="12-cv-02355",
+            case_name="Vargas v. Wilkins",
+            source=Docket.RECAP,
+        )
+        de = DocketEntryFactory(docket=docket, entry_number=1)
+        rd = RECAPDocumentFactory(
+            docket_entry=de,
+            document_number="1",
+            is_available=True,
+            plain_text="Nothing citable here.",
+        )
+
+        delete_document_citations(rd)
+
+        mock_update_es.delay.assert_not_called()
 
         # Clean up index.
         docket.delete()

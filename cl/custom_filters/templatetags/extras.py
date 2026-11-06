@@ -2,6 +2,7 @@ import random
 import re
 import urllib.parse
 from datetime import UTC, datetime
+from typing import Any
 
 from django import template
 from django.core.exceptions import ValidationError
@@ -162,7 +163,7 @@ def get_es_doc_content(
 
 
 @register.simple_tag
-def citation(obj) -> SafeString:
+def citation(obj) -> str:
     # Inline import to avoid circular dependency
     from cl.opinion_page.utils import build_citation_string
 
@@ -184,7 +185,7 @@ def contains_highlights(content: str, alert: bool = False) -> bool:
 
 
 @register.filter
-def render_string_or_list(value: any) -> any:
+def render_string_or_list(value: Any) -> Any:
     """Filter to render list of strings separated by commas or the original
     value.
 
@@ -251,7 +252,7 @@ def highlight_query(text: str, query: str) -> str:
 
 
 @register.filter
-def get_highlight(result: AttrDict | dict[str, any], field: str) -> any:
+def get_highlight(result: AttrDict | dict[str, Any], field: str) -> Any:
     """Returns the highlighted version of the field is present, otherwise,
     falls back to the original field value.
 
@@ -458,6 +459,19 @@ def get_item(obj, key):
 def get_attr(obj, attr_name):
     """Return the value of the attribute attr_name."""
     return getattr(obj, attr_name, "")
+
+
+@register.filter
+def has_any_perm(perms_for_app, model_name: str) -> bool:
+    """Return True if the user has view, change, or delete permission for
+    the given model name within an app, e.g.
+    ``perms.search|has_any_perm:"docketentry"``. Lets templates check the
+    view/change/delete permission for diferents models.
+    """
+    return any(
+        perms_for_app[f"{action}_{model_name}"]
+        for action in ("view", "change", "delete")
+    )
 
 
 @register.simple_tag

@@ -2,7 +2,8 @@
 """Automated frontend checks for CourtListener PR reviews.
 
 Runs checks on changed template and CSS files to enforce frontend
-conventions. Called by the frontend-lint GitHub Actions workflow.
+conventions, and checks that changes to vendored JS are recorded in that
+directory's README. Called by the frontend-lint GitHub Actions workflow.
 
 Input file must be in git --name-status format (STATUS\\tPATH per line).
 """
@@ -28,7 +29,8 @@ WARN = "warning"
 # Per-file skip directives
 # ---------------------------------------------------------------------------
 
-# Checks that can be skipped via {# frontend-checks-skip: ... #} comments.
+# Checks that can be skipped via frontend-checks-skip / frontend-checks-skip-line
+# directives in comment blocks, {# #} for templates and /* */ for css.
 # Only advisory/context-dependent checks belong here — security, a11y, and
 # architecture checks must stay enforced.
 SKIPPABLE_CHECKS = {
@@ -38,21 +40,46 @@ SKIPPABLE_CHECKS = {
     "check_include_in_v2",
 }
 
-_skip_directive_re = re.compile(r"\{#\s*frontend-checks-skip:\s*(.+?)\s*#\}")
+# Directives live in Django ({# #}) or CSS (/* */) comments so they work in
+# both templates and input.css.
+_skip_directive_re = re.compile(
+    r"(?:\{#|/\*)\s*frontend-checks-skip:\s*(.+?)\s*(?:#\}|\*/)"
+)
+_line_skip_directive_re = re.compile(
+    r"(?:\{#|/\*)\s*frontend-checks-skip-line:\s*(.+?)\s*(?:#\}|\*/)"
+)
+
+
+def _skippable_names(raw: str) -> set[str]:
+    """Split a comma-separated directive value, keeping only SKIPPABLE_CHECKS."""
+    return {name.strip() for name in raw.split(",")} & SKIPPABLE_CHECKS
 
 
 def _parse_skip_checks(lines: list[str]) -> set[str]:
-    """Parse ``{# frontend-checks-skip: ... #}`` comments.
+    """Parse ``frontend-checks-skip: ...`` comments.
 
     Returns the intersection of requested skips with SKIPPABLE_CHECKS,
-    so non-allowlisted checks cannot be bypassed.
+    so non-allowlisted checks cannot be bypassed. Applies to the whole file.
     """
     skip: set[str] = set()
     for line in lines:
-        m = _skip_directive_re.search(line)
-        if m:
-            skip.update(name.strip() for name in m.group(1).split(","))
-    return skip & SKIPPABLE_CHECKS
+        if m := _skip_directive_re.search(line):
+            skip |= _skippable_names(m.group(1))
+    return skip
+
+
+def _parse_line_skips(lines: list[str]) -> dict[int, set[str]]:
+    """Parse ``frontend-checks-skip-line: ...`` comments.
+
+    Returns a mapping of 1-indexed line number to the skippable checks
+    requested on that same line. Non-allowlisted checks are dropped.
+    """
+    skips: dict[int, set[str]] = {}
+    for i, line in enumerate(lines, 1):
+        if m := _line_skip_directive_re.search(line):
+            if names := _skippable_names(m.group(1)):
+                skips[i] = names
+    return skips
 
 
 # ---------------------------------------------------------------------------
@@ -62,6 +89,16 @@ def _parse_skip_checks(lines: list[str]) -> set[str]:
 
 def is_v2_template(path: str) -> bool:
     return "templates/v2_" in path and path.endswith(".html")
+
+
+def is_v2_partial(path: str) -> bool:
+    """A v2 partial rendered on its own, such as an htmx response.
+
+    Partials have no page URL and no base template, so the page-only
+    checks do not apply to them. Everything else about v2 templates does.
+    The prefix mirrors V2_PARTIALS_PREFIX in cl/lib/middleware.py.
+    """
+    return is_v2_template(path) and "templates/v2_includes/" in path
 
 
 def is_cotton_component(path: str) -> bool:
@@ -82,6 +119,24 @@ def is_legacy_template(path: str) -> bool:
 
 def is_input_css(path: str) -> bool:
     return path == "cl/assets/tailwind/input.css"
+
+
+# ---------------------------------------------------------------------------
+# Vendored JS directories
+# ---------------------------------------------------------------------------
+
+# Each directory holds upstream code and a README listing every package
+# vendored there, with its version and source.
+VENDORED_JS_DIRS = (
+    "cl/assets/static-global/js/third_party/",
+    "cl/assets/static-global/js/alpine/",
+)
+
+# Our own code inside a vendored directory; changing it needs no README entry.
+VENDORED_JS_OWN_CODE = (
+    "cl/assets/static-global/js/alpine/components/",
+    "cl/assets/static-global/js/alpine/composables/",
+)
 
 
 # ---------------------------------------------------------------------------
@@ -648,19 +703,25 @@ def check_raw_css(lines: list[str]) -> list[tuple[int, str]]:
     )
     # Looks like a CSS property declaration
     prop_re = re.compile(r"^\s*[\w-]+\s*:")
+    inline_comment_re = re.compile(r"/\*.*?\*/")
 
     in_comment = False
     for i, line in enumerate(lines, 1):
-        stripped = line.strip()
-
-        # Track block comments
-        if "/*" in stripped:
-            in_comment = True
-        if "*/" in stripped:
-            in_comment = False
-            continue
+        # Track multiline block comments (/* ... */)
         if in_comment:
-            continue
+            close_pos = line.find("*/")
+            if close_pos == -1:
+                continue  # entire line is inside comment
+            in_comment = False
+            line = line[close_pos + 2 :]
+
+        # Strip inline comments so a trailing note can't hide a declaration
+        line = inline_comment_re.sub("", line)
+        if "/*" in line:
+            in_comment = True
+            line = line[: line.index("/*")]
+
+        stripped = line.strip()
 
         # Skip empty lines and lines that are just closing braces
         if not stripped or stripped in ("{", "}", ");"):
@@ -709,10 +770,14 @@ V2_CHECKS = [
     (check_alpine_shortcuts, FAIL),
     (check_font_awesome, FAIL),
     (check_inline_xdata, FAIL),
-    (check_extends_new_base, FAIL),
     (check_bare_links, FAIL),
     (check_include_in_v2, WARN),
     (check_xdata_without_require_script, WARN),
+]
+
+# Only full pages extend a base template; partials (v2_includes/) don't.
+V2_PAGE_CHECKS = [
+    (check_extends_new_base, FAIL),
 ]
 
 COTTON_CHECKS = [
@@ -737,12 +802,18 @@ def _apply_checks(
     filepath: str,
     findings: list[Finding],
 ) -> None:
-    """Run a list of (check_fn, severity) pairs and collect findings."""
+    """Run a list of (check_fn, severity) pairs and collect findings.
+
+    Honors file-level and same-line skip directives for SKIPPABLE_CHECKS.
+    """
     skip_checks = _parse_skip_checks(lines)
+    line_skips = _parse_line_skips(lines)
     for fn, severity in checks:
         if fn.__name__ in skip_checks:
             continue
         for line_no, msg in fn(lines):
+            if fn.__name__ in line_skips.get(line_no, ()):
+                continue
             findings.append(
                 Finding(filepath, line_no, fn.__name__, severity, msg)
             )
@@ -753,7 +824,12 @@ def run_checks(
     repo_root: Path,
     file_statuses: dict[str, str],
 ) -> list[Finding]:
-    """Run all applicable checks on the given files."""
+    """Run all applicable checks on the given files.
+
+    ``changed_files`` is the subset of the diff to lint (HTML and input.css);
+    ``file_statuses`` maps every path in the diff to its git status, so checks
+    that depend on non-frontend files must look there.
+    """
     findings: list[Finding] = []
 
     # Collect v2_ templates changed in this PR (for sync notice check)
@@ -763,7 +839,8 @@ def run_checks(
     components_library_modified = any(
         f.endswith("v2_components.html") for f in changed_files
     )
-    v2_register_test_modified = V2_REGISTER_TEST_FILE in changed_files
+    # The register test is a Python file, so it is never in changed_files.
+    v2_register_test_modified = V2_REGISTER_TEST_FILE in file_statuses
 
     for filepath in changed_files:
         abs_path = repo_root / filepath
@@ -780,6 +857,9 @@ def run_checks(
 
         if is_v2_template(filepath):
             _apply_checks(V2_CHECKS, lines, filepath, findings)
+
+        if is_v2_template(filepath) and not is_v2_partial(filepath):
+            _apply_checks(V2_PAGE_CHECKS, lines, filepath, findings)
 
             status = file_statuses.get(filepath, "")
             if (
@@ -878,6 +958,68 @@ def run_checks(
             )
         )
 
+    # Deletion check: IncrementalNewTemplateMiddleware serves a v2_ template
+    # to everyone once its legacy counterpart is gone, so deleting the legacy
+    # file is a release, not a cleanup. Warning-level because v2-only pages
+    # can be intentional.
+    for legacy_path in changed_legacy_templates:
+        if file_statuses.get(legacy_path) != "D":
+            continue
+        v2_path = _swap_template_prefix(legacy_path, add_v2=True)
+        if v2_path is None or not (repo_root / v2_path).is_file():
+            continue
+        findings.append(
+            Finding(
+                legacy_path,
+                1,
+                "check_legacy_template_deleted",
+                WARN,
+                f"Legacy template deleted but its v2_ counterpart ({v2_path}) "
+                "exists; deleting it makes the v2 page live for everyone. "
+                "Confirm if this is intentional.",
+            )
+        )
+
+    return findings
+
+
+def check_vendored_js_readme(diff_paths: list[str]) -> list[Finding]:
+    """Fail when upstream files in a vendored JS directory change but that
+    directory's README doesn't.
+
+    ``diff_paths`` is every path in the diff, including the old side of a
+    rename, so moving a file into or out of a directory counts for both.
+    """
+    findings = []
+    for vendored_dir in VENDORED_JS_DIRS:
+        readme = f"{vendored_dir}README.md"
+        upstream_changes = sorted(
+            {
+                path
+                for path in diff_paths
+                if path.startswith(vendored_dir)
+                and path != readme
+                and not path.startswith(VENDORED_JS_OWN_CODE)
+            }
+        )
+        if not upstream_changes or readme in diff_paths:
+            continue
+        shown = ", ".join(
+            path.removeprefix(vendored_dir) for path in upstream_changes[:3]
+        )
+        if len(upstream_changes) > 3:
+            shown += f" and {len(upstream_changes) - 3} more"
+        findings.append(
+            Finding(
+                readme,
+                1,
+                "check_vendored_js_readme",
+                FAIL,
+                f"Upstream files in {vendored_dir} changed ({shown}) but "
+                f"{readme} did not — record each package's version and "
+                "source there",
+            )
+        )
     return findings
 
 
@@ -1032,6 +1174,7 @@ def main() -> int:
     raw = Path(args.changed_files).read_text()
 
     changed_files = []
+    diff_paths: list[str] = []
     file_statuses: dict[str, str] = {}
     for line in raw.splitlines():
         line = line.strip()
@@ -1048,6 +1191,10 @@ def main() -> int:
         path = parts[-1]
         file_statuses[path] = status
         changed_files.append(path)
+        diff_paths.append(path)
+        # A rename also removes its old path; a copy leaves it untouched.
+        if status.startswith("R") and len(parts) == 3:
+            diff_paths.append(parts[1])
 
     # Filter to relevant files
     relevant = [
@@ -1057,10 +1204,11 @@ def main() -> int:
         and not any(fnmatch.fnmatch(f, g) for g in args.skip_files)
     ]
 
-    if not relevant:
+    findings = check_vendored_js_readme(diff_paths)
+    if not relevant and not findings:
         return 0
-
-    findings = run_checks(relevant, repo_root, file_statuses)
+    if relevant:
+        findings += run_checks(relevant, repo_root, file_statuses)
 
     if not findings:
         print("All frontend checks passed.")

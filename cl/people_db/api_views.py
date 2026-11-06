@@ -1,8 +1,5 @@
 from rest_framework import viewsets
-from rest_framework.permissions import (
-    DjangoModelPermissions,
-    DjangoModelPermissionsOrAnonReadOnly,
-)
+from rest_framework.permissions import DjangoModelPermissions
 
 from cl.api.api_permissions import V3APIPermission
 from cl.api.utils import (
@@ -60,7 +57,7 @@ class PersonViewSet(LoggingMixin, DeferredFieldsMixin, viewsets.ModelViewSet):
     serializer_class = PersonSerializer
     filterset_class = PersonFilter
     permission_classes = [
-        DjangoModelPermissionsOrAnonReadOnly,
+        DjangoModelPermissions,
         V3APIPermission,
     ]
     ordering_fields = (
@@ -98,7 +95,7 @@ class PositionViewSet(
     serializer_class = PositionSerializer
     filterset_class = PositionFilter
     permission_classes = [
-        DjangoModelPermissionsOrAnonReadOnly,
+        DjangoModelPermissions,
         V3APIPermission,
     ]
     ordering_fields = (
@@ -133,7 +130,7 @@ class RetentionEventViewSet(
     serializer_class = RetentionEventSerializer
     filterset_class = RetentionEventFilter
     permission_classes = [
-        DjangoModelPermissionsOrAnonReadOnly,
+        DjangoModelPermissions,
         V3APIPermission,
     ]
     ordering_fields = ("id", "date_created", "date_modified", "date_retention")
@@ -154,7 +151,7 @@ class EducationViewSet(
     serializer_class = EducationSerializer
     filterset_class = EducationFilter
     permission_classes = [
-        DjangoModelPermissionsOrAnonReadOnly,
+        DjangoModelPermissions,
         V3APIPermission,
     ]
     ordering_fields = ("id", "date_created", "date_modified")
@@ -173,7 +170,7 @@ class SchoolViewSet(LoggingMixin, DeferredFieldsMixin, viewsets.ModelViewSet):
     serializer_class = SchoolSerializer
     filterset_class = SchoolFilter
     permission_classes = [
-        DjangoModelPermissionsOrAnonReadOnly,
+        DjangoModelPermissions,
         V3APIPermission,
     ]
     ordering_fields = ("id", "date_created", "date_modified", "name")
@@ -194,7 +191,7 @@ class PoliticalAffiliationViewSet(
     serializer_class = PoliticalAffiliationSerializer
     filterset_class = PoliticalAffiliationFilter
     permission_classes = [
-        DjangoModelPermissionsOrAnonReadOnly,
+        DjangoModelPermissions,
         V3APIPermission,
     ]
     ordering_fields = (
@@ -219,7 +216,7 @@ class SourceViewSet(LoggingMixin, DeferredFieldsMixin, viewsets.ModelViewSet):
     serializer_class = SourceSerializer
     filterset_class = SourceFilter
     permission_classes = [
-        DjangoModelPermissionsOrAnonReadOnly,
+        DjangoModelPermissions,
         V3APIPermission,
     ]
     ordering_fields = (
@@ -240,7 +237,7 @@ class ABARatingViewSet(
     serializer_class = ABARatingSerializer
     filterset_class = ABARatingFilter
     permission_classes = [
-        DjangoModelPermissionsOrAnonReadOnly,
+        DjangoModelPermissions,
         V3APIPermission,
     ]
     ordering_fields = (

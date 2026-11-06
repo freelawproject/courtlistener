@@ -62,8 +62,9 @@ class DocumentMerger[
         reporting an update gets the download re-dispatched on re-ingest."""
         return (
             self.existing is not None
-            and not self.existing.filepath_local
-            and self.existing.processing_error is None
+            and not cast(AbstractStateDocument, self.existing).filepath_local
+            and cast(AbstractStateDocument, self.existing).processing_error
+            is None
         )
 
     @override
@@ -71,7 +72,9 @@ class DocumentMerger[
         updated = super().pre_update(updated_fields)
         # This hook only runs on the update path, so `existing` is set; the
         # guard narrows the type for mypy.
-        if (existing := self.existing) is None:
+        if (
+            existing := cast(AbstractStateDocument | None, self.existing)
+        ) is None:
             return updated
         if "url" not in updated_fields:
             return updated

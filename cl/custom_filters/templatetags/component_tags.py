@@ -5,6 +5,7 @@ from django import template
 from django.conf import settings
 from django.contrib.staticfiles import finders
 from django.http import HttpRequest
+from django.middleware.csp import get_nonce
 from django.template import TemplateSyntaxError
 from django.templatetags.static import static
 from django.utils.html import format_html
@@ -121,9 +122,18 @@ def require_script(context, script_path, **kwargs):
         TemplateSyntaxError:
             - If the same script is required twice with different defer flags.
             - If an invalid value is passed to the defer flag.
+            - If called after render_required_scripts already printed the
+              registry for this request, since the script would be dropped
+              silently. In new_base.html that is the case for footer-scripts.
     """
     if "request" not in context:
         return ""
+
+    if getattr(context["request"], "_required_scripts_rendered", False):
+        raise TemplateSyntaxError(
+            f"Script '{script_path}' was required after render_required_scripts "
+            "already ran. Require it from the component that needs it."
+        )
 
     if not script_path.endswith(".js"):
         _extensionless_registry_for(context["request"]).add(script_path)
@@ -147,20 +157,30 @@ def require_script(context, script_path, **kwargs):
 def render_required_scripts(context):
     """
     Renders the required scripts for this request right before the Alpine script.
+
+    Marks the request as rendered: a require_script after this point raises
+    instead of registering a script that would never be emitted.
     """
     if "request" not in context:
         return ""
 
     _warn_about_unusable_scripts(context["request"])
+    context["request"]._required_scripts_rendered = True
 
     registry = getattr(context["request"], "_required_component_scripts", None)
     if not registry:
         return ""
 
-    nonce_attr = ""
-    nonce = getattr(context["request"], "csp_nonce", "")
-    if nonce:
-        nonce_attr = f' nonce="{nonce}"'
+    # Read the nonce off the request rather than the {{ csp_nonce }} context
+    # variable, so this keeps working in a template rendered without the csp
+    # context processor. get_nonce() is what that processor calls anyway.
+    #
+    # It hands back a lazy object that only generates the nonce once something
+    # interpolates it, and that object is falsy until then, so the test below
+    # has to be against None rather than truthiness. None itself means the CSP
+    # middleware never ran.
+    nonce = get_nonce(context["request"])
+    nonce_attr = "" if nonce is None else f' nonce="{nonce}"'
 
     pieces = []
     for path, defer_flag in registry.items():

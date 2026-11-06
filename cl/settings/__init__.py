@@ -1,5 +1,6 @@
 from .django import *
 from .misc import *
+from .project.alerts import *
 from .project.citations import *
 from .project.corpus_importer import *
 from .project.email import *
@@ -11,6 +12,7 @@ from .project.security import *
 from .project.sitemaps import *
 from .project.testing import *
 from .project.users import *
+from .third_party.allauth import *
 from .third_party.aws import *
 from .third_party.celery import *
 from .third_party.elasticsearch import *

@@ -5,17 +5,17 @@ import math
 import random
 import re
 from collections import defaultdict
-from collections.abc import Generator, Iterator, Mapping, Sequence
-from dataclasses import dataclass
+from collections.abc import Callable, Generator, Iterator, Mapping, Sequence
 from datetime import date
 from difflib import SequenceMatcher
-from typing import Any, cast
+from typing import TYPE_CHECKING, Any, cast
 from urllib.parse import urlparse
 
 from asgiref.sync import async_to_sync
 from bs4 import BeautifulSoup
 from courts_db import find_court
 from django.conf import settings
+from django.db import transaction
 from django.db.models import QuerySet
 from django.db.utils import IntegrityError
 from django.utils.timezone import now
@@ -42,6 +42,11 @@ from cl.people_db.lookup_utils import (
 )
 from cl.people_db.models import Person
 from cl.search.models import Citation, Court, Docket, Opinion, OpinionCluster
+
+if TYPE_CHECKING:
+    import numpy as np
+    from numpy import NDArray
+    from scipy.sparse import csr_matrix
 
 HYPERSCAN_TOKENIZER = HyperscanTokenizer(cache_dir=".hyperscan")
 
@@ -184,19 +189,7 @@ def is_bankruptcy_court(court_id: str) -> bool:
     return bankr_court_ids.filter(pk=court_id).exists()
 
 
-def is_appellate_court(court_id: str) -> bool:
-    """Checks if the given court_id belongs to an appellate court.
-
-    :param court_id: The unique identifier of the court.
-
-    :return: True if the court_id corresponds to an appellate court,
-        False otherwise.
-    """
-    appellate_court_ids = Court.federal_courts.appellate_courts()
-    return appellate_court_ids.filter(pk=court_id).exists()
-
-
-async def ais_appellate_court(court_id: str) -> bool:
+async def is_appellate_court(court_id: str) -> bool:
     """Checks if the given court_id belongs to an appellate court.
 
     :param court_id: The unique identifier of the court.
@@ -336,7 +329,7 @@ def compare_documents(file_characters: str, cl_characters: str) -> int:
 
 def similarity_scores(
     texts_to_compare_1: list[str], texts_to_compare_2: list[str]
-) -> list[list[float]]:
+) -> NDArray[np.float64]:
     """Get similarity scores between two sets of lists
 
     Using TF-IDF/Term Frequency-Inverse Document Frequency
@@ -353,9 +346,14 @@ def similarity_scores(
     from sklearn.metrics.pairwise import cosine_similarity
 
     # Weights the word counts by a measure of how often they appear in the
-    # documents, and it returns a sparse matrix
-    X = TfidfVectorizer().fit_transform(
-        texts_to_compare_1 + texts_to_compare_2
+    # documents, and it returns a sparse matrix. TfidfVectorizer always
+    # returns a csr_matrix, but pyrefly infers the abstract spmatrix base
+    # class, which doesn't declare __getitem__.
+    X = cast(
+        "csr_matrix",
+        TfidfVectorizer().fit_transform(
+            texts_to_compare_1 + texts_to_compare_2
+        ),
     )
 
     # Calculate cosine similarity between weight of words for each text in list
@@ -786,8 +784,11 @@ def add_citations_to_cluster(
                 )
                 continue
             try:
-                # We don't have the citation or any citation from the reporter
-                Citation.objects.create(**citation_params)
+                # We don't have the citation or any citation from the reporter.
+                # The savepoint keeps a caught IntegrityError from aborting an
+                # outer transaction.
+                with transaction.atomic():
+                    Citation.objects.create(**citation_params)
                 logger.info(
                     f"New citation: {cite} added to cluster id: {cluster_id}"
                 )
@@ -841,6 +842,8 @@ def get_opinion_text(cluster: OpinionCluster) -> str:
             opinions.append(op.html)
         elif len(op.xml_harvard) > 1:
             opinions.append(op.xml_harvard)
+        elif len(op.xml_scan) > 1:
+            opinions.append(op.xml_scan)
     op = " ".join(opinions)
     soup = BeautifulSoup(op, features="html.parser")
     return soup.getText(separator=" ", strip=True)
@@ -887,8 +890,10 @@ def winnow_case_name(case_name: str) -> set:
     # "R. L. C. R. v. L. Z. S." -> "RLCR v. LZS"
     # "J. B. v. C. E." -> "JB v. CE"
     # "County v. A. D. B. County" -> "County v. ADB County"
+    # Only runs of single letters are joined, so names printed in capitals
+    # like "JAMES SMITH v. THE STATE" keep their words
     case_name = re.sub(
-        r"\b[A-Z][A-Z\.\s]*[A-Z]\b\.?",
+        r"\b[A-Z]\b(?:\.?\s*\b[A-Z]\b)+\.?",
         lambda m: m.group().replace(".", "").replace(" ", ""),
         case_name,
     )
@@ -1063,7 +1068,10 @@ def cosine_similarity_too_different(
 
     similarities = []
     for title in [case_name_full, case_name_abbreviation]:
-        similarity = get_cosine_similarity(title, case.case_name)
+        # Lowercased: scrapers can store names in capitals
+        similarity = get_cosine_similarity(
+            title.lower(), case.case_name.lower()
+        )
         similarities.append(similarity)
     max_similarity = max(similarities)
 
@@ -1103,21 +1111,23 @@ def match_based_text(
     file_characters: str,
     docket_number: str,
     case_name_full: str,
-    possible_cases: QuerySet,
+    possible_clusters: QuerySet[OpinionCluster],
     case_name_abbreviation: str,
     citation: FullCaseCitation,
 ) -> OpinionCluster | None:
     """Compare CL text to file content to establish duplicates
 
     :param file_characters: stripped characters to compare from file/source
-    :param possible_cases: List of opinions to check against
+    :param possible_clusters: Candidate clusters to compare against; the
+        first one that passes every check is returned
     :param docket_number: The docket number
     :param case_name_full: The full case name
     :param case_name_abbreviation: The case name abbreviation
     :param citation: The citation obtained from file/source to compare
     :return: OpinionCluster or None
     """
-    for case in possible_cases:
+    # The docket is read by the content check and by callers of the match
+    for case in possible_clusters.select_related("docket"):
         cl_case_body = get_opinion_text(case)
         cl_characters = clean_body_content(cl_case_body)
 
@@ -1125,16 +1135,41 @@ def match_based_text(
             logger.warning(f"Empty opinion in cluster id: {case.id}")
             continue
 
-        case_and_texts = [case, file_characters, cl_characters]
-        case_and_texts_and_docket = case_and_texts + [docket_number]
-        case_and_titles = [case, case_name_full, case_name_abbreviation]
-        if (
-            length_too_different(*case_and_texts)
-            or has_too_similar_citation(case, citation)
-            or case_names_dont_overlap(*case_and_titles)
-            or cosine_similarity_too_different(*case_and_titles)
-            or content_too_different(*case_and_texts_and_docket)
-        ):
+        # Checked in this order, cheapest first, until one fails
+        checks: list[tuple[str, Callable[[], bool]]] = [
+            (
+                "text length",
+                lambda: length_too_different(
+                    case, file_characters, cl_characters
+                ),
+            ),
+            ("citation", lambda: has_too_similar_citation(case, citation)),
+            (
+                "case name overlap",
+                lambda: case_names_dont_overlap(
+                    case, case_name_full, case_name_abbreviation
+                ),
+            ),
+            (
+                "case name similarity",
+                lambda: cosine_similarity_too_different(
+                    case, case_name_full, case_name_abbreviation
+                ),
+            ),
+            (
+                "content",
+                lambda: content_too_different(
+                    case, file_characters, cl_characters, docket_number
+                ),
+            ),
+        ]
+        if failed := next((name for name, check in checks if check()), None):
+            # Helps tune the matching, so duplicates aren't created
+            logger.debug(
+                "Cluster %s is not a match: the %s check failed",
+                case.id,
+                failed,
+            )
             continue
         return case
     return None
@@ -1189,7 +1224,7 @@ def compute_binary_probe_jitter(
     """
 
     if max_probe is None:
-        max_probe = settings.IQUERY_MAX_PROBE
+        max_probe = cast(int, settings.IQUERY_MAX_PROBE)
     # The jitter will be a random value between 1 and half of max_probe.
     return random.randint(1, round(max_probe * 0.5)) if not testing else 0
 
@@ -1224,7 +1259,7 @@ def compute_next_binary_probe(
     # the detection of new cases once courts catch up.
     jitter = 0 if iteration == 1 else jitter
     if max_probe is None:
-        max_probe = settings.IQUERY_MAX_PROBE
+        max_probe = cast(int, settings.IQUERY_MAX_PROBE)
     cap_iteration = int(math.log2(max_probe)) + 1
     if iteration < cap_iteration:
         offset = 2 ** (iteration - 1)
@@ -1364,14 +1399,6 @@ def create_docket_entry_sequence_numbers(
         date_counts[entry_date] = i + 1
 
     return sequence_numbers
-
-
-@dataclass
-class DownloadPDFResult:
-    """Result of a PDF download operation."""
-
-    success: bool
-    sha1: str | None = None
 
 
 def texas_js_court_id_to_court_id(js_court_id: str) -> str | None:
