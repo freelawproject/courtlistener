@@ -3,3 +3,4 @@ DJANGO_SETTINGS_MODULE = "cl.settings"
 python_classes = ["*Bench"]
 python_files = ["bench_*.py"]
 python_functions = ["bench_*"]
+addopts = ["--reuse-db"]
