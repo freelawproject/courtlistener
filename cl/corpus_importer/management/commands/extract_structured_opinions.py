@@ -31,9 +31,13 @@ def get_opinions_to_extract(
 ) -> QuerySet[Opinion]:
     """Find scraped opinions that Centralia's structured extraction can read.
 
-    Only clusters scraped from a court website, that hold exactly one
-    opinion with a stored PDF, are returned. Clusters with several opinions
-    are not supported yet.
+    Only clusters whose only source is a court website scraper, that hold
+    exactly one opinion with a stored PDF, are returned. Clusters with
+    several opinions are not supported yet. Opinions with Harvard, scan,
+    anon 2020, Columbia or Lawbox content are left out too: those fields
+    outrank `html` for display and citation finding, so the extracted HTML
+    would never be shown, while the opinion's curated type and author would
+    still be overwritten.
 
     :param courts: The court ids to read. Should be a subset of
     CENTRALIA_ENABLED_COURTS.
@@ -47,7 +51,7 @@ def get_opinions_to_extract(
     clusters = (
         OpinionCluster.objects.filter(
             docket__court_id__in=courts,
-            source__contains=ClusterSources.COURT_WEBSITE,
+            source=ClusterSources.COURT_WEBSITE,
         )
         .annotate(opinion_count=Count("sub_opinions"))
         .filter(opinion_count=1)
@@ -60,7 +64,14 @@ def get_opinions_to_extract(
         clusters = clusters.filter(date_filed__lte=date_filed_lte)
 
     opinions = (
-        Opinion.objects.filter(cluster_id__in=clusters.values("pk"))
+        Opinion.objects.filter(
+            cluster_id__in=clusters.values("pk"),
+            xml_harvard="",
+            xml_scan="",
+            html_anon_2020="",
+            html_columbia="",
+            html_lawbox="",
+        )
         .exclude(local_path="")
         .select_related("cluster__docket")
         .order_by("cluster_id")
@@ -187,8 +198,9 @@ class Command(VerboseCommand):
     stores its HTML on the cluster's only opinion and queues a task to find
     its citations. See extract_structured_opinion.
 
-    Only courts in CENTRALIA_ENABLED_COURTS, and clusters scraped from a
-    court website with exactly one opinion, are processed.
+    Only courts in CENTRALIA_ENABLED_COURTS, and clusters whose only source
+    is a court website scraper, with exactly one opinion and no Harvard,
+    scan, anon 2020, Columbia or Lawbox content, are processed.
 
     Use --dry-run with --compare on a small sample first: it calls Centralia
     and reports what would be ingested, with character and citation counts
