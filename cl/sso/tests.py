@@ -139,6 +139,34 @@ class AllauthRoutingTest(SimpleTestCase):
         )
 
 
+class SSORateLimitTest(TestCase):
+    """The unauthenticated SSO URLs are rate limited."""
+
+    def test_sso_urls_are_rate_limited(self) -> None:
+        """Do the IdP-facing URLs refuse requests over the limit?
+
+        Limits are off under test, so this pretends every request is over.
+        """
+        for method, name, kwargs in (
+            ("get", "sso_oidc_initiate", {"provider_id": "acme"}),
+            ("post", "openid_connect_login", {"provider_id": "acme"}),
+            ("get", "openid_connect_callback", {"provider_id": "acme"}),
+            ("post", "saml_login", {"organization_slug": "acme"}),
+            ("post", "saml_acs", {"organization_slug": "acme"}),
+            ("post", "saml_finish_acs", {"organization_slug": "acme"}),
+            ("get", "saml_metadata", {"organization_slug": "acme"}),
+        ):
+            with (
+                self.subTest(name=name),
+                mock.patch(
+                    "django_ratelimit.decorators.is_ratelimited",
+                    return_value=True,
+                ),
+            ):
+                r = getattr(self.client, method)(reverse(name, kwargs=kwargs))
+                self.assertEqual(r.status_code, 429)
+
+
 class AllauthAliasTest(TestCase):
     """The allauth URL names its SSO flow redirects to."""
 

@@ -8,7 +8,10 @@ from django.views.decorators.cache import never_cache
 from django.views.decorators.csrf import csrf_exempt
 from django.views.decorators.http import require_http_methods
 
-from cl.lib.ratelimiter import ratelimiter_unsafe_10_per_m
+from cl.lib.ratelimiter import (
+    ratelimiter_all_10_per_m,
+    ratelimiter_unsafe_10_per_m,
+)
 from cl.lib.url_utils import (
     get_redirect_or_abort,
     is_safe_url,
@@ -77,6 +80,7 @@ def normalize_issuer(url: str) -> str:
 # nosemgrep: python.django.security.audit.csrf-exempt.no-csrf-exempt
 @csrf_exempt
 @never_cache
+@ratelimiter_all_10_per_m
 @require_http_methods(["GET", "POST"])
 def oidc_initiate_login(
     request: HttpRequest, provider_id: str

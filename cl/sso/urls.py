@@ -1,9 +1,32 @@
 from allauth.socialaccount import views as socialaccount_views
 from allauth.urls import build_provider_urlpatterns
-from django.urls import include, path
+from django.urls import URLPattern, URLResolver, include, path
 from django.views.generic import RedirectView
 
+from cl.lib.ratelimiter import ratelimiter_all_10_per_m
 from cl.sso import views
+
+
+def rate_limited(
+    patterns: list[URLPattern | URLResolver],
+) -> list[URLPattern | URLResolver]:
+    """Put a per-IP limit on every view in a list of URL patterns.
+
+    For allauth's provider URLs, which are unauthenticated and, for SAML's
+    ACS, CSRF-exempt, and which store state in the session before anything
+    is validated. The limit counts every method, since the login callbacks
+    are GETs.
+
+    :param patterns: URL patterns, nested includes too. Changed in place.
+    :return: The same patterns.
+    """
+    for pattern in patterns:
+        if isinstance(pattern, URLResolver):
+            rate_limited(pattern.url_patterns)
+        else:
+            pattern.callback = ratelimiter_all_10_per_m(pattern.callback)
+    return patterns
+
 
 # Only the SSO parts of allauth are routed. allauth.urls is deliberately not
 # included: it would also mount allauth's own login, signup and password
@@ -47,7 +70,7 @@ urlpatterns = [
                     views.oidc_initiate_login,
                     name="sso_oidc_initiate",
                 ),
-                *build_provider_urlpatterns(),
+                *rate_limited(build_provider_urlpatterns()),
             ]
         ),
     ),
