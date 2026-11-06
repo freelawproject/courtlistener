@@ -1,4 +1,5 @@
 import csv
+import html
 import logging
 import traceback
 from collections.abc import Iterable
@@ -705,10 +706,12 @@ def build_idb_rows(idb_data: FjcIntegratedDatabase) -> list[IdbRow]:
 
 class PartyFirm(TypedDict):
     """One firm of an attorney on the Parties tab, with its mailing address
-    as one line per address part that is set."""
+    as one line per address part that is set. label names the firm in its
+    edit link: the name, or "firm <pk>" for a firm stored without one."""
 
     pk: int
     name: str
+    label: str
     address_lines: list[str]
 
 
@@ -771,7 +774,9 @@ def build_party_groups(party_types: Iterable[PartyType]) -> list[PartyGroup]:
     party_types must be ordered by type name and carry the view's prefetches:
     the party's roles on this docket with their attorney and the attorney's
     firms_in_docket, plus the criminal counts and complaints. Attorneys are
-    listed by name; parties keep the order they come in.
+    listed by name; parties keep the order they come in. Party, attorney and
+    firm names are HTML-unescaped, since PACER stores entities such as &amp;
+    in them.
     """
     none = "None"
 
@@ -801,14 +806,16 @@ def build_party_groups(party_types: Iterable[PartyType]) -> list[PartyGroup]:
             if attorney.pk not in by_attorney:
                 by_attorney[attorney.pk] = {
                     "pk": attorney.pk,
-                    "name": attorney.name,
+                    "name": html.unescape(attorney.name),
                     "phone": attorney.phone,
                     "fax": attorney.fax,
                     "roles": [],
                     "firms": [
                         {
                             "pk": firm.pk,
-                            "name": firm.name,
+                            "name": html.unescape(firm.name),
+                            "label": html.unescape(firm.name)
+                            or f"firm {firm.pk}",
                             "address_lines": address_lines(firm),
                         }
                         # Set by the view's prefetch to_attr.
@@ -865,7 +872,7 @@ def build_party_groups(party_types: Iterable[PartyType]) -> list[PartyGroup]:
         party = party_type.party
         item: PartyItem = {
             "pk": party.pk,
-            "name": party.name,
+            "name": html.unescape(party.name),
             "date_terminated": (
                 date_format(party_type.date_terminated)
                 if party_type.date_terminated

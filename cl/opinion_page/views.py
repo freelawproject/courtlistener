@@ -95,7 +95,6 @@ from cl.opinion_page.forms import (
     TennWorkCompClUploadForm,
 )
 from cl.opinion_page.utils import (
-    CoreDocketDataDict,
     build_idb_rows,
     build_party_groups,
     core_docket_data,
@@ -470,11 +469,8 @@ async def view_parties(
     docket_id: int,
     slug: str,
 ) -> HttpResponse:
-    """Show the parties and attorneys tab on the docket.
-
-    Routes on the new-design flag: the v2 tab gets every party at once,
-    however many there are, while the legacy tab keeps its pagination.
-    """
+    """Show the parties and attorneys tab on the docket, 1,000 party types
+    per page."""
 
     docket, context = await core_docket_data(request, docket_id)
     # We work with this data at the level of party_types so that we can group
@@ -508,38 +504,6 @@ async def view_parties(
         .order_by("name", "party__name")
     )
 
-    # The flag check matches the template middleware's.
-    if not await sync_to_async(waffle.flag_is_active)(
-        request, "use_new_design"
-    ):
-        return await _view_parties_legacy(
-            request, docket, context, party_types
-        )
-
-    return TemplateResponse(
-        request,
-        "docket_parties.html",
-        context
-        | {
-            "party_groups": await sync_to_async(build_party_groups)(
-                party_types
-            ),
-        },
-    )
-
-
-async def _view_parties_legacy(
-    request: HttpRequest,
-    docket: Docket,
-    context: CoreDocketDataDict,
-    party_types: QuerySet[PartyType],
-) -> HttpResponse:
-    """Show the legacy parties and attorneys tab, paginated.
-
-    TODO: Remove once new design is completely rolled out, together with
-    the router in view_parties and the pager in docket_parties.html.
-    """
-
     page = request.GET.get("page", 1)
 
     @sync_to_async
@@ -555,15 +519,19 @@ async def _view_parties_legacy(
             return paginator.page(paginator.num_pages)
 
     party_types_paginator = await paginate_parties(party_types, page)
-    parties: dict[str, list] = {}
     # Page.object_list is typed as _SupportsPagination, but here it is the
     # sliced QuerySet, which supports async iteration.
-    async for party_type in cast(
-        QuerySet[PartyType], party_types_paginator.object_list
-    ):
-        if party_type.name not in parties:
-            parties[party_type.name] = []
-        parties[party_type.name].append(party_type)
+    party_types_on_page = [
+        party_type
+        async for party_type in cast(
+            QuerySet[PartyType], party_types_paginator.object_list
+        )
+    ]
+    # TODO: Remove the legacy parties dict once new design is completely
+    # rolled out.
+    parties: dict[str, list] = {}
+    for party_type in party_types_on_page:
+        parties.setdefault(party_type.name, []).append(party_type)
 
     return TemplateResponse(
         request,
@@ -571,6 +539,9 @@ async def _view_parties_legacy(
         context
         | {
             "parties": parties,
+            "party_groups": await sync_to_async(build_party_groups)(
+                party_types_on_page
+            ),
             "parties_paginator": party_types_paginator,
             "docket_entries": await docket.docket_entries.aexists(),
         },

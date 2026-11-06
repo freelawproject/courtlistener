@@ -69,7 +69,7 @@
                                 <p>
                                   {{ firm.name }}
                                   {% if perms.people_db.change_attorneyorganization %}
-                                    <a href="{% url 'admin:people_db_attorneyorganization_change' firm.pk %}" class="inline-block align-middle ml-1 text-greyscale-500 hover:text-greyscale-700 focus-visible:ring-2 focus-visible:ring-primary-400 focus-visible:outline-none rounded" aria-label="Edit {{ firm.name|default:'firm' }}" title="Edit {{ firm.name|default:'firm' }}">{% svg "edit" class="w-4 h-4" aria_hidden="true" %}</a>
+                                    <a href="{% url 'admin:people_db_attorneyorganization_change' firm.pk %}" class="inline-block align-middle ml-1 text-greyscale-500 hover:text-greyscale-700 focus-visible:ring-2 focus-visible:ring-primary-400 focus-visible:outline-none rounded" aria-label="Edit {{ firm.label }}" title="Edit {{ firm.label }}">{% svg "edit" class="w-4 h-4" aria_hidden="true" %}</a>
                                   {% endif %}
                                 </p>
                               {% endif %}
@@ -121,6 +121,14 @@
         </section>
       {% endfor %}
       </div>
+
+      <c-pagination
+        :page_obj="parties_paginator"
+        show_first
+        show_previous
+        show_page_indicator
+        show_next
+      />
     </c-docket-page>
   </div>
 </div>
