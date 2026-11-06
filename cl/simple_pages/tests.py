@@ -13,6 +13,9 @@ from lxml.html import fromstring
 from waffle.testutils import override_flag
 
 from cl.lib.test_helpers import SimpleUserDataMixin
+from cl.people_db.factories import PartyFactory, PartyTypeFactory
+from cl.search.factories import CourtFactory, DocketFactory
+from cl.search.models import Docket
 from cl.simple_pages.forms import ContactForm
 from cl.simple_pages.sitemap import SimpleSitemap
 from cl.tests.cases import SimpleTestCase, TestCase
@@ -401,14 +404,37 @@ class V2PagesRegisterTest(PageLoadTestMixin, SimpleUserDataMixin, TestCase):
     tests in cl/search/tests/test_v2_pages.py.
     """
 
-    V2_PAGES: list[tuple[dict[str, Any], str]] = [
-        # Help pages — (reverse_param, expected v2 template)
-        ({"viewname": "help_home"}, "v2_help/index.html"),
-        # Info pages
-        ({"viewname": "components"}, "v2_components.html"),
-        # API pages
-        ({"viewname": "court_index"}, "v2_jurisdictions.html"),
-    ]
+    # Built in setUpTestData: the docket tabs reverse against a docket
+    # that has to exist first.
+    V2_PAGES: list[tuple[dict[str, Any], str]]
+
+    @classmethod
+    def setUpTestData(cls) -> None:
+        """Creates the records the registered pages need and lists the
+        pages as (reverse_param, expected v2 template)."""
+        docket = DocketFactory(
+            court=CourtFactory(id="canb", jurisdiction="FB"),
+            source=Docket.RECAP,
+        )
+        PartyTypeFactory(
+            docket=docket,
+            party=PartyFactory(name="Test Plaintiff Inc.", docket=docket),
+            name="Plaintiff",
+        )
+        docket_kwargs = {"docket_id": docket.pk, "slug": docket.slug}
+        cls.V2_PAGES = [
+            # Help pages
+            ({"viewname": "help_home"}, "v2_help/index.html"),
+            # Info pages
+            ({"viewname": "components"}, "v2_components.html"),
+            # API pages
+            ({"viewname": "court_index"}, "v2_jurisdictions.html"),
+            # Docket tabs
+            (
+                {"viewname": "docket_parties", "kwargs": docket_kwargs},
+                "v2_docket_parties.html",
+            ),
+        ]
 
     @staticmethod
     def _get_legacy_counterpart(v2_template: str) -> str | None:
