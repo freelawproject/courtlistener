@@ -783,7 +783,7 @@ class SSOStartViewTest(SSOFixtureMixin, TestCase):
     def test_get(self) -> None:
         """Does the page show the address form?"""
         r = self.client.get(reverse("sso_start"))
-        self.assertContains(r, "Sign In with Single Sign-On")
+        self.assertContains(r, "Continue with SSO")
 
     def test_known_domain_continues_to_idp(self) -> None:
         """Does an SSO domain lead to a button that POSTs to the IdP login?"""
