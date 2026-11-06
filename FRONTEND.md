@@ -89,6 +89,7 @@ Templates render; they SHOULD know as little as possible about the data they sho
 - Use `TextInput` for standard text-input styling and `autocomplete="off"`
 - Use `Select` for standard select styling, with `input_text=True` when the select requires the `input-text` component class
 - Keep field-specific attributes, such as `placeholder`, in the form field declaration
+- Tailwind scans only `forms_v2.py` modules for class names, so any widget class string for the new stack MUST live in one — otherwise the class silently drops out of the build
 
 ## Alpine.js
 
@@ -216,8 +217,8 @@ To hide an "install RECAP" call to action from users who have the extension, mar
 ## Links
 
 - All `<a>` tags in new templates MUST have a `class` attribute
-- Internal links: `text-primary-600`
-- External links: `underline`
+- Internal links: `links`
+- External links: `links-external`, which adds the external-link icon (both classes are defined in `input.css`)
 - `target="_blank"` MUST include `rel="noopener"` or `rel="noreferrer"` (`noreferrer` alone is sufficient — it implies `noopener`)
 - Do NOT add `nofollow` to editorial links — `nofollow` is for user-generated content and for links into pages we don't want crawled: `noindex` pages (search results, anything rendered with `private=True`) and file downloads, e.g. the per-court search links on the jurisdictions page or the document links in docket entries
 
