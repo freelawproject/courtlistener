@@ -1,4 +1,5 @@
 from collections import Counter
+from datetime import date
 from typing import Any
 
 import httpx
@@ -24,6 +25,9 @@ from cl.search.models import Opinion, OpinionCluster
 def get_opinions_to_extract(
     courts: list[str],
     cluster_ids: list[int] | None = None,
+    date_filed_gte: date | None = None,
+    date_filed_lte: date | None = None,
+    limit: int | None = None,
 ) -> QuerySet[Opinion]:
     """Find scraped opinions that Centralia's structured extraction can read.
 
@@ -34,6 +38,9 @@ def get_opinions_to_extract(
     :param courts: The court ids to read. Should be a subset of
     CENTRALIA_ENABLED_COURTS.
     :param cluster_ids: If given, only these clusters are considered.
+    :param date_filed_gte: If given, only clusters filed on or after it.
+    :param date_filed_lte: If given, only clusters filed on or before it.
+    :param limit: If given, the maximum number of opinions returned.
     :return: The opinions, with their cluster and docket selected, ordered
     by cluster id.
     """
@@ -47,13 +54,20 @@ def get_opinions_to_extract(
     )
     if cluster_ids:
         clusters = clusters.filter(pk__in=cluster_ids)
+    if date_filed_gte:
+        clusters = clusters.filter(date_filed__gte=date_filed_gte)
+    if date_filed_lte:
+        clusters = clusters.filter(date_filed__lte=date_filed_lte)
 
-    return (
+    opinions = (
         Opinion.objects.filter(cluster_id__in=clusters.values("pk"))
         .exclude(local_path="")
         .select_related("cluster__docket")
         .order_by("cluster_id")
     )
+    if limit:
+        opinions = opinions[:limit]
+    return opinions
 
 
 def extract_structured_opinion(
@@ -193,6 +207,23 @@ class Command(VerboseCommand):
             "still apply.",
         )
         parser.add_argument(
+            "--date-filed-gte",
+            type=date.fromisoformat,
+            help="Only process clusters filed on or after this YYYY-MM-DD "
+            "date.",
+        )
+        parser.add_argument(
+            "--date-filed-lte",
+            type=date.fromisoformat,
+            help="Only process clusters filed on or before this YYYY-MM-DD "
+            "date.",
+        )
+        parser.add_argument(
+            "--limit",
+            type=int,
+            help="The maximum number of clusters to process.",
+        )
+        parser.add_argument(
             "--dry-run",
             action="store_true",
             default=False,
@@ -211,15 +242,29 @@ class Command(VerboseCommand):
             help="The celery queue where the citation-finding tasks should "
             "be processed.",
         )
+        parser.add_argument(
+            "--chunk-size",
+            type=int,
+            default=500,
+            help="How many opinions to fetch from the database at a time.",
+        )
 
     def handle(self, *args: Any, **options: Any) -> None:
         super().handle(*args, **options)
+        if options["limit"] is not None and options["limit"] < 1:
+            raise CommandError("--limit must be a positive number.")
+        if options["chunk_size"] < 1:
+            raise CommandError("--chunk-size must be a positive number.")
+
         opinions = get_opinions_to_extract(
             courts=options["courts"],
             cluster_ids=options["cluster_ids"],
+            date_filed_gte=options["date_filed_gte"],
+            date_filed_lte=options["date_filed_lte"],
+            limit=options["limit"],
         )
         results: list[dict[str, Any]] = []
-        for opinion in opinions.iterator():
+        for opinion in opinions.iterator(chunk_size=options["chunk_size"]):
             result = extract_structured_opinion(
                 opinion,
                 allow_pending=options["allow_pending"],
