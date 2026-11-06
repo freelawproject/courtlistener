@@ -6837,6 +6837,29 @@ class ESDocketSourcesTest(TestCase):
             if source.metadata_model is not None:
                 self.assertIs(SOURCE_BY_MODEL[source.metadata_model], source)
 
+    def test_sources_meet_the_shared_indexing_assumptions(self) -> None:
+        """Names and child _id prefixes must be unique, each prefix must
+        exist on ES_CHILD_ID, and each document must reach its Docket
+        through docket_entry, as bulk indexing routes children that way."""
+        names = [source.name for source in ALL_ES_SOURCES]
+        self.assertEqual(len(names), len(set(names)))
+        # Compare the generated ids, not the property names: two properties
+        # returning the same prefix would overwrite each other in ES.
+        child_ids = [
+            getattr(ES_CHILD_ID(1), source.child_id_property)
+            for source in ALL_ES_SOURCES
+        ]
+        self.assertEqual(len(child_ids), len(set(child_ids)))
+        for source in ALL_ES_SOURCES:
+            with self.subTest(source=source.name):
+                entry_model = source.document_model._meta.get_field(
+                    "docket_entry"
+                ).related_model
+                self.assertIs(
+                    entry_model._meta.get_field("docket").related_model,
+                    Docket,
+                )
+
     def test_docket_belongs_distinguishes_recap_from_scotus(self) -> None:
         """Each source's docket_belongs checks the field it actually
         relies on: Docket.source for RECAP, the _index_in_es flag or
