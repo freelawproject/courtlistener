@@ -105,7 +105,7 @@
     {#  Date After  #}
     {% if split and not relative %}
     <div class="flex flex-col gap-1.5">
-      <label x-bind:for="calendarAfterInputId" class="text-sm font-medium text-greyscale-600">{{ label }}</label>
+      <label x-bind:for="calendarAfterInputId" class="text-sm font-medium text-greyscale-600">{{ label }}<span class="sr-only"> in format MM/DD/YYYY</span></label>
     {% endif %}
     <div data-date="after" x-on:click="openDatePicker" class="focus-container input-text flex justify-stretch items-stretch gap-2">
       <button
