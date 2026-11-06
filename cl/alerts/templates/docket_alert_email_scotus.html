@@ -4,7 +4,7 @@
 {% block preheader %}
       {% for de in new_des %}
         {% if forloop.first %}
-          {% for doc in de.scotusdocument_set.all %}
+          {% for doc in de.scotus_documents.all %}
             {% if forloop.first %}
               {% if doc.description %}
                 {{ doc.description|safe }}
@@ -20,7 +20,7 @@
 
 {% block rows %}
       {% for de in new_des %}
-        {% for doc in de.scotusdocument_set.all %}
+        {% for doc in de.scotus_documents.all %}
           <tr>
             <td style="text-align: center">
               <a href="https://www.courtlistener.com{% if doc.get_absolute_url %}{{ doc.get_absolute_url }}{% else %}{{ docket.get_absolute_url }}#minute-entry-{{ de.pk }}{% endif %}">
