@@ -14,6 +14,7 @@ import argparse
 import fnmatch
 import re
 import sys
+from collections.abc import Callable
 from dataclasses import dataclass
 from pathlib import Path
 
@@ -80,6 +81,45 @@ def _parse_line_skips(lines: list[str]) -> dict[int, set[str]]:
             if names := _skippable_names(m.group(1)):
                 skips[i] = names
     return skips
+
+
+# ---------------------------------------------------------------------------
+# <c-code> blocks
+# ---------------------------------------------------------------------------
+
+# A check over the lines of one file, returning (line number, message) pairs.
+type FileCheck = Callable[[list[str]], list[tuple[int, str]]]
+
+_code_block_re = re.compile(
+    r"(<c-code\b[^>]*(?<!/)>)(.*?)(</c-code>)", re.DOTALL
+)
+_checks_inside_code_blocks: set[FileCheck] = set()
+
+
+def also_checks_inside_code_blocks(check: FileCheck) -> FileCheck:
+    """Hand a check the file as written, ``<c-code>`` blocks included.
+
+    A check normally receives the file with the content of every
+    ``<c-code>`` block emptied, because a block shows markup as text.
+    Django tags inside a block still run, so a check that looks for
+    template tags takes this decorator. A check that looks for markup
+    must not.
+    """
+    _checks_inside_code_blocks.add(check)
+    return check
+
+
+def _blank_code_blocks(lines: list[str]) -> list[str]:
+    """Return ``lines`` with the content of every ``<c-code>`` block emptied.
+
+    The opening and closing tags stay and the line count is preserved, so
+    findings on the rest of the file keep their line numbers.
+    """
+    content = _code_block_re.sub(
+        lambda m: m.group(1) + "\n" * m.group(2).count("\n") + m.group(3),
+        "\n".join(lines),
+    )
+    return content.split("\n")
 
 
 # ---------------------------------------------------------------------------
@@ -620,6 +660,7 @@ def check_hardcoded_ids(lines: list[str]) -> list[tuple[int, str]]:
     return results
 
 
+@also_checks_inside_code_blocks
 def check_include_in_v2(lines: list[str]) -> list[tuple[int, str]]:
     """Flag {% include %} in v2_ templates."""
     results = []
@@ -799,19 +840,25 @@ CSS_CHECKS = [
 def _apply_checks(
     checks: list[tuple],
     lines: list[str],
+    raw_lines: list[str],
     filepath: str,
     findings: list[Finding],
 ) -> None:
     """Run a list of (check_fn, severity) pairs and collect findings.
 
-    Honors file-level and same-line skip directives for SKIPPABLE_CHECKS.
+    ``lines`` has the content of ``<c-code>`` blocks emptied and is what a
+    check normally sees; ``raw_lines`` is the file as written, handed only
+    to checks marked with ``also_checks_inside_code_blocks``. Honors
+    file-level and same-line skip directives for SKIPPABLE_CHECKS, read
+    from ``raw_lines`` so a directive inside a block still counts.
     """
-    skip_checks = _parse_skip_checks(lines)
-    line_skips = _parse_line_skips(lines)
+    skip_checks = _parse_skip_checks(raw_lines)
+    line_skips = _parse_line_skips(raw_lines)
     for fn, severity in checks:
         if fn.__name__ in skip_checks:
             continue
-        for line_no, msg in fn(lines):
+        check_lines = raw_lines if fn in _checks_inside_code_blocks else lines
+        for line_no, msg in fn(check_lines):
             if fn.__name__ in line_skips.get(line_no, ()):
                 continue
             findings.append(
@@ -848,18 +895,19 @@ def run_checks(
             continue
 
         try:
-            lines = abs_path.read_text(encoding="utf-8").splitlines()
+            raw_lines = abs_path.read_text(encoding="utf-8").splitlines()
         except (OSError, UnicodeDecodeError):
             continue
+        lines = _blank_code_blocks(raw_lines)
 
         if filepath.endswith(".html"):
-            _apply_checks(HTML_CHECKS, lines, filepath, findings)
+            _apply_checks(HTML_CHECKS, lines, raw_lines, filepath, findings)
 
         if is_v2_template(filepath):
-            _apply_checks(V2_CHECKS, lines, filepath, findings)
+            _apply_checks(V2_CHECKS, lines, raw_lines, filepath, findings)
 
         if is_v2_template(filepath) and not is_v2_partial(filepath):
-            _apply_checks(V2_PAGE_CHECKS, lines, filepath, findings)
+            _apply_checks(V2_PAGE_CHECKS, lines, raw_lines, filepath, findings)
 
             status = file_statuses.get(filepath, "")
             if (
@@ -878,7 +926,7 @@ def run_checks(
                 )
 
         if is_cotton_component(filepath):
-            _apply_checks(COTTON_CHECKS, lines, filepath, findings)
+            _apply_checks(COTTON_CHECKS, lines, raw_lines, filepath, findings)
 
             status = file_statuses.get(filepath, "")
             if (
@@ -896,10 +944,10 @@ def run_checks(
                 )
 
         if is_legacy_template(filepath):
-            _apply_checks(LEGACY_CHECKS, lines, filepath, findings)
+            _apply_checks(LEGACY_CHECKS, lines, raw_lines, filepath, findings)
 
         if is_input_css(filepath):
-            _apply_checks(CSS_CHECKS, lines, filepath, findings)
+            _apply_checks(CSS_CHECKS, lines, raw_lines, filepath, findings)
 
     # Check sync notices: for each v2_ template in the PR, make sure
     # the legacy counterpart (if it exists on disk) has the sync notice.
