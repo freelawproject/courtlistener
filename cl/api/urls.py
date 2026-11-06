@@ -48,6 +48,11 @@ router.register(
     search_views.OpinionsCitedViewSet,
     basename="opinionscited",
 )
+router.register(
+    r"parentheticals",
+    search_views.ParentheticalViewSet,
+    basename="parenthetical",
+)
 router.register(r"search", search_views.SearchViewSet, basename="search")
 router.register(r"tag", search_views.TagViewSet, basename="tag")
 

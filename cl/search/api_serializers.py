@@ -51,6 +51,8 @@ from cl.search.models import (
     OpinionCluster,
     OpinionsCited,
     OriginatingCourtInformation,
+    Parenthetical,
+    ParentheticalGroup,
     RECAPDocument,
     Tag,
 )
@@ -272,6 +274,96 @@ class OpinionsCitedSerializer(
 
     class Meta:
         model = OpinionsCited
+        fields = "__all__"
+
+
+class ParentheticalGroupSerializer(
+    DynamicFieldsMixin,
+    HyperlinkedModelSerializerWithId,
+):
+    """Serialize a ParentheticalGroup for embedding inside a Parenthetical.
+
+    Exposes the group's aggregate metadata (score, size) and a link to the
+    opinion the group describes. Group rows are only present when they have
+    already been computed (at ingestion or by the web UI); the API never
+    computes them on demand.
+    """
+
+    opinion_id = serializers.ReadOnlyField()
+    opinion = serializers.HyperlinkedRelatedField(
+        many=False,
+        view_name="opinion-detail",
+        read_only=True,
+        style={"base_template": "input.html"},
+    )
+
+    class Meta:
+        model = ParentheticalGroup
+        fields = ["id", "opinion_id", "opinion", "score", "size"]
+
+
+class ParentheticalSerializer(
+    RetrieveFilteredFieldsMixin,
+    DynamicFieldsMixin,
+    HyperlinkedModelSerializerWithId,
+):
+    """Serialize a Parenthetical with links to both opinions and embedded
+    group context.
+
+    The explicit ``HyperlinkedRelatedField`` declarations mirror
+    ``OpinionsCitedSerializer``: without them DRF issues a query that pulls
+    back every Opinion. ``group`` is embedded so a client gets the grouping
+    context in the same response, avoiding a follow-up request per row.
+    """
+
+    absolute_url = serializers.SerializerMethodField()
+
+    def get_absolute_url(self, obj) -> str:
+        """Return the absolute URL for the opinion's summaries page.
+
+        Returns an empty string if the URL cannot be resolved (e.g. in
+        test environments where frontend URL patterns are not loaded).
+        """
+        try:
+            return obj.get_absolute_url()
+        except Exception:
+            return ""
+
+    describing_opinion_id = serializers.ReadOnlyField()
+    describing_opinion = serializers.HyperlinkedRelatedField(
+        many=False,
+        view_name="opinion-detail",
+        queryset=Opinion.objects.all(),
+        style={"base_template": "input.html"},
+    )
+    describing_opinion_case_name = serializers.SerializerMethodField()
+    described_opinion_id = serializers.ReadOnlyField()
+    described_opinion = serializers.HyperlinkedRelatedField(
+        many=False,
+        view_name="opinion-detail",
+        queryset=Opinion.objects.all(),
+        style={"base_template": "input.html"},
+    )
+    described_opinion_case_name = serializers.SerializerMethodField()
+    group_id = serializers.ReadOnlyField()
+    group = ParentheticalGroupSerializer(many=False, read_only=True)
+
+    def get_describing_opinion_case_name(self, obj) -> str:
+        """The case name of the citing opinion's cluster."""
+        try:
+            return obj.describing_opinion.cluster.case_name
+        except AttributeError:
+            return ""
+
+    def get_described_opinion_case_name(self, obj) -> str:
+        """The case name of the described opinion's cluster."""
+        try:
+            return obj.described_opinion.cluster.case_name
+        except AttributeError:
+            return ""
+
+    class Meta:
+        model = Parenthetical
         fields = "__all__"
 
 
