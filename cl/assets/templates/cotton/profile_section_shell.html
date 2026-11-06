@@ -1,0 +1,119 @@
+{% load svg_tags %}
+
+<c-vars active_section username class="" />
+
+<div class="w-full {{ class }}">
+  <h1 class="mb-4 text-lg font-semibold text-greyscale-900 md:hidden">
+    {% if active_section == "alerts" %}
+      Alerts
+    {% elif active_section == "notes" %}
+      Notes
+    {% elif active_section == "tags" %}
+      Tags
+    {% elif active_section == "developer_tools" %}
+      Developer Tools
+    {% elif active_section == "prayers" %}
+      Prayers
+    {% elif active_section == "support" %}
+      Your Support
+    {% elif active_section == "account" %}
+      Account
+    {% else %}
+      Profile
+    {% endif %}
+  </h1>
+
+  <div class="md:flex md:items-start md:gap-5">
+    <nav class="hidden w-[--nav-menu-width] shrink-0 md:block" aria-label="Profile navigation">
+      <ul class="m-0 list-none p-0">
+        <li>
+          <a
+            href="{% url 'profile_alerts' %}"
+            class="relative flex w-full items-center gap-2 rounded-[10px] px-2.5 py-2 text-sm focus-visible:z-10 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-400 {% if active_section == 'alerts' %}bg-greyscale-100 font-medium text-greyscale-900{% else %}font-normal text-greyscale-800 hover:bg-greyscale-50{% endif %}"
+            {% if active_section == "alerts" %}aria-current="page"{% endif %}
+          >
+            {% svg "bell_outline" aria_hidden="true" class="h-5 w-5 shrink-0 text-greyscale-400" %}
+            Alerts
+          </a>
+        </li>
+        <li>
+          <a
+            href="{% url 'profile_notes' %}"
+            class="relative flex w-full items-center gap-2 rounded-[10px] px-2.5 py-2 text-sm focus-visible:z-10 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-400 {% if active_section == 'notes' %}bg-greyscale-100 font-medium text-greyscale-900{% else %}font-normal text-greyscale-800 hover:bg-greyscale-50{% endif %}"
+            {% if active_section == "notes" %}aria-current="page"{% endif %}
+          >
+            {% svg "bookmark" aria_hidden="true" class="h-5 w-5 shrink-0 text-greyscale-400" %}
+            Notes
+          </a>
+        </li>
+        <li>
+          <a
+            href="{% url 'tag_list' username=username %}"
+            class="relative flex w-full items-center gap-2 rounded-[10px] px-2.5 py-2 text-sm focus-visible:z-10 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-400 {% if active_section == 'tags' %}bg-greyscale-100 font-medium text-greyscale-900{% else %}font-normal text-greyscale-800 hover:bg-greyscale-50{% endif %}"
+            {% if active_section == "tags" %}aria-current="page"{% endif %}
+          >
+            {% svg "tag" aria_hidden="true" class="h-5 w-5 shrink-0 text-greyscale-400" %}
+            Tags
+          </a>
+        </li>
+        <li>
+          <a
+            href="{% url 'view_api' %}"
+            class="relative flex w-full items-center gap-2 rounded-[10px] px-2.5 py-2 text-sm focus-visible:z-10 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-400 {% if active_section == 'developer_tools' %}bg-greyscale-100 font-medium text-greyscale-900{% else %}font-normal text-greyscale-800 hover:bg-greyscale-50{% endif %}"
+            {% if active_section == "developer_tools" %}aria-current="page"{% endif %}
+          >
+            {% svg "code" aria_hidden="true" class="h-5 w-5 shrink-0 text-greyscale-400" %}
+            Developer Tools
+          </a>
+        </li>
+        <li>
+          <a
+            href="{% url 'user_prayers' username %}"
+            class="relative flex w-full items-center gap-2 rounded-[10px] px-2.5 py-2 text-sm focus-visible:z-10 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-400 {% if active_section == 'prayers' %}bg-greyscale-100 font-medium text-greyscale-900{% else %}font-normal text-greyscale-800 hover:bg-greyscale-50{% endif %}"
+            {% if active_section == "prayers" %}aria-current="page"{% endif %}
+          >
+            {% svg "donate" aria_hidden="true" class="h-5 w-5 shrink-0 text-greyscale-400" %}
+            Prayers
+          </a>
+        </li>
+        <li role="separator" class="my-2 border-t border-greyscale-100"></li>
+        <li>
+          <a
+            href="{% url 'profile_your_support' %}"
+            class="relative flex w-full items-center gap-2 rounded-[10px] px-2.5 py-2 text-sm focus-visible:z-10 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-400 {% if active_section == 'support' %}bg-greyscale-100 font-medium text-greyscale-900{% else %}font-normal text-greyscale-800 hover:bg-greyscale-50{% endif %}"
+            {% if active_section == "support" %}aria-current="page"{% endif %}
+          >
+            {% svg "donate" aria_hidden="true" class="h-5 w-5 shrink-0 text-greyscale-400" %}
+            Your Support
+          </a>
+        </li>
+        <li>
+          <a
+            href="{% url 'view_settings' %}"
+            class="relative flex w-full items-center gap-2 rounded-[10px] px-2.5 py-2 text-sm focus-visible:z-10 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-400 {% if active_section == 'account' %}bg-greyscale-100 font-medium text-greyscale-900{% else %}font-normal text-greyscale-800 hover:bg-greyscale-50{% endif %}"
+            {% if active_section == "account" %}aria-current="page"{% endif %}
+          >
+            {% svg "avatar_outline" aria_hidden="true" class="h-5 w-5 shrink-0 text-greyscale-400" %}
+            Account
+          </a>
+        </li>
+        <li>
+          <form method="post" action="{% url 'sign-out' %}">
+            {% csrf_token %}
+            <button
+              type="submit"
+              class="relative flex w-full items-center gap-2 rounded-[10px] px-2.5 py-2 text-sm font-normal text-greyscale-800 hover:bg-greyscale-50 focus-visible:z-10 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-400"
+            >
+              {% svg "sign_out" aria_hidden="true" class="h-5 w-5 shrink-0 text-greyscale-400" %}
+              Sign out
+            </button>
+          </form>
+        </li>
+      </ul>
+    </nav>
+
+    <div class="min-w-0 flex-1">
+      {{ slot }}
+    </div>
+  </div>
+</div>
