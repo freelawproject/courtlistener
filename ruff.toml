@@ -52,6 +52,7 @@ docstring-code-format = true
 "**/tests_*.py" = ["D100", "D101", "D102", "D103", "D107"]
 "**/bench/**" = ["D100", "D101", "D102", "D103", "D107"]
 "**/bench_*.py" = ["D100", "D101", "D102", "D103", "D107"]
+"**/bench.py" = ["D100", "D101", "D102", "D103", "D107"]
 "**/migrations/**" = ["D"]
 # Legacy undocumented code exempt from docstring rules; remove a file once it is documented.
 ".github/scripts/frontend_checks.py" = ["D101", "D103", "D205", "D301"]
@@ -199,7 +200,7 @@ docstring-code-format = true
 "cl/corpus_importer/state/florida/factories.py" = ["D101"]
 "cl/corpus_importer/state/florida/mergers.py" = ["D100", "D101", "D102"]
 "cl/corpus_importer/state/florida/utils.py" = ["D100"]
-"cl/corpus_importer/state/merger.py" = ["D100", "D101", "D102", "D103", "D107"]
+"cl/corpus_importer/state/merger/base.py" =["D100", "D101", "D102", "D103", "D107"]
 "cl/corpus_importer/state/new_york/factories.py" = ["D101"]
 "cl/corpus_importer/state/new_york/utils.py" = ["D100"]
 "cl/corpus_importer/state/preflight.py" = ["D101"]
