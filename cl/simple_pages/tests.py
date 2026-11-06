@@ -4,18 +4,16 @@ from unittest.mock import MagicMock, patch
 
 from django.contrib.auth.models import User
 from django.http import HttpResponse
-from django.template import engines
 from django.template.loader import TemplateDoesNotExist, get_template
-from django.test import RequestFactory, override_settings
+from django.test import override_settings
 from django.urls import resolve, reverse
-from django_cotton.compiler_regex import CottonCompiler
 from lxml.html import fromstring
 from waffle.testutils import override_flag
 
 from cl.lib.test_helpers import SimpleUserDataMixin
 from cl.simple_pages.forms import ContactForm
 from cl.simple_pages.sitemap import SimpleSitemap
-from cl.tests.cases import SimpleTestCase, TestCase
+from cl.tests.cases import CottonComponentMixin, SimpleTestCase, TestCase
 from cl.tests.utils import parse_csp
 
 
@@ -751,18 +749,94 @@ class ContentSecurityPolicyTest(TestCase):
         self.assertNotIn('nonce=""', html)
 
 
-class DialogComponentTest(SimpleTestCase):
-    """The c-dialog component renders a trigger only when given one."""
+class ButtonComponentTest(CottonComponentMixin, SimpleTestCase):
+    """The c-button busy state: declared by aria-busy, static or bound."""
 
-    def render(self, source: str) -> str:
-        """Compiles a Cotton snippet and renders it."""
-        compiled = CottonCompiler().process(source)
-        template = engines["django"].from_string(compiled)
-        return template.render({"request": RequestFactory().get("/")})
+    def test_a_plain_button_renders_no_busy_markup(self) -> None:
+        """Without aria-busy the element is rendered bare, with no wrapper,
+        spinner or status region."""
+        for source, tag in (
+            ('<c-button variant="primary">Save</c-button>', "button"),
+            ('<c-button variant="primary" href="/x/">Save</c-button>', "a"),
+            (
+                '<c-button variant="primary" touch_target>Save</c-button>',
+                "button",
+            ),
+        ):
+            with self.subTest(tag=tag, source=source):
+                root = fromstring(self.render_component(source))
+                self.assertEqual(root.tag, tag)
+                self.assertIsNone(root.get("x-data"))
+                self.assertEqual(root.xpath('.//*[local-name()="svg"]'), [])
+                self.assertEqual(root.xpath('.//*[@role="status"]'), [])
+
+    def test_caller_attributes_reach_the_busy_capable_button(self) -> None:
+        """A bound aria-busy turns on the busy markup, and the other
+        attributes still land on the rendered element."""
+        for source, tag in (
+            (
+                '<c-button variant="primary" type="submit" x-bind:aria-busy="busy" class="w-full">Save</c-button>',
+                "button",
+            ),
+            (
+                '<c-button variant="primary" href="/x/" rel="nofollow" x-bind:aria-busy="busy" class="w-full">Save</c-button>',
+                "a",
+            ),
+        ):
+            with self.subTest(tag=tag):
+                root = fromstring(self.render_component(source))
+                self.assertEqual(root.get("x-data"), "busyButton")
+                element = root.find(tag)
+                self.assertIsNotNone(element)
+                self.assertEqual(element.get("x-bind:aria-busy"), "busy")
+                self.assertIn("w-full", element.get("class").split())
+                if tag == "a":
+                    self.assertEqual(element.get("href"), "/x/")
+                    self.assertEqual(element.get("rel"), "nofollow")
+                else:
+                    self.assertEqual(element.get("type"), "submit")
+
+    def test_busy_keeps_the_label_and_hides_the_spinner_from_assistive_technology(
+        self,
+    ) -> None:
+        """The label stays the accessible name; the spinner and status region
+        are not part of it."""
+        for source in (
+            '<c-button variant="primary" aria-busy="true">Save</c-button>',
+            '<c-button variant="primary" href="#" aria-busy="true">Save</c-button>',
+        ):
+            with self.subTest(source=source):
+                root = fromstring(self.render_component(source))
+                element = root[0]
+                self.assertEqual(element.get("aria-busy"), "true")
+                spinners = element.xpath('.//*[local-name()="svg"]')
+                self.assertEqual(len(spinners), 1)
+                self.assertEqual(spinners[0].get("aria-hidden"), "true")
+                self.assertEqual(element.text_content().strip(), "Save")
+                statuses = root.xpath('./*[@role="status"]')
+                self.assertEqual(len(statuses), 1)
+                self.assertEqual(statuses[0].text_content(), "")
+                self.assertTrue(statuses[0].get("data-busy-text"))
+
+    def test_busy_text_is_what_the_status_region_announces(self) -> None:
+        """busy_text replaces the default announcement and never reaches the
+        button itself."""
+        root = fromstring(
+            self.render_component(
+                '<c-button variant="primary" aria-busy="true" busy_text="Saving your changes">Save</c-button>'
+            )
+        )
+        status = root.xpath('./*[@role="status"]')[0]
+        self.assertEqual(status.get("data-busy-text"), "Saving your changes")
+        self.assertIsNone(root[0].get("busy_text"))
+
+
+class DialogComponentTest(CottonComponentMixin, SimpleTestCase):
+    """The c-dialog component renders a trigger only when given one."""
 
     def test_trigger_slot_renders_a_trigger(self) -> None:
         """Trigger content renders the default trigger button."""
-        html = self.render(
+        html = self.render_component(
             '<c-dialog><c-slot name="button_content">Open</c-slot>'
             '<c-slot name="panel">Body</c-slot></c-dialog>'
         )
@@ -770,7 +844,7 @@ class DialogComponentTest(SimpleTestCase):
 
     def test_without_a_trigger_slot_no_trigger_is_rendered(self) -> None:
         """A dialog opened by other means, such as an event listener, has no trigger button."""
-        html = self.render(
+        html = self.render_component(
             '<c-dialog><c-slot name="panel">Body</c-slot></c-dialog>'
         )
         self.assertNotIn('aria-haspopup="dialog"', html)

@@ -1,6 +1,6 @@
 import re
 from datetime import datetime
-from typing import cast
+from typing import Any, cast
 from unittest import mock
 from urllib.parse import parse_qs, urlparse
 
@@ -8,11 +8,13 @@ from asgiref.sync import sync_to_async
 from django import test
 from django.apps import apps
 from django.contrib.staticfiles import testing
-from django.test import SimpleTestCase
+from django.template import engines
+from django.test import RequestFactory, SimpleTestCase
 from django.urls import reverse
 from django.utils.dateformat import format
 from django.utils.html import strip_tags
 from django.utils.timezone import localtime, now
+from django_cotton.compiler_regex import CottonCompiler
 from django_elasticsearch_dsl.registries import registry
 from elasticsearch.dsl.connections import connections
 from elasticsearch.helpers import bulk, scan
@@ -112,6 +114,26 @@ class RestartSentEmailQuotaMixin:
     def tearDown(self):
         self.restart_sent_email_quota()
         super().tearDown()
+
+
+class CottonComponentMixin:
+    """Render Cotton components the way templates write them.
+
+    ``render_component`` compiles a snippet such as
+    ``<c-button variant="primary">Save</c-button>`` and renders it with a GET
+    request in the context, which components that read ``request`` need.
+    Values in ``context`` are added to it and may replace the request.
+    """
+
+    def render_component(
+        self, source: str, context: dict[str, Any] | None = None
+    ) -> str:
+        """Returns the HTML a Cotton snippet renders to."""
+        compiled = CottonCompiler().process(source)
+        template = engines["django"].from_string(compiled)
+        return template.render(
+            {"request": RequestFactory().get("/"), **(context or {})}
+        )
 
 
 class TestCase(
