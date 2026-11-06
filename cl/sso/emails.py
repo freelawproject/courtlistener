@@ -26,7 +26,8 @@ emails: dict[str, EmailType] = {
         "CourtListener, but without the organization's membership "
         "benefits.\n\n"
         "To give them a seat, remove somebody who no longer needs one or "
-        "ask Free Law Project about more seats at support@free.law.\n\n"
+        "ask Free Law Project about more seats:\n\n"
+        "    https://www.courtlistener.com%s\n\n"
         "The Free Law Project Team\n\n",
         "from_email": settings.DEFAULT_FROM_EMAIL,
     },

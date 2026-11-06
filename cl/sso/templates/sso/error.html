@@ -10,7 +10,7 @@
   <div class="col-xs-10 col-sm-8 col-md-6 well">
     <h2>We Couldn't Sign You In</h2>
     <p class="alert alert-danger">{{ reason }}</p>
-    <p><a href="{% url "sso_start" %}">Try single sign-on again</a> or <a href="{% url "contact" %}">contact us</a>.</p>
+    <p><a href="{% url "sso_start" %}">Try single sign-on again</a> or <a href="{% url "contact" %}?issue_type=support">contact us</a>.</p>
   </div>
   <div class="col-xs-1 col-sm-2 col-md-3"></div>
 {% endblock %}

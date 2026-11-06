@@ -584,7 +584,8 @@ class OIDCLoginTest(SSOFixtureMixin, TestCase):
         membership = OrganizationMembership.objects.get(user=user)
         self.assertFalse(membership.has_seat)
         self.assertIsNone(get_effective_membership(user))
-        self.assertTrue(any("seat" in m.subject.lower() for m in mail.outbox))
+        notice = next(m for m in mail.outbox if "seat" in m.subject.lower())
+        self.assertIn(f"{reverse('contact')}?issue_type=support", notice.body)
 
     def test_seat_check_locks_the_organization(self) -> None:
         """Is the organization locked while a limited seat is handed out?"""

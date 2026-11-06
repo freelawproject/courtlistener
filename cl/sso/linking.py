@@ -31,6 +31,7 @@ from django.db import transaction
 from django.db.models import F
 from django.http import HttpRequest
 from django.template.response import TemplateResponse
+from django.urls import reverse
 from django.utils import timezone
 
 from cl.lib.auth import filter_by_email
@@ -305,7 +306,7 @@ def find_or_create_account(
             raise SSORefusal(
                 "This address belongs to a CourtListener account that is "
                 "already linked to a different person in your "
-                "organization's sign-on. Please contact support@free.law.",
+                "organization's sign-on. Please contact us.",
                 "address already linked to another IdP subject",
                 connection=connection,
                 user=user,
@@ -400,6 +401,7 @@ def notify_seat_limit(user: User, organization: Organization) -> None:
         user.email,
         organization.name,
         organization.seat_limit,
+        f"{reverse('contact')}?issue_type=support",
     )
     if admins:
         send_mail(subject, body, email["from_email"], admins)
@@ -453,7 +455,7 @@ def _link_in_transaction(
     if not user.is_active or profile is None or profile.stub_account:
         raise SSORefusal(
             "This CourtListener account has been deactivated or deleted. "
-            "Please contact support@free.law.",
+            "Please contact us.",
             "inactive or stub account",
             connection=connection,
             user=user,
@@ -491,7 +493,7 @@ def resolve_sso_login(request: HttpRequest, sociallogin: SocialLogin) -> None:
             request,
             SSORefusal(
                 "Single sign-on isn't set up for this organization. Please "
-                "contact support@free.law.",
+                "contact us.",
                 "no enabled connection for provider "
                 f"{sociallogin.account.provider}",
             ),
