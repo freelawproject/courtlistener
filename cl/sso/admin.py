@@ -129,10 +129,14 @@ class OrganizationAdmin(admin.ModelAdmin):
         """Re-sync members' API throttles after the organization changes.
 
         The organization's level decides its members' API rates, so a
-        level change in the admin has to reach them.
+        level change in the admin has to reach them. It waits for the
+        commit, so a request in between can't cache the old rates again.
         """
         super().save_related(request, form, formsets, change)
-        sync_organization_throttles(form.instance)
+        organization = form.instance
+        transaction.on_commit(
+            lambda: sync_organization_throttles(organization)
+        )
 
     @admin.action(description="Export members as CSV")
     def export_members(
