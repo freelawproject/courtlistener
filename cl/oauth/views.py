@@ -2,144 +2,37 @@
 
 These sit alongside the endpoints that ``django-oauth-toolkit`` (DOT)
 provides under ``/o/`` (authorize, token, revoke, introspect, OIDC
-discovery, JWKS). They add:
+discovery, JWKS). They add RFC 8414 Authorization Server Metadata at
+``/.well-known/oauth-authorization-server`` so MCP clients can discover
+our endpoints, and extend introspection with ``sub``.
 
-* RFC 7591 Dynamic Client Registration at ``/o/register/`` so MCP
-  clients can self-register without a human filling out a form.
-* RFC 8414 Authorization Server Metadata at
-  ``/.well-known/oauth-authorization-server`` so MCP clients can
-  discover our endpoints.
+Clients are registered by hand, or by the MCP server, which is its own
+authorization server. RFC 7591 Dynamic Client Registration is gone;
+applications it created live on with ``registration_source="dcr"``.
 """
 
 import json
-import uuid
 from typing import Any
 
 from django.conf import settings
 from django.contrib.auth.models import User
 from django.http import JsonResponse
 from django.urls import reverse
-from django.utils import timezone
-from django.utils.decorators import method_decorator
-from django_ratelimit.decorators import ratelimit
-from django_ratelimit.exceptions import Ratelimited
 from oauth2_provider import views as oauth2_views
-from oauth2_provider.models import get_application_model
-from rest_framework import status
 from rest_framework.request import Request
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
-from cl.lib.ratelimiter import get_ip_for_ratelimiter
-from cl.oauth.api_serializers import (
-    ALLOWED_GRANT_TYPES,
-    ALLOWED_RESPONSE_TYPES,
-    ALLOWED_TOKEN_AUTH_METHODS,
-    DynamicClientRegistrationSerializer,
-    first_error_description,
-)
-from cl.oauth.validators import CourtListenerOAuth2Validator
-
-Application = get_application_model()
-
-
-def _invalid_metadata(description: str) -> Response:
-    return Response(
-        {
-            "error": "invalid_client_metadata",
-            "error_description": description,
-        },
-        status=status.HTTP_400_BAD_REQUEST,
-    )
-
-
-def get_dcr_rate(group: str, request: Request) -> str:
-    return settings.OAUTH2_DCR_RATELIMIT
-
-
-@method_decorator(
-    ratelimit(
-        key=get_ip_for_ratelimiter,
-        rate=get_dcr_rate,
-        block=True,
-        method="POST",
-    ),
-    name="post",
-)
-class DynamicClientRegistrationView(APIView):
-    """RFC 7591 Dynamic Client Registration endpoint.
-
-    Open registration: anyone on the internet may POST to this
-    endpoint to create an OAuth client. The MCP server registers its
-    own clients now; this stays open for clients that still hold its
-    address from before the cutover. The resulting client is useless
-    until a real user completes the authorization-code flow and grants
-    consent, so the abuse surface is DB pollution, which the tight
-    per-IP rate limit bounds.
-    """
-
-    authentication_classes: list[Any] = []
-    permission_classes: list[Any] = []
-    throttle_classes: list[Any] = []
-
-    def handle_exception(self, exc: Exception) -> Response:
-        if isinstance(exc, Ratelimited):
-            return Response(
-                {
-                    "error": "rate_limited",
-                    "error_description": (
-                        "Too many client registrations from this IP; "
-                        "try again later."
-                    ),
-                },
-                status=status.HTTP_429_TOO_MANY_REQUESTS,
-            )
-        return super().handle_exception(exc)
-
-    def post(self, request: Request) -> Response:
-        serializer = DynamicClientRegistrationSerializer(data=request.data)
-        if not serializer.is_valid():
-            return _invalid_metadata(
-                first_error_description(serializer.errors)
-            )
-
-        data = serializer.validated_data
-        token_endpoint_auth_method = data["token_endpoint_auth_method"]
-        client_name = (
-            data.get("client_name") or f"MCP Client {uuid.uuid4().hex[:8]}"
-        )
-        client_type = (
-            Application.CLIENT_PUBLIC
-            if token_endpoint_auth_method == "none"
-            else Application.CLIENT_CONFIDENTIAL
-        )
-
-        app = Application(
-            name=client_name,
-            client_type=client_type,
-            authorization_grant_type=Application.GRANT_AUTHORIZATION_CODE,
-            redirect_uris=" ".join(data["redirect_uris"]),
-            algorithm=Application.RS256_ALGORITHM,
-            skip_authorization=False,
-            registration_source=Application.RegistrationSource.DCR,
-        )
-        # Capture the plaintext BEFORE save() hashes it in place.
-        client_secret_plaintext = app.client_secret
-        app.save()
-
-        response_data: dict[str, Any] = {
-            "client_id": app.client_id,
-            "client_name": client_name,
-            "redirect_uris": data["redirect_uris"],
-            "grant_types": data["grant_types"],
-            "response_types": data["response_types"],
-            "token_endpoint_auth_method": token_endpoint_auth_method,
-            "client_id_issued_at": int(timezone.now().timestamp()),
-        }
-        if client_type == Application.CLIENT_CONFIDENTIAL:
-            response_data["client_secret"] = client_secret_plaintext
-            response_data["client_secret_expires_at"] = 0
-        return Response(response_data, status=status.HTTP_201_CREATED)
+# What the metadata advertises. Client-credentials, password, and
+# device-code grants are intentionally left out: MCP clients are
+# confidential or public user-agent apps using authorization-code + PKCE.
+GRANT_TYPES_SUPPORTED = ["authorization_code", "refresh_token"]
+RESPONSE_TYPES_SUPPORTED = ["code"]
+TOKEN_ENDPOINT_AUTH_METHODS_SUPPORTED = [
+    "client_secret_basic",
+    "client_secret_post",
+    "none",
+]
 
 
 class IntrospectTokenView(oauth2_views.IntrospectTokenView):
@@ -169,8 +62,7 @@ class OAuthMetadataView(APIView):
 
     MCP clients fetch this from
     ``https://<issuer>/.well-known/oauth-authorization-server`` and
-    use it to discover the authorize, token, registration, and JWKS
-    endpoints.
+    use it to discover the authorize, token, and JWKS endpoints.
 
     The issuer is derived from the incoming request so the same code
     serves the right URLs for ``courtlistener.com``, staging, and any
@@ -184,13 +76,10 @@ class OAuthMetadataView(APIView):
     def get(self, request: Request) -> Response:
         base = request.build_absolute_uri("/").rstrip("/")
         oidc_enabled = settings.OAUTH2_PROVIDER.get("OIDC_ENABLED")
-        # Discovery serves dynamically registered clients, so advertise
-        # only the scopes they are allowed to request.
         scopes_supported = [
             scope
             for scope in settings.OAUTH2_PROVIDER["SCOPES"]
-            if scope in CourtListenerOAuth2Validator.DCR_SCOPES
-            and (oidc_enabled or scope not in settings.OIDC_SCOPES)
+            if oidc_enabled or scope not in settings.OIDC_SCOPES
         ]
         return Response(
             {
@@ -198,7 +87,6 @@ class OAuthMetadataView(APIView):
                 "authorization_endpoint": base
                 + reverse("oauth2_provider:authorize"),
                 "token_endpoint": base + reverse("oauth2_provider:token"),
-                "registration_endpoint": base + reverse("oauth2_dcr"),
                 "revocation_endpoint": base
                 + reverse("oauth2_provider:revoke-token"),
                 "introspection_endpoint": base
@@ -206,10 +94,10 @@ class OAuthMetadataView(APIView):
                 "userinfo_endpoint": base
                 + reverse("oauth2_provider:user-info"),
                 "jwks_uri": base + reverse("oauth2_provider:jwks-info"),
-                "response_types_supported": sorted(ALLOWED_RESPONSE_TYPES),
-                "grant_types_supported": sorted(ALLOWED_GRANT_TYPES),
-                "token_endpoint_auth_methods_supported": sorted(
-                    ALLOWED_TOKEN_AUTH_METHODS
+                "response_types_supported": RESPONSE_TYPES_SUPPORTED,
+                "grant_types_supported": GRANT_TYPES_SUPPORTED,
+                "token_endpoint_auth_methods_supported": (
+                    TOKEN_ENDPOINT_AUTH_METHODS_SUPPORTED
                 ),
                 "code_challenge_methods_supported": ["S256"],
                 "authorization_response_iss_parameter_supported": bool(

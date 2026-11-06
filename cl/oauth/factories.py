@@ -6,7 +6,7 @@ Application = get_application_model()
 
 
 class ApplicationFactory(DjangoModelFactory):
-    """An Application as the DCR endpoint creates it: confidential, no owner."""
+    """A confidential Application with no owner, as MCP clients are registered."""
 
     class Meta:
         model = Application
