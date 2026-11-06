@@ -33,6 +33,8 @@ class BaseMergerTest(TestCase):
     def setUpTestData(cls) -> None:
         cls.court = CourtFactory.create()
         cls.docket = DocketFactory.create()
+        # pyrefly:ignore[bad-assignment]
+        cls.docket_number: str = cls.docket.docket_number
 
     @merger_test(expected_query_count=1)
     def test_merger_creates_object(self) -> None:
@@ -78,8 +80,7 @@ class BaseMergerTest(TestCase):
     @merger_test(expected_query_count=2)
     def test_merger_updates_docket(self) -> None:
         tc = self
-        dn = self.docket.docket_number
-        new_dn = dn + "New"
+        new_dn = self.docket_number + "New"
         start_docket_count = Docket.objects.count()
 
         class TestMerger(Merger[dict[str, str], None, Docket]):
@@ -182,9 +183,7 @@ class BaseMergerTest(TestCase):
 
             court: Court = Attribute(default=self.court)
             source: int = Attribute(default=DocketSources.SCRAPER)
-            docket_number: str = Attribute(
-                default=self.docket.docket_number + "New"
-            )
+            docket_number: str = Attribute(default=self.docket_number + "New")
             originating_court_information: OriginatingCourtInformation = (
                 OneToOneRelation(
                     TestRelatedMerger,
@@ -316,9 +315,7 @@ class BaseMergerTest(TestCase):
 
             court: Court = Attribute(default=self.court)
             source: int = Attribute(default=DocketSources.SCRAPER)
-            docket_number: str = Attribute(
-                default=self.docket.docket_number + "New"
-            )
+            docket_number: str = Attribute(default=self.docket_number + "New")
             docket_entries: list[DocketEntry] = OneToManyRelation(
                 TestRelatedMerger,
                 lambda d, params: d["mctest"],

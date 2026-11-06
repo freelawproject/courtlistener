@@ -340,6 +340,7 @@ class NYCoADocketMetadataMergerTest(NYCoAMergerTestCase):
         result = NYCoADocketMerger(case, params=None).merge()
 
         self.assertTrue(result.success)
+        # pyrefly:ignore[missing-attribute]
         metadata = self.merged_docket(result).nycoa_metadata
         self.assertEqual(metadata.decision_date, date(2025, 4, 17))
         self.assertEqual(metadata.official_citation, "41 NY3d 1")
@@ -393,6 +394,7 @@ class NYCoAIssueMergerTest(NYCoAMergerTestCase):
         result = NYCoADocketMerger(case, params=None).merge()
 
         self.assertTrue(result.success)
+        # pyrefly:ignore[missing-attribute]
         issue = self.merged_docket(result).nycoa_metadata.issues.get()
         self.assertEqual(issue.category, IssueCategory.JUDGMENTS.code)
         self.assertEqual(
@@ -429,6 +431,7 @@ class NYCoAIssueMergerTest(NYCoAMergerTestCase):
         result = NYCoADocketMerger(case, params=None).merge()
 
         self.assertTrue(result.success)
+        # pyrefly:ignore[missing-attribute]
         issues = self.merged_docket(result).nycoa_metadata.issues.all()
         self.assertEqual(
             {issue.detail for issue in issues},
@@ -587,6 +590,7 @@ class NYCoAIssueMergerTest(NYCoAMergerTestCase):
         result = NYCoADocketMerger(case, params=None).merge()
 
         self.assertTrue(result.success)
+        # pyrefly:ignore[missing-attribute]
         issue = self.merged_docket(result).nycoa_metadata.issues.get()
         self.assertEqual(issue.category, UNASSIGNED)
         self.assertEqual(issue.subcategory, UNASSIGNED)
@@ -606,6 +610,7 @@ class NYCoAIssueMergerTest(NYCoAMergerTestCase):
         result = NYCoADocketMerger(case, params=None).merge()
 
         self.assertTrue(result.success)
+        # pyrefly:ignore[missing-attribute]
         issue = self.merged_docket(result).nycoa_metadata.issues.get()
         self.assertEqual(issue.category, IssueCategory.CRIMES.code)
         self.assertEqual(issue.subcategory, UNKNOWN)
@@ -685,6 +690,7 @@ class NYCoADocketEntryMergerTest(NYCoAMergerTestCase):
 
         self.assertTrue(result.success)
         self.assertIn("NYCoADocketEntry", result.creates)
+        # pyrefly:ignore[missing-attribute]
         merged = self.merged_docket(result).nycoa_docket_entries.get()
         self.assertEqual(merged.docket_entry_id, "e:appellant-brief:smith:1")
         self.assertEqual(merged.entry_index, 3)
@@ -714,6 +720,7 @@ class NYCoADocketEntryMergerTest(NYCoAMergerTestCase):
         result = NYCoADocketMerger(case, params=None).merge()
 
         self.assertTrue(result.success)
+        # pyrefly:ignore[missing-attribute]
         merged = self.merged_docket(result).nycoa_docket_entries.get()
         self.assertEqual(merged.filing_type, UNASSIGNED)
         self.assertEqual(merged.filing_type_raw, "Appellant Sur-Reply Brief")
@@ -740,6 +747,7 @@ class NYCoADocketEntryMergerTest(NYCoAMergerTestCase):
         result = NYCoADocketMerger(case, params=None).merge()
 
         self.assertTrue(result.success)
+        # pyrefly:ignore[missing-attribute]
         merged = self.merged_docket(result).nycoa_docket_entries.get()
         self.assertEqual(
             merged.filing_type,
@@ -816,6 +824,7 @@ class NYCoADocketEntryMergerTest(NYCoAMergerTestCase):
             "A filing the scrape no longer reports should be pruned.",
         )
         self.assertEqual(
+            # pyrefly:ignore[missing-attribute]
             docket.nycoa_docket_entries.get().docket_entry_id,
             "e:appellant-brief:smith:1",
         )
@@ -834,6 +843,7 @@ class NYCoADocketEntryMergerTest(NYCoAMergerTestCase):
         result = NYCoADocketMerger(case, params=None).merge()
 
         self.assertTrue(result.success)
+        # pyrefly:ignore[missing-attribute]
         merged = self.merged_docket(result).nycoa_docket_entries.get()
         self.assertEqual(merged.party, Party.objects.get(name="Smith"))
         self.assertEqual(merged.party_name, "Smith")
@@ -869,6 +879,7 @@ class NYCoADocketEntryMergerTest(NYCoAMergerTestCase):
 
         self.assertTrue(result.success)
         self.assertEqual(Party.objects.filter(name="A. R.").count(), 2)
+        # pyrefly:ignore[missing-attribute]
         merged = self.merged_docket(result).nycoa_docket_entries.get()
         self.assertEqual(
             merged.party_id,
@@ -895,6 +906,7 @@ class NYCoADocketEntryMergerTest(NYCoAMergerTestCase):
         result = NYCoADocketMerger(case, params=None).merge()
 
         self.assertTrue(result.success)
+        # pyrefly:ignore[missing-attribute]
         merged = self.merged_docket(result).nycoa_docket_entries.get()
         self.assertIsNone(merged.party_id)
         # The name the FILINGS table printed survives the unresolved FK.
@@ -968,6 +980,7 @@ class NYCoADocumentMergerTest(NYCoAMergerTestCase):
         self.assertTrue(result.success)
         self.assertIn("NYCoADocument", result.creates)
         merged = (
+            # pyrefly:ignore[missing-attribute]
             self.merged_docket(result)
             .nycoa_docket_entries.get()
             .documents.get()
@@ -2063,7 +2076,9 @@ class NYCoAPartyMergerTest(NYCoAMergerTestCase):
             "The docket's own fields merged and were committed.",
         )
         self.assertEqual(
-            docket.nycoa_metadata.decision_date, date(2025, 6, 12)
+            # pyrefly:ignore[missing-attribute]
+            docket.nycoa_metadata.decision_date,
+            date(2025, 6, 12),
         )
         self.assertEqual(
             NYCoADocketEntry.objects.filter(docket=docket).count(),
