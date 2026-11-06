@@ -397,7 +397,7 @@ class UserDataTest(LiveServerTestCase):
             email_confirmed=False
         )
 
-        r = await self.async_client.get(
+        r = await self.async_client.post(
             reverse("email_confirm", args=[up.activation_key])
         )
         self.assertEqual(
@@ -417,6 +417,31 @@ class UserDataTest(LiveServerTestCase):
         await up.arefresh_from_db()
         self.assertEqual(up.activation_key, "")
 
+    async def test_get_does_not_confirm_email(self) -> None:
+        """Does a GET (e.g. a mail scanner prefetch) leave the account and
+        key untouched while showing a confirmation button?
+        """
+        up = await sync_to_async(UserProfileWithParentsFactory.create)(
+            email_confirmed=False
+        )
+        key = up.activation_key
+        url = reverse("email_confirm", args=[key])
+
+        r = await self.async_client.get(url)
+        self.assertEqual(r.status_code, 200)
+        self.assertIn("Confirm My Email Address", r.content.decode())
+        self.assertNotIn("has been confirmed", r.content.decode())
+
+        await up.arefresh_from_db()
+        self.assertFalse(up.email_confirmed)
+        self.assertEqual(up.activation_key, key)
+
+        # The human can still confirm afterward.
+        r = await self.async_client.post(url)
+        self.assertIn("has been confirmed", r.content.decode())
+        await up.arefresh_from_db()
+        self.assertTrue(up.email_confirmed)
+
     async def test_confirming_an_email_when_it_is_associated_with_multiple_accounts(
         self,
     ) -> None:
@@ -428,7 +453,7 @@ class UserDataTest(LiveServerTestCase):
             email_confirmed=False,
         )
 
-        r = await self.async_client.get(
+        r = await self.async_client.post(
             reverse("email_confirm", args=[ups[0].activation_key])
         )
         self.assertIn(
@@ -4288,7 +4313,7 @@ class NeonAccountCreationTest(TestCase):
             email_confirmed=False
         )
 
-        r = await self.async_client.get(
+        r = await self.async_client.post(
             reverse("email_confirm", args=[up.activation_key])
         )
         self.assertEqual(
@@ -4328,7 +4353,7 @@ class NeonAccountCreationTest(TestCase):
             email_confirmed=False
         )
 
-        r = await self.async_client.get(
+        r = await self.async_client.post(
             reverse("email_confirm", args=[up.activation_key])
         )
         self.assertEqual(
@@ -4357,7 +4382,7 @@ class NeonAccountCreationTest(TestCase):
             email_confirmed=False
         )
 
-        r = await self.async_client.get(
+        r = await self.async_client.post(
             reverse("email_confirm", args=[up.activation_key])
         )
         self.assertEqual(

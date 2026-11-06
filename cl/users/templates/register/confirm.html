@@ -15,6 +15,13 @@
       <h2><i class="fa fa-exclamation-triangle red"></i>&nbsp;Expired Confirmation Link</h2>
       <p>Your confirmation link has expired. Please try clicking the link again or you may
       request a <a href="{% url "email_confirmation_request" %}">new confirmation link</a>.</p>
+    {% elif needs_confirmation %}
+      <h2>Confirm Your Email Address</h2>
+      <p>Click the button below to finish confirming your email address.</p>
+      <form method="post" action="">
+        {% csrf_token %}
+        <button type="submit" class="btn btn-primary btn-lg">Confirm My Email Address</button>
+      </form>
     {% elif success or already_confirmed %}
       <h2><i class="fa fa-check-circle-o green"></i>&nbsp;Your email address has been confirmed.</h2>
       <p>Thank you for successfully confirming your email address.</p>
