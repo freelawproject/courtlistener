@@ -484,12 +484,13 @@ def get_request_value(request_get, field_name):
 def render_field_with_id(field, field_id):
     """Render a form field with a custom ID attribute.
 
-    A field with errors is also marked invalid and described by its error
-    message, which c-form.input renders with the id ``<field_id>-error``.
+    Django marks a field with errors ``aria-invalid`` on its own, but its
+    default ``aria-describedby`` points at ``<auto_id>_error``, so it is
+    overridden here to match the ``<field_id>-error`` element that
+    c-form.input renders.
     """
     attrs = {"id": field_id}
     if field.errors:
-        attrs["aria-invalid"] = "true"
         attrs["aria-describedby"] = f"{field_id}-error"
     return field.as_widget(attrs=attrs)
 

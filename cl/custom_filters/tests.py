@@ -322,8 +322,12 @@ class TestExtras(SimpleTestCase):
         rendered = render_field_with_id(form["name"], "custom_id")
         self.assertNotIn('id="id_name"', rendered)
 
-    def test_render_field_with_id_marks_invalid_fields(self) -> None:
-        """Does render_field_with_id point an invalid field at its error?"""
+    def test_render_field_with_id_points_invalid_field_at_error(self) -> None:
+        """Does render_field_with_id point an invalid field at its error?
+
+        Django adds ``aria-invalid`` itself; the filter only overrides
+        ``aria-describedby``.
+        """
         form = SimpleForm({"name": "Jane", "email": "not-an-email"})
         form.is_valid()
 
