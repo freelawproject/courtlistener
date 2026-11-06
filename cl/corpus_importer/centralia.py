@@ -1,5 +1,12 @@
 # Code for importing Centralia structured opinion extractions into the DB
+import logging
+from typing import Any
+
+from juriscraper.lib.string_utils import titlecase
+
 from cl.search.models import Opinion
+
+logger = logging.getLogger(__name__)
 
 # The only verdict centralia gives that means "fully accounted for, nothing
 # to look at". Its other three -- ``scanned`` (no text layer), ``review``
@@ -55,6 +62,18 @@ def map_centralia_opinion_type(centralia_type: str | None) -> str:
     return CENTRALIA_OPINION_TYPES.get(
         normalize_centralia_opinion_type(centralia_type), Opinion.LEAD
     )
+
+
+def _wrap(html: str) -> str:
+    """Scope a payload fragment under the class CL's stylesheet targets.
+
+    :param html: Centralia markup for one writing.
+    :return: The wrapped fragment, or "" when there is nothing to wrap.
+    """
+    html = (html or "").strip()
+    if not html:
+        return ""
+    return f'<div class="centralia">{html}</div>'
 
 
 def _payload_text_length(payload: dict) -> int:
@@ -119,3 +138,89 @@ def should_ingest(opinion: Opinion, payload: dict) -> tuple[bool, str]:
         )
 
     return True, f"status={status}"
+
+
+def check_structured_extraction(
+    opinion: Opinion, data: dict[str, Any]
+) -> tuple[bool, str]:
+    """Decide whether a structured extraction can be merged into an opinion.
+
+    Runs should_ingest and, while only single-opinion documents are
+    supported, requires Centralia to have found exactly one writing. Nothing
+    is changed or logged, so dry runs can use it too.
+
+    :param opinion: The opinion the extraction was read from.
+    :param data: A successful response payload from Doctor's structured
+    opinion endpoint.
+    :return: A 2-tuple of whether the extraction can be merged and the
+    reason, for logging.
+    """
+    ingestible, reason = should_ingest(opinion, data)
+    if not ingestible:
+        return False, reason
+    if (count := len(data["opinions"])) != 1:
+        return False, (
+            f"found {count} opinions; only single-opinion documents are "
+            "supported"
+        )
+    return True, reason
+
+
+def merge_structured_opinion_into_cl_opinion(
+    opinion: Opinion, data: dict[str, Any]
+) -> tuple[bool, str]:
+    """Merge a Centralia structured extraction into a CL opinion and save it.
+
+    Stores the extracted HTML in `Opinion.html` along with the opinion's
+    ordering key, type, per curiam flag and author string. Extractions that
+    fail check_structured_extraction are logged and skipped, leaving the
+    opinion untouched. Errors while saving are raised.
+
+    Callers must run find_citations_and_parentheticals_for_opinion_by_pks
+    afterward to find and store citations in the new HTML.
+
+    :param opinion: The opinion to update. It should be its cluster's only
+    opinion.
+    :param data: A successful response payload from Doctor's structured
+    opinion endpoint.
+    :return: A 2-tuple of whether the opinion was updated and saved, and
+    the reason, for logging.
+    """
+    log_extra = {
+        "opinion_id": opinion.pk,
+        "opinion_cluster_id": opinion.cluster_id,
+    }
+    mergeable, reason = check_structured_extraction(opinion, data)
+    if not mergeable:
+        logger.warning(
+            "Skipped structured extraction for cluster %s: %s",
+            opinion.cluster_id,
+            reason,
+            extra=log_extra,
+        )
+        return False, reason
+
+    extracted = data["opinions"][0]
+    # should_ingest has already rejected writings without HTML
+    opinion.html = _wrap(extracted["html"])
+    opinion.ordering_key = extracted["order"]
+    centralia_type = extracted.get("type")
+    opinion.type = map_centralia_opinion_type(centralia_type)
+    opinion.per_curiam = (
+        normalize_centralia_opinion_type(centralia_type) == "per-curiam"
+    )
+    if not opinion.per_curiam:
+        if author_name := extracted.get("author_name"):
+            opinion.author_str = titlecase(author_name)
+
+    opinion.save(
+        update_fields=[
+            "date_modified",
+            "html",
+            "ordering_key",
+            "type",
+            "per_curiam",
+            "author_str",
+        ]
+    )
+    return True, reason

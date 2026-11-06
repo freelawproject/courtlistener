@@ -39,7 +39,10 @@ from pydantic import ValidationError
 from cl.alerts.factories import DocketAlertFactory
 from cl.alerts.models import DocketAlert
 from cl.audio.factories import AudioFactory
-from cl.corpus_importer.centralia import should_ingest
+from cl.corpus_importer.centralia import (
+    merge_structured_opinion_into_cl_opinion,
+    should_ingest,
+)
 from cl.corpus_importer.court_regexes import match_court_string
 from cl.corpus_importer.factories import (
     CaseBodyFactory,
@@ -187,6 +190,7 @@ from cl.search.factories import (
     OpinionClusterWithChildrenAndParentsFactory,
     OpinionClusterWithMultipleOpinionsFactory,
     OpinionClusterWithParentsFactory,
+    OpinionFactory,
     OpinionWithChildrenFactory,
     OpinionWithParentsFactory,
     RECAPDocumentFactory,
@@ -6368,3 +6372,87 @@ class CentraliaShouldIngestTest(SimpleTestCase):
         ingestible, reason = should_ingest(opinion, self.make_payload())
         self.assertTrue(ingestible, msg=reason)
         self.assertEqual(reason, "status=valid")
+
+
+class CentraliaIngestTest(TestCase):
+    """Test ingesting a structured payload onto a CL opinion."""
+
+    test_dir = (
+        Path(settings.INSTALL_ROOT) / "cl" / "corpus_importer" / "test_assets"
+    )
+
+    @classmethod
+    def setUpTestData(cls) -> None:
+        cls.court = CourtFactory(id="test", jurisdiction="F")
+        with open(
+            cls.test_dir / "centralia_payload_multi.json", encoding="utf-8"
+        ) as f:
+            cls.multi_payload = json.load(f)
+        with open(
+            cls.test_dir / "centralia_payload_single.json", encoding="utf-8"
+        ) as f:
+            cls.single_payload = json.load(f)
+
+    def setUp(self) -> None:
+        self.cluster = OpinionClusterFactory(
+            docket=DocketFactory(court=self.court),
+            date_filed=date(2024, 1, 1),
+        )
+        self.seed = OpinionFactory(
+            cluster=self.cluster,
+            type=Opinion.COMBINED,
+            plain_text="The judgment is affirmed.",
+            html="",
+            xml_harvard="<sentinel/>",
+            download_url="https://example.com/opinion.pdf",
+        )
+
+    @patch("cl.corpus_importer.centralia.logger")
+    def test_rejects_a_multi_writing_payload(self, mock_logger) -> None:
+        """Is a payload with several writings refused, leaving the cluster
+        untouched?
+
+        Only single-opinion documents are supported for now, so the extra
+        writings are neither merged into the seed nor created as siblings.
+        """
+        ingested, reason = merge_structured_opinion_into_cl_opinion(
+            self.seed, self.multi_payload
+        )
+
+        self.assertFalse(ingested)
+        self.assertIn("found 2 opinions", reason)
+        mock_logger.warning.assert_called_once()
+        self.assertEqual(mock_logger.warning.call_args.args[2], reason)
+        self.assertEqual(self.cluster.sub_opinions.count(), 1)
+        self.seed.refresh_from_db()
+        self.assertEqual(self.seed.html, "")
+        self.assertEqual(self.seed.type, Opinion.COMBINED)
+
+    def test_a_lone_writing_ingests_as_the_lead(self) -> None:
+        """Does a single-writing paper become the lead opinion?
+
+        The seed arrives as COMBINED from the text pipeline, which could not
+        tell writings apart. Centralia can, so a paper holding exactly one
+        is that court's decision.
+        """
+        self.assertEqual(self.seed.type, Opinion.COMBINED)
+
+        ingested, reason = merge_structured_opinion_into_cl_opinion(
+            self.seed, self.single_payload
+        )
+
+        self.seed.refresh_from_db()
+        self.assertTrue(ingested, msg=reason)
+        self.assertEqual(self.seed.type, Opinion.LEAD)
+        self.assertTrue(self.seed.per_curiam)
+        self.assertEqual(self.seed.ordering_key, 1)
+        self.assertTrue(
+            self.seed.html.startswith('<div class="centralia">'),
+            msg=self.seed.html[:80],
+        )
+        self.assertEqual(
+            self.seed.xml_harvard,
+            "<sentinel/>",
+            msg="xml_harvard must never be touched",
+        )
+        self.assertEqual(self.cluster.sub_opinions.count(), 1)
