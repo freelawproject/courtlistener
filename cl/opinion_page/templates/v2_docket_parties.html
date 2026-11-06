@@ -30,9 +30,9 @@
 
           {% for party in group.parties %}
             {# One grid per party: the party on the left, "Represented By:" with the attorney rows and the criminal block stacked on the right. The grid owns the top padding and the closing border; each element only pads below itself, and the stack draws the lines between its rows. #}
-            <div class="grid grid-cols-1 md:grid-cols-3 pt-4 md:pt-6 border-b border-greyscale-200">
+            <div class="grid grid-cols-1 md:grid-cols-3 pt-4 md:pt-6 border-b border-greyscale-200" aria-labelledby="party-{{ party.pk }}-heading">
               <div class="pb-4 md:pb-6 md:pr-6 space-y-1">
-                <h3 class="text-md md:pl-3">
+                <h3 class="text-md md:pl-3" id="party-{{ party.pk }}-heading" aria-label="{{ party.name }}">
                   {{ party.name }}
                   {% if perms.people_db.change_party %}
                     <a href="{% url 'admin:people_db_party_change' party.pk %}" class="inline-block align-middle ml-1 text-greyscale-500 hover:text-greyscale-700 focus-visible:ring-2 focus-visible:ring-primary-400 focus-visible:outline-none rounded" aria-label="Edit {{ party.name }}" title="Edit {{ party.name }}">{% svg "edit" class="w-4 h-4" aria_hidden="true" %}</a>
