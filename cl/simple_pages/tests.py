@@ -750,27 +750,85 @@ class ContentSecurityPolicyTest(TestCase):
 
 
 class ButtonComponentTest(CottonComponentMixin, SimpleTestCase):
-    """The c-button busy state, keyed on aria-busy for buttons and links alike."""
+    """The c-button busy state: declared by aria-busy, static or bound."""
+
+    def test_a_plain_button_renders_no_busy_markup(self) -> None:
+        """Without aria-busy the element is rendered bare, with no wrapper,
+        spinner or status region."""
+        for source, tag in (
+            ('<c-button variant="primary">Save</c-button>', "button"),
+            ('<c-button variant="primary" href="/x/">Save</c-button>', "a"),
+            (
+                '<c-button variant="primary" touch_target>Save</c-button>',
+                "button",
+            ),
+        ):
+            with self.subTest(tag=tag, source=source):
+                root = fromstring(self.render_component(source))
+                self.assertEqual(root.tag, tag)
+                self.assertIsNone(root.get("x-data"))
+                self.assertEqual(root.xpath('.//*[local-name()="svg"]'), [])
+                self.assertEqual(root.xpath('.//*[@role="status"]'), [])
+
+    def test_caller_attributes_reach_the_busy_capable_button(self) -> None:
+        """A bound aria-busy turns on the busy markup, and the other
+        attributes still land on the rendered element."""
+        for source, tag in (
+            (
+                '<c-button variant="primary" type="submit" x-bind:aria-busy="busy" class="w-full">Save</c-button>',
+                "button",
+            ),
+            (
+                '<c-button variant="primary" href="/x/" rel="nofollow" x-bind:aria-busy="busy" class="w-full">Save</c-button>',
+                "a",
+            ),
+        ):
+            with self.subTest(tag=tag):
+                root = fromstring(self.render_component(source))
+                self.assertEqual(root.get("x-data"), "busyButton")
+                element = root.find(tag)
+                self.assertIsNotNone(element)
+                self.assertEqual(element.get("x-bind:aria-busy"), "busy")
+                self.assertIn("w-full", element.get("class").split())
+                if tag == "a":
+                    self.assertEqual(element.get("href"), "/x/")
+                    self.assertEqual(element.get("rel"), "nofollow")
+                else:
+                    self.assertEqual(element.get("type"), "submit")
 
     def test_busy_keeps_the_label_and_hides_the_spinner_from_assistive_technology(
         self,
     ) -> None:
-        """aria-busy reaches the rendered element and the label survives.
-
-        The spinner is decoration, so the accessible name is the label alone.
-        """
+        """The label stays the accessible name; the spinner and status region
+        are not part of it."""
         for source in (
             '<c-button variant="primary" aria-busy="true">Save</c-button>',
-            '<c-button variant="primary" touch_target aria-busy="true">Save</c-button>',
             '<c-button variant="primary" href="#" aria-busy="true">Save</c-button>',
         ):
             with self.subTest(source=source):
-                element = fromstring(self.render_component(source))
+                root = fromstring(self.render_component(source))
+                element = root[0]
                 self.assertEqual(element.get("aria-busy"), "true")
                 spinners = element.xpath('.//*[local-name()="svg"]')
                 self.assertEqual(len(spinners), 1)
                 self.assertEqual(spinners[0].get("aria-hidden"), "true")
                 self.assertEqual(element.text_content().strip(), "Save")
+                statuses = root.xpath('./*[@role="status"]')
+                self.assertEqual(len(statuses), 1)
+                self.assertEqual(statuses[0].text_content(), "")
+                self.assertTrue(statuses[0].get("data-busy-text"))
+
+    def test_busy_text_is_what_the_status_region_announces(self) -> None:
+        """busy_text replaces the default announcement and never reaches the
+        button itself."""
+        root = fromstring(
+            self.render_component(
+                '<c-button variant="primary" aria-busy="true" busy_text="Saving your changes">Save</c-button>'
+            )
+        )
+        status = root.xpath('./*[@role="status"]')[0]
+        self.assertEqual(status.get("data-busy-text"), "Saving your changes")
+        self.assertIsNone(root[0].get("busy_text"))
 
 
 class DialogComponentTest(CottonComponentMixin, SimpleTestCase):
