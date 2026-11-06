@@ -89,6 +89,7 @@ Templates render; they SHOULD know as little as possible about the data they sho
 - Use `TextInput` for standard text-input styling and `autocomplete="off"`
 - Use `Select` for standard select styling, with `input_text=True` when the select requires the `input-text` component class
 - Keep field-specific attributes, such as `placeholder`, in the form field declaration
+- Tailwind scans only `forms_v2.py` modules for class names, so any widget class string for the new stack MUST live in one — otherwise the class silently drops out of the build
 
 ## Alpine.js
 
