@@ -7,7 +7,7 @@ from contextlib import closing, contextmanager
 from io import StringIO
 from pathlib import Path
 from tempfile import TemporaryDirectory
-from typing import Any, ClassVar, cast
+from typing import Any, ClassVar
 from unittest.mock import MagicMock, Mock, call, patch
 
 from botocore.exceptions import BotoCoreError, ClientError
@@ -99,7 +99,7 @@ def merger_test[**P, R](
                 # Skip savepoint bookkeeping from transaction.atomic(); it only
                 # appears because tests already run inside a transaction.
                 if not sql.startswith(("SAVEPOINT", "RELEASE", "ROLLBACK")):
-                    if merge_depth:
+                    if merge_depth:  # pyrefly:ignore[redundant-condition] See https://github.com/meta/pyrefly/issues/5563
                         counts["merger"] += 1
                         merger_sql.append(sql)
                     else:
@@ -116,13 +116,13 @@ def merger_test[**P, R](
                     # It's okay if the query count is below the expect amount, but we still assert it isn't to force
                     # the expectation to be updated whenever performance is improved.
                     if isinstance(expected_query_count, int):
-                        cast(TestCase, args[0]).assertEqual(
+                        args[0].assertEqual(
                             counts["merger"],
                             expected_query_count,
                             "Merger query count should be equal to expectation.",
                         )
                     elif isinstance(expected_query_count, range):
-                        cast(TestCase, args[0]).assertIn(
+                        args[0].assertIn(
                             counts["merger"],
                             expected_query_count,
                             "Merger query count should be in expected range.",
@@ -1062,7 +1062,7 @@ class StateStorageTest(SimpleTestCase):
         self.storage.get_object_parameters.return_value = {
             "CacheControl": "max-age=315360000"
         }
-        self.client = self.storage.connection.meta.client
+        self.client: MagicMock = self.storage.connection.meta.client
         patcher = patch(
             "cl.corpus_importer.state.storage.AWSMediaStorage",
             return_value=self.storage,
