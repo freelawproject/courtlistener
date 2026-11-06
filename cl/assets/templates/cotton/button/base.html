@@ -1,0 +1,46 @@
+{% load extras %}
+<c-vars
+  variant=""
+  size=""
+  href=""
+  type="button"
+  touch_target=""
+  class=""
+  :sizes="{
+    'sm': 'py-1.5 px-2.5 text-xs',
+    'md': 'py-2.5 px-3.5 text-sm',
+    'xl': 'py-3 px-4.5 text-md',
+  }"
+  :variants="{
+    'primary': 'text-white bg-primary-600 outline-none hover:bg-primary-700 focus-visible:ring-4 focus-visible:ring-primary-300 disabled:bg-primary-100 disabled:text-primary-400 aria-disabled:bg-primary-100 aria-disabled:text-primary-400 aria-disabled:pointer-events-none',
+    'outline': 'bg-white text-greyscale-700 border border-greyscale-300 outline-none hover:bg-greyscale-50 hover:border-greyscale-400 focus-visible:ring-4 focus-visible:ring-greyscale-300 disabled:bg-white disabled:text-greyscale-400 disabled:border-greyscale-200 aria-disabled:bg-white aria-disabled:text-greyscale-400 aria-disabled:border-greyscale-200 aria-disabled:pointer-events-none',
+    'dark': 'text-white bg-greyscale-900 outline-none hover:bg-greyscale-800 focus-visible:ring-4 focus-visible:ring-greyscale-400 disabled:bg-greyscale-400 disabled:text-greyscale-200 aria-disabled:bg-greyscale-400 aria-disabled:text-greyscale-200 aria-disabled:pointer-events-none',
+    'ghost': 'hover:bg-greyscale-100 focus-visible:ring-4 focus-visible:ring-greyscale-200 disabled:text-greyscale-400 aria-disabled:text-greyscale-400 aria-disabled:pointer-events-none',
+    'grey': 'bg-greyscale-100 hover:bg-greyscale-200 focus-visible:ring-4 focus-visible:ring-greyscale-200 disabled:text-greyscale-400 disabled:bg-greyscale-50 aria-disabled:text-greyscale-400 aria-disabled:bg-greyscale-50 aria-disabled:pointer-events-none',
+    'blue': 'text-white bg-sky-800 hover:bg-sky-900 outline-none focus-visible:ring-4 focus-visible:ring-sky-600 disabled:bg-sky-100 disabled:text-blue-300 aria-disabled:bg-sky-100 aria-disabled:text-blue-300 aria-disabled:pointer-events-none',
+  }"
+/>
+{# An unknown variant falls back to primary. #}
+{% with base="rounded-lg w-fit font-normal flex gap-1 items-center" sizing=sizes|get_item:size|default:sizes.md styles=variants|get_item:variant|default:variants.primary %}
+{% if href %}
+<a
+  href="{{ href }}"
+  class="{% if variant %}{{ base }} {{ sizing }} {{ styles }}{% endif %} {{ class }}"
+  {{ attrs }}
+>{{ slot }}</a>
+{% elif touch_target %}
+<button
+  type="{{ type }}"
+  class="min-h-13 h-fit min-w-13 w-fit flex justify-center items-center focus-visible:outline-none group"
+  {{ attrs }}
+>
+  <span class="{% if variant %}{{ base }} {{ sizing }} {{ styles }} group-focus-visible:ring-4 group-focus-visible:ring-greyscale-300{% endif %} {{ class }}">{{ slot }}</span>
+</button>
+{% else %}
+<button
+  type="{{ type }}"
+  class="{% if variant %}{{ base }} {{ sizing }} {{ styles }}{% endif %} {{ class }}"
+  {{ attrs }}
+>{{ slot }}</button>
+{% endif %}
+{% endwith %}
