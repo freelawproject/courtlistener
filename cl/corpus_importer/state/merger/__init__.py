@@ -7,11 +7,16 @@ from .parameters import (
     ThroughParameters,
 )
 from .specifications import (
-    Attribute,
+    Ancestor,
+    Constant,
+    Fn,
     ManyStrategy,
     ManyToManyRelation,
     OneToManyRelation,
     OneToOneRelation,
+    Params,
+    Scrape,
+    WithStrategy,
 )
 from .strategy import (
     overwrite,
@@ -19,7 +24,9 @@ from .strategy import (
 )
 
 __all__ = [
-    "Attribute",
+    "Ancestor",
+    "Constant",
+    "Fn",
     "RelatedParams",
     "OneToOneRelation",
     "ManyStrategy",
@@ -27,6 +34,9 @@ __all__ = [
     "ThroughParameters",
     "ManyToManyRelation",
     "Merger",
+    "Scrape",
+    "Params",
+    "WithStrategy",
     "auto_now_fields",
     "overwrite",
     "overwrite_if_present",

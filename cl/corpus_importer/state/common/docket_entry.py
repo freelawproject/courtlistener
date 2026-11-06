@@ -15,12 +15,13 @@ from juriscraper.state.docket import DocketEntry as ScrapeDocketEntry
 from juriscraper.state.docket import Document as ScrapeDocument
 
 from cl.corpus_importer.state.merger import (
-    Attribute,
+    Fn,
     ManyStrategy,
     Merger,
     OneToManyRelation,
+    Params,
     RelatedParams,
-    overwrite,
+    Scrape,
 )
 from cl.search.state.shared import (
     AbstractStateDocument,
@@ -29,23 +30,10 @@ from cl.search.state.shared import (
 )
 
 
-def _entry_type(entry: ScrapeDocketEntry[Any], params: Any) -> int:
-    """Map Juriscraper's `DocketEntryType` enum to CL's integer mirror."""
-    return cast(int, getattr(DocketEntryType, entry.entry_type.name))
-
-
-def _entry_date_filed(entry: ScrapeDocketEntry[Any], params: Any) -> date:
-    return entry.date_filed
-
-
 def _entry_attachments[DocType: ScrapeDocument](
     entry: ScrapeDocketEntry[DocType], params: Any
 ) -> Sequence[DocType]:
     return entry.attachments
-
-
-def _document_url(document: ScrapeDocument, params: Any) -> str:
-    return document.url
 
 
 class DocumentMerger[
@@ -53,7 +41,7 @@ class DocumentMerger[
     ParamType,
     M: AbstractStateDocument,
 ](Merger[DocType, RelatedParams[ParamType], M], abstract=True):
-    url: str = Attribute(transform=_document_url, strategy=overwrite)
+    url: str = Scrape(ScrapeDocument).url
 
     @override
     def needs_update(self) -> bool:
@@ -96,7 +84,7 @@ def AttachmentRelation(
 ) -> list[Any]:
     return OneToManyRelation(
         merger,
-        Attribute(transform=transform),
+        Fn(transform)(Scrape(Any), Params(Any)),
         strategy=strategy,
     )
 
@@ -106,8 +94,8 @@ class DocketEntryMerger[
     ParamType,
     M: Model,
 ](Merger[EntryType, RelatedParams[ParamType], M], abstract=True):
-    date_filed: date = Attribute(
-        transform=_entry_date_filed, strategy=overwrite
+    date_filed: date = Scrape(ScrapeDocketEntry).date_filed
+    entry_type: int = Fn(getattr)(
+        DocketEntryType, Scrape(ScrapeDocketEntry).entry_type.name
     )
-    entry_type: int = Attribute(transform=_entry_type, strategy=overwrite)
     documents: list[Any] = AttachmentRelation()

@@ -122,13 +122,13 @@ class MergerSpecRegistry[Scrape, Params]:
     def register(self, spec: MergerSpecification[Scrape, Params, Any]):
         match spec:
             case AttributeMerger():
-                self.attr[spec.name] = spec
+                self.attr[spec._name] = spec
             case OneToOneMerger():
-                self.one_to_one[spec.name] = spec
+                self.one_to_one[spec._name] = spec
             case RelatedMerger():
-                self.related[spec.name] = spec
+                self.related[spec._name] = spec
             case _:
-                logger.error(f"Unknown merger spec type: {spec}")
+                logger.error(f"Unknown merger spec type: {spec!r}")
 
 
 class MergerMeta(type):
@@ -203,9 +203,6 @@ class Merger[Scrape, Params, M: Model](metaclass=MergerMeta):
         super().__init_subclass__()
 
         if abstract:
-            logger.info(
-                "Skipping validation of abstract merger: %s", cls.__name__
-            )
             return
 
         cls.errors += cls.__registry__.validate(cls)

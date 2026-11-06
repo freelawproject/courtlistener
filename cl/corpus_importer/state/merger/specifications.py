@@ -5,14 +5,14 @@ import typing
 from abc import ABC, abstractmethod
 from collections.abc import (
     Callable,
+    Mapping,
     Sequence,
 )
-from dataclasses import dataclass
 from enum import Enum
 from typing import (
     Any,
+    Self,
     cast,
-    overload,
     override,
 )
 
@@ -32,7 +32,7 @@ from .parameters import (
     RelatedParams,
     ThroughParameters,
 )
-from .strategy import overwrite_if_present
+from .strategy import Strategy, overwrite_if_present
 
 if typing.TYPE_CHECKING:
     from django.db.models.fields.related_descriptors import RelatedManager
@@ -44,31 +44,28 @@ logger = logging.getLogger(__name__)
 type Transformer[Scrape, Params, Transformed] = Callable[
     [Scrape, Params], Transformed
 ]
-type Strategy[Scrape, Existing, Output = Scrape | Existing] = Callable[
-    [Scrape, Existing], Output
-]
 
 Absent = Sentinel("Absent")
 
 
 class MergerSpecification[Scrape, Params, Output](ABC):
-    __slots__: tuple[str, ...] = ("name",)
+    __slots__ = ("_name",)
 
     def __init__(self, /):
-        self.name: str = ""
+        self._name: str = ""
 
     def run_validation(
         self, merger: type[Merger[Scrape, Params, Any]]
     ) -> list[Exception]:
         """Runs validation for this spec against the given merger, returning any errors found."""
         try:
-            f = merger.model._meta.get_field(self.name)
+            f = merger.model._meta.get_field(self._name)
         except FieldDoesNotExist as e:
             return [e]
         if isinstance(f, GenericForeignKey):
             return [
                 TypeError(
-                    f"{self.name}: Generic foreign keys are not supported yet."
+                    f"{self._name}: Generic foreign keys are not supported yet."
                 )
             ]
         return self.validate(f)
@@ -90,85 +87,206 @@ class MergerSpecification[Scrape, Params, Output](ABC):
 
         if not issubclass(owner, Merger):
             return
-        self.name = name
+        self._name = name
         owner.__registry__.register(self)
 
     @abstractmethod
     def transform(self, scrape: Scrape, params: Params) -> Output: ...
 
 
-@dataclass(slots=True)
-class _Constant[T]:
-    value: T
-
-
 class AttributeMerger[Scrape, Params, Transform](
-    MergerSpecification[Scrape, Params, Transform | None]
+    MergerSpecification[Scrape, Params, Transform]
 ):
-    """Class encapsulating logic for merging a single attribute from a scrape into a DB object.
+    __slots__ = ("strategy",)
 
-    Args:
-        transform: Defines how to get the DB value from the scrape data
-        strategy: How to behave when data is present in the scrape and DB. Defaults to overwriting the DB value
-            only when the scraped value is present (not `None`), so a partial scrape won't overwrite existing data.
-    """
-
-    __slots__: tuple[str, ...] = "transformer", "strategy"
-
-    def __init__(
-        self,
-        transform: Transformer[Scrape, Params, Transform],
-        strategy: Strategy[
-            Transform | None,
-            Transform | None,
-        ] = overwrite_if_present,
-    ):
+    def __init__(self):
         super().__init__()
-        self.transformer: Transformer[Scrape, Params, Transform] = transform
-        self.strategy: Strategy[Transform | None, Transform | None] = strategy
+        self.strategy: Strategy = overwrite_if_present
+
+
+class _RootProxy[Scrape, Params, Transform](
+    AttributeMerger[Scrape, Params, Transform]
+):
+    __slots__ = ("path",)
+
+    def __init__(self, path: tuple[_PathProxy, ...]):
+        super().__init__()
+        self.path: tuple[_PathProxy, ...] = path
+
+    def ensure_proxied(self, value: Any) -> _RootProxy:
+        match value:
+            case _RootProxy():
+                return value
+            case _:
+                return _ConstantProxy(value)
+
+    def __getattr__(self, name: str) -> Self | Any:
+        for cls in self.__class__.__mro__:
+            if hasattr(cls, name):
+                return getattr(cls, name).__get__(self)
+
+        # ABCs and other stuff inspect dunder attributes to function
+        if name.startswith("__"):
+            raise AttributeError(name)
+
+        self.path = (*self.path, _AttrProxy(name))
+        return self
+
+    def __getitem__(self, key: Any) -> Self:
+        self.path = (*self.path, _ItemProxy(self.ensure_proxied(key)))
+        return self
+
+    def __call__(self, *args: Any, **kwargs: Any) -> Self:
+        self.path = (
+            *self.path,
+            _CallProxy(
+                tuple(self.ensure_proxied(arg) for arg in args),
+                {k: self.ensure_proxied(v) for k, v in kwargs},
+            ),
+        )
+        return self
+
+    @abstractmethod
+    def root(self, scrape: Scrape, params: Params) -> Any: ...
 
     @override
     def transform(self, scrape: Scrape, params: Params) -> Transform:
-        return self.transformer(scrape, params)
+        current = self.root(scrape, params)
+
+        for segment in self.path:
+            current = segment.apply(current, scrape, params)
+
+        # pyrefly:ignore[bad-return]
+        return current
 
 
-@overload
-def Attribute[Scrape, Params, Transform](
-    *,
-    transform: Absent = ...,
-    strategy: Strategy[
-        Transform | None,
-        Transform | None,
-    ] = ...,
-    default: Transform,
-) -> Any: ...
-@overload
-def Attribute[Scrape, Params, Transform](
-    *,
-    transform: Transformer[Scrape, Params, Transform],
-    strategy: Strategy[
-        Transform | None,
-        Transform | None,
-    ] = ...,
-    default: Absent = ...,
-) -> Any: ...
-def Attribute[Scrape, Params, Transform](
-    *,
-    transform: Transformer[Scrape, Params, Transform] | Absent = Absent,
-    strategy: Strategy[
-        Transform | None,
-        Transform | None,
-    ] = overwrite_if_present,
-    default: Transform | Absent = Absent,
-) -> Any:
-    if transform is Absent:
-        if default is Absent:
-            raise TypeError("One of transform or default must be specified")
+class _AncestorProxy[Scrape, Params, M: Model](_RootProxy[Scrape, Params, M]):
+    __slots__ = ("model",)
 
-        def transform(scrape: Scrape, params: Scrape) -> Transform:
-            return default
+    def __init__(self, model: type[M]):
+        super().__init__(())
+        self.model: type[M] = model
 
-    return AttributeMerger(transform, strategy)
+    @override
+    def root(self, scrape: Scrape, params: Params) -> Any:
+        current = params
+
+        while isinstance(current, RelatedParams):
+            if isinstance(current.parent, self.model):
+                return current.parent
+            current = current.params
+
+        raise AttributeError(f"Unable to find ancestor {self.model.__name__}")
+
+
+class _ConstantProxy[Scrape, Params, Transform](
+    _RootProxy[Scrape, Params, Transform]
+):
+    __slots__ = ("value",)
+
+    def __init__(self, value: Any):
+        super().__init__(())
+        self.value: Any = value
+
+    @override
+    def root(self, scrape: Scrape, params: Params) -> Any:
+        return self.value
+
+
+class _ScrapeProxy[Scrape, Params, Transform](
+    _RootProxy[Scrape, Params, Transform]
+):
+    __slots__ = ()
+
+    @override
+    def root(self, scrape: Scrape, params: Params) -> Any:
+        return scrape
+
+
+class _ParamsProxy[Scrape, Params, Transform](
+    _RootProxy[Scrape, Params, Transform]
+):
+    __slots__ = ()
+
+    @override
+    def root(self, scrape: Scrape, params: Params) -> Any:
+        return params
+
+
+class _ItemProxy:
+    __slots__ = ("key",)
+    __match_args__ = ("key",)
+
+    def __init__(self, key: _RootProxy):
+        self.key: _RootProxy = key
+
+    def apply(self, current: Any, scrape: Any, params: Any) -> Any:
+        return current[self.key.transform(scrape, params)]
+
+
+class _AttrProxy:
+    __slots__ = ("key",)
+    __match_args__ = ("key",)
+
+    def __init__(self, key: str):
+        self.key: str = key
+
+    def apply(self, current: Any, scrape: Any, params: Any) -> Any:
+        return getattr(current, self.key)
+
+
+class _CallProxy:
+    __slots__ = ("args", "kwargs")
+    __match_args__ = ("args", "kwargs")
+
+    def __init__(
+        self, args: tuple[_RootProxy, ...], kwargs: Mapping[str, _RootProxy]
+    ):
+        self.args: tuple[_RootProxy, ...] = args
+        self.kwargs: Mapping[str, _RootProxy] = kwargs
+
+    def apply(self, current: Any, scrape: Any, params: Any) -> Any:
+        return current(
+            *(arg.transform(scrape, params) for arg in self.args),
+            **{k: v.transform(scrape, params) for k, v in self.kwargs.items()},
+        )
+
+
+type _PathProxy = _ItemProxy | _AttrProxy | _CallProxy
+
+
+def Fn[F: Callable](f: F) -> F:
+    # pyrefly: ignore[bad-return]
+    return _ConstantProxy(f)
+
+
+def Scrape[T](_: type[T]) -> T:
+    # pyrefly: ignore[bad-return]
+    return _ScrapeProxy(())
+
+
+def Params[T](_: type[T]) -> T:
+    # pyrefly: ignore[bad-return]
+    return _ParamsProxy(())
+
+
+def Ancestor[M: Model](model: type[M]) -> M:
+    # pyrefly: ignore[bad-return]
+    return _AncestorProxy(model)
+
+
+def Constant[T](value: T) -> T:
+    # pyrefly: ignore[bad-return]
+    return _ConstantProxy(value)
+
+
+def WithStrategy[T](specification: T, strategy: Strategy) -> T:
+    if not isinstance(specification, AttributeMerger):
+        raise TypeError(
+            f"specification must be an AttributeMerger. Found {type(specification)!r}"
+        )
+    specification.strategy = strategy
+    return specification
 
 
 class RelatedMerger[
@@ -196,7 +314,7 @@ class RelatedMerger[
         errors = super().validate(field)
         if not field.related_model:
             errors.append(
-                TypeError(f"Field {self.name} is not a related field")
+                TypeError(f"Field {self._name} is not a related field")
             )
         if (
             field.related_model is not None
@@ -205,13 +323,13 @@ class RelatedMerger[
             if field.related_model == "self":
                 errors.append(
                     TypeError(
-                        f"{self.name}: Merging self references is not supported yet."
+                        f"{self._name}: Merging self references is not supported yet."
                     )
                 )
             else:
                 errors.append(
                     TypeError(
-                        f"Field {self.name} is related to {field.related_model.__name__}, not {self.merger.model.__name__}"
+                        f"Field {self._name} is related to {field.related_model.__name__}, not {self.merger.model.__name__}"
                         # type: ignore[union-attr]
                     )
                 )
@@ -253,7 +371,9 @@ class OneToOneMerger[Scrape, Params, Child, RM: Model](
         """Validate the field and, along the way, learn which side of the relation it is. A reverse relation is a `OneToOneRel` rather than a `OneToOneField`, and carries the name of the child's own field."""
         errors = super().validate(field)
         if not field.one_to_one:
-            errors.append(TypeError(f"{self.name}: Is not a one-to-one field"))
+            errors.append(
+                TypeError(f"{self._name}: Is not a one-to-one field")
+            )
             return errors
         if isinstance(field, OneToOneRel):
             self.forward = False
@@ -272,12 +392,12 @@ class OneToOneMerger[Scrape, Params, Child, RM: Model](
             if not self.forward:
                 # A reverse relation is merged after its parent exists, so
                 # there is nothing to hang the child off of without one.
-                logger.error("%s: No parent model specified", self.name)
+                logger.error("%s: No parent model specified", self._name)
                 return MergeResult.failed(self.merger.model.__name__)
             db_obj = None
         else:
             try:
-                db_obj = cast(RM | None, getattr(parent, self.name))
+                db_obj = cast(RM | None, getattr(parent, self._name))
             except ObjectDoesNotExist:
                 # Unlike a forward one-to-one, an absent reverse relation
                 # raises instead of returning None.
@@ -331,7 +451,7 @@ class NToManyMerger[Scrape, Params, Child, RM: Model](
     def _transform_result_and_manager(
         self, parent: RM | None, scrape: Scrape, params: Params
     ) -> tuple[Sequence[Child], MergeResult, RelatedManager[Any]]:
-        related_manager: RelatedManager[Any] = getattr(parent, self.name)
+        related_manager: RelatedManager[Any] = getattr(parent, self._name)
         transformed = self.transform(scrape, params)
         if isinstance(transformed, (str, bytes)):
             return (
@@ -398,7 +518,7 @@ class OneToManyMerger[Scrape, Params, Child, RM: Model](
         errors = super().validate(field)
         if not field.one_to_many:
             errors.append(
-                TypeError(f"{self.name}: Is not a one-to-many field")
+                TypeError(f"{self._name}: Is not a one-to-many field")
             )
         return errors
 
@@ -450,7 +570,7 @@ class ManyToManyMerger[
         errors = super().validate(field)
         if not field.many_to_many:
             errors.append(
-                TypeError(f"{self.name}: Is not a many-to-many field")
+                TypeError(f"{self._name}: Is not a many-to-many field")
             )
 
         if self.through:
@@ -475,7 +595,7 @@ class ManyToManyMerger[
     ) -> MergeResult:
         """Run the merge method on the appropriate inputs for the given relationship."""
         if parent is None:
-            logger.error("%s: No parent model specified", self.name)
+            logger.error("%s: No parent model specified", self._name)
             return MergeResult.failed(self.merger.model.__name__)
         if self.through is None:
             # If there's no `through` model, everything is functionally the same as `OneToMany`
