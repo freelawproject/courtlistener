@@ -1,7 +1,7 @@
 from collections.abc import Callable
 from datetime import datetime
 from functools import partial
-from typing import Any
+from typing import Any, TypedDict
 
 from django.conf import settings
 from django.http import QueryDict
@@ -417,8 +417,8 @@ class AudioDocument(CSVSerializableDocumentMixin, AudioDocumentBase):
             key: lambda x: render_string_or_list(x)
             for key in SEARCH_ORAL_ARGUMENT_ES_HL_FIELDS.keys()
         }
-        transformations["absolute_url"] = (
-            lambda x: f"https://www.courtlistener.com{x}"
+        transformations["absolute_url"] = lambda x: (
+            f"https://www.courtlistener.com{x}"
         )
         transformations["local_path"] = lambda x: (
             f"https://storage.courtlistener.com/{x}" if x else ""
@@ -986,9 +986,9 @@ class PersonDocument(CSVSerializableDocumentMixin, PersonBaseDocument):
             for key in (hl_fields + list_fields)
         }
 
-        # Adds tranformation for relative URL and compute human-readable values
-        transformations["absolute_url"] = (
-            lambda x: f"https://www.courtlistener.com{x}"
+        # Adds transformation for relative URL and compute human-readable values
+        transformations["absolute_url"] = lambda x: (
+            f"https://www.courtlistener.com{x}"
         )
         transformations["religion"] = lambda x: dict(Person.RELIGIONS).get(
             x, x
@@ -1483,6 +1483,15 @@ class DocketBaseDocument(DSLDocument):
     )
 
 
+class _DocketDocumentPartyDict(TypedDict):
+    party_id: set
+    party: set[str] | list[str]
+    attorney_id: set
+    attorney: set[str]
+    firm_id: set
+    firm: set
+
+
 @recap_index.document
 class DocketDocument(
     CSVSerializableDocumentMixin, DocketBaseDocument, RECAPBaseDocument
@@ -1534,8 +1543,8 @@ class DocketDocument(
             for key in (hl_fields + list_fields)
         }
         # Add a transformation for relative URLs.
-        transformations["docket_absolute_url"] = (
-            lambda x: f"https://www.courtlistener.com{x}"
+        transformations["docket_absolute_url"] = lambda x: (
+            f"https://www.courtlistener.com{x}"
         )
         return transformations
 
@@ -1568,10 +1577,11 @@ class DocketDocument(
     def prepare_docket_absolute_url(self, instance):
         return instance.get_absolute_url()
 
-    def prepare_parties(self, instance):
-        out = {
+    def prepare_parties(self, instance) -> _DocketDocumentPartyDict:
+        parties = set()
+        out: _DocketDocumentPartyDict = {
             "party_id": set(),
-            "party": set(),
+            "party": parties,
             "attorney_id": set(),
             "attorney": set(),
             "firm_id": set(),
@@ -1582,7 +1592,7 @@ class DocketDocument(
         party_values = instance.parties.values_list("pk", "name")
         for pk, name in party_values.iterator():
             out["party_id"].add(pk)
-            out["party"].add(name)
+            parties.add(name)
 
         if not out["party"]:
             # Get party from docket case_name if no normalized parties are
@@ -1592,7 +1602,9 @@ class DocketDocument(
                 if is_bankruptcy_court(instance.court_id)
                 else get_parties_from_case_name(instance.case_name)
             )
-            out["party"] = party_from_case_name if party_from_case_name else []
+            out["party"] = (
+                party_from_case_name if party_from_case_name else list[str]()
+            )
 
         # Extract only required attorney values.
         atty_values = (
@@ -1635,7 +1647,7 @@ class DocketDocumentPlain(DocketDocument):
     control whether to include parties based on
     the MAX_ATTORNEYS_TO_PERCOLATE setting."""
 
-    def prepare_parties(self, instance: Docket) -> dict[str, set]:
+    def prepare_parties(self, instance: Docket) -> _DocketDocumentPartyDict:
         out = {
             "party_id": set(),
             "party": set(),
@@ -2100,6 +2112,10 @@ class OpinionDocument(CSVSerializableDocumentMixin, OpinionBaseDocument):
             return html_decode(
                 strip_tags(instance.xml_harvard.translate(null_map))
             )
+        elif instance.xml_scan:
+            return html_decode(
+                strip_tags(instance.xml_scan.translate(null_map))
+            )
         elif instance.html_anon_2020:
             return html_decode(
                 strip_tags(instance.html_anon_2020.translate(null_map))
@@ -2306,14 +2322,14 @@ class OpinionClusterDocument(
     def get_csv_transformations(cls) -> dict[str, Callable[..., Any]]:
         list_fields = ["panel_names", "citation"]
         hl_fields = list(SEARCH_OPINION_HL_FIELDS.keys())
-        transformations = {
+        transformations: dict[str, Callable[..., Any]] = {
             key: lambda x: render_string_or_list(x)
             for key in (hl_fields + list_fields)
         }
 
         # Add a transformation for relative URL
-        transformations["absolute_url"] = (
-            lambda x: f"https://www.courtlistener.com{x}"
+        transformations["absolute_url"] = lambda x: (
+            f"https://www.courtlistener.com{x}"
         )
 
         # Add a transformation to compute Human-readable values

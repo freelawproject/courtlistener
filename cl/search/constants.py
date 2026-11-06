@@ -336,3 +336,29 @@ jurisdiction_relevance_multipliers = {
     # 0.2
     Court.INTERNATIONAL: 0.2,
 }
+
+
+# Homepage corpus search tabs.
+# Server-rendered so tabs appear before Alpine initializes (see #7035).
+CORPUS_SEARCH_SCOPES = (
+    {
+        "label": "Case Law",
+        "type": "o",
+        "short_description": "10M+ Opinions",
+    },
+    {
+        "label": "RECAP Archive",
+        "type": "r",
+        "short_description": "500M+ Records",
+    },
+    {
+        "label": "Oral Arguments",
+        "type": "oa",
+        "short_description": "90k+ Audio Files",
+    },
+    {
+        "label": "Judges",
+        "type": "p",
+        "short_description": "15k+ Profiles",
+    },
+)

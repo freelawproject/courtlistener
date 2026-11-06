@@ -32,8 +32,11 @@ you're working in and MUST read `FRONTEND.md` for stack-specific rules. Do not m
    url = "/some/hardcoded/path/1/"
    ```
 
-2. **Type Hints**: New code MUST include type hints and pass MyPy. MUST upgrade lint.yml
-   with new files as you go.
+2. **Type Hints**: New code MUST include type hints and pass pyrefly.
+    - Pre-existing type errors are grandfathered in `.pyrefly-baseline.json`. Fixed errors
+      linger there until pruned by pre-commit hooks. MUST NOT update the baseline to silence errors in new or changed code —
+      fix the code instead.
+    - SHOULD fix baselined type errors in modified code when it does not dilute the focus of your work.
 
 3. **Unused Code**: MUST delete unused code created during a task.
 
@@ -165,6 +168,20 @@ Migration guide: https://wiki.free.law/c/courtlistener/dev-guide/database-migrat
 
 ## Available Tools
 
+### Local Stack
+
+The development environment is the Docker Compose stack in `docker/courtlistener/`; the
+Getting Started guide above is the walkthrough. Start it from that directory with
+`docker compose up`; the containers are named `cl-django`, `cl-celery`, `cl-postgres`,
+`cl-redis`, `cl-es`, and so on, and tests run inside `cl-django` as shown below.
+
+In Claude Code on the web, `.claude/hooks/session_start.py` boots that stack in the
+background when the session starts. Before running tests, MUST run
+`python3 .claude/hooks/session_start.py --wait` with a 10-minute timeout; run it again if
+it says the stack is still starting. If it reports that the environment's network policy
+refused a download, MUST NOT work around it: tell the user which host to allow and carry on
+without the stack.
+
 ### Docker Commands
 
 ```bash
@@ -179,5 +196,7 @@ docker exec -it cl-django python manage.py shell
 
 - `rg` may be installed. Use it instead of `grep` if so.
 - `gh` → GitHub CLI for PRs, issues, actions
-- `pre-commit` → code quality checks (ruff, mypy, etc.)
+- `pre-commit` → code quality checks (ruff, pyrefly, etc.). Its `check python ast`
+  hook already validates Python syntax on every edited file — MUST rely on that instead of
+  ad hoc `python -c "import ast; ast.parse(...)"` snippets.
 - `uv` → Python dependency management (the only tool to use for deps)

@@ -1,8 +1,15 @@
+from asgiref.sync import async_to_sync
 from juriscraper.lib.exceptions import PacerLoginException
 from rest_framework import serializers
 from rest_framework.exceptions import ValidationError
 
 from cl.corpus_importer.utils import is_appellate_court
+from cl.lib.file_validation import (
+    NOT_A_PDF_MESSAGE,
+    content_is_pdf,
+    file_too_large_message,
+    is_too_large,
+)
 from cl.lib.pacer_session import get_or_cache_pacer_cookies
 from cl.recap.models import (
     REQUEST_TYPE,
@@ -53,6 +60,7 @@ class ProcessingQueueSerializer(serializers.ModelSerializer):
             "docket",
             "docket_entry",
             "recap_document",
+            "source",
         )
         extra_kwargs = {"filepath_local": {"write_only": True}}
 
@@ -69,6 +77,13 @@ class ProcessingQueueSerializer(serializers.ModelSerializer):
                 raise ValidationError(
                     f"'{attr_name}' field cannot have the literal value 'undefined'."
                 )
+
+        # Check the size of every upload before it's written to storage. The
+        # uploader controls it, and downstream processing loads these files
+        # into memory.
+        uploaded_file = attrs.get("filepath_local")
+        if uploaded_file is not None and is_too_large(uploaded_file):
+            raise ValidationError({"filepath_local": file_too_large_message()})
 
         if attrs["upload_type"] in [
             UPLOAD_TYPE.DOCKET,
@@ -128,7 +143,7 @@ class ProcessingQueueSerializer(serializers.ModelSerializer):
             UPLOAD_TYPE.APPELLATE_CASE_QUERY_RESULT_PAGE,
         ]:
             # Appellate court dockets. Is the court valid?
-            if not is_appellate_court(attrs["court"].pk):
+            if not async_to_sync(is_appellate_court)(attrs["court"].pk):
                 raise ValidationError(
                     "{} is not an appellate court ID. Did you mean to use the "
                     "upload_type for district dockets?".format(attrs["court"])
@@ -143,6 +158,12 @@ class ProcessingQueueSerializer(serializers.ModelSerializer):
                     "Uploaded PDFs must have the pacer_doc_id and "
                     "document_number fields completed."
                 )
+
+            # The upload_type is just a claim by the uploader, and these
+            # files get served back to the public, so confirm the contents
+            # really are a PDF.
+            if uploaded_file is not None and not content_is_pdf(uploaded_file):
+                raise ValidationError({"filepath_local": NOT_A_PDF_MESSAGE})
 
         if attrs["upload_type"] not in [
             UPLOAD_TYPE.PDF,
@@ -319,7 +340,7 @@ class PacerFetchQueueSerializer(serializers.ModelSerializer):
         if (
             attrs.get("pacer_case_id")
             and not attrs.get("docket_number")
-            and is_appellate_court(attrs.get("court").pk)
+            and async_to_sync(is_appellate_court)(attrs.get("court").pk)
         ):
             # The user is trying to purchase an appellate docket using only the
             # PACER case ID, which is not supported.
@@ -331,7 +352,7 @@ class PacerFetchQueueSerializer(serializers.ModelSerializer):
         court_id = get_court_id_from_fetch_queue(attrs)
         if (
             attrs.get("de_number_end") or attrs.get("de_number_start")
-        ) and is_appellate_court(court_id):
+        ) and async_to_sync(is_appellate_court)(court_id):
             raise ValidationError(
                 "Docket entry filtering by number is not supported for "
                 "appellate courts. Use date range filtering with "
@@ -371,7 +392,7 @@ class PacerFetchQueueSerializer(serializers.ModelSerializer):
 
         # Do the PACER credentials work?
         try:
-            _ = get_or_cache_pacer_cookies(
+            _ = async_to_sync(get_or_cache_pacer_cookies)(
                 attrs["user"].pk,
                 username=attrs.pop("pacer_username"),
                 password=attrs.pop("pacer_password"),

@@ -2,6 +2,7 @@ import argparse
 import csv
 import os
 
+from asgiref.sync import async_to_sync
 from celery.canvas import chain
 from django.conf import settings
 
@@ -16,7 +17,7 @@ from cl.corpus_importer.tasks import (
 )
 from cl.lib.celery_utils import CeleryThrottle
 from cl.lib.command_utils import VerboseCommand, logger
-from cl.lib.pacer_session import ProxyPacerSession, SessionData
+from cl.lib.pacer_session import SessionData, log_into_pacer
 from cl.scrapers.tasks import extract_pdf_document
 from cl.search.models import DocketEntry, RECAPDocument
 
@@ -34,10 +35,9 @@ def get_dockets(options):
     reader = csv.DictReader(f)
     q = options["queue"]
     throttle = CeleryThrottle(queue_name=q)
-    pacer_session = ProxyPacerSession(
+    pacer_session = async_to_sync(log_into_pacer)(
         username=PACER_USERNAME, password=PACER_PASSWORD
     )
-    pacer_session.login()
     for i, row in enumerate(reader):
         if i < options["offset"]:
             continue
@@ -45,10 +45,9 @@ def get_dockets(options):
             break
 
         if i % 1000 == 0:
-            pacer_session = ProxyPacerSession(
+            pacer_session = async_to_sync(log_into_pacer)(
                 username=PACER_USERNAME, password=PACER_PASSWORD
             )
-            pacer_session.login()
             logger.info(f"Sent {i} tasks to celery so far.")
         logger.info("Doing row %s", i)
         throttle.maybe_wait()
@@ -90,10 +89,9 @@ def get_final_docs(options):
     )
     q = options["queue"]
     throttle = CeleryThrottle(queue_name=q)
-    pacer_session = ProxyPacerSession(
+    pacer_session = async_to_sync(log_into_pacer)(
         username=PACER_USERNAME, password=PACER_PASSWORD
     )
-    pacer_session.login()
     for i, de in enumerate(des):
         if i < options["offset"]:
             i += 1
@@ -101,10 +99,9 @@ def get_final_docs(options):
         if i >= options["limit"] > 0:
             break
         if i % 1000 == 0:
-            pacer_session = ProxyPacerSession(
+            pacer_session = async_to_sync(log_into_pacer)(
                 username=PACER_USERNAME, password=PACER_PASSWORD
             )
-            pacer_session.login()
             logger.info(f"Sent {i} tasks to celery so far.")
         logger.info("Doing row %s", i)
         rd_pks = (

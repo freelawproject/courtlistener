@@ -103,6 +103,8 @@ def get_total_number_of_records(type: str, options: dict[str, Any]) -> int:
         case "fd":
             base_query = "SELECT count(*) AS exact_count FROM disclosures_financialdisclosure"
             filter_clause = ""
+        case _:
+            raise ValueError(f"Unsupported record type: {type}")
 
     if options["random_sample_percentage"]:
         percentage = options["random_sample_percentage"]
@@ -182,6 +184,8 @@ def get_custom_query(
         case "fd":
             base_query = "SELECT id FROM disclosures_financialdisclosure"
             filter_clause = ""
+        case _:
+            raise ValueError(f"Unsupported record type: {type}")
 
     if random_sample:
         base_query = f"{base_query} TABLESAMPLE SYSTEM ({random_sample})"

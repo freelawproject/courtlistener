@@ -4,11 +4,10 @@ from asgiref.sync import async_to_sync
 from django.db.models import Q
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
-from rest_framework.viewsets import ModelViewSet
+from rest_framework.viewsets import ModelViewSet, ReadOnlyModelViewSet
 
 from cl.api.api_permissions import IsOwner, V3APIPermission
 from cl.api.utils import LoggingMixin
-from cl.visualizations.api_permissions import IsParentVisualizationOwner
 from cl.visualizations.api_serializers import (
     JSONVersionSerializer,
     VisualizationSerializer,
@@ -18,10 +17,12 @@ from cl.visualizations.network_utils import reverse_endpoints_if_needed
 from cl.visualizations.utils import build_visualization
 
 
-class JSONViewSet(LoggingMixin, ModelViewSet):
+class JSONViewSet(LoggingMixin, ReadOnlyModelViewSet):
+    """Read-only: JSONVersions are only ever created server-side, by
+    build_visualization() (GHSA-cvh7-rv7v-wx2j)."""
+
     permission_classes = [
         IsAuthenticated,
-        IsParentVisualizationOwner,
         V3APIPermission,
     ]
     serializer_class = JSONVersionSerializer

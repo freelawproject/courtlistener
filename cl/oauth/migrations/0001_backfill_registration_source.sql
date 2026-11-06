@@ -1,0 +1,4 @@
+--
+-- Data-only migration; no schema change. The UPDATE it runs on the publisher
+-- reaches replicas through replication, so there is nothing to apply here.
+--

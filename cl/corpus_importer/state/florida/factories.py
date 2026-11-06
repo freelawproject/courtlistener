@@ -25,6 +25,10 @@ from juriscraper.state.florida.docket_entries import (
 from juriscraper.state.florida.documents import FloridaDocument
 from juriscraper.state.florida.parties import FloridaParty, PartyType
 
+from cl.tests.providers import LegalProvider
+
+Faker.add_provider(LegalProvider)
+
 
 class _PydanticConstructFactory(Factory):
     """Builds Pydantic models via ``model_construct`` so factories can use
@@ -108,7 +112,9 @@ class FloridaDocumentFactory(_PydanticConstructFactory):
         model = FloridaDocument
 
     docket_entry_uuid = Faker("uuid4")
-    document_link_uuid = Faker("uuid4")
+    # Real UUID to match juriscraper's validated UUID4 type; a str here makes
+    # every re-merge see link_uuid as changed.
+    document_link_uuid = Faker("uuid4", cast_to=None)
     document_name = Faker("text", max_nb_chars=50)
     user_document_state = Faker("uuid4")
     case_uuid = Faker("uuid4")

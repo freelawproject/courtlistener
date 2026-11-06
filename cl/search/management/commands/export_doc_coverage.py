@@ -19,7 +19,7 @@ class Command(BaseCommand):
     will be faster, but the psql has the advantage of pulling in stats on the number of
     rss entries which might be useful for sampling (I couldn't figure out description == '' in es!)
 
-    Just pulls in minimal document level stats I thought might be useful for smapling a good set.
+    Just pulls in minimal document level stats I thought might be useful for sampling a good set.
     We can merge in other header data from the bulk exports later.
     """
 
@@ -33,7 +33,7 @@ class Command(BaseCommand):
         parser.add_argument(
             "--psql",
             action="store_true",
-            help="Use postgres approch instead of elastic",
+            help="Use postgres approach instead of elastic",
         )
         parser.add_argument(
             "--overwrite",
@@ -44,7 +44,7 @@ class Command(BaseCommand):
             "--sleep",
             type=float,
             default=0.0,
-            help="Seconds to sleep betweeen batches",
+            help="Seconds to sleep between batches",
         )
 
     def handle(self, *args, **options):

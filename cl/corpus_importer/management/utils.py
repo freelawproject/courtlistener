@@ -5,13 +5,11 @@ from abc import ABC, abstractmethod
 from collections.abc import Iterable
 from datetime import date
 from itertools import islice
-from typing import final
 
-from celery import chain
+from celery import Task, chain
 from django.conf import settings
 from pydantic import BaseModel, field_validator
 
-from cl.celery_init import app
 from cl.lib.celery_utils import CeleryThrottle
 from cl.lib.command_utils import VerboseCommand, logger
 from cl.lib.indexing_utils import (
@@ -65,7 +63,6 @@ class CorpusImporterCommand(VerboseCommand, ABC):
 
     compose_redis_key: str
 
-    @final
     def add_arguments(self, parser):
         parser.add_argument(
             "--inventory-file",
@@ -127,14 +124,14 @@ class CorpusImporterCommand(VerboseCommand, ABC):
         )
 
     @staticmethod
-    def download_task() -> app.Task:
+    def download_task() -> Task:
         from cl.corpus_importer.tasks import default_corpus_download_task
 
         return default_corpus_download_task
 
     @staticmethod
     @abstractmethod
-    def merge_task() -> app.Task: ...
+    def merge_task() -> Task: ...
 
     @staticmethod
     def transform_inventory_iterator(

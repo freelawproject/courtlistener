@@ -19,13 +19,13 @@ from django.core.cache import caches
 from django.core.exceptions import ValidationError
 from django.core.management import call_command
 from django.db import IntegrityError, connection
-from django.http import HttpRequest, JsonResponse
 from django.test import RequestFactory, SimpleTestCase, override_settings
 from django.test.client import AsyncClient, AsyncRequestFactory
 from django.test.utils import CaptureQueriesContext
 from django.urls import reverse
 from django.utils.timezone import now
 from django.utils.xmlutils import UnserializableContentError
+from lxml import html as lhtml
 from rest_framework import status
 from rest_framework.authtoken.models import Token
 from rest_framework.exceptions import NotFound, Throttled
@@ -33,8 +33,9 @@ from rest_framework.pagination import Cursor, CursorPagination
 from rest_framework.request import Request
 from rest_framework.response import Response
 from rest_framework.test import APIRequestFactory
+from rest_framework.views import APIView
 from rest_framework_xml.renderers import XMLRenderer
-from waffle.testutils import override_switch
+from waffle.testutils import override_flag, override_switch
 
 from cl.alerts.api_views import DocketAlertViewSet, SearchAlertViewSet
 from cl.api.api_permissions import V3APIPermission
@@ -54,9 +55,12 @@ from cl.api.models import (
 from cl.api.pagination import VersionBasedPagination
 from cl.api.utils import (
     DOUBLE_API_THROTTLES_SWITCH,
+    CloudFrontAnonRateThrottle,
+    EventCounterThrottle,
     ExceptionalUserRateThrottle,
     FetchRateThrottle,
     LoggingMixin,
+    TagRateThrottle,
     apply_membership_throttles,
     clear_membership_throttles,
     detect_unknown_filter_params,
@@ -68,7 +72,7 @@ from cl.api.utils import (
     promo_doubling_applies,
     promo_switch_is_active,
 )
-from cl.api.views import build_chart_data, coverage_data, make_court_variable
+from cl.api.views import make_court_variable
 from cl.api.webhooks import send_webhook_event
 from cl.audio.api_views import AudioViewSet
 from cl.audio.audio_sources import AudioSources
@@ -178,12 +182,6 @@ from cl.visualizations.api_views import JSONViewSet, VisualizationViewSet
 class BasicAPIPageTest(ESIndexTestCase, TestCase):
     """Test the basic views"""
 
-    fixtures = [
-        "judge_judy.json",
-        "test_court.json",
-        "test_objects_search.json",
-    ]
-
     @classmethod
     def setUpTestData(cls):
         cls.rebuild_index("search.OpinionCluster")
@@ -206,15 +204,16 @@ class BasicAPIPageTest(ESIndexTestCase, TestCase):
         r = await self.async_client.get(reverse("court_index"))
         self.assertEqual(r.status_code, 200)
 
-    async def test_coverage_api(self) -> None:
-        r = await self.async_client.get(
-            reverse("coverage_data", kwargs={"version": 4, "court": "ca1"})
-        )
-        self.assertEqual(r.status_code, 200)
+    async def test_drf_login_redirects_to_sign_in(self) -> None:
+        """Is DRF's browsable-API login page pointed at our own?
 
-    async def test_coverage_api_via_url(self) -> None:
-        r = await self.async_client.get("/api/rest/v4/coverage/ca1/")
-        self.assertEqual(r.status_code, 200)
+        Its own login view skips the ratelimiting, redirect sanitizing and
+        confirmed-email check that /sign-in/ has.
+        """
+        r = await self.async_client.get(reverse("drf_login_redirect"))
+        self.assertRedirects(
+            r, reverse("sign-in"), fetch_redirect_response=False
+        )
 
     async def test_wiki_data_endpoint(self) -> None:
         """Does the wiki data endpoint return the expected JSON structure?"""
@@ -263,6 +262,100 @@ class BasicAPIPageTest(ESIndexTestCase, TestCase):
         self.assertIsInstance(prayers["total_cost"], str)
         self.assertIsInstance(data["feeds"]["opinion_courts"], str)
         self.assertIsInstance(data["podcasts"]["oral_argument_courts"], str)
+
+    async def test_wiki_coverage_data_endpoint(self) -> None:
+        """Does the coverage data endpoint return the expected JSON structure?"""
+        await caches["default"].adelete("wiki-coverage-data")
+        r = await self.async_client.get(reverse("wiki_coverage_data"))
+        self.assertEqual(r.status_code, 200)
+        self.assertEqual(r["Content-Type"], "application/json")
+        data = json.loads(r.content)
+        expected_keys = {"judges", "oral_arguments", "financial_disclosures"}
+        self.assertEqual(set(data.keys()), expected_keys)
+        self.assertIsInstance(data["judges"]["count"], int)
+        self.assertIn("duration_minutes", data["oral_arguments"])
+        financial_disclosures = data["financial_disclosures"]
+        for key in (
+            "disclosures",
+            "investments",
+            "positions",
+            "agreements",
+            "non_investment_income",
+            "spousal_income",
+            "reimbursements",
+            "gifts",
+            "debts",
+        ):
+            self.assertIsInstance(financial_disclosures[key], int)
+
+    async def test_wiki_coverage_data_rounds_oa_duration(self) -> None:
+        """Is the total oral argument duration rounded to the nearest minute?
+
+        The wiki renders this value as-is, so CourtListener has to do the
+        rounding itself rather than serving a raw float.
+        """
+        await caches["default"].adelete("wiki-coverage-data")
+        await sync_to_async(AudioFactory)(duration=250)
+        r = await self.async_client.get(reverse("wiki_coverage_data"))
+        data = json.loads(r.content)
+        duration_minutes = data["oral_arguments"]["duration_minutes"]
+        self.assertIsInstance(duration_minutes, int)
+        self.assertEqual(duration_minutes, 4)
+
+
+@override_settings(WAFFLE_CACHE_PREFIX="test_jurisdictions_v2_waffle")
+@override_flag("use_new_design", active=True)
+class JurisdictionsV2TemplateTest(TestCase):
+    """Row markup of the v2 jurisdictions table that the template builds itself.
+
+    `WAFFLE_CACHE_PREFIX` isolates the flag cache from parallel workers, see
+    `DocketPageV2TemplateTest`.
+    """
+
+    @classmethod
+    def setUpTestData(cls) -> None:
+        # Pin the jurisdiction: make_court_variable() drops TESTING_COURT rows,
+        # and the factory's random choice would otherwise hit it sometimes.
+        cls.with_url = CourtFactory(
+            id="v2withurl", jurisdiction="F", url="https://example.com/"
+        )
+        cls.without_url = CourtFactory(id="v2nourl", jurisdiction="F", url="")
+        cls.unsafe_url = CourtFactory(
+            id="v2badurl", jurisdiction="F", url="javascript:alert(1)"
+        )
+
+    async def test_row_links(self) -> None:
+        """Does every court link to its search, and only courts with an http(s) URL to a homepage?"""
+        r = await self.async_client.get(reverse("court_index"))
+        tbody = lhtml.fromstring(r.content).findall(".//tbody")[0]
+        search_url = reverse("show_results")
+        expected = (
+            (self.with_url, [self.with_url.url]),
+            (self.without_url, []),
+            (self.unsafe_url, []),
+        )
+        for court, homepage_links in expected:
+            with self.subTest(court=court.pk):
+                search_href = (
+                    f"{search_url}?q=&court_{court.pk}=on&order_by=score+desc"
+                )
+                rows = [
+                    row
+                    for row in tbody.findall("tr")
+                    if any(
+                        a.get("href") == search_href
+                        for a in row.findall(".//a")
+                    )
+                ]
+                self.assertEqual(len(rows), 1)
+                self.assertEqual(
+                    [
+                        a.get("href")
+                        for a in rows[0].findall(".//a")
+                        if a.get("class") == "links-external"
+                    ],
+                    homepage_links,
+                )
 
 
 @override_settings(
@@ -379,36 +472,90 @@ class WikiDataRssFeedTests(TestCase):
         )
 
     async def test_bust_cache_param(self) -> None:
-        """Does ?bust_cache rebuild the cached response for staff only?"""
-        sentinel = {"sentinel": True}
-        await caches["default"].aset("wiki-data", sentinel)
+        """Does ?bust_cache rebuild the cached response for staff only?
 
-        # Without the param, the cached payload is served.
-        r = await self.async_client.get(reverse("wiki_data"))
-        self.assertEqual(json.loads(r.content), sentinel)
-
-        # Anonymous and non-staff users can't bust the cache.
-        r = await self.async_client.get(
-            reverse("wiki_data"), {"bust_cache": ""}
-        )
-        self.assertEqual(json.loads(r.content), sentinel)
+        Both wiki-data endpoints share the same get_or_build_wiki_json()
+        caching logic, so one parametrized test covers both instead of
+        duplicating it per endpoint.
+        """
         non_staff = await sync_to_async(UserFactory)(is_staff=False)
-        await self.async_client.aforce_login(non_staff)
-        r = await self.async_client.get(
-            reverse("wiki_data"), {"bust_cache": ""}
-        )
-        self.assertEqual(json.loads(r.content), sentinel)
+        staff = await sync_to_async(UserFactory)(is_staff=True)
+        cases = [
+            ("wiki_data", "wiki-data", "rss_feeds"),
+            (
+                "wiki_coverage_data",
+                "wiki-coverage-data",
+                "financial_disclosures",
+            ),
+        ]
+        for url_name, cache_key, marker_key in cases:
+            with self.subTest(url_name=url_name):
+                # A fresh, logged-out client per case, so the previous
+                # case's aforce_login(staff) can't leak into this one's
+                # anonymous/non-staff assertions.
+                self.async_client = AsyncClient()
+                sentinel = {"sentinel": True}
+                await caches["default"].aset(cache_key, sentinel)
 
-        # Staff can: the response is rebuilt and re-cached.
+                # Without the param, the cached payload is served.
+                r = await self.async_client.get(reverse(url_name))
+                self.assertEqual(json.loads(r.content), sentinel)
+
+                # Anonymous and non-staff users can't bust the cache.
+                r = await self.async_client.get(
+                    reverse(url_name), {"bust_cache": ""}
+                )
+                self.assertEqual(json.loads(r.content), sentinel)
+                await self.async_client.aforce_login(non_staff)
+                r = await self.async_client.get(
+                    reverse(url_name), {"bust_cache": ""}
+                )
+                self.assertEqual(json.loads(r.content), sentinel)
+
+                # Staff can: the response is rebuilt and re-cached.
+                await self.async_client.aforce_login(staff)
+                r = await self.async_client.get(
+                    reverse(url_name), {"bust_cache": ""}
+                )
+                data = json.loads(r.content)
+                self.assertIn(marker_key, data)
+                cached = await caches["default"].aget(cache_key)
+                self.assertIn(marker_key, cached)
+
+    async def test_bust_cache_refreshes_nested_fd_cache(self) -> None:
+        """Does ?bust_cache also refresh get_coverage_data_fds()'s own,
+        separately-cached financial disclosure counts?
+
+        get_coverage_data_fds() caches its counts under "coverage-data.fd3"
+        for a week, independent of the wiki endpoints' own caches. Busting
+        wiki_data/wiki_coverage_data's cache must bust that nested cache
+        too, or staff see up to a week-old FD counts despite ?bust_cache.
+        """
+        stale_fd_data = {
+            "disclosures": -1,
+            "investments": -1,
+            "positions": -1,
+            "agreements": -1,
+            "non_investment_income": -1,
+            "spousal_income": -1,
+            "reimbursements": -1,
+            "gifts": -1,
+            "debts": -1,
+            "private": False,
+        }
+        await caches["default"].aset("coverage-data.fd3", stale_fd_data)
+        await caches["default"].adelete("wiki-coverage-data")
+
         staff = await sync_to_async(UserFactory)(is_staff=True)
         await self.async_client.aforce_login(staff)
         r = await self.async_client.get(
-            reverse("wiki_data"), {"bust_cache": ""}
+            reverse("wiki_coverage_data"), {"bust_cache": ""}
         )
-        data = json.loads(r.content)
-        self.assertIn("rss_feeds", data)
-        cached = await caches["default"].aget("wiki-data")
-        self.assertIn("rss_feeds", cached)
+        data = json.loads(r.content)["financial_disclosures"]
+        self.assertNotEqual(data["disclosures"], -1)
+
+        cached_fd_data = await caches["default"].aget("coverage-data.fd3")
+        self.assertNotEqual(cached_fd_data["disclosures"], -1)
 
 
 class CoverageTests(ESIndexTestCase, TestCase):
@@ -450,45 +597,6 @@ class CoverageTests(ESIndexTestCase, TestCase):
             testing_mode=True,
         )
 
-    async def test_coverage_data_view_provides_court_data(self) -> None:
-        response = await coverage_data(HttpRequest(), "v4", "ca1")
-        self.assertEqual(response.status_code, 200)
-        self.assertIsInstance(response, JsonResponse)
-        self.assertContains(response, "annual_counts")
-        self.assertContains(response, "total")
-
-    async def test_coverage_data_all_courts(self) -> None:
-        r = await self.async_client.get(
-            reverse("coverage_data", kwargs={"version": "4", "court": "all"})
-        )
-        j = json.loads(r.content)
-        self.assertTrue(len(j["annual_counts"].keys()) > 0)
-        self.assertIn("total", j)
-
-    async def test_coverage_data_specific_court(self) -> None:
-        r = await self.async_client.get(
-            reverse(
-                "coverage_data", kwargs={"version": "4", "court": "scotus"}
-            )
-        )
-        j = json.loads(r.content)
-        self.assertEqual(len(j["annual_counts"].keys()), 25)
-        self.assertEqual(j["annual_counts"]["2000"], 1)
-        self.assertEqual(j["annual_counts"]["2024"], 1)
-        self.assertEqual(j["total"], 2)
-
-        # Ensure that coverage can be filtered using a query string.
-        r = await self.async_client.get(
-            reverse(
-                "coverage_data", kwargs={"version": "3", "court": "scotus"}
-            ),
-            {"q": "America"},
-        )
-        j = json.loads(r.content)
-        self.assertEqual(len(j["annual_counts"].keys()), 1)
-        self.assertEqual(j["annual_counts"]["2024"], 1)
-        self.assertEqual(j["total"], 1)
-
     async def test_make_court_variable(self) -> None:
         """Confirm opinions counts per court are properly returned."""
 
@@ -502,47 +610,6 @@ class CoverageTests(ESIndexTestCase, TestCase):
                 self.assertEqual(2, court.count)
             if court.pk == self.court_cand.pk:
                 self.assertEqual(1, court.count)
-
-    async def test_build_chart_data(self) -> None:
-        """Confirm build_chart_data method returns the right data."""
-
-        chart_data = await sync_to_async(build_chart_data)(["scotus", "cand"])
-        for court_data in chart_data:
-            if (
-                court_data["group"]
-                == self.court_scotus.get_jurisdiction_display()
-            ):
-                data = court_data["data"][0]
-                self.assertEqual(data["id"], self.court_scotus.pk)
-                self.assertEqual(data["label"], self.court_scotus.full_name)
-                self.assertEqual(data["data"][0]["val"], 2)
-
-                date_1 = datetime.fromisoformat(
-                    data["data"][0]["timeRange"][0].replace("Z", "+00:00")
-                )
-                date_2 = datetime.fromisoformat(
-                    data["data"][0]["timeRange"][1].replace("Z", "+00:00")
-                )
-                self.assertEqual(date_1.date(), self.c_scotus_1.date_filed)
-                self.assertEqual(date_2.date(), self.c_scotus_2.date_filed)
-
-            if (
-                court_data["group"]
-                == self.court_cand.get_jurisdiction_display()
-            ):
-                data = court_data["data"][0]
-                self.assertEqual(data["id"], self.court_cand.pk)
-                self.assertEqual(data["label"], self.court_cand.full_name)
-                self.assertEqual(data["data"][0]["val"], 1)
-
-                date_1 = datetime.fromisoformat(
-                    data["data"][0]["timeRange"][0].replace("Z", "+00:00")
-                )
-                date_2 = datetime.fromisoformat(
-                    data["data"][0]["timeRange"][1].replace("Z", "+00:00")
-                )
-                self.assertEqual(date_1.date(), self.c_cand_1.date_filed)
-                self.assertEqual(date_2.date(), self.c_cand_1.date_filed)
 
 
 @mock.patch(
@@ -593,6 +660,9 @@ class ApiQueryCountTests(TestCase):
         api_prefix = "api:test_counts.count"
         r.set(api_prefix, 101)
         self.clear_query_caches()
+        # This call is a bit arbitrary, and intended to warm caches
+        # so that we have consistent cache behavior for tests.
+        self.client.get(reverse("audio-list", kwargs={"version": "v3"}))
 
     def tearDown(self) -> None:
         UserProfile.objects.all().delete()
@@ -844,8 +914,9 @@ class ApiEventCreationTestCase(TestCase):
     # run in parallel do not affect this one.
     @mock.patch(
         "cl.api.utils.get_logging_prefix",
-        side_effect=lambda *args,
-        **kwargs: f"{get_logging_prefix(*args, **kwargs)}-Test",
+        side_effect=lambda *args, **kwargs: (
+            f"{get_logging_prefix(*args, **kwargs)}-Test"
+        ),
     )
     async def test_api_logged_correctly(self, mock_logging_prefix) -> None:
         # Global stats
@@ -877,8 +948,9 @@ class ApiEventCreationTestCase(TestCase):
     @mock.patch("cl.api.utils.create_or_update_zoho_account")
     @mock.patch(
         "cl.api.utils.get_logging_prefix",
-        side_effect=lambda *args,
-        **kwargs: f"{get_logging_prefix(*args, **kwargs)}-Test",
+        side_effect=lambda *args, **kwargs: (
+            f"{get_logging_prefix(*args, **kwargs)}-Test"
+        ),
     )
     async def test_api_logged_correctly_v4(
         self, mock_logging_prefix, mock_zoho_task
@@ -1017,7 +1089,7 @@ class BlockV3APITests(TestCase):
             V3APIPermission, "check_request", return_value=True
         ):
             response = await self.async_client.get(self.audio_path_v3)
-        self.assertEqual(response.status_code, HTTPStatus.FORBIDDEN)
+        self.assertEqual(response.status_code, HTTPStatus.UNAUTHORIZED)
 
     async def test_allow_v4_for_new_users(self, mock_api_prefix) -> None:
         """Confirm new API users are allowed to use V4 of the API"""
@@ -1029,13 +1101,13 @@ class BlockV3APITests(TestCase):
             )
         self.assertEqual(response.status_code, HTTPStatus.OK)
 
-    async def test_allow_v4_for_anonymous_users(self, mock_api_prefix) -> None:
-        """Confirm V4 anonymous API users are not allowed to use V4 of the API"""
+    async def test_block_v4_for_anonymous_users(self, mock_api_prefix) -> None:
+        """Confirm anonymous API users are not allowed to use V4 of the API"""
         with mock.patch.object(
             V3APIPermission, "check_request", return_value=True
         ):
             response = await self.async_client.get(self.audio_path_v4)
-        self.assertEqual(response.status_code, HTTPStatus.OK)
+        self.assertEqual(response.status_code, HTTPStatus.UNAUTHORIZED)
 
     async def test_confirm_v4_post_requests_are_not_allowed(
         self, mock_api_prefix
@@ -1057,6 +1129,52 @@ class BlockV3APITests(TestCase):
         """Confirm anonymous users are not allowed to POST requests."""
         response = await self.async_client.post(self.debt_path_v4, {})
         self.assertEqual(response.status_code, HTTPStatus.UNAUTHORIZED)
+
+
+class AuthRequiredAPIEndpointsTest(TestCase):
+    """Judge, financial disclosure and audio endpoints require an account."""
+
+    endpoints = [
+        "audio-list",
+        "person-list",
+        "position-list",
+        "retentionevent-list",
+        "education-list",
+        "school-list",
+        "politicalaffiliation-list",
+        "source-list",
+        "abarating-list",
+        "agreement-list",
+        "debt-list",
+        "financialdisclosure-list",
+        "gift-list",
+        "investment-list",
+        "noninvestmentincome-list",
+        "disclosureposition-list",
+        "reimbursement-list",
+        "spouseincome-list",
+    ]
+
+    @classmethod
+    def setUpTestData(cls) -> None:
+        cls.user = UserFactory()
+
+    async def test_anonymous_users_are_rejected(self) -> None:
+        """Do anonymous requests get a 401?"""
+        for endpoint in self.endpoints:
+            with self.subTest(endpoint=endpoint):
+                path = reverse(endpoint, kwargs={"version": "v4"})
+                r = await self.async_client.get(path)
+                self.assertEqual(r.status_code, HTTPStatus.UNAUTHORIZED)
+
+    async def test_authenticated_users_can_read(self) -> None:
+        """Can logged-in users without model permissions still read?"""
+        await self.async_client.aforce_login(self.user)
+        for endpoint in self.endpoints:
+            with self.subTest(endpoint=endpoint):
+                path = reverse(endpoint, kwargs={"version": "v4"})
+                r = await self.async_client.get(path)
+                self.assertEqual(r.status_code, HTTPStatus.OK)
 
 
 class DRFOrderingTests(TestCase):
@@ -4570,7 +4688,7 @@ class BankruptcyInformationAPITests(TestCase):
             (d for d in results if d["id"] == self.docket.id), None
         )
         self.assertIsNotNone(docket_with_bankruptcy)
-        assert docket_with_bankruptcy is not None  # for mypy
+        assert docket_with_bankruptcy is not None  # for the type checker
 
         # Confirm the bankruptcy_information field is present and is a URL
         self.assertIn("bankruptcy_information", docket_with_bankruptcy)
@@ -4586,7 +4704,7 @@ class BankruptcyInformationAPITests(TestCase):
             None,
         )
         self.assertIsNotNone(docket_without_bankruptcy)
-        assert docket_without_bankruptcy is not None  # for mypy
+        assert docket_without_bankruptcy is not None  # for the type checker
 
         # Confirm the bankruptcy_information field is None for dockets without it
         self.assertIn("bankruptcy_information", docket_without_bankruptcy)
@@ -4642,7 +4760,7 @@ class BankruptcyInformationAPITests(TestCase):
             (d for d in results if d["id"] == self.docket.id), None
         )
         self.assertIsNotNone(docket_with_bankruptcy)
-        assert docket_with_bankruptcy is not None  # for mypy
+        assert docket_with_bankruptcy is not None  # for the type checker
 
         # Confirm the bankruptcy_information field is NOT present
         self.assertNotIn("bankruptcy_information", docket_with_bankruptcy)
@@ -4679,7 +4797,7 @@ class BankruptcyInformationAPITests(TestCase):
             (d for d in results if d["id"] == self.docket.id), None
         )
         self.assertIsNotNone(docket_with_bankruptcy)
-        assert docket_with_bankruptcy is not None  # for mypy
+        assert docket_with_bankruptcy is not None  # for the type checker
 
         # Should only have the requested fields
         self.assertEqual(
@@ -5126,10 +5244,11 @@ class ThrottleOverrideIntegrationTest(TestCase):
         overrides = get_all_throttle_overrides(ThrottleType.API)
         self.assertNotIn(throttle.user.username, overrides)
 
+    @override_settings(NEON_MEMBERSHIP_GRACE_PERIOD_DAYS=0)
     def test_overrides_drop_membership_when_membership_terminated(
         self,
     ) -> None:
-        """MEMBERSHIP throttles are dropped when termination_date is in the past."""
+        """MEMBERSHIP throttles are dropped once the term ends, with no grace."""
         user = UserFactory()
         APIThrottleFactory(
             user=user,
@@ -5143,6 +5262,28 @@ class ThrottleOverrideIntegrationTest(TestCase):
         )
         overrides = get_all_throttle_overrides(ThrottleType.API)
         self.assertNotIn(user.username, overrides)
+
+    @override_settings(NEON_MEMBERSHIP_GRACE_PERIOD_DAYS=3)
+    def test_overrides_keep_membership_within_grace_period(self) -> None:
+        """MEMBERSHIP throttles survive the grace period after the term ends."""
+        in_grace = UserFactory()
+        past_grace = UserFactory()
+        for user, days_ago in ((in_grace, 2), (past_grace, 4)):
+            APIThrottleFactory(
+                user=user,
+                throttle_type=ThrottleType.API,
+                rate="10/min",
+                source=APIThrottle.Source.MEMBERSHIP,
+            )
+            NeonMembershipFactory(
+                user=user,
+                termination_date=now() - timedelta(days=days_ago),
+            )
+
+        overrides = get_all_throttle_overrides(ThrottleType.API)
+
+        self.assertIn(in_grace.username, overrides)
+        self.assertNotIn(past_grace.username, overrides)
 
     def test_overrides_drop_membership_when_payment_failed(self) -> None:
         """MEMBERSHIP throttles are dropped when payment_status is FAILED."""
@@ -5413,6 +5554,149 @@ class MultiRateThrottleTest(TestCase):
     CACHES={
         "default": {
             "BACKEND": "django.core.cache.backends.locmem.LocMemCache",
+            "LOCATION": "anon-throttle-ident-test",
+        }
+    }
+)
+class AnonThrottleIdentTest(TestCase):
+    """Does the anonymous throttle count a client by one stable key?
+
+    Behind CloudFront, X-Forwarded-For and REMOTE_ADDR both vary from request
+    to request, so keying on them scattered one client's requests across many
+    buckets and the limit stopped holding (#7655).
+    """
+
+    def setUp(self) -> None:
+        caches["default"].clear()
+        self.factory = RequestFactory()
+        self.view = APIView()
+
+    def _request(self, **headers) -> Request:
+        """Build the DRF request a throttle sees, anonymous until given a user."""
+        return Request(self.factory.get("/", **headers))
+
+    def test_the_viewer_address_decides_the_key(self) -> None:
+        """One viewer behind two proxy paths gets one key, not two."""
+        throttle = CloudFrontAnonRateThrottle()
+        first = self._request(
+            HTTP_CLOUDFRONT_VIEWER_ADDRESS="96.23.39.106:51396",
+            HTTP_X_FORWARDED_FOR="10.0.0.1",
+            REMOTE_ADDR="10.0.0.1",
+        )
+        second = self._request(
+            HTTP_CLOUDFRONT_VIEWER_ADDRESS="96.23.39.106:22222",
+            HTTP_X_FORWARDED_FOR="10.0.0.2",
+            REMOTE_ADDR="10.0.0.2",
+        )
+
+        self.assertEqual(
+            throttle.get_cache_key(first, view=self.view),
+            throttle.get_cache_key(second, view=self.view),
+        )
+
+    def test_two_viewers_are_counted_separately(self) -> None:
+        throttle = CloudFrontAnonRateThrottle()
+        one = self._request(
+            HTTP_CLOUDFRONT_VIEWER_ADDRESS="96.23.39.106:51396"
+        )
+        two = self._request(
+            HTTP_CLOUDFRONT_VIEWER_ADDRESS="96.23.39.107:51396"
+        )
+
+        self.assertNotEqual(
+            throttle.get_cache_key(one, view=self.view),
+            throttle.get_cache_key(two, view=self.view),
+        )
+
+    def test_it_falls_back_without_the_header(self) -> None:
+        """Local development and tests see no CloudFront header."""
+        throttle = CloudFrontAnonRateThrottle()
+        request = self._request(REMOTE_ADDR="10.0.0.1")
+
+        self.assertEqual(throttle.get_ident(request), "10.0.0.1")
+
+    def test_an_authenticated_client_is_keyed_by_user(self) -> None:
+        """The viewer address decides nothing once there's a user.
+
+        get_ident() is only reached on the anonymous branch, so a signed-in
+        user counts by their pk no matter which address CloudFront reports.
+        """
+        user = UserFactory()
+        throttle = ExceptionalUserRateThrottle()
+        first = self._request(
+            HTTP_CLOUDFRONT_VIEWER_ADDRESS="96.23.39.106:51396"
+        )
+        first.user = user
+        second = self._request(
+            HTTP_CLOUDFRONT_VIEWER_ADDRESS="203.0.113.9:22222"
+        )
+        second.user = user
+
+        key = throttle.get_cache_key(first, view=self.view)
+        self.assertEqual(key, throttle.get_cache_key(second, view=self.view))
+        self.assertIn(str(user.pk), key)
+
+    def test_two_authenticated_clients_are_counted_separately(self) -> None:
+        """Even sharing one address, as an office behind one NAT would."""
+        throttle = ExceptionalUserRateThrottle()
+        requests = []
+        for _ in range(2):
+            request = self._request(
+                HTTP_CLOUDFRONT_VIEWER_ADDRESS="96.23.39.106:51396"
+            )
+            request.user = UserFactory()
+            requests.append(request)
+
+        self.assertNotEqual(
+            throttle.get_cache_key(requests[0], view=self.view),
+            throttle.get_cache_key(requests[1], view=self.view),
+        )
+
+    def test_the_anon_throttle_skips_authenticated_clients(self) -> None:
+        """It returns no key at all for them, as DRF's does."""
+        throttle = CloudFrontAnonRateThrottle()
+        request = self._request(
+            HTTP_CLOUDFRONT_VIEWER_ADDRESS="96.23.39.106:51396"
+        )
+        request.user = UserFactory()
+
+        self.assertIsNone(throttle.get_cache_key(request, view=self.view))
+
+    def test_the_user_scope_keys_anonymous_clients_the_same_way(self) -> None:
+        """Anonymous requests are counted in the user scope too.
+
+        DRF's UserRateThrottle falls back to the ident for a request with no
+        user, which is why an anonymous client can see the user scope's
+        "5/min" message. That key has to be stable for the same reason, and
+        for every other UserRateThrottle an anonymous client can reach: the
+        event counter and the read-only tag endpoints.
+        """
+        first = self._request(
+            HTTP_CLOUDFRONT_VIEWER_ADDRESS="96.23.39.106:51396",
+            REMOTE_ADDR="10.0.0.1",
+        )
+        second = self._request(
+            HTTP_CLOUDFRONT_VIEWER_ADDRESS="96.23.39.106:22222",
+            REMOTE_ADDR="10.0.0.2",
+        )
+
+        for throttle_class in (
+            ExceptionalUserRateThrottle,
+            EventCounterThrottle,
+            TagRateThrottle,
+        ):
+            with self.subTest(throttle=throttle_class.__name__):
+                throttle = throttle_class()
+                self.assertEqual(
+                    throttle.get_cache_key(first, view=self.view),
+                    throttle.get_cache_key(second, view=self.view),
+                )
+
+
+@override_settings(
+    CACHES={
+        "default": {
+            "BACKEND": "django.core.cache.backends.locmem.LocMemCache",
             "LOCATION": "fetch-rate-throttle-test",
         }
     }
@@ -5442,7 +5726,7 @@ class FetchRateThrottleTest(TestCase):
         num_requests, _ = FetchRateThrottle().parse_rate(
             FetchRateThrottle.THROTTLE_RATES["fetch"]
         )
-        assert num_requests is not None  # for mypy
+        assert num_requests is not None  # for the type checker
         for _ in range(num_requests):
             throttle = FetchRateThrottle()
             self.assertTrue(throttle.allow_request(request, view=None))

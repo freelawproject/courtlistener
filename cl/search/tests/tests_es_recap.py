@@ -59,12 +59,26 @@ from cl.people_db.factories import (
 from cl.search.admin import RECAPDocumentAdmin
 from cl.search.api_serializers import (
     DocketESResultSerializer,
+    OAESResultSerializer,
+    OpinionClusterESResultSerializer,
+    PersonESResultSerializer,
     RECAPDocumentESResultSerializer,
     RECAPESResultSerializer,
 )
 from cl.search.api_utils import CursorESList
-from cl.search.api_views import SearchV4ViewSet
-from cl.search.documents import ES_CHILD_ID, DocketDocument, ESRECAPDocument
+from cl.search.api_views import (
+    SearchV4ViewSet,
+    _ESResultSerializer,
+    _ESResultSerializers,
+)
+from cl.search.documents import (
+    ES_CHILD_ID,
+    AudioDocument,
+    DocketDocument,
+    ESRECAPDocument,
+    OpinionClusterDocument,
+    PersonDocument,
+)
 from cl.search.factories import (
     BankruptcyInformationFactory,
     CourtFactory,
@@ -96,6 +110,7 @@ from cl.search.tasks import (
 )
 from cl.search.types import EventTable
 from cl.tests.cases import (
+    AuthenticatedClientMixin,
     CountESTasksTestCase,
     ESIndexTestCase,
     TestCase,
@@ -2482,7 +2497,7 @@ class RECAPSearchTest(RECAPSearchTestCase, ESIndexTestCase, TestCase):
                 description="MOTION for Leave to File Amicus Curiae Lorem Served",
             )
             dockets_to_remove.append(de_3.docket)
-            initial_document_3 = RECAPDocumentFactory(
+            RECAPDocumentFactory(
                 docket_entry=de_3,
                 document_number="1",
                 is_available=False,
@@ -2925,9 +2940,7 @@ class RECAPSearchTest(RECAPSearchTestCase, ESIndexTestCase, TestCase):
             "order_by": "dateFiled desc",
             "highlight": True,
         }
-        r = await self._test_article_count(
-            search_params, 2, "filter + text query"
-        )
+        await self._test_article_count(search_params, 2, "filter + text query")
         self.assertEqual(
             mock_fetch_es.call_count, 1, "Wrong number of query calls."
         )
@@ -2941,9 +2954,7 @@ class RECAPSearchTest(RECAPSearchTestCase, ESIndexTestCase, TestCase):
             "order_by": "dateFiled desc",
             "highlight": True,
         }
-        r = await self._test_article_count(
-            search_params, 2, "filter + text query"
-        )
+        await self._test_article_count(search_params, 2, "filter + text query")
         # The request ignores the invalid parameter, so the cache key remains the same
         # and the response is retrieved from the cache.
         self.assertEqual(
@@ -3362,7 +3373,7 @@ class RECAPSearchTest(RECAPSearchTestCase, ESIndexTestCase, TestCase):
 
 
 class RECAPSearchDecayRelevancyTest(
-    ESIndexTestCase, V4SearchAPIAssertions, TestCase
+    AuthenticatedClientMixin, ESIndexTestCase, V4SearchAPIAssertions, TestCase
 ):
     """
     RECAP Search Decay Relevancy  Tests
@@ -4396,7 +4407,11 @@ class RECAPESResultSerializerTest(RECAPESResultSerializer):
 
 
 class RECAPSearchAPIV4Test(
-    RECAPSearchAPICommonTests, ESIndexTestCase, TestCase, V4SearchAPIAssertions
+    AuthenticatedClientMixin,
+    RECAPSearchAPICommonTests,
+    ESIndexTestCase,
+    TestCase,
+    V4SearchAPIAssertions,
 ):
     """
     RECAP Search API V4 Tests
@@ -4699,7 +4714,7 @@ class RECAPSearchAPIV4Test(
         """Test if the function score used for the dateFiled sorting in the V4
         of the RECAP Search API works as expected."""
 
-        with self.captureOnCommitCallbacks(execute=True) as callbacks:
+        with self.captureOnCommitCallbacks(execute=True):
             # This Docket will be matched only by its RECAPDocument.
             docket_entry_recent = DocketEntryFactory(
                 docket__source=Docket.RECAP,
@@ -4842,27 +4857,33 @@ class RECAPSearchAPIV4Test(
     @override_settings(SEARCH_API_PAGE_SIZE=1)
     @mock.patch.object(
         SearchV4ViewSet,
-        "supported_search_types",
-        {
-            SEARCH_TYPES.RECAP: {
-                "document_class": SearchV4ViewSet.supported_search_types[
-                    SEARCH_TYPES.RECAP
-                ]["document_class"],
-                "serializer_class": RECAPESResultSerializerTest,
-            },
-            SEARCH_TYPES.DOCKETS: {
-                "document_class": SearchV4ViewSet.supported_search_types[
-                    SEARCH_TYPES.DOCKETS
-                ]["document_class"],
-                "serializer_class": DocketESResultSerializerTest,
-            },
-            SEARCH_TYPES.RECAP_DOCUMENT: {
-                "document_class": SearchV4ViewSet.supported_search_types[
-                    SEARCH_TYPES.RECAP_DOCUMENT
-                ]["document_class"],
-                "serializer_class": RECAPDocumentESResultSerializerTest,
-            },
-        },
+        "search_serializers",
+        _ESResultSerializers(
+            recap=_ESResultSerializer(
+                document=DocketDocument,
+                serializer=RECAPESResultSerializerTest,
+            ),
+            docket=_ESResultSerializer(
+                document=DocketDocument,
+                serializer=DocketESResultSerializerTest,
+            ),
+            recap_document=_ESResultSerializer(
+                document=DocketDocument,
+                serializer=RECAPDocumentESResultSerializerTest,
+            ),
+            opinion=_ESResultSerializer(
+                document=OpinionClusterDocument,
+                serializer=OpinionClusterESResultSerializer,
+            ),
+            person=_ESResultSerializer(
+                document=PersonDocument,
+                serializer=PersonESResultSerializer,
+            ),
+            oral_argument=_ESResultSerializer(
+                document=AudioDocument,
+                serializer=OAESResultSerializer,
+            ),
+        ),
     )
     @mock.patch(
         "cl.search.api_utils.set_results_highlights",
@@ -4985,27 +5006,33 @@ class RECAPSearchAPIV4Test(
     @override_settings(SEARCH_API_PAGE_SIZE=1)
     @mock.patch.object(
         SearchV4ViewSet,
-        "supported_search_types",
-        {
-            SEARCH_TYPES.RECAP: {
-                "document_class": SearchV4ViewSet.supported_search_types[
-                    SEARCH_TYPES.RECAP
-                ]["document_class"],
-                "serializer_class": RECAPESResultSerializerTest,
-            },
-            SEARCH_TYPES.DOCKETS: {
-                "document_class": SearchV4ViewSet.supported_search_types[
-                    SEARCH_TYPES.DOCKETS
-                ]["document_class"],
-                "serializer_class": DocketESResultSerializerTest,
-            },
-            SEARCH_TYPES.RECAP_DOCUMENT: {
-                "document_class": SearchV4ViewSet.supported_search_types[
-                    SEARCH_TYPES.RECAP_DOCUMENT
-                ]["document_class"],
-                "serializer_class": RECAPDocumentESResultSerializerTest,
-            },
-        },
+        "search_serializers",
+        _ESResultSerializers(
+            recap=_ESResultSerializer(
+                document=DocketDocument,
+                serializer=RECAPESResultSerializerTest,
+            ),
+            docket=_ESResultSerializer(
+                document=DocketDocument,
+                serializer=DocketESResultSerializerTest,
+            ),
+            recap_document=_ESResultSerializer(
+                document=DocketDocument,
+                serializer=RECAPDocumentESResultSerializerTest,
+            ),
+            opinion=_ESResultSerializer(
+                document=OpinionClusterDocument,
+                serializer=OpinionClusterESResultSerializer,
+            ),
+            person=_ESResultSerializer(
+                document=PersonDocument,
+                serializer=PersonESResultSerializer,
+            ),
+            oral_argument=_ESResultSerializer(
+                document=AudioDocument,
+                serializer=OAESResultSerializer,
+            ),
+        ),
     )
     @mock.patch(
         "cl.search.api_utils.set_results_highlights",
@@ -5122,7 +5149,7 @@ class RECAPSearchAPIV4Test(
 
         created_dockets = []
         dockets_to_create = 20
-        with self.captureOnCommitCallbacks(execute=True) as callbacks:
+        with self.captureOnCommitCallbacks(execute=True):
             for _ in range(dockets_to_create):
                 docket_entry = DocketEntryFactory(
                     docket__source=Docket.RECAP,
@@ -5425,7 +5452,7 @@ class RECAPSearchAPIV4Test(
         """Test cursor pagination previous and next page when the number of
         equals the page_size."""
 
-        with self.captureOnCommitCallbacks(execute=True) as callbacks:
+        with self.captureOnCommitCallbacks(execute=True):
             docket = DocketFactory(source=Docket.RECAP)
 
         search_params = {
@@ -5975,7 +6002,7 @@ class RECAPSearchAPIV4Test(
         sorting in the V4 of the RECAP Search API works as expected for the RD type.
         """
 
-        with self.captureOnCommitCallbacks(execute=True) as callbacks:
+        with self.captureOnCommitCallbacks(execute=True):
             latest_null_date_filed = DocketEntryFactory(
                 docket=DocketFactory(
                     court=self.court_api,
@@ -6119,7 +6146,7 @@ class RECAPSearchAPIV4Test(
 
         created_dockets = []
         dockets_to_create = 10
-        with self.captureOnCommitCallbacks(execute=True) as callbacks:
+        with self.captureOnCommitCallbacks(execute=True):
             for _ in range(dockets_to_create):
                 docket_entry = DocketEntryFactory(
                     docket__source=Docket.RECAP,
@@ -6285,7 +6312,7 @@ class RECAPSearchAPIV4Test(
         empty lists after a partial update that removes the related instance
         and empties the list field.
         """
-        with self.captureOnCommitCallbacks(execute=True) as callbacks:
+        with self.captureOnCommitCallbacks(execute=True):
             d = DocketFactory(
                 case_name="Lorem Ipsum",
                 court=self.court_2,
@@ -6810,7 +6837,7 @@ class RECAPFeedTest(RECAPSearchTestCase, ESIndexTestCase, TestCase):
             de_1.delete()
 
     def test_catch_es_errors(self) -> None:
-        """Can we catch es errors and just render an empy feed?"""
+        """Can we catch es errors and just render an empty feed?"""
 
         # Bad syntax error.
         params = {
@@ -7299,8 +7326,8 @@ class IndexDocketRECAPDocumentsCommandTest(
         child_count = len(article[0].xpath(".//h4"))
         self.assertEqual(2, child_count)
 
-    @mock.patch("cl.search.utils.delete_from_ia")
-    @mock.patch("cl.search.utils.invalidate_cloudfront")
+    @mock.patch("cl.search.deletion_utils.delete_from_ia")
+    @mock.patch("cl.search.deletion_utils.invalidate_cloudfront")
     def test_re_index_recap_documents_sealed(
         self, mock_delete_from_ia, mock_invalidate_cloudfront
     ):
@@ -8721,7 +8748,7 @@ class RECAPIndexingTest(
             organizations=[firm],
             docket=docket_with_parties,
         )
-        party_type = PartyTypeFactory.create(
+        PartyTypeFactory.create(
             party=PartyFactory(
                 name="Mary Williams Corp.",
                 docket=docket_with_parties,
@@ -8797,108 +8824,6 @@ class RECAPIndexingTest(
         docket_with_parties.delete()
         docket_doc_no_parties.delete()
         docket_with_no_parties_no_separator.delete()
-
-    @mock.patch("cl.search.utils.time.sleep")
-    @mock.patch("cl.search.utils.delete_from_ia")
-    @mock.patch("cl.search.utils.invalidate_cloudfront")
-    def test_seal_documents_action(
-        self, mock_invalidate_cloudfront, mock_delete_from_ia, mock_sleep
-    ):
-        """Confirm that seal_documents admin action updates related RDs in ES"""
-
-        docket = DocketFactory(
-            court=self.court,
-            pacer_case_id="asdf",
-            docket_number="12-cv-02354",
-            case_name="Vargas v. Wilkins",
-            source=Docket.RECAP,
-        )
-        de_1 = DocketEntryFactory(
-            docket=docket,
-            date_filed=datetime.date(2015, 8, 19),
-            description="MOTION for Leave to File Amicus Curiae Lorem",
-            entry_number=None,
-        )
-        rd_1 = RECAPDocumentFactory(
-            docket_entry=de_1,
-            document_number="1",
-            is_available=True,
-            page_count=5,
-            filepath_local="test.pdf",
-            plain_text="Lorem ipsum dolor text.",
-        )
-        rd_2 = RECAPDocumentFactory(
-            docket_entry=de_1,
-            document_number="2",
-            is_available=True,
-            page_count=10,
-            filepath_local="test.pdf",
-            plain_text="Lorem ipsum dolor text 2.",
-        )
-
-        # Confirm initial indexing:
-        rd_1_doc = DocketDocument.get(id=ES_CHILD_ID(rd_1.pk).RECAP)
-        self.assertEqual(rd_1_doc.is_available, True)
-        self.assertEqual(rd_1_doc.plain_text, rd_1.plain_text)
-        self.assertEqual(rd_1_doc.page_count, rd_1.page_count)
-        self.assertEqual(rd_1_doc.filepath_local, rd_1.filepath_local)
-
-        rd_2_doc = DocketDocument.get(id=ES_CHILD_ID(rd_2.pk).RECAP)
-        self.assertEqual(rd_2_doc.is_available, True)
-        self.assertEqual(rd_2_doc.plain_text, rd_2.plain_text)
-        self.assertEqual(rd_2_doc.page_count, rd_2.page_count)
-        self.assertEqual(rd_2_doc.filepath_local, rd_2.filepath_local)
-
-        # Call seal_documents action.
-        recap_admin = RECAPDocumentAdmin(RECAPDocument, self.site)
-        recap_admin.message_user = mock.Mock()
-        url = reverse("admin:search_recapdocument_changelist")
-        request = self.factory.post(url)
-
-        queryset = RECAPDocument.objects.filter(pk__in=[rd_1.pk, rd_2.pk])
-        recap_admin.seal_documents(request, queryset)
-
-        recap_admin.message_user.assert_called_once_with(
-            request,
-            "Successfully sealed and removed 2 document(s).",
-            messages.SUCCESS,
-        )
-        # The throttle sleep only runs between documents, so sealing two
-        # documents should trigger it exactly once.
-        mock_sleep.assert_called_once_with(1)
-
-        # Confirm DB update:
-        rd_1.refresh_from_db()
-        self.assertEqual(rd_1.is_available, False)
-        self.assertEqual(rd_1.is_sealed, True)
-        self.assertEqual(rd_1.filepath_local, "")
-        self.assertIsNone(rd_1.page_count)
-        self.assertEqual(rd_1.sha1, "")
-        self.assertEqual(rd_1.plain_text, "")
-
-        rd_2.refresh_from_db()
-        self.assertEqual(rd_2.is_available, False)
-        self.assertEqual(rd_2.is_sealed, True)
-        self.assertEqual(rd_2.filepath_local, "")
-        self.assertIsNone(rd_2.page_count)
-        self.assertEqual(rd_2.sha1, "")
-        self.assertEqual(rd_2.plain_text, "")
-
-        # Confirm ES indexing:
-        rd_1_doc = DocketDocument.get(id=ES_CHILD_ID(rd_1.pk).RECAP)
-        self.assertEqual(rd_1_doc.is_available, False)
-        self.assertEqual(rd_1_doc.plain_text, "")
-        self.assertEqual(rd_1_doc.page_count, None)
-        self.assertEqual(rd_1_doc.filepath_local, None)
-
-        rd_2_doc = DocketDocument.get(id=ES_CHILD_ID(rd_2.pk).RECAP)
-        self.assertEqual(rd_2_doc.is_available, False)
-        self.assertEqual(rd_2_doc.plain_text, "")
-        self.assertEqual(rd_2_doc.page_count, None)
-        self.assertEqual(rd_2_doc.filepath_local, None)
-
-        # Clean up index.
-        docket.delete()
 
 
 class RECAPHistoryTablesIndexingTest(
@@ -9364,7 +9289,6 @@ class RECAPFixBrokenRDLinksTest(ESIndexTestCase, TestCase):
         # Change slug with two different values.
         self.docket_2.case_name = "Dolor Ipsum"
         self.docket_2.save()
-        d2_last_slug_in_event_table = self.docket_2.slug
         self.docket_2.case_name = "Dolor Ipsum 2"
         self.docket_2.save()
 

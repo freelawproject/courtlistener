@@ -2,9 +2,9 @@ import json
 import logging
 import random
 from datetime import timedelta
-from enum import Enum
+from enum import StrEnum
 from pathlib import PurePosixPath
-from typing import Any
+from typing import Any, assert_never
 
 from django.conf import settings
 from django.core.files.base import ContentFile
@@ -15,7 +15,7 @@ from django_ses.signals import bounce_received, complaint_received
 from rest_framework.authtoken.models import Token
 
 from cl.api.models import Webhook
-from cl.lib.crypto import sha1_activation_key
+from cl.lib.crypto import generate_activation_key
 from cl.lib.storage import S3PrivateUUIDStorage
 from cl.stats.metrics import accounts_created_total
 from cl.users.email_handlers import (
@@ -30,7 +30,7 @@ from cl.users.tasks import notify_new_or_updated_webhook
 logger = logging.getLogger(__name__)
 
 
-class SESEventType(str, Enum):
+class SESEventType(StrEnum):
     BOUNCE = "bounce"
     COMPLAINT = "complaint"
 
@@ -69,6 +69,7 @@ def store_bounce_or_complaint_obj(
             dir_name = "bounces"
             storing_rate = settings.BOUNCES_STORE_RATE
         case _:
+            assert_never(obj_type)
             return None
 
     if random.random() >= storing_rate or not email_recipient:
@@ -184,7 +185,7 @@ def superuser_creation(sender, instance, created, **kwargs):
     if created and instance.is_superuser:
         UserProfile.objects.create(
             user=instance,
-            activation_key=sha1_activation_key(instance.username),
+            activation_key=generate_activation_key(),
             key_expires=now() + timedelta(days=5),
             email_confirmed=True,
         )
@@ -207,11 +208,7 @@ def webhook_created_or_updated(
     if created:
         notify_new_or_updated_webhook.delay(instance.pk, created=True)
     else:
-        if update_fields:
-            if (
-                "failure_count"
-                or "enabled"
-                or "date_modified" in update_fields
-            ):
-                return
+        bypass_fields = ("failure_count", "enabled", "date_modified")
+        if update_fields and set(bypass_fields) & set(update_fields):
+            return
         notify_new_or_updated_webhook.delay(instance.pk, created=False)

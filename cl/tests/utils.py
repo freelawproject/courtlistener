@@ -2,7 +2,10 @@ from datetime import date, datetime
 
 from django.contrib.auth.models import User
 from django.core.files.base import ContentFile
-from django.http import HttpHeaders  # type: ignore[attr-defined]
+from django.http import (
+    HttpHeaders,  # type: ignore[attr-defined]
+    HttpResponse,
+)
 from django.test import AsyncClient
 from django.utils.encoding import force_bytes
 from django.utils.http import urlencode
@@ -119,6 +122,21 @@ def make_session_client(user_pk: int) -> AsyncAPIClient:
     client = AsyncAPIClient()
     client.force_login(user)
     return client
+
+
+def parse_csp(response: HttpResponse) -> dict[str, list[str]]:
+    """Parses a response's CSP header into a dict of directives.
+
+    :param response: A response carrying a Content-Security-Policy header.
+    :return: A dict mapping each directive name to its list of values. A
+    valueless directive, like upgrade-insecure-requests, maps to an empty list.
+    """
+    header = response.headers["Content-Security-Policy"]
+    directives = {}
+    for directive in header.split(";"):
+        name, _, values = directive.strip().partition(" ")
+        directives[name] = values.split()
+    return directives
 
 
 def get_with_wait(

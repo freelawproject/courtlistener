@@ -1,5 +1,6 @@
+{% load extras %}
 {# show the admin tools if applicable #}
-{% if perms.search.view_recapdocument or perms.search.change_recapdocument or perms.search.delete_recapdocument or perms.search.view_docketentry or perms.search.change_docketentry or perms.search.delete_docketentry or perms.search.view_docket or perms.search.change_docket or perms.search.delete_docket %}
+{% if perms.search.view_docket or perms.search.change_docket or perms.search.delete_docket or perms.search|has_any_perm:admin_perm_names.entry or perms.search|has_any_perm:admin_perm_names.document %}
   <div class="sidebar-section">
     <h3><span>Admin</span></h3>
     <p>
@@ -11,16 +12,16 @@
         {% endif %}
       {% endif %}
       {% if de %}
-        {% if perms.search.view_docketentry or perms.search.change_docketentry or perms.search.delete_docketentry %}
+        {% if perms.search|has_any_perm:admin_perm_names.entry %}
           <a
-            href="{% url 'admin:search_docketentry_change' de.pk %}"
+            href="{% url admin_url_names.entry de.pk %}"
             class="btn btn-primary btn-xs">Docket Entry</a>
         {% endif %}
       {% endif %}
       {% if rd %}
-        {% if perms.search.view_recapdocument or perms.search.change_recapdocument or perms.search.delete_recapdocument %}
-          <a href="{% url 'admin:search_recapdocument_change' rd.pk %}"
-             class="btn btn-primary btn-xs">RECAP Document</a>
+        {% if perms.search|has_any_perm:admin_perm_names.document %}
+          <a href="{% url admin_url_names.document rd.pk %}"
+             class="btn btn-primary btn-xs">{{ admin_document_label }}</a>
         {% endif %}
       {% endif %}
     </p>

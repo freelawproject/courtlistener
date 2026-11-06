@@ -12,6 +12,7 @@ we ingest it as in a regular scrape
 from asgiref.sync import sync_to_async
 from django.db import IntegrityError
 from django.utils.encoding import force_bytes
+from juriscraper.AbstractSite import AbstractSite
 from juriscraper.lib.exceptions import BadContentError
 
 from cl import settings
@@ -30,14 +31,14 @@ class Command(cl_back_scrape_opinions.Command):
 
     async def scrape_court(
         self,
-        site,
+        site: AbstractSite,
         full_crawl: bool = False,
         ocr_available: bool = True,
         backscrape: bool = False,
     ):
         """
         If the scraped case has citation data
-            Check for Opinion existance via content hash
+            Check for Opinion existence via content hash
             If we have the Opinion
                 if we don't have the citation -> ingest
                 if we already have the citation -> pass

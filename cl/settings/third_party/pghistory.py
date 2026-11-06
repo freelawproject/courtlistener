@@ -42,7 +42,7 @@ class EventsAdminNoFilters(pghistory.admin.EventsAdmin):
                 model_class.objects.get(id=obj_id)
             )
 
-        # By default it wont perform any query
+        # By default it won't perform any query
         return admin_model().objects.none()
 
 
