@@ -7,7 +7,6 @@ from unittest.mock import patch
 
 from django.apps import apps
 from django.conf import settings
-from django.core.cache import cache
 from django.core.exceptions import ValidationError
 from django.core.management import call_command
 from django.db import connection
@@ -32,195 +31,6 @@ Grant = get_grant_model()
 AccessToken = get_access_token_model()
 
 
-@override_settings(RATELIMIT_ENABLE=False)
-class DynamicClientRegistrationTest(APITestCase):
-    """Tests for the RFC 7591 DCR endpoint at /o/register/.
-
-    Rate limiting is disabled at the class level so that the many
-    POSTs exercising validation branches don't trip the limiter.
-    ``DynamicClientRegistrationRateLimitTest`` covers the limiter
-    behavior itself.
-    """
-
-    def setUp(self):
-        super().setUp()
-        self.url = reverse("oauth2_dcr")
-
-    def test_confidential_client_registration(self):
-        """A confidential client gets a client_id and client_secret."""
-        resp = self.client.post(
-            self.url,
-            {
-                "redirect_uris": ["https://mcp.example.com/callback"],
-                "client_name": "Example MCP Client",
-            },
-            format="json",
-        )
-        self.assertEqual(resp.status_code, 201, resp.content)
-        body = resp.json()
-        self.assertIn("client_id", body)
-        self.assertIn("client_secret", body)
-        self.assertEqual(body["client_secret_expires_at"], 0)
-        self.assertEqual(body["client_name"], "Example MCP Client")
-        self.assertEqual(
-            body["redirect_uris"], ["https://mcp.example.com/callback"]
-        )
-        self.assertEqual(body["grant_types"], ["authorization_code"])
-        self.assertEqual(body["response_types"], ["code"])
-        self.assertEqual(
-            body["token_endpoint_auth_method"], "client_secret_basic"
-        )
-        # The app was persisted with the right type and provenance.
-        app = Application.objects.get(client_id=body["client_id"])
-        self.assertEqual(app.client_type, Application.CLIENT_CONFIDENTIAL)
-        self.assertEqual(
-            app.registration_source, Application.RegistrationSource.DCR
-        )
-
-    def test_public_client_registration_has_no_secret(self):
-        """token_endpoint_auth_method=none yields a public client."""
-        resp = self.client.post(
-            self.url,
-            {
-                "redirect_uris": ["https://mcp.example.com/callback"],
-                "token_endpoint_auth_method": "none",
-            },
-            format="json",
-        )
-        self.assertEqual(resp.status_code, 201, resp.content)
-        body = resp.json()
-        self.assertIn("client_id", body)
-        self.assertNotIn("client_secret", body)
-        self.assertNotIn("client_secret_expires_at", body)
-        app = Application.objects.get(client_id=body["client_id"])
-        self.assertEqual(app.client_type, Application.CLIENT_PUBLIC)
-
-    def test_missing_redirect_uris_rejected(self):
-        resp = self.client.post(self.url, {}, format="json")
-        self.assertEqual(resp.status_code, 400)
-        self.assertEqual(resp.json()["error"], "invalid_client_metadata")
-
-    def test_empty_redirect_uris_rejected(self):
-        resp = self.client.post(self.url, {"redirect_uris": []}, format="json")
-        self.assertEqual(resp.status_code, 400)
-
-    def test_http_loopback_allowed(self):
-        for uri in (
-            "http://localhost:8080/cb",
-            "http://127.0.0.1:5555/cb",
-            "http://[::1]:9000/cb",
-        ):
-            with self.subTest(uri=uri):
-                resp = self.client.post(
-                    self.url,
-                    {"redirect_uris": [uri]},
-                    format="json",
-                )
-                self.assertEqual(resp.status_code, 201, resp.content)
-
-    def test_http_non_loopback_rejected(self):
-        resp = self.client.post(
-            self.url,
-            {"redirect_uris": ["http://evil.example.com/cb"]},
-            format="json",
-        )
-        self.assertEqual(resp.status_code, 400)
-        self.assertIn("loopback", resp.json()["error_description"])
-
-    def test_unsupported_scheme_rejected(self):
-        resp = self.client.post(
-            self.url,
-            {"redirect_uris": ["javascript:alert(1)"]},
-            format="json",
-        )
-        self.assertEqual(resp.status_code, 400)
-
-    def test_disallowed_grant_type_rejected(self):
-        resp = self.client.post(
-            self.url,
-            {
-                "redirect_uris": ["https://mcp.example.com/cb"],
-                "grant_types": ["client_credentials"],
-            },
-            format="json",
-        )
-        self.assertEqual(resp.status_code, 400)
-
-    def test_missing_authorization_code_grant_rejected(self):
-        resp = self.client.post(
-            self.url,
-            {
-                "redirect_uris": ["https://mcp.example.com/cb"],
-                "grant_types": ["refresh_token"],
-            },
-            format="json",
-        )
-        self.assertEqual(resp.status_code, 400)
-
-    def test_unsupported_token_auth_method_rejected(self):
-        resp = self.client.post(
-            self.url,
-            {
-                "redirect_uris": ["https://mcp.example.com/cb"],
-                "token_endpoint_auth_method": "private_key_jwt",
-            },
-            format="json",
-        )
-        self.assertEqual(resp.status_code, 400)
-
-    def test_default_client_name_generated(self):
-        resp = self.client.post(
-            self.url,
-            {"redirect_uris": ["https://mcp.example.com/cb"]},
-            format="json",
-        )
-        self.assertEqual(resp.status_code, 201)
-        self.assertTrue(resp.json()["client_name"].startswith("MCP Client "))
-
-
-@override_settings(
-    OAUTH2_DCR_RATELIMIT="10/h",
-    CACHES={
-        "default": {
-            "BACKEND": "django.core.cache.backends.locmem.LocMemCache",
-            # Unique LOCATION so this cache is its own LocMemCache
-            # instance, not shared with the default unnamed one.
-            "LOCATION": "oauth-dcr-ratelimit-test",
-        },
-        # Preserve db_cache because some unrelated request paths
-        # reference caches["db_cache"]. Not used by /o/register/.
-        "db_cache": {
-            "BACKEND": "django.core.cache.backends.db.DatabaseCache",
-            "LOCATION": "django_cache",
-        },
-    },
-)
-class DynamicClientRegistrationRateLimitTest(APITestCase):
-    """The DCR endpoint is rate-limited per IP.
-
-    Why the cache override: the project test runner defaults to
-    ``--parallel=N`` (cl/tests/runner.py), and every parallel worker
-    shares the same Redis. ``RestartRateLimitMixin.tearDownClass``
-    runs ``DEL :1:rl:*`` which would wipe this test's counter mid-loop
-    if a sibling worker tore down its class at the wrong moment. A
-    process-local LocMemCache isolates us from sibling workers.
-    """
-
-    def setUp(self):
-        super().setUp()
-        self.url = reverse("oauth2_dcr")
-        cache.clear()
-
-    def test_ratelimit_blocks_after_threshold(self):
-        payload = {"redirect_uris": ["https://mcp.example.com/cb"]}
-        for _ in range(10):
-            resp = self.client.post(self.url, payload, format="json")
-            self.assertEqual(resp.status_code, 201, resp.content)
-        resp = self.client.post(self.url, payload, format="json")
-        self.assertEqual(resp.status_code, 429)
-        self.assertEqual(resp.json()["error"], "rate_limited")
-
-
 class OAuthMetadataTest(APITestCase):
     """Tests for the RFC 8414 metadata endpoint."""
 
@@ -241,7 +51,6 @@ class OAuthMetadataTest(APITestCase):
         ):
             self.assertIn(field, body)
         # MCP-specific expectations.
-        self.assertIn("registration_endpoint", body)
         self.assertIn("S256", body["code_challenge_methods_supported"])
         self.assertIn("authorization_code", body["grant_types_supported"])
         self.assertEqual(body["response_types_supported"], ["code"])
@@ -255,21 +64,26 @@ class OAuthMetadataTest(APITestCase):
             body["authorization_endpoint"].startswith(body["issuer"])
         )
         self.assertTrue(body["token_endpoint"].startswith(body["issuer"]))
-        self.assertTrue(
-            body["registration_endpoint"].startswith(body["issuer"])
-        )
-        # The registration endpoint must point at our DCR view.
-        self.assertTrue(body["registration_endpoint"].endswith("/o/register/"))
+        # Dynamic Client Registration is retired, so nothing to advertise.
+        self.assertNotIn("registration_endpoint", body)
+
+    def test_registration_endpoint_is_gone(self):
+        for path in ("/o/register/", "/o/register/some-client-id/"):
+            with self.subTest(path=path):
+                self.assertEqual(self.client.post(path).status_code, 404)
 
     def test_scopes_supported_excludes_oidc_scopes_when_oidc_disabled(self):
         with patch.dict(settings.OAUTH2_PROVIDER, {"OIDC_ENABLED": False}):
             resp = self.client.get(self.url)
-        self.assertEqual(resp.json()["scopes_supported"], ["api"])
+        self.assertEqual(resp.json()["scopes_supported"], ["api", "wiki"])
 
-    def test_scopes_supported_lists_only_dcr_scopes_when_oidc_enabled(self):
+    def test_scopes_supported_lists_every_scope_when_oidc_enabled(self):
         with patch.dict(settings.OAUTH2_PROVIDER, {"OIDC_ENABLED": True}):
             resp = self.client.get(self.url)
-        self.assertEqual(resp.json()["scopes_supported"], ["api", "openid"])
+        self.assertEqual(
+            resp.json()["scopes_supported"],
+            ["api", "wiki", "openid", "email", "profile"],
+        )
 
 
 class ApplicationRedirectUriPolicyTest(TestCase):
@@ -696,67 +510,6 @@ class OIDCClaimsTest(APITestCase):
         for scope in ("api", "wiki", "openid", "email", "profile"):
             with self.subTest(scope=scope):
                 self.assertIn(scope, body["scopes_supported"])
-
-
-@override_settings(
-    OAUTH2_PROVIDER={**settings.OAUTH2_PROVIDER, "OIDC_ENABLED": True}
-)
-class DCRScopeRestrictionTest(TestCase):
-    """Dynamically registered apps may request only ``api`` and ``openid``.
-
-    Anyone can register an app through DCR under any name, so the identity
-    and wiki scopes are reserved for applications we create by hand.
-    """
-
-    REDIRECT_URI = "https://client.example.com/callback"
-
-    @classmethod
-    def setUpTestData(cls) -> None:
-        cls.user = UserFactory()
-        cls.dcr_app = ApplicationFactory(
-            client_type=Application.CLIENT_PUBLIC,
-            redirect_uris=cls.REDIRECT_URI,
-            registration_source=Application.RegistrationSource.DCR,
-        )
-        cls.manual_app = ApplicationFactory(
-            client_type=Application.CLIENT_PUBLIC,
-            redirect_uris=cls.REDIRECT_URI,
-        )
-
-    def setUp(self) -> None:
-        super().setUp()
-        self.client.force_login(self.user)
-
-    def _authorize(self, application, scope: str):
-        """GET the consent screen for *application* requesting *scope*."""
-        return self.client.get(
-            reverse("oauth2_provider:authorize"),
-            {
-                "response_type": "code",
-                "client_id": application.client_id,
-                "redirect_uri": self.REDIRECT_URI,
-                "scope": scope,
-                "state": "xyz",
-                "code_challenge": s256_challenge("a" * 64),
-                "code_challenge_method": "S256",
-            },
-        )
-
-    def test_dcr_app_may_request_api_and_openid(self):
-        r = self._authorize(self.dcr_app, "api openid")
-        self.assertEqual(r.status_code, 200, r.content)
-
-    def test_dcr_app_is_refused_other_scopes(self):
-        for scope in ("api wiki", "openid email", "openid profile", "wiki"):
-            with self.subTest(scope=scope):
-                r = self._authorize(self.dcr_app, scope)
-                self.assertEqual(r.status_code, 302)
-                self.assertTrue(r["Location"].startswith(self.REDIRECT_URI))
-                self.assertIn("error=invalid_scope", r["Location"])
-
-    def test_manual_app_may_request_every_scope(self):
-        r = self._authorize(self.manual_app, "openid api wiki email profile")
-        self.assertEqual(r.status_code, 200, r.content)
 
 
 class IntrospectionSubTest(APITestCase):
