@@ -202,6 +202,13 @@ for prefix, viewset, basename in router.registry:
         router_v4.register(prefix, viewset, basename)
 router_v4.register(r"api-usage", views.ApiUsageViewSet, basename="api-usage")
 
+# SCOTUS content (v4 only)
+router_v4.register(
+    r"scotus-docket-metadata",
+    search_views.ScotusDocketMetadataViewSet,
+    basename="scotusdocketmetadata",
+)
+
 # When we finally need to deprecate V3 of the API, the process to remove it, is:
 # - Remove the re_path(r"^api/rest/(?P<version>[v3]+)/", include(router.urls)) below
 # - The only ViewSet that requires removal is SearchViewSet and its related
