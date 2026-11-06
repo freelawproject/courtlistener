@@ -1133,7 +1133,7 @@ class NotifyDomainUsersTest(SSOFixtureMixin, TestCase):
         for email in [
             f"contractor@{DOMAIN}",
             f"ada@{DOMAIN}",
-            f"ada@{DOMAIN}",
+            f"ADA@{DOMAIN.upper()}",
         ]:
             UserProfileWithParentsFactory.create(user__email=email)
         user = UserProfileWithParentsFactory.create(
