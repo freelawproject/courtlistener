@@ -1,3 +1,7 @@
+// How far the arrow's centre sits outside the bubble: half of
+// tooltip_arrow.svg's 8.5px height minus the 2.5px that overlaps the bubble.
+const ARROW_OUTSIDE = 1.75;
+
 document.addEventListener('alpine:init', () => {
   /**
    * Help-icon toggletip for `cotton/tooltip.html`.
@@ -27,6 +31,7 @@ document.addEventListener('alpine:init', () => {
         // The live region is empty while closed, so this is new content and
         // screen readers announce it.
         this.$refs.live.append(this.$refs.message.content.cloneNode(true));
+        this.placeArrow();
       });
     },
 
@@ -66,6 +71,43 @@ document.addEventListener('alpine:init', () => {
      */
     hideOnFocusOut(event) {
       if (!this.$root.contains(event.relatedTarget)) this.hide();
+    },
+
+    /**
+     * Points the arrow at the button from whichever side the tooltip landed
+     * on. `x-effect` passes `$anchor`, so this re-runs on every move.
+     */
+    placeArrow(anchor) {
+      // Reading the position makes x-effect re-run whenever it changes.
+      anchor?.x;
+      anchor?.y;
+
+      // The arrow is a copy Alpine never initialised, so it's styled here.
+      const arrow = this.$refs.live.querySelector('[data-arrow]');
+      if (!arrow) return;
+
+      const button = this.$refs.trigger.getBoundingClientRect();
+      const bubble = this.$refs.live.getBoundingClientRect();
+      const x = button.left + button.width / 2 - bubble.left;
+      const y = button.top + button.height / 2 - bubble.top;
+
+      // The SVG points down; rotate it toward the button.
+      let left = x;
+      let top = bubble.height + ARROW_OUTSIDE;
+      let rotation = 0;
+      if (bubble.top >= button.bottom) {
+        [top, rotation] = [-ARROW_OUTSIDE, 180];
+      } else if (bubble.right <= button.left) {
+        [left, top, rotation] = [bubble.width + ARROW_OUTSIDE, y, -90];
+      } else if (bubble.left >= button.right) {
+        [left, top, rotation] = [-ARROW_OUTSIDE, y, 90];
+      }
+
+      Object.assign(arrow.style, {
+        left: `${left}px`,
+        top: `${top}px`,
+        transform: `translate(-50%, -50%) rotate(${rotation}deg)`,
+      });
     },
   }));
 });
