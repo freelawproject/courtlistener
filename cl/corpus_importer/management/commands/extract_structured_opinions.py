@@ -2,7 +2,6 @@ from collections import Counter
 from datetime import date
 from typing import Any
 
-import httpx
 from asgiref.sync import async_to_sync
 from django.core.management import CommandError
 from django.db.models import Count, QuerySet
@@ -92,8 +91,8 @@ def extract_structured_opinion(
     skipped without changing the database. See cl.corpus_importer.centralia
     for the details.
 
-    Doctor errors, including connection errors and timeouts, are logged and
-    reported in the result; other errors, including database errors while
+    Error responses from Doctor are logged and reported in the result. Other
+    errors, such as connection errors, timeouts or database errors while
     saving, are raised.
 
     :param opinion: The opinion to extract, from get_opinions_to_extract.
@@ -123,37 +122,32 @@ def extract_structured_opinion(
         "local_path": opinion.local_path.name,
         "fingerprint": [f"{court_id}-opinion-extract-structured-failure"],
     }
-    try:
-        with opinion.local_path.open("rb") as document_file:
-            response = async_to_sync(microservice)(
-                service="opinion-extract-structured",
-                file=document_file,
-                data={
-                    "court_id": court_id,
-                    "allow_pending": str(allow_pending).lower(),
-                },
-            )
-    except (httpx.ConnectError, httpx.TimeoutException) as e:
+    with opinion.local_path.open("rb") as document_file:
+        response = async_to_sync(microservice)(
+            service="opinion-extract-structured",
+            file=document_file,
+            data={
+                "court_id": court_id,
+                "allow_pending": str(allow_pending).lower(),
+            },
+        )
+    if not response.is_success:
         logger.error(
-            "Could not reach the opinion-extract-structured microservice: %s",
-            e,
+            "Error from opinion-extract-structured microservice: %s",
+            response.status_code,
             extra=log_extra,
         )
-        result["reason"] = f"{type(e).__name__}: {e}"
+        result["reason"] = f"HTTP {response.status_code}"
         return result
 
     data = response.json()
-    if not response.is_success or not data.get("success"):
+    if not data.get("success"):
         logger.error(
-            "Error from opinion-extract-structured microservice: %s %s",
-            response.status_code,
+            "Error from opinion-extract-structured microservice: %s",
             data.get("error_code"),
             extra={**log_extra, "msg": data.get("msg")},
         )
-        result["reason"] = (
-            f"HTTP {response.status_code} {data.get('error_code')}: "
-            f"{data.get('msg')}"
-        )
+        result["reason"] = f"{data.get('error_code')}: {data.get('msg')}"
         return result
 
     if compare:
@@ -200,8 +194,10 @@ class Command(VerboseCommand):
     and reports what would be ingested, with character and citation counts
     for the current and extracted content, without changing the database.
 
-    Doctor errors are reported and make the command exit with an error once
-    every cluster is processed. Other errors stop it immediately.
+    A cluster that fails, whether from a Doctor error or an exception while
+    extracting it, is logged and reported as an error, and the run moves on
+    to the next one. The command exits with an error once every cluster is
+    processed if any failed.
     """
 
     def add_arguments(self, parser):
@@ -286,13 +282,25 @@ class Command(VerboseCommand):
         )
         results: list[dict[str, Any]] = []
         for opinion in opinions.iterator(chunk_size=options["chunk_size"]):
-            result = extract_structured_opinion(
-                opinion,
-                allow_pending=options["allow_pending"],
-                dry_run=options["dry_run"],
-                compare=options["compare"],
-                queue=options["queue"],
-            )
+            try:
+                result = extract_structured_opinion(
+                    opinion,
+                    allow_pending=options["allow_pending"],
+                    dry_run=options["dry_run"],
+                    compare=options["compare"],
+                    queue=options["queue"],
+                )
+            except Exception as e:
+                logger.exception(
+                    "Structured extraction failed for cluster %s",
+                    opinion.cluster_id,
+                )
+                result = {
+                    "cluster_id": opinion.cluster_id,
+                    "status": StructuredExtractionStatus.ERROR,
+                    "reason": f"{type(e).__name__}: {e}",
+                    "metrics": {},
+                }
             results.append(result)
             logger.info(
                 "Cluster %s: %s (%s) %s",
