@@ -794,6 +794,7 @@ class SSOStartViewTest(SSOFixtureMixin, TestCase):
         )
         self.assertTemplateUsed(r, "sso/continue.html")
         self.assertContains(r, self.connection.get_login_url())
+        self.assertContains(r, f'{reverse("sso_start")}?next=/"')
 
     def test_domain_with_enforcement_off_is_not_offered(self) -> None:
         """Are domains still being tested kept off the page?"""
