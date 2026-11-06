@@ -282,6 +282,26 @@ def flag_for_support(
     transaction.on_commit(lambda: mail_managers(subject, body))
 
 
+def refuse_if_linked(user: User, connection: SSOConnection) -> None:
+    """Refuse to link an account another identity at this IdP already has.
+
+    :param user: The account a new IdP identity would be linked to.
+    :param connection: The connection the login came through.
+    :raises SSORefusal: If the account is already linked to this IdP.
+    """
+    if SocialAccount.objects.filter(
+        user=user, provider=connection.provider_id
+    ).exists():
+        raise SSORefusal(
+            "This address belongs to a CourtListener account that is "
+            "already linked to a different person in your "
+            "organization's sign-on. Please contact us.",
+            "address already linked to another IdP subject",
+            connection=connection,
+            user=user,
+        )
+
+
 def find_or_create_account(
     request: HttpRequest,
     sociallogin: SocialLogin,
@@ -299,18 +319,7 @@ def find_or_create_account(
     """
     user, confirmed_count = best_confirmed_account(email)
     if user is not None:
-        already_linked = SocialAccount.objects.filter(
-            user=user, provider=connection.provider_id
-        ).exists()
-        if already_linked:
-            raise SSORefusal(
-                "This address belongs to a CourtListener account that is "
-                "already linked to a different person in your "
-                "organization's sign-on. Please contact us.",
-                "address already linked to another IdP subject",
-                connection=connection,
-                user=user,
-            )
+        refuse_if_linked(user, connection)
         if confirmed_count > 1:
             flag_for_support(
                 request,
@@ -321,13 +330,20 @@ def find_or_create_account(
             )
         return user, AuthOutcome.LINKED
 
+    # Only active stubs (donors and Neon members). Deleted accounts are
+    # inactive stubs that keep their address, and must not go to whoever
+    # holds the address next.
     stub = (
-        filter_by_email(User.objects.filter(profile__stub_account=True), email)
+        filter_by_email(
+            User.objects.filter(is_active=True, profile__stub_account=True),
+            email,
+        )
         .select_related("profile")
         .order_by("pk")
         .first()
     )
     if stub is not None:
+        refuse_if_linked(stub, connection)
         return upgrade_stub(stub, sociallogin, email), AuthOutcome.CREATED
 
     user = create_account(sociallogin, email)

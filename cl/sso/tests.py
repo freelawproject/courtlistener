@@ -487,7 +487,6 @@ class OIDCLoginTest(SSOFixtureMixin, TestCase):
             stub_account=True,
             email_confirmed=False,
             user__email=f"donor@{DOMAIN}",
-            user__is_active=False,
         ).user
         users_before = User.objects.count()
 
@@ -500,6 +499,42 @@ class OIDCLoginTest(SSOFixtureMixin, TestCase):
         self.assertFalse(stub.profile.stub_account)
         self.assertTrue(stub.profile.email_confirmed)
         self.assertSignedInAs(stub)
+
+    def test_deleted_account_is_not_reused(self) -> None:
+        """Does somebody given a departed person's address get a new account?
+
+        Deleting an account leaves an inactive stub that keeps the address
+        and its old IdP link.
+        """
+        deleted = UserProfileWithParentsFactory.create(
+            stub_account=True,
+            email_confirmed=False,
+            user__email=f"ada@{DOMAIN}",
+            user__is_active=False,
+        ).user
+        SocialAccount.objects.create(user=deleted, provider="acme", uid="s-1")
+
+        r = self._log_in_via_idp(FakeIdP(sub="s-2", email=deleted.email))
+
+        self.assertRedirects(r, "/alerts/", fetch_redirect_response=False)
+        new_user = SocialAccount.objects.get(uid="s-2").user
+        self.assertNotEqual(new_user.pk, deleted.pk)
+        self.assertSignedInAs(new_user)
+        deleted.refresh_from_db()
+        self.assertFalse(deleted.is_active)
+
+    def test_linked_stub_is_refused(self) -> None:
+        """Is a stub already linked to another identity at the IdP refused?"""
+        stub = UserProfileWithParentsFactory.create(
+            stub_account=True, user__email=f"donor@{DOMAIN}"
+        ).user
+        SocialAccount.objects.create(user=stub, provider="acme", uid="s-1")
+
+        r = self._log_in_via_idp(FakeIdP(sub="s-2", email=stub.email))
+
+        self.assertEqual(r.status_code, 403)
+        self.assertNotSignedIn()
+        self.assertFalse(SocialAccount.objects.filter(uid="s-2").exists())
 
     def test_unverified_domain_is_refused(self) -> None:
         """Is an identity whose address isn't on a verified domain refused?
