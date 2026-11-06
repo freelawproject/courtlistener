@@ -39,6 +39,7 @@ from pydantic import ValidationError
 from cl.alerts.factories import DocketAlertFactory
 from cl.alerts.models import DocketAlert
 from cl.audio.factories import AudioFactory
+from cl.corpus_importer.centralia import should_ingest
 from cl.corpus_importer.court_regexes import match_court_string
 from cl.corpus_importer.factories import (
     CaseBodyFactory,
@@ -6262,3 +6263,108 @@ class IquerySweepLockTest(SimpleTestCase):
             )
         self.assertIsNone(self.r.get(self.lock_key))
         self.assertEqual(self._counters(), (5, 5))
+
+
+class CentraliaShouldIngestTest(SimpleTestCase):
+    """Test the gate deciding whether a structured read is stored."""
+
+    @staticmethod
+    def make_payload(**overrides) -> dict:
+        """Build a minimal ingestible payload, then apply overrides.
+
+        :param overrides: Top-level payload keys to replace.
+        :return: The payload.
+        """
+        payload = {
+            "status": "valid",
+            "cluster": {"doc_type": "opinion"},
+            "opinions": [
+                {"order": 1, "type": "majority", "html": "<p>Affirmed.</p>"}
+            ],
+            "headmatter": {"text": "COURT OF APPEALS"},
+            "diagnostics": {
+                "scan_pages": [],
+                "text_missing_pages": [],
+                "cid_pages": [],
+            },
+        }
+        payload.update(overrides)
+        return payload
+
+    def test_declines_bad_payloads(self) -> None:
+        """Are untrustworthy payloads declined?"""
+        opinion = Opinion(plain_text="Affirmed.")
+        test_cases = (
+            ("scanned status", {"status": "scanned"}),
+            ("failed status", {"status": "failed"}),
+            # A parse that left content unplaced or raised a warning. The
+            # flat text stands until a human has looked at it.
+            ("review status", {"status": "review"}),
+            (
+                "scan pages",
+                {
+                    "diagnostics": {
+                        "scan_pages": [2],
+                        "text_missing_pages": [],
+                        "cid_pages": [],
+                    }
+                },
+            ),
+            (
+                "textless pages",
+                {
+                    "diagnostics": {
+                        "scan_pages": [],
+                        "text_missing_pages": [3],
+                        "cid_pages": [],
+                    }
+                },
+            ),
+            (
+                "CID pages",
+                {
+                    "diagnostics": {
+                        "scan_pages": [],
+                        "text_missing_pages": [],
+                        "cid_pages": [1],
+                    }
+                },
+            ),
+            ("no writings", {"opinions": []}),
+            (
+                "html-less writings",
+                {"opinions": [{"order": 1, "type": "majority", "html": ""}]},
+            ),
+            (
+                "review-flavored writing html",
+                {
+                    "opinions": [
+                        {
+                            "order": 1,
+                            "type": "majority",
+                            "html": '<span class="chip">majority</span><p>Hi</p>',
+                        }
+                    ]
+                },
+            ),
+        )
+        for label, overrides in test_cases:
+            with self.subTest(label=label):
+                ingestible, reason = should_ingest(
+                    opinion, self.make_payload(**overrides)
+                )
+                self.assertFalse(ingestible, msg=reason)
+
+    def test_declines_partial_reads(self) -> None:
+        """Is a read that recovered too little text declined?"""
+        opinion = Opinion(plain_text="x" * 10_000)
+        ingestible, reason = should_ingest(opinion, self.make_payload())
+        self.assertFalse(ingestible)
+        self.assertIn("already extracted", reason)
+
+    def test_ingests_a_clean_read(self) -> None:
+        """Does a complete read of a real opinion pass the gate?"""
+        opinion = Opinion(plain_text="Affirmed.")
+        ingestible, reason = should_ingest(opinion, self.make_payload())
+        self.assertTrue(ingestible, msg=reason)
+        self.assertEqual(reason, "status=valid")
