@@ -351,6 +351,8 @@ async def components(request: HttpRequest) -> HttpResponse:
     # error state; is_valid() runs validation and fills the field's errors.
     demo_invalid_filter_form = DocketEntryFilterForm({"entry_gte": "-1"})
     demo_invalid_filter_form.is_valid()
+    demo_disabled_filter_form = DocketEntryFilterForm(initial={"entry_gte": 5})
+    demo_disabled_filter_form.fields["entry_gte"].disabled = True
 
     return TemplateResponse(
         request,
@@ -364,6 +366,7 @@ async def components(request: HttpRequest) -> HttpResponse:
             "demo_docket": MockDocket(),
             "demo_filter_form": DocketEntryFilterForm(),
             "demo_invalid_filter_form": demo_invalid_filter_form,
+            "demo_disabled_filter_form": demo_disabled_filter_form,
             "demo_metadata_items": [
                 {"label": "Date Filed", "value": "January 14, 2025"},
                 {
