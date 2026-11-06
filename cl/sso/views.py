@@ -1,7 +1,7 @@
 from allauth.socialaccount.adapter import get_adapter
 from allauth.socialaccount.providers.base.constants import AuthProcess
 from django.conf import settings
-from django.http import HttpRequest, HttpResponse
+from django.http import Http404, HttpRequest, HttpResponse
 from django.shortcuts import get_object_or_404
 from django.template.response import TemplateResponse
 from django.views.decorators.cache import never_cache
@@ -22,6 +22,23 @@ from cl.sso.models import SSOConnection
 from cl.sso.policy import email_domain, sso_option_for_email
 
 WELL_KNOWN_SUFFIX = "/.well-known/openid-configuration"
+
+
+def saml_logout_not_supported(
+    request: HttpRequest, organization_slug: str
+) -> HttpResponse:
+    """Refuse SAML single logout requests.
+
+    Stands in for allauth's SLS view. We never start a SAML logout, and
+    allauth's view acts on unsigned logout requests, so anybody could log a
+    person out with a crafted link. The URL name stays because allauth
+    builds the SP settings with it.
+
+    :param request: The request.
+    :param organization_slug: The SAML app's slug, unused.
+    :raises Http404: Always.
+    """
+    raise Http404
 
 
 @never_cache

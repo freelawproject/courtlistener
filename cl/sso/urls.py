@@ -7,6 +7,22 @@ from cl.lib.ratelimiter import ratelimiter_all_10_per_m
 from cl.sso import views
 
 
+def without_saml_logout(
+    patterns: list[URLPattern | URLResolver],
+) -> list[URLPattern | URLResolver]:
+    """Swap allauth's SAML logout view for one that refuses every request.
+
+    :param patterns: URL patterns, nested includes too. Changed in place.
+    :return: The same patterns.
+    """
+    for pattern in patterns:
+        if isinstance(pattern, URLResolver):
+            without_saml_logout(pattern.url_patterns)
+        elif pattern.name == "saml_sls":
+            pattern.callback = views.saml_logout_not_supported
+    return patterns
+
+
 def rate_limited(
     patterns: list[URLPattern | URLResolver],
 ) -> list[URLPattern | URLResolver]:
@@ -70,7 +86,9 @@ urlpatterns = [
                     views.oidc_initiate_login,
                     name="sso_oidc_initiate",
                 ),
-                *rate_limited(build_provider_urlpatterns()),
+                *rate_limited(
+                    without_saml_logout(build_provider_urlpatterns())
+                ),
             ]
         ),
     ),

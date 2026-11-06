@@ -103,12 +103,19 @@ class AllauthRoutingTest(SimpleTestCase):
                 "openid_connect_callback",
                 "saml_acs",
                 "saml_finish_acs",
-                "saml_sls",
                 "saml_metadata",
                 "saml_login",
             },
             msg=f"Unexpected allauth routes: {routes}",
         )
+
+    def test_saml_logout_is_refused(self) -> None:
+        """Does the SAML logout URL refuse requests but still reverse?"""
+        url = reverse("saml_sls", kwargs={"organization_slug": "acme"})
+        for method in ("get", "post"):
+            with self.subTest(method=method):
+                r = getattr(self.client, method)(url)
+                self.assertEqual(r.status_code, 404)
 
     def test_local_account_url_names_do_not_resolve(self) -> None:
         """Do allauth's local-account URL names fail to reverse?"""
