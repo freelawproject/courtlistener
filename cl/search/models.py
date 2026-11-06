@@ -3617,6 +3617,7 @@ def build_authority_opinions_query(
             "cluster__citation_count",
             "cluster__docket_id",
             "cluster__date_filed",
+            "cluster__precedential_status",
         )
         .order_by("-num_filings", "-total_depth")
     )
