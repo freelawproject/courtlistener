@@ -24,6 +24,7 @@ from cl.api.utils import (
     NoFilterCacheListMixin,
 )
 from cl.lib.elasticsearch_utils import do_es_api_query
+from cl.lib.search_utils import scotus_search_enabled
 from cl.search import api_utils
 from cl.search.api_renderers import SafeXMLRenderer
 from cl.search.api_serializers import (
@@ -529,6 +530,7 @@ class SearchV4ViewSet(LoggingMixin, viewsets.ViewSet):
         :return: Response object with paginated search results or validation
             errors.
         """
+        cleaned_data["hide_scotus"] = not scotus_search_enabled(request)
         search_type = cleaned_data["type"]
         match search_type:
             case SEARCH_TYPES.RECAP:

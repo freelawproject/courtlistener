@@ -3,6 +3,7 @@ import math
 import re
 import urllib.parse
 from http import HTTPStatus
+from itertools import product
 from unittest import mock
 
 import time_machine
@@ -18,11 +19,13 @@ from django.utils.timezone import now
 from elasticsearch.dsl import Q
 from lxml import etree, html
 from rest_framework.serializers import CharField
+from waffle.testutils import override_flag
 
 from cl.alerts.utils import add_cutoff_timestamp_filter
 from cl.lib.elasticsearch_utils import (
     build_es_main_query,
     build_search_feed_query,
+    clean_count_query,
     compute_lowest_possible_estimate,
     fetch_es_results,
     merge_unavailable_fields_on_parent_document,
@@ -7166,8 +7169,7 @@ class SCOTUSESIndexingSignalTest(
     def _recap_and_scotus_documents_sharing_a_pk(
         self,
     ) -> tuple[RECAPDocument, SCOTUSDocument]:
-        """Index a RECAPDocument and a SCOTUSDocument with the same pk.
-        """
+        """Index a RECAPDocument and a SCOTUSDocument with the same pk."""
         shared_pk = 987650
         rd = RECAPDocumentFactory(
             pk=shared_pk,
@@ -7452,6 +7454,101 @@ class SCOTUSESIndexingSignalTest(
 
         hit = ESRECAPDocument.get(id=ES_CHILD_ID(scotus_document.pk).SCOTUS)
         self.assertEqual(hit.caseName, "Edited Case Name")
+
+
+@override_flag("scotus_docket_page", active=True)
+class SCOTUSRECAPSearchTest(
+    AuthenticatedClientMixin, ESIndexTestCase, TestCase
+):
+    """Confirm RECAP search shows SCOTUS content only behind its flag."""
+
+    @classmethod
+    def setUpTestData(cls):
+        cls.rebuild_index("search.Docket")
+        with cls.captureOnCommitCallbacks(execute=True):
+            scotus_entry = SCOTUSDocketEntryFactory(
+                docket__court=CourtFactory(id="scotus", jurisdiction="F")
+            )
+            recap_entry = DocketEntryFactory(
+                docket__court=CourtFactory(id="ca1", jurisdiction="F"),
+                docket__source=Docket.RECAP,
+            )
+            # Every docket and document URL of a docket starts with this.
+            cls.scotus_docket_path = f"/docket/{scotus_entry.docket_id}/"
+            cls.recap_docket_path = f"/docket/{recap_entry.docket_id}/"
+            SCOTUSDocumentFactory(
+                docket_entry=scotus_entry, description="Tied"
+            )
+            RECAPDocumentFactory(docket_entry=recap_entry, description="Tied")
+
+    def test_scotus_results_need_the_scotus_docket_page_flag(self) -> None:
+        """Until launch, the search page and the v4 API show SCOTUS content
+        only to requests with the scotus_docket_page flag."""
+        api_v4 = reverse("search-list", kwargs={"version": "v4"})
+        endpoints = [
+            ("search page", reverse("show_results"), SEARCH_TYPES.RECAP),
+            ("API v4 r", api_v4, SEARCH_TYPES.RECAP),
+            ("API v4 d", api_v4, SEARCH_TYPES.DOCKETS),
+            ("API v4 rd", api_v4, SEARCH_TYPES.RECAP_DOCUMENT),
+        ]
+        # An empty q runs the match-all query, which builds its queries
+        # differently.
+        for (endpoint, url, search_type), q in product(
+            endpoints, ["Tied", ""]
+        ):
+            with self.subTest(endpoint=endpoint, q=q):
+                params = {"type": search_type, "q": q}
+                with override_flag("scotus_docket_page", active=False):
+                    hidden = self.client.get(url, params).content.decode()
+                shown = self.client.get(url, params).content.decode()
+
+                self.assertIn(self.recap_docket_path, hidden)
+                self.assertNotIn(self.scotus_docket_path, hidden)
+                self.assertIn(self.scotus_docket_path, shown)
+
+    def test_count_query_drops_inner_hits_when_hiding_scotus(self) -> None:
+        """clean_count_query still strips the has_child inner_hits from a
+        query that leaves SCOTUS out."""
+        search_query, *_ = build_es_main_query(
+            DocketDocument.search(),
+            {"type": SEARCH_TYPES.RECAP, "q": "Tied", "hide_scotus": True},
+        )
+
+        count_query = clean_count_query(search_query).to_dict()["query"][
+            "bool"
+        ]
+
+        self.assertEqual(
+            count_query["must_not"], [{"term": {"court_id.raw": "scotus"}}]
+        )
+        for clause in count_query["should"]:
+            self.assertNotIn("inner_hits", clause.get("has_child", {}))
+
+    @mock.patch(
+        "cl.lib.search_utils.get_micro_cache_key",
+        return_value="search_results_cache_scotus_test:",
+    )
+    @override_settings(ELASTICSEARCH_MICRO_CACHE_ENABLED=True)
+    def test_search_page_cache_is_separate_per_flag(self, _mock) -> None:
+        """A search page cached for one scotus_docket_page value is never
+        served to a request with the other value."""
+        r = get_redis_interface("CACHE")
+        params = {"type": SEARCH_TYPES.RECAP, "q": "Tied"}
+        for first_flag in [True, False]:
+            with self.subTest(first_flag=first_flag):
+                if keys := r.keys(":1:search_results_cache_scotus_test:*"):
+                    r.delete(*keys)
+                with override_flag("scotus_docket_page", active=first_flag):
+                    self.client.get(reverse("show_results"), params)
+                with override_flag(
+                    "scotus_docket_page", active=not first_flag
+                ):
+                    second = self.client.get(reverse("show_results"), params)
+
+                self.assertEqual(
+                    self.scotus_docket_path in second.content.decode(),
+                    not first_flag,
+                )
 
 
 class RECAPFeedTest(RECAPSearchTestCase, ESIndexTestCase, TestCase):

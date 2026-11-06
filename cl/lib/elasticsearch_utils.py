@@ -24,7 +24,7 @@ from django.utils.html import strip_tags
 from django_elasticsearch_dsl.search import Search
 from elasticsearch.dsl import A, MultiSearch, Q
 from elasticsearch.dsl import Search as SearchDSL
-from elasticsearch.dsl.query import Query, QueryString, Range
+from elasticsearch.dsl.query import Bool, Query, QueryString, Range
 from elasticsearch.dsl.response import Hit, Response
 from elasticsearch.dsl.utils import AttrDict
 from elasticsearch.exceptions import ApiError, RequestError, TransportError
@@ -1320,6 +1320,35 @@ def get_match_all_query(
     return final_match_all_query
 
 
+def hides_scotus(cd: CleanData) -> bool:
+    """True for a RECAP search (r, d, rd) whose caller set cd["hide_scotus"],
+    so SCOTUS content must be left out of its results. The search page and
+    the v4 API set it when the scotus_docket_page flag is off. Temporary:
+    remove once SCOTUS launches.
+    """
+    return bool(cd.get("hide_scotus")) and cd["type"] in (
+        SEARCH_TYPES.RECAP,
+        SEARCH_TYPES.DOCKETS,
+        SEARCH_TYPES.RECAP_DOCUMENT,
+    )
+
+
+def exclude_scotus(query: Query | None) -> Query:
+    """Return query, or a match-everything query if it's None, without
+    SCOTUS dockets and documents.
+
+    A bool query gets the exclusion added to its own must_not rather than
+    being wrapped, so code that reads its clauses (e.g. clean_count_query)
+    still finds them.
+    """
+    scotus = Q("term", **{"court_id.raw": "scotus"})
+    if isinstance(query, Bool):
+        query = query._clone()
+        query.must_not = [*query.must_not, scotus]
+        return query
+    return Q("bool", must=[query] if query else [], must_not=[scotus])
+
+
 def build_es_base_query(
     search_query: Search,
     cd: CleanData,
@@ -1507,6 +1536,11 @@ def build_es_base_query(
         )
         boost_mode = "multiply" if string_query else "replace"
 
+    if hides_scotus(cd):
+        main_query = exclude_scotus(cast(Query, main_query))
+        if child_query:
+            child_query = exclude_scotus(child_query)
+
     # Apply a custom function score to the main query, useful for cursor pagination
     # in the V4 API and for date decay relevance.
     main_query = apply_custom_score_to_main_query(
@@ -1576,6 +1610,10 @@ def build_child_docs_query(
     ]
     parties_has_parent_query = build_has_parent_parties_query(parties_filters)
 
+    if not child_docs_query and hides_scotus(cd):
+        # Match all query case, where build_es_base_query had no child query
+        # to exclude SCOTUS from.
+        child_docs_query = exclude_scotus(None)
     if not child_docs_query:
         # Match all query case.
         if not exclude_docs_for_empty_field:
