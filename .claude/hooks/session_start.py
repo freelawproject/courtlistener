@@ -37,6 +37,10 @@ Assumptions about the environment, each learned from a real session:
   stack therefore boots only when DOCKERHUB_USERNAME and DOCKERHUB_TOKEN are
   set in the cloud environment's settings; otherwise the hook and --wait
   print a note explaining how to set them and boot nothing.
+- The sandbox re-signs outbound TLS with its own CA and points host tools
+  at the bundle through SSL_CERT_FILE. Containers don't see the host's
+  trust store, so without help the image build and npm fail with
+  certificate errors; the proxy-ca compose override passes the bundle in.
 """
 
 from __future__ import annotations
@@ -64,6 +68,13 @@ COMPOSE_FILES = [
     COMPOSE_DIR / "docker-compose.yml",
     COMPOSE_DIR / "docker-compose.tmpfs.yml",
 ]
+# The host's CA bundle, when the sandbox's TLS-intercepting proxy sets one;
+# the override makes the containers trust it too. `buildx bake` only reads
+# build secrets from inside the project, so the bundle is staged there.
+HOST_CA_BUNDLE = os.environ.get("SSL_CERT_FILE", "")
+PROXY_CA_BUNDLE = COMPOSE_DIR / "proxy-ca-bundle.crt"  # gitignored
+if os.path.isfile(HOST_CA_BUNDLE):
+    COMPOSE_FILES.append(COMPOSE_DIR / "docker-compose.proxy-ca.yml")
 # The image bakes in the Python and Node dependencies; when any of these
 # change, an image cached from an earlier session is stale.
 IMAGE_INPUTS = [
@@ -308,6 +319,10 @@ def configure_environment(persist: bool) -> None:
         "AWS_SECRET_ACCESS_KEY": "",
         "AWS_SESSION_TOKEN": "",
     }
+    if os.path.isfile(HOST_CA_BUNDLE):
+        # Read by docker-compose.proxy-ca.yml.
+        shutil.copyfile(HOST_CA_BUNDLE, PROXY_CA_BUNDLE)
+        variables["CL_PROXY_CA_BUNDLE"] = str(PROXY_CA_BUNDLE)
     os.environ.update(variables)
     env_file = os.environ.get("CLAUDE_ENV_FILE")
     if not persist or not env_file:
@@ -497,6 +512,9 @@ def show_hints() -> None:
     log("    Tell the user which host was refused; they allow it in the")
     log("    environment's network access settings. A first boot needs:")
     log(f"    {', '.join(DOWNLOAD_HOSTS)}")
+    log("  * A certificate error inside a build or container (UnknownIssuer,")
+    log("    SELF_SIGNED_CERT_IN_CHAIN) means it did not get the host's CA")
+    log("    bundle; check that SSL_CERT_FILE points at an existing file.")
     log("  * 429 Too Many Requests from Docker Hub means the login was not")
     log("    applied or the account itself is rate-limited; retry later.")
     log("  * Elasticsearch needs about 1 GB of memory.")
