@@ -39,14 +39,18 @@ from cl.search.documents import (
     PersonDocument,
     PositionDocument,
 )
+from cl.search.es_docket_sources import (
+    ALL_ES_SOURCES,
+    SOURCE_BY_MODEL,
+)
 from cl.search.models import (
-    BankruptcyInformation,
     Citation,
     Docket,
     Opinion,
     OpinionCluster,
     ParentheticalGroup,
     RECAPDocument,
+    SCOTUSDocument,
 )
 from cl.search.tasks import (
     compute_single_opinion_embeddings,
@@ -210,7 +214,8 @@ def update_es_documents(
                 | Position()
                 | OpinionCluster()
                 | Opinion()
-            ) if mapping_fields.get("self", None):  # type: ignore
+                | SCOTUSDocument()
+            ) if mapping_fields.get("self", None):
                 # Update main document in ES, including fields to be
                 # extracted from a related instance.
                 should_compute_embeddings = (
@@ -307,9 +312,17 @@ def update_es_documents(
                         )
                     )
             case Docket() if es_document is ESRECAPDocument:  # type: ignore
+                # The related name must come from this source's own
+                # config -- a hardcoded RECAP name would silently miss
+                # every other source.
+                if main_model not in SOURCE_BY_MODEL:
+                    continue
+                source = SOURCE_BY_MODEL[main_model]
                 # Avoid calling update_children_docs_by_query if the Docket
-                # doesn't have any docket entries.
-                if not instance.docket_entries.exists():
+                # doesn't have any entries from this source.
+                if not getattr(
+                    instance, source.docket_entries_related_name
+                ).exists():
                     continue
                 transaction.on_commit(
                     partial(
@@ -321,11 +334,16 @@ def update_es_documents(
                     )
                 )
             case Person() if es_document is ESRECAPDocument:  # type: ignore
+                if main_model not in SOURCE_BY_MODEL:
+                    continue
+                source = SOURCE_BY_MODEL[main_model]
                 related_dockets = Docket.objects.filter(**{query: instance})
                 for rel_docket in related_dockets:
-                    # Avoid calling update_children_docs_by_query if the Docket
-                    # doesn't have any docket entries.
-                    if not rel_docket.docket_entries.exists():
+                    # Avoid calling update_children_docs_by_query if the
+                    # Docket doesn't have any entries from this source.
+                    if not getattr(
+                        rel_docket, source.docket_entries_related_name
+                    ).exists():
                         continue
                     transaction.on_commit(
                         partial(
@@ -510,17 +528,24 @@ def update_reverse_related_documents(
                     fields_map_to_pass,
                 )
             )
-        case BankruptcyInformation() if es_document is DocketDocument:  # type: ignore
-            # bulk update RECAP documents when a reverse related record is created/updated.
+        case _ if (
+            type(instance) in SOURCE_BY_MODEL and es_document is DocketDocument
+        ):  # type: ignore
+            # Always a metadata-model instance here.
+            source = SOURCE_BY_MODEL[type(instance)]
+            # docket is a real FK on every metadata model.
+            docket = getattr(instance, "docket")
             # Avoid calling update_children_docs_by_query if the Docket
-            # doesn't have any entries.
-            if not instance.docket.docket_entries.exists():
+            # doesn't have any entries from this source.
+            if not getattr(
+                docket, source.docket_entries_related_name
+            ).exists():
                 return
             transaction.on_commit(
                 partial(
                     update_children_docs_by_query.delay,
                     ESRECAPDocument.__name__,
-                    instance.docket.pk,
+                    docket.pk,
                     affected_fields,
                 )
             )
@@ -586,11 +611,16 @@ def delete_reverse_related_documents(
                     None,
                 )
             )
-            # Avoid calling update_children_docs_by_query if the Docket
-            # doesn't have any entries.
-            if not instance.docket_entries.exists():
+            # Must check every source, not just one -- by now `instance`
+            # is a plain Docket, so the type that triggered the delete is
+            # no longer known.
+            has_entries = any(
+                getattr(instance, source.docket_entries_related_name).exists()
+                for source in ALL_ES_SOURCES
+            )
+            if not has_entries:
                 return
-            # Then update all their child documents (RECAPDocuments)
+            # Then update all their child documents
             transaction.on_commit(
                 partial(
                     update_children_docs_by_query.delay,
@@ -812,13 +842,21 @@ class ESSignalProcessor:
         mapping_fields = self.documents_model_mapping["save"][sender]
         if (
             isinstance(instance, Docket)
-            and instance.source not in Docket.RECAP_SOURCES()
+            and not any(
+                source.docket_belongs(instance)
+                # ready_to_index only gates the very first write -- an
+                # update on an already-indexed Docket is a normal
+                # partial update, not a race with incomplete data.
+                and (not created or source.ready_to_index(instance))
+                for source in ALL_ES_SOURCES
+            )
             and mapping_fields.get(
                 "self", None
             )  # Apply only to signals intended to affect the DocketDocument mapping.
         ):
-            # Avoid saving or updating the Docket in ES if it doesn't belong to
-            # RECAP.
+            # Avoid saving or updating the Docket in ES if it doesn't belong
+            # to any registered source, or is being created before its
+            # source is ready to index it.
             return
 
         if isinstance(instance, Opinion) and instance.main_version:
@@ -917,13 +955,16 @@ class ESSignalProcessor:
         mapping_fields = self.documents_model_mapping["reverse"][sender]
         for query_string, fields_map in mapping_fields.items():
             match instance:
-                case BankruptcyInformation() if (
-                    self.es_document is DocketDocument
+                case _ if (
+                    type(instance) in SOURCE_BY_MODEL
+                    and self.es_document is DocketDocument
                 ):  # type: ignore
-                    # BankruptcyInformation is a one-to-one relation that can
-                    # be re-saved many times without changes. It's better to
-                    # check if the indexed fields have changed before
-                    # triggering an update.
+                    # Sender is always a registered metadata model here.
+                    # Every registered metadata model (BankruptcyInformation,
+                    # ScotusDocketMetadata, ...) is a one-to-one relation
+                    # that can be re-saved many times without changes. It's
+                    # better to check if the indexed fields have changed
+                    # before triggering an update.
                     changed_fields = updated_fields(instance, self.es_document)
                     affected_fields = get_fields_to_update(
                         changed_fields, fields_map

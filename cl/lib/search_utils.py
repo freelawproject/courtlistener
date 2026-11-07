@@ -273,6 +273,14 @@ async def add_depth_counts(
         return None
 
 
+def scotus_search_enabled(request: HttpRequest) -> bool:
+    """Whether this request's RECAP search results may include SCOTUS
+    content. Temporary: SCOTUS stays hidden until launch, behind the same
+    flag as the SCOTUS docket pages.
+    """
+    return bool(flag_is_active(request, "scotus_docket_page"))
+
+
 def store_search_query(request: HttpRequest, search_results: dict) -> None:
     """Saves an user's search query in a SearchQuery model
 
@@ -688,6 +696,7 @@ def do_es_search(
     is_csv_export: bool = False,
     courts: QuerySet[Court] | None = None,
     is_semantic_frontend_active: bool = False,
+    hide_scotus: bool = True,
 ) -> ESSearchResult:
     """Run Elasticsearch searching and filtering and prepare data to display
 
@@ -701,6 +710,8 @@ def do_es_search(
     :param is_csv_export: Indicates if the data being processed is intended for
     an export process.
     :param courts: QuerySet of courts used in the jurisdiction picker.
+    :param hide_scotus: Whether to leave SCOTUS content out of RECAP results;
+    see scotus_search_enabled.
     :return: A big dict of variables for use in the search results, homepage, or
     other location.
     """
@@ -745,6 +756,7 @@ def do_es_search(
     if search_form.is_valid() and document_type:
         # Copy cleaned_data to preserve the original data when displaying the form
         cd = search_form.cleaned_data.copy()
+        cd["hide_scotus"] = hide_scotus
         # Create necessary filters to execute ES query
         search_query = document_type.search()
         try:
@@ -781,6 +793,9 @@ def do_es_search(
                 page = 1
             cleaned_params = search_form.cleaned_data.copy()
             cleaned_params["page"] = page
+            # Part of the micro-cache key, so results cached with and without
+            # SCOTUS are never served to the other side.
+            cleaned_params["hide_scotus"] = hide_scotus
             # Use a smaller page size for semantic results so the longer
             # chunk previews are less overwhelming to scan.
             if has_semantic_params(cd):
