@@ -1,0 +1,32 @@
+# Trust a TLS-intercepting proxy's CA inside the stack.
+#
+# Some hosts, such as Claude Code web sessions, re-sign every outbound TLS
+# connection with their own CA. The host trusts it, but containers don't,
+# so image builds fail to download dependencies and npm fails in the node
+# containers. Add this file to COMPOSE_FILE with CL_PROXY_CA_BUNDLE set to
+# a copy of the proxy's CA bundle inside this directory (`buildx bake` only
+# reads build secrets from inside the project); the gitignored
+# proxy-ca-bundle.crt is where .claude/hooks/session_start.py stages it in
+# web sessions. Image builds receive the bundle as a BuildKit secret (see
+# docker/django/Dockerfile); the stock node image gets it mounted, with npm
+# pointed at it.
+secrets:
+  proxy_ca_bundle:
+    file: ${CL_PROXY_CA_BUNDLE}
+
+services:
+  cl-django:
+    build:
+      secrets:
+        - proxy_ca_bundle
+
+  cl-celery:
+    build:
+      secrets:
+        - proxy_ca_bundle
+
+  cl-webpack:
+    volumes:
+      - ${CL_PROXY_CA_BUNDLE}:/etc/ssl/certs/proxy-ca-bundle.crt:ro
+    environment:
+      NPM_CONFIG_CAFILE: /etc/ssl/certs/proxy-ca-bundle.crt

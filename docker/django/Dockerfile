@@ -24,12 +24,27 @@ RUN --mount=type=cache,target=/var/cache/apt,sharing=locked \
 # https://docs.astral.sh/uv/guides/integration/docker/#installing-uv
 COPY --from=ghcr.io/astral-sh/uv:0.9.22 /uv /uvx /bin/
 
+# Builds behind a TLS-intercepting proxy (Claude Code web sessions, some
+# corporate networks) pass the proxy's CA bundle as the BuildKit secret
+# `proxy_ca_bundle`; docker/courtlistener/docker-compose.proxy-ca.yml wires it
+# up. Without the secret this step changes nothing.
+RUN --mount=type=secret,id=proxy_ca_bundle \
+    if [ -s /run/secrets/proxy_ca_bundle ]; then \
+        cp /run/secrets/proxy_ca_bundle \
+            /usr/local/share/ca-certificates/proxy-ca-bundle.crt && \
+        update-ca-certificates; \
+    fi
+
 ENV \
     # Set PGSSLCERT at a dummy location ro avoid a SSL error connection.
     # https://github.com/freelawproject/courtlistener/issues/2827
     PGSSLCERT=/tmp/postgresql.crt \
     # Unbuffer Python output for instant logging
-    PYTHONUNBUFFERED=1
+    PYTHONUNBUFFERED=1 \
+    # uv and npm ship their own root certificates; point them at the image's
+    # trust store instead so a proxy CA installed above is honored.
+    SSL_CERT_FILE=/etc/ssl/certs/ca-certificates.crt \
+    NPM_CONFIG_CAFILE=/etc/ssl/certs/ca-certificates.crt
 
 FROM build-base AS python-base
 ARG BUILD_ENV=prod
