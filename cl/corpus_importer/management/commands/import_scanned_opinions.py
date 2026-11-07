@@ -939,7 +939,7 @@ def add_opinion_content(
         opinion=opinion,
         content=opinion.xml_scan,
         source=OpinionContent.FLP_SCANNING,
-        extraction_type=OpinionContent.OCR,
+        extraction_type=OpinionContent.OCR_ENSEMBLE,
         is_main_version=True,
         sha1=sha1(opinion.xml_scan),
         page_count=scan_case.page_count,

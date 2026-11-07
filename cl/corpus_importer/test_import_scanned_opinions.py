@@ -643,7 +643,7 @@ class ImportScannedOpinionsTest(TestCase):
         content = OpinionContent.objects.get(opinion=opinion)
         self.assertEqual(content.content, opinion.xml_scan)
         self.assertEqual(content.source, OpinionContent.FLP_SCANNING)
-        self.assertEqual(content.extraction_type, OpinionContent.OCR)
+        self.assertEqual(content.extraction_type, OpinionContent.OCR_ENSEMBLE)
         self.assertTrue(content.is_main_version)
         self.assertEqual(len(content.sha1), 40)
         self.assertEqual(content.page_count, 4)
