@@ -419,6 +419,8 @@ class SearchViewSet(LoggingMixin, viewsets.ViewSet):
         search_form = SearchForm(request.GET)
         if search_form.is_valid():
             cd = search_form.cleaned_data
+            # v3 is deprecated, so SCOTUS content is only searchable in v4.
+            cd["hide_scotus"] = True
             search_type = cd["type"]
             paginator = pagination.PageNumberPagination()
             sl = api_utils.get_object_list(

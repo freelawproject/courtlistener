@@ -7507,6 +7507,14 @@ class SCOTUSRECAPSearchTest(
                 self.assertNotIn(self.scotus_docket_path, hidden)
                 self.assertIn(self.scotus_docket_path, shown)
 
+    def test_api_v3_never_shows_scotus(self) -> None:
+        """v3 is deprecated, so it leaves SCOTUS out even with the flag."""
+        url = reverse("search-list", kwargs={"version": "v3"})
+        r = self.client.get(url, {"type": SEARCH_TYPES.RECAP, "q": "Tied"})
+
+        self.assertIn(self.recap_docket_path, r.content.decode())
+        self.assertNotIn(self.scotus_docket_path, r.content.decode())
+
     def test_count_query_drops_inner_hits_when_hiding_scotus(self) -> None:
         """clean_count_query still strips the has_child inner_hits from a
         query that leaves SCOTUS out."""
