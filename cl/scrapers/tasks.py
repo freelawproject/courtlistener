@@ -200,8 +200,9 @@ def extract_opinion_content(
             )
             return
 
-        content = response.json()["content"]
-        extracted_by_ocr = response.json()["extracted_by_ocr"]
+        data = response.json()
+        content = data["content"]
+        extracted_by_ocr = data["extracted_by_ocr"]
         # For PDF documents, if there's no content after the extraction without OCR
         # Let's try to extract using OCR.
         if (
@@ -210,16 +211,30 @@ def extract_opinion_content(
             and ".pdf" in str(opinion.local_path)
         ):
             document_file.seek(0)
-            response = async_to_sync(microservice)(
+            ocr_response = async_to_sync(microservice)(
                 service="document-extract-ocr",
                 file=document_file,
                 params={"ocr_available": ocr_available},
             )
-            if response.is_success:
-                content = response.json()["content"]
+            if ocr_response.is_success:
+                data = ocr_response.json()
+                content = data["content"]
                 extracted_by_ocr = True
+            else:
+                # Keep the result of the extraction without OCR.
+                logger.error(
+                    "Error from document-extract-ocr microservice: %s",
+                    ocr_response.status_code,
+                    extra=dict(
+                        opinion_id=opinion.id,
+                        url=opinion.download_url,
+                        local_path=opinion.local_path.name,
+                        fingerprint=[
+                            f"{opinion.cluster.docket.court_id}-document-extract-ocr-failure"
+                        ],
+                    ),
+                )
 
-    data = response.json()
     extension = opinion.local_path.name.split(".")[-1]
     opinion.extracted_by_ocr = extracted_by_ocr
 
@@ -341,8 +356,9 @@ def extract_doc_content(
             )
             return
 
-        content = response.json()["content"]
-        extracted_by_ocr = response.json()["extracted_by_ocr"]
+        data = response.json()
+        content = data["content"]
+        extracted_by_ocr = data["extracted_by_ocr"]
         # For PDF documents, if there's no content after the extraction without OCR
         # Let's try to extract using OCR.
         if (
@@ -351,16 +367,30 @@ def extract_doc_content(
             and ".pdf" in str(opinion.local_path)
         ):
             document_file.seek(0)
-            response = async_to_sync(microservice)(
+            ocr_response = async_to_sync(microservice)(
                 service="document-extract-ocr",
                 file=document_file,
                 params={"ocr_available": ocr_available},
             )
-            if response.is_success:
-                content = response.json()["content"]
+            if ocr_response.is_success:
+                data = ocr_response.json()
+                content = data["content"]
                 extracted_by_ocr = True
+            else:
+                # Keep the result of the extraction without OCR.
+                logger.error(
+                    "Error from document-extract-ocr microservice: %s",
+                    ocr_response.status_code,
+                    extra=dict(
+                        opinion_id=opinion.id,
+                        url=opinion.download_url,
+                        local_path=opinion.local_path.name,
+                        fingerprint=[
+                            f"{opinion.cluster.docket.court_id}-document-extract-ocr-failure"
+                        ],
+                    ),
+                )
 
-    data = response.json()
     extension = opinion.local_path.name.split(".")[-1]
     opinion.extracted_by_ocr = extracted_by_ocr
 
