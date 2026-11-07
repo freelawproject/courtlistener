@@ -1,4 +1,5 @@
 from dataclasses import dataclass
+from typing import Any, cast
 
 from celery import Task
 from django.contrib.auth.models import User
@@ -109,10 +110,18 @@ class StateEmailEndpoint(LoggingMixin, ModelViewSet):
     cursor_ordering_fields = ["id", "date_created", "date_modified"]
 
     def get_message_id_from_request_data(self):
-        return self.request.data.get("mail", {}).get("message_id")
+        return (
+            cast(dict[str, Any], self.request.data)
+            .get("mail", {})
+            .get("message_id")
+        )
 
     def get_destination_emails_from_request_data(self):
-        return self.request.data.get("receipt", {}).get("recipients")
+        return (
+            cast(dict[str, Any], self.request.data)
+            .get("receipt", {})
+            .get("recipients")
+        )
 
     def create(self, request, *args, **kwargs):
         state = kwargs["state"]
@@ -166,10 +175,18 @@ class ScraperSCOTUSEmailEndpoint(LoggingMixin, ModelViewSet):
     cursor_ordering_fields = ["id", "date_created", "date_modified"]
 
     def get_message_id_from_request_data(self):
-        return self.request.data.get("mail", {}).get("message_id")
+        return (
+            cast(dict[str, Any], self.request.data)
+            .get("mail", {})
+            .get("message_id")
+        )
 
     def get_destination_emails_from_request_data(self):
-        return self.request.data.get("receipt", {}).get("recipients")
+        return (
+            cast(dict[str, Any], self.request.data)
+            .get("receipt", {})
+            .get("recipients")
+        )
 
     def perform_create(self, serializer):
         scotus_email_user = User.objects.get(username="recap-email")
