@@ -37,6 +37,12 @@ Assumptions about the environment, each learned from a real session:
   stack therefore boots only when DOCKERHUB_USERNAME and DOCKERHUB_TOKEN are
   set in the cloud environment's settings; otherwise the hook and --wait
   print a note explaining how to set them and boot nothing.
+- The sandbox re-signs outbound TLS with its own CA and points host tools
+  at the bundle through SSL_CERT_FILE. Containers don't see the host's
+  trust store, so the image build and npm fail with certificate errors
+  unless the stack's base images are rebuilt with the bundle installed;
+  proxy-ca/ holds the Dockerfile and the compose override that swaps
+  them in.
 """
 
 from __future__ import annotations
@@ -44,6 +50,7 @@ from __future__ import annotations
 import hashlib
 import json
 import os
+import re
 import secrets
 import shlex
 import shutil
@@ -64,6 +71,20 @@ COMPOSE_FILES = [
     COMPOSE_DIR / "docker-compose.yml",
     COMPOSE_DIR / "docker-compose.tmpfs.yml",
 ]
+# The host's CA bundle when a TLS-intercepting proxy sets one, and the
+# Docker Hub base images the stack uses, mapped to the tags their rebuilt,
+# bundle-trusting versions get. The keys must match the FROM line in
+# docker/django/Dockerfile and the node image in docker-compose.yml, which
+# build_proxy_ca_images checks, since a mismatch would silently fall back
+# to the untrusting originals.
+HOST_CA_BUNDLE = os.environ.get("SSL_CERT_FILE", "")
+PROXY_CA_DIR = Path(__file__).resolve().parent / "proxy-ca"
+PROXY_CA_IMAGES = {
+    "python:3.13": "cl-proxy-ca/python:3.13",
+    "node:16": "cl-proxy-ca/node:16",
+}
+if os.path.isfile(HOST_CA_BUNDLE):
+    COMPOSE_FILES.append(PROXY_CA_DIR / "docker-compose.yml")
 # The image bakes in the Python and Node dependencies; when any of these
 # change, an image cached from an earlier session is stale.
 IMAGE_INPUTS = [
@@ -317,6 +338,49 @@ def configure_environment(persist: bool) -> None:
             f.write(f"export {name}={shlex.quote(value)}\n")
 
 
+def build_proxy_ca_images() -> None:
+    """Rebuild the stack's base images with the host's CA bundle installed,
+    for the proxy-ca compose override to swap in. Does nothing when the host
+    has no such bundle."""
+    if not os.path.isfile(HOST_CA_BUNDLE):
+        return
+    stack_sources = "".join(
+        path.read_text(encoding="utf-8")
+        for path in (
+            REPO / "docker" / "django" / "Dockerfile",
+            COMPOSE_DIR / "docker-compose.yml",
+        )
+    )
+    for base in PROXY_CA_IMAGES:
+        if not re.search(
+            rf"^\s*(FROM|image:) {re.escape(base)}(\s|$)", stack_sources, re.M
+        ):
+            raise Bail(
+                f"The stack no longer uses the base image {base}; update"
+                " PROXY_CA_IMAGES and proxy-ca/docker-compose.yml."
+            )
+    log("Rebuilding the stack's base images to trust the sandbox proxy...")
+    context = STATE_DIR / "proxy-ca"
+    context.mkdir(parents=True, exist_ok=True)
+    shutil.copyfile(HOST_CA_BUNDLE, context / "ca-bundle.crt")
+    for base, tag in PROXY_CA_IMAGES.items():
+        build = run(
+            "docker",
+            "build",
+            "--quiet",
+            "--build-arg",
+            f"BASE={base}",
+            "--tag",
+            tag,
+            "--file",
+            str(PROXY_CA_DIR / "Dockerfile"),
+            str(context),
+            check=False,
+        )
+        if build.returncode:
+            raise Bail(f"Building {tag} from {base} failed.")
+
+
 def image_inputs_hash() -> str:
     """A digest of everything baked into the Django image."""
     digest = hashlib.sha256()
@@ -459,6 +523,7 @@ def boot() -> None:
     try:
         start_dockerd()
         dockerhub_login()
+        build_proxy_ca_images()
         ensure_max_map_count()
         ensure_env_file()
         current_hash = image_inputs_hash()
@@ -497,6 +562,9 @@ def show_hints() -> None:
     log("    Tell the user which host was refused; they allow it in the")
     log("    environment's network access settings. A first boot needs:")
     log(f"    {', '.join(DOWNLOAD_HOSTS)}")
+    log("  * A certificate error inside a build or container (UnknownIssuer,")
+    log("    SELF_SIGNED_CERT_IN_CHAIN) means it did not get the host's CA")
+    log("    bundle; check that SSL_CERT_FILE points at an existing file.")
     log("  * 429 Too Many Requests from Docker Hub means the login was not")
     log("    applied or the account itself is rate-limited; retry later.")
     log("  * Elasticsearch needs about 1 GB of memory.")

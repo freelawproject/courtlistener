@@ -1,0 +1,18 @@
+# Swap the stack's Docker Hub base images for ones that trust a
+# TLS-intercepting proxy's CA. session_start.py builds them from the
+# Dockerfile beside this file and adds this override in web sessions; the
+# production Dockerfile stays as it is. The keys under additional_contexts
+# must match its FROM lines exactly for BuildKit to substitute the image.
+services:
+  cl-django:
+    build:
+      additional_contexts:
+        "python:3.13": docker-image://cl-proxy-ca/python:3.13
+
+  cl-celery:
+    build:
+      additional_contexts:
+        "python:3.13": docker-image://cl-proxy-ca/python:3.13
+
+  cl-webpack:
+    image: cl-proxy-ca/node:16
