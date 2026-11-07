@@ -56,9 +56,6 @@ cl/settings/google_auth.json
 /docker-compose.override.yml
 /docker/courtlistener/compose.override.yaml
 /docker/courtlistener/docker-compose.override.yml
-# A proxy CA bundle staged by .claude/hooks/session_start.py for
-# docker/courtlistener/docker-compose.proxy-ca.yml.
-/docker/courtlistener/proxy-ca-bundle.crt
 
 # Local archive built by scripts/gather-test-reports.py
 /.test-reports/

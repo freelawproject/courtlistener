@@ -16,4 +16,3 @@ cl/node_modules
 *.secrets
 *.env.dev
 *.env
-docker/courtlistener/proxy-ca-bundle.crt
