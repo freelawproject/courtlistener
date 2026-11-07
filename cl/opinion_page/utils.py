@@ -135,7 +135,6 @@ def build_docket_metadata(
                 ),
                 # Explains why this date can lag the docket's real
                 # last-filing date.
-                "has_tooltip": True,
                 "tooltip_message": mark_safe(
                     "This docket was collected as part of the RECAP "
                     "Project. Therefore, it is updated when users of the "
@@ -372,7 +371,6 @@ def build_originating_court_metadata(
                     f"Search the RECAP Archive for docket number "
                     f"{og_info.docket_number}"
                 )
-                item["suffix_has_tooltip"] = True
                 item["suffix_tooltip_message"] = (
                     "Search for this docket number in the RECAP Archive."
                 )
