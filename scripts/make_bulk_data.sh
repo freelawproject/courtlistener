@@ -156,6 +156,12 @@ parentheticals_fields='(
 	   )'
 parentheticals_csv_filename="parentheticals-$(date -I).csv"
 
+# search_parentheticalgroup
+parentheticalgroups_fields='(
+	       id, score, size, opinion_id, representative_id
+	   )'
+parentheticalgroups_csv_filename="parenthetical-groups-$(date -I).csv"
+
 # audio_audio
 oralarguments_fields='(
 	       id, date_created, date_modified, source, case_name_short,
@@ -318,7 +324,7 @@ unmatchedcitations_fields='(
 unmatchedcitations_csv_filename="unmatched-citations-$(date -I).csv"
 
 # If you add or remove a table, you need to update this number
-NUM_TABLES=35
+NUM_TABLES=36
 
 # Every new table added to bulk script should be added as an associative array
 # This ordering is important. Tables with foreign key constraints must be loaded in order.
@@ -363,6 +369,9 @@ declare -a t_34=("search_clusterredirection" "$clusterredirection_fields" "$clus
 
 # After search_opinion (t_12), which its opinion_id references
 declare -a t_35=("search_opinioncontent" "$opinioncontent_fields" "$opinioncontent_csv_filename")
+
+# Loaded together with search_parenthetical (t_18), see the load loop below
+declare -a t_36=("search_parentheticalgroup" "$parentheticalgroups_fields" "$parentheticalgroups_csv_filename")
 
 # Create a new array with the data of each associative array
 declare -a listOfLists
@@ -464,6 +473,28 @@ EOF
 # Start adding the code to the script to load the tables
 for group in "${listOfLists[@]}"; do
 declare -a lst="$group"
+# search_parenthetical.group_id and search_parentheticalgroup.representative_id
+# reference each other. Both FKs are DEFERRABLE INITIALLY DEFERRED, so they are
+# only checked at commit: loaded in separate transactions, whichever table is
+# loaded first fails. Load both in one transaction, after search_opinion.
+if [[ "${lst[0]}" == "search_parentheticalgroup" ]]; then
+	continue
+fi
+if [[ "${lst[0]}" == "search_parenthetical" ]]; then
+cat >> "$OUT" <<- EOF
+echo "Loading $parentheticalgroups_csv_filename and ${lst[2]} to database"
+psql --single-transaction --set ON_ERROR_STOP=1 \
+--command \
+"\COPY public.search_parentheticalgroup $parentheticalgroups_fields FROM '\$BULK_DIR/$parentheticalgroups_csv_filename' WITH (FORMAT csv, ENCODING utf8, ESCAPE '\\', HEADER)" \
+--command \
+"\COPY public.${lst[0]} ${lst[1]} FROM '\$BULK_DIR/${lst[2]}' WITH (FORMAT csv, ENCODING utf8, ESCAPE '\\', HEADER)" \
+--host "\$BULK_DB_HOST" \
+--username "\$BULK_DB_USER" \
+--dbname "\$BULK_DB_NAME"
+
+EOF
+continue
+fi
 cat >> "$OUT" <<- EOF
 echo "Loading ${lst[2]} to database"
 psql --command \
