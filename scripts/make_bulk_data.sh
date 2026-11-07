@@ -370,7 +370,8 @@ declare -a t_34=("search_clusterredirection" "$clusterredirection_fields" "$clus
 # After search_opinion (t_12), which its opinion_id references
 declare -a t_35=("search_opinioncontent" "$opinioncontent_fields" "$opinioncontent_csv_filename")
 
-# Loaded together with search_parenthetical (t_18), see the load loop below
+# Exported and loaded together with search_parenthetical (t_18), see
+# stream_parentheticals_to_s3 and the load loop below
 declare -a t_36=("search_parentheticalgroup" "$parentheticalgroups_fields" "$parentheticalgroups_csv_filename")
 
 # Create a new array with the data of each associative array
@@ -380,9 +381,41 @@ for (( i=1; i<=$NUM_TABLES; i++ )); do
     listOfLists+=("(${table_array[*]@Q})")
 done
 
+# search_parenthetical.group_id and search_parentheticalgroup.representative_id
+# reference each other, and citation processing deletes and recreates groups
+# while the export runs. Exported in separate psql sessions, the two files come
+# from different moments, and the load fails on rows that point at a group or
+# a parenthetical the other file does not have. So both are exported inside one
+# REPEATABLE READ transaction, where every statement sees the same snapshot.
+# psql's \copy ... TO PROGRAM runs the program on this client, so the data
+# still streams to S3 the same way as the loop below.
+stream_parentheticals_to_s3() {
+	# \copy must fit on one line, so flatten the multi-line field lists
+	local group_fields="${parentheticalgroups_fields//[$'
+	']/ }"
+	local parenthetical_fields="${parentheticals_fields//[$'
+	']/ }"
+	echo "Streaming search_parentheticalgroup and search_parenthetical to S3 from one snapshot"
+	psql 		--no-psqlrc 		--set ON_ERROR_STOP=1 		--quiet 		--host "$DB_HOST" 		--username "$DB_USER" 		--dbname courtlistener <<- EOF
+	set statement_timeout to 0;
+	BEGIN ISOLATION LEVEL REPEATABLE READ READ ONLY;
+	\copy search_parentheticalgroup $group_fields TO PROGRAM 'bzip2 | aws s3 cp - s3://com-courtlistener-storage/bulk-data/$parentheticalgroups_csv_filename.bz2 --acl public-read' WITH (FORMAT csv, ENCODING utf8, HEADER, ESCAPE '\', FORCE_QUOTE *)
+	\copy search_parenthetical $parenthetical_fields TO PROGRAM 'bzip2 | aws s3 cp - s3://com-courtlistener-storage/bulk-data/$parentheticals_csv_filename.bz2 --acl public-read' WITH (FORMAT csv, ENCODING utf8, HEADER, ESCAPE '\', FORCE_QUOTE *)
+	COMMIT;
+	EOF
+}
+
 # Stream to S3
 for group in "${listOfLists[@]}"; do
 declare -a lst="$group"
+# Exported together with search_parenthetical, see stream_parentheticals_to_s3
+if [[ "${lst[0]}" == "search_parentheticalgroup" ]]; then
+	continue
+fi
+if [[ "${lst[0]}" == "search_parenthetical" ]]; then
+	stream_parentheticals_to_s3
+	continue
+fi
 echo "Streaming ${lst[0]} to S3"
 psql \
 	--command \
