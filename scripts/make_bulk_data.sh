@@ -459,6 +459,25 @@ psql --command "ALTER TABLE public.search_opinioncluster ALTER COLUMN filepath_p
 --username "\$BULK_DB_USER" \
 --dbname "\$BULK_DB_NAME"
 
+# The tables are exported one at a time, not from a single snapshot, so a few
+# rows can reference rows that were created after the referenced table was
+# exported. With the foreign keys in place, one such row rolls back the load of
+# its whole table. So the foreign keys are dropped while loading, and re-added
+# at the end of this script.
+ADD_FOREIGN_KEYS=\$(psql --tuples-only --no-align --command "SELECT format('ALTER TABLE %s ADD CONSTRAINT %I %s NOT VALID;', conrelid::regclass, conname, pg_get_constraintdef(oid)) FROM pg_constraint WHERE contype = 'f' AND connamespace = 'public'::regnamespace" \
+--host "\$BULK_DB_HOST" \
+--username "\$BULK_DB_USER" \
+--dbname "\$BULK_DB_NAME")
+DROP_FOREIGN_KEYS=\$(psql --tuples-only --no-align --command "SELECT format('ALTER TABLE %s DROP CONSTRAINT %I;', conrelid::regclass, conname) FROM pg_constraint WHERE contype = 'f' AND connamespace = 'public'::regnamespace" \
+--host "\$BULK_DB_HOST" \
+--username "\$BULK_DB_USER" \
+--dbname "\$BULK_DB_NAME")
+echo "Dropping foreign keys while loading"
+psql --command "\$DROP_FOREIGN_KEYS" \
+--host "\$BULK_DB_HOST" \
+--username "\$BULK_DB_USER" \
+--dbname "\$BULK_DB_NAME"
+
 EOF
 
 # Start adding the code to the script to load the tables
@@ -474,6 +493,55 @@ psql --command \
 
 EOF
 done
+
+# Re-add the foreign keys dropped before loading, then validate them one by one.
+# A foreign key with rows whose referenced row is missing from the bulk files is
+# reported and left NOT VALID: PostgreSQL still enforces it for new rows, but
+# not for the rows already loaded. No loaded row is changed or deleted.
+cat >> "$OUT" <<- EOF
+echo "Re-adding foreign keys"
+psql --command "\$ADD_FOREIGN_KEYS" \
+--host "\$BULK_DB_HOST" \
+--username "\$BULK_DB_USER" \
+--dbname "\$BULK_DB_NAME"
+
+echo "Validating foreign keys"
+psql --set ON_ERROR_STOP=1 \
+--host "\$BULK_DB_HOST" \
+--username "\$BULK_DB_USER" \
+--dbname "\$BULK_DB_NAME" <<'SQL'
+DO \$\$
+DECLARE
+    fk record;
+    orphans bigint;
+BEGIN
+    FOR fk IN
+        SELECT c.conrelid::regclass AS tbl, c.conname, c.confrelid::regclass AS ref,
+               a.attname AS col, r.attname AS ref_col
+        FROM pg_constraint c
+        JOIN pg_attribute a ON a.attrelid = c.conrelid AND a.attnum = c.conkey[1]
+        JOIN pg_attribute r ON r.attrelid = c.confrelid AND r.attnum = c.confkey[1]
+        WHERE c.contype = 'f' AND NOT c.convalidated
+          AND c.connamespace = 'public'::regnamespace
+        ORDER BY c.conrelid::regclass::text, c.conname
+    LOOP
+        BEGIN
+            EXECUTE format('ALTER TABLE %s VALIDATE CONSTRAINT %I', fk.tbl, fk.conname);
+        EXCEPTION WHEN foreign_key_violation THEN
+            EXECUTE format(
+                'SELECT count(*) FROM %s t WHERE t.%I IS NOT NULL'
+                ' AND NOT EXISTS (SELECT 1 FROM %s r WHERE r.%I = t.%I)',
+                fk.tbl, fk.col, fk.ref, fk.ref_col, fk.col
+            ) INTO orphans;
+            RAISE WARNING '% rows of % have a % that is not in %, so % is left NOT VALID',
+                orphans, fk.tbl, fk.col, fk.ref, fk.conname;
+        END;
+    END LOOP;
+END
+\$\$;
+SQL
+
+EOF
 
 # Upload generated file to S3
 aws s3 cp "$OUT" s3://com-courtlistener-storage/bulk-data/"$BULK_SCRIPT_FILENAME" --acl public-read
