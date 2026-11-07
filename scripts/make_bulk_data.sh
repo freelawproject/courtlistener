@@ -450,11 +450,11 @@ export BULK_DB_NAME=courtlistener
 export PGPASSWORD=\$BULK_DB_PASSWORD
 
 echo "Loading schema to database: $schema_filename"
-psql -f "\$BULK_DIR"/$schema_filename --host "\$BULK_DB_HOST" --username "\$BULK_DB_USER" --dbname "\$BULK_DB_NAME"
+psql --no-psqlrc -f "\$BULK_DIR"/$schema_filename --host "\$BULK_DB_HOST" --username "\$BULK_DB_USER" --dbname "\$BULK_DB_NAME"
 
 # filepath_pdf_scan is not exported since it points to private files, but its
 # column is NOT NULL without a default, so loading the clusters would fail
-psql --command "ALTER TABLE public.search_opinioncluster ALTER COLUMN filepath_pdf_scan SET DEFAULT ''" \
+psql --no-psqlrc --command "ALTER TABLE public.search_opinioncluster ALTER COLUMN filepath_pdf_scan SET DEFAULT ''" \
 --host "\$BULK_DB_HOST" \
 --username "\$BULK_DB_USER" \
 --dbname "\$BULK_DB_NAME"
@@ -464,16 +464,22 @@ psql --command "ALTER TABLE public.search_opinioncluster ALTER COLUMN filepath_p
 # exported. With the foreign keys in place, one such row rolls back the load of
 # its whole table. So the foreign keys are dropped while loading, and re-added
 # at the end of this script.
-ADD_FOREIGN_KEYS=\$(psql --tuples-only --no-align --command "SELECT format('ALTER TABLE %s ADD CONSTRAINT %I %s NOT VALID;', conrelid::regclass, conname, pg_get_constraintdef(oid)) FROM pg_constraint WHERE contype = 'f' AND connamespace = 'public'::regnamespace" \
+ADD_FOREIGN_KEYS=\$(psql --no-psqlrc --tuples-only --no-align --command "SELECT format('ALTER TABLE %s ADD CONSTRAINT %I %s NOT VALID;', conrelid::regclass, conname, pg_get_constraintdef(oid)) FROM pg_constraint WHERE contype = 'f' AND connamespace = 'public'::regnamespace" \
 --host "\$BULK_DB_HOST" \
 --username "\$BULK_DB_USER" \
 --dbname "\$BULK_DB_NAME")
-DROP_FOREIGN_KEYS=\$(psql --tuples-only --no-align --command "SELECT format('ALTER TABLE %s DROP CONSTRAINT %I;', conrelid::regclass, conname) FROM pg_constraint WHERE contype = 'f' AND connamespace = 'public'::regnamespace" \
+DROP_FOREIGN_KEYS=\$(psql --no-psqlrc --tuples-only --no-align --command "SELECT format('ALTER TABLE %s DROP CONSTRAINT %I;', conrelid::regclass, conname) FROM pg_constraint WHERE contype = 'f' AND connamespace = 'public'::regnamespace" \
 --host "\$BULK_DB_HOST" \
 --username "\$BULK_DB_USER" \
 --dbname "\$BULK_DB_NAME")
+# Keep the ADD statements on disk before dropping anything. If a later step
+# fails, the foreign keys stay dropped, and this file is how to restore them.
+FK_FILE="\$PWD/courtlistener-foreign-keys-$(date -I).sql"
+echo "\$ADD_FOREIGN_KEYS" > "\$FK_FILE"
+echo "Saved the foreign key definitions to \$FK_FILE"
+trap 'status=\$?; if [[ \$status -ne 0 ]]; then echo "The load failed while the foreign keys were dropped. Their definitions are in \$FK_FILE. Restart from a fresh database, or re-add them with: psql --no-psqlrc -f \$FK_FILE (plus your --host, --username and --dbname)" >&2; fi' EXIT
 echo "Dropping foreign keys while loading"
-psql --command "\$DROP_FOREIGN_KEYS" \
+psql --no-psqlrc --command "\$DROP_FOREIGN_KEYS" \
 --host "\$BULK_DB_HOST" \
 --username "\$BULK_DB_USER" \
 --dbname "\$BULK_DB_NAME"
@@ -485,7 +491,7 @@ for group in "${listOfLists[@]}"; do
 declare -a lst="$group"
 cat >> "$OUT" <<- EOF
 echo "Loading ${lst[2]} to database"
-psql --command \
+psql --no-psqlrc --command \
 "\COPY public.${lst[0]} ${lst[1]} FROM '\$BULK_DIR/${lst[2]}' WITH (FORMAT csv, ENCODING utf8, ESCAPE '\\', HEADER)" \
 --host "\$BULK_DB_HOST" \
 --username "\$BULK_DB_USER" \
@@ -500,13 +506,16 @@ done
 # not for the rows already loaded. No loaded row is changed or deleted.
 cat >> "$OUT" <<- EOF
 echo "Re-adding foreign keys"
-psql --command "\$ADD_FOREIGN_KEYS" \
+psql --no-psqlrc --command "\$ADD_FOREIGN_KEYS" \
 --host "\$BULK_DB_HOST" \
 --username "\$BULK_DB_USER" \
 --dbname "\$BULK_DB_NAME"
 
+# The foreign keys are back (NOT VALID), so the restore hint no longer applies
+trap - EXIT
+
 echo "Validating foreign keys"
-psql --set ON_ERROR_STOP=1 \
+psql --no-psqlrc --set ON_ERROR_STOP=1 \
 --host "\$BULK_DB_HOST" \
 --username "\$BULK_DB_USER" \
 --dbname "\$BULK_DB_NAME" <<'SQL'
@@ -536,6 +545,9 @@ BEGIN
             RAISE WARNING '% rows of % have a % that is not in %, so % is left NOT VALID',
                 orphans, fk.tbl, fk.col, fk.ref, fk.conname;
         END;
+        -- One transaction per constraint, so an error other than a violation
+        -- (a timeout, a cancel) keeps the validations that already passed
+        COMMIT;
     END LOOP;
 END
 \$\$;
