@@ -1,0 +1,61 @@
+{% load svg_tags component_tags %}
+
+{% require_script "js/alpine/plugins/anchor" defer=True %}
+{% require_script "js/alpine/components/tooltip.js" %}
+
+<c-vars
+  variant=""
+  icon="circle_question_mark_outline"
+  has_arrow
+  description=""
+  label
+  position="bottom"
+/>
+
+{% if variant == "light" %}
+{% firstof "absolute text-white" as arrow_class %}
+{% else %}
+{% firstof "absolute text-greyscale-900" as arrow_class %}
+{% endif %}
+
+<div
+  x-data="tooltip"
+  x-on:mouseenter="show"
+  x-on:mouseleave="scheduleHide"
+  x-on:click.outside="hide"
+  x-on:keydown.escape.window="hide"
+  x-on:focusout="hideOnFocusOut"
+  class="relative inline-flex"
+>
+  <button
+    type="button"
+    x-ref="trigger"
+    aria-label="More about {{ label }}"
+    x-bind:aria-expanded="isOpen"
+    x-on:click="togglePin"
+    class="size-6 inline-flex items-center justify-center rounded-full text-greyscale-400 outline-none hover:text-greyscale-500 focus-visible:ring-4 focus-visible:ring-primary-600 focus-visible:ring-opacity-60 focus:text-greyscale-500"
+  >
+    {% svg icon aria_hidden="true" class="size-4" %}
+  </button>
+  {# Always rendered and empty while closed: screen readers only announce content added to a live region that already exists #}
+  <div
+    role="status"
+    x-ref="live"
+    tabindex="-1"
+    x-anchor.{{ position }}.offset.6="$refs.trigger"
+    x-effect="placeArrow($anchor)"
+    class="z-30 outline-none [filter:drop-shadow(0_12px_8px_rgba(0,0,0,0.08))_drop-shadow(0_4px_3px_rgba(0,0,0,0.03))]"
+  ></div>
+  {# Copied into the live region on open; Alpine never initialises this copy, so the arrow is positioned from JS #}
+  <template x-ref="message">
+    <div class="flex flex-col w-max max-w-xs rounded-lg text-xs {% if description %} gap-1 p-3{% else %} px-3 py-2{% endif %} {% if variant == 'light' %}bg-white text-greyscale-700{% else %}bg-greyscale-900 text-white{% endif %}">
+      <p class="font-medium">{{ slot }}</p>
+      {% if description %}
+        <div class="{% if variant == 'light' %}text-greyscale-500{% else %}text-greyscale-200{% endif %}">{{ description }}</div>
+      {% endif %}
+    </div>
+    {% if has_arrow %}
+      {% svg "tooltip_arrow" aria_hidden="true" data_arrow="" class=arrow_class %}
+    {% endif %}
+  </template>
+</div>

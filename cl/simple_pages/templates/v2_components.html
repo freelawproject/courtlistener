@@ -30,6 +30,7 @@
         {'href': '#pagination', 'text': 'Pagination'},
         {'href': '#filter-drawer', 'text': 'Filter drawer'},
         {'href': '#banner', 'text': 'Banner'},
+        {'href': '#tooltip', 'text': 'Tooltip'},
       ]},
       {'href': '#page-shells', 'text': 'Page shells', 'children': [
         {'href': '#docket-page', 'text': 'Docket page'},
@@ -1567,6 +1568,83 @@ Sample code here.
           link_text="Go to Case"&gt;
           &lt;p&gt;It looks like you're trying to search for &lt;strong&gt;Miranda v. Arizona,&lt;/strong&gt; from 1966.&lt;/p&gt;
         &lt;/c-banner&gt;
+      </c-code>
+    </c-expansion-panel>
+  </section>
+
+  {# TOOLTIP #}
+  <section class="max-w-full w-full border-t-2 border-greyscale-200" x-intersect.margin.-100px="show" id="tooltip">
+    <h2 class="mt-6 mb-3">Tooltip</h2>
+    <p>A help (?) button that explains the item next to it. Hovering over the button shows the message; clicking it, tapping it, or pressing Enter or Space pins the message open until the button is pressed again, Escape is pressed, focus leaves the button, or the user clicks elsewhere. The component always renders its own button: attaching a tooltip to any other element is not supported yet.</p>
+
+    <h4 class="mt-3">Demo — Dark (default)</h4>
+    <div class="flex flex-wrap items-center justify-between gap-x-16 gap-y-24 my-4 rounded-lg border border-greyscale-200 px-4 py-16">
+      <c-tooltip label="the top arrow" position="top" has_arrow>Top</c-tooltip>
+      <c-tooltip label="the top-start arrow" position="top-start" has_arrow>Top start</c-tooltip>
+      <c-tooltip label="the top-end arrow" position="top-end" has_arrow>Top end</c-tooltip>
+      <c-tooltip label="the bottom arrow" has_arrow>Bottom</c-tooltip>
+      <c-tooltip label="the left arrow" position="left" has_arrow>Left</c-tooltip>
+      <c-tooltip label="the right arrow" position="right" has_arrow>Right</c-tooltip>
+      <c-tooltip label="the tooltip without an arrow">No arrow</c-tooltip>
+      <c-tooltip label="the tooltip with a description" position="top" has_arrow description="Tooltips describe or identify an element. They help the user understand its meaning or function.">With a description</c-tooltip>
+    </div>
+
+    <h4 class="mt-3">Demo — Light</h4>
+    <div class="flex flex-wrap items-center justify-between gap-x-16 gap-y-24 my-4 rounded-lg border border-greyscale-200 px-4 py-16">
+      <c-tooltip variant="light" label="the light top arrow" position="top" has_arrow>Top</c-tooltip>
+      <c-tooltip variant="light" label="the light top-start arrow" position="top-start" has_arrow>Top start</c-tooltip>
+      <c-tooltip variant="light" label="the light top-end arrow" position="top-end" has_arrow>Top end</c-tooltip>
+      <c-tooltip variant="light" label="the light bottom arrow" has_arrow>Bottom</c-tooltip>
+      <c-tooltip variant="light" label="the light left arrow" position="left" has_arrow>Left</c-tooltip>
+      <c-tooltip variant="light" label="the light right arrow" position="right" has_arrow>Right</c-tooltip>
+      <c-tooltip variant="light" label="the light tooltip without an arrow">No arrow</c-tooltip>
+      <c-tooltip variant="light" label="the light tooltip with a description" position="top" has_arrow description="Tooltips describe or identify an element. They help the user understand its meaning or function.">With a description</c-tooltip>
+    </div>
+
+    <c-library.list title="Props" only>
+      <c-library.item only>
+        <c-slot name="label"><code>label</code></c-slot>
+        <c-slot name="description">What the tooltip explains, e.g. <code>Last Updated</code>. The button is announced as "More about {label}": an icon-only button has no name of its own, and "Help" alone wouldn't tell screen reader users which item it explains.</c-slot>
+      </c-library.item>
+      <c-library.item optional only>
+        <c-slot name="label"><code>description</code></c-slot>
+        <c-slot name="description">Supporting text shown below the message, for Figma's "Supporting text" variant. Setting it also switches the bubble to the roomier padding that variant uses.</c-slot>
+      </c-library.item>
+      <c-library.item optional only>
+        <c-slot name="label"><code>variant</code></c-slot>
+        <c-slot name="description">Figma's light or dark theme. Use <code>light</code> for the light theme; leave it out for the dark one, which is the default.</c-slot>
+      </c-library.item>
+      <c-library.item optional only>
+        <c-slot name="label"><code>position</code></c-slot>
+        <c-slot name="description">Where the tooltip opens relative to the button: <code>top</code>, <code>bottom</code>, <code>left</code> or <code>right</code>, optionally with <code>-start</code> or <code>-end</code>. Default: <code>bottom</code>. It's passed to <code>x-anchor</code>, which flips the tooltip to the opposite side when there isn't room; the arrow follows wherever it lands.</c-slot>
+      </c-library.item>
+      <c-library.item optional only>
+        <c-slot name="label"><code>has_arrow</code></c-slot>
+        <c-slot name="description">Adds an arrow pointing at the button. Leave it out for Figma's "Arrow = None" variant.</c-slot>
+      </c-library.item>
+      <c-library.item optional only>
+        <c-slot name="label"><code>icon</code></c-slot>
+        <c-slot name="description">Name of the SVG shown in the button. Default: <code>circle_question_mark_outline</code>, the help icon from Figma.</c-slot>
+      </c-library.item>
+    </c-library.list>
+
+    <c-library.list title="Slots" only>
+      <c-library.item only>
+        <c-slot name="label">Default</c-slot>
+        <c-slot name="description">The message. It may contain HTML such as <code>&lt;strong&gt;</code>; it's shown in medium weight, and above the description when there is one.</c-slot>
+      </c-library.item>
+    </c-library.list>
+
+    <c-expansion-panel title="Code">
+      <c-code>
+      &lt;c-tooltip
+        label="Last Updated"
+        position="right"
+        has_arrow
+        description="Optional supporting text."
+      &gt;
+        The message, which may contain &lt;strong&gt;HTML&lt;/strong&gt;.
+      &lt;/c-tooltip&gt;
       </c-code>
     </c-expansion-panel>
   </section>
