@@ -11,6 +11,7 @@ from cl.lib.command_utils import logger
 from cl.lib.redis_utils import (
     acquire_redis_lock,
     get_redis_interface,
+    hset_if_lock_held,
     make_update_pacer_case_id_key,
     release_redis_lock,
 )
@@ -49,80 +50,99 @@ def update_latest_case_id_and_schedule_iquery_sweep(
     # Get the latest pacer_case_id from Redis using a lock to avoid race conditions
     # when getting and updating it.
     update_lock_key = make_update_pacer_case_id_key(court_id)
-    # ttl one hour.
+    # ttl one minute.
     lock_value = acquire_redis_lock(r, update_lock_key, 60 * 1000)
-
-    highest_known_pacer_case_id = int(
-        r.hget("iquery:highest_known_pacer_case_id", court_id) or 0
-    )
-    iquery_pacer_case_id_current = int(
-        r.hget("iquery:pacer_case_id_current", court_id) or 0
-    )
-    found_higher_case_id = False
-    if incoming_pacer_case_id > highest_known_pacer_case_id:
-        found_higher_case_id = True
-
-    if found_higher_case_id:
-        tasks_to_schedule = (
-            incoming_pacer_case_id - iquery_pacer_case_id_current
+    # Always release the lock, even if enqueueing fails. Otherwise every
+    # other Docket save in this court spins in acquire_redis_lock until the
+    # TTL expires.
+    try:
+        highest_known_pacer_case_id = int(
+            r.hget("iquery:highest_known_pacer_case_id", court_id) or 0
         )
-        logger.info(
-            "Found %s %s tasks to schedule for pacer case IDs ranging from %s to %s.",
-            tasks_to_schedule,
-            court_id,
-            iquery_pacer_case_id_current,
-            incoming_pacer_case_id,
+        iquery_pacer_case_id_current = int(
+            r.hget("iquery:pacer_case_id_current", court_id) or 0
         )
-        if (
-            tasks_to_schedule
-            > settings.IQUERY_PROBE_MAX_OFFSET + settings.IQUERY_MAX_PROBE
-        ):
-            # Don't schedule more than IQUERY_PROBE_MAX_OFFSET tasks at a time
-            # to prevent Redis from being filled up.
-            # It's safer to abort if more than 600 tasks are attempted to be
-            # scheduled. This could indicate an issue with retrieving the
-            # highest_known_pacer_case_id or a loss of the
-            # iquery_pacer_case_id_current for the court in Redis.
-            logger.error(
-                "Tried to schedule more than %s iquery pages to scrape for "
-                "court %s; aborting to avoid Redis memory exhaustion.",
-                tasks_to_schedule,
-                court_id,
-            )
-            release_redis_lock(r, update_lock_key, lock_value)
-            return None
+        found_higher_case_id = False
+        if incoming_pacer_case_id > highest_known_pacer_case_id:
+            found_higher_case_id = True
 
-        r.hset(
-            "iquery:highest_known_pacer_case_id",
-            court_id,
-            incoming_pacer_case_id,
-        )
-        task_to_schedule_count = 0
-        while iquery_pacer_case_id_current + 1 < incoming_pacer_case_id:
-            iquery_pacer_case_id_current += 1
-            task_to_schedule_count += 1
-            # Schedule the next task.
-            make_docket_by_iquery_sweep.apply_async(
-                args=(court_id, str(iquery_pacer_case_id_current)),
-                kwargs={"skip_iquery_sweep": True},
-                queue=settings.CELERY_IQUERY_QUEUE,
+        if found_higher_case_id:
+            tasks_to_schedule = (
+                incoming_pacer_case_id - iquery_pacer_case_id_current
             )
             logger.info(
-                "Enqueued %s iquery docket with case ID: %s for court %s",
-                task_to_schedule_count,
-                iquery_pacer_case_id_current,
+                "Found %s %s tasks to schedule for pacer case IDs ranging from %s to %s.",
+                tasks_to_schedule,
                 court_id,
+                iquery_pacer_case_id_current,
+                incoming_pacer_case_id,
             )
+            if (
+                tasks_to_schedule
+                > settings.IQUERY_PROBE_MAX_OFFSET + settings.IQUERY_MAX_PROBE
+            ):
+                # Don't schedule more than IQUERY_PROBE_MAX_OFFSET tasks at a time
+                # to prevent Redis from being filled up.
+                # It's safer to abort if more than 600 tasks are attempted to be
+                # scheduled. This could indicate an issue with retrieving the
+                # highest_known_pacer_case_id or a loss of the
+                # iquery_pacer_case_id_current for the court in Redis.
+                logger.error(
+                    "Tried to schedule more than %s iquery pages to scrape for "
+                    "court %s; aborting to avoid Redis memory exhaustion.",
+                    tasks_to_schedule,
+                    court_id,
+                )
+                return None
 
-        # Update the iquery_pacer_case_id_current in Redis
-        r.hset(
-            "iquery:pacer_case_id_current",
-            court_id,
-            iquery_pacer_case_id_current,
-        )
+            task_to_schedule_count = 0
+            while iquery_pacer_case_id_current + 1 < incoming_pacer_case_id:
+                iquery_pacer_case_id_current += 1
+                task_to_schedule_count += 1
+                # Schedule the next task.
+                make_docket_by_iquery_sweep.apply_async(
+                    args=(court_id, str(iquery_pacer_case_id_current)),
+                    kwargs={"skip_iquery_sweep": True},
+                    queue=settings.CELERY_IQUERY_QUEUE,
+                )
+                logger.info(
+                    "Enqueued %s iquery docket with case ID: %s for court %s",
+                    task_to_schedule_count,
+                    iquery_pacer_case_id_current,
+                    court_id,
+                )
 
-    # Release the lock once the whole process is complete.
-    release_redis_lock(r, update_lock_key, lock_value)
+            # Update both counters in one fenced write. If our lock expired
+            # while enqueueing and another process took it over, skip the
+            # write so we don't move its newer values backwards. The tasks we
+            # enqueued may then be scheduled again, which is harmless. Writing
+            # both together means an abort never leaves highest_known ahead of
+            # pacer_case_id_current.
+            if not hset_if_lock_held(
+                r,
+                update_lock_key,
+                lock_value,
+                [
+                    (
+                        "iquery:highest_known_pacer_case_id",
+                        court_id,
+                        incoming_pacer_case_id,
+                    ),
+                    (
+                        "iquery:pacer_case_id_current",
+                        court_id,
+                        iquery_pacer_case_id_current,
+                    ),
+                ],
+            ):
+                logger.warning(
+                    "Lost the iquery update lock for court %s while "
+                    "scheduling up to case ID %s; skipped updating counters.",
+                    court_id,
+                    incoming_pacer_case_id,
+                )
+    finally:
+        release_redis_lock(r, update_lock_key, lock_value)
 
 
 @receiver(

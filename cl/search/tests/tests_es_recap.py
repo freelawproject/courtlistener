@@ -2514,7 +2514,7 @@ class RECAPSearchTest(RECAPSearchTestCase, ESIndexTestCase, TestCase):
                 description="MOTION for Leave to File Amicus Curiae Lorem Served",
             )
             dockets_to_remove.append(de_3.docket)
-            initial_document_3 = RECAPDocumentFactory(
+            RECAPDocumentFactory(
                 docket_entry=de_3,
                 document_number="1",
                 is_available=False,
@@ -2957,9 +2957,7 @@ class RECAPSearchTest(RECAPSearchTestCase, ESIndexTestCase, TestCase):
             "order_by": "dateFiled desc",
             "highlight": True,
         }
-        r = await self._test_article_count(
-            search_params, 2, "filter + text query"
-        )
+        await self._test_article_count(search_params, 2, "filter + text query")
         self.assertEqual(
             mock_fetch_es.call_count, 1, "Wrong number of query calls."
         )
@@ -2973,9 +2971,7 @@ class RECAPSearchTest(RECAPSearchTestCase, ESIndexTestCase, TestCase):
             "order_by": "dateFiled desc",
             "highlight": True,
         }
-        r = await self._test_article_count(
-            search_params, 2, "filter + text query"
-        )
+        await self._test_article_count(search_params, 2, "filter + text query")
         # The request ignores the invalid parameter, so the cache key remains the same
         # and the response is retrieved from the cache.
         self.assertEqual(
@@ -4752,7 +4748,7 @@ class RECAPSearchAPIV4Test(
         """Test if the function score used for the dateFiled sorting in the V4
         of the RECAP Search API works as expected."""
 
-        with self.captureOnCommitCallbacks(execute=True) as callbacks:
+        with self.captureOnCommitCallbacks(execute=True):
             # This Docket will be matched only by its RECAPDocument.
             docket_entry_recent = DocketEntryFactory(
                 docket__source=Docket.RECAP,
@@ -5187,7 +5183,7 @@ class RECAPSearchAPIV4Test(
 
         created_dockets = []
         dockets_to_create = 20
-        with self.captureOnCommitCallbacks(execute=True) as callbacks:
+        with self.captureOnCommitCallbacks(execute=True):
             for _ in range(dockets_to_create):
                 docket_entry = DocketEntryFactory(
                     docket__source=Docket.RECAP,
@@ -5490,7 +5486,7 @@ class RECAPSearchAPIV4Test(
         """Test cursor pagination previous and next page when the number of
         equals the page_size."""
 
-        with self.captureOnCommitCallbacks(execute=True) as callbacks:
+        with self.captureOnCommitCallbacks(execute=True):
             docket = DocketFactory(source=Docket.RECAP)
 
         search_params = {
@@ -6040,7 +6036,7 @@ class RECAPSearchAPIV4Test(
         sorting in the V4 of the RECAP Search API works as expected for the RD type.
         """
 
-        with self.captureOnCommitCallbacks(execute=True) as callbacks:
+        with self.captureOnCommitCallbacks(execute=True):
             latest_null_date_filed = DocketEntryFactory(
                 docket=DocketFactory(
                     court=self.court_api,
@@ -6184,7 +6180,7 @@ class RECAPSearchAPIV4Test(
 
         created_dockets = []
         dockets_to_create = 10
-        with self.captureOnCommitCallbacks(execute=True) as callbacks:
+        with self.captureOnCommitCallbacks(execute=True):
             for _ in range(dockets_to_create):
                 docket_entry = DocketEntryFactory(
                     docket__source=Docket.RECAP,
@@ -6350,7 +6346,7 @@ class RECAPSearchAPIV4Test(
         empty lists after a partial update that removes the related instance
         and empties the list field.
         """
-        with self.captureOnCommitCallbacks(execute=True) as callbacks:
+        with self.captureOnCommitCallbacks(execute=True):
             d = DocketFactory(
                 case_name="Lorem Ipsum",
                 court=self.court_2,
@@ -9019,7 +9015,7 @@ class RECAPIndexingTest(
             organizations=[firm],
             docket=docket_with_parties,
         )
-        party_type = PartyTypeFactory.create(
+        PartyTypeFactory.create(
             party=PartyFactory(
                 name="Mary Williams Corp.",
                 docket=docket_with_parties,
@@ -9560,7 +9556,6 @@ class RECAPFixBrokenRDLinksTest(ESIndexTestCase, TestCase):
         # Change slug with two different values.
         self.docket_2.case_name = "Dolor Ipsum"
         self.docket_2.save()
-        d2_last_slug_in_event_table = self.docket_2.slug
         self.docket_2.case_name = "Dolor Ipsum 2"
         self.docket_2.save()
 
