@@ -4094,6 +4094,22 @@ class BuildDocketMetadataTest(TestCase):
             parsed = parse_qs(urlparse(cause["url"]).query)
             self.assertEqual(parsed["cause"][0], '"Civil Rights & Liberties"')
 
+    def test_recap_docket_explains_last_updated(self) -> None:
+        """A RECAP docket's Last Updated item carries a safe HTML message for
+        its tooltip, explaining why the date can lag the latest filing."""
+        docket = DocketFactory(
+            court=self.court,
+            source=Docket.RECAP,
+            assigned_to=None,
+            referred_to=None,
+        )
+        items = build_docket_metadata(docket, "US/Eastern")
+        last_updated = next(i for i in items if i["label"] == "Last Updated")
+        message = last_updated["tooltip_message"]
+        self.assertIsInstance(message, SafeString)
+        self.assertIn("<strong>not</strong>", message)
+        self.assertNotIn("has_tooltip", last_updated)
+
 
 class BuildOriginatingCourtMetadataTest(TestCase):
     """Test the build_originating_court_metadata helper function."""
@@ -4144,6 +4160,10 @@ class BuildOriginatingCourtMetadataTest(TestCase):
         self.assertIn("1:23-cv-456", appealed_from["suffix_aria_label"])
         self.assertIn("RECAP", appealed_from["suffix_aria_label"])
 
+        # The message alone turns on the tooltip explaining the search link.
+        self.assertIn("RECAP Archive", appealed_from["suffix_tooltip_message"])
+        self.assertNotIn("suffix_has_tooltip", appealed_from)
+
     def test_appealed_from_renders_lower_court_docket_number_as_plain_text(
         self,
     ) -> None:
@@ -4166,6 +4186,8 @@ class BuildOriginatingCourtMetadataTest(TestCase):
         self.assertEqual(appealed_from["value"], "Some State Court")
         self.assertEqual(appealed_from["suffix_text"], "42")
         self.assertNotIn("suffix_url", appealed_from)
+        # No link means no search to explain.
+        self.assertNotIn("suffix_tooltip_message", appealed_from)
 
 
 class BuildScotusMetadataTest(TestCase):
@@ -4557,6 +4579,77 @@ class DocketPageV2TemplateTest(TestCase):
             "601 U.S. 416",
         )
 
+    def test_metadata_section_places_tooltips_from_their_messages(
+        self,
+    ) -> None:
+        """A tooltip_message puts a help button after the label, and a
+        suffix_tooltip_message puts one after the suffix link."""
+        # Rendered through a wrapper string so the component's own c-vars
+        # don't shadow the context, as in the one_click_select test above.
+        template = engines["django"].from_string(
+            CottonCompiler().process('<c-metadata-section :items="items" />')
+        )
+        label_tooltip = {
+            "tooltip_message": SafeString(
+                "Not the <strong>latest</strong> filing."
+            )
+        }
+        suffix_tooltip = {
+            "suffix_text": "1:23-cv-456",
+            "suffix_url": "/?type=r&docket_number=1:23-cv-456",
+            "suffix_tooltip_message": "Search for this docket number.",
+        }
+        cases = [
+            ("label only", label_tooltip, True, False),
+            ("suffix only", suffix_tooltip, False, True),
+            ("both", {**label_tooltip, **suffix_tooltip}, True, True),
+            ("neither", {}, False, False),
+        ]
+        for name, extra, in_term, in_details in cases:
+            with self.subTest(name):
+                item = {"label": "Last Updated", "value": "Jan 20", **extra}
+                tree = fromstring(template.render({"items": [item]}))
+                term = next(tree.iter("dt"))
+                details = next(tree.iter("dd"))
+                self.assertEqual(
+                    bool(
+                        term.xpath(
+                            ".//button[@aria-label='More about Last Updated']"
+                        )
+                    ),
+                    in_term,
+                )
+                # The label row only becomes flex to line up its button.
+                self.assertEqual(
+                    "flex" in (term.get("class") or "").split(), in_term
+                )
+                self.assertEqual(
+                    bool(
+                        details.xpath(
+                            ".//button[@aria-label="
+                            "'More about the docket number search']"
+                        )
+                    ),
+                    in_details,
+                )
+                self.assertEqual(
+                    len(tree.xpath("//button")), in_term + in_details
+                )
+
+        with self.subTest("HTML in the message is not escaped"):
+            html = template.render(
+                {
+                    "items": [
+                        {
+                            "label": "Last Updated",
+                            "value": "Jan 20",
+                            **label_tooltip,
+                        }
+                    ]
+                }
+            )
+            self.assertIn("<strong>latest</strong>", html)
+
     async def test_v2_docket_page_loads_htmx(self) -> None:
         """The page loads the vendored htmx under the hardened config."""
         r = await self.async_client.get(
@@ -4618,6 +4711,49 @@ class DocketPageV2TemplateTest(TestCase):
             html,
             r'<script[^>]*src="[^"]*js/alpine/composables/view_count\.js"',
         )
+
+
+class LegacyMetadataSectionTooltipTest(SimpleTestCase):
+    """The legacy metadata section shows its Bootstrap tooltips from the
+    message fields alone, now that the has_tooltip flags are gone."""
+
+    def render(self, item: dict[str, str]) -> Any:
+        """Renders one item through the legacy include and parses it."""
+        html = get_template("includes/metadata_section.html").render(
+            {"items": [item]}
+        )
+        return fromstring(html)
+
+    def test_tooltips_follow_their_messages(self) -> None:
+        """Each message adds a tooltip where legacy has always shown it, and
+        an item with neither has no tooltip at all."""
+        base = {"label": "Last Updated", "value": "Jan 20"}
+
+        with self.subTest("tooltip_message"):
+            tree = self.render({**base, "tooltip_message": "Lags filings."})
+            value = tree.xpath("//span[contains(@class, 'meta-data-value')]")[
+                0
+            ]
+            self.assertEqual(value.get("data-toggle"), "tooltip")
+            self.assertEqual(value.get("title"), "Lags filings.")
+            self.assertIn("cursor-help", value.get("class"))
+
+        with self.subTest("suffix_tooltip_message"):
+            tree = self.render(
+                {
+                    **base,
+                    "suffix_text": "1:23-cv-456",
+                    "suffix_url": "/search/",
+                    "suffix_tooltip_message": "Search for this number.",
+                }
+            )
+            link = tree.xpath("//a[@href='/search/']")[0]
+            self.assertEqual(link.get("data-toggle"), "tooltip")
+            self.assertEqual(link.get("title"), "Search for this number.")
+
+        with self.subTest("neither"):
+            tree = self.render(base)
+            self.assertFalse(tree.xpath("//*[@data-toggle]"))
 
 
 @override_settings(WAFFLE_CACHE_PREFIX="test_docket_staff_links_v2_waffle")

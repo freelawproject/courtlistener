@@ -8,6 +8,8 @@
 {#   - suffix_text (optional): rendered after value in parentheses #}
 {#   - suffix_url (optional): renders suffix_text as a link #}
 {#   - suffix_nofollow / suffix_is_external / suffix_aria_label (optional): same semantics as the value-link variants #}
+{#   - tooltip_message (optional): shows a help tooltip after the label; may contain HTML, so the caller must mark_safe it #}
+{#   - suffix_tooltip_message (optional, needs suffix_url): shows a help tooltip after the suffix link explaining the search it runs #}
 {#   - one_click_select (optional bool): makes the value a one-click selection for copying #}
 {#   - is_label_link (optional bool, needs url): the label itself is the link, value is not rendered #}
 <c-vars
@@ -41,7 +43,12 @@
           {# A dt must be followed by a dd to satisfy the dl content model. #}
           <c-description-details></c-description-details>
         {% else %}
-          <c-description-term>{{ item.label }}</c-description-term>
+          <c-description-term class="{% if item.tooltip_message %}flex items-center gap-1{% endif %}">
+            {{ item.label }}
+            {% if item.tooltip_message %}
+              <c-tooltip :label="item.label" position="right" has_arrow>{{ item.tooltip_message }}</c-tooltip>
+            {% endif %}
+          </c-description-term>
           <c-description-details class="{% if item.one_click_select %}select-all cursor-text{% endif %}">
             {% if item.url %}
               <a
@@ -71,6 +78,9 @@
                   {% elif item.suffix_aria_label %}aria-label="{{ item.suffix_aria_label }}"
                   {% endif %}
                 >{{ item.suffix_text }}</a>)
+                {% if item.suffix_tooltip_message %}
+                  <c-tooltip label="the docket number search" position="right" has_arrow>{{ item.suffix_tooltip_message }}</c-tooltip>
+                {% endif %}
               {% else %}
                 ({{ item.suffix_text }})
               {% endif %}
