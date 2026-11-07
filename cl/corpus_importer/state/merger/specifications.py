@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import logging
+import operator
 import typing
 from abc import ABC, abstractmethod
 from collections.abc import (
@@ -107,11 +108,12 @@ class AttributeMerger[Scrape, Params, Transform](
 class _RootProxy[Scrape, Params, Transform](
     AttributeMerger[Scrape, Params, Transform]
 ):
-    __slots__ = ("path",)
+    __slots__ = ("_path", "_optimized")
 
     def __init__(self, path: tuple[_PathProxy, ...]):
         super().__init__()
-        self.path: tuple[_PathProxy, ...] = path
+        self._path: tuple[_PathProxy, ...] = path
+        self._optimized: Transformer[Scrape, Params, Any] = self.root
 
     def ensure_proxied(self, value: Any) -> _RootProxy:
         match value:
@@ -129,20 +131,43 @@ class _RootProxy[Scrape, Params, Transform](
         if name.startswith("__"):
             raise AttributeError(name)
 
-        self.path = (*self.path, _AttrProxy(name))
+        self._path = (*self._path, _AttrProxy(name))
+        g = self._optimized
+        self._optimized = lambda scrape, params: operator.attrgetter(name)(
+            g(scrape, params)
+        )
         return self
 
     def __getitem__(self, key: Any) -> Self:
-        self.path = (*self.path, _ItemProxy(self.ensure_proxied(key)))
+        self._path = (*self._path, _ItemProxy(self.ensure_proxied(key)))
+        g = self._optimized
+        if isinstance(key, _RootProxy):
+            h = key._optimized
+            self._optimized = lambda scrape, params: g(scrape, params)[
+                h(scrape, params)
+            ]
+        else:
+            self._optimized = lambda scrape, params: operator.itemgetter(key)(
+                g(scrape, params)
+            )
         return self
 
     def __call__(self, *args: Any, **kwargs: Any) -> Self:
-        self.path = (
-            *self.path,
+        args_proxy = tuple(self.ensure_proxied(arg) for arg in args)
+        kwargs_proxy = {k: self.ensure_proxied(v) for k, v in kwargs}
+        self._path = (
+            *self._path,
             _CallProxy(
-                tuple(self.ensure_proxied(arg) for arg in args),
-                {k: self.ensure_proxied(v) for k, v in kwargs},
+                args_proxy,
+                kwargs_proxy,
             ),
+        )
+        g = self._optimized
+        arg_fns = tuple(arg._optimized for arg in args_proxy)
+        kwarg_fns = {k: v._optimized for k, v in kwargs_proxy.items()}
+        self._optimized = lambda scrape, params: g(scrape, params)(
+            *(arg_fn(scrape, params) for arg_fn in arg_fns),
+            **{k: v(scrape, params) for k, v in kwarg_fns.items()},
         )
         return self
 
@@ -151,13 +176,7 @@ class _RootProxy[Scrape, Params, Transform](
 
     @override
     def transform(self, scrape: Scrape, params: Params) -> Transform:
-        current = self.root(scrape, params)
-
-        for segment in self.path:
-            current = segment.apply(current, scrape, params)
-
-        # pyrefly:ignore[bad-return]
-        return current
+        return self._optimized(scrape, params)
 
 
 class _AncestorProxy[Scrape, Params, M: Model](_RootProxy[Scrape, Params, M]):
