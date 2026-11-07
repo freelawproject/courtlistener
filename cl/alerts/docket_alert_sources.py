@@ -101,7 +101,7 @@ def _scotus_entries_by_pk(des_pks: list[int]) -> QuerySet:
         SCOTUSDocketEntry.objects.filter(pk__in=des_pks).order_by(
             "sequence_number"
         ),
-        "scotusdocument_set",
+        "scotus_documents",
         SCOTUSDocument,
     )
 
@@ -113,7 +113,7 @@ def _scotus_entries_since(docket: Docket, since: datetime) -> QuerySet:
         SCOTUSDocketEntry.objects.filter(
             date_created__gte=since, docket=docket
         ).order_by("sequence_number"),
-        "scotusdocument_set",
+        "scotus_documents",
         SCOTUSDocument,
     )
 
