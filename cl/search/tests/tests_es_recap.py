@@ -81,7 +81,9 @@ from cl.search.documents import (
 )
 from cl.search.es_docket_sources import (
     ALL_ES_SOURCES,
+    RECAP_ES_SOURCE,
     SCOTUS_ES_SOURCE,
+    SOURCE_BY_MODEL,
 )
 from cl.search.factories import (
     BankruptcyInformationFactory,
@@ -108,6 +110,13 @@ from cl.search.models import (
     DocketEvent,
     OpinionsCitedByRECAPDocument,
     RECAPDocument,
+    SCOTUSDocketEntry,
+    ScotusDocketMetadata,
+    SCOTUSDocument,
+)
+from cl.search.signals import (
+    docket_field_mapping,
+    scotus_document_field_mapping,
 )
 from cl.search.tasks import (
     es_save_document,
@@ -120,6 +129,7 @@ from cl.tests.cases import (
     AuthenticatedClientMixin,
     CountESTasksTestCase,
     ESIndexTestCase,
+    SimpleTestCase,
     TestCase,
     TransactionTestCase,
     V4SearchAPIAssertions,
@@ -6767,6 +6777,68 @@ class ESRECAPDocumentSCOTUSCompatibilityTest(TestCase):
             self.assertEqual(rd.docket_entry_id, recap["docket_entry_id"])
             self.assertIsNone(recap["uid"])
             self.assertIsNone(recap["docket_entry_uid"])
+
+
+class SCOTUSFieldTrackerTest(SimpleTestCase):
+    """Confirm the FieldTrackers added for #8020 track exactly the fields
+    the SCOTUS ES signal mappings depend on.
+    """
+
+    def test_trackers_match_the_es_signal_mappings(self) -> None:
+        """A mapped field missing from its tracker would never trigger an
+        ES update, and a tracked field missing from the mapping is dead
+        weight."""
+        cases = [
+            (
+                SCOTUSDocument,
+                scotus_document_field_mapping["save"][SCOTUSDocument]["self"],
+            ),
+            (
+                SCOTUSDocketEntry,
+                scotus_document_field_mapping["save"][SCOTUSDocketEntry][
+                    "docket_entry"
+                ],
+            ),
+            (
+                ScotusDocketMetadata,
+                docket_field_mapping["reverse"][ScotusDocketMetadata][
+                    "scotus_metadata"
+                ],
+            ),
+        ]
+        for model, fields_map in cases:
+            with self.subTest(model=model.__name__):
+                self.assertEqual(
+                    set(model.es_rd_field_tracker.fields), set(fields_map)
+                )
+
+
+class ESDocketSourcesTest(SimpleTestCase):
+    """Confirm the per-source ES docket configuration added for #8020
+    (cl.search.es_docket_sources) is internally consistent.
+    """
+
+    def test_all_sources_resolve_back_to_themselves_in_source_by_model(
+        self,
+    ) -> None:
+        """Every source's document_model (and metadata_model, if any)
+        must map back to that exact source."""
+        for source in ALL_ES_SOURCES:
+            self.assertIs(SOURCE_BY_MODEL[source.document_model], source)
+            if source.metadata_model is not None:
+                self.assertIs(SOURCE_BY_MODEL[source.metadata_model], source)
+
+    def test_docket_belongs_distinguishes_recap_from_scotus(self) -> None:
+        """Each source's docket_belongs checks the field it actually
+        relies on so a RECAP docket and a SCOTUS docket each belong
+        to exactly one source."""
+        recap_docket = Docket(source=Docket.RECAP, court_id="cand")
+        scotus_docket = Docket(source=Docket.DEFAULT, court_id="scotus")
+
+        self.assertTrue(RECAP_ES_SOURCE.docket_belongs(recap_docket))
+        self.assertFalse(SCOTUS_ES_SOURCE.docket_belongs(recap_docket))
+        self.assertFalse(RECAP_ES_SOURCE.docket_belongs(scotus_docket))
+        self.assertTrue(SCOTUS_ES_SOURCE.docket_belongs(scotus_docket))
 
 
 class RECAPFeedTest(RECAPSearchTestCase, ESIndexTestCase, TestCase):
