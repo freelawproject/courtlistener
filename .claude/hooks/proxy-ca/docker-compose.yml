@@ -16,3 +16,5 @@ services:
 
   cl-webpack:
     image: cl-proxy-ca/node:16
+    # The tag exists only on this machine; never let a `pull` look for it.
+    pull_policy: never

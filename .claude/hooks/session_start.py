@@ -71,18 +71,28 @@ COMPOSE_FILES = [
     COMPOSE_DIR / "docker-compose.yml",
     COMPOSE_DIR / "docker-compose.tmpfs.yml",
 ]
-# The host's CA bundle when a TLS-intercepting proxy sets one, and the
-# Docker Hub base images the stack uses, mapped to the tags their rebuilt,
-# bundle-trusting versions get. The keys must match the FROM line in
-# docker/django/Dockerfile and the node image in docker-compose.yml, which
-# build_proxy_ca_images checks, since a mismatch would silently fall back
-# to the untrusting originals.
+# The host's CA bundle when a TLS-intercepting proxy sets one, and where
+# the stack names the Docker Hub images it builds on: the file, a pattern
+# capturing the image named there, the image the proxy-ca override assumes,
+# and the tag its rebuilt, bundle-trusting version gets. The override
+# hard-codes the images, so build_proxy_ca_images checks that the stack
+# still agrees; a mismatch would silently fall back to the originals.
 HOST_CA_BUNDLE = os.environ.get("SSL_CERT_FILE", "")
 PROXY_CA_DIR = Path(__file__).resolve().parent / "proxy-ca"
-PROXY_CA_IMAGES = {
-    "python:3.13": "cl-proxy-ca/python:3.13",
-    "node:16": "cl-proxy-ca/node:16",
-}
+PROXY_CA_IMAGES = [
+    (
+        REPO / "docker" / "django" / "Dockerfile",
+        r"^FROM (\S+)",
+        "python:3.13",
+        "cl-proxy-ca/python:3.13",
+    ),
+    (
+        COMPOSE_DIR / "docker-compose.yml",
+        r"^  cl-webpack:\n(?:    .*\n)*?    image: (\S+)",
+        "node:16",
+        "cl-proxy-ca/node:16",
+    ),
+]
 if os.path.isfile(HOST_CA_BUNDLE):
     COMPOSE_FILES.append(PROXY_CA_DIR / "docker-compose.yml")
 # The image bakes in the Python and Node dependencies; when any of these
@@ -344,26 +354,20 @@ def build_proxy_ca_images() -> None:
     has no such bundle."""
     if not os.path.isfile(HOST_CA_BUNDLE):
         return
-    stack_sources = "".join(
-        path.read_text(encoding="utf-8")
-        for path in (
-            REPO / "docker" / "django" / "Dockerfile",
-            COMPOSE_DIR / "docker-compose.yml",
-        )
-    )
-    for base in PROXY_CA_IMAGES:
-        if not re.search(
-            rf"^\s*(FROM|image:) {re.escape(base)}(\s|$)", stack_sources, re.M
-        ):
+    for path, pattern, base, tag in PROXY_CA_IMAGES:
+        match = re.search(pattern, path.read_text(encoding="utf-8"), re.M)
+        found = match.group(1) if match else "no image"
+        if found != base:
             raise Bail(
-                f"The stack no longer uses the base image {base}; update"
-                " PROXY_CA_IMAGES and proxy-ca/docker-compose.yml."
+                f"{path.name} names {found} where the proxy-ca override"
+                f" expects {base}; update PROXY_CA_IMAGES and"
+                " proxy-ca/docker-compose.yml."
             )
     log("Rebuilding the stack's base images to trust the sandbox proxy...")
     context = STATE_DIR / "proxy-ca"
     context.mkdir(parents=True, exist_ok=True)
     shutil.copyfile(HOST_CA_BUNDLE, context / "ca-bundle.crt")
-    for base, tag in PROXY_CA_IMAGES.items():
+    for _, _, base, tag in PROXY_CA_IMAGES:
         build = run(
             "docker",
             "build",
