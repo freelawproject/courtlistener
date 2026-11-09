@@ -750,11 +750,14 @@ class PartyCriminalInfo(TypedDict):
 
 
 class PartyItem(TypedDict):
-    """One party on the Parties tab. date_terminated is in the site's date
-    format and empty when unset. criminal is only present for parties with
-    criminal data."""
+    """One party on the Parties tab. pk is the Party; party_type_pk is the
+    PartyType row, unique per party and type on the docket, so a party
+    listed under two types gets distinct element ids. date_terminated is in
+    the site's date format and empty when unset. criminal is only present
+    for parties with criminal data."""
 
     pk: int
+    party_type_pk: int
     name: str
     date_terminated: str
     attorneys: list[PartyAttorney]
@@ -872,6 +875,7 @@ def build_party_groups(party_types: Iterable[PartyType]) -> list[PartyGroup]:
         party = party_type.party
         item: PartyItem = {
             "pk": party.pk,
+            "party_type_pk": party_type.pk,
             "name": html.unescape(party.name),
             "date_terminated": (
                 date_format(party_type.date_terminated)
