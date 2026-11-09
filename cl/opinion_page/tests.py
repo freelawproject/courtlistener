@@ -4475,6 +4475,17 @@ class DocketPartiesContextTest(TestCase):
             docket=cls.docket,
             organizations=[AttorneyOrganizationFactory(lookup_key="rcfp")],
         )
+        # Inserted before the plaintiff that sorts first, so a name-ordered
+        # result can only come from the view. PACER names carry HTML entities.
+        PartyTypeFactory(
+            docket=cls.docket,
+            party=PartyFactory(
+                name="M&amp;B CAPITAL ADVISERS",
+                docket=cls.docket,
+                attorneys=[cls.other],
+            ),
+            name="Plaintiff",
+        )
         # PartyFactory links each attorney through a role with no type.
         plaintiff = PartyFactory(
             name="AMERICAN ASSOCIATION OF LAW LIBRARIES",
@@ -4506,16 +4517,6 @@ class DocketPartiesContextTest(TestCase):
             name="Plaintiff",
             date_terminated=date(2016, 4, 21),
         )
-        # PACER names arrive with HTML entities in them.
-        PartyTypeFactory(
-            docket=cls.docket,
-            party=PartyFactory(
-                name="M&amp;B CAPITAL ADVISERS",
-                docket=cls.docket,
-                attorneys=[cls.other],
-            ),
-            name="Plaintiff",
-        )
         defendant_type = PartyTypeFactory(
             docket=cls.docket,
             party=PartyFactory(
@@ -4541,17 +4542,21 @@ class DocketPartiesContextTest(TestCase):
 
     async def test_parties_group_by_type_in_name_order(self) -> None:
         """One group per party type, types and parties in name order, names
-        unescaped, with the party's termination date in the site format or
-        empty."""
+        unescaped."""
         groups = await self.get_party_groups()
         self.assertEqual(
             [group["name"] for group in groups], ["Defendant", "Plaintiff"]
         )
-        defendant, plaintiff = (group["parties"][0] for group in groups)
         self.assertEqual(
             [party["name"] for party in groups[1]["parties"]],
             ["AMERICAN ASSOCIATION OF LAW LIBRARIES", "M&B CAPITAL ADVISERS"],
         )
+
+    async def test_termination_date_is_formatted_or_empty(self) -> None:
+        """A terminated party carries its date in the site format; an
+        active one carries an empty string."""
+        groups = await self.get_party_groups()
+        defendant, plaintiff = (group["parties"][0] for group in groups)
         self.assertEqual(plaintiff["date_terminated"], "April 21, 2016")
         self.assertEqual(defendant["date_terminated"], "")
 
