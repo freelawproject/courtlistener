@@ -6868,6 +6868,27 @@ class ESDocketSourcesTest(TestCase):
         self.assertFalse(RECAP_ES_SOURCE.docket_belongs(scotus_docket))
         self.assertTrue(SCOTUS_ES_SOURCE.docket_belongs(scotus_docket))
 
+    def test_has_entries_skips_the_query_for_other_courts(self) -> None:
+        """has_entries rules out Dockets from courts outside the source's
+        court_ids without a query, so the SCOTUS processor adds no query
+        to RECAP Docket saves, while still finding real entries."""
+        recap_entry = DocketEntryFactory(
+            docket=DocketFactory(court=CourtFactory(), source=Docket.RECAP)
+        )
+        scotus_entry = SCOTUSDocketEntryFactory(
+            docket__court=CourtFactory(id="scotus", jurisdiction="F"),
+            docket__source=Docket.SCRAPER,
+        )
+        recap_docket = Docket.objects.get(pk=recap_entry.docket_id)
+        scotus_docket = Docket.objects.get(pk=scotus_entry.docket_id)
+
+        with self.assertNumQueries(0):
+            self.assertFalse(SCOTUS_ES_SOURCE.has_entries(recap_docket))
+        with self.assertNumQueries(1):
+            self.assertTrue(SCOTUS_ES_SOURCE.has_entries(scotus_docket))
+        with self.assertNumQueries(1):
+            self.assertTrue(RECAP_ES_SOURCE.has_entries(recap_docket))
+
     def test_scotus_docket_belongs_via_flag_before_any_content(
         self,
     ) -> None:
