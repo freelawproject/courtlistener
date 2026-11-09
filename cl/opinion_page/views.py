@@ -102,6 +102,7 @@ from cl.opinion_page.utils import (
     es_get_related_clusters_with_cache,
     es_related_case_count,
     generate_docket_entries_csv_data,
+    separate_syllabus,
 )
 from cl.people_db.models import (
     AttorneyOrganization,
@@ -1037,6 +1038,7 @@ async def setup_opinion_context(
         "private": cluster.blocked,
         "sponsored": sponsored,
         "citations": sorted(cluster.citations.all(), key=sort_cites),
+        "separate_syllabus": separate_syllabus(cluster),
     }
 
     download_context = await get_downloads_context(cluster)
