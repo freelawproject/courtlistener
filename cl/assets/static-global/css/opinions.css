@@ -16,9 +16,46 @@
     line-height: 2.3em;
   }
 
-  /* Opinions ingested from centralia's structured extraction. The cover
-     (cluster.headmatter) is inline-styled by centralia itself; these rules
-     cover the writings' semantic markup only. */
+  /* Opinions ingested from centralia's structured extraction. */
+  #headmatter > .centralia {
+    text-indent: 0;
+  }
+  .centralia .hmrow.ac {
+    text-align: center;
+  }
+  .centralia .hmrow.ar {
+    text-align: right;
+  }
+  .centralia .hmrow.rel {
+    margin-left: var(--rel, 0);
+  }
+  .centralia .hmrow[data-role="caption"],
+  .centralia .hmrow[data-role="lower-court"] {
+    text-align: center;
+    margin-left: 0;
+  }
+  .centralia .rule,
+  .centralia .typedrule {
+    width: 100%;
+    margin: 1.1em 0;
+    border-top: 1px solid #999;
+  }
+  .centralia .rule.span-center,
+  .centralia .typedrule.span-center {
+    width: 40%;
+    margin: 1.1em auto;
+  }
+  .centralia .rule.span-left,
+  .centralia .typedrule.span-left {
+    width: 48%;
+    margin: 1.1em auto 1.1em 0;
+  }
+  .centralia .rule.span-right,
+  .centralia .typedrule.span-right {
+    width: 48%;
+    margin: 1.1em 0 1.1em auto;
+  }
+
   .centralia p {
     margin: 0 0 1em;
     text-align: justify;
