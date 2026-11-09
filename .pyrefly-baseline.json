@@ -1367,27 +1367,6 @@
       "severity": "error"
     },
     {
-      "column": 5,
-      "path": "cl/oauth/views.py",
-      "name": "bad-override-mutable-attribute",
-      "concise_description": "Class member `OAuthMetadataView.authentication_classes` overrides parent class `APIView` in an inconsistent manner",
-      "severity": "error"
-    },
-    {
-      "column": 5,
-      "path": "cl/oauth/views.py",
-      "name": "bad-override-mutable-attribute",
-      "concise_description": "Class member `OAuthMetadataView.permission_classes` overrides parent class `APIView` in an inconsistent manner",
-      "severity": "error"
-    },
-    {
-      "column": 5,
-      "path": "cl/oauth/views.py",
-      "name": "bad-override-mutable-attribute",
-      "concise_description": "Class member `OAuthMetadataView.throttle_classes` overrides parent class `APIView` in an inconsistent manner",
-      "severity": "error"
-    },
-    {
       "column": 28,
       "path": "cl/opinion_page/feeds.py",
       "name": "bad-argument-type",

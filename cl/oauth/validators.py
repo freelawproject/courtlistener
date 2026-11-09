@@ -2,32 +2,37 @@ from collections.abc import Callable
 from typing import Any
 
 from oauth2_provider.oauth2_validators import OAuth2Validator
+from waffle import switch_is_active
+
+# While on, the token endpoint refuses refreshes from applications that
+# were registered through the retired DCR endpoint, so their users
+# reconnect through the MCP server instead.
+DCR_REFRESH_SWITCH = "refuse-dcr-refresh"
 
 
 class CourtListenerOAuth2Validator(OAuth2Validator):
-    """Adds the standard OIDC ``email`` and ``profile`` claims and limits
-    dynamically registered applications to the ``api`` and ``openid`` scopes.
+    """Adds the standard OIDC ``email`` and ``profile`` claims and winds
+    down the applications left behind by Dynamic Client Registration.
     """
 
-    DCR_SCOPES = frozenset({"api", "openid"})
-
-    def validate_scopes(
+    def validate_refresh_token(
         self,
-        client_id: str,
-        scopes: list[str],
+        refresh_token: str,
         client: Any,
         request: Any,
         *args: Any,
         **kwargs: Any,
     ) -> bool:
-        """Refuse identity and wiki scopes to apps registered through DCR."""
+        """Answer ``invalid_grant`` to a DCR application's refresh once
+        ``DCR_REFRESH_SWITCH`` is on, so the client starts over with a
+        fresh authorization; other applications are unaffected."""
         if (
             client.registration_source == client.RegistrationSource.DCR
-            and not set(scopes) <= self.DCR_SCOPES
+            and switch_is_active(DCR_REFRESH_SWITCH)
         ):
             return False
-        return super().validate_scopes(
-            client_id, scopes, client, request, *args, **kwargs
+        return super().validate_refresh_token(
+            refresh_token, client, request, *args, **kwargs
         )
 
     # Request-free signature is how DOT opts claims into discovery.
