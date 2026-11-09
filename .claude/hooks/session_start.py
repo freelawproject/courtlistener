@@ -33,6 +33,16 @@ Assumptions about the environment, each learned from a real session:
   so `docker compose up --wait` alone means "ready to run tests".
 - Downloads go through the environment's network policy, which can refuse
   hosts. DOWNLOAD_HOSTS lists the ones a first boot needs.
+- Docker Hub rate-limits anonymous pulls from the sessions' shared IPs. The
+  stack therefore boots only when DOCKERHUB_USERNAME and DOCKERHUB_TOKEN are
+  set in the cloud environment's settings; otherwise the hook and --wait
+  print a note explaining how to set them and boot nothing.
+- The sandbox re-signs outbound TLS with its own CA and points host tools
+  at the bundle through SSL_CERT_FILE. Containers don't see the host's
+  trust store, so the image build and npm fail with certificate errors
+  unless the stack's base images are rebuilt with the bundle installed;
+  proxy-ca/ holds the Dockerfile and the compose override that swaps
+  them in.
 """
 
 from __future__ import annotations
@@ -40,6 +50,7 @@ from __future__ import annotations
 import hashlib
 import json
 import os
+import re
 import secrets
 import shlex
 import shutil
@@ -60,6 +71,30 @@ COMPOSE_FILES = [
     COMPOSE_DIR / "docker-compose.yml",
     COMPOSE_DIR / "docker-compose.tmpfs.yml",
 ]
+# The host's CA bundle when a TLS-intercepting proxy sets one, and where
+# the stack names the Docker Hub images it builds on: the file, a pattern
+# capturing the image named there, the image the proxy-ca override assumes,
+# and the tag its rebuilt, bundle-trusting version gets. The override
+# hard-codes the images, so build_proxy_ca_images checks that the stack
+# still agrees; a mismatch would silently fall back to the originals.
+HOST_CA_BUNDLE = os.environ.get("SSL_CERT_FILE", "")
+PROXY_CA_DIR = Path(__file__).resolve().parent / "proxy-ca"
+PROXY_CA_IMAGES = [
+    (
+        REPO / "docker" / "django" / "Dockerfile",
+        r"^FROM (\S+)",
+        "python:3.13",
+        "cl-proxy-ca/python:3.13",
+    ),
+    (
+        COMPOSE_DIR / "docker-compose.yml",
+        r"^  cl-webpack:\n(?:    .*\n)*?    image: (\S+)",
+        "node:16",
+        "cl-proxy-ca/node:16",
+    ),
+]
+if os.path.isfile(HOST_CA_BUNDLE):
+    COMPOSE_FILES.append(PROXY_CA_DIR / "docker-compose.yml")
 # The image bakes in the Python and Node dependencies; when any of these
 # change, an image cached from an earlier session is stale.
 IMAGE_INPUTS = [
@@ -105,6 +140,11 @@ DOWNLOAD_HOSTS = [
     "deb.debian.org",
     "security.debian.org",
 ]
+# Docker Hub rate-limits anonymous pulls per source IP, and web sessions share
+# a few egress IPs, so a boot without credentials fails with 429s. The stack
+# only boots when both variables are set in the cloud environment's settings.
+DOCKERHUB_USERNAME_VAR = "DOCKERHUB_USERNAME"
+DOCKERHUB_TOKEN_VAR = "DOCKERHUB_TOKEN"
 ES_MIN_MAP_COUNT = 262144
 BOOT_TIMEOUT_SECONDS = 1200
 DOCKERD_START_TIMEOUT_SECONDS = 60
@@ -201,6 +241,61 @@ def start_dockerd() -> None:
     raise Bail(f"The Docker daemon did not come up. See {DOCKERD_LOG}.")
 
 
+def have_dockerhub_credentials() -> bool:
+    """Whether the environment provides both Docker Hub credentials."""
+    return bool(
+        os.environ.get(DOCKERHUB_USERNAME_VAR)
+        and os.environ.get(DOCKERHUB_TOKEN_VAR)
+    )
+
+
+def dockerhub_login() -> None:
+    """Log the Docker daemon in to Docker Hub so pulls aren't rate-limited.
+
+    The token goes in on stdin so it never appears in a process list or log.
+    The login lands in ~/.docker/config.json, which is fine on an ephemeral
+    session machine but must never be committed or copied elsewhere.
+    """
+    result = subprocess.run(
+        [
+            "docker",
+            "login",
+            "--username",
+            os.environ[DOCKERHUB_USERNAME_VAR],
+            "--password-stdin",
+        ],
+        input=os.environ[DOCKERHUB_TOKEN_VAR],
+        text=True,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.STDOUT,
+        check=False,
+    )
+    if result.returncode != 0:
+        # Docker's output echoes the registry's error, not the token.
+        raise Bail(
+            "Logging in to Docker Hub failed; check "
+            f"{DOCKERHUB_USERNAME_VAR} and {DOCKERHUB_TOKEN_VAR}: "
+            f"{result.stdout.strip()}"
+        )
+
+
+def show_credentials_note() -> None:
+    """Explain why the stack isn't booting and how the user can enable it."""
+    log("The development stack was NOT started: no Docker Hub credentials.")
+    log("Docker Hub rate-limits anonymous pulls from shared cloud IPs, so")
+    log("booting without a login usually fails with 429 Too Many Requests.")
+    log("To enable the stack, the user must (never paste a token in chat):")
+    log("  1. Create a Docker Hub access token with 'Public Repo Read-only'")
+    log("     scope, ideally on a dedicated account.")
+    log(
+        "  2. In the cloud environment's settings (the environment menu in the"
+    )
+    log("     session's title bar, then Edit), set the variables")
+    log(f"     {DOCKERHUB_USERNAME_VAR} and {DOCKERHUB_TOKEN_VAR}.")
+    log("  3. Start a new session; it picks them up and boots the stack.")
+    log("Tests can't run until then. Do not work around this: tell the user.")
+
+
 def ensure_max_map_count() -> None:
     """Raise vm.max_map_count to what Elasticsearch requires."""
     current = int(
@@ -251,6 +346,43 @@ def configure_environment(persist: bool) -> None:
     with open(env_file, "a", encoding="utf-8") as f:
         for name, value in variables.items():
             f.write(f"export {name}={shlex.quote(value)}\n")
+
+
+def build_proxy_ca_images() -> None:
+    """Rebuild the stack's base images with the host's CA bundle installed,
+    for the proxy-ca compose override to swap in. Does nothing when the host
+    has no such bundle."""
+    if not os.path.isfile(HOST_CA_BUNDLE):
+        return
+    for path, pattern, base, tag in PROXY_CA_IMAGES:
+        match = re.search(pattern, path.read_text(encoding="utf-8"), re.M)
+        found = match.group(1) if match else "no image"
+        if found != base:
+            raise Bail(
+                f"{path.name} names {found} where the proxy-ca override"
+                f" expects {base}; update PROXY_CA_IMAGES and"
+                " proxy-ca/docker-compose.yml."
+            )
+    log("Rebuilding the stack's base images to trust the sandbox proxy...")
+    context = STATE_DIR / "proxy-ca"
+    context.mkdir(parents=True, exist_ok=True)
+    shutil.copyfile(HOST_CA_BUNDLE, context / "ca-bundle.crt")
+    for _, _, base, tag in PROXY_CA_IMAGES:
+        build = run(
+            "docker",
+            "build",
+            "--quiet",
+            "--build-arg",
+            f"BASE={base}",
+            "--tag",
+            tag,
+            "--file",
+            str(PROXY_CA_DIR / "Dockerfile"),
+            str(context),
+            check=False,
+        )
+        if build.returncode:
+            raise Bail(f"Building {tag} from {base} failed.")
 
 
 def image_inputs_hash() -> str:
@@ -394,6 +526,8 @@ def boot() -> None:
     lint = start_lint_sync()
     try:
         start_dockerd()
+        dockerhub_login()
+        build_proxy_ca_images()
         ensure_max_map_count()
         ensure_env_file()
         current_hash = image_inputs_hash()
@@ -432,8 +566,11 @@ def show_hints() -> None:
     log("    Tell the user which host was refused; they allow it in the")
     log("    environment's network access settings. A first boot needs:")
     log(f"    {', '.join(DOWNLOAD_HOSTS)}")
-    log("  * 429 Too Many Requests from Docker Hub is its limit on anonymous")
-    log("    pulls; retry later.")
+    log("  * A certificate error inside a build or container (UnknownIssuer,")
+    log("    SELF_SIGNED_CERT_IN_CHAIN) means it did not get the host's CA")
+    log("    bundle; check that SSL_CERT_FILE points at an existing file.")
+    log("  * 429 Too Many Requests from Docker Hub means the login was not")
+    log("    applied or the account itself is rate-limited; retry later.")
     log("  * Elasticsearch needs about 1 GB of memory.")
     log(f"  * Full log: {BOOT_LOG}")
 
@@ -485,6 +622,10 @@ def main() -> int:
         return 0
     os.chdir(REPO)
     STATE_DIR.mkdir(parents=True, exist_ok=True)
+    if not have_dockerhub_credentials():
+        if "--boot" not in sys.argv:
+            show_credentials_note()
+        return 1 if "--wait" in sys.argv else 0
     if "--boot" in sys.argv:
         configure_environment(persist=False)
         boot()
