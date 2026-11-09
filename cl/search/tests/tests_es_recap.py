@@ -2731,6 +2731,10 @@ class RECAPSearchTest(RECAPSearchTestCase, ESIndexTestCase, TestCase):
         for docket in dockets_to_remove:
             docket.delete()
 
+    @override_flag("scotus_docket_page", active=True)
+    @override_settings(
+        WAFFLE_CACHE_PREFIX="test_initial_document_buttons_on_mixed_page"
+    )
     def test_initial_document_buttons_on_mixed_page(self) -> None:
         """Confirm a results page with RECAP and SCOTUS dockets gives each
         docket the initial document button of its own source."""
