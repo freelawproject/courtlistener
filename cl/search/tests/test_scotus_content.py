@@ -420,6 +420,39 @@ class ScotusDocketMergeTest(TestCase):
             attorney_orgs.count(), 3, "AttorneysOrgs were duplicated."
         )
 
+    @mock.patch("cl.corpus_importer.tasks.index_docket_parties_in_es")
+    def test_merge_scotus_docket_indexes_parties_in_es(
+        self, mock_index_parties: mock.MagicMock
+    ) -> None:
+        """Party rows don't trigger ES signals, so merging a SCOTUS docket
+        with parties must index them in ES explicitly, like RECAP does."""
+        data = ScotusDocketDataFactory(
+            lower_court=self.lower_court.full_name,
+            parties=[SCOTUSPartyDataFactory()],
+            docket_entries=[],
+        )
+
+        docket, _, _ = merge_scotus_docket(data, download_file=False)
+
+        mock_index_parties.delay.assert_called_once_with(
+            docket.pk, percolate_parties=False
+        )
+
+    @mock.patch("cl.corpus_importer.tasks.index_docket_parties_in_es")
+    def test_merge_scotus_docket_skips_party_indexing_without_parties(
+        self, mock_index_parties: mock.MagicMock
+    ) -> None:
+        """No parties means nothing to index."""
+        data = ScotusDocketDataFactory(
+            lower_court=self.lower_court.full_name,
+            parties=[],
+            docket_entries=[],
+        )
+
+        merge_scotus_docket(data, download_file=False)
+
+        mock_index_parties.delay.assert_not_called()
+
     def test_merge_scotus_docket_updates_existing_docket(self) -> None:
         """Confirm merging again updates an existing SCOTUS docket."""
 

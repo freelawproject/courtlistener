@@ -226,6 +226,7 @@ from cl.search.state.texas.models import (
     TexasDocketEntry,
     TexasDocument,
 )
+from cl.search.tasks import index_docket_parties_in_es
 from cl.settings import COURT_REQUEST_USER_AGENT
 
 HYPERSCAN_TOKENIZER = HyperscanTokenizer(cache_dir=".hyperscan")
@@ -4008,6 +4009,9 @@ def merge_scotus_docket(
     if report_data["parties"]:
         normalized_parties = normalize_scotus_parties(report_data["parties"])
         add_parties_and_attorneys(d, normalized_parties)
+        # Party rows don't trigger ES signals, and the Docket was indexed
+        # when its metadata was saved, before these parties existed.
+        index_docket_parties_in_es.delay(d.pk, percolate_parties=False)
 
     # Docket entries merger:
     enrich_scotus_attachments(report_data["docket_entries"])
