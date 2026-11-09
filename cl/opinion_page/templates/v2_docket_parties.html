@@ -83,16 +83,16 @@
                     {% if party.criminal %}
                       <div class="py-4 first:pt-0">
                         <h4 id="party-{{ party.pk }}-charges-heading" class="text-md font-semibold text-greyscale-900">Criminal Charges:</h4>
-                        <c-description-list class="mt-2 flex flex-col gap-1">
-                          <c-description-item class="flex flex-wrap gap-x-1">
-                            <c-description-term>Highest Offense Level (Opening):</c-description-term>
-                            <c-description-details>{{ party.criminal.highest_offense_level_opening }}</c-description-details>
-                          </c-description-item>
-                          <c-description-item class="flex flex-wrap gap-x-1">
-                            <c-description-term>Highest Offense Level (Terminated):</c-description-term>
-                            <c-description-details>{{ party.criminal.highest_offense_level_terminated }}</c-description-details>
-                          </c-description-item>
-                        </c-description-list>
+                        <dl class="mt-2 flex flex-col gap-1">
+                          <div class="flex flex-wrap gap-x-1">
+                            <dt class="font-semibold">Highest Offense Level (Opening):</dt>
+                            <dd>{{ party.criminal.highest_offense_level_opening }}</dd>
+                          </div>
+                          <div class="flex flex-wrap gap-x-1">
+                            <dt class="font-semibold">Highest Offense Level (Terminated):</dt>
+                            <dd>{{ party.criminal.highest_offense_level_terminated }}</dd>
+                          </div>
+                        </dl>
                         <div class="mt-4 [&_tr:last-child]:border-b-0">
                           <c-flex-table
                             caption="Criminal charges for {{ party.name }}"
