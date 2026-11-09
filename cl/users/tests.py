@@ -531,7 +531,7 @@ class ProfileTest(SimpleUserDataMixin, TestCase):
             ],
         )
         self.assertNotIn("Visualizations", nav.text_content())
-        self.assertEqual(len(nav.xpath(".//*[@role='separator']")), 1)
+        self.assertEqual(len(nav.xpath(".//li[@aria-hidden='true']")), 1)
 
         active_links = nav.xpath(".//a[@aria-current='page']")
         self.assertEqual(len(active_links), 1)
@@ -539,9 +539,7 @@ class ProfileTest(SimpleUserDataMixin, TestCase):
             active_links[0].text_content().strip(), "Developer Tools"
         )
 
-        mobile_heading = html.xpath(
-            "//h1[contains(concat(' ', normalize-space(@class), ' '), ' md:hidden ')]"
-        )
+        mobile_heading = html.xpath("//h1")
         self.assertEqual(len(mobile_heading), 1)
         self.assertEqual(
             mobile_heading[0].text_content().strip(), "Developer Tools"

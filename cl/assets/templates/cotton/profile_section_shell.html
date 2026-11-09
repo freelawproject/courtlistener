@@ -3,7 +3,7 @@
 <c-vars active_section username class="" />
 
 <div class="w-full {{ class }}">
-  <h1 class="mb-4 text-lg font-semibold text-greyscale-900 md:hidden">
+  <h1 class="mb-4 text-lg font-semibold text-greyscale-900 md:sr-only">
     {% if active_section == "alerts" %}
       Alerts
     {% elif active_section == "notes" %}
@@ -25,7 +25,7 @@
 
   <div class="md:flex md:items-start md:gap-5">
     <nav class="hidden w-[--nav-menu-width] shrink-0 md:block" aria-label="Profile navigation">
-      <ul class="m-0 list-none p-0">
+      <ul class="m-0 list-none p-0" role="list">
         <li>
           <a
             href="{% url 'profile_alerts' %}"
@@ -76,7 +76,7 @@
             Prayers
           </a>
         </li>
-        <li role="separator" class="my-2 border-t border-greyscale-100"></li>
+        <li class="my-2 border-t border-greyscale-100" aria-hidden="true"></li>
         <li>
           <a
             href="{% url 'profile_your_support' %}"
