@@ -79,6 +79,7 @@ from cl.search.models import (
     OriginatingCourtInformation,
     RECAPDocument,
     Tag,
+    TaggableType,
 )
 from cl.search.tasks import index_docket_parties_in_es
 
@@ -2012,7 +2013,7 @@ def get_data_from_appellate_att_report(
 
 
 async def add_tags_to_objs(
-    tag_names: list[str] | None, objs: Any
+    tag_names: list[str] | None, objs: Iterable[TaggableType]
 ) -> list[Tag]:
     """Add tags by name to objects
 
