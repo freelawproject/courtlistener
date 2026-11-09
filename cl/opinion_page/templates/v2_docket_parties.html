@@ -30,7 +30,7 @@
 
           {% for party in group.parties %}
             {# One grid per party: the party on the left, "Represented By:" with the attorney rows and the criminal block stacked on the right. The grid owns the top padding and the closing border; each element only pads below itself, and the stack draws the lines between its rows. #}
-            <div class="grid grid-cols-1 md:grid-cols-3 pt-4 md:pt-6 border-b border-greyscale-200" aria-labelledby="party-{{ party.pk }}-heading">
+            <div role="group" aria-labelledby="party-{{ party.pk }}-heading" class="grid grid-cols-1 md:grid-cols-3 pt-4 md:pt-6 border-b border-greyscale-200">
               <div class="pb-4 md:pb-6 md:pr-6 space-y-1">
                 <h3 class="text-md md:pl-3" id="party-{{ party.pk }}-heading" aria-label="{{ party.name }}">
                   {{ party.name }}
@@ -46,7 +46,7 @@
               {% if party.attorneys or party.criminal %}
                 <div class="md:col-span-2 pt-4 md:pt-0">
                   {% if party.attorneys %}
-                    <p class="pb-4 text-md font-semibold text-greyscale-900">Represented By:</p>
+                    <h4 id="party-{{ party.pk }}-attorneys-heading" class="pb-4 text-md font-semibold text-greyscale-900">Represented By:</h4>
                   {% endif %}
                   <div class="divide-y divide-greyscale-200">
                     {% for attorney in party.attorneys %}
@@ -82,7 +82,7 @@
 
                     {% if party.criminal %}
                       <div class="py-4 first:pt-0">
-                        <p class="text-md font-semibold text-greyscale-900">Criminal Charges:</p>
+                        <h4 id="party-{{ party.pk }}-charges-heading" class="text-md font-semibold text-greyscale-900">Criminal Charges:</h4>
                         <c-description-list class="mt-2 flex flex-col gap-1">
                           <c-description-item class="flex flex-wrap gap-x-1">
                             <c-description-term>Highest Offense Level (Opening):</c-description-term>
