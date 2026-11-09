@@ -256,8 +256,9 @@ def merge_structured_opinion_into_cl_opinion(
 
     Stores the extracted HTML in `Opinion.html` along with the opinion's
     ordering key, type, per curiam flag and author string, and the syllabus
-    in `OpinionCluster.syllabus`. A cluster field is only replaced when the
-    read found that section, so existing content is never blanked.
+    and headmatter in `OpinionCluster.syllabus` and `.headmatter`. A cluster
+    field is only replaced when the read found that section, so existing
+    content is never blanked.
     Extractions that fail check_structured_extraction are logged and
     skipped, leaving the opinion and cluster untouched. Errors while saving
     are raised.
@@ -304,6 +305,10 @@ def merge_structured_opinion_into_cl_opinion(
     if syllabus := _wrap(_syllabus_html(data)):
         cluster.syllabus = syllabus
         cluster_fields.append("syllabus")
+    headmatter = (data.get("headmatter") or {}).get("html") or ""
+    if headmatter := _wrap(headmatter):
+        cluster.headmatter = headmatter
+        cluster_fields.append("headmatter")
 
     with transaction.atomic():
         opinion.save(
