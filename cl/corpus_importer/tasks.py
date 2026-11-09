@@ -136,7 +136,6 @@ from cl.corpus_importer.utils import (
 )
 from cl.custom_filters.templatetags.text_filters import best_case_name
 from cl.lib.celery_utils import throttle_task
-from cl.lib.command_utils import logger
 from cl.lib.courts import find_court_object_by_name
 from cl.lib.crypto import sha1
 from cl.lib.decorators import retry, time_call
@@ -227,6 +226,7 @@ from cl.search.state.texas.models import (
     TexasDocketEntry,
     TexasDocument,
 )
+from cl.search.tasks import index_docket_parties_in_es
 from cl.settings import COURT_REQUEST_USER_AGENT
 
 HYPERSCAN_TOKENIZER = HyperscanTokenizer(cache_dir=".hyperscan")
@@ -397,7 +397,7 @@ async def download_recap_item(
                 headers={"User-Agent": "Free Law Project"},
             )
         r.raise_for_status()
-    except TimeoutException as e:
+    except TimeoutException:
         logger.warning(f"    Timed out attempting to get: {url}\n")
     except HTTPError as e:
         logger.warning(f"    Unable to get {url}\nException was:\n{e}")
@@ -3832,19 +3832,22 @@ def add_scotus_docket_entries(
     docket: Docket,
     docket_entries: list[dict[str, Any]],
     download_file: bool = True,
-) -> list[int]:
+) -> tuple[list[int], bool]:
     """Add or update SCOTUS docket entries for a docket.
 
     :param docket: The Docket to add entries to.
     :param docket_entries: List of docket entry dicts from the scraper.
     :param download_file: Whether to trigger PDF download and extraction.
-    :return: A list of PKs of SCOTUSDocument objects that were created or
-        updated across all entries.
+    :return: A two-tuple: a list of PKs of SCOTUSDocument objects that were
+        created or updated across all entries, and whether any
+        SCOTUSDocketEntry was newly created (there's something to alert
+        subscribers about).
     """
     sequence_numbers = create_docket_entry_sequence_numbers(
         docket_entries, "date_filed"
     )
     all_doc_pks: list[int] = []
+    content_updated = False
     for sequence_number, docket_entry in zip(
         sequence_numbers, docket_entries, strict=True
     ):
@@ -3863,7 +3866,9 @@ def add_scotus_docket_entries(
             )
             continue
         all_doc_pks.extend(doc_pks)
-    return all_doc_pks
+        if de_created:
+            content_updated = True
+    return all_doc_pks, content_updated
 
 
 def merge_scotus_docket(
@@ -3874,6 +3879,8 @@ def merge_scotus_docket(
 
     This will create or update the Docket row for the SCOTUS and
     then create or update the related ScotusDocketMetadata instance.
+    If any docket entry was newly created, this also triggers a docket
+    alert to current subscribers.
 
     :param report_data: A dictionary containing parsed SCOTUS docket data.
     :param download_file: Whether to trigger PDF download and extraction.
@@ -4002,12 +4009,20 @@ def merge_scotus_docket(
     if report_data["parties"]:
         normalized_parties = normalize_scotus_parties(report_data["parties"])
         add_parties_and_attorneys(d, normalized_parties)
+        # Party rows don't trigger ES signals, and the Docket was indexed
+        # when its metadata was saved, before these parties existed.
+        index_docket_parties_in_es.delay(d.pk, percolate_parties=False)
 
     # Docket entries merger:
     enrich_scotus_attachments(report_data["docket_entries"])
-    doc_pks = add_scotus_docket_entries(
+    start_time = now()
+    doc_pks, content_updated = add_scotus_docket_entries(
         d, report_data["docket_entries"], download_file=download_file
     )
+    if content_updated:
+        newly_enqueued = enqueue_docket_alert(d.pk)
+        if newly_enqueued:
+            send_alert_and_webhook.delay(d.pk, start_time)
 
     return d, download_qp, doc_pks
 

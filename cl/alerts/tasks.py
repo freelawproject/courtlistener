@@ -10,12 +10,14 @@ from django.contrib.auth.models import User
 from django.contrib.contenttypes.models import ContentType
 from django.core.mail import EmailMultiAlternatives, get_connection, send_mail
 from django.db import IntegrityError, transaction
+from django.db.models import QuerySet
 from django.template import loader
 from django.urls import reverse
 from django.utils.timezone import now
 from elasticsearch.exceptions import ConnectionError
 from redis import ConnectionError as RedisConnectionError
 
+from cl.alerts.docket_alert_sources import SCOTUS_ALERT_SOURCE
 from cl.alerts.models import Alert, DocketAlert, ScheduledAlertHit
 from cl.alerts.utils import (
     add_document_hit_to_alert_set,
@@ -38,7 +40,6 @@ from cl.api.tasks import (
 from cl.celery_init import app
 from cl.custom_filters.templatetags.text_filters import best_case_name
 from cl.favorites.models import Note, UserTag
-from cl.favorites.utils import build_dual_read_query
 from cl.lib.command_utils import logger
 from cl.lib.decorators import retry
 from cl.lib.redis_utils import (
@@ -48,7 +49,13 @@ from cl.lib.redis_utils import (
 )
 from cl.lib.string_utils import trunc
 from cl.recap.constants import COURT_TIMEZONES
-from cl.search.models import SEARCH_TYPES, Docket, DocketEntry, RECAPDocument
+from cl.search.models import (
+    SEARCH_TYPES,
+    Docket,
+    DocketEntry,
+    RECAPDocument,
+    SCOTUSDocketEntry,
+)
 from cl.search.types import (
     ESDocumentNameType,
     SaveESDocumentReturn,
@@ -190,7 +197,9 @@ def get_docket_notes_and_tags_by_user(
     notes = None
     note = (
         Note.objects.filter(
-            build_dual_read_query(Docket, d_pk), user_id=user_pk
+            content_type=ContentType.objects.get_for_model(Docket),
+            object_id=d_pk,
+            user_id=user_pk,
         )
         .only("notes")
         .first()
@@ -204,20 +213,22 @@ def get_docket_notes_and_tags_by_user(
 
 def make_alert_messages(
     d: Docket,
-    new_des: list[DocketEntry],
+    new_des: QuerySet[DocketEntry] | QuerySet[SCOTUSDocketEntry],
     da_recipients: list[DocketAlertRecipient],
 ) -> list[EmailMultiAlternatives]:
     """Make docket alert messages that can be sent to users
 
     :param d: The docket to work on
-    :param new_des: The new docket entries
+    :param new_des: The new docket entries (SCOTUSDocketEntry for a SCOTUS
+    docket, DocketEntry otherwise -- see Docket.get_alert_source())
     :param da_recipients: A list of DocketAlertRecipients objects
     :return: A list of email messages to send
     """
 
+    source = d.get_alert_source()
     case_name = trunc(best_case_name(d), 100, ellipsis="...")
-    txt_template = loader.get_template("docket_alert_email.txt")
-    html_template = loader.get_template("docket_alert_email.html")
+    txt_template = loader.get_template(source.email_txt_template)
+    html_template = loader.get_template(source.email_html_template)
     subject_template = loader.get_template("docket_alert_subject.txt")
     de_count = len(new_des)
     subject_context = {
@@ -227,7 +238,14 @@ def make_alert_messages(
     }
     # TODO: Might be good as a TypedDict, but that seems like overkill for now
     email_context: dict[
-        str, list[DocketEntry] | int | Docket | None | str | list[UserTag]
+        str,
+        QuerySet[DocketEntry]
+        | QuerySet[SCOTUSDocketEntry]
+        | int
+        | Docket
+        | None
+        | str
+        | list[UserTag],
     ] = {
         "new_des": new_des,
         "count": de_count,
@@ -321,6 +339,10 @@ def send_alert_and_webhook(
      The second email comes in to atty1@recap.email. We:
      -Do nothing.
 
+    Entries and email templates are resolved per docket source (RECAP vs.
+    SCOTUS) via Docket.get_alert_source() -- see
+    cl/alerts/docket_alert_sources.py.
+
     :param d_pk: The docket PK that was modified
     :param since: If we run alerts, notify users about items *since* this time.
     :param recap_email_recipients: The recap.email addresses if needed to send
@@ -353,12 +375,11 @@ def send_alert_and_webhook(
         return
 
     d = Docket.objects.get(pk=d_pk)
+    source = d.get_alert_source()
     if des_pks is not None:
-        new_des = DocketEntry.objects.filter(pk__in=des_pks)
+        new_des = source.entries_by_pk(des_pks)
     else:
-        new_des = list(
-            DocketEntry.objects.filter(date_created__gte=since, docket=d)
-        )
+        new_des = source.entries_since(d, since)
         des_pks = [de.pk for de in new_des]
     if len(new_des) == 0 and not recap_email_user_only:
         # No new docket entries.
@@ -377,8 +398,14 @@ def send_alert_and_webhook(
     )
     DocketAlert.objects.filter(docket=d).update(date_last_hit=now())
 
-    # Send docket entries to webhook
-    send_docket_alert_webhook_events.delay(des_pks, webhook_recipients)
+    # Send docket entries to webhook. SCOTUS webhooks stay off until
+    # send_docket_alert_webhook_events supports SCOTUSDocketEntry: it looks
+    # des_pks up as DocketEntry pks, so it would send unrelated RECAP entries.
+    if (
+        source is not SCOTUS_ALERT_SOURCE
+        or settings.SCOTUS_DOCKET_ALERT_WEBHOOKS_ENABLED
+    ):
+        send_docket_alert_webhook_events.delay(des_pks, webhook_recipients)
     if not recap_email_user_only:
         delete_redis_semaphore("ALERTS", make_alert_key(d_pk))
 
@@ -588,7 +615,7 @@ def create_schedule_alerts_hits_in_bulk(
     return len(hits_to_create)
 
 
-@app.task(ignore_result=True)
+@app.task(ignore_result=True, queue=settings.CELERY_SEARCH_ALERTS_QUEUE)
 def percolator_response_processing(response: SendAlertsResponse) -> None:
     """Process the response from the percolator and handle alerts triggered by
      the percolator query.
@@ -770,6 +797,7 @@ def percolator_response_processing(response: SendAlertsResponse) -> None:
     autoretry_for=(ConnectionError,),
     max_retries=3,
     interval_start=5,
+    queue=settings.CELERY_SEARCH_ALERTS_QUEUE,
 )
 def send_or_schedule_search_alerts(
     self: Task, response: SaveESDocumentReturn | None

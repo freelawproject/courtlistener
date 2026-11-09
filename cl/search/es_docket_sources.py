@@ -22,6 +22,9 @@ from cl.search.models import (
     SCOTUSDocument,
 )
 
+# The document models an ESDocketSource can index.
+type SourceDocument = RECAPDocument | SCOTUSDocument
+
 
 @dataclass(frozen=True)
 class ESDocketSource:
@@ -50,10 +53,15 @@ class ESDocketSource:
     changes should cascade to the Docket (and its documents) in ES (e.g.
     BankruptcyInformation for RECAP, ScotusDocketMetadata for SCOTUS).
 
-    ``court_ids`` are the courts whose dockets belong to this source, taken
-    from the court-id constants in cl.search.constants. recap_search_courts()
-    adds them to the PACER courts in the RECAP search court picker. Empty for
-    RECAP, whose courts are the PACER ones.
+    ``uid_namespace`` prefixes the searchable ``uid`` and
+    ``docket_entry_uid`` fields of this source's documents (e.g. "scotus"
+    gives "scotus_123"). None for RECAP, whose documents keep the integer
+    ``id`` and ``docket_entry_id`` fields instead.
+
+    ``court_ids`` limits the source to Dockets from these courts, so
+    has_entries can rule out other courts without a query, and
+    recap_search_courts() adds them to the RECAP search court picker. Empty
+    means any court (RECAP, whose courts are the PACER ones).
     """
 
     docket_entries_related_name: str
@@ -62,7 +70,19 @@ class ESDocketSource:
     docket_belongs: Callable[[Docket], bool]
     metadata_model: type[models.Model] | None = None
     ready_to_index: Callable[[Docket], bool] = lambda docket: True
+    uid_namespace: str | None = None
     court_ids: frozenset[str] = frozenset()
+
+    def has_entries(self, docket: Docket) -> bool:
+        """Whether the Docket has any docket entries from this source.
+
+        Dockets from a court outside ``court_ids`` return False without a
+        query, so callers can check every source on each Docket save
+        without an extra EXISTS query per source.
+        """
+        if self.court_ids and docket.court_id not in self.court_ids:
+            return False
+        return getattr(docket, self.docket_entries_related_name).exists()
 
 
 def _scotus_docket_belongs(docket: Docket) -> bool:
@@ -102,12 +122,13 @@ RECAP_ES_SOURCE = ESDocketSource(
     metadata_model=BankruptcyInformation,
 )
 SCOTUS_ES_SOURCE = ESDocketSource(
-    docket_entries_related_name="scotusdocketentry_set",
+    docket_entries_related_name="scotus_docket_entries",
     document_model=SCOTUSDocument,
     child_id_property="SCOTUS",
     docket_belongs=_scotus_docket_belongs,
     metadata_model=ScotusDocketMetadata,
     ready_to_index=_scotus_ready_to_index,
+    uid_namespace="scotus",
     court_ids=SCOTUS_COURT_IDS,
 )
 
@@ -129,6 +150,15 @@ SOURCE_BY_MODEL: dict[type[models.Model], ESDocketSource] = {
         if source.metadata_model is not None
     },
 }
+
+
+def skips_percolation(instance: models.Model) -> bool:
+    """True for a SCOTUS Docket, so callers must skip its percolator
+    request. Temporary: remove once search alerts support SCOTUS.
+    """
+    return isinstance(instance, Docket) and SCOTUS_ES_SOURCE.docket_belongs(
+        instance
+    )
 
 
 def recap_search_courts() -> QuerySet[Court]:

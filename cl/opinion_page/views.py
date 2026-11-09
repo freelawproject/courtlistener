@@ -95,7 +95,7 @@ from cl.opinion_page.forms import (
     TennWorkCompClUploadForm,
 )
 from cl.opinion_page.utils import (
-    build_docket_tabs,
+    build_idb_rows,
     core_docket_data,
     es_cited_case_count,
     es_get_cited_clusters_with_cache,
@@ -441,25 +441,16 @@ async def view_docket(
             doc.prayer_count = prayer_counts.get(doc.id, 0)
             doc.prayer_exists = existing_prayers.get(doc.id, False)
 
-    parties = await docket.parties.aexists()
-    has_idb_data = bool(docket.idb_data_id)
-    has_authorities = await docket.ahas_authorities()
-
     return TemplateResponse(
         request,
         "docket.html",
         context
         | {
-            "parties": parties,
-            "authorities": has_authorities,
             "docket_entries": paginated_entries,
             "sort_order_asc": sort_order_asc,
             "form": form,
             "filters_applied": form.has_filters(),
             "get_string": make_get_string(request),
-            "tabs": build_docket_tabs(
-                docket, parties, has_idb_data, has_authorities
-            ),
         },
     )
 
@@ -566,9 +557,9 @@ async def docket_idb_data(
         "docket_idb_data.html",
         context
         | {
-            # Needed to show/hide parties tab.
-            "parties": await docket.parties.aexists(),
             "docket_entries": await docket.docket_entries.aexists(),
+            "idb_data": idb_data,
+            "idb_rows": build_idb_rows(idb_data),
             "origin_csv": choices_to_csv(idb_data, "origin"),
             "jurisdiction_csv": choices_to_csv(idb_data, "jurisdiction"),
             "arbitration_csv": choices_to_csv(
@@ -597,7 +588,7 @@ async def docket_authorities(
     slug: str,
 ) -> HttpResponse:
     docket, context = await core_docket_data(request, docket_id)
-    if not await docket.ahas_authorities():
+    if not context["has_authorities"]:
         raise Http404("No authorities data for this docket at this time")
 
     return TemplateResponse(
@@ -605,8 +596,6 @@ async def docket_authorities(
         "docket_authorities.html",
         context
         | {
-            # Needed to show/hide parties tab.
-            "parties": await docket.parties.aexists(),
             "docket_entries": await docket.docket_entries.aexists(),
             "authorities": docket.authority_opinions.distinct(),
         },
@@ -632,8 +621,12 @@ def make_rd_title(rd: RECAPDocument | SCOTUSDocument) -> str:
     )
 
 
-@ratelimiter_all_10_per_h
+# login_required goes first so that anonymous requests are redirected to sign
+# in without counting against the limit. The limit is keyed by path, so all
+# users share it, and anonymous traffic could otherwise block a docket's export
+# for everyone.
 @login_required
+@ratelimiter_all_10_per_h
 def download_docket_entries_csv(
     request: HttpRequest, docket_id: int
 ) -> HttpResponse:
@@ -659,8 +652,9 @@ def download_docket_entries_csv(
         # still raise a error 500.
         if docket.get_entry_source() is docket_entry_sources.RECAP:
             raise
-        # A handled 501 triggers the existing "There was a problem. Try
-        # again later." message in export-csv.js instead of crashing.
+        # A handled 501 shows an error message instead of crashing: the
+        # generic one in legacy's export-csv.js, the status-keyed one in the
+        # v2 download composable.
         return HttpResponse(status=501)
     response: HttpResponse = HttpResponse(csv_content, content_type="text/csv")
     response["Content-Disposition"] = f'attachment; filename="{filename}"'
@@ -796,16 +790,17 @@ async def recap_document_context(
     redirect_or_modal = request.GET.get("redirect_or_modal", False)
     if rd_download_redirect or redirect_or_modal:
         # Check if the document is available from CourtListener and
-        # if it is, redirect to the local document
-        # if it isn't, if pacer_url is available and
-        # rd_download_redirect is True, redirect to PACER. If redirect_or_modal
-        # is True set redirect_to_pacer_modal to True to open the modal.
+        # if it is, redirect to the local document. If it isn't, fall back
+        # to the source's own external URL (PACER for RECAP, the source
+        # court's website for SCOTUS) when rd_download_redirect is True.
+        # redirect_or_modal instead opens the Buy-on-PACER modal.
         if rd.is_available:
             return HttpResponseRedirect(rd.filepath_local.url)
-        elif source.has_pay_and_pray:
-            if rd.pacer_url and rd_download_redirect:
-                return HttpResponseRedirect(rd.pacer_url)
-            if rd.pacer_url and redirect_or_modal:
+        else:
+            external_url = source.document_external_url(rd)
+            if external_url and rd_download_redirect:
+                return HttpResponseRedirect(external_url)
+            if source.has_pay_and_pray and external_url and redirect_or_modal:
                 redirect_to_pacer_modal = True
 
     title = make_rd_title(rd)

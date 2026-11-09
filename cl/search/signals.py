@@ -744,7 +744,9 @@ def update_court_cache(sender, instance: Court, created: bool, **kwargs):
     sender=Court,
     dispatch_uid="handle_new_court_needs_courthouse",
 )
-def update_court_cache(sender, instance: Court, created: bool, **kwargs):
+def warn_new_court_needs_courthouse(
+    sender, instance: Court, created: bool, **kwargs
+):
     """
     A new courthouse should be created alongside a new court. Send a warning
     to Sentry for someone to look at it

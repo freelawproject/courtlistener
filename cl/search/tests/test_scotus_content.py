@@ -2,9 +2,11 @@ import datetime
 from unittest import mock
 
 from asgiref.sync import async_to_sync
+from django.core import mail
 from django.core.files.base import ContentFile
 from django.test import TestCase
 
+from cl.alerts.models import DocketAlert
 from cl.corpus_importer.tasks import (
     add_scotus_docket_entries,
     download_qp_scotus_pdf,
@@ -32,6 +34,7 @@ from cl.search.factories import (
     ScotusDocketDataFactory,
     SCOTUSDocketEntryDataFactory,
     SCOTUSDocketEntryFactory,
+    SCOTUSDocumentFactory,
     SCOTUSPartyDataFactory,
 )
 from cl.search.models import (
@@ -42,6 +45,7 @@ from cl.search.models import (
 )
 from cl.settings import COURT_REQUEST_USER_AGENT
 from cl.tests.cases import TestCase as CLTestCase
+from cl.users.factories import UserFactory
 
 
 class ScotusDocketMergeTest(TestCase):
@@ -416,6 +420,39 @@ class ScotusDocketMergeTest(TestCase):
             attorney_orgs.count(), 3, "AttorneysOrgs were duplicated."
         )
 
+    @mock.patch("cl.corpus_importer.tasks.index_docket_parties_in_es")
+    def test_merge_scotus_docket_indexes_parties_in_es(
+        self, mock_index_parties: mock.MagicMock
+    ) -> None:
+        """Party rows don't trigger ES signals, so merging a SCOTUS docket
+        with parties must index them in ES explicitly, like RECAP does."""
+        data = ScotusDocketDataFactory(
+            lower_court=self.lower_court.full_name,
+            parties=[SCOTUSPartyDataFactory()],
+            docket_entries=[],
+        )
+
+        docket, _, _ = merge_scotus_docket(data, download_file=False)
+
+        mock_index_parties.delay.assert_called_once_with(
+            docket.pk, percolate_parties=False
+        )
+
+    @mock.patch("cl.corpus_importer.tasks.index_docket_parties_in_es")
+    def test_merge_scotus_docket_skips_party_indexing_without_parties(
+        self, mock_index_parties: mock.MagicMock
+    ) -> None:
+        """No parties means nothing to index."""
+        data = ScotusDocketDataFactory(
+            lower_court=self.lower_court.full_name,
+            parties=[],
+            docket_entries=[],
+        )
+
+        merge_scotus_docket(data, download_file=False)
+
+        mock_index_parties.delay.assert_not_called()
+
     def test_merge_scotus_docket_updates_existing_docket(self) -> None:
         """Confirm merging again updates an existing SCOTUS docket."""
 
@@ -539,6 +576,79 @@ class ScotusDocketMergeTest(TestCase):
             Docket.SCRAPER_AND_HARVARD,
             "Source should be compounded with SCRAPER.",
         )
+
+    # The enqueue semaphore lives in Redis, which parallel test workers
+    # share while each has its own DB, so docket pks repeat across workers.
+    # A key left by another worker would block the alert, so mock it.
+    @mock.patch(
+        "cl.corpus_importer.tasks.enqueue_docket_alert", return_value=True
+    )
+    def test_merge_scotus_docket_triggers_docket_alert_for_a_new_entry(
+        self, mock_enqueue: mock.MagicMock
+    ) -> None:
+        """Does merging a SCOTUS docket with a new entry notify current
+        subscribers?"""
+        existing = DocketFactory(
+            court=self.court, docket_number="24-201", source=Docket.SCRAPER
+        )
+        user = UserFactory()
+        DocketAlert.objects.create(docket=existing, user=user)
+
+        docket_entries = [
+            SCOTUSDocketEntryDataFactory(
+                description="Petition for a writ of certiorari filed.",
+                date_filed=datetime.date(2025, 6, 2),
+                document_number=None,
+                attachments=[],
+            )
+        ]
+        data = ScotusDocketDataFactory(
+            docket_number="24-201",
+            docket_entries=docket_entries,
+            parties=[],
+        )
+        docket, _, _ = merge_scotus_docket(data, download_file=False)
+
+        self.assertEqual(docket.pk, existing.pk)
+        mock_enqueue.assert_called_once_with(existing.pk)
+        self.assertEqual(len(mail.outbox), 1)
+        self.assertEqual(mail.outbox[0].to, [user.email])
+
+    @mock.patch(
+        "cl.corpus_importer.tasks.enqueue_docket_alert", return_value=True
+    )
+    def test_merge_scotus_docket_does_not_alert_when_nothing_is_new(
+        self, mock_enqueue: mock.MagicMock
+    ) -> None:
+        """Re-merging an already-seen entry shouldn't notify subscribers --
+        only a newly created SCOTUSDocketEntry triggers the alert."""
+        existing = DocketFactory(
+            court=self.court, docket_number="24-202", source=Docket.SCRAPER
+        )
+        user = UserFactory()
+        DocketAlert.objects.create(docket=existing, user=user)
+
+        docket_entries = [
+            SCOTUSDocketEntryDataFactory(
+                description="Petition for a writ of certiorari filed.",
+                date_filed=datetime.date(2025, 6, 2),
+                document_number=None,
+                attachments=[],
+            )
+        ]
+        data = ScotusDocketDataFactory(
+            docket_number="24-202",
+            docket_entries=docket_entries,
+            parties=[],
+        )
+        merge_scotus_docket(data, download_file=False)
+        mail.outbox.clear()
+
+        # Re-merge the exact same entry -- it already exists.
+        merge_scotus_docket(data, download_file=False)
+        self.assertEqual(len(mail.outbox), 0)
+        # Only the first merge found something new to alert about.
+        mock_enqueue.assert_called_once_with(existing.pk)
 
     def test_merge_scotus_docket_source_compounds_recap(self) -> None:
         """Merging into a RECAP docket compounds with SCRAPER."""
@@ -969,3 +1079,36 @@ class ScotusDocketUrlPropertyTest(CLTestCase):
             court=self.court, source=Docket.SCRAPER, docket_number=""
         )
         self.assertEqual(docket.scotus_docket_url, "")
+
+
+class ScotusRelatedNamesTest(CLTestCase):
+    """SCOTUS entries and documents are reachable through explicit
+    related names, which the API serializers and filters reference.
+    """
+
+    @classmethod
+    def setUpTestData(cls) -> None:
+        cls.court = CourtFactory(id="scotus", jurisdiction="F")
+        cls.docket = DocketFactory(court=cls.court, source=Docket.SCRAPER)
+        cls.entry = SCOTUSDocketEntryFactory(docket=cls.docket)
+        cls.document = SCOTUSDocumentFactory(docket_entry=cls.entry)
+
+    def test_reverse_accessors(self) -> None:
+        """Entries and documents are reachable from their parents."""
+        self.assertEqual(
+            list(self.docket.scotus_docket_entries.all()), [self.entry]
+        )
+        self.assertEqual(
+            list(self.entry.scotus_documents.all()), [self.document]
+        )
+
+    def test_reverse_query_lookups(self) -> None:
+        """The related names work as ORM lookups, as API filters use them."""
+        self.assertEqual(
+            list(
+                Docket.objects.filter(
+                    scotus_docket_entries__scotus_documents=self.document
+                )
+            ),
+            [self.docket],
+        )

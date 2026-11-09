@@ -76,12 +76,30 @@ from cl.lib.storage import IncrementingAWSMediaStorage, S3PrivateUUIDStorage
 from cl.lib.string_utils import get_token_count_from_string, trunc
 from cl.search.cluster_sources import ClusterSources
 from cl.search.docket_sources import DocketSources
-from cl.search.state.florida.models import *
-from cl.search.state.new_york.models import *
-from cl.search.state.texas.models import *
+
+# State models are re-exported so Django registers them with the search app.
+from cl.search.state.florida.models import (
+    FloridaDocketEntry as FloridaDocketEntry,
+)
+from cl.search.state.florida.models import FloridaDocument as FloridaDocument
+from cl.search.state.new_york.models import (
+    NYCoADocketEntry as NYCoADocketEntry,
+)
+from cl.search.state.new_york.models import (
+    NYCoADocketIssue as NYCoADocketIssue,
+)
+from cl.search.state.new_york.models import (
+    NYCoADocketMetadata as NYCoADocketMetadata,
+)
+from cl.search.state.new_york.models import NYCoADocument as NYCoADocument
+from cl.search.state.texas.models import (
+    TexasDocketEntry as TexasDocketEntry,
+)
+from cl.search.state.texas.models import TexasDocument as TexasDocument
 from cl.users.models import User
 
 if TYPE_CHECKING:
+    from cl.alerts.docket_alert_sources import DocketAlertSource
     from cl.opinion_page.docket_entry_sources import DocketEntrySource
 
 HYPERSCAN_TOKENIZER = HyperscanTokenizer(cache_dir=".hyperscan")
@@ -844,10 +862,6 @@ class Docket(AbstractDateTimeModel, DocketSources):
         )
         return build_authority_opinions_query(opinions)
 
-    def add_scraper_source(self) -> None:
-        if self.source in self.NON_SCRAPER_SOURCES():
-            self.source = self.source + self.SCRAPER
-
     def add_idb_source(self):
         if self.source in self.NON_IDB_SOURCES():
             self.source = self.source + self.IDB
@@ -939,6 +953,19 @@ class Docket(AbstractDateTimeModel, DocketSources):
         from cl.opinion_page import docket_entry_sources
 
         return docket_entry_sources.source_for_court_id(self.court_id)
+
+    def get_alert_source(self) -> "DocketAlertSource":
+        """Return the DocketAlertSource config for this docket's court -
+        RECAP/PACER by default, with per-court overrides.
+        """
+        from cl.alerts.docket_alert_sources import (
+            _ALERT_SOURCES_BY_COURT_ID,
+            RECAP_ALERT_SOURCE,
+        )
+
+        return _ALERT_SOURCES_BY_COURT_ID.get(
+            self.court_id, RECAP_ALERT_SOURCE
+        )
 
     @property
     def pacer_alias_url(self):
@@ -1901,15 +1928,6 @@ class FederalCourtsQuerySet(models.QuerySet["Court"]):
             end_date__isnull=True,
         )
 
-    def appellate_courts(self) -> Self:
-        return self.filter(
-            Q(jurisdiction=Court.FEDERAL_APPELLATE)
-            |
-            # Court of Appeals for Veterans Claims uses appellate PACER
-            Q(pk__in=["cavc"]),
-            end_date__isnull=True,
-        )
-
     def bankruptcy_pacer_courts(self) -> Self:
         return self.filter(
             jurisdiction=Court.FEDERAL_BANKRUPTCY, end_date__isnull=True
@@ -2251,7 +2269,7 @@ class Courthouse(models.Model):
         verbose_name_plural = "Courthouses"
 
 
-class ClusterCitationQuerySet(models.query.QuerySet):
+class ClusterCitationQuerySet[M: OpinionCluster](models.QuerySet[M]):
     """Add filtering on citation strings.
 
     Historically we had citations in the db as strings like, "22 U.S. 44". The
@@ -2574,7 +2592,7 @@ class OpinionCluster(AbstractDateTimeModel):
         blank=True,
     )
 
-    objects = ClusterCitationQuerySet.as_manager()
+    objects = ClusterCitationQuerySet[Self].as_manager()
     es_pa_field_tracker = FieldTracker(
         fields=[
             "case_name",
@@ -3091,7 +3109,7 @@ OPINION_TEXT_SOURCE_FIELDS = [
 ]
 
 
-class OpinionQuerySet(models.QuerySet["Opinion"]):
+class OpinionQuerySet[M: Opinion](models.QuerySet[M]):
     def with_best_text(self) -> Self:
         """Annotates an Opinion QuerySet with best_text and best_text_source.
 
@@ -3330,7 +3348,7 @@ class Opinion(AbstractDateTimeModel):
         related_name="versions",
     )
 
-    objects = OpinionQuerySet.as_manager()
+    objects = OpinionQuerySet[Self].as_manager()
 
     class Meta:
         constraints = [
@@ -4259,6 +4277,7 @@ class SCOTUSDocketEntry(AbstractDateTimeModel, CSVExportMixin):
     docket = models.ForeignKey(
         "search.Docket",
         on_delete=models.CASCADE,
+        related_name="scotus_docket_entries",
     )
     entry_number = models.IntegerField(
         null=True,
@@ -4298,7 +4317,9 @@ class SCOTUSDocument(AbstractDateTimeModel, AbstractPDF):
     """
 
     docket_entry = models.ForeignKey(
-        SCOTUSDocketEntry, on_delete=models.CASCADE
+        SCOTUSDocketEntry,
+        on_delete=models.CASCADE,
+        related_name="scotus_documents",
     )
     description = models.TextField(blank=True)
     document_number = models.IntegerField(
