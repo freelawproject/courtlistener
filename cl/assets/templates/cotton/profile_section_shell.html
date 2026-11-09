@@ -1,6 +1,6 @@
 {% load svg_tags %}
 
-<c-vars active_section username class="" />
+<c-vars active_section request csrf_token class="" />
 
 <div class="w-full {{ class }}">
   <h1 class="mb-4 text-lg font-semibold text-greyscale-900 md:sr-only">
@@ -48,7 +48,7 @@
         </li>
         <li>
           <a
-            href="{% url 'tag_list' username=username %}"
+            href="{% url 'tag_list' request.user.username %}"
             class="relative flex w-full items-center gap-2 rounded-[10px] px-2.5 py-2 text-sm focus-visible:z-10 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-400 {% if active_section == 'tags' %}bg-greyscale-100 font-medium text-greyscale-900{% else %}font-normal text-greyscale-800 hover:bg-greyscale-50{% endif %}"
             {% if active_section == "tags" %}aria-current="page"{% endif %}
           >
@@ -68,7 +68,7 @@
         </li>
         <li>
           <a
-            href="{% url 'user_prayers' username %}"
+            href="{% url 'user_prayers' request.user.username %}"
             class="relative flex w-full items-center gap-2 rounded-[10px] px-2.5 py-2 text-sm focus-visible:z-10 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-400 {% if active_section == 'prayers' %}bg-greyscale-100 font-medium text-greyscale-900{% else %}font-normal text-greyscale-800 hover:bg-greyscale-50{% endif %}"
             {% if active_section == "prayers" %}aria-current="page"{% endif %}
           >

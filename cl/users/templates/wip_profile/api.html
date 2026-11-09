@@ -6,7 +6,9 @@
   <div class="capped-width px-4 pt-4 pb-35 md:pt-6 lg:px-10">
     <c-profile-section-shell
       active_section="developer_tools"
-      :username="request.user.username"
+      :request="request"
+      :csrf_token="csrf_token"
+      only
     />
   </div>
 {% endblock %}
