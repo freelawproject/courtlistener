@@ -563,7 +563,7 @@ class BaseRECAPDocumentESResultSerializer(DocumentSerializer):
 
     class Meta:
         document = ESRECAPDocument
-        exclude = (
+        exclude: tuple[str, ...] = (
             "caseName",
             "case_name_full",
             "docketNumber",
@@ -588,10 +588,6 @@ class BaseRECAPDocumentESResultSerializer(DocumentSerializer):
             "pacer_case_id",
             "plain_text",
             "docket_id",
-            # SCOTUS fields aren't exposed until the SCOTUS search API (#8153).
-            "capital_case",
-            "uid",
-            "docket_entry_uid",
         )
 
 
@@ -627,15 +623,13 @@ class BaseDocketESResultSerializer(DocumentSerializer):
 
     class Meta:
         document = DocketDocument
-        exclude = (
+        exclude: tuple[str, ...] = (
             "_related_instance_to_ignore",
             "docket_child",
             "docket_slug",
             "court_exact",
             "timestamp",
             "date_created",
-            # SCOTUS fields aren't exposed until the SCOTUS search API (#8153).
-            "capital_case",
         )
 
 
@@ -660,13 +654,34 @@ class RECAPESResultSerializer(BaseDocketESResultSerializer):
     meta = RECAPMetaDataSerializer(source="*", read_only=True)
 
 
+class NestedRECAPDocumentESWebhookSerializer(
+    NestedRECAPDocumentESResultSerializer
+):
+    """The serializer for the documents nested in RECAP search webhook
+    results."""
+
+    class Meta(NestedRECAPDocumentESResultSerializer.Meta):
+        # SCOTUS fields stay out of webhooks until SCOTUS gets its own
+        # webhook version.
+        exclude = NestedRECAPDocumentESResultSerializer.Meta.exclude + (
+            "capital_case",
+            "uid",
+            "docket_entry_uid",
+        )
+
+
 class RECAPESWebhookResultSerializer(BaseDocketESResultSerializer):
     """The serializer class for RECAP search Webhooks results."""
 
-    recap_documents = NestedRECAPDocumentESResultSerializer(
+    recap_documents = NestedRECAPDocumentESWebhookSerializer(
         many=True, read_only=True, source="child_docs"
     )
     meta = RECAPWebhookMetaDataSerializer(source="*", read_only=True)
+
+    class Meta(BaseDocketESResultSerializer.Meta):
+        # SCOTUS fields stay out of webhooks until SCOTUS gets its own
+        # webhook version.
+        exclude = BaseDocketESResultSerializer.Meta.exclude + ("capital_case",)
 
 
 class OpinionDocumentESResultSerializer(ChildMetaMixin, DocumentSerializer):

@@ -67,6 +67,7 @@ from cl.search.api_serializers import (
     PersonESResultSerializer,
     RECAPDocumentESResultSerializer,
     RECAPESResultSerializer,
+    RECAPESWebhookResultSerializer,
 )
 from cl.search.api_utils import CursorESList
 from cl.search.api_views import (
@@ -4538,23 +4539,6 @@ class RECAPSearchAPIV4Test(
             v4_recap_meta_keys,
         )
 
-    async def test_capital_case_not_in_api_results(self) -> None:
-        """capital_case isn't exposed in V4 RECAP results yet: not on the
-        docket, its nested documents, or RECAP document results. The SCOTUS
-        search API (#8153) adds it."""
-        search_params = {
-            "type": SEARCH_TYPES.RECAP,
-            "q": f"id:{self.rd_api.pk}",
-        }
-        r = await self._test_api_results_count(search_params, 1, "type r")
-        docket_result = r.data["results"][0]
-        self.assertNotIn("capital_case", docket_result)
-        self.assertNotIn("capital_case", docket_result["recap_documents"][0])
-
-        search_params["type"] = SEARCH_TYPES.RECAP_DOCUMENT
-        r = await self._test_api_results_count(search_params, 1, "type rd")
-        self.assertNotIn("capital_case", r.data["results"][0])
-
     async def test_results_api_empty_fields(self) -> None:
         """Confirm empty fields values in V4 RECAP Search API results."""
 
@@ -6822,6 +6806,23 @@ class SCOTUSFieldTrackerTest(SimpleTestCase):
                 )
 
 
+class RECAPWebhookSerializerTest(SimpleTestCase):
+    """Check the fields of the RECAP search webhook payload."""
+
+    def test_webhook_payload_leaves_scotus_fields_out(self) -> None:
+        """RECAP search webhooks don't get the SCOTUS fields the v4 API
+        shows, until SCOTUS gets its own webhook version."""
+        serializer = RECAPESWebhookResultSerializer()
+        fields = {
+            *serializer.fields,
+            *serializer.fields["recap_documents"].child.fields,
+        }
+
+        self.assertTrue(
+            fields.isdisjoint({"capital_case", "uid", "docket_entry_uid"})
+        )
+
+
 class ESDocketSourcesTest(TestCase):
     """Confirm the per-source ES docket configuration added for #8020
     (cl.search.es_docket_sources) is internally consistent.
@@ -7473,6 +7474,9 @@ class SCOTUSRECAPSearchTest(
             scotus_entry = SCOTUSDocketEntryFactory(
                 docket__court=CourtFactory(id="scotus", jurisdiction="F")
             )
+            ScotusDocketMetadataFactory(
+                docket=scotus_entry.docket, capital_case=True
+            )
             recap_entry = DocketEntryFactory(
                 docket__court=CourtFactory(id="ca1", jurisdiction="F"),
                 docket__source=Docket.RECAP,
@@ -7486,6 +7490,7 @@ class SCOTUSRECAPSearchTest(
                     docket_entry=scotus_entry,
                     attachment_number=n,
                     description="Tied",
+                    plain_text=f"SCOTUS text {n}",
                 ).get_absolute_url()
                 for n in range(1, 6)
             ]
@@ -7542,6 +7547,30 @@ class SCOTUSRECAPSearchTest(
                 self.assertIn(self.recap_docket_path, hidden)
                 self.assertNotIn(self.scotus_docket_path, hidden)
                 self.assertIn(self.scotus_docket_path, shown)
+
+    def test_api_v4_identifies_scotus_documents_by_uid(self) -> None:
+        """v4 rd results give SCOTUS documents their uid fields instead of
+        an id, and fill their snippet from the SCOTUSDocument."""
+        r = self.client.get(
+            reverse("search-list", kwargs={"version": "v4"}),
+            {
+                "type": SEARCH_TYPES.RECAP_DOCUMENT,
+                "q": "Tied",
+                "court": "scotus",
+            },
+        )
+
+        expected = {
+            f"scotus_{sd.pk}": (f"scotus_{sd.docket_entry_id}", sd.plain_text)
+            for sd in SCOTUSDocument.objects.all()
+        }
+        results = r.data["results"]
+        self.assertEqual(
+            {d["uid"]: (d["docket_entry_uid"], d["snippet"]) for d in results},
+            expected,
+        )
+        self.assertEqual({d["id"] for d in results}, {None})
+        self.assertEqual({d["capital_case"] for d in results}, {True})
 
     def test_count_query_drops_inner_hits_when_hiding_scotus(self) -> None:
         """clean_count_query still strips the has_child inner_hits from a
