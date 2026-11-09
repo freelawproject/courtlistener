@@ -1865,7 +1865,7 @@ def get_docket_by_pacer_case_id(
     court_id: str,
     session_data: SessionData,
     docket_pk: int | None = None,
-    tag_names: str | None = None,
+    tag_names: list[str] | None = None,
     **kwargs: Any,
 ) -> TaskData | None:
     """Celery task wrapper for get_docket_by_pacer_case_id_base."""
@@ -1890,7 +1890,7 @@ async def get_docket_by_pacer_case_id_base(
     court_id: str,
     session_data: SessionData,
     docket_pk: int | None = None,
-    tag_names: str | None = None,
+    tag_names: list[str] | None = None,
     **kwargs,
 ) -> TaskData | None:
     """Get a docket by PACER case id, CL court ID, and a collection of kwargs

@@ -137,6 +137,10 @@ docker exec cl-django python manage.py test --keepdb cl.appname.tests.TestClassN
 - SHOULD use `subTest()` to reduce test methods while testing multiple cases
 - SHOULD avoid selenium tests (they're slow)
 - MUST use `time_machine` for date-dependent tests to avoid flaky failures
+- MUST add `@override_settings(WAFFLE_CACHE_PREFIX="<unique_name>")` to any test that
+  overrides a waffle flag, listed above `@override_flag`. Tests run in parallel and
+  share the waffle cache, so without a unique prefix another worker can leave the flag
+  cached in the wrong state and the test passes without checking anything.
 - SHOULD use `FactoryBoy` to make mock data.
 - MUST NOT use Django fixtures. If fixtures are found, MUST replace them with tests that
   use FactoryBoy and Fakes.
