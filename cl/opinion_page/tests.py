@@ -4719,6 +4719,22 @@ class DocketPartiesV2TemplateTest(TestCase):
             attorneys=[cls.attorney],
         )
         PartyTypeFactory(docket=cls.docket, party=cls.party, name="Amicus")
+        charged = PartyTypeFactory(
+            docket=cls.docket,
+            party=PartyFactory(
+                name="UNITED STATES OF AMERICA",
+                docket=cls.docket,
+                attorneys=[cls.attorney],
+            ),
+            name="Defendant",
+            highest_offense_level_opening="Felony",
+        )
+        CriminalCount.objects.create(
+            party_type=charged,
+            name="18:1001 False Statements",
+            disposition="",
+            status=CriminalCount.PENDING,
+        )
         cls.editor = UserProfileWithParentsFactory(
             user__username="parties_editor",
             user__password=make_password("password"),
@@ -4745,27 +4761,37 @@ class DocketPartiesV2TemplateTest(TestCase):
         return r
 
     async def test_renders_groups_parties_and_attorneys(self) -> None:
-        """Party types are h2 headings and parties h3 headings; a party with
-        attorneys gets one "Represented By:" label."""
+        """Party types are h2 headings and parties h3 headings; each party
+        with attorneys gets one "Represented By:" heading and each charged
+        party one "Criminal Charges:" heading with its data."""
         content = (await self.get_page()).content.decode()
-        tree = fromstring(content)
-        self.assertIn(
-            "Amicus", [h.text_content().strip() for h in tree.iter("h2")]
+        card = fromstring(content).get_element_by_id("tab-content")
+        self.assertEqual(
+            [h.text_content().strip() for h in card.iter("h2")],
+            ["Amicus", "Defendant"],
         )
         self.assertIn(
             "AMERICAN ASSOCIATION OF LAW LIBRARIES",
-            [h.text_content().strip() for h in tree.iter("h3")],
+            [h.text_content().strip() for h in card.iter("h3")],
         )
-        self.assertEqual(content.count("Represented By:"), 1)
+        self.assertEqual(content.count("Represented By:"), 2)
+        self.assertEqual(content.count("Criminal Charges:"), 1)
         self.assertIn("Sasha Samberg-Champion", content)
         self.assertIn("Washington, DC 20036", content)
+        self.assertIn("18:1001 False Statements", content)
+        self.assertEqual(
+            [dd.text_content().strip() for dd in card.iter("dd")],
+            ["Felony", "None"],
+        )
 
     async def test_party_blocks_are_named_groups(self) -> None:
-        """Each party, and its representation block inside it, is a group
-        named by its heading, so assistive technology can announce and skip
-        them as units."""
+        """Each party, and the representation and charges blocks inside it,
+        is a group named by its heading, so assistive technology can
+        announce and skip them as units."""
         tree = fromstring((await self.get_page()).content.decode())
-        groups = tree.xpath('//*[@role="group"][@aria-labelledby]')
+        groups = tree.xpath(
+            '//*[@id="tab-content"]//*[@role="group"][@aria-labelledby]'
+        )
         headings = [
             tree.get_element_by_id(group.get("aria-labelledby"))
             for group in groups
@@ -4778,9 +4804,14 @@ class DocketPartiesV2TemplateTest(TestCase):
             [
                 ("h3", "AMERICAN ASSOCIATION OF LAW LIBRARIES"),
                 ("h4", "Represented By:"),
+                ("h3", "UNITED STATES OF AMERICA"),
+                ("h4", "Represented By:"),
+                ("h4", "Criminal Charges:"),
             ],
         )
         self.assertIn(groups[1], groups[0].iterdescendants())
+        self.assertIn(groups[3], groups[2].iterdescendants())
+        self.assertIn(groups[4], groups[2].iterdescendants())
 
     async def test_parties_tab_is_current(self) -> None:
         """The tab navigation marks the parties tab as the current page."""
