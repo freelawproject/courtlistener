@@ -17,6 +17,8 @@ SCHEDULED_ALERT_HIT_BATCH_SIZE = env.int(
 ##########################
 # SCOTUS docket alerts   #
 ##########################
-# Temporary kill switch: keeps SCOTUS docket alerts from firing until their
-# email templates and webhook payloads are ready.
-SCOTUS_ALERTS_ENABLED = env.bool("SCOTUS_ALERTS_ENABLED", default=False)
+# Keeps SCOTUS docket alert webhooks off until send_docket_alert_webhook_events
+# can serialize SCOTUSDocketEntry rows. Alert emails are not affected.
+SCOTUS_DOCKET_ALERT_WEBHOOKS_ENABLED = env.bool(
+    "SCOTUS_DOCKET_ALERT_WEBHOOKS_ENABLED", default=False
+)

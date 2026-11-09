@@ -1065,7 +1065,7 @@ class PeopleV4APISearchTest(
 
         created_persons = []
         persons_to_create = 7
-        with self.captureOnCommitCallbacks(execute=True) as callbacks:
+        with self.captureOnCommitCallbacks(execute=True):
             person_4 = PersonFactory.create(
                 date_granularity_dob="%Y-%m-%d",
                 date_granularity_dod="%Y-%m-%d",
@@ -1672,7 +1672,7 @@ class PeopleSearchTestElasticSearch(PeopleTestCase, ESIndexTestCase, TestCase):
         self.assertEqual(predecessors, self.person_3.name_full_reverse)
 
         person = PersonFactory.create(name_first="John American")
-        position_5 = PositionFactory.create(
+        PositionFactory.create(
             date_granularity_start="%Y-%m-%d",
             court=self.court_1,
             date_start=datetime.date(2015, 12, 14),

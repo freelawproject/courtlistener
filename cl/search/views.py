@@ -30,7 +30,7 @@ from cl.lib.search_utils import (
     do_es_search,
     make_get_string,
     merge_form_with_courts,
-    scotus_search_enabled,
+    scotus_frontend_search_enabled,
     store_search_query,
 )
 from cl.lib.string_utils import trunc
@@ -168,7 +168,7 @@ def show_results(request: HttpRequest) -> HttpResponse:
             render_dict.update(
                 do_es_search(
                     request.GET.copy(),
-                    hide_scotus=not scotus_search_enabled(request),
+                    include_scotus=scotus_frontend_search_enabled(request),
                 )
             )
             render_dict.update(
@@ -302,13 +302,13 @@ def show_results(request: HttpRequest) -> HttpResponse:
             courts=cast(
                 FederalCourtsQuerySet, Court.federal_courts
             ).all_pacer_courts(),
-            hide_scotus=not scotus_search_enabled(request),
+            include_scotus=scotus_frontend_search_enabled(request),
         )
     else:
         search_results = do_es_search(
             request.GET.copy(),
             is_semantic_frontend_active=is_semantic_active,
-            hide_scotus=not scotus_search_enabled(request),
+            include_scotus=scotus_frontend_search_enabled(request),
         )
 
     render_dict.update(search_results)

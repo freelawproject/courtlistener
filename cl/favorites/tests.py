@@ -986,19 +986,19 @@ class RECAPPrayAndPay(SimpleUserDataMixin, PrayAndPayTestCase):
         """Does the delete_prayer method work properly?"""
 
         # Prayer is added, then deleted successfully
-        prayer_created = await create_prayer(self.user, self.rd_2)
+        await create_prayer(self.user, self.rd_2)
         prayer_deleted = await delete_prayer(self.user, self.rd_2)
         self.assertTrue(prayer_deleted)
 
         # Prayer is created, then document is made available to check that a user can't delete a prayer that has been granted
-        prayer_created = await create_prayer(self.user, self.rd_6)
+        await create_prayer(self.user, self.rd_6)
         self.rd_6.is_available = True
         await sync_to_async(self.rd_6.save)()
         prayer_deleted = await delete_prayer(self.user, self.rd_6)
         self.assertFalse(prayer_deleted)
 
         # Ensure that a user cannot delete the same prayer twice
-        prayer_created = await create_prayer(self.user, self.rd_2)
+        await create_prayer(self.user, self.rd_2)
         prayer_deleted = await delete_prayer(self.user, self.rd_2)
         prayer_deleted = await delete_prayer(self.user, self.rd_2)
         self.assertFalse(prayer_deleted)

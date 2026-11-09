@@ -1320,13 +1320,21 @@ def get_match_all_query(
     return final_match_all_query
 
 
-def hides_scotus(cd: CleanData) -> bool:
-    """True for a RECAP search (r, d, rd) whose caller set cd["hide_scotus"],
-    so SCOTUS content must be left out of its results. The search page and
-    the v4 API set it when the scotus_docket_page flag is off. Temporary:
-    remove once SCOTUS launches.
+def includes_scotus(cd: CleanData) -> bool:
+    """Whether a RECAP search should include SCOTUS content. False unless
+    the caller sets cd["include_scotus"], which only the search frontend
+    does, behind the scotus_docket_page flag. Temporary: remove once
+    SCOTUS launches.
     """
-    return bool(cd.get("hide_scotus")) and cd["type"] in (
+    return bool(cd.get("include_scotus"))
+
+
+def excludes_scotus(cd: CleanData) -> bool:
+    """True for a RECAP search (r, d, rd) that must leave SCOTUS content
+    out of its results, see includes_scotus. Other search types never
+    contain SCOTUS RECAP-style content.
+    """
+    return not includes_scotus(cd) and cd["type"] in (
         SEARCH_TYPES.RECAP,
         SEARCH_TYPES.DOCKETS,
         SEARCH_TYPES.RECAP_DOCUMENT,
@@ -1536,7 +1544,7 @@ def build_es_base_query(
         )
         boost_mode = "multiply" if string_query else "replace"
 
-    if hides_scotus(cd):
+    if excludes_scotus(cd):
         main_query = exclude_scotus(cast(Query, main_query))
         if child_query:
             child_query = exclude_scotus(child_query)
@@ -1610,7 +1618,7 @@ def build_child_docs_query(
     ]
     parties_has_parent_query = build_has_parent_parties_query(parties_filters)
 
-    if not child_docs_query and hides_scotus(cd):
+    if not child_docs_query and excludes_scotus(cd):
         # Match all query case, where build_es_base_query had no child query
         # to exclude SCOTUS from.
         child_docs_query = exclude_scotus(None)
