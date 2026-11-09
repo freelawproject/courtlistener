@@ -3,6 +3,7 @@ import logging
 from enum import StrEnum
 from typing import Any
 
+from django.db import transaction
 from eyecite import get_citations
 from juriscraper.lib.string_utils import titlecase
 
@@ -94,6 +95,21 @@ def _wrap(html: str) -> str:
     if not html:
         return ""
     return f'<div class="centralia">{html}</div>'
+
+
+def _syllabus_html(payload: dict) -> str:
+    """Join the syllabus paragraphs of a structured read into HTML.
+
+    :param payload: Doctor's structured payload.
+    :return: One <p> per paragraph of `sections.syllabus.html`, which holds
+    inline markup only; "" when the read found no syllabus.
+    """
+    syllabus = (payload.get("sections") or {}).get("syllabus") or {}
+    return "".join(
+        f"<p>{paragraph.strip()}</p>"
+        for paragraph in syllabus.get("html") or []
+        if (paragraph or "").strip()
+    )
 
 
 def _payload_text_length(payload: dict) -> int:
@@ -239,9 +255,12 @@ def merge_structured_opinion_into_cl_opinion(
     """Merge a Centralia structured extraction into a CL opinion and save it.
 
     Stores the extracted HTML in `Opinion.html` along with the opinion's
-    ordering key, type, per curiam flag and author string. Extractions that
-    fail check_structured_extraction are logged and skipped, leaving the
-    opinion untouched. Errors while saving are raised.
+    ordering key, type, per curiam flag and author string, and the syllabus
+    in `OpinionCluster.syllabus`. A cluster field is only replaced when the
+    read found that section, so existing content is never blanked.
+    Extractions that fail check_structured_extraction are logged and
+    skipped, leaving the opinion and cluster untouched. Errors while saving
+    are raised.
 
     Callers must run find_citations_and_parentheticals_for_opinion_by_pks
     afterward to find and store citations in the new HTML.
@@ -280,14 +299,23 @@ def merge_structured_opinion_into_cl_opinion(
         if author_name := extracted.get("author_name"):
             opinion.author_str = titlecase(author_name)
 
-    opinion.save(
-        update_fields=[
-            "date_modified",
-            "html",
-            "ordering_key",
-            "type",
-            "per_curiam",
-            "author_str",
-        ]
-    )
+    cluster = opinion.cluster
+    cluster_fields = []
+    if syllabus := _wrap(_syllabus_html(data)):
+        cluster.syllabus = syllabus
+        cluster_fields.append("syllabus")
+
+    with transaction.atomic():
+        opinion.save(
+            update_fields=[
+                "date_modified",
+                "html",
+                "ordering_key",
+                "type",
+                "per_curiam",
+                "author_str",
+            ]
+        )
+        if cluster_fields:
+            cluster.save(update_fields=["date_modified", *cluster_fields])
     return True, reason
