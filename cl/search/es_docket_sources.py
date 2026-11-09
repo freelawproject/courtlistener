@@ -161,19 +161,27 @@ def skips_percolation(instance: models.Model) -> bool:
     )
 
 
-def recap_search_courts() -> QuerySet[Court]:
+def recap_search_courts(include_scotus: bool) -> QuerySet[Court]:
     """Return the courts offered in the RECAP search court picker: the
     PACER courts plus the ones every other registered source adds. Use it
     only for search; PACER-specific code (scrapers, uploads) must keep
     using all_pacer_courts(), which excludes non-PACER courts like SCOTUS.
+
+    :param include_scotus: Whether the search can return SCOTUS content
+    (see scotus_frontend_search_enabled). Without it, only the PACER
+    courts are offered. Temporary: remove once SCOTUS launches.
     """
+    # federal_courts is typed as a plain Manager, which hides the
+    # FederalCourtsQuerySet methods from the type checker.
+    pacer_courts = cast(
+        FederalCourtsQuerySet, Court.federal_courts
+    ).all_pacer_courts()
+    if not include_scotus:
+        return pacer_courts
     source_court_ids = [
         court_id for source in ALL_ES_SOURCES for court_id in source.court_ids
     ]
-    # federal_courts is typed as a plain Manager, which hides the
-    # FederalCourtsQuerySet methods from the type checker.
-    federal_courts = cast(FederalCourtsQuerySet, Court.federal_courts)
     return (
         Court.objects.filter(pk__in=source_court_ids, in_use=True)
-        | federal_courts.all_pacer_courts()
+        | pacer_courts
     )

@@ -6936,13 +6936,23 @@ class RECAPSearchCourtsTest(TestCase):
             CourtFactory(id=court_id, jurisdiction=jurisdiction, end_date=None)
 
     def test_recap_search_courts_add_source_courts(self) -> None:
-        """SCOTUS joins the PACER courts in the search list, courts that are
-        neither PACER nor claimed by a source stay out, and
-        all_pacer_courts(), used by PACER scrapers and uploads, keeps
-        excluding SCOTUS."""
-        search_ids = set(recap_search_courts().values_list("pk", flat=True))
+        """SCOTUS joins the PACER courts in the search list only when the
+        search can include it, courts that are neither PACER nor claimed by
+        a source stay out, and all_pacer_courts(), used by PACER scrapers
+        and uploads, keeps excluding SCOTUS."""
+        search_ids = set(
+            recap_search_courts(include_scotus=True).values_list(
+                "pk", flat=True
+            )
+        )
         self.assertLessEqual({"scotus", "ca1", "cand"}, search_ids)
         self.assertNotIn("ohio", search_ids)
+        self.assertNotIn(
+            "scotus",
+            recap_search_courts(include_scotus=False).values_list(
+                "pk", flat=True
+            ),
+        )
         self.assertNotIn(
             "scotus",
             Court.federal_courts.all_pacer_courts().values_list(
@@ -6951,8 +6961,10 @@ class RECAPSearchCourtsTest(TestCase):
         )
 
 
+@override_settings(WAFFLE_CACHE_PREFIX="RECAPSearchCourtPickerTest")
 class RECAPSearchCourtPickerTest(ESIndexTestCase, TestCase):
-    """The RECAP search pages render SCOTUS in the court picker."""
+    """The RECAP search pages render SCOTUS in the court picker only
+    behind the scotus_docket_page flag."""
 
     @classmethod
     def setUpClass(cls) -> None:
@@ -6972,17 +6984,25 @@ class RECAPSearchCourtPickerTest(ESIndexTestCase, TestCase):
 
     def test_recap_pages_offer_scotus_in_federal_appellate_tab(self) -> None:
         """Both the RECAP results page and the RECAP advanced search page
-        render a SCOTUS checkbox in the Federal Appellate tab."""
-        for url in [
+        render a SCOTUS checkbox in the Federal Appellate tab with the
+        scotus_docket_page flag, and leave it out without it."""
+        urls = [
             f"{reverse('show_results')}?type={SEARCH_TYPES.RECAP}",
             reverse("advanced_r"),
-        ]:
-            with self.subTest(url=url):
+        ]
+        for url, active in product(urls, [True, False]):
+            with (
+                self.subTest(url=url, flag=active),
+                override_flag("scotus_docket_page", active=active),
+            ):
                 r = self.client.get(url)
+
                 self.assertEqual(r.status_code, HTTPStatus.OK)
                 federal_ids = {c.pk for c in r.context["courts"]["federal"]}
-                self.assertIn("scotus", federal_ids)
-                self.assertContains(r, 'id="id_scotus"')
+                self.assertEqual("scotus" in federal_ids, active)
+                self.assertEqual(
+                    'id="id_scotus"' in r.content.decode(), active
+                )
 
 
 class SCOTUSESIndexingSignalTest(

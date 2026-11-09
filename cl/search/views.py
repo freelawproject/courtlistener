@@ -296,10 +296,11 @@ def show_results(request: HttpRequest) -> HttpResponse:
         )
 
     if search_type == SEARCH_TYPES.RECAP:
+        include_scotus = scotus_frontend_search_enabled(request)
         search_results = do_es_search(
             request.GET.copy(),
-            courts=recap_search_courts(),
-            include_scotus=scotus_frontend_search_enabled(request),
+            courts=recap_search_courts(include_scotus=include_scotus),
+            include_scotus=include_scotus,
         )
     else:
         search_results = do_es_search(
@@ -353,7 +354,9 @@ def advanced(request: HttpRequest, search_type: str) -> HttpResponse:
         return TemplateResponse(request, "advanced.html", render_dict)
 
     if search_type == SEARCH_TYPES.RECAP:
-        courts_in_use = recap_search_courts()
+        courts_in_use = recap_search_courts(
+            include_scotus=scotus_frontend_search_enabled(request)
+        )
 
     search_form = SearchForm({"type": search_type}, courts=courts)
     courts, court_count_human, court_count = merge_form_with_courts(
