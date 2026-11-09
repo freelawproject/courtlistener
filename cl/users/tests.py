@@ -88,6 +88,7 @@ from cl.favorites.models import (
 from cl.lib.AuthenticationBackend import MAX_EMAIL_CANDIDATES
 from cl.lib.crypto import generate_activation_key
 from cl.lib.email_backends import get_email_count
+from cl.lib.middleware import WIP_PROPS
 from cl.lib.ratelimiter import (
     FAILED_LOGIN_LIMIT,
     FAILED_LOGIN_WINDOW,
@@ -492,10 +493,11 @@ class ProfileTest(SimpleUserDataMixin, TestCase):
 
         self.assertEqual(response.status_code, HTTPStatus.OK)
         self.assertTemplateUsed(response, "profile/api.html")
-        self.assertTemplateNotUsed(response, "v2_profile/api.html")
+        self.assertTemplateNotUsed(response, "wip_profile/api.html")
         self.assertContains(response, "REST APIs and Bulk Data for Developers")
 
     @override_flag("use_new_design", True)
+    @override_flag(WIP_PROPS["flag"], True)
     def test_api_page_uses_accessible_profile_shell_with_flag(self) -> None:
         """Does the redesigned API page render the requested profile shell?"""
         self.assertTrue(
@@ -505,7 +507,7 @@ class ProfileTest(SimpleUserDataMixin, TestCase):
         response = self.client.get(reverse("view_api"))
 
         self.assertEqual(response.status_code, HTTPStatus.OK)
-        self.assertTemplateUsed(response, "v2_profile/api.html")
+        self.assertTemplateUsed(response, "wip_profile/api.html")
         self.assertTemplateNotUsed(response, "profile/api.html")
 
         html = fromstring(response.content.decode())
