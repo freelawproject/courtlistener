@@ -4756,16 +4756,26 @@ class DocketPartiesV2TemplateTest(TestCase):
         self.assertIn("Washington, DC 20036", content)
 
     async def test_party_blocks_are_named_groups(self) -> None:
-        """Each party is a group named by its heading, so assistive
-        technology can announce and skip it as one unit."""
+        """Each party, and its representation block inside it, is a group
+        named by its heading, so assistive technology can announce and skip
+        them as units."""
         tree = fromstring((await self.get_page()).content.decode())
         groups = tree.xpath('//*[@role="group"][@aria-labelledby]')
-        self.assertEqual(len(groups), 1)
-        heading = tree.get_element_by_id(groups[0].get("aria-labelledby"))
-        self.assertEqual(heading.tag, "h3")
+        headings = [
+            tree.get_element_by_id(group.get("aria-labelledby"))
+            for group in groups
+        ]
         self.assertEqual(
-            heading.get("aria-label"), "AMERICAN ASSOCIATION OF LAW LIBRARIES"
+            [
+                (h.tag, h.get("aria-label") or h.text_content().strip())
+                for h in headings
+            ],
+            [
+                ("h3", "AMERICAN ASSOCIATION OF LAW LIBRARIES"),
+                ("h4", "Represented By:"),
+            ],
         )
+        self.assertIn(groups[1], groups[0].iterdescendants())
 
     async def test_parties_tab_is_current(self) -> None:
         """The tab navigation marks the parties tab as the current page."""

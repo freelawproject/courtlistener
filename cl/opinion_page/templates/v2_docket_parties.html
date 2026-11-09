@@ -29,7 +29,7 @@
           </h2>
 
           {% for party in group.parties %}
-            {# One grid per party: the party on the left, "Represented By:" with the attorney rows and the criminal block stacked on the right. The grid owns the top padding and the closing border; each element only pads below itself, and the stack draws the lines between its rows. #}
+            {# One grid per party: the party on the left, the representation and criminal charges groups stacked on the right. The grid owns the top padding and the closing border; each element only pads below itself, and the stacks draw the lines between their children. #}
             <div role="group" aria-labelledby="party-{{ party.pk }}-heading" class="grid grid-cols-1 md:grid-cols-3 pt-4 md:pt-6 border-b border-greyscale-200">
               <div class="pb-4 md:pb-6 md:pr-6 space-y-1">
                 <h3 class="text-md md:pl-3" id="party-{{ party.pk }}-heading" aria-label="{{ party.name }}">
@@ -44,76 +44,78 @@
               </div>
 
               {% if party.attorneys or party.criminal %}
-                <div class="md:col-span-2 pt-4 md:pt-0">
+                <div class="md:col-span-2 pt-4 md:pt-0 divide-y divide-greyscale-200">
                   {% if party.attorneys %}
-                    <h4 id="party-{{ party.pk }}-attorneys-heading" class="pb-4 text-md font-semibold text-greyscale-900">Represented By:</h4>
-                  {% endif %}
-                  <div class="divide-y divide-greyscale-200">
-                    {% for attorney in party.attorneys %}
-                      <div class="grid grid-cols-1 md:grid-cols-2 gap-y-8 py-4 first:pt-0">
-                        <div class="md:pr-6 space-y-1">
-                          <p>
-                            {{ attorney.name }}
-                            {% if perms.people_db.change_attorney %}
-                              <a href="{% url 'admin:people_db_attorney_change' attorney.pk %}" class="inline-block align-middle ml-1 text-greyscale-500 hover:text-greyscale-700 focus-visible:ring-2 focus-visible:ring-primary-400 focus-visible:outline-none rounded" aria-label="Edit {{ attorney.name }}" title="Edit {{ attorney.name }}">{% svg "edit" class="w-4 h-4" aria_hidden="true" %}</a>
-                            {% endif %}
-                          </p>
-                          {% if attorney.phone %}<p>{{ attorney.phone }}</p>{% endif %}
-                          {% if attorney.fax %}<p>Fax: {{ attorney.fax }}</p>{% endif %}
-                          {% for role in attorney.roles %}<p>{{ role }}</p>{% endfor %}
-                        </div>
-                        <div class="space-y-2">
-                          {% for firm in attorney.firms %}
-                            <div class="space-y-1">
-                              {% if firm.name or perms.people_db.change_attorneyorganization %}
-                                <p>
-                                  {{ firm.name }}
-                                  {% if perms.people_db.change_attorneyorganization %}
-                                    <a href="{% url 'admin:people_db_attorneyorganization_change' firm.pk %}" class="inline-block align-middle ml-1 text-greyscale-500 hover:text-greyscale-700 focus-visible:ring-2 focus-visible:ring-primary-400 focus-visible:outline-none rounded" aria-label="Edit {{ firm.label }}" title="Edit {{ firm.label }}">{% svg "edit" class="w-4 h-4" aria_hidden="true" %}</a>
-                                  {% endif %}
-                                </p>
-                              {% endif %}
-                              {% for line in firm.address_lines %}<p class="italic">{{ line }}</p>{% endfor %}
+                    <div role="group" aria-labelledby="party-{{ party.pk }}-attorneys-heading">
+                      <h4 id="party-{{ party.pk }}-attorneys-heading" class="pb-4 text-md font-semibold text-greyscale-900">Represented By:</h4>
+                      <div class="divide-y divide-greyscale-200">
+                        {% for attorney in party.attorneys %}
+                          <div class="grid grid-cols-1 md:grid-cols-2 gap-y-8 py-4 first:pt-0">
+                            <div class="md:pr-6 space-y-1">
+                              <p>
+                                {{ attorney.name }}
+                                {% if perms.people_db.change_attorney %}
+                                  <a href="{% url 'admin:people_db_attorney_change' attorney.pk %}" class="inline-block align-middle ml-1 text-greyscale-500 hover:text-greyscale-700 focus-visible:ring-2 focus-visible:ring-primary-400 focus-visible:outline-none rounded" aria-label="Edit {{ attorney.name }}" title="Edit {{ attorney.name }}">{% svg "edit" class="w-4 h-4" aria_hidden="true" %}</a>
+                                {% endif %}
+                              </p>
+                              {% if attorney.phone %}<p>{{ attorney.phone }}</p>{% endif %}
+                              {% if attorney.fax %}<p>Fax: {{ attorney.fax }}</p>{% endif %}
+                              {% for role in attorney.roles %}<p>{{ role }}</p>{% endfor %}
                             </div>
-                          {% endfor %}
-                        </div>
+                            <div class="space-y-2">
+                              {% for firm in attorney.firms %}
+                                <div class="space-y-1">
+                                  {% if firm.name or perms.people_db.change_attorneyorganization %}
+                                    <p>
+                                      {{ firm.name }}
+                                      {% if perms.people_db.change_attorneyorganization %}
+                                        <a href="{% url 'admin:people_db_attorneyorganization_change' firm.pk %}" class="inline-block align-middle ml-1 text-greyscale-500 hover:text-greyscale-700 focus-visible:ring-2 focus-visible:ring-primary-400 focus-visible:outline-none rounded" aria-label="Edit {{ firm.label }}" title="Edit {{ firm.label }}">{% svg "edit" class="w-4 h-4" aria_hidden="true" %}</a>
+                                      {% endif %}
+                                    </p>
+                                  {% endif %}
+                                  {% for line in firm.address_lines %}<p class="italic">{{ line }}</p>{% endfor %}
+                                </div>
+                              {% endfor %}
+                            </div>
+                          </div>
+                        {% endfor %}
                       </div>
-                    {% endfor %}
+                    </div>
+                  {% endif %}
 
-                    {% if party.criminal %}
-                      <div class="py-4 first:pt-0">
-                        <h4 id="party-{{ party.pk }}-charges-heading" class="text-md font-semibold text-greyscale-900">Criminal Charges:</h4>
-                        <dl class="mt-2 flex flex-col gap-1">
-                          <div class="flex flex-wrap gap-x-1">
-                            <dt class="font-semibold">Highest Offense Level (Opening):</dt>
-                            <dd>{{ party.criminal.highest_offense_level_opening }}</dd>
-                          </div>
-                          <div class="flex flex-wrap gap-x-1">
-                            <dt class="font-semibold">Highest Offense Level (Terminated):</dt>
-                            <dd>{{ party.criminal.highest_offense_level_terminated }}</dd>
-                          </div>
-                        </dl>
-                        <div class="mt-4 [&_tr:last-child]:border-b-0">
-                          <c-flex-table
-                            caption="Criminal charges for {{ party.name }}"
-                            :columns="[
-                              {'label': 'Type', 'field': 'label'},
-                              {'label': 'Description', 'field': 'name'},
-                              {'label': 'Disposition', 'field': 'disposition'},
-                            ]"
-                          >
-                            {% for row in party.criminal.rows %}
-                              <tr>
-                                <c-flex-cell header valign="top" class="md:w-40 md:whitespace-nowrap font-semibold">{{ row.label }}</c-flex-cell>
-                                <c-flex-cell valign="top" class="md:w-1/2">{{ row.name }}</c-flex-cell>
-                                <c-flex-cell valign="top">{{ row.disposition }}</c-flex-cell>
-                              </tr>
-                            {% endfor %}
-                          </c-flex-table>
+                  {% if party.criminal %}
+                    <div role="group" aria-labelledby="party-{{ party.pk }}-charges-heading" class="py-4 first:pt-0">
+                      <h4 id="party-{{ party.pk }}-charges-heading" class="text-md font-semibold text-greyscale-900">Criminal Charges:</h4>
+                      <dl class="mt-2 flex flex-col gap-1">
+                        <div class="flex flex-wrap gap-x-1">
+                          <dt class="font-semibold">Highest Offense Level (Opening):</dt>
+                          <dd>{{ party.criminal.highest_offense_level_opening }}</dd>
                         </div>
+                        <div class="flex flex-wrap gap-x-1">
+                          <dt class="font-semibold">Highest Offense Level (Terminated):</dt>
+                          <dd>{{ party.criminal.highest_offense_level_terminated }}</dd>
+                        </div>
+                      </dl>
+                      <div class="mt-4 [&_tr:last-child]:border-b-0">
+                        <c-flex-table
+                          caption="Criminal charges for {{ party.name }}"
+                          :columns="[
+                            {'label': 'Type', 'field': 'label'},
+                            {'label': 'Description', 'field': 'name'},
+                            {'label': 'Disposition', 'field': 'disposition'},
+                          ]"
+                        >
+                          {% for row in party.criminal.rows %}
+                            <tr>
+                              <c-flex-cell header valign="top" class="md:w-40 md:whitespace-nowrap font-semibold">{{ row.label }}</c-flex-cell>
+                              <c-flex-cell valign="top" class="md:w-1/2">{{ row.name }}</c-flex-cell>
+                              <c-flex-cell valign="top">{{ row.disposition }}</c-flex-cell>
+                            </tr>
+                          {% endfor %}
+                        </c-flex-table>
                       </div>
-                    {% endif %}
-                  </div>
+                    </div>
+                  {% endif %}
                 </div>
               {% endif %}
             </div>
