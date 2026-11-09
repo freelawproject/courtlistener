@@ -118,6 +118,9 @@ module.exports = {
       maxWidth: {
         content: '948px',
       },
+      borderRadius: {
+        'lg-10': '10px',
+      },
     },
   },
   plugins: [],
