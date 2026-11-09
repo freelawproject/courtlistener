@@ -101,9 +101,12 @@ def also_checks_inside_code_blocks(check: FileCheck) -> FileCheck:
 
     A check normally receives the file with the content of every
     ``<c-code>`` block emptied, because a block shows markup as text.
-    Django tags inside a block still run, so a check that looks for
-    template tags takes this decorator. A check that looks for markup
-    must not.
+    Django tags inside a block still run, so a check that looks only
+    for template tags takes this decorator. A check that also matches
+    markup must not, even when it looks for a tag as well:
+    ``check_xdata_without_require_script`` matches ``x-data``
+    attributes, so decorating it would report the examples inside
+    blocks again.
     """
     _checks_inside_code_blocks.add(check)
     return check
