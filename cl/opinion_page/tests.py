@@ -4719,6 +4719,19 @@ class DocketPartiesV2TemplateTest(TestCase):
             attorneys=[cls.attorney],
         )
         PartyTypeFactory(docket=cls.docket, party=cls.party, name="Amicus")
+        RoleFactory(
+            party=cls.party,
+            docket=cls.docket,
+            attorney=AttorneyFactory(
+                name="Thomas &lt;Unknown&gt; &amp; Sons",
+                docket=cls.docket,
+                organizations=[
+                    AttorneyOrganizationFactory(
+                        lookup_key="mb", name="M&amp;B Capital"
+                    )
+                ],
+            ),
+        )
         charged = PartyTypeFactory(
             docket=cls.docket,
             party=PartyFactory(
@@ -4783,6 +4796,17 @@ class DocketPartiesV2TemplateTest(TestCase):
             [dd.text_content().strip() for dd in card.iter("dd")],
             ["Felony", "None"],
         )
+
+    async def test_names_are_decoded_once_then_escaped(self) -> None:
+        """Names stored with HTML entities render decoded once and escaped
+        by the template: M&amp;B reads M&B, and a name in angle brackets
+        shows as text instead of disappearing as a tag."""
+        content = (await self.get_page()).content.decode()
+        self.assertIn("Thomas &lt;Unknown&gt; &amp; Sons", content)
+        self.assertIn("M&amp;B Capital", content)
+        self.assertNotIn("<Unknown>", content)
+        self.assertNotIn("&amp;amp;", content)
+        self.assertNotIn("&amp;lt;", content)
 
     async def test_party_blocks_are_named_groups(self) -> None:
         """Each party, and the representation and charges blocks inside it,
