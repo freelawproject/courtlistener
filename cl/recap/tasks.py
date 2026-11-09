@@ -9,7 +9,7 @@ from datetime import datetime
 from functools import partial
 from http import HTTPStatus
 from multiprocessing import process
-from typing import Any, TypedDict, overload
+from typing import Any, TypedDict, Unpack, overload
 from zipfile import ZipFile
 
 import httpx
@@ -65,6 +65,8 @@ from cl.api.webhooks import send_recap_fetch_webhooks
 from cl.celery_init import app
 from cl.corpus_importer.scotus_daemon_utils import save_scotus_raw_to_s3
 from cl.corpus_importer.tasks import (
+    AppellateDocketReportQueryParams,
+    DocketReportQueryParams,
     download_acms_pdf_by_rd,
     download_pacer_pdf_by_rd,
     download_pdf_by_magic_number,
@@ -2506,7 +2508,7 @@ def replicate_fq_pdf_to_subdocket_rds(
         async_to_sync(process_recap_pdf)(pq_pk)
 
 
-def get_fq_docket_kwargs(fq):
+def get_fq_docket_kwargs(fq: PacerFetchQueue) -> DocketReportQueryParams:
     """Gather the kwargs for the Juriscraper DocketReport from the fq object.
 
     Args:
@@ -2526,7 +2528,9 @@ def get_fq_docket_kwargs(fq):
     }
 
 
-def get_fq_appellate_docket_kwargs(fq: PacerFetchQueue):
+def get_fq_appellate_docket_kwargs(
+    fq: PacerFetchQueue,
+) -> AppellateDocketReportQueryParams:
     """Gather the kwargs for the Juriscraper AppellateDocketReport from the fq object.
 
     Args:
@@ -2651,7 +2655,7 @@ async def purchase_appellate_docket_by_docket_number(
     court_id: str,
     docket_number: str,
     fq: PacerFetchQueue,
-    **kwargs,
+    **kwargs: Unpack[AppellateDocketReportQueryParams],
 ) -> _CreateUpdateDocketFromFetchDict:
     """Purchases and processes an appellate docket from PACER by docket number.
 

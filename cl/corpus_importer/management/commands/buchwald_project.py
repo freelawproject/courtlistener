@@ -9,6 +9,7 @@ from cl.corpus_importer.management.commands.everything_project import (
     NOS_EXCLUSIONS,
 )
 from cl.corpus_importer.tasks import (
+    DocketReportQueryParams,
     get_docket_by_pacer_case_id,
     make_docket_by_iquery,
 )
@@ -101,11 +102,13 @@ def get_dockets(options):
                 ),
                 docket_pk=d.pk,
                 tag_names=[BUCKWALD_TAG],
-                **{
-                    "show_parties_and_counsel": True,
-                    "show_terminated_parties": True,
-                    "show_list_of_member_cases": False,
-                },
+                **DocketReportQueryParams(
+                    {
+                        "show_parties_and_counsel": True,
+                        "show_terminated_parties": True,
+                        "show_list_of_member_cases": False,
+                    }
+                ),
             ).set(queue=q),
         ).apply_async()
 
