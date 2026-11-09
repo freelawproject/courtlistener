@@ -7473,8 +7473,8 @@ class SCOTUSESIndexingSignalTest(
         self.assertEqual(hit.caseName, "Edited Case Name")
 
 
-@override_flag("scotus_docket_page", active=True)
 @override_settings(WAFFLE_CACHE_PREFIX="SCOTUSRECAPSearchTest")
+@override_flag("scotus_docket_page", active=True)
 class SCOTUSRECAPSearchTest(
     AuthenticatedClientMixin, ESIndexTestCase, TestCase
 ):
@@ -7483,13 +7483,20 @@ class SCOTUSRECAPSearchTest(
     @classmethod
     def setUpTestData(cls):
         cls.rebuild_index("search.Docket")
+        # The RSS feed skips entries without a filing date, and the alert
+        # estimate counts by filing date, so both need dates.
+        filed = datetime.date(2024, 1, 2)
         with cls.captureOnCommitCallbacks(execute=True):
             scotus_entry = SCOTUSDocketEntryFactory(
-                docket__court=CourtFactory(id="scotus", jurisdiction="F")
+                docket__court=CourtFactory(id="scotus", jurisdiction="F"),
+                docket__date_filed=filed,
+                date_filed=filed,
             )
             recap_entry = DocketEntryFactory(
                 docket__court=CourtFactory(id="ca1", jurisdiction="F"),
                 docket__source=Docket.RECAP,
+                docket__date_filed=filed,
+                date_filed=filed,
             )
             # Every docket and document URL of a docket starts with this.
             cls.scotus_docket_path = f"/docket/{scotus_entry.docket_id}/"
@@ -7499,23 +7506,19 @@ class SCOTUSRECAPSearchTest(
             )
             RECAPDocumentFactory(docket_entry=recap_entry, description="Tied")
 
-    def test_scotus_results_need_the_scotus_docket_page_flag(self) -> None:
-        """Until launch, the search page and the v4 API show SCOTUS content
-        only to requests with the scotus_docket_page flag."""
-        api_v4 = reverse("search-list", kwargs={"version": "v4"})
+    def test_search_frontend_shows_scotus_only_with_the_flag(self) -> None:
+        """Until launch, the search page and the RSS search feed show
+        SCOTUS content only to requests with the scotus_docket_page flag."""
+        feed = reverse("search_feed", args=["search"])
         endpoints = [
-            ("search page", reverse("show_results"), SEARCH_TYPES.RECAP),
-            ("API v4 r", api_v4, SEARCH_TYPES.RECAP),
-            ("API v4 d", api_v4, SEARCH_TYPES.DOCKETS),
-            ("API v4 rd", api_v4, SEARCH_TYPES.RECAP_DOCUMENT),
+            ("search page", reverse("show_results")),
+            ("RSS search feed", feed),
         ]
         # An empty q runs the match-all query, which builds its queries
         # differently.
-        for (endpoint, url, search_type), q in product(
-            endpoints, ["Tied", ""]
-        ):
+        for (endpoint, url), q in product(endpoints, ["Tied", ""]):
             with self.subTest(endpoint=endpoint, q=q):
-                params = {"type": search_type, "q": q}
+                params = {"type": SEARCH_TYPES.RECAP, "q": q}
                 with override_flag("scotus_docket_page", active=False):
                     hidden = self.client.get(url, params).content.decode()
                 shown = self.client.get(url, params).content.decode()
@@ -7524,20 +7527,52 @@ class SCOTUSRECAPSearchTest(
                 self.assertNotIn(self.scotus_docket_path, hidden)
                 self.assertIn(self.scotus_docket_path, shown)
 
-    def test_api_v3_never_shows_scotus(self) -> None:
-        """v3 is deprecated, so it leaves SCOTUS out even with the flag."""
-        url = reverse("search-list", kwargs={"version": "v3"})
-        r = self.client.get(url, {"type": SEARCH_TYPES.RECAP, "q": "Tied"})
+    def test_search_apis_never_show_scotus(self) -> None:
+        """The v3 and v4 search APIs leave SCOTUS out even for requests
+        with the scotus_docket_page flag, until their own launch."""
+        api_v3 = reverse("search-list", kwargs={"version": "v3"})
+        api_v4 = reverse("search-list", kwargs={"version": "v4"})
+        endpoints = [
+            ("API v3 r", api_v3, SEARCH_TYPES.RECAP),
+            ("API v4 r", api_v4, SEARCH_TYPES.RECAP),
+            ("API v4 d", api_v4, SEARCH_TYPES.DOCKETS),
+            ("API v4 rd", api_v4, SEARCH_TYPES.RECAP_DOCUMENT),
+        ]
+        for (endpoint, url, search_type), q in product(
+            endpoints, ["Tied", ""]
+        ):
+            with self.subTest(endpoint=endpoint, q=q):
+                r = self.client.get(url, {"type": search_type, "q": q})
 
-        self.assertIn(self.recap_docket_path, r.content.decode())
-        self.assertNotIn(self.scotus_docket_path, r.content.decode())
+                self.assertIn(self.recap_docket_path, r.content.decode())
+                self.assertNotIn(self.scotus_docket_path, r.content.decode())
+
+    def test_alert_estimate_counts_scotus_only_with_the_flag(self) -> None:
+        """The create-alert modal's estimate counts SCOTUS content only
+        for requests with the scotus_docket_page flag, like the search
+        page it belongs to."""
+        url = reverse(
+            "alert_frequency", kwargs={"version": "4", "day_count": 100}
+        )
+        params = {"type": SEARCH_TYPES.RECAP, "q": "Tied"}
+
+        # The estimate counts back from today, so pin today near the
+        # 2024-01-02 filing date.
+        with time_machine.travel(datetime.date(2024, 2, 1), tick=False):
+            with override_flag("scotus_docket_page", active=False):
+                hidden = self.client.get(url, params).json()
+            shown = self.client.get(url, params).json()
+
+        # Each docket counts once as a case and once with its document.
+        self.assertEqual(hidden["count_case_only"], 1)
+        self.assertEqual(shown["count_case_only"], 2)
 
     def test_count_query_drops_inner_hits_when_hiding_scotus(self) -> None:
         """clean_count_query still strips the has_child inner_hits from a
         query that leaves SCOTUS out."""
         search_query, *_ = build_es_main_query(
             DocketDocument.search(),
-            {"type": SEARCH_TYPES.RECAP, "q": "Tied", "hide_scotus": True},
+            {"type": SEARCH_TYPES.RECAP, "q": "Tied"},
         )
 
         count_query = clean_count_query(search_query).to_dict()["query"][
