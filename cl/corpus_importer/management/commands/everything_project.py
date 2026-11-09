@@ -95,7 +95,7 @@ def get_everything_full(options):
     get_dockets(options, items, tags)
 
 
-def get_dockets(options, items, tags, sample_size=0, doc_num_end=""):
+def get_dockets(options, items, tags: list[str], sample_size=0, doc_num_end=""):
     """Download dockets from PACER.
 
     :param options: Options provided by argparse

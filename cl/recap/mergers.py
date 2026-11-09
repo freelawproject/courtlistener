@@ -1925,7 +1925,7 @@ def add_claim_history_entry(new_history, claim):
 
 
 @transaction.atomic
-def add_claims_to_docket(d, new_claims, tag_names=None):
+def add_claims_to_docket(d, new_claims, tag_names: list[str] | None = None):
     """Add claims data to the docket.
 
     :param d: A docket object to associate claims with.
@@ -2038,7 +2038,12 @@ async def add_tags_to_objs(
 
 @transaction.atomic
 def merge_pacer_docket_into_cl_docket(
-    d, pacer_case_id, docket_data, report, appellate=False, tag_names=None
+    d,
+    pacer_case_id,
+    docket_data,
+    report,
+    appellate=False,
+    tag_names: list[str] | None = None,
 ):
     # Ensure that we set the case ID. This is needed on dockets that have
     # matching docket numbers, but that never got PACER data before. This was
