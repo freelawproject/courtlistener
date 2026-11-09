@@ -6,7 +6,7 @@ from django.template import Library
 from django.template.defaultfilters import stringfilter
 from django.utils.encoding import force_str
 from django.utils.html import conditional_escape
-from django.utils.safestring import SafeData, SafeString, mark_safe
+from django.utils.safestring import SafeString, mark_safe
 
 register = Library()
 
@@ -44,11 +44,14 @@ def oxford_join(items, conjunction="and", separator=",", autoescape=True):
                 s = item
             elif i == (num_items - 1):
                 # Last item.
+                # pyrefly: ignore [unbound-name]
                 s += f"{separator} {conjunction} {item}"
             else:
                 # Items in the middle
+                # pyrefly: ignore [unbound-name]
                 s += f"{separator} {item}"
 
+    # pyrefly: ignore [unbound-name]
     return mark_safe(s)
 
 
@@ -62,13 +65,9 @@ def nbsp(text, autoescape=None):
     and are not already marked as safe.
     """
 
-    if isinstance(text, SafeData) or not autoescape:
-        # This is an anonymous python identity function. Simply returns the
-        # value of x when x is given.
-        esc = lambda x: x
-    else:
-        esc = conditional_escape
-    return mark_safe(re.sub(r"\s", "&nbsp;", esc(text.strip())))
+    if isinstance(text, SafeString) or not autoescape:
+        return mark_safe(re.sub(r"\s", "&nbsp;", text.strip()))
+    return mark_safe(re.sub(r"\s", "&nbsp;", conditional_escape(text.strip())))
 
 
 @register.filter(needs_autoescape=True)
@@ -76,12 +75,14 @@ def nbsp(text, autoescape=None):
 def v_wrapper(text, autoescape=None):
     """Wraps every v. in a string with a class of alt"""
     if autoescape:
-        esc = conditional_escape
-    else:
-        esc = lambda x: x
-    return mark_safe(
-        re.sub(r" v\. ", '<span class="alt"> v. </span>', esc(text))
-    )
+        return mark_safe(
+            re.sub(
+                r" v\. ",
+                '<span class="alt"> v. </span>',
+                conditional_escape(text),
+            )
+        )
+    return mark_safe(re.sub(r" v\. ", '<span class="alt"> v. </span>', text))
 
 
 @register.filter(needs_autoescape=True)
@@ -89,10 +90,8 @@ def v_wrapper(text, autoescape=None):
 def underscore_to_space(text, autoescape=None):
     """Removed underscores from text."""
     if autoescape:
-        esc = conditional_escape
-    else:
-        esc = lambda x: x
-    return mark_safe(re.sub("_", " ", esc(text)))
+        return mark_safe(re.sub("_", " ", conditional_escape(text)))
+    return mark_safe(re.sub("_", " ", text))
 
 
 @register.filter(needs_autoescape=True)
@@ -109,10 +108,8 @@ def compress_whitespace(text, autoescape=None):
     Becomes: 'text foo bar baz'
     """
     if autoescape:
-        esc = conditional_escape
-    else:
-        esc = lambda x: x
-    text = esc(text)
+        text = conditional_escape(text)
+
     return mark_safe(" ".join(text.split()))
 
 
@@ -215,10 +212,9 @@ def read_more(s, show_words, autoescape=True):
     """
     show_words = int(show_words)
     if autoescape:
-        esc = conditional_escape
+        words = conditional_escape(s).split()
     else:
-        esc = lambda x: x
-    words = esc(s).split()
+        words = s.split()
 
     if len(words) <= show_words:
         return s

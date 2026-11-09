@@ -81,6 +81,7 @@ from cl.search.tests.test_generate_opinion_embeddings import (
     FakeS3IntelligentTieringStorage,
 )
 from cl.tests.cases import (
+    AuthenticatedClientMixin,
     CountESTasksTestCase,
     ESIndexTestCase,
     TestCase,
@@ -482,7 +483,7 @@ class OpinionV3APISearchTest(
 
         created_opinions = []
         opinions_to_create = 20
-        with self.captureOnCommitCallbacks(execute=True) as callbacks:
+        with self.captureOnCommitCallbacks(execute=True):
             for i in range(opinions_to_create):
                 opinion = OpinionWithParentsFactory(
                     cluster__date_filed=datetime.date(2000, 6, i + 1)
@@ -571,6 +572,7 @@ class OpinionV3APISearchTest(
 
 
 class OpinionV4APISearchTest(
+    AuthenticatedClientMixin,
     OpinionSearchAPICommonTests,
     ESIndexTestCase,
     TestCase,
@@ -805,7 +807,7 @@ class OpinionV4APISearchTest(
 
         created_clusters = []
         cluster_to_create = 6
-        with self.captureOnCommitCallbacks(execute=True) as callbacks:
+        with self.captureOnCommitCallbacks(execute=True):
             for _ in range(cluster_to_create):
                 cluster = OpinionClusterWithChildrenAndParentsFactory(
                     docket=DocketFactory(
@@ -1047,7 +1049,7 @@ class OpinionV4APISearchTest(
     def test_nested_opinions_limit(self) -> None:
         """Test nested opinions limit for V4 Opinion Search API."""
 
-        with self.captureOnCommitCallbacks(execute=True) as callbacks:
+        with self.captureOnCommitCallbacks(execute=True):
             cluster = OpinionClusterFactory.create(
                 precedential_status=PRECEDENTIAL_STATUS.PUBLISHED,
                 docket=self.docket_1,
@@ -1152,7 +1154,7 @@ class OpinionV4APISearchTest(
         empty lists after a partial update that removes the related instance
         and empties the list field.
         """
-        with self.captureOnCommitCallbacks(execute=True) as callbacks:
+        with self.captureOnCommitCallbacks(execute=True):
             person = PersonFactory.create(
                 gender="m",
                 name_first="Bill",
@@ -1203,7 +1205,7 @@ class OpinionV4APISearchTest(
             r.data["results"][0]["opinions"][0]["joined_by_ids"], []
         )
 
-        with self.captureOnCommitCallbacks(execute=True) as callbacks:
+        with self.captureOnCommitCallbacks(execute=True):
             citation_1.delete()
             opinion.delete()
 
@@ -2427,7 +2429,7 @@ class OpinionsESSearchTest(ESIndexTestCase, SearchTestCase, TestCase):
 
 
 class OpinionSearchDecayRelevancyTest(
-    ESIndexTestCase, V4SearchAPIAssertions, TestCase
+    AuthenticatedClientMixin, ESIndexTestCase, V4SearchAPIAssertions, TestCase
 ):
     """
     Opinion Search Decay Relevancy Tests
@@ -2706,7 +2708,7 @@ class OpinionSearchDecayRelevancyTest(
 
 
 class OpinionSearchJurisdictionRelevancyTest(
-    ESIndexTestCase, V4SearchAPIAssertions, TestCase
+    AuthenticatedClientMixin, ESIndexTestCase, V4SearchAPIAssertions, TestCase
 ):
     """
     Opinion Search Jurisdiction Relevance Tests

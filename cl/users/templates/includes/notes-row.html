@@ -1,8 +1,6 @@
 {% load text_filters %}
 
-{# target is the noted object, resolved dual-read (get_noted_object())   #}
-{# and passed in with note_form as a (form, target) tuple from            #}
-{# view_notes(). type (e.g. "Opinions") comes from profile/notes.html.    #}
+{# Context: (note_form, target) from view_notes(); type from profile/notes.html. #}
 <tr id="note-row-{{ note_form.instance.id }}">
   <td id="name-{{ note_form.instance.id }}">
     {% if type == "Opinions" %}
@@ -43,13 +41,10 @@
          data-id="{{ note_form.instance.id }}"><i class="fa fa-pencil"></i> Edit / Delete
       </a>
 
-      {# content_type/object_id come from the form (not the instance     #}
-      {# directly) so a legacy-shaped Note's prefilled values (see       #}
-      {# NoteForm.__init__) are what gets sent back on save, not nulls.  #}
       <div id="data-store-{{ note_form.instance.id }}"
            class="hidden"
-           data-content_type="{{ note_form.content_type.value|default_if_none:"" }}"
-           data-object_id="{{ note_form.object_id.value|default_if_none:"" }}"
+           data-content_type="{{ note_form.instance.content_type_id }}"
+           data-object_id="{{ note_form.instance.object_id }}"
            data-name="{{ note_form.instance.name|default_if_none:"" }}"
            data-notes="{{ note_form.instance.notes|default_if_none:"" }}">
       </div>

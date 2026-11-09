@@ -61,8 +61,8 @@ from cl.search.tasks import (
     update_es_document,
 )
 from cl.search.types import (
-    ESDocumentClassType,
-    ESModelClassType,
+    ESDocumentType,
+    ESModelType,
 )
 
 type DocumentModelMapping = dict[str, dict[type[Model], dict]]
@@ -127,7 +127,7 @@ def check_fields_that_changed(
 
 
 def updated_fields(
-    instance: Model, es_document: ESDocumentClassType
+    instance: Model, es_document: type[ESDocumentType]
 ) -> list[str]:
     """Look for changes in the tracked fields of an instance.
     :param instance: The instance to check for changed fields.
@@ -177,8 +177,8 @@ def get_fields_to_update(
 
 
 def update_es_documents(
-    main_model: ESModelClassType,
-    es_document: ESDocumentClassType,
+    main_model: type[ESModelType],
+    es_document: type[ESDocumentType],
     instance: Model,
     created: bool,
     mapping_fields: dict,
@@ -320,9 +320,7 @@ def update_es_documents(
                 source = SOURCE_BY_MODEL[main_model]
                 # Avoid calling update_children_docs_by_query if the Docket
                 # doesn't have any entries from this source.
-                if not getattr(
-                    instance, source.docket_entries_related_name
-                ).exists():
+                if not source.has_entries(instance):
                     continue
                 transaction.on_commit(
                     partial(
@@ -341,9 +339,7 @@ def update_es_documents(
                 for rel_docket in related_dockets:
                     # Avoid calling update_children_docs_by_query if the
                     # Docket doesn't have any entries from this source.
-                    if not getattr(
-                        rel_docket, source.docket_entries_related_name
-                    ).exists():
+                    if not source.has_entries(rel_docket):
                         continue
                     transaction.on_commit(
                         partial(
@@ -376,8 +372,8 @@ def update_es_documents(
 
 
 def update_remove_m2m_documents(
-    main_model: ESModelClassType,
-    es_document: ESDocumentClassType,
+    main_model: type[ESModelType],
+    es_document: type[ESDocumentType],
     instance: Model,
     mapping_fields: dict,
     affected_field: str,
@@ -406,9 +402,9 @@ def update_remove_m2m_documents(
             )
 
 
-def update_m2m_field_in_es_document(
+def update_m2m_field_in_es_document[DocumentT: ESDocumentType](
     instance: Model,
-    es_document: ESDocumentClassType,
+    es_document: type[DocumentT],
     affected_field: str,
 ) -> None:
     """Update a single field created using a many-to-many relationship.
@@ -447,8 +443,8 @@ def update_m2m_field_in_es_document(
 
 
 def update_reverse_related_documents(
-    main_model: ESModelClassType,
-    es_document: ESDocumentClassType,
+    main_model: type[ESModelType],
+    es_document: type[ESDocumentType],
     instance: Model,
     query_string: str,
     affected_fields: list[str],
@@ -537,9 +533,7 @@ def update_reverse_related_documents(
             docket = getattr(instance, "docket")
             # Avoid calling update_children_docs_by_query if the Docket
             # doesn't have any entries from this source.
-            if not getattr(
-                docket, source.docket_entries_related_name
-            ).exists():
+            if not source.has_entries(docket):
                 return
             transaction.on_commit(
                 partial(
@@ -552,8 +546,8 @@ def update_reverse_related_documents(
 
 
 def delete_reverse_related_documents(
-    main_model: ESModelClassType,
-    es_document: ESDocumentClassType,
+    main_model: type[ESModelType],
+    es_document: type[ESDocumentType],
     instance: Model,
     query_string: str,
     affected_fields: list[str],
@@ -615,8 +609,7 @@ def delete_reverse_related_documents(
             # is a plain Docket, so the type that triggered the delete is
             # no longer known.
             has_entries = any(
-                getattr(instance, source.docket_entries_related_name).exists()
-                for source in ALL_ES_SOURCES
+                source.has_entries(instance) for source in ALL_ES_SOURCES
             )
             if not has_entries:
                 return
@@ -741,8 +734,8 @@ class ESSignalProcessor:
 
     def __init__(
         self,
-        main_model,
-        es_document,
+        main_model: type[ESModelType],
+        es_document: type[ESDocumentType],
         documents_model_mapping: DocumentModelMapping,
     ):
         self.main_model = main_model

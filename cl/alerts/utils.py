@@ -76,7 +76,7 @@ from cl.search.forms import SearchForm
 from cl.search.models import SEARCH_TYPES, Docket
 from cl.search.types import (
     ESDictDocument,
-    ESDocumentClassType,
+    ESDocumentType,
     PercolatorResponses,
     SearchAlertHitType,
 )
@@ -151,14 +151,16 @@ def create_percolator_search_query(
     return s
 
 
+type _DocumentsToPercolate = tuple[
+    ESDictDocument, ESDictDocument | None, ESDictDocument | None
+]
+
+
 def percolate_es_document(
     document_id: str,
     percolator_index: str,
     document_index: str | None = None,
-    documents_to_percolate: (
-        tuple[ESDictDocument, ESDictDocument | None, ESDictDocument | None]
-        | None
-    ) = None,
+    documents_to_percolate: _DocumentsToPercolate | None = None,
     app_label: str | None = None,
     main_search_after: int | None = None,
     rd_search_after: int | None = None,
@@ -690,7 +692,7 @@ def get_field_names(mapping_dict):
 
 
 def select_es_document_fields(
-    es_document_class: ESDocumentClassType,
+    es_document_class: type[ESDocumentType],
     main_document: ESDictDocument,
     fields_to_ignore: set[str],
 ) -> ESDictDocument:
@@ -716,11 +718,7 @@ def select_es_document_fields(
 
 def prepare_percolator_content(
     app_label: str, document_id: str
-) -> tuple[
-    str,
-    str | None,
-    tuple[ESDictDocument, ESDictDocument, ESDictDocument] | None,
-]:
+) -> tuple[str, str | None, _DocumentsToPercolate | None]:
     """Prepare percolator content for different according to the app_label.
 
     It returns the percolator index name and the ES document index where the
@@ -738,14 +736,17 @@ def prepare_percolator_content(
     or None if no dict documents to percolate.
     """
 
-    es_document_index = None
-    documents_to_percolate = None
+    percolator_index: str
+    es_document_index: str | None
+    documents_to_percolate: _DocumentsToPercolate | None
     match app_label:
         case "audio.Audio":
             percolator_index = AudioPercolator._index._name
             es_document_index = AudioDocument._index._name
+            documents_to_percolate = None
         case "search.Docket":
             percolator_index = RECAPPercolator._index._name
+            es_document_index = None
             model = apps.get_model(app_label)
             docket = model.objects.get(pk=document_id)
             document_content_plain = DocketDocumentPlain().prepare(docket)
@@ -757,6 +758,7 @@ def prepare_percolator_content(
             )
         case "search.RECAPDocument":
             percolator_index = RECAPPercolator._index._name
+            es_document_index = None
             model = apps.get_model(app_label)
             rd = model.objects.get(pk=document_id)
             document_content_plain = ESRECAPDocumentPlain().prepare(rd)
@@ -785,6 +787,7 @@ def prepare_percolator_content(
 
         case "search.Opinion":
             percolator_index = OpinionPercolator._index._name
+            es_document_index = None
             model = apps.get_model(app_label)
             opinion = model.objects.get(pk=document_id)
             document_content_plain = ESOpinionDocumentPlain().prepare(opinion)
@@ -1012,7 +1015,7 @@ def check_alert_limits(
 
 
 def get_alert_estimation_count(
-    query_data: QueryDict, day_count: int
+    query_data: QueryDict, day_count: int, include_scotus: bool = False
 ) -> tuple[int, int] | None:
     """Estimate the number of alert hits a query would have produced over the
     last ``day_count`` days.
@@ -1023,6 +1026,9 @@ def get_alert_estimation_count(
 
     :param query_data: A QueryDict holding the alert's search query parameters.
     :param day_count: The number of days to average the estimation across.
+    :param include_scotus: Whether RECAP estimates may count SCOTUS content.
+    Off by default; only the create-alert modal on the search frontend turns
+    it on, with scotus_frontend_search_enabled.
     :return: A two-tuple ``(total_hits, case_only_hits)`` where
     ``case_only_hits`` is 0 for non-RECAP search types, or None if the query
     can't be validated by SearchForm.
@@ -1037,6 +1043,7 @@ def get_alert_estimation_count(
         return None
 
     cd = search_form.cleaned_data
+    cd["include_scotus"] = include_scotus
     total_case_only_query_results = 0
     try:
         match cd["type"]:

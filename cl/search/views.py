@@ -30,6 +30,7 @@ from cl.lib.search_utils import (
     do_es_search,
     make_get_string,
     merge_form_with_courts,
+    scotus_frontend_search_enabled,
     store_search_query,
 )
 from cl.lib.string_utils import trunc
@@ -165,7 +166,12 @@ def show_results(request: HttpRequest) -> HttpResponse:
         if not alert_form.is_valid():
             # Invalid form. Do the search again and show them the alert form
             # with the errors
-            render_dict.update(do_es_search(request.GET.copy()))
+            render_dict.update(
+                do_es_search(
+                    request.GET.copy(),
+                    include_scotus=scotus_frontend_search_enabled(request),
+                )
+            )
             render_dict.update(
                 {
                     "alert_form": alert_form,
@@ -291,12 +297,15 @@ def show_results(request: HttpRequest) -> HttpResponse:
 
     if search_type == SEARCH_TYPES.RECAP:
         search_results = do_es_search(
-            request.GET.copy(), courts=recap_search_courts()
+            request.GET.copy(),
+            courts=recap_search_courts(),
+            include_scotus=scotus_frontend_search_enabled(request),
         )
     else:
         search_results = do_es_search(
             request.GET.copy(),
             is_semantic_frontend_active=is_semantic_active,
+            include_scotus=scotus_frontend_search_enabled(request),
         )
 
     render_dict.update(search_results)

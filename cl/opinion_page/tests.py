@@ -1,11 +1,13 @@
 import asyncio
 import datetime
+import json
 import os
 import re
 import shutil
 import threading
 from collections import Counter
 from datetime import date
+from hashlib import md5
 from http import HTTPStatus
 from itertools import product
 from typing import TYPE_CHECKING, Any, cast
@@ -19,6 +21,7 @@ from django.conf import settings
 from django.contrib.auth.hashers import make_password
 from django.contrib.auth.models import AnonymousUser, Group, Permission, User
 from django.contrib.staticfiles.finders import find
+from django.core.cache import caches
 from django.core.files.uploadedfile import SimpleUploadedFile
 from django.core.management import call_command
 from django.core.paginator import Paginator
@@ -37,6 +40,7 @@ from django.test.client import AsyncClient
 from django.test.utils import CaptureQueriesContext
 from django.urls import reverse
 from django.utils.html import escape
+from django.utils.safestring import SafeString
 from django_cotton.compiler_regex import CottonCompiler
 from factory import RelatedFactory
 from lxml.etree import _Attrib, _Element
@@ -82,6 +86,7 @@ from cl.opinion_page.forms import (
 from cl.opinion_page.utils import (
     build_docket_metadata,
     build_docket_tabs,
+    build_idb_rows,
     build_originating_court_metadata,
     es_cited_case_count,
     es_get_cited_clusters_with_cache,
@@ -108,8 +113,10 @@ from cl.recap.factories import (
     AppellateAttachmentPageFactory,
     DocketEntriesDataFactory,
     DocketEntryDataFactory,
+    FjcIntegratedDatabaseFactory,
 )
 from cl.recap.mergers import add_docket_entries, merge_attachment_page_data
+from cl.recap.models import FjcIntegratedDatabase
 from cl.search.es_docket_sources import ALL_ES_SOURCES
 from cl.search.factories import (
     CitationWithParentsFactory,
@@ -119,7 +126,9 @@ from cl.search.factories import (
     OpinionClusterWithChildrenAndParentsFactory,
     OpinionClusterWithParentsFactory,
     OpinionFactory,
+    OpinionsCitedByRECAPDocumentFactory,
     OpinionsCitedWithParentsFactory,
+    OpinionWithParentsFactory,
     RECAPAttachmentFactory,
     RECAPDocumentFactory,
     SCOTUSDocketEntryFactory,
@@ -957,6 +966,31 @@ class ViewSCOTUSDocumentTest(TestCase):
             with_file.get_absolute_url(),
         )
         self.assertIsNone(_scotus_document_detail_url(without_file))
+
+    async def test_download_redirect_to_source_court_website(self) -> None:
+        """redirect_to_download falls back to the source's own external URL
+        when we don't have the file."""
+        entry = await sync_to_async(SCOTUSDocketEntryFactory)(
+            docket=self.docket
+        )
+        document = await sync_to_async(SCOTUSDocumentFactory)(
+            docket_entry=entry,
+            attachment_number=1,
+            filepath_local="",
+            url="https://www.supremecourt.gov/DocketPDF/test.pdf",
+        )
+        path = reverse(
+            "view_recap_attachment",
+            kwargs={
+                "docket_id": self.docket.id,
+                "doc_num": document.document_number,
+                "att_num": document.attachment_number,
+                "slug": self.docket.slug,
+            },
+        )
+        r = await self.async_client.get(path, {"redirect_to_download": True})
+        self.assertEqual(r.status_code, HTTPStatus.FOUND)
+        self.assertEqual(r["Location"], document.url)
 
 
 @override_settings(WAFFLE_CACHE_PREFIX="test_scotus_document_flag_waffle")
@@ -3630,6 +3664,27 @@ class DocketEntryFileDownload(TestCase):
         response = self.client.get(download_path)
         self.assertRedirects(response, redirect_path)
 
+    @mock.patch(
+        "django_ratelimit.decorators.is_ratelimited", return_value=False
+    )
+    def test_anonymous_requests_do_not_count_against_limit(
+        self, mock_is_ratelimited: MagicMock
+    ) -> None:
+        """The export's limit is shared by everyone, so only signed-in
+        requests may count against it; anonymous ones are sent to sign in
+        first.
+        """
+        download_path = reverse(
+            "view_download_docket", kwargs={"docket_id": self.mocked_docket.id}
+        )
+        response = self.client.get(download_path)
+        self.assertEqual(response.status_code, HTTPStatus.FOUND)
+        mock_is_ratelimited.assert_not_called()
+
+        self.client.login(username=self.user.username, password="password")
+        self.client.get(download_path)
+        mock_is_ratelimited.assert_called_once()
+
     @override_settings(
         WAFFLE_CACHE_PREFIX="test_csv_export_scotus_docket_waffle"
     )
@@ -3675,6 +3730,235 @@ class DocketEntryFileDownload(TestCase):
                         kwargs={"docket_id": self.mocked_docket.id},
                     )
                 )
+
+
+class DocketFeedTest(TestCase):
+    """Does the docket RSS feed render the right content for both RECAP
+    and SCOTUS dockets?"""
+
+    @classmethod
+    def setUpTestData(cls) -> None:
+        cls.recap_court = CourtFactory(id="ca5", jurisdiction="F")
+        cls.recap_docket = DocketFactory(
+            court=cls.recap_court, docket_number="1:23-cv-456"
+        )
+        cls.scotus_court = CourtFactory(id="scotus", jurisdiction="F")
+        cls.scotus_docket = DocketFactory(
+            court=cls.scotus_court, docket_number="23-456"
+        )
+        # A SCOTUS docket that never gets entries, for the empty-feed test.
+        cls.empty_scotus_docket = DocketFactory(
+            court=cls.scotus_court, docket_number="23-457"
+        )
+
+    def setUp(self) -> None:
+        # Every test reuses these docket URLs and the view is cached
+        # (cache_page_ignore_params, keyed on md5(url_path)), so a stale
+        # response would leak between tests. Delete only our own keys --
+        # deleting everything would wipe a parallel worker's unrelated
+        # entry, since they share one Redis.
+        cache = caches["default"]
+        for docket in (
+            self.recap_docket,
+            self.scotus_docket,
+            self.empty_scotus_docket,
+        ):
+            url_path = reverse("docket_feed", kwargs={"docket_id": docket.id})
+            hash_key = md5(url_path.encode("ascii"), usedforsecurity=False)
+            cache.delete(
+                f"custom.views.decorator.cache:{hash_key.hexdigest()}"
+            )
+
+    async def get_feed(self, docket: Docket):
+        return await self.async_client.get(
+            reverse("docket_feed", kwargs={"docket_id": docket.id})
+        )
+
+    async def test_recap_entry_with_main_document_renders_full_entry(
+        self,
+    ) -> None:
+        de = await sync_to_async(DocketEntryFactory)(
+            docket=self.recap_docket,
+            entry_number=5,
+            date_filed="2024-01-01",
+            description="",
+        )
+        await sync_to_async(RECAPDocumentFactory)(
+            docket_entry=de,
+            document_number="5",
+            description="Motion to dismiss",
+            filepath_local="recap/test.pdf",
+        )
+        r = await self.get_feed(self.recap_docket)
+        body = r.content.decode()
+        self.assertIn("Entry #5", body)
+        self.assertIn("Motion to dismiss", body)
+        self.assertIn("storage.courtlistener.com/recap/test.pdf", body)
+
+    async def test_recap_attachment_only_entry_falls_back_to_entry_description(
+        self,
+    ) -> None:
+        de = await sync_to_async(DocketEntryFactory)(
+            docket=self.recap_docket,
+            entry_number=6,
+            date_filed="2024-01-02",
+            description="Attachment-only entry",
+        )
+        await sync_to_async(RECAPDocumentFactory)(
+            docket_entry=de,
+            document_type=RECAPDocument.ATTACHMENT,
+            attachment_number=1,
+            document_number="6",
+        )
+        r = await self.get_feed(self.recap_docket)
+        body = r.content.decode()
+        self.assertIn("Attachment-only entry", body)
+        self.assertNotIn('rel="enclosure"', body)
+
+    async def test_recap_minute_entry_has_no_enclosure(self) -> None:
+        de = await sync_to_async(DocketEntryFactory)(
+            docket=self.recap_docket,
+            entry_number=None,
+            date_filed="2024-01-03",
+        )
+        r = await self.get_feed(self.recap_docket)
+        body = r.content.decode()
+        self.assertIn(f"Minute entry from {de.date_filed}", body)
+        self.assertNotIn('rel="enclosure"', body)
+
+    async def test_recap_main_document_without_local_file_uses_pacer_fallback(
+        self,
+    ) -> None:
+        de = await sync_to_async(DocketEntryFactory)(
+            docket=self.recap_docket, entry_number=7, date_filed="2024-01-04"
+        )
+        rd = await sync_to_async(RECAPDocumentFactory)(
+            docket_entry=de,
+            document_number="7",
+            filepath_local="",
+            pacer_doc_id="998877",
+        )
+        r = await self.get_feed(self.recap_docket)
+        self.assertIn(rd.pacer_url, r.content.decode())
+
+    async def test_recap_entry_without_date_filed_is_excluded(self) -> None:
+        await sync_to_async(DocketEntryFactory)(
+            docket=self.recap_docket,
+            entry_number=8,
+            date_filed=None,
+            description="Should not appear",
+        )
+        r = await self.get_feed(self.recap_docket)
+        self.assertNotIn("Should not appear", r.content.decode())
+
+    async def test_scotus_entry_with_one_document_renders_full_entry(
+        self,
+    ) -> None:
+        de = await sync_to_async(SCOTUSDocketEntryFactory)(
+            docket=self.scotus_docket,
+            entry_number=1,
+            date_filed="2024-02-01",
+            description="",
+        )
+        await sync_to_async(SCOTUSDocumentFactory)(
+            docket_entry=de,
+            document_number=1,
+            attachment_number=1,
+            description="Petition for writ of certiorari",
+            filepath_local="scotus/test.pdf",
+        )
+        r = await self.get_feed(self.scotus_docket)
+        body = r.content.decode()
+        self.assertIn("Entry #1", body)
+        self.assertIn("Petition for writ of certiorari", body)
+        self.assertIn("storage.courtlistener.com/scotus/test.pdf", body)
+
+    async def test_scotus_entry_with_multiple_documents_uses_lowest_attachment_number(
+        self,
+    ) -> None:
+        de = await sync_to_async(SCOTUSDocketEntryFactory)(
+            docket=self.scotus_docket,
+            entry_number=2,
+            date_filed="2024-02-02",
+            description="",
+        )
+        await sync_to_async(SCOTUSDocumentFactory)(
+            docket_entry=de,
+            document_number=2,
+            attachment_number=2,
+            description="Second document",
+        )
+        await sync_to_async(SCOTUSDocumentFactory)(
+            docket_entry=de,
+            document_number=2,
+            attachment_number=1,
+            description="First document",
+        )
+        r = await self.get_feed(self.scotus_docket)
+        body = r.content.decode()
+        self.assertIn("First document", body)
+        self.assertNotIn("Second document", body)
+
+    async def test_scotus_entry_with_zero_documents_falls_back_to_entry_description(
+        self,
+    ) -> None:
+        await sync_to_async(SCOTUSDocketEntryFactory)(
+            docket=self.scotus_docket,
+            entry_number=3,
+            date_filed="2024-02-03",
+            description="DISTRIBUTED for Conference",
+        )
+        r = await self.get_feed(self.scotus_docket)
+        body = r.content.decode()
+        self.assertIn("DISTRIBUTED for Conference", body)
+        self.assertNotIn('rel="enclosure"', body)
+
+    async def test_scotus_document_without_local_file_uses_external_url_fallback(
+        self,
+    ) -> None:
+        de = await sync_to_async(SCOTUSDocketEntryFactory)(
+            docket=self.scotus_docket, entry_number=4, date_filed="2024-02-04"
+        )
+        await sync_to_async(SCOTUSDocumentFactory)(
+            docket_entry=de,
+            document_number=4,
+            attachment_number=1,
+            filepath_local="",
+            url="https://www.supremecourt.gov/DocketPDF/test.pdf",
+        )
+        r = await self.get_feed(self.scotus_docket)
+        self.assertIn(
+            "https://www.supremecourt.gov/DocketPDF/test.pdf",
+            r.content.decode(),
+        )
+
+    async def test_scotus_entry_without_entry_number_has_no_enclosure(
+        self,
+    ) -> None:
+        de = await sync_to_async(SCOTUSDocketEntryFactory)(
+            docket=self.scotus_docket,
+            entry_number=None,
+            date_filed="2024-02-06",
+        )
+        r = await self.get_feed(self.scotus_docket)
+        body = r.content.decode()
+        self.assertIn(f"Minute entry from {de.date_filed}", body)
+        self.assertNotIn('rel="enclosure"', body)
+
+    async def test_scotus_entry_without_date_filed_is_excluded(self) -> None:
+        await sync_to_async(SCOTUSDocketEntryFactory)(
+            docket=self.scotus_docket,
+            entry_number=10,
+            date_filed=None,
+            description="Should not appear",
+        )
+        r = await self.get_feed(self.scotus_docket)
+        self.assertNotIn("Should not appear", r.content.decode())
+
+    async def test_empty_scotus_docket_renders_valid_empty_feed(self) -> None:
+        r = await self.get_feed(self.empty_scotus_docket)
+        self.assertEqual(r.status_code, HTTPStatus.OK)
+        self.assertNotIn("<entry>", r.content.decode())
 
 
 class CachePageIgnoreParamsTest(TestCase):
@@ -3772,6 +4056,80 @@ class ClusterRedirectionTest(TestCase):
             expected_redirect_url,
             status_code=301,
         )
+
+
+class BuildIdbRowsTest(SimpleTestCase):
+    """Test the build_idb_rows helper function."""
+
+    def test_every_field_gets_a_row(self) -> None:
+        """One row per IDB field, Office Number first and Pro Se last."""
+        rows = build_idb_rows(FjcIntegratedDatabaseFactory.build())
+        self.assertEqual(len(rows), 28)
+        self.assertEqual(rows[0]["label"], "Office Number")
+        self.assertEqual(rows[-1]["label"], "Pro Se")
+
+    def test_values_are_display_ready(self) -> None:
+        """Dates use the site format, choice fields show their label, coded
+        fields show code and label, False and 0 are values, and unset fields
+        fall back."""
+        idb_data = FjcIntegratedDatabaseFactory.build(
+            office="3",
+            origin=FjcIntegratedDatabase.ORIG,
+            date_filed=date(2016, 4, 21),
+            jurisdiction=None,
+            class_action=False,
+            monetary_demand=0,
+            pro_se=FjcIntegratedDatabase.PRO_SE_NONE,
+        )
+        values = {
+            row["label"]: row["value"] for row in build_idb_rows(idb_data)
+        }
+        self.assertEqual(values["Office Number"], "3")
+        self.assertEqual(values["Origin"], "(1) Original Proceeding")
+        self.assertEqual(values["Date Filed"], "April 21, 2016")
+        self.assertEqual(values["Jurisdiction"], "Not Provided")
+        self.assertEqual(values["Class Action Status"], "False")
+        self.assertEqual(values["Monetary Demand"], "0")
+        self.assertEqual(values["Date Terminated"], "Not Provided")
+        self.assertEqual(
+            values["Pro Se"], "No pro se plaintiffs or defendants"
+        )
+
+    def test_judgment_missing_codes_fall_back(self) -> None:
+        """Judgment shows "Not Provided" for the FJC missing-data codes, the
+        label for a known choice and the raw number for an unknown code."""
+        cases = [
+            (0, "Not Provided"),
+            (-8, "Not Provided"),
+            (FjcIntegratedDatabase.PLAINTIFF, "Plaintiff"),
+            (9, "9"),
+        ]
+        for judgment, expected in cases:
+            with self.subTest(judgment=judgment):
+                idb_data = FjcIntegratedDatabaseFactory.build(
+                    judgment=judgment
+                )
+                values = {
+                    row["label"]: row["value"]
+                    for row in build_idb_rows(idb_data)
+                }
+                self.assertEqual(values["Judgment"], expected)
+
+    def test_hints_are_safe_markup_with_the_choices(self) -> None:
+        """Hints carry their links unescaped and list the field's choices."""
+        hints = {
+            row["label"]: row.get("hint")
+            for row in build_idb_rows(FjcIntegratedDatabaseFactory.build())
+        }
+        self.assertIsInstance(hints["Office Number"], SafeString)
+        self.assertIn("<a ", hints["Office Number"])
+        self.assertIn(
+            "Denied or Granted", hints["Termination Class Action Status"]
+        )
+        self.assertIn(
+            "Formal Arbitration Program", hints["Arbitration at Filing"]
+        )
+        self.assertIsNone(hints["Date Filed"])
 
 
 class BuildDocketMetadataTest(TestCase):
@@ -4077,6 +4435,101 @@ class BuildDocketTabsTest(SimpleTestCase):
             self.assertEqual(keys, ["entries", "idb"])
 
 
+class DocketTabViewsTest(TestCase):
+    """Context every tab view of a docket shares, whichever stack renders it."""
+
+    @classmethod
+    def setUpTestData(cls) -> None:
+        cls.court = CourtFactory(id="canb", jurisdiction="FB")
+        cls.docket = DocketFactory(
+            court=cls.court,
+            source=Docket.RECAP,
+            idb_data=FjcIntegratedDatabaseFactory(),
+        )
+        party = PartyFactory.build()
+        party.save()
+        PartyTypeFactory(docket=cls.docket, party=party)
+        OpinionsCitedByRECAPDocumentFactory(
+            citing_document=RECAPDocumentFactory(
+                docket_entry=DocketEntryFactory(docket=cls.docket)
+            ),
+            cited_opinion=OpinionWithParentsFactory(),
+        )
+
+    async def test_every_tab_view_gets_the_full_tab_list(self) -> None:
+        """Each tab view hands the template the same navigation, so a tab
+        never disappears depending on which one is active."""
+        for url_name in (
+            "view_docket",
+            "docket_parties",
+            "docket_idb_data",
+            "docket_authorities",
+        ):
+            with self.subTest(view=url_name):
+                r = await self.async_client.get(
+                    reverse(url_name, args=[self.docket.pk, self.docket.slug])
+                )
+                self.assertEqual(r.status_code, HTTPStatus.OK)
+                keys = [tab["key"] for tab in r.context["tabs"]]
+                self.assertEqual(
+                    keys, ["entries", "parties", "idb", "authorities"]
+                )
+
+
+@override_settings(WAFFLE_CACHE_PREFIX="test_docket_idb_v2_waffle")
+@override_flag("use_new_design", active=True)
+class DocketIdbV2TemplateTest(TestCase):
+    """The v2 FJC Integrated Database tab.
+
+    `WAFFLE_CACHE_PREFIX` isolates the flag cache from parallel workers, as
+    in DocketPageV2TemplateTest.
+    """
+
+    @classmethod
+    def setUpTestData(cls) -> None:
+        cls.court = CourtFactory(id="canb", jurisdiction="FB")
+        cls.docket = DocketFactory(
+            court=cls.court,
+            source=Docket.RECAP,
+            idb_data=FjcIntegratedDatabaseFactory(
+                office="3",
+                origin=FjcIntegratedDatabase.ORIG,
+                date_filed=date(2016, 4, 21),
+            ),
+        )
+
+    async def get_page(self) -> HttpResponse:
+        """Requests the IDB tab and checks it rendered through the v2 template."""
+        r = await self.async_client.get(
+            reverse(
+                "docket_idb_data",
+                args=[self.docket.pk, self.docket.slug],
+            )
+        )
+        self.assertEqual(r.status_code, HTTPStatus.OK)
+        self.assertTemplateUsed(r, "v2_docket_idb_data.html")
+        return r
+
+    async def test_renders_the_idb_values(self) -> None:
+        """Set fields, choice displays and the fallback for unset fields all
+        come through the table."""
+        content = (await self.get_page()).content.decode()
+        self.assertIn("(1) Original Proceeding", content)
+        self.assertIn("April 21, 2016", content)
+        self.assertIn("Not Provided", content)
+
+    async def test_idb_tab_is_current(self) -> None:
+        """The tab navigation marks the IDB tab as the current page."""
+        content = (await self.get_page()).content.decode()
+        current = [
+            el
+            for el in fromstring(content).iter("a")
+            if el.get("aria-current") == "page"
+        ]
+        self.assertEqual(len(current), 1)
+        self.assertIn("FJC Integrated Database", current[0].text_content())
+
+
 @override_settings(WAFFLE_CACHE_PREFIX="test_docket_page_v2_waffle")
 @override_flag("use_new_design", active=True)
 class DocketPageV2TemplateTest(TestCase):
@@ -4223,19 +4676,23 @@ class DocketPageV2TemplateTest(TestCase):
         self.assertIn(" defer", tag.group(0))
         self.assertIn('nonce="', tag.group(0))
 
-    async def test_v2_body_carries_the_csrf_header_for_htmx(self) -> None:
-        """Every hx-post inherits the CSRF token from the body's hx-headers."""
+    async def test_v2_body_carries_the_htmx_headers(self) -> None:
+        """Every htmx request inherits the body's hx-headers.
+
+        They carry the CSRF token, and the design header that gets v2
+        partials back from IncrementalNewTemplateMiddleware.
+        """
         r = await self.async_client.get(
             reverse("view_docket", args=[self.docket.pk, self.docket.slug])
         )
         body = re.search(r"<body[^>]*>", r.content.decode())
         self.assertIsNotNone(body)
-        header = re.search(
-            r'hx-headers=\'\{"X-CSRFToken": "([^"]*)"\}\'', body.group(0)
-        )
-        self.assertIsNotNone(header)
+        hx_headers = re.search(r"hx-headers='([^']*)'", body.group(0))
+        self.assertIsNotNone(hx_headers)
+        headers = json.loads(hx_headers.group(1))
+        self.assertEqual(headers["X-CL-Design"], "v2")
         # The length rules out Django's NOTPROVIDED placeholder.
-        token = header.group(1)
+        token = headers["X-CSRFToken"]
         self.assertEqual(len(token), CSRF_TOKEN_LENGTH)
         self.assertTrue(token.isalnum())
 
@@ -4769,12 +5226,66 @@ class DocketEntryRowsV2Test(TestCase):
             escape(docket_entry_sources.RECAP.empty_message), content
         )
 
+    def export_link(self, html: str) -> _Element:
+        """The Export entries CSV link, rendered for every user state."""
+        links = [
+            a
+            for a in fromstring(html).iter("a")
+            if " ".join(a.text_content().split()).startswith(
+                "Export entries CSV"
+            )
+        ]
+        self.assertEqual(len(links), 1)
+        return links[0]
+
     async def test_csv_export_for_authenticated_user(self) -> None:
-        """CSV export button should render for authenticated users."""
+        """A signed-in user gets the download link, fetched in place by Alpine.
+
+        The view answers 501 and 429, so the page declares a message for each
+        plus a fallback.
+        """
         user = await sync_to_async(UserWithChildProfileFactory)()
         await sync_to_async(self.async_client.force_login)(user)
+        link = self.export_link(await self._get_docket_page())
+        download_path = reverse(
+            "view_download_docket", kwargs={"docket_id": self.docket.pk}
+        )
+        self.assertEqual(link.get("href"), download_path)
+        self.assertEqual(link.get("rel"), "nofollow")
+        self.assertEqual(link.get("x-on:click.prevent"), "start")
+        self.assertIsNone(link.get("hx-get"))
+        self.assertNotIn("sign in required", link.text_content())
+        component = link.xpath('ancestor::*[@x-data="download"]')
+        self.assertEqual(len(component), 1)
+        for key in (
+            "data-error-message-501",
+            "data-error-message-429",
+            "data-error-message-default",
+        ):
+            self.assertTrue(component[0].get(key), key)
+        alerts = component[0].xpath('.//*[@role="alert"]')
+        self.assertEqual(
+            [alert.get("x-text") for alert in alerts], ["errorMessage"]
+        )
+
+    async def test_csv_export_for_anonymous_user(self) -> None:
+        """A visitor gets a plain link to sign in and come back to this docket."""
         content = await self._get_docket_page()
-        self.assertIn("Export entries CSV", content)
+        download_path = reverse(
+            "view_download_docket", kwargs={"docket_id": self.docket.pk}
+        )
+        self.assertNotIn(download_path, content)
+        link = self.export_link(content)
+        docket_path = reverse(
+            "view_docket", args=[self.docket.pk, self.docket.slug]
+        )
+        self.assertEqual(
+            link.get("href"), f"{reverse('sign-in')}?next={docket_path}"
+        )
+        self.assertEqual(link.get("rel"), "nofollow")
+        self.assertIsNone(link.get("x-on:click.prevent"))
+        self.assertIsNone(link.get("hx-get"))
+        self.assertIn("sign in required", link.text_content())
 
     async def test_entries_use_option_d_semantic_markup(self) -> None:
         """Entries render as an <ol> of <li>, with <dl> for metadata and a nested <ul> for RECAP documents."""
