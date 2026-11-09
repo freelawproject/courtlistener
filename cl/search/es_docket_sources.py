@@ -99,7 +99,7 @@ RECAP_ES_SOURCE = ESDocketSource(
     metadata_model=BankruptcyInformation,
 )
 SCOTUS_ES_SOURCE = ESDocketSource(
-    docket_entries_related_name="scotusdocketentry_set",
+    docket_entries_related_name="scotus_docket_entries",
     document_model=SCOTUSDocument,
     child_id_property="SCOTUS",
     docket_belongs=_scotus_docket_belongs,

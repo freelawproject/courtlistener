@@ -520,7 +520,7 @@ def make_federal_judge(item, testing=False):
             degyear = item[f"Degree Year{school_str}"]
             try:
                 int(degyear)
-            except:
+            except Exception:
                 degyear = None
             school = get_school(schoolname)
             if school is not None:
@@ -569,7 +569,7 @@ def make_federal_judge(item, testing=False):
         else:
             try:
                 start_year = int(start_year)
-            except:
+            except Exception:
                 continue
             date_start = date(start_year, 1, 1)
             date_start_granularity = GRANULARITY_YEAR
