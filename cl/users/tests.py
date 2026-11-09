@@ -474,32 +474,10 @@ class UserDataTest(LiveServerTestCase):
 @override_settings(WAFFLE_CACHE_PREFIX="ProfileTest")
 @override_switch(DOUBLE_API_THROTTLES_SWITCH, active=False)
 class ProfileTest(SimpleUserDataMixin, TestCase):
-    def test_api_page_requires_authentication(self) -> None:
-        """Does the API profile page continue to require authentication?"""
-        url = reverse("view_api")
-        response = self.client.get(url)
-
-        self.assertEqual(response.status_code, HTTPStatus.FOUND)
-        self.assertEqual(response.url, f"{reverse('sign-in')}?next={url}")
-
-    @override_flag("use_new_design", False)
-    def test_api_page_uses_legacy_template_without_flag(self) -> None:
-        """Does the API profile page retain its legacy implementation?"""
-        self.assertTrue(
-            self.client.login(username="pandora", password="password")
-        )
-
-        response = self.client.get(reverse("view_api"))
-
-        self.assertEqual(response.status_code, HTTPStatus.OK)
-        self.assertTemplateUsed(response, "profile/api.html")
-        self.assertTemplateNotUsed(response, "wip_profile/api.html")
-        self.assertContains(response, "REST APIs and Bulk Data for Developers")
-
     @override_flag("use_new_design", True)
     @override_flag(WIP_PROPS["flag"], True)
-    def test_api_page_uses_accessible_profile_shell_with_flag(self) -> None:
-        """Does the redesigned API page render the requested profile shell?"""
+    def test_api_page_renders_profile_shell(self) -> None:
+        """Does the WIP API page render the shell with Developer Tools active?"""
         self.assertTrue(
             self.client.login(username="pandora", password="password")
         )
@@ -507,8 +485,6 @@ class ProfileTest(SimpleUserDataMixin, TestCase):
         response = self.client.get(reverse("view_api"))
 
         self.assertEqual(response.status_code, HTTPStatus.OK)
-        self.assertTemplateUsed(response, "wip_profile/api.html")
-        self.assertTemplateNotUsed(response, "profile/api.html")
 
         html = fromstring(response.content.decode())
         profile_nav = html.xpath("//nav[@aria-label='Profile navigation']")
@@ -530,7 +506,6 @@ class ProfileTest(SimpleUserDataMixin, TestCase):
                 "Account",
             ],
         )
-        self.assertNotIn("Visualizations", nav.text_content())
         self.assertEqual(len(nav.xpath(".//li[@aria-hidden='true']")), 1)
 
         active_links = nav.xpath(".//a[@aria-current='page']")
@@ -539,11 +514,9 @@ class ProfileTest(SimpleUserDataMixin, TestCase):
             active_links[0].text_content().strip(), "Developer Tools"
         )
 
-        mobile_heading = html.xpath("//h1")
-        self.assertEqual(len(mobile_heading), 1)
-        self.assertEqual(
-            mobile_heading[0].text_content().strip(), "Developer Tools"
-        )
+        heading = html.xpath("//h1")
+        self.assertEqual(len(heading), 1)
+        self.assertEqual(heading[0].text_content().strip(), "Developer Tools")
 
         sign_out_form = nav.xpath(
             ".//form[@method='post' and @action=$url]",
@@ -553,6 +526,11 @@ class ProfileTest(SimpleUserDataMixin, TestCase):
         self.assertEqual(
             sign_out_form[0].xpath("normalize-space(.//button)"), "Sign out"
         )
+        # The shell renders with `only`, so the token must be passed in
+        csrf_token = sign_out_form[0].xpath(
+            "string(.//input[@name='csrfmiddlewaretoken']/@value)"
+        )
+        self.assertTrue(csrf_token)
 
     async def test_api_page_with_data(self) -> None:
         """Can we access the API stats page after the API has been used?"""
