@@ -748,6 +748,45 @@ class FloridaPartyMergerTest(TestCase):
         party_type = PartyType.objects.get(docket=docket)
         assert party_type.name == "Appellee"
 
+    @merger_test(expected_query_count=22)
+    def test_remerge_keeps_same_name_parties_distinct(self):
+        """When two parties on a docket share a name (e.g. a cross-appellant), does a re-merge match each by its UUID rather than collapsing both onto one party?"""
+        appellant = FloridaCasePartyFactory.create(
+            name="State of Florida",
+            party_type=ScrapePartyType.APPELLANT,
+            representatives=[],
+        )
+        appellee = FloridaCasePartyFactory.create(
+            name="State of Florida",
+            party_type=ScrapePartyType.APPELLEE,
+            representatives=[],
+        )
+        docket_data = self._make_case(appellant, appellee)
+        first = FloridaDocketMerger(
+            docket_data, params=docket_data.entries
+        ).merge()
+        self.assertTrue(first.success)
+        docket = self._merged_docket(first)
+
+        second = FloridaDocketMerger(
+            docket_data, params=docket_data.entries
+        ).merge()
+
+        self.assertTrue(second.success, second.failures)
+        self.assertFalse(second.create)
+        self.assertFalse(second.update)
+        self.assertEqual(Party.objects.count(), 2)
+        self.assertEqual(
+            {
+                (pt.party.extra_info, pt.name)
+                for pt in PartyType.objects.filter(docket=docket)
+            },
+            {
+                (str(appellant.party_uuid), "Appellant"),
+                (str(appellee.party_uuid), "Appellee"),
+            },
+        )
+
     @merger_test(expected_query_count=20)
     def test_merge_empty_parties_preserves_existing(self):
         """Does a scrape with no parties leave existing parties, types, and roles untouched?"""

@@ -100,6 +100,12 @@ def _florida_party_uuid(party: FloridaParty, params: None) -> str:
 
 
 class FloridaPartyMerger(PartyMerger[FloridaParty, RelatedParams[None]]):
+    """Florida identifies parties by UUID, stored in `extra_info`, so a party is matched on that within the docket rather than on its name.
+
+    Two parties on one docket can share a name (e.g. a cross-appellant), and
+    matching by name collapses them onto one `Party`.
+    """
+
     key: ClassVar[Iterable[str]] = ["extra_info"]
 
     attorneys: list[Attorney] = AttorneyRelation(role=FloridaRoleMerger)
@@ -109,6 +115,13 @@ class FloridaPartyMerger(PartyMerger[FloridaParty, RelatedParams[None]]):
         return super().query().order_by("date_created")
 
     def resolve_query(self, qs: QuerySet[Party]) -> tuple[bool, Party | None]:
+        """Take the oldest match.
+
+        A docket can hold two parties with the same UUID where an earlier
+        name-based match overwrote one party's UUID with another's; preferring
+        the oldest keeps those dockets merging instead of failing on the
+        ambiguity.
+        """
         results = list(qs)
         if len(results) == 0:
             return True, None

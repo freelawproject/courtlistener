@@ -1,1 +1,5 @@
 cl/assets/static-global/js/react
+# Self-signed certificates for the local development stack only. They are
+# meant to be public; pre-commit's detect-private-key hook excludes them too.
+docker/elastic/cl-es.key
+docker/postgresql/cl-postgres.key

@@ -79,13 +79,20 @@ from cl.search.documents import (
     OpinionClusterDocument,
     PersonDocument,
 )
+from cl.search.es_docket_sources import (
+    ALL_ES_SOURCES,
+    SCOTUS_ES_SOURCE,
+)
 from cl.search.factories import (
     BankruptcyInformationFactory,
     CourtFactory,
     DocketEntryFactory,
     DocketFactory,
+    OpinionsCitedByRECAPDocumentFactory,
     OpinionWithParentsFactory,
     RECAPDocumentFactory,
+    ScotusDocketMetadataFactory,
+    SCOTUSDocumentFactory,
 )
 from cl.search.management.commands.cl_index_parent_and_child_docs import (
     compose_redis_key,
@@ -4463,6 +4470,24 @@ class RECAPSearchAPIV4Test(
             v4_recap_meta_keys,
         )
 
+    async def test_capital_case_not_in_api_results(self) -> None:
+        """capital_case isn't exposed in V4 RECAP results yet: not on the docket, its nested documents, or RECAP document results.
+
+        The SCOTUS search API (#8153) adds it.
+        """
+        search_params = {
+            "type": SEARCH_TYPES.RECAP,
+            "q": f"id:{self.rd_api.pk}",
+        }
+        r = await self._test_api_results_count(search_params, 1, "type r")
+        docket_result = r.data["results"][0]
+        self.assertNotIn("capital_case", docket_result)
+        self.assertNotIn("capital_case", docket_result["recap_documents"][0])
+
+        search_params["type"] = SEARCH_TYPES.RECAP_DOCUMENT
+        r = await self._test_api_results_count(search_params, 1, "type rd")
+        self.assertNotIn("capital_case", r.data["results"][0])
+
     async def test_results_api_empty_fields(self) -> None:
         """Confirm empty fields values in V4 RECAP Search API results."""
         # Confirm expected values for empty fields.
@@ -6474,6 +6499,166 @@ class RECAPSearchAPIV4Test(
                     "The date entered has an invalid format.",
                     r.content.decode(),
                 )
+
+
+class ESRECAPDocumentSCOTUSCompatibilityTest(TestCase):
+    """Confirm DocketDocument/ESRECAPDocument.prepare() stay compatible with SCOTUS content (no RECAPDocument/DocketEntry rows)."""
+
+    def setUp(self) -> None:
+        self.court = CourtFactory(id="scotus", jurisdiction="F")
+
+    def test_capital_case_true_on_scotus_document_and_docket(self) -> None:
+        """A SCOTUS docket flagged as a capital case surfaces `True` at both the Docket and RECAPDocument ES-document levels."""
+        scotus_document = SCOTUSDocumentFactory(
+            docket_entry__docket__court=self.court
+        )
+        docket = scotus_document.docket_entry.docket
+        ScotusDocketMetadataFactory(docket=docket, capital_case=True)
+
+        prepared_document = ESRECAPDocument().prepare(scotus_document)
+        prepared_docket = DocketDocument().prepare(docket)
+
+        self.assertIs(prepared_document["capital_case"], True)
+        self.assertIs(prepared_docket["capital_case"], True)
+        self.assertEqual(
+            prepared_document["short_description"],
+            scotus_document.description,
+        )
+        self.assertEqual(
+            prepared_document["attachment_number"],
+            scotus_document.attachment_number,
+        )
+        self.assertEqual(prepared_document["docket_id"], docket.pk)
+        self.assertEqual(prepared_docket["caseName"], docket.case_name)
+        self.assertEqual(prepared_docket["docketNumber"], docket.docket_number)
+
+    def test_capital_case_false_is_not_confused_with_absent(self) -> None:
+        """`capital_case=False` (a real SCOTUS case that isn't capital) must come back as `False`, not `None` (no SCOTUS metadata)."""
+        scotus_document = SCOTUSDocumentFactory(
+            docket_entry__docket__court=self.court
+        )
+        docket = scotus_document.docket_entry.docket
+        ScotusDocketMetadataFactory(docket=docket, capital_case=False)
+
+        prepared_document = ESRECAPDocument().prepare(scotus_document)
+        prepared_docket = DocketDocument().prepare(docket)
+
+        self.assertIs(prepared_document["capital_case"], False)
+        self.assertIs(prepared_docket["capital_case"], False)
+        self.assertEqual(
+            prepared_document["short_description"],
+            scotus_document.description,
+        )
+        self.assertEqual(prepared_document["docket_id"], docket.pk)
+        self.assertEqual(prepared_docket["caseName"], docket.case_name)
+
+    def test_capital_case_none_without_scotus_metadata(self) -> None:
+        """A SCOTUS docket with no ScotusDocketMetadata row yet reports `None`, not a crash."""
+        scotus_document = SCOTUSDocumentFactory(
+            docket_entry__docket__court=self.court
+        )
+        docket = scotus_document.docket_entry.docket
+
+        prepared_document = ESRECAPDocument().prepare(scotus_document)
+        prepared_docket = DocketDocument().prepare(docket)
+
+        self.assertIsNone(prepared_document["capital_case"])
+        self.assertIsNone(prepared_docket["capital_case"])
+        self.assertEqual(
+            prepared_document["short_description"],
+            scotus_document.description,
+        )
+        self.assertEqual(prepared_document["docket_id"], docket.pk)
+        self.assertEqual(prepared_docket["caseName"], docket.case_name)
+
+    def test_capital_case_none_on_plain_recap_docket(self) -> None:
+        """A regular RECAP docket also reports `None` for capital_case, not a crash."""
+        rd = RECAPDocumentFactory(docket_entry=DocketEntryFactory())
+        docket = rd.docket_entry.docket
+
+        prepared_document = ESRECAPDocument().prepare(rd)
+        prepared_docket = DocketDocument().prepare(docket)
+
+        self.assertIsNone(prepared_document["capital_case"])
+        self.assertIsNone(prepared_docket["capital_case"])
+        self.assertEqual(
+            prepared_document["short_description"], rd.description
+        )
+        self.assertEqual(prepared_document["docket_id"], docket.pk)
+        self.assertEqual(prepared_docket["caseName"], docket.case_name)
+
+    def test_scotus_document_type_and_cites_do_not_crash(self) -> None:
+        """SCOTUS documents have no document_type and no citation attributes; prepare() shouldn't raise AttributeError."""
+        scotus_document = SCOTUSDocumentFactory(
+            docket_entry__docket__court=self.court
+        )
+
+        docket = scotus_document.docket_entry.docket
+        prepared = ESRECAPDocument().prepare(scotus_document)
+
+        self.assertIsNone(prepared["document_type"])
+        self.assertEqual(prepared["cites"], [])
+        self.assertEqual(
+            prepared["short_description"], scotus_document.description
+        )
+        self.assertEqual(
+            prepared["attachment_number"], scotus_document.attachment_number
+        )
+        self.assertEqual(prepared["docket_id"], docket.pk)
+
+    def test_recap_document_type_and_cites_regression(self) -> None:
+        """A regular RECAPDocument still gets its real document_type and cites values - the SCOTUS compatibility guards must not swallow the existing PACER behavior."""
+        rd = RECAPDocumentFactory(
+            docket_entry=DocketEntryFactory(),
+            document_type=RECAPDocument.PACER_DOCUMENT,
+        )
+        citation = OpinionsCitedByRECAPDocumentFactory(
+            citing_document=rd, cited_opinion=OpinionWithParentsFactory()
+        )
+
+        docket = rd.docket_entry.docket
+        prepared = ESRECAPDocument().prepare(rd)
+
+        self.assertEqual(prepared["document_type"], "PACER Document")
+        self.assertEqual(prepared["cites"], [citation.cited_opinion_id])
+        self.assertEqual(prepared["short_description"], rd.description)
+        self.assertEqual(prepared["docket_id"], docket.pk)
+
+    def test_es_id_and_uid_share_the_source_namespace(self) -> None:
+        """Each source's ES _id comes from its own ES_CHILD_ID property, and SCOTUS's _id prefix is its uid_namespace plus "d" (for document)."""
+        child_ids = [
+            getattr(ES_CHILD_ID(42), source.child_id_property)
+            for source in ALL_ES_SOURCES
+        ]
+        self.assertEqual(len(child_ids), len(set(child_ids)))
+        self.assertEqual(ES_CHILD_ID(42).RECAP, "rd_42")
+        self.assertEqual(
+            ES_CHILD_ID(42).SCOTUS, f"{SCOTUS_ES_SOURCE.uid_namespace}d_42"
+        )
+
+    def test_ids_are_namespaced_for_scotus_only(self) -> None:
+        """RECAP documents keep the integer id and docket_entry_id; SCOTUS documents leave them empty and use the namespaced uid fields, so the two sources' pks can't collide."""
+        scotus_document = SCOTUSDocumentFactory(
+            docket_entry__docket__court=self.court
+        )
+        rd = RECAPDocumentFactory(docket_entry=DocketEntryFactory())
+
+        scotus = ESRECAPDocument().prepare(scotus_document)
+        recap = ESRECAPDocument().prepare(rd)
+
+        with self.subTest("SCOTUS"):
+            self.assertIsNone(scotus["id"])
+            self.assertIsNone(scotus["docket_entry_id"])
+            self.assertEqual(f"scotus_{scotus_document.pk}", scotus["uid"])
+            self.assertEqual(
+                f"scotus_{scotus_document.docket_entry_id}",
+                scotus["docket_entry_uid"],
+            )
+        with self.subTest("RECAP"):
+            self.assertEqual(rd.pk, recap["id"])
+            self.assertEqual(rd.docket_entry_id, recap["docket_entry_id"])
+            self.assertIsNone(recap["uid"])
+            self.assertIsNone(recap["docket_entry_uid"])
 
 
 class RECAPFeedTest(RECAPSearchTestCase, ESIndexTestCase, TestCase):

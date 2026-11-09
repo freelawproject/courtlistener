@@ -386,10 +386,10 @@ RECAP: DocketEntrySource = DocketEntrySource(
 
 # SCOTUS
 def _scotus_entries(docket: Docket) -> QuerySet[SCOTUSDocketEntry]:
-    """Return this docket's SCOTUSDocketEntry queryset, with scotusdocument_set prefetched for the docket page's entry list."""
-    return docket.scotusdocketentry_set.all().prefetch_related(
+    """Return this docket's SCOTUSDocketEntry queryset, with scotus_documents prefetched for the docket page's entry list."""
+    return docket.scotus_docket_entries.all().prefetch_related(
         Prefetch(
-            "scotusdocument_set",
+            "scotus_documents",
             queryset=SCOTUSDocument.objects.defer("plain_text"),
         )
     )
@@ -399,7 +399,7 @@ def _scotus_documents_for_entry(
     de: SCOTUSDocketEntry,
 ) -> QuerySet[SCOTUSDocument]:
     """Return the SCOTUSDocuments attached to this docket entry."""
-    return de.scotusdocument_set.all()
+    return de.scotus_documents.all()
 
 
 def _scotus_documents_for_docket_and_number(
@@ -440,7 +440,7 @@ def _scotus_main_docs_prefetch() -> Prefetch:
     has no designated main document, so its lowest attachment_number stands in.
     """
     return Prefetch(
-        "scotusdocument_set",
+        "scotus_documents",
         queryset=SCOTUSDocument.objects.defer("plain_text").order_by(
             "attachment_number", "date_created"
         )[:1],

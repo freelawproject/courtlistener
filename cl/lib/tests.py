@@ -1,6 +1,8 @@
 import datetime
 import pickle
+import threading
 import time
+from concurrent.futures import ThreadPoolExecutor
 from http import HTTPStatus
 from typing import TypedDict, cast
 from unittest import mock
@@ -15,7 +17,7 @@ from django.core.exceptions import ValidationError
 from django.core.files.base import ContentFile
 from django.core.files.uploadedfile import SimpleUploadedFile
 from django.db import models
-from django.http import HttpResponse
+from django.http import Http404, HttpResponse
 from django.template.response import TemplateResponse
 from django.test import RequestFactory, override_settings
 from django.urls import ResolverMatch, reverse
@@ -48,6 +50,7 @@ from cl.lib.file_validation import (
 from cl.lib.filesizes import convert_size_to_bytes
 from cl.lib.middleware import (
     V2_PARTIALS_PREFIX,
+    WIP_PROPS,
     IncrementalNewTemplateMiddleware,
 )
 from cl.lib.mime_types import lookup_mime_type
@@ -83,7 +86,9 @@ from cl.lib.ratelimiter import parse_rate
 from cl.lib.recap_utils import needs_ocr
 from cl.lib.redis_utils import (
     acquire_redis_lock,
+    create_redis_semaphore,
     get_redis_interface,
+    hset_if_lock_held,
     release_redis_lock,
 )
 from cl.lib.s3_cache import get_s3_cache, make_s3_cache_key
@@ -1831,6 +1836,57 @@ class TestRedisUtils(SimpleTestCase):
         result = release_redis_lock(r, lock_key, identifier)
         self.assertEqual(result, 1)
 
+    def test_redis_semaphore_has_single_winner(self) -> None:
+        """Concurrent callers get exactly one winner, and the key keeps its TTL.
+
+        Each round releases many threads at once with a barrier so their
+        Redis calls interleave. A check-then-set implementation lets several
+        of them win.
+        """
+        key = "test_semaphore"
+        threads = 16
+        r = get_redis_interface("CACHE")
+        self.addCleanup(r.delete, key)
+
+        barrier = threading.Barrier(threads)
+
+        def contend(_: int) -> bool:
+            barrier.wait()
+            return create_redis_semaphore(r, key, ttl=60)
+
+        with ThreadPoolExecutor(max_workers=threads) as pool:
+            for round_number in range(20):
+                r.delete(key)
+                winners = sum(pool.map(contend, range(threads)))
+                self.assertEqual(winners, 1, msg=f"round {round_number}")
+        self.assertGreater(r.ttl(key), 0)
+
+    def test_hset_if_lock_held(self) -> None:
+        """Writes apply only while the caller still holds the lock."""
+        lock_key = "test_fenced_lock"
+        hash_name = "test_fenced_hash"
+        r = get_redis_interface("CACHE")
+        r.delete(lock_key, hash_name)
+        self.addCleanup(r.delete, lock_key, hash_name)
+
+        identifier = acquire_redis_lock(r, lock_key, 60_000)
+        self.assertTrue(
+            hset_if_lock_held(
+                r,
+                lock_key,
+                identifier,
+                [(hash_name, "a", 2), (hash_name, "b", 3)],
+            )
+        )
+        self.assertEqual(r.hgetall(hash_name), {"a": "2", "b": "3"})
+
+        # Simulate the lease expiring and another process taking the lock.
+        r.set(lock_key, "someone-else")
+        self.assertFalse(
+            hset_if_lock_held(r, lock_key, identifier, [(hash_name, "a", 1)])
+        )
+        self.assertEqual(r.hget(hash_name, "a"), "2")
+
 
 class TestLinkifyOrigDocketNumber(SimpleTestCase):
     def test_linkify_orig_docket_number(self):
@@ -3016,6 +3072,70 @@ class IncrementalNewTemplateMiddlewareTest(TestCase):
             response.template_name, f"{V2_PARTIALS_PREFIX}foo/button.html"
         )
         self.assertNotIn("search_form", response.context_data or {})
+
+    def test_template_selection_by_flags(self) -> None:
+        """Does each mix of templates and flags pick the right template?
+
+        No WIP template exists in the repo yet, and the ones that do are
+        renamed to v2_ once finished, so the template lookup is stubbed to
+        decide which versions of the page exist in each case.
+        """
+        prefix = WIP_PROPS["prefix"]
+        legacy, v2, wip = "foo.html", "v2_foo.html", f"{prefix}foo.html"
+        # (templates that exist, use_new_design, WIP flag, expected template)
+        # An expected template of None means the middleware raises Http404.
+        cases: list[tuple[set[str], bool, bool, str | None]] = [
+            # Legacy + WIP: only both flags reach the WIP template.
+            ({legacy, wip}, True, True, wip),
+            ({legacy, wip}, True, False, legacy),
+            ({legacy, wip}, False, True, legacy),
+            ({legacy, wip}, False, False, legacy),
+            # WIP-only: there's no template to fall back to.
+            ({wip}, True, True, wip),
+            ({wip}, True, False, None),
+            ({wip}, False, True, None),
+            ({wip}, False, False, None),
+            # WIP wins over v2 for opted-in visitors only.
+            ({legacy, v2, wip}, True, True, wip),
+            ({legacy, v2, wip}, True, False, v2),
+            # v2 pages ignore the WIP flag.
+            ({legacy, v2}, True, True, v2),
+            ({legacy, v2}, False, True, legacy),
+            ({v2}, False, True, v2),
+        ]
+        for existing, new_design, wip_design, expected in cases:
+            with (
+                self.subTest(
+                    existing=sorted(existing),
+                    use_new_design=new_design,
+                    wip_flag=wip_design,
+                ),
+                override_flag("use_new_design", active=new_design),
+                override_flag(WIP_PROPS["flag"], active=wip_design),
+                patch.object(
+                    IncrementalNewTemplateMiddleware,
+                    "template_exists",
+                    side_effect=existing.__contains__,
+                ),
+            ):
+                if expected is None:
+                    with self.assertRaises(Http404):
+                        self.process(legacy)
+                    continue
+                response = self.process(legacy)
+                self.assertEqual(response.template_name, expected)
+                # Only a swapped full page renders the new header and its
+                # search form; a page left on legacy isn't handed one.
+                self.assertEqual(
+                    "search_form" in (response.context_data or {}),
+                    expected != legacy,
+                )
+
+    @override_flag(WIP_PROPS["flag"], True)
+    def test_v2_page_unaffected_by_wip_flag(self) -> None:
+        """Does a real v2 page still get its v2 template with both flags on?"""
+        response = self.process("homepage.html")
+        self.assertEqual(response.template_name, "v2_homepage.html")
 
     def test_htmx_partial_follows_the_design_header(self) -> None:
         """A flagged htmx request gets the partial for the page that sent it.

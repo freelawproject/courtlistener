@@ -60,7 +60,9 @@ def _with_email_relations(
 def _recap_entries_by_pk(des_pks: list[int]) -> QuerySet:
     """Return the DocketEntry rows matching the given pks."""
     return _with_email_relations(
-        DocketEntry.objects.filter(pk__in=des_pks),
+        DocketEntry.objects.filter(pk__in=des_pks).order_by(
+            "recap_sequence_number", "entry_number"
+        ),
         "recap_documents",
         RECAPDocument,
     )
@@ -69,7 +71,9 @@ def _recap_entries_by_pk(des_pks: list[int]) -> QuerySet:
 def _recap_entries_since(docket: Docket, since: datetime) -> QuerySet:
     """Return the docket's entries created at or after `since`."""
     return _with_email_relations(
-        DocketEntry.objects.filter(date_created__gte=since, docket=docket),
+        DocketEntry.objects.filter(
+            date_created__gte=since, docket=docket
+        ).order_by("recap_sequence_number", "entry_number"),
         "recap_documents",
         RECAPDocument,
     )
@@ -89,8 +93,10 @@ RECAP_ALERT_SOURCE = DocketAlertSource(
 def _scotus_entries_by_pk(des_pks: list[int]) -> QuerySet:
     """Return the SCOTUSDocketEntry rows matching the given pks."""
     return _with_email_relations(
-        SCOTUSDocketEntry.objects.filter(pk__in=des_pks),
-        "scotusdocument_set",
+        SCOTUSDocketEntry.objects.filter(pk__in=des_pks).order_by(
+            "sequence_number"
+        ),
+        "scotus_documents",
         SCOTUSDocument,
     )
 
@@ -100,8 +106,8 @@ def _scotus_entries_since(docket: Docket, since: datetime) -> QuerySet:
     return _with_email_relations(
         SCOTUSDocketEntry.objects.filter(
             date_created__gte=since, docket=docket
-        ),
-        "scotusdocument_set",
+        ).order_by("sequence_number"),
+        "scotus_documents",
         SCOTUSDocument,
     )
 

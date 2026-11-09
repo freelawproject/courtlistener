@@ -3,7 +3,7 @@ from inspect import iscoroutinefunction
 from typing import cast
 
 from asgiref.sync import markcoroutinefunction
-from django.http import HttpRequest, HttpResponseBase
+from django.http import Http404, HttpRequest, HttpResponseBase
 from django.template import TemplateDoesNotExist
 from django.template.loader import get_template
 from django.template.response import TemplateResponse
@@ -14,6 +14,13 @@ from cl.search.forms import CorpusSearchForm
 # Templates a view returns on their own (htmx partials) live under this
 # prefix. .github/scripts/frontend_checks.py mirrors it in is_v2_partial.
 V2_PARTIALS_PREFIX = "v2_includes/"
+# Unfinished redesign pages use this prefix instead of "v2_" and are only
+# served to visitors with both "use_new_design" and this flag active.
+# Promoting a page means renaming its template from this prefix to "v2_".
+WIP_PROPS = {
+    "flag": "use_wip_design",
+    "prefix": "wip_",
+}
 
 
 class RobotsHeaderMiddleware:
@@ -89,6 +96,14 @@ class IncrementalNewTemplateMiddleware:
     v2 templates that do not have a legacy counterpart are assumed to be
     available for **everyone**.
 
+    Unfinished pages use the WIP prefix (see WIP_PROPS) in place of "v2_".
+    They are served only when both "use_new_design" and the WIP flag are
+    active, and take precedence over a "v2_" version of the same page.
+
+    WIP templates that do not have a legacy counterpart are available to
+    **everyone** with both flags enabled, and raise Http404 for everyone
+    else, since there is no template they are allowed to see.
+
     htmx requests are swapped by the "X-CL-Design" header instead of the
     flag. `new_base.html` sends it with value "v2" on every htmx request
     from a v2 page, so a partial always matches the page that asked for it.
@@ -144,7 +159,8 @@ class IncrementalNewTemplateMiddleware:
 
         # Checking flag_is_active hits the db, so be sure to short-circuit for cheaper
         # evaluations first
-        if self.template_exists(old_template):
+        old_template_exists = self.template_exists(old_template)
+        if old_template_exists:
             if request.headers.get("Hx-Request"):
                 # A partial must match the page already in the browser, and
                 # only v2 pages mark their htmx requests (see new_base.html).
@@ -155,9 +171,29 @@ class IncrementalNewTemplateMiddleware:
             if not expects_v2:
                 return response
 
-        new_template_name = f"v2_{old_template}"
+        v2_template_name = f"v2_{old_template}"
+        wip_template_name = f"{WIP_PROPS['prefix']}{old_template}"
+        v2_template_exists = self.template_exists(v2_template_name)
+        wip_template_exists = self.template_exists(wip_template_name)
 
-        if not self.template_exists(new_template_name):
+        # The WIP flag only counts together with "use_new_design", which is
+        # checked here because the gate above may have let the request
+        # through on the design header instead. Both flags go last so pages
+        # without a WIP template never evaluate them.
+        if (
+            wip_template_exists
+            and flag_is_active(request, "use_new_design")
+            and flag_is_active(request, WIP_PROPS["flag"])
+        ):
+            new_template_name = wip_template_name
+        elif v2_template_exists:
+            new_template_name = v2_template_name
+        elif not old_template_exists and wip_template_exists:
+            # WIP-only page and the visitor isn't opted in: there's no
+            # template they're allowed to see. Rendering the missing legacy
+            # template would be a 500, so answer as if the page didn't exist.
+            raise Http404
+        else:
             return response
 
         response.template_name = new_template_name

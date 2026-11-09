@@ -1,4 +1,4 @@
-from collections.abc import Callable
+from collections.abc import Callable, Iterable
 from typing import Any, ClassVar, cast
 
 from django.db.models import Model, QuerySet
@@ -79,17 +79,19 @@ class PartyMerger[PType: ScrapeParty[ScrapeRepresentative], ParamType](
     Merger[PType, RelatedParams[ParamType], Party]
 ):
     model: ClassVar[type[Model]] = Party
+    key: ClassVar[Iterable[str]] = ["name"]
 
     attorneys: list[Attorney] = AttorneyRelation()
     name: str = Attribute(_party_name)
 
     def query(self) -> QuerySet[Party]:
-        # Parties have no natural key, so treat the name as unique within the
-        # parent docket, like the RECAP mergers do.
+        """Find the party by its natural key within the parent docket.
+
+        The default key is the name, like the RECAP mergers use; a source that
+        identifies parties more reliably sets `key` to that field instead.
+        """
         docket = cast(Docket, self.params.parent)
-        return self.manager.filter(
-            name=self.transformed["name"], party_types__docket=docket
-        ).distinct()
+        return super().query().filter(party_types__docket=docket).distinct()
 
 
 def _party_type_name(
