@@ -1575,7 +1575,7 @@ Sample code here.
   {# PROFILE SECTION SHELL #}
   <section class="max-w-full w-full border-t-2 border-greyscale-200" x-intersect.margin.-100px="show" id="profile-section-shell">
     <h2 class="mt-6 mb-3">Profile section shell</h2>
-    <p>Responsive shell shared by authenticated profile pages. It renders the profile navigation on desktop, the active section heading on mobile, and page-specific content in its default slot.</p>
+    <p>Responsive shell shared by authenticated profile pages. It renders the profile navigation on desktop and page-specific content in its default slot. It owns the page's <code>h1</code>, so the page's own headings start at <code>h2</code>.</p>
 
     <c-library.list title="Props" only>
       <c-library.item only>
@@ -1583,8 +1583,12 @@ Sample code here.
         <c-slot name="description">The active profile section: <code>"alerts"</code>, <code>"notes"</code>, <code>"tags"</code>, <code>"developer_tools"</code>, <code>"prayers"</code>, <code>"support"</code>, or <code>"account"</code>.</c-slot>
       </c-library.item>
       <c-library.item only>
-        <c-slot name="label"><code>username</code></c-slot>
-        <c-slot name="description">Username used to build the Tags and Prayers navigation URLs.</c-slot>
+        <c-slot name="label"><code>request</code></c-slot>
+        <c-slot name="description">The current request. The Tags and Prayers links use its user's username.</c-slot>
+      </c-library.item>
+      <c-library.item only>
+        <c-slot name="label"><code>csrf_token</code></c-slot>
+        <c-slot name="description">The page's CSRF token, for the Sign out form. Required because the shell is rendered with <code>only</code>, which hides the page's context.</c-slot>
       </c-library.item>
       <c-library.item optional only>
         <c-slot name="label"><code>class</code></c-slot>
@@ -1603,7 +1607,9 @@ Sample code here.
       <c-code>
 &lt;c-profile-section-shell
   active_section="developer_tools"
-  :username="request.user.username"
+  :request="request"
+  :csrf_token="csrf_token"
+  only
 &gt;
   &lt;!-- Page-specific content --&gt;
 &lt;/c-profile-section-shell&gt;
