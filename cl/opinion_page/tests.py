@@ -1,5 +1,7 @@
 import asyncio
+import csv
 import datetime
+import io
 import json
 import os
 import re
@@ -144,6 +146,7 @@ from cl.search.models import (
     OpinionCluster,
     OriginatingCourtInformation,
     RECAPDocument,
+    SCOTUSDocument,
 )
 from cl.sitemaps_infinite.sitemap_generator import generate_urls_chunk
 from cl.tests.cases import ESIndexTestCase, SimpleTestCase, TestCase
@@ -3590,17 +3593,19 @@ class DocketEntryFileDownload(TestCase):
         WAFFLE_CACHE_PREFIX="test_csv_export_scotus_docket_waffle"
     )
     @override_flag("scotus_docket_page", active=True)
-    def test_csv_export_return_gracefully_for_scotus_docket(self) -> None:
-        """SCOTUSDocketEntry/SCOTUSDocument don't implement CSV
-        export yet, but the button should stay visible. Clicking
-        it must return a handled error status.
-        """
+    def test_csv_export_for_scotus_docket(self) -> None:
+        """A SCOTUS docket exports its entries and their documents."""
         scotus_court = CourtFactory(id="scotus", jurisdiction="F")
         scotus_docket = DocketFactory(
             court=scotus_court, source=Docket.SCRAPER
         )
         entry = SCOTUSDocketEntryFactory(docket=scotus_docket)
-        SCOTUSDocumentFactory(docket_entry=entry)
+        document = SCOTUSDocumentFactory(
+            docket_entry=entry,
+            filepath_local="scotus/test.pdf",
+            ocr_status=SCOTUSDocument.OCR_COMPLETE,
+            sha1="a" * 40,
+        )
         self.client.login(username=self.user.username, password="password")
 
         response = self.client.get(
@@ -3609,28 +3614,20 @@ class DocketEntryFileDownload(TestCase):
                 kwargs={"docket_id": scotus_docket.id},
             )
         )
-        self.assertEqual(response.status_code, HTTPStatus.NOT_IMPLEMENTED)
 
-    def test_csv_export_real_bug_still_surfaces_for_recap_docket(
-        self,
-    ) -> None:
-        """The SCOTUS error catch must not mask a real bug in the
-        RECAP CSV path. That should still raise, not quietly
-        return a handled 501.
-        """
-        self.client.login(username=self.user.username, password="password")
-
-        with mock.patch(
-            "cl.opinion_page.views.generate_docket_entries_csv_data",
-            side_effect=AttributeError("boom"),
-        ):
-            with self.assertRaises(AttributeError):
-                self.client.get(
-                    reverse(
-                        "view_download_docket",
-                        kwargs={"docket_id": self.mocked_docket.id},
-                    )
-                )
+        self.assertEqual(response.status_code, HTTPStatus.OK)
+        header, row = csv.reader(io.StringIO(response.content.decode()))
+        self.assertEqual(header[0], "scotusdocketentry_id")
+        self.assertEqual(row[0], str(entry.pk))
+        self.assertEqual(row[header.index("scotusdocument_url")], document.url)
+        self.assertEqual(
+            row[header.index("scotusdocument_filepath_local")],
+            "https://storage.courtlistener.com/scotus/test.pdf",
+        )
+        self.assertEqual(
+            row[header.index("scotusdocument_ocr_status")], "OCR Complete"
+        )
+        self.assertEqual(row[header.index("scotusdocument_sha1")], "a" * 40)
 
 
 class DocketFeedTest(TestCase):

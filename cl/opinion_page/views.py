@@ -641,21 +641,7 @@ def download_docket_entries_csv(
     filename = f"{case_name}.{court_id}.{docket_id}.{date_str}.csv"
 
     # TODO check if for large files we'll cache or send file by email
-    try:
-        csv_content = (
-            generate_docket_entries_csv_data(de_list) if de_list else b""
-        )
-    except (NotImplementedError, AttributeError):
-        # Some docket sources (e.g. SCOTUS) don't support CSV export yet.
-        # Only return a handled 501 for those. A RECAP docket hitting
-        # this branch means a real bug in the CSV path, and that should
-        # still raise a error 500.
-        if docket.get_entry_source() is docket_entry_sources.RECAP:
-            raise
-        # A handled 501 shows an error message instead of crashing: the
-        # generic one in legacy's export-csv.js, the status-keyed one in the
-        # v2 download composable.
-        return HttpResponse(status=501)
+    csv_content = generate_docket_entries_csv_data(de_list) if de_list else b""
     response: HttpResponse = HttpResponse(csv_content, content_type="text/csv")
     response["Content-Disposition"] = f'attachment; filename="{filename}"'
     return response
