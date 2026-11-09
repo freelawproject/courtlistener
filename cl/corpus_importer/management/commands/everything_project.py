@@ -7,6 +7,7 @@ from celery.canvas import chain
 from django.conf import settings
 
 from cl.corpus_importer.tasks import (
+    DocketReportQueryParams,
     filter_docket_by_tags,
     get_docket_by_pacer_case_id,
     get_pacer_case_id_and_title,
@@ -155,10 +156,12 @@ def get_dockets(
                 court_id=row.district_id,
                 session_data=session,
                 tag_names=tags,
-                show_parties_and_counsel=True,
-                show_terminated_parties=True,
-                show_list_of_member_cases=False,
-                doc_num_end=doc_num_end,
+                **DocketReportQueryParams(
+                    show_parties_and_counsel=True,
+                    show_terminated_parties=True,
+                    show_list_of_member_cases=False,
+                    doc_num_end=doc_num_end,
+                ),
             ).set(queue=q),
         ).apply_async()
 
