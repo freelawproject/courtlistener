@@ -17,6 +17,7 @@ from django.utils.timezone import now
 from elasticsearch.exceptions import ConnectionError
 from redis import ConnectionError as RedisConnectionError
 
+from cl.alerts.docket_alert_sources import SCOTUS_ALERT_SOURCE
 from cl.alerts.models import Alert, DocketAlert, ScheduledAlertHit
 from cl.alerts.utils import (
     add_document_hit_to_alert_set,
@@ -397,8 +398,14 @@ def send_alert_and_webhook(
     )
     DocketAlert.objects.filter(docket=d).update(date_last_hit=now())
 
-    # Send docket entries to webhook
-    send_docket_alert_webhook_events.delay(des_pks, webhook_recipients)
+    # Send docket entries to webhook. SCOTUS webhooks stay off until
+    # send_docket_alert_webhook_events supports SCOTUSDocketEntry: it looks
+    # des_pks up as DocketEntry pks, so it would send unrelated RECAP entries.
+    if (
+        source is not SCOTUS_ALERT_SOURCE
+        or settings.SCOTUS_DOCKET_ALERT_WEBHOOKS_ENABLED
+    ):
+        send_docket_alert_webhook_events.delay(des_pks, webhook_recipients)
     if not recap_email_user_only:
         delete_redis_semaphore("ALERTS", make_alert_key(d_pk))
 
@@ -608,7 +615,7 @@ def create_schedule_alerts_hits_in_bulk(
     return len(hits_to_create)
 
 
-@app.task(ignore_result=True)
+@app.task(ignore_result=True, queue=settings.CELERY_SEARCH_ALERTS_QUEUE)
 def percolator_response_processing(response: SendAlertsResponse) -> None:
     """Process the response from the percolator and handle alerts triggered by
      the percolator query.
@@ -790,6 +797,7 @@ def percolator_response_processing(response: SendAlertsResponse) -> None:
     autoretry_for=(ConnectionError,),
     max_retries=3,
     interval_start=5,
+    queue=settings.CELERY_SEARCH_ALERTS_QUEUE,
 )
 def send_or_schedule_search_alerts(
     self: Task, response: SaveESDocumentReturn | None

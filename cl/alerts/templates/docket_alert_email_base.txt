@@ -1,0 +1,35 @@
+
+{# Shared by every source's docket alert email; each source's template extends it and fills the blocks. #}{% load text_filters %}{% load humanize %}{% load tz %}{% block intro %}{% endblock %}
+**************************
+CourtListener Docket Alert
+**************************
+
+{{ count }} New Entr{{ count|pluralize:"y,ies" }} in {{ docket|best_case_name|safe }} {% if docket.docket_number %}({{ docket.docket_number }}){% endif %}
+{{ docket.court }}
+~~~
+View Docket: https://www.courtlistener.com{{ docket.get_absolute_url }}?order_by=desc{% block docket_links %}{% endblock %}
+{% block rows %}{% endblock %}
+
+{% if notes or tags %}
+Your Note: {% if notes %}{{ notes }}{% else %} You have not added notes to this case. Learn More: {{ WIKI_HELP_URL }}/general/using-notes-to-annotate-content{% endif %}
+
+Your Tags: {% if tags %}{% for tag in tags %}{{ tag.name }}{% if not forloop.last %}, {% endif %}{% endfor %}{% else %} No tags yet. Learn More: {{ WIKI_HELP_URL }}/general/using-tags-to-organize-docket-collections{% endif %}
+{% else %}
+Use notes and tags to organize and share the cases you follow. Learn More: {{ WIKI_HELP_URL }}/general/using-tags-to-organize-docket-collections
+{% endif %}
+
+{% if not first_email or first_email and auto_subscribe %}
+This alert was sent because you subscribed to this docket with your account on CourtListener.com.
+To disable this alert unsubscribe here: https://www.courtlistener.com{% url 'toggle_docket_alert_confirmation' 'unsubscribe' docket_alert_secret_key %}
+{% endif %}
+************************
+{% include "includes/alert_promo_banner.txt" %}
+
+This alert brought to you by the 501(c)(3) non-profit Free Law Project
+
+ - Blog: https://free.law
+ - BlueSky: https://bsky.app/profile/free.law
+ - Donate: https://donate.free.law/forms/supportflp
+ - Become a Member: https://free.law/membership/
+
+Please donate to support our work.

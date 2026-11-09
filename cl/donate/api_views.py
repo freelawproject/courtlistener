@@ -148,7 +148,9 @@ class MembershipWebhookViewSet(
             User: User object associated with the Neon account
         """
         try:
-            user = User.objects.select_for_update().get(
+            # FOR NO KEY UPDATE for the same reason as in _lock_membership:
+            # FOR UPDATE would deadlock with sync_neon_memberships.
+            user = User.objects.select_for_update(no_key=True).get(
                 profile__neon_account_id=account_id
             )
         except User.DoesNotExist:
@@ -279,6 +281,44 @@ class MembershipWebhookViewSet(
             trigger=trigger,
         )
 
+    @staticmethod
+    def _lock_membership(neon_id: str) -> NeonMembership | None:
+        """Lock a membership's user, then the membership, and return it.
+
+        Use this before changing or deleting a membership. Must be called
+        inside a transaction.
+
+        Every handler must lock the User before the membership. Creation
+        locks the User first via _get_member_record, so a handler that
+        locked the membership first could deadlock with an overlapping
+        webhook for the same user. That includes a handler that only writes
+        APIThrottle rows, whose foreign key check locks the User at commit.
+
+        Both locks are FOR NO KEY UPDATE. That foreign key check takes
+        FOR KEY SHARE on the User, which conflicts with FOR UPDATE but not
+        with FOR NO KEY UPDATE. The sync_neon_memberships command locks the
+        membership and then writes APIThrottle rows without locking the
+        User, so a FOR UPDATE lock on the User here would deadlock with it.
+
+        :param neon_id: The Neon membership ID.
+        :return: The locked membership, or None if no membership has this
+        ID once the locks are held, e.g. because a concurrent
+        createMembership replaced it.
+        """
+        user_id = (
+            NeonMembership.objects.filter(neon_id=neon_id)
+            .values_list("user_id", flat=True)
+            .first()
+        )
+        if user_id is None:
+            return None
+        User.objects.select_for_update(no_key=True).filter(pk=user_id).first()
+        return (
+            NeonMembership.objects.select_for_update(no_key=True)
+            .filter(neon_id=neon_id)
+            .first()
+        )
+
     def _handle_membership_update(self, webhook_data) -> None:
         """Apply an updateMembership/editMembership webhook to its local record.
 
@@ -288,12 +328,13 @@ class MembershipWebhookViewSet(
         row stays locked until the webhook commits.
         """
         membership_data = self._get_membership_data(webhook_data)
-        # Lock the row so this read waits for any concurrent writer, such as
-        # the sync_neon_memberships command, and sees its result.
-        neon_membership = (
-            NeonMembership.objects.select_for_update(no_key=True)
-            .filter(neon_id=membership_data["membershipId"])
-            .first()
+        # Lock the row so a concurrent writer can't change it between this
+        # read and the save below. That writer can be a createMembership
+        # webhook for the same upgrade or the sync_neon_memberships command.
+        # Without the lock, this handler could save stale data over theirs,
+        # or find the row gone and crash.
+        neon_membership = self._lock_membership(
+            membership_data["membershipId"]
         )
         if neon_membership is None:
             # Prevents an existing membership from being overwritten by data
@@ -403,14 +444,13 @@ class MembershipWebhookViewSet(
     @staticmethod
     def _handle_membership_deletion(webhook_data) -> None:
         membership_data = webhook_data["data"]["membership"]
-        try:
-            # Locked for the same reason as in _handle_membership_update: the
-            # row is deleted by primary key, so a stale read could remove a
-            # membership the sync command has just renewed.
-            neon_membership = NeonMembership.objects.select_for_update(
-                no_key=True
-            ).get(neon_id=membership_data["membershipId"])
-        except NeonMembership.DoesNotExist:
+        # Locked for the same reason as in _handle_membership_update: the
+        # row is deleted by primary key, so a stale read could remove a
+        # membership the sync command has just renewed.
+        neon_membership = MembershipWebhookViewSet._lock_membership(
+            membership_data["membershipId"]
+        )
+        if neon_membership is None:
             return HttpResponse(
                 "Error processing webhook, Membership not found",
                 status=HTTPStatus.INTERNAL_SERVER_ERROR,

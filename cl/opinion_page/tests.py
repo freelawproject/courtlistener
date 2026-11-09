@@ -6,6 +6,7 @@ import re
 import shutil
 import threading
 from datetime import date
+from hashlib import md5
 from http import HTTPStatus
 from itertools import product
 from typing import TYPE_CHECKING, Any, cast
@@ -19,6 +20,7 @@ from django.conf import settings
 from django.contrib.auth.hashers import make_password
 from django.contrib.auth.models import AnonymousUser, Group, Permission, User
 from django.contrib.staticfiles.finders import find
+from django.core.cache import caches
 from django.core.files.uploadedfile import SimpleUploadedFile
 from django.core.management import call_command
 from django.core.paginator import Paginator
@@ -962,6 +964,31 @@ class ViewSCOTUSDocumentTest(TestCase):
             with_file.get_absolute_url(),
         )
         self.assertIsNone(_scotus_document_detail_url(without_file))
+
+    async def test_download_redirect_to_source_court_website(self) -> None:
+        """redirect_to_download falls back to the source's own external URL
+        when we don't have the file."""
+        entry = await sync_to_async(SCOTUSDocketEntryFactory)(
+            docket=self.docket
+        )
+        document = await sync_to_async(SCOTUSDocumentFactory)(
+            docket_entry=entry,
+            attachment_number=1,
+            filepath_local="",
+            url="https://www.supremecourt.gov/DocketPDF/test.pdf",
+        )
+        path = reverse(
+            "view_recap_attachment",
+            kwargs={
+                "docket_id": self.docket.id,
+                "doc_num": document.document_number,
+                "att_num": document.attachment_number,
+                "slug": self.docket.slug,
+            },
+        )
+        r = await self.async_client.get(path, {"redirect_to_download": True})
+        self.assertEqual(r.status_code, HTTPStatus.FOUND)
+        self.assertEqual(r["Location"], document.url)
 
 
 @override_settings(WAFFLE_CACHE_PREFIX="test_scotus_document_flag_waffle")
@@ -3538,6 +3565,27 @@ class DocketEntryFileDownload(TestCase):
         response = self.client.get(download_path)
         self.assertRedirects(response, redirect_path)
 
+    @mock.patch(
+        "django_ratelimit.decorators.is_ratelimited", return_value=False
+    )
+    def test_anonymous_requests_do_not_count_against_limit(
+        self, mock_is_ratelimited: MagicMock
+    ) -> None:
+        """The export's limit is shared by everyone, so only signed-in
+        requests may count against it; anonymous ones are sent to sign in
+        first.
+        """
+        download_path = reverse(
+            "view_download_docket", kwargs={"docket_id": self.mocked_docket.id}
+        )
+        response = self.client.get(download_path)
+        self.assertEqual(response.status_code, HTTPStatus.FOUND)
+        mock_is_ratelimited.assert_not_called()
+
+        self.client.login(username=self.user.username, password="password")
+        self.client.get(download_path)
+        mock_is_ratelimited.assert_called_once()
+
     @override_settings(
         WAFFLE_CACHE_PREFIX="test_csv_export_scotus_docket_waffle"
     )
@@ -3583,6 +3631,235 @@ class DocketEntryFileDownload(TestCase):
                         kwargs={"docket_id": self.mocked_docket.id},
                     )
                 )
+
+
+class DocketFeedTest(TestCase):
+    """Does the docket RSS feed render the right content for both RECAP
+    and SCOTUS dockets?"""
+
+    @classmethod
+    def setUpTestData(cls) -> None:
+        cls.recap_court = CourtFactory(id="ca5", jurisdiction="F")
+        cls.recap_docket = DocketFactory(
+            court=cls.recap_court, docket_number="1:23-cv-456"
+        )
+        cls.scotus_court = CourtFactory(id="scotus", jurisdiction="F")
+        cls.scotus_docket = DocketFactory(
+            court=cls.scotus_court, docket_number="23-456"
+        )
+        # A SCOTUS docket that never gets entries, for the empty-feed test.
+        cls.empty_scotus_docket = DocketFactory(
+            court=cls.scotus_court, docket_number="23-457"
+        )
+
+    def setUp(self) -> None:
+        # Every test reuses these docket URLs and the view is cached
+        # (cache_page_ignore_params, keyed on md5(url_path)), so a stale
+        # response would leak between tests. Delete only our own keys --
+        # deleting everything would wipe a parallel worker's unrelated
+        # entry, since they share one Redis.
+        cache = caches["default"]
+        for docket in (
+            self.recap_docket,
+            self.scotus_docket,
+            self.empty_scotus_docket,
+        ):
+            url_path = reverse("docket_feed", kwargs={"docket_id": docket.id})
+            hash_key = md5(url_path.encode("ascii"), usedforsecurity=False)
+            cache.delete(
+                f"custom.views.decorator.cache:{hash_key.hexdigest()}"
+            )
+
+    async def get_feed(self, docket: Docket):
+        return await self.async_client.get(
+            reverse("docket_feed", kwargs={"docket_id": docket.id})
+        )
+
+    async def test_recap_entry_with_main_document_renders_full_entry(
+        self,
+    ) -> None:
+        de = await sync_to_async(DocketEntryFactory)(
+            docket=self.recap_docket,
+            entry_number=5,
+            date_filed="2024-01-01",
+            description="",
+        )
+        await sync_to_async(RECAPDocumentFactory)(
+            docket_entry=de,
+            document_number="5",
+            description="Motion to dismiss",
+            filepath_local="recap/test.pdf",
+        )
+        r = await self.get_feed(self.recap_docket)
+        body = r.content.decode()
+        self.assertIn("Entry #5", body)
+        self.assertIn("Motion to dismiss", body)
+        self.assertIn("storage.courtlistener.com/recap/test.pdf", body)
+
+    async def test_recap_attachment_only_entry_falls_back_to_entry_description(
+        self,
+    ) -> None:
+        de = await sync_to_async(DocketEntryFactory)(
+            docket=self.recap_docket,
+            entry_number=6,
+            date_filed="2024-01-02",
+            description="Attachment-only entry",
+        )
+        await sync_to_async(RECAPDocumentFactory)(
+            docket_entry=de,
+            document_type=RECAPDocument.ATTACHMENT,
+            attachment_number=1,
+            document_number="6",
+        )
+        r = await self.get_feed(self.recap_docket)
+        body = r.content.decode()
+        self.assertIn("Attachment-only entry", body)
+        self.assertNotIn('rel="enclosure"', body)
+
+    async def test_recap_minute_entry_has_no_enclosure(self) -> None:
+        de = await sync_to_async(DocketEntryFactory)(
+            docket=self.recap_docket,
+            entry_number=None,
+            date_filed="2024-01-03",
+        )
+        r = await self.get_feed(self.recap_docket)
+        body = r.content.decode()
+        self.assertIn(f"Minute entry from {de.date_filed}", body)
+        self.assertNotIn('rel="enclosure"', body)
+
+    async def test_recap_main_document_without_local_file_uses_pacer_fallback(
+        self,
+    ) -> None:
+        de = await sync_to_async(DocketEntryFactory)(
+            docket=self.recap_docket, entry_number=7, date_filed="2024-01-04"
+        )
+        rd = await sync_to_async(RECAPDocumentFactory)(
+            docket_entry=de,
+            document_number="7",
+            filepath_local="",
+            pacer_doc_id="998877",
+        )
+        r = await self.get_feed(self.recap_docket)
+        self.assertIn(rd.pacer_url, r.content.decode())
+
+    async def test_recap_entry_without_date_filed_is_excluded(self) -> None:
+        await sync_to_async(DocketEntryFactory)(
+            docket=self.recap_docket,
+            entry_number=8,
+            date_filed=None,
+            description="Should not appear",
+        )
+        r = await self.get_feed(self.recap_docket)
+        self.assertNotIn("Should not appear", r.content.decode())
+
+    async def test_scotus_entry_with_one_document_renders_full_entry(
+        self,
+    ) -> None:
+        de = await sync_to_async(SCOTUSDocketEntryFactory)(
+            docket=self.scotus_docket,
+            entry_number=1,
+            date_filed="2024-02-01",
+            description="",
+        )
+        await sync_to_async(SCOTUSDocumentFactory)(
+            docket_entry=de,
+            document_number=1,
+            attachment_number=1,
+            description="Petition for writ of certiorari",
+            filepath_local="scotus/test.pdf",
+        )
+        r = await self.get_feed(self.scotus_docket)
+        body = r.content.decode()
+        self.assertIn("Entry #1", body)
+        self.assertIn("Petition for writ of certiorari", body)
+        self.assertIn("storage.courtlistener.com/scotus/test.pdf", body)
+
+    async def test_scotus_entry_with_multiple_documents_uses_lowest_attachment_number(
+        self,
+    ) -> None:
+        de = await sync_to_async(SCOTUSDocketEntryFactory)(
+            docket=self.scotus_docket,
+            entry_number=2,
+            date_filed="2024-02-02",
+            description="",
+        )
+        await sync_to_async(SCOTUSDocumentFactory)(
+            docket_entry=de,
+            document_number=2,
+            attachment_number=2,
+            description="Second document",
+        )
+        await sync_to_async(SCOTUSDocumentFactory)(
+            docket_entry=de,
+            document_number=2,
+            attachment_number=1,
+            description="First document",
+        )
+        r = await self.get_feed(self.scotus_docket)
+        body = r.content.decode()
+        self.assertIn("First document", body)
+        self.assertNotIn("Second document", body)
+
+    async def test_scotus_entry_with_zero_documents_falls_back_to_entry_description(
+        self,
+    ) -> None:
+        await sync_to_async(SCOTUSDocketEntryFactory)(
+            docket=self.scotus_docket,
+            entry_number=3,
+            date_filed="2024-02-03",
+            description="DISTRIBUTED for Conference",
+        )
+        r = await self.get_feed(self.scotus_docket)
+        body = r.content.decode()
+        self.assertIn("DISTRIBUTED for Conference", body)
+        self.assertNotIn('rel="enclosure"', body)
+
+    async def test_scotus_document_without_local_file_uses_external_url_fallback(
+        self,
+    ) -> None:
+        de = await sync_to_async(SCOTUSDocketEntryFactory)(
+            docket=self.scotus_docket, entry_number=4, date_filed="2024-02-04"
+        )
+        await sync_to_async(SCOTUSDocumentFactory)(
+            docket_entry=de,
+            document_number=4,
+            attachment_number=1,
+            filepath_local="",
+            url="https://www.supremecourt.gov/DocketPDF/test.pdf",
+        )
+        r = await self.get_feed(self.scotus_docket)
+        self.assertIn(
+            "https://www.supremecourt.gov/DocketPDF/test.pdf",
+            r.content.decode(),
+        )
+
+    async def test_scotus_entry_without_entry_number_has_no_enclosure(
+        self,
+    ) -> None:
+        de = await sync_to_async(SCOTUSDocketEntryFactory)(
+            docket=self.scotus_docket,
+            entry_number=None,
+            date_filed="2024-02-06",
+        )
+        r = await self.get_feed(self.scotus_docket)
+        body = r.content.decode()
+        self.assertIn(f"Minute entry from {de.date_filed}", body)
+        self.assertNotIn('rel="enclosure"', body)
+
+    async def test_scotus_entry_without_date_filed_is_excluded(self) -> None:
+        await sync_to_async(SCOTUSDocketEntryFactory)(
+            docket=self.scotus_docket,
+            entry_number=10,
+            date_filed=None,
+            description="Should not appear",
+        )
+        r = await self.get_feed(self.scotus_docket)
+        self.assertNotIn("Should not appear", r.content.decode())
+
+    async def test_empty_scotus_docket_renders_valid_empty_feed(self) -> None:
+        r = await self.get_feed(self.empty_scotus_docket)
+        self.assertEqual(r.status_code, HTTPStatus.OK)
+        self.assertNotIn("<entry>", r.content.decode())
 
 
 class CachePageIgnoreParamsTest(TestCase):

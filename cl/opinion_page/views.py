@@ -621,8 +621,12 @@ def make_rd_title(rd: RECAPDocument | SCOTUSDocument) -> str:
     )
 
 
-@ratelimiter_all_10_per_h
+# login_required goes first so that anonymous requests are redirected to sign
+# in without counting against the limit. The limit is keyed by path, so all
+# users share it, and anonymous traffic could otherwise block a docket's export
+# for everyone.
 @login_required
+@ratelimiter_all_10_per_h
 def download_docket_entries_csv(
     request: HttpRequest, docket_id: int
 ) -> HttpResponse:
@@ -786,16 +790,17 @@ async def recap_document_context(
     redirect_or_modal = request.GET.get("redirect_or_modal", False)
     if rd_download_redirect or redirect_or_modal:
         # Check if the document is available from CourtListener and
-        # if it is, redirect to the local document
-        # if it isn't, if pacer_url is available and
-        # rd_download_redirect is True, redirect to PACER. If redirect_or_modal
-        # is True set redirect_to_pacer_modal to True to open the modal.
+        # if it is, redirect to the local document. If it isn't, fall back
+        # to the source's own external URL (PACER for RECAP, the source
+        # court's website for SCOTUS) when rd_download_redirect is True.
+        # redirect_or_modal instead opens the Buy-on-PACER modal.
         if rd.is_available:
             return HttpResponseRedirect(rd.filepath_local.url)
-        elif source.has_pay_and_pray:
-            if rd.pacer_url and rd_download_redirect:
-                return HttpResponseRedirect(rd.pacer_url)
-            if rd.pacer_url and redirect_or_modal:
+        else:
+            external_url = source.document_external_url(rd)
+            if external_url and rd_download_redirect:
+                return HttpResponseRedirect(external_url)
+            if source.has_pay_and_pray and external_url and redirect_or_modal:
                 redirect_to_pacer_modal = True
 
     title = make_rd_title(rd)

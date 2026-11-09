@@ -167,6 +167,7 @@ jobs:
           - celery-inception
           - celery-es-sweep
           - celery-recap-fetch
+          - celery-search-alerts
     steps:
       - name: Configure AWS credentials
         uses: aws-actions/configure-aws-credentials@e1253824e5c10ff9df46874f81ed3ec929e19cfd # v6
