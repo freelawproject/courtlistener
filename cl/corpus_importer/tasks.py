@@ -5284,7 +5284,9 @@ def fl_corpus_download_task(bucket: str, key: str) -> tuple[bytes, str, str]:
     max_retries=5,
     retry_backoff=5 * 60,
     retry_backoff_max=60 * 60,
-    retry_jitter=True,
+    # Jitter picks a wait anywhere between zero and the backoff, which can
+    # retry while the court is still refusing us.
+    retry_jitter=False,
 )
 @throttle_task("2/s")
 def download_fl_document(self: Task, fl_document_pk: int) -> int | None:
@@ -5386,7 +5388,9 @@ def fl_ingest_docket_task(
     max_retries=5,
     retry_backoff=5 * 60,
     retry_backoff_max=60 * 60,
-    retry_jitter=True,
+    # Jitter picks a wait anywhere between zero and the backoff, which can
+    # retry while the court is still refusing us.
+    retry_jitter=False,
 )
 def download_state_document(
     self: Task,

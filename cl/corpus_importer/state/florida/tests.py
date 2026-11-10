@@ -1960,6 +1960,33 @@ class FloridaDocumentDownloadTest(TestCase):
         self.assertFalse(fl_document.filepath_local)
         self.extract_document_mock.assert_not_called()
 
+    def test_download_refusal_retries_wait_full_backoff(self) -> None:
+        """Does every retry of a refused download wait its whole backoff
+        interval? A retry sent while the court is still blocking us is
+        wasted, so the waits must not be shortened at random."""
+        fl_document = FloridaDocumentModelFactory.create()
+        self.download_document_mock.return_value.__enter__.side_effect = (
+            requests.HTTPError(response=mock.Mock(status_code=403))
+        )
+
+        with mock.patch.object(
+            download_fl_document, "retry", wraps=download_fl_document.retry
+        ) as retry_mock:
+            download_fl_document.apply(args=(fl_document.pk,))
+
+        minute = 60
+        # The final call to retry raises the refusal instead of waiting.
+        waits = [
+            call.kwargs["countdown"]
+            for call in retry_mock.call_args_list[
+                : download_fl_document.max_retries
+            ]
+        ]
+        self.assertEqual(
+            waits,
+            [5 * minute, 10 * minute, 20 * minute, 40 * minute, 60 * minute],
+        )
+
     @mock.patch("cl.search.state.shared.logger")
     @mock.patch("cl.scrapers.utils.get_extension", return_value=".tiff")
     def test_download_tiff_extracts_without_warning(
