@@ -1120,6 +1120,28 @@ class DocketAlertSourceTest(TestCase):
             set(entries.values_list("pk", flat=True)), {de_new.pk}
         )
 
+    def test_scotus_source_lookups_return_oldest_entries_first(self) -> None:
+        """Do both SCOTUS lookups return entries oldest first, like RECAP's?"""
+        before = now()
+        des = [
+            SCOTUSDocketEntryFactory(
+                docket=self.scotus_docket, sequence_number=seq
+            )
+            for seq in ("2025-01-03.001", "2025-01-01.001", "2025-01-02.001")
+        ]
+        expected = ["2025-01-01.001", "2025-01-02.001", "2025-01-03.001"]
+        lookups = {
+            "entries_by_pk": SCOTUS_ALERT_SOURCE.entries_by_pk(
+                [de.pk for de in des]
+            ),
+            "entries_since": SCOTUS_ALERT_SOURCE.entries_since(
+                self.scotus_docket, before
+            ),
+        }
+        for lookup_name, qs in lookups.items():
+            with self.subTest(lookup=lookup_name):
+                self.assertEqual([de.sequence_number for de in qs], expected)
+
     def test_docket_get_alert_source_dispatches_by_court_id(self) -> None:
         """Does Docket.get_alert_source() route to the right registry entry?"""
         self.assertIs(self.recap_docket.get_alert_source(), RECAP_ALERT_SOURCE)
@@ -1161,7 +1183,7 @@ class DocketAlertSourceTest(TestCase):
                 "SCOTUS",
                 SCOTUS_ALERT_SOURCE,
                 self.scotus_docket,
-                "scotusdocument_set",
+                "scotus_documents",
             ),
         ]
         for source_name, source, docket, docs_attr in cases:
@@ -1217,6 +1239,40 @@ class DocketAlertScotusTest(TestCase):
         after = now()
         send_alert_and_webhook(self.docket.pk, after)
         self.assertEqual(len(mail.outbox), 0)
+
+    def test_multiple_new_entries_render_correctly_in_one_alert_email(
+        self,
+    ) -> None:
+        """A single alert email bundles every entry created since `since`."""
+        de1 = SCOTUSDocketEntryFactory(docket=self.docket)
+        SCOTUSDocumentFactory(docket_entry=de1, description="First entry")
+        de2 = SCOTUSDocketEntryFactory(docket=self.docket)
+        SCOTUSDocumentFactory(docket_entry=de2, description="Second entry")
+
+        send_alert_and_webhook(self.docket.pk, self.before)
+        self.assertEqual(len(mail.outbox), 1)
+        body = mail.outbox[0].body
+        self.assertIn("First entry", body)
+        self.assertIn("Second entry", body)
+
+    @mock.patch("cl.alerts.tasks.send_docket_alert_webhook_events")
+    def test_scotus_webhooks_are_gated_by_setting(self, mock_webhooks) -> None:
+        """Does the SCOTUS alert email go out while its webhook is only
+        queued when SCOTUS_DOCKET_ALERT_WEBHOOKS_ENABLED is on?"""
+        de = SCOTUSDocketEntryFactory(docket=self.docket)
+        SCOTUSDocumentFactory(docket_entry=de)
+        for enabled in (False, True):
+            with (
+                self.subTest(webhooks_enabled=enabled),
+                override_settings(
+                    SCOTUS_DOCKET_ALERT_WEBHOOKS_ENABLED=enabled
+                ),
+            ):
+                mail.outbox.clear()
+                mock_webhooks.reset_mock()
+                send_alert_and_webhook(self.docket.pk, self.before)
+                self.assertEqual(len(mail.outbox), 1)
+                self.assertEqual(mock_webhooks.delay.called, enabled)
 
 
 class DisableDocketAlertTest(TestCase):
@@ -2441,7 +2497,6 @@ class SearchAlertsWebhooksTest(
             url="https://example.com/",
             enabled=True,
         )
-        unpublished_status = PRECEDENTIAL_STATUS.UNPUBLISHED
         with cls.captureOnCommitCallbacks(execute=True):
             cls.search_alert_oa = AlertFactory(
                 user=cls.user_profile.user,
@@ -2771,7 +2826,7 @@ class PrayAndPayAlertsWebhooksTest(TestCase):
             ),
         ):
             # Create a WAITING prayer (shouldn't create webhook)
-            prayer = PrayerFactory(
+            PrayerFactory(
                 user=self.user_profile.user,
                 recap_document=rd,
                 status=Prayer.WAITING,

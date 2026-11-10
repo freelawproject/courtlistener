@@ -136,7 +136,10 @@ from cl.favorites.models import PrayerAvailability
 from cl.lib.model_helpers import make_texas_docket_number_core
 from cl.lib.pacer import process_docket_data
 from cl.lib.pacer_session import SessionData
-from cl.lib.redis_utils import get_redis_interface
+from cl.lib.redis_utils import (
+    get_redis_interface,
+    make_update_pacer_case_id_key,
+)
 from cl.people_db.factories import (
     ABARatingFactory,
     AttorneyFactory,
@@ -2518,7 +2521,7 @@ class TexasMergerTest(TestCase):
         original_docket_entries = [
             e["pk"] for e in TexasDocketEntry.objects.all().values("pk")
         ]
-        merge_result = merge_texas_docket(docket_dict)
+        merge_texas_docket(docket_dict)
 
         docket_entries = list(
             TexasDocketEntry.objects.exclude(
@@ -3907,7 +3910,7 @@ class TexasMergerTest(TestCase):
             is_direct_appeal=False,
         )
 
-        result = merge_texas_case_transfers(self.docket_coa1, docket_data)
+        merge_texas_case_transfers(self.docket_coa1, docket_data)
         transfers = CaseTransfer.objects.all()
         self.assertEqual(transfers.count(), 3)
         source_dns = set(aci["case_number"])
@@ -4486,7 +4489,7 @@ class ScrapeIqueryPagesTest(TestCase):
         r.set(f"iquery:court_wait:{self.court_vib.pk}", 1000, ex=3600)
         r.set(f"iquery:court_wait:{self.court_mowd.pk}", 1000, ex=3600)
 
-        with patch("cl.lib.decorators.time.sleep") as mock_sleep:
+        with patch("cl.lib.decorators.time.sleep"):
             call_command(
                 "probe_iquery_pages_daemon",
                 testing_iterations=1,
@@ -4915,7 +4918,7 @@ class ScrapeIqueryPagesTest(TestCase):
         for expected_wait in tests:
             with self.subTest(expected_wait=expected_wait):
                 r.delete(f"iquery:court_wait:{self.court_gamb.pk}")
-                with patch("cl.lib.decorators.time.sleep") as mock_sleep:
+                with patch("cl.lib.decorators.time.sleep"):
                     call_command(
                         "probe_iquery_pages_daemon",
                         testing_iterations=1,
@@ -4928,7 +4931,7 @@ class ScrapeIqueryPagesTest(TestCase):
 
         # Test one more attempt. The alert error should be triggered.
         r.delete(f"iquery:court_wait:{self.court_gamb.pk}")
-        with patch("cl.lib.decorators.time.sleep") as mock_sleep:
+        with patch("cl.lib.decorators.time.sleep"):
             call_command(
                 "probe_iquery_pages_daemon",
                 testing_iterations=1,
@@ -4995,7 +4998,7 @@ class ScrapeIqueryPagesTest(TestCase):
                 r.delete(f"iquery:court_wait:{self.court_cacd.pk}")
                 with (
                     time_machine.travel(monday_local, tick=False),
-                    patch("cl.lib.decorators.time.sleep") as mock_sleep,
+                    patch("cl.lib.decorators.time.sleep"),
                 ):
                     call_command(
                         "probe_iquery_pages_daemon",
@@ -5019,7 +5022,7 @@ class ScrapeIqueryPagesTest(TestCase):
         r.delete(f"iquery:court_wait:{self.court_cacd.pk}")
         with (
             time_machine.travel(monday_local, tick=False),
-            patch("cl.lib.decorators.time.sleep") as mock_sleep,
+            patch("cl.lib.decorators.time.sleep"),
         ):
             call_command(
                 "probe_iquery_pages_daemon",
@@ -5086,7 +5089,7 @@ class ScrapeIqueryPagesTest(TestCase):
                 r.delete(f"iquery:court_wait:{self.court_vib.pk}")
                 with (
                     time_machine.travel(monday_local, tick=False),
-                    patch("cl.lib.decorators.time.sleep") as mock_sleep,
+                    patch("cl.lib.decorators.time.sleep"),
                 ):
                     call_command(
                         "probe_iquery_pages_daemon",
@@ -5106,7 +5109,7 @@ class ScrapeIqueryPagesTest(TestCase):
         r.delete(f"iquery:court_wait:{self.court_vib.pk}")
         with (
             time_machine.travel(monday_local, tick=False),
-            patch("cl.lib.decorators.time.sleep") as mock_sleep,
+            patch("cl.lib.decorators.time.sleep"),
         ):
             call_command(
                 "probe_iquery_pages_daemon",
@@ -5180,7 +5183,7 @@ class ScrapeIqueryPagesTest(TestCase):
                 weekend_day = sunday_local if test % 2 == 0 else saturday_local
                 with (
                     time_machine.travel(weekend_day, tick=False),
-                    patch("cl.lib.decorators.time.sleep") as mock_sleep,
+                    patch("cl.lib.decorators.time.sleep"),
                 ):
                     call_command(
                         "probe_iquery_pages_daemon",
@@ -5431,7 +5434,7 @@ class ScrapeIqueryPagesTest(TestCase):
     def test_get_latest_pacer_case_id_for_courts(self, mock_cookies):
         """Test get_latest_pacer_case_id_for_courts helper."""
         today = date.today()
-        d_canb_old = DocketFactory(
+        DocketFactory(
             court=self.court_canb,
             appeal_from=None,
             source=Docket.RECAP,
@@ -5445,7 +5448,7 @@ class ScrapeIqueryPagesTest(TestCase):
             pacer_case_id="43000",
             date_filed=today,
         )
-        d_cand_old = DocketFactory(
+        DocketFactory(
             court=self.court_cand,
             appeal_from=None,
             source=Docket.RECAP,
@@ -5536,7 +5539,7 @@ class ScrapeIqueryPagesTest(TestCase):
             override_settings(
                 IQUERY_SWEEP_UPLOADS_SIGNAL_ENABLED=True, IQUERY_FIXED_SWEEP=10
             ),
-            patch("cl.lib.decorators.time.sleep") as mock_sleep,
+            patch("cl.lib.decorators.time.sleep"),
             patch(
                 "cl.corpus_importer.tasks.query_iquery_page",
                 return_value=({}, ""),
@@ -5572,7 +5575,7 @@ class ScrapeIqueryPagesTest(TestCase):
             override_settings(
                 IQUERY_SWEEP_UPLOADS_SIGNAL_ENABLED=True, IQUERY_FIXED_SWEEP=10
             ),
-            patch("cl.lib.decorators.time.sleep") as mock_sleep,
+            patch("cl.lib.decorators.time.sleep"),
             patch(
                 "cl.corpus_importer.tasks.query_iquery_page",
                 return_value=({}, ""),
@@ -5611,7 +5614,7 @@ class ScrapeIqueryPagesTest(TestCase):
                     IQUERY_SWEEP_UPLOADS_SIGNAL_ENABLED=True,
                     IQUERY_FIXED_SWEEP=10,
                 ),
-                patch("cl.lib.decorators.time.sleep") as mock_sleep,
+                patch("cl.lib.decorators.time.sleep"),
                 self.captureOnCommitCallbacks(execute=True),
             ):
                 call_command(
@@ -6184,3 +6187,78 @@ class TamesMissingFileTest(SimpleTestCase):
         """Verify a normal HTML page is not flagged as missing."""
         normal_html = b"<html><body><p>Normal page content</p></body></html>"
         self.assertFalse(is_missing_file_page(normal_html))
+
+
+class IquerySweepLockTest(SimpleTestCase):
+    """Tests for the Redis lock around the iquery sweep counters."""
+
+    court_id = "test_iquery_lock"
+
+    def setUp(self) -> None:
+        super().setUp()
+        self.r = get_redis_interface("CACHE")
+        self.lock_key = make_update_pacer_case_id_key(self.court_id)
+        self._clean()
+        self.addCleanup(self._clean)
+        self.r.hset("iquery:highest_known_pacer_case_id", self.court_id, 5)
+        self.r.hset("iquery:pacer_case_id_current", self.court_id, 5)
+
+    def _clean(self) -> None:
+        """Remove this test's lock and counter fields from Redis."""
+        self.r.delete(self.lock_key)
+        self.r.hdel("iquery:highest_known_pacer_case_id", self.court_id)
+        self.r.hdel("iquery:pacer_case_id_current", self.court_id)
+
+    def _counters(self) -> tuple[int, int]:
+        """Return (highest_known_pacer_case_id, pacer_case_id_current)."""
+        return (
+            int(
+                self.r.hget(
+                    "iquery:highest_known_pacer_case_id", self.court_id
+                )
+            ),
+            int(self.r.hget("iquery:pacer_case_id_current", self.court_id)),
+        )
+
+    @patch(
+        "cl.corpus_importer.signals.make_docket_by_iquery_sweep.apply_async"
+    )
+    def test_updates_counters_while_lock_held(self, mock_apply) -> None:
+        """Both counters advance and the lock is released afterwards."""
+        update_latest_case_id_and_schedule_iquery_sweep(
+            None, court_pk=self.court_id, fixed_case_id_sweep=9
+        )
+        self.assertEqual(mock_apply.call_count, 3)
+        self.assertEqual(self._counters(), (9, 8))
+        self.assertIsNone(self.r.get(self.lock_key))
+
+    @patch(
+        "cl.corpus_importer.signals.make_docket_by_iquery_sweep.apply_async"
+    )
+    def test_lost_lock_does_not_overwrite_counters(self, mock_apply) -> None:
+        """If the lease expires mid-sweep and another process takes the
+        lock, the stale holder must not write its counters."""
+
+        def steal_lock(*args, **kwargs) -> None:
+            self.r.set(self.lock_key, "another-process")
+
+        mock_apply.side_effect = steal_lock
+        update_latest_case_id_and_schedule_iquery_sweep(
+            None, court_pk=self.court_id, fixed_case_id_sweep=9
+        )
+        self.assertEqual(self._counters(), (5, 5))
+        # The other process's lock must be left alone.
+        self.assertEqual(self.r.get(self.lock_key), "another-process")
+
+    @patch(
+        "cl.corpus_importer.signals.make_docket_by_iquery_sweep.apply_async",
+        side_effect=ConnectionError("broker down"),
+    )
+    def test_lock_released_when_enqueue_fails(self, mock_apply) -> None:
+        """An enqueue failure releases the lock and leaves counters as is."""
+        with self.assertRaises(ConnectionError):
+            update_latest_case_id_and_schedule_iquery_sweep(
+                None, court_pk=self.court_id, fixed_case_id_sweep=9
+            )
+        self.assertIsNone(self.r.get(self.lock_key))
+        self.assertEqual(self._counters(), (5, 5))

@@ -10,7 +10,7 @@ from asgiref.sync import async_to_sync
 from django.conf import settings
 from django.core.management import call_command
 from django.http import HttpResponse
-from django.test import TestCase, override_settings
+from django.test import override_settings
 from django.urls import reverse
 from elasticsearch.dsl import Document
 from lxml import html as lhtml
@@ -56,7 +56,7 @@ class OpinionEmbeddingIndexingTests(ESIndexTestCase, TestCase):
             id="canb",
             jurisdiction="FB",
         )
-        with cls.captureOnCommitCallbacks(execute=True) as callbacks:
+        with cls.captureOnCommitCallbacks(execute=True):
             cls.opinion_cluster_2 = OpinionClusterFactory(
                 docket=DocketFactory(
                     court=cls.court,
@@ -68,7 +68,7 @@ class OpinionEmbeddingIndexingTests(ESIndexTestCase, TestCase):
 
     def test_opinion_embeddings_field(self) -> None:
         """Test index embeddings into an opinion document."""
-        with self.captureOnCommitCallbacks(execute=True) as callbacks:
+        with self.captureOnCommitCallbacks(execute=True):
             opinion_cluster_1 = OpinionClusterFactory(
                 docket=DocketFactory(
                     court=self.court,
@@ -303,7 +303,7 @@ class SemanticSearchTests(AuthenticatedClientMixin, ESIndexTestCase, TestCase):
         )
 
         # Create opinions and clusters
-        with cls.captureOnCommitCallbacks(execute=True) as callbacks:
+        with cls.captureOnCommitCallbacks(execute=True):
             cls.opinion_2 = OpinionFactory(
                 cluster=OpinionClusterFactory(
                     docket=DocketFactory(
