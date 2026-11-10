@@ -22,6 +22,9 @@ from cl.citations.utils import (
     lawbox_is_citation_source,
     lawbox_is_citation_source_filter,
 )
+from cl.corpus_importer.management.commands.repair_lawbox_encoding import (
+    Command,
+)
 from cl.lib.string_utils import (
     looks_like_lawbox_cp1252_corruption,
     repair_lawbox_content_if_needed,
@@ -402,6 +405,56 @@ class RepairLawboxEncodingCommandTest(TestCase):
                 [opinions[2].pk, opinions[3].pk],
                 [opinions[4].pk],
             ],
+        )
+
+    @patch("cl.lib.es_signal_processor.update_es_documents")
+    @patch(
+        "cl.corpus_importer.management.commands.repair_lawbox_encoding."
+        "find_citations_and_parentheticals_for_opinion_by_pks"
+    )
+    def test_only_flagged_rows_are_scanned(
+        self, mock_annotate, mock_update_es
+    ) -> None:
+        # The SQL regex pre-filter must keep clean rows out of the scan loop.
+        OpinionWithParentsFactory(
+            html_lawbox="<p>an em-dash \u2014 and ellipsis \u2026</p>",
+            plain_text="",
+        )
+        corrupt = self._make_corrupt_opinion()
+        with patch.object(
+            Command, "_repair_one_opinion", return_value="clean"
+        ) as mock_repair:
+            call_command("repair_lawbox_encoding")
+        self.assertEqual(
+            [call.args[0] for call in mock_repair.call_args_list],
+            [corrupt.pk],
+        )
+
+    @patch("cl.lib.es_signal_processor.update_es_documents")
+    @patch(
+        "cl.corpus_importer.management.commands.repair_lawbox_encoding."
+        "find_citations_and_parentheticals_for_opinion_by_pks"
+    )
+    def test_annotation_dispatched_before_scan_completes(
+        self, mock_annotate, mock_update_es
+    ) -> None:
+        # A crash mid-scan must not lose re-annotation for the rows already
+        # repaired: the first full batch is dispatched during the loop.
+        opinions = [self._make_corrupt_opinion() for _ in range(3)]
+        real_repair = Command._repair_one_opinion
+
+        def fake_repair(self, opinion_pk, dry_run):
+            if opinion_pk == opinions[2].pk:
+                raise RuntimeError("boom")
+            return real_repair(self, opinion_pk, dry_run=dry_run)
+
+        with patch.object(Command, "_repair_one_opinion", fake_repair):
+            with self.assertRaises(RuntimeError):
+                call_command("repair_lawbox_encoding", opinions_per_task=2)
+        mock_annotate.apply_async.assert_called_once()
+        self.assertEqual(
+            mock_annotate.apply_async.call_args.kwargs["args"][0],
+            [opinions[0].pk, opinions[1].pk],
         )
 
     @patch("cl.lib.es_signal_processor.update_es_documents")

@@ -8,7 +8,8 @@ the C1 control characters (U+0080-U+009F) or the replacement character
 (and, for already-annotated rows, in the derived ``Opinion.html_with_citations``
 field); no current ingestion path writes ``html_lawbox``.
 
-This command iterates ``Opinion`` rows that have ``html_lawbox`` content,
+This command iterates only the ``Opinion`` rows whose ``html_lawbox`` carries
+a corruption marker (filtered in SQL, see ``LAWBOX_CORRUPTION_MARKERS_REGEX``),
 safely repairs the corruption (see ``cl.lib.string_utils.repair_lawbox_cp1252``)
 and re-saves via ``Opinion.save(update_fields=[...])``. Saving through the ORM
 is deliberate: ``html_lawbox`` and ``html_with_citations`` are members of
@@ -54,6 +55,11 @@ from cl.search.models import Opinion, OpinionContent
 DEFAULT_SCAN_CHUNK_SIZE = 1_000
 DEFAULT_OPINIONS_PER_TASK = 50
 DEFAULT_THROTTLE_MIN_ITEMS = 50
+
+# SQL-side mirror of looks_like_lawbox_cp1252_corruption: the C1 control block
+# plus the replacement character. A non-raw string so Python sends the literal
+# characters; PostgreSQL ARE has no \uXXXX escape.
+LAWBOX_CORRUPTION_MARKERS_REGEX = "[\u0080-\u009f\ufffd]"
 
 # Outcome of inspecting one Opinion. "unrecoverable" means corruption markers
 # are present but the original bytes are gone (see repair_lawbox_cp1252).
@@ -157,7 +163,9 @@ class Command(VerboseCommand):
         opinions_per_task = cast(int, options["opinions_per_task"])
         throttle_min_items = cast(int, options["throttle_min_items"])
 
-        queryset = Opinion.objects.exclude(html_lawbox="").order_by("pk")
+        queryset = Opinion.objects.filter(
+            html_lawbox__regex=LAWBOX_CORRUPTION_MARKERS_REGEX
+        ).order_by("pk")
         doc_ids = options.get("doc_id")
         if doc_ids:
             queryset = queryset.filter(pk__in=doc_ids)
@@ -168,7 +176,8 @@ class Command(VerboseCommand):
 
         total = queryset.count()
         logger.info(
-            "Scanning %d opinion(s) with html_lawbox content (dry_run=%s).",
+            "Scanning %d opinion(s) flagged by the corruption detector "
+            "(dry_run=%s).",
             total,
             dry_run,
         )
@@ -176,7 +185,11 @@ class Command(VerboseCommand):
         scanned = 0
         repaired = 0
         unrecoverable = 0
-        annotation_pks: list[int] = []
+        repaired_pks: list[int] = []
+        pending_pks: list[int] = []
+        throttle: CeleryThrottle | None = None
+        tasks_sent = 0
+        dispatched = 0
 
         opinion_pks = queryset.values_list("pk", flat=True).iterator(
             chunk_size=scan_chunk_size
@@ -186,7 +199,27 @@ class Command(VerboseCommand):
             outcome = self._repair_one_opinion(opinion_pk, dry_run=dry_run)
             if outcome == "repaired":
                 repaired += 1
-                annotation_pks.append(opinion_pk)
+                repaired_pks.append(opinion_pk)
+                pending_pks.append(opinion_pk)
+                if (
+                    not dry_run
+                    and not skip_annotate
+                    and len(pending_pks) >= opinions_per_task
+                ):
+                    # Dispatch as we go: a crash midway must not leave repaired
+                    # rows without re-annotation (a rerun would see them clean).
+                    if throttle is None:
+                        throttle = CeleryThrottle(queue_name=queue)
+                        throttle.update_min_items(throttle_min_items)
+                    sent, count = self._dispatch_annotation_batch(
+                        pending_pks,
+                        queue=queue,
+                        disable_citation_count_update=disable_citation_count_update,
+                        throttle=throttle,
+                    )
+                    tasks_sent += sent
+                    dispatched += count
+                    pending_pks = []
             elif outcome == "unrecoverable":
                 unrecoverable += 1
 
@@ -225,76 +258,26 @@ class Command(VerboseCommand):
                 "Skipping citation annotation for %d repaired opinion(s) "
                 "(--skip-annotate). Re-run find_citations afterwards so "
                 "html_with_citations picks up the repaired html_lawbox.",
-                len(annotation_pks),
+                len(repaired_pks),
             )
             return
 
-        self._dispatch_annotation(
-            annotation_pks,
-            queue=queue,
-            disable_citation_count_update=disable_citation_count_update,
-            opinions_per_task=opinions_per_task,
-            throttle_min_items=throttle_min_items,
-        )
-
-    def _dispatch_annotation(
-        self,
-        opinion_pks: list[int],
-        queue: str,
-        disable_citation_count_update: bool,
-        opinions_per_task: int,
-        throttle_min_items: int,
-    ) -> None:
-        """Re-dispatch citation annotation for the repaired opinions that need
-        it.
-
-        Tasks are dispatched in small batches and throttled, mirroring
-        ``find_citations``: one task iterates its opinions inside a single
-        Celery worker, so a large batch is merely slow rather than parallel,
-        and an unthrottled flood of tasks can overwhelm the queue.
-
-        Only opinions whose ``html_with_citations`` derives from
-        ``html_lawbox`` are dispatched. That filter is evaluated in SQL, so the
-        higher-priority text columns are never loaded into Python.
-
-        :param opinion_pks: The Opinion ids that were repaired.
-        :param queue: The Celery queue to send the tasks to.
-        :param disable_citation_count_update: Forwarded to the task.
-        :param opinions_per_task: Opinions per annotation task.
-        :param throttle_min_items: Keeps the queue between this and twice it.
-        :return: None
-        """
-        if not opinion_pks:
+        if not repaired_pks:
             logger.info("No opinion was repaired; nothing to re-annotate.")
             return
 
-        throttle = CeleryThrottle(queue_name=queue)
-        throttle.update_min_items(throttle_min_items)
-        tasks_sent = 0
-        dispatched = 0
-        for chunk in batched(opinion_pks, opinions_per_task):
-            source_pks = list(
-                Opinion.objects.filter(pk__in=list(chunk))
-                .filter(lawbox_is_citation_source_filter())
-                .order_by("pk")
-                .values_list("pk", flat=True)
-            )
-            if not source_pks:
-                # Every opinion in this chunk prefers another corpus for
-                # annotation; re-running it would only rebuild the same
-                # html_with_citations from that other source.
-                continue
-            throttle.maybe_wait()
-            find_citations_and_parentheticals_for_opinion_by_pks.apply_async(
-                args=(
-                    source_pks,
-                    True,  # disable_parenthetical_groups (bulk-safe)
-                    disable_citation_count_update,
-                ),
+        if pending_pks:
+            if throttle is None:
+                throttle = CeleryThrottle(queue_name=queue)
+                throttle.update_min_items(throttle_min_items)
+            sent, count = self._dispatch_annotation_batch(
+                pending_pks,
                 queue=queue,
+                disable_citation_count_update=disable_citation_count_update,
+                throttle=throttle,
             )
-            tasks_sent += 1
-            dispatched += len(source_pks)
+            tasks_sent += sent
+            dispatched += count
 
         logger.info(
             "Re-dispatched citation annotation for %d of %d repaired "
@@ -303,17 +286,58 @@ class Command(VerboseCommand):
             "html_lawbox. The other %d prefer another corpus for annotation "
             "(see cl.citations.utils.CITATION_SOURCE_FIELDS).",
             dispatched,
-            len(opinion_pks),
+            len(repaired_pks),
             tasks_sent,
             queue,
-            len(opinion_pks) - dispatched,
+            len(repaired_pks) - dispatched,
         )
-        self._log_cluster_sources(opinion_pks)
+        self._log_cluster_sources(repaired_pks)
+
+    def _dispatch_annotation_batch(
+        self,
+        opinion_pks: list[int],
+        queue: str,
+        disable_citation_count_update: bool,
+        throttle: CeleryThrottle,
+    ) -> tuple[int, int]:
+        """Dispatch citation annotation for one batch of repaired opinions.
+
+        Only opinions whose ``html_with_citations`` derives from
+        ``html_lawbox`` are dispatched. That filter is evaluated in SQL, so the
+        higher-priority text columns are never loaded into Python.
+
+        :param opinion_pks: The Opinion ids of this batch (already repaired).
+        :param queue: The Celery queue to send the task to.
+        :param disable_citation_count_update: Forwarded to the task.
+        :param throttle: Shared throttle keeping the queue from flooding.
+        :return: ``(tasks_sent, opinions_dispatched)``.
+        """
+        source_pks = list(
+            Opinion.objects.filter(pk__in=opinion_pks)
+            .filter(lawbox_is_citation_source_filter())
+            .order_by("pk")
+            .values_list("pk", flat=True)
+        )
+        if not source_pks:
+            # Every opinion in this batch prefers another corpus for
+            # annotation; re-running it would only rebuild the same
+            # html_with_citations from that other source.
+            return 0, 0
+        throttle.maybe_wait()
+        find_citations_and_parentheticals_for_opinion_by_pks.apply_async(
+            args=(
+                source_pks,
+                True,  # disable_parenthetical_groups (bulk-safe)
+                disable_citation_count_update,
+            ),
+            queue=queue,
+        )
+        return 1, len(source_pks)
 
     def _log_cluster_sources(self, opinion_pks: list[int]) -> None:
         """Report how the repaired opinions' clusters are sourced.
 
-        The per-Opinion filter used by :meth:`_dispatch_annotation` is
+        The per-Opinion filter used by :meth:`_dispatch_annotation_batch` is
         authoritative, but an operator reasons about this data by cluster
         ``source``, so log the breakdown and call out how many repaired
         opinions sit in a Lawbox-preferred cluster. A large disagreement
