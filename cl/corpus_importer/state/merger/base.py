@@ -10,7 +10,7 @@ from collections.abc import (
 )
 from dataclasses import dataclass, field
 from functools import cache, cached_property, reduce
-from graphlib import TopologicalSorter
+from graphlib import CycleError, TopologicalSorter
 from itertools import chain
 from typing import (
     Any,
@@ -122,7 +122,8 @@ class MergerSpecRegistry[Scrape, Params]:
         required properties defined yet.
 
         Validation is also the first point at which a one-to-one spec knows
-        which side of the relation it is on.
+        which side of the relation it is on, and where circular `after`
+        declarations are reported.
         """
         errors = [
             e
@@ -130,12 +131,20 @@ class MergerSpecRegistry[Scrape, Params]:
             for e in spec.run_validation(merger)
         ]
 
-        for name, spec in self.related.items():
-            errors += [
-                ValueError(f"{name}: Runs after unknown related spec {dep}")
-                for dep in spec.after
-                if dep not in self.related
-            ]
+        unknown = [
+            ValueError(f"{name}: Runs after unknown related spec {dep}")
+            for name, spec in self.related.items()
+            for dep in spec.after
+            if dep not in self.related
+        ]
+        errors += unknown
+        # Settling the order here keeps it off the first merge. An unknown
+        # dependency has no spec to order, so there is nothing to settle.
+        if not unknown:
+            try:
+                _ = self.merge_order
+            except CycleError as e:
+                errors.append(e)
 
         model_fields = merger.config.model._meta.get_fields()
         fields = {field.name: field for field in model_fields}

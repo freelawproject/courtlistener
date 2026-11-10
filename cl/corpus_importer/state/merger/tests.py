@@ -1,5 +1,4 @@
 from collections.abc import Callable, Sequence
-from graphlib import CycleError
 from typing import Any, ClassVar, cast, override
 
 from django.db import connection
@@ -989,20 +988,24 @@ class MergerSpecOrderTest(SimpleTestCase):
                 )
 
     def test_after_cycle_is_rejected(self) -> None:
-        """Do circular dependencies between related specs fail loudly?"""
+        """Are circular dependencies between related specs refused when the
+        merger is defined, rather than when it first merges?"""
 
-        class TestMerger(Merger[dict[str, str], None, Docket]):
-            config: ClassVar[MergerConfig[Docket]] = MergerConfig(model=Docket)
+        with self.assertRaisesRegex(TypeError, "CycleError"):
 
-            docket_entries: list[DocketEntry] = OneToManyRelation(
-                EntryMerger, Scrape(dict)["entries"], after=["parties"]
-            )
-            parties: list[Party] = ManyToManyRelation(
-                PartyMerger, Scrape(dict)["parties"], after=["docket_entries"]
-            )
+            class TestMerger(Merger[dict[str, str], None, Docket]):
+                config: ClassVar[MergerConfig[Docket]] = MergerConfig(
+                    model=Docket
+                )
 
-        with self.assertRaises(CycleError):
-            TestMerger.config.registry.merge_order
+                docket_entries: list[DocketEntry] = OneToManyRelation(
+                    EntryMerger, Scrape(dict)["entries"], after=["parties"]
+                )
+                parties: list[Party] = ManyToManyRelation(
+                    PartyMerger,
+                    Scrape(dict)["parties"],
+                    after=["docket_entries"],
+                )
 
 
 class MergerConfigInheritanceTest(SimpleTestCase):
