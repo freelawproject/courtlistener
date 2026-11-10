@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import functools
 import logging
 import operator
 import typing
@@ -12,8 +13,8 @@ from collections.abc import (
 from enum import Enum
 from typing import (
     Any,
-    Self,
     cast,
+    final,
     override,
 )
 
@@ -98,31 +99,18 @@ class MergerSpecification[Scrape, Params, Output](ABC):
 class AttributeMerger[Scrape, Params, Transform](
     MergerSpecification[Scrape, Params, Transform]
 ):
-    __slots__ = ("strategy",)
+    __slots__ = (
+        "strategy",
+        "_transform",
+    )
+
+    _transform: Transformer[Any, Any, Any]
 
     def __init__(self):
         super().__init__()
         self.strategy: Strategy = overwrite_if_present
 
-
-class _RootProxy[Scrape, Params, Transform](
-    AttributeMerger[Scrape, Params, Transform]
-):
-    __slots__ = ("_path", "_optimized")
-
-    def __init__(self, path: tuple[_PathProxy, ...]):
-        super().__init__()
-        self._path: tuple[_PathProxy, ...] = path
-        self._optimized: Transformer[Scrape, Params, Any] = self.root
-
-    def ensure_proxied(self, value: Any) -> _RootProxy:
-        match value:
-            case _RootProxy():
-                return value
-            case _:
-                return _ConstantProxy(value)
-
-    def __getattr__(self, name: str) -> Self | Any:
+    def __getattr__(self, name: str) -> _AttrProxy | Any:
         for cls in self.__class__.__mro__:
             if hasattr(cls, name):
                 return getattr(cls, name).__get__(self)
@@ -131,147 +119,144 @@ class _RootProxy[Scrape, Params, Transform](
         if name.startswith("__"):
             raise AttributeError(name)
 
-        self._path = (*self._path, _AttrProxy(name))
-        g = self._optimized
-        self._optimized = lambda scrape, params: operator.attrgetter(name)(
-            g(scrape, params)
-        )
-        return self
+        return _AttrProxy(self, name)
 
-    def __getitem__(self, key: Any) -> Self:
-        self._path = (*self._path, _ItemProxy(self.ensure_proxied(key)))
-        g = self._optimized
-        if isinstance(key, _RootProxy):
-            h = key._optimized
-            self._optimized = lambda scrape, params: g(scrape, params)[
-                h(scrape, params)
-            ]
-        else:
-            self._optimized = lambda scrape, params: operator.itemgetter(key)(
-                g(scrape, params)
-            )
-        return self
+    def __getitem__(self, key: Any) -> _ItemProxy:
+        return _ItemProxy(self, key)
 
-    def __call__(self, *args: Any, **kwargs: Any) -> Self:
-        args_proxy = tuple(self.ensure_proxied(arg) for arg in args)
-        kwargs_proxy = {k: self.ensure_proxied(v) for k, v in kwargs}
-        self._path = (
-            *self._path,
-            _CallProxy(
-                args_proxy,
-                kwargs_proxy,
-            ),
-        )
-        g = self._optimized
-        arg_fns = tuple(arg._optimized for arg in args_proxy)
-        kwarg_fns = {k: v._optimized for k, v in kwargs_proxy.items()}
-        self._optimized = lambda scrape, params: g(scrape, params)(
-            *(arg_fn(scrape, params) for arg_fn in arg_fns),
-            **{k: v(scrape, params) for k, v in kwarg_fns.items()},
-        )
-        return self
-
-    @abstractmethod
-    def root(self, scrape: Scrape, params: Params) -> Any: ...
+    def __call__(self, *args: Any, **kwargs: Any) -> _CallProxy:
+        return _CallProxy(self, args, kwargs)
 
     @override
-    def transform(self, scrape: Scrape, params: Params) -> Transform:
-        return self._optimized(scrape, params)
+    @final
+    def transform(self, scrape: Any, params: Any) -> Any:
+        return self._transform(scrape, params)
 
 
-class _AncestorProxy[Scrape, Params, M: Model](_RootProxy[Scrape, Params, M]):
-    __slots__ = ("model",)
-
+class _AncestorProxy[M: Model](AttributeMerger):
     def __init__(self, model: type[M]):
-        super().__init__(())
-        self.model: type[M] = model
-
-    @override
-    def root(self, scrape: Scrape, params: Params) -> Any:
-        current = params
-
-        while isinstance(current, RelatedParams):
-            if isinstance(current.parent, self.model):
-                return current.parent
-            current = current.params
-
-        raise AttributeError(f"Unable to find ancestor {self.model.__name__}")
+        super().__init__()
+        self._transform = functools.partial(_ancestor, model)
 
 
-class _ConstantProxy[Scrape, Params, Transform](
-    _RootProxy[Scrape, Params, Transform]
-):
-    __slots__ = ("value",)
+def _ancestor[M: Model](model: type[M], scrape: Any, params: Any) -> M:
+    current = params
+    while isinstance(current, RelatedParams):
+        if isinstance(current.parent, model):
+            return current.parent
+        current = current.params
+    raise TypeError(f"Unable to find model {model.__name__} in ancestor list")
+
+
+class _ConstantProxy(AttributeMerger):
+    __slots__ = ("_value",)
 
     def __init__(self, value: Any):
-        super().__init__(())
-        self.value: Any = value
-
-    @override
-    def root(self, scrape: Scrape, params: Params) -> Any:
-        return self.value
+        super().__init__()
+        self._transform = lambda s, p: value
+        self._value = value
 
 
-class _ScrapeProxy[Scrape, Params, Transform](
-    _RootProxy[Scrape, Params, Transform]
-):
-    __slots__ = ()
-
-    @override
-    def root(self, scrape: Scrape, params: Params) -> Any:
-        return scrape
+class _ScrapeProxy(AttributeMerger):
+    def __init__(self):
+        super().__init__()
+        self._transform = lambda s, p: s
 
 
-class _ParamsProxy[Scrape, Params, Transform](
-    _RootProxy[Scrape, Params, Transform]
-):
-    __slots__ = ()
-
-    @override
-    def root(self, scrape: Scrape, params: Params) -> Any:
-        return params
+class _ParamsProxy(AttributeMerger):
+    def __init__(self):
+        super().__init__()
+        self._transform = lambda s, p: p
 
 
-class _ItemProxy:
-    __slots__ = ("key",)
-    __match_args__ = ("key",)
+class _AttrProxy(AttributeMerger):
+    __slots__ = ("_key", "_previous")
 
-    def __init__(self, key: _RootProxy):
-        self.key: _RootProxy = key
+    def __init__(self, previous: AttributeMerger, key: str):
+        super().__init__()
+        if isinstance(previous, _AttrProxy):
+            key = f"{previous._key}.{key}"
+            previous = previous._previous
+        self._key = key
+        self._previous: AttributeMerger = previous
+        getter = operator.attrgetter(key)
+        match previous:
+            case _ScrapeProxy():
+                self._transform = lambda s, p: getter(s)
+            case _ParamsProxy():
+                self._transform = lambda s, p: getter(p)
+            case _ConstantProxy():
+                v = previous._value
+                self._transform = lambda s, p: getter(v)
+            case _:
+                g = previous._transform
+                self._transform = lambda s, p: getter(g(s, p))
 
-    def apply(self, current: Any, scrape: Any, params: Any) -> Any:
-        return current[self.key.transform(scrape, params)]
+
+class _ItemProxy(AttributeMerger):
+    def __init__(self, previous: AttributeMerger, key: AttributeMerger | Any):
+        super().__init__()
+        if isinstance(key, AttributeMerger):
+            f = key._transform
+            match previous:
+                case _ScrapeProxy():
+                    self._transform = lambda s, p: s[f(s, p)]
+                case _ParamsProxy():
+                    self._transform = lambda s, p: p[f(s, p)]
+                case _ConstantProxy():
+                    v = previous._value
+                    self._transform = lambda s, p: v[f(s, p)]
+                case _:
+                    g = previous._transform
+                    self._transform = lambda s, p: g(s, p)[f(s, p)]
+        else:
+            getter = operator.itemgetter(key)
+            match previous:
+                case _ScrapeProxy():
+                    self._transform = lambda s, p: getter(s)
+                case _ParamsProxy():
+                    self._transform = lambda s, p: getter(p)
+                case _ConstantProxy():
+                    v = previous._value
+                    self._transform = lambda s, p: getter(v)
+                case _:
+                    g = previous._transform
+                    self._transform = lambda s, p: getter(g(s, p))
 
 
-class _AttrProxy:
-    __slots__ = ("key",)
-    __match_args__ = ("key",)
-
-    def __init__(self, key: str):
-        self.key: str = key
-
-    def apply(self, current: Any, scrape: Any, params: Any) -> Any:
-        return getattr(current, self.key)
-
-
-class _CallProxy:
-    __slots__ = ("args", "kwargs")
-    __match_args__ = ("args", "kwargs")
-
+class _CallProxy(AttributeMerger):
     def __init__(
-        self, args: tuple[_RootProxy, ...], kwargs: Mapping[str, _RootProxy]
+        self,
+        previous: AttributeMerger,
+        args: tuple[AttributeMerger | Any, ...],
+        kwargs: Mapping[str, AttributeMerger | Any],
     ):
-        self.args: tuple[_RootProxy, ...] = args
-        self.kwargs: Mapping[str, _RootProxy] = kwargs
+        super().__init__()
 
-    def apply(self, current: Any, scrape: Any, params: Any) -> Any:
-        return current(
-            *(arg.transform(scrape, params) for arg in self.args),
-            **{k: v.transform(scrape, params) for k, v in self.kwargs.items()},
-        )
+        # Three cheers for unintuitive behavior! (late binding)
+        def _make_transform(
+            v: AttributeMerger | Any,
+        ) -> Transformer[Any, Any, Any]:
+            if isinstance(v, AttributeMerger):
+                return v._transform
+            return lambda s, p: v
 
+        arg_fns = tuple(_make_transform(arg) for arg in args)
+        kwarg_fns = {k: _make_transform(kwarg) for k, kwarg in kwargs.items()}
 
-type _PathProxy = _ItemProxy | _AttrProxy | _CallProxy
+        match previous:
+            case _ConstantProxy():
+                f = previous._value
+                self._transform = lambda s, p: f(
+                    *(a(s, p) for a in arg_fns),
+                    **{k: v(s, p) for k, v in kwarg_fns.items()},
+                )
+            case _:
+                f = previous._transform
+                self._transform = lambda s, p: f(s, p)(
+                    *(a(s, p) for a in arg_fns),
+                    **{k: v(s, p) for k, v in kwarg_fns.items()},
+                )
 
 
 def Fn[F: Callable](f: F) -> F:
@@ -281,12 +266,12 @@ def Fn[F: Callable](f: F) -> F:
 
 def Scrape[T](_: type[T]) -> T:
     # pyrefly: ignore[bad-return]
-    return _ScrapeProxy(())
+    return _ScrapeProxy()
 
 
 def Params[T](_: type[T]) -> T:
     # pyrefly: ignore[bad-return]
-    return _ParamsProxy(())
+    return _ParamsProxy()
 
 
 def Ancestor[M: Model](model: type[M]) -> M:
@@ -302,7 +287,7 @@ def Constant[T](value: T) -> T:
 def WithStrategy[T](specification: T, strategy: Strategy) -> T:
     if not isinstance(specification, AttributeMerger):
         raise TypeError(
-            f"specification must be an AttributeMerger. Found {type(specification)!r}"
+            f"Specification must be an AttributeMerger. Found {type(specification)!r}"
         )
     specification.strategy = strategy
     return specification
