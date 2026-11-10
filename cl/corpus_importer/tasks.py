@@ -221,7 +221,7 @@ from cl.search.models import (
     TrialCourtData,
 )
 from cl.search.state.florida.models import FloridaDocument
-from cl.search.state.shared import AbstractStateDocument
+from cl.search.state.shared import AbstractStateDocument, CourtRefused
 from cl.search.state.texas.models import (
     TexasDocketEntry,
     TexasDocument,
@@ -5280,14 +5280,21 @@ def fl_corpus_download_task(bucket: str, key: str) -> tuple[bytes, str, str]:
 @app.task(
     bind=True,
     ignore_result=True,
-    # No retries because download_document_in_stream already has retry logic
+    autoretry_for=(CourtRefused,),
+    max_retries=5,
+    retry_backoff=5 * 60,
+    retry_backoff_max=60 * 60,
+    # Jitter picks a wait anywhere between zero and the backoff, which can
+    # retry while the court is still refusing us.
+    retry_jitter=False,
 )
 @throttle_task("2/s")
 def download_fl_document(self: Task, fl_document_pk: int) -> int | None:
     """Download a Florida document and save it locally.
 
     Accepts any file type. PDF-specific processing (page count) is only
-    performed for PDFs.
+    performed for PDFs. A refusal from the court is retried with backoff and
+    fails the task once the retries are exhausted.
 
     :param self: The Celery task instance.
     :param fl_document_pk: The primary key of the `FloridaDocument` instance to
@@ -5374,7 +5381,17 @@ def fl_ingest_docket_task(
     return result
 
 
-@app.task(bind=True, ignore_result=True)
+@app.task(
+    bind=True,
+    ignore_result=True,
+    autoretry_for=(CourtRefused,),
+    max_retries=5,
+    retry_backoff=5 * 60,
+    retry_backoff_max=60 * 60,
+    # Jitter picks a wait anywhere between zero and the backoff, which can
+    # retry while the court is still refusing us.
+    retry_jitter=False,
+)
 def download_state_document(
     self: Task,
     model_name: str,
@@ -5383,6 +5400,9 @@ def download_state_document(
     extraction_queue: str,
 ) -> int | None:
     """Celery task to download the file for a state document and store it in S3.
+
+    A refusal from the court is retried with backoff and fails the task once
+    the retries are exhausted.
 
     :param model_name: The name of the state document model (must be a subclass of `AbstractStateDocument`).
     :param pk: The primary key of the object to download.
