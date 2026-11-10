@@ -1090,7 +1090,7 @@ class CitationObjectTest(ESIndexTestCase, TestCase):
         # Create 3 citations that match full_citation
         for i in range(3):
             with self.captureOnCommitCallbacks(execute=True):
-                citation = CitationWithParentsFactory.create(
+                CitationWithParentsFactory.create(
                     volume="3",
                     reporter="U.S.",
                     page="888",

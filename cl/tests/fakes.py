@@ -48,7 +48,7 @@ class FakeDocketReport:
 class FakeAppellateDocketReport(FakeDocketReport):
     @property
     def data(self):
-        data = super(FakeAppellateDocketReport, self).data
+        data = super().data
         data["court_id"] = "ca1"
         return data
 
@@ -56,7 +56,7 @@ class FakeAppellateDocketReport(FakeDocketReport):
 class FakeNewAppellateCaseDocketReport(FakeDocketReport):
     @property
     def data(self):
-        data = super(FakeNewAppellateCaseDocketReport, self).data
+        data = super().data
         data["court_id"] = "ca1"
         data["docket_number"] = "10-1081"
         data["case_name"] = "United States v. Brown"
@@ -109,7 +109,7 @@ class FakeAcmsDocketReport(FakeDocketReport):
 class FakeAcmsDocketReportToUpdate(FakeAcmsDocketReport):
     @property
     def data(self):
-        data = super(FakeAcmsDocketReportToUpdate, self).data
+        data = super().data
         data["court_id"] = "ca2"
         data["docket_number"] = "25-1671"
         data["case_name"] = "G.F.F. v. Trump"
