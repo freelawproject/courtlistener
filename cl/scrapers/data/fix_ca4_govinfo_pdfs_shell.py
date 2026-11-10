@@ -5,7 +5,7 @@
 import csv
 import io
 import re
-from datetime import date
+from datetime import UTC, date, datetime
 from typing import Any
 
 import httpx
@@ -38,6 +38,15 @@ FILED_RE = re.compile(r"Filed:\s*(\d{2})/(\d{2})/(\d{4})")
 PUBLISHED_RE = re.compile(r"\bPUBLISHED\b")
 UNPUBLISHED_RE = re.compile(r"\bUNPUBLISHED\b")
 STATUSES = {PRECEDENTIAL_STATUS.PUBLISHED, PRECEDENTIAL_STATUS.UNPUBLISHED}
+BACKUP_FIELDS = [
+    "id",
+    "cluster_id",
+    "download_url",
+    "sha1",
+    "local_path",
+    "page_count",
+    "cluster__precedential_status",
+]
 STAT_KEYS = [
     "replaced",
     "text_finished",
@@ -263,12 +272,31 @@ def process_row(
     extract_and_set_status(opinion_id, row, stats)
 
 
+def write_backup(rows: list[dict[str, Any]]) -> None:
+    """Save the current values of every CSV opinion to a new /tmp file."""
+    stamp = datetime.now(UTC).strftime("%Y%m%dT%H%M%SZ")
+    path = f"/tmp/8100-backup-{stamp}.csv"
+    values = (
+        Opinion.objects.filter(pk__in=[r["opinion_id"] for r in rows])
+        .order_by("pk")
+        .values_list(*BACKUP_FIELDS)
+    )
+    # Mode "x" fails instead of overwriting an earlier backup.
+    with open(path, "x", newline="") as f:
+        writer = csv.writer(f)
+        writer.writerow(BACKUP_FIELDS)
+        writer.writerows(values)
+    print(f"Backup of the old values: {path}")
+
+
 def run(dry_run: bool) -> dict[str, int] | None:
     """Process every CSV row. Stops before any row if there are conflicts."""
     rows = load_rows()
     if conflicts := find_merge_conflicts(rows):
         print(f"STOP. {len(conflicts)} merge conflicts: {conflicts}")
         return None
+    if not dry_run:
+        write_backup(rows)
     stats = dict.fromkeys(STAT_KEYS, 0)
     with httpx.Client() as client:
         for i, row in enumerate(rows, start=1):
