@@ -22,6 +22,8 @@ from cl.corpus_importer.state.merger import (
     Params,
     RelatedParams,
     Scrape,
+    WithStrategy,
+    overwrite,
 )
 from cl.search.state.shared import (
     AbstractStateDocument,
@@ -41,7 +43,7 @@ class DocumentMerger[
     ParamType,
     M: AbstractStateDocument,
 ](Merger[DocType, RelatedParams[ParamType], M], abstract=True):
-    url: str = Scrape(ScrapeDocument).url
+    url: str = WithStrategy(Scrape(ScrapeDocument).url, overwrite)
 
     @override
     def needs_update(self) -> bool:
@@ -94,8 +96,13 @@ class DocketEntryMerger[
     ParamType,
     M: Model,
 ](Merger[EntryType, RelatedParams[ParamType], M], abstract=True):
-    date_filed: date = Scrape(ScrapeDocketEntry).date_filed
-    entry_type: int = Fn(getattr)(
-        DocketEntryType, Scrape(ScrapeDocketEntry).entry_type.name
+    date_filed: date = WithStrategy(
+        Scrape(ScrapeDocketEntry).date_filed, overwrite
+    )
+    entry_type: int = WithStrategy(
+        Fn(getattr)(
+            DocketEntryType, Scrape(ScrapeDocketEntry).entry_type.name
+        ),
+        overwrite,
     )
     documents: list[Any] = AttachmentRelation()

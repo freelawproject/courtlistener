@@ -30,6 +30,8 @@ from cl.corpus_importer.state.merger import (
     Params,
     RelatedParams,
     Scrape,
+    WithStrategy,
+    overwrite,
 )
 from cl.corpus_importer.state.merger.specifications import AttributeMerger
 from cl.search.models import CaseTransfer, Docket
@@ -118,30 +120,25 @@ class CaseTransferMerger[TransferType: DocketTransfer, ParamType](
     ]
 
     destination_docket_id: int | None = Fn(_destination_docket_id)(
-        Scrape(DocketTransfer),
-        # strategy=overwrite_if_present,
-        Params(RelatedParams),
+        Scrape(DocketTransfer), Params(RelatedParams)
     )
-    origin_docket_number: str = Scrape(DocketTransfer).docket_number
-    transfer_type: int = Constant(TRANSFER_REASON_MAP)[
-        Scrape(DocketTransfer).reason
-    ]
-    destination_court_id: str = Ancestor(
-        Docket
-        # strategy=overwrite
-    ).court_id
-    destination_docket_number: str = Fn(lambda v: v or "")(
-        Ancestor(
-            Docket,
-            # strategy=overwrite
-        ).docket_number
+    origin_docket_number: str = WithStrategy(
+        Scrape(DocketTransfer).docket_number, overwrite
+    )
+    transfer_type: int = WithStrategy(
+        Constant(TRANSFER_REASON_MAP)[Scrape(DocketTransfer).reason], overwrite
+    )
+    destination_court_id: str = WithStrategy(
+        Ancestor(Docket).court_id, overwrite
+    )
+    destination_docket_number: str = WithStrategy(
+        Fn(lambda v: v or "")(Ancestor(Docket).docket_number), overwrite
     )
     # The standard docket format doesn't include transfer dates, so treat the
     # destination docket's filing date as the date the transfer occurred.
-    transfer_date: date | None = Ancestor(
-        Docket,
-        # strategy=overwrite
-    ).date_filed
+    transfer_date: date | None = WithStrategy(
+        Ancestor(Docket).date_filed, overwrite
+    )
 
     @override
     def query(self) -> QuerySet[CaseTransfer]:

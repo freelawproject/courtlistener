@@ -20,6 +20,8 @@ from cl.corpus_importer.state.merger import (
     OneToManyRelation,
     Params,
     Scrape,
+    WithStrategy,
+    overwrite,
 )
 from cl.corpus_importer.state.merger.specifications import AttributeMerger
 from cl.people_db.models import Party
@@ -85,32 +87,21 @@ class DocketMerger[DType: ScrapeDocket[Any, Any, Any], ParamType](
 
     atomic = True
 
-    source: int = Constant(
-        Docket.SCRAPER,
-        # strategy=add_scraper_source,
+    source: int = WithStrategy(Constant(Docket.SCRAPER), add_scraper_source)
+    date_filed: date | None = WithStrategy(
+        Scrape(ScrapeDocket).date_filed, overwrite
     )
-    date_filed: date | None = Scrape(
-        ScrapeDocket
-        # strategy=overwrite,
-    ).date_filed
-    case_name: str = Scrape(
-        ScrapeDocket
-        # strategy=overwrite
-    ).case_name
-    case_name_full: str = Scrape(
-        ScrapeDocket
-        # strategy=overwrite
-    ).case_name_full
-    case_name_short: str = Scrape(
-        ScrapeDocket
-        # strategy=overwrite
-    ).case_name_short
-    docket_number: str | None = Scrape(
-        ScrapeDocket
-        # strategy=overwrite
-    ).docket_number
-    docket_number_raw: str = Scrape(
-        ScrapeDocket
-        # strategy=overwrite
-    ).docket_number
+    case_name: str = WithStrategy(Scrape(ScrapeDocket).case_name, overwrite)
+    case_name_full: str = WithStrategy(
+        Scrape(ScrapeDocket).case_name_full, overwrite
+    )
+    case_name_short: str = WithStrategy(
+        Scrape(ScrapeDocket).case_name_short, overwrite
+    )
+    docket_number: str | None = WithStrategy(
+        Scrape(ScrapeDocket).docket_number, overwrite
+    )
+    docket_number_raw: str = WithStrategy(
+        Scrape(ScrapeDocket).docket_number, overwrite
+    )
     parties: list[Party] = PartyRelation()

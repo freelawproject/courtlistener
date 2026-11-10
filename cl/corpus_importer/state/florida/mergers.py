@@ -58,6 +58,8 @@ from cl.corpus_importer.state.merger import (
     Params,
     RelatedParams,
     Scrape,
+    WithStrategy,
+    overwrite,
 )
 from cl.corpus_importer.state.merger.specifications import AttributeMerger
 from cl.people_db.models import Attorney, Party, PartyType, Role
@@ -139,14 +141,21 @@ class FloridaDocumentMerger(
     model: ClassVar[type[Model]] = FloridaDocument
     key: ClassVar[Iterable[str]] = ["link_uuid"]
 
-    document_name: str = Scrape(ScrapeFloridaDocument).document_name
-    document_type: str = Fn(lambda v: v or "")(
-        Scrape(ScrapeFloridaDocument).document_type
+    document_name: str = WithStrategy(
+        Scrape(ScrapeFloridaDocument).document_name, overwrite
     )
-    content_type: str = Fn(_content_type)(Scrape(ScrapeFloridaDocument))
+    document_type: str = WithStrategy(
+        Fn(lambda v: v or "")(Scrape(ScrapeFloridaDocument).document_type),
+        overwrite,
+    )
+    content_type: str = WithStrategy(
+        Fn(_content_type)(Scrape(ScrapeFloridaDocument)), overwrite
+    )
     page_count: int | None = Scrape(ScrapeFloridaDocument).page_count
     file_size: int | None = Scrape(ScrapeFloridaDocument).file_size
-    link_uuid: UUID = Scrape(ScrapeFloridaDocument).document_link_uuid
+    link_uuid: UUID = WithStrategy(
+        Scrape(ScrapeFloridaDocument).document_link_uuid, overwrite
+    )
 
     def scrape_link_uuids(self) -> list[UUID]:
         """Shorthand to get the full set of link UUIDs passed as a parameter to the root merger."""
@@ -276,23 +285,35 @@ class FloridaDocketEntryMerger(
     # Florida's CL field is a DateTimeField, so override the base's
     # date-only mapping with the scrape's full timestamp. Annotated as the
     # base's `date` because an override can't narrow the declared type.
-    date_filed: date = Scrape(ScrapeFloridaDocketEntry).datetime_filed
-    date_submitted: datetime = Scrape(ScrapeFloridaDocketEntry).date_submitted
-    entry_type_raw: str = Scrape(ScrapeFloridaDocketEntry).entry_type_raw
-    entry_name: str = Scrape(ScrapeFloridaDocketEntry).entry_name
-    description: str = Scrape(ScrapeFloridaDocketEntry).entry_description
-    status: int = Fn(_entry_status)(Scrape(ScrapeFloridaDocketEntry))
-    submitted_by_name: str = Fn(_submitted_by_name)(
-        Scrape(ScrapeFloridaDocketEntry)
+    date_filed: date = WithStrategy(
+        Scrape(ScrapeFloridaDocketEntry).datetime_filed, overwrite
+    )
+    date_submitted: datetime = WithStrategy(
+        Scrape(ScrapeFloridaDocketEntry).date_submitted, overwrite
+    )
+    entry_type_raw: str = WithStrategy(
+        Scrape(ScrapeFloridaDocketEntry).entry_type_raw, overwrite
+    )
+    entry_name: str = WithStrategy(
+        Scrape(ScrapeFloridaDocketEntry).entry_name, overwrite
+    )
+    description: str = WithStrategy(
+        Scrape(ScrapeFloridaDocketEntry).entry_description, overwrite
+    )
+    status: int = WithStrategy(
+        Fn(_entry_status)(Scrape(ScrapeFloridaDocketEntry)), overwrite
+    )
+    submitted_by_name: str = WithStrategy(
+        Fn(_submitted_by_name)(Scrape(ScrapeFloridaDocketEntry)), overwrite
     )
     # Keep a party we resolved on an earlier scrape rather than clearing it
     # when this scrape can't find a match.
     submitted_by_id: int | None = Fn(_submitted_by_id)(
         Scrape(ScrapeFloridaDocketEntry), Ancestor(Docket)
     )
-    docket_entry_uuid: UUID = Scrape(
-        ScrapeFloridaDocketEntry
-    ).docket_entry_uuid
+    docket_entry_uuid: UUID = WithStrategy(
+        Scrape(ScrapeFloridaDocketEntry).docket_entry_uuid, overwrite
+    )
     documents: list[FloridaDocument] = AttachmentRelation(
         FloridaDocumentMerger, strategy=ManyStrategy.REPLACE
     )
@@ -330,8 +351,12 @@ class FloridaOriginatingCourtInformationMerger(
 ):
     model: ClassVar[type[Model]] = OriginatingCourtInformation
 
-    docket_number: str = Scrape(FloridaOriginatingCase).case_number
-    docket_number_raw: str = Scrape(FloridaOriginatingCase).case_number
+    docket_number: str = WithStrategy(
+        Scrape(FloridaOriginatingCase).case_number, overwrite
+    )
+    docket_number_raw: str = WithStrategy(
+        Scrape(FloridaOriginatingCase).case_number, overwrite
+    )
 
     def query(self) -> QuerySet[OriginatingCourtInformation]:
         return OriginatingCourtInformation.objects.none()
@@ -354,8 +379,11 @@ def _originating_case(
 
 
 class FloridaCaseTransferMerger(CaseTransferMerger[DocketTransfer, None]):
-    origin_court_id: str | None = Constant(FLORIDA_TRANSFER_COURT_ID_MAP).get(
-        Scrape(DocketTransfer).court_id
+    origin_court_id: str | None = WithStrategy(
+        Constant(FLORIDA_TRANSFER_COURT_ID_MAP).get(
+            Scrape(DocketTransfer).court_id
+        ),
+        overwrite,
     )
 
 
@@ -400,18 +428,29 @@ class FloridaDocketMerger(
 
     atomic = True
 
-    court_id: str = Constant(FLORIDA_COURT_ID_MAP)[
-        Scrape(FloridaCase).court_id
-    ]
-    date_last_filing: date | None = Fn(_date_last_filing)(Scrape(FloridaCase))
-    docket_number_core: str = Fn(make_docket_number_core)(
-        Scrape(FloridaCase).docket_number,
-        Constant(FLORIDA_COURT_ID_MAP)[Scrape(FloridaCase).court_id],
+    court_id: str = WithStrategy(
+        Constant(FLORIDA_COURT_ID_MAP)[Scrape(FloridaCase).court_id], overwrite
     )
-    appeal_from_id: str | None = Fn(_appeal_from_id)(Scrape(FloridaCase))
-    appeal_from_str: str | None = Fn(_appeal_from_str)(Scrape(FloridaCase))
+    date_last_filing: date | None = WithStrategy(
+        Fn(_date_last_filing)(Scrape(FloridaCase)), overwrite
+    )
+    docket_number_core: str = WithStrategy(
+        Fn(make_docket_number_core)(
+            Scrape(FloridaCase).docket_number,
+            Constant(FLORIDA_COURT_ID_MAP)[Scrape(FloridaCase).court_id],
+        ),
+        overwrite,
+    )
+    appeal_from_id: str | None = WithStrategy(
+        Fn(_appeal_from_id)(Scrape(FloridaCase)), overwrite
+    )
+    appeal_from_str: str | None = WithStrategy(
+        Fn(_appeal_from_str)(Scrape(FloridaCase)), overwrite
+    )
     # See https://github.com/freelawproject/courtlistener/issues/7361#issuecomment-4566459292
-    pacer_case_id: str = Fn(str)(Scrape(FloridaCase).case_uuid)
+    pacer_case_id: str = WithStrategy(
+        Fn(str)(Scrape(FloridaCase).case_uuid), overwrite
+    )
     originating_court_information: OriginatingCourtInformation = (
         OneToOneRelation(
             FloridaOriginatingCourtInformationMerger,
