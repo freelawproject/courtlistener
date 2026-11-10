@@ -285,5 +285,5 @@ def apply() -> dict[str, int] | None:
     return run(dry_run=False)
 
 
-run(dry_run=True)
+stats = run(dry_run=True)
 print("Expected: replaced=112, all else 0. If so, type: apply()")
