@@ -175,7 +175,9 @@ class ScotusDocketMergeTest(TestCase):
         mock_response.raise_for_status.return_value = None
         mock_get.return_value.__enter__.return_value = mock_response
 
-        ingest_scotus_docket(data)
+        # The PDF downloads are queued when the merge commits.
+        with self.captureOnCommitCallbacks(execute=True):
+            ingest_scotus_docket(data)
         docket = Docket.objects.all().first()
         docket.refresh_from_db()
 
@@ -392,7 +394,8 @@ class ScotusDocketMergeTest(TestCase):
         )
 
         # Merge again. Confirm objects are not duplicated.
-        ingest_scotus_docket(data)
+        with self.captureOnCommitCallbacks(execute=True):
+            ingest_scotus_docket(data)
         docket.refresh_from_db()
 
         # No additional calls to the download methods’ loggers.
@@ -1110,24 +1113,31 @@ class ScotusPlaceholderDocumentTest(CLTestCase):
     ) -> None:
         """Once the entry has attachments, its placeholder becomes the
         first one instead of staying empty next to them, and gets its PDF
-        downloaded like a new document."""
+        downloaded like a new document once the merge commits."""
         self._merge(attachments=[])
         placeholder = SCOTUSDocument.objects.get(
             docket_entry__docket=self.docket
         )
 
-        doc_pks = self._merge(
-            document_number=310278,
-            attachments=[
-                SCOTUSAttachmentDataFactory(
-                    description="Petition", document_number=310278
-                ),
-                SCOTUSAttachmentDataFactory(
-                    description="Appendix", document_number=310278
-                ),
-            ],
-            download_file=True,
-        )
+        with self.captureOnCommitCallbacks() as callbacks:
+            doc_pks = self._merge(
+                document_number=310278,
+                attachments=[
+                    SCOTUSAttachmentDataFactory(
+                        description="Petition", document_number=310278
+                    ),
+                    SCOTUSAttachmentDataFactory(
+                        description="Appendix", document_number=310278
+                    ),
+                ],
+                download_file=True,
+            )
+
+        # Before the commit, the placeholder's url is still empty in the DB,
+        # so the downloads must wait for it.
+        apply_async = mock_chain.return_value.apply_async
+        apply_async.assert_not_called()
+        self.assertEqual(callbacks.count(apply_async), 2)
 
         documents = SCOTUSDocument.objects.filter(
             docket_entry__docket=self.docket

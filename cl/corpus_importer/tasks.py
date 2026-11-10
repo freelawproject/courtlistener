@@ -3665,7 +3665,8 @@ def merge_scotus_document(
 
     Checks if the document exists, creating a SCOTUSDocument object if it does
     not. Then, if the document is new, was a placeholder, or the filename has
-    changed, fetch the attachment PDF, store it, and compute metadata.
+    changed, fetch the attachment PDF, store it, and compute metadata. The
+    download is queued when the current transaction commits.
 
     :param docket_entry: The docket entry this attachment belongs to.
     :param doc_data: The attachment data to merge.
@@ -3710,12 +3711,17 @@ def merge_scotus_document(
         )
 
     if download_file and (created or file_name_changed):
-        chain(
-            download_scotus_document_pdf.si(scotus_document.pk),
-            extract_pdf_document.s(
-                check_if_needed=False, model_name="search.SCOTUSDocument"
-            ),
-        ).apply_async()
+        # Queue the download once the merge commits; otherwise the worker can
+        # read the document before it exists or, for a filled-in placeholder,
+        # while its url is still empty.
+        transaction.on_commit(
+            chain(
+                download_scotus_document_pdf.si(scotus_document.pk),
+                extract_pdf_document.s(
+                    check_if_needed=False, model_name="search.SCOTUSDocument"
+                ),
+            ).apply_async
+        )
 
     return created, scotus_document.pk
 
