@@ -1191,6 +1191,33 @@ class ScotusPlaceholderDocumentTest(CLTestCase):
         )
         self.assertEqual(list(documents), [document])
 
+    @mock.patch("cl.corpus_importer.tasks.logger")
+    def test_multiple_placeholders_are_left_untouched(
+        self, mock_logger: mock.MagicMock
+    ) -> None:
+        """If an entry somehow has more than one placeholder, the merge logs
+        an error and leaves them as they are, merging the attachment as a new
+        document."""
+        self._merge(attachments=[])
+        entry = SCOTUSDocument.objects.get(
+            docket_entry__docket=self.docket
+        ).docket_entry
+        SCOTUSDocument.objects.create(docket_entry=entry)
+
+        self._merge(
+            document_number=310278,
+            attachments=[SCOTUSAttachmentDataFactory(document_number=310278)],
+        )
+
+        mock_logger.error.assert_called_once()
+        documents = SCOTUSDocument.objects.filter(docket_entry=entry)
+        self.assertEqual(sum(d.is_placeholder for d in documents), 2)
+        self.assertTrue(
+            documents.filter(
+                document_number=310278, attachment_number=1
+            ).exists()
+        )
+
     @mock.patch(f"{DOWNLOAD_COMMAND}.CeleryThrottle")
     @mock.patch(f"{DOWNLOAD_COMMAND}.download_scotus_document_pdf")
     def test_pdf_download_command_skips_placeholders(
