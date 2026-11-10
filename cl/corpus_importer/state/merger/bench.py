@@ -249,7 +249,7 @@ class SpecificationBench:
         spec = OneToManyRelation(
             EntryMerger, cast(AttributeMerger, ScrapeProxy(Scrape))
         )
-        spec.name = "docket_entries"
+        spec._name = "docket_entries"
 
         benchmark(spec.run_validation, DocketMerger)
 

@@ -460,6 +460,41 @@ class BaseMergerTest(TestCase):
             {("Alice", "Plaintiff"), ("Bob", "Defendant")},
         )
 
+    def test_m2m_through_merger_must_match_through_model(self) -> None:
+        """Is a `through` merger for the wrong model refused?
+
+        A many-to-many spec whose `through` merger targets a model other than
+        the relation's actual through model should fail when the merger is
+        defined, with an error naming the mismatch.
+        """
+
+        class TestPartyMerger(
+            Merger[dict[str, str], RelatedParams[None], Party]
+        ):
+            model: ClassVar[type[Model]] = Party
+
+            name: str = Scrape(dict)["name"]
+
+        class TestWrongThroughMerger(
+            Merger[dict[str, str], ThroughParameters[None], DocketEntry]
+        ):
+            model: ClassVar[type[Model]] = DocketEntry
+
+            description: str = Scrape(dict)["type"]
+
+        with self.assertRaisesRegex(
+            TypeError, "parties: Model for through merger is DocketEntry"
+        ):
+
+            class TestMerger(Merger[dict[str, Any], None, Docket]):
+                model: ClassVar[type[Model]] = Docket
+
+                parties: list[Party] = ManyToManyRelation(
+                    TestPartyMerger,
+                    Scrape(dict)["parties"],
+                    TestWrongThroughMerger,
+                )
+
     @merger_test(expected_query_count=9)
     def test_related_mergers_m2m_simple_disassociate(self) -> None:
         """Does DISASSOCIATE on a plain many-to-many remove stale associations while keeping the objects themselves?"""
