@@ -163,6 +163,27 @@ class SCOTUSAlertsPercolatorTest(ESIndexTestCase, TransactionTestCase):
             download_scotus_document_pdf(scotus_document.pk)
         mock_percolate_task.assert_called_once_with(scotus_document.pk)
 
+    def test_failed_pdf_chain_still_percolates_the_document(self, mock_prefix):
+        """The PDF chain is sent with percolate_scotus_document as its error
+        callback, so a task that fails for good (e.g. an HTTP error on the
+        download) still gets the new document percolated. Eager chains
+        re-raise instead of running error callbacks, so this checks the
+        wiring; the other tests cover what the task does."""
+        with mock.patch("cl.corpus_importer.tasks.chain") as mock_chain:
+            _, doc_pk = merge_scotus_document(
+                self._make_scotus_entry(),
+                {
+                    "document_number": 1,
+                    "attachment_number": 1,
+                    "description": "Petition for a writ of certiorari",
+                    "document_url": "https://www.supremecourt.gov/a.pdf",
+                },
+                download_file=True,
+            )
+        mock_chain.return_value.apply_async.assert_called_once_with(
+            link_error=percolate_scotus_document.si(doc_pk)
+        )
+
     def test_document_without_a_pdf_download_is_percolated_on_creation(
         self, mock_prefix
     ):
@@ -338,7 +359,11 @@ class SCOTUSAlertsPercolatorTest(ESIndexTestCase, TransactionTestCase):
         """A SCOTUS document whose pk equals an already-alerted RECAP
         document's pk still triggers its own hit."""
         alert = self._make_alert('q="writ of certiorari"&type=r')
+        # A pk no factory reaches: the ES index is shared by the whole class,
+        # so a lower pk could match a SCOTUS document another test indexed.
+        shared_pk = 9_000_000
         rd = RECAPDocumentFactory(
+            id=shared_pk,
             docket_entry=DocketEntryFactory(
                 docket=DocketFactory(
                     court=CourtFactory(id="ca1", jurisdiction="F"),
@@ -350,7 +375,7 @@ class SCOTUSAlertsPercolatorTest(ESIndexTestCase, TransactionTestCase):
         self.assertEqual(len(self._hits(alert)), 1)
 
         SCOTUSDocumentFactory(
-            id=rd.pk,
+            id=shared_pk,
             docket_entry=self._make_scotus_entry(),
             description="Petition for a writ of certiorari",
         )

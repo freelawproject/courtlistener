@@ -3717,15 +3717,21 @@ def merge_scotus_document(
         )
 
     if download_file and (created or file_name_changed):
+        percolate = percolate_scotus_document.si(scotus_document.pk)
         chain(
             download_scotus_document_pdf.si(scotus_document.pk),
             extract_pdf_document.s(
                 check_if_needed=False, model_name="search.SCOTUSDocument"
             ),
-            # Runs even if the extraction fails, so the document is still
-            # percolated with its metadata.
-            percolate_scotus_document.si(scotus_document.pk),
-        ).apply_async()
+            # Also runs when the extraction service can't extract the text,
+            # so the document is still percolated with its metadata.
+            percolate,
+        ).apply_async(
+            # The chain stops at a task that fails for good (e.g. an HTTP
+            # error or exhausted retries), so percolate the document then
+            # too. Celery attaches this errback to every task in the chain.
+            link_error=percolate
+        )
 
     return created, scotus_document.pk
 
