@@ -1,4 +1,4 @@
-from contextlib import nullcontext
+from contextlib import AbstractContextManager, nullcontext
 from unittest import mock
 
 from django.test.utils import override_settings
@@ -29,7 +29,7 @@ from cl.search.factories import (
     SCOTUSDocumentFactory,
     SCOTUSPartyDataFactory,
 )
-from cl.search.models import Docket, SCOTUSDocument
+from cl.search.models import Docket, SCOTUSDocketEntry, SCOTUSDocument
 from cl.tests.cases import ESIndexTestCase, TransactionTestCase
 from cl.users.factories import UserProfileWithParentsFactory
 
@@ -49,11 +49,14 @@ class SCOTUSAlertsPercolatorTest(ESIndexTestCase, TransactionTestCase):
 
     @classmethod
     def setUpClass(cls) -> None:
+        """Build the people and RECAP indices once for the class."""
         super().setUpClass()
         cls.rebuild_index("people_db.Person")
         cls.rebuild_index("search.Docket")
 
     def setUp(self) -> None:
+        """Start each test with an empty percolator index and no recorded
+        alert hits, plus the scotus court and an alert owner."""
         RECAPPercolator._index.delete(ignore=404)
         RECAPPercolator.init()
         self.r = get_redis_interface("CACHE")
@@ -63,7 +66,9 @@ class SCOTUSAlertsPercolatorTest(ESIndexTestCase, TransactionTestCase):
         self.user = UserProfileWithParentsFactory().user
         super().setUp()
 
-    def _make_alert(self, query: str, alert_type: str = SEARCH_TYPES.RECAP):
+    def _make_alert(
+        self, query: str, alert_type: str = SEARCH_TYPES.RECAP
+    ) -> Alert:
         """Create a daily alert, which is always scheduled regardless of the
         user's membership."""
         return AlertFactory(
@@ -73,7 +78,7 @@ class SCOTUSAlertsPercolatorTest(ESIndexTestCase, TransactionTestCase):
             alert_type=alert_type,
         )
 
-    def _make_scotus_entry(self):
+    def _make_scotus_entry(self) -> SCOTUSDocketEntry:
         """Create a SCOTUS docket the way merge_scotus_docket does: its
         metadata is what makes it SCOTUS content in ES."""
         docket = DocketFactory(court=self.court, source=Docket.SCRAPER)
@@ -84,7 +89,7 @@ class SCOTUSAlertsPercolatorTest(ESIndexTestCase, TransactionTestCase):
         """Return the hits scheduled for an alert."""
         return list(ScheduledAlertHit.objects.filter(alert=alert))
 
-    def _count_percolations(self):
+    def _count_percolations(self) -> AbstractContextManager[mock.MagicMock]:
         """Count percolations by wrapping prepare_percolator_content."""
         return mock.patch(
             "cl.alerts.tasks.prepare_percolator_content",
@@ -92,8 +97,8 @@ class SCOTUSAlertsPercolatorTest(ESIndexTestCase, TransactionTestCase):
         )
 
     def test_new_document_is_percolated_once_its_pdf_is_processed(
-        self, mock_prefix
-    ):
+        self, mock_prefix: mock.MagicMock
+    ) -> None:
         """A new SCOTUS document whose PDF will be downloaded isn't
         percolated when created, nor when its text is saved. It's percolated
         once by percolate_scotus_document, the last step of its PDF chain,
@@ -144,8 +149,8 @@ class SCOTUSAlertsPercolatorTest(ESIndexTestCase, TransactionTestCase):
         self.assertEqual(self._hits(other_court_alert), [])
 
     def test_failed_pdf_download_still_percolates_the_document(
-        self, mock_prefix
-    ):
+        self, mock_prefix: mock.MagicMock
+    ) -> None:
         """If the PDF download fails the chain stops, so the document is
         percolated right away with its metadata."""
         scotus_document = SCOTUSDocumentFactory(
@@ -163,7 +168,9 @@ class SCOTUSAlertsPercolatorTest(ESIndexTestCase, TransactionTestCase):
             download_scotus_document_pdf(scotus_document.pk)
         mock_percolate_task.assert_called_once_with(scotus_document.pk)
 
-    def test_failed_pdf_chain_still_percolates_the_document(self, mock_prefix):
+    def test_failed_pdf_chain_still_percolates_the_document(
+        self, mock_prefix: mock.MagicMock
+    ) -> None:
         """The PDF chain is sent with percolate_scotus_document as its error
         callback, so a task that fails for good (e.g. an HTTP error on the
         download) still gets the new document percolated. Eager chains
@@ -185,8 +192,8 @@ class SCOTUSAlertsPercolatorTest(ESIndexTestCase, TransactionTestCase):
         )
 
     def test_document_without_a_pdf_download_is_percolated_on_creation(
-        self, mock_prefix
-    ):
+        self, mock_prefix: mock.MagicMock
+    ) -> None:
         """A SCOTUS document created without a PDF download coming is
         percolated when it's created."""
         alert = self._make_alert('q="writ of certiorari"&type=r')
@@ -199,8 +206,8 @@ class SCOTUSAlertsPercolatorTest(ESIndexTestCase, TransactionTestCase):
         self.assertEqual(len(self._hits(alert)), 1)
 
     def test_scotus_updates_are_percolated_without_duplicate_hits(
-        self, mock_prefix
-    ):
+        self, mock_prefix: mock.MagicMock
+    ) -> None:
         """Updates to SCOTUS documents, entries, dockets and their metadata
         are percolated. An alert that already hit a document or docket
         doesn't hit it again."""
@@ -213,20 +220,24 @@ class SCOTUSAlertsPercolatorTest(ESIndexTestCase, TransactionTestCase):
         self.assertEqual(len(self._hits(first_alert)), 1)
 
         def update_document() -> None:
+            """Change the document's description."""
             scotus_document.description = (
                 "Brief in opposition to the writ of certiorari"
             )
             scotus_document.save(update_fields=["description"])
 
         def update_entry() -> None:
+            """Change the docket entry's description."""
             entry.description = "Motion to dismiss granted"
             entry.save()
 
         def update_docket() -> None:
+            """Change the docket's case name."""
             docket.case_name = "Roe v. Wade"
             docket.save()
 
         def update_metadata() -> None:
+            """Turn on capital_case in the docket's SCOTUS metadata."""
             docket.scotus_metadata.capital_case = True
             docket.scotus_metadata.save()
 
@@ -270,7 +281,9 @@ class SCOTUSAlertsPercolatorTest(ESIndexTestCase, TransactionTestCase):
                 # never gets a second hit for the same document.
                 self.assertEqual(len(self._hits(first_alert)), 1)
 
-    def test_scotus_docket_percolated_after_its_parties(self, mock_prefix):
+    def test_scotus_docket_percolated_after_its_parties(
+        self, mock_prefix: mock.MagicMock
+    ) -> None:
         """merge_scotus_docket percolates a docket once its parties are
         indexed, so party alerts match it. Merging again percolates it again
         without duplicating hits, and matches alerts on the new data."""
@@ -310,8 +323,8 @@ class SCOTUSAlertsPercolatorTest(ESIndexTestCase, TransactionTestCase):
         self.assertEqual(len(self._hits(case_name_alert)), 1)
 
     def test_scotus_webhooks_follow_the_docket_alert_webhooks_setting(
-        self, mock_prefix
-    ):
+        self, mock_prefix: mock.MagicMock
+    ) -> None:
         """SCOTUS search alert hits only send webhooks when
         SCOTUS_ALERT_WEBHOOKS_ENABLED is on. The hit is still
         scheduled for the email either way."""
@@ -338,7 +351,9 @@ class SCOTUSAlertsPercolatorTest(ESIndexTestCase, TransactionTestCase):
                 self.assertEqual(mock_webhook.called, enabled)
                 self.assertEqual(len(self._hits(alert)), 1)
 
-    def test_metadata_change_waits_for_the_new_parties(self, mock_prefix):
+    def test_metadata_change_waits_for_the_new_parties(
+        self, mock_prefix: mock.MagicMock
+    ) -> None:
         """When a merge changes both the metadata (capital_case) and the
         parties, the docket is percolated once, after its new parties are
         indexed, not before with the old ones. Otherwise an alert excluding
@@ -373,7 +388,9 @@ class SCOTUSAlertsPercolatorTest(ESIndexTestCase, TransactionTestCase):
         self.assertEqual(len(self._hits(capital_alert)), 1)
         self.assertEqual(self._hits(excluding_alert), [])
 
-    def test_metadata_change_without_parties_is_percolated(self, mock_prefix):
+    def test_metadata_change_without_parties_is_percolated(
+        self, mock_prefix: mock.MagicMock
+    ) -> None:
         """A merge that changes the metadata but has no parties still
         percolates the docket, through the metadata update."""
         report_data = ScotusDocketDataFactory(
@@ -395,7 +412,9 @@ class SCOTUSAlertsPercolatorTest(ESIndexTestCase, TransactionTestCase):
         self.assertEqual(len(self._hits(capital_alert)), 1)
 
     @override_settings(PERCOLATOR_SCOTUS_SEARCH_ALERTS_ENABLED=False)
-    def test_scotus_percolation_follows_its_own_setting(self, mock_prefix):
+    def test_scotus_percolation_follows_its_own_setting(
+        self, mock_prefix: mock.MagicMock
+    ) -> None:
         """Without PERCOLATOR_SCOTUS_SEARCH_ALERTS_ENABLED, SCOTUS content
         isn't percolated."""
         alert = self._make_alert('q="writ of certiorari"&type=r')
@@ -411,7 +430,9 @@ class SCOTUSAlertsPercolatorTest(ESIndexTestCase, TransactionTestCase):
         self.assertEqual(self._hits(alert), [])
 
     @override_settings(PERCOLATOR_RECAP_SEARCH_ALERTS_ENABLED=True)
-    def test_scotus_and_recap_documents_with_the_same_pk(self, mock_prefix):
+    def test_scotus_and_recap_documents_with_the_same_pk(
+        self, mock_prefix: mock.MagicMock
+    ) -> None:
         """A SCOTUS document whose pk equals an already-alerted RECAP
         document's pk still triggers its own hit."""
         alert = self._make_alert('q="writ of certiorari"&type=r')
@@ -441,8 +462,8 @@ class SCOTUSAlertsPercolatorTest(ESIndexTestCase, TransactionTestCase):
         )
 
     def test_alerts_indexed_and_removed_with_only_scotus_enabled(
-        self, mock_prefix
-    ):
+        self, mock_prefix: mock.MagicMock
+    ) -> None:
         """RECAP and docket-only alerts are indexed into the RECAP
         percolator when only SCOTUS percolation is on, and removed from it
         when deleted."""
