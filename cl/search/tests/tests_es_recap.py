@@ -110,6 +110,7 @@ from cl.search.management.commands.fix_rd_broken_links import (
 )
 from cl.search.models import (
     SEARCH_TYPES,
+    Court,
     Docket,
     DocketEvent,
     OpinionsCitedByRECAPDocument,
@@ -2519,7 +2520,7 @@ class RECAPSearchTest(RECAPSearchTestCase, ESIndexTestCase, TestCase):
                 description="MOTION for Leave to File Amicus Curiae Lorem Served",
             )
             dockets_to_remove.append(de_3.docket)
-            initial_document_3 = RECAPDocumentFactory(
+            RECAPDocumentFactory(
                 docket_entry=de_3,
                 document_number="1",
                 is_available=False,
@@ -2962,9 +2963,7 @@ class RECAPSearchTest(RECAPSearchTestCase, ESIndexTestCase, TestCase):
             "order_by": "dateFiled desc",
             "highlight": True,
         }
-        r = await self._test_article_count(
-            search_params, 2, "filter + text query"
-        )
+        await self._test_article_count(search_params, 2, "filter + text query")
         self.assertEqual(
             mock_fetch_es.call_count, 1, "Wrong number of query calls."
         )
@@ -2978,9 +2977,7 @@ class RECAPSearchTest(RECAPSearchTestCase, ESIndexTestCase, TestCase):
             "order_by": "dateFiled desc",
             "highlight": True,
         }
-        r = await self._test_article_count(
-            search_params, 2, "filter + text query"
-        )
+        await self._test_article_count(search_params, 2, "filter + text query")
         # The request ignores the invalid parameter, so the cache key remains the same
         # and the response is retrieved from the cache.
         self.assertEqual(
@@ -4757,7 +4754,7 @@ class RECAPSearchAPIV4Test(
         """Test if the function score used for the dateFiled sorting in the V4
         of the RECAP Search API works as expected."""
 
-        with self.captureOnCommitCallbacks(execute=True) as callbacks:
+        with self.captureOnCommitCallbacks(execute=True):
             # This Docket will be matched only by its RECAPDocument.
             docket_entry_recent = DocketEntryFactory(
                 docket__source=Docket.RECAP,
@@ -5192,7 +5189,7 @@ class RECAPSearchAPIV4Test(
 
         created_dockets = []
         dockets_to_create = 20
-        with self.captureOnCommitCallbacks(execute=True) as callbacks:
+        with self.captureOnCommitCallbacks(execute=True):
             for _ in range(dockets_to_create):
                 docket_entry = DocketEntryFactory(
                     docket__source=Docket.RECAP,
@@ -5495,7 +5492,7 @@ class RECAPSearchAPIV4Test(
         """Test cursor pagination previous and next page when the number of
         equals the page_size."""
 
-        with self.captureOnCommitCallbacks(execute=True) as callbacks:
+        with self.captureOnCommitCallbacks(execute=True):
             docket = DocketFactory(source=Docket.RECAP)
 
         search_params = {
@@ -6045,7 +6042,7 @@ class RECAPSearchAPIV4Test(
         sorting in the V4 of the RECAP Search API works as expected for the RD type.
         """
 
-        with self.captureOnCommitCallbacks(execute=True) as callbacks:
+        with self.captureOnCommitCallbacks(execute=True):
             latest_null_date_filed = DocketEntryFactory(
                 docket=DocketFactory(
                     court=self.court_api,
@@ -6189,7 +6186,7 @@ class RECAPSearchAPIV4Test(
 
         created_dockets = []
         dockets_to_create = 10
-        with self.captureOnCommitCallbacks(execute=True) as callbacks:
+        with self.captureOnCommitCallbacks(execute=True):
             for _ in range(dockets_to_create):
                 docket_entry = DocketEntryFactory(
                     docket__source=Docket.RECAP,
@@ -6355,7 +6352,7 @@ class RECAPSearchAPIV4Test(
         empty lists after a partial update that removes the related instance
         and empties the list field.
         """
-        with self.captureOnCommitCallbacks(execute=True) as callbacks:
+        with self.captureOnCommitCallbacks(execute=True):
             d = DocketFactory(
                 case_name="Lorem Ipsum",
                 court=self.court_2,
@@ -6872,6 +6869,27 @@ class ESDocketSourcesTest(TestCase):
         self.assertFalse(RECAP_ES_SOURCE.docket_belongs(scotus_docket))
         self.assertTrue(SCOTUS_ES_SOURCE.docket_belongs(scotus_docket))
 
+    def test_has_entries_skips_the_query_for_other_courts(self) -> None:
+        """has_entries rules out Dockets from courts outside the source's
+        court_ids without a query, so the SCOTUS processor adds no query
+        to RECAP Docket saves, while still finding real entries."""
+        recap_entry = DocketEntryFactory(
+            docket=DocketFactory(court=CourtFactory(), source=Docket.RECAP)
+        )
+        scotus_entry = SCOTUSDocketEntryFactory(
+            docket__court=CourtFactory(id="scotus", jurisdiction="F"),
+            docket__source=Docket.SCRAPER,
+        )
+        recap_docket = Docket.objects.get(pk=recap_entry.docket_id)
+        scotus_docket = Docket.objects.get(pk=scotus_entry.docket_id)
+
+        with self.assertNumQueries(0):
+            self.assertFalse(SCOTUS_ES_SOURCE.has_entries(recap_docket))
+        with self.assertNumQueries(1):
+            self.assertTrue(SCOTUS_ES_SOURCE.has_entries(scotus_docket))
+        with self.assertNumQueries(1):
+            self.assertTrue(RECAP_ES_SOURCE.has_entries(recap_docket))
+
     def test_scotus_docket_belongs_via_flag_before_any_content(
         self,
     ) -> None:
@@ -6910,11 +6928,13 @@ class SCOTUSESIndexingSignalTest(
     """
 
     @classmethod
-    def setUpClass(cls):
+    def setUpClass(cls) -> None:
+        """Start every test class run from an empty RECAP index."""
         super().setUpClass()
         cls.rebuild_index("search.Docket")
 
-    def setUp(self):
+    def setUp(self) -> None:
+        """Create the scotus Court every SCOTUS docket in these tests uses."""
         self.court = CourtFactory(id="scotus", jurisdiction="F")
         super().setUp()
 
@@ -7456,8 +7476,8 @@ class SCOTUSESIndexingSignalTest(
         self.assertEqual(hit.caseName, "Edited Case Name")
 
 
-@override_flag("scotus_docket_page", active=True)
 @override_settings(WAFFLE_CACHE_PREFIX="SCOTUSRECAPSearchTest")
+@override_flag("scotus_docket_page", active=True)
 class SCOTUSRECAPSearchTest(
     AuthenticatedClientMixin, ESIndexTestCase, TestCase
 ):
@@ -7467,15 +7487,24 @@ class SCOTUSRECAPSearchTest(
     """
 
     @classmethod
-    def setUpTestData(cls):
+    def setUpTestData(cls) -> None:
+        """Index one dated SCOTUS docket and one dated RECAP docket, each
+        with a document matching "Tied"."""
         cls.rebuild_index("search.Docket")
+        # The RSS feed skips entries without a filing date, and the alert
+        # estimate counts by filing date, so both need dates.
+        filed = datetime.date(2024, 1, 2)
         with cls.captureOnCommitCallbacks(execute=True):
             scotus_entry = SCOTUSDocketEntryFactory(
-                docket__court=CourtFactory(id="scotus", jurisdiction="F")
+                docket__court=CourtFactory(id="scotus", jurisdiction="F"),
+                docket__date_filed=filed,
+                date_filed=filed,
             )
             recap_entry = DocketEntryFactory(
                 docket__court=CourtFactory(id="ca1", jurisdiction="F"),
                 docket__source=Docket.RECAP,
+                docket__date_filed=filed,
+                date_filed=filed,
             )
             # Every docket and document URL of a docket starts with this.
             cls.scotus_docket_path = f"/docket/{scotus_entry.docket_id}/"
@@ -7518,23 +7547,19 @@ class SCOTUSRECAPSearchTest(
             ]
         return forward, backward
 
-    def test_scotus_results_need_the_scotus_docket_page_flag(self) -> None:
-        """Until launch, the search page and the v4 API show SCOTUS content
-        only to requests with the scotus_docket_page flag."""
-        api_v4 = reverse("search-list", kwargs={"version": "v4"})
+    def test_search_frontend_shows_scotus_only_with_the_flag(self) -> None:
+        """Until launch, the search page and the RSS search feed show
+        SCOTUS content only to requests with the scotus_docket_page flag."""
+        feed = reverse("search_feed", args=["search"])
         endpoints = [
-            ("search page", reverse("show_results"), SEARCH_TYPES.RECAP),
-            ("API v4 r", api_v4, SEARCH_TYPES.RECAP),
-            ("API v4 d", api_v4, SEARCH_TYPES.DOCKETS),
-            ("API v4 rd", api_v4, SEARCH_TYPES.RECAP_DOCUMENT),
+            ("search page", reverse("show_results")),
+            ("RSS search feed", feed),
         ]
         # An empty q runs the match-all query, which builds its queries
         # differently.
-        for (endpoint, url, search_type), q in product(
-            endpoints, ["Tied", ""]
-        ):
+        for (endpoint, url), q in product(endpoints, ["Tied", ""]):
             with self.subTest(endpoint=endpoint, q=q):
-                params = {"type": search_type, "q": q}
+                params = {"type": SEARCH_TYPES.RECAP, "q": q}
                 with override_flag("scotus_docket_page", active=False):
                     hidden = self.client.get(url, params).content.decode()
                 shown = self.client.get(url, params).content.decode()
@@ -7543,12 +7568,125 @@ class SCOTUSRECAPSearchTest(
                 self.assertNotIn(self.scotus_docket_path, hidden)
                 self.assertIn(self.scotus_docket_path, shown)
 
+    def test_search_feed_links_numberless_documents_to_their_entry(
+        self,
+    ) -> None:
+        """RSS search feed items for RECAP and SCOTUS documents without a
+        number, which have no page of their own, link to their entry on the
+        docket page instead of the homepage."""
+        filed = datetime.date(2024, 1, 3)
+        with self.captureOnCommitCallbacks(execute=True):
+            recap_minute_entry = DocketEntryFactory(
+                docket__court=CourtFactory(id="cand", jurisdiction="FD"),
+                docket__source=Docket.RECAP,
+                date_filed=filed,
+                description="Numberless",
+            )
+            scotus_numbered_entry = SCOTUSDocketEntryFactory(
+                docket__court=Court.objects.get(pk="scotus"),
+                entry_number=7,
+                date_filed=filed,
+                description="Numberless",
+            )
+            scotus_minute_entry = SCOTUSDocketEntryFactory(
+                docket=scotus_numbered_entry.docket,
+                entry_number=None,
+                date_filed=filed,
+                description="Numberless",
+            )
+            # build() skips the factories' fixups, which would give each
+            # document its entry's number.
+            for document in [
+                RECAPDocumentFactory.build(
+                    docket_entry=recap_minute_entry, document_number=""
+                ),
+                SCOTUSDocumentFactory.build(
+                    docket_entry=scotus_numbered_entry, document_number=None
+                ),
+                SCOTUSDocumentFactory.build(
+                    docket_entry=scotus_minute_entry, document_number=None
+                ),
+            ]:
+                document.save()
+
+        r = self.client.get(
+            reverse("search_feed", args=["search"]),
+            {"type": SEARCH_TYPES.RECAP, "q": "Numberless"},
+        )
+
+        namespaces = {"atom": "http://www.w3.org/2005/Atom"}
+        tree = etree.fromstring(r.content)
+        hrefs = tree.xpath(
+            "//atom:entry/atom:link/@href", namespaces=namespaces
+        )
+        recap_docket_url = recap_minute_entry.docket.get_absolute_url()
+        scotus_docket_url = scotus_numbered_entry.docket.get_absolute_url()
+        expected = [
+            f"{recap_docket_url}#minute-entry-{recap_minute_entry.pk}",
+            f"{scotus_docket_url}#entry-7",
+            f"{scotus_docket_url}#minute-entry-{scotus_minute_entry.pk}",
+        ]
+        # The feed makes item links absolute; compare their path and anchor.
+        links = [
+            urllib.parse.urlsplit(href)._replace(scheme="", netloc="").geturl()
+            for href in hrefs
+        ]
+        self.assertCountEqual(links, expected)
+        # Each summary's "Original document" link gets the same fallback.
+        summary_links = [
+            html.fromstring(summary).xpath("//a/@href")[0]
+            for summary in tree.xpath(
+                "//atom:entry/atom:summary/text()", namespaces=namespaces
+            )
+        ]
+        self.assertCountEqual(summary_links, expected)
+
+    def test_search_apis_never_show_scotus(self) -> None:
+        """The v3 and v4 search APIs leave SCOTUS out even for requests
+        with the scotus_docket_page flag, until their own launch."""
+        api_v3 = reverse("search-list", kwargs={"version": "v3"})
+        api_v4 = reverse("search-list", kwargs={"version": "v4"})
+        endpoints = [
+            ("API v3 r", api_v3, SEARCH_TYPES.RECAP),
+            ("API v4 r", api_v4, SEARCH_TYPES.RECAP),
+            ("API v4 d", api_v4, SEARCH_TYPES.DOCKETS),
+            ("API v4 rd", api_v4, SEARCH_TYPES.RECAP_DOCUMENT),
+        ]
+        for (endpoint, url, search_type), q in product(
+            endpoints, ["Tied", ""]
+        ):
+            with self.subTest(endpoint=endpoint, q=q):
+                r = self.client.get(url, {"type": search_type, "q": q})
+
+                self.assertIn(self.recap_docket_path, r.content.decode())
+                self.assertNotIn(self.scotus_docket_path, r.content.decode())
+
+    def test_alert_estimate_counts_scotus_only_with_the_flag(self) -> None:
+        """The create-alert modal's estimate counts SCOTUS content only
+        for requests with the scotus_docket_page flag, like the search
+        page it belongs to."""
+        url = reverse(
+            "alert_frequency", kwargs={"version": "4", "day_count": 100}
+        )
+        params = {"type": SEARCH_TYPES.RECAP, "q": "Tied"}
+
+        # The estimate counts back from today, so pin today near the
+        # 2024-01-02 filing date.
+        with time_machine.travel(datetime.date(2024, 2, 1), tick=False):
+            with override_flag("scotus_docket_page", active=False):
+                hidden = self.client.get(url, params).json()
+            shown = self.client.get(url, params).json()
+
+        # Each docket counts once as a case and once with its document.
+        self.assertEqual(hidden["count_case_only"], 1)
+        self.assertEqual(shown["count_case_only"], 2)
+
     def test_count_query_drops_inner_hits_when_hiding_scotus(self) -> None:
         """clean_count_query still strips the has_child inner_hits from a
         query that leaves SCOTUS out."""
         search_query, *_ = build_es_main_query(
             DocketDocument.search(),
-            {"type": SEARCH_TYPES.RECAP, "q": "Tied", "hide_scotus": True},
+            {"type": SEARCH_TYPES.RECAP, "q": "Tied"},
         )
 
         count_query = clean_count_query(search_query).to_dict()["query"][
@@ -7566,7 +7704,9 @@ class SCOTUSRECAPSearchTest(
         return_value="search_results_cache_scotus_test:",
     )
     @override_settings(ELASTICSEARCH_MICRO_CACHE_ENABLED=True)
-    def test_search_page_cache_is_separate_per_flag(self, _mock) -> None:
+    def test_search_page_cache_is_separate_per_flag(
+        self, _mock: mock.MagicMock
+    ) -> None:
         """A search page cached for one scotus_docket_page value is never
         served to a request with the other value."""
         r = get_redis_interface("CACHE")
@@ -9801,7 +9941,7 @@ class RECAPIndexingTest(
             organizations=[firm],
             docket=docket_with_parties,
         )
-        party_type = PartyTypeFactory.create(
+        PartyTypeFactory.create(
             party=PartyFactory(
                 name="Mary Williams Corp.",
                 docket=docket_with_parties,
@@ -10342,7 +10482,6 @@ class RECAPFixBrokenRDLinksTest(ESIndexTestCase, TestCase):
         # Change slug with two different values.
         self.docket_2.case_name = "Dolor Ipsum"
         self.docket_2.save()
-        d2_last_slug_in_event_table = self.docket_2.slug
         self.docket_2.case_name = "Dolor Ipsum 2"
         self.docket_2.save()
 

@@ -136,7 +136,6 @@ from cl.corpus_importer.utils import (
 )
 from cl.custom_filters.templatetags.text_filters import best_case_name
 from cl.lib.celery_utils import throttle_task
-from cl.lib.command_utils import logger
 from cl.lib.courts import find_court_object_by_name
 from cl.lib.crypto import sha1
 from cl.lib.decorators import retry, time_call
@@ -227,6 +226,7 @@ from cl.search.state.texas.models import (
     TexasDocketEntry,
     TexasDocument,
 )
+from cl.search.tasks import index_docket_parties_in_es
 from cl.settings import COURT_REQUEST_USER_AGENT
 
 HYPERSCAN_TOKENIZER = HyperscanTokenizer(cache_dir=".hyperscan")
@@ -397,7 +397,7 @@ async def download_recap_item(
                 headers={"User-Agent": "Free Law Project"},
             )
         r.raise_for_status()
-    except TimeoutException as e:
+    except TimeoutException:
         logger.warning(f"    Timed out attempting to get: {url}\n")
     except HTTPError as e:
         logger.warning(f"    Unable to get {url}\nException was:\n{e}")
@@ -4009,6 +4009,9 @@ def merge_scotus_docket(
     if report_data["parties"]:
         normalized_parties = normalize_scotus_parties(report_data["parties"])
         add_parties_and_attorneys(d, normalized_parties)
+        # Party rows don't trigger ES signals, and the Docket was indexed
+        # when its metadata was saved, before these parties existed.
+        index_docket_parties_in_es.delay(d.pk, percolate_parties=False)
 
     # Docket entries merger:
     enrich_scotus_attachments(report_data["docket_entries"])
@@ -4016,7 +4019,7 @@ def merge_scotus_docket(
     doc_pks, content_updated = add_scotus_docket_entries(
         d, report_data["docket_entries"], download_file=download_file
     )
-    if content_updated and settings.SCOTUS_ALERTS_ENABLED:
+    if content_updated:
         newly_enqueued = enqueue_docket_alert(d.pk)
         if newly_enqueued:
             send_alert_and_webhook.delay(d.pk, start_time)

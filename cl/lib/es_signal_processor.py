@@ -320,9 +320,7 @@ def update_es_documents(
                 source = SOURCE_BY_MODEL[main_model]
                 # Avoid calling update_children_docs_by_query if the Docket
                 # doesn't have any entries from this source.
-                if not getattr(
-                    instance, source.docket_entries_related_name
-                ).exists():
+                if not source.has_entries(instance):
                     continue
                 transaction.on_commit(
                     partial(
@@ -341,9 +339,7 @@ def update_es_documents(
                 for rel_docket in related_dockets:
                     # Avoid calling update_children_docs_by_query if the
                     # Docket doesn't have any entries from this source.
-                    if not getattr(
-                        rel_docket, source.docket_entries_related_name
-                    ).exists():
+                    if not source.has_entries(rel_docket):
                         continue
                     transaction.on_commit(
                         partial(
@@ -537,9 +533,7 @@ def update_reverse_related_documents(
             docket = getattr(instance, "docket")
             # Avoid calling update_children_docs_by_query if the Docket
             # doesn't have any entries from this source.
-            if not getattr(
-                docket, source.docket_entries_related_name
-            ).exists():
+            if not source.has_entries(docket):
                 return
             transaction.on_commit(
                 partial(
@@ -615,8 +609,7 @@ def delete_reverse_related_documents(
             # is a plain Docket, so the type that triggered the delete is
             # no longer known.
             has_entries = any(
-                getattr(instance, source.docket_entries_related_name).exists()
-                for source in ALL_ES_SOURCES
+                source.has_entries(instance) for source in ALL_ES_SOURCES
             )
             if not has_entries:
                 return

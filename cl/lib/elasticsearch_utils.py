@@ -1332,13 +1332,21 @@ def get_match_all_query(
     return final_match_all_query
 
 
-def hides_scotus(cd: CleanData) -> bool:
-    """True for a RECAP search (r, d, rd) whose caller set cd["hide_scotus"],
-    so SCOTUS content must be left out of its results. The search page and
-    the v4 API set it when the scotus_docket_page flag is off. Temporary:
-    remove once SCOTUS launches.
+def includes_scotus(cd: CleanData) -> bool:
+    """Whether a RECAP search should include SCOTUS content. False unless
+    the caller sets cd["include_scotus"], which only the search frontend
+    does, behind the scotus_docket_page flag. Temporary: remove once
+    SCOTUS launches.
     """
-    return bool(cd.get("hide_scotus")) and cd["type"] in (
+    return bool(cd.get("include_scotus"))
+
+
+def excludes_scotus(cd: CleanData) -> bool:
+    """True for a RECAP search (r, d, rd) that must leave SCOTUS content
+    out of its results, see includes_scotus. Other search types never
+    contain SCOTUS RECAP-style content.
+    """
+    return not includes_scotus(cd) and cd["type"] in (
         SEARCH_TYPES.RECAP,
         SEARCH_TYPES.DOCKETS,
         SEARCH_TYPES.RECAP_DOCUMENT,
@@ -1548,7 +1556,7 @@ def build_es_base_query(
         )
         boost_mode = "multiply" if string_query else "replace"
 
-    if hides_scotus(cd):
+    if excludes_scotus(cd):
         main_query = exclude_scotus(cast(Query, main_query))
         if child_query:
             child_query = exclude_scotus(child_query)
@@ -1622,7 +1630,7 @@ def build_child_docs_query(
     ]
     parties_has_parent_query = build_has_parent_parties_query(parties_filters)
 
-    if not child_docs_query and hides_scotus(cd):
+    if not child_docs_query and excludes_scotus(cd):
         # Match all query case, where build_es_base_query had no child query
         # to exclude SCOTUS from.
         child_docs_query = exclude_scotus(None)
@@ -2722,6 +2730,22 @@ def process_feed_query_results(
         if not jurisdiction:
             limit_inner_hits(cd, response, cd["type"])
     set_results_highlights(response, cd["type"])
+
+
+def get_docket_entry_pk(doc: AttrDict[Any]) -> int | None:
+    """Return the DocketEntry pk of an ESRECAPDocument hit, whatever its
+    source. RECAP documents keep it in docket_entry_id; other sources keep
+    it in docket_entry_uid, prefixed with their uid_namespace (e.g.
+    "scotus_321").
+
+    :param doc: An ESRECAPDocument hit.
+    :return: The docket entry pk, or None if the hit has neither field.
+    """
+    if docket_entry_id := getattr(doc, "docket_entry_id", None):
+        return docket_entry_id
+    if docket_entry_uid := getattr(doc, "docket_entry_uid", None):
+        return int(docket_entry_uid.rsplit("_", 1)[1])
+    return None
 
 
 def do_es_feed_query(
