@@ -292,7 +292,7 @@ class SCOTUSAlertsPercolatorTest(ESIndexTestCase, TransactionTestCase):
         self, mock_prefix
     ):
         """SCOTUS search alert hits only send webhooks when
-        SCOTUS_DOCKET_ALERT_WEBHOOKS_ENABLED is on. The hit is still
+        SCOTUS_ALERT_WEBHOOKS_ENABLED is on. The hit is still
         scheduled for the email either way."""
         WebhookFactory(
             user=self.user,
@@ -304,9 +304,7 @@ class SCOTUSAlertsPercolatorTest(ESIndexTestCase, TransactionTestCase):
         for enabled in (False, True):
             with (
                 self.subTest(enabled=enabled),
-                override_settings(
-                    SCOTUS_DOCKET_ALERT_WEBHOOKS_ENABLED=enabled
-                ),
+                override_settings(SCOTUS_ALERT_WEBHOOKS_ENABLED=enabled),
                 mock.patch(
                     "cl.alerts.tasks.send_search_alert_webhook_es.delay"
                 ) as mock_webhook,

@@ -1258,15 +1258,13 @@ class DocketAlertScotusTest(TestCase):
     @mock.patch("cl.alerts.tasks.send_docket_alert_webhook_events")
     def test_scotus_webhooks_are_gated_by_setting(self, mock_webhooks) -> None:
         """Does the SCOTUS alert email go out while its webhook is only
-        queued when SCOTUS_DOCKET_ALERT_WEBHOOKS_ENABLED is on?"""
+        queued when SCOTUS_ALERT_WEBHOOKS_ENABLED is on?"""
         de = SCOTUSDocketEntryFactory(docket=self.docket)
         SCOTUSDocumentFactory(docket_entry=de)
         for enabled in (False, True):
             with (
                 self.subTest(webhooks_enabled=enabled),
-                override_settings(
-                    SCOTUS_DOCKET_ALERT_WEBHOOKS_ENABLED=enabled
-                ),
+                override_settings(SCOTUS_ALERT_WEBHOOKS_ENABLED=enabled),
             ):
                 mail.outbox.clear()
                 mock_webhooks.reset_mock()

@@ -413,7 +413,7 @@ def send_alert_and_webhook(
     # des_pks up as DocketEntry pks, so it would send unrelated RECAP entries.
     if (
         source is not SCOTUS_ALERT_SOURCE
-        or settings.SCOTUS_DOCKET_ALERT_WEBHOOKS_ENABLED
+        or settings.SCOTUS_ALERT_WEBHOOKS_ENABLED
     ):
         send_docket_alert_webhook_events.delay(des_pks, webhook_recipients)
     if not recap_email_user_only:
@@ -655,7 +655,7 @@ def percolator_response_processing(response: SendAlertsResponse) -> None:
     send_webhooks = (
         get_docket_source(app_label_model, document_content)
         is not SCOTUS_ES_SOURCE
-        or settings.SCOTUS_DOCKET_ALERT_WEBHOOKS_ENABLED
+        or settings.SCOTUS_ALERT_WEBHOOKS_ENABLED
     )
     r = get_redis_interface("CACHE")
     recap_document_hits = [hit.id for hit in rd_alerts_triggered]
