@@ -3166,6 +3166,43 @@ class TestBlockSearchItemAjax(TestCase):
         )
         self.assertEqual(response.status_code, HTTPStatus.OK)
 
+    async def _block_docket_with_htmx(
+        self, user: User
+    ) -> "_MonkeyPatchedASGIResponse":
+        """Posts an htmx request to block the fixture docket as user."""
+        client = AsyncClient()
+        await client.aforce_login(user=user)
+        return await client.post(
+            reverse("block_item"),
+            data={"id": self.cluster.docket.pk, "type": "docket"},
+            headers={"HX-Request": "true"},
+        )
+
+    async def test_htmx_request_blocks_docket(self) -> None:
+        """An htmx request from a user with change_docket blocks the
+        docket."""
+        await self._block_docket_with_htmx(self.docket_only.user)
+
+        await self.cluster.docket.arefresh_from_db()
+        self.assertTrue(self.cluster.docket.blocked)
+
+    async def test_htmx_request_gets_blocked_badge(self) -> None:
+        """An htmx request is answered with the Blocked badge partial."""
+        response = await self._block_docket_with_htmx(self.docket_only.user)
+
+        self.assertTemplateUsed(
+            response, "v2_includes/docket_blocked_badge.html"
+        )
+
+    async def test_htmx_request_denied_without_permission(self) -> None:
+        """An htmx request from a user without change_docket gets a 403 and
+        leaves the docket unblocked."""
+        response = await self._block_docket_with_htmx(self.viewer.user)
+
+        self.assertEqual(response.status_code, HTTPStatus.FORBIDDEN)
+        await self.cluster.docket.arefresh_from_db()
+        self.assertFalse(self.cluster.docket.blocked)
+
 
 class TestAdminButtonsVisibility(TestCase):
     """Test that admin buttons are shown or hidden based on user permissions
