@@ -3,6 +3,7 @@ from __future__ import annotations
 import json
 import logging
 from collections.abc import (
+    Callable,
     Iterable,
     MutableMapping,
     Sequence,
@@ -72,6 +73,12 @@ class MergerSpecRegistry[Scrape, Params]:
         self.one_to_one: dict[
             str, OneToOneMerger[Scrape, Params, Any, Model]
         ] = one_to_one or {}
+        self._transformers: dict[str, Callable[[Scrape, Params], Any]] = (
+            # pyrefly:ignore[bad-assignment]
+            {k: v.transform for k, v in self.attr.items()}
+            | {k: v.transform for k, v in self.one_to_one.items()}
+            | {k: v.transform for k, v in self.related.items()}
+        )
 
     def __copy__(self) -> Self:
         return self.__class__(
@@ -129,6 +136,11 @@ class MergerSpecRegistry[Scrape, Params]:
                 self.related[spec._name] = spec
             case _:
                 logger.error(f"Unknown merger spec type: {spec!r}")
+                return
+        self._transformers[spec._name] = spec.transform
+
+    def transform(self, scrape: Scrape, params: Params) -> dict[str, Any]:
+        return {k: v(scrape, params) for k, v in self._transformers.items()}
 
 
 class MergerMeta(type):
@@ -366,20 +378,7 @@ class Merger[Scrape, Params, M: Model](metaclass=MergerMeta):
         self.out: M | None = None
 
         self.transformed: dict[str, Any] = (
-            {
-                name: spec.transform(scrape, params)
-                for name, spec in self.__registry__.attr.items()
-            }
-            | {
-                name: spec.transform(scrape, params)
-                for name, spec in self.__registry__.related.items()
-            }
-            | {
-                name: spec.transform(scrape, params)
-                for name, spec in self.__registry__.one_to_one.items()
-            }
-            if valid
-            else {}
+            self.__registry__.transform(scrape, params) if valid else {}
         )
 
         # Relations the merger fills in itself rather than leaving to a spec: a

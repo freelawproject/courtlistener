@@ -129,7 +129,7 @@ class AttributeMerger[Scrape, Params, Transform](
 
     @override
     @final
-    def transform(self, scrape: Any, params: Any) -> Any:
+    def transform(self, scrape: Scrape, params: Params) -> Transform:
         return self._transform(scrape, params)
 
 
