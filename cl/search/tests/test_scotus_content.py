@@ -1166,6 +1166,31 @@ class ScotusPlaceholderDocumentTest(CLTestCase):
         self.assertEqual(documents.count(), 1)
         self.assertFalse(documents.get().is_placeholder)
 
+    def test_stale_placeholder_is_deleted(self) -> None:
+        """A placeholder left next to real documents, e.g. by a worker
+        running older code during a deploy, is deleted on the next merge
+        instead of taking the numbers of a document that already has them.
+        """
+        self._merge(attachments=[])
+        placeholder = SCOTUSDocument.objects.get(
+            docket_entry__docket=self.docket
+        )
+        document = SCOTUSDocumentFactory(
+            docket_entry=placeholder.docket_entry,
+            document_number=310278,
+            attachment_number=1,
+        )
+
+        self._merge(
+            document_number=310278,
+            attachments=[SCOTUSAttachmentDataFactory(document_number=310278)],
+        )
+
+        documents = SCOTUSDocument.objects.filter(
+            docket_entry__docket=self.docket
+        )
+        self.assertEqual(list(documents), [document])
+
     @mock.patch(f"{DOWNLOAD_COMMAND}.CeleryThrottle")
     @mock.patch(f"{DOWNLOAD_COMMAND}.download_scotus_document_pdf")
     def test_pdf_download_command_skips_placeholders(

@@ -3747,12 +3747,23 @@ def fill_scotus_placeholder_document(
     then finds it and fills in the rest, instead of creating a new document
     and leaving the empty placeholder next to it.
 
+    If the entry already has other documents, the placeholder is stale and
+    is deleted instead, so the attachments merge as usual.
+
     :param docket_entry: The entry whose placeholder to fill in.
     :param attachment: The attachment data the placeholder becomes.
-    :return: The placeholder's pk, or None if the entry has no placeholder.
+    :return: The placeholder's pk, or None if there was none to fill in.
     """
-    placeholder = docket_entry.scotus_documents.filter(url="").first()
+    placeholder = docket_entry.scotus_documents.filter(
+        url="", document_number__isnull=True, attachment_number__isnull=True
+    ).first()
     if placeholder is None:
+        return None
+    # A worker running older code, e.g. during a deploy, can add documents
+    # next to the placeholder. Giving it their numbers would then break the
+    # entry's unique (document_number, attachment_number) pairs.
+    if docket_entry.scotus_documents.exclude(pk=placeholder.pk).exists():
+        placeholder.delete()
         return None
     placeholder.document_number = attachment["document_number"]
     placeholder.attachment_number = attachment["attachment_number"]
