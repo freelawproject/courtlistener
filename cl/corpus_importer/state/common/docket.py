@@ -21,7 +21,6 @@ from cl.corpus_importer.state.merger import (
     Params,
     Scrape,
     WithStrategy,
-    overwrite,
 )
 from cl.corpus_importer.state.merger.specifications import AttributeMerger
 from cl.people_db.models import Party
@@ -89,20 +88,10 @@ class DocketMerger[DType: ScrapeDocket[Any, Any, Any], ParamType](
     config: ClassVar[MergerConfig[Docket]] = MergerConfig(model=Docket)
 
     source: int = WithStrategy(Constant(Docket.SCRAPER), add_scraper_source)
-    date_filed: date | None = WithStrategy(
-        Scrape(ScrapeDocket).date_filed, overwrite
-    )
-    case_name: str = WithStrategy(Scrape(ScrapeDocket).case_name, overwrite)
-    case_name_full: str = WithStrategy(
-        Scrape(ScrapeDocket).case_name_full, overwrite
-    )
-    case_name_short: str = WithStrategy(
-        Scrape(ScrapeDocket).case_name_short, overwrite
-    )
-    docket_number: str | None = WithStrategy(
-        Scrape(ScrapeDocket).docket_number, overwrite
-    )
-    docket_number_raw: str = WithStrategy(
-        Scrape(ScrapeDocket).docket_number, overwrite
-    )
+    date_filed: date | None = Scrape(ScrapeDocket).date_filed
+    case_name: str = Scrape(ScrapeDocket).case_name
+    case_name_full: str = Scrape(ScrapeDocket).case_name_full
+    case_name_short: str = Scrape(ScrapeDocket).case_name_short
+    docket_number: str | None = Scrape(ScrapeDocket).docket_number
+    docket_number_raw: str = Scrape(ScrapeDocket).docket_number
     parties: Sequence[Party] = PartyRelation()

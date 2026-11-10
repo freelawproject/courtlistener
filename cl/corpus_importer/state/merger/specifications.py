@@ -37,7 +37,7 @@ from .parameters import (
     ThroughParameters,
     Update,
 )
-from .strategy import Strategy, overwrite_if_present
+from .strategy import Strategy, overwrite
 
 if typing.TYPE_CHECKING:
     from django.db.models.fields.related_descriptors import RelatedManager
@@ -125,7 +125,7 @@ class AttributeMerger[Scrape, Params, Transform](
     def __init__(self):
         """Create an expression using the `overwrite_if_present` strategy."""
         super().__init__()
-        self.strategy: Strategy = overwrite_if_present
+        self.strategy: Strategy = overwrite
 
     def __getattr__(self, name: str) -> _AttrProxy | Any:
         """Build an expression reading an attribute of this one's value.

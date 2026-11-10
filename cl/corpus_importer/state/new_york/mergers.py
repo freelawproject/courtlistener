@@ -46,7 +46,7 @@ from cl.corpus_importer.state.merger import (
     RelatedParams,
     Scrape,
     WithStrategy,
-    overwrite,
+    overwrite_if_present,
 )
 from cl.corpus_importer.state.merger.specifications import AttributeMerger
 from cl.corpus_importer.state.new_york.nycourts_gov import (
@@ -202,26 +202,16 @@ class NYCoADocumentMerger[ParamType](
         model=NYCoADocument, key=("file_name",)
     )
 
-    file_name: str = WithStrategy(Scrape(NYCoAFile).file_name, overwrite)
-    content_type: str = WithStrategy(Scrape(NYCoAFile).content_type, overwrite)
-    doc_role: str = WithStrategy(
-        Fn(_stated)(Scrape(NYCoAFile).doc_role), overwrite
+    file_name: str = Scrape(NYCoAFile).file_name
+    content_type: str = Scrape(NYCoAFile).content_type
+    doc_role: str = Fn(_stated)(Scrape(NYCoAFile).doc_role)
+    doc_party: str = Scrape(NYCoAFile).doc_party
+    doc_type: str = Fn(_stated)(Scrape(NYCoAFile).doc_type)
+    volume: int | None = Fn(_storable_number)(
+        Scrape(NYCoAFile).volume, "volume", Scrape(NYCoAFile)
     )
-    doc_party: str = WithStrategy(Scrape(NYCoAFile).doc_party, overwrite)
-    doc_type: str = WithStrategy(
-        Fn(_stated)(Scrape(NYCoAFile).doc_type), overwrite
-    )
-    volume: int | None = WithStrategy(
-        Fn(_storable_number)(
-            Scrape(NYCoAFile).volume, "volume", Scrape(NYCoAFile)
-        ),
-        overwrite,
-    )
-    part: int | None = WithStrategy(
-        Fn(_storable_number)(
-            Scrape(NYCoAFile).part, "part", Scrape(NYCoAFile)
-        ),
-        overwrite,
+    part: int | None = Fn(_storable_number)(
+        Scrape(NYCoAFile).part, "part", Scrape(NYCoAFile)
     )
     filepath_local: str = WithStrategy(
         Scrape(NYCoAFile).local_path, _keep_stored_file
@@ -419,41 +409,25 @@ class NYCoADocketEntryMerger[ParamType](
     )
 
     # Court-PASS only dates the filings its FILINGS table lists.
-    date_filed: date | None = WithStrategy(
-        Scrape(NYCoDocketEntry).date_filed, overwrite
+    date_filed: date | None = Scrape(NYCoDocketEntry).date_filed
+    date_due: date | None = Scrape(NYCoDocketEntry).date_due
+    docket_entry_id: str = Scrape(NYCoDocketEntry).docket_entry_id
+    entry_index: int | None = Scrape(NYCoDocketEntry).entry_index
+    filing_type: int = Fn(mirrored_code)(
+        FilingType, Scrape(NYCoDocketEntry).entry_filing_type
     )
-    date_due: date | None = WithStrategy(
-        Scrape(NYCoDocketEntry).date_due, overwrite
+    filing_type_raw: str = Scrape(NYCoDocketEntry).raw_filing_type
+    filing_role: int = Fn(mirrored_code)(
+        FilingRole, Scrape(NYCoDocketEntry).entry_role
     )
-    docket_entry_id: str = WithStrategy(
-        Scrape(NYCoDocketEntry).docket_entry_id, overwrite
-    )
-    entry_index: int | None = WithStrategy(
-        Scrape(NYCoDocketEntry).entry_index, overwrite
-    )
-    filing_type: int = WithStrategy(
-        Fn(mirrored_code)(
-            FilingType, Scrape(NYCoDocketEntry).entry_filing_type
-        ),
-        overwrite,
-    )
-    filing_type_raw: str = WithStrategy(
-        Scrape(NYCoDocketEntry).raw_filing_type, overwrite
-    )
-    filing_role: int = WithStrategy(
-        Fn(mirrored_code)(FilingRole, Scrape(NYCoDocketEntry).entry_role),
-        overwrite,
-    )
-    filing_doctype: int = WithStrategy(
-        Fn(mirrored_code)(
-            FilingDocType, Scrape(NYCoDocketEntry).entry_doctype
-        ),
-        overwrite,
+    filing_doctype: int = Fn(mirrored_code)(
+        FilingDocType, Scrape(NYCoDocketEntry).entry_doctype
     )
     # Keep a party we resolved on an earlier scrape rather than clearing it
     # when this scrape can't find a match.
-    party_id: int | None = Fn(_entry_party_id)(
-        Scrape(NYCoDocketEntry), Ancestor(Docket)
+    party_id: int | None = WithStrategy(
+        Fn(_entry_party_id)(Scrape(NYCoDocketEntry), Ancestor(Docket)),
+        overwrite_if_present,
     )
     # The name Court-PASS printed, kept whether or not `party_id` resolved --
     # on a filing by a party with no attorney of record it is the only record
@@ -545,12 +519,8 @@ class NYCoAAttorneyMerger(
 ):
     """Merger for an attorney on a Court-PASS docket."""
 
-    contact_raw: str = WithStrategy(
-        Fn(_attorney_contact_raw)(Scrape(ScrapedAttorney)), overwrite
-    )
-    phone: str = WithStrategy(
-        Fn(_attorney_phone)(Scrape(ScrapedAttorney)), overwrite
-    )
+    contact_raw: str = Fn(_attorney_contact_raw)(Scrape(ScrapedAttorney))
+    phone: str = Fn(_attorney_phone)(Scrape(ScrapedAttorney))
 
 
 def _attorney_role(attorney: ScrapedAttorney) -> int:
@@ -712,14 +682,10 @@ class NYCoAIssueMerger[ParamType](
         model=NYCoADocketIssue, key=("category", "subcategory")
     )
 
-    category: int = WithStrategy(Scrape(ScrapedIssue).category, overwrite)
-    subcategory: int = WithStrategy(
-        Scrape(ScrapedIssue).subcategory, overwrite
-    )
-    category_raw: str = WithStrategy(
-        Scrape(ScrapedIssue).issue.category_raw, overwrite
-    )
-    detail: str = WithStrategy(Scrape(ScrapedIssue).issue.detail, overwrite)
+    category: int = Scrape(ScrapedIssue).category
+    subcategory: int = Scrape(ScrapedIssue).subcategory
+    category_raw: str = Scrape(ScrapedIssue).issue.category_raw
+    detail: str = Scrape(ScrapedIssue).issue.detail
 
     @override
     def lookup(
@@ -851,15 +817,9 @@ class NYCoADocketMetadataMerger(
         cast(AttributeMerger, Fn(_case_issues)(Scrape(NYCoACase))),
         strategy=ManyStrategy.REPLACE,
     )
-    decision_date: date | None = WithStrategy(
-        Scrape(NYCoACase).decision_date, overwrite
-    )
-    official_citation: str = WithStrategy(
-        Scrape(NYCoACase).official_citation, overwrite
-    )
-    lower_court_citation: str = WithStrategy(
-        Scrape(NYCoACase).lower_court_citation, overwrite
-    )
+    decision_date: date | None = Scrape(NYCoACase).decision_date
+    official_citation: str = Scrape(NYCoACase).official_citation
+    lower_court_citation: str = Scrape(NYCoACase).lower_court_citation
 
 
 def _date_last_filing(case: NYCoACase) -> date | None:
@@ -896,15 +856,17 @@ class NYCoADocketMerger(DocketMerger[NYCoACase, None]):
     it raise.
     """
 
-    court_id: str = WithStrategy(Constant(NYCOA_COURT_ID), overwrite)
-    docket_number_core: str = WithStrategy(
-        Fn(make_docket_number_core)(Scrape(NYCoACase).docket_number), overwrite
+    court_id: str = Constant(NYCOA_COURT_ID)
+    docket_number_core: str = Fn(make_docket_number_core)(
+        Scrape(NYCoACase).docket_number
     )
-    date_filed: date | None = Scrape(NYCoACase).date_filed
-    date_argued: date | None = Scrape(NYCoACase).argument_date
-    date_last_filing: date | None = WithStrategy(
-        Fn(_date_last_filing)(Scrape(NYCoACase)), overwrite
+    date_filed: date | None = WithStrategy(
+        Scrape(NYCoACase).date_filed, overwrite_if_present
     )
+    date_argued: date | None = WithStrategy(
+        Scrape(NYCoACase).argument_date, overwrite_if_present
+    )
+    date_last_filing: date | None = Fn(_date_last_filing)(Scrape(NYCoACase))
 
     parties: Sequence[Party] = PartyRelation(
         NYCoAPartyMerger, party_type=NYCoAPartyTypeMerger
