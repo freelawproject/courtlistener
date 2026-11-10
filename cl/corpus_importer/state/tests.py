@@ -683,7 +683,7 @@ class JKentScrapeLoaderTest(LoaderTestCase):
         ledger = self.ledger()
         ledger.dispatched(1, "A-1")
 
-        ledger.merged(1, MergeResult(files=FileTally(moved=2, missing=1)))
+        ledger.merged(1, MergeResult(), FileTally(moved=2, missing=1))
 
         self.assertEqual(
             set(self.redis.keys(f"{self.key}:*")),
@@ -721,7 +721,7 @@ class JKentScrapeLoaderTest(LoaderTestCase):
             )
         ):
             ledger.dispatched(row, f"A-{row}")
-            ledger.merged(row, MergeResult(files=files))
+            ledger.merged(row, MergeResult(), files)
 
         self.assertEqual(
             ledger.totals().files, FileTally(moved=4, missing=1, failed=2)
@@ -734,7 +734,8 @@ class JKentScrapeLoaderTest(LoaderTestCase):
 
         ledger.rejected(
             1,
-            MergeResult(failures={"Docket": [None]}, files=FileTally(moved=1)),
+            MergeResult(failures={"Docket": [None]}),
+            FileTally(moved=1),
         )
 
         self.assertEqual(ledger.totals().files, FileTally(moved=1))

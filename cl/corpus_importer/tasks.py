@@ -5788,7 +5788,7 @@ def merge_state_scrape_row(
         return
 
     try:
-        label, result = loader_class.merge_payload(payload)
+        label, result, files = loader_class.merge_payload(payload)
     except ValidationError as error:
         logger.error(
             "Row %s of the %s run no longer validates for %s: %s",
@@ -5837,7 +5837,7 @@ def merge_state_scrape_row(
 
     if result.success:
         logger.info("Merged row %s of the %s run (%s)", row, loader, label)
-        ledger.merged(row, result)
+        ledger.merged(row, result, files)
     else:
         logger.error(
             "Merge of row %s of the %s run (%s) reported failures: %s",
@@ -5847,7 +5847,7 @@ def merge_state_scrape_row(
             result.failures,
             extra=fingerprint(loader, LoadPhase.MERGE),
         )
-        ledger.rejected(row, result)
+        ledger.rejected(row, result, files)
 
     if not extract:
         return

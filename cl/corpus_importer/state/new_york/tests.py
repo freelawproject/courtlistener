@@ -156,26 +156,30 @@ class NYCoAMergerTestCase(TestCase):
             docket_number=DOCKET_NUMBER, entries=[filing], parties=[]
         )
 
-    def merge(self, case: NYCoACase) -> MergeResult:
-        """Merge a case, running what waits on the merge committing.
+    def merge(self, case: NYCoACase) -> tuple[MergeResult, FileTally]:
+        """Merge a case and reconcile its files, as a load's worker does
+        before it publishes them.
 
         Args:
             case: The scraped case.
 
         Returns:
-            What the merge did.
+            What the merge did, and what became of the case's files.
         """
+        merger = NYCoADocketMerger(case, params=None)
         with self.captureOnCommitCallbacks(execute=True):
-            return NYCoADocketMerger(case, params=None).merge()
+            result = merger.merge()
+        return result, NYCoACourtPassLoader.reconcile_files(case, merger)
 
-    def load(self, case: NYCoACase) -> MergeResult:
+    def load(self, case: NYCoACase) -> tuple[MergeResult, FileTally]:
         """Merge a case and publish its files, as a load's worker does.
 
         Args:
             case: The scraped case.
 
         Returns:
-            What the merge and the publish did together.
+            What the merge and the publish did together, and what became
+            of the case's files.
         """
         with self.captureOnCommitCallbacks(execute=True):
             return NYCoACourtPassLoader.merge_one(case)
@@ -968,7 +972,7 @@ class NYCoADocumentMergerTest(NYCoAMergerTestCase):
         )
         case = self.case_with_files(file)
 
-        result = self.merge(case)
+        result, _ = self.merge(case)
 
         self.assertTrue(result.success)
         self.assertIn("NYCoADocument", result.creates)
@@ -1052,7 +1056,7 @@ class NYCoADocumentMergerTest(NYCoAMergerTestCase):
         )
         self.assertIsNone(merged.volume)
 
-    @merger_test(expected_query_count=26)
+    @merger_test(expected_query_count=25)
     def test_remerge_documents_is_idempotent(self) -> None:
         """Does merging the same case twice avoid duplicating documents?"""
         case = self.case_with_files(NYCoAFileFactory.create())
@@ -1065,7 +1069,7 @@ class NYCoADocumentMergerTest(NYCoAMergerTestCase):
         self.assertNotIn("NYCoADocument", second.creates)
         self.assertEqual(NYCoADocument.objects.count(), 1)
 
-    @merger_test(expected_query_count=17)
+    @merger_test(expected_query_count=16)
     def test_merge_prunes_documents_missing_from_scrape(self) -> None:
         """Is a document the scrape no longer lists deleted?"""
         docket = self.existing_docket()
@@ -1129,7 +1133,7 @@ class NYCoADocumentMergerTest(NYCoAMergerTestCase):
             ),
         )
 
-        result = self.merge(case)
+        result, _ = self.merge(case)
 
         self.assertTrue(result.success)
         self.assertEqual(
@@ -1161,7 +1165,7 @@ class NYCoADocumentMergerTest(NYCoAMergerTestCase):
             corrected, docket_entry_id="e:appellant-brief:smith:1"
         )
         second.issues = case.issues
-        result = self.merge(second)
+        result, _ = self.merge(second)
 
         self.assertTrue(result.success)
         merged = NYCoADocument.objects.get()
@@ -1179,7 +1183,7 @@ class NYCoADocumentMergerTest(NYCoAMergerTestCase):
             "The pages were counted off the copy that has been replaced.",
         )
 
-    @merger_test(expected_query_count=28)
+    @merger_test(expected_query_count=27)
     def test_remerge_keeps_stored_path_when_scrape_reports_none(self) -> None:
         """Does a later scrape that did not fetch the file leave the path an earlier one recorded, rather than blanking it?
 
@@ -1235,7 +1239,7 @@ class NYCoADocumentMergerTest(NYCoAMergerTestCase):
             docket_entry_id="e:appellant-brief:smith:1",
         )
         second.issues = case.issues
-        result = self.merge(second)
+        result, _ = self.merge(second)
 
         self.assertTrue(result.success)
         merged = NYCoADocument.objects.get()
@@ -1262,10 +1266,10 @@ class NYCoADocumentMergerTest(NYCoAMergerTestCase):
         published = document.filepath_local.name
         file.local_path = f"{PRIVATE_PREFIX}rescraped/brf.pdf"
 
-        result = self.merge(case)
+        result, files = self.merge(case)
 
         self.assertTrue(result.success)
-        self.assertEqual(result.files, FileTally())
+        self.assertEqual(files, FileTally())
         self.assertEqual(NYCoADocument.objects.get().filepath_local, published)
         self.assertEqual(
             self.deleted,
@@ -1294,15 +1298,15 @@ class NYCoADocumentMergerTest(NYCoAMergerTestCase):
                 for field_name, value in rescraped.items():
                     setattr(file, field_name, value)
 
-                result = self.merge(case)
+                result, files = self.merge(case)
 
                 self.assertTrue(result.success)
-                self.assertEqual(result.files, FileTally())
+                self.assertEqual(files, FileTally())
                 self.assertEqual(
                     NYCoADocument.objects.get().filepath_local, stored
                 )
 
-    @merger_test(expected_query_count=28)
+    @merger_test(expected_query_count=27)
     def test_remerge_at_the_same_path_leaves_extraction_alone(self) -> None:
         """Re-scraping a file that has not moved must not throw away text already extracted from it."""
         case = self.case_with_files(
@@ -1347,12 +1351,12 @@ class NYCoADocumentMergerTest(NYCoAMergerTestCase):
         )
         case = self.case_with_files(unhashed, hashed)
 
-        result = self.merge(case)
+        result, files = self.merge(case)
 
         self.assertTrue(
             result.success, "One untracked file must not fail the case."
         )
-        self.assertEqual(result.files, FileTally(missing=1))
+        self.assertEqual(files, FileTally(missing=1))
         merged = NYCoADocument.objects.get(file_name=unhashed.file_name)
         self.assertEqual(merged.filepath_local, "")
         self.assertEqual(merged.sha256, "")
@@ -1374,9 +1378,9 @@ class NYCoADocumentMergerTest(NYCoAMergerTestCase):
             )
         )
 
-        result = self.merge(case)
+        _, files = self.merge(case)
 
-        self.assertEqual(result.files, FileTally(missing=1))
+        self.assertEqual(files, FileTally(missing=1))
         self.assertEqual(NYCoADocument.objects.get().filepath_local, "")
 
     @merger_test(expected_query_count=15)
@@ -1390,10 +1394,10 @@ class NYCoADocumentMergerTest(NYCoAMergerTestCase):
             )
         )
 
-        result = self.merge(case)
+        result, files = self.merge(case)
 
         self.assertTrue(result.success)
-        self.assertFalse(result.files)
+        self.assertFalse(files)
         self.assertEqual(NYCoADocument.objects.get().filepath_local, "")
 
 
@@ -1428,7 +1432,7 @@ class NYCoAFileDeletionTest(NYCoAMergerTestCase):
             docket_entry_id="e:appellant-brief:smith:1",
         )
         pulled.issues = case.issues
-        result = self.merge(pulled)
+        result, _ = self.merge(pulled)
 
         self.assertTrue(result.success)
         self.assertEqual(NYCoADocument.objects.count(), 0)
@@ -1466,7 +1470,7 @@ class NYCoAFileDeletionTest(NYCoAMergerTestCase):
             docket_entry_id="e:respondent-brief:jones:1",
         )
         withdrawn_filing.issues = case.issues
-        result = self.merge(withdrawn_filing)
+        result, _ = self.merge(withdrawn_filing)
 
         self.assertTrue(result.success)
         self.assertEqual(NYCoADocketEntry.objects.count(), 1)
@@ -1551,7 +1555,7 @@ class NYCoAPublishFilesTest(NYCoAMergerTestCase):
         )
         case = self.case_with_files(file, date_filed=date(2024, 3, 1))
 
-        result = self.load(case)
+        result, files = self.load(case)
 
         document = NYCoADocument.objects.get()
         expected = published_key(document, date(2024, 3, 1))
@@ -1560,7 +1564,7 @@ class NYCoAPublishFilesTest(NYCoAMergerTestCase):
             self.copied, [(PRIVATE_BUCKET, file.local_path, expected)]
         )
         self.assertEqual(self.deleted, [(PRIVATE_BUCKET, file.local_path)])
-        self.assertEqual(result.files, FileTally(moved=1))
+        self.assertEqual(files, FileTally(moved=1))
         self.assertIn(document.pk, result.updates["NYCoADocument"])
 
     def test_the_name_keeps_the_file_s_extension(self) -> None:
@@ -1614,13 +1618,11 @@ class NYCoAPublishFilesTest(NYCoAMergerTestCase):
         self.copied.clear()
         self.deleted.clear()
 
-        result = self.load(case)
+        _, files = self.load(case)
 
         self.assertEqual(self.copied, [])
         self.assertEqual(self.deleted, [(PRIVATE_BUCKET, file.local_path)])
-        self.assertFalse(
-            result.files, f"Counted a move that did not happen: {result.files}"
-        )
+        self.assertFalse(files, f"Counted a move that did not happen: {files}")
 
     def test_a_file_whose_date_changed_is_moved(self) -> None:
         """A later scrape can date a filing an earlier one could not.
@@ -1642,7 +1644,7 @@ class NYCoAPublishFilesTest(NYCoAMergerTestCase):
         self.deleted.clear()
 
         case.entries[0].date_filed = date(2024, 3, 1)
-        result = self.load(case)
+        _, files = self.load(case)
 
         dated = published_key(document, date(2024, 3, 1))
         self.assertEqual(NYCoADocument.objects.get().filepath_local, dated)
@@ -1651,19 +1653,19 @@ class NYCoAPublishFilesTest(NYCoAMergerTestCase):
             self.deleted,
             [(PUBLIC_BUCKET, undated), (PRIVATE_BUCKET, file.local_path)],
         )
-        self.assertEqual(result.files, FileTally(moved=1))
+        self.assertEqual(files, FileTally(moved=1))
 
     def test_a_refused_copy_leaves_the_file_to_a_later_load(self) -> None:
         """The bucket refusing the copy says nothing about the file, which is still in the private bucket. Does the document keep pointing there, so re-running the load finishes the move, with nothing deleted?"""
         self.publish_outcome = PublishOutcome.FAILED
         file = NYCoAFileFactory.create(local_path=f"{PRIVATE_PREFIX}brf.pdf")
 
-        result = self.load(self.case_with_files(file))
+        result, files = self.load(self.case_with_files(file))
 
         self.assertTrue(
             result.success, "A file we could not move must not fail the case."
         )
-        self.assertEqual(result.files, FileTally(failed=1))
+        self.assertEqual(files, FileTally(failed=1))
         self.assertNotIn("NYCoADocument", result.updates)
         self.assertEqual(
             NYCoADocument.objects.get().filepath_local, file.local_path
@@ -1671,9 +1673,9 @@ class NYCoAPublishFilesTest(NYCoAMergerTestCase):
         self.assertEqual(self.deleted, [])
 
         self.publish_outcome = PublishOutcome.PUBLISHED
-        result = NYCoACourtPassLoader.publish_files(Docket.objects.get())
+        _, files = NYCoACourtPassLoader.publish_files(Docket.objects.get())
 
-        self.assertEqual(result.files, FileTally(moved=1))
+        self.assertEqual(files, FileTally(moved=1))
 
     def test_a_missing_file_stops_being_pointed_at(self) -> None:
         """A file the private bucket does not hold will not appear on a re-run.
@@ -1682,9 +1684,9 @@ class NYCoAPublishFilesTest(NYCoAMergerTestCase):
         """
         self.publish_outcome = PublishOutcome.MISSING
 
-        result = self.load(self.case_with_files(NYCoAFileFactory.create()))
+        _, files = self.load(self.case_with_files(NYCoAFileFactory.create()))
 
-        self.assertEqual(result.files, FileTally(missing=1))
+        self.assertEqual(files, FileTally(missing=1))
         self.assertEqual(NYCoADocument.objects.get().filepath_local, "")
         self.assertEqual(self.deleted, [])
 
@@ -1714,9 +1716,9 @@ class NYCoAPublishFilesTest(NYCoAMergerTestCase):
             ],
         )
 
-        result = self.load(case)
+        _, files = self.load(case)
 
-        self.assertEqual(result.files, FileTally(moved=2))
+        self.assertEqual(files, FileTally(moved=2))
         self.assertEqual(
             [source for _, source, _ in self.copied], [shared, shared]
         )
@@ -1737,10 +1739,10 @@ class NYCoAPublishFilesTest(NYCoAMergerTestCase):
         with patch(
             "cl.corpus_importer.state.loader.copy_file", copy_then_repoint
         ):
-            result = NYCoACourtPassLoader.publish_files(Docket.objects.get())
+            _, files = NYCoACourtPassLoader.publish_files(Docket.objects.get())
 
         self.assertEqual(NYCoADocument.objects.get().filepath_local, newer)
-        self.assertFalse(result.files)
+        self.assertFalse(files)
         self.assertEqual(self.deleted, [])
 
 
