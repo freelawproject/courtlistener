@@ -16,7 +16,7 @@
 
 <div>
 {% if perms.search|has_any_perm:"docket" %}
-  <div class="flex justify-end mb-2" x-data>
+  <div class="flex justify-end items-center gap-2 mb-2" x-data>
     <c-button variant="dark" size="sm" href="{% url 'admin:search_docket_change' docket.pk %}">
       {% svg "edit" class="w-3.5 h-3.5" aria_hidden="true" %}
       Edit Docket
@@ -24,6 +24,29 @@
         <span x-show="$store.viewCount.loaded" x-cloak class="text-greyscale-300">(<span x-text="$store.viewCount.value"></span> views)</span>
       {% endif %}
     </c-button>
+    {% if perms.search.change_docket %}
+      {# Swap target: the block response replaces this span's contents. #}
+      <span id="docket-block-{{ docket.pk }}" class="contents">
+        {% if docket.blocked %}
+          <c-badge variant="danger">Blocked</c-badge>
+        {% else %}
+          {# No hx-disabled-elt: a disabled button drops focus, and htmx could not then move it to the badge that takes this id. #}
+          <c-button
+            variant="dark"
+            size="sm"
+            id="docket-block-control-{{ docket.pk }}"
+            hx-post="{% url 'block_item' %}"
+            hx-vals='{"id": "{{ docket.pk }}", "type": "docket"}'
+            hx-swap="none"
+            hx-confirm="Are you sure you want to block this docket?"
+          >
+            Block This Docket
+          </c-button>
+        {% endif %}
+      </span>
+      {# Announces the block's outcome; the response swaps its contents. #}
+      <span id="docket-block-status-{{ docket.pk }}" role="status" class="sr-only"></span>
+    {% endif %}
   </div>
 {% endif %}
 
@@ -45,10 +68,6 @@
     <p class="text-display-xs font-semibold text-greyscale-900">{{ docket.court }}</p>
   {% endif %}
 </hgroup>
-
-{% if perms.search.change_docket and docket.blocked %}
-  <span class="inline-block px-3 py-1 text-sm font-semibold text-red-700 bg-red-100 border border-red-300 rounded-lg">Blocked</span>
-{% endif %}
 
 {# Action buttons — Note and Tags are placeholders. #}
 {# TODO: Wire up Add a Note and Tags button interactivity. #}

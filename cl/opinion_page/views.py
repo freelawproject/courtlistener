@@ -1753,8 +1753,9 @@ async def citation_homepage(request: HttpRequest) -> HttpResponse:
 async def block_item(request: HttpRequest) -> HttpResponse:
     """Block an item from search results using AJAX or htmx.
 
-    htmx requests are answered with the Blocked badge partial, to swap in
-    place of the control that sent them; AJAX requests get plain text.
+    htmx requests are answered with a partial that swaps the Blocked badge
+    and a status message into the v2 docket page; AJAX requests get plain
+    text.
     """
     is_htmx = bool(request.headers.get("HX-Request"))
     if not is_htmx and not is_ajax(request):
@@ -1812,6 +1813,8 @@ async def block_item(request: HttpRequest) -> HttpResponse:
 
     if is_htmx:
         return TemplateResponse(
-            request, "v2_includes/docket_blocked_badge.html"
+            request,
+            "v2_includes/docket_block_htmx/blocked.html",
+            {"docket": d},
         )
     return HttpResponse("It worked")
