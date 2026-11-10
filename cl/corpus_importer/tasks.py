@@ -136,7 +136,6 @@ from cl.corpus_importer.utils import (
 )
 from cl.custom_filters.templatetags.text_filters import best_case_name
 from cl.lib.celery_utils import throttle_task
-from cl.lib.command_utils import logger
 from cl.lib.courts import find_court_object_by_name
 from cl.lib.crypto import sha1
 from cl.lib.decorators import retry, time_call
@@ -397,7 +396,7 @@ async def download_recap_item(
                 headers={"User-Agent": "Free Law Project"},
             )
         r.raise_for_status()
-    except TimeoutException as e:
+    except TimeoutException:
         logger.warning(f"    Timed out attempting to get: {url}\n")
     except HTTPError as e:
         logger.warning(f"    Unable to get {url}\nException was:\n{e}")
@@ -1866,7 +1865,7 @@ def get_docket_by_pacer_case_id(
     court_id: str,
     session_data: SessionData,
     docket_pk: int | None = None,
-    tag_names: str | None = None,
+    tag_names: list[str] | None = None,
     **kwargs: Any,
 ) -> TaskData | None:
     """Celery task wrapper for get_docket_by_pacer_case_id_base."""
@@ -1891,7 +1890,7 @@ async def get_docket_by_pacer_case_id_base(
     court_id: str,
     session_data: SessionData,
     docket_pk: int | None = None,
-    tag_names: str | None = None,
+    tag_names: list[str] | None = None,
     **kwargs,
 ) -> TaskData | None:
     """Get a docket by PACER case id, CL court ID, and a collection of kwargs
@@ -4011,7 +4010,7 @@ def merge_scotus_docket(
     doc_pks, content_updated = add_scotus_docket_entries(
         d, report_data["docket_entries"], download_file=download_file
     )
-    if content_updated and settings.SCOTUS_ALERTS_ENABLED:
+    if content_updated:
         newly_enqueued = enqueue_docket_alert(d.pk)
         if newly_enqueued:
             send_alert_and_webhook.delay(d.pk, start_time)

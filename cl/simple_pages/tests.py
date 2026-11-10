@@ -13,6 +13,7 @@ from lxml.html import fromstring
 from waffle.testutils import override_flag
 
 from cl.custom_filters.templatetags.svg_tags import svg
+from cl.lib.middleware import WIP_PROPS
 from cl.lib.test_helpers import SimpleUserDataMixin
 from cl.simple_pages.forms import ContactForm
 from cl.simple_pages.sitemap import SimpleSitemap
@@ -403,6 +404,9 @@ class V2PagesRegisterTest(PageLoadTestMixin, SimpleUserDataMixin, TestCase):
     Adding a page here is part of the definition of done for a
     redesigned template. The homepage is excluded — it has dedicated
     tests in cl/search/tests/test_v2_pages.py.
+
+    Unfinished pages go in WIP_PAGES instead, and move to V2_PAGES when
+    their template is promoted from the WIP prefix to v2_.
     """
 
     V2_PAGES: list[tuple[dict[str, Any], str]] = [
@@ -414,6 +418,9 @@ class V2PagesRegisterTest(PageLoadTestMixin, SimpleUserDataMixin, TestCase):
         ({"viewname": "court_index"}, "v2_jurisdictions.html"),
     ]
 
+    # (reverse_param, expected WIP template)
+    WIP_PAGES: list[tuple[dict[str, Any], str]] = []
+
     @staticmethod
     def _get_legacy_counterpart(v2_template: str) -> str | None:
         """Returns the legacy template a v2 one replaces, None otherwise."""
@@ -423,6 +430,22 @@ class V2PagesRegisterTest(PageLoadTestMixin, SimpleUserDataMixin, TestCase):
             return legacy
         except TemplateDoesNotExist:
             return None
+
+    @staticmethod
+    def _get_wip_fallback(wip_template: str) -> str | None:
+        """Returns the template a WIP page shows without the WIP flag.
+
+        Mirrors the middleware: the page's v2_ template when it has one,
+        otherwise its legacy one. None means it has neither and is a 404.
+        """
+        name = wip_template.removeprefix(WIP_PROPS["prefix"])
+        for candidate in (f"v2_{name}", name):
+            try:
+                get_template(candidate)
+                return candidate
+            except TemplateDoesNotExist:
+                continue
+        return None
 
     async def test_v2_pages(self) -> None:
         """Do all registered v2 pages load properly with the redesign flag?"""
@@ -449,6 +472,36 @@ class V2PagesRegisterTest(PageLoadTestMixin, SimpleUserDataMixin, TestCase):
                 self.assertTemplateUsed(
                     r, self._get_legacy_counterpart(v2_template) or v2_template
                 )
+
+    @override_flag(WIP_PROPS["flag"], active=True)
+    def test_wip_pages(self) -> None:
+        """Do all registered WIP pages load with both redesign flags?"""
+        for reverse_param, wip_template in self.WIP_PAGES:
+            with self.subTest(
+                "Checking WIP page", reverse_params=reverse_param
+            ):
+                r = self.client.get(reverse(**reverse_param))
+                self.assertEqual(r.status_code, HTTPStatus.OK)
+                self.assertTemplateUsed(r, wip_template)
+
+    @override_flag(WIP_PROPS["flag"], active=False)
+    def test_wip_pages_without_the_wip_flag(self) -> None:
+        """Do registered WIP pages stay hidden with only use_new_design?
+
+        Each one falls back to its v2_ template, then its legacy one, or is
+        a 404 when the page has neither.
+        """
+        for reverse_param, wip_template in self.WIP_PAGES:
+            with self.subTest(
+                "Checking WIP page", reverse_params=reverse_param
+            ):
+                r = self.client.get(reverse(**reverse_param))
+                fallback = self._get_wip_fallback(wip_template)
+                if fallback is None:
+                    self.assertEqual(r.status_code, HTTPStatus.NOT_FOUND)
+                    continue
+                self.assertEqual(r.status_code, HTTPStatus.OK)
+                self.assertTemplateUsed(r, fallback)
 
 
 @override_flag("use_new_design", True)
