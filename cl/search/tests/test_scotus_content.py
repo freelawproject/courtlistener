@@ -8,6 +8,9 @@ from django.core.files.base import ContentFile
 from django.test import TestCase
 
 from cl.alerts.models import DocketAlert
+from cl.corpus_importer.management.commands.download_scotus_pdfs import (
+    download_scotus_pdfs,
+)
 from cl.corpus_importer.tasks import (
     add_scotus_docket_entries,
     download_qp_scotus_pdf,
@@ -47,6 +50,10 @@ from cl.search.models import (
 from cl.settings import COURT_REQUEST_USER_AGENT
 from cl.tests.cases import TestCase as CLTestCase
 from cl.users.factories import UserFactory
+
+DOWNLOAD_COMMAND = (
+    "cl.corpus_importer.management.commands.download_scotus_pdfs"
+)
 
 
 class ScotusDocketMergeTest(TestCase):
@@ -1148,6 +1155,22 @@ class ScotusPlaceholderDocumentTest(CLTestCase):
         )
         self.assertEqual(documents.count(), 1)
         self.assertFalse(documents.get().is_placeholder)
+
+    @mock.patch(f"{DOWNLOAD_COMMAND}.CeleryThrottle")
+    @mock.patch(f"{DOWNLOAD_COMMAND}.download_scotus_document_pdf")
+    def test_pdf_download_command_skips_placeholders(
+        self, mock_download: mock.MagicMock, _mock_throttle: mock.MagicMock
+    ) -> None:
+        """download_scotus_pdfs schedules the documents without a file, but
+        not placeholders, which have no URL to download from."""
+        self._merge(attachments=[])
+        document = SCOTUSDocumentFactory(
+            docket_entry__docket=self.docket, filepath_local=""
+        )
+
+        download_scotus_pdfs(download_queue="celery", delay=0)
+
+        mock_download.si.assert_called_once_with(document.pk)
 
 
 class ScotusDocketUrlPropertyTest(CLTestCase):
