@@ -4,6 +4,7 @@ import re
 import urllib.parse
 from http import HTTPStatus
 from itertools import product
+from typing import Any
 from unittest import mock
 
 import time_machine
@@ -7179,7 +7180,9 @@ class SCOTUSESIndexingSignalTest(
         docket = DocketFactory(court=self.court, source=Docket.SCRAPER)
         ScotusDocketMetadataFactory(docket=docket)
 
-        def merge(document_number: int | None, attachments: list) -> None:
+        def merge(
+            document_number: int | None, attachments: list[dict[str, Any]]
+        ) -> None:
             """Merge the same entry with the given attachments."""
             docket_entries = [
                 SCOTUSDocketEntryDataFactory(
