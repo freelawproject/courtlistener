@@ -467,6 +467,31 @@ class ScotusDocketMergeTest(TestCase):
         merge_scotus_docket(data, download_file=False)
         mock_index_parties.delay.assert_not_called()
 
+    @mock.patch("cl.corpus_importer.tasks.index_docket_parties_in_es")
+    def test_merge_scotus_docket_percolates_opinion_docket_becoming_scotus(
+        self, mock_index_parties: mock.MagicMock
+    ) -> None:
+        """An existing opinion-only docket that becomes SCOTUS docket
+        content (it gets its ScotusDocketMetadata now) is percolated once
+        through index_docket_parties_in_es, even without parties: its first
+        ES write comes from the metadata save, which isn't percolated."""
+        opinion_docket = DocketFactory(
+            court=self.court, source=Docket.SCRAPER, docket_number="23-1234"
+        )
+        data = ScotusDocketDataFactory(
+            lower_court=self.lower_court.full_name,
+            docket_number="23-1234",
+            parties=[],
+            docket_entries=[],
+        )
+
+        docket, _, _ = merge_scotus_docket(data, download_file=False)
+
+        self.assertEqual(docket.pk, opinion_docket.pk)
+        mock_index_parties.delay.assert_called_once_with(
+            docket.pk, percolate_parties=True
+        )
+
     def test_merge_scotus_docket_updates_existing_docket(self) -> None:
         """Confirm merging again updates an existing SCOTUS docket."""
 

@@ -3952,7 +3952,6 @@ def merge_scotus_docket(
             None,
         )
 
-        docket_created = d.pk is None
         if d.pk:
             # If the docket already exists, compound the SCRAPER source.
             d.add_scraper_source()
@@ -4052,7 +4051,12 @@ def merge_scotus_docket(
                 qp_url = urljoin("https://www.supremecourt.gov/", qp_url)
             defaults["questions_presented_url"] = qp_url
 
-        scotus_metadata, _ = ScotusDocketMetadata.objects.update_or_create(
+        # True for a new Docket, and for an existing one (e.g. created to
+        # hold a scraped opinion) that becomes SCOTUS docket content now.
+        (
+            scotus_metadata,
+            metadata_created,
+        ) = ScotusDocketMetadata.objects.update_or_create(
             docket=d,
             defaults=defaults,
         )
@@ -4063,14 +4067,15 @@ def merge_scotus_docket(
     # Merge Parties
     if normalized_parties:
         add_parties_and_attorneys(d, normalized_parties)
-    if normalized_parties or docket_created:
+    if normalized_parties or metadata_created:
         # Party rows don't trigger ES signals, and the Docket was indexed when
-        # its metadata was saved, before these parties existed. A new SCOTUS
-        # docket is always percolated here: unlike RECAP, its own first save
-        # isn't indexed (it waits for the metadata), so it's never percolated
-        # on save.
+        # its metadata was saved, before these parties existed. A docket that
+        # just became SCOTUS content (new, or an existing opinion-only docket)
+        # is always percolated here: its first ES write comes from the
+        # metadata save, which isn't percolated, so it's never percolated on
+        # save.
         index_docket_parties_in_es.delay(
-            d.pk, percolate_parties=percolate_parties or docket_created
+            d.pk, percolate_parties=percolate_parties or metadata_created
         )
 
     # Docket entries merger:

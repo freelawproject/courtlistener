@@ -362,7 +362,7 @@ class SCOTUSAlertsPercolatorTest(ESIndexTestCase, TransactionTestCase):
         # A pk no factory reaches: the ES index is shared by the whole class,
         # so a lower pk could match a SCOTUS document another test indexed.
         shared_pk = 9_000_000
-        rd = RECAPDocumentFactory(
+        RECAPDocumentFactory(
             id=shared_pk,
             docket_entry=DocketEntryFactory(
                 docket=DocketFactory(
