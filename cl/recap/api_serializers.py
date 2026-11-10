@@ -10,6 +10,7 @@ from cl.lib.file_validation import (
     file_too_large_message,
     is_too_large,
 )
+from cl.lib.model_helpers import clean_docket_number
 from cl.lib.pacer_session import get_or_cache_pacer_cookies
 from cl.recap.models import (
     REQUEST_TYPE,
@@ -313,6 +314,27 @@ class PacerFetchQueueSerializer(serializers.ModelSerializer):
                         "recap_document is a required field for attachment page "
                         "and PDF fetches."
                     )
+
+        # A destination docket fixes the identity of the case being purchased.
+        if attrs["request_type"] == REQUEST_TYPE.DOCKET and (
+            docket := attrs.get("docket")
+        ):
+            for field, expected in (
+                ("court", docket.court),
+                ("pacer_case_id", docket.pacer_case_id),
+                ("docket_number", docket.docket_number_raw),
+            ):
+                supplied = attrs.get(field)
+                if not supplied:
+                    continue
+                if field == "docket_number":
+                    supplied = clean_docket_number(supplied)
+                    expected = clean_docket_number(expected)
+                if not expected or supplied != expected:
+                    raise ValidationError(
+                        {field: "Must match the destination docket."}
+                    )
+            attrs["court"] = docket.court
 
         # Docket validations
         if attrs.get("pacer_case_id") and not attrs.get("court"):

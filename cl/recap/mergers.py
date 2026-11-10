@@ -14,6 +14,7 @@ from django.core.files.base import ContentFile
 from django.db import IntegrityError, OperationalError, transaction
 from django.db.models import Count, Prefetch, Q, QuerySet
 from django.utils.timezone import now
+from juriscraper.lib.exceptions import ParsingException
 from juriscraper.lib.string_utils import CaseNameTweaker
 from juriscraper.pacer import AppellateAttachmentPage, AttachmentPage
 from waffle import switch_is_active
@@ -2046,6 +2047,45 @@ def merge_pacer_docket_into_cl_docket(
     appellate=False,
     tag_names: list[str] | None = None,
 ):
+    # Check before changing even the in-memory docket: metadata and related
+    # records must never be merged into a caller-selected, unrelated case.
+    if map_pacer_to_cl_id(docket_data.get("court_id", "")) != d.court_id:
+        raise ParsingException(
+            "Fetched court does not match destination docket."
+        )
+    reported_case_id = docket_data.get("pacer_case_id")
+    # The appellate importer passes its docket number in this argument.
+    queried_case_id = None if appellate else pacer_case_id
+    if (
+        (
+            d.pacer_case_id
+            and queried_case_id
+            and d.pacer_case_id != queried_case_id
+        )
+        or (
+            d.pacer_case_id
+            and reported_case_id
+            and d.pacer_case_id != reported_case_id
+        )
+        or (
+            queried_case_id
+            and reported_case_id
+            and queried_case_id != reported_case_id
+        )
+    ):
+        raise ParsingException(
+            "Fetched case ID does not match destination docket."
+        )
+    # District and appellate reports do not always include a case ID. Also
+    # verify the report's number, including for destinations without a PACER ID.
+    incoming_number = clean_docket_number(docket_data.get("docket_number"))
+    if not incoming_number or incoming_number != clean_docket_number(
+        d.docket_number_raw
+    ):
+        raise ParsingException(
+            "Fetched docket number does not match destination docket."
+        )
+
     # Ensure that we set the case ID. This is needed on dockets that have
     # matching docket numbers, but that never got PACER data before. This was
     # previously rare, but since we added the FJC data to the dockets table,

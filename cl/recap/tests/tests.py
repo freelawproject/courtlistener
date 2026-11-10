@@ -3303,6 +3303,24 @@ class RecapFetchApiSerializationTestCase(TestCase):
             "pacer_password": "mrjangles",
         }
 
+    def test_destination_rejects_conflicting_selectors(
+        self, mock: MagicMock
+    ) -> None:
+        """A fetch cannot select another case while retaining its destination."""
+        for field, value in (
+            ("court", self.court_appellate.pk),
+            ("pacer_case_id", "unrelated"),
+            ("docket_number", "99-99999"),
+        ):
+            with self.subTest(field=field):
+                serializer = PacerFetchQueueSerializer(
+                    data={**self.fetch_attributes, field: value},
+                    context={"request": self.request},
+                )
+                self.assertFalse(serializer.is_valid())
+                self.assertIn(field, serializer.errors)
+        mock.assert_not_called()
+
     def test_simple_request_serialization(self, mock) -> None:
         """Can we serialize a simple request?"""
         serialized_fq = PacerFetchQueueSerializer(
