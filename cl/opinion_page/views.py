@@ -47,6 +47,7 @@ from reporters_db import (
     VARIATIONS_ONLY,
 )
 from seal_rookery.search import ImageSizes, seal
+from waffle import flag_is_active
 
 from cl.citations.parenthetical_utils import get_or_create_parenthetical_groups
 from cl.citations.utils import (
@@ -77,7 +78,7 @@ from cl.lib.string_utils import trunc
 from cl.lib.thumbnails import make_png_thumbnail_for_instance
 from cl.lib.url_utils import get_redirect_or_abort
 from cl.lib.utils import human_sort
-from cl.opinion_page import docket_entry_sources
+from cl.opinion_page import docket_entry_sources, forms_v2
 from cl.opinion_page.decorators import handle_cluster_redirection
 from cl.opinion_page.docket_entry_sources import (
     SourceDocketEntry,
@@ -370,7 +371,10 @@ async def view_docket(
     request: HttpRequest, pk: int, slug: str
 ) -> HttpResponse:
     sort_order_asc = True
-    form = DocketEntryFilterForm(request.GET, request=request)
+    if await sync_to_async(flag_is_active)(request, "use_new_design"):
+        form = forms_v2.DocketEntryFilterForm(request.GET, request=request)
+    else:
+        form = DocketEntryFilterForm(request.GET, request=request)
     docket, context = await core_docket_data(request, pk)
 
     source = docket.get_entry_source()
@@ -790,16 +794,17 @@ async def recap_document_context(
     redirect_or_modal = request.GET.get("redirect_or_modal", False)
     if rd_download_redirect or redirect_or_modal:
         # Check if the document is available from CourtListener and
-        # if it is, redirect to the local document
-        # if it isn't, if pacer_url is available and
-        # rd_download_redirect is True, redirect to PACER. If redirect_or_modal
-        # is True set redirect_to_pacer_modal to True to open the modal.
+        # if it is, redirect to the local document. If it isn't, fall back
+        # to the source's own external URL (PACER for RECAP, the source
+        # court's website for SCOTUS) when rd_download_redirect is True.
+        # redirect_or_modal instead opens the Buy-on-PACER modal.
         if rd.is_available:
             return HttpResponseRedirect(rd.filepath_local.url)
-        elif source.has_pay_and_pray:
-            if rd.pacer_url and rd_download_redirect:
-                return HttpResponseRedirect(rd.pacer_url)
-            if rd.pacer_url and redirect_or_modal:
+        else:
+            external_url = source.document_external_url(rd)
+            if external_url and rd_download_redirect:
+                return HttpResponseRedirect(external_url)
+            if source.has_pay_and_pray and external_url and redirect_or_modal:
                 redirect_to_pacer_modal = True
 
     title = make_rd_title(rd)
