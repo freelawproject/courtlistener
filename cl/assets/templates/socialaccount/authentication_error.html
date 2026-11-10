@@ -14,7 +14,7 @@ invalid assertion, and so on).
   <div class="col-xs-10 col-sm-8 col-md-6 well">
     <h2>We Couldn't Sign You In</h2>
     <p class="alert alert-danger">Something went wrong while signing you in through your organization's single sign-on.</p>
-    <p><a href="{% url "sso_start" %}">Try again</a>. If it keeps happening, ask your organization's IT team or <a href="{% url "contact" %}?issue_type=support">contact us</a>.</p>
+    <p><a href="{% url 'sso_start' %}">Try again</a>. If it keeps happening, ask your organization's IT team or <a href="{% url 'contact' %}?issue_type=support">contact us</a>.</p>
   </div>
   <div class="col-xs-1 col-sm-2 col-md-3"></div>
 {% endblock %}

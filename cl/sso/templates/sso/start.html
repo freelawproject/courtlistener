@@ -20,7 +20,7 @@
     {% endif %}
     <p>If your organization uses single sign-on (SSO) with CourtListener, enter your work email address to continue to your organization's sign-in page.</p>
 
-    <form action="{% url "sso_start" %}" method="post">{% csrf_token %}
+    <form action="{% url 'sso_start' %}" method="post">{% csrf_token %}
       <div class="form-group{% if form.email.errors %} has-error{% endif %}">
         <label for="{{ form.email.id_for_label }}">{{ form.email.label }}</label>
         {{ form.email }}

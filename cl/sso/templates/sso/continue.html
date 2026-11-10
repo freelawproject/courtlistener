@@ -15,7 +15,7 @@
       <input type="hidden" name="next" value="{{ next }}">
       <button type="submit" class="btn btn-primary btn-lg">Continue to {{ organization.name }}</button>
     </form>
-    <p class="v-offset-above-2"><a href="{% url "sso_start" %}?next={{ next|urlencode }}">Use a different email address</a></p>
+    <p class="v-offset-above-2"><a href="{% url 'sso_start' %}?next={{ next|urlencode }}">Use a different email address</a></p>
   </div>
   <div class="col-xs-1 col-sm-2 col-md-3"></div>
 {% endblock %}
