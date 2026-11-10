@@ -6,6 +6,8 @@ from django.test.utils import override_settings
 from cl.alerts.factories import AlertFactory
 from cl.alerts.models import SEARCH_TYPES, Alert, ScheduledAlertHit
 from cl.alerts.utils import prepare_percolator_content
+from cl.api.factories import WebhookFactory
+from cl.api.models import WebhookEventType
 from cl.corpus_importer.tasks import (
     download_scotus_document_pdf,
     merge_scotus_docket,
@@ -285,6 +287,37 @@ class SCOTUSAlertsPercolatorTest(ESIndexTestCase, TransactionTestCase):
         self.assertEqual(mock_percolate.call_count, 1)
         self.assertEqual(len(self._hits(party_alert)), 1)
         self.assertEqual(len(self._hits(case_name_alert)), 1)
+
+    def test_scotus_webhooks_follow_the_docket_alert_webhooks_setting(
+        self, mock_prefix
+    ):
+        """SCOTUS search alert hits only send webhooks when
+        SCOTUS_DOCKET_ALERT_WEBHOOKS_ENABLED is on. The hit is still
+        scheduled for the email either way."""
+        WebhookFactory(
+            user=self.user,
+            event_type=WebhookEventType.SEARCH_ALERT,
+            url="https://example.com/",
+            enabled=True,
+        )
+        alert = self._make_alert('q="writ of certiorari"&type=r')
+        for enabled in (False, True):
+            with (
+                self.subTest(enabled=enabled),
+                override_settings(
+                    SCOTUS_DOCKET_ALERT_WEBHOOKS_ENABLED=enabled
+                ),
+                mock.patch(
+                    "cl.alerts.tasks.send_search_alert_webhook_es.delay"
+                ) as mock_webhook,
+            ):
+                ScheduledAlertHit.objects.all().delete()
+                SCOTUSDocumentFactory(
+                    docket_entry=self._make_scotus_entry(),
+                    description="Petition for a writ of certiorari",
+                )
+                self.assertEqual(mock_webhook.called, enabled)
+                self.assertEqual(len(self._hits(alert)), 1)
 
     @override_settings(PERCOLATOR_SCOTUS_SEARCH_ALERTS_ENABLED=False)
     def test_scotus_percolation_follows_its_own_setting(self, mock_prefix):

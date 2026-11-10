@@ -51,7 +51,9 @@ from cl.lib.redis_utils import (
 from cl.lib.string_utils import trunc
 from cl.recap.constants import COURT_TIMEZONES
 from cl.search.es_docket_sources import (
+    SCOTUS_ES_SOURCE,
     SOURCE_BY_MODEL,
+    ESDocketSource,
     percolator_enabled,
     source_for_court,
 )
@@ -64,6 +66,7 @@ from cl.search.models import (
     SCOTUSDocument,
 )
 from cl.search.types import (
+    ESDictDocument,
     ESDocumentNameType,
     SaveESDocumentReturn,
     SearchAlertHitType,
@@ -646,6 +649,14 @@ def percolator_response_processing(response: SendAlertsResponse) -> None:
     instance_content_type = ContentType.objects.get(
         app_label=app_label_str, model=model_str.lower()
     )
+    # SCOTUS search alert webhooks stay off with SCOTUS docket alert
+    # webhooks: their payloads would have id null and no uid until the
+    # SCOTUS search API (#8153).
+    send_webhooks = (
+        get_docket_source(app_label_model, document_content)
+        is not SCOTUS_ES_SOURCE
+        or settings.SCOTUS_DOCKET_ALERT_WEBHOOKS_ENABLED
+    )
     r = get_redis_interface("CACHE")
     recap_document_hits = [hit.id for hit in rd_alerts_triggered]
     docket_hits = [hit.id for hit in d_alerts_triggered]
@@ -762,7 +773,9 @@ def percolator_response_processing(response: SendAlertsResponse) -> None:
         ]
         # Send real time Webhooks for all users regardless of alert rate and
         # user's donations.
-        webhook_sent = send_webhook_alert_hits(alert_user, hits)
+        webhook_sent = send_webhooks and send_webhook_alert_hits(
+            alert_user, hits
+        )
         schedule_alert = not (
             alert_triggered.rate == Alert.REAL_TIME
             and not alert_user.profile.is_eligible_for_rt_search_alerts  # pyrefly:ignore[missing-attribute]
@@ -805,6 +818,25 @@ def percolator_response_processing(response: SendAlertsResponse) -> None:
     create_schedule_alerts_hits_in_bulk(scheduled_hits_to_create)
 
 
+def get_docket_source(
+    app_label: str, document_content: ESDictDocument
+) -> ESDocketSource | None:
+    """Return the docket source (RECAP, SCOTUS) of a percolated document.
+
+    :param app_label: The percolated document's app label.
+    :param document_content: The percolated document's ES content.
+    :return: The document's ESDocketSource, or None if it isn't docket
+    content (e.g. an Opinion).
+    """
+    match app_label:
+        case "search.Docket":
+            return source_for_court(document_content.get("court_id", ""))
+        case "search.RECAPDocument" | "search.SCOTUSDocument":
+            return SOURCE_BY_MODEL[apps.get_model(app_label)]
+        case _:
+            return None
+
+
 def search_alerts_percolation_enabled(response: SaveESDocumentReturn) -> bool:
     """Whether search alerts percolation is enabled for an indexed
     document, according to its PERCOLATOR_*_SEARCH_ALERTS_ENABLED setting.
@@ -812,19 +844,13 @@ def search_alerts_percolation_enabled(response: SaveESDocumentReturn) -> bool:
     :param response: The indexed document to percolate.
     :return: True if the document should be percolated.
     """
-    match response.app_label:
-        case "search.Docket":
-            source = source_for_court(
-                response.document_content.get("court_id", "")
-            )
-            return percolator_enabled(source)
-        case "search.RECAPDocument" | "search.SCOTUSDocument":
-            model = apps.get_model(response.app_label)
-            return percolator_enabled(SOURCE_BY_MODEL[model])
-        case "search.Opinion":
-            return settings.PERCOLATOR_OPINIONS_SEARCH_ALERTS_ENABLED
-        case _:
-            return True
+    if source := get_docket_source(
+        response.app_label, response.document_content
+    ):
+        return percolator_enabled(source)
+    if response.app_label == "search.Opinion":
+        return settings.PERCOLATOR_OPINIONS_SEARCH_ALERTS_ENABLED
+    return True
 
 
 @app.task(
