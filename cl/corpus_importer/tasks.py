@@ -4051,15 +4051,21 @@ def merge_scotus_docket(
                 qp_url = urljoin("https://www.supremecourt.gov/", qp_url)
             defaults["questions_presented_url"] = qp_url
 
+        scotus_metadata = ScotusDocketMetadata.objects.filter(docket=d).first()
         # True for a new Docket, and for an existing one (e.g. created to
         # hold a scraped opinion) that becomes SCOTUS docket content now.
-        (
-            scotus_metadata,
-            metadata_created,
-        ) = ScotusDocketMetadata.objects.update_or_create(
-            docket=d,
-            defaults=defaults,
+        metadata_created = scotus_metadata is None
+        if scotus_metadata is None:
+            scotus_metadata = ScotusDocketMetadata(docket=d)
+        for field, value in defaults.items():
+            setattr(scotus_metadata, field, value)
+        # The parties are merged after this block. If the docket is
+        # percolated after its parties are indexed (below), don't percolate
+        # this metadata change now, with the old parties.
+        scotus_metadata.skip_percolator_request = (
+            percolate_parties or metadata_created
         )
+        scotus_metadata.save()
         download_qp = bool(
             qp_url and not scotus_metadata.questions_presented_file
         )

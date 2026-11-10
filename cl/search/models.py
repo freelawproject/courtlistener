@@ -4018,6 +4018,12 @@ class ScotusDocketMetadata(AbstractDateTimeModel):
     namespace.
     """
 
+    # Not a model field - merge_scotus_docket sets this transiently so the
+    # metadata change isn't percolated when the docket is percolated after
+    # its parties are merged instead. Declared here only so the type checker
+    # knows the attribute exists.
+    skip_percolator_request: bool
+
     docket = models.OneToOneField(
         "search.Docket",
         help_text="The docket this SCOTUS metadata applies to.",

@@ -502,6 +502,7 @@ def update_reverse_related_documents(
                         (compose_app_label(main_object), main_object.pk),
                         related_instance,
                         fields_map_to_pass,
+                        getattr(instance, "skip_percolator_request", False),
                     ),
                     send_or_schedule_search_alerts.s(),
                     percolator_response_processing.s(),

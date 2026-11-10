@@ -338,6 +338,62 @@ class SCOTUSAlertsPercolatorTest(ESIndexTestCase, TransactionTestCase):
                 self.assertEqual(mock_webhook.called, enabled)
                 self.assertEqual(len(self._hits(alert)), 1)
 
+    def test_metadata_change_waits_for_the_new_parties(self, mock_prefix):
+        """When a merge changes both the metadata (capital_case) and the
+        parties, the docket is percolated once, after its new parties are
+        indexed, not before with the old ones. Otherwise an alert excluding
+        an incoming party could match the old parties."""
+        report_data = ScotusDocketDataFactory(
+            capital_case=False,
+            docket_entries=[],
+            questions_presented=None,
+            parties=[
+                SCOTUSPartyDataFactory(
+                    name="Encino Motorcars, LLC", type="Petitioner"
+                )
+            ],
+        )
+        merge_scotus_docket(report_data, download_file=False)
+
+        capital_alert = self._make_alert(
+            "q=capital_case:true&type=d", SEARCH_TYPES.DOCKETS
+        )
+        excluding_alert = self._make_alert(
+            'q=capital_case:true AND NOT party:"Acme Corp"&type=d',
+            SEARCH_TYPES.DOCKETS,
+        )
+        report_data["capital_case"] = True
+        report_data["parties"].append(
+            SCOTUSPartyDataFactory(name="Acme Corp", type="Respondent")
+        )
+        with self._count_percolations() as mock_percolate:
+            merge_scotus_docket(report_data, download_file=False)
+
+        self.assertEqual(mock_percolate.call_count, 1)
+        self.assertEqual(len(self._hits(capital_alert)), 1)
+        self.assertEqual(self._hits(excluding_alert), [])
+
+    def test_metadata_change_without_parties_is_percolated(self, mock_prefix):
+        """A merge that changes the metadata but has no parties still
+        percolates the docket, through the metadata update."""
+        report_data = ScotusDocketDataFactory(
+            capital_case=False,
+            docket_entries=[],
+            questions_presented=None,
+            parties=[],
+        )
+        merge_scotus_docket(report_data, download_file=False)
+
+        capital_alert = self._make_alert(
+            "q=capital_case:true&type=d", SEARCH_TYPES.DOCKETS
+        )
+        report_data["capital_case"] = True
+        with self._count_percolations() as mock_percolate:
+            merge_scotus_docket(report_data, download_file=False)
+
+        self.assertEqual(mock_percolate.call_count, 1)
+        self.assertEqual(len(self._hits(capital_alert)), 1)
+
     @override_settings(PERCOLATOR_SCOTUS_SEARCH_ALERTS_ENABLED=False)
     def test_scotus_percolation_follows_its_own_setting(self, mock_prefix):
         """Without PERCOLATOR_SCOTUS_SEARCH_ALERTS_ENABLED, SCOTUS content
