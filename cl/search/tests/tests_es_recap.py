@@ -2805,6 +2805,46 @@ class RECAPSearchTest(RECAPSearchTestCase, ESIndexTestCase, TestCase):
         for docket in dockets_to_remove:
             docket.delete()
 
+    @override_flag("scotus_docket_page", active=True)
+    @override_settings(
+        WAFFLE_CACHE_PREFIX="test_scotus_docket_titles_have_no_empty_parentheses"
+    )
+    def test_scotus_docket_titles_have_no_empty_parentheses(self) -> None:
+        """Confirm SCOTUS docket titles hide the court citation: the year
+        alone when the docket has a date, and no parentheses when it
+        doesn't."""
+        scotus_court = CourtFactory(
+            id="scotus", jurisdiction="F", citation_string="SCOTUS"
+        )
+        with self.captureOnCommitCallbacks(execute=True):
+            dated_docket = DocketFactory(
+                court=scotus_court,
+                case_name="Lorem Title Dated",
+                date_filed=datetime.date(2024, 3, 1),
+            )
+            undated_docket = DocketFactory(
+                court=scotus_court,
+                case_name="Lorem Title Undated",
+                date_filed=None,
+            )
+            # SCOTUS dockets are only indexed once they have metadata.
+            ScotusDocketMetadataFactory(docket=dated_docket)
+            ScotusDocketMetadataFactory(docket=undated_docket)
+        self.addCleanup(dated_docket.delete)
+        self.addCleanup(undated_docket.delete)
+
+        cd = {"type": SEARCH_TYPES.RECAP, "q": '"Lorem Title"'}
+        r = async_to_sync(self._test_article_count)(cd, 2, "scotus titles")
+        tree = html.fromstring(r.content.decode())
+        # Collapse the template's line breaks and &nbsp; into spaces.
+        titles = {
+            " ".join(a.text_content().split())
+            for a in tree.xpath("//article/h3/a")
+        }
+        self.assertEqual(
+            titles, {"Lorem Title Dated (2024)", "Lorem Title Undated"}
+        )
+
     async def test_get_results_from_paginator(self) -> None:
         """Assert Paginator Page objects are handled as expected."""
 
