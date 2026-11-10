@@ -87,8 +87,24 @@ def _parse_line_skips(lines: list[str]) -> dict[int, set[str]]:
 # ---------------------------------------------------------------------------
 
 
+# Finished redesign pages use v2_; unfinished ones use wip_ until they are
+# promoted to v2_. Both mirror the prefixes in cl/lib/middleware.py.
+V2_PREFIX = "v2_"
+WIP_PREFIX = "wip_"
+REDESIGN_PREFIXES = (V2_PREFIX, WIP_PREFIX)
+
+
 def is_v2_template(path: str) -> bool:
-    return "templates/v2_" in path and path.endswith(".html")
+    return f"templates/{V2_PREFIX}" in path and path.endswith(".html")
+
+
+def is_wip_template(path: str) -> bool:
+    return f"templates/{WIP_PREFIX}" in path and path.endswith(".html")
+
+
+def is_redesign_template(path: str) -> bool:
+    """A v2_ or wip_ template. Both are held to the same new-stack checks."""
+    return is_v2_template(path) or is_wip_template(path)
 
 
 def is_v2_partial(path: str) -> bool:
@@ -110,7 +126,7 @@ def is_legacy_template(path: str) -> bool:
         return False
     if "templates/" not in path:
         return False
-    if is_v2_template(path) or is_cotton_component(path):
+    if is_redesign_template(path) or is_cotton_component(path):
         return False
     if path.endswith("new_base.html"):
         return False
@@ -394,7 +410,7 @@ def check_inline_xdata(lines: list[str]) -> list[tuple[int, str]]:
 
 
 def check_extends_new_base(lines: list[str]) -> list[tuple[int, str]]:
-    """v2_ templates must extend new_base.html or another v2_ template."""
+    """Redesign templates must extend new_base.html or a v2_ template."""
     results = []
     extends_re = re.compile(r'{%\s*extends\s+["\']([^"\']+)["\']\s*%}')
 
@@ -412,19 +428,19 @@ def check_extends_new_base(lines: list[str]) -> list[tuple[int, str]]:
         m = extends_re.search(stripped)
         if m:
             parent = m.group(1)
-            if parent != "new_base.html" and "v2_" not in parent:
+            if parent != "new_base.html" and V2_PREFIX not in parent:
                 results.append(
                     (
                         i,
-                        f'extends "{parent}" — v2_ templates must extend '
-                        f'"new_base.html" or another v2_ template',
+                        f'extends "{parent}" — v2_/wip_ templates must extend '
+                        f'"new_base.html" or a v2_ template',
                     )
                 )
         else:
             results.append(
                 (
                     i,
-                    "v2_ template does not have {% extends %} as first "
+                    "v2_/wip_ template does not have {% extends %} as first "
                     "directive — must extend new_base.html or a v2_ template",
                 )
             )
@@ -433,15 +449,43 @@ def check_extends_new_base(lines: list[str]) -> list[tuple[int, str]]:
     return results
 
 
+def check_wip_dependency(lines: list[str]) -> list[tuple[int, str]]:
+    """No template may extend or include a wip_ template.
+
+    WIP is limited to whole pages, which the middleware swaps in for the
+    template a view returns. A wip_ template pulled in by another one is
+    never swapped, so it would reach everyone who sees that template.
+    """
+    results = []
+    tag_re = re.compile(
+        r'{%\s*(extends|include)\s+["\']([^"\']*)["\']', re.IGNORECASE
+    )
+    for i, line in enumerate(lines, 1):
+        for m in tag_re.finditer(line):
+            tag, name = m.groups()
+            # Template names are relative to templates/, so a WIP one always
+            # starts with the prefix (wip_help/x.html).
+            if name.startswith(WIP_PREFIX):
+                results.append(
+                    (
+                        i,
+                        f'{tag} "{name}" — templates must not extend or '
+                        "include wip_ templates; WIP is limited to whole pages",
+                    )
+                )
+    return results
+
+
 def check_sync_notice(lines: list[str]) -> list[tuple[int, str]]:
-    """Legacy template must have sync notice if v2_ counterpart exists."""
+    """Legacy template must have sync notice if a v2_/wip_ counterpart exists."""
     content = "\n".join(lines)
     if "use_new_design waffle flag" not in content:
         return [
             (
                 1,
-                "Legacy template missing sync notice — a v2_ counterpart "
-                "exists. Add the standard ATTENTION comment block.",
+                "Legacy template missing sync notice — a v2_/wip_ "
+                "counterpart exists. Add the standard ATTENTION comment "
+                "block.",
             )
         ]
     return []
@@ -763,6 +807,7 @@ HTML_CHECKS = [
     (check_tabnabbing, FAIL),
     (check_tabindex, FAIL),
     (check_placeholder_text, WARN),
+    (check_wip_dependency, FAIL),
 ]
 
 V2_CHECKS = [
@@ -832,8 +877,10 @@ def run_checks(
     """
     findings: list[Finding] = []
 
-    # Collect v2_ templates changed in this PR (for sync notice check)
-    changed_v2_templates = {f for f in changed_files if is_v2_template(f)}
+    # Collect v2_/wip_ templates changed in this PR (for sync notice check)
+    changed_redesign_templates = {
+        f for f in changed_files if is_redesign_template(f)
+    }
 
     # Check if v2_components.html is modified (for component library check)
     components_library_modified = any(
@@ -855,15 +902,18 @@ def run_checks(
         if filepath.endswith(".html"):
             _apply_checks(HTML_CHECKS, lines, filepath, findings)
 
-        if is_v2_template(filepath):
+        if is_redesign_template(filepath):
             _apply_checks(V2_CHECKS, lines, filepath, findings)
 
-        if is_v2_template(filepath) and not is_v2_partial(filepath):
+        if is_redesign_template(filepath) and not is_v2_partial(filepath):
             _apply_checks(V2_PAGE_CHECKS, lines, filepath, findings)
 
+            # Renames count too: promoting a page from wip_ to v2_ is one,
+            # and it has to move the page between the two registries.
             status = file_statuses.get(filepath, "")
+            registry = "WIP_PAGES" if is_wip_template(filepath) else "V2_PAGES"
             if (
-                status == "A" or status.startswith("C")
+                status == "A" or status.startswith(("C", "R"))
             ) and not v2_register_test_modified:
                 findings.append(
                     Finding(
@@ -871,9 +921,10 @@ def run_checks(
                         1,
                         "check_v2_register",
                         WARN,
-                        "New v2 template added but v2 register test "
-                        f"({V2_REGISTER_TEST_FILE}) not modified — add "
-                        "the page's viewname to V2PagesRegisterTest.V2_PAGES",
+                        "New or renamed v2_/wip_ template but register test "
+                        f"({V2_REGISTER_TEST_FILE}) not modified — add the "
+                        f"page's viewname to V2PagesRegisterTest.{registry} "
+                        "(a promoted page moves there from WIP_PAGES)",
                     )
                 )
 
@@ -901,12 +952,12 @@ def run_checks(
         if is_input_css(filepath):
             _apply_checks(CSS_CHECKS, lines, filepath, findings)
 
-    # Check sync notices: for each v2_ template in the PR, make sure
+    # Check sync notices: for each v2_/wip_ template in the PR, make sure
     # the legacy counterpart (if it exists on disk) has the sync notice.
     # This runs outside the per-file loop because the legacy file may
     # not be in the PR's changed files at all.
-    for v2_path in changed_v2_templates:
-        legacy_path = _swap_template_prefix(v2_path, add_v2=False)
+    for redesign_path in changed_redesign_templates:
+        legacy_path = _legacy_counterpart(redesign_path)
         if legacy_path is None:
             continue
         abs_legacy = repo_root / legacy_path
@@ -928,16 +979,19 @@ def run_checks(
             )
 
     # Reverse sync check: if a legacy template with sync notice is
-    # modified, the v2_ counterpart should also be modified.
+    # modified, its v2_/wip_ counterparts should also be modified.
     changed_legacy_templates = {
         f for f in changed_files if is_legacy_template(f)
     }
     for legacy_path in changed_legacy_templates:
-        v2_path = _swap_template_prefix(legacy_path, add_v2=True)
-        if v2_path is None or v2_path in changed_v2_templates:
-            continue
-        abs_v2 = repo_root / v2_path
-        if not abs_v2.is_file():
+        counterparts = [
+            path
+            for prefix in REDESIGN_PREFIXES
+            if (path := _swap_template_prefix(legacy_path, prefix, add=True))
+            and path not in changed_redesign_templates
+            and (repo_root / path).is_file()
+        ]
+        if not counterparts:
             continue
         abs_legacy = repo_root / legacy_path
         try:
@@ -946,39 +1000,55 @@ def run_checks(
             continue
         if "use_new_design waffle flag" not in content:
             continue
-        findings.append(
-            Finding(
-                legacy_path,
-                1,
-                "check_v2_counterpart_updated",
-                WARN,
-                f"Legacy template with sync notice was modified but "
-                f"v2_ counterpart ({v2_path}) was not — ensure both "
-                f"templates stay in sync",
+        for counterpart in counterparts:
+            findings.append(
+                Finding(
+                    legacy_path,
+                    1,
+                    "check_v2_counterpart_updated",
+                    WARN,
+                    f"Legacy template with sync notice was modified but "
+                    f"its counterpart ({counterpart}) was not — ensure "
+                    f"both templates stay in sync",
+                )
             )
-        )
 
     # Deletion check: IncrementalNewTemplateMiddleware serves a v2_ template
     # to everyone once its legacy counterpart is gone, so deleting the legacy
     # file is a release, not a cleanup. Warning-level because v2-only pages
-    # can be intentional.
+    # can be intentional. A wip_ template is never served without both flags,
+    # so with no v2_ to fall back to, the page becomes a 404 for everyone
+    # else. That's never a release, so it fails.
     for legacy_path in changed_legacy_templates:
         if file_statuses.get(legacy_path) != "D":
             continue
-        v2_path = _swap_template_prefix(legacy_path, add_v2=True)
-        if v2_path is None or not (repo_root / v2_path).is_file():
-            continue
-        findings.append(
-            Finding(
-                legacy_path,
-                1,
-                "check_legacy_template_deleted",
-                WARN,
-                f"Legacy template deleted but its v2_ counterpart ({v2_path}) "
-                "exists; deleting it makes the v2 page live for everyone. "
-                "Confirm if this is intentional.",
+        v2_path = _swap_template_prefix(legacy_path, V2_PREFIX, add=True)
+        wip_path = _swap_template_prefix(legacy_path, WIP_PREFIX, add=True)
+        if v2_path and (repo_root / v2_path).is_file():
+            findings.append(
+                Finding(
+                    legacy_path,
+                    1,
+                    "check_legacy_template_deleted",
+                    WARN,
+                    f"Legacy template deleted but its v2_ counterpart "
+                    f"({v2_path}) exists; deleting it makes the v2 page live "
+                    "for everyone. Confirm if this is intentional.",
+                )
             )
-        )
+        elif wip_path and (repo_root / wip_path).is_file():
+            findings.append(
+                Finding(
+                    legacy_path,
+                    1,
+                    "check_legacy_template_deleted",
+                    FAIL,
+                    f"Legacy template deleted but its only counterpart is "
+                    f"the unfinished {wip_path}; the page would return 404 "
+                    "for everyone not opted into the WIP flag. Promote it "
+                    "to v2_ first.",
+                )
+            )
 
     return findings
 
@@ -1023,12 +1093,15 @@ def check_vendored_js_readme(diff_paths: list[str]) -> list[Finding]:
     return findings
 
 
-def _swap_template_prefix(path: str, *, add_v2: bool) -> str | None:
-    """Swap between legacy and v2_ template paths.
+def _swap_template_prefix(path: str, prefix: str, *, add: bool) -> str | None:
+    """Swap between legacy and v2_/wip_ template paths.
+
+    Returns None when the path is not under a templates/ directory, or when
+    removing a prefix the path does not have.
 
     Examples:
-        add_v2=True:  templates/help/foo.html → templates/v2_help/foo.html
-        add_v2=False: templates/v2_help/foo.html → templates/help/foo.html
+        prefix="v2_", add=True:   templates/help/foo.html → templates/v2_help/foo.html
+        prefix="wip_", add=False: templates/wip_help/foo.html → templates/help/foo.html
     """
     p = Path(path)
     parts = list(p.parts)
@@ -1039,13 +1112,21 @@ def _swap_template_prefix(path: str, *, add_v2: bool) -> str | None:
     if idx + 1 >= len(parts):
         return None
     subdir = parts[idx + 1]
-    if add_v2:
-        parts[idx + 1] = f"v2_{subdir}"
+    if add:
+        parts[idx + 1] = f"{prefix}{subdir}"
     else:
-        if not subdir.startswith("v2_"):
+        if not subdir.startswith(prefix):
             return None
-        parts[idx + 1] = subdir.removeprefix("v2_")
+        parts[idx + 1] = subdir.removeprefix(prefix)
     return str(Path(*parts))
+
+
+def _legacy_counterpart(path: str) -> str | None:
+    """Return the legacy path a v2_ or wip_ template replaces, None otherwise."""
+    for prefix in REDESIGN_PREFIXES:
+        if legacy := _swap_template_prefix(path, prefix, add=False):
+            return legacy
+    return None
 
 
 # ---------------------------------------------------------------------------
@@ -1120,10 +1201,10 @@ def format_summary_markdown(findings: list[Finding]) -> str:
             "Links in redesign templates need Tailwind styling classes. Common fixes:"
         )
         lines.append(
-            '- Add classes directly: `<a class="text-primary-600 hover:underline" ...>`'
+            '- Add classes directly: `<a class="links" ...>`, or `links-external` for external links'
         )
         lines.append(
-            '- Style from a parent using [descendant selectors](https://tailwindcss.com/docs/hover-focus-and-other-states#styling-based-on-descendants): `<div class="[&_a]:text-primary-600 [&_a]:hover:underline">`'
+            '- Style from a parent using [descendant selectors](https://tailwindcss.com/docs/hover-focus-and-other-states#styling-based-on-descendants): `<div class="[&_a]:links">`'
         )
         lines.append("")
 
@@ -1195,6 +1276,10 @@ def main() -> int:
         # A rename also removes its old path; a copy leaves it untouched.
         if status.startswith("R") and len(parts) == 3:
             diff_paths.append(parts[1])
+            # Report the old path as deleted, so moving a legacy template
+            # to wip_ or v2_ gets the same checks as deleting it.
+            file_statuses[parts[1]] = "D"
+            changed_files.append(parts[1])
 
     # Filter to relevant files
     relevant = [
