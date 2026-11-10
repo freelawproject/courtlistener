@@ -59,8 +59,10 @@ from cl.corpus_importer.state.merger import (
     Params,
     RelatedParams,
     Scrape,
+    WithStrategy,
 )
 from cl.corpus_importer.state.merger.specifications import AttributeMerger
+from cl.corpus_importer.state.merger.strategy import overwrite_if_present
 from cl.corpus_importer.state.utils import MergeResult
 from cl.people_db.models import Attorney, Party, PartyType, Role
 from cl.recap.mergers import find_docket_object_query
@@ -343,8 +345,11 @@ class FloridaDocketEntryMerger(
     )
     # Keep a party we resolved on an earlier scrape rather than clearing it
     # when this scrape can't find a match.
-    submitted_by_id: int | None = Fn(_submitted_by_id)(
-        Scrape(ScrapeFloridaDocketEntry), Ancestor(Docket)
+    submitted_by_id: int | None = WithStrategy(
+        Fn(_submitted_by_id)(
+            Scrape(ScrapeFloridaDocketEntry), Ancestor(Docket)
+        ),
+        overwrite_if_present,
     )
     docket_entry_uuid: UUID = Scrape(
         ScrapeFloridaDocketEntry

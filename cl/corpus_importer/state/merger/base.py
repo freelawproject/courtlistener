@@ -241,15 +241,6 @@ class Merger[Scrape, Params, M: Model](MergerState.Machine[Scrape, Params, M]):
                 )
             )
 
-    @classmethod
-    def uses_natural_key(cls) -> bool:
-        """Check if the implementor has overridden the lookup.
-
-        This is useful because natural keys allow us to use some nice
-        optimizations when merging N-to-many relations.
-        """
-        return cls.lookup == Merger.lookup and cls.resolve == Merger.resolve
-
     @overload
     @classmethod
     def init_many(
@@ -301,7 +292,7 @@ class Merger[Scrape, Params, M: Model](MergerState.Machine[Scrape, Params, M]):
                 cls(scrape, params=params, manager=manager)
                 for scrape in cast(Sequence[Scrape], scrapes)
             ]
-        if not cls.uses_natural_key():
+        if cls.lookup != Merger.lookup:
             return result, mergers
 
         model_name = cls.config.model.__name__
@@ -337,31 +328,17 @@ class Merger[Scrape, Params, M: Model](MergerState.Machine[Scrape, Params, M]):
             (merger._key_query(state) for merger, state in pending.values()),
         )
         relation_names = next(iter(pending.values()))[1].relation_params
+        candidates: dict[int, list[M]] = {}
         for obj in query.iterator():
             k = cls._hash_natural_key_model(obj, relation_names)
-            if k not in pending:
-                continue
-            merger, state = pending[k]
-            match merger.state:
-                case MergerState.Lookup():
-                    merger.state = state.update(obj)
-                    continue
-                case MergerState.Update() as matched:
-                    merger.state = matched.failed(
-                        "Found multiple matching objects for natural key",
-                        MergeResult.failed(model_name),
-                    )
-                case _:
-                    pass
-            logger.error(
-                "Found multiple matching objects for natural key of %s",
-                model_name,
-            )
-            result |= MergeResult.failed(model_name)
+            candidates.setdefault(k, []).append(obj)
 
-        for merger, state in pending.values():
-            if merger.state is state:
+        for k, (merger, state) in pending.items():
+            if k in candidates:
+                merger.state = state.resolve(candidates[k])
+            else:
                 merger.state = state.create()
+
         return result, mergers
 
     def initial_state(

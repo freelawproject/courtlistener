@@ -473,9 +473,6 @@ class InstanceInitBench:
             PartyTypeMerger._hash_natural_key_model, obj, ("docket", "party")
         )
 
-    def bench_uses_natural_key(self, benchmark: BenchmarkFixture):
-        benchmark(DocketMerger.uses_natural_key)
-
 
 class MergeBench:
     """The merge paths that never touch the DB."""
