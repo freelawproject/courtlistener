@@ -631,17 +631,6 @@ def build_sort_results(
         "cluster_id desc": {"cluster_id": {"order": "desc"}},
         "id asc": {"id": {"order": "asc"}},
         "id desc": {"id": {"order": "desc"}},
-        # RECAP documents have an id and SCOTUS ones a uid. A missing uid
-        # sorts as "" because a null sort value doesn't survive the cursor,
-        # and a missing id stays at the same end when the cursor reverses.
-        "id asc,uid asc": {
-            "id": {"order": "asc", "missing": "_first"},
-            "uid": {"order": "asc", "missing": ""},
-        },
-        "id desc,uid desc": {
-            "id": {"order": "desc", "missing": "_last"},
-            "uid": {"order": "desc", "missing": ""},
-        },
         "dob desc,name_reverse asc": {
             "dob": {"order": "desc"},
             "name_reverse": {"order": "asc"},

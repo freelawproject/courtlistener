@@ -7482,7 +7482,7 @@ class SCOTUSRECAPSearchTest(
     AuthenticatedClientMixin, ESIndexTestCase, TestCase
 ):
     """Confirm RECAP search shows SCOTUS content only behind its flag, and
-    that pagination and counts handle SCOTUS documents, which have a uid
+    that the search page's counts include SCOTUS documents, which have a uid
     instead of an id.
     """
 
@@ -7509,43 +7509,15 @@ class SCOTUSRECAPSearchTest(
             # Every docket and document URL of a docket starts with this.
             cls.scotus_docket_path = f"/docket/{scotus_entry.docket_id}/"
             cls.recap_docket_path = f"/docket/{recap_entry.docket_id}/"
-            # Same description everywhere, so every document ties on score.
-            cls.scotus_urls = [
+            # Several SCOTUS documents, so the counts tests can tell them
+            # apart from a docket count.
+            for n in range(1, 6):
                 SCOTUSDocumentFactory(
                     docket_entry=scotus_entry,
                     attachment_number=n,
                     description="Tied",
-                ).get_absolute_url()
-                for n in range(1, 6)
-            ]
-            cls.recap_urls = [
-                RECAPDocumentFactory(
-                    docket_entry=recap_entry,
-                    document_type=RECAPDocument.ATTACHMENT,
-                    attachment_number=n,
-                    description="Tied",
-                ).get_absolute_url()
-                for n in range(1, 6)
-            ]
-
-    def _walk_rd_cursor(self, court: str) -> tuple[list[str], list[str]]:
-        """Return the document URLs of every type=rd page, going forward
-        through "next" and then back through "previous"."""
-        r = self.client.get(
-            reverse("search-list", kwargs={"version": "v4"}),
-            {"type": SEARCH_TYPES.RECAP_DOCUMENT, "q": "Tied", "court": court},
-        )
-        forward = [result["absolute_url"] for result in r.data["results"]]
-        while r.data["next"]:
-            r = self.client.get(r.data["next"])
-            forward += [result["absolute_url"] for result in r.data["results"]]
-        backward = [result["absolute_url"] for result in r.data["results"]]
-        while r.data["previous"]:
-            r = self.client.get(r.data["previous"])
-            backward += [
-                result["absolute_url"] for result in r.data["results"]
-            ]
-        return forward, backward
+                )
+            RECAPDocumentFactory(docket_entry=recap_entry, description="Tied")
 
     def test_search_frontend_shows_scotus_only_with_the_flag(self) -> None:
         """Until launch, the search page and the RSS search feed show
@@ -7727,26 +7699,14 @@ class SCOTUSRECAPSearchTest(
                     not first_flag,
                 )
 
-    @override_settings(SEARCH_API_PAGE_SIZE=2)
-    def test_rd_api_cursor_reaches_every_document(self) -> None:
-        """The type=rd cursor returns every document once, forward and back."""
-        cases = [
-            ("ca1", self.recap_urls),
-            ("scotus", self.scotus_urls),
-            ("ca1 scotus", self.recap_urls + self.scotus_urls),
-        ]
-        for court, expected in cases:
-            with self.subTest(court=court):
-                forward, backward = self._walk_rd_cursor(court)
-
-                self.assertCountEqual(forward, expected)
-                self.assertCountEqual(backward, expected)
-
     @override_settings(ELASTICSEARCH_MAX_RESULT_COUNT=1)
-    def test_document_counts_include_scotus(self) -> None:
-        """The document counts of the search page and the API count SCOTUS
-        documents. ELASTICSEARCH_MAX_RESULT_COUNT=1 makes the type=rd API
-        use its approximate count."""
+    def test_document_counts_include_scotus_only_on_the_search_page(
+        self,
+    ) -> None:
+        """The search page's document count includes SCOTUS documents. The
+        API counts leave them out, like the API results, until the API
+        launch. ELASTICSEARCH_MAX_RESULT_COUNT=1 makes the type=rd API use
+        its approximate count."""
         params = {"q": "Tied", "court": "scotus"}
 
         page = self.client.get(
@@ -7763,8 +7723,8 @@ class SCOTUSRECAPSearchTest(
 
         # results_details is [query time, parent count, limit, child count].
         self.assertEqual(page.context["results_details"][3], 5)
-        self.assertEqual(api_r.data["document_count"], 5)
-        self.assertEqual(api_rd.data["count"], 5)
+        self.assertEqual(api_r.data["document_count"], 0)
+        self.assertEqual(api_rd.data["count"], 0)
 
 
 class RECAPFeedTest(RECAPSearchTestCase, ESIndexTestCase, TestCase):

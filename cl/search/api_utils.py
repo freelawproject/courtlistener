@@ -31,11 +31,7 @@ from cl.lib.search_utils import (
     retrieve_cached_search_results,
     store_search_api_query,
 )
-from cl.search.constants import (
-    SEARCH_HL_TAG,
-    cardinality_query_extra_unique_ids,
-    cardinality_query_unique_ids,
-)
+from cl.search.constants import SEARCH_HL_TAG, cardinality_query_unique_ids
 from cl.search.documents import (
     AudioDocument,
     DocketDocument,
@@ -277,9 +273,7 @@ class CursorESList:
         main_count_query = clean_count_query(self.main_query)
         unique_field = cardinality_query_unique_ids[self.clean_data["type"]]
         cardinality_query = build_cardinality_count(
-            main_count_query,
-            unique_field,
-            cardinality_query_extra_unique_ids.get(self.clean_data["type"]),
+            main_count_query, unique_field
         )
 
         # Build a cardinality query to count child documents.
@@ -301,11 +295,7 @@ class CursorESList:
                 self.child_docs_query
             )
             child_cardinality_query = build_cardinality_count(
-                child_count_query,
-                child_unique_field,
-                cardinality_query_extra_unique_ids[
-                    SEARCH_TYPES.RECAP_DOCUMENT
-                ],
+                child_count_query, child_unique_field
             )
 
         error_to_raise = None
@@ -525,13 +515,11 @@ class CursorESList:
         unique_field = cardinality_query_unique_ids[self.clean_data["type"]]
         # Use a document unique field as a unique sorting key for the current
         # search type.
-        unique_order = f"{unique_field} desc"
-        if extra_field := cardinality_query_extra_unique_ids.get(
-            self.clean_data["type"]
-        ):
-            # SCOTUS documents have no id, so their uid breaks the ties.
-            unique_order += f",{extra_field} desc"
-        default_unique_order.update({"order_by": unique_order})
+        default_unique_order.update(
+            {
+                "order_by": f"{unique_field} desc",
+            }
+        )
 
         unique_sorting = build_sort_results(
             default_unique_order, self.reverse, "v4"
