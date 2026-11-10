@@ -11,9 +11,9 @@
   <input type="hidden" name="type" value="r" />
   <input type="hidden" name="q" value="docket_id:{{ docket.pk }}" />
   <label for="{{ input_id }}" class="sr-only">Search this docket</label>
-  <div class="flex">
+  <div class="flex w-full h-full">
     <input
-      class="input-text rounded-r-none flex-1"
+      class="input-text min-h-full rounded-r-none w-full focus-self"
       id="{{ input_id }}"
       data-search-terms
       autocomplete="off"

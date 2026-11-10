@@ -37,7 +37,7 @@ MIME_TYPES = {
 DEFAULT_MIME_TYPE = "application/octet-stream"
 
 
-def lookup_mime_type(file_path):
+def lookup_mime_type(file_path: str) -> str:
     """
     Do a simple dictionary lookup of the mime-type for the given file.
     :param file_path Full or relative path to the given file.

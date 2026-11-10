@@ -1,7 +1,9 @@
+from __future__ import annotations
+
 import time
 
 from django.conf import settings
-from redis import ConnectionError
+from redis import ConnectionError, Redis
 
 from cl.corpus_importer.tasks import probe_or_scrape_iquery_pages
 from cl.corpus_importer.utils import (
@@ -22,7 +24,9 @@ def enqueue_iquery_probe(court_id: str) -> bool:
     return create_redis_semaphore("CACHE", key, ttl=60 * 10)
 
 
-def get_latest_pacer_case_id_for_courts(court_ids: list[str], r) -> dict:
+def get_latest_pacer_case_id_for_courts(
+    court_ids: list[str], r: Redis[str]
+) -> dict[str, int]:
     """Return the latest pacer_case_id for each given court from Redis.
 
     :param court_ids: List of court IDs to fetch the latest pacer_case_id for.
@@ -106,8 +110,17 @@ with ID of 1032, the signal will catch that and create tasks to fill in numbers
                         # No other probing being conducted for the court.
                         # Enqueue it.
                         latest_know_case_id_db = latest_case_ids.get(court_id)
+                        latest_know_case_id_db_str = (
+                            None
+                            if latest_know_case_id_db is None
+                            else str(latest_know_case_id_db)
+                        )
                         probe_or_scrape_iquery_pages.apply_async(
-                            args=(court_id, latest_know_case_id_db, testing),
+                            args=(
+                                court_id,
+                                latest_know_case_id_db_str,
+                                testing,
+                            ),
                             queue=settings.CELERY_IQUERY_QUEUE,
                         )
                         logger.info(

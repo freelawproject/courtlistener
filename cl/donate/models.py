@@ -1,9 +1,13 @@
+from datetime import date, timedelta
+from typing import Self
+
 import pghistory
 from django.conf import settings
 from django.contrib.auth.models import User
 from django.core.serializers.json import DjangoJSONEncoder
 from django.core.validators import MinValueValidator
 from django.db import models
+from django.db.models import Q
 from django.utils import timezone
 
 from cl.lib.model_helpers import invert_choices_group_lookup
@@ -303,6 +307,48 @@ class NeonMembershipLevel:
     TYPES_INVERTED = invert_choices_group_lookup(TYPES)
 
 
+class NeonMembershipQuerySet(models.QuerySet["NeonMembership"]):
+    """QuerySet for NeonMembership that owns the shared "active" rule."""
+
+    def active(self) -> Self:
+        """Memberships that currently grant benefits, grace period included.
+
+        Same rule as ``NeonMembership.is_active``: the payment status grants
+        benefits and the termination date, taken in the current time zone,
+        is on or after ``NeonMembership.benefits_cutoff_date()``. Use this
+        instead of filtering on termination_date so ORM callers and Python
+        callers can never disagree about who is a member.
+        """
+        # The ``__date`` lookup extracts the date in the current time zone,
+        # matching ``timezone.localdate`` in ``is_active``.
+        return self.filter(
+            payment_status__in=NeonMembership.ACTIVE_PAYMENT_STATUSES
+        ).filter(
+            Q(termination_date__isnull=True)
+            | Q(
+                termination_date__date__gte=(
+                    NeonMembership.benefits_cutoff_date()
+                )
+            )
+        )
+
+
+class NeonMembershipManager(models.Manager["NeonMembership"]):
+    """Manager that exposes NeonMembershipQuerySet.active() on ``objects``.
+
+    Written out instead of using ``QuerySet.as_manager()`` because the type
+    checker can't see custom queryset methods behind that shortcut.
+    """
+
+    def get_queryset(self) -> NeonMembershipQuerySet:
+        """Return a NeonMembershipQuerySet so its methods chain off ``objects``."""
+        return NeonMembershipQuerySet(self.model, using=self._db)
+
+    def active(self) -> NeonMembershipQuerySet:
+        """See ``NeonMembershipQuerySet.active``."""
+        return self.get_queryset().active()
+
+
 @pghistory.track()
 class NeonMembership(AbstractDateTimeModel):
     user = models.OneToOneField(
@@ -330,6 +376,8 @@ class NeonMembership(AbstractDateTimeModel):
         default=MembershipPaymentStatus.PENDING,
     )
 
+    objects = NeonMembershipManager()
+
     # Payment statuses that grant membership benefits. PENDING ("waiting for
     # payment") is included so members keep access while a charge is still
     # processing; only an outright FAILED/declined payment revokes benefits.
@@ -340,12 +388,35 @@ class NeonMembership(AbstractDateTimeModel):
         }
     )
 
+    @classmethod
+    def benefits_cutoff_date(cls) -> date:
+        """Earliest termination date that still grants benefits today.
+
+        Today's date in the current time zone minus the grace period
+        (NEON_MEMBERSHIP_GRACE_PERIOD_DAYS), which keeps benefits going while
+        a late renewal webhook or the daily Neon sync catches up. Shared by
+        ``is_active`` and ``NeonMembershipQuerySet.active`` so the Python and
+        SQL checks can't drift apart. Dates are compared as calendar days in
+        the current time zone, so DST changes don't shorten the grace period.
+        """
+        grace = timedelta(days=settings.NEON_MEMBERSHIP_GRACE_PERIOD_DAYS)
+        return timezone.localdate() - grace
+
     @property
     def is_active(self) -> bool:
+        """Whether the membership currently grants benefits.
+
+        Requires a payment status in ACTIVE_PAYMENT_STATUSES and a termination
+        date on or after ``benefits_cutoff_date()``, or no termination date at
+        all. ``NeonMembershipQuerySet.active`` applies the same rule in SQL.
+        """
         if self.payment_status not in self.ACTIVE_PAYMENT_STATUSES:
             return False
 
         if not self.termination_date:
             return True
 
-        return self.termination_date.date() >= timezone.now().date()
+        return (
+            timezone.localdate(self.termination_date)
+            >= self.benefits_cutoff_date()
+        )

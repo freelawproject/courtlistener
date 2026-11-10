@@ -409,7 +409,7 @@ def import_anon_2020_db(
 
         if cluster_id is not None:
             # Matching citations. Merge.
-            docket = merge_or_add_opinions(
+            merge_or_add_opinions(
                 cluster_id,
                 html_str,
                 data,
@@ -422,7 +422,7 @@ def import_anon_2020_db(
             )
         else:
             # No matching citations. Create new records.
-            docket = add_new_records(
+            add_new_records(
                 html_str,
                 data,
                 date_argued,

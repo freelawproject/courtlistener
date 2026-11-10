@@ -129,10 +129,10 @@ class Command(VerboseCommand):
         self.throttle = None
         self.testing_mode = None
         self.queue = None
-        self.chunk_size = None
+        self.chunk_size: int = 100
         self.interval = None
         self.ids = None
-        self.docket_batch_size = None
+        self.docket_batch_size: int = 2_000
 
     def add_arguments(self, parser):
         parser.add_argument(
@@ -288,7 +288,7 @@ class Command(VerboseCommand):
 
         return all_affected_rds
 
-    def handle(self, *args, **options):
+    def handle(self, *args, docket_batch_size: int, **options):
         super().handle(*args, **options)
         self.options = options
         self.queue = self.options["queue"]
@@ -297,7 +297,7 @@ class Command(VerboseCommand):
         self.throttle = CeleryThrottle(queue_name=self.queue)
         self.interval = self.options["interval"]
         self.ids = options.get("ids")
-        self.docket_batch_size = options.get("docket_batch_size")
+        self.docket_batch_size = docket_batch_size
         auto_resume = options["auto_resume"]
         if auto_resume:
             self.pk_offset = get_last_parent_document_id_processed(

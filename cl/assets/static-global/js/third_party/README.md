@@ -19,3 +19,16 @@ Current version: **2.0.11**
 | `htmx.min.js` | https://cdn.jsdelivr.net/npm/htmx.org@2.0.11/dist/htmx.min.js |
 
 Legacy templates run htmx 1.7.0 from `/js/` and are not to be upgraded; that copy retires with legacy.
+
+## flatpickr
+
+Current version: **4.6.13**
+
+| File | CDN URL |
+|------|---------|
+| `flatpickr/flatpickr.js` | https://cdn.jsdelivr.net/npm/flatpickr@4.6.13/dist/flatpickr.js |
+| `flatpickr/flatpickr.min.js` | https://cdn.jsdelivr.net/npm/flatpickr@4.6.13/dist/flatpickr.min.js |
+| `flatpickr/plugins/confirmDate.js` | https://cdn.jsdelivr.net/npm/flatpickr@4.6.13/dist/plugins/confirmDate/confirmDate.js |
+| `flatpickr/plugins/confirmDate.min.js` | https://cdn.jsdelivr.net/npm/flatpickr@4.6.13/dist/plugins/confirmDate/confirmDate.min.js |
+
+The unminified files in this repo have been reformatted by Prettier; the code is unchanged.

@@ -10,10 +10,13 @@ from django.db import models
 from django.forms import ModelForm
 
 from cl.favorites.models import Note
-from cl.favorites.utils import get_note_for_target, resolve_legacy_object
+from cl.favorites.utils import get_note_for_target
 
 
 class NoteForm(ModelForm):
+    """Create/edit form for a user's Note; content_type/object_id are
+    hidden inputs."""
+
     class Meta:
         model = Note
         exclude = ("user",)
@@ -43,22 +46,6 @@ class NoteForm(ModelForm):
                 }
             ),
         }
-
-    def __init__(self, *args: Any, **kwargs: Any) -> None:
-        """Prefill a legacy-shaped instance's hidden fields (#7725): read
-        content_type/object_id from whichever legacy FK is set, so the
-        form renders in the new shape.
-        """
-        super().__init__(*args, **kwargs)
-        instance = kwargs.get("instance")
-        if not instance or not instance.pk or instance.content_type_id:
-            return
-
-        resolved = resolve_legacy_object(instance)
-        if resolved:
-            content_type, object_id = resolved
-            self.initial["content_type"] = content_type.pk
-            self.initial["object_id"] = object_id
 
     def clean(self) -> dict[str, Any]:
         """Confirm content_type/object_id resolve to a real row."""

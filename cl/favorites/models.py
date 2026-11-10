@@ -6,13 +6,14 @@ from django.core.validators import MaxLengthValidator
 from django.db import models
 from django.utils import timezone
 
-from cl.audio.models import Audio
 from cl.lib.models import AbstractDateTimeModel
-from cl.search.models import Docket, OpinionCluster, RECAPDocument
+from cl.search.models import Docket, RECAPDocument
 
 
 @pghistory.track()
 class Note(models.Model):
+    """A user's private note on a noteable object."""
+
     date_created = models.DateTimeField(
         help_text="The original creation date for the item",
         auto_now_add=True,
@@ -27,15 +28,10 @@ class Note(models.Model):
         related_name="notes",
         on_delete=models.CASCADE,
     )
-    # Generic replacement for the 4 legacy per-type FKs below, kept
-    # alongside them for now -- lets a Note attach to any model without a
-    # new FK column per type.
     content_type = models.ForeignKey(
         ContentType,
         verbose_name="the content type of the item saved",
         on_delete=models.CASCADE,
-        null=True,
-        blank=True,
         db_index=False,
         # cl.lib.models.Note (an unrelated model) also has an unnamed
         # content_type FK; without "+" the reverse accessors would collide.
@@ -43,38 +39,8 @@ class Note(models.Model):
     )
     object_id = models.PositiveIntegerField(
         verbose_name="the ID of the item saved",
-        null=True,
-        blank=True,
     )
     content_object = GenericForeignKey("content_type", "object_id")
-    cluster_id = models.ForeignKey(
-        OpinionCluster,
-        verbose_name="the opinion cluster that is saved",
-        on_delete=models.CASCADE,
-        null=True,
-        blank=True,
-    )
-    audio_id = models.ForeignKey(
-        Audio,
-        verbose_name="the audio file that is saved",
-        on_delete=models.CASCADE,
-        null=True,
-        blank=True,
-    )
-    docket_id = models.ForeignKey(
-        Docket,
-        verbose_name="the docket that is saved",
-        on_delete=models.CASCADE,
-        null=True,
-        blank=True,
-    )
-    recap_doc_id = models.ForeignKey(
-        RECAPDocument,
-        verbose_name="the RECAP document that is saved",
-        on_delete=models.CASCADE,
-        null=True,
-        blank=True,
-    )
     name = models.CharField("a name for the alert", max_length=100)
     notes = models.TextField(
         "notes about the item saved",
@@ -84,21 +50,9 @@ class Note(models.Model):
     )
 
     class Meta:
-        unique_together = (
-            ("cluster_id", "user"),
-            ("audio_id", "user"),
-            ("docket_id", "user"),
-            ("recap_doc_id", "user"),
-        )
         constraints = [
-            # GenericForeignKey equivalent of the unique_together pairs
-            # above. Partial (content_type__isnull=False) because an
-            # unconditional constraint wouldn't actually block duplicate
-            # not-yet-migrated legacy rows anyway, so scoping it out avoids
-            # validating against them for nothing.
             models.UniqueConstraint(
                 fields=["content_type", "object_id", "user"],
-                condition=models.Q(content_type__isnull=False),
                 name="unique_note_per_user_per_object",
             ),
         ]

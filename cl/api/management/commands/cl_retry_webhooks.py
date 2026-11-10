@@ -33,7 +33,7 @@ def retry_webhook_events() -> int:
         )
         # Mark as failed webhook events older than HOURS_WEBHOOKS_CUT_OFF hours
         # avoid retrying.
-        failed_webhook_events = base_events.filter(
+        base_events.filter(
             event_status__in=[
                 WEBHOOK_EVENT_STATUS.ENQUEUED_RETRY,
                 WEBHOOK_EVENT_STATUS.ENDPOINT_DISABLED,
@@ -43,7 +43,7 @@ def retry_webhook_events() -> int:
 
         # Restore retry counter to 0 for ENDPOINT_DISABLED events after
         # webhook is re-enabled.
-        webhook_events_to_restart = base_events.filter(
+        base_events.filter(
             event_status=WEBHOOK_EVENT_STATUS.ENDPOINT_DISABLED,
             date_created__gte=created_date_cut_off,
         ).update(retry_counter=0, date_modified=now())

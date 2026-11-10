@@ -914,7 +914,9 @@ class ViewAudioFileNoteTest(TestCase):
         )
 
     async def test_docket_not_fetched_when_note_already_exists(self) -> None:
-        await sync_to_async(NoteFactory.for_object)(self.audio, user=self.user)
+        await sync_to_async(NoteFactory)(
+            content_object=self.audio, user=self.user
+        )
         await self.async_client.aforce_login(self.user)
 
         with mock.patch(

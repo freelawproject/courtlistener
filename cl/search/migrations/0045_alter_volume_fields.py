@@ -22,9 +22,9 @@ BEGIN
         UPDATE search_citation
         SET volume_new = volume::text
         WHERE id >= current_id AND id < current_id + batch_size;
-        
+
         RAISE NOTICE 'Updated rows with id % to %', current_id, current_id + batch_size - 1;
-        
+
         current_id := current_id + batch_size;
     END LOOP;
 END

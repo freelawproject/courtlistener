@@ -355,7 +355,7 @@ def add_bank_cases_to_cl(options: OptionsType, r) -> None:
                     continue
 
                 make_docket_by_iquery.apply_async(
-                    args=(court_id, pacer_case_id),
+                    args=(court_id, str(pacer_case_id)),
                     kwargs={"log_results_redis": True},
                     queue=q,
                 )

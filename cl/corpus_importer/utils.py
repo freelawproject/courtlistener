@@ -5,8 +5,7 @@ import math
 import random
 import re
 from collections import defaultdict
-from collections.abc import Generator, Iterator, Mapping, Sequence
-from dataclasses import dataclass
+from collections.abc import Callable, Generator, Iterator, Mapping, Sequence
 from datetime import date
 from difflib import SequenceMatcher
 from typing import TYPE_CHECKING, Any, cast
@@ -16,6 +15,7 @@ from asgiref.sync import async_to_sync
 from bs4 import BeautifulSoup
 from courts_db import find_court
 from django.conf import settings
+from django.db import transaction
 from django.db.models import QuerySet
 from django.db.utils import IntegrityError
 from django.utils.timezone import now
@@ -784,8 +784,11 @@ def add_citations_to_cluster(
                 )
                 continue
             try:
-                # We don't have the citation or any citation from the reporter
-                Citation.objects.create(**citation_params)
+                # We don't have the citation or any citation from the reporter.
+                # The savepoint keeps a caught IntegrityError from aborting an
+                # outer transaction.
+                with transaction.atomic():
+                    Citation.objects.create(**citation_params)
                 logger.info(
                     f"New citation: {cite} added to cluster id: {cluster_id}"
                 )
@@ -839,6 +842,8 @@ def get_opinion_text(cluster: OpinionCluster) -> str:
             opinions.append(op.html)
         elif len(op.xml_harvard) > 1:
             opinions.append(op.xml_harvard)
+        elif len(op.xml_scan) > 1:
+            opinions.append(op.xml_scan)
     op = " ".join(opinions)
     soup = BeautifulSoup(op, features="html.parser")
     return soup.getText(separator=" ", strip=True)
@@ -885,8 +890,10 @@ def winnow_case_name(case_name: str) -> set:
     # "R. L. C. R. v. L. Z. S." -> "RLCR v. LZS"
     # "J. B. v. C. E." -> "JB v. CE"
     # "County v. A. D. B. County" -> "County v. ADB County"
+    # Only runs of single letters are joined, so names printed in capitals
+    # like "JAMES SMITH v. THE STATE" keep their words
     case_name = re.sub(
-        r"\b[A-Z][A-Z\.\s]*[A-Z]\b\.?",
+        r"\b[A-Z]\b(?:\.?\s*\b[A-Z]\b)+\.?",
         lambda m: m.group().replace(".", "").replace(" ", ""),
         case_name,
     )
@@ -1061,7 +1068,10 @@ def cosine_similarity_too_different(
 
     similarities = []
     for title in [case_name_full, case_name_abbreviation]:
-        similarity = get_cosine_similarity(title, case.case_name)
+        # Lowercased: scrapers can store names in capitals
+        similarity = get_cosine_similarity(
+            title.lower(), case.case_name.lower()
+        )
         similarities.append(similarity)
     max_similarity = max(similarities)
 
@@ -1101,21 +1111,23 @@ def match_based_text(
     file_characters: str,
     docket_number: str,
     case_name_full: str,
-    possible_cases: QuerySet,
+    possible_clusters: QuerySet[OpinionCluster],
     case_name_abbreviation: str,
     citation: FullCaseCitation,
 ) -> OpinionCluster | None:
     """Compare CL text to file content to establish duplicates
 
     :param file_characters: stripped characters to compare from file/source
-    :param possible_cases: List of opinions to check against
+    :param possible_clusters: Candidate clusters to compare against; the
+        first one that passes every check is returned
     :param docket_number: The docket number
     :param case_name_full: The full case name
     :param case_name_abbreviation: The case name abbreviation
     :param citation: The citation obtained from file/source to compare
     :return: OpinionCluster or None
     """
-    for case in possible_cases:
+    # The docket is read by the content check and by callers of the match
+    for case in possible_clusters.select_related("docket"):
         cl_case_body = get_opinion_text(case)
         cl_characters = clean_body_content(cl_case_body)
 
@@ -1123,16 +1135,41 @@ def match_based_text(
             logger.warning(f"Empty opinion in cluster id: {case.id}")
             continue
 
-        case_and_texts = [case, file_characters, cl_characters]
-        case_and_texts_and_docket = case_and_texts + [docket_number]
-        case_and_titles = [case, case_name_full, case_name_abbreviation]
-        if (
-            length_too_different(*case_and_texts)
-            or has_too_similar_citation(case, citation)
-            or case_names_dont_overlap(*case_and_titles)
-            or cosine_similarity_too_different(*case_and_titles)
-            or content_too_different(*case_and_texts_and_docket)
-        ):
+        # Checked in this order, cheapest first, until one fails
+        checks: list[tuple[str, Callable[[], bool]]] = [
+            (
+                "text length",
+                lambda: length_too_different(
+                    case, file_characters, cl_characters
+                ),
+            ),
+            ("citation", lambda: has_too_similar_citation(case, citation)),
+            (
+                "case name overlap",
+                lambda: case_names_dont_overlap(
+                    case, case_name_full, case_name_abbreviation
+                ),
+            ),
+            (
+                "case name similarity",
+                lambda: cosine_similarity_too_different(
+                    case, case_name_full, case_name_abbreviation
+                ),
+            ),
+            (
+                "content",
+                lambda: content_too_different(
+                    case, file_characters, cl_characters, docket_number
+                ),
+            ),
+        ]
+        if failed := next((name for name, check in checks if check()), None):
+            # Helps tune the matching, so duplicates aren't created
+            logger.debug(
+                "Cluster %s is not a match: the %s check failed",
+                case.id,
+                failed,
+            )
             continue
         return case
     return None
@@ -1362,14 +1399,6 @@ def create_docket_entry_sequence_numbers(
         date_counts[entry_date] = i + 1
 
     return sequence_numbers
-
-
-@dataclass
-class DownloadPDFResult:
-    """Result of a PDF download operation."""
-
-    success: bool
-    sha1: str | None = None
 
 
 def texas_js_court_id_to_court_id(js_court_id: str) -> str | None:

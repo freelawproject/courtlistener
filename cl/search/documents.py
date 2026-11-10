@@ -1,7 +1,7 @@
 from collections.abc import Callable
 from datetime import datetime
 from functools import partial
-from typing import Any
+from typing import Any, TypedDict
 
 from django.conf import settings
 from django.http import QueryDict
@@ -50,6 +50,7 @@ from cl.search.constants import (
     SEARCH_RECAP_HL_FIELDS,
     o_type_index_map,
 )
+from cl.search.es_docket_sources import SOURCE_BY_MODEL, SourceDocument
 from cl.search.es_indices import (
     opinion_index,
     oral_arguments_index,
@@ -68,6 +69,7 @@ from cl.search.models import (
     OpinionCluster,
     ParentheticalGroup,
     RECAPDocument,
+    SCOTUSDocument,
 )
 
 
@@ -532,6 +534,12 @@ class ES_CHILD_ID:
     @property
     def RECAP(self) -> str:
         return f"rd_{self.instance_id}"
+
+    @property
+    def SCOTUS(self) -> str:
+        # Own prefix because SCOTUSDocument's pk sequence is independent
+        # from RECAPDocument's -- sharing one could collide on the same _id.
+        return f"scotusd_{self.instance_id}"
 
     @property
     def OPINION(self) -> str:
@@ -1179,6 +1187,7 @@ class RECAPBaseDocument(Document):
     )
     date_created = fields.DateField(attr="date_created")
     pacer_case_id = fields.KeywordField(attr="pacer_case_id")
+    capital_case = fields.BooleanField()
 
     class Django:
         model = Docket
@@ -1189,8 +1198,13 @@ class RECAPBaseDocument(Document):
 
 
 class ESRECAPBaseDocument(DSLDocument):
-    id = fields.IntegerField(attr="pk")
-    docket_entry_id = fields.IntegerField(attr="docket_entry.pk")
+    # id and docket_entry_id hold RECAP pks only. Other sources' pks would
+    # collide with them, so those documents use uid and docket_entry_uid,
+    # prefixed with their ESDocketSource.uid_namespace (e.g. "scotus_123").
+    id = fields.IntegerField()
+    docket_entry_id = fields.IntegerField()
+    uid = fields.KeywordField()
+    docket_entry_uid = fields.KeywordField()
     description = fields.TextField(
         attr="docket_entry.description",
         analyzer="text_en_splitting_cl",
@@ -1334,7 +1348,10 @@ class ESRECAPDocument(
         return instance.document_number or None
 
     def prepare_document_type(self, instance):
-        return instance.get_document_type_display()
+        # SCOTUS documents have no document_type attribute, so no
+        # get_document_type_display() either.
+        get_display = getattr(instance, "get_document_type_display", None)
+        return get_display() if get_display else None
 
     def prepare_filepath_local(self, instance):
         if instance.filepath_local:
@@ -1423,14 +1440,58 @@ class ESRECAPDocument(
         return escape(instance.plain_text.translate(null_map))
 
     def prepare_cites(self, instance):
+        # SCOTUSDocument has no cited_opinions relation yet -- citation
+        # matching isn't built for SCOTUS content yet, but is planned.
+        cited_opinions = getattr(instance, "cited_opinions", None)
+        if cited_opinions is None:
+            return []
         return list(
-            instance.cited_opinions.all().values_list(
-                "cited_opinion_id", flat=True
-            )
+            cited_opinions.all().values_list("cited_opinion_id", flat=True)
         )
 
     def prepare_pacer_case_id(self, instance):
         return instance.docket_entry.docket.pacer_case_id
+
+    def prepare_capital_case(self, instance: SourceDocument) -> bool | None:
+        """Return the SCOTUS docket's capital_case flag; empty for other
+        sources."""
+        if not isinstance(instance, SCOTUSDocument):
+            return None
+        scotus_metadata = getattr(
+            instance.docket_entry.docket, "scotus_metadata", None
+        )
+        return scotus_metadata.capital_case if scotus_metadata else None
+
+    def prepare_id(self, instance: SourceDocument) -> int | None:
+        """Return the RECAPDocument pk; empty for other sources (see
+        prepare_uid)."""
+        if not isinstance(instance, RECAPDocument):
+            return None
+        return instance.pk
+
+    def prepare_docket_entry_id(self, instance: SourceDocument) -> int | None:
+        """Return the DocketEntry pk; empty for other sources (see
+        prepare_docket_entry_uid)."""
+        if not isinstance(instance, RECAPDocument):
+            return None
+        return instance.docket_entry_id
+
+    def prepare_uid(self, instance: SourceDocument) -> str | None:
+        """Return the pk prefixed with the source's uid_namespace, e.g.
+        "scotus_123"; empty for sources without one, like RECAP."""
+        source = SOURCE_BY_MODEL.get(type(instance))
+        if not source or not source.uid_namespace:
+            return None
+        return f"{source.uid_namespace}_{instance.pk}"
+
+    def prepare_docket_entry_uid(self, instance: SourceDocument) -> str | None:
+        """Return the docket entry pk prefixed with the source's
+        uid_namespace, e.g. "scotus_321"; empty for sources without one,
+        like RECAP."""
+        source = SOURCE_BY_MODEL.get(type(instance))
+        if not source or not source.uid_namespace:
+            return None
+        return f"{source.uid_namespace}_{instance.docket_entry_id}"
 
 
 class DocketBaseDocument(DSLDocument):
@@ -1481,6 +1542,15 @@ class DocketBaseDocument(DSLDocument):
             multi=True,
         )
     )
+
+
+class _DocketDocumentPartyDict(TypedDict):
+    party_id: set
+    party: set[str] | list[str]
+    attorney_id: set
+    attorney: set[str]
+    firm_id: set
+    firm: set
 
 
 @recap_index.document
@@ -1562,16 +1632,25 @@ class DocketDocument(
         if BankruptcyInformation.objects.filter(docket=instance).exists():
             return instance.bankruptcy_information.trustee_str
 
+    def prepare_capital_case(self, instance: Docket) -> bool | None:
+        """Return the docket's SCOTUS capital_case flag; empty for dockets
+        without SCOTUS metadata."""
+        if instance.court_id != "scotus":
+            return None
+        scotus_metadata = getattr(instance, "scotus_metadata", None)
+        return scotus_metadata.capital_case if scotus_metadata else None
+
     def prepare_docket_child(self, instance):
         return "docket"
 
     def prepare_docket_absolute_url(self, instance):
         return instance.get_absolute_url()
 
-    def prepare_parties(self, instance):
-        out = {
+    def prepare_parties(self, instance) -> _DocketDocumentPartyDict:
+        parties = set()
+        out: _DocketDocumentPartyDict = {
             "party_id": set(),
-            "party": set(),
+            "party": parties,
             "attorney_id": set(),
             "attorney": set(),
             "firm_id": set(),
@@ -1582,7 +1661,7 @@ class DocketDocument(
         party_values = instance.parties.values_list("pk", "name")
         for pk, name in party_values.iterator():
             out["party_id"].add(pk)
-            out["party"].add(name)
+            parties.add(name)
 
         if not out["party"]:
             # Get party from docket case_name if no normalized parties are
@@ -1592,7 +1671,9 @@ class DocketDocument(
                 if is_bankruptcy_court(instance.court_id)
                 else get_parties_from_case_name(instance.case_name)
             )
-            out["party"] = party_from_case_name if party_from_case_name else []
+            out["party"] = (
+                party_from_case_name if party_from_case_name else list[str]()
+            )
 
         # Extract only required attorney values.
         atty_values = (
@@ -1635,7 +1716,7 @@ class DocketDocumentPlain(DocketDocument):
     control whether to include parties based on
     the MAX_ATTORNEYS_TO_PERCOLATE setting."""
 
-    def prepare_parties(self, instance: Docket) -> dict[str, set]:
+    def prepare_parties(self, instance: Docket) -> _DocketDocumentPartyDict:
         out = {
             "party_id": set(),
             "party": set(),
@@ -2100,6 +2181,10 @@ class OpinionDocument(CSVSerializableDocumentMixin, OpinionBaseDocument):
             return html_decode(
                 strip_tags(instance.xml_harvard.translate(null_map))
             )
+        elif instance.xml_scan:
+            return html_decode(
+                strip_tags(instance.xml_scan.translate(null_map))
+            )
         elif instance.html_anon_2020:
             return html_decode(
                 strip_tags(instance.html_anon_2020.translate(null_map))
@@ -2306,7 +2391,7 @@ class OpinionClusterDocument(
     def get_csv_transformations(cls) -> dict[str, Callable[..., Any]]:
         list_fields = ["panel_names", "citation"]
         hl_fields = list(SEARCH_OPINION_HL_FIELDS.keys())
-        transformations = {
+        transformations: dict[str, Callable[..., Any]] = {
             key: lambda x: render_string_or_list(x)
             for key in (hl_fields + list_fields)
         }

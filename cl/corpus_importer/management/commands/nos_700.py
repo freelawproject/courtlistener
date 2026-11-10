@@ -214,7 +214,7 @@ def get_cand_full(options):
     get_dockets(options, items, tags)
 
 
-def get_dockets(options, items, tags, sample_size=0):
+def get_dockets(options, items, tags: list[str], sample_size=0):
     """Download dockets from PACER.
 
     :param options: Options provided by argparse

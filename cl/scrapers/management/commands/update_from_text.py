@@ -51,7 +51,7 @@ def rerun_extract_from_text(
     with transaction.atomic():
         try:
             changes = update_document_from_text(opinion, juriscraper_module)
-        except:
+        except Exception:
             # Probably a bad implementation of `extract_from_text`
             logger.debug(
                 "`update_document_from_text` failed for opinion %s. Traceback: %s",

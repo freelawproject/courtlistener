@@ -5244,10 +5244,11 @@ class ThrottleOverrideIntegrationTest(TestCase):
         overrides = get_all_throttle_overrides(ThrottleType.API)
         self.assertNotIn(throttle.user.username, overrides)
 
+    @override_settings(NEON_MEMBERSHIP_GRACE_PERIOD_DAYS=0)
     def test_overrides_drop_membership_when_membership_terminated(
         self,
     ) -> None:
-        """MEMBERSHIP throttles are dropped when termination_date is in the past."""
+        """MEMBERSHIP throttles are dropped once the term ends, with no grace."""
         user = UserFactory()
         APIThrottleFactory(
             user=user,
@@ -5261,6 +5262,28 @@ class ThrottleOverrideIntegrationTest(TestCase):
         )
         overrides = get_all_throttle_overrides(ThrottleType.API)
         self.assertNotIn(user.username, overrides)
+
+    @override_settings(NEON_MEMBERSHIP_GRACE_PERIOD_DAYS=3)
+    def test_overrides_keep_membership_within_grace_period(self) -> None:
+        """MEMBERSHIP throttles survive the grace period after the term ends."""
+        in_grace = UserFactory()
+        past_grace = UserFactory()
+        for user, days_ago in ((in_grace, 2), (past_grace, 4)):
+            APIThrottleFactory(
+                user=user,
+                throttle_type=ThrottleType.API,
+                rate="10/min",
+                source=APIThrottle.Source.MEMBERSHIP,
+            )
+            NeonMembershipFactory(
+                user=user,
+                termination_date=now() - timedelta(days=days_ago),
+            )
+
+        overrides = get_all_throttle_overrides(ThrottleType.API)
+
+        self.assertIn(in_grace.username, overrides)
+        self.assertNotIn(past_grace.username, overrides)
 
     def test_overrides_drop_membership_when_payment_failed(self) -> None:
         """MEMBERSHIP throttles are dropped when payment_status is FAILED."""

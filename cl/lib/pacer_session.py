@@ -7,6 +7,7 @@ from typing import Any
 from asgiref.sync import sync_to_async
 from django.conf import settings
 from httpx import URL, Cookies, Request, Response
+from httpx._types import CookieTypes
 from juriscraper.pacer import PacerSession
 from redis import Redis
 
@@ -79,15 +80,17 @@ class ProxyPacerSession(PacerSession):
 
     def __init__(
         self,
-        cookies=None,
-        username=None,
-        password=None,
-        client_code=None,
-        proxy=None,
-        *args,
-        **kwargs,
-    ):
-        self.proxy_address = proxy if proxy else self._pick_proxy_connection()
+        cookies: CookieTypes | None = None,
+        username: str | None = None,
+        password: str | None = None,
+        client_code: str | None = None,
+        proxy: str | None = None,
+        *args: Any,
+        **kwargs: Any,
+    ) -> None:
+        self.proxy_address: str = (
+            proxy if proxy else self._pick_proxy_connection()
+        )
         super().__init__(
             cookies,
             username,
@@ -213,7 +216,7 @@ async def get_or_cache_pacer_cookies(
 def get_pacer_cookie_from_cache(
     user_pk: str | int,
     r: Redis | None = None,
-):
+) -> SessionData | None:
     """Get the cookie for a user from the cache.
 
     :param user_pk: The ID of the user, can be a string or an ID
@@ -240,7 +243,7 @@ def get_pacer_cookie_from_cache(
 def delete_pacer_cookie_from_cache(
     user_pk: str | int,
     r: Redis | None = None,
-):
+) -> None:
     """Deletes the cookie for a user from the cache.
 
     :param user_pk: The ID of the user, can be a string or an ID

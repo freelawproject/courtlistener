@@ -221,6 +221,8 @@ class SearchAlertSerializer(
                     "gain access to real time alerts, please join Free Law "
                     f"Project as a member: {FLP_MEMBERSHIP_URL}"
                 )
+            case None:
+                pass
 
     def _validate_alert_frequency(self, query):
         """Estimate the alert's frequency and reject overly broad queries.

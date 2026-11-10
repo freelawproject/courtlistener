@@ -5,13 +5,13 @@
 <fieldset x-bind:id="fieldsetId" class="contents" x-show="isActiveScope" x-cloak data-scope="Case Law">
   <legend class="sr-only">Case law filters</legend>
 
-  <c-corpus-search.filters.input :search_form="search_form" field_name="case_name" namespace="opinions" :form_prefix="form_prefix" only/>
+  <c-form.input :form="search_form" field_name="case_name" namespace="opinions" :form_prefix="form_prefix" only/>
 
-  <c-corpus-search.filters.input :search_form="search_form" field_name="docket_number" namespace="opinions" :form_prefix="form_prefix" only/>
+  <c-form.input :form="search_form" field_name="docket_number" namespace="opinions" :form_prefix="form_prefix" only/>
 
-  <c-corpus-search.filters.input :search_form="search_form" field_name="citation" namespace="opinions" :form_prefix="form_prefix" only/>
+  <c-form.input :form="search_form" field_name="citation" namespace="opinions" :form_prefix="form_prefix" only/>
 
-  <c-corpus-search.filters.input :search_form="search_form" field_name="judge" namespace="opinions" :form_prefix="form_prefix" only/>
+  <c-form.input :form="search_form" field_name="judge" namespace="opinions" :form_prefix="form_prefix" only/>
 
   <c-corpus-search.date-selector
     label="Filed After"

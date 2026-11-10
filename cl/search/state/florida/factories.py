@@ -26,7 +26,8 @@ class FloridaDocketEntryFactory(DjangoModelFactory):
     docket_entry_uuid = Faker("uuid4")
 
     @post_generation
-    def submitted_by(obj, create, extracted, **kwargs):
+    # pyrefly:ignore[invalid-annotation] factory_boy passes the model instance
+    def submitted_by(obj: FloridaDocketEntry, create, extracted, **kwargs):
         """Attach a submitting party tied to the entry's docket, since
         PartyFactory's default attorney requires a docket."""
         if not create:

@@ -1,5 +1,5 @@
 from collections import defaultdict
-from datetime import datetime, timedelta
+from datetime import datetime, time, timedelta
 from http import HTTPStatus
 from types import SimpleNamespace
 from typing import TYPE_CHECKING, cast
@@ -28,7 +28,15 @@ if TYPE_CHECKING:
     from django.test.client import _MonkeyPatchedWSGIResponse
 
 from cl.alerts.constants import LEGACY_MEMBERSHIP_HELP_URL
-from cl.alerts.factories import AlertFactory, DocketAlertWithParentsFactory
+from cl.alerts.docket_alert_sources import (
+    RECAP_ALERT_SOURCE,
+    SCOTUS_ALERT_SOURCE,
+)
+from cl.alerts.factories import (
+    AlertFactory,
+    DocketAlertFactory,
+    DocketAlertWithParentsFactory,
+)
 from cl.alerts.forms import CreateAlertForm
 from cl.alerts.management.commands.cl_send_scheduled_alerts import (
     DAYS_TO_DELETE,
@@ -86,8 +94,11 @@ from cl.search.factories import (
     CourtFactory,
     DocketEntryFactory,
     DocketFactory,
+    OpinionClusterFactory,
     OpinionWithParentsFactory,
     RECAPDocumentFactory,
+    SCOTUSDocketEntryFactory,
+    SCOTUSDocumentFactory,
 )
 from cl.search.models import (
     PRECEDENTIAL_STATUS,
@@ -288,8 +299,13 @@ class AlertTest(SimpleUserDataMixin, ESIndexTestCase, TestCase):
         )
         rt_alert_params = self.alert_params.copy()
         rt_alert_params["rate"] = Alert.REAL_TIME
-        with time_machine.travel(
-            self.membership_termination_date + timedelta(days=2), tick=False
+        # Pin the grace period so two days past termination counts as expired.
+        with (
+            override_settings(NEON_MEMBERSHIP_GRACE_PERIOD_DAYS=0),
+            time_machine.travel(
+                self.membership_termination_date + timedelta(days=2),
+                tick=False,
+            ),
         ):
             r = await self.async_client.post(
                 reverse("show_results"), rt_alert_params, follow=True
@@ -947,7 +963,7 @@ class DocketAlertTest(TestCase):
     @classmethod
     def setUpTestData(cls) -> None:
         cls.user = UserFactory()
-        cls.court = CourtFactory(id="scotus", jurisdiction="F")
+        cls.court = CourtFactory()
 
         # Create a DOCKET_ALERT webhook
         cls.webhook = WebhookFactory(
@@ -962,7 +978,7 @@ class DocketAlertTest(TestCase):
         # Create a new docket
         self.docket = Docket.objects.create(
             source=Docket.RECAP,
-            court_id="scotus",
+            court_id=self.court.pk,
             pacer_case_id="asdf",
             docket_number="12-cv-02354",
             docket_number_raw="12-cv-02354",
@@ -1045,6 +1061,220 @@ class DocketAlertTest(TestCase):
         )
 
 
+class DocketAlertSourceTest(TestCase):
+    """Does the per-source alert registry resolve the right
+    queries and templates for RECAP vs. SCOTUS dockets?"""
+
+    @classmethod
+    def setUpTestData(cls) -> None:
+        cls.recap_docket = DocketFactory(court=CourtFactory())
+        cls.recap_de_1 = DocketEntryFactory(docket=cls.recap_docket)
+        cls.recap_de_2 = DocketEntryFactory(docket=cls.recap_docket)
+
+        cls.scotus_court = CourtFactory(id="scotus", jurisdiction="F")
+        cls.scotus_docket = DocketFactory(court=cls.scotus_court)
+        cls.scotus_de_1 = SCOTUSDocketEntryFactory(docket=cls.scotus_docket)
+        cls.scotus_de_2 = SCOTUSDocketEntryFactory(docket=cls.scotus_docket)
+
+    def test_recap_source_entries_by_pk_returns_docket_entries(self) -> None:
+        """Does RECAP_ALERT_SOURCE.entries_by_pk look up DocketEntry rows?"""
+        entries = RECAP_ALERT_SOURCE.entries_by_pk(
+            [self.recap_de_1.pk, self.recap_de_2.pk]
+        )
+        self.assertEqual(
+            set(entries.values_list("pk", flat=True)),
+            {self.recap_de_1.pk, self.recap_de_2.pk},
+        )
+
+    def test_recap_source_entries_since_returns_docket_entries(self) -> None:
+        """Does RECAP_ALERT_SOURCE.entries_since filter by creation time?"""
+        before = now()
+        de_new = DocketEntryFactory(docket=self.recap_docket)
+        entries = RECAP_ALERT_SOURCE.entries_since(self.recap_docket, before)
+        self.assertEqual(
+            set(entries.values_list("pk", flat=True)), {de_new.pk}
+        )
+
+    def test_scotus_source_entries_by_pk_returns_scotus_docket_entries(
+        self,
+    ) -> None:
+        """Does SCOTUS_ALERT_SOURCE.entries_by_pk look up SCOTUSDocketEntry
+        rows, not DocketEntry?"""
+        entries = SCOTUS_ALERT_SOURCE.entries_by_pk(
+            [self.scotus_de_1.pk, self.scotus_de_2.pk]
+        )
+        self.assertEqual(
+            set(entries.values_list("pk", flat=True)),
+            {self.scotus_de_1.pk, self.scotus_de_2.pk},
+        )
+
+    def test_scotus_source_entries_since_returns_scotus_docket_entries(
+        self,
+    ) -> None:
+        """Does SCOTUS_ALERT_SOURCE.entries_since filter by creation time,
+        same as RECAP's?"""
+        before = now()
+        de_new = SCOTUSDocketEntryFactory(docket=self.scotus_docket)
+        entries = SCOTUS_ALERT_SOURCE.entries_since(self.scotus_docket, before)
+        self.assertEqual(
+            set(entries.values_list("pk", flat=True)), {de_new.pk}
+        )
+
+    def test_scotus_source_lookups_return_oldest_entries_first(self) -> None:
+        """Do both SCOTUS lookups return entries oldest first, like RECAP's?"""
+        before = now()
+        des = [
+            SCOTUSDocketEntryFactory(
+                docket=self.scotus_docket, sequence_number=seq
+            )
+            for seq in ("2025-01-03.001", "2025-01-01.001", "2025-01-02.001")
+        ]
+        expected = ["2025-01-01.001", "2025-01-02.001", "2025-01-03.001"]
+        lookups = {
+            "entries_by_pk": SCOTUS_ALERT_SOURCE.entries_by_pk(
+                [de.pk for de in des]
+            ),
+            "entries_since": SCOTUS_ALERT_SOURCE.entries_since(
+                self.scotus_docket, before
+            ),
+        }
+        for lookup_name, qs in lookups.items():
+            with self.subTest(lookup=lookup_name):
+                self.assertEqual([de.sequence_number for de in qs], expected)
+
+    def test_docket_get_alert_source_dispatches_by_court_id(self) -> None:
+        """Does Docket.get_alert_source() route to the right registry entry?"""
+        self.assertIs(self.recap_docket.get_alert_source(), RECAP_ALERT_SOURCE)
+        self.assertIs(
+            self.scotus_docket.get_alert_source(), SCOTUS_ALERT_SOURCE
+        )
+
+    def test_entries_since_preloads_what_the_alert_email_renders(self) -> None:
+        """Does entries_since load the entries, their docket and their
+        documents (minus plain_text) in two queries, however many entries
+        there are?"""
+        before = now()
+        # Two entries, so any per-entry query shows up in the count.
+        for n in (10, 11):
+            RECAPDocumentFactory(
+                docket_entry=DocketEntryFactory(
+                    docket=self.recap_docket,
+                    entry_number=n,
+                    date_filed=datetime(2025, 1, 2).date(),
+                    time_filed=time(15, 30),
+                ),
+                document_number=str(n),
+            )
+            SCOTUSDocumentFactory(
+                docket_entry=SCOTUSDocketEntryFactory(
+                    docket=self.scotus_docket, entry_number=n
+                ),
+                document_number=n,
+            )
+
+        cases = [
+            (
+                "RECAP",
+                RECAP_ALERT_SOURCE,
+                self.recap_docket,
+                "recap_documents",
+            ),
+            (
+                "SCOTUS",
+                SCOTUS_ALERT_SOURCE,
+                self.scotus_docket,
+                "scotus_documents",
+            ),
+        ]
+        for source_name, source, docket, docs_attr in cases:
+            with self.subTest(source=source_name):
+                # One query for the entries joined with their docket, one
+                # for all their documents.
+                with self.assertNumQueries(2):
+                    docs = [
+                        doc
+                        for de in source.entries_since(docket, before)
+                        for doc in getattr(de, docs_attr).all()
+                    ]
+                    for doc in docs:
+                        doc.get_absolute_url()
+                        # RECAP entries with a time_filed resolve their
+                        # court's timezone through their docket.
+                        getattr(doc.docket_entry, "datetime_filed", None)
+                self.assertEqual(len(docs), 2)
+                for doc in docs:
+                    self.assertIn("plain_text", doc.get_deferred_fields())
+
+
+class DocketAlertScotusTest(TestCase):
+    """Does send_alert_and_webhook work end-to-end for a SCOTUS docket --
+    resolving SCOTUSDocketEntry rows and rendering the SCOTUS templates?"""
+
+    @classmethod
+    def setUpTestData(cls) -> None:
+        cls.user = UserFactory()
+        cls.court = CourtFactory(id="scotus", jurisdiction="F")
+
+    def setUp(self) -> None:
+        self.before = now()
+        self.docket = DocketFactory(court=self.court)
+        self.alert = DocketAlert.objects.create(
+            docket=self.docket, user=self.user
+        )
+
+    def test_triggering_docket_alert_for_a_scotus_docket(self) -> None:
+        """Does the alert go out, using the SCOTUS entries/templates,
+        for an entry created after `since`?"""
+        de = SCOTUSDocketEntryFactory(docket=self.docket)
+        SCOTUSDocumentFactory(docket_entry=de)
+        send_alert_and_webhook(self.docket.pk, self.before)
+        self.assertEqual(len(mail.outbox), 1)
+        self.assertIn(self.docket.case_name, mail.outbox[0].body)
+
+    def test_nothing_happens_for_timers_after_de_creation(self) -> None:
+        """Do we avoid sending alerts for timers after the de was
+        created?"""
+        de = SCOTUSDocketEntryFactory(docket=self.docket)
+        SCOTUSDocumentFactory(docket_entry=de)
+        after = now()
+        send_alert_and_webhook(self.docket.pk, after)
+        self.assertEqual(len(mail.outbox), 0)
+
+    def test_multiple_new_entries_render_correctly_in_one_alert_email(
+        self,
+    ) -> None:
+        """A single alert email bundles every entry created since `since`."""
+        de1 = SCOTUSDocketEntryFactory(docket=self.docket)
+        SCOTUSDocumentFactory(docket_entry=de1, description="First entry")
+        de2 = SCOTUSDocketEntryFactory(docket=self.docket)
+        SCOTUSDocumentFactory(docket_entry=de2, description="Second entry")
+
+        send_alert_and_webhook(self.docket.pk, self.before)
+        self.assertEqual(len(mail.outbox), 1)
+        body = mail.outbox[0].body
+        self.assertIn("First entry", body)
+        self.assertIn("Second entry", body)
+
+    @mock.patch("cl.alerts.tasks.send_docket_alert_webhook_events")
+    def test_scotus_webhooks_are_gated_by_setting(self, mock_webhooks) -> None:
+        """Does the SCOTUS alert email go out while its webhook is only
+        queued when SCOTUS_DOCKET_ALERT_WEBHOOKS_ENABLED is on?"""
+        de = SCOTUSDocketEntryFactory(docket=self.docket)
+        SCOTUSDocumentFactory(docket_entry=de)
+        for enabled in (False, True):
+            with (
+                self.subTest(webhooks_enabled=enabled),
+                override_settings(
+                    SCOTUS_DOCKET_ALERT_WEBHOOKS_ENABLED=enabled
+                ),
+            ):
+                mail.outbox.clear()
+                mock_webhooks.reset_mock()
+                send_alert_and_webhook(self.docket.pk, self.before)
+                self.assertEqual(len(mail.outbox), 1)
+                self.assertEqual(mock_webhooks.delay.called, enabled)
+
+
 class DisableDocketAlertTest(TestCase):
     """Do old docket alerts get disabled or alerted properly?"""
 
@@ -1094,7 +1324,7 @@ class UnlimitedAlertsTest(TestCase):
         """Can a user create an alert?"""
         up = UserProfileWithParentsFactory()
         self.assertTrue(
-            up.can_make_another_alert,
+            up.can_make_another_alert(),
             msg="User with no alerts cannot make its first alert.",
         )
 
@@ -1106,8 +1336,28 @@ class UnlimitedAlertsTest(TestCase):
         )
 
         self.assertTrue(
-            up.can_make_another_alert,
+            up.can_make_another_alert(),
             msg="User with one alert cannot make another.",
+        )
+
+    @override_settings(MAX_FREE_DOCKET_ALERTS=0, DOCKET_ALERT_RECAP_BONUS=1)
+    def test_recap_bonus_raises_the_free_limit(self) -> None:
+        """The RECAP bonus adds to the free limit only when it is claimed."""
+        up = UserProfileWithParentsFactory()
+        self.assertFalse(
+            up.can_make_another_alert(),
+            msg="Got the bonus without claiming RECAP.",
+        )
+        self.assertTrue(
+            up.can_make_another_alert(recap_installed=True),
+            msg="Claiming RECAP did not raise the limit.",
+        )
+        DocketAlertWithParentsFactory(
+            user=up.user, docket__source=Docket.RECAP
+        )
+        self.assertFalse(
+            up.can_make_another_alert(recap_installed=True),
+            msg="The bonus allowed more alerts than the raised limit.",
         )
 
     @override_settings(MAX_FREE_DOCKET_ALERTS=0)
@@ -1123,7 +1373,7 @@ class UnlimitedAlertsTest(TestCase):
             msg="Grantlist allowed even though email should not be on list.",
         )
         self.assertFalse(
-            up.can_make_another_alert,
+            up.can_make_another_alert(),
             msg="Was able to make alerts even though the max free "
             "alerts was overridden to zero.",
         )
@@ -1133,7 +1383,7 @@ class UnlimitedAlertsTest(TestCase):
                 msg="Grantlist denied even though email should be allowed. ",
             )
             self.assertTrue(
-                up.can_make_another_alert,
+                up.can_make_another_alert(),
                 msg="Unable to make an alert even though user's email is "
                 "granted unlimited docket alerts",
             )
@@ -2247,7 +2497,6 @@ class SearchAlertsWebhooksTest(
             url="https://example.com/",
             enabled=True,
         )
-        unpublished_status = PRECEDENTIAL_STATUS.UNPUBLISHED
         with cls.captureOnCommitCallbacks(execute=True):
             cls.search_alert_oa = AlertFactory(
                 user=cls.user_profile.user,
@@ -2577,7 +2826,7 @@ class PrayAndPayAlertsWebhooksTest(TestCase):
             ),
         ):
             # Create a WAITING prayer (shouldn't create webhook)
-            prayer = PrayerFactory(
+            PrayerFactory(
                 user=self.user_profile.user,
                 recap_document=rd,
                 status=Prayer.WAITING,
@@ -3146,6 +3395,10 @@ class ToggleDocketAlertHtmxTest(TestCase):
             headers={"HX-Request": "true"},
         )
 
+    def count_id(self) -> str:
+        """The id attribute of the quota dialog's alert count on the docket page."""
+        return f'id="docket-alert-quota-count-{self.docket.pk}"'
+
     def subscriptions(self) -> int:
         """How many active alerts the user has on the docket."""
         return DocketAlert.objects.filter(
@@ -3169,10 +3422,13 @@ class ToggleDocketAlertHtmxTest(TestCase):
         self.assertTemplateUsed(r, self.FRAGMENT)
         self.assertEqual(self.subscriptions(), 1)
         self.assertTrue(r.context["has_alert"])
+        self.assertFalse(r.context["quota_reached"])
+        self.assertNotIn("HX-Trigger-After-Swap", r)
         self.assertContains(r, f'id="docket-alert-label-{self.docket.pk}"')
         self.assertContains(r, f'id="docket-alert-toggle-{self.docket.pk}"')
         self.assertContains(r, f'id="docket-alert-status-{self.docket.pk}"')
         self.assertContains(r, 'hx-swap-oob="innerHTML"', count=3)
+        self.assertNotContains(r, self.count_id())
 
     def test_htmx_disables_the_alert(self) -> None:
         """Toggling a subscribed docket unsubscribes it."""
@@ -3184,11 +3440,21 @@ class ToggleDocketAlertHtmxTest(TestCase):
 
     @override_settings(MAX_FREE_DOCKET_ALERTS=0)
     def test_htmx_refuses_to_subscribe_over_quota(self) -> None:
-        """A user at quota gets no alert, even without the page's dialog."""
+        """A user at quota gets the quota dialog instead of an alert.
+
+        The partial fills the dialog's alert count out of band, and the
+        header is what opens the dialog on the page.
+        """
         r = self.toggle()
         self.assertEqual(r.status_code, HTTPStatus.OK)
         self.assertEqual(self.subscriptions(), 0)
         self.assertFalse(r.context["has_alert"])
+        self.assertTrue(r.context["quota_reached"])
+        self.assertEqual(r.context["subscription_count"], 0)
+        self.assertEqual(
+            r["HX-Trigger-After-Swap"], "docket-alert-quota-reached"
+        )
+        self.assertContains(r, f'{self.count_id()} hx-swap-oob="innerHTML"')
 
     @override_settings(MAX_FREE_DOCKET_ALERTS=1)
     def test_htmx_allows_disabling_at_quota(self) -> None:
@@ -3197,6 +3463,39 @@ class ToggleDocketAlertHtmxTest(TestCase):
         r = self.toggle()
         self.assertEqual(self.subscriptions(), 0)
         self.assertFalse(r.context["has_alert"])
+        self.assertFalse(r.context["quota_reached"])
+
+    @override_settings(MAX_FREE_DOCKET_ALERTS=1)
+    def test_quota_dialog_reports_the_current_count(self) -> None:
+        """The dialog's count is the user's live subscription total."""
+        DocketAlertFactory(
+            user=self.profile.user, docket=DocketFactory(source=Docket.RECAP)
+        )
+        r = self.toggle()
+        self.assertTrue(r.context["quota_reached"])
+        self.assertEqual(r.context["subscription_count"], 1)
+
+    @override_settings(MAX_FREE_DOCKET_ALERTS=0, DOCKET_ALERT_RECAP_BONUS=1)
+    def test_recap_cookie_grants_the_bonus(self) -> None:
+        """A truthy recap_installed cookie raises the quota by the RECAP bonus; absent or empty, the free limit applies."""
+        r = self.toggle()
+        self.assertTrue(r.context["quota_reached"])
+        self.assertEqual(self.subscriptions(), 0)
+
+        self.client.cookies["recap_installed"] = ""
+        r = self.toggle()
+        self.assertTrue(r.context["quota_reached"])
+        self.assertEqual(self.subscriptions(), 0)
+
+        self.client.cookies["recap_installed"] = "true"
+        r = self.toggle()
+        self.assertFalse(r.context["quota_reached"])
+        self.assertEqual(self.subscriptions(), 1)
+
+        self.docket = DocketFactory(source=Docket.RECAP)
+        r = self.toggle()
+        self.assertTrue(r.context["quota_reached"])
+        self.assertEqual(r.context["subscription_count"], 1)
 
     def test_htmx_without_id_is_a_bad_request(self) -> None:
         """A missing or malformed docket id is the caller's error.
@@ -3493,29 +3792,27 @@ class DocketAlertGetNotesTagsTests(TestCase):
         cls.docket_3 = DocketFactory(
             court=cls.court,
         )
-        cls.docket_4 = DocketFactory(
-            court=cls.court,
-        )
         cls.note_docket_1_user_1 = NoteFactory(
             user=cls.user_1,
-            docket_id=cls.docket_1,
+            content_object=cls.docket_1,
             notes="Note 1 Test",
-        )
-        # GFK-shaped note (#7725) -- proves the lookup isn't legacy-only.
-        cls.note_docket_4_user_1 = NoteFactory.for_object(
-            cls.docket_4,
-            user=cls.user_1,
-            notes="Note 4 Test",
         )
         cls.note_docket_2_user_1 = NoteFactory(
             user=cls.user_1,
-            docket_id=cls.docket_2,
+            content_object=cls.docket_2,
             notes="",
         )
         cls.note_docket_1_user_2 = NoteFactory(
             user=cls.user_2,
-            docket_id=cls.docket_1,
+            content_object=cls.docket_1,
             notes="Note 2 Test",
+        )
+        cls.note_cluster_same_pk_user_1 = NoteFactory(
+            user=cls.user_1,
+            content_object=OpinionClusterFactory(
+                id=cls.docket_3.pk, docket=cls.docket_1
+            ),
+            notes="Note on a cluster sharing docket_3's pk",
         )
 
         cls.orphan_tag_user_1 = UserTagFactory(user=cls.user_1, name="orphan")
@@ -3564,16 +3861,10 @@ class DocketAlertGetNotesTagsTests(TestCase):
             notes_docket_3_user_1,
             tags_docket_3_user_1,
         ) = get_docket_notes_and_tags_by_user(self.docket_3.pk, self.user_1.pk)
+        # user_1's note on the cluster sharing docket_3's pk isn't a docket
+        # note, so it must not show up here.
         self.assertEqual(notes_docket_3_user_1, None)
         self.assertEqual(tags_docket_3_user_1, [])
-
-        # GFK-shaped note (#7725) -- must be found too, not just legacy ones.
-        (
-            notes_docket_4_user_1,
-            tags_docket_4_user_1,
-        ) = get_docket_notes_and_tags_by_user(self.docket_4.pk, self.user_1.pk)
-        self.assertEqual(notes_docket_4_user_1, "Note 4 Test")
-        self.assertEqual(tags_docket_4_user_1, [])
 
 
 @mock.patch("cl.search.tasks.percolator_alerts_models_supported", new=[Audio])

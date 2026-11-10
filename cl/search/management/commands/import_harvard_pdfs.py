@@ -219,7 +219,7 @@ class Command(BaseCommand):
         """
         logger.debug("Processing entry: %s", entry)
         try:
-            cap_case_id = entry["cap_case_id"]
+            entry["cap_case_id"]
             cl_cluster_id = entry["cl_cluster_id"]
             json_path = entry["cap_path"]
 

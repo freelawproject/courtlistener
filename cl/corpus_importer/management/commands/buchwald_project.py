@@ -34,7 +34,7 @@ def add_all_nysd_to_cl(options):
     """
     q = options["queue"]
     throttle = CeleryThrottle(queue_name=q)
-    session = async_to_sync(log_into_pacer)(
+    async_to_sync(log_into_pacer)(
         username=PACER_USERNAME, password=PACER_PASSWORD
     )
 
@@ -50,14 +50,14 @@ def add_all_nysd_to_cl(options):
         if pacer_case_id % 5000 == 0:
             # Re-authenticate just in case the auto-login mechanism isn't
             # working.
-            session = async_to_sync(log_into_pacer)(
+            async_to_sync(log_into_pacer)(
                 username=PACER_USERNAME, password=PACER_PASSWORD
             )
 
         throttle.maybe_wait()
         logger.info("Doing pacer_case_id: %s", pacer_case_id)
         make_docket_by_iquery.apply_async(
-            args=("nysd", pacer_case_id, "default", [NYSD_TAG]),
+            args=("nysd", str(pacer_case_id), "default", [NYSD_TAG]),
             queue=q,
         )
 

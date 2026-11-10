@@ -1277,7 +1277,7 @@ class RecapUploadsTest(TestCase):
         )
         del self.data["pacer_doc_id"]
         r = await self.async_client.post(self.path, self.data)
-        j = json.loads(r.content)
+        json.loads(r.content)
 
         self.assertEqual(r.status_code, HTTPStatus.CREATED)
 
@@ -1296,7 +1296,7 @@ class RecapUploadsTest(TestCase):
             filepath_local=self.f,
         )
         with mock.patch(
-            "cl.recap.tasks.ACMSDocketReport", MockACMSDocketReport
+            "cl.recap.parsers.ACMSDocketReport", MockACMSDocketReport
         ):
             # Process the ACMS docket report.
             async_to_sync(process_recap_acms_docket)(pq.pk)
@@ -1404,7 +1404,7 @@ class RecapUploadsTest(TestCase):
         # After adding 1 docket entry, it should only exist its main RD.
         self.assertEqual(recap_documents.count(), 1)
         with mock.patch(
-            "cl.recap.tasks.ACMSAttachmentPage", MockACMSAttachmentPage
+            "cl.recap.parsers.ACMSAttachmentPage", MockACMSAttachmentPage
         ):
             # Process the acms attachment page containing 3 attachments.
             async_to_sync(process_recap_acms_appellate_attachment)(pq.pk)
@@ -1427,7 +1427,7 @@ class RecapUploadsTest(TestCase):
             filepath_local=self.f,
         )
         with mock.patch(
-            "cl.recap.tasks.ACMSAttachmentPage", MockACMSAttachmentPage
+            "cl.recap.parsers.ACMSAttachmentPage", MockACMSAttachmentPage
         ):
             # Process the acms attachment page containing 3 attachments.
             async_to_sync(process_recap_acms_appellate_attachment)(pq_1.pk)
@@ -4235,6 +4235,20 @@ class RecapAttPageFetchApiTest(TestCase):
         self.assertEqual(self.fq.status, PROCESSING_STATUS.FAILED)
         self.assertIn("Unable to find cached cookies", self.fq.message)
 
+    def test_fetch_att_page_rd_deleted(self, mock_court_accessible) -> None:
+        """Is the FQ marked as failed if its RD is deleted before the task
+        runs?
+        """
+        self.rd.delete()
+
+        result = do_pacer_fetch(self.fq)
+        result.get()
+
+        self.fq.refresh_from_db()
+        self.assertIsNone(self.fq.recap_document_id)
+        self.assertEqual(self.fq.status, PROCESSING_STATUS.FAILED)
+        self.assertIn("no longer exists", self.fq.message)
+
     @mock.patch(
         "cl.recap.tasks.get_pacer_cookie_from_cache",
         return_value=SessionData(None, "http://proxy_1:9090"),
@@ -5912,12 +5926,11 @@ class RecapDocketTaskTest(TestCase):
         pacer_free_doc_row = PACERFreeDocumentRowFactory(
             court_id=self.court.pk, pacer_case_id=docket.pacer_case_id
         )
-        pacer_free_doc_row.court = self.court
         delattr(pacer_free_doc_row, "id")
         tests = {
             "add_recap_source_test": lambda x: add_recap_source_and_save(x),
             "lookup_and_save_test": lambda x: lookup_and_save(
-                pacer_free_doc_row
+                pacer_free_doc_row, self.court
             ),
         }
         for test, method in tests.items():
@@ -6112,9 +6125,8 @@ class RecapDocketTaskTest(TestCase):
                     pacer_case_id=d.pacer_case_id,
                     nature_of_suit=nature_of_suit_from_row,
                 )
-                pacer_free_doc_row.court = self.court
                 delattr(pacer_free_doc_row, "id")
-                lookup_and_save(pacer_free_doc_row)
+                lookup_and_save(pacer_free_doc_row, self.court)
                 d.refresh_from_db()
                 self.assertEqual(
                     d.nature_of_suit,
@@ -7307,7 +7319,7 @@ class WebhooksRetries(TestCase):
         it won't be retried.
         """
         fake_now = now()
-        webhook_e1 = WebhookEventFactory(
+        WebhookEventFactory(
             webhook=self.webhook_disabled,
             content="{'message': 'ok_1'}",
             event_status=WEBHOOK_EVENT_STATUS.ENQUEUED_RETRY,
@@ -7347,26 +7359,26 @@ class WebhooksRetries(TestCase):
             event_status=WEBHOOK_EVENT_STATUS.ENQUEUED_RETRY,
             next_retry_date=fake_now + timedelta(minutes=3),
         )
-        webhook_e1_debug = WebhookEventFactory(
+        WebhookEventFactory(
             webhook=self.webhook,
             content="{'message': 'ok_1'}",
             event_status=WEBHOOK_EVENT_STATUS.ENQUEUED_RETRY,
             next_retry_date=fake_now + timedelta(minutes=3),
             debug=True,
         )
-        webhook_e2 = WebhookEventFactory(
+        WebhookEventFactory(
             webhook=self.webhook,
             content="{'message': 'ok_2'}",
             event_status=WEBHOOK_EVENT_STATUS.SUCCESSFUL,
             next_retry_date=fake_now + timedelta(minutes=3),
         )
-        webhook_e3 = WebhookEventFactory(
+        WebhookEventFactory(
             webhook=self.webhook,
             content="{'message': 'ok_3'}",
             event_status=WEBHOOK_EVENT_STATUS.IN_PROGRESS,
             next_retry_date=fake_now + timedelta(minutes=3),
         )
-        webhook_e4 = WebhookEventFactory(
+        WebhookEventFactory(
             webhook=self.webhook,
             content="{'message': 'ok_4'}",
             event_status=WEBHOOK_EVENT_STATUS.FAILED,
@@ -8222,10 +8234,10 @@ class WebhooksRetries(TestCase):
 
         fake_days_ago = now() - timedelta(days=DAYS_TO_DELETE + 1)
         with time_machine.travel(fake_days_ago, tick=False):
-            webhook_e1 = WebhookEventFactory(
+            WebhookEventFactory(
                 webhook=self.webhook,
             )
-            webhook_e2 = WebhookEventFactory(
+            WebhookEventFactory(
                 webhook=self.webhook,
             )
 

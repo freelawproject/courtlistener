@@ -32,6 +32,7 @@ from cl.alerts.utils import (
 )
 from cl.lib.redis_utils import get_redis_interface
 from cl.search.models import SEARCH_TYPES
+from cl.users.factories import UserProfileWithParentsFactory
 
 
 class RestartRateLimitMixin:
@@ -50,6 +51,28 @@ class RestartRateLimitMixin:
     def tearDownClass(cls):
         cls.restart_rate_limit()
         super().tearDownClass()
+
+
+class AuthenticatedClientMixin:
+    """Log ``self.client`` and ``self.async_client`` in before each test.
+
+    The v4 REST API rejects anonymous requests, so test classes that exercise
+    API endpoints mix this in to get authenticated clients without repeating
+    the login boilerplate. List it first in the bases: its ``setUp`` calls
+    ``super().setUp()`` before logging in, so clients created by the other
+    ``setUp`` methods are the ones that get authenticated.
+
+    The user is created in ``setUp`` rather than ``setUpTestData`` so the mixin
+    also works for classes whose ``setUpTestData`` doesn't call ``super()``.
+    The user has a profile, which the search views require for authenticated
+    users. Requires database access, so it must be used with ``TestCase``.
+    """
+
+    def setUp(self) -> None:
+        super().setUp()
+        self.api_user = UserProfileWithParentsFactory().user
+        self.client.force_login(self.api_user)
+        self.async_client.force_login(self.api_user)
 
 
 class MockTallyStatMixin:

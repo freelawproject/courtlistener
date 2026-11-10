@@ -13,3 +13,12 @@ env = environ.FileAwareEnv()
 SCHEDULED_ALERT_HIT_BATCH_SIZE = env.int(
     "SCHEDULED_ALERT_HIT_BATCH_SIZE", default=100
 )
+
+##########################
+# SCOTUS docket alerts   #
+##########################
+# Keeps SCOTUS docket alert webhooks off until send_docket_alert_webhook_events
+# can serialize SCOTUSDocketEntry rows. Alert emails are not affected.
+SCOTUS_DOCKET_ALERT_WEBHOOKS_ENABLED = env.bool(
+    "SCOTUS_DOCKET_ALERT_WEBHOOKS_ENABLED", default=False
+)

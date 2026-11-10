@@ -22,6 +22,7 @@ from juriscraper.lib.exceptions import PacerLoginException
 from juriscraper.pacer import CaseQuery
 from redis import ConnectionError as RedisConnectionError
 
+from cl.audio.dispatch import _release_lock
 from cl.audio.models import Audio
 from cl.celery_init import app
 from cl.citations.tasks import (
@@ -757,14 +758,15 @@ def process_audio_file(self, pk) -> None:
     audio_response.raise_for_status()
     cf = ContentFile(audio_response.content)
     file_name = f"{trunc(best_case_name(audio_obj).lower(), 72)}_cl.mp3"
-    audio_obj.file_with_date = audio_obj.docket.date_argued  # type: ignore[attr-defined]
     audio_obj.local_path_mp3.save(file_name, cf, save=False)
-    audio_obj.duration = float(
-        async_to_sync(microservice)(
-            service="audio-duration",
-            file=audio_response.content,  # type: ignore[arg-type]
-            file_type="mp3",
-        ).text
+    audio_obj.duration = round(
+        float(
+            async_to_sync(microservice)(
+                service="audio-duration",
+                file=audio_response.content,
+                file_type="mp3",
+            ).text
+        )
     )
     audio_obj.processing_complete = True
     audio_obj.save(
@@ -774,6 +776,9 @@ def process_audio_file(self, pk) -> None:
             "processing_complete",
         ]
     )
+    # Free the dispatch lock so a later dispatch for this pk isn't skipped
+    # until the TTL expires. Failed runs keep it, so the TTL acts as backoff.
+    _release_lock("process_audio_file", pk)
     # Transcription dispatch is owned by reenqueue_pending_audio_tasks_daemon.
     # We deliberately do not hand off here — the daemon paces dispatches to
     # stay under OpenAI's safe concurrency.

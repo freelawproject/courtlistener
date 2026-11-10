@@ -9,7 +9,7 @@ import time_machine
 from django.conf import settings
 from django.core import mail
 from django.core.management import call_command
-from django.test import TestCase, override_settings
+from django.test import override_settings
 from django.urls import reverse
 from django.utils.timezone import now
 from prometheus_client import CollectorRegistry
@@ -42,7 +42,7 @@ from cl.stats.utils import (
     get_milestone_range,
     tally_stat,
 )
-from cl.tests.cases import ESIndexTestCase, TestCase
+from cl.tests.cases import AuthenticatedClientMixin, ESIndexTestCase, TestCase
 from cl.tests.utils import AsyncAPIClient
 from cl.users.factories import UserFactory, UserProfileWithParentsFactory
 
@@ -308,7 +308,9 @@ class PrometheusIntegrationTestBase(ESIndexTestCase, TestCase):
     WAFFLE_CACHE_PREFIX="test_prometheus_integration",
     STAT_METRICS_PREFIX="prometheus:stat:PrometheusIntegrationAPITests:",
 )
-class PrometheusIntegrationAPITests(PrometheusIntegrationTestBase):
+class PrometheusIntegrationAPITests(
+    AuthenticatedClientMixin, PrometheusIntegrationTestBase
+):
     """Integration tests for Prometheus metrics with API searches"""
 
     @classmethod

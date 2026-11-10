@@ -7,7 +7,7 @@ from contextlib import closing, contextmanager
 from io import StringIO
 from pathlib import Path
 from tempfile import TemporaryDirectory
-from typing import Any, ClassVar, ParamSpec, TypeVar, cast
+from typing import Any, ClassVar, cast
 from unittest.mock import MagicMock, Mock, call, patch
 
 from botocore.exceptions import BotoCoreError, ClientError
@@ -84,15 +84,12 @@ from cl.search.models import (
 )
 from cl.tests.cases import SimpleTestCase, TestCase
 
-Param = ParamSpec("Param")
-Return = TypeVar("Return")
 
-
-def merger_test(
+def merger_test[**P, R](
     *, expected_query_count: int | range | None = None
-) -> Callable[[Callable[Param, Return]], Callable[Param, Return]]:
-    def decorator(f: Callable[Param, Return]) -> Callable[Param, Return]:
-        def wrapper(*args: Param.args, **kwargs: Param.kwargs) -> Return:
+) -> Callable[[Callable[P, R]], Callable[P, R]]:
+    def decorator(f: Callable[P, R]) -> Callable[P, R]:
+        def wrapper(*args: P.args, **kwargs: P.kwargs) -> R:
             counts = {"merger": 0, "test": 0}
             merger_sql: list[str] = []
             merge_depth = 0
@@ -975,7 +972,9 @@ class LoaderTestCase(TestCase):
         """The ledger the test's loads report into."""
         return LoadLedger(self.key)
 
-    def loader_class(self, **attributes: Any) -> type[JKentScrapeLoader[Any]]:
+    def loader_class(
+        self, **attributes: Any
+    ) -> type[JKentScrapeLoader[Any, Any, Any]]:
         """A loader over the test database, merging into `Docket`.
 
         The class is put in the registry for the test's lifetime, because a
@@ -1005,7 +1004,7 @@ class LoaderTestCase(TestCase):
                     court=test_court, docket_number=self.scrape.docket_number
                 )
 
-        loader: type[JKentScrapeLoader[Any]] = type(
+        loader: type[JKentScrapeLoader[Any, Any]] = type(
             "TestLoader",
             (JKentScrapeLoader,),
             {
@@ -1022,9 +1021,9 @@ class LoaderTestCase(TestCase):
 
     def loader(
         self,
-        loader_class: type[JKentScrapeLoader[Any]] | None = None,
+        loader_class: type[JKentScrapeLoader[Any, Any]] | None = None,
         **kwargs: Any,
-    ) -> JKentScrapeLoader[Any]:
+    ) -> JKentScrapeLoader[Any, Any]:
         """A loader over the test database, keeping a ledger by default.
 
         Neither wait sleeps by default. Celery runs eagerly here, so the

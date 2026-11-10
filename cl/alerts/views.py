@@ -226,10 +226,16 @@ def _toggle_docket_alert_htmx(
 ) -> HttpResponse:
     """Toggles the alert for an htmx POST and returns the v2 fragment.
 
-    A user at their quota is refused a new or re-enabled subscription, so the
-    limit holds even if the page's dialog is bypassed. The refusal is still a
-    200 carrying the fragment: htmx does not swap error responses, and the
-    fragment's status message is how the user learns what happened.
+    A user at their quota is refused a new or re-enabled subscription. The
+    refusal is still a 200: htmx does not swap error responses, and the
+    partial carries the status message plus the live alert count for the
+    page's quota dialog. The `HX-Trigger-After-Swap` header is what opens
+    that dialog, once the count is in the page and the menu has closed and
+    refocused its trigger.
+
+    The `recap_installed` cookie, set by the page when the RECAP extension
+    announces itself, raises the quota by the RECAP bonus. The cookie is
+    taken at face value.
     """
     if request.method != "POST":
         return HttpResponseNotAllowed(permitted_methods={"POST"})
@@ -248,14 +254,26 @@ def _toggle_docket_alert_htmx(
         alert = DocketAlert.objects.filter(
             user=request.user, docket=docket
         ).first()
+        quota_reached = False
+        subscription_count = 0
+        headers = {}
         if alert and alert.alert_type == DocketAlert.SUBSCRIPTION:
             alert.alert_type = DocketAlert.UNSUBSCRIPTION
             alert.save()
             has_alert = False
             message = "Alert disabled successfully"
-        elif not profile.can_make_another_alert:
+        elif not profile.can_make_another_alert(
+            recap_installed=bool(request.COOKIES.get("recap_installed"))
+        ):
             has_alert = False
+            quota_reached = True
+            subscription_count = (
+                DocketAlert.objects.subscriptions()
+                .filter(user=request.user)
+                .count()
+            )
             message = "You have reached your docket alert limit."
+            headers["HX-Trigger-After-Swap"] = "docket-alert-quota-reached"
         else:
             if alert:
                 alert.alert_type = DocketAlert.SUBSCRIPTION
@@ -267,7 +285,14 @@ def _toggle_docket_alert_htmx(
     return TemplateResponse(
         request,
         "v2_includes/docket_alerts_htmx/toggle.html",
-        {"docket": docket, "has_alert": has_alert, "message": message},
+        {
+            "docket": docket,
+            "has_alert": has_alert,
+            "message": message,
+            "quota_reached": quota_reached,
+            "subscription_count": subscription_count,
+        },
+        headers=headers,
     )
 
 

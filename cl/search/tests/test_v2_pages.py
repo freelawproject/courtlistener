@@ -12,8 +12,6 @@ from waffle.testutils import override_flag
 
 from cl.lib import widgets
 from cl.lib.test_helpers import (
-    CourtTestCase,
-    PeopleTestCase,
     RECAPSearchTestCase,
     SearchTestCase,
     SimpleUserDataMixin,
@@ -485,13 +483,7 @@ class CorpusSearchFormTest(SimpleUserDataMixin, TestCase):
         },
     },
 )
-class HomepageStatsTest(
-    RECAPSearchTestCase,
-    CourtTestCase,
-    PeopleTestCase,
-    SearchTestCase,
-    TestCase,
-):
+class HomepageStatsTest(RECAPSearchTestCase, SearchTestCase, TestCase):
     """Stats tests that checks values displayed correspond with actual data in the DB.
 
     Skips Redis to keep this test scoped to DB queries.

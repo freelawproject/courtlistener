@@ -10,7 +10,7 @@ from asgiref.sync import async_to_sync
 from django.conf import settings
 from django.core.management import call_command
 from django.http import HttpResponse
-from django.test import TestCase, override_settings
+from django.test import override_settings
 from django.urls import reverse
 from elasticsearch.dsl import Document
 from lxml import html as lhtml
@@ -35,7 +35,7 @@ from cl.search.models import (
     Opinion,
     SearchQuery,
 )
-from cl.tests.cases import ESIndexTestCase, TestCase
+from cl.tests.cases import AuthenticatedClientMixin, ESIndexTestCase, TestCase
 
 
 def mock_read_from_s3(file_path, r):
@@ -56,7 +56,7 @@ class OpinionEmbeddingIndexingTests(ESIndexTestCase, TestCase):
             id="canb",
             jurisdiction="FB",
         )
-        with cls.captureOnCommitCallbacks(execute=True) as callbacks:
+        with cls.captureOnCommitCallbacks(execute=True):
             cls.opinion_cluster_2 = OpinionClusterFactory(
                 docket=DocketFactory(
                     court=cls.court,
@@ -68,7 +68,7 @@ class OpinionEmbeddingIndexingTests(ESIndexTestCase, TestCase):
 
     def test_opinion_embeddings_field(self) -> None:
         """Test index embeddings into an opinion document."""
-        with self.captureOnCommitCallbacks(execute=True) as callbacks:
+        with self.captureOnCommitCallbacks(execute=True):
             opinion_cluster_1 = OpinionClusterFactory(
                 docket=DocketFactory(
                     court=self.court,
@@ -282,7 +282,7 @@ class OpinionEmbeddingIndexingTests(ESIndexTestCase, TestCase):
 @override_settings(KNN_SEARCH_ENABLED=True)
 @override_settings(WAFFLE_CACHE_PREFIX="test_semantic_search_opinion")
 @mock.patch("cl.lib.elasticsearch_utils.microservice")
-class SemanticSearchTests(ESIndexTestCase, TestCase):
+class SemanticSearchTests(AuthenticatedClientMixin, ESIndexTestCase, TestCase):
     @classmethod
     def setUpTestData(cls):
         """Set up test index and test data."""
@@ -303,7 +303,7 @@ class SemanticSearchTests(ESIndexTestCase, TestCase):
         )
 
         # Create opinions and clusters
-        with cls.captureOnCommitCallbacks(execute=True) as callbacks:
+        with cls.captureOnCommitCallbacks(execute=True):
             cls.opinion_2 = OpinionFactory(
                 cluster=OpinionClusterFactory(
                     docket=DocketFactory(

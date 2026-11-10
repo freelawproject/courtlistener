@@ -554,7 +554,7 @@ def add_new_case(
         add_citations_to_cluster(
             [c.get("cite") for c in data.get("citations", [])], cluster.id
         )
-        new_op_pks = add_opinions(soup, cluster.id, citation)
+        add_opinions(soup, cluster.id, citation)
 
     logger.info("Finished: %s", citation.corrected_citation())
     logger.info(

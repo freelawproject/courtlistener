@@ -390,7 +390,7 @@ class MigrateDocumentPathsCommandTest(TestCase):
         self.tmp = tempfile.TemporaryDirectory()
         self.addCleanup(self.tmp.cleanup)
         self.manifest = Path(self.tmp.name) / "manifest.csv"
-        self.client = FakeS3Client(
+        self.s3_client = FakeS3Client(
             {
                 self.doc.filepath_local.name: '"etaga"',
                 self.dup.filepath_local.name: '"etagb"',
@@ -401,7 +401,7 @@ class MigrateDocumentPathsCommandTest(TestCase):
         )
 
     def run_command(self, client: FakeS3Client | None = None, **options):
-        with patch_s3(client or self.client):
+        with patch_s3(client or self.s3_client):
             call_command(
                 "migrate_document_paths",
                 model="scotus",
@@ -441,11 +441,11 @@ class MigrateDocumentPathsCommandTest(TestCase):
         self.done.refresh_from_db()
         self.assertNotIn(
             self.done.filepath_local.name,
-            [old_key for old_key, _, _ in self.client.copies],
+            [old_key for old_key, _, _ in self.s3_client.copies],
         )
 
         self.assertEqual(
-            self.client.copies,
+            self.s3_client.copies,
             [
                 (
                     "scotus/documents/gov.scotus.a.pdf",
@@ -479,16 +479,16 @@ class MigrateDocumentPathsCommandTest(TestCase):
 
     def test_rerun_only_touches_leftovers(self) -> None:
         self.run_command()
-        self.client.copies.clear()
+        self.s3_client.copies.clear()
         self.run_command()
         # Only the row whose source is missing is retried; it can't be copied.
-        self.assertEqual(self.client.copies, [])
+        self.assertEqual(self.s3_client.copies, [])
         statuses = [row["status"] for row in read_manifest(self.manifest)]
         self.assertEqual(statuses, [MIGRATED, MIGRATED])
 
     def test_dry_run_changes_nothing(self) -> None:
         self.run_command(dry_run=True)
-        self.assertEqual(self.client.copies, [])
+        self.assertEqual(self.s3_client.copies, [])
         self.doc.refresh_from_db()
         self.assertEqual(
             self.doc.filepath_local.name, "scotus/documents/gov.scotus.a.pdf"
@@ -504,14 +504,14 @@ class MigrateDocumentPathsCommandTest(TestCase):
 
     def test_limit(self) -> None:
         self.run_command(limit=1)
-        self.assertEqual(len(self.client.copies), 1)
+        self.assertEqual(len(self.s3_client.copies), 1)
         self.dup.refresh_from_db()
         self.assertEqual(
             self.dup.filepath_local.name, "scotus/documents/gov.scotus.b.pdf"
         )
 
     def test_etag_mismatch_leaves_row_unchanged(self) -> None:
-        client = CorruptingS3Client(self.client.objects)
+        client = CorruptingS3Client(self.s3_client.objects)
         with mock.patch.object(command_module.logger, "error") as m_error:
             self.run_command(client=client)
         self.doc.refresh_from_db()
@@ -538,14 +538,14 @@ class MigrateDocumentPathsCommandTest(TestCase):
         self.assertEqual(self.dup.filepath_local.name, self.expected_key)
 
     def test_check_destination_counts_objects(self) -> None:
-        self.client.objects[f"{self.bucket}/stray.pdf"] = '"x"'
+        self.s3_client.objects[f"{self.bucket}/stray.pdf"] = '"x"'
         with mock.patch.object(command_module.logger, "info") as m_info:
             self.run_command(check_destination=True)
-        self.assertEqual(self.client.copies, [])
+        self.assertEqual(self.s3_client.copies, [])
         m_info.assert_called_once_with(
             "%s: %s objects", "recap/gov.uscourts.scotus.", 1
         )
 
     def test_manifest_is_required(self) -> None:
-        with patch_s3(self.client), self.assertRaises(CommandError):
+        with patch_s3(self.s3_client), self.assertRaises(CommandError):
             call_command("migrate_document_paths", model="scotus")

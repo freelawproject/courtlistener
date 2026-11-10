@@ -18,6 +18,7 @@ from re import Pattern
 from tempfile import NamedTemporaryFile
 from typing import IO, Any, TypeIs, cast
 from urllib.parse import urljoin
+from uuid import UUID
 
 import botocore.exceptions
 import environ
@@ -121,7 +122,6 @@ from cl.corpus_importer.state.loader import LoadPhase, fingerprint
 from cl.corpus_importer.state.registry import get_loader
 from cl.corpus_importer.state.utils import MergeResult
 from cl.corpus_importer.utils import (
-    DownloadPDFResult,
     compute_binary_probe_jitter,
     compute_blocked_court_wait,
     compute_next_binary_probe,
@@ -136,7 +136,6 @@ from cl.corpus_importer.utils import (
 )
 from cl.custom_filters.templatetags.text_filters import best_case_name
 from cl.lib.celery_utils import throttle_task
-from cl.lib.command_utils import logger
 from cl.lib.courts import find_court_object_by_name
 from cl.lib.crypto import sha1
 from cl.lib.decorators import retry, time_call
@@ -397,7 +396,7 @@ async def download_recap_item(
                 headers={"User-Agent": "Free Law Project"},
             )
         r.raise_for_status()
-    except TimeoutException as e:
+    except TimeoutException:
         logger.warning(f"    Timed out attempting to get: {url}\n")
     except HTTPError as e:
         logger.warning(f"    Unable to get {url}\nException was:\n{e}")
@@ -600,14 +599,11 @@ def process_free_opinion_result(
         self.request.chain = None
         return None
 
-    # TODO: Come up with some way to do this that satisfies the type checker
-    result.court = Court.objects.get(
-        pk=map_pacer_to_cl_id(result.court_id)
-    )  # pyrefly:ignore[missing-attribute]
+    court = Court.objects.get(pk=map_pacer_to_cl_id(result.court_id))
     result.case_name = harmonize(result.case_name)
-    result.case_name_short = cnt.make_case_name_short(
-        result.case_name
-    )  # pyrefly:ignore[missing-attribute]
+    # TODO: Come up with some way to do this that satisfies the type checker
+    # pyrefly:ignore[missing-attribute]
+    result.case_name_short = cnt.make_case_name_short(result.case_name)
 
     row_copy = copy.copy(result)
     # If we don't do this, the doc's date_filed becomes the docket's
@@ -620,7 +616,7 @@ def process_free_opinion_result(
     start_time = now()
     try:
         with transaction.atomic():
-            d = lookup_and_save(row_copy)
+            d = lookup_and_save(row_copy, court)
             if not d:
                 msg = f"Unable to create docket for {result}"
                 logger.error(msg)
@@ -1376,7 +1372,7 @@ def filter_docket_by_tags(
 
 
 async def query_case_query_report(
-    court_id: str, pacer_case_id: int
+    court_id: str, pacer_case_id: str
 ) -> tuple[dict[str, Any], str]:
     """Query the iquery page for a given PACER case ID.
 
@@ -1397,9 +1393,7 @@ async def query_case_query_report(
         proxy=session_data.proxy_address,
     ) as s:
         report = CaseQuery(map_cl_to_pacer_id(court_id), s)
-        # Juriscraper sends this as multipart form data, and httpx only
-        # accepts str/bytes values there; an int raises AttributeError.
-        await report.query(str(pacer_case_id))
+        await report.query(pacer_case_id)
         if report.response is None:
             raise ParsingException("The case query returned no response.")
         return report.data, report.response.text
@@ -1408,7 +1402,7 @@ async def query_case_query_report(
 def make_docket_by_iquery_base(
     self: Task,
     court_id: str,
-    pacer_case_id: int,
+    pacer_case_id: str,
     using: str = "default",
     tag_names: list[str] | None = None,
     log_results_redis: bool = False,
@@ -1461,7 +1455,7 @@ def make_docket_by_iquery_base(
 
     d = async_to_sync(find_docket_object)(
         court_id,
-        str(pacer_case_id),
+        pacer_case_id,
         report_data["docket_number"],
         report_data.get("federal_defendant_number"),
         report_data.get("federal_dn_judge_initials_assigned"),
@@ -1499,7 +1493,7 @@ def make_docket_by_iquery_base(
 def make_docket_by_iquery(
     self: Task,
     court_id: str,
-    pacer_case_id: int,
+    pacer_case_id: str,
     using: str = "default",
     tag_names: list[str] | None = None,
     log_results_redis: bool = False,
@@ -1546,7 +1540,7 @@ def make_docket_by_iquery(
 def make_docket_by_iquery_sweep(
     self: Task,
     court_id: str,
-    pacer_case_id: int,
+    pacer_case_id: str,
     using: str = "default",
     tag_names: list[str] | None = None,
     log_results_redis: bool = False,
@@ -1582,8 +1576,8 @@ def make_docket_by_iquery_sweep(
 
 @retry((TimeoutException, PacerLoginException), tries=3, delay=0.25, backoff=1)
 def query_iquery_page(
-    court_id: str, pacer_case_id: int
-) -> tuple[bool, None] | tuple[dict[str, Any], str]:
+    court_id: str, pacer_case_id: str
+) -> None | tuple[dict[str, Any], str]:
     """A small wrapper to query the iquery page for a given PACER case ID to
     support retries via the @retry decorator in case of a failure.
 
@@ -1602,7 +1596,7 @@ def query_iquery_page(
             court_id,
             pacer_case_id,
         )
-        return False, None
+        return None
     return report_data, report_text
 
 
@@ -1677,9 +1671,7 @@ def probe_or_scrape_iquery_pages(
         )
         probe_iteration += 1
         try:
-            report_data, report_text = query_iquery_page(
-                court_id, pacer_case_id_to_lookup
-            )
+            report = query_iquery_page(court_id, str(pacer_case_id_to_lookup))
         except TimeoutException:
             logger.warning(
                 "The court %s website is probably down. Aborting the probe task.",
@@ -1740,10 +1732,10 @@ def probe_or_scrape_iquery_pages(
             delete_redis_semaphore("CACHE", make_iquery_probing_key(court_id))
             return None
 
-        if report_data:
+        if report is not None:
             # Find and update/store the Docket.
             reports_data.append(
-                (pacer_case_id_to_lookup, report_data, report_text)
+                (pacer_case_id_to_lookup, report[0], report[1])
             )
             latest_match = pacer_case_id_to_lookup
             found_match = True
@@ -1840,7 +1832,7 @@ def probe_or_scrape_iquery_pages(
         try:
             process_case_query_report(
                 court_id,
-                pacer_case_id=pacer_case_id,
+                pacer_case_id=str(pacer_case_id),
                 report_data=report_data,
                 report_text=report_text,
                 skip_iquery_sweep=skip_iquery_sweep,
@@ -1852,7 +1844,7 @@ def probe_or_scrape_iquery_pages(
                 "IntegrityError occurred when processing iquery page for "
                 "court: %s and pacer_case_id: %s",
                 court_id,
-                report_data[0],
+                pacer_case_id,
             )
             continue
     delete_redis_semaphore("CACHE", make_iquery_probing_key(court_id))
@@ -1873,7 +1865,7 @@ def get_docket_by_pacer_case_id(
     court_id: str,
     session_data: SessionData,
     docket_pk: int | None = None,
-    tag_names: str | None = None,
+    tag_names: list[str] | None = None,
     **kwargs: Any,
 ) -> TaskData | None:
     """Celery task wrapper for get_docket_by_pacer_case_id_base."""
@@ -1898,7 +1890,7 @@ async def get_docket_by_pacer_case_id_base(
     court_id: str,
     session_data: SessionData,
     docket_pk: int | None = None,
-    tag_names: str | None = None,
+    tag_names: list[str] | None = None,
     **kwargs,
 ) -> TaskData | None:
     """Get a docket by PACER case id, CL court ID, and a collection of kwargs
@@ -3537,7 +3529,7 @@ def download_document_in_stream(
         delay=1,
         backoff=2,
     )
-    def download_to_file(tmp_file):
+    def download_to_file(tmp_file: IO[bytes]) -> str | None:
         tmp_file.seek(0)
         # Clear any partial content from previous attempt
         tmp_file.truncate()
@@ -3555,18 +3547,21 @@ def download_document_in_stream(
                     identifier,
                     url,
                 )
-                return DownloadPDFResult(success=False)
+                return None
             for chunk in response.iter_content(chunk_size=8 * 1024):
                 if chunk:
                     tmp_file.write(chunk)
                     hasher.update(chunk)
             tmp_file.flush()
             tmp_file.seek(0)
-            return DownloadPDFResult(success=True, sha1=hasher.hexdigest())
+            return hasher.hexdigest()
 
     with NamedTemporaryFile(prefix=temp_prefix, suffix=".pdf") as tmp:
         result = download_to_file(tmp)
-        yield (tmp, result.sha1) if result.success else None
+        if result is None:
+            yield None
+        else:
+            yield (tmp.file, result)
 
 
 @app.task(
@@ -3836,19 +3831,22 @@ def add_scotus_docket_entries(
     docket: Docket,
     docket_entries: list[dict[str, Any]],
     download_file: bool = True,
-) -> list[int]:
+) -> tuple[list[int], bool]:
     """Add or update SCOTUS docket entries for a docket.
 
     :param docket: The Docket to add entries to.
     :param docket_entries: List of docket entry dicts from the scraper.
     :param download_file: Whether to trigger PDF download and extraction.
-    :return: A list of PKs of SCOTUSDocument objects that were created or
-        updated across all entries.
+    :return: A two-tuple: a list of PKs of SCOTUSDocument objects that were
+        created or updated across all entries, and whether any
+        SCOTUSDocketEntry was newly created (there's something to alert
+        subscribers about).
     """
     sequence_numbers = create_docket_entry_sequence_numbers(
         docket_entries, "date_filed"
     )
     all_doc_pks: list[int] = []
+    content_updated = False
     for sequence_number, docket_entry in zip(
         sequence_numbers, docket_entries, strict=True
     ):
@@ -3867,7 +3865,9 @@ def add_scotus_docket_entries(
             )
             continue
         all_doc_pks.extend(doc_pks)
-    return all_doc_pks
+        if de_created:
+            content_updated = True
+    return all_doc_pks, content_updated
 
 
 def merge_scotus_docket(
@@ -3878,6 +3878,8 @@ def merge_scotus_docket(
 
     This will create or update the Docket row for the SCOTUS and
     then create or update the related ScotusDocketMetadata instance.
+    If any docket entry was newly created, this also triggers a docket
+    alert to current subscribers.
 
     :param report_data: A dictionary containing parsed SCOTUS docket data.
     :param download_file: Whether to trigger PDF download and extraction.
@@ -4004,9 +4006,14 @@ def merge_scotus_docket(
 
     # Docket entries merger:
     enrich_scotus_attachments(report_data["docket_entries"])
-    doc_pks = add_scotus_docket_entries(
+    start_time = now()
+    doc_pks, content_updated = add_scotus_docket_entries(
         d, report_data["docket_entries"], download_file=download_file
     )
+    if content_updated:
+        newly_enqueued = enqueue_docket_alert(d.pk)
+        if newly_enqueued:
+            send_alert_and_webhook.delay(d.pk, start_time)
 
     return d, download_qp, doc_pks
 
@@ -4393,7 +4400,9 @@ def merge_texas_document(
 
     if needs_update:
         texas_document.description = input_document["description"]
-        texas_document.media_version_id = input_document["media_version_id"]
+        texas_document.media_version_id = UUID(
+            input_document["media_version_id"]
+        )
         texas_document.url = input_document["document_url"]
         if texas_document.filepath_local:
             texas_document.filepath_local.delete(save=False)
@@ -4501,7 +4510,7 @@ def merge_texas_docket_entry(
         appellate_brief["description"] if appellate_brief else ""
     )
     docket_entry.disposition = case_event["disposition"]
-    docket_entry.remarks = case_event.get("remarks", "")
+    docket_entry.remarks = cast(str, case_event.get("remarks", ""))
     docket_entry.save()
 
     logger.info(
@@ -5293,7 +5302,7 @@ def download_fl_document(self: Task, fl_document_pk: int) -> int | None:
 @app.task(bind=True, max_retries=5, ignore_result=True)
 def fl_ingest_docket_task(
     task: Task,
-    download_result: tuple[bytes, str, str],
+    download_result: tuple[bytes | FloridaCase, str, str],
     download_attachments: bool = True,
 ) -> MergeResult[Any]:
     """
@@ -5302,23 +5311,27 @@ def fl_ingest_docket_task(
     :param task: The Celery task.
 
     :param download_result: Tuple of:
-    - The bytes of the parsed JSON retrieved from S3.
-    - The S3 bucket this case was retrieved from. Used for error messages.
+    - The bytes of the parsed JSON retrieved from S3 or the fully parsed case.
+    - The S3 bucket this case was retrieved from. Used for error messages. May be blank for tasks spawned from the
+    poller daemon as we don't have a good way to access the bucket there.
     - The S3 key this case was retrieved from. Used for error messages.
     :param download_attachments: Whether to download docket entry attachments.
 
     :return: The result of the merge operation.
     """
     case_bytes, bucket, key = download_result
-    try:
-        case = FloridaCase.deserialize(case_bytes.decode())
-    except Exception:
-        logger.exception(
-            "Failed to deserialize Florida case stored in %s at %s",
-            bucket,
-            key,
-        )
-        return MergeResult.failed("Docket")
+    if isinstance(case_bytes, bytes):
+        try:
+            case = FloridaCase.deserialize(case_bytes.decode())
+        except Exception:
+            logger.exception(
+                "Failed to deserialize Florida case stored in %s at %s",
+                bucket,
+                key,
+            )
+            return MergeResult.failed("Docket")
+    else:
+        case = case_bytes
     logger.info(
         "Attempting to merge Florida case %s",
         case.docket_number,
@@ -5334,7 +5347,8 @@ def fl_ingest_docket_task(
             de_total,
             de_unique,
         )
-    merger = FloridaDocketMerger(scrape=case, params=None)
+
+    merger = FloridaDocketMerger(scrape=case, params=case.entries)
     result = merger.merge()
     if result.failures:
         logger.error(
@@ -5343,9 +5357,17 @@ def fl_ingest_docket_task(
             result.failures,
         )
     if download_attachments:
-        attachment_pks = result.creates.get(
+        merged_pks = result.creates.get(
             FloridaDocument.__name__, set()
         ) | result.updates.get(FloridaDocument.__name__, set())
+        # An update to a document that already has a file only changed its
+        # metadata (a changed link UUID is matched back to the same document
+        # by title), so it needs no download.
+        attachment_pks = list(
+            FloridaDocument.objects.filter(
+                pk__in=merged_pks, filepath_local=""
+            ).values_list("pk", flat=True)
+        )
         logger.info("Downloading FloridaDocuments: %r", attachment_pks)
         for pk in attachment_pks:
             download_fl_document.si(pk).apply_async()

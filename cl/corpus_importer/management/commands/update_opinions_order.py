@@ -226,7 +226,7 @@ class Command(VerboseCommand):
     help = "Add ordering Key for sub opinions"
 
     def __init__(self, *args, **kwargs):
-        super(Command, self).__init__(*args, **kwargs)
+        super().__init__(*args, **kwargs)
 
     def valid_actions(self, s):
         if s.lower() not in self.VALID_ACTIONS:

@@ -10,6 +10,7 @@ from django.contrib.contenttypes.models import ContentType
 from django.core import mail
 from django.core.cache import cache
 from django.db import IntegrityError, transaction
+from django.http import HttpResponse
 from django.template.defaultfilters import date as template_date
 from django.test import RequestFactory, override_settings
 from django.urls import reverse
@@ -19,8 +20,10 @@ from selenium.webdriver.common.by import By
 from selenium.webdriver.support import expected_conditions as EC
 from selenium.webdriver.support.wait import WebDriverWait
 from timeout_decorator import timeout_decorator
+from waffle.testutils import override_flag
 
 from cl.custom_filters.templatetags.pacer import price
+from cl.donate.factories import NeonMembershipFactory
 from cl.donate.models import (
     MembershipPaymentStatus,
     NeonMembership,
@@ -44,7 +47,6 @@ from cl.favorites.utils import (
     delete_prayer,
     get_existing_prayers_in_bulk,
     get_lifetime_prayer_stats,
-    get_note_for_target,
     get_prayer_counts_in_bulk,
     get_top_prayers,
     get_user_prayer_history,
@@ -64,13 +66,22 @@ from cl.search.factories import (
     OpinionFactory,
     RECAPDocumentFactory,
 )
-from cl.search.models import PRECEDENTIAL_STATUS
+from cl.search.models import PRECEDENTIAL_STATUS, RECAPDocument
 from cl.search.utils import get_homepage_stats
 from cl.tests.base import SELENIUM_TIMEOUT, BaseSeleniumTest
 from cl.tests.cases import APITestCase, TestCase
 from cl.tests.fakes import FakeAvailableConfirmationPage, FakeConfirmationPage
 from cl.tests.utils import make_client
 from cl.users.factories import UserFactory, UserProfileWithParentsFactory
+
+
+def text_of(response: HttpResponse) -> str:
+    """Return the response body with whitespace runs collapsed to one space.
+
+    Template line breaks split messages across lines, so use this to assert
+    on a full sentence.
+    """
+    return " ".join(response.content.decode().split())
 
 
 class NoteTest(SimpleUserDataMixin, AudioTestCase):
@@ -122,6 +133,13 @@ class NoteTest(SimpleUserDataMixin, AudioTestCase):
             )
             self.assertEqual(r.status_code, 200)
             self.assertIn("It worked", r.content.decode())
+            self.assertTrue(
+                Note.objects.filter(
+                    user=self.user,
+                    content_type_id=params["content_type"],
+                    object_id=params["object_id"],
+                ).exists()
+            )
 
         # And can we delete them?
         for params in [self.note_cluster_params, self.note_audio_params]:
@@ -131,150 +149,59 @@ class NoteTest(SimpleUserDataMixin, AudioTestCase):
                 follow=True,
                 headers={"x-requested-with": "XMLHttpRequest"},
             )
-        self.assertEqual(r.status_code, 200)
-        self.assertIn("It worked", r.content.decode())
-
-    def test_dual_read_finds_legacy_shaped_note(self) -> None:
-        """A Note saved before #7725 (legacy FK set, content_type null) must
-        still be found by the dual-read lookup, not just new GFK-shaped rows.
-        """
-        legacy_note = NoteFactory(
-            cluster_id=self.opinion_cluster,
-            user=self.user,
-            name="pre-migration note",
-            notes="still here",
-        )
-
-        found = get_note_for_target(
-            type(self.opinion_cluster), self.opinion_cluster.pk, self.user
-        )
-
-        self.assertEqual(found, legacy_note)
-
-    def test_new_note_is_redirect_only_not_dual_write(self) -> None:
-        """A Note created via the real save endpoint today must land
-        entirely in the new content_type/object_id shape -- the legacy
-        FK column for its type is never also populated.
-        """
-        self.assertTrue(
-            self.client.login(username="pandora", password="password")
-        )
-        r = self.client.post(
-            reverse("save_or_update_note"),
-            self.note_cluster_params,
-            follow=True,
-            headers={"x-requested-with": "XMLHttpRequest"},
-        )
-        self.assertEqual(r.status_code, 200)
-
-        note = Note.objects.get(
-            content_type=ContentType.objects.get_for_model(
-                self.opinion_cluster
-            ),
-            object_id=self.opinion_cluster.pk,
-        )
-        self.assertIsNone(note.cluster_id_id)
-
-    def test_editing_a_legacy_note_migrates_it(self) -> None:
-        """Editing a pre-#7725 Note through the real save endpoint ends
-        up with content_type/object_id populated.
-        """
-        legacy_note = NoteFactory(
-            cluster_id=self.opinion_cluster,
-            user=self.user,
-            name="old name",
-            notes="old notes",
-        )
-
-        self.assertTrue(
-            self.client.login(username="pandora", password="password")
-        )
-        r = self.client.post(
-            reverse("save_or_update_note"),
-            {
-                **self.note_cluster_params,
-                "name": "edited name",
-                "notes": "edited notes",
-            },
-            follow=True,
-            headers={"x-requested-with": "XMLHttpRequest"},
-        )
-        self.assertEqual(r.status_code, 200)
-
-        legacy_note.refresh_from_db()
-        self.assertEqual(
-            legacy_note.content_type,
-            ContentType.objects.get_for_model(self.opinion_cluster),
-        )
-        self.assertEqual(legacy_note.object_id, self.opinion_cluster.pk)
-        # The legacy column is left as-is, not cleared.
-        self.assertEqual(legacy_note.cluster_id_id, self.opinion_cluster.pk)
-        self.assertEqual(legacy_note.name, "edited name")
+            self.assertEqual(r.status_code, 200)
+            self.assertIn("It worked", r.content.decode())
+            self.assertFalse(
+                Note.objects.filter(
+                    user=self.user,
+                    content_type_id=params["content_type"],
+                    object_id=params["object_id"],
+                ).exists()
+            )
 
     def test_deleting_noted_object_removes_notes_pointing_at_it(self) -> None:
-        """Deleting a noteable object (#7725) cleans up any Note left
-        pointing at it, regardless of shape.
-        """
+        """Deleting a noteable object cleans up any Note left pointing at it."""
         rd = RECAPDocumentFactory(docket_entry__docket=self.docket_2)
         other_rd = RECAPDocumentFactory(docket_entry__docket=self.docket_3)
-        gfk_note = NoteFactory.for_object(rd, user=self.user)
-        legacy_note = NoteFactory(
-            cluster_id=self.opinion_cluster, user=self.user
+        rd_note = NoteFactory(content_object=rd, user=self.user)
+        cluster_note = NoteFactory(
+            content_object=self.opinion_cluster, user=self.user
         )
-        unrelated_note = NoteFactory.for_object(other_rd, user=self.user)
+        unrelated_note = NoteFactory(content_object=other_rd, user=self.user)
 
         rd.delete()
-        self.opinion_cluster.delete()
+        # Takes the cluster down with it via on_delete=CASCADE.
+        self.opinion_cluster.docket.delete()
 
-        self.assertFalse(Note.objects.filter(pk=gfk_note.pk).exists())
-        self.assertFalse(Note.objects.filter(pk=legacy_note.pk).exists())
+        self.assertFalse(Note.objects.filter(pk=rd_note.pk).exists())
+        self.assertFalse(Note.objects.filter(pk=cluster_note.pk).exists())
         self.assertTrue(Note.objects.filter(pk=unrelated_note.pk).exists())
 
-    def test_duplicate_gfk_note_is_rejected(self) -> None:
+    def test_duplicate_note_is_rejected(self) -> None:
         """A second Note for the same (content_type, object_id, user)
         is rejected.
         """
         rd = RECAPDocumentFactory(docket_entry__docket=self.docket_1)
-        NoteFactory.for_object(rd, user=self.user)
+        NoteFactory(content_object=rd, user=self.user)
 
         with self.assertRaises(IntegrityError):
             with transaction.atomic():
-                NoteFactory.for_object(rd, user=self.user)
+                NoteFactory(content_object=rd, user=self.user)
 
         other_user = UserFactory()
-        NoteFactory.for_object(rd, user=other_user)
+        NoteFactory(content_object=rd, user=other_user)
         self.assertEqual(
             Note.objects.filter(
-                content_type__isnull=False, object_id=rd.pk
+                content_type=ContentType.objects.get_for_model(rd),
+                object_id=rd.pk,
             ).count(),
             2,
         )
 
-    def test_form_prefills_hidden_fields_for_a_legacy_note(
-        self,
-    ) -> None:
-        """NoteForm.__init__ pre-fills content_type/object_id in
-        self.initial when bound to a still-legacy-shaped Note instance,
-        so an unbound (rendered) form already shows the new shape even
-        before anything is saved again.
-        """
-        legacy_note = NoteFactory(
-            cluster_id=self.opinion_cluster, user=self.user
-        )
-
-        form = NoteForm(instance=legacy_note)
-
-        self.assertEqual(
-            form.initial["content_type"],
-            ContentType.objects.get_for_model(self.opinion_cluster).pk,
-        )
-        self.assertEqual(form.initial["object_id"], self.opinion_cluster.pk)
-
     def test_form_rejects_a_dangling_object_id(self) -> None:
-        """Unlike the legacy FKs (real ForeignKeys, validated by
-        ModelChoiceField), object_id is a plain integer -- nothing stops
-        it from naming a row that doesn't exist unless NoteForm.clean()
-        checks it explicitly.
+        """object_id is a plain integer, not a real ForeignKey -- nothing
+        stops it from naming a row that doesn't exist unless
+        NoteForm.clean() checks it explicitly.
         """
         content_type = ContentType.objects.get_for_model(self.opinion_cluster)
         form = NoteForm(
@@ -1070,19 +997,19 @@ class RECAPPrayAndPay(SimpleUserDataMixin, PrayAndPayTestCase):
         """Does the delete_prayer method work properly?"""
 
         # Prayer is added, then deleted successfully
-        prayer_created = await create_prayer(self.user, self.rd_2)
+        await create_prayer(self.user, self.rd_2)
         prayer_deleted = await delete_prayer(self.user, self.rd_2)
         self.assertTrue(prayer_deleted)
 
         # Prayer is created, then document is made available to check that a user can't delete a prayer that has been granted
-        prayer_created = await create_prayer(self.user, self.rd_6)
+        await create_prayer(self.user, self.rd_6)
         self.rd_6.is_available = True
         await sync_to_async(self.rd_6.save)()
         prayer_deleted = await delete_prayer(self.user, self.rd_6)
         self.assertFalse(prayer_deleted)
 
         # Ensure that a user cannot delete the same prayer twice
-        prayer_created = await create_prayer(self.user, self.rd_2)
+        await create_prayer(self.user, self.rd_2)
         prayer_deleted = await delete_prayer(self.user, self.rd_2)
         prayer_deleted = await delete_prayer(self.user, self.rd_2)
         self.assertFalse(prayer_deleted)
@@ -1646,6 +1573,196 @@ class RECAPPrayAndPay(SimpleUserDataMixin, PrayAndPayTestCase):
 
         await self.rd_4.arefresh_from_db()
         self.assertEqual(self.rd_4.is_sealed, False)
+
+    async def test_prayers_page_nudges_non_members(self) -> None:
+        """Non-members are offered a way to get more daily prayers."""
+        await self.async_client.alogin(username="pandora", password="password")
+        r = await self.async_client.get(
+            reverse("user_prayers", args=["pandora"])
+        )
+        self.assertContains(r, "Members get more prayers each day.")
+        self.assertContains(r, ">Join FLP</a>")
+
+    async def test_prayers_page_does_not_nudge_members(self) -> None:
+        """Members already have more prayers, so don't ask them to join."""
+        user = await User.objects.aget(username="pandora")
+        await sync_to_async(NeonMembershipFactory)(user=user)
+        await self.async_client.alogin(username="pandora", password="password")
+        r = await self.async_client.get(
+            reverse("user_prayers", args=["pandora"])
+        )
+        self.assertNotContains(r, "Members get more prayers each day.")
+
+    @override_settings(ALLOWED_PRAYER_COUNT=0)
+    async def test_daily_limit_tooltip_mentions_membership(self) -> None:
+        """Only people who could get more prayers are told that members do."""
+        user = await User.objects.aget(username="pandora")
+        await self.async_client.alogin(username="pandora", password="password")
+        url = reverse("create_prayer", args=[self.rd_2.pk])
+
+        r = await self.async_client.post(url, headers={"HX-Request": "true"})
+        self.assertContains(r, "You have reached your daily prayer limit.")
+        self.assertContains(r, "Join FLP to get higher limits.")
+
+        await sync_to_async(NeonMembershipFactory)(user=user)
+        r = await self.async_client.post(url, headers={"HX-Request": "true"})
+        self.assertContains(r, "You have reached your daily prayer limit.")
+        self.assertNotContains(r, "Join FLP to get higher limits.")
+
+    # Sync on purpose: a method-level override_flag writes to the DB, which
+    # raises SynchronousOnlyOperation inside an async test.
+    @override_settings(WAFFLE_CACHE_PREFIX="test_pray_button_template_waffle")
+    @override_flag("use_new_design", active=True)
+    def test_pray_button_template(self) -> None:
+        """Flagged users get the partial for the page they clicked Pray on.
+
+        The design middleware picks the htmx partial by the X-CL-Design
+        header that v2 pages send, not by the flag, so a flagged user on a
+        page that is still legacy gets the legacy partial back.
+
+        Each subtest uses its own document and starts it with another user's
+        prayer, so the announced count has to move for the test to pass.
+        """
+        self.client.login(username="pandora", password="password")
+        pandora = User.objects.get(username="pandora")
+        legacy = "includes/pray_and_pay_htmx/pray_button.html"
+        v2 = "v2_includes/pray_and_pay_htmx/pray_button.html"
+        v2_headers = {"HX-Request": "true", "X-CL-Design": "v2"}
+
+        with self.subTest("legacy page"):
+            r = self.client.post(
+                reverse("create_prayer", args=[self.rd_2.pk]),
+                headers={"HX-Request": "true"},
+            )
+            self.assertTemplateUsed(r, legacy)
+            self.assertTemplateNotUsed(r, v2)
+
+        with self.subTest("v2 page, request added"):
+            PrayerFactory(
+                user=self.user, recap_document=self.rd_3, status=Prayer.WAITING
+            )
+            r = self.client.post(
+                reverse("create_prayer", args=[self.rd_3.pk]),
+                headers=v2_headers,
+            )
+            self.assertTemplateUsed(r, v2)
+            self.assertTemplateNotUsed(r, legacy)
+            self.assertTrue(
+                Prayer.objects.filter(
+                    user=pandora, recap_document=self.rd_3
+                ).exists()
+            )
+            self.assertIn(
+                "Your prayer for document 3 was added. 2 prayers so far.",
+                text_of(r),
+            )
+
+        with self.subTest("v2 page, request removed"):
+            PrayerFactory(
+                user=self.user, recap_document=self.rd_4, status=Prayer.WAITING
+            )
+            PrayerFactory(
+                user=pandora, recap_document=self.rd_4, status=Prayer.WAITING
+            )
+            r = self.client.post(
+                reverse("delete_prayer", args=[self.rd_4.pk]),
+                headers=v2_headers,
+            )
+            self.assertTemplateUsed(r, v2)
+            self.assertFalse(
+                Prayer.objects.filter(
+                    user=pandora, recap_document=self.rd_4
+                ).exists()
+            )
+            self.assertIn(
+                "Your prayer for document 4 was removed. 1 prayer so far.",
+                text_of(r),
+            )
+
+    @override_settings(WAFFLE_CACHE_PREFIX="test_pray_button_status_waffle")
+    @override_flag("use_new_design", active=True)
+    def test_pray_button_status_messages(self) -> None:
+        """The v2 status message names the document and the real outcome.
+
+        Added and removed are covered by test_pray_button_template; these are
+        the cases where the click didn't change anything.
+        """
+        self.client.login(username="pandora", password="password")
+        pandora = User.objects.get(username="pandora")
+        v2_headers = {"HX-Request": "true", "X-CL-Design": "v2"}
+
+        def post(view: str, rd: RECAPDocument) -> str:
+            r = self.client.post(
+                reverse(view, args=[rd.pk]), headers=v2_headers
+            )
+            return text_of(r)
+
+        with self.subTest("already added"):
+            PrayerFactory(
+                user=pandora, recap_document=self.rd_5, status=Prayer.WAITING
+            )
+            self.assertIn(
+                "Your prayer for document 5 was already added. 1 prayer so far.",
+                post("create_prayer", self.rd_5),
+            )
+
+        with self.subTest("not added, document available"):
+            self.assertIn(
+                "Your prayer for document 1 wasn't added because the document "
+                "is already available. 0 prayers so far.",
+                post("create_prayer", self.rd_1),
+            )
+
+        with self.subTest("not added, daily limit"):
+            with self.settings(ALLOWED_PRAYER_COUNT=0):
+                text = post("create_prayer", self.rd_6)
+            self.assertIn(
+                "Your prayer for document 6 wasn't added because you reached "
+                "your daily limit. 0 prayers so far.",
+                text,
+            )
+
+        with self.subTest("already removed"):
+            self.assertIn(
+                "Your prayer for document 2 was already removed. 0 prayers so far.",
+                post("delete_prayer", self.rd_2),
+            )
+
+        with self.subTest("not removed, already granted"):
+            PrayerFactory(
+                user=pandora, recap_document=self.rd_3, status=Prayer.GRANTED
+            )
+            self.assertIn(
+                "Your prayer for document 3 can't be removed because it was "
+                "already granted. 0 prayers so far.",
+                post("delete_prayer", self.rd_3),
+            )
+            self.assertTrue(
+                Prayer.objects.filter(
+                    user=pandora, recap_document=self.rd_3
+                ).exists()
+            )
+
+        with self.subTest("attachment label"):
+            rd = RECAPDocumentFactory(
+                document_number="7",
+                attachment_number=2,
+                document_type=RECAPDocument.ATTACHMENT,
+                is_available=False,
+            )
+            self.assertIn(
+                "Your prayer for document 7, attachment 2 was added. 1 prayer so far.",
+                post("create_prayer", rd),
+            )
+
+        with self.subTest("no document number"):
+            rd = RECAPDocumentFactory(is_available=False)
+            # The factory fills in a blank document_number, so clear it after.
+            RECAPDocument.objects.filter(pk=rd.pk).update(document_number="")
+            self.assertIn(
+                "Your prayer for this document was added. 1 prayer so far.",
+                post("create_prayer", rd),
+            )
 
     async def test_can_we_load_the_top_prayers_page(self) -> None:
         """Does the 'top prayers' page return a successful response?"""

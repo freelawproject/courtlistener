@@ -5,7 +5,6 @@ from datetime import timedelta
 from types import SimpleNamespace
 from unittest.mock import patch
 
-import time_machine
 from django.apps import apps
 from django.conf import settings
 from django.core.cache import cache
@@ -19,17 +18,10 @@ from oauth2_provider.models import (
     get_access_token_model,
     get_application_model,
     get_grant_model,
-    get_id_token_model,
-    get_refresh_token_model,
     set_token_value,
 )
 from rest_framework.authtoken.models import Token
 
-from cl.oauth.cleanup_utils import (
-    delete_unconfirmed_applications,
-    run_cleanup_pass,
-    unconfirmed_applications,
-)
 from cl.oauth.factories import ApplicationFactory
 from cl.tests.cases import APITestCase, TestCase
 from cl.tests.utils import parse_csp
@@ -38,8 +30,6 @@ from cl.users.factories import UserFactory, UserProfileWithParentsFactory
 Application = get_application_model()
 Grant = get_grant_model()
 AccessToken = get_access_token_model()
-RefreshToken = get_refresh_token_model()
-IDToken = get_id_token_model()
 
 
 @override_settings(RATELIMIT_ENABLE=False)
@@ -565,187 +555,23 @@ class AuthorizeViewCSPTest(TestCase):
         self.assertEqual(parse_csp(r)["form-action"], ["'self'"])
 
 
-class UnconfirmedApplicationCleanupTest(TestCase):
-    """The application cleanup deletes never-authorized DCR apps only."""
+class CleanOAuthTablesCommandTest(TestCase):
+    """The command clears expired grants and tokens and leaves every
+    application alone, authorized or not."""
 
-    @classmethod
-    def setUpTestData(cls):
-        cls.user = UserFactory()
-        expires = now() + timedelta(hours=1)
-        redirect_uri = "https://client.example.com/callback"
-        with time_machine.travel(now() - timedelta(days=2), tick=False):
-            cls.stale = ApplicationFactory(name="stale, never authorized")
-            cls.owned = ApplicationFactory(name="owned", user=cls.user)
-            cls.in_house = ApplicationFactory(
-                name="in-house", skip_authorization=True
-            )
-            cls.with_grant = ApplicationFactory(name="consent pending")
-            cls.with_access_token = ApplicationFactory(name="access token")
-            cls.with_refresh_token = ApplicationFactory(name="refresh token")
-            cls.with_id_token = ApplicationFactory(name="id token")
-        cls.fresh = ApplicationFactory(name="registered just now")
-        Grant.objects.create(
-            user=cls.user,
-            code="grant-code",
-            application=cls.with_grant,
-            expires=expires,
-            redirect_uri=redirect_uri,
-        )
-        AccessToken.objects.create(
-            user=cls.user,
-            token="access-token",
-            application=cls.with_access_token,
-            expires=expires,
-        )
-        RefreshToken.objects.create(
-            user=cls.user,
-            token="refresh-token",
-            application=cls.with_refresh_token,
-        )
-        IDToken.objects.create(
-            user=cls.user, application=cls.with_id_token, expires=expires
-        )
-        cls.kept = [
-            cls.owned,
-            cls.in_house,
-            cls.with_grant,
-            cls.with_access_token,
-            cls.with_refresh_token,
-            cls.with_id_token,
-            cls.fresh,
-        ]
-
-    def assertKeptApplicationsExist(self):
-        for app in self.kept:
-            with self.subTest(app=app.name):
-                self.assertTrue(Application.objects.filter(pk=app.pk).exists())
-
-    def test_only_stale_unauthorized_apps_are_candidates(self):
-        candidates = unconfirmed_applications(min_age=timedelta(days=1))
-        self.assertEqual(
-            list(candidates.values_list("pk", flat=True)), [self.stale.pk]
-        )
-
-    def test_max_age_excludes_older_registrations(self):
-        old_enough = unconfirmed_applications(
-            min_age=timedelta(days=1), max_age=timedelta(days=3)
-        )
-        self.assertEqual(old_enough.count(), 1)
-        too_old = unconfirmed_applications(
-            min_age=timedelta(days=1), max_age=timedelta(hours=36)
-        )
-        self.assertEqual(too_old.count(), 0)
-
-    def test_delete_removes_candidates_and_keeps_the_rest(self):
-        deleted = delete_unconfirmed_applications(
-            min_age=timedelta(days=1), batch_size=100, pause_seconds=0
-        )
-        self.assertEqual(deleted, 1)
-        self.assertFalse(Application.objects.filter(pk=self.stale.pk).exists())
-        self.assertKeptApplicationsExist()
-
-    def test_dry_run_counts_without_deleting(self):
-        deleted = delete_unconfirmed_applications(
-            min_age=timedelta(days=1),
-            batch_size=100,
-            pause_seconds=0,
-            dry_run=True,
-        )
-        self.assertEqual(deleted, 1)
-        self.assertTrue(Application.objects.filter(pk=self.stale.pk).exists())
-
-    def test_batches_until_no_candidates_remain(self):
-        with time_machine.travel(now() - timedelta(days=2), tick=False):
-            ApplicationFactory.create_batch(4)
-        deleted = delete_unconfirmed_applications(
-            min_age=timedelta(days=1), batch_size=2, pause_seconds=0
-        )
-        self.assertEqual(deleted, 5)
-        self.assertEqual(
-            unconfirmed_applications(min_age=timedelta(days=1)).count(), 0
-        )
-        self.assertKeptApplicationsExist()
-
-    @patch("cl.oauth.cleanup_utils.logger")
-    def test_window_narrower_than_min_age_warns(self, mock_logger):
-        """An empty age window is logged rather than silently deleting nothing."""
-        unconfirmed_applications(
-            min_age=timedelta(days=2), max_age=timedelta(days=1)
-        )
-        mock_logger.warning.assert_called_once()
-        self.assertIn("no application", mock_logger.warning.call_args.args[0])
-
-
-@override_settings(OAUTH_CLEANUP_UNCONFIRMED_APP_MIN_AGE_HOURS=24)
-class CleanupPassTest(TestCase):
-    """A full pass deletes applications and then clears expired tokens."""
-
-    @classmethod
-    def setUpTestData(cls):
-        cls.user = UserFactory()
-        with time_machine.travel(now() - timedelta(days=2), tick=False):
-            cls.stale = ApplicationFactory(name="stale, never authorized")
-
-    @patch("cl.oauth.cleanup_utils.clear_expired")
-    def test_pass_clears_expired_tokens(self, mock_clear_expired):
-        """The pass deletes applications and clears tokens."""
-        run_cleanup_pass()
-        mock_clear_expired.assert_called_once()
-        self.assertFalse(Application.objects.filter(pk=self.stale.pk).exists())
-
-    @patch("cl.oauth.cleanup_utils.clear_expired")
-    def test_dry_run_skips_token_cleanup(self, mock_clear_expired):
-        """Dry run counts applications and leaves tokens alone."""
-        run_cleanup_pass(dry_run=True)
-        mock_clear_expired.assert_not_called()
-        self.assertTrue(Application.objects.filter(pk=self.stale.pk).exists())
-
-    @patch("cl.oauth.cleanup_utils.refresh_token_expire_timedelta")
-    def test_pass_caps_candidates_at_the_refresh_token_lifetime(
-        self, mock_lifetime
-    ):
-        """Applications older than the refresh token window are left alone."""
-        # Past this age clear_expired() may already have removed the tokens
-        # that prove a user authorized the application, so it is no longer
-        # possible to tell it apart from one that was never authorized.
-        mock_lifetime.return_value = timedelta(days=30)
-        with time_machine.travel(now() - timedelta(days=31), tick=False):
-            ancient = ApplicationFactory(name="authorized long ago")
-        run_cleanup_pass()
-        self.assertTrue(Application.objects.filter(pk=ancient.pk).exists())
-        self.assertFalse(Application.objects.filter(pk=self.stale.pk).exists())
-
-    def test_pass_removes_expired_grants(self):
-        """Expired grants are really cleared, not just counted."""
+    def test_clears_expired_grants_and_keeps_applications(self):
+        """Expired grants go; a never-authorized application stays."""
+        app = ApplicationFactory(name="never authorized")
         expired_grant = Grant.objects.create(
-            user=self.user,
+            user=UserFactory(),
             code="expired-code",
-            application=self.stale,
+            application=app,
             expires=now() - timedelta(hours=1),
             redirect_uri="https://client.example.com/callback",
         )
-        run_cleanup_pass()
-        self.assertFalse(Grant.objects.filter(pk=expired_grant.pk).exists())
-        # The grant kept its application out of the candidate set this pass.
-        self.assertTrue(Application.objects.filter(pk=self.stale.pk).exists())
-
-
-@override_settings(OAUTH_CLEANUP_UNCONFIRMED_APP_MIN_AGE_HOURS=24)
-class CleanOAuthTablesCommandTest(TestCase):
-    """The clean_oauth_tables command runs one pass and honors --dry-run."""
-
-    @classmethod
-    def setUpTestData(cls):
-        with time_machine.travel(now() - timedelta(days=2), tick=False):
-            cls.stale = ApplicationFactory(name="stale, never authorized")
-
-    def test_run_deletes_unconfirmed_applications(self):
         call_command("clean_oauth_tables")
-        self.assertFalse(Application.objects.filter(pk=self.stale.pk).exists())
-
-    def test_dry_run_deletes_nothing(self):
-        call_command("clean_oauth_tables", "--dry-run")
-        self.assertTrue(Application.objects.filter(pk=self.stale.pk).exists())
+        self.assertFalse(Grant.objects.filter(pk=expired_grant.pk).exists())
+        self.assertTrue(Application.objects.filter(pk=app.pk).exists())
 
 
 class RegistrationSourceBackfillTest(TestCase):
