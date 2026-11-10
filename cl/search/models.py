@@ -4318,6 +4318,12 @@ class SCOTUSDocument(AbstractDateTimeModel, AbstractPDF):
     :ivar url: The download URL that SCOTUS provided for this document.
     """
 
+    # Not a model field - merge_scotus_document sets this transiently on a
+    # new document whose PDF will be downloaded, so the ES signal processor
+    # doesn't percolate it before its text is extracted. Declared here only
+    # so the type checker knows the attribute exists.
+    skip_percolator_request: bool
+
     docket_entry = models.ForeignKey(
         SCOTUSDocketEntry,
         on_delete=models.CASCADE,

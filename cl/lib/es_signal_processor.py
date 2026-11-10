@@ -356,18 +356,33 @@ def update_es_documents(
                     if fields_to_update:
                         # Update main document in ES, including fields to be
                         # extracted from a related instance.
-                        transaction.on_commit(
-                            partial(
-                                update_es_document.delay,
-                                es_document.__name__,
-                                fields_to_update,
-                                (
-                                    compose_app_label(main_object),
-                                    main_object.pk,
-                                ),
-                                (compose_app_label(instance), instance.pk),
-                                fields_map,
+                        update_args = (
+                            es_document.__name__,
+                            fields_to_update,
+                            (
+                                compose_app_label(main_object),
+                                main_object.pk,
+                            ),
+                            # Same "app_label.ClassName" as compose_app_label,
+                            # which only accepts ES model types.
+                            (instance._meta.label, instance.pk),
+                            fields_map,
+                        )
+                        if type(main_object) not in SOURCE_BY_MODEL:
+                            transaction.on_commit(
+                                partial(update_es_document.delay, *update_args)
                             )
+                            continue
+                        # A docket-source document updated from a related
+                        # instance (e.g. its SCOTUS docket entry) can trigger
+                        # alerts; should_percolate_update in
+                        # update_es_document decides.
+                        transaction.on_commit(
+                            chain(
+                                update_es_document.si(*update_args),
+                                send_or_schedule_search_alerts.s(),
+                                percolator_response_processing.s(),
+                            ).apply_async
                         )
 
 

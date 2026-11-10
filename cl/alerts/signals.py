@@ -12,6 +12,7 @@ from cl.search.documents import (
     OpinionPercolator,
     RECAPPercolator,
 )
+from cl.search.es_docket_sources import ALL_ES_SOURCES, percolator_enabled
 from cl.search.models import SEARCH_TYPES
 from cl.search.tasks import remove_document_from_es_index
 
@@ -38,8 +39,10 @@ def create_or_update_alert_in_es_index(sender, instance=None, **kwargs):
                     AudioPercolator.__name__,
                 )
             )
-        case SEARCH_TYPES.RECAP | SEARCH_TYPES.DOCKETS if (
-            settings.PERCOLATOR_RECAP_SEARCH_ALERTS_ENABLED
+        # RECAP and SCOTUS content share the RECAP percolator index, so the
+        # alerts are needed there if either is percolated.
+        case SEARCH_TYPES.RECAP | SEARCH_TYPES.DOCKETS if any(
+            percolator_enabled(source) for source in ALL_ES_SOURCES
         ):
             transaction.on_commit(
                 partial(
@@ -85,7 +88,7 @@ def remove_alert_from_es_index(sender, instance=None, **kwargs):
             remove_document_from_es_index.delay(
                 AudioPercolator.__name__, instance.pk, None
             )
-        case SEARCH_TYPES.RECAP:
+        case SEARCH_TYPES.RECAP | SEARCH_TYPES.DOCKETS:
             remove_document_from_es_index.delay(
                 RECAPPercolator.__name__, instance.pk, None
             )

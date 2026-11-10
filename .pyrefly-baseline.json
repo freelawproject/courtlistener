@@ -1318,13 +1318,6 @@
       "severity": "error"
     },
     {
-      "column": 52,
-      "path": "cl/lib/es_signal_processor.py",
-      "name": "bad-argument-type",
-      "concise_description": "Argument `Model` is not assignable to parameter `instance` with type `Audio | Citation | Docket | DocketEntry | Education | Opinion | OpinionCluster | Parenthetical | ParentheticalGroup | Person | Position | RECAPDocument` in function `cl.lib.indexing_utils.compose_app_label`",
-      "severity": "error"
-    },
-    {
       "column": 32,
       "path": "cl/lib/es_signal_processor.py",
       "name": "bad-argument-type",

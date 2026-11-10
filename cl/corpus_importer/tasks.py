@@ -106,6 +106,7 @@ from rest_framework.renderers import JSONRenderer
 from sentry_sdk import capture_exception
 
 from cl.alerts.tasks import enqueue_docket_alert, send_alert_and_webhook
+from cl.alerts.utils import set_skip_percolation_if_parties_data
 from cl.audio.models import Audio
 from cl.celery_init import app
 from cl.citations.tasks import (
@@ -203,6 +204,7 @@ from cl.scrapers.tasks import (
     extract_pdf_document_base,
 )
 from cl.search.cluster_sources import ClusterSources
+from cl.search.documents import ESRECAPDocument
 from cl.search.models import (
     PRECEDENTIAL_STATUS,
     CaseTransfer,
@@ -226,7 +228,7 @@ from cl.search.state.texas.models import (
     TexasDocketEntry,
     TexasDocument,
 )
-from cl.search.tasks import index_docket_parties_in_es
+from cl.search.tasks import index_docket_parties_in_es, percolate_document
 from cl.settings import COURT_REQUEST_USER_AGENT
 
 HYPERSCAN_TOKENIZER = HyperscanTokenizer(cache_dir=".hyperscan")
@@ -3682,15 +3684,23 @@ def merge_scotus_document(
     attachment_number = doc_data["attachment_number"]
 
     # Retrieve existing object or create new one
-    scotus_document, created = SCOTUSDocument.objects.get_or_create(
-        docket_entry=docket_entry,
-        document_number=document_number,
-        attachment_number=attachment_number,
-        defaults={
-            "description": description,
-            "url": url,
-        },
-    )
+    lookup = {
+        "docket_entry": docket_entry,
+        "document_number": document_number,
+        "attachment_number": attachment_number,
+    }
+    try:
+        scotus_document = SCOTUSDocument.objects.get(**lookup)
+        created = False
+    except SCOTUSDocument.DoesNotExist:
+        scotus_document = SCOTUSDocument(
+            **lookup, description=description, url=url
+        )
+        # Its PDF is downloaded next, so don't percolate it yet: it's
+        # percolated once, with its text, by percolate_scotus_document.
+        scotus_document.skip_percolator_request = download_file
+        scotus_document.save()
+        created = True
 
     # Check if the filename has changed for existing documents
     file_name_changed = False
@@ -3712,9 +3722,36 @@ def merge_scotus_document(
             extract_pdf_document.s(
                 check_if_needed=False, model_name="search.SCOTUSDocument"
             ),
+            # Runs even if the extraction fails, so the document is still
+            # percolated with its metadata.
+            percolate_scotus_document.si(scotus_document.pk),
         ).apply_async()
 
     return created, scotus_document.pk
+
+
+@app.task(ignore_result=True)
+def percolate_scotus_document(doc_pk: int) -> None:
+    """Percolate a new SCOTUSDocument once its PDF processing is done, so
+    search alerts match its text too.
+
+    Runs after the text extraction, or right away when the PDF download
+    fails. New documents with a PDF to download skip percolation when
+    they're created (see merge_scotus_document), so this is their first
+    percolation. Percolation is still gated by
+    PERCOLATOR_SCOTUS_SEARCH_ALERTS_ENABLED.
+
+    :param doc_pk: The SCOTUSDocument pk.
+    :return: None
+    """
+    scotus_document = (
+        SCOTUSDocument.objects.select_related("docket_entry__docket")
+        .filter(pk=doc_pk)
+        .first()
+    )
+    if not scotus_document:
+        return
+    percolate_document(ESRECAPDocument, scotus_document.pk, scotus_document)
 
 
 def merge_scotus_docket_entry(
@@ -3909,6 +3946,7 @@ def merge_scotus_docket(
             None,
         )
 
+        docket_created = d.pk is None
         if d.pk:
             # If the docket already exists, compound the SCRAPER source.
             d.add_scraper_source()
@@ -3977,6 +4015,17 @@ def merge_scotus_docket(
         # source=SCRAPER is indistinguishable from an opinion-scraper
         # Docket, so it can't tell them apart on its own.
         d._index_in_es = True
+        normalized_parties = (
+            normalize_scotus_parties(report_data["parties"])
+            if report_data["parties"]
+            else []
+        )
+        # Like RECAP: if the parties fit the attorney limit, skip
+        # percolating this save; the docket is percolated after its parties
+        # are indexed, so alerts on party fields can match it.
+        percolate_parties = set_skip_percolation_if_parties_data(
+            normalized_parties, d
+        )
         d.save()
 
         # Merge ScotusDocketMetadata
@@ -4006,12 +4055,17 @@ def merge_scotus_docket(
         )
 
     # Merge Parties
-    if report_data["parties"]:
-        normalized_parties = normalize_scotus_parties(report_data["parties"])
+    if normalized_parties:
         add_parties_and_attorneys(d, normalized_parties)
-        # Party rows don't trigger ES signals, and the Docket was indexed
-        # when its metadata was saved, before these parties existed.
-        index_docket_parties_in_es.delay(d.pk, percolate_parties=False)
+    if normalized_parties or docket_created:
+        # Party rows don't trigger ES signals, and the Docket was indexed when
+        # its metadata was saved, before these parties existed. A new SCOTUS
+        # docket is always percolated here: unlike RECAP, its own first save
+        # isn't indexed (it waits for the metadata), so it's never percolated
+        # on save.
+        index_docket_parties_in_es.delay(
+            d.pk, percolate_parties=percolate_parties or docket_created
+        )
 
     # Docket entries merger:
     enrich_scotus_attachments(report_data["docket_entries"])
@@ -4092,6 +4146,9 @@ def download_scotus_document_pdf(self: Task, doc_pk: int) -> int | None:
                 doc_pk,
                 url,
             )
+            # The chain stops here, so percolate the document now, with
+            # its metadata only.
+            percolate_scotus_document.delay(doc_pk)
             self.request.chain = None
             return None
 

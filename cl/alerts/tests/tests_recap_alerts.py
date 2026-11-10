@@ -2682,8 +2682,9 @@ class RECAPAlertsSweepIndexTest(
         docket_2.delete()
 
     def test_sweep_index_skips_scotus(self, mock_prefix) -> None:
-        """Search alerts don't support SCOTUS yet, so the daily sweep index
-        gets RECAP content changed that day but not SCOTUS content."""
+        """SCOTUS alerts only cover new content, which is percolated, so
+        the daily sweep index gets RECAP content changed that day but not
+        SCOTUS content."""
         RECAPSweepDocument._index.delete(ignore=404)
         RECAPSweepDocument.init()
         with (
