@@ -3664,8 +3664,8 @@ def merge_scotus_document(
     """Merge a single SCOTUSDocument attachment into CL.
 
     Checks if the document exists, creating a SCOTUSDocument object if it does
-    not. Then, if the document is new or the filename has changed,
-    fetch the attachment PDF, store it, and compute metadata.
+    not. Then, if the document is new, was a placeholder, or the filename has
+    changed, fetch the attachment PDF, store it, and compute metadata.
 
     :param docket_entry: The docket entry this attachment belongs to.
     :param doc_data: The attachment data to merge.
@@ -3692,12 +3692,15 @@ def merge_scotus_document(
         },
     )
 
-    # Check if the filename has changed for existing documents
+    # Check if the filename has changed for existing documents. A filled-in
+    # placeholder never had a file, so it needs one whatever its URL.
     file_name_changed = False
     if not created:
         old_file_name = extract_file_name_from_url(scotus_document.url)
         new_file_name = extract_file_name_from_url(url)
-        file_name_changed = old_file_name != new_file_name
+        file_name_changed = (
+            scotus_document.is_placeholder or old_file_name != new_file_name
+        )
 
         # Update the fields
         scotus_document.description = description
@@ -3717,6 +3720,42 @@ def merge_scotus_document(
     return created, scotus_document.pk
 
 
+def add_scotus_placeholder_document(docket_entry: SCOTUSDocketEntry) -> None:
+    """Give a SCOTUS entry without attachments an empty placeholder
+    document, so ES, which indexes entries through their documents, can
+    index it. Does nothing if the entry already has a document.
+
+    :param docket_entry: The entry to add the placeholder to.
+    :return: None
+    """
+    if docket_entry.scotus_documents.exists():
+        return
+    SCOTUSDocument.objects.create(docket_entry=docket_entry)
+
+
+def fill_scotus_placeholder_document(
+    docket_entry: SCOTUSDocketEntry, attachment: dict[str, Any]
+) -> int | None:
+    """Turn the entry's placeholder, if it has one, into the given
+    attachment by giving it the attachment's numbers. merge_scotus_document
+    then finds it and fills in the rest, instead of creating a new document
+    and leaving the empty placeholder next to it.
+
+    :param docket_entry: The entry whose placeholder to fill in.
+    :param attachment: The attachment data the placeholder becomes.
+    :return: The placeholder's pk, or None if the entry has no placeholder.
+    """
+    placeholder = docket_entry.scotus_documents.filter(url="").first()
+    if placeholder is None:
+        return None
+    placeholder.document_number = attachment["document_number"]
+    placeholder.attachment_number = attachment["attachment_number"]
+    placeholder.save(
+        update_fields=["document_number", "attachment_number", "date_modified"]
+    )
+    return placeholder.pk
+
+
 def merge_scotus_docket_entry(
     docket: Docket,
     sequence_number: str,
@@ -3724,6 +3763,9 @@ def merge_scotus_docket_entry(
     download_file: bool = True,
 ) -> tuple[bool, int | None, list[int]]:
     """Merges a SCOTUS docket entry into CL.
+
+    An entry without attachments gets an empty placeholder document, which
+    becomes its first attachment once it has some.
 
     :param docket: The docket this entry belongs to.
     :param sequence_number: The sequence number of the docket entry.
@@ -3816,14 +3858,22 @@ def merge_scotus_docket_entry(
         de.date_filed = date_filed
         de.save()
 
+        attachments = input_docket_entry["attachments"]
+        if not attachments:
+            add_scotus_placeholder_document(de)
+            return de_created, de.pk, []
+
         # Merge attachments; only track newly created document PKs
         doc_pks = []
-        attachments = input_docket_entry["attachments"]
+        filled_placeholder_pk = fill_scotus_placeholder_document(
+            de, attachments[0]
+        )
         for document in attachments:
             created, doc_pk = merge_scotus_document(
                 de, document, download_file=download_file
             )
-            if created:
+            # A filled-in placeholder is a new document to callers too.
+            if created or doc_pk == filled_placeholder_pk:
                 doc_pks.append(doc_pk)
         return de_created, de.pk, doc_pks
 
