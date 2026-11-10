@@ -2737,6 +2737,25 @@ def get_docket_entry_pk(doc: AttrDict[Any]) -> int | None:
     return None
 
 
+def get_docket_entry_fragment(doc: AttrDict[Any]) -> str:
+    """Return the URL fragment of an ESRECAPDocument hit's entry on the
+    docket page, e.g. "#entry-7", or "" if the hit has no entry to point to.
+
+    Use it to link documents without a page of their own, like minute
+    entries and SCOTUS placeholders, to their entry. It matches the anchors
+    the docket page renders: "entry-<number>" for numbered entries and
+    "minute-entry-<pk>" for the rest.
+
+    :param doc: An ESRECAPDocument hit.
+    :return: The fragment, including its "#", or "".
+    """
+    if entry_number := getattr(doc, "entry_number", None):
+        return f"#entry-{entry_number}"
+    if docket_entry_pk := get_docket_entry_pk(doc):
+        return f"#minute-entry-{docket_entry_pk}"
+    return ""
+
+
 def do_es_feed_query(
     search_query: Search,
     cd: CleanData,

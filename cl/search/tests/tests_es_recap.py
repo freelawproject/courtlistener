@@ -7540,12 +7540,10 @@ class SCOTUSRECAPSearchTest(
                 self.assertNotIn(self.scotus_docket_path, hidden)
                 self.assertIn(self.scotus_docket_path, shown)
 
-    def test_search_feed_links_numberless_documents_to_their_entry(
-        self,
-    ) -> None:
-        """RSS search feed items for RECAP and SCOTUS documents without a
-        number, which have no page of their own, link to their entry on the
-        docket page instead of the homepage."""
+    def _create_numberless_documents(self) -> list[str]:
+        """Create RECAP and SCOTUS documents without a number, matching the
+        query "Numberless", and return the links to their entries on the
+        docket page that search results should use for them."""
         filed = datetime.date(2024, 1, 3)
         with self.captureOnCommitCallbacks(execute=True):
             recap_minute_entry = DocketEntryFactory(
@@ -7581,6 +7579,22 @@ class SCOTUSRECAPSearchTest(
             ]:
                 document.save()
 
+        recap_docket_url = recap_minute_entry.docket.get_absolute_url()
+        scotus_docket_url = scotus_numbered_entry.docket.get_absolute_url()
+        return [
+            f"{recap_docket_url}#minute-entry-{recap_minute_entry.pk}",
+            f"{scotus_docket_url}#entry-7",
+            f"{scotus_docket_url}#minute-entry-{scotus_minute_entry.pk}",
+        ]
+
+    def test_search_feed_links_numberless_documents_to_their_entry(
+        self,
+    ) -> None:
+        """RSS search feed items for RECAP and SCOTUS documents without a
+        number, which have no page of their own, link to their entry on the
+        docket page instead of the homepage."""
+        expected = self._create_numberless_documents()
+
         r = self.client.get(
             reverse("search_feed", args=["search"]),
             {"type": SEARCH_TYPES.RECAP, "q": "Numberless"},
@@ -7591,13 +7605,6 @@ class SCOTUSRECAPSearchTest(
         hrefs = tree.xpath(
             "//atom:entry/atom:link/@href", namespaces=namespaces
         )
-        recap_docket_url = recap_minute_entry.docket.get_absolute_url()
-        scotus_docket_url = scotus_numbered_entry.docket.get_absolute_url()
-        expected = [
-            f"{recap_docket_url}#minute-entry-{recap_minute_entry.pk}",
-            f"{scotus_docket_url}#entry-7",
-            f"{scotus_docket_url}#minute-entry-{scotus_minute_entry.pk}",
-        ]
         # The feed makes item links absolute; compare their path and anchor.
         links = [
             urllib.parse.urlsplit(href)._replace(scheme="", netloc="").geturl()
@@ -7612,6 +7619,24 @@ class SCOTUSRECAPSearchTest(
             )
         ]
         self.assertCountEqual(summary_links, expected)
+
+    def test_search_page_links_numberless_documents_to_their_entry(
+        self,
+    ) -> None:
+        """Search page results for RECAP and SCOTUS documents without a
+        number link to their entry on the docket page, the same as the RSS
+        search feed."""
+        expected = self._create_numberless_documents()
+
+        r = self.client.get(
+            reverse("show_results"),
+            {"type": SEARCH_TYPES.RECAP, "q": "Numberless"},
+        )
+
+        links = html.fromstring(r.content.decode()).xpath(
+            "//a[contains(@href, 'entry-')]/@href"
+        )
+        self.assertCountEqual(links, expected)
 
     def test_search_apis_never_show_scotus(self) -> None:
         """The v3 and v4 search APIs leave SCOTUS out even for requests
