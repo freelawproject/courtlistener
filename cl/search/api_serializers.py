@@ -316,19 +316,9 @@ class ParentheticalSerializer(
     context in the same response, avoiding a follow-up request per row.
     """
 
-    absolute_url = serializers.SerializerMethodField()
-
-    def get_absolute_url(self, obj) -> str:
-        """Return the absolute URL for the opinion's summaries page.
-
-        Returns an empty string if the URL cannot be resolved (e.g. in
-        test environments where frontend URL patterns are not loaded).
-        """
-        try:
-            return obj.get_absolute_url()
-        except Exception:
-            return ""
-
+    absolute_url = serializers.CharField(
+        source="get_absolute_url", read_only=True
+    )
     describing_opinion_id = serializers.ReadOnlyField()
     describing_opinion = serializers.HyperlinkedRelatedField(
         many=False,

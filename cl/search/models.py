@@ -3697,8 +3697,11 @@ class Parenthetical(models.Model):
         )
 
     def get_absolute_url(self) -> str:
+        """Return the URL of the Summaries tab of the described opinion's
+        cluster, where this parenthetical is displayed.
+        """
         cluster = self.described_opinion.cluster
-        return reverse("view_summaries", args=[cluster.pk, cluster.slug])
+        return reverse("view_case_summaries", args=[cluster.pk, cluster.slug])
 
     class Meta:
         verbose_name_plural = "Opinion parentheticals"
