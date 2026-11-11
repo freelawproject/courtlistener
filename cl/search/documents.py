@@ -1262,7 +1262,7 @@ class ESRECAPBaseDocument(DSLDocument):
         search_analyzer="search_analyzer",
     )
     attachment_number = fields.IntegerField(attr="attachment_number")
-    is_available = fields.BooleanField(attr="is_available")
+    is_available = fields.BooleanField()
     page_count = fields.IntegerField(attr="page_count")
     filepath_local = fields.KeywordField(index=False)
     absolute_url = fields.KeywordField(index=False)
@@ -1356,6 +1356,13 @@ class ESRECAPDocument(
     def prepare_filepath_local(self, instance):
         if instance.filepath_local:
             return instance.filepath_local.name
+
+    def prepare_is_available(self, instance: SourceDocument) -> bool | None:
+        """Index whether the document's file is available."""
+        # SCOTUS maps filepath_local changes to is_available. Without a
+        # prepare method, partial updates would copy the filepath_local
+        # value into is_available.
+        return instance.is_available
 
     def prepare_absolute_url(self, instance):
         return instance.get_absolute_url()

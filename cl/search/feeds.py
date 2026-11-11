@@ -1,20 +1,26 @@
 import logging
 from collections.abc import Callable
 from functools import wraps
+from typing import Any
 
 from django.contrib.syndication.views import Feed
 from django.http import HttpResponse
 from django.shortcuts import get_object_or_404
+from django.urls import reverse
 from django.utils.feedgenerator import Atom1Feed
 from django.utils.html import strip_tags
+from django.utils.text import slugify
 from django.utils.timezone import is_naive
 from elasticsearch.dsl.response import Response
+from elasticsearch.dsl.utils import AttrDict
 from elasticsearch.exceptions import ApiError, TransportError
 
 from cl.lib.date_time import midnight_pt
-from cl.lib.elasticsearch_utils import do_es_feed_query
+from cl.lib.elasticsearch_utils import do_es_feed_query, get_docket_entry_pk
 from cl.lib.mime_types import lookup_mime_type
 from cl.lib.search_index_utils import null_map
+from cl.lib.search_utils import scotus_frontend_search_enabled
+from cl.lib.string_utils import trunc
 from cl.lib.timezone_helpers import localize_naive_datetime_to_court_timezone
 from cl.search.documents import ESRECAPDocument, OpinionClusterDocument
 from cl.search.exception import (
@@ -100,6 +106,9 @@ class SearchFeed(Feed):
             return []
 
         cd = search_form.cleaned_data
+        # obj is the request (see get_object). Also part of the feed's
+        # micro-cache key, so feeds cached with and without SCOTUS stay apart.
+        cd["include_scotus"] = scotus_frontend_search_enabled(obj)
         order_by = "dateFiled"
         match cd["type"]:
             case SEARCH_TYPES.OPINION:
@@ -129,8 +138,34 @@ class SearchFeed(Feed):
         cleanup_control_chars(items, document_text_key)
         return items
 
-    def item_link(self, item):
-        return get_item(item)["absolute_url"]
+    def item_link(self, item: AttrDict[Any]) -> str:
+        """Return the item's own page, or, for a RECAP search document
+        without one, its entry on the docket page.
+        """
+        doc = get_item(item)
+        if doc["absolute_url"]:
+            return doc["absolute_url"]
+        # RECAP and SCOTUS documents without a number have no page of their
+        # own, so link to their entry on the docket page, using the anchors
+        # that page renders. The slug is rebuilt the way Docket.save() does,
+        # since child documents don't store it.
+        docket_url = reverse(
+            "view_docket",
+            args=[doc["docket_id"], slugify(trunc(doc["caseName"], 75))],
+        )
+        if entry_number := getattr(doc, "entry_number", None):
+            return f"{docket_url}#entry-{entry_number}"
+        if docket_entry_pk := get_docket_entry_pk(doc):
+            return f"{docket_url}#minute-entry-{docket_entry_pk}"
+        return docket_url
+
+    def get_context_data(self, **kwargs: Any) -> dict[str, Any]:
+        """Add the item's link to the description template's context, so
+        its "Original document" link gets the same fallback as item_link.
+        """
+        context = super().get_context_data(**kwargs)
+        context["item_link"] = self.item_link(kwargs["item"])
+        return context
 
     def item_author_name(self, item):
         return get_item(item)["court"]

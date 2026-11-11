@@ -24,7 +24,7 @@ from django.utils.html import strip_tags
 from django_elasticsearch_dsl.search import Search
 from elasticsearch.dsl import A, MultiSearch, Q
 from elasticsearch.dsl import Search as SearchDSL
-from elasticsearch.dsl.query import Query, QueryString, Range
+from elasticsearch.dsl.query import Bool, Query, QueryString, Range
 from elasticsearch.dsl.response import Hit, Response
 from elasticsearch.dsl.utils import AttrDict
 from elasticsearch.exceptions import ApiError, RequestError, TransportError
@@ -56,6 +56,7 @@ from cl.lib.utils import (
     parse_string_date,
     perform_special_character_replacements,
 )
+from cl.opinion_page import docket_entry_sources
 from cl.people_db.models import Position
 from cl.search.constants import (
     ALERTS_HL_TAG,
@@ -1320,6 +1321,43 @@ def get_match_all_query(
     return final_match_all_query
 
 
+def includes_scotus(cd: CleanData) -> bool:
+    """Whether a RECAP search should include SCOTUS content. False unless
+    the caller sets cd["include_scotus"], which only the search frontend
+    does, behind the scotus_docket_page flag. Temporary: remove once
+    SCOTUS launches.
+    """
+    return bool(cd.get("include_scotus"))
+
+
+def excludes_scotus(cd: CleanData) -> bool:
+    """True for a RECAP search (r, d, rd) that must leave SCOTUS content
+    out of its results, see includes_scotus. Other search types never
+    contain SCOTUS RECAP-style content.
+    """
+    return not includes_scotus(cd) and cd["type"] in (
+        SEARCH_TYPES.RECAP,
+        SEARCH_TYPES.DOCKETS,
+        SEARCH_TYPES.RECAP_DOCUMENT,
+    )
+
+
+def exclude_scotus(query: Query | None) -> Query:
+    """Return query, or a match-everything query if it's None, without
+    SCOTUS dockets and documents.
+
+    A bool query gets the exclusion added to its own must_not rather than
+    being wrapped, so code that reads its clauses (e.g. clean_count_query)
+    still finds them.
+    """
+    scotus = Q("term", **{"court_id.raw": "scotus"})
+    if isinstance(query, Bool):
+        query = query._clone()
+        query.must_not = [*query.must_not, scotus]
+        return query
+    return Q("bool", must=[query] if query else [], must_not=[scotus])
+
+
 def build_es_base_query(
     search_query: Search,
     cd: CleanData,
@@ -1507,6 +1545,11 @@ def build_es_base_query(
         )
         boost_mode = "multiply" if string_query else "replace"
 
+    if excludes_scotus(cd):
+        main_query = exclude_scotus(cast(Query, main_query))
+        if child_query:
+            child_query = exclude_scotus(child_query)
+
     # Apply a custom function score to the main query, useful for cursor pagination
     # in the V4 API and for date decay relevance.
     main_query = apply_custom_score_to_main_query(
@@ -1576,6 +1619,10 @@ def build_child_docs_query(
     ]
     parties_has_parent_query = build_has_parent_parties_query(parties_filters)
 
+    if not child_docs_query and excludes_scotus(cd):
+        # Match all query case, where build_es_base_query had no child query
+        # to exclude SCOTUS from.
+        child_docs_query = exclude_scotus(None)
     if not child_docs_query:
         # Match all query case.
         if not exclude_docs_for_empty_field:
@@ -2096,87 +2143,28 @@ def merge_unavailable_fields_on_parent_document(
             request_type == "frontend"
         ):
             # Merge initial document button to the frontend search results.
-            docket_ids = {doc["docket_id"] for doc in results}
-            # This query retrieves initial documents considering two
-            # possibilities:
-            # 1. For district, bankruptcy, and appellate entries where we don't know
-            #    if the entry contains attachments, it considers:
-            #    document_number=1 and attachment_number=None and document_type=PACER_DOCUMENT
-            #    This represents the main document with document_number 1.
-            # 2. For appellate entries where the attachment page has already been
-            #    merged, it considers:
-            #    document_number=1 and attachment_number=1 and document_type=ATTACHMENT
-            #    This represents document_number 1 that has been converted to an attachment.
-
-            appellate_court_ids = (
-                Court.federal_courts.appellate_courts().values_list(
-                    "pk", flat=True
+            # Group the page's dockets by source, so each source answers
+            # with one query.
+            docket_ids_by_source: defaultdict[
+                docket_entry_sources.DocketEntrySource, set[int]
+            ] = defaultdict(set)
+            for result in results:
+                source = docket_entry_sources.source_for_court_id(
+                    result["court_id"]
                 )
-            )
-            initial_documents = (
-                RECAPDocument.objects.filter(
-                    QObject(
-                        QObject(
-                            attachment_number=None,
-                            document_type=RECAPDocument.PACER_DOCUMENT,
-                        )
-                        | QObject(
-                            attachment_number=1,
-                            document_type=RECAPDocument.ATTACHMENT,
-                            docket_entry__docket__court_id__in=appellate_court_ids,
-                        )
-                    ),
-                    docket_entry__docket_id__in=docket_ids,
-                    document_number="1",
-                )
-                .select_related(
-                    "docket_entry",
-                    "docket_entry__docket",
-                    "docket_entry__docket__court",
-                )
-                .only(
-                    "pk",
-                    "document_type",
-                    "document_number",
-                    "attachment_number",
-                    "pacer_doc_id",
-                    "is_available",
-                    "filepath_local",
-                    "docket_entry__docket_id",
-                    "docket_entry__docket__slug",
-                    "docket_entry__docket__pacer_case_id",
-                    "docket_entry__docket__court__jurisdiction",
-                    "docket_entry__docket__court_id",
-                )
-            )
-
+                docket_ids_by_source[source].add(result["docket_id"])
             initial_documents_in_page: dict[
-                int, tuple[str | None, str | None, str]
+                int, docket_entry_sources.InitialDocumentButton
             ] = {}
-            for initial_document in initial_documents:
-                if initial_document.has_valid_pdf:
-                    # Initial Document available
-                    initial_documents_in_page[
-                        initial_document.docket_entry.docket_id
-                    ] = (
-                        initial_document.get_absolute_url(),
-                        None,
-                        "Initial Document",
-                    )
-                else:
-                    # Initial Document not available. Buy button.
-                    initial_documents_in_page[
-                        initial_document.docket_entry.docket_id
-                    ] = (
-                        None,
-                        initial_document.pacer_url,
-                        "Buy Initial Document",
-                    )
+            for source, docket_ids in docket_ids_by_source.items():
+                initial_documents_in_page.update(
+                    source.initial_document_buttons(docket_ids)
+                )
 
             for result in results:
                 document_url, buy_document_url, text_button = (
                     initial_documents_in_page.get(
-                        result.docket_id, (None, None, "")
+                        result["docket_id"], (None, None, "")
                     )
                 )
                 result["initial_document_url"] = document_url
@@ -2668,6 +2656,22 @@ def process_feed_query_results(
         if not jurisdiction:
             limit_inner_hits(cd, response, cd["type"])
     set_results_highlights(response, cd["type"])
+
+
+def get_docket_entry_pk(doc: AttrDict[Any]) -> int | None:
+    """Return the DocketEntry pk of an ESRECAPDocument hit, whatever its
+    source. RECAP documents keep it in docket_entry_id; other sources keep
+    it in docket_entry_uid, prefixed with their uid_namespace (e.g.
+    "scotus_321").
+
+    :param doc: An ESRECAPDocument hit.
+    :return: The docket entry pk, or None if the hit has neither field.
+    """
+    if docket_entry_id := getattr(doc, "docket_entry_id", None):
+        return docket_entry_id
+    if docket_entry_uid := getattr(doc, "docket_entry_uid", None):
+        return int(docket_entry_uid.rsplit("_", 1)[1])
+    return None
 
 
 def do_es_feed_query(

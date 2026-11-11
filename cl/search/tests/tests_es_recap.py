@@ -3,6 +3,8 @@ import math
 import re
 import urllib.parse
 from http import HTTPStatus
+from itertools import product
+from typing import Any
 from unittest import mock
 
 import time_machine
@@ -10,7 +12,7 @@ from asgiref.sync import async_to_sync
 from django.conf import settings
 from django.contrib import admin, messages
 from django.core.files.uploadedfile import SimpleUploadedFile
-from django.core.management import call_command
+from django.core.management import CommandError, call_command
 from django.core.paginator import Paginator
 from django.test import RequestFactory, override_settings
 from django.urls import reverse
@@ -18,11 +20,17 @@ from django.utils.timezone import now
 from elasticsearch.dsl import Q
 from lxml import etree, html
 from rest_framework.serializers import CharField
+from waffle.testutils import override_flag
 
 from cl.alerts.utils import add_cutoff_timestamp_filter
+from cl.corpus_importer.tasks import (
+    add_scotus_docket_entries,
+    enrich_scotus_attachments,
+)
 from cl.lib.elasticsearch_utils import (
     build_es_main_query,
     build_search_feed_query,
+    clean_count_query,
     compute_lowest_possible_estimate,
     fetch_es_results,
     merge_unavailable_fields_on_parent_document,
@@ -81,7 +89,10 @@ from cl.search.documents import (
 )
 from cl.search.es_docket_sources import (
     ALL_ES_SOURCES,
+    RECAP_ES_SOURCE,
     SCOTUS_ES_SOURCE,
+    SOURCE_BY_MODEL,
+    recap_search_courts,
 )
 from cl.search.factories import (
     BankruptcyInformationFactory,
@@ -91,6 +102,9 @@ from cl.search.factories import (
     OpinionsCitedByRECAPDocumentFactory,
     OpinionWithParentsFactory,
     RECAPDocumentFactory,
+    SCOTUSAttachmentDataFactory,
+    SCOTUSDocketEntryDataFactory,
+    SCOTUSDocketEntryFactory,
     ScotusDocketMetadataFactory,
     SCOTUSDocumentFactory,
 )
@@ -104,15 +118,26 @@ from cl.search.management.commands.fix_rd_broken_links import (
 )
 from cl.search.models import (
     SEARCH_TYPES,
+    Court,
     Docket,
     DocketEvent,
     OpinionsCitedByRECAPDocument,
     RECAPDocument,
+    SCOTUSDocketEntry,
+    ScotusDocketMetadata,
+    SCOTUSDocument,
+)
+from cl.search.signals import (
+    docket_field_mapping,
+    scotus_document_field_mapping,
 )
 from cl.search.tasks import (
     es_save_document,
     index_docket_parties_in_es,
+    index_parent_and_child_docs,
+    index_parent_or_child_docs_in_es,
     index_related_cites_fields,
+    update_children_docs_by_query,
     update_es_document,
 )
 from cl.search.types import EventTable
@@ -120,6 +145,7 @@ from cl.tests.cases import (
     AuthenticatedClientMixin,
     CountESTasksTestCase,
     ESIndexTestCase,
+    SimpleTestCase,
     TestCase,
     TransactionTestCase,
     V4SearchAPIAssertions,
@@ -2713,6 +2739,120 @@ class RECAPSearchTest(RECAPSearchTestCase, ESIndexTestCase, TestCase):
 
         for docket in dockets_to_remove:
             docket.delete()
+
+    @override_flag("scotus_docket_page", active=True)
+    @override_settings(
+        WAFFLE_CACHE_PREFIX="test_initial_document_buttons_on_mixed_page"
+    )
+    def test_initial_document_buttons_on_mixed_page(self) -> None:
+        """Confirm a results page with RECAP and SCOTUS dockets gives each
+        docket the initial document button of its own source."""
+        scotus_court = CourtFactory(id="scotus", jurisdiction="F")
+        district_court = CourtFactory(id="cand", jurisdiction="FD")
+        dockets_to_remove = []
+        with self.captureOnCommitCallbacks(execute=True):
+            recap_entry = DocketEntryFactory(
+                docket=DocketFactory(
+                    court=district_court,
+                    case_name="Lorem Mixed Page Recap",
+                    source=Docket.RECAP,
+                ),
+                entry_number=1,
+                date_filed=datetime.date(2015, 8, 19),
+            )
+            recap_document = RECAPDocumentFactory(
+                docket_entry=recap_entry,
+                document_number="1",
+                document_type=RECAPDocument.PACER_DOCUMENT,
+                is_available=False,
+                pacer_doc_id="234564",
+            )
+            scotus_docket = DocketFactory(
+                court=scotus_court, case_name="Lorem Mixed Page Scotus"
+            )
+            ScotusDocketMetadataFactory(docket=scotus_docket)
+            scotus_document = SCOTUSDocumentFactory(
+                docket_entry__docket=scotus_docket,
+                docket_entry__date_filed=datetime.date(2024, 1, 1),
+                attachment_number=1,
+                url="https://www.supremecourt.gov/DocketPDF/24/24-2/a.pdf",
+            )
+            dockets_to_remove.extend([recap_entry.docket, scotus_docket])
+
+        cd = {"type": SEARCH_TYPES.RECAP, "q": '"Lorem Mixed Page"'}
+        r = async_to_sync(self._test_article_count)(cd, 2, "mixed page")
+        tree = html.fromstring(r.content.decode())
+        buttons = {}
+        for article in tree.xpath("//article"):
+            title = article.xpath("./h3/a")[0].text_content().strip()
+            button = article.xpath(
+                ".//a[contains(@class, 'initial-document')]"
+            )
+            buttons[title] = (
+                (button[0].get("href"), button[0].text_content().strip())
+                if button
+                else (None, None)
+            )
+        expected = {
+            "Lorem Mixed Page Recap": (
+                recap_document.pacer_url,
+                "Buy Initial Document",
+            ),
+            "Lorem Mixed Page Scotus": (
+                scotus_document.url,
+                "Initial Document",
+            ),
+        }
+        for case_name, expected_button in expected.items():
+            with self.subTest(case_name=case_name):
+                title = next(
+                    (t for t in buttons if t.startswith(case_name)), None
+                )
+                self.assertIsNotNone(title, f"{case_name} not in results")
+                self.assertEqual(expected_button, buttons[title])
+
+        for docket in dockets_to_remove:
+            docket.delete()
+
+    @override_flag("scotus_docket_page", active=True)
+    @override_settings(
+        WAFFLE_CACHE_PREFIX="test_scotus_docket_titles_have_no_empty_parentheses"
+    )
+    def test_scotus_docket_titles_have_no_empty_parentheses(self) -> None:
+        """Confirm SCOTUS docket titles hide the court citation: the year
+        alone when the docket has a date, and no parentheses when it
+        doesn't."""
+        scotus_court = CourtFactory(
+            id="scotus", jurisdiction="F", citation_string="SCOTUS"
+        )
+        with self.captureOnCommitCallbacks(execute=True):
+            dated_docket = DocketFactory(
+                court=scotus_court,
+                case_name="Lorem Title Dated",
+                date_filed=datetime.date(2024, 3, 1),
+            )
+            undated_docket = DocketFactory(
+                court=scotus_court,
+                case_name="Lorem Title Undated",
+                date_filed=None,
+            )
+            # SCOTUS dockets are only indexed once they have metadata.
+            ScotusDocketMetadataFactory(docket=dated_docket)
+            ScotusDocketMetadataFactory(docket=undated_docket)
+        self.addCleanup(dated_docket.delete)
+        self.addCleanup(undated_docket.delete)
+
+        cd = {"type": SEARCH_TYPES.RECAP, "q": '"Lorem Title"'}
+        r = async_to_sync(self._test_article_count)(cd, 2, "scotus titles")
+        tree = html.fromstring(r.content.decode())
+        # Collapse the template's line breaks and &nbsp; into spaces.
+        titles = {
+            " ".join(a.text_content().split())
+            for a in tree.xpath("//article/h3/a")
+        }
+        self.assertEqual(
+            titles, {"Lorem Title Dated (2024)", "Lorem Title Undated"}
+        )
 
     async def test_get_results_from_paginator(self) -> None:
         """Assert Paginator Page objects are handled as expected."""
@@ -6769,6 +6909,1075 @@ class ESRECAPDocumentSCOTUSCompatibilityTest(TestCase):
             self.assertIsNone(recap["docket_entry_uid"])
 
 
+class SCOTUSFieldTrackerTest(SimpleTestCase):
+    """Confirm the FieldTrackers added for #8020 track exactly the fields
+    the SCOTUS ES signal mappings depend on.
+    """
+
+    def test_trackers_match_the_es_signal_mappings(self) -> None:
+        """A mapped field missing from its tracker would never trigger an
+        ES update, and a tracked field missing from the mapping is dead
+        weight."""
+        cases = [
+            (
+                SCOTUSDocument,
+                scotus_document_field_mapping["save"][SCOTUSDocument]["self"],
+            ),
+            (
+                SCOTUSDocketEntry,
+                scotus_document_field_mapping["save"][SCOTUSDocketEntry][
+                    "docket_entry"
+                ],
+            ),
+            (
+                ScotusDocketMetadata,
+                docket_field_mapping["reverse"][ScotusDocketMetadata][
+                    "scotus_metadata"
+                ],
+            ),
+        ]
+        for model, fields_map in cases:
+            with self.subTest(model=model.__name__):
+                self.assertEqual(
+                    set(model.es_rd_field_tracker.fields), set(fields_map)
+                )
+
+
+class ESDocketSourcesTest(TestCase):
+    """Confirm the per-source ES docket configuration added for #8020
+    (cl.search.es_docket_sources) is internally consistent.
+    """
+
+    def test_all_sources_resolve_back_to_themselves_in_source_by_model(
+        self,
+    ) -> None:
+        """Every source's document_model (and metadata_model, if any)
+        must map back to that exact source."""
+        for source in ALL_ES_SOURCES:
+            self.assertIs(SOURCE_BY_MODEL[source.document_model], source)
+            if source.metadata_model is not None:
+                self.assertIs(SOURCE_BY_MODEL[source.metadata_model], source)
+
+    def test_sources_meet_the_shared_indexing_assumptions(self) -> None:
+        """Names and child _id prefixes must be unique, each prefix must
+        exist on ES_CHILD_ID, and each document must reach its Docket
+        through docket_entry, as bulk indexing routes children that way."""
+        names = [source.name for source in ALL_ES_SOURCES]
+        self.assertEqual(len(names), len(set(names)))
+        # Compare the generated ids, not the property names: two properties
+        # returning the same prefix would overwrite each other in ES.
+        child_ids = [
+            getattr(ES_CHILD_ID(1), source.child_id_property)
+            for source in ALL_ES_SOURCES
+        ]
+        self.assertEqual(len(child_ids), len(set(child_ids)))
+        for source in ALL_ES_SOURCES:
+            with self.subTest(source=source.name):
+                entry_model = source.document_model._meta.get_field(
+                    "docket_entry"
+                ).related_model
+                self.assertIs(
+                    entry_model._meta.get_field("docket").related_model,
+                    Docket,
+                )
+
+    def test_docket_belongs_distinguishes_recap_from_scotus(self) -> None:
+        """Each source's docket_belongs checks the field it actually
+        relies on: Docket.source for RECAP, the _index_in_es flag or
+        ScotusDocketMetadata for SCOTUS. A RECAP docket and a real
+        SCOTUS docket each belong to exactly one source -- and a
+        scotus-court docket with neither the flag nor metadata (one
+        created only to hold a scraped Opinion) belongs to neither."""
+        recap_docket = DocketFactory(
+            source=Docket.RECAP,
+            pacer_case_id="12345",
+            docket_number_raw="1:20-cv-00001",
+        )
+        scotus_court = CourtFactory(id="scotus", jurisdiction="F")
+        opinion_only_docket = DocketFactory(
+            court=scotus_court, source=Docket.SCRAPER
+        )
+        entry_only_docket = SCOTUSDocketEntryFactory(
+            docket__court=scotus_court, docket__source=Docket.SCRAPER
+        ).docket
+        scotus_docket = ScotusDocketMetadataFactory(
+            docket__court=scotus_court, docket__source=Docket.SCRAPER
+        ).docket
+
+        self.assertTrue(RECAP_ES_SOURCE.docket_belongs(recap_docket))
+        self.assertFalse(SCOTUS_ES_SOURCE.docket_belongs(recap_docket))
+
+        self.assertFalse(RECAP_ES_SOURCE.docket_belongs(opinion_only_docket))
+        self.assertFalse(SCOTUS_ES_SOURCE.docket_belongs(opinion_only_docket))
+
+        self.assertFalse(RECAP_ES_SOURCE.docket_belongs(entry_only_docket))
+        self.assertFalse(SCOTUS_ES_SOURCE.docket_belongs(entry_only_docket))
+
+        self.assertFalse(RECAP_ES_SOURCE.docket_belongs(scotus_docket))
+        self.assertTrue(SCOTUS_ES_SOURCE.docket_belongs(scotus_docket))
+
+    def test_has_entries_skips_the_query_for_other_courts(self) -> None:
+        """has_entries rules out Dockets from courts outside the source's
+        court_ids without a query, so the SCOTUS processor adds no query
+        to RECAP Docket saves, while still finding real entries."""
+        recap_entry = DocketEntryFactory(
+            docket=DocketFactory(court=CourtFactory(), source=Docket.RECAP)
+        )
+        scotus_entry = SCOTUSDocketEntryFactory(
+            docket__court=CourtFactory(id="scotus", jurisdiction="F"),
+            docket__source=Docket.SCRAPER,
+        )
+        recap_docket = Docket.objects.get(pk=recap_entry.docket_id)
+        scotus_docket = Docket.objects.get(pk=scotus_entry.docket_id)
+
+        with self.assertNumQueries(0):
+            self.assertFalse(SCOTUS_ES_SOURCE.has_entries(recap_docket))
+        with self.assertNumQueries(1):
+            self.assertTrue(SCOTUS_ES_SOURCE.has_entries(scotus_docket))
+        with self.assertNumQueries(1):
+            self.assertTrue(RECAP_ES_SOURCE.has_entries(recap_docket))
+
+    def test_scotus_docket_belongs_via_flag_before_any_content(
+        self,
+    ) -> None:
+        """A scotus-court Docket with the _index_in_es flag set, but
+        no SCOTUSDocketEntry/ScotusDocketMetadata yet, already belongs
+        -- this is the moment merge_scotus_docket first saves a brand
+        new Docket, before its metadata exists."""
+        scotus_court = CourtFactory(id="scotus", jurisdiction="F")
+        docket = DocketFactory(court=scotus_court, source=Docket.SCRAPER)
+        docket._index_in_es = True
+
+        self.assertTrue(SCOTUS_ES_SOURCE.docket_belongs(docket))
+
+    def test_scotus_ready_to_index_requires_metadata(self) -> None:
+        """ready_to_index is False until ScotusDocketMetadata exists,
+        even if the Docket already belongs via the flag -- this is
+        what defers the first ES write to a single, complete one."""
+        scotus_court = CourtFactory(id="scotus", jurisdiction="F")
+        docket = DocketFactory(court=scotus_court, source=Docket.SCRAPER)
+        docket._index_in_es = True
+
+        self.assertTrue(SCOTUS_ES_SOURCE.docket_belongs(docket))
+        self.assertFalse(SCOTUS_ES_SOURCE.ready_to_index(docket))
+
+        ScotusDocketMetadataFactory(docket=docket)
+        docket.refresh_from_db()
+        self.assertTrue(SCOTUS_ES_SOURCE.ready_to_index(docket))
+
+
+class RECAPSearchCourtsTest(TestCase):
+    """recap_search_courts() offers the PACER courts plus the courts the
+    other docket sources add, such as SCOTUS."""
+
+    @classmethod
+    def setUpTestData(cls) -> None:
+        """Create PACER, SCOTUS and state courts."""
+        for court_id, jurisdiction in [
+            ("scotus", Court.FEDERAL_APPELLATE),
+            ("ca1", Court.FEDERAL_APPELLATE),
+            ("cand", Court.FEDERAL_DISTRICT),
+            ("ohio", Court.STATE_SUPREME),
+        ]:
+            CourtFactory(id=court_id, jurisdiction=jurisdiction, end_date=None)
+
+    def test_recap_search_courts_add_source_courts(self) -> None:
+        """SCOTUS joins the PACER courts in the search list only when the
+        search can include it, courts that are neither PACER nor claimed by
+        a source stay out, and all_pacer_courts(), used by PACER scrapers
+        and uploads, keeps excluding SCOTUS."""
+        search_ids = set(
+            recap_search_courts(include_scotus=True).values_list(
+                "pk", flat=True
+            )
+        )
+        self.assertLessEqual({"scotus", "ca1", "cand"}, search_ids)
+        self.assertNotIn("ohio", search_ids)
+        self.assertNotIn(
+            "scotus",
+            recap_search_courts(include_scotus=False).values_list(
+                "pk", flat=True
+            ),
+        )
+        self.assertNotIn(
+            "scotus",
+            Court.federal_courts.all_pacer_courts().values_list(
+                "pk", flat=True
+            ),
+        )
+
+
+@override_settings(WAFFLE_CACHE_PREFIX="RECAPSearchCourtPickerTest")
+class RECAPSearchCourtPickerTest(ESIndexTestCase, TestCase):
+    """The RECAP search pages render SCOTUS in the court picker only
+    behind the scotus_docket_page flag."""
+
+    @classmethod
+    def setUpClass(cls) -> None:
+        """Build the Docket index the results page searches."""
+        super().setUpClass()
+        cls.rebuild_index("search.Docket")
+
+    @classmethod
+    def setUpTestData(cls) -> None:
+        """Create SCOTUS and a circuit court for the Federal Appellate tab."""
+        for court_id in ["scotus", "ca1"]:
+            CourtFactory(
+                id=court_id,
+                jurisdiction=Court.FEDERAL_APPELLATE,
+                end_date=None,
+            )
+
+    def test_recap_pages_offer_scotus_in_federal_appellate_tab(self) -> None:
+        """Both the RECAP results page and the RECAP advanced search page
+        render a SCOTUS checkbox in the Federal Appellate tab with the
+        scotus_docket_page flag, and leave it out without it."""
+        urls = [
+            f"{reverse('show_results')}?type={SEARCH_TYPES.RECAP}",
+            reverse("advanced_r"),
+        ]
+        for url, active in product(urls, [True, False]):
+            with (
+                self.subTest(url=url, flag=active),
+                override_flag("scotus_docket_page", active=active),
+            ):
+                r = self.client.get(url)
+
+                self.assertEqual(r.status_code, HTTPStatus.OK)
+                federal_ids = {c.pk for c in r.context["courts"]["federal"]}
+                self.assertEqual("scotus" in federal_ids, active)
+                self.assertEqual(
+                    'id="id_scotus"' in r.content.decode(), active
+                )
+
+
+class SCOTUSESIndexingSignalTest(
+    CountESTasksTestCase, ESIndexTestCase, TransactionTestCase
+):
+    """Confirm the ES signal-processing wiring added for #8020 actually
+    indexes/updates/deletes SCOTUS content automatically, via real Django
+    signals and real Elasticsearch writes.
+    """
+
+    @classmethod
+    def setUpClass(cls) -> None:
+        """Start every test class run from an empty RECAP index."""
+        super().setUpClass()
+        cls.rebuild_index("search.Docket")
+
+    def setUp(self) -> None:
+        """Create the scotus Court every SCOTUS docket in these tests uses."""
+        self.court = CourtFactory(id="scotus", jurisdiction="F")
+        super().setUp()
+
+    def test_scotus_document_create_and_delete(self) -> None:
+        """Creating a SCOTUSDocument indexes it into ESRECAPDocument
+        automatically, with the right fields; deleting it removes it
+        from ES in turn, using its own scotusd_-prefixed _id.
+        """
+        with mock.patch(
+            "cl.lib.es_signal_processor.es_save_document.si",
+            side_effect=lambda *args, **kwargs: self.count_task_calls(
+                es_save_document, True, *args, **kwargs
+            ),
+        ):
+            scotus_document = SCOTUSDocumentFactory(
+                docket_entry__docket__court=self.court,
+                docket_entry__docket__source=Docket.SCRAPER,
+            )
+        # 1 call: the SCOTUSDocument itself. The new Docket has no
+        # SCOTUS content yet (and no _index_in_es flag) at its own
+        # creation moment, so it doesn't get its own es_save_document
+        # call -- but it still ends up indexed, when its SCOTUSDocument
+        # get indexed.
+        self.reset_and_assert_task_count(expected=1)
+
+        hit = ESRECAPDocument.get(id=ES_CHILD_ID(scotus_document.pk).SCOTUS)
+        self.assertIsNone(hit.capital_case)
+        self.assertEqual(hit.short_description, scotus_document.description)
+        self.assertEqual(hit.document_number, scotus_document.document_number)
+        self.assertEqual(
+            hit.attachment_number, scotus_document.attachment_number
+        )
+        self.assertEqual(hit.is_available, scotus_document.is_available)
+        self.assertIsNone(hit.filepath_local)
+
+        scotus_document.delete()
+
+        self.assertFalse(
+            ESRECAPDocument.exists(id=ES_CHILD_ID(scotus_document.pk).SCOTUS)
+        )
+
+    def test_docket_creation_with_metadata_is_a_single_write(self) -> None:
+        """Simulates merge_scotus_docket's real order: the Docket's own
+        save (with the _index_in_es flag, before metadata exists)
+        shouldn't trigger any ES write -- only the ScotusDocketMetadata
+        creation right after does, and that one write already includes
+        capital_case, instead of an incomplete first write followed by
+        a second one to add it."""
+        docket = DocketFactory.build(
+            court=self.court, source=Docket.SCRAPER, appeal_from=None
+        )
+        docket._index_in_es = True
+        with (
+            mock.patch(
+                "cl.lib.es_signal_processor.es_save_document.si",
+                side_effect=lambda *args, **kwargs: self.count_task_calls(
+                    es_save_document, True, *args, **kwargs
+                ),
+            ),
+            mock.patch(
+                "cl.lib.es_signal_processor.update_es_document.si",
+                side_effect=lambda *args, **kwargs: self.count_task_calls(
+                    update_es_document, True, *args, **kwargs
+                ),
+            ),
+        ):
+            docket.save()
+        # The flag alone isn't enough -- ready_to_index still requires
+        # ScotusDocketMetadata, so this save triggers nothing yet.
+        self.reset_and_assert_task_count(expected=0)
+        self.assertFalse(DocketDocument.exists(docket.pk))
+
+        with mock.patch(
+            "cl.lib.es_signal_processor.update_es_document.si",
+            side_effect=lambda *args, **kwargs: self.count_task_calls(
+                update_es_document, True, *args, **kwargs
+            ),
+        ):
+            ScotusDocketMetadataFactory(docket=docket, capital_case=True)
+        # 1 call: the metadata's own cascade creates the Docket's ES
+        # doc directly, already complete.
+        self.reset_and_assert_task_count(expected=1)
+
+        hit = DocketDocument.get(id=docket.pk)
+        self.assertIs(hit.capital_case, True)
+
+    def test_capital_case_create_update_delete_propagates(self) -> None:
+        """Creating, updating, and deleting ScotusDocketMetadata each
+        propagate capital_case correctly to the Docket-level ES document
+        and every SCOTUSDocument-level ES document under it -- create
+        also fans out to multiple documents, confirming the bulk
+        cascade."""
+        entry = SCOTUSDocketEntryFactory(docket__court=self.court)
+        doc_a = SCOTUSDocumentFactory(
+            docket_entry=entry, document_number=1, attachment_number=1
+        )
+        doc_b = SCOTUSDocumentFactory(
+            docket_entry=entry, document_number=1, attachment_number=2
+        )
+        docket_id = entry.docket_id
+
+        # Create: capital_case=True propagates to the Docket + both
+        # documents.
+        with (
+            mock.patch(
+                "cl.lib.es_signal_processor.update_es_document.si",
+                side_effect=lambda *args, **kwargs: self.count_task_calls(
+                    update_es_document, True, *args, **kwargs
+                ),
+            ),
+            mock.patch(
+                "cl.lib.es_signal_processor.update_children_docs_by_query.delay",
+                side_effect=lambda *args, **kwargs: self.count_task_calls(
+                    update_children_docs_by_query, False, *args, **kwargs
+                ),
+            ),
+        ):
+            ScotusDocketMetadataFactory(docket_id=docket_id, capital_case=True)
+        # 1 update_es_document call (the Docket itself) + 1
+        # update_children_docs_by_query call (the bulk cascade to its
+        # SCOTUSDocument children).
+        self.reset_and_assert_task_count(expected=2)
+
+        self.assertIs(DocketDocument.get(id=docket_id).capital_case, True)
+        hit_a = ESRECAPDocument.get(id=ES_CHILD_ID(doc_a.pk).SCOTUS)
+        hit_b = ESRECAPDocument.get(id=ES_CHILD_ID(doc_b.pk).SCOTUS)
+        self.assertIs(hit_a.capital_case, True)
+        self.assertIs(hit_b.capital_case, True)
+        # The capital_case cascade is a partial ES update -- confirm it
+        # doesn't wipe fields it wasn't supposed to touch.
+        self.assertEqual(hit_a.short_description, doc_a.description)
+        self.assertEqual(hit_a.document_number, doc_a.document_number)
+        self.assertEqual(hit_b.short_description, doc_b.description)
+        self.assertEqual(hit_b.document_number, doc_b.document_number)
+
+        # Update: capital_case=False also propagates (fan-out already
+        # proven above, so checking doc_a alone is enough here).
+        metadata = ScotusDocketMetadata.objects.get(docket_id=docket_id)
+        metadata.capital_case = False
+        with (
+            mock.patch(
+                "cl.lib.es_signal_processor.update_es_document.si",
+                side_effect=lambda *args, **kwargs: self.count_task_calls(
+                    update_es_document, True, *args, **kwargs
+                ),
+            ),
+            mock.patch(
+                "cl.lib.es_signal_processor.update_children_docs_by_query.delay",
+                side_effect=lambda *args, **kwargs: self.count_task_calls(
+                    update_children_docs_by_query, False, *args, **kwargs
+                ),
+            ),
+        ):
+            metadata.save()
+        self.reset_and_assert_task_count(expected=2)
+
+        self.assertIs(DocketDocument.get(id=docket_id).capital_case, False)
+        self.assertIs(
+            ESRECAPDocument.get(id=ES_CHILD_ID(doc_a.pk).SCOTUS).capital_case,
+            False,
+        )
+
+        # Delete: resets capital_case back to None on both.
+        with (
+            mock.patch(
+                "cl.lib.es_signal_processor.update_es_document.delay",
+                side_effect=lambda *args, **kwargs: self.count_task_calls(
+                    update_es_document, False, *args, **kwargs
+                ),
+            ),
+            mock.patch(
+                "cl.lib.es_signal_processor.update_children_docs_by_query.delay",
+                side_effect=lambda *args, **kwargs: self.count_task_calls(
+                    update_children_docs_by_query, False, *args, **kwargs
+                ),
+            ),
+        ):
+            metadata.delete()
+        self.reset_and_assert_task_count(expected=2)
+
+        self.assertIsNone(DocketDocument.get(id=docket_id).capital_case)
+        self.assertIsNone(
+            ESRECAPDocument.get(id=ES_CHILD_ID(doc_a.pk).SCOTUS).capital_case
+        )
+
+    def test_docket_entry_field_change_propagates_to_documents(
+        self,
+    ) -> None:
+        """A SCOTUSDocketEntry's own field change propagates to its child
+        SCOTUSDocument's ES entry -- checked for every field in the
+        entry's mapping (description, entry_number, date_filed)."""
+        entry = SCOTUSDocketEntryFactory(
+            docket__court=self.court, entry_number=1
+        )
+        scotus_document = SCOTUSDocumentFactory(docket_entry=entry)
+
+        cases = [
+            ("entry_number", 999, "entry_number", 999),
+            (
+                "description",
+                "updated entry text",
+                "description",
+                "updated entry text",
+            ),
+            (
+                "date_filed",
+                datetime.date(2021, 6, 15),
+                "entry_date_filed",
+                datetime.datetime(2021, 6, 15),
+            ),
+        ]
+        for field, new_value, es_field, expected in cases:
+            with self.subTest(field=field):
+                de = SCOTUSDocketEntry.objects.get(pk=entry.pk)
+                setattr(de, field, new_value)
+                with mock.patch(
+                    "cl.lib.es_signal_processor.update_es_document.delay",
+                    side_effect=lambda *args, **kwargs: self.count_task_calls(
+                        update_es_document, False, *args, **kwargs
+                    ),
+                ):
+                    de.save()
+                self.reset_and_assert_task_count(expected=1)
+
+                hit = ESRECAPDocument.get(
+                    id=ES_CHILD_ID(scotus_document.pk).SCOTUS
+                )
+                self.assertEqual(getattr(hit, es_field), expected)
+
+    def test_entry_without_attachments_is_indexed_through_placeholder(
+        self,
+    ) -> None:
+        """An entry merged without attachments is indexed in ES through its
+        placeholder document, so its description can be searched. Once the
+        entry has an attachment, the same ES document gets its fields."""
+        docket = DocketFactory(court=self.court, source=Docket.SCRAPER)
+        ScotusDocketMetadataFactory(docket=docket)
+
+        def merge(
+            document_number: int | None, attachments: list[dict[str, Any]]
+        ) -> None:
+            """Merge the same entry with the given attachments."""
+            docket_entries = [
+                SCOTUSDocketEntryDataFactory(
+                    description="DISTRIBUTED for Conference.",
+                    date_filed=datetime.date(2024, 3, 1),
+                    document_number=document_number,
+                    attachments=attachments,
+                )
+            ]
+            enrich_scotus_attachments(docket_entries)
+            add_scotus_docket_entries(
+                docket, docket_entries, download_file=False
+            )
+
+        merge(document_number=None, attachments=[])
+
+        placeholder = SCOTUSDocument.objects.get(docket_entry__docket=docket)
+        es_id = ES_CHILD_ID(placeholder.pk).SCOTUS
+        hit = ESRECAPDocument.get(id=es_id)
+        self.assertEqual(hit.description, "DISTRIBUTED for Conference.")
+        self.assertEqual(hit.absolute_url, "")
+        self.assertEqual(
+            ESRECAPDocument.search()
+            .query("match", description="DISTRIBUTED")
+            .count(),
+            1,
+        )
+
+        merge(
+            document_number=7,
+            attachments=[
+                SCOTUSAttachmentDataFactory(
+                    description="Petition", document_number=7
+                )
+            ],
+        )
+
+        hit = ESRECAPDocument.get(id=es_id)
+        self.assertEqual(hit.short_description, "Petition")
+        self.assertEqual(hit.document_number, 7)
+        self.assertEqual(hit.entry_number, 7)
+
+    def test_scotus_docket_entry_delete_cascades_to_documents(self) -> None:
+        """Deleting a SCOTUSDocketEntry cascades (on_delete=CASCADE) to
+        its SCOTUSDocument children, each removed from ES in turn."""
+        entry = SCOTUSDocketEntryFactory(docket__court=self.court)
+        doc_a = SCOTUSDocumentFactory(docket_entry=entry, attachment_number=1)
+        doc_b = SCOTUSDocumentFactory(docket_entry=entry, attachment_number=2)
+        self.assertTrue(
+            ESRECAPDocument.exists(id=ES_CHILD_ID(doc_a.pk).SCOTUS)
+        )
+        self.assertTrue(
+            ESRECAPDocument.exists(id=ES_CHILD_ID(doc_b.pk).SCOTUS)
+        )
+
+        entry.delete()
+
+        self.assertFalse(
+            ESRECAPDocument.exists(id=ES_CHILD_ID(doc_a.pk).SCOTUS)
+        )
+        self.assertFalse(
+            ESRECAPDocument.exists(id=ES_CHILD_ID(doc_b.pk).SCOTUS)
+        )
+
+    def _recap_and_scotus_documents_sharing_a_pk(
+        self,
+    ) -> tuple[RECAPDocument, SCOTUSDocument]:
+        """Index a RECAPDocument and a SCOTUSDocument with the same pk."""
+        shared_pk = 987650
+        rd = RECAPDocumentFactory(
+            pk=shared_pk,
+            docket_entry=DocketEntryFactory(
+                docket__court=CourtFactory(), docket__source=Docket.RECAP
+            ),
+            description="RECAP description",
+        )
+        scotus_document = SCOTUSDocumentFactory(
+            pk=shared_pk, docket_entry__docket__court=self.court
+        )
+        return rd, scotus_document
+
+    def test_entry_change_leaves_recap_document_with_same_pk_alone(
+        self,
+    ) -> None:
+        """A SCOTUSDocketEntry change updates its SCOTUSDocument's ES
+        entry, not the RECAPDocument's that shares its pk."""
+        rd, scotus_document = self._recap_and_scotus_documents_sharing_a_pk()
+        entry = scotus_document.docket_entry
+
+        entry.description = "SCOTUS entry description"
+        entry.save()
+
+        scotus_hit = ESRECAPDocument.get(
+            id=ES_CHILD_ID(scotus_document.pk).SCOTUS
+        )
+        self.assertEqual(scotus_hit.description, "SCOTUS entry description")
+        rd_hit = ESRECAPDocument.get(id=ES_CHILD_ID(rd.pk).RECAP)
+        self.assertEqual(rd_hit.description, rd.docket_entry.description)
+
+    def test_delete_leaves_recap_document_with_same_pk_alone(self) -> None:
+        """Deleting a SCOTUSDocument removes its own ES entry, not the
+        RECAPDocument's that shares its pk."""
+        rd, scotus_document = self._recap_and_scotus_documents_sharing_a_pk()
+
+        scotus_document.delete()
+
+        self.assertFalse(ESRECAPDocument.exists(id=ES_CHILD_ID(rd.pk).SCOTUS))
+        self.assertTrue(ESRECAPDocument.exists(id=ES_CHILD_ID(rd.pk).RECAP))
+
+    def test_scotus_dockets_are_not_sent_to_the_percolator(self) -> None:
+        """Search alerts don't support SCOTUS yet, so a SCOTUS Docket's ES
+        save or update returns nothing to percolate, unlike a RECAP
+        Docket's."""
+        # Not indexed yet: es_save_document only percolates a first write.
+        with override_settings(ELASTICSEARCH_DISABLED=True):
+            scotus_docket = ScotusDocketMetadataFactory(
+                docket=DocketFactory(court=self.court, source=Docket.SCRAPER)
+            ).docket
+            recap_docket = DocketFactory(
+                court=CourtFactory(), source=Docket.RECAP
+            )
+
+        for docket, percolates in [
+            (scotus_docket, False),
+            (recap_docket, True),
+        ]:
+            with self.subTest(source=docket.source):
+                saved = es_save_document(
+                    docket.pk, "search.Docket", DocketDocument.__name__
+                )
+                # Same arguments as a Docket's own field change.
+                updated = update_es_document(
+                    DocketDocument.__name__,
+                    ["case_name"],
+                    ("search.Docket", docket.pk),
+                    ("search.Docket", docket.pk),
+                    {"case_name": ["caseName"]},
+                )
+
+                self.assertEqual(saved is not None, percolates)
+                self.assertEqual(updated is not None, percolates)
+
+    def test_docket_entry_id_change_triggers_full_reprepare(self) -> None:
+        """Reparenting a SCOTUSDocument to a SCOTUSDocketEntry on a
+        different Docket triggers a full re-.prepare() via the
+        "prepare" sentinel in the mapping.
+        """
+        entry_a = SCOTUSDocketEntryFactory(docket__court=self.court)
+        entry_b = SCOTUSDocketEntryFactory(docket__court=self.court)
+        scotus_document = SCOTUSDocumentFactory(docket_entry=entry_a)
+
+        hit_before = ESRECAPDocument.get(
+            id=ES_CHILD_ID(scotus_document.pk).SCOTUS
+        )
+        self.assertEqual(hit_before.docket_id, entry_a.docket_id)
+        self.assertEqual(hit_before.caseName, entry_a.docket.case_name)
+
+        d = SCOTUSDocument.objects.get(pk=scotus_document.pk)
+        d.docket_entry = entry_b
+        d.save()
+
+        hit_after = ESRECAPDocument.get(
+            id=ES_CHILD_ID(scotus_document.pk).SCOTUS
+        )
+        self.assertEqual(hit_after.docket_id, entry_b.docket_id)
+        self.assertEqual(hit_after.caseName, entry_b.docket.case_name)
+
+    def test_document_field_change_updates_in_place(self) -> None:
+        """A SCOTUSDocument's own field change (description) updates that
+        document's ES entry directly"""
+        scotus_document = SCOTUSDocumentFactory(
+            docket_entry__docket__court=self.court,
+            description="original",
+        )
+
+        d = SCOTUSDocument.objects.get(pk=scotus_document.pk)
+        d.description = "updated"
+        with mock.patch(
+            "cl.lib.es_signal_processor.update_es_document.si",
+            side_effect=lambda *args, **kwargs: self.count_task_calls(
+                update_es_document, True, *args, **kwargs
+            ),
+        ):
+            d.save()
+        self.reset_and_assert_task_count(expected=1)
+
+        hit = ESRECAPDocument.get(id=ES_CHILD_ID(scotus_document.pk).SCOTUS)
+        self.assertEqual(hit.short_description, "updated")
+
+    def test_filepath_local_change_updates_is_available(self) -> None:
+        """Setting filepath_local on an existing SCOTUSDocument updates
+        both filepath_local and the derived is_available field in ES.
+        """
+        scotus_document = SCOTUSDocumentFactory(
+            docket_entry__docket__court=self.court,
+            filepath_local=None,
+        )
+        hit_before = ESRECAPDocument.get(
+            id=ES_CHILD_ID(scotus_document.pk).SCOTUS
+        )
+        self.assertFalse(hit_before.is_available)
+
+        d = SCOTUSDocument.objects.get(pk=scotus_document.pk)
+        d.filepath_local.name = "recap/fake/test.pdf"
+        with mock.patch(
+            "cl.lib.es_signal_processor.update_es_document.si",
+            side_effect=lambda *args, **kwargs: self.count_task_calls(
+                update_es_document, True, *args, **kwargs
+            ),
+        ):
+            d.save()
+
+        self.reset_and_assert_task_count(expected=1)
+
+        hit_after = ESRECAPDocument.get(
+            id=ES_CHILD_ID(scotus_document.pk).SCOTUS
+        )
+        self.assertTrue(hit_after.is_available)
+        self.assertEqual(hit_after.filepath_local, "recap/fake/test.pdf")
+
+    def test_docket_own_field_change_indexes_for_non_recap_source(
+        self,
+    ) -> None:
+        """A Docket whose source isn't RECAP but has a
+        ScotusDocketMetadata row still indexes on edit -- contrasted
+        with a scotus-court Docket with no metadata and no
+        _index_in_es flag (e.g. one created only to hold a scraped
+        Opinion), and with an equally non-RECAP docket whose court_id
+        isn't "scotus" either, both of which stay correctly skipped."""
+        docket = ScotusDocketMetadataFactory(
+            docket__court=self.court, docket__source=Docket.SCRAPER
+        ).docket
+
+        d = Docket.objects.get(pk=docket.pk)
+        d.case_name = "Edited Name"
+        with mock.patch(
+            "cl.lib.es_signal_processor.update_es_document.si",
+            side_effect=lambda *args, **kwargs: self.count_task_calls(
+                update_es_document, True, *args, **kwargs
+            ),
+        ):
+            d.save()
+        self.reset_and_assert_task_count(expected=1)
+
+        self.assertEqual(
+            DocketDocument.get(id=docket.pk).caseName, "Edited Name"
+        )
+
+        # Contrast 1: a scotus-court docket with no SCOTUS content and
+        # no flag (e.g. one created only to hold a scraped Opinion)
+        # must stay skipped, on creation and on edit.
+        opinion_only_docket = DocketFactory(
+            court=self.court,
+            source=Docket.SCRAPER,
+            case_name="Opinion Only",
+        )
+        self.assertFalse(DocketDocument.exists(opinion_only_docket.pk))
+
+        ood = Docket.objects.get(pk=opinion_only_docket.pk)
+        ood.case_name = "Still Opinion Only"
+        with mock.patch(
+            "cl.lib.es_signal_processor.update_es_document.si",
+            side_effect=lambda *args, **kwargs: self.count_task_calls(
+                update_es_document, True, *args, **kwargs
+            ),
+        ):
+            ood.save()
+        self.reset_and_assert_task_count(expected=0)
+        self.assertFalse(DocketDocument.exists(opinion_only_docket.pk))
+
+        # Contrast 2: a docket that's equally non-RECAP but NOT scotus
+        # should still be skipped entirely, on creation and on edit.
+        non_scotus_court = CourtFactory(id="ordy3", jurisdiction="FD")
+        other_docket = DocketFactory(
+            court=non_scotus_court,
+            source=Docket.SCRAPER,
+            case_name="Unrelated",
+        )
+        self.assertFalse(DocketDocument.exists(other_docket.pk))
+
+        od = Docket.objects.get(pk=other_docket.pk)
+        od.case_name = "Still Unrelated"
+        with mock.patch(
+            "cl.lib.es_signal_processor.update_es_document.si",
+            side_effect=lambda *args, **kwargs: self.count_task_calls(
+                update_es_document, True, *args, **kwargs
+            ),
+        ):
+            od.save()
+        self.reset_and_assert_task_count(expected=0)
+        self.assertFalse(DocketDocument.exists(other_docket.pk))
+
+    def test_bankruptcy_information_cascade_still_works(self) -> None:
+        """Regression: BankruptcyInformation's cascade to the Docket and
+        its RECAPDocuments (chapter, trustee_str) still works after
+        generalizing the reverse-metadata dispatch for multiple
+        sources."""
+        bankr_court = CourtFactory(id="recapbankr", jurisdiction="FB")
+        de = DocketEntryFactory(
+            docket__court=bankr_court, docket__source=Docket.RECAP
+        )
+        rd = RECAPDocumentFactory(docket_entry=de)
+        docket_id = de.docket_id
+
+        with (
+            mock.patch(
+                "cl.lib.es_signal_processor.update_es_document.si",
+                side_effect=lambda *args, **kwargs: self.count_task_calls(
+                    update_es_document, True, *args, **kwargs
+                ),
+            ),
+            mock.patch(
+                "cl.lib.es_signal_processor.update_children_docs_by_query.delay",
+                side_effect=lambda *args, **kwargs: self.count_task_calls(
+                    update_children_docs_by_query, False, *args, **kwargs
+                ),
+            ),
+        ):
+            BankruptcyInformationFactory(
+                docket_id=docket_id, chapter="7", trustee_str="Jane Trustee"
+            )
+        self.reset_and_assert_task_count(expected=2)
+
+        self.assertEqual(DocketDocument.get(id=docket_id).chapter, "7")
+        self.assertEqual(
+            DocketDocument.get(id=docket_id).trustee_str, "Jane Trustee"
+        )
+        hit = ESRECAPDocument.get(id=ES_CHILD_ID(rd.pk).RECAP)
+        self.assertEqual(hit.chapter, "7")
+        self.assertEqual(hit.trustee_str, "Jane Trustee")
+
+    def test_docket_own_field_change_cascades_to_documents(self) -> None:
+        """A Docket's own field change (case_name) cascades to its child
+        SCOTUSDocument's ES entry, not just the DocketDocument itself.
+        """
+        entry = SCOTUSDocketEntryFactory(docket__court=self.court)
+        scotus_document = SCOTUSDocumentFactory(docket_entry=entry)
+        docket_id = entry.docket_id
+
+        d = Docket.objects.get(pk=docket_id)
+        d.case_name = "Edited Case Name"
+        with mock.patch(
+            "cl.lib.es_signal_processor.update_children_docs_by_query.delay",
+            side_effect=lambda *args, **kwargs: self.count_task_calls(
+                update_children_docs_by_query, False, *args, **kwargs
+            ),
+        ):
+            d.save()
+        self.reset_and_assert_task_count(expected=1)
+
+        hit = ESRECAPDocument.get(id=ES_CHILD_ID(scotus_document.pk).SCOTUS)
+        self.assertEqual(hit.caseName, "Edited Case Name")
+
+
+@override_settings(WAFFLE_CACHE_PREFIX="SCOTUSRECAPSearchTest")
+@override_flag("scotus_docket_page", active=True)
+class SCOTUSRECAPSearchTest(
+    AuthenticatedClientMixin, ESIndexTestCase, TestCase
+):
+    """Confirm RECAP search shows SCOTUS content only behind its flag."""
+
+    @classmethod
+    def setUpTestData(cls) -> None:
+        """Index one dated SCOTUS docket and one dated RECAP docket, each
+        with a document matching "Tied"."""
+        cls.rebuild_index("search.Docket")
+        # The RSS feed skips entries without a filing date, and the alert
+        # estimate counts by filing date, so both need dates.
+        filed = datetime.date(2024, 1, 2)
+        with cls.captureOnCommitCallbacks(execute=True):
+            scotus_entry = SCOTUSDocketEntryFactory(
+                docket__court=CourtFactory(id="scotus", jurisdiction="F"),
+                docket__date_filed=filed,
+                date_filed=filed,
+            )
+            recap_entry = DocketEntryFactory(
+                docket__court=CourtFactory(id="ca1", jurisdiction="F"),
+                docket__source=Docket.RECAP,
+                docket__date_filed=filed,
+                date_filed=filed,
+            )
+            # Every docket and document URL of a docket starts with this.
+            cls.scotus_docket_path = f"/docket/{scotus_entry.docket_id}/"
+            cls.recap_docket_path = f"/docket/{recap_entry.docket_id}/"
+            SCOTUSDocumentFactory(
+                docket_entry=scotus_entry, description="Tied"
+            )
+            RECAPDocumentFactory(docket_entry=recap_entry, description="Tied")
+
+    def test_search_frontend_shows_scotus_only_with_the_flag(self) -> None:
+        """Until launch, the search page and the RSS search feed show
+        SCOTUS content only to requests with the scotus_docket_page flag."""
+        feed = reverse("search_feed", args=["search"])
+        endpoints = [
+            ("search page", reverse("show_results")),
+            ("RSS search feed", feed),
+        ]
+        # An empty q runs the match-all query, which builds its queries
+        # differently.
+        for (endpoint, url), q in product(endpoints, ["Tied", ""]):
+            with self.subTest(endpoint=endpoint, q=q):
+                params = {"type": SEARCH_TYPES.RECAP, "q": q}
+                with override_flag("scotus_docket_page", active=False):
+                    hidden = self.client.get(url, params).content.decode()
+                shown = self.client.get(url, params).content.decode()
+
+                self.assertIn(self.recap_docket_path, hidden)
+                self.assertNotIn(self.scotus_docket_path, hidden)
+                self.assertIn(self.scotus_docket_path, shown)
+
+    def test_search_feed_links_numberless_documents_to_their_entry(
+        self,
+    ) -> None:
+        """RSS search feed items for RECAP and SCOTUS documents without a
+        number, which have no page of their own, link to their entry on the
+        docket page instead of the homepage."""
+        filed = datetime.date(2024, 1, 3)
+        with self.captureOnCommitCallbacks(execute=True):
+            recap_minute_entry = DocketEntryFactory(
+                docket__court=CourtFactory(id="cand", jurisdiction="FD"),
+                docket__source=Docket.RECAP,
+                date_filed=filed,
+                description="Numberless",
+            )
+            scotus_numbered_entry = SCOTUSDocketEntryFactory(
+                docket__court=Court.objects.get(pk="scotus"),
+                entry_number=7,
+                date_filed=filed,
+                description="Numberless",
+            )
+            scotus_minute_entry = SCOTUSDocketEntryFactory(
+                docket=scotus_numbered_entry.docket,
+                entry_number=None,
+                date_filed=filed,
+                description="Numberless",
+            )
+            # build() skips the factories' fixups, which would give each
+            # document its entry's number.
+            for document in [
+                RECAPDocumentFactory.build(
+                    docket_entry=recap_minute_entry, document_number=""
+                ),
+                SCOTUSDocumentFactory.build(
+                    docket_entry=scotus_numbered_entry, document_number=None
+                ),
+                SCOTUSDocumentFactory.build(
+                    docket_entry=scotus_minute_entry, document_number=None
+                ),
+            ]:
+                document.save()
+
+        r = self.client.get(
+            reverse("search_feed", args=["search"]),
+            {"type": SEARCH_TYPES.RECAP, "q": "Numberless"},
+        )
+
+        namespaces = {"atom": "http://www.w3.org/2005/Atom"}
+        tree = etree.fromstring(r.content)
+        hrefs = tree.xpath(
+            "//atom:entry/atom:link/@href", namespaces=namespaces
+        )
+        recap_docket_url = recap_minute_entry.docket.get_absolute_url()
+        scotus_docket_url = scotus_numbered_entry.docket.get_absolute_url()
+        expected = [
+            f"{recap_docket_url}#minute-entry-{recap_minute_entry.pk}",
+            f"{scotus_docket_url}#entry-7",
+            f"{scotus_docket_url}#minute-entry-{scotus_minute_entry.pk}",
+        ]
+        # The feed makes item links absolute; compare their path and anchor.
+        links = [
+            urllib.parse.urlsplit(href)._replace(scheme="", netloc="").geturl()
+            for href in hrefs
+        ]
+        self.assertCountEqual(links, expected)
+        # Each summary's "Original document" link gets the same fallback.
+        summary_links = [
+            html.fromstring(summary).xpath("//a/@href")[0]
+            for summary in tree.xpath(
+                "//atom:entry/atom:summary/text()", namespaces=namespaces
+            )
+        ]
+        self.assertCountEqual(summary_links, expected)
+
+    def test_search_apis_never_show_scotus(self) -> None:
+        """The v3 and v4 search APIs leave SCOTUS out even for requests
+        with the scotus_docket_page flag, until their own launch."""
+        api_v3 = reverse("search-list", kwargs={"version": "v3"})
+        api_v4 = reverse("search-list", kwargs={"version": "v4"})
+        endpoints = [
+            ("API v3 r", api_v3, SEARCH_TYPES.RECAP),
+            ("API v4 r", api_v4, SEARCH_TYPES.RECAP),
+            ("API v4 d", api_v4, SEARCH_TYPES.DOCKETS),
+            ("API v4 rd", api_v4, SEARCH_TYPES.RECAP_DOCUMENT),
+        ]
+        for (endpoint, url, search_type), q in product(
+            endpoints, ["Tied", ""]
+        ):
+            with self.subTest(endpoint=endpoint, q=q):
+                r = self.client.get(url, {"type": search_type, "q": q})
+
+                self.assertIn(self.recap_docket_path, r.content.decode())
+                self.assertNotIn(self.scotus_docket_path, r.content.decode())
+
+    def test_alert_estimate_counts_scotus_only_with_the_flag(self) -> None:
+        """The create-alert modal's estimate counts SCOTUS content only
+        for requests with the scotus_docket_page flag, like the search
+        page it belongs to."""
+        url = reverse(
+            "alert_frequency", kwargs={"version": "4", "day_count": 100}
+        )
+        params = {"type": SEARCH_TYPES.RECAP, "q": "Tied"}
+
+        # The estimate counts back from today, so pin today near the
+        # 2024-01-02 filing date.
+        with time_machine.travel(datetime.date(2024, 2, 1), tick=False):
+            with override_flag("scotus_docket_page", active=False):
+                hidden = self.client.get(url, params).json()
+            shown = self.client.get(url, params).json()
+
+        # Each docket counts once as a case and once with its document.
+        self.assertEqual(hidden["count_case_only"], 1)
+        self.assertEqual(shown["count_case_only"], 2)
+
+    def test_count_query_drops_inner_hits_when_hiding_scotus(self) -> None:
+        """clean_count_query still strips the has_child inner_hits from a
+        query that leaves SCOTUS out."""
+        search_query, *_ = build_es_main_query(
+            DocketDocument.search(),
+            {"type": SEARCH_TYPES.RECAP, "q": "Tied"},
+        )
+
+        count_query = clean_count_query(search_query).to_dict()["query"][
+            "bool"
+        ]
+
+        self.assertEqual(
+            count_query["must_not"], [{"term": {"court_id.raw": "scotus"}}]
+        )
+        for clause in count_query["should"]:
+            self.assertNotIn("inner_hits", clause.get("has_child", {}))
+
+    @mock.patch(
+        "cl.lib.search_utils.get_micro_cache_key",
+        return_value="search_results_cache_scotus_test:",
+    )
+    @override_settings(ELASTICSEARCH_MICRO_CACHE_ENABLED=True)
+    def test_search_page_cache_is_separate_per_flag(
+        self, _mock: mock.MagicMock
+    ) -> None:
+        """A search page cached for one scotus_docket_page value is never
+        served to a request with the other value."""
+        r = get_redis_interface("CACHE")
+        params = {"type": SEARCH_TYPES.RECAP, "q": "Tied"}
+        for first_flag in [True, False]:
+            with self.subTest(first_flag=first_flag):
+                if keys := r.keys(":1:search_results_cache_scotus_test:*"):
+                    r.delete(*keys)
+                with override_flag("scotus_docket_page", active=first_flag):
+                    self.client.get(reverse("show_results"), params)
+                with override_flag(
+                    "scotus_docket_page", active=not first_flag
+                ):
+                    second = self.client.get(reverse("show_results"), params)
+
+                self.assertEqual(
+                    self.scotus_docket_path in second.content.decode(),
+                    not first_flag,
+                )
+
+
 class RECAPFeedTest(RECAPSearchTestCase, ESIndexTestCase, TestCase):
     """Tests for RECAP Search Feed"""
 
@@ -7609,6 +8818,411 @@ class IndexDocketRECAPDocumentsCommandTest(
         es_rd_2 = ESRECAPDocument.get(id=ES_CHILD_ID(rd_2.pk).RECAP)
         self.assertEqual(es_rd_2.plain_text, rd_2.plain_text)
         self.assertEqual(es_rd_2.filepath_local, rd_2.filepath_local)
+
+
+class IndexSCOTUSCommandTest(ESIndexTestCase, TestCase):
+    """cl_index_parent_and_child_docs --source tests: indexing a non-RECAP
+    docket source (SCOTUS) must pick the same Dockets and documents the ES
+    signal processor would.
+    """
+
+    @classmethod
+    def setUpTestData(cls) -> None:
+        """Create one SCOTUS Docket per data shape the signals index or skip,
+        plus a RECAP Docket to check sources don't leak into each other."""
+        court = CourtFactory(id="scotus", jurisdiction="F")
+        cls.full_docket = ScotusDocketMetadataFactory(
+            docket__court=court, docket__source=Docket.SCRAPER
+        ).docket
+        entry = SCOTUSDocketEntryFactory(docket=cls.full_docket)
+        cls.sd_1 = SCOTUSDocumentFactory(
+            docket_entry=entry, attachment_number=1
+        )
+        cls.sd_2 = SCOTUSDocumentFactory(
+            docket_entry=entry, attachment_number=2
+        )
+        # Metadata but no entries, as merge_scotus_docket does for a docket
+        # without entries.
+        cls.metadata_only_docket = ScotusDocketMetadataFactory(
+            docket__court=court, docket__source=Docket.SCRAPER
+        ).docket
+        # No metadata, but signals still index it through its document.
+        cls.sd_3 = SCOTUSDocumentFactory(
+            docket_entry__docket__court=court,
+            docket_entry__docket__source=Docket.SCRAPER,
+        )
+        cls.document_only_docket = cls.sd_3.docket_entry.docket
+        # A scotus Docket with no SCOTUS content (like one created only for a
+        # scraped opinion) and an entry-only one aren't indexed by signals.
+        DocketFactory(court=court, source=Docket.SCRAPER)
+        SCOTUSDocketEntryFactory(
+            docket__court=court, docket__source=Docket.SCRAPER
+        )
+        cls.rd = RECAPDocumentFactory(
+            docket_entry=DocketEntryFactory(
+                docket=DocketFactory(
+                    court=CourtFactory(id="canb", jurisdiction="FB"),
+                    source=Docket.RECAP,
+                )
+            )
+        )
+
+    def setUp(self) -> None:
+        """Start every test from an empty Docket index and no auto-resume
+        offsets logged in Redis."""
+        # rebuild_index would populate the index from the DB.
+        self.delete_index("search.Docket")
+        self.create_index("search.Docket")
+        self.r = get_redis_interface("CACHE")
+        self.redis_keys = [
+            compose_redis_key(SEARCH_TYPES.RECAP),
+            *[
+                compose_redis_key(
+                    SEARCH_TYPES.RECAP,
+                    source_name="scotus",
+                    document_type=document_type,
+                )
+                for document_type in [None, "parent", "child"]
+            ],
+        ]
+        self.r.delete(*self.redis_keys)
+
+    def tearDown(self) -> None:
+        """Remove the auto-resume offsets the test logged in Redis."""
+        self.r.delete(*self.redis_keys)
+        super().tearDown()
+
+    def _index(self, source: str = "scotus", **options) -> None:
+        """Run the command for a docket source with the given options."""
+        call_command(
+            "cl_index_parent_and_child_docs",
+            search_type=SEARCH_TYPES.RECAP,
+            source=source,
+            queue="celery",
+            pk_offset=0,
+            testing_mode=True,
+            **options,
+        )
+
+    def _indexed_docket_ids(self) -> set[int]:
+        """Return the pks of the Dockets currently in the index."""
+        s = DocketDocument.search().query(Q("match", docket_child="docket"))
+        return {hit.docket_id for hit in s.extra(size=100).execute()}
+
+    def assertSCOTUSDocumentsIndexed(self) -> None:
+        """Assert every SCOTUSDocument is indexed under its scotusd_ id with
+        its uid fields instead of the RECAP-only ids, routed and joined to
+        its own Docket, and that no RECAPDocument was indexed."""
+        for sd in [self.sd_1, self.sd_2, self.sd_3]:
+            docket_id = sd.docket_entry.docket_id
+            with self.subTest(sd=sd.pk):
+                doc = ESRECAPDocument.get(
+                    id=ES_CHILD_ID(sd.pk).SCOTUS, routing=docket_id
+                )
+                self.assertIsNone(doc.id)
+                self.assertIsNone(doc.docket_entry_id)
+                self.assertEqual(doc.uid, f"scotus_{sd.pk}")
+                self.assertEqual(
+                    doc.docket_entry_uid, f"scotus_{sd.docket_entry_id}"
+                )
+                self.assertEqual(doc.meta.routing, str(docket_id))
+                self.assertEqual(doc.docket_child.parent, docket_id)
+        s = DocketDocument.search().query(
+            Q("match", docket_child="recap_document")
+        )
+        self.assertEqual(s.count(), 3)
+
+    def test_parent_then_child(self) -> None:
+        """Dockets with metadata or a document are indexed, opinion-only and
+        entry-only ones aren't, and children land under their parents."""
+        self._index(document_type="parent")
+        self.assertEqual(
+            self._indexed_docket_ids(),
+            {
+                self.full_docket.pk,
+                self.metadata_only_docket.pk,
+                self.document_only_docket.pk,
+            },
+        )
+
+        self._index(document_type="child")
+        self.assertSCOTUSDocumentsIndexed()
+
+    def test_child_only(self) -> None:
+        """Children can be indexed before their parents, routed by their
+        own docket."""
+        self._index(document_type="child")
+        self.assertSCOTUSDocumentsIndexed()
+
+    def test_recap_source_is_unchanged(self) -> None:
+        """The default source still indexes only RECAP content."""
+        call_command(
+            "cl_index_parent_and_child_docs",
+            search_type=SEARCH_TYPES.RECAP,
+            queue="celery",
+            pk_offset=0,
+            testing_mode=True,
+        )
+        self.assertEqual(
+            self._indexed_docket_ids(), {self.rd.docket_entry.docket_id}
+        )
+        self.assertTrue(
+            ESRECAPDocument.exists(id=ES_CHILD_ID(self.rd.pk).RECAP)
+        )
+        # The RECAPDocument is the only child: no SCOTUSDocument leaked in.
+        s = DocketDocument.search().query(
+            Q("match", docket_child="recap_document")
+        )
+        self.assertEqual(s.count(), 1)
+
+    def test_auto_resume_uses_its_own_redis_key(self) -> None:
+        """A SCOTUS run resumes from the SCOTUS key, not from RECAP's, and
+        the RECAP key keeps its existing name."""
+        self.assertEqual(
+            compose_redis_key(SEARCH_TYPES.RECAP), "es_r_indexing:log"
+        )
+        self.assertEqual(
+            compose_redis_key(SEARCH_TYPES.RECAP, source_name="scotus"),
+            "es_r_scotus_indexing:log",
+        )
+        self.assertEqual(
+            compose_redis_key(
+                SEARCH_TYPES.RECAP,
+                source_name="scotus",
+                document_type="parent",
+            ),
+            "es_r_scotus_parent_indexing:log",
+        )
+        log_last_document_indexed(
+            10_000_000, compose_redis_key(SEARCH_TYPES.RECAP)
+        )
+        log_last_document_indexed(
+            self.document_only_docket.pk,
+            compose_redis_key(
+                SEARCH_TYPES.RECAP,
+                source_name="scotus",
+                document_type="parent",
+            ),
+        )
+
+        self._index(document_type="parent", auto_resume=True)
+
+        # full_docket and metadata_only_docket were created before it, so
+        # they're below the logged offset.
+        self.assertEqual(
+            self._indexed_docket_ids(), {self.document_only_docket.pk}
+        )
+
+    def test_child_auto_resume_ignores_the_parent_offset(self) -> None:
+        """A child run doesn't resume from a parent run's offset: parent runs
+        log Docket pks, child runs walk document pks."""
+        log_last_document_indexed(
+            10_000_000,
+            compose_redis_key(
+                SEARCH_TYPES.RECAP,
+                source_name="scotus",
+                document_type="parent",
+            ),
+        )
+
+        self._index(document_type="child", auto_resume=True)
+
+        self.assertSCOTUSDocumentsIndexed()
+
+    def test_each_scotus_mode_logs_and_resumes_from_its_own_key(
+        self,
+    ) -> None:
+        """Every SCOTUS mode logs its progress to its own Redis key once it
+        reaches the 1,000-item logging point, and a resumed run starts from
+        the logged pk."""
+        court = Court.objects.get(pk="scotus")
+        # The command only logs every 1,000 items, so add enough Dockets and
+        # documents for every mode to reach that point. bulk_create skips the
+        # ES signals, and the tasks are mocked below.
+        new_dockets = Docket.objects.bulk_create(
+            DocketFactory.build(
+                court=court, appeal_from=None, source=Docket.SCRAPER
+            )
+            for _ in range(1000)
+        )
+        ScotusDocketMetadata.objects.bulk_create(
+            ScotusDocketMetadataFactory.build(docket=docket)
+            for docket in new_dockets
+        )
+        entry = SCOTUSDocketEntryFactory(docket=self.full_docket)
+        new_documents = SCOTUSDocument.objects.bulk_create(
+            SCOTUSDocumentFactory.build(
+                docket_entry=entry, document_number=1, attachment_number=i
+            )
+            for i in range(1, 1001)
+        )
+        docket_pks = sorted(
+            [
+                self.full_docket.pk,
+                self.metadata_only_docket.pk,
+                self.document_only_docket.pk,
+                *[docket.pk for docket in new_dockets],
+            ]
+        )
+        document_pks = sorted(
+            [
+                self.sd_1.pk,
+                self.sd_2.pk,
+                self.sd_3.pk,
+                *[document.pk for document in new_documents],
+            ]
+        )
+        cases = [
+            (None, index_parent_and_child_docs, docket_pks),
+            ("parent", index_parent_or_child_docs_in_es, docket_pks),
+            ("child", index_parent_or_child_docs_in_es, document_pks),
+        ]
+        for document_type, task, pks in cases:
+            with self.subTest(document_type=document_type):
+                self.r.delete(*self.redis_keys)
+                key = compose_redis_key(
+                    SEARCH_TYPES.RECAP,
+                    source_name="scotus",
+                    document_type=document_type,
+                )
+
+                with mock.patch.object(task, "si"):
+                    self._index(document_type=document_type)
+
+                # The 1,000th pk is logged, to this mode's key only.
+                self.assertEqual(
+                    [k for k in self.redis_keys if self.r.exists(k)], [key]
+                )
+                self.assertEqual(
+                    get_last_parent_document_id_processed(key), pks[999]
+                )
+
+                with mock.patch.object(task, "si") as mock_si:
+                    self._index(document_type=document_type, auto_resume=True)
+
+                scheduled = [
+                    pk
+                    for call in mock_si.call_args_list
+                    for pk in call.args[0]
+                ]
+                self.assertEqual(scheduled, pks[999:])
+
+    def test_missing_checks_each_source_document_id(self) -> None:
+        """--missing looks documents up by their source's _id prefix, so only
+        the one actually missing from ES is scheduled again, with its
+        source passed to the task."""
+        cases = [
+            ("recap", self.rd, ES_CHILD_ID(self.rd.pk).RECAP),
+            ("scotus", self.sd_2, ES_CHILD_ID(self.sd_2.pk).SCOTUS),
+        ]
+        for source, document, es_id in cases:
+            with self.subTest(source=source):
+                self._index(source=source)
+                ESRECAPDocument.get(
+                    id=es_id, routing=document.docket_entry.docket_id
+                ).delete(refresh=True)
+
+                with mock.patch.object(
+                    index_parent_or_child_docs_in_es, "si"
+                ) as mock_si:
+                    self._index(
+                        source=source, document_type="child", missing=True
+                    )
+
+                scheduled = [
+                    pk
+                    for call in mock_si.call_args_list
+                    for pk in call.args[0]
+                ]
+                self.assertEqual(scheduled, [document.pk])
+                self.assertEqual(
+                    {
+                        call.kwargs.get("source_name")
+                        for call in mock_si.call_args_list
+                    },
+                    {source},
+                )
+
+    def test_rejects_unsupported_combinations(self) -> None:
+        """Unknown sources are rejected, and non-RECAP sources only work with
+        the RECAP search type and without the event-table mode."""
+        cases = [
+            {"source": "texas", "search_type": SEARCH_TYPES.RECAP},
+            {"source": "scotus", "search_type": SEARCH_TYPES.OPINION},
+            {
+                "source": "scotus",
+                "search_type": SEARCH_TYPES.RECAP,
+                "update_from_event_tables": EventTable.DOCKET,
+            },
+        ]
+        for options in cases:
+            with (
+                self.subTest(options=options),
+                self.assertRaises(CommandError),
+            ):
+                call_command(
+                    "cl_index_parent_and_child_docs", queue="celery", **options
+                )
+
+
+class SCOTUSIndexingParityTest(ESIndexTestCase, TestCase):
+    """A backfill with cl_index_parent_and_child_docs must index exactly
+    what the ES signal processor indexes for the same SCOTUS data."""
+
+    def _indexed_docs(self) -> dict[str, tuple[str | None, dict]]:
+        """Return every document in the index as {_id: (_routing, _source)},
+        without the indexing timestamp, which differs between runs."""
+        hits = DocketDocument.search().extra(size=100).execute()
+        return {
+            hit.meta.id: (
+                getattr(hit.meta, "routing", None),
+                {k: v for k, v in hit.to_dict().items() if k != "timestamp"},
+            )
+            for hit in hits
+        }
+
+    def test_command_indexes_what_signals_index(self) -> None:
+        """For every real SCOTUS data shape, both a single run and a parent
+        then child run index the same documents, with the same routing and
+        content, as the signals."""
+        court = CourtFactory(id="scotus", jurisdiction="F")
+        with self.captureOnCommitCallbacks(execute=True):
+            # capital_case=True, so its propagation to the Docket and its
+            # documents is compared too.
+            full_docket = ScotusDocketMetadataFactory(
+                docket__court=court,
+                docket__source=Docket.SCRAPER,
+                capital_case=True,
+            ).docket
+            SCOTUSDocumentFactory(docket_entry__docket=full_docket)
+            ScotusDocketMetadataFactory(
+                docket__court=court, docket__source=Docket.SCRAPER
+            )
+            SCOTUSDocumentFactory(
+                docket_entry__docket__court=court,
+                docket_entry__docket__source=Docket.SCRAPER,
+            )
+            DocketFactory(court=court, source=Docket.SCRAPER)
+            SCOTUSDocketEntryFactory(
+                docket__court=court, docket__source=Docket.SCRAPER
+            )
+        signal_docs = self._indexed_docs()
+
+        for document_types in [[None], ["parent", "child"]]:
+            with self.subTest(document_types=document_types):
+                self.delete_index("search.Docket")
+                self.create_index("search.Docket")
+                for document_type in document_types:
+                    call_command(
+                        "cl_index_parent_and_child_docs",
+                        search_type=SEARCH_TYPES.RECAP,
+                        source="scotus",
+                        document_type=document_type,
+                        queue="celery",
+                        pk_offset=0,
+                        testing_mode=True,
+                    )
+                self.assertEqual(self._indexed_docs(), signal_docs)
 
 
 class RECAPIndexingTest(
