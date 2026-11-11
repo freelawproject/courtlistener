@@ -4,6 +4,7 @@ import re
 import urllib.parse
 from http import HTTPStatus
 from itertools import product
+from typing import Any
 from unittest import mock
 
 import time_machine
@@ -22,6 +23,10 @@ from rest_framework.serializers import CharField
 from waffle.testutils import override_flag
 
 from cl.alerts.utils import add_cutoff_timestamp_filter
+from cl.corpus_importer.tasks import (
+    add_scotus_docket_entries,
+    enrich_scotus_attachments,
+)
 from cl.lib.elasticsearch_utils import (
     build_es_main_query,
     build_search_feed_query,
@@ -96,6 +101,8 @@ from cl.search.factories import (
     OpinionsCitedByRECAPDocumentFactory,
     OpinionWithParentsFactory,
     RECAPDocumentFactory,
+    SCOTUSAttachmentDataFactory,
+    SCOTUSDocketEntryDataFactory,
     SCOTUSDocketEntryFactory,
     ScotusDocketMetadataFactory,
     SCOTUSDocumentFactory,
@@ -110,6 +117,7 @@ from cl.search.management.commands.fix_rd_broken_links import (
 )
 from cl.search.models import (
     SEARCH_TYPES,
+    Court,
     Docket,
     DocketEvent,
     OpinionsCitedByRECAPDocument,
@@ -6951,11 +6959,13 @@ class SCOTUSESIndexingSignalTest(
     """
 
     @classmethod
-    def setUpClass(cls):
+    def setUpClass(cls) -> None:
+        """Start every test class run from an empty RECAP index."""
         super().setUpClass()
         cls.rebuild_index("search.Docket")
 
-    def setUp(self):
+    def setUp(self) -> None:
+        """Create the scotus Court every SCOTUS docket in these tests uses."""
         self.court = CourtFactory(id="scotus", jurisdiction="F")
         super().setUp()
 
@@ -7184,6 +7194,60 @@ class SCOTUSESIndexingSignalTest(
                     id=ES_CHILD_ID(scotus_document.pk).SCOTUS
                 )
                 self.assertEqual(getattr(hit, es_field), expected)
+
+    def test_entry_without_attachments_is_indexed_through_placeholder(
+        self,
+    ) -> None:
+        """An entry merged without attachments is indexed in ES through its
+        placeholder document, so its description can be searched. Once the
+        entry has an attachment, the same ES document gets its fields."""
+        docket = DocketFactory(court=self.court, source=Docket.SCRAPER)
+        ScotusDocketMetadataFactory(docket=docket)
+
+        def merge(
+            document_number: int | None, attachments: list[dict[str, Any]]
+        ) -> None:
+            """Merge the same entry with the given attachments."""
+            docket_entries = [
+                SCOTUSDocketEntryDataFactory(
+                    description="DISTRIBUTED for Conference.",
+                    date_filed=datetime.date(2024, 3, 1),
+                    document_number=document_number,
+                    attachments=attachments,
+                )
+            ]
+            enrich_scotus_attachments(docket_entries)
+            add_scotus_docket_entries(
+                docket, docket_entries, download_file=False
+            )
+
+        merge(document_number=None, attachments=[])
+
+        placeholder = SCOTUSDocument.objects.get(docket_entry__docket=docket)
+        es_id = ES_CHILD_ID(placeholder.pk).SCOTUS
+        hit = ESRECAPDocument.get(id=es_id)
+        self.assertEqual(hit.description, "DISTRIBUTED for Conference.")
+        self.assertEqual(hit.absolute_url, "")
+        self.assertEqual(
+            ESRECAPDocument.search()
+            .query("match", description="DISTRIBUTED")
+            .count(),
+            1,
+        )
+
+        merge(
+            document_number=7,
+            attachments=[
+                SCOTUSAttachmentDataFactory(
+                    description="Petition", document_number=7
+                )
+            ],
+        )
+
+        hit = ESRECAPDocument.get(id=es_id)
+        self.assertEqual(hit.short_description, "Petition")
+        self.assertEqual(hit.document_number, 7)
+        self.assertEqual(hit.entry_number, 7)
 
     def test_scotus_docket_entry_delete_cascades_to_documents(self) -> None:
         """Deleting a SCOTUSDocketEntry cascades (on_delete=CASCADE) to
@@ -7505,7 +7569,9 @@ class SCOTUSRECAPSearchTest(
     """Confirm RECAP search shows SCOTUS content only behind its flag."""
 
     @classmethod
-    def setUpTestData(cls):
+    def setUpTestData(cls) -> None:
+        """Index one dated SCOTUS docket and one dated RECAP docket, each
+        with a document matching "Tied"."""
         cls.rebuild_index("search.Docket")
         # The RSS feed skips entries without a filing date, and the alert
         # estimate counts by filing date, so both need dates.
@@ -7550,6 +7616,79 @@ class SCOTUSRECAPSearchTest(
                 self.assertIn(self.recap_docket_path, hidden)
                 self.assertNotIn(self.scotus_docket_path, hidden)
                 self.assertIn(self.scotus_docket_path, shown)
+
+    def test_search_feed_links_numberless_documents_to_their_entry(
+        self,
+    ) -> None:
+        """RSS search feed items for RECAP and SCOTUS documents without a
+        number, which have no page of their own, link to their entry on the
+        docket page instead of the homepage."""
+        filed = datetime.date(2024, 1, 3)
+        with self.captureOnCommitCallbacks(execute=True):
+            recap_minute_entry = DocketEntryFactory(
+                docket__court=CourtFactory(id="cand", jurisdiction="FD"),
+                docket__source=Docket.RECAP,
+                date_filed=filed,
+                description="Numberless",
+            )
+            scotus_numbered_entry = SCOTUSDocketEntryFactory(
+                docket__court=Court.objects.get(pk="scotus"),
+                entry_number=7,
+                date_filed=filed,
+                description="Numberless",
+            )
+            scotus_minute_entry = SCOTUSDocketEntryFactory(
+                docket=scotus_numbered_entry.docket,
+                entry_number=None,
+                date_filed=filed,
+                description="Numberless",
+            )
+            # build() skips the factories' fixups, which would give each
+            # document its entry's number.
+            for document in [
+                RECAPDocumentFactory.build(
+                    docket_entry=recap_minute_entry, document_number=""
+                ),
+                SCOTUSDocumentFactory.build(
+                    docket_entry=scotus_numbered_entry, document_number=None
+                ),
+                SCOTUSDocumentFactory.build(
+                    docket_entry=scotus_minute_entry, document_number=None
+                ),
+            ]:
+                document.save()
+
+        r = self.client.get(
+            reverse("search_feed", args=["search"]),
+            {"type": SEARCH_TYPES.RECAP, "q": "Numberless"},
+        )
+
+        namespaces = {"atom": "http://www.w3.org/2005/Atom"}
+        tree = etree.fromstring(r.content)
+        hrefs = tree.xpath(
+            "//atom:entry/atom:link/@href", namespaces=namespaces
+        )
+        recap_docket_url = recap_minute_entry.docket.get_absolute_url()
+        scotus_docket_url = scotus_numbered_entry.docket.get_absolute_url()
+        expected = [
+            f"{recap_docket_url}#minute-entry-{recap_minute_entry.pk}",
+            f"{scotus_docket_url}#entry-7",
+            f"{scotus_docket_url}#minute-entry-{scotus_minute_entry.pk}",
+        ]
+        # The feed makes item links absolute; compare their path and anchor.
+        links = [
+            urllib.parse.urlsplit(href)._replace(scheme="", netloc="").geturl()
+            for href in hrefs
+        ]
+        self.assertCountEqual(links, expected)
+        # Each summary's "Original document" link gets the same fallback.
+        summary_links = [
+            html.fromstring(summary).xpath("//a/@href")[0]
+            for summary in tree.xpath(
+                "//atom:entry/atom:summary/text()", namespaces=namespaces
+            )
+        ]
+        self.assertCountEqual(summary_links, expected)
 
     def test_search_apis_never_show_scotus(self) -> None:
         """The v3 and v4 search APIs leave SCOTUS out even for requests
@@ -7614,7 +7753,9 @@ class SCOTUSRECAPSearchTest(
         return_value="search_results_cache_scotus_test:",
     )
     @override_settings(ELASTICSEARCH_MICRO_CACHE_ENABLED=True)
-    def test_search_page_cache_is_separate_per_flag(self, _mock) -> None:
+    def test_search_page_cache_is_separate_per_flag(
+        self, _mock: mock.MagicMock
+    ) -> None:
         """A search page cached for one scotus_docket_page value is never
         served to a request with the other value."""
         r = get_redis_interface("CACHE")

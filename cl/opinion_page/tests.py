@@ -67,7 +67,7 @@ from cl.lib.test_helpers import (
     SimpleUserDataMixin,
     SitemapTest,
 )
-from cl.opinion_page import docket_entry_sources
+from cl.opinion_page import docket_entry_sources, forms_v2
 from cl.opinion_page.docket_entry_sources import (
     _recap_document_detail_url,
     _scotus_document_detail_url,
@@ -2131,6 +2131,39 @@ class ScotusDocketFlagEnabledTest(TestCase):
         )
         self.assertIn(
             "sourced from the Supreme Court of the United States", content
+        )
+
+    async def test_scotus_placeholder_documents_are_not_listed(self) -> None:
+        """An entry's placeholder document isn't listed under it on the
+        docket page, while real attachments are."""
+        placeholder_entry = await sync_to_async(SCOTUSDocketEntryFactory)(
+            docket=self.docket, entry_number=None
+        )
+        await sync_to_async(SCOTUSDocumentFactory)(
+            docket_entry=placeholder_entry,
+            url="",
+            document_number=None,
+            attachment_number=None,
+        )
+        attachment_entry = await sync_to_async(SCOTUSDocketEntryFactory)(
+            docket=self.docket
+        )
+        attachment = await sync_to_async(SCOTUSDocumentFactory)(
+            docket_entry=attachment_entry
+        )
+
+        r = await self.async_client.get(
+            reverse("view_docket", args=[self.docket.pk, self.docket.slug])
+        )
+
+        self.assertEqual(r.status_code, HTTPStatus.OK)
+        listed = {
+            entry.pk: [document.pk for document in entry.documents]
+            for entry in r.context["docket_entries"]
+        }
+        self.assertEqual(
+            listed,
+            {placeholder_entry.pk: [], attachment_entry.pk: [attachment.pk]},
         )
 
     async def test_scotus_docket_entry_filters_still_work(self) -> None:
@@ -5235,7 +5268,7 @@ class DocketFilterRenderTestCase(TestCase):
         cls.docket = DocketFactory(court=cls.court, source=Docket.RECAP)
         cls.empty_page = Paginator([], 100).get_page(1)
 
-    def _render(self, form: DocketEntryFilterForm) -> str:
+    def _render(self, form: forms_v2.DocketEntryFilterForm) -> str:
         # Render via a wrapper template that invokes <c-docket-filter> as a
         # child component, instead of rendering
         # cotton/docket_filter/index.html directly — the latter declares
@@ -5264,58 +5297,61 @@ class DocketFilterRenderTestCase(TestCase):
         )
 
 
-class DocketFilterDrawerAttrPropagationTest(DocketFilterRenderTestCase):
-    """The mobile filter drawer auto-opens when a filter submission fails
-    validation, so users can see the error messages inside it. That depends
-    on two pieces of plumbing — `data-has-errors` reaching the drawer's root
-    element via Cotton's `{{ attrs }}` passthrough, and the
-    `x-on:open-filter-drawer` listener being wired up on the same element so
-    `docket_filter.js` can dispatch the open event. Lock both in.
+class DocketFilterErrorDialogTest(DocketFilterRenderTestCase):
+    """The mobile filter dialog auto-opens when a filter submission fails
+    validation. That depends on two pieces of plumbing — `data-has-errors`
+    on the `docketFilter` root, which `docket_filter.js` reads on init, and
+    the dialog listening for the `open-filter-dialog` window event the
+    script dispatches. Lock both in.
+
+    Elements are found by attribute instead of XPath because `:` in
+    attribute names isn't first-class in XPath.
     """
 
-    def _find_drawer(self, html: str) -> _Element | None:
-        """Return the element with `x-on:open-filter-drawer` (the drawer root).
-
-        Done element-wise instead of XPath because `:` in attribute names
-        isn't first-class in XPath.
-        """
+    def _find_by_attr(self, html: str, name: str) -> _Element | None:
+        """Return the first element that has the attribute `name`."""
         for el in fromstring(html).iter():
-            if "x-on:open-filter-drawer" in cast(_Attrib, el.attrib):
+            if name in cast(_Attrib, el.attrib):
                 return el
         return None
 
-    def test_data_has_errors_lands_on_drawer_when_form_invalid(self) -> None:
-        request = RequestFactory().get("/?entry_gte=abc")
+    def _render_root(self, query: str) -> _Element | None:
+        request = RequestFactory().get(f"/{query}")
         request.user = AnonymousUser()
-        form = DocketEntryFilterForm(request.GET, request=request)
-        self.assertFalse(form.is_valid())
+        form = forms_v2.DocketEntryFilterForm(request.GET, request=request)
+        form.is_valid()
+        html = self._render(form)
+        for el in fromstring(html).iter():
+            if cast(_Attrib, el.attrib).get("x-data") == "docketFilter":
+                return el
+        return None
 
-        drawer = self._find_drawer(self._render(form))
+    def test_root_has_errors_when_form_invalid(self) -> None:
+        root = self._render_root("?entry_gte=abc")
+        self.assertIsNotNone(root, "docketFilter root not found")
+        self.assertIn("data-has-errors", root.attrib)
 
-        self.assertIsNotNone(
-            drawer, "drawer root with open listener not found"
-        )
-        self.assertIn(
-            "data-has-errors",
-            drawer.attrib,
-            "data-has-errors must land on the same element that listens "
-            "for open-filter-drawer — otherwise docket_filter.js can't "
-            "find the drawer to dispatch the open event",
-        )
-        self.assertEqual(
-            cast(_Attrib, drawer.attrib)["x-on:open-filter-drawer"], "open"
-        )
+    def test_root_has_no_errors_when_form_is_clean(self) -> None:
+        root = self._render_root("")
+        self.assertIsNotNone(root, "docketFilter root not found")
+        self.assertNotIn("data-has-errors", root.attrib)
 
-    def test_no_data_has_errors_when_form_is_clean(self) -> None:
+    def test_dialog_opens_on_window_event(self) -> None:
         request = RequestFactory().get("/")
         request.user = AnonymousUser()
-        form = DocketEntryFilterForm(request.GET, request=request)
-        self.assertTrue(form.is_valid())
-
-        drawer = self._find_drawer(self._render(form))
-
-        self.assertIsNotNone(drawer)
-        self.assertNotIn("data-has-errors", drawer.attrib)
+        form = forms_v2.DocketEntryFilterForm(request.GET, request=request)
+        dialog = self._find_by_attr(
+            self._render(form), "x-on:open-filter-dialog.window"
+        )
+        self.assertIsNotNone(
+            dialog,
+            "the dialog must listen for open-filter-dialog on window, "
+            "which docket_filter.js dispatches when the filters have errors",
+        )
+        self.assertEqual(
+            cast(_Attrib, dialog.attrib)["x-on:open-filter-dialog.window"],
+            "open",
+        )
 
 
 class DocketFilterSearchScopeTest(DocketFilterRenderTestCase):
@@ -5330,7 +5366,7 @@ class DocketFilterSearchScopeTest(DocketFilterRenderTestCase):
         the submit hook that merges them."""
         request = RequestFactory().get("/")
         request.user = AnonymousUser()
-        form = DocketEntryFilterForm(request.GET, request=request)
+        form = forms_v2.DocketEntryFilterForm(request.GET, request=request)
 
         tree = fromstring(self._render(form))
         # docket_filter.js reads the pristine scope from here on every
@@ -5456,6 +5492,50 @@ class DocketFilterPaginationWiringTest(TestCase):
         r = await self._get_docket_and_verify_v2(data={"entry_gte": "3"})
         numbers = sorted(e.entry_number for e in r.context["docket_entries"])  # type:ignore[attr-defined] Django inserts the context attribute in test envs
         self.assertEqual(numbers, [3, 4, 5])
+
+    async def test_profile_default_order_applies_without_order_by(
+        self,
+    ) -> None:
+        """A signed-in user who saved newest-first as their docket order gets
+        the entries descending when the URL picks no order, and the toolbar
+        checks the Desc radio to match."""
+        profile = await sync_to_async(UserProfileWithParentsFactory)(
+            docket_default_order_desc=True
+        )
+        await self.async_client.aforce_login(profile.user)
+        r = await self._get_docket_and_verify_v2()
+        numbers = [e.entry_number for e in r.context["docket_entries"]]  # type:ignore[attr-defined] Django inserts the context attribute in test envs
+        self.assertEqual(numbers, [5, 4, 3, 2, 1])
+        checked = [
+            el.get("value")
+            for el in fromstring(r.content.decode()).iter("input")
+            if el.get("type") == "radio"
+            and el.get("name") == "order_by"
+            and "checked" in cast(_Attrib, el.attrib)
+        ]
+        self.assertEqual(checked, ["desc"])
+
+    async def test_mobile_dialog_carries_current_order_by(self) -> None:
+        """The mobile filter dialog has no sort control, so its hidden
+        order_by input must always carry the current order. Otherwise an
+        ascending view submitted from the dialog falls back to the signed-in
+        user's profile default and silently flips to descending."""
+        profile = await sync_to_async(UserProfileWithParentsFactory)(
+            docket_default_order_desc=True
+        )
+        await self.async_client.aforce_login(profile.user)
+        for order in ("asc", "desc"):
+            with self.subTest(order=order):
+                r = await self._get_docket_and_verify_v2(
+                    data={"order_by": order}
+                )
+                hidden = [
+                    el.get("value")
+                    for el in fromstring(r.content.decode()).iter("input")
+                    if el.get("type") == "hidden"
+                    and el.get("name") == "order_by"
+                ]
+                self.assertEqual(hidden, [order])
 
     async def test_pagination_nav_renders_with_multiple_pages(self) -> None:
         """The bottom <c-pagination> only renders its <nav> when

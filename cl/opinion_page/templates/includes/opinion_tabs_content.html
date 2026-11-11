@@ -358,6 +358,13 @@
                     <div class="serif-text harvard" id="headmatter">
                     {{ cluster.headmatter|safe }}
                     </div>
+                    {% if separate_syllabus %}
+                        <h2 class="opinion-section-title jump-link" id="syllabus">Syllabus</h2>
+                        <hr class="hr-opinion">
+                        <div class="serif-text harvard">
+                        {{ cluster.syllabus|safe }}
+                        </div>
+                    {% endif %}
                 {% else %}
                     {% if cluster.correction %}
                         <h2 class="opinion-section-title jump-link" id="correction">Correction</h2>

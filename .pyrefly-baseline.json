@@ -1255,27 +1255,6 @@
       "severity": "error"
     },
     {
-      "column": 35,
-      "path": "cl/favorites/views.py",
-      "name": "bad-argument-type",
-      "concise_description": "Argument `AbstractBaseUser | AnonymousUser` is not assignable to parameter `user` with type `User` in function `cl.favorites.selectors.prayer_eligible`",
-      "severity": "error"
-    },
-    {
-      "column": 25,
-      "path": "cl/favorites/views.py",
-      "name": "bad-argument-type",
-      "concise_description": "Argument `AbstractBaseUser | AnonymousUser` is not assignable to parameter `user` with type `User` in function `cl.favorites.utils.create_prayer`",
-      "severity": "error"
-    },
-    {
-      "column": 25,
-      "path": "cl/favorites/views.py",
-      "name": "bad-argument-type",
-      "concise_description": "Argument `AbstractBaseUser | AnonymousUser` is not assignable to parameter `user` with type `User` in function `cl.favorites.utils.delete_prayer`",
-      "severity": "error"
-    },
-    {
       "column": 19,
       "path": "cl/favorites/views.py",
       "name": "missing-attribute",
