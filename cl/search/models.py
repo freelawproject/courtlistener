@@ -283,6 +283,12 @@ class Docket(AbstractDateTimeModel, DocketSources):
     and link them together.
     """
 
+    # Not a model field - merge_scotus_docket sets this transiently, right
+    # before a Docket's first save, so the ES signal processor can tell a
+    # real SCOTUS docket from one created only to hold a scraped Opinion.
+    # Declared here only so the type checker knows the attribute exists.
+    _index_in_es: bool
+
     source = models.SmallIntegerField(
         help_text="contains the source of the Docket.",
         choices=DocketSources.SOURCE_CHOICES,
@@ -4305,6 +4311,10 @@ class SCOTUSDocument(AbstractDateTimeModel, AbstractPDF):
     """
     Represents an attachment to a SCOTUS docket entry.
 
+    An entry without attachments gets one empty placeholder document (no
+    url), so its metadata can be indexed in ES, which indexes entries
+    through their documents. See is_placeholder.
+
     :ivar docket_entry: The Docket this document is associated with.
     :ivar description: The description of this file in SCOTUS.
     :ivar document_number: The document number on the docket page in SCOTUS.
@@ -4402,6 +4412,14 @@ class SCOTUSDocument(AbstractDateTimeModel, AbstractPDF):
     @property
     def is_available(self) -> bool:
         return bool(self.filepath_local)
+
+    @property
+    def is_placeholder(self) -> bool:
+        """Whether this is the empty document of an entry without
+        attachments. Placeholders have no file to download and no page of
+        their own; to find them in a query, filter on url="".
+        """
+        return not self.url
 
     @property
     def has_valid_pdf(self) -> bool:

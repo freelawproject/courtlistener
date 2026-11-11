@@ -218,10 +218,13 @@ def index_daily_recap_documents(
         query_date_local_midnight_utc.isoformat().replace("+00:00", "Z")
     )
     next_day_utc_iso = next_day_utc.isoformat().replace("+00:00", "Z")
+    # Temporary: search alerts don't support SCOTUS content yet.
+    exclude_scotus = [{"term": {"court_id.raw": "scotus"}}]
     # Re Index API query.
     query = (
         {
             "bool": {
+                "must_not": exclude_scotus,
                 "should": [
                     # Dockets added/modified today
                     {
@@ -283,12 +286,13 @@ def index_daily_recap_documents(
                             },
                         }
                     },
-                ]
+                ],
             }
         }
         if not only_rd
         else {
             "bool": {
+                "must_not": exclude_scotus,
                 "should": [
                     # RECAPDocuments with parents added/modified today
                     {
@@ -320,7 +324,7 @@ def index_daily_recap_documents(
                             ]
                         }
                     },
-                ]
+                ],
             }
         }
     )
