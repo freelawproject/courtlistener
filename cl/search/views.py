@@ -1,5 +1,5 @@
 from datetime import date
-from typing import Any
+from typing import Any, cast
 from urllib.parse import quote
 
 from django.contrib import messages
@@ -30,12 +30,13 @@ from cl.lib.search_utils import (
     do_es_search,
     make_get_string,
     merge_form_with_courts,
+    scotus_frontend_search_enabled,
     store_search_query,
 )
 from cl.lib.string_utils import trunc
 from cl.lib.types import AuthenticatedHttpRequest
 from cl.search.forms import SearchForm, _clean_form
-from cl.search.models import SEARCH_TYPES, Court
+from cl.search.models import SEARCH_TYPES, Court, FederalCourtsQuerySet
 from cl.search.tasks import email_search_results
 from cl.search.utils import get_homepage_stats, get_v2_homepage_stats
 from cl.stats.constants import StatMethod, StatMetric, StatQueryType
@@ -164,7 +165,12 @@ def show_results(request: HttpRequest) -> HttpResponse:
         if not alert_form.is_valid():
             # Invalid form. Do the search again and show them the alert form
             # with the errors
-            render_dict.update(do_es_search(request.GET.copy()))
+            render_dict.update(
+                do_es_search(
+                    request.GET.copy(),
+                    include_scotus=scotus_frontend_search_enabled(request),
+                )
+            )
             render_dict.update(
                 {
                     "alert_form": alert_form,
@@ -290,12 +296,19 @@ def show_results(request: HttpRequest) -> HttpResponse:
 
     if search_type == SEARCH_TYPES.RECAP:
         search_results = do_es_search(
-            request.GET.copy(), courts=Court.federal_courts.all_pacer_courts()
+            request.GET.copy(),
+            # federal_courts is typed as a plain Manager, which hides the
+            # FederalCourtsQuerySet methods from the type checker.
+            courts=cast(
+                FederalCourtsQuerySet, Court.federal_courts
+            ).all_pacer_courts(),
+            include_scotus=scotus_frontend_search_enabled(request),
         )
     else:
         search_results = do_es_search(
             request.GET.copy(),
             is_semantic_frontend_active=is_semantic_active,
+            include_scotus=scotus_frontend_search_enabled(request),
         )
 
     render_dict.update(search_results)
