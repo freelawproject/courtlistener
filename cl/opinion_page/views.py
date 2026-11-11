@@ -1764,6 +1764,8 @@ async def block_item(request: HttpRequest) -> HttpResponse:
     htmx requests are answered with a partial that swaps the Blocked badge
     and a status message into the v2 docket page; AJAX requests get plain
     text.
+
+    TODO: Remove all ajax logic once v2 is rolled out globally
     """
     is_htmx = bool(request.headers.get("HX-Request"))
     if not is_htmx and not is_ajax(request):
