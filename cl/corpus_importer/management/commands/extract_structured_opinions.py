@@ -207,8 +207,8 @@ class Command(VerboseCommand):
 
     --skip-validation lifts those restrictions and the quality checks, for
     previewing Centralia on other courts or on clusters a check would
-    decline. Use it only with --cluster-ids, ideally with --dry-run and
-    --compare, never for bulk runs.
+    decline. It requires --cluster-ids, so it can't be used for bulk runs,
+    and is best paired with --dry-run and --compare.
 
     Use --dry-run with --compare on a small sample first: it calls Centralia
     and reports what would be ingested, with character and citation counts
@@ -280,10 +280,11 @@ class Command(VerboseCommand):
             default=False,
             help="Accept any court, drop the source, opinion count and anon "
             "2020 filters, and skip Centralia's quality checks. Implies "
-            "--allow-pending. Meant for previews and one-off fixes with "
-            "--cluster-ids, not bulk runs. WARNING: without the checks, a "
-            "partial or garbled read can replace an opinion's existing "
-            "content, so pair it with --dry-run and --compare first.",
+            "--allow-pending. Requires --cluster-ids, as it's meant for "
+            "previews and one-off fixes, not bulk runs. WARNING: without "
+            "the checks, a partial or garbled read can replace an "
+            "opinion's existing content, so pair it with --dry-run and "
+            "--compare first.",
         )
         parser.add_argument(
             "--queue",
@@ -305,6 +306,8 @@ class Command(VerboseCommand):
         if options["chunk_size"] < 1:
             raise CommandError("--chunk-size must be a positive number.")
         skip_validation = options["skip_validation"]
+        if skip_validation and not options["cluster_ids"]:
+            raise CommandError("--skip-validation requires --cluster-ids.")
         if not skip_validation and (
             unknown := sorted(
                 set(options["courts"]) - set(CENTRALIA_ENABLED_COURTS)
