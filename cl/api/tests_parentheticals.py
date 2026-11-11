@@ -2,7 +2,6 @@ from http import HTTPStatus
 from typing import Any
 
 from asgiref.sync import async_to_sync, sync_to_async
-from django.contrib.auth.models import Permission
 from django.db import connection
 from django.test.utils import CaptureQueriesContext
 from django.urls import NoReverseMatch, reverse
@@ -26,17 +25,15 @@ class ParentheticalAPITest(TestCase):
         """Create a user, two described opinions and a citing opinion with
         four parentheticals of distinct scores.
         """
-        # An authenticated user is enough for read access; DjangoModelPermissions
-        # only gates write methods.
+        # Any authenticated user can read; DjangoModelPermissions only gates
+        # write methods.
         cls.user_profile = UserProfileWithParentsFactory.create()
-        ps = Permission.objects.filter(codename="has_recap_api_access")
-        cls.user_profile.user.user_permissions.add(*ps)
 
         # Two described opinions so we can prove filtering isolates results.
         cls.described_a = OpinionWithParentsFactory.create()
         cls.described_b = OpinionWithParentsFactory.create()
         cls.describing = OpinionWithParentsFactory.create()
-        cls.citation = CitationWithParentsFactory.create(
+        CitationWithParentsFactory.create(
             cluster=cls.describing.cluster,
             volume=576,
             reporter="U.S.",
