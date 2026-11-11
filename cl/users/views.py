@@ -62,8 +62,8 @@ from cl.lib.ratelimiter import (
 )
 from cl.lib.types import AuthenticatedHttpRequest, EmailType
 from cl.lib.url_utils import get_redirect_or_abort
-from cl.search.es_docket_sources import SOURCE_BY_MODEL
-from cl.search.models import SEARCH_TYPES, RECAPDocument
+from cl.search.es_docket_sources import es_uid
+from cl.search.models import SEARCH_TYPES
 from cl.simple_pages.tasks import create_zoho_desk_ticket
 from cl.stats.metrics import accounts_deleted_total
 from cl.users.forms import (
@@ -223,12 +223,13 @@ def view_notes(request: AuthenticatedHttpRequest) -> HttpResponse:
     )
     # The ES id field holds RECAP pks only; other sources' documents are
     # matched by their uid (e.g. "scotus_123").
-    ids, uids = [], []
+    ids: list[str] = []
+    uids: list[str] = []
     for _, d in note_forms["Documents"]:
-        if isinstance(d, RECAPDocument):
-            ids.append(str(d.pk))
+        if uid := es_uid(type(d), d.pk):
+            uids.append(uid)
         else:
-            uids.append(f"{SOURCE_BY_MODEL[type(d)].uid_namespace}_{d.pk}")
+            ids.append(str(d.pk))
     id_query = f"id:({' OR '.join(ids)})"
     uid_query = f"uid:({' OR '.join(uids)})"
     # ES rejects an empty "id:()" or "uid:()", so each is only added when
