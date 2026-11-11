@@ -46,10 +46,11 @@ def get_opinions_to_extract(
     :param date_filed_lte: If given, only clusters filed on or before it.
     :param limit: If given, the maximum number of opinions returned.
     :param skip_validation: Whether to drop the court, source, opinion count
-    and anon 2020 filters, keeping only the stored PDF requirement. Meant for
-    previews and one-off fixes together with `cluster_ids`.
+    and anon 2020 filters. Meant for previews and one-off fixes together
+    with `cluster_ids`.
     :return: The opinions, with their cluster and docket selected, ordered
-    by cluster id.
+    by cluster id. Superseded opinion versions and opinions without a
+    stored PDF are always left out.
     """
     clusters = OpinionCluster.objects.all()
     if not skip_validation:
@@ -68,10 +69,14 @@ def get_opinions_to_extract(
     if date_filed_lte:
         clusters = clusters.filter(date_filed__lte=date_filed_lte)
 
-    # Without a PDF there is nothing to send to Doctor, so this filter stays
-    # even when validation is skipped.
+    # These filters stay even when validation is skipped. Without a PDF there
+    # is nothing to send to Doctor. Superseded versions keep their PDF, but
+    # their citations were dropped when they were merged into the main
+    # version, so extracting them would count those citations again.
     opinions = (
-        Opinion.objects.filter(cluster_id__in=clusters.values("pk"))
+        Opinion.objects.filter(
+            cluster_id__in=clusters.values("pk"), main_version__isnull=True
+        )
         .exclude(local_path="")
         .select_related("cluster__docket")
         .order_by("cluster_id")
