@@ -30,18 +30,28 @@
         {% if docket.blocked %}
           <c-badge variant="danger">Blocked</c-badge>
         {% else %}
-          {# No hx-disabled-elt: a disabled button drops focus, and htmx could not then move it to the badge that takes this id. #}
-          <c-button
-            variant="dark"
-            size="sm"
-            id="docket-block-control-{{ docket.pk }}"
-            hx-post="{% url 'block_item' %}"
-            hx-vals='{"id": "{{ docket.pk }}", "type": "docket"}'
-            hx-swap="none"
-            hx-confirm="Are you sure you want to block this docket?"
+          <c-toast
+            variant="warning"
+            title="Could not block this docket"
+            description="Please try again."
+            x-on:htmx:response-error="open"
+            x-on:htmx:send-error="open"
           >
-            Block This Docket
-          </c-button>
+            <c-slot name="trigger">
+              {# No hx-disabled-elt: a disabled button drops focus, and htmx could not then move it to the badge that takes this id. #}
+              <c-button
+                variant="dark"
+                size="sm"
+                id="docket-block-control-{{ docket.pk }}"
+                hx-post="{% url 'block_item' %}"
+                hx-vals='{"id": "{{ docket.pk }}", "type": "docket"}'
+                hx-swap="none"
+                hx-confirm="Are you sure you want to block this docket?"
+              >
+                Block This Docket
+              </c-button>
+            </c-slot>
+          </c-toast>
         {% endif %}
       </span>
       {# Announces the block's outcome; the response swaps its contents. #}

@@ -4845,6 +4845,26 @@ class DocketPageV2StaffLinksTest(TestCase):
             [{"id": str(self.docket.pk), "type": "docket"}],
         )
 
+    async def test_failed_block_request_opens_the_error_toast(self) -> None:
+        """The Block button sits inside a toast that opens when its htmx
+        request gets an error response or cannot be sent."""
+        user = await sync_to_async(self._user_with)("search.change_docket")
+        r = await self._get_docket_page(user)
+        (button,) = self._block_buttons(r.content.decode())
+        toasts = [
+            el for el in button.iterancestors() if el.get("x-data") == "toast"
+        ]
+        self.assertEqual(
+            [
+                (
+                    toast.get("x-on:htmx:response-error"),
+                    toast.get("x-on:htmx:send-error"),
+                )
+                for toast in toasts
+            ],
+            [("open", "open")],
+        )
+
     async def test_block_button_needs_change_docket(self) -> None:
         """Users who cannot change dockets see no Block button, even with
         another docket permission."""
