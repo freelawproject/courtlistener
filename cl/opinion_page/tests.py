@@ -2133,6 +2133,39 @@ class ScotusDocketFlagEnabledTest(TestCase):
             "sourced from the Supreme Court of the United States", content
         )
 
+    async def test_scotus_placeholder_documents_are_not_listed(self) -> None:
+        """An entry's placeholder document isn't listed under it on the
+        docket page, while real attachments are."""
+        placeholder_entry = await sync_to_async(SCOTUSDocketEntryFactory)(
+            docket=self.docket, entry_number=None
+        )
+        await sync_to_async(SCOTUSDocumentFactory)(
+            docket_entry=placeholder_entry,
+            url="",
+            document_number=None,
+            attachment_number=None,
+        )
+        attachment_entry = await sync_to_async(SCOTUSDocketEntryFactory)(
+            docket=self.docket
+        )
+        attachment = await sync_to_async(SCOTUSDocumentFactory)(
+            docket_entry=attachment_entry
+        )
+
+        r = await self.async_client.get(
+            reverse("view_docket", args=[self.docket.pk, self.docket.slug])
+        )
+
+        self.assertEqual(r.status_code, HTTPStatus.OK)
+        listed = {
+            entry.pk: [document.pk for document in entry.documents]
+            for entry in r.context["docket_entries"]
+        }
+        self.assertEqual(
+            listed,
+            {placeholder_entry.pk: [], attachment_entry.pk: [attachment.pk]},
+        )
+
     async def test_scotus_docket_entry_filters_still_work(self) -> None:
         """filters must work against SCOTUSDocketEntry field names
         (entry_number/date_filed), not just DocketEntry's."""

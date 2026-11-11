@@ -417,7 +417,11 @@ async def view_docket(
     def _attach_documents(entries: list) -> list:
         page_documents = []
         for entry in entries:
-            entry.documents = list(source.documents_for_entry(entry))
+            entry.documents = [
+                document
+                for document in source.documents_for_entry(entry)
+                if source.document_is_listed(document)
+            ]
             for document in entry.documents:
                 attach_display_fields(source, document)
             page_documents.extend(entry.documents)
