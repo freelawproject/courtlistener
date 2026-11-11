@@ -30,6 +30,7 @@ from waffle.testutils import override_flag
 
 from cl.custom_filters.templatetags.text_filters import html_decode
 from cl.lib.elasticsearch_utils import build_es_base_query, do_es_api_query
+from cl.lib.es_signal_processor import update_es_documents
 from cl.lib.redis_utils import get_redis_interface
 from cl.lib.test_helpers import (
     SearchTestCase,
@@ -84,6 +85,7 @@ from cl.tests.cases import (
     AuthenticatedClientMixin,
     CountESTasksTestCase,
     ESIndexTestCase,
+    SimpleTestCase,
     TestCase,
     TransactionTestCase,
     V4SearchAPIAssertions,
@@ -3680,6 +3682,105 @@ class IndexOpinionDocumentsCommandTest(
 
 
 @override_settings(ENABLE_EMBEDDING_COMPUTATION=True)
+class OpinionEmbeddingQueueRoutingTest(SimpleTestCase):
+    """Test queue routing for embedding work triggered by opinion saves."""
+
+    def test_embedding_queue_routing(self) -> None:
+        """Only embeddings are rerouted; task arguments and chain order survive."""
+        for metadata in (
+            {},
+            {"embedding_queue": None},
+            {"embedding_queue": "batch2"},
+        ):
+            with self.subTest(metadata=metadata):
+                opinion = Opinion(pk=123)
+                for key, value in metadata.items():
+                    setattr(opinion, key, value)
+                with (
+                    mock.patch(
+                        "cl.lib.es_signal_processor.updated_fields",
+                        return_value=["html_with_citations"],
+                    ),
+                    mock.patch(
+                        "cl.lib.es_signal_processor.transaction.on_commit"
+                    ) as on_commit,
+                ):
+                    update_es_documents(
+                        Opinion,
+                        OpinionDocument,
+                        opinion,
+                        False,
+                        {"self": {"html_with_citations": ["text"]}},
+                    )
+
+                on_commit.assert_called_once()
+                task_chain = on_commit.call_args.args[0].func.__self__
+                self.assertEqual(task_chain.options, {})
+                self.assertEqual(
+                    [signature.task for signature in task_chain.tasks],
+                    [
+                        "cl.search.tasks.compute_single_opinion_embeddings",
+                        "cl.search.tasks.update_es_document",
+                        "cl.alerts.tasks.send_or_schedule_search_alerts",
+                        "cl.alerts.tasks.percolator_response_processing",
+                    ],
+                )
+                embedding, update, alerts, percolator = task_chain.tasks
+                self.assertEqual(embedding.args, (opinion.pk,))
+                self.assertEqual(embedding.kwargs, {})
+                self.assertTrue(embedding.immutable)
+                queue = metadata.get("embedding_queue")
+                self.assertEqual(
+                    embedding.options,
+                    {"queue": queue} if queue is not None else {},
+                )
+                self.assertEqual(update.options, {})
+                self.assertEqual(alerts.options, {})
+                self.assertEqual(percolator.options, {})
+                self.assertEqual(
+                    update_es_document.queue, settings.CELERY_ETL_TASK_QUEUE
+                )
+                self.assertTrue(update.immutable)
+                self.assertEqual(update.args[-2:], (False, True))
+                self.assertFalse(alerts.immutable)
+                self.assertFalse(percolator.immutable)
+
+    def test_queue_override_does_not_trigger_unneeded_embeddings(self) -> None:
+        """An override does not enable embeddings for unrelated field changes."""
+        opinion = Opinion(pk=123)
+        setattr(opinion, "embedding_queue", "batch2")
+        for enabled, field in (
+            (False, "html_with_citations"),
+            (True, "plain_text"),
+        ):
+            with (
+                self.subTest(enabled=enabled, field=field),
+                override_settings(ENABLE_EMBEDDING_COMPUTATION=enabled),
+                mock.patch(
+                    "cl.lib.es_signal_processor.updated_fields",
+                    return_value=[field],
+                ),
+                mock.patch(
+                    "cl.lib.es_signal_processor.transaction.on_commit"
+                ) as on_commit,
+            ):
+                update_es_documents(
+                    Opinion,
+                    OpinionDocument,
+                    opinion,
+                    False,
+                    {"self": {field: ["text"]}},
+                )
+                task_chain = on_commit.call_args.args[0].func.__self__
+                self.assertEqual(len(task_chain.tasks), 3)
+                self.assertEqual(
+                    task_chain.tasks[0].task,
+                    "cl.search.tasks.update_es_document",
+                )
+                self.assertEqual(task_chain.tasks[0].options, {})
+
+
+@override_settings(ENABLE_EMBEDDING_COMPUTATION=True)
 class EsOpinionsIndexingTest(
     CountESTasksTestCase, ESIndexTestCase, TransactionTestCase
 ):
@@ -4498,7 +4599,10 @@ class EsOpinionsIndexingTest(
     @mock.patch("cl.search.tasks.S3IntelligentTieringStorage")
     @mock.patch("cl.search.tasks.microservice")
     def test_updating_text_field_computes_embeddings(
-        self, inception_mock, mock_aws_media_storage, mock_download_embeddings
+        self,
+        inception_mock: MagicMock,
+        mock_aws_media_storage: MagicMock,
+        mock_download_embeddings: MagicMock,
     ) -> None:
         """Confirm updates to text field trigger embeddings generation."""
         cluster = OpinionClusterFactory.create(
@@ -4567,19 +4671,40 @@ class EsOpinionsIndexingTest(
         mock_aws_media_storage.assert_not_called()
         mock_download_embeddings.assert_not_called()
 
-        # Updating `html_with_citations` should trigger embeddings generation
-        opinion.html_with_citations = "HTML with citations content" * 100
-        opinion.save()
+        for queue in (None, "batch2"):
+            with self.subTest(queue=queue):
+                inception_mock.reset_mock()
+                mock_aws_media_storage.reset_mock()
+                mock_download_embeddings.reset_mock()
+                setattr(opinion, "embedding_queue", queue)
+                opinion.html_with_citations = (
+                    f"HTML with citations content {queue}" * 100
+                )
+                opinion.save()
 
-        inception_mock.assert_called_once_with(
-            service="inception-text", data=opinion.clean_text
-        )
-        mock_aws_media_storage.assert_called_once()
-        es_doc = OpinionDocument.get(ES_CHILD_ID(opinion.pk).OPINION)
-        self.assertEqual(es_doc.embeddings, expected_embeddings["embeddings"])
-
-        # check the cache entry is removed after updating the ES document
-        self.assertFalse(cache.has_key(f"embeddings:o_{opinion.pk}"))
+                inception_mock.assert_called_once_with(
+                    service="inception-text", data=opinion.clean_text
+                )
+                mock_aws_media_storage.assert_called_once()
+                path = (
+                    f"embeddings/opinions/{settings.NLP_EMBEDDING_MODEL}/"
+                    f"{opinion.pk}.json"
+                )
+                self.assertEqual(
+                    json.loads(fake_storage.saved_files[path]),
+                    {
+                        "id": opinion.pk,
+                        "embeddings": expected_embeddings["embeddings"],
+                    },
+                )
+                mock_download_embeddings.assert_called_once_with(
+                    ANY, opinion.pk
+                )
+                es_doc = OpinionDocument.get(ES_CHILD_ID(opinion.pk).OPINION)
+                self.assertEqual(
+                    es_doc.embeddings, expected_embeddings["embeddings"]
+                )
+                self.assertFalse(cache.has_key(f"embeddings:o_{opinion.pk}"))
 
     @mock.patch("cl.search.tasks.logging.error")
     @mock.patch("cl.search.tasks.download_embedding")
