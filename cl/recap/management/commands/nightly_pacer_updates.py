@@ -170,7 +170,7 @@ def get_docket_ids() -> set[int]:
 
                 url = item["entry_page"]
                 if match := re.search(r"^/docket/([0-9]+)/", url):
-                    docket_ids.add(match.group(1))
+                    docket_ids.add(int(match.group(1)))
 
     # Add docket IDs that have docket alerts and have not been terminated.
     docket_ids.update(get_docket_ids_docket_alerts())

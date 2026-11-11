@@ -1,7 +1,8 @@
 from collections.abc import Iterable
 from pathlib import Path
 
-from cl.celery_init import app
+from celery import Task
+
 from cl.corpus_importer.management.utils import (
     CorpusImporterCommand,
 )
@@ -23,8 +24,10 @@ class Command(CorpusImporterCommand):
     ) -> Iterable[tuple[tuple[str, str], tuple[str, str]]]:
         meta_rows = filter(
             # Filter only for meta files which are not duplicates (don't end in "_X") and not for search result scrapes
-            lambda r: "searches" not in r[1]
-            and Path(r[1]).name.endswith("_meta.json"),
+            lambda r: (
+                "searches" not in r[1]
+                and Path(r[1]).name.endswith("_meta.json")
+            ),
             map(lambda r: (r[0].strip(), r[1].strip()), csv_reader),
         )
 
@@ -39,11 +42,11 @@ class Command(CorpusImporterCommand):
             )
 
     @staticmethod
-    def download_task() -> app.Task:
+    def download_task() -> Task:
         return texas_corpus_download_task
 
     @staticmethod
-    def merge_task() -> app.Task:
+    def merge_task() -> Task:
         return texas_ingest_docket_task
 
     def handle(self, *args, **options):

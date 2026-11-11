@@ -23,7 +23,7 @@ def rerun_extract_from_text(
     Reruns `update_document_from_text` from the scraper flow, saving changes
 
     `update_document_from_text` calls `Site.extract_from_text` and assigns
-    any changes to the proper objets, in place, but they are not saved.
+    any changes to the proper objects, in place, but they are not saved.
     This method saves the ones with actual changes
 
     :param opinion: the Opinion on which to apply extract_from_text
@@ -51,7 +51,7 @@ def rerun_extract_from_text(
     with transaction.atomic():
         try:
             changes = update_document_from_text(opinion, juriscraper_module)
-        except:
+        except Exception:
             # Probably a bad implementation of `extract_from_text`
             logger.debug(
                 "`update_document_from_text` failed for opinion %s. Traceback: %s",

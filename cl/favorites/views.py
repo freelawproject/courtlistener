@@ -2,7 +2,7 @@ from asgiref.sync import sync_to_async
 from django.contrib import messages
 from django.contrib.auth.decorators import login_required
 from django.contrib.auth.models import User
-from django.core.exceptions import ObjectDoesNotExist
+from django.contrib.contenttypes.models import ContentType
 from django.core.paginator import EmptyPage, PageNotAnInteger, Paginator
 from django.db import IntegrityError
 from django.http import (
@@ -21,47 +21,52 @@ from cl.favorites.forms import NoteForm
 from cl.favorites.models import DocketTag, Note, Prayer, UserTag
 from cl.favorites.selectors import prayer_eligible
 from cl.favorites.utils import (
+    NOTEABLE_MODELS,
     create_prayer,
     delete_prayer,
     get_existing_prayers_in_bulk,
     get_lifetime_prayer_stats,
+    get_note_for_target,
+    get_prayer_counts_in_bulk,
     get_top_prayers,
     get_user_prayer_history,
     get_user_prayers,
 )
 from cl.lib.http import is_ajax
+from cl.lib.types import AuthenticatedHttpRequest
 from cl.search.models import RECAPDocument
 from cl.users.models import UserProfile
 
 
-def get_note(request: HttpRequest) -> HttpResponse:
-    audio_pk = request.POST.get("audio_id")
-    cluster_pk = request.POST.get("cluster_id")
-    docket_pk = request.POST.get("docket_id")
-    recap_doc_pk = request.POST.get("recap_doc_id")
-    user = request.user
-    if audio_pk and audio_pk != "undefined":
-        try:
-            note = Note.objects.get(audio_id=audio_pk, user=user)
-        except ObjectDoesNotExist:
-            note = Note()
-    elif cluster_pk and cluster_pk != "undefined":
-        try:
-            note = Note.objects.get(cluster_id=cluster_pk, user=user)
-        except ObjectDoesNotExist:
-            note = Note()
-    elif docket_pk and docket_pk != "undefined":
-        try:
-            note = Note.objects.get(docket_id=docket_pk, user=user)
-        except ObjectDoesNotExist:
-            note = Note()
-    elif recap_doc_pk and recap_doc_pk != "undefined":
-        try:
-            note = Note.objects.get(recap_doc_id=recap_doc_pk, user=user)
-        except ObjectDoesNotExist:
-            note = Note()
-    else:
-        note = None
+def get_note(request: HttpRequest) -> Note | None:
+    """Look up the requesting user's Note for the object named in POST data.
+
+    :param request: The request, expected to carry ``content_type`` (a
+        ContentType pk) and ``object_id`` in POST data, identifying the
+        noted object.
+    :return: The user's Note for that object, a blank unsaved Note if the
+        object is valid but has no Note yet, or None if content_type/
+        object_id are missing, invalid, or don't resolve to a model in
+        NOTEABLE_MODELS.
+    """
+    content_type_pk = request.POST.get("content_type")
+    raw_object_id = request.POST.get("object_id")
+    if not content_type_pk or not raw_object_id:
+        return None
+
+    try:
+        content_type = ContentType.objects.get_for_id(int(content_type_pk))
+        object_id = int(raw_object_id)
+    except (ContentType.DoesNotExist, ValueError):
+        return None
+
+    model_class = content_type.model_class()
+    if model_class not in NOTEABLE_MODELS:
+        return None
+
+    note = get_note_for_target(model_class, object_id, request.user)
+    if note is None:
+        note = Note()
     return note
 
 
@@ -233,42 +238,68 @@ async def open_prayers(request: HttpRequest) -> HttpResponse:
 
 @login_required
 async def create_prayer_view(
-    request: HttpRequest, recap_document: int
+    request: AuthenticatedHttpRequest, recap_document: int
 ) -> HttpResponse:
     user = request.user
     is_htmx_request = request.headers.get("hx-request", False)
     regular_size = bool(request.POST.get("regular_size"))
-    if not (await prayer_eligible(request.user))[0]:
+    recap_document_obj = await RECAPDocument.objects.aget(id=recap_document)
+    is_eligible, _ = await prayer_eligible(user)
+    if not is_eligible:
         if is_htmx_request:
+            prayer_counts = await get_prayer_counts_in_bulk(
+                [recap_document_obj]
+            )
             return TemplateResponse(
                 request,
                 "includes/pray_and_pay_htmx/pray_button.html",
                 {
                     "prayer_exists": False,
                     "document_id": recap_document,
-                    "count": 0,
+                    "count": prayer_counts.get(recap_document_obj.pk, 0),
                     "daily_limit_reached": True,
                     "regular_size": regular_size,
                     "should_swap": True,
+                    "outcome": "limit",
+                    "document_number": recap_document_obj.document_number,
+                    "attachment_number": recap_document_obj.attachment_number,
                 },
             )
         return HttpResponseServerError(
             "User have reached your daily request limit"
         )
 
-    recap_document = await RECAPDocument.objects.aget(id=recap_document)
-
-    # Call the create_prayer async function
-    await create_prayer(user, recap_document)
+    prayer = await create_prayer(
+        user, recap_document_obj, is_eligible=is_eligible
+    )
     if is_htmx_request:
+        # create_prayer returns None both for a duplicate and for a document
+        # that became available, so check the DB to tell them apart.
+        prayer_exists = (
+            prayer is not None
+            or await Prayer.objects.filter(
+                user=user, recap_document=recap_document_obj
+            ).aexists()
+        )
+        if prayer:
+            outcome = "added"
+        elif prayer_exists:
+            outcome = "already_added"
+        else:
+            outcome = "not_added"
+        # Fetch after creation so the new prayer is included in the count.
+        prayer_counts = await get_prayer_counts_in_bulk([recap_document_obj])
         return TemplateResponse(
             request,
             "includes/pray_and_pay_htmx/pray_button.html",
             {
-                "prayer_exists": True,
-                "document_id": recap_document.pk,
-                "count": 0,
+                "prayer_exists": prayer_exists,
+                "document_id": recap_document_obj.pk,
+                "count": prayer_counts.get(recap_document_obj.pk, 0),
                 "daily_limit_reached": False,
+                "outcome": outcome,
+                "document_number": recap_document_obj.document_number,
+                "attachment_number": recap_document_obj.attachment_number,
                 "regular_size": regular_size,
                 "should_swap": True,
             },
@@ -278,25 +309,42 @@ async def create_prayer_view(
 
 @login_required
 async def delete_prayer_view(
-    request: HttpRequest, recap_document: int
+    request: AuthenticatedHttpRequest, recap_document: int
 ) -> HttpResponse:
     user = request.user
-    recap_document = await RECAPDocument.objects.aget(id=recap_document)
+    recap_document_obj = await RECAPDocument.objects.aget(id=recap_document)
 
-    # Call the delete_prayer async function
-    await delete_prayer(user, recap_document)
+    deleted = await delete_prayer(user, recap_document_obj)
     regular_size = bool(request.POST.get("regular_size"))
     source = request.POST.get("source", "")
     if request.headers.get("hx-request"):
+        # delete_prayer only deletes waiting prayers, so a False result can
+        # mean the prayer was already gone or that it was already granted.
+        prayer_exists = (
+            not deleted
+            and await Prayer.objects.filter(
+                user=user, recap_document=recap_document_obj
+            ).aexists()
+        )
+        if deleted:
+            outcome = "removed"
+        elif prayer_exists:
+            outcome = "not_removed"
+        else:
+            outcome = "already_removed"
+        prayer_counts = await get_prayer_counts_in_bulk([recap_document_obj])
         return TemplateResponse(
             request,
             "includes/pray_and_pay_htmx/pray_button.html",
             {
-                "prayer_exists": False,
-                "document_id": recap_document.pk,
-                "count": 0,
+                "prayer_exists": prayer_exists,
+                "document_id": recap_document_obj.pk,
+                "count": prayer_counts.get(recap_document_obj.pk, 0),
                 "regular_size": regular_size,
                 "should_swap": True if source != "user_prayer_list" else False,
+                "outcome": outcome,
+                "document_number": recap_document_obj.document_number,
+                "attachment_number": recap_document_obj.attachment_number,
             },
             headers={"HX-Trigger": "prayersListChanged"},
         )

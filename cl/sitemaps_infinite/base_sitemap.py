@@ -19,7 +19,7 @@ REDIS_DB = "CACHE"
 HASH_NAME = "large-sitemaps:num_pages"
 
 
-class CacheableList(list):
+class CacheableList[T](list[T]):
     """
     A wrapper around a list that can hold the additional attributes,
     used to store the cache metadata - e.g. the `expiration_time` and `cursor` used to get that list.
@@ -32,7 +32,7 @@ class CacheableList(list):
 
     expiration_time: datetime
     current_cursor: str
-    next_cursor: str
+    next_cursor: str | None
 
 
 class CustomCursorPaginator(CursorPaginator):
@@ -89,7 +89,7 @@ class InfinitePaginatorSitemap(sitemaps.Sitemap):
         )
         return self.protocol or protocol or env_based_protocol
 
-    _cursor: str | None | bool = False
+    _cursor: str | None
     _has_next: bool = False
 
     # make cache key with p=1 by default (to simplify the handling, @see `make_cache_key` in `sitemap.py`)
@@ -161,7 +161,7 @@ class InfinitePaginatorSitemap(sitemaps.Sitemap):
         Returns:
             list[dict[str, Any]]: A list of dictionaries representing the URLs for the sitemap.
         """
-        if self._cursor is False:
+        if not hasattr(self, "_cursor"):
             raise Exception(
                 "The cursor should be set (by calling `set_cursor`) before calling `get_urls_by_cursor` method."
             )
@@ -177,8 +177,8 @@ class InfinitePaginatorSitemap(sitemaps.Sitemap):
 
     def _urls(
         self, cursor: str, protocol: str, domain: str
-    ) -> tuple[CacheableList[dict[str, Any]], str, bool]:
-        urls = CacheableList()
+    ) -> tuple[CacheableList[dict[str, Any]], str | None, bool]:
+        urls: CacheableList[dict[str, Any]] = CacheableList()
         # keep the `current_cursor` with the list as cached metadata, can be used later to re-fetch the list
         urls.current_cursor = cursor
 

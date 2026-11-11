@@ -1,12 +1,20 @@
 import datetime
+from typing import Any
 from unittest import mock
 
 from asgiref.sync import async_to_sync
+from django.core import mail
 from django.core.files.base import ContentFile
 from django.test import TestCase
 
+from cl.alerts.models import DocketAlert
+from cl.corpus_importer.management.commands.download_scotus_pdfs import (
+    download_scotus_pdfs,
+)
 from cl.corpus_importer.tasks import (
+    add_scotus_docket_entries,
     download_qp_scotus_pdf,
+    enrich_scotus_attachments,
     ingest_scotus_docket,
     merge_scotus_docket,
     merge_scotus_document,
@@ -30,6 +38,7 @@ from cl.search.factories import (
     ScotusDocketDataFactory,
     SCOTUSDocketEntryDataFactory,
     SCOTUSDocketEntryFactory,
+    SCOTUSDocumentFactory,
     SCOTUSPartyDataFactory,
 )
 from cl.search.models import (
@@ -37,6 +46,13 @@ from cl.search.models import (
     SCOTUSDocketEntry,
     ScotusDocketMetadata,
     SCOTUSDocument,
+)
+from cl.settings import COURT_REQUEST_USER_AGENT
+from cl.tests.cases import TestCase as CLTestCase
+from cl.users.factories import UserFactory
+
+DOWNLOAD_COMMAND = (
+    "cl.corpus_importer.management.commands.download_scotus_pdfs"
 )
 
 
@@ -159,7 +175,9 @@ class ScotusDocketMergeTest(TestCase):
         mock_response.raise_for_status.return_value = None
         mock_get.return_value.__enter__.return_value = mock_response
 
-        ingest_scotus_docket(data)
+        # The PDF downloads are queued when the merge commits.
+        with self.captureOnCommitCallbacks(execute=True):
+            ingest_scotus_docket(data)
         docket = Docket.objects.all().first()
         docket.refresh_from_db()
 
@@ -187,8 +205,13 @@ class ScotusDocketMergeTest(TestCase):
             ).first()
             self.assertEqual(de["document_number"], de_db.entry_number)
 
+        # The 4 attachments, plus a placeholder for each of the 2 entries
+        # without attachments.
         rds = SCOTUSDocument.objects.filter(docket_entry__docket=docket)
-        self.assertEqual(rds.count(), 4, "Wrong number of Documents.")
+        self.assertEqual(rds.count(), 6, "Wrong number of Documents.")
+        self.assertEqual(
+            sum(rd.is_placeholder for rd in rds), 2, "Wrong placeholders."
+        )
         rds_pks = set(rds.values_list("pk", flat=True))
 
         rd_att_1 = SCOTUSDocument.objects.filter(
@@ -196,7 +219,14 @@ class ScotusDocketMergeTest(TestCase):
         ).first()
 
         self.assertEqual(rd_att_1.url, att_1["document_url"])
-        self.assertTrue(rd_att_1.filepath_local)
+        bucket = f"gov.uscourts.{self.court.pk}.{docket.pk}"
+        self.assertEqual(
+            rd_att_1.filepath_local.name,
+            f"recap/{bucket}/{bucket}.2015-08-19."
+            f"{rd_att_1.document_number}.{rd_att_1.attachment_number or 0}.pdf",
+            "Filed in its docket's directory, named for the day its entry was "
+            "filed and for its document and attachment numbers.",
+        )
         self.assertEqual(rd_att_1.page_count, 1)
         self.assertIsNotNone(rd_att_1.sha1)
         self.assertIn("UNITED", rd_att_1.plain_text)
@@ -364,7 +394,8 @@ class ScotusDocketMergeTest(TestCase):
         )
 
         # Merge again. Confirm objects are not duplicated.
-        ingest_scotus_docket(data)
+        with self.captureOnCommitCallbacks(execute=True):
+            ingest_scotus_docket(data)
         docket.refresh_from_db()
 
         # No additional calls to the download methods’ loggers.
@@ -375,7 +406,7 @@ class ScotusDocketMergeTest(TestCase):
         self.assertEqual(des.count(), 4, "Wrong number of Docket entries.")
 
         rds = SCOTUSDocument.objects.filter(docket_entry__docket=docket)
-        self.assertEqual(rds.count(), 4, "Wrong number of Documents")
+        self.assertEqual(rds.count(), 6, "Wrong number of Documents")
         rds_pks_new = set(rds.values_list("pk", flat=True))
         self.assertEqual(rds_pks, rds_pks_new)
 
@@ -404,6 +435,39 @@ class ScotusDocketMergeTest(TestCase):
         self.assertEqual(
             attorney_orgs.count(), 3, "AttorneysOrgs were duplicated."
         )
+
+    @mock.patch("cl.corpus_importer.tasks.index_docket_parties_in_es")
+    def test_merge_scotus_docket_indexes_parties_in_es(
+        self, mock_index_parties: mock.MagicMock
+    ) -> None:
+        """Party rows don't trigger ES signals, so merging a SCOTUS docket
+        with parties must index them in ES explicitly, like RECAP does."""
+        data = ScotusDocketDataFactory(
+            lower_court=self.lower_court.full_name,
+            parties=[SCOTUSPartyDataFactory()],
+            docket_entries=[],
+        )
+
+        docket, _, _ = merge_scotus_docket(data, download_file=False)
+
+        mock_index_parties.delay.assert_called_once_with(
+            docket.pk, percolate_parties=False
+        )
+
+    @mock.patch("cl.corpus_importer.tasks.index_docket_parties_in_es")
+    def test_merge_scotus_docket_skips_party_indexing_without_parties(
+        self, mock_index_parties: mock.MagicMock
+    ) -> None:
+        """No parties means nothing to index."""
+        data = ScotusDocketDataFactory(
+            lower_court=self.lower_court.full_name,
+            parties=[],
+            docket_entries=[],
+        )
+
+        merge_scotus_docket(data, download_file=False)
+
+        mock_index_parties.delay.assert_not_called()
 
     def test_merge_scotus_docket_updates_existing_docket(self) -> None:
         """Confirm merging again updates an existing SCOTUS docket."""
@@ -459,6 +523,56 @@ class ScotusDocketMergeTest(TestCase):
             metadata.questions_presented_url, data["questions_presented"]
         )
 
+    def test_scotus_merger_matches_entry_that_gained_attachments(
+        self,
+    ) -> None:
+        """Confirm an entry merged before it had attachments is matched, not
+        duplicated, when re-merged with attachments and a document number."""
+
+        docket = DocketFactory(court=self.court, source=Docket.SCRAPER)
+        entry_data = {
+            "description": "Petition for a writ of certiorari filed.",
+            "date_filed": datetime.date(2025, 6, 2),
+        }
+
+        # The poller sees the entry before it has attachments, so its
+        # document_number is None.
+        docket_entries = [
+            SCOTUSDocketEntryDataFactory(
+                **entry_data,
+                document_number=None,
+                attachments=[],
+            )
+        ]
+        enrich_scotus_attachments(docket_entries)
+        add_scotus_docket_entries(docket, docket_entries, download_file=False)
+
+        entries = SCOTUSDocketEntry.objects.filter(docket=docket)
+        self.assertEqual(entries.count(), 1)
+        self.assertIsNone(entries.first().entry_number)
+
+        # An attachment is then added to the entry, so the email update
+        # parses a document_number for it.
+        docket_entries = [
+            SCOTUSDocketEntryDataFactory(
+                **entry_data,
+                document_number=310278,
+                attachments=[
+                    SCOTUSAttachmentDataFactory(
+                        description="Petition", document_number=310278
+                    )
+                ],
+            )
+        ]
+        enrich_scotus_attachments(docket_entries)
+        add_scotus_docket_entries(docket, docket_entries, download_file=False)
+
+        entries = SCOTUSDocketEntry.objects.filter(docket=docket)
+        self.assertEqual(
+            entries.count(), 1, "Docket entry was duplicated on re-merge."
+        )
+        self.assertEqual(entries.first().entry_number, 310278)
+
     def test_merge_scotus_docket_source_compounds_existing(self) -> None:
         """Merging into an existing docket compounds its source with SCRAPER."""
         existing = DocketFactory(
@@ -478,6 +592,79 @@ class ScotusDocketMergeTest(TestCase):
             Docket.SCRAPER_AND_HARVARD,
             "Source should be compounded with SCRAPER.",
         )
+
+    # The enqueue semaphore lives in Redis, which parallel test workers
+    # share while each has its own DB, so docket pks repeat across workers.
+    # A key left by another worker would block the alert, so mock it.
+    @mock.patch(
+        "cl.corpus_importer.tasks.enqueue_docket_alert", return_value=True
+    )
+    def test_merge_scotus_docket_triggers_docket_alert_for_a_new_entry(
+        self, mock_enqueue: mock.MagicMock
+    ) -> None:
+        """Does merging a SCOTUS docket with a new entry notify current
+        subscribers?"""
+        existing = DocketFactory(
+            court=self.court, docket_number="24-201", source=Docket.SCRAPER
+        )
+        user = UserFactory()
+        DocketAlert.objects.create(docket=existing, user=user)
+
+        docket_entries = [
+            SCOTUSDocketEntryDataFactory(
+                description="Petition for a writ of certiorari filed.",
+                date_filed=datetime.date(2025, 6, 2),
+                document_number=None,
+                attachments=[],
+            )
+        ]
+        data = ScotusDocketDataFactory(
+            docket_number="24-201",
+            docket_entries=docket_entries,
+            parties=[],
+        )
+        docket, _, _ = merge_scotus_docket(data, download_file=False)
+
+        self.assertEqual(docket.pk, existing.pk)
+        mock_enqueue.assert_called_once_with(existing.pk)
+        self.assertEqual(len(mail.outbox), 1)
+        self.assertEqual(mail.outbox[0].to, [user.email])
+
+    @mock.patch(
+        "cl.corpus_importer.tasks.enqueue_docket_alert", return_value=True
+    )
+    def test_merge_scotus_docket_does_not_alert_when_nothing_is_new(
+        self, mock_enqueue: mock.MagicMock
+    ) -> None:
+        """Re-merging an already-seen entry shouldn't notify subscribers --
+        only a newly created SCOTUSDocketEntry triggers the alert."""
+        existing = DocketFactory(
+            court=self.court, docket_number="24-202", source=Docket.SCRAPER
+        )
+        user = UserFactory()
+        DocketAlert.objects.create(docket=existing, user=user)
+
+        docket_entries = [
+            SCOTUSDocketEntryDataFactory(
+                description="Petition for a writ of certiorari filed.",
+                date_filed=datetime.date(2025, 6, 2),
+                document_number=None,
+                attachments=[],
+            )
+        ]
+        data = ScotusDocketDataFactory(
+            docket_number="24-202",
+            docket_entries=docket_entries,
+            parties=[],
+        )
+        merge_scotus_docket(data, download_file=False)
+        mail.outbox.clear()
+
+        # Re-merge the exact same entry -- it already exists.
+        merge_scotus_docket(data, download_file=False)
+        self.assertEqual(len(mail.outbox), 0)
+        # Only the first merge found something new to alert about.
+        mock_enqueue.assert_called_once_with(existing.pk)
 
     def test_merge_scotus_docket_source_compounds_recap(self) -> None:
         """Merging into a RECAP docket compounds with SCRAPER."""
@@ -521,37 +708,43 @@ class ScotusDocketMergeTest(TestCase):
         mock_get,
         mock_is_pdf,
     ) -> None:
-        """Confirm the SCOTUS QP PDF is downloaded and stored."""
-
-        docket = DocketFactory.create(court=self.court)
-        scotus_meta = ScotusDocketMetadata.objects.create(
-            docket=docket,
-            questions_presented_url="https://www.supremecourt.gov/qp.pdf",
-        )
-        self.assertFalse(scotus_meta.questions_presented_file)
-
+        """Confirm the SCOTUS QP PDF is downloaded and stored in its docket's
+        directory, named for the docket's filing date or as undated."""
         # Mock the response from requests.get
         mock_response = mock.Mock()
         mock_response.iter_content.return_value = [b"fake pdf content"]
         mock_response.raise_for_status.return_value = None
         mock_get.return_value.__enter__.return_value = mock_response
 
-        download_qp_scotus_pdf.delay(docket.id)
+        for date_filed, stamp in (
+            (datetime.date(2024, 7, 30), "2024-07-30"),
+            (None, "undated"),
+        ):
+            with self.subTest(stamp=stamp):
+                mock_get.reset_mock()
+                docket = DocketFactory.create(
+                    court=self.court, date_filed=date_filed
+                )
+                scotus_meta = ScotusDocketMetadata.objects.create(
+                    docket=docket,
+                    questions_presented_url="https://www.supremecourt.gov/qp.pdf",
+                )
+                self.assertFalse(scotus_meta.questions_presented_file)
 
-        mock_get.assert_called_once_with(
-            scotus_meta.questions_presented_url,
-            stream=True,
-            timeout=60,
-            headers={"User-Agent": "Free Law Project"},
-        )
+                download_qp_scotus_pdf.delay(docket.id)
 
-        scotus_meta.refresh_from_db()
-
-        # Confirm the file was stored
-        self.assertTrue(scotus_meta.questions_presented_file)
-        self.assertTrue(
-            scotus_meta.questions_presented_file.name.endswith("-qp.pdf")
-        )
+                mock_get.assert_called_once_with(
+                    scotus_meta.questions_presented_url,
+                    stream=True,
+                    timeout=60,
+                    headers={"User-Agent": COURT_REQUEST_USER_AGENT},
+                )
+                scotus_meta.refresh_from_db()
+                bucket = f"gov.uscourts.{self.court.pk}.{docket.pk}"
+                self.assertEqual(
+                    scotus_meta.questions_presented_file.name,
+                    f"recap/{bucket}/{bucket}.{stamp}.qp.pdf",
+                )
 
     def test_merge_scotus_docket_resolves_relative_qp_url(self) -> None:
         """Confirm relative questions_presented URLs (e.g.
@@ -866,3 +1059,246 @@ class ScotusDocketMergeTest(TestCase):
                     federal_dn_judge_initials_referred=None,
                 )
                 self.assertEqual(found.pk, docket.pk)
+
+
+class ScotusPlaceholderDocumentTest(CLTestCase):
+    """SCOTUS entries without attachments get one empty placeholder
+    document, which becomes their first attachment once they have some."""
+
+    @classmethod
+    def setUpTestData(cls) -> None:
+        """Create the SCOTUS docket the tests merge their entry into."""
+        cls.docket = DocketFactory(
+            court=CourtFactory(id="scotus", jurisdiction="F"),
+            source=Docket.SCRAPER,
+        )
+
+    def _merge(
+        self,
+        attachments: list[dict[str, Any]],
+        document_number: int | None = None,
+        download_file: bool = False,
+    ) -> list[int]:
+        """Merge the same entry with the given attachments and return the
+        pks of the documents the merge reports as new."""
+        docket_entries = [
+            SCOTUSDocketEntryDataFactory(
+                description="Petition for a writ of certiorari filed.",
+                date_filed=datetime.date(2025, 6, 2),
+                document_number=document_number,
+                attachments=attachments,
+            )
+        ]
+        enrich_scotus_attachments(docket_entries)
+        doc_pks, _ = add_scotus_docket_entries(
+            self.docket, docket_entries, download_file=download_file
+        )
+        return doc_pks
+
+    def test_entry_without_attachments_gets_one_placeholder(self) -> None:
+        """Merging an entry without attachments, even twice, leaves it with
+        a single placeholder, which the merge doesn't report as new."""
+        for _ in range(2):
+            self.assertEqual(self._merge(attachments=[]), [])
+
+        documents = SCOTUSDocument.objects.filter(
+            docket_entry__docket=self.docket
+        )
+        self.assertEqual(documents.count(), 1)
+        self.assertTrue(documents.get().is_placeholder)
+
+    @mock.patch("cl.corpus_importer.tasks.chain")
+    def test_placeholder_becomes_the_first_attachment(
+        self, mock_chain: mock.MagicMock
+    ) -> None:
+        """Once the entry has attachments, its placeholder becomes the
+        first one instead of staying empty next to them, and gets its PDF
+        downloaded like a new document once the merge commits."""
+        self._merge(attachments=[])
+        placeholder = SCOTUSDocument.objects.get(
+            docket_entry__docket=self.docket
+        )
+
+        with self.captureOnCommitCallbacks() as callbacks:
+            doc_pks = self._merge(
+                document_number=310278,
+                attachments=[
+                    SCOTUSAttachmentDataFactory(
+                        description="Petition", document_number=310278
+                    ),
+                    SCOTUSAttachmentDataFactory(
+                        description="Appendix", document_number=310278
+                    ),
+                ],
+                download_file=True,
+            )
+
+        # Before the commit, the placeholder's url is still empty in the DB,
+        # so the downloads must wait for it.
+        apply_async = mock_chain.return_value.apply_async
+        apply_async.assert_not_called()
+        self.assertEqual(callbacks.count(apply_async), 2)
+
+        documents = SCOTUSDocument.objects.filter(
+            docket_entry__docket=self.docket
+        ).order_by("attachment_number")
+        self.assertEqual(
+            [d.description for d in documents], ["Petition", "Appendix"]
+        )
+        self.assertEqual(documents[0].pk, placeholder.pk)
+        self.assertFalse(any(d.is_placeholder for d in documents))
+        self.assertCountEqual(doc_pks, [d.pk for d in documents])
+        self.assertEqual(mock_chain.call_count, 2)
+
+    def test_entry_with_documents_gets_no_placeholder(self) -> None:
+        """An entry that already has documents doesn't get a placeholder
+        when merged again without attachments."""
+        self._merge(
+            document_number=310278,
+            attachments=[SCOTUSAttachmentDataFactory(document_number=310278)],
+        )
+
+        self._merge(attachments=[])
+
+        documents = SCOTUSDocument.objects.filter(
+            docket_entry__docket=self.docket
+        )
+        self.assertEqual(documents.count(), 1)
+        self.assertFalse(documents.get().is_placeholder)
+
+    def test_stale_placeholder_is_deleted(self) -> None:
+        """A placeholder left next to real documents, e.g. by a worker
+        running older code during a deploy, is deleted on the next merge
+        instead of taking the numbers of a document that already has them.
+        """
+        self._merge(attachments=[])
+        placeholder = SCOTUSDocument.objects.get(
+            docket_entry__docket=self.docket
+        )
+        document = SCOTUSDocumentFactory(
+            docket_entry=placeholder.docket_entry,
+            document_number=310278,
+            attachment_number=1,
+        )
+
+        self._merge(
+            document_number=310278,
+            attachments=[SCOTUSAttachmentDataFactory(document_number=310278)],
+        )
+
+        documents = SCOTUSDocument.objects.filter(
+            docket_entry__docket=self.docket
+        )
+        self.assertEqual(list(documents), [document])
+
+    @mock.patch("cl.corpus_importer.tasks.logger")
+    def test_multiple_placeholders_are_left_untouched(
+        self, mock_logger: mock.MagicMock
+    ) -> None:
+        """If an entry somehow has more than one placeholder, the merge logs
+        an error and leaves them as they are, merging the attachment as a new
+        document."""
+        self._merge(attachments=[])
+        entry = SCOTUSDocument.objects.get(
+            docket_entry__docket=self.docket
+        ).docket_entry
+        SCOTUSDocument.objects.create(docket_entry=entry)
+
+        self._merge(
+            document_number=310278,
+            attachments=[SCOTUSAttachmentDataFactory(document_number=310278)],
+        )
+
+        mock_logger.error.assert_called_once()
+        documents = SCOTUSDocument.objects.filter(docket_entry=entry)
+        self.assertEqual(sum(d.is_placeholder for d in documents), 2)
+        self.assertTrue(
+            documents.filter(
+                document_number=310278, attachment_number=1
+            ).exists()
+        )
+
+    @mock.patch(f"{DOWNLOAD_COMMAND}.CeleryThrottle")
+    @mock.patch(f"{DOWNLOAD_COMMAND}.download_scotus_document_pdf")
+    def test_pdf_download_command_skips_placeholders(
+        self, mock_download: mock.MagicMock, _mock_throttle: mock.MagicMock
+    ) -> None:
+        """download_scotus_pdfs schedules the documents without a file, but
+        not placeholders, which have no URL to download from."""
+        self._merge(attachments=[])
+        document = SCOTUSDocumentFactory(
+            docket_entry__docket=self.docket, filepath_local=""
+        )
+
+        download_scotus_pdfs(download_queue="celery", delay=0)
+
+        mock_download.si.assert_called_once_with(document.pk)
+
+
+class ScotusDocketUrlPropertyTest(CLTestCase):
+    """#7584: Docket.scotus_docket_url builds the public case-page link,
+    mirroring the existing pacer_docket_url property's location/shape.
+    """
+
+    @classmethod
+    def setUpTestData(cls) -> None:
+        cls.court = CourtFactory(id="scotus", jurisdiction="F")
+
+    def test_builds_url_from_docket_number(self) -> None:
+        docket = DocketFactory(
+            court=self.court,
+            source=Docket.SCRAPER,
+            docket_number="25-1210",
+        )
+        self.assertEqual(
+            docket.scotus_docket_url,
+            "https://www.supremecourt.gov/search.aspx"
+            "?filename=/docket/docketfiles/html/public/25-1210.html",
+        )
+
+    def test_url_encodes_special_characters(self) -> None:
+        docket = DocketFactory(
+            court=self.court,
+            source=Docket.SCRAPER,
+            docket_number="25 1210",
+        )
+        self.assertIn("25%201210", docket.scotus_docket_url)
+
+    def test_returns_empty_string_when_no_docket_number(self) -> None:
+        docket = DocketFactory(
+            court=self.court, source=Docket.SCRAPER, docket_number=""
+        )
+        self.assertEqual(docket.scotus_docket_url, "")
+
+
+class ScotusRelatedNamesTest(CLTestCase):
+    """SCOTUS entries and documents are reachable through explicit
+    related names, which the API serializers and filters reference.
+    """
+
+    @classmethod
+    def setUpTestData(cls) -> None:
+        cls.court = CourtFactory(id="scotus", jurisdiction="F")
+        cls.docket = DocketFactory(court=cls.court, source=Docket.SCRAPER)
+        cls.entry = SCOTUSDocketEntryFactory(docket=cls.docket)
+        cls.document = SCOTUSDocumentFactory(docket_entry=cls.entry)
+
+    def test_reverse_accessors(self) -> None:
+        """Entries and documents are reachable from their parents."""
+        self.assertEqual(
+            list(self.docket.scotus_docket_entries.all()), [self.entry]
+        )
+        self.assertEqual(
+            list(self.entry.scotus_documents.all()), [self.document]
+        )
+
+    def test_reverse_query_lookups(self) -> None:
+        """The related names work as ORM lookups, as API filters use them."""
+        self.assertEqual(
+            list(
+                Docket.objects.filter(
+                    scotus_docket_entries__scotus_documents=self.document
+                )
+            ),
+            [self.docket],
+        )

@@ -525,6 +525,10 @@ a.button:active {
   text-decoration: none;
 }
 
+.underline {
+  text-decoration: underline;
+}
+
 a.black-link,
 a.black-link:hover,
 a.black-link:active,
@@ -1712,15 +1716,6 @@ div.subopinion-content img {
   position: absolute;
 }
 
-/* Custom CSS for opinion coverage page */
-.timelines-dialog {
-    width: 95vw;
-}
-
-.legendG {
-    display: None;
-}
-
 #fullScreenModal {
   width: 100vw;
 }
@@ -1760,15 +1755,6 @@ div.subopinion-content img {
   .alert-dismissible .close {
     right: 0px;
   }
-}
-
-.brusher {
-  display: none;
-}
-
-rect.series-segment {
-  fill: rgb(49, 54, 149) !important;
-  fill-opacity: 1.0 !important;
 }
 
 .ml-1 {

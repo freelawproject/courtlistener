@@ -1,9 +1,10 @@
+from asgiref.sync import async_to_sync
 from celery import chain
 
 from cl.corpus_importer.tasks import get_pacer_doc_by_rd
 from cl.lib.celery_utils import CeleryThrottle
 from cl.lib.command_utils import logger
-from cl.lib.pacer_session import ProxyPacerSession, SessionData
+from cl.lib.pacer_session import SessionData, log_into_pacer
 from cl.scrapers.tasks import extract_pdf_document
 from cl.search.models import RECAPDocument
 
@@ -42,10 +43,9 @@ def get_petitions(
     )
     q = options["queue"]
     throttle = CeleryThrottle(queue_name=q)
-    session = ProxyPacerSession(
+    session = async_to_sync(log_into_pacer)(
         username=pacer_username, password=pacer_password
     )
-    session.login()
     for i, rd_pk in enumerate(rds):
         if i < options["offset"]:
             i += 1
@@ -54,10 +54,9 @@ def get_petitions(
             break
 
         if i % 1000 == 0:
-            session = ProxyPacerSession(
+            session = async_to_sync(log_into_pacer)(
                 username=pacer_username, password=pacer_password
             )
-            session.login()
             logger.info(f"Sent {i} tasks to celery so far.")
         logger.info("Doing row %s", i)
         throttle.maybe_wait()

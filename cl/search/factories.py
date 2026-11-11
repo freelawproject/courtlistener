@@ -32,12 +32,14 @@ from cl.search.models import (
     DocketEntry,
     Opinion,
     OpinionCluster,
+    OpinionContent,
     OpinionsCited,
     OpinionsCitedByRECAPDocument,
     Parenthetical,
     ParentheticalGroup,
     RECAPDocument,
     SCOTUSDocketEntry,
+    ScotusDocketMetadata,
     SCOTUSDocument,
     TrialCourtData,
 )
@@ -109,7 +111,8 @@ class DocketFactory(DjangoModelFactory):
     """
 
     @post_generation
-    def filepath_local(self, create, extracted, **kwargs):
+    # pyrefly:ignore[invalid-annotation] factory_boy passes the model instance
+    def filepath_local(self: Docket, create, extracted, **kwargs):
         """Attaches a stub file to an instance of this factory."""
         if extracted:
             self.filepath_local = extracted
@@ -179,6 +182,19 @@ class OpinionWithParentsFactory(OpinionFactory):
     cluster = SubFactory(
         "cl.search.factories.OpinionClusterWithParentsFactory",
     )
+
+
+class OpinionContentFactory(DjangoModelFactory):
+    """Make an OpinionContent from the scanning project for an opinion."""
+
+    class Meta:
+        model = OpinionContent
+
+    opinion = SubFactory(OpinionWithParentsFactory)
+    content = Faker("text", max_nb_chars=2000)
+    source = OpinionContent.FLP_SCANNING
+    extraction_type = OpinionContent.OCR
+    is_main_version = True
 
 
 class OpinionClusterFactory(DjangoModelFactory):
@@ -313,7 +329,7 @@ class RECAPAttachmentFactory(RECAPDocumentFactory):
     @classmethod
     def _fixup(cls, obj):
         """
-        If an attachment_number wasn't specificed, then set it to the highest
+        If an attachment_number wasn't specified, then set it to the highest
         for the docket entry.
         """
         super()._fixup(obj)
@@ -391,10 +407,31 @@ class SCOTUSDocumentFactory(DjangoModelFactory):
         model = SCOTUSDocument
 
     docket_entry = SubFactory(SCOTUSDocketEntryFactory)
-    document_number = Faker("random_int", min=1, max=1000)
     attachment_number = Faker("random_int", min=1, max=10)
     url = Faker("url")
     description = Faker("text", max_nb_chars=20)
+
+    @classmethod
+    def _create(cls, model_class, *args, **kwargs):
+        obj = model_class(*args, **kwargs)
+        cls._fixup(obj)
+        obj.save()
+        return obj
+
+    @classmethod
+    def _fixup(cls, obj):
+        if not obj.document_number and (de := obj.docket_entry):
+            obj.document_number = de.entry_number
+
+
+class ScotusDocketMetadataFactory(DjangoModelFactory):
+    class Meta:
+        model = ScotusDocketMetadata
+
+    docket = SubFactory(DocketFactory)
+    capital_case = False
+    linked_with = ""
+    questions_presented_url = ""
 
 
 class OpinionsCitedByRECAPDocumentFactory(DjangoModelFactory):
@@ -489,9 +526,11 @@ class CaseTransferFactory(DjangoModelFactory):
     origin_docket = SubFactory(DocketFactory)
     destination_court = SubFactory(CourtFactory)
     destination_docket_number = LazyAttribute(
-        lambda ct: ct.destination_docket.docket_number
-        if ct.destination_docket
-        else None
+        lambda ct: (
+            ct.destination_docket.docket_number
+            if ct.destination_docket
+            else None
+        )
     )
     destination_docket = SubFactory(DocketFactory)
     transfer_date = Faker("date_object")

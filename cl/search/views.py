@@ -1,4 +1,5 @@
 from datetime import date
+from typing import Any, cast
 from urllib.parse import quote
 
 from django.contrib import messages
@@ -21,17 +22,21 @@ from cl.alerts.forms import CreateAlertForm
 from cl.alerts.models import Alert
 from cl.donate.models import NeonMembershipLevel
 from cl.lib.bot_detector import is_bot
-from cl.lib.ratelimiter import ratelimiter_unsafe_5_per_d
+from cl.lib.ratelimiter import (
+    ratelimit_deny_list,
+    ratelimiter_unsafe_5_per_d,
+)
 from cl.lib.search_utils import (
     do_es_search,
     make_get_string,
     merge_form_with_courts,
+    scotus_frontend_search_enabled,
     store_search_query,
 )
 from cl.lib.string_utils import trunc
 from cl.lib.types import AuthenticatedHttpRequest
 from cl.search.forms import SearchForm, _clean_form
-from cl.search.models import SEARCH_TYPES, Court
+from cl.search.models import SEARCH_TYPES, Court, FederalCourtsQuerySet
 from cl.search.tasks import email_search_results
 from cl.search.utils import get_homepage_stats, get_v2_homepage_stats
 from cl.stats.constants import StatMethod, StatMetric, StatQueryType
@@ -100,6 +105,7 @@ def home_router(request: HttpRequest) -> HttpResponse:
 
 
 @never_cache
+@ratelimit_deny_list
 def show_results(request: HttpRequest) -> HttpResponse:
     """
     This view can vary significantly, depending on how it is called:
@@ -123,7 +129,7 @@ def show_results(request: HttpRequest) -> HttpResponse:
     get_string_sans_alert = make_get_string(
         request, ["page", "edit_alert", "show_alert_modal"]
     )
-    render_dict = {
+    render_dict: dict[str, Any] = {
         "private": True,
         "get_string": get_string,
         "get_string_sans_alert": get_string_sans_alert,
@@ -133,7 +139,7 @@ def show_results(request: HttpRequest) -> HttpResponse:
     edit_alert = "edit_alert" in request.GET
 
     if request.method == "POST":
-        alert_form_context = {
+        alert_form_context: dict[str, Any] = {
             "data": request.POST,
             "user": request.user,
             "initial": {
@@ -159,7 +165,12 @@ def show_results(request: HttpRequest) -> HttpResponse:
         if not alert_form.is_valid():
             # Invalid form. Do the search again and show them the alert form
             # with the errors
-            render_dict.update(do_es_search(request.GET.copy()))
+            render_dict.update(
+                do_es_search(
+                    request.GET.copy(),
+                    include_scotus=scotus_frontend_search_enabled(request),
+                )
+            )
             render_dict.update(
                 {
                     "alert_form": alert_form,
@@ -285,12 +296,19 @@ def show_results(request: HttpRequest) -> HttpResponse:
 
     if search_type == SEARCH_TYPES.RECAP:
         search_results = do_es_search(
-            request.GET.copy(), courts=Court.federal_courts.all_pacer_courts()
+            request.GET.copy(),
+            # federal_courts is typed as a plain Manager, which hides the
+            # FederalCourtsQuerySet methods from the type checker.
+            courts=cast(
+                FederalCourtsQuerySet, Court.federal_courts
+            ).all_pacer_courts(),
+            include_scotus=scotus_frontend_search_enabled(request),
         )
     else:
         search_results = do_es_search(
             request.GET.copy(),
             is_semantic_frontend_active=is_semantic_active,
+            include_scotus=scotus_frontend_search_enabled(request),
         )
 
     render_dict.update(search_results)
@@ -312,7 +330,7 @@ def show_results(request: HttpRequest) -> HttpResponse:
 
 @never_cache
 def advanced(request: HttpRequest, search_type: str) -> HttpResponse:
-    render_dict = {"private": False}
+    render_dict: dict[str, Any] = {"private": False}
     courts = courts_in_use = Court.objects.filter(in_use=True)
 
     if search_type == SEARCH_TYPES.OPINION:
@@ -361,7 +379,7 @@ def es_search(request: HttpRequest) -> HttpResponse:
     :param request: HttpRequest object
     :return: HttpResponse
     """
-    render_dict = {"private": False}
+    render_dict: dict[str, Any] = {"private": False}
     courts = Court.objects.filter(in_use=True)
     render_dict.update({"search_type": "parenthetical"})
     obj_type = SEARCH_TYPES.PARENTHETICAL

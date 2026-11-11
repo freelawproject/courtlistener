@@ -73,6 +73,9 @@
               <li class="jump-links"><a id="nav_caption" href="{% if tab != "opinions" %}{% url 'view_case' cluster.pk cluster.slug %}{% endif %}#caption" >Caption</a></li>
               {% if cluster.headmatter %}
                 <li class="jump-links"><a id="nav_o" href="{% if tab != "opinions" %}{% url 'view_case' cluster.pk cluster.slug %}{% endif %}#o">Headmatter</a></li>
+                {% if separate_syllabus %}
+                  <li class="jump-links"><a id="nav_syllabus" href="{% if tab != "opinions" %}{% url 'view_case' cluster.pk cluster.slug %}{% endif %}#syllabus">Syllabus</a></li>
+                {% endif %}
               {% else %}
 
                   {% if cluster.correction %}
@@ -216,13 +219,13 @@
                       <span class="sr-only">Toggle Dropdown</span>
                     </a>
                     <ul class="dropdown-menu">
-                      <li><a href="{% url "alert_help" %}#citation-alerts">Learn More</a></li>
+                      <li><a href="{{ WIKI_HELP_URL }}/alerts/citation-alerts-to-track-new-legal-references">Learn More</a></li>
                     </ul>
                   </div>
                   {% if download_file_path %}
                       {% include "includes/add_download_button.html" %}
                   {% endif %}
-                  {% include "includes/add_note_button.html" with form_instance_id=note_form.instance.cluster_id %}
+                  {% include "includes/add_note_button.html" with form_instance_id=note_form.instance.pk %}
                 </div>
             </div>
 

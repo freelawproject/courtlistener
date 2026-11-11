@@ -55,8 +55,22 @@ STAT_METRICS_PREFIX = "prometheus:stat:"
 ########
 # Wiki #
 ########
-WIKI_API_BASE_URL = "https://wiki.free.law/c/courtlistener/help/api"
-
+WIKI_HELP_BASE_URL = "https://wiki.free.law/c/courtlistener/help"
+WIKI_API_BASE_URL = f"{WIKI_HELP_BASE_URL}/api"
+WIKI_TERMS_URL = "https://wiki.free.law/c/terms/courtlistener/courtlistenercom-terms-of-service-and-policies"
+WIKI_REMOVAL_URL = "https://wiki.free.law/c/terms/courtlistener/courtlistenercom-content-removal-policy"
+# Coverage help pages moved to the wiki (#7766).
+WIKI_COVERAGE_BASE_URL = f"{WIKI_HELP_BASE_URL}/data-coverage"
+WIKI_COVERAGE_URL = WIKI_COVERAGE_BASE_URL
+WIKI_COVERAGE_FDS_URL = (
+    f"{WIKI_COVERAGE_BASE_URL}/judicial-financial-disclosures"
+)
+WIKI_COVERAGE_OA_URL = f"{WIKI_COVERAGE_BASE_URL}/oral-argument-recordings"
+WIKI_COVERAGE_OPINIONS_URL = f"{WIKI_COVERAGE_BASE_URL}/case-law"
+WIKI_COVERAGE_RECAP_URL = f"{WIKI_COVERAGE_BASE_URL}/federal-cases-and-filings"
+WIKI_COVERAGE_SCOTUS_URL = (
+    f"{WIKI_COVERAGE_BASE_URL}/supreme-court-cases-and-filings"
+)
 
 ##############
 # Super Misc #
@@ -91,4 +105,9 @@ CHARS_THRESHOLD_OCR_PER_PAGE = env.int(
 # SCOTUS email subscription
 SCOTUS_RECAP_EMAIL = env(
     "SCOTUS_RECAP_EMAIL", default="notifications@scotus.recap.email"
+)
+
+# User agent for requests from Courtlistener to court websites
+COURT_REQUEST_USER_AGENT = env(
+    "REQUEST_USER_AGENT", default="Courtlistener (Free Law Project)"
 )

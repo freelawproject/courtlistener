@@ -1,9 +1,11 @@
 from dataclasses import dataclass
 
 from django.conf import settings
-from django.contrib.auth.models import User
+from django.contrib.auth.models import AnonymousUser, User
+from django.contrib.contenttypes.models import ContentType
 from django.core.cache import cache
 from django.core.mail import EmailMultiAlternatives, get_connection
+from django.db import models
 from django.db.models import (
     Case,
     CharField,
@@ -23,18 +25,106 @@ from django.template import loader
 
 from cl.api.models import Webhook, WebhookEventType
 from cl.api.tasks import send_pray_and_pay_webhooks
+from cl.audio.models import Audio
 from cl.custom_filters.templatetags.pacer import price
-from cl.favorites.models import GenericCount, Prayer, PrayerAvailability
+from cl.favorites.models import GenericCount, Note, Prayer, PrayerAvailability
 from cl.favorites.selectors import prayer_eligible
-from cl.search.models import RECAPDocument
+from cl.search.models import (
+    Docket,
+    OpinionCluster,
+    RECAPDocument,
+    SCOTUSDocument,
+)
+
+# Models that can have a Note attached, mapped to the bucket label the
+# profile Notes page groups them under (cl.users.views.view_notes()).
+NOTEABLE_MODELS: dict[type[models.Model], str] = {
+    Docket: "Dockets",
+    OpinionCluster: "Opinions",
+    Audio: "Oral Arguments",
+    RECAPDocument: "Documents",
+    SCOTUSDocument: "Documents",
+}
+
+
+def get_notes_for(obj: models.Model) -> QuerySet[Note]:
+    """Return the Notes attached to a given object, across all users.
+
+    :param obj: A noteable model instance (see NOTEABLE_MODELS).
+    :return: A queryset of matching Note rows.
+    """
+    content_type = ContentType.objects.get_for_model(type(obj))
+    return Note.objects.filter(content_type=content_type, object_id=obj.pk)
+
+
+def repoint_notes(
+    main_object: models.Model, version_object: models.Model
+) -> None:
+    """Repoint Notes from version_object onto main_object.
+
+    For use when merging two noteable rows into one (e.g.
+    merge_opinion_versions).
+
+    A user who already has a Note on main_object keeps that one; the
+    version's Note is left pointed at version_object, to be cleaned up by
+    delete_orphaned_notes when it's deleted.
+
+    :param main_object: The noteable object absorbing version_object's
+        Notes.
+    :param version_object: The noteable object about to be deleted.
+    :return: None
+    """
+    existing_user_ids = get_notes_for(main_object).values_list(
+        "user_id", flat=True
+    )
+    get_notes_for(version_object).exclude(
+        user_id__in=existing_user_ids
+    ).update(
+        content_type=ContentType.objects.get_for_model(type(main_object)),
+        object_id=main_object.pk,
+    )
+
+
+def get_note_for_target(
+    model_class: type[models.Model],
+    object_id: int | str,
+    user: AnonymousUser | User,
+) -> Note | None:
+    """Return the given user's Note for a noted object, identified by its
+    model class and pk, if any.
+
+    :param model_class: The model class object_id belongs to.
+    :param object_id: The pk of the noted object.
+    :param user: The user requesting their Note, possibly anonymous.
+    :return: The user's Note for the object, or None if anonymous or not
+        found.
+    """
+    if not user.is_authenticated:
+        return None
+
+    content_type = ContentType.objects.get_for_model(model_class)
+    return Note.objects.filter(
+        content_type=content_type, object_id=object_id, user=user
+    ).first()
 
 
 async def create_prayer(
-    user: User, recap_document: RECAPDocument
+    user: User,
+    recap_document: RECAPDocument,
+    is_eligible: bool | None = None,
 ) -> Prayer | None:
-    is_user_eligible, _ = await prayer_eligible(user)
+    """Create a waiting prayer for the user on an unavailable document.
 
-    if not is_user_eligible or recap_document.is_available:
+    Returns None when the user reached their daily limit, the document is
+    already available, or the user already prayed for it.
+
+    :param is_eligible: The result of prayer_eligible() when the caller
+        already has it, to avoid querying it twice. Checked here if omitted.
+    """
+    if is_eligible is None:
+        is_eligible, _ = await prayer_eligible(user)
+
+    if not is_eligible or recap_document.is_available:
         return None
 
     new_prayer, created = await Prayer.objects.aget_or_create(
@@ -171,12 +261,12 @@ async def get_top_prayers() -> QuerySet[RECAPDocument]:
 async def get_user_prayers(
     user: User, status: str | None = None
 ) -> QuerySet[RECAPDocument]:
-    filters = {"prayers__user": user}
+    filters = Q(prayers__user=user)
     if status is not None:
-        filters["prayers__status"] = status
+        filters &= Q(prayers__status=status)
 
     documents = (
-        RECAPDocument.objects.filter(**filters)
+        RECAPDocument.objects.filter(filters)
         .select_related(
             "docket_entry",
             "docket_entry__docket",

@@ -358,6 +358,13 @@
                     <div class="serif-text harvard" id="headmatter">
                     {{ cluster.headmatter|safe }}
                     </div>
+                    {% if separate_syllabus %}
+                        <h2 class="opinion-section-title jump-link" id="syllabus">Syllabus</h2>
+                        <hr class="hr-opinion">
+                        <div class="serif-text harvard">
+                        {{ cluster.syllabus|safe }}
+                        </div>
+                    {% endif %}
                 {% else %}
                     {% if cluster.correction %}
                         <h2 class="opinion-section-title jump-link" id="correction">Correction</h2>
@@ -441,6 +448,11 @@
                           <div class="serif-text harvard">{{ sub_opinion.html_with_citations|safe }}</div>
                          {% elif sub_opinion.xml_harvard  %}
                               <div class="serif-text harvard">{{ sub_opinion.xml_harvard|safe }}</div>
+                        {# Scanned XML has the same shape as Harvard's, so it uses its styles #}
+                        {% elif sub_opinion.xml_scan and sub_opinion.html_with_citations %}
+                          <div class="serif-text harvard">{{ sub_opinion.html_with_citations|safe }}</div>
+                        {% elif sub_opinion.xml_scan %}
+                          <div class="serif-text harvard">{{ sub_opinion.xml_scan|safe }}</div>
                         {% elif sub_opinion.html_with_citations %}
                           {% if cluster.source == "C" %}
                         {# It's a PDF with no HTML enrichment#}

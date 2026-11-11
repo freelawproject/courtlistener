@@ -20,17 +20,7 @@
           ><i class="fa fa-search"></i>&nbsp;Search this Docket</a>
         </li>
       {% endif %}
-      {% if docket.pacer_docket_url %}
-        {% if not request.COOKIES.buy_on_pacer_modal and not request.COOKIES.recap_install_plea %}
-          <li><a href="{{ docket.pacer_docket_url }}"
-              data-toggle="modal" data-target="#modal-buy-pacer"
-              class="open_buy_pacer_modal"><i class="fa fa-external-link"></i> View on PACER</a></li>
-        {% else%}
-          <li><a href="{{ docket.pacer_docket_url }}"><i class="fa fa-external-link"></i> View on PACER</a></li>
-        {% endif %}
-
-
-      {% endif %}
+      {% include "includes/docket_source_li/index.html" %}
     </ul>
   </div>
   <h4>

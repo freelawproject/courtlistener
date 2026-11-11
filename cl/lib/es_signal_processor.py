@@ -1,10 +1,17 @@
+from collections.abc import Callable, Iterable
 from functools import partial
 
 from celery.canvas import chain
 from django.conf import settings
 from django.core.exceptions import FieldDoesNotExist, ObjectDoesNotExist
 from django.db import transaction
-from django.db.models.signals import m2m_changed, post_delete, post_save
+from django.db.models import Model
+from django.db.models.signals import (
+    ModelSignal,
+    m2m_changed,
+    post_delete,
+    post_save,
+)
 from model_utils.tracker import FieldInstanceTracker
 
 from cl.alerts.tasks import (
@@ -32,14 +39,18 @@ from cl.search.documents import (
     PersonDocument,
     PositionDocument,
 )
+from cl.search.es_docket_sources import (
+    ALL_ES_SOURCES,
+    SOURCE_BY_MODEL,
+)
 from cl.search.models import (
-    BankruptcyInformation,
     Citation,
     Docket,
     Opinion,
     OpinionCluster,
     ParentheticalGroup,
     RECAPDocument,
+    SCOTUSDocument,
 )
 from cl.search.tasks import (
     compute_single_opinion_embeddings,
@@ -49,13 +60,18 @@ from cl.search.tasks import (
     update_children_docs_by_query,
     update_es_document,
 )
-from cl.search.types import ESDocumentClassType, ESModelType
+from cl.search.types import (
+    ESDocumentType,
+    ESModelType,
+)
+
+type DocumentModelMapping = dict[str, dict[type[Model], dict]]
 
 
 def check_fields_that_changed(
-    current_instance: ESModelType,
+    current_instance: Model,
     tracked_set: FieldInstanceTracker,
-    previous_instance: ESModelType | None = None,
+    previous_instance: Model | None = None,
 ) -> list[str]:
     """Identify which fields have changed between two instances of a model or
     between an instance and its previous state.
@@ -71,7 +87,15 @@ def check_fields_that_changed(
     changed.
     """
     changed_fields = []
+    # A field deferred during the merge process (`add_docket_entries`) in
+    # `chunked_docket_entries` was neither read nor assigned after the instance
+    # was loaded. Django's `save()` omits deferred fields from the `UPDATE`, so
+    # they cannot have changed. Skip them to prevent `getattr()` from triggering
+    # a per-field query to fetch their values.
+    deferred_fields = current_instance.get_deferred_fields()
     for field in tracked_set.fields:
+        if field in deferred_fields:
+            continue
         current_value = getattr(current_instance, field)
         if previous_instance:
             previous_value = getattr(previous_instance, field)
@@ -103,7 +127,7 @@ def check_fields_that_changed(
 
 
 def updated_fields(
-    instance: ESModelType, es_document: ESDocumentClassType
+    instance: Model, es_document: type[ESDocumentType]
 ) -> list[str]:
     """Look for changes in the tracked fields of an instance.
     :param instance: The instance to check for changed fields.
@@ -153,9 +177,9 @@ def get_fields_to_update(
 
 
 def update_es_documents(
-    main_model: ESModelType,
-    es_document: ESDocumentClassType,
-    instance: ESModelType,
+    main_model: type[ESModelType],
+    es_document: type[ESDocumentType],
+    instance: Model,
     created: bool,
     mapping_fields: dict,
 ) -> None:
@@ -190,7 +214,8 @@ def update_es_documents(
                 | Position()
                 | OpinionCluster()
                 | Opinion()
-            ) if mapping_fields.get("self", None):  # type: ignore
+                | SCOTUSDocument()
+            ) if mapping_fields.get("self", None):
                 # Update main document in ES, including fields to be
                 # extracted from a related instance.
                 should_compute_embeddings = (
@@ -287,9 +312,15 @@ def update_es_documents(
                         )
                     )
             case Docket() if es_document is ESRECAPDocument:  # type: ignore
+                # The related name must come from this source's own
+                # config -- a hardcoded RECAP name would silently miss
+                # every other source.
+                if main_model not in SOURCE_BY_MODEL:
+                    continue
+                source = SOURCE_BY_MODEL[main_model]
                 # Avoid calling update_children_docs_by_query if the Docket
-                # doesn't have any docket entries.
-                if not instance.docket_entries.exists():
+                # doesn't have any entries from this source.
+                if not source.has_entries(instance):
                     continue
                 transaction.on_commit(
                     partial(
@@ -301,11 +332,14 @@ def update_es_documents(
                     )
                 )
             case Person() if es_document is ESRECAPDocument:  # type: ignore
+                if main_model not in SOURCE_BY_MODEL:
+                    continue
+                source = SOURCE_BY_MODEL[main_model]
                 related_dockets = Docket.objects.filter(**{query: instance})
                 for rel_docket in related_dockets:
-                    # Avoid calling update_children_docs_by_query if the Docket
-                    # doesn't have any docket entries.
-                    if not rel_docket.docket_entries.exists():
+                    # Avoid calling update_children_docs_by_query if the
+                    # Docket doesn't have any entries from this source.
+                    if not source.has_entries(rel_docket):
                         continue
                     transaction.on_commit(
                         partial(
@@ -338,9 +372,9 @@ def update_es_documents(
 
 
 def update_remove_m2m_documents(
-    main_model: ESModelType,
-    es_document: ESDocumentClassType,
-    instance: ESModelType,
+    main_model: type[ESModelType],
+    es_document: type[ESDocumentType],
+    instance: Model,
     mapping_fields: dict,
     affected_field: str,
 ) -> None:
@@ -354,7 +388,7 @@ def update_remove_m2m_documents(
     :return: None
     """
     for key, fields_map in mapping_fields.items():
-        if main_model.__name__.lower() != key:  # type: ignore
+        if main_model.__name__.lower() != key:
             # The m2m relationship is not defined in the main model but
             # we use the relationship to add data to the ES documents.
             main_objects = main_model.objects.filter(**{key: instance})
@@ -368,9 +402,9 @@ def update_remove_m2m_documents(
             )
 
 
-def update_m2m_field_in_es_document(
-    instance: ESModelType,
-    es_document: ESDocumentClassType,
+def update_m2m_field_in_es_document[DocumentT: ESDocumentType](
+    instance: Model,
+    es_document: type[DocumentT],
     affected_field: str,
 ) -> None:
     """Update a single field created using a many-to-many relationship.
@@ -409,9 +443,9 @@ def update_m2m_field_in_es_document(
 
 
 def update_reverse_related_documents(
-    main_model: ESModelType,
-    es_document: ESDocumentClassType,
-    instance: ESModelType,
+    main_model: type[ESModelType],
+    es_document: type[ESDocumentType],
+    instance: Model,
     query_string: str,
     affected_fields: list[str],
     fields_map: dict[str, str],
@@ -490,26 +524,31 @@ def update_reverse_related_documents(
                     fields_map_to_pass,
                 )
             )
-        case BankruptcyInformation() if es_document is DocketDocument:  # type: ignore
-            # bulk update RECAP documents when a reverse related record is created/updated.
+        case _ if (
+            type(instance) in SOURCE_BY_MODEL and es_document is DocketDocument
+        ):  # type: ignore
+            # Always a metadata-model instance here.
+            source = SOURCE_BY_MODEL[type(instance)]
+            # docket is a real FK on every metadata model.
+            docket = getattr(instance, "docket")
             # Avoid calling update_children_docs_by_query if the Docket
-            # doesn't have any entries.
-            if not instance.docket.docket_entries.exists():
+            # doesn't have any entries from this source.
+            if not source.has_entries(docket):
                 return
             transaction.on_commit(
                 partial(
                     update_children_docs_by_query.delay,
                     ESRECAPDocument.__name__,
-                    instance.docket.pk,
+                    docket.pk,
                     affected_fields,
                 )
             )
 
 
 def delete_reverse_related_documents(
-    main_model: ESModelType,
-    es_document: ESDocumentClassType,
-    instance: ESModelType,
+    main_model: type[ESModelType],
+    es_document: type[ESDocumentType],
+    instance: Model,
     query_string: str,
     affected_fields: list[str],
 ) -> None:
@@ -566,11 +605,15 @@ def delete_reverse_related_documents(
                     None,
                 )
             )
-            # Avoid calling update_children_docs_by_query if the Docket
-            # doesn't have any entries.
-            if not instance.docket_entries.exists():
+            # Must check every source, not just one -- by now `instance`
+            # is a plain Docket, so the type that triggered the delete is
+            # no longer known.
+            has_entries = any(
+                source.has_entries(instance) for source in ALL_ES_SOURCES
+            )
+            if not has_entries:
                 return
-            # Then update all their child documents (RECAPDocuments)
+            # Then update all their child documents
             transaction.on_commit(
                 partial(
                     update_children_docs_by_query.delay,
@@ -619,7 +662,7 @@ def delete_reverse_related_documents(
 
 
 def allow_es_audio_indexing(
-    instance: ESModelType,
+    instance: Model,
     update_fields: list[str] | None,
 ):
     """Check conditions to abort Elasticsearch indexing for Audio instances.
@@ -650,7 +693,7 @@ def remove_non_judge_person_and_positions_from_index(
     :return: None
     """
     try:
-        if instance.person.is_judge:
+        if (person := instance.person) is None or person.is_judge:
             # The Person is still a Judge, return.
             return
 
@@ -689,7 +732,12 @@ class ESSignalProcessor:
         "update_reverse_related_{}_on_delete"
     )
 
-    def __init__(self, main_model, es_document, documents_model_mapping):
+    def __init__(
+        self,
+        main_model: type[ESModelType],
+        es_document: type[ESDocumentType],
+        documents_model_mapping: DocumentModelMapping,
+    ):
         self.main_model = main_model
         self.es_document = es_document
         self.documents_model_mapping = documents_model_mapping
@@ -748,7 +796,12 @@ class ESSignalProcessor:
         )
 
     @staticmethod
-    def connect_signals(models, handler, signal_to_uid_mapping, weak=False):
+    def connect_signals(
+        models: Iterable[type[Model]],
+        handler: Callable[..., None],
+        signal_to_uid_mapping: dict[ModelSignal, str],
+        weak: bool = False,
+    ) -> None:
         """Helper method to connect signals to a handler for multiple models."""
         for model in models:
             model_name = model.__name__.lower()
@@ -761,15 +814,17 @@ class ESSignalProcessor:
                 )
 
     @elasticsearch_enabled
-    def handle_save(
+    def handle_save[M: Model](
         self,
-        sender,
-        instance=None,
+        sender: type[M],
+        instance: M | None = None,
         created=False,
         update_fields=None,
         **kwargs,
-    ):
+    ) -> None:
         """Receiver function that gets called after an object instance is saved"""
+        if instance is None:
+            raise TypeError("Signals did not send an instance")
 
         if update_fields and "view_count" in update_fields:
             # If the save includes 'view_count' in the update fields, abort
@@ -780,13 +835,21 @@ class ESSignalProcessor:
         mapping_fields = self.documents_model_mapping["save"][sender]
         if (
             isinstance(instance, Docket)
-            and instance.source not in Docket.RECAP_SOURCES()
+            and not any(
+                source.docket_belongs(instance)
+                # ready_to_index only gates the very first write -- an
+                # update on an already-indexed Docket is a normal
+                # partial update, not a race with incomplete data.
+                and (not created or source.ready_to_index(instance))
+                for source in ALL_ES_SOURCES
+            )
             and mapping_fields.get(
                 "self", None
             )  # Apply only to signals intended to affect the DocketDocument mapping.
         ):
-            # Avoid saving or updating the Docket in ES if it doesn't belong to
-            # RECAP.
+            # Avoid saving or updating the Docket in ES if it doesn't belong
+            # to any registered source, or is being created before its
+            # source is ready to index it.
             return
 
         if isinstance(instance, Opinion) and instance.main_version:
@@ -830,8 +893,12 @@ class ESSignalProcessor:
         )
 
     @elasticsearch_enabled
-    def handle_delete(self, sender, instance, **kwargs):
+    def handle_delete[M: Model](
+        self, sender: type[M], instance: M | None = None, **kwargs
+    ) -> None:
         """Receiver function that gets called after an object instance is deleted"""
+        if instance is None:
+            raise TypeError("Signals did not send an instance")
 
         doc_id, routing_id = get_es_doc_id_and_parent_id(
             self.es_document, instance
@@ -849,8 +916,13 @@ class ESSignalProcessor:
         )
 
     @elasticsearch_enabled
-    def handle_m2m(self, sender, instance=None, action=None, **kwargs):
+    def handle_m2m[M: Model](
+        self, sender: type[M], instance: M | None = None, action=None, **kwargs
+    ) -> None:
         """Receiver function that gets called after a m2m relation is modified"""
+        if instance is None:
+            raise TypeError("Signals did not send an instance")
+
         if action == "post_add" or action == "post_remove":
             mapping_fields = self.documents_model_mapping["m2m"][sender]
             for key, fields_map in mapping_fields.items():
@@ -864,20 +936,28 @@ class ESSignalProcessor:
                 )
 
     @elasticsearch_enabled
-    def handle_reverse_actions(self, sender, instance=None, **kwargs):
+    def handle_reverse_actions[M: Model](
+        self, sender: type[M], instance: M | None = None, **kwargs
+    ) -> None:
         """Receiver function that gets called after a reverse relation is
         created, updated or removed.
         """
+        if instance is None:
+            raise TypeError("Signals did not send an instance")
+
         mapping_fields = self.documents_model_mapping["reverse"][sender]
         for query_string, fields_map in mapping_fields.items():
             match instance:
-                case BankruptcyInformation() if (
-                    self.es_document is DocketDocument
+                case _ if (
+                    type(instance) in SOURCE_BY_MODEL
+                    and self.es_document is DocketDocument
                 ):  # type: ignore
-                    # BankruptcyInformation is a one-to-one relation that can
-                    # be re-saved many times without changes. It's better to
-                    # check if the indexed fields have changed before
-                    # triggering an update.
+                    # Sender is always a registered metadata model here.
+                    # Every registered metadata model (BankruptcyInformation,
+                    # ScotusDocketMetadata, ...) is a one-to-one relation
+                    # that can be re-saved many times without changes. It's
+                    # better to check if the indexed fields have changed
+                    # before triggering an update.
                     changed_fields = updated_fields(instance, self.es_document)
                     affected_fields = get_fields_to_update(
                         changed_fields, fields_map
@@ -908,10 +988,15 @@ class ESSignalProcessor:
             )
 
     @elasticsearch_enabled
-    def handle_reverse_actions_delete(self, sender, instance=None, **kwargs):
+    def handle_reverse_actions_delete[M: Model](
+        self, sender: type[M], instance: M | None = None, **kwargs
+    ) -> None:
         """Receiver function that gets called after a reverse relation is
         removed.
         """
+        if instance is None:
+            raise TypeError("Signals did not send an instance")
+
         mapping_fields = self.documents_model_mapping["reverse-delete"][sender]
         for query_string, fields_map in mapping_fields.items():
             try:

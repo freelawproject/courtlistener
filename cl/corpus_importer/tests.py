@@ -1,6 +1,9 @@
+import asyncio
 import json
 from datetime import date, datetime, timedelta
 from pathlib import Path
+from tempfile import TemporaryDirectory
+from typing import assert_type, cast
 from unittest import mock
 from unittest.mock import call, patch
 
@@ -10,30 +13,36 @@ import pytest
 import requests
 import responses
 import time_machine
-from bs4 import BeautifulSoup
 from celery.exceptions import Retry
 from django.conf import settings
 from django.core.exceptions import ObjectDoesNotExist
 from django.core.files.base import ContentFile
 from django.core.management import call_command
 from django.db.models.signals import post_save
-from django.test import SimpleTestCase, override_settings
+from django.test import override_settings
 from django.utils import timezone
 from django.utils.timezone import now
 from eyecite.tokenizers import HyperscanTokenizer
 from factory import RelatedFactory
-from juriscraper.lib.string_utils import harmonize, titlecase
+from juriscraper.lib.string_utils import CaseNameTweaker, harmonize, titlecase
 from juriscraper.pacer.free_documents import FreeOpinionReport
 from juriscraper.state.texas import (
     TexasCaseParty,
+    TexasCourtOfCriminalAppealsDocket,
+    TexasSupremeCourtDocket,
 )
 from juriscraper.state.texas.common import CourtID, CourtType
+from juriscraper.state.texas.court_of_appeals import TexasCourtOfAppealsDocket
 from openai import RateLimitError
 from pydantic import ValidationError
 
 from cl.alerts.factories import DocketAlertFactory
 from cl.alerts.models import DocketAlert
 from cl.audio.factories import AudioFactory
+from cl.corpus_importer.centralia import (
+    merge_structured_opinion_into_cl_opinion,
+    should_ingest,
+)
 from cl.corpus_importer.court_regexes import match_court_string
 from cl.corpus_importer.factories import (
     CaseBodyFactory,
@@ -41,16 +50,12 @@ from cl.corpus_importer.factories import (
     CaseLawFactory,
     CitationFactory,
 )
-from cl.corpus_importer.import_columbia.columbia_utils import fix_xml_tags
-from cl.corpus_importer.import_columbia.parse_opinions import (
-    get_state_court_object,
-)
 from cl.corpus_importer.llm_models import CaseNameExtractionResponse
+from cl.corpus_importer.management.commands.claims_activity_project import (
+    query_and_parse_claims_activity,
+)
 from cl.corpus_importer.management.commands.clean_up_mis_matched_dockets import (
     find_and_fix_mis_matched_dockets,
-)
-from cl.corpus_importer.management.commands.columbia_merge import (
-    process_cluster,
 )
 from cl.corpus_importer.management.commands.harvard_merge import (
     combine_non_overlapping_data,
@@ -82,6 +87,7 @@ from cl.corpus_importer.management.commands.scrape_pacer_free_opinions import (
     do_everything,
     get_and_save_free_document_reports,
     get_outstanding_failed_dates,
+    get_pdfs,
     report_free_document_scrape_stalls,
 )
 from cl.corpus_importer.management.commands.update_casenames_wl_dataset import (
@@ -93,12 +99,17 @@ from cl.corpus_importer.signals import (
     update_latest_case_id_and_schedule_iquery_sweep,
 )
 from cl.corpus_importer.state.texas.utils import is_missing_file_page
+from cl.corpus_importer.state.utils import MergeResult
 from cl.corpus_importer.tasks import (
-    MergeResult,
     classify_case_name_by_llm,
+    download_recap_item,
     download_texas_document,
     generate_ia_json,
+    get_and_process_free_pdf,
     get_and_save_free_document_report,
+    get_document_number_for_appellate,
+    is_texas_appellate_docket,
+    is_texas_supreme_docket,
     merge_texas_case_transfers,
     merge_texas_docket,
     merge_texas_docket_entry,
@@ -108,6 +119,8 @@ from cl.corpus_importer.tasks import (
     merge_texas_trial_court_data,
     normalize_texas_parties,
     probe_or_scrape_iquery_pages,
+    process_free_opinion_result,
+    upload_to_ia,
 )
 from cl.corpus_importer.utils import (
     DocketSourceException,
@@ -126,7 +139,11 @@ from cl.corpus_importer.utils import (
 from cl.favorites.models import PrayerAvailability
 from cl.lib.model_helpers import make_texas_docket_number_core
 from cl.lib.pacer import process_docket_data
-from cl.lib.redis_utils import get_redis_interface
+from cl.lib.pacer_session import SessionData
+from cl.lib.redis_utils import (
+    get_redis_interface,
+    make_update_pacer_case_id_key,
+)
 from cl.people_db.factories import (
     ABARatingFactory,
     AttorneyFactory,
@@ -159,7 +176,7 @@ from cl.recap.management.commands.nightly_pacer_updates import (
     get_docket_ids_week_ago_no_case_name,
     get_recap_documents_pray_and_pay,
 )
-from cl.recap.models import UPLOAD_TYPE, PacerHtmlFiles
+from cl.recap.models import UPLOAD_TYPE, PacerHtmlFiles, ProcessingQueue
 from cl.recap.tests.tests import mock_bucket_open
 from cl.scrapers.models import PACERFreeDocumentLog, PACERFreeDocumentRow
 from cl.scrapers.tasks import update_docket_info_iquery
@@ -173,6 +190,7 @@ from cl.search.factories import (
     OpinionClusterWithChildrenAndParentsFactory,
     OpinionClusterWithMultipleOpinionsFactory,
     OpinionClusterWithParentsFactory,
+    OpinionFactory,
     OpinionWithChildrenFactory,
     OpinionWithParentsFactory,
     RECAPDocumentFactory,
@@ -207,7 +225,7 @@ from cl.search.state.texas.factories import (
 )
 from cl.search.state.texas.models import TexasDocketEntry, TexasDocument
 from cl.settings import MEDIA_ROOT
-from cl.tests.cases import TestCase
+from cl.tests.cases import SimpleTestCase, TestCase
 from cl.tests.fakes import FakeCaseQueryReport, FakeFreeOpinionReport
 from cl.tests.providers import fake
 from cl.tests.utils import MockResponse
@@ -250,226 +268,6 @@ class JudgeExtractionTest(SimpleTestCase):
 
 class CourtMatchingTest(SimpleTestCase):
     """Tests related to converting court strings into court objects."""
-
-    def test_get_court_object_from_string(self) -> None:
-        """Can we get a court object from a string and filename combo?
-
-        When importing the Columbia corpus, we use a combination of regexes and
-        the file path to determine a match.
-        """
-        pairs = (
-            {
-                "args": (
-                    "California Superior Court  "
-                    "Appellate Division, Kern County.",
-                    "california/supreme_court_opinions/documents"
-                    "/0dc538c63bd07a28.xml",
-                    # noqa
-                ),
-                "answer": "calappdeptsuperct",
-            },
-            {
-                "args": (
-                    "California Superior Court  "
-                    "Appellate Department, Sacramento.",
-                    "california/supreme_court_opinions/documents"
-                    "/0dc538c63bd07a28.xml",
-                    # noqa
-                ),
-                "answer": "calappdeptsuperct",
-            },
-            {
-                "args": (
-                    "Appellate Session of the Superior Court",
-                    "connecticut/appellate_court_opinions/documents"
-                    "/0412a06c60a7c2a2.xml",
-                    # noqa
-                ),
-                "answer": "connsuperct",
-            },
-            {
-                "args": (
-                    "Court of Errors and Appeals.",
-                    "new_jersey/supreme_court_opinions/documents"
-                    "/0032e55e607f4525.xml",
-                    # noqa
-                ),
-                "answer": "nj",
-            },
-            {
-                "args": (
-                    "Court of Chancery",
-                    "new_jersey/supreme_court_opinions/documents"
-                    "/0032e55e607f4525.xml",
-                    # noqa
-                ),
-                "answer": "njch",
-            },
-            {
-                "args": (
-                    "Workers' Compensation Commission",
-                    "connecticut/workers_compensation_commission/documents"
-                    "/0902142af68ef9df.xml",
-                    # noqa
-                ),
-                "answer": "connworkcompcom",
-            },
-            {
-                "args": (
-                    "Appellate Session of the Superior Court",
-                    "connecticut/appellate_court_opinions/documents"
-                    "/00ea30ce0e26a5fd.xml",
-                    # noqa
-                ),
-                "answer": "connsuperct",
-            },
-            {
-                "args": (
-                    "Superior Court  New Haven County",
-                    "connecticut/superior_court_opinions/documents"
-                    "/0218655b78d2135b.xml",
-                    # noqa
-                ),
-                "answer": "connsuperct",
-            },
-            {
-                "args": (
-                    "Superior Court, Hartford County",
-                    "connecticut/superior_court_opinions/documents"
-                    "/0218655b78d2135b.xml",
-                    # noqa
-                ),
-                "answer": "connsuperct",
-            },
-            {
-                "args": (
-                    "Compensation Review Board  "
-                    "WORKERS' COMPENSATION COMMISSION",
-                    "connecticut/workers_compensation_commission/documents"
-                    "/00397336451f6659.xml",
-                    # noqa
-                ),
-                "answer": "connworkcompcom",
-            },
-            {
-                "args": (
-                    "Appellate Division Of The Circuit Court",
-                    "connecticut/superior_court_opinions/documents"
-                    "/03dd9ec415bf5bf4.xml",
-                    # noqa
-                ),
-                "answer": "connsuperct",
-            },
-            {
-                "args": (
-                    "Superior Court for Law and Equity",
-                    "tennessee/court_opinions/documents/01236c757d1128fd.xml",
-                ),
-                "answer": "tennsuperct",
-            },
-            {
-                "args": (
-                    "Courts of General Sessions and Oyer and Terminer "
-                    "of Delaware",
-                    "delaware/court_opinions/documents/108da18f9278da90.xml",
-                ),
-                "answer": "delsuperct",
-            },
-            {
-                "args": (
-                    "Circuit Court of the United States of Delaware",
-                    "delaware/court_opinions/documents/108da18f9278da90.xml",
-                ),
-                "answer": "circtdel",
-            },
-            {
-                "args": (
-                    "Circuit Court of Delaware",
-                    "delaware/court_opinions/documents/108da18f9278da90.xml",
-                ),
-                "answer": "circtdel",
-            },
-            {
-                "args": (
-                    "Court of Quarter Sessions "
-                    "Court of Delaware,  Kent County.",
-                    "delaware/court_opinions/documents/f01f1724cc350bb9.xml",
-                ),
-                "answer": "delsuperct",
-            },
-            {
-                "args": (
-                    "District Court of Appeal.",
-                    "florida/court_opinions/documents/25ce1e2a128df7ff.xml",
-                ),
-                "answer": "fladistctapp",
-            },
-            {
-                "args": (
-                    "District Court of Appeal, Lakeland, Florida.",
-                    "florida/court_opinions/documents/25ce1e2a128df7ff.xml",
-                ),
-                "answer": "fladistctapp",
-            },
-            {
-                "args": (
-                    "District Court of Appeal Florida.",
-                    "florida/court_opinions/documents/25ce1e2a128df7ff.xml",
-                ),
-                "answer": "fladistctapp",
-            },
-            {
-                "args": (
-                    "District Court of Appeal, Florida.",
-                    "florida/court_opinions/documents/25ce1e2a128df7ff.xml",
-                ),
-                "answer": "fladistctapp",
-            },
-            {
-                "args": (
-                    "District Court of Appeal of Florida, Second District.",
-                    "florida/court_opinions/documents/25ce1e2a128df7ff.xml",
-                ),
-                "answer": "fladistctapp",
-            },
-            {
-                "args": (
-                    "District Court of Appeal of Florida, Second District.",
-                    "/data/dumps/florida/court_opinions/documents"
-                    "/25ce1e2a128df7ff.xml",
-                    # noqa
-                ),
-                "answer": "fladistctapp",
-            },
-            {
-                "args": (
-                    "U.S. Circuit Court",
-                    "north_carolina/court_opinions/documents"
-                    "/fa5b96d590ae8d48.xml",
-                    # noqa
-                ),
-                "answer": "circtnc",
-            },
-            {
-                "args": (
-                    "United States Circuit Court,  Delaware District.",
-                    "delaware/court_opinions/documents/6abba852db7c12a1.xml",
-                ),
-                "answer": "circtdel",
-            },
-            {
-                "args": ("Court of Common Pleas  Hartford County", "asdf"),
-                "answer": "connsuperct",
-            },
-        )
-        for d in pairs:
-            got = get_state_court_object(*d["args"])
-            self.assertEqual(
-                got,
-                d["answer"],
-                msg="\nDid not get court we expected: '{}'.\n"
-                "               Instead we got: '{}'".format(d["answer"], got),
-            )
 
     def test_get_fed_court_object_from_string(self) -> None:
         """Can we get the correct federal courts?"""
@@ -606,7 +404,10 @@ class PacerDocketParserTest(TestCase):
         self.assertEqual(godfrey_llp.city, "Seattle")
         self.assertEqual(godfrey_llp.state, "WA")
 
-    @patch("cl.corpus_importer.tasks.get_or_cache_pacer_cookies")
+    @patch(
+        "cl.corpus_importer.tasks.get_or_cache_pacer_cookies",
+        return_value=SessionData(None, "http://proxy_1:9090"),
+    )
     def test_get_and_save_free_document_report(self, mock_cookies) -> None:
         """Test the retrieval and storage of free document report data."""
 
@@ -681,8 +482,8 @@ class ScrapeFreeOpinionsLoopTest(TestCase):
         start = date(2025, 11, 1)
         end = date(2025, 11, 3)
         # Fail the middle day, succeed the others.
-        mock_fetch.side_effect = lambda court, s, e, day_span=1: s == date(
-            2025, 11, 2
+        mock_fetch.side_effect = lambda court, s, e, day_span=1: (
+            s == date(2025, 11, 2)
         )
 
         get_and_save_free_document_reports(
@@ -892,6 +693,191 @@ class ScrapeFreeOpinionsLoopTest(TestCase):
         mock_stalls.assert_called_once_with([self.court.pk])
 
 
+class FreeOpinionAlreadyAvailableTest(TestCase):
+    """A document that RECAP already has must still reach the opinion
+    ingestion task when the free opinion report lists it later."""
+
+    @classmethod
+    def setUpTestData(cls) -> None:
+        cls.court = CourtFactory.create(
+            id="nysd",
+            jurisdiction=Court.FEDERAL_DISTRICT,
+            in_use=True,
+            end_date=None,
+        )
+        cls.docket = DocketFactory.create(
+            court=cls.court,
+            pacer_case_id="12345",
+            docket_number="1:20-cv-01234",
+            docket_number_raw="1:20-cv-01234",
+            source=Docket.RECAP,
+        )
+        cls.de = DocketEntryFactory.create(
+            docket=cls.docket,
+            entry_number=119,
+            date_filed=date(2026, 3, 20),
+        )
+        cls.rd = RECAPDocumentFactory.create(
+            docket_entry=cls.de,
+            document_number="119",
+            attachment_number=None,
+            pacer_doc_id="1234567890",
+            is_available=True,
+            sha1="0e5741e89ea3d43305f265ad80c193ae91d0075b",
+        )
+
+    def make_row(self) -> PACERFreeDocumentRow:
+        """Build the free opinion report row for the existing document.
+
+        :return: The saved PACERFreeDocumentRow.
+        """
+        return PACERFreeDocumentRow.objects.create(
+            court_id="nysd",
+            pacer_case_id="12345",
+            docket_number="1:20-cv-01234",
+            case_name="Doe v. Bank of America, NA",
+            date_filed=date(2026, 3, 20),
+            pacer_doc_id="1234567890",
+            document_number="119",
+            description="OPINION AND ORDER",
+            nature_of_suit="",
+            cause="",
+            error_msg="",
+        )
+
+    @patch("cl.corpus_importer.tasks.enqueue_docket_alert")
+    @patch(
+        "cl.corpus_importer.tasks.mark_ia_upload_needed",
+        new_callable=mock.AsyncMock,
+    )
+    @patch(
+        "cl.corpus_importer.tasks.get_blocked_status",
+        new_callable=mock.AsyncMock,
+        return_value=(False, None),
+    )
+    def test_available_document_keeps_the_chain_alive(
+        self, mock_blocked, mock_ia, mock_alert
+    ) -> None:
+        """An available document must not cancel the rest of the chain."""
+        row = self.make_row()
+        with patch(
+            "cl.corpus_importer.tasks.lookup_and_save",
+            return_value=self.docket,
+        ):
+            data = process_free_opinion_result(
+                row.pk, self.court.pk, CaseNameTweaker()
+            )
+
+        self.assertIsNotNone(data)
+        self.assertEqual(data["rd_pk"], self.rd.pk)
+        self.assertTrue(data["skip_pdf_download"])
+        # delete_pacer_row removes the row at the end of the chain instead.
+        self.assertTrue(
+            PACERFreeDocumentRow.objects.filter(pk=row.pk).exists()
+        )
+
+    @patch("cl.corpus_importer.tasks.enqueue_docket_alert")
+    @patch(
+        "cl.corpus_importer.tasks.mark_ia_upload_needed",
+        new_callable=mock.AsyncMock,
+    )
+    @patch(
+        "cl.corpus_importer.tasks.get_blocked_status",
+        new_callable=mock.AsyncMock,
+        return_value=(False, None),
+    )
+    def test_unavailable_document_still_downloads_the_pdf(
+        self, mock_blocked, mock_ia, mock_alert
+    ) -> None:
+        """A document without a PDF must still be downloaded from PACER."""
+        RECAPDocument.objects.filter(pk=self.rd.pk).update(is_available=False)
+        row = self.make_row()
+        with patch(
+            "cl.corpus_importer.tasks.lookup_and_save",
+            return_value=self.docket,
+        ):
+            data = process_free_opinion_result(
+                row.pk, self.court.pk, CaseNameTweaker()
+            )
+
+        self.assertIsNotNone(data)
+        self.assertEqual(data["rd_pk"], self.rd.pk)
+        self.assertFalse(data["skip_pdf_download"])
+
+    @patch(
+        "cl.corpus_importer.tasks.find_citations_and_parentheticals_for_opinion_by_pks"
+    )
+    @patch("cl.corpus_importer.tasks.classify_case_name_by_llm")
+    @patch("cl.corpus_importer.tasks.extract_recap_document_for_opinions")
+    @patch("cl.corpus_importer.tasks.download_pacer_pdf_by_rd")
+    @patch("cl.corpus_importer.tasks.enqueue_docket_alert")
+    @patch(
+        "cl.corpus_importer.tasks.mark_ia_upload_needed",
+        new_callable=mock.AsyncMock,
+    )
+    @patch(
+        "cl.corpus_importer.tasks.get_blocked_status",
+        new_callable=mock.AsyncMock,
+        return_value=(False, None),
+    )
+    def test_scraper_chain_imports_available_document(
+        self,
+        mock_blocked,
+        mock_ia,
+        mock_alert,
+        mock_download,
+        mock_extract,
+        mock_llm,
+        mock_find_citations,
+    ) -> None:
+        """The full get_pdfs chain must turn an available document into an
+        opinion without buying it again."""
+        mock_extract.return_value.json.return_value = {
+            "content": "See Doe v. Roe, 671 F. Supp. 3d 387 (S.D.N.Y. 2023).",
+            "extracted_by_ocr": False,
+        }
+        row = self.make_row()
+        with patch(
+            "cl.corpus_importer.tasks.lookup_and_save",
+            return_value=self.docket,
+        ):
+            get_pdfs(
+                [self.court.pk], date(2026, 3, 20), date(2026, 3, 20), "celery"
+            )
+
+        mock_download.assert_not_called()
+        self.assertTrue(
+            Opinion.objects.filter(
+                sha1=self.rd.sha1, cluster__docket=self.docket
+            ).exists()
+        )
+        self.assertFalse(
+            PACERFreeDocumentRow.objects.filter(pk=row.pk).exists()
+        )
+
+    @patch("cl.corpus_importer.tasks.download_pacer_pdf_by_rd")
+    @patch("cl.corpus_importer.tasks.get_or_cache_pacer_cookies")
+    def test_skip_flag_does_not_buy_the_document_again(
+        self, mock_cookies, mock_download
+    ) -> None:
+        """The skip flag must pass the document on without calling PACER."""
+        row = self.make_row()
+        data = get_and_process_free_pdf(
+            {
+                "result": row,
+                "rd_pk": self.rd.pk,
+                "pacer_court_id": "nysd",
+                "skip_pdf_download": True,
+            },
+            row.pk,
+            self.court.pk,
+        )
+
+        self.assertEqual(data["rd_pk"], self.rd.pk)
+        mock_cookies.assert_not_called()
+        mock_download.assert_not_called()
+
+
 class GetQuarterTest(SimpleTestCase):
     """Can we properly figure out when the quarter that we're currently in
     began?
@@ -909,6 +895,114 @@ class GetQuarterTest(SimpleTestCase):
         self.assertEqual(
             date(2018, 10, 1), get_start_of_quarter(date(2018, 12, 1))
         )
+
+
+class ImporterTransportTest(SimpleTestCase):
+    """Check HTTP client boundaries without PACER or Internet Archive access."""
+
+    def test_claims_queries_share_the_login_event_loop(self) -> None:
+        """Await every query on the same loop and close the shared session."""
+        loops = []
+
+        async def record_loop(**kwargs: object) -> None:
+            """Capture the event loop used by login and report requests."""
+            loops.append(asyncio.get_running_loop())
+
+        module = (
+            "cl.corpus_importer.management.commands.claims_activity_project"
+        )
+        with (
+            TemporaryDirectory() as directory,
+            override_settings(MEDIA_ROOT=directory),
+            patch(f"{module}.ProxyPacerSession") as session_class,
+            patch(f"{module}.ClaimsActivity") as report_class,
+        ):
+            session_context = session_class.return_value
+            session = session_context.__aenter__.return_value
+            session.login.side_effect = record_loop
+            report = report_class.return_value
+            report.query = mock.AsyncMock(side_effect=record_loop)
+            report.response = httpx.Response(200, text="<html></html>")
+            report.data = {}
+
+            query_and_parse_claims_activity(
+                ["nysb"], date(2025, 1, 1), date(2025, 1, 2)
+            )
+
+            session.login.assert_awaited_once()
+            self.assertEqual(report.query.await_count, 4)
+            self.assertEqual(len(set(loops)), 1)
+            session_context.__aexit__.assert_awaited_once()
+            self.assertEqual(len(list(Path(directory).rglob("*.json"))), 4)
+
+    async def test_download_recap_item_uses_httpx_content(self) -> None:
+        """Write the downloaded bytes using the HTTPX response API."""
+        content = b"%PDF-1.7 test document"
+        client = httpx.AsyncClient(
+            transport=httpx.MockTransport(
+                lambda request: httpx.Response(200, content=content)
+            )
+        )
+        with TemporaryDirectory() as directory:
+            destination = Path(directory, "recap", "test.pdf")
+            destination.parent.mkdir()
+            with (
+                override_settings(MEDIA_ROOT=directory),
+                patch(
+                    "cl.corpus_importer.tasks.httpx.AsyncClient",
+                    return_value=client,
+                ),
+            ):
+                await download_recap_item(
+                    "https://archive.org/download/test.pdf", "test.pdf"
+                )
+            self.assertEqual(destination.read_bytes(), content)
+
+    async def test_confirmation_page_is_awaited_for_special_courts(
+        self,
+    ) -> None:
+        """Normalize the confirmation result instead of processing a coroutine."""
+        for court_id in ("ca8", "cadc"):
+            with (
+                self.subTest(court_id=court_id),
+                patch(
+                    "cl.corpus_importer.tasks.get_document_number_from_confirmation_page",
+                    return_value="00218987740",
+                ) as confirmation,
+            ):
+                result = await get_document_number_for_appellate(
+                    court_id, "00218987740", ProcessingQueue()
+                )
+                self.assertEqual(result, "208987740")
+                confirmation.assert_awaited_once_with(court_id, "00218987740")
+
+    def test_ia_upload_handles_requests_http_errors(self) -> None:
+        """Return terminal IA errors even though Requests considers them false."""
+        for status_code in (400, 403):
+            with (
+                self.subTest(status_code=status_code),
+                patch("cl.corpus_importer.tasks.ia_session") as ia_session,
+            ):
+                response = requests.Response()
+                response.status_code = status_code
+                ia_session.s3_is_overloaded.return_value = False
+                ia_session.get_item.return_value.upload.side_effect = (
+                    requests.HTTPError(response=response)
+                )
+                task = mock.MagicMock()
+                result = upload_to_ia(
+                    task,
+                    identifier="test",
+                    files="test.pdf",
+                    title="Test docket",
+                    collection=[],
+                    court_id="ca8",
+                    source_url="https://example.com/docket/",
+                    media_type="texts",
+                    description="Test",
+                )
+                self.assertEqual(result, [response])
+                task.retry.assert_not_called()
 
 
 @pytest.mark.django_db
@@ -1388,7 +1482,16 @@ label="194">*194</page-number>
             "overlaps": 0,
         }
 
-        cases = [case_1_data, case_2_data, case_3_data]
+        # A name printed in capitals keeps its words
+        case_4_data = {
+            "case_name_full": "James Sthubin, Appellant, v. the State of "
+            "Florida, Appellee",
+            "case_name_abbreviation": "James Sthubin v. State of Florida",
+            "case_name_cl": "JAMES STHUBIN v. THE STATE OF FLORIDA",
+            "overlaps": 3,
+        }
+
+        cases = [case_1_data, case_2_data, case_3_data, case_4_data]
 
         for case in cases:
             harvard_case = f"{case.get('case_name_full')} {case.get('case_name_abbreviation')}"
@@ -2293,152 +2396,6 @@ class HarvardMergerTests(TestCase):
         )
 
 
-class ColumbiaMergerTests(TestCase):
-    def setUp(self):
-        """Setup columbia merger tests"""
-        self.read_xml_to_soup_patch = patch(
-            "cl.corpus_importer.management.commands.columbia_merge.read_xml_to_soup"
-        )
-        self.read_xml_to_soup_func = self.read_xml_to_soup_patch.start()
-
-    def tearDown(self) -> None:
-        """Tear down patches and remove added objects"""
-        Docket.objects.all().delete()
-        self.read_xml_to_soup_patch.stop()
-
-    def test_merger(self):
-        """Can we identify opinions correctly even when they are slightly
-        different"""
-
-        # Xml content with bad tags </footnote_body></block_quote> instead of
-        # </block_quote></footnote_body> and unpublished opinion
-        case_xml = """<opinion unpublished=true>
-<reporter_caption>
-<center>
-MENDOZA v. STATE,
-<citation>61 S.W.3d 498</citation>
-(Tex.App.-San Antonio [4th Dist.] 2001)
-</center>
-</reporter_caption>
-<caption>
-<center>PIOQUINTO MENDOZA, III, Appellant, v. THE STATE OF TEXAS, Appellee.</center>
-</caption>
-<docket>
-<center>No. 04-00-00521-CR.</center>
-</docket>
-<court>
-<center>Court of Appeals of Texas, Fourth District, San Antonio.</center>
-</court>
-<date>
-<center>Delivered and Filed: July 25, 2001.</center>
-<center>Rehearing Overruled August 21, 2001.</center>
-<center>Discretionary Review Granted February 13, 2002.</center>
-</date>
-<posture>
-Appeal from the 49th Judicial District Court, Webb County, Texas, Trial Court No. 99-CRN3-0088-DI, Honorable Manuel Flores, Judge Presiding
-<footnote_reference>[fn1]</footnote_reference>
-.
-<footnote_body>
-<footnote_number>[fn1]</footnote_number>
-Judge Flores presided over the pre-trial hearings. The Honorable Peter Michael Curry, Visiting Judge, presided over the trial on the merits.
-</footnote_body>
-<page_number>Page 499</page_number>
-</posture>
-<opinion_text>
-[EDITORS' NOTE: THIS PAGE CONTAINS HEADNOTES. HEADNOTES ARE NOT AN OFFICIAL PRODUCT OF THE COURT, THEREFORE THEY ARE NOT DISPLAYED.]
-<page_number>Page 500</page_number>
-</opinion_text>
-<attorneys> Fernando Sanchez, Law Offices of Fernando Sanchez, Laredo, for appellant. Oscar J. Hale, Assistant District Attorney, Laredo, for appellee. </attorneys>
-<panel> Sitting: TOM RICKHOFF, ALMA L. LOPEZ, and SARAH B. DUNCAN, Justices. </panel>
-<opinion_byline> Opinion by ALMA L. LOPEZ, Justice. </opinion_byline>
-<opinion_text>
-Lorem ipsum dolor sit amet, consectetur adipiscing elit. Nullam quis elit sed dui interdum feugiat.
-<footnote_body>
-<footnote_number>[fn1]</footnote_number>
-<block_quote>Footnote sample
-</footnote_body></block_quote>
-</opinion_text>
-</opinion>
-        """
-
-        fixed_case_xml = fix_xml_tags(case_xml)
-
-        self.read_xml_to_soup_func.return_value = BeautifulSoup(
-            fixed_case_xml, "lxml"
-        )
-
-        # Factory create cluster, data from cluster id: 1589121
-        cluster = OpinionClusterWithMultipleOpinionsFactory(
-            case_name="Mendoza v. State",
-            case_name_full="Pioquinto MENDOZA, III, Appellant, v. the STATE of Texas, "
-            "Appellee",
-            date_filed=date(2002, 2, 13),
-            attorneys="Fernando Sanchez, Law Offices of Fernando Sanchez, Laredo, "
-            "for appellant., Oscar J. Hale, Assistant District Attorney, Laredo, "
-            "for appellee.",
-            other_dates="Rehearing Overruled Aug. 21, 2001., Discretionary Review "
-            "Granted Feb. 13, 2002.",
-            posture="",
-            judges="Alma, Duncan, Lopez, Rickhoff, Sarah, Tom",
-            source=ClusterSources.LAWBOX_M_HARVARD,
-            docket=DocketFactory(source=Docket.HARVARD),
-            sub_opinions__data=[
-                {
-                    "type": "010combined",
-                    "xml_harvard": "<p>Lorem ipsum dolor sit amet, consectetur "
-                    "adipiscing elit. Nullam quis elit sed dui "
-                    "interdum feugiat.</p>",
-                    "html_columbia": "",
-                    "author_str": "Lopez",
-                },
-            ],
-        )
-
-        # cluster posture is empty
-        self.assertEqual(cluster.posture, "")
-
-        # html_columbia is empty
-        self.assertEqual(cluster.sub_opinions.all().first().html_columbia, "")
-
-        # Merge cluster
-        process_cluster(cluster.id, "/columbia/fake_filepath.xml")
-
-        # Reload the object
-        cluster.refresh_from_db()
-
-        # Check if merged metadata is updated correctly
-        self.assertEqual(
-            cluster.posture,
-            "Appeal from the 49th Judicial District Court, Webb County, Texas, "
-            "Trial Court No. 99-CRN3-0088-DI, Honorable Manuel Flores, "
-            "Judge Presiding [fn1] . [fn1] Judge Flores presided over the pre-trial "
-            "hearings. The Honorable Peter Michael Curry, Visiting Judge, presided "
-            "over the trial on the merits. Page 499",
-        )
-        # check if we saved opinion content in html_columbia field
-        self.assertEqual(
-            cluster.sub_opinions.all().first().html_columbia,
-            """<p>[EDITORS' NOTE: THIS PAGE CONTAINS HEADNOTES. HEADNOTES ARE NOT AN OFFICIAL PRODUCT OF THE COURT, THEREFORE THEY ARE NOT DISPLAYED.]
- <span class="star-pagination">*Page 500</span> </p>
-<p>Lorem ipsum dolor sit amet, consectetur adipiscing elit. Nullam quis elit sed dui interdum feugiat.
-<footnote_body>
-<sup id="op0-fn1"><a href="#op0-ref-fn1">1</a></sup>
-<blockquote>Footnote sample
-</blockquote></footnote_body></p>""",
-        )
-
-        # Ensure the cluster is not merged again if it has already been merged
-        # and the COLUMBIA source was assigned.
-        with patch(
-            "cl.corpus_importer.management.commands.columbia_merge.logger"
-        ) as mock_logger:
-            # Merge cluster
-            process_cluster(cluster.id, "/columbia/fake_filepath.xml")
-            mock_logger.info.assert_called_with(
-                f"Cluster id: {cluster.id} already merged"
-            )
-
-
 class TexasMergerTest(TestCase):
     def setUp(self):
         """Set up texas merger tests"""
@@ -2447,7 +2404,7 @@ class TexasMergerTest(TestCase):
         )
         self.download_task_mock = self.download_task_patch.start()
         self.extract_document_patch = patch(
-            "cl.corpus_importer.tasks.extract_formatted_text_document.s"
+            "cl.scrapers.tasks.extract_formatted_text_document.si"
         )
         self.extract_document_mock = self.extract_document_patch.start()
         self.download_document_patch = patch(
@@ -2569,7 +2526,7 @@ class TexasMergerTest(TestCase):
         original_docket_entries = [
             e["pk"] for e in TexasDocketEntry.objects.all().values("pk")
         ]
-        merge_result = merge_texas_docket(docket_dict)
+        merge_texas_docket(docket_dict)
 
         docket_entries = list(
             TexasDocketEntry.objects.exclude(
@@ -2727,8 +2684,8 @@ class TexasMergerTest(TestCase):
         self.download_task_mock.assert_not_called()
 
     @mock.patch("cl.lib.celery_utils.get_task_wait", return_value=0)
-    @mock.patch("cl.corpus_importer.tasks.doc_page_count_service")
-    @mock.patch("cl.corpus_importer.tasks.get_extension", return_value=".pdf")
+    @mock.patch("cl.lib.microservice_utils.doc_page_count_service")
+    @mock.patch("cl.scrapers.utils.get_extension", return_value=".pdf")
     @responses.activate
     def test_merge_texas_document_plaintext_extraction(
         self, ext_mock, pcs_mock, throttle_mock
@@ -2791,25 +2748,30 @@ class TexasMergerTest(TestCase):
                 self.docket_coa1, "2025-01-02.000", case_event, appellate_brief
             )
 
-        assert output.create is True
-        assert output.update is False
-        assert output.success is True
-        assert "TexasDocketEntry" in output.creates
+        self.assertTrue(output.create)
+        self.assertFalse(output.update)
+        self.assertTrue(output.success)
+        self.assertIn("TexasDocketEntry", output.creates)
         entry_pk = next(iter(output.creates["TexasDocketEntry"]))
         created_docket_entry = TexasDocketEntry.objects.get(pk=entry_pk)
-        assert created_docket_entry.docket_id == self.docket_coa1.id
-        assert created_docket_entry.entry_type == case_event["type"]
-        assert created_docket_entry.disposition == case_event["disposition"]
-        assert created_docket_entry.description == (
-            appellate_brief["description"] if appellate_brief else ""
+        self.assertEqual(created_docket_entry.docket_id, self.docket_coa1.id)
+        self.assertEqual(created_docket_entry.entry_type, case_event["type"])
+        self.assertEqual(
+            created_docket_entry.disposition, case_event["disposition"]
         )
-        assert created_docket_entry.remarks == case_event.get("remarks", "")
-        assert created_docket_entry.date_filed == case_event["date"]
+        self.assertEqual(
+            created_docket_entry.description,
+            appellate_brief["description"] if appellate_brief else "",
+        )
+        self.assertEqual(
+            created_docket_entry.remarks, case_event.get("remarks", "")
+        )
+        self.assertEqual(created_docket_entry.date_filed, case_event["date"])
         n_attachments = TexasDocument.objects.filter(
             docket_entry_id=created_docket_entry.id
         ).count()
-        assert n_attachments == 1
-        assert self.extract_document_mock.call_count == 1
+        self.assertEqual(n_attachments, 1)
+        self.assertEqual(self.download_task_mock.call_count, 1)
 
     def test_merge_texas_docket_entry_no_update(self):
         """Can we correctly handle a docket entry update noop?"""
@@ -2836,7 +2798,7 @@ class TexasMergerTest(TestCase):
             document.filepath_local = "a"
             document.save()
         # Reset call count
-        self.extract_document_mock.reset_mock()
+        self.download_task_mock.reset_mock()
 
         # noop
         with self.captureOnCommitCallbacks(execute=True):
@@ -2844,24 +2806,29 @@ class TexasMergerTest(TestCase):
                 self.docket_coa1, "2025-01-02.000", case_event, appellate_brief
             )
 
-        assert output.create is False
-        assert output.update is True
-        assert output.success is True
-        assert entry_pk in output.updates["TexasDocketEntry"]
+        self.assertFalse(output.create)
+        self.assertTrue(output.update)
+        self.assertTrue(output.success)
+        self.assertIn(entry_pk, output.updates["TexasDocketEntry"])
         created_docket_entry = TexasDocketEntry.objects.get(pk=entry_pk)
-        assert created_docket_entry.docket_id == self.docket_coa1.id
-        assert created_docket_entry.entry_type == case_event["type"]
-        assert created_docket_entry.disposition == case_event["disposition"]
-        assert created_docket_entry.description == (
-            appellate_brief["description"] if appellate_brief else ""
+        self.assertEqual(created_docket_entry.docket_id, self.docket_coa1.id)
+        self.assertEqual(created_docket_entry.entry_type, case_event["type"])
+        self.assertEqual(
+            created_docket_entry.disposition, case_event["disposition"]
         )
-        assert created_docket_entry.remarks == case_event.get("remarks", "")
-        assert created_docket_entry.date_filed == case_event["date"]
+        self.assertEqual(
+            created_docket_entry.description,
+            appellate_brief["description"] if appellate_brief else "",
+        )
+        self.assertEqual(
+            created_docket_entry.remarks, case_event.get("remarks", "")
+        )
+        self.assertEqual(created_docket_entry.date_filed, case_event["date"])
         n_attachments = TexasDocument.objects.filter(
             docket_entry_id=created_docket_entry.id
         ).count()
-        assert n_attachments == len(case_event["attachments"])
-        assert self.extract_document_mock.call_count == 0
+        self.assertEqual(n_attachments, len(case_event["attachments"]))
+        self.assertEqual(self.download_task_mock.call_count, 0)
 
     def test_merge_texas_docket_entry_add_document(self):
         """Can we correctly add a new document to an existing docket entry?"""
@@ -2889,7 +2856,7 @@ class TexasMergerTest(TestCase):
             document.filepath_local = "a"
             document.save()
         # Reset call count
-        self.extract_document_mock.reset_mock()
+        self.download_task_mock.reset_mock()
 
         case_event["attachments"].append(TexasCaseDocumentDictFactory())
         with self.captureOnCommitCallbacks(execute=True):
@@ -2897,24 +2864,29 @@ class TexasMergerTest(TestCase):
                 self.docket_coa1, "2025-01-02.000", case_event, appellate_brief
             )
 
-        assert output.create is True
-        assert output.update is True
-        assert output.success is True
-        assert entry_pk in output.updates["TexasDocketEntry"]
+        self.assertTrue(output.create)
+        self.assertTrue(output.update)
+        self.assertTrue(output.success)
+        self.assertIn(entry_pk, output.updates["TexasDocketEntry"])
         created_docket_entry = TexasDocketEntry.objects.get(pk=entry_pk)
-        assert created_docket_entry.docket_id == self.docket_coa1.id
-        assert created_docket_entry.entry_type == case_event["type"]
-        assert created_docket_entry.remarks == case_event.get("remarks", "")
-        assert created_docket_entry.description == (
-            appellate_brief["description"] if appellate_brief else ""
+        self.assertEqual(created_docket_entry.docket_id, self.docket_coa1.id)
+        self.assertEqual(created_docket_entry.entry_type, case_event["type"])
+        self.assertEqual(
+            created_docket_entry.remarks, case_event.get("remarks", "")
         )
-        assert created_docket_entry.disposition == case_event["disposition"]
-        assert created_docket_entry.date_filed == case_event["date"]
+        self.assertEqual(
+            created_docket_entry.description,
+            appellate_brief["description"] if appellate_brief else "",
+        )
+        self.assertEqual(
+            created_docket_entry.disposition, case_event["disposition"]
+        )
+        self.assertEqual(created_docket_entry.date_filed, case_event["date"])
         n_attachments = TexasDocument.objects.filter(
             docket_entry_id=created_docket_entry.id
         ).count()
-        assert n_attachments == initial_n_attachments + 1
-        assert self.extract_document_mock.call_count == 1
+        self.assertEqual(n_attachments, initial_n_attachments + 1)
+        self.assertEqual(self.download_task_mock.call_count, 1)
 
     def test_merge_texas_docket_entry_multiple_matches_with_sequence(self):
         """When multiple entries match by date/type/brief, use the one with matching sequence number."""
@@ -3237,15 +3209,17 @@ class TexasMergerTest(TestCase):
         assert result == []
 
     @mock.patch("cl.lib.celery_utils.get_task_wait", return_value=0)
-    @mock.patch("cl.corpus_importer.tasks.doc_page_count_service")
-    @mock.patch("cl.corpus_importer.tasks.get_extension", return_value=".pdf")
+    @mock.patch("cl.lib.microservice_utils.doc_page_count_service")
+    @mock.patch("cl.scrapers.utils.get_extension", return_value=".pdf")
     @responses.activate
     def test_download_texas_document_pdf_success(
         self, ext_mock, pcs_mock, throttle_mock
     ):
         """Can we successfully download a PDF for a TexasDocument?"""
         self.download_document_patch.stop()
-        texas_document = TexasDocumentFactory.create()
+        texas_document = TexasDocumentFactory.create(
+            docket_entry__date_filed=date(2024, 3, 1)
+        )
 
         def get_test_pdf(
             request: requests.Request,
@@ -3263,13 +3237,20 @@ class TexasMergerTest(TestCase):
 
         result = download_texas_document(texas_document.pk)
 
-        assert result is not None
+        self.assertIsNotNone(result)
         texas_document.refresh_from_db()
-        assert texas_document.filepath_local is not None
-        assert texas_document.page_count == 1
-        assert texas_document.processing_error is None
-        assert pdf_response.call_count == 1
-        assert pcs_mock.call_count == 1
+        docket = texas_document.docket_entry.docket
+        bucket = f"gov.uscourts.{docket.court_id}.{docket.pk}"
+        self.assertEqual(
+            texas_document.filepath_local.name,
+            f"recap/{bucket}/{bucket}.2024-03-01.{texas_document.pk}.pdf",
+            "Filed in its docket's directory, named for the day it was filed "
+            "and for the document itself.",
+        )
+        self.assertEqual(texas_document.page_count, 1)
+        self.assertIsNone(texas_document.processing_error)
+        self.assertEqual(pdf_response.call_count, 1)
+        self.assertEqual(pcs_mock.call_count, 1)
 
     def test_download_texas_document_not_found(self):
         """Do we handle a missing TexasDocument gracefully?"""
@@ -3302,7 +3283,7 @@ class TexasMergerTest(TestCase):
         assert not texas_document.filepath_local
 
     @mock.patch("cl.lib.celery_utils.get_task_wait", return_value=0)
-    @mock.patch("cl.corpus_importer.tasks.get_extension", return_value=".html")
+    @mock.patch("cl.scrapers.utils.get_extension", return_value=".html")
     def test_download_texas_document_html(self, ext_mock, throttle_mock):
         """Does an HTML document get saved to filepath_local?"""
         from tempfile import NamedTemporaryFile
@@ -3320,22 +3301,23 @@ class TexasMergerTest(TestCase):
 
             result = download_texas_document(texas_document.pk)
 
-        # HTML is extractable, so pk is returned and chain continues
-        assert result == texas_document.pk
+        # HTML is extractable, so extraction is dispatched
+        self.assertEqual(result, texas_document.pk)
+        self.extract_document_mock.assert_called_once()
         texas_document.refresh_from_db()
-        assert texas_document.filepath_local
-        assert texas_document.sha1 == "abc123sha1"
-        assert ".html" in texas_document.filepath_local.name
-        assert texas_document.processing_error is None
+        self.assertTrue(texas_document.filepath_local)
+        self.assertEqual(texas_document.sha1, "abc123sha1")
+        self.assertIn(".html", texas_document.filepath_local.name)
+        self.assertIsNone(texas_document.processing_error)
         # No page_count for non-PDFs
-        assert texas_document.page_count is None
+        self.assertIsNone(texas_document.page_count)
 
     @mock.patch("cl.lib.celery_utils.get_task_wait", return_value=0)
-    @mock.patch("cl.corpus_importer.tasks.get_extension", return_value=".mp3")
-    def test_download_texas_document_mp3_breaks_chain(
+    @mock.patch("cl.scrapers.utils.get_extension", return_value=".mp3")
+    def test_download_texas_document_mp3_skips_extraction(
         self, ext_mock, throttle_mock
     ):
-        """Does an MP3 get saved but skip the extract chain?"""
+        """Does an MP3 get saved but skip extraction?"""
         from tempfile import NamedTemporaryFile
 
         texas_document = TexasDocumentFactory.create()
@@ -3351,19 +3333,22 @@ class TexasMergerTest(TestCase):
 
             result = download_texas_document(texas_document.pk)
 
-        # MP3 is not extractable — chain broken, None returned
-        assert result is None
+        # MP3 is not extractable — no extraction dispatched
+        self.assertEqual(result, texas_document.pk)
+        self.extract_document_mock.assert_not_called()
         texas_document.refresh_from_db()
-        assert texas_document.filepath_local
-        assert texas_document.sha1 == "mp3sha1hash"
-        assert ".mp3" in texas_document.filepath_local.name
-        assert texas_document.ocr_status == TexasDocument.OCR_UNNECESSARY
-        assert texas_document.processing_error is None
-        assert not texas_document.plain_text
+        self.assertTrue(texas_document.filepath_local)
+        self.assertEqual(texas_document.sha1, "mp3sha1hash")
+        self.assertIn(".mp3", texas_document.filepath_local.name)
+        self.assertEqual(
+            texas_document.ocr_status, TexasDocument.OCR_UNNECESSARY
+        )
+        self.assertIsNone(texas_document.processing_error)
+        self.assertFalse(texas_document.plain_text)
 
     @mock.patch("cl.lib.celery_utils.get_task_wait", return_value=0)
-    @mock.patch("cl.corpus_importer.tasks.get_extension", return_value=".docx")
-    @mock.patch("cl.corpus_importer.tasks.logger")
+    @mock.patch("cl.scrapers.utils.get_extension", return_value=".docx")
+    @mock.patch("cl.search.state.shared.logger")
     def test_download_texas_document_unknown_extension_logged(
         self, logger_mock, ext_mock, throttle_mock
     ):
@@ -3383,21 +3368,24 @@ class TexasMergerTest(TestCase):
 
             result = download_texas_document(texas_document.pk)
 
-        # Unknown extension is not extractable — chain broken, None returned
-        assert result is None
+        # Unknown extension is not extractable — no extraction dispatched
+        self.assertEqual(result, texas_document.pk)
+        self.extract_document_mock.assert_not_called()
         # Should log a warning about the unknown extension
         logger_mock.warning.assert_any_call(
-            "Texas document download: Unexpected file extension "
-            "'%s' for TexasDocument %s from %s. Proceeding anyway.",
+            "Document download: Unexpected extension '%s' for %s %s from %s. Proceeding anyway.",
             ".docx",
+            "TexasDocument",
             texas_document.pk,
             texas_document.url,
         )
         texas_document.refresh_from_db()
-        assert texas_document.filepath_local
-        assert texas_document.sha1 == "docxsha1"
-        assert texas_document.ocr_status == TexasDocument.OCR_UNNECESSARY
-        assert texas_document.processing_error is None
+        self.assertTrue(texas_document.filepath_local)
+        self.assertEqual(texas_document.sha1, "docxsha1")
+        self.assertEqual(
+            texas_document.ocr_status, TexasDocument.OCR_UNNECESSARY
+        )
+        self.assertIsNone(texas_document.processing_error)
 
     @mock.patch("cl.lib.celery_utils.get_task_wait", return_value=0)
     @responses.activate
@@ -3445,7 +3433,7 @@ class TexasMergerTest(TestCase):
 
     @mock.patch("cl.lib.celery_utils.get_task_wait", return_value=0)
     @mock.patch("cl.scrapers.tasks.microservice", new_callable=mock.AsyncMock)
-    @mock.patch("cl.corpus_importer.tasks.get_extension", return_value=".html")
+    @mock.patch("cl.scrapers.utils.get_extension", return_value=".html")
     def test_html_download_and_extraction_strips_tags(
         self, ext_mock, microservice_mock, throttle_mock
     ):
@@ -3473,11 +3461,11 @@ class TexasMergerTest(TestCase):
 
             download_result = download_texas_document(texas_document.pk)
 
-        # HTML is extractable — pk returned and chain continues
-        assert download_result == texas_document.pk
+        # HTML is extractable — pk returned and extraction dispatched
+        self.assertEqual(download_result, texas_document.pk)
         texas_document.refresh_from_db()
-        assert texas_document.filepath_local
-        assert ".html" in texas_document.filepath_local.name
+        self.assertTrue(texas_document.filepath_local)
+        self.assertIn(".html", texas_document.filepath_local.name)
 
         # Mock Doctor returning HTML content
         microservice_mock.return_value = httpx.Response(
@@ -3498,11 +3486,115 @@ class TexasMergerTest(TestCase):
         )
 
         texas_document.refresh_from_db()
-        assert texas_document.ocr_status == TexasDocument.OCR_UNNECESSARY
-        assert texas_document.processing_error is None
-        assert "<" not in texas_document.plain_text
-        assert "Hello" in texas_document.plain_text
-        assert "world" in texas_document.plain_text
+        self.assertEqual(
+            texas_document.ocr_status, TexasDocument.OCR_UNNECESSARY
+        )
+        self.assertIsNone(texas_document.processing_error)
+        self.assertNotIn("<", texas_document.plain_text)
+        self.assertIn("Hello", texas_document.plain_text)
+        self.assertIn("world", texas_document.plain_text)
+
+    def test_is_texas_appellate_docket(self):
+        appeals_docket_data = cast(
+            TexasCourtOfAppealsDocket
+            | TexasCourtOfCriminalAppealsDocket
+            | TexasSupremeCourtDocket,
+            cast(
+                object,  # cast to `object` suppresses checker warning
+                TexasCourtOfAppealsDocketDictFactory(
+                    court_id=CourtID.FIRST_COURT_OF_APPEALS.value,
+                    docket_number=self.docket_number_coa1,
+                    originating_court=TexasOriginatingDistrictCourtDictFactory(
+                        district=5,
+                    ),
+                ),
+            ),
+        )
+        supreme_docket_data = cast(
+            TexasCourtOfAppealsDocket
+            | TexasCourtOfCriminalAppealsDocket
+            | TexasSupremeCourtDocket,
+            cast(
+                object,  # cast to `object` suppresses checker warning
+                TexasFinalCourtDocketDictFactory(
+                    court_id=CourtID.SUPREME_COURT.value,
+                    docket_number=DocketFactory.create(
+                        court=self.texas_cca
+                    ).docket_number,
+                    appeals_court=TexasAppellateCourtInfoDictFactory(
+                        court_id=CourtID.FIRST_COURT_OF_APPEALS.value,
+                    ),
+                ),
+            ),
+        )
+
+        self.assertTrue(is_texas_appellate_docket(appeals_docket_data))
+        self.assertFalse(is_texas_appellate_docket(supreme_docket_data))
+
+        # Here we make sure that narrowing is legible to analyzer with
+        # `assert_type`
+        if is_texas_appellate_docket(appeals_docket_data):
+            assert_type(appeals_docket_data, TexasCourtOfAppealsDocket)
+        else:
+            self.fail()
+        if not is_texas_appellate_docket(supreme_docket_data):
+            assert_type(
+                supreme_docket_data,
+                TexasCourtOfCriminalAppealsDocket | TexasSupremeCourtDocket,
+            )
+        else:
+            self.fail()
+
+    def test_is_texas_supreme_docket(self):
+        appeals_docket_data = cast(
+            TexasCourtOfAppealsDocket
+            | TexasCourtOfCriminalAppealsDocket
+            | TexasSupremeCourtDocket,
+            cast(
+                object,
+                TexasCourtOfAppealsDocketDictFactory(
+                    court_id=CourtID.FIRST_COURT_OF_APPEALS.value,
+                    docket_number=self.docket_number_coa1,
+                    originating_court=TexasOriginatingDistrictCourtDictFactory(
+                        district=5,
+                    ),
+                ),
+            ),
+        )
+        supreme_docket_data = cast(
+            TexasCourtOfAppealsDocket
+            | TexasCourtOfCriminalAppealsDocket
+            | TexasSupremeCourtDocket,
+            cast(
+                object,
+                TexasFinalCourtDocketDictFactory(
+                    court_id=CourtID.SUPREME_COURT.value,
+                    docket_number=DocketFactory.create(
+                        court=self.texas_cca
+                    ).docket_number,
+                    appeals_court=TexasAppellateCourtInfoDictFactory(
+                        court_id=CourtID.FIRST_COURT_OF_APPEALS.value,
+                    ),
+                ),
+            ),
+        )
+
+        self.assertFalse(is_texas_supreme_docket(appeals_docket_data))
+        self.assertTrue(is_texas_supreme_docket(supreme_docket_data))
+
+        # Here we make sure that narrowing is legible to analyzer with
+        # `assert_type`
+        if not is_texas_supreme_docket(appeals_docket_data):
+            assert_type(appeals_docket_data, TexasCourtOfAppealsDocket)
+        else:
+            self.fail()
+        if is_texas_supreme_docket(supreme_docket_data):
+            assert_type(
+                supreme_docket_data,
+                TexasCourtOfCriminalAppealsDocket | TexasSupremeCourtDocket,
+            )
+        else:
+            self.fail()
 
     def test_merge_texas_docket_originating_court_creates_new(self):
         """Can we create new originating court information?"""
@@ -3823,7 +3915,7 @@ class TexasMergerTest(TestCase):
             is_direct_appeal=False,
         )
 
-        result = merge_texas_case_transfers(self.docket_coa1, docket_data)
+        merge_texas_case_transfers(self.docket_coa1, docket_data)
         transfers = CaseTransfer.objects.all()
         self.assertEqual(transfers.count(), 3)
         source_dns = set(aci["case_number"])
@@ -4074,7 +4166,10 @@ class TexasMergerTest(TestCase):
         assert TrialCourtData.objects.filter(docket=docket_sc).count() == 1
 
 
-@patch("cl.corpus_importer.tasks.get_or_cache_pacer_cookies")
+@patch(
+    "cl.corpus_importer.tasks.get_or_cache_pacer_cookies",
+    return_value=SessionData(None, "http://proxy_1:9090"),
+)
 @override_settings(
     IQUERY_CASE_PROBE_DAEMON_ENABLED=True,
     IQUERY_SWEEP_UPLOADS_SIGNAL_ENABLED=True,
@@ -4399,7 +4494,7 @@ class ScrapeIqueryPagesTest(TestCase):
         r.set(f"iquery:court_wait:{self.court_vib.pk}", 1000, ex=3600)
         r.set(f"iquery:court_wait:{self.court_mowd.pk}", 1000, ex=3600)
 
-        with patch("cl.lib.decorators.time.sleep") as mock_sleep:
+        with patch("cl.lib.decorators.time.sleep"):
             call_command(
                 "probe_iquery_pages_daemon",
                 testing_iterations=1,
@@ -4513,9 +4608,10 @@ class ScrapeIqueryPagesTest(TestCase):
                 override_settings(IQUERY_SWEEP_UPLOADS_SIGNAL_ENABLED=False),
                 patch(
                     "cl.corpus_importer.signals.update_latest_case_id_and_schedule_iquery_sweep",
-                    side_effect=lambda *args,
-                    **kwargs: update_latest_case_id_and_schedule_iquery_sweep(
-                        *args, **kwargs
+                    side_effect=lambda *args, **kwargs: (
+                        update_latest_case_id_and_schedule_iquery_sweep(
+                            *args, **kwargs
+                        )
                     ),
                 ) as mock_iquery_sweep,
                 self.captureOnCommitCallbacks(execute=True),
@@ -4549,9 +4645,10 @@ class ScrapeIqueryPagesTest(TestCase):
             with (
                 patch(
                     "cl.corpus_importer.signals.update_latest_case_id_and_schedule_iquery_sweep",
-                    side_effect=lambda *args,
-                    **kwargs: update_latest_case_id_and_schedule_iquery_sweep(
-                        *args, **kwargs
+                    side_effect=lambda *args, **kwargs: (
+                        update_latest_case_id_and_schedule_iquery_sweep(
+                            *args, **kwargs
+                        )
                     ),
                 ) as mock_iquery_sweep,
                 self.captureOnCommitCallbacks(execute=True),
@@ -4588,9 +4685,10 @@ class ScrapeIqueryPagesTest(TestCase):
             with (
                 patch(
                     "cl.corpus_importer.signals.update_latest_case_id_and_schedule_iquery_sweep",
-                    side_effect=lambda *args,
-                    **kwargs: update_latest_case_id_and_schedule_iquery_sweep(
-                        *args, **kwargs
+                    side_effect=lambda *args, **kwargs: (
+                        update_latest_case_id_and_schedule_iquery_sweep(
+                            *args, **kwargs
+                        )
                     ),
                 ) as mock_iquery_sweep,
                 self.captureOnCommitCallbacks(execute=True),
@@ -4625,9 +4723,10 @@ class ScrapeIqueryPagesTest(TestCase):
             with (
                 patch(
                     "cl.corpus_importer.signals.update_latest_case_id_and_schedule_iquery_sweep",
-                    side_effect=lambda *args,
-                    **kwargs: update_latest_case_id_and_schedule_iquery_sweep(
-                        *args, **kwargs
+                    side_effect=lambda *args, **kwargs: (
+                        update_latest_case_id_and_schedule_iquery_sweep(
+                            *args, **kwargs
+                        )
                     ),
                 ) as mock_iquery_sweep,
                 self.captureOnCommitCallbacks(execute=True),
@@ -4660,9 +4759,10 @@ class ScrapeIqueryPagesTest(TestCase):
                 override_settings(IQUERY_SWEEP_UPLOADS_SIGNAL_ENABLED=True),
                 patch(
                     "cl.corpus_importer.signals.update_latest_case_id_and_schedule_iquery_sweep",
-                    side_effect=lambda *args,
-                    **kwargs: update_latest_case_id_and_schedule_iquery_sweep(
-                        *args, **kwargs
+                    side_effect=lambda *args, **kwargs: (
+                        update_latest_case_id_and_schedule_iquery_sweep(
+                            *args, **kwargs
+                        )
                     ),
                 ) as mock_iquery_sweep,
                 self.captureOnCommitCallbacks(execute=True),
@@ -4719,9 +4819,10 @@ class ScrapeIqueryPagesTest(TestCase):
                 override_settings(IQUERY_SWEEP_UPLOADS_SIGNAL_ENABLED=False),
                 patch(
                     "cl.corpus_importer.signals.update_latest_case_id_and_schedule_iquery_sweep",
-                    side_effect=lambda *args,
-                    **kwargs: update_latest_case_id_and_schedule_iquery_sweep(
-                        *args, **kwargs
+                    side_effect=lambda *args, **kwargs: (
+                        update_latest_case_id_and_schedule_iquery_sweep(
+                            *args, **kwargs
+                        )
                     ),
                 ) as mock_iquery_sweep,
                 self.captureOnCommitCallbacks(execute=True),
@@ -4822,7 +4923,7 @@ class ScrapeIqueryPagesTest(TestCase):
         for expected_wait in tests:
             with self.subTest(expected_wait=expected_wait):
                 r.delete(f"iquery:court_wait:{self.court_gamb.pk}")
-                with patch("cl.lib.decorators.time.sleep") as mock_sleep:
+                with patch("cl.lib.decorators.time.sleep"):
                     call_command(
                         "probe_iquery_pages_daemon",
                         testing_iterations=1,
@@ -4835,7 +4936,7 @@ class ScrapeIqueryPagesTest(TestCase):
 
         # Test one more attempt. The alert error should be triggered.
         r.delete(f"iquery:court_wait:{self.court_gamb.pk}")
-        with patch("cl.lib.decorators.time.sleep") as mock_sleep:
+        with patch("cl.lib.decorators.time.sleep"):
             call_command(
                 "probe_iquery_pages_daemon",
                 testing_iterations=1,
@@ -4902,7 +5003,7 @@ class ScrapeIqueryPagesTest(TestCase):
                 r.delete(f"iquery:court_wait:{self.court_cacd.pk}")
                 with (
                     time_machine.travel(monday_local, tick=False),
-                    patch("cl.lib.decorators.time.sleep") as mock_sleep,
+                    patch("cl.lib.decorators.time.sleep"),
                 ):
                     call_command(
                         "probe_iquery_pages_daemon",
@@ -4926,7 +5027,7 @@ class ScrapeIqueryPagesTest(TestCase):
         r.delete(f"iquery:court_wait:{self.court_cacd.pk}")
         with (
             time_machine.travel(monday_local, tick=False),
-            patch("cl.lib.decorators.time.sleep") as mock_sleep,
+            patch("cl.lib.decorators.time.sleep"),
         ):
             call_command(
                 "probe_iquery_pages_daemon",
@@ -4993,7 +5094,7 @@ class ScrapeIqueryPagesTest(TestCase):
                 r.delete(f"iquery:court_wait:{self.court_vib.pk}")
                 with (
                     time_machine.travel(monday_local, tick=False),
-                    patch("cl.lib.decorators.time.sleep") as mock_sleep,
+                    patch("cl.lib.decorators.time.sleep"),
                 ):
                     call_command(
                         "probe_iquery_pages_daemon",
@@ -5013,7 +5114,7 @@ class ScrapeIqueryPagesTest(TestCase):
         r.delete(f"iquery:court_wait:{self.court_vib.pk}")
         with (
             time_machine.travel(monday_local, tick=False),
-            patch("cl.lib.decorators.time.sleep") as mock_sleep,
+            patch("cl.lib.decorators.time.sleep"),
         ):
             call_command(
                 "probe_iquery_pages_daemon",
@@ -5087,7 +5188,7 @@ class ScrapeIqueryPagesTest(TestCase):
                 weekend_day = sunday_local if test % 2 == 0 else saturday_local
                 with (
                     time_machine.travel(weekend_day, tick=False),
-                    patch("cl.lib.decorators.time.sleep") as mock_sleep,
+                    patch("cl.lib.decorators.time.sleep"),
                 ):
                     call_command(
                         "probe_iquery_pages_daemon",
@@ -5155,13 +5256,17 @@ class ScrapeIqueryPagesTest(TestCase):
                 override_settings(IQUERY_SWEEP_UPLOADS_SIGNAL_ENABLED=False),
                 patch(
                     "cl.corpus_importer.signals.update_latest_case_id_and_schedule_iquery_sweep",
-                    side_effect=lambda *args,
-                    **kwargs: update_latest_case_id_and_schedule_iquery_sweep(
-                        *args, **kwargs
+                    side_effect=lambda *args, **kwargs: (
+                        update_latest_case_id_and_schedule_iquery_sweep(
+                            *args, **kwargs
+                        )
                     ),
                 ) as mock_iquery_sweep,
                 self.captureOnCommitCallbacks(execute=True),
-                patch("cl.scrapers.tasks.get_or_cache_pacer_cookies"),
+                patch(
+                    "cl.scrapers.tasks.get_or_cache_pacer_cookies",
+                    return_value=mock_cookies.return_value,
+                ),
             ):
                 update_docket_info_iquery.apply_async(
                     args=(docket_gand.pk, docket_gand.court_id)
@@ -5175,13 +5280,17 @@ class ScrapeIqueryPagesTest(TestCase):
                 override_settings(IQUERY_SWEEP_UPLOADS_SIGNAL_ENABLED=True),
                 patch(
                     "cl.corpus_importer.signals.update_latest_case_id_and_schedule_iquery_sweep",
-                    side_effect=lambda *args,
-                    **kwargs: update_latest_case_id_and_schedule_iquery_sweep(
-                        *args, **kwargs
+                    side_effect=lambda *args, **kwargs: (
+                        update_latest_case_id_and_schedule_iquery_sweep(
+                            *args, **kwargs
+                        )
                     ),
                 ) as mock_iquery_sweep,
                 self.captureOnCommitCallbacks(execute=True),
-                patch("cl.scrapers.tasks.get_or_cache_pacer_cookies"),
+                patch(
+                    "cl.scrapers.tasks.get_or_cache_pacer_cookies",
+                    return_value=mock_cookies.return_value,
+                ),
             ):
                 update_docket_info_iquery.apply_async(
                     args=(docket_cand.pk, docket_cand.court_id)
@@ -5330,7 +5439,7 @@ class ScrapeIqueryPagesTest(TestCase):
     def test_get_latest_pacer_case_id_for_courts(self, mock_cookies):
         """Test get_latest_pacer_case_id_for_courts helper."""
         today = date.today()
-        d_canb_old = DocketFactory(
+        DocketFactory(
             court=self.court_canb,
             appeal_from=None,
             source=Docket.RECAP,
@@ -5344,7 +5453,7 @@ class ScrapeIqueryPagesTest(TestCase):
             pacer_case_id="43000",
             date_filed=today,
         )
-        d_cand_old = DocketFactory(
+        DocketFactory(
             court=self.court_cand,
             appeal_from=None,
             source=Docket.RECAP,
@@ -5435,7 +5544,7 @@ class ScrapeIqueryPagesTest(TestCase):
             override_settings(
                 IQUERY_SWEEP_UPLOADS_SIGNAL_ENABLED=True, IQUERY_FIXED_SWEEP=10
             ),
-            patch("cl.lib.decorators.time.sleep") as mock_sleep,
+            patch("cl.lib.decorators.time.sleep"),
             patch(
                 "cl.corpus_importer.tasks.query_iquery_page",
                 return_value=({}, ""),
@@ -5471,7 +5580,7 @@ class ScrapeIqueryPagesTest(TestCase):
             override_settings(
                 IQUERY_SWEEP_UPLOADS_SIGNAL_ENABLED=True, IQUERY_FIXED_SWEEP=10
             ),
-            patch("cl.lib.decorators.time.sleep") as mock_sleep,
+            patch("cl.lib.decorators.time.sleep"),
             patch(
                 "cl.corpus_importer.tasks.query_iquery_page",
                 return_value=({}, ""),
@@ -5510,7 +5619,7 @@ class ScrapeIqueryPagesTest(TestCase):
                     IQUERY_SWEEP_UPLOADS_SIGNAL_ENABLED=True,
                     IQUERY_FIXED_SWEEP=10,
                 ),
-                patch("cl.lib.decorators.time.sleep") as mock_sleep,
+                patch("cl.lib.decorators.time.sleep"),
                 self.captureOnCommitCallbacks(execute=True),
             ):
                 call_command(
@@ -6083,3 +6192,267 @@ class TamesMissingFileTest(SimpleTestCase):
         """Verify a normal HTML page is not flagged as missing."""
         normal_html = b"<html><body><p>Normal page content</p></body></html>"
         self.assertFalse(is_missing_file_page(normal_html))
+
+
+class IquerySweepLockTest(SimpleTestCase):
+    """Tests for the Redis lock around the iquery sweep counters."""
+
+    court_id = "test_iquery_lock"
+
+    def setUp(self) -> None:
+        super().setUp()
+        self.r = get_redis_interface("CACHE")
+        self.lock_key = make_update_pacer_case_id_key(self.court_id)
+        self._clean()
+        self.addCleanup(self._clean)
+        self.r.hset("iquery:highest_known_pacer_case_id", self.court_id, 5)
+        self.r.hset("iquery:pacer_case_id_current", self.court_id, 5)
+
+    def _clean(self) -> None:
+        """Remove this test's lock and counter fields from Redis."""
+        self.r.delete(self.lock_key)
+        self.r.hdel("iquery:highest_known_pacer_case_id", self.court_id)
+        self.r.hdel("iquery:pacer_case_id_current", self.court_id)
+
+    def _counters(self) -> tuple[int, int]:
+        """Return (highest_known_pacer_case_id, pacer_case_id_current)."""
+        return (
+            int(
+                self.r.hget(
+                    "iquery:highest_known_pacer_case_id", self.court_id
+                )
+            ),
+            int(self.r.hget("iquery:pacer_case_id_current", self.court_id)),
+        )
+
+    @patch(
+        "cl.corpus_importer.signals.make_docket_by_iquery_sweep.apply_async"
+    )
+    def test_updates_counters_while_lock_held(self, mock_apply) -> None:
+        """Both counters advance and the lock is released afterwards."""
+        update_latest_case_id_and_schedule_iquery_sweep(
+            None, court_pk=self.court_id, fixed_case_id_sweep=9
+        )
+        self.assertEqual(mock_apply.call_count, 3)
+        self.assertEqual(self._counters(), (9, 8))
+        self.assertIsNone(self.r.get(self.lock_key))
+
+    @patch(
+        "cl.corpus_importer.signals.make_docket_by_iquery_sweep.apply_async"
+    )
+    def test_lost_lock_does_not_overwrite_counters(self, mock_apply) -> None:
+        """If the lease expires mid-sweep and another process takes the
+        lock, the stale holder must not write its counters."""
+
+        def steal_lock(*args, **kwargs) -> None:
+            self.r.set(self.lock_key, "another-process")
+
+        mock_apply.side_effect = steal_lock
+        update_latest_case_id_and_schedule_iquery_sweep(
+            None, court_pk=self.court_id, fixed_case_id_sweep=9
+        )
+        self.assertEqual(self._counters(), (5, 5))
+        # The other process's lock must be left alone.
+        self.assertEqual(self.r.get(self.lock_key), "another-process")
+
+    @patch(
+        "cl.corpus_importer.signals.make_docket_by_iquery_sweep.apply_async",
+        side_effect=ConnectionError("broker down"),
+    )
+    def test_lock_released_when_enqueue_fails(self, mock_apply) -> None:
+        """An enqueue failure releases the lock and leaves counters as is."""
+        with self.assertRaises(ConnectionError):
+            update_latest_case_id_and_schedule_iquery_sweep(
+                None, court_pk=self.court_id, fixed_case_id_sweep=9
+            )
+        self.assertIsNone(self.r.get(self.lock_key))
+        self.assertEqual(self._counters(), (5, 5))
+
+
+class CentraliaShouldIngestTest(SimpleTestCase):
+    """Test the gate deciding whether a structured read is stored."""
+
+    @staticmethod
+    def make_payload(**overrides) -> dict:
+        """Build a minimal ingestible payload, then apply overrides.
+
+        :param overrides: Top-level payload keys to replace.
+        :return: The payload.
+        """
+        payload = {
+            "status": "valid",
+            "cluster": {"doc_type": "opinion"},
+            "opinions": [
+                {"order": 1, "type": "majority", "html": "<p>Affirmed.</p>"}
+            ],
+            "headmatter": {"text": "COURT OF APPEALS"},
+            "diagnostics": {
+                "scan_pages": [],
+                "text_missing_pages": [],
+                "cid_pages": [],
+            },
+        }
+        payload.update(overrides)
+        return payload
+
+    def test_declines_bad_payloads(self) -> None:
+        """Are untrustworthy payloads declined?"""
+        opinion = Opinion(plain_text="Affirmed.")
+        test_cases = (
+            ("scanned status", {"status": "scanned"}),
+            ("failed status", {"status": "failed"}),
+            # A parse that left content unplaced or raised a warning. The
+            # flat text stands until a human has looked at it.
+            ("review status", {"status": "review"}),
+            (
+                "scan pages",
+                {
+                    "diagnostics": {
+                        "scan_pages": [2],
+                        "text_missing_pages": [],
+                        "cid_pages": [],
+                    }
+                },
+            ),
+            (
+                "textless pages",
+                {
+                    "diagnostics": {
+                        "scan_pages": [],
+                        "text_missing_pages": [3],
+                        "cid_pages": [],
+                    }
+                },
+            ),
+            (
+                "CID pages",
+                {
+                    "diagnostics": {
+                        "scan_pages": [],
+                        "text_missing_pages": [],
+                        "cid_pages": [1],
+                    }
+                },
+            ),
+            ("no writings", {"opinions": []}),
+            (
+                "html-less writings",
+                {"opinions": [{"order": 1, "type": "majority", "html": ""}]},
+            ),
+            (
+                "review-flavored writing html",
+                {
+                    "opinions": [
+                        {
+                            "order": 1,
+                            "type": "majority",
+                            "html": '<span class="chip">majority</span><p>Hi</p>',
+                        }
+                    ]
+                },
+            ),
+        )
+        for label, overrides in test_cases:
+            with self.subTest(label=label):
+                ingestible, reason = should_ingest(
+                    opinion, self.make_payload(**overrides)
+                )
+                self.assertFalse(ingestible, msg=reason)
+
+    def test_declines_partial_reads(self) -> None:
+        """Is a read that recovered too little text declined?"""
+        opinion = Opinion(plain_text="x" * 10_000)
+        ingestible, reason = should_ingest(opinion, self.make_payload())
+        self.assertFalse(ingestible)
+        self.assertIn("already extracted", reason)
+
+    def test_ingests_a_clean_read(self) -> None:
+        """Does a complete read of a real opinion pass the gate?"""
+        opinion = Opinion(plain_text="Affirmed.")
+        ingestible, reason = should_ingest(opinion, self.make_payload())
+        self.assertTrue(ingestible, msg=reason)
+        self.assertEqual(reason, "status=valid")
+
+
+class CentraliaIngestTest(TestCase):
+    """Test ingesting a structured payload onto a CL opinion."""
+
+    test_dir = (
+        Path(settings.INSTALL_ROOT) / "cl" / "corpus_importer" / "test_assets"
+    )
+
+    @classmethod
+    def setUpTestData(cls) -> None:
+        cls.court = CourtFactory(id="test", jurisdiction="F")
+        with open(
+            cls.test_dir / "centralia_payload_multi.json", encoding="utf-8"
+        ) as f:
+            cls.multi_payload = json.load(f)
+        with open(
+            cls.test_dir / "centralia_payload_single.json", encoding="utf-8"
+        ) as f:
+            cls.single_payload = json.load(f)
+
+    def setUp(self) -> None:
+        self.cluster = OpinionClusterFactory(
+            docket=DocketFactory(court=self.court),
+            date_filed=date(2024, 1, 1),
+        )
+        self.seed = OpinionFactory(
+            cluster=self.cluster,
+            type=Opinion.COMBINED,
+            plain_text="The judgment is affirmed.",
+            html="",
+            xml_harvard="<sentinel/>",
+            download_url="https://example.com/opinion.pdf",
+        )
+
+    @patch("cl.corpus_importer.centralia.logger")
+    def test_rejects_a_multi_writing_payload(self, mock_logger) -> None:
+        """Is a payload with several writings refused, leaving the cluster
+        untouched?
+
+        Only single-opinion documents are supported for now, so the extra
+        writings are neither merged into the seed nor created as siblings.
+        """
+        ingested, reason = merge_structured_opinion_into_cl_opinion(
+            self.seed, self.multi_payload
+        )
+
+        self.assertFalse(ingested)
+        self.assertIn("found 2 opinions", reason)
+        mock_logger.warning.assert_called_once()
+        self.assertEqual(mock_logger.warning.call_args.args[2], reason)
+        self.assertEqual(self.cluster.sub_opinions.count(), 1)
+        self.seed.refresh_from_db()
+        self.assertEqual(self.seed.html, "")
+        self.assertEqual(self.seed.type, Opinion.COMBINED)
+
+    def test_a_lone_writing_ingests_as_the_lead(self) -> None:
+        """Does a single-writing paper become the lead opinion?
+
+        The seed arrives as COMBINED from the text pipeline, which could not
+        tell writings apart. Centralia can, so a paper holding exactly one
+        is that court's decision.
+        """
+        self.assertEqual(self.seed.type, Opinion.COMBINED)
+
+        ingested, reason = merge_structured_opinion_into_cl_opinion(
+            self.seed, self.single_payload
+        )
+
+        self.seed.refresh_from_db()
+        self.assertTrue(ingested, msg=reason)
+        self.assertEqual(self.seed.type, Opinion.LEAD)
+        self.assertTrue(self.seed.per_curiam)
+        self.assertEqual(self.seed.ordering_key, 1)
+        self.assertTrue(
+            self.seed.html.startswith('<div class="centralia">'),
+            msg=self.seed.html[:80],
+        )
+        self.assertEqual(
+            self.seed.xml_harvard,
+            "<sentinel/>",
+            msg="xml_harvard must never be touched",
+        )
+        self.assertEqual(self.cluster.sub_opinions.count(), 1)

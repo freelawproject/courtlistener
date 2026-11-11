@@ -2,7 +2,9 @@ import logging
 
 from django.conf import settings
 from django.core.cache import cache
-from django.db.models.signals import post_save
+from django.db import transaction
+from django.db.models import Model, QuerySet
+from django.db.models.signals import post_delete, post_save
 from django.dispatch import receiver
 
 from cl.audio.models import Audio
@@ -15,7 +17,7 @@ from cl.citations.tasks import (
 )
 from cl.favorites.utils import send_prayer_emails
 from cl.lib.courts import get_cache_key_for_court_list
-from cl.lib.es_signal_processor import ESSignalProcessor
+from cl.lib.es_signal_processor import DocumentModelMapping, ESSignalProcessor
 from cl.people_db.models import (
     ABARating,
     Education,
@@ -49,7 +51,11 @@ from cl.search.models import (
     Parenthetical,
     ParentheticalGroup,
     RECAPDocument,
+    SCOTUSDocketEntry,
+    ScotusDocketMetadata,
+    SCOTUSDocument,
 )
+from cl.search.state.shared import AbstractStateDocument
 from cl.settings import DEVELOPMENT, TESTING
 
 logger = logging.getLogger(__name__)
@@ -70,7 +76,8 @@ logger = logging.getLogger(__name__)
 # should be added. Keys should be the field name on the Model and values
 # should be the field name in the ES document.
 
-pa_field_mapping = {
+
+pa_field_mapping: DocumentModelMapping = {
     "save": {
         Docket: {
             "opinion__cluster__docket": {
@@ -147,7 +154,7 @@ pa_field_mapping = {
     },
 }
 
-oa_field_mapping = {
+oa_field_mapping: DocumentModelMapping = {
     "save": {
         Docket: {
             "docket": {
@@ -183,7 +190,7 @@ oa_field_mapping = {
     "reverse-delete": {},
 }
 
-p_field_mapping = {
+p_field_mapping: DocumentModelMapping = {
     "save": {
         Person: {
             "self": {
@@ -226,7 +233,7 @@ p_field_mapping = {
     },
 }
 
-position_field_mapping = {
+position_field_mapping: DocumentModelMapping = {
     "save": {
         Person: {
             "appointer__person": {
@@ -303,7 +310,7 @@ position_field_mapping = {
     "reverse-delete": {},
 }
 
-docket_field_mapping = {
+docket_field_mapping: DocumentModelMapping = {
     "save": {
         Docket: {
             "self": {
@@ -351,13 +358,19 @@ docket_field_mapping = {
                 "trustee_str": ["trustee_str"],
             }
         },
+        ScotusDocketMetadata: {
+            "scotus_metadata": {
+                "capital_case": ["capital_case"],
+            }
+        },
     },
     "reverse-delete": {
         BankruptcyInformation: {"docket": {"all": ["chapter", "trustee_str"]}},
+        ScotusDocketMetadata: {"docket": {"all": ["capital_case"]}},
     },
 }
 
-recap_document_field_mapping = {
+recap_document_field_mapping: DocumentModelMapping = {
     "save": {
         RECAPDocument: {
             "self": {
@@ -420,7 +433,66 @@ recap_document_field_mapping = {
     "reverse-delete": {},
 }
 
-o_field_mapping = {
+scotus_document_field_mapping: DocumentModelMapping = {
+    "save": {
+        SCOTUSDocument: {
+            "self": {
+                "description": ["short_description"],
+                "document_number": ["document_number", "absolute_url"],
+                "attachment_number": ["attachment_number", "absolute_url"],
+                "plain_text": ["plain_text"],
+                "page_count": ["page_count"],
+                "filepath_local": ["filepath_local", "is_available"],
+                "docket_entry_id": ["prepare"],
+            },
+        },
+        SCOTUSDocketEntry: {
+            "docket_entry": {
+                "description": ["description"],
+                "entry_number": ["entry_number"],
+                "date_filed": ["entry_date_filed"],
+            }
+        },
+        Docket: {
+            "docket_entry__docket": {
+                "case_name": ["caseName"],
+                "case_name_full": ["case_name_full"],
+                "docket_number": ["docketNumber"],
+                "nature_of_suit": ["suitNature"],
+                "cause": ["cause"],
+                "jury_demand": ["juryDemand"],
+                "jurisdiction_type": ["jurisdictionType"],
+                "date_argued": ["dateArgued"],
+                "date_filed": ["dateFiled"],
+                "date_terminated": ["dateTerminated"],
+                "assigned_to_id": ["assigned_to_id", "assignedTo"],
+                "referred_to_id": ["referred_to_id", "referredTo"],
+                "assigned_to_str": ["assignedTo"],
+                "referred_to_str": ["referredTo"],
+            }
+        },
+        Person: {
+            "assigned_to": {
+                "name_first": ["assignedTo"],
+                "name_middle": ["assignedTo"],
+                "name_last": ["assignedTo"],
+                "get_name_suffix_display": ["assignedTo"],
+            },
+            "referred_to": {
+                "name_first": ["referredTo"],
+                "name_middle": ["referredTo"],
+                "name_last": ["referredTo"],
+                "get_name_suffix_display": ["referredTo"],
+            },
+        },
+    },
+    "delete": {SCOTUSDocument: {}},
+    "m2m": {},
+    "reverse": {},
+    "reverse-delete": {},
+}
+
+o_field_mapping: DocumentModelMapping = {
     "save": {
         Docket: {
             "docket": {
@@ -458,6 +530,7 @@ o_field_mapping = {
                 "html_columbia": ["text"],
                 "html_lawbox": ["text"],
                 "xml_harvard": ["text"],
+                "xml_scan": ["text"],
                 "html_anon_2020": ["text"],
                 "html": ["text"],
                 "plain_text": ["text"],
@@ -481,7 +554,7 @@ o_field_mapping = {
     "reverse-delete": {},
 }
 
-o_cluster_field_mapping = {
+o_cluster_field_mapping: DocumentModelMapping = {
     "save": {
         Docket: {
             "docket": {
@@ -568,6 +641,9 @@ if not settings.ELASTICSEARCH_RECAP_DOCS_SIGNALS_DISABLED:
     _recap_document_signal_processor = ESSignalProcessor(
         RECAPDocument, ESRECAPDocument, recap_document_field_mapping
     )
+    _scotus_document_signal_processor = ESSignalProcessor(
+        SCOTUSDocument, ESRECAPDocument, scotus_document_field_mapping
+    )
 if not settings.ELASTICSEARCH_DOCKETS_SIGNALS_DISABLED:
     _docket_signal_processor = ESSignalProcessor(
         Docket, DocketDocument, docket_field_mapping
@@ -580,6 +656,9 @@ if settings.ELASTICSEARCH_CLUSTERS_SIGNALS_ENABLED:
     _o_cluster_signal_processor = ESSignalProcessor(
         OpinionCluster, OpinionClusterDocument, o_cluster_field_mapping
     )
+
+
+DEFAULT_RD_CITATION_QUEUE = "celery"
 
 
 @receiver(
@@ -605,8 +684,14 @@ def handle_recap_doc_change(
             RECAPDocument.OCR_COMPLETE,
             RECAPDocument.OCR_UNNECESSARY,
         ):
+            # Batch jobs may set ``citation_queue`` on the instance to route
+            # this task off the default queue and avoid clogging it.
+            queue = (
+                getattr(instance, "citation_queue", None)
+                or DEFAULT_RD_CITATION_QUEUE
+            )
             find_citations_and_parantheticals_for_recap_documents.apply_async(
-                args=([instance.pk],)
+                args=([instance.pk],), queue=queue
             )
 
     if (
@@ -659,7 +744,9 @@ def update_court_cache(sender, instance: Court, created: bool, **kwargs):
     sender=Court,
     dispatch_uid="handle_new_court_needs_courthouse",
 )
-def update_court_cache(sender, instance: Court, created: bool, **kwargs):
+def warn_new_court_needs_courthouse(
+    sender, instance: Court, created: bool, **kwargs
+):
     """
     A new courthouse should be created alongside a new court. Send a warning
     to Sentry for someone to look at it
@@ -693,3 +780,33 @@ def handle_docket_number_raw_cleaning(
 
     if created or instance.docket_number_raw_tracker.changed():
         clean_docket_number_raw_and_update_redis_cache(instance)
+
+
+@receiver(post_delete)
+def cleanup_document_storage[M: Model](
+    sender: type[M],
+    instance: M,
+    origin: M | QuerySet[M],
+    **kwargs,
+):
+    """Deletes files stored in S3 after a state document is deleted. Django does not delete
+    associated files when a row is deleted so without this a docket entry's attachments would
+    linger in storage with nothing pointing to them. This is a post-delete signal which schedules
+    files to be deleted once the current transaction is commited since otherwise if a file
+    deletion failed it would raise and cancel the whole transaction."""
+
+    if not isinstance(instance, AbstractStateDocument):
+        return
+
+    files = [f for f in (instance.filepath_local, instance.thumbnail) if f]
+
+    def delete_files() -> None:
+        for f in files:
+            try:
+                f.delete(save=False)
+            except Exception:
+                logger.exception(
+                    "Failed to delete %s for %r", f.name, instance
+                )
+
+    transaction.on_commit(delete_files, robust=True)

@@ -30,11 +30,13 @@
         {% svg "logos/courtlistener" class="bg-greyscale-800" %}
       </div>
       {# Tagline #}
-      <h1 class="w-full text-center lg:text-display-sm-cooper text-xl" x-text="tagline"></h1>
+      <h1 class="w-full text-center lg:text-display-sm-cooper text-xl" x-text="tagline">
+        Search millions of opinions across hundreds of jurisdictions
+      </h1>
     </div>
 
     {#  SEARCH TABS  #}
-    <div class="md:p-10 px-4 py-5">
+    <div class="capped-width py-5 md:py-10">
       {#   MOBILE SEARCH   #}
       <div class="md:hidden bg-white rounded-2xl flex flex-col">
         <c-corpus-search class="p-4 pt-2 w-full !flex-col" only>
@@ -60,7 +62,7 @@
               {% svg "magnifier" class="text-white" aria_hidden="true" %} Search
             </c-corpus-search.button>
           </div>
-          <a href="{% url "coverage" %}" class="w-full flex items-center justify-center text-sm text-greyscale-600 gap-1 hover:text-greyscale-500">
+          <a href="{{ WIKI_COVERAGE_URL }}" class="w-full flex items-center justify-center text-sm text-greyscale-600 gap-1 hover:text-greyscale-500">
             {% svg "circle_question_mark" class="text-greyscale-400 hover:text-greyscale-300 h-4 w-4" %}
             About This Data
           </a>
@@ -68,7 +70,7 @@
       </div>
 
       {#   DESKTOP SEARCH   #}
-      <c-corpus-search class="capped-width max-md:hidden !flex-col" only>
+      <c-corpus-search class="max-md:hidden !flex-col" only>
         {# Scope selector tabs #}
         <c-corpus-search.scope
           class="text-greyscale-600 hidden md:flex"
@@ -169,7 +171,7 @@
 
       <c-icon-link
         x-on:focus="scrollIntoView"
-        href="{% url "alert_help" %}"
+        href="{{ WIKI_HELP_URL }}/alerts/"
         aria-label="Learn about creating alerts in CourtListener"
         icon="bell"
       >
@@ -187,7 +189,7 @@
 
       <c-icon-link
         x-on:focus="scrollIntoView"
-        href="{% url "podcasts" %}"
+        href="{{ WIKI_HELP_URL }}/general/custom-podcasts-of-oral-argument-audio-recordings"
         aria-label="Subscribe to our oral argument podcasts or create your own"
         icon="microphone"
       >
@@ -208,9 +210,9 @@
     </button>
   </div>
 
-  {# BANNER #}
-  <section class="capped-width flex flex-col gap-y-5 md:flex-row gap-x-5 md:px-10 px-4 py-6 md:py-10">
-      <c-banner
+  {# FEATURE CARD #}
+  <section class="capped-width flex flex-col gap-y-5 md:flex-row gap-x-5 py-6 md:py-10">
+      <c-feature-card
           size="basis-1/2"
           eyebrow_text="RECAP Suite"
           title_text="Turning PACER Around Since 2009"
@@ -247,8 +249,8 @@
           image_source="{%  static 'png/recap_search_container.png' %}"
           image_alt="Screenshot of the free.law homepage showing a popup that reads: RECAP Archive. Donate. Search millions of PACER documents and dockets. There is a search box, a toggle switch set to Enable Uploads, an advanced search button, and a help button."
         >
-      </c-banner>
-      <c-banner
+      </c-feature-card>
+      <c-feature-card
           size="basis-1/2"
           eyebrow_text="REST API"
           title_text="Legal Data for Developers and Researchers That Need Granular information"
@@ -263,13 +265,13 @@
           image_source="{%  static 'png/api_setup_container.png' %}"
           image_alt="REST API -- v4.0. Header: Getting Started. APIs for developers and researchers that need granular legal data. Bulleted list: Set up your API. Data Models. API Overview. APIs. Available Jurisdictions. Upgrades & Fixes. Maintenance Schedule."
       >
-      </c-banner>
+      </c-feature-card>
   </section>
 
   {# PRODUCT STATS #}
   <section
     aria-labelledby="stats-title"
-    class="flex flex-row flex-wrap gap-5 capped-width md:px-10 px-4 py-11 justify-center"
+    class="flex flex-row flex-wrap gap-5 capped-width py-11 justify-center"
   >
     <h2 id="stats-title" class="sr-only">CourtListener Statistics</h2>
     <dl class="flex flex-col md:gap-5 gap-2.5 md:flex-row">
@@ -282,42 +284,42 @@
       </div>
 
       <div class="grid gap-2.5 md:grid-cols-3 grid-cols-2">
-        <div class="rounded-[10px] border border-greyscale-200 py-4 px-6 gap-1 flex flex-col">
+        <div class="rounded-lg-10 border border-greyscale-200 py-4 px-6 gap-1 flex flex-col">
           <dt class="text-md order-2 text-greyscale-600 hidden sm:block">Number of federal cases in the RECAP Archive</dt>
           <dt class="text-md order-2 text-greyscale-600 sm:hidden">Federal cases in the RECAP Archive</dt>
           <dd class="order-1">
             <data class="text-md font-cooper font-semibold" value="{{ docket_count }}">{{ docket_count|intword }}</data>
           </dd>
         </div>
-        <div class="rounded-[10px] border border-greyscale-200 py-4 px-6 gap-1 flex flex-col">
+        <div class="rounded-lg-10 border border-greyscale-200 py-4 px-6 gap-1 flex flex-col">
           <dt class="text-md order-2 text-greyscale-600 hidden sm:block">Number of federal filings in the RECAP Archive</dt>
           <dt class="text-md order-2 text-greyscale-600 sm:hidden">Federal filings in the RECAP Archive</dt>
           <dd class="order-1">
             <data class="text-md font-cooper font-semibold" value="{{ recap_doc_count }}">{{ recap_doc_count|intword }}</data>
           </dd>
         </div>
-        <div class="rounded-[10px] border border-greyscale-200 py-4 px-6 gap-1 flex flex-col">
+        <div class="rounded-lg-10 border border-greyscale-200 py-4 px-6 gap-1 flex flex-col">
           <dt class="text-md order-2 text-greyscale-600 hidden sm:block">Minutes of oral argument recordings in our system</dt>
           <dt class="text-md order-2 text-greyscale-600 sm:hidden">Minutes of audio recordings in our system</dt>
           <dd class="order-1">
             <data class="text-md font-cooper font-semibold" value="{{ minutes_of_oa }}">{{ minutes_of_oa|intcomma|intword }}</data>
           </dd>
         </div>
-        <div class="rounded-[10px] border border-greyscale-200 py-4 px-6 gap-1 flex flex-col">
+        <div class="rounded-lg-10 border border-greyscale-200 py-4 px-6 gap-1 flex flex-col">
           <dt class="text-md order-2 text-greyscale-600 hidden sm:block">Number of searches conducted in the last ten days</dt>
           <dt class="text-md order-2 text-greyscale-600 sm:hidden">Searches conducted in the last ten days</dt>
           <dd class="order-1">
             <data class="text-md font-cooper font-semibold" value="{{ queries_in_last_ten }}">{{ queries_in_last_ten|intcomma }}</data>
           </dd>
         </div>
-        <div class="rounded-[10px] border border-greyscale-200 py-4 px-6 gap-1 flex flex-col">
+        <div class="rounded-lg-10 border border-greyscale-200 py-4 px-6 gap-1 flex flex-col">
           <dt class="text-md order-2 text-greyscale-600 hidden sm:block">Number of alert emails sent over the last ten days</dt>
           <dt class="text-md order-2 text-greyscale-600 sm:hidden">Alert emails sent in the last ten days</dt>
           <dd class="order-1">
             <data class="text-md font-cooper font-semibold" value="{{ alerts_in_last_ten }}">{{ alerts_in_last_ten|intcomma }}</data>
           </dd>
         </div>
-        <div class="rounded-[10px] border border-greyscale-200 py-4 px-6 gap-1 flex flex-col">
+        <div class="rounded-lg-10 border border-greyscale-200 py-4 px-6 gap-1 flex flex-col">
           <dt class="text-md order-2 text-greyscale-600 hidden sm:block">Number of API calls made in the last ten days</dt>
           <dt class="text-md order-2 text-greyscale-600 sm:hidden">API calls made in the last ten days</dt>
           <dd class="order-1">
