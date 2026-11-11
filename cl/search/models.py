@@ -952,9 +952,7 @@ class Docket(AbstractDateTimeModel, DocketSources):
         """
         from cl.opinion_page import docket_entry_sources
 
-        return docket_entry_sources.BY_COURT_ID.get(
-            self.court_id, docket_entry_sources.RECAP
-        )
+        return docket_entry_sources.source_for_court_id(self.court_id)
 
     def get_alert_source(self) -> "DocketAlertSource":
         """Return the DocketAlertSource config for this docket's court -

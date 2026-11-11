@@ -1,17 +1,22 @@
 """Per-source configuration for the shared Elasticsearch signal-processing
 machinery in cl.lib.es_signal_processor and the ES indexing tasks in
-cl.search.tasks.
+cl.search.tasks. Each source's court_ids also feed the RECAP search court
+picker.
 """
 
 from collections.abc import Callable
 from dataclasses import dataclass
+from typing import cast
 
 from django.db import models
-from django.db.models import Exists, OuterRef, Q
+from django.db.models import Exists, OuterRef, Q, QuerySet
 
+from cl.search.constants import SCOTUS_COURT_IDS
 from cl.search.models import (
     BankruptcyInformation,
+    Court,
     Docket,
+    FederalCourtsQuerySet,
     RECAPDocument,
     ScotusDocketMetadata,
     SCOTUSDocument,
@@ -62,8 +67,9 @@ class ESDocketSource:
     ``id`` and ``docket_entry_id`` fields instead.
 
     ``court_ids`` limits the source to Dockets from these courts, so
-    has_entries can rule out other courts without a query. Empty means
-    any court (RECAP).
+    has_entries can rule out other courts without a query, and
+    recap_search_courts() adds them to the RECAP search court picker. Empty
+    means any court (RECAP, whose courts are the PACER ones).
     """
 
     name: str
@@ -101,7 +107,7 @@ def _scotus_docket_belongs(docket: Docket) -> bool:
     ScotusDocketMetadata is what keeps the Docket belonging on every
     save after the first.
     """
-    if docket.court_id != "scotus":
+    if docket.court_id not in SCOTUS_COURT_IDS:
         return False
     return (
         getattr(docket, "_index_in_es", False)
@@ -158,7 +164,7 @@ SCOTUS_ES_SOURCE = ESDocketSource(
     metadata_model=ScotusDocketMetadata,
     ready_to_index=_scotus_ready_to_index,
     uid_namespace="scotus",
-    court_ids=frozenset({"scotus"}),
+    court_ids=SCOTUS_COURT_IDS,
 )
 
 # Every known source, used wherever the shared code needs to loop over all
@@ -193,4 +199,30 @@ def skips_percolation(instance: models.Model) -> bool:
     """
     return isinstance(instance, Docket) and SCOTUS_ES_SOURCE.docket_belongs(
         instance
+    )
+
+
+def recap_search_courts(include_scotus: bool) -> QuerySet[Court]:
+    """Return the courts offered in the RECAP search court picker: the
+    PACER courts plus the ones every other registered source adds. Use it
+    only for search; PACER-specific code (scrapers, uploads) must keep
+    using all_pacer_courts(), which excludes non-PACER courts like SCOTUS.
+
+    :param include_scotus: Whether the search can return SCOTUS content
+    (see scotus_frontend_search_enabled). Without it, only the PACER
+    courts are offered. Temporary: remove once SCOTUS launches.
+    """
+    # federal_courts is typed as a plain Manager, which hides the
+    # FederalCourtsQuerySet methods from the type checker.
+    pacer_courts = cast(
+        FederalCourtsQuerySet, Court.federal_courts
+    ).all_pacer_courts()
+    if not include_scotus:
+        return pacer_courts
+    source_court_ids = [
+        court_id for source in ALL_ES_SOURCES for court_id in source.court_ids
+    ]
+    return (
+        Court.objects.filter(pk__in=source_court_ids, in_use=True)
+        | pacer_courts
     )

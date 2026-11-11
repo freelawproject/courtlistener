@@ -20,7 +20,7 @@
       <a href="{% url 'view_docket' result.docket_id result.docket_slug %}"
          class="visitable">
       {{ result.caseName|render_string_or_list|safe }}
-      ({% if result.court_id != 'scotus' %}{{ result.court_citation_string|render_string_or_list|safe|nbsp }}{% endif %}{% if result.court_citation_string and result.dateFiled %}&nbsp;{% endif %}{{ result.dateFiled|date:"Y" }})
+      {% if result.court_id != 'scotus' or result.dateFiled %}({% if result.court_id != 'scotus' %}{{ result.court_citation_string|render_string_or_list|safe|nbsp }}{% if result.court_citation_string and result.dateFiled %}&nbsp;{% endif %}{% endif %}{{ result.dateFiled|date:"Y" }}){% endif %}
       </a>
 
     {% elif type == SEARCH_TYPES.OPINION or type_override == SEARCH_TYPES.OPINION %}

@@ -92,6 +92,7 @@ from cl.search.es_docket_sources import (
     RECAP_ES_SOURCE,
     SCOTUS_ES_SOURCE,
     SOURCE_BY_MODEL,
+    recap_search_courts,
 )
 from cl.search.factories import (
     BankruptcyInformationFactory,
@@ -2738,6 +2739,120 @@ class RECAPSearchTest(RECAPSearchTestCase, ESIndexTestCase, TestCase):
 
         for docket in dockets_to_remove:
             docket.delete()
+
+    @override_flag("scotus_docket_page", active=True)
+    @override_settings(
+        WAFFLE_CACHE_PREFIX="test_initial_document_buttons_on_mixed_page"
+    )
+    def test_initial_document_buttons_on_mixed_page(self) -> None:
+        """Confirm a results page with RECAP and SCOTUS dockets gives each
+        docket the initial document button of its own source."""
+        scotus_court = CourtFactory(id="scotus", jurisdiction="F")
+        district_court = CourtFactory(id="cand", jurisdiction="FD")
+        dockets_to_remove = []
+        with self.captureOnCommitCallbacks(execute=True):
+            recap_entry = DocketEntryFactory(
+                docket=DocketFactory(
+                    court=district_court,
+                    case_name="Lorem Mixed Page Recap",
+                    source=Docket.RECAP,
+                ),
+                entry_number=1,
+                date_filed=datetime.date(2015, 8, 19),
+            )
+            recap_document = RECAPDocumentFactory(
+                docket_entry=recap_entry,
+                document_number="1",
+                document_type=RECAPDocument.PACER_DOCUMENT,
+                is_available=False,
+                pacer_doc_id="234564",
+            )
+            scotus_docket = DocketFactory(
+                court=scotus_court, case_name="Lorem Mixed Page Scotus"
+            )
+            ScotusDocketMetadataFactory(docket=scotus_docket)
+            scotus_document = SCOTUSDocumentFactory(
+                docket_entry__docket=scotus_docket,
+                docket_entry__date_filed=datetime.date(2024, 1, 1),
+                attachment_number=1,
+                url="https://www.supremecourt.gov/DocketPDF/24/24-2/a.pdf",
+            )
+            dockets_to_remove.extend([recap_entry.docket, scotus_docket])
+
+        cd = {"type": SEARCH_TYPES.RECAP, "q": '"Lorem Mixed Page"'}
+        r = async_to_sync(self._test_article_count)(cd, 2, "mixed page")
+        tree = html.fromstring(r.content.decode())
+        buttons = {}
+        for article in tree.xpath("//article"):
+            title = article.xpath("./h3/a")[0].text_content().strip()
+            button = article.xpath(
+                ".//a[contains(@class, 'initial-document')]"
+            )
+            buttons[title] = (
+                (button[0].get("href"), button[0].text_content().strip())
+                if button
+                else (None, None)
+            )
+        expected = {
+            "Lorem Mixed Page Recap": (
+                recap_document.pacer_url,
+                "Buy Initial Document",
+            ),
+            "Lorem Mixed Page Scotus": (
+                scotus_document.url,
+                "Initial Document",
+            ),
+        }
+        for case_name, expected_button in expected.items():
+            with self.subTest(case_name=case_name):
+                title = next(
+                    (t for t in buttons if t.startswith(case_name)), None
+                )
+                self.assertIsNotNone(title, f"{case_name} not in results")
+                self.assertEqual(expected_button, buttons[title])
+
+        for docket in dockets_to_remove:
+            docket.delete()
+
+    @override_flag("scotus_docket_page", active=True)
+    @override_settings(
+        WAFFLE_CACHE_PREFIX="test_scotus_docket_titles_have_no_empty_parentheses"
+    )
+    def test_scotus_docket_titles_have_no_empty_parentheses(self) -> None:
+        """Confirm SCOTUS docket titles hide the court citation: the year
+        alone when the docket has a date, and no parentheses when it
+        doesn't."""
+        scotus_court = CourtFactory(
+            id="scotus", jurisdiction="F", citation_string="SCOTUS"
+        )
+        with self.captureOnCommitCallbacks(execute=True):
+            dated_docket = DocketFactory(
+                court=scotus_court,
+                case_name="Lorem Title Dated",
+                date_filed=datetime.date(2024, 3, 1),
+            )
+            undated_docket = DocketFactory(
+                court=scotus_court,
+                case_name="Lorem Title Undated",
+                date_filed=None,
+            )
+            # SCOTUS dockets are only indexed once they have metadata.
+            ScotusDocketMetadataFactory(docket=dated_docket)
+            ScotusDocketMetadataFactory(docket=undated_docket)
+        self.addCleanup(dated_docket.delete)
+        self.addCleanup(undated_docket.delete)
+
+        cd = {"type": SEARCH_TYPES.RECAP, "q": '"Lorem Title"'}
+        r = async_to_sync(self._test_article_count)(cd, 2, "scotus titles")
+        tree = html.fromstring(r.content.decode())
+        # Collapse the template's line breaks and &nbsp; into spaces.
+        titles = {
+            " ".join(a.text_content().split())
+            for a in tree.xpath("//article/h3/a")
+        }
+        self.assertEqual(
+            titles, {"Lorem Title Dated (2024)", "Lorem Title Undated"}
+        )
 
     async def test_get_results_from_paginator(self) -> None:
         """Assert Paginator Page objects are handled as expected."""
@@ -6949,6 +7064,91 @@ class ESDocketSourcesTest(TestCase):
         ScotusDocketMetadataFactory(docket=docket)
         docket.refresh_from_db()
         self.assertTrue(SCOTUS_ES_SOURCE.ready_to_index(docket))
+
+
+class RECAPSearchCourtsTest(TestCase):
+    """recap_search_courts() offers the PACER courts plus the courts the
+    other docket sources add, such as SCOTUS."""
+
+    @classmethod
+    def setUpTestData(cls) -> None:
+        """Create PACER, SCOTUS and state courts."""
+        for court_id, jurisdiction in [
+            ("scotus", Court.FEDERAL_APPELLATE),
+            ("ca1", Court.FEDERAL_APPELLATE),
+            ("cand", Court.FEDERAL_DISTRICT),
+            ("ohio", Court.STATE_SUPREME),
+        ]:
+            CourtFactory(id=court_id, jurisdiction=jurisdiction, end_date=None)
+
+    def test_recap_search_courts_add_source_courts(self) -> None:
+        """SCOTUS joins the PACER courts in the search list only when the
+        search can include it, courts that are neither PACER nor claimed by
+        a source stay out, and all_pacer_courts(), used by PACER scrapers
+        and uploads, keeps excluding SCOTUS."""
+        search_ids = set(
+            recap_search_courts(include_scotus=True).values_list(
+                "pk", flat=True
+            )
+        )
+        self.assertLessEqual({"scotus", "ca1", "cand"}, search_ids)
+        self.assertNotIn("ohio", search_ids)
+        self.assertNotIn(
+            "scotus",
+            recap_search_courts(include_scotus=False).values_list(
+                "pk", flat=True
+            ),
+        )
+        self.assertNotIn(
+            "scotus",
+            Court.federal_courts.all_pacer_courts().values_list(
+                "pk", flat=True
+            ),
+        )
+
+
+@override_settings(WAFFLE_CACHE_PREFIX="RECAPSearchCourtPickerTest")
+class RECAPSearchCourtPickerTest(ESIndexTestCase, TestCase):
+    """The RECAP search pages render SCOTUS in the court picker only
+    behind the scotus_docket_page flag."""
+
+    @classmethod
+    def setUpClass(cls) -> None:
+        """Build the Docket index the results page searches."""
+        super().setUpClass()
+        cls.rebuild_index("search.Docket")
+
+    @classmethod
+    def setUpTestData(cls) -> None:
+        """Create SCOTUS and a circuit court for the Federal Appellate tab."""
+        for court_id in ["scotus", "ca1"]:
+            CourtFactory(
+                id=court_id,
+                jurisdiction=Court.FEDERAL_APPELLATE,
+                end_date=None,
+            )
+
+    def test_recap_pages_offer_scotus_in_federal_appellate_tab(self) -> None:
+        """Both the RECAP results page and the RECAP advanced search page
+        render a SCOTUS checkbox in the Federal Appellate tab with the
+        scotus_docket_page flag, and leave it out without it."""
+        urls = [
+            f"{reverse('show_results')}?type={SEARCH_TYPES.RECAP}",
+            reverse("advanced_r"),
+        ]
+        for url, active in product(urls, [True, False]):
+            with (
+                self.subTest(url=url, flag=active),
+                override_flag("scotus_docket_page", active=active),
+            ):
+                r = self.client.get(url)
+
+                self.assertEqual(r.status_code, HTTPStatus.OK)
+                federal_ids = {c.pk for c in r.context["courts"]["federal"]}
+                self.assertEqual("scotus" in federal_ids, active)
+                self.assertEqual(
+                    'id="id_scotus"' in r.content.decode(), active
+                )
 
 
 class SCOTUSESIndexingSignalTest(

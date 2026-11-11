@@ -1,5 +1,5 @@
 from datetime import date
-from typing import Any, cast
+from typing import Any
 from urllib.parse import quote
 
 from django.contrib import messages
@@ -35,8 +35,9 @@ from cl.lib.search_utils import (
 )
 from cl.lib.string_utils import trunc
 from cl.lib.types import AuthenticatedHttpRequest
+from cl.search.es_docket_sources import recap_search_courts
 from cl.search.forms import SearchForm, _clean_form
-from cl.search.models import SEARCH_TYPES, Court, FederalCourtsQuerySet
+from cl.search.models import SEARCH_TYPES, Court
 from cl.search.tasks import email_search_results
 from cl.search.utils import get_homepage_stats, get_v2_homepage_stats
 from cl.stats.constants import StatMethod, StatMetric, StatQueryType
@@ -295,14 +296,11 @@ def show_results(request: HttpRequest) -> HttpResponse:
         )
 
     if search_type == SEARCH_TYPES.RECAP:
+        include_scotus = scotus_frontend_search_enabled(request)
         search_results = do_es_search(
             request.GET.copy(),
-            # federal_courts is typed as a plain Manager, which hides the
-            # FederalCourtsQuerySet methods from the type checker.
-            courts=cast(
-                FederalCourtsQuerySet, Court.federal_courts
-            ).all_pacer_courts(),
-            include_scotus=scotus_frontend_search_enabled(request),
+            courts=recap_search_courts(include_scotus=include_scotus),
+            include_scotus=include_scotus,
         )
     else:
         search_results = do_es_search(
@@ -356,7 +354,9 @@ def advanced(request: HttpRequest, search_type: str) -> HttpResponse:
         return TemplateResponse(request, "advanced.html", render_dict)
 
     if search_type == SEARCH_TYPES.RECAP:
-        courts_in_use = Court.federal_courts.all_pacer_courts()
+        courts_in_use = recap_search_courts(
+            include_scotus=scotus_frontend_search_enabled(request)
+        )
 
     search_form = SearchForm({"type": search_type}, courts=courts)
     courts, court_count_human, court_count = merge_form_with_courts(
