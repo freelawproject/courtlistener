@@ -1,4 +1,4 @@
-{# Out-of-band response to the Block button. It replaces only the contents of nodes already on the docket page, so the live region survives the swap. The badge takes the button's id, so htmx moves focus from the removed button to it. #}
+{# Out-of-band response to the Block button: fills the badge and status nodes already on the docket page. The badge takes the button's id, which is where htmx moves focus. #}
 <span id="docket-block-{{ docket.pk }}" hx-swap-oob="innerHTML">
   <c-badge variant="danger" id="docket-block-control-{{ docket.pk }}" tabindex="-1">Blocked</c-badge>
 </span>

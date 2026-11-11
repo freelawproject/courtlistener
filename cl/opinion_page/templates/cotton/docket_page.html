@@ -16,7 +16,7 @@
 
 <div class="flex flex-col gap-9">
   {% if perms.search|has_any_perm:"docket" %}
-  <div class="flex justify-end items-center gap-2 mb-2" x-data>
+  <div class="flex flex-wrap justify-end items-center gap-2 mb-2" x-data>
     <c-button variant="dark" size="sm" href="{% url 'admin:search_docket_change' docket.pk %}">
       {% svg "edit" class="w-3.5 h-3.5" aria_hidden="true" %}
       Edit Docket
@@ -33,12 +33,11 @@
           <c-toast
             variant="warning"
             title="Could not block this docket"
-            description="Please try again."
             x-on:htmx:response-error="open"
             x-on:htmx:send-error="open"
           >
             <c-slot name="trigger">
-              {# No hx-disabled-elt: a disabled button drops focus, and htmx could not then move it to the badge that takes this id. #}
+              {# Stays enabled during the request: htmx moves focus to the badge that takes this id only while the button holds it. #}
               <c-button
                 variant="dark"
                 size="sm"
