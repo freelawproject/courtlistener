@@ -1501,13 +1501,6 @@
     },
     {
       "column": 9,
-      "path": "cl/opinion_page/utils.py",
-      "name": "missing-attribute",
-      "concise_description": "Object of class `SCOTUSDocketEntry` has no attribute `recap_documents`",
-      "severity": "error"
-    },
-    {
-      "column": 9,
       "path": "cl/opinion_page/views.py",
       "name": "missing-attribute",
       "concise_description": "Object of class `Docket` has no attribute `party_types`",

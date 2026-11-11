@@ -3589,6 +3589,22 @@ class DocketEntryFileDownload(TestCase):
         self.client.get(download_path)
         mock_is_ratelimited.assert_called_once()
 
+    def test_csv_export_when_first_entry_has_no_documents(self) -> None:
+        """The CSV header doesn't depend on the first entry having a
+        document."""
+        scotus_court = CourtFactory(id="scotus", jurisdiction="F")
+        docket = DocketFactory(court=scotus_court, source=Docket.SCRAPER)
+        empty_entry = SCOTUSDocketEntryFactory(docket=docket)
+        entry = SCOTUSDocketEntryFactory(docket=docket)
+        SCOTUSDocumentFactory(docket_entry=entry)
+
+        header, *rows = csv.reader(
+            io.StringIO(generate_docket_entries_csv_data([empty_entry, entry]))
+        )
+
+        self.assertIn("scotusdocument_id", header)
+        self.assertEqual([row[0] for row in rows], [str(entry.pk)])
+
     @override_settings(
         WAFFLE_CACHE_PREFIX="test_csv_export_scotus_docket_waffle"
     )
