@@ -209,13 +209,14 @@ def view_notes(request: AuthenticatedHttpRequest) -> HttpResponse:
         # Carried alongside the form so the template can build a link/
         # icon for the noted object.
         note_forms[bucket].append((NoteForm(instance=note), target))
+    search_url = reverse("show_results")
     docket_search_url = (
-        "/?type=r&q=xxx AND docket_id:("
+        f"{search_url}?type=r&q=xxx AND docket_id:("
         + " OR ".join(str(target.pk) for _, target in note_forms["Dockets"])
         + ")"
     )
     oral_search_url = (
-        "/?type=oa&q=xxx AND id:("
+        f"{search_url}?type=oa&q=xxx AND id:("
         + " OR ".join(
             str(target.pk) for _, target in note_forms["Oral Arguments"]
         )
@@ -240,9 +241,9 @@ def view_notes(request: AuthenticatedHttpRequest) -> HttpResponse:
         document_query = uid_query
     else:
         document_query = id_query
-    recap_search_url = f"/?type=r&q=xxx AND {document_query}"
+    recap_search_url = f"{search_url}?type=r&q=xxx AND {document_query}"
     opinion_search_url = (
-        "/?q=xxx AND cluster_id:("
+        f"{search_url}?q=xxx AND cluster_id:("
         + " OR ".join(str(target.pk) for _, target in note_forms["Opinions"])
         + ")&stat_Precedential=on&stat_Non-Precedential=on&stat_Errata=on&stat_Separate%20Opinion=on&stat_In-chambers=on&stat_Relating-to%20orders=on&stat_Unknown%20Status=on"
     )
