@@ -112,6 +112,7 @@ Templates render; they SHOULD know as little as possible about the data they sho
 - Use `TextInput` for standard text-input styling and `autocomplete="off"`
 - Use `Select` for standard select styling, with `input_text=True` when the select requires the `input-text` component class
 - Keep field-specific attributes, such as `placeholder`, in the form field declaration
+- Tailwind scans only `forms_v2.py` modules for class names, so any widget class string for the new stack MUST live in one — otherwise the class silently drops out of the build
 
 ## Alpine.js
 
@@ -239,8 +240,8 @@ To hide an "install RECAP" call to action from users who have the extension, mar
 ## Links
 
 - All `<a>` tags in new templates MUST have a `class` attribute
-- Internal links: `text-primary-600`
-- External links: `underline`
+- Internal links: `links`
+- External links: `links-external`, which adds the external-link icon (both classes are defined in `input.css`)
 - `target="_blank"` MUST include `rel="noopener"` or `rel="noreferrer"` (`noreferrer` alone is sufficient — it implies `noopener`)
 - Do NOT add `nofollow` to editorial links — `nofollow` is for user-generated content and for links into pages we don't want crawled: `noindex` pages (search results, anything rendered with `private=True`) and file downloads, e.g. the per-court search links on the jurisdictions page or the document links in docket entries
 
@@ -268,3 +269,5 @@ The rules in this doc are enforced as hard errors that block merge. See `fronten
 **Skipping a check** (only the checks listed in `SKIPPABLE_CHECKS` in `frontend_checks.py`; security, accessibility and architecture checks cannot be skipped). Use the check name shown in brackets in the CI annotation, e.g. `[check_raw_css]`:
 - Whole file: `{# frontend-checks-skip: check_name, other_check #}` anywhere in a template, or `/* frontend-checks-skip: check_name */` in CSS
 - Single line: end the offending line with `{# frontend-checks-skip-line: check_name #}` in templates or `/* frontend-checks-skip-line: check_name */` in CSS, like `eslint-disable-line`
+
+Checks do not look inside `<c-code>` blocks, whose content is shown as code. Django tags inside a block still render, so the `{% include %}` check does read them: show a tag with `{% templatetag %}`.

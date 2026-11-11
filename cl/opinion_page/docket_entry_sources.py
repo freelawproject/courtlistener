@@ -153,6 +153,11 @@ def _always_has_actions(document: Any) -> bool:
     return True
 
 
+def _always_listed(document: Any) -> bool:
+    """Return True: by default every document is listed under its entry."""
+    return True
+
+
 def _no_metadata_items(docket: Docket) -> list[MetadataItem]:
     """Return no items: by default a source adds nothing to the core
     docket metadata block."""
@@ -221,6 +226,10 @@ class DocketEntrySource:
     with the one document representing an entry in the docket RSS feed
     (DocketFeed.items()).
 
+    ``document_is_listed`` decides whether the docket page lists a
+    document under its entry. A source returns False for documents that
+    only exist to index their entry, like SCOTUS placeholders.
+
     Every callable below touches the ORM, so callers in async views MUST
     wrap them in ``sync_to_async``.
     """
@@ -258,6 +267,7 @@ class DocketEntrySource:
     )
     admin_document_label: str = "RECAP Document"
     document_has_actions: Callable[[Any], bool] = _always_has_actions
+    document_is_listed: Callable[[Any], bool] = _always_listed
     metadata_items: Callable[[Docket], list[MetadataItem]] = _no_metadata_items
     metadata_sections: Callable[[Docket], list[MetadataSection]] = (
         _no_metadata_sections
@@ -564,6 +574,12 @@ def _scotus_document_is_attachment(document: SCOTUSDocument) -> bool:
     return True
 
 
+def _scotus_document_is_listed(document: SCOTUSDocument) -> bool:
+    """Return False for placeholders: their entry is already listed, and
+    they have no file or page of their own to show under it."""
+    return not document.is_placeholder
+
+
 def _scotus_document_label(document: SCOTUSDocument) -> str:
     """Return the label identifying one SCOTUS document within its entry.
 
@@ -659,6 +675,7 @@ SCOTUS: DocketEntrySource = DocketEntrySource(
     order_by_asc=("sequence_number",),
     order_by_desc=("-sequence_number",),
     document_is_attachment=_scotus_document_is_attachment,
+    document_is_listed=_scotus_document_is_listed,
     document_label=_scotus_document_label,
     document_detail_url=_scotus_document_detail_url,
     document_external_url=_scotus_document_external_url,

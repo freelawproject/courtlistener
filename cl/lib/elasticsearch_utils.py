@@ -2658,6 +2658,22 @@ def process_feed_query_results(
     set_results_highlights(response, cd["type"])
 
 
+def get_docket_entry_pk(doc: AttrDict[Any]) -> int | None:
+    """Return the DocketEntry pk of an ESRECAPDocument hit, whatever its
+    source. RECAP documents keep it in docket_entry_id; other sources keep
+    it in docket_entry_uid, prefixed with their uid_namespace (e.g.
+    "scotus_321").
+
+    :param doc: An ESRECAPDocument hit.
+    :return: The docket entry pk, or None if the hit has neither field.
+    """
+    if docket_entry_id := getattr(doc, "docket_entry_id", None):
+        return docket_entry_id
+    if docket_entry_uid := getattr(doc, "docket_entry_uid", None):
+        return int(docket_entry_uid.rsplit("_", 1)[1])
+    return None
+
+
 def do_es_feed_query(
     search_query: Search,
     cd: CleanData,

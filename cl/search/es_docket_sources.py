@@ -9,7 +9,7 @@ from dataclasses import dataclass
 from typing import cast
 
 from django.db import models
-from django.db.models import QuerySet
+from django.db.models import Exists, OuterRef, Q, QuerySet
 
 from cl.search.constants import SCOTUS_COURT_IDS
 from cl.search.models import (
@@ -32,6 +32,9 @@ class ESDocketSource:
     entries, documents, and an optional docket-level metadata model) plugs
     into the shared Elasticsearch signal-processing code.
 
+    ``name`` identifies the source where a plain string is needed, e.g.
+    the ``--source`` option of cl_index_parent_and_child_docs.
+
     ``docket_entries_related_name`` is the attribute on Docket that
     reaches this source's entries (e.g. ``docket_entries`` for RECAP).
 
@@ -45,6 +48,11 @@ class ESDocketSource:
     each other's document.
 
     ``docket_belongs`` decides whether a given Docket is this source's.
+
+    ``docket_filter`` returns a Q selecting the saved Dockets bulk indexing
+    should pick for this source, matching what the signal processor
+    indexes. It's a callable because this module is imported while models
+    are still loading.
 
     ``ready_to_index`` decides whether there's enough data to index the
     Docket's own fields right now. Defaults to always-ready.
@@ -64,10 +72,12 @@ class ESDocketSource:
     means any court (RECAP, whose courts are the PACER ones).
     """
 
+    name: str
     docket_entries_related_name: str
     document_model: type[models.Model]
     child_id_property: str
     docket_belongs: Callable[[Docket], bool]
+    docket_filter: Callable[[], Q]
     metadata_model: type[models.Model] | None = None
     ready_to_index: Callable[[Docket], bool] = lambda docket: True
     uid_namespace: str | None = None
@@ -105,6 +115,27 @@ def _scotus_docket_belongs(docket: Docket) -> bool:
     )
 
 
+def _scotus_docket_filter() -> Q:
+    """Select court_id="scotus" Dockets with a ScotusDocketMetadata row or
+    at least one SCOTUSDocument. _index_in_es only exists in memory, so it
+    can't be matched in SQL; Dockets with a document are included because
+    es_save_document indexes a document's Docket along with it when the
+    Docket isn't indexed yet.
+    """
+    # The court filter wraps both branches so the query can use the court
+    # index instead of checking every Docket.
+    return Q(court_id="scotus") & (
+        Q(scotus_metadata__isnull=False)
+        | Q(
+            Exists(
+                SCOTUSDocument.objects.filter(
+                    docket_entry__docket=OuterRef("pk")
+                )
+            )
+        )
+    )
+
+
 def _scotus_ready_to_index(docket: Docket) -> bool:
     """True once the Docket has a ScotusDocketMetadata row. capital_case
     lives there, so waiting for it means the Docket's first ES write
@@ -115,17 +146,21 @@ def _scotus_ready_to_index(docket: Docket) -> bool:
 
 
 RECAP_ES_SOURCE = ESDocketSource(
+    name="recap",
     docket_entries_related_name="docket_entries",
     document_model=RECAPDocument,
     child_id_property="RECAP",
     docket_belongs=lambda docket: docket.source in Docket.RECAP_SOURCES(),
+    docket_filter=lambda: Q(source__in=Docket.RECAP_SOURCES()),
     metadata_model=BankruptcyInformation,
 )
 SCOTUS_ES_SOURCE = ESDocketSource(
+    name="scotus",
     docket_entries_related_name="scotus_docket_entries",
     document_model=SCOTUSDocument,
     child_id_property="SCOTUS",
     docket_belongs=_scotus_docket_belongs,
+    docket_filter=_scotus_docket_filter,
     metadata_model=ScotusDocketMetadata,
     ready_to_index=_scotus_ready_to_index,
     uid_namespace="scotus",
@@ -138,6 +173,12 @@ ALL_ES_SOURCES: tuple[ESDocketSource, ...] = (
     RECAP_ES_SOURCE,
     SCOTUS_ES_SOURCE,
 )
+
+# Each source by name, for callers that only have a string (CLI options,
+# Celery task arguments).
+ES_SOURCE_BY_NAME: dict[str, ESDocketSource] = {
+    source.name: source for source in ALL_ES_SOURCES
+}
 
 # Every model (document or metadata) belonging to a source, mapped back to
 # that source -- so a caller with only a model TYPE on hand (e.g. a
