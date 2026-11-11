@@ -48,11 +48,6 @@ router.register(
     search_views.OpinionsCitedViewSet,
     basename="opinionscited",
 )
-router.register(
-    r"parentheticals",
-    search_views.ParentheticalViewSet,
-    basename="parenthetical",
-)
 router.register(r"search", search_views.SearchViewSet, basename="search")
 router.register(r"tag", search_views.TagViewSet, basename="tag")
 
@@ -206,6 +201,11 @@ for prefix, viewset, basename in router.registry:
     if basename != "search":
         router_v4.register(prefix, viewset, basename)
 router_v4.register(r"api-usage", views.ApiUsageViewSet, basename="api-usage")
+router_v4.register(
+    r"parentheticals",
+    search_views.ParentheticalViewSet,
+    basename="parenthetical",
+)
 
 # When we finally need to deprecate V3 of the API, the process to remove it, is:
 # - Remove the re_path(r"^api/rest/(?P<version>[v3]+)/", include(router.urls)) below
