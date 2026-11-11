@@ -3237,6 +3237,31 @@ class TestBlockSearchItemAjax(TestCase):
             },
         )
 
+    async def test_htmx_response_badge_takes_the_button_id(self) -> None:
+        """The badge swapped in carries the Block button's id and is
+        focusable from script, so htmx can move focus to it."""
+        response = await self._block_docket_with_htmx(self.docket_only.user)
+
+        docket_pk = self.cluster.docket.pk
+        target, _ = fragments_fromstring(response.content.decode())
+        self.assertEqual(
+            [
+                (el.get("id"), el.get("tabindex"))
+                for el in target.iterdescendants()
+            ],
+            [(f"docket-block-control-{docket_pk}", "-1")],
+        )
+
+    async def test_htmx_request_must_be_a_post(self) -> None:
+        """An htmx request with another method gets a 405."""
+        client = AsyncClient()
+        await client.aforce_login(user=self.docket_only.user)
+        response = await client.get(
+            reverse("block_item"), headers={"HX-Request": "true"}
+        )
+
+        self.assertEqual(response.status_code, HTTPStatus.METHOD_NOT_ALLOWED)
+
     async def test_htmx_request_denied_without_permission(self) -> None:
         """An htmx request from a user without change_docket gets a 403 and
         leaves the docket unblocked."""
