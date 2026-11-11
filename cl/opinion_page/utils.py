@@ -965,6 +965,25 @@ def build_docket_tabs(
     return tabs
 
 
+def separate_syllabus(cluster: OpinionCluster) -> bool:
+    """Whether the opinion page should show the syllabus after the headmatter.
+
+    The page shows a cluster's headmatter instead of its other front matter,
+    since Harvard's headmatter already holds the syllabus. Other sources,
+    such as Centralia's structured extraction, store the cover in headmatter
+    and the syllabus on its own, so it has to be shown as well.
+
+    :param cluster: The cluster shown on the page.
+    :return: True when the cluster has headmatter and a syllabus, and does
+    not come from Harvard.
+    """
+    return bool(
+        cluster.headmatter
+        and cluster.syllabus
+        and not cluster.filepath_json_harvard
+    )
+
+
 async def get_case_title(cluster: OpinionCluster) -> str:
     return f"{trunc(best_case_name(cluster), 100)}, {await cluster.acitation_string()}"
 

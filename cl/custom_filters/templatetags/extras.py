@@ -482,8 +482,17 @@ def get_request_value(request_get, field_name):
 
 @register.simple_tag
 def render_field_with_id(field, field_id):
-    """Render a form field with a custom ID attribute."""
-    return field.as_widget(attrs={"id": field_id})
+    """Render a form field with a custom ID attribute.
+
+    Django marks a field with errors ``aria-invalid`` on its own, but its
+    default ``aria-describedby`` points at ``<auto_id>_error``, so it is
+    overridden here to match the ``<field_id>-error`` element that
+    c-form.input renders.
+    """
+    attrs = {"id": field_id}
+    if field.errors:
+        attrs["aria-describedby"] = f"{field_id}-error"
+    return field.as_widget(attrs=attrs)
 
 
 @register.simple_tag

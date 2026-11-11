@@ -30,6 +30,7 @@ from cl.search.models import (
     Parenthetical,
     ParentheticalGroup,
     RECAPDocument,
+    SCOTUSDocument,
 )
 
 type ESModelType = (
@@ -45,6 +46,7 @@ type ESModelType = (
     | Position
     | Education
     | RECAPDocument
+    | SCOTUSDocument
 )
 
 type ESDocumentType = (
