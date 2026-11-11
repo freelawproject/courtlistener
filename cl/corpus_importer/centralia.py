@@ -28,6 +28,16 @@ INGESTIBLE_STATUS = "valid"
 # running headers and page furniture, so the bar is deliberately low.
 MIN_TEXT_COVERAGE = 0.5
 
+# Opinion text fields that outrank `html`, the field a merge writes, for
+# display and citation finding. See make_get_citations_kwargs.
+FIELDS_OUTRANKING_HTML = (
+    "xml_harvard",
+    "xml_scan",
+    "html_anon_2020",
+    "html_columbia",
+    "html_lawbox",
+)
+
 
 class StructuredExtractionStatus(StrEnum):
     """Outcome of running Centralia's structured extraction on a cluster."""
@@ -190,12 +200,24 @@ def check_structured_extraction(
     opinion endpoint.
     :param skip_validation: Whether to skip should_ingest's quality checks.
     Only the single writing with HTML that merging needs is still required,
-    so a partial or garbled read passes. Meant for previews and one-off
-    fixes.
+    so a partial or garbled read passes. Opinions with text in a field that
+    outranks `html` are still refused, since the merged HTML would be
+    neither shown nor cited. Meant for previews and one-off fixes.
     :return: A 2-tuple of whether the extraction can be merged and the
     reason, for logging.
     """
     if skip_validation:
+        # Without validation, the command no longer filters these opinions
+        # out by source or anon 2020 content, so check them here.
+        if outranking := [
+            field
+            for field in FIELDS_OUTRANKING_HTML
+            if getattr(opinion, field)
+        ]:
+            return False, (
+                f"text in {', '.join(outranking)} outranks html, so the "
+                "extraction would be neither shown nor cited"
+            )
         reason = f"status={data.get('status') or ''}, validation skipped"
     else:
         ingestible, reason = should_ingest(opinion, data)

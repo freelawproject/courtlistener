@@ -110,7 +110,8 @@ def extract_structured_opinion(
     skipped without changing the database. See cl.corpus_importer.centralia
     for the details. With `skip_validation`, only the single writing with
     HTML is required, so a partial or garbled read can replace the
-    opinion's existing content.
+    opinion's existing content, but opinions with text in a field that
+    outranks `html` are still skipped.
 
     Error responses from Doctor are logged and reported in the result. Other
     errors, such as connection errors, timeouts or database errors while
