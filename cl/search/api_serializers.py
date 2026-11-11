@@ -281,13 +281,9 @@ class ParentheticalGroupSerializer(
     DynamicFieldsMixin,
     HyperlinkedModelSerializerWithId,
 ):
-    """Serialize a ParentheticalGroup for embedding inside a Parenthetical.
-
-    Exposes the group's aggregate metadata (score, size), a link to the
-    opinion the group describes, and a link to the parenthetical chosen to
-    represent the group. Group rows are only present when they have
-    already been computed (at ingestion or by the web UI); the API never
-    computes them on demand.
+    """Serialize a ParentheticalGroup for embedding inside a Parenthetical,
+    with links to the opinion it describes and to its representative
+    parenthetical.
     """
 
     opinion_id = serializers.ReadOnlyField()

@@ -405,15 +405,17 @@ class ParentheticalViewSet(
     DeferredFieldsMixin,
     viewsets.ModelViewSet,
 ):
-    """List parentheticals, the short descriptions judges write about the
+    """Parentheticals are the short descriptions judges write about the
     cases they cite.
 
-    Filter by ``described_opinion`` to see how other courts summarized an
-    opinion, or by ``describing_opinion`` to see what an opinion said about
-    the cases it cites. Groups are served only when they were already
-    computed; this endpoint never computes them.
+    Filter by described_opinion to see what other courts said about an
+    opinion, or by describing_opinion to see what an opinion said about
+    other cases.
     """
 
+    # This endpoint never computes groups. That is a heavy write done at
+    # ingestion or when someone opens the Summaries page; until then, group
+    # is null.
     serializer_class = ParentheticalSerializer
     filterset_class = ParentheticalFilter
     permission_classes = [
