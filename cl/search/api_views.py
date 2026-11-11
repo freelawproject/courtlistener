@@ -420,7 +420,24 @@ class ParentheticalViewSet(
             "described_opinion__cluster",
             "group",
         )
-        .all()
+        # Load only the columns the serializer uses. Otherwise every row
+        # pulls both opinions' full text fields and their whole clusters.
+        .only(
+            "id",
+            "text",
+            "score",
+            "describing_opinion__id",
+            "describing_opinion__cluster__id",
+            "describing_opinion__cluster__case_name",
+            "described_opinion__id",
+            "described_opinion__cluster__id",
+            "described_opinion__cluster__case_name",
+            "described_opinion__cluster__slug",
+            "group__id",
+            "group__opinion_id",
+            "group__score",
+            "group__size",
+        )
         .order_by("-id")
     )
 
