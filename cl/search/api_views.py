@@ -71,6 +71,7 @@ from cl.search.forms import SearchForm
 from cl.search.models import (
     SEARCH_TYPES,
     BankruptcyInformation,
+    Citation,
     ClusterRedirection,
     Court,
     Docket,
@@ -416,9 +417,17 @@ class ParentheticalViewSet(
     cursor_ordering_fields = ["id"]
     queryset = (
         Parenthetical.objects.select_related(
-            "describing_opinion__cluster",
+            "describing_opinion__cluster__docket",
             "described_opinion__cluster",
             "group",
+        )
+        .prefetch_related(
+            Prefetch(
+                "describing_opinion__cluster__citations",
+                queryset=Citation.objects.only(
+                    "id", "cluster_id", "volume", "reporter", "page", "type"
+                ),
+            )
         )
         # Load only the columns the serializer uses. Otherwise every row
         # pulls both opinions' full text fields and their whole clusters.
@@ -429,12 +438,16 @@ class ParentheticalViewSet(
             "describing_opinion__id",
             "describing_opinion__cluster__id",
             "describing_opinion__cluster__case_name",
+            "describing_opinion__cluster__date_filed",
+            "describing_opinion__cluster__docket__id",
+            "describing_opinion__cluster__docket__court_id",
             "described_opinion__id",
             "described_opinion__cluster__id",
             "described_opinion__cluster__case_name",
             "described_opinion__cluster__slug",
             "group__id",
             "group__opinion_id",
+            "group__representative_id",
             "group__score",
             "group__size",
         )

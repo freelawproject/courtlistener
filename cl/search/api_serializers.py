@@ -283,8 +283,9 @@ class ParentheticalGroupSerializer(
 ):
     """Serialize a ParentheticalGroup for embedding inside a Parenthetical.
 
-    Exposes the group's aggregate metadata (score, size) and a link to the
-    opinion the group describes. Group rows are only present when they have
+    Exposes the group's aggregate metadata (score, size), a link to the
+    opinion the group describes, and a link to the parenthetical chosen to
+    represent the group. Group rows are only present when they have
     already been computed (at ingestion or by the web UI); the API never
     computes them on demand.
     """
@@ -296,10 +297,25 @@ class ParentheticalGroupSerializer(
         read_only=True,
         style={"base_template": "input.html"},
     )
+    representative_id = serializers.ReadOnlyField()
+    representative = serializers.HyperlinkedRelatedField(
+        many=False,
+        view_name="parenthetical-detail",
+        read_only=True,
+        style={"base_template": "input.html"},
+    )
 
     class Meta:
         model = ParentheticalGroup
-        fields = ["id", "opinion_id", "opinion", "score", "size"]
+        fields = [
+            "id",
+            "opinion_id",
+            "opinion",
+            "representative_id",
+            "representative",
+            "score",
+            "size",
+        ]
 
 
 class ParentheticalSerializer(
@@ -327,6 +343,15 @@ class ParentheticalSerializer(
         style={"base_template": "input.html"},
     )
     describing_opinion_case_name = serializers.SerializerMethodField()
+    describing_opinion_citation = serializers.CharField(
+        source="describing_opinion.cluster.citation_string", read_only=True
+    )
+    describing_opinion_date_filed = serializers.DateField(
+        source="describing_opinion.cluster.date_filed", read_only=True
+    )
+    describing_opinion_court_id = serializers.CharField(
+        source="describing_opinion.cluster.docket.court_id", read_only=True
+    )
     described_opinion_id = serializers.ReadOnlyField()
     described_opinion = serializers.HyperlinkedRelatedField(
         many=False,
