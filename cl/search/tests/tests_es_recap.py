@@ -133,6 +133,7 @@ from cl.search.signals import (
 from cl.search.tasks import (
     es_save_document,
     index_docket_parties_in_es,
+    index_parent_and_child_docs,
     index_parent_or_child_docs_in_es,
     index_related_cites_fields,
     update_children_docs_by_query,
@@ -8827,6 +8828,84 @@ class IndexSCOTUSCommandTest(ESIndexTestCase, TestCase):
         self._index(document_type="child", auto_resume=True)
 
         self.assertSCOTUSDocumentsIndexed()
+
+    def test_each_scotus_mode_logs_and_resumes_from_its_own_key(
+        self,
+    ) -> None:
+        """Every SCOTUS mode logs its progress to its own Redis key once it
+        reaches the 1,000-item logging point, and a resumed run starts from
+        the logged pk."""
+        court = Court.objects.get(pk="scotus")
+        # The command only logs every 1,000 items, so add enough Dockets and
+        # documents for every mode to reach that point. bulk_create skips the
+        # ES signals, and the tasks are mocked below.
+        new_dockets = Docket.objects.bulk_create(
+            DocketFactory.build(
+                court=court, appeal_from=None, source=Docket.SCRAPER
+            )
+            for _ in range(1000)
+        )
+        ScotusDocketMetadata.objects.bulk_create(
+            ScotusDocketMetadataFactory.build(docket=docket)
+            for docket in new_dockets
+        )
+        entry = SCOTUSDocketEntryFactory(docket=self.full_docket)
+        new_documents = SCOTUSDocument.objects.bulk_create(
+            SCOTUSDocumentFactory.build(
+                docket_entry=entry, document_number=1, attachment_number=i
+            )
+            for i in range(1, 1001)
+        )
+        docket_pks = sorted(
+            [
+                self.full_docket.pk,
+                self.metadata_only_docket.pk,
+                self.document_only_docket.pk,
+                *[docket.pk for docket in new_dockets],
+            ]
+        )
+        document_pks = sorted(
+            [
+                self.sd_1.pk,
+                self.sd_2.pk,
+                self.sd_3.pk,
+                *[document.pk for document in new_documents],
+            ]
+        )
+        cases = [
+            (None, index_parent_and_child_docs, docket_pks),
+            ("parent", index_parent_or_child_docs_in_es, docket_pks),
+            ("child", index_parent_or_child_docs_in_es, document_pks),
+        ]
+        for document_type, task, pks in cases:
+            with self.subTest(document_type=document_type):
+                self.r.delete(*self.redis_keys)
+                key = compose_redis_key(
+                    SEARCH_TYPES.RECAP,
+                    source_name="scotus",
+                    document_type=document_type,
+                )
+
+                with mock.patch.object(task, "si"):
+                    self._index(document_type=document_type)
+
+                # The 1,000th pk is logged, to this mode's key only.
+                self.assertEqual(
+                    [k for k in self.redis_keys if self.r.exists(k)], [key]
+                )
+                self.assertEqual(
+                    get_last_parent_document_id_processed(key), pks[999]
+                )
+
+                with mock.patch.object(task, "si") as mock_si:
+                    self._index(document_type=document_type, auto_resume=True)
+
+                scheduled = [
+                    pk
+                    for call in mock_si.call_args_list
+                    for pk in call.args[0]
+                ]
+                self.assertEqual(scheduled, pks[999:])
 
     def test_missing_checks_each_source_document_id(self) -> None:
         """--missing looks documents up by their source's _id prefix, so only
