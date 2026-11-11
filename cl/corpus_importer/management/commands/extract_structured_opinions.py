@@ -90,7 +90,6 @@ def get_opinions_to_extract(
 
 def extract_structured_opinion(
     opinion: Opinion,
-    allow_pending: bool = False,
     dry_run: bool = False,
     compare: bool = False,
     queue: str = "batch1",
@@ -118,15 +117,14 @@ def extract_structured_opinion(
     saving, are raised.
 
     :param opinion: The opinion to extract, from get_opinions_to_extract.
-    :param allow_pending: Whether Centralia should read a court it has not
-    released yet.
     :param dry_run: Whether to only call Centralia and run the quality
     checks, without saving anything or finding citations.
     :param compare: Whether to add character and citation count metrics
     comparing the opinion's current content with the extraction. Slow, as it
     runs eyecite on both.
     :param queue: The Celery queue for the citation-finding task.
-    :param skip_validation: Whether to skip Centralia's quality checks.
+    :param skip_validation: Whether to skip Centralia's quality checks. It
+    also lets Centralia read courts it has not released yet.
     :return: A dict with the "cluster_id", the StructuredExtractionStatus as
     "status", the "reason" for it, and the "metrics" from
     compare_structured_extraction (empty unless `compare` is set and Doctor
@@ -151,7 +149,9 @@ def extract_structured_opinion(
             file=document_file,
             data={
                 "court_id": court_id,
-                "allow_pending": str(allow_pending).lower(),
+                # Every court outside CENTRALIA_ENABLED_COURTS is pending in
+                # Centralia, and only skip_validation lets those through.
+                "allow_pending": str(skip_validation).lower(),
             },
         )
     if not response.is_success:
@@ -278,20 +278,14 @@ class Command(VerboseCommand):
             "eyecite on both.",
         )
         parser.add_argument(
-            "--allow-pending",
-            action="store_true",
-            default=False,
-            help="Let Centralia read courts it has not released yet. Implied "
-            "by --skip-validation.",
-        )
-        parser.add_argument(
             "--skip-validation",
             action="store_true",
             default=False,
             help="Accept any court, drop the source, opinion count and anon "
-            "2020 filters, and skip Centralia's quality checks. Implies "
-            "--allow-pending. Requires --cluster-ids, as it's meant for "
-            "previews and one-off fixes, not bulk runs. WARNING: without "
+            "2020 filters, and skip Centralia's quality checks. Lets "
+            "Centralia read courts it has not released yet. Requires "
+            "--cluster-ids, as it's meant for previews and one-off fixes, "
+            "not bulk runs. WARNING: without "
             "the checks, a partial or garbled read can replace an "
             "opinion's existing content, so pair it with --dry-run and "
             "--compare first.",
@@ -346,9 +340,6 @@ class Command(VerboseCommand):
             try:
                 result = extract_structured_opinion(
                     opinion,
-                    # Every court outside CENTRALIA_ENABLED_COURTS is
-                    # pending in Centralia.
-                    allow_pending=options["allow_pending"] or skip_validation,
                     dry_run=options["dry_run"],
                     compare=options["compare"],
                     queue=options["queue"],
