@@ -4356,11 +4356,11 @@ class SCOTUSDocument(AbstractDateTimeModel, AbstractPDF, CSVExportMixin):
         "ocr_status",
     ]
 
-    def _get_readable_ocr_status(self, *args, **kwargs) -> str:
+    def _get_readable_ocr_status(self, field: str) -> str:
         """Return the OCR status label for the CSV export."""
         return self.get_ocr_status_display()
 
-    def _get_full_filepath_local(self, *args, **kwargs) -> str:
+    def _get_full_filepath_local(self, field: str) -> str:
         """Return the file's full storage URL for the CSV export, or an
         empty string when there's no file."""
         if self.filepath_local:
