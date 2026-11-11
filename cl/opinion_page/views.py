@@ -637,7 +637,11 @@ def download_docket_entries_csv(
     """Download csv file containing list of DocketEntry for specific Docket"""
 
     docket, _ = async_to_sync(core_docket_data)(request, docket_id)
-    de_list = async_to_sync(fetch_docket_entries)(docket)
+    # Order explicitly from the source config: SCOTUSDocketEntry's
+    # Meta.ordering is descending, while DocketEntry's is ascending.
+    de_list = async_to_sync(fetch_docket_entries)(docket).order_by(
+        *docket.get_entry_source().order_by_asc
+    )
     court_id = docket.court_id
     case_name = docket.slug
 

@@ -3645,6 +3645,39 @@ class DocketEntryFileDownload(TestCase):
         )
         self.assertEqual(row[header.index("scotusdocument_sha1")], "a" * 40)
 
+    @override_settings(
+        WAFFLE_CACHE_PREFIX="test_csv_export_scotus_docket_order_waffle"
+    )
+    @override_flag("scotus_docket_page", active=True)
+    def test_csv_export_for_scotus_docket_is_oldest_first(self) -> None:
+        """SCOTUS entries export oldest first, like RECAP entries, even
+        though SCOTUSDocketEntry's default ordering is newest first."""
+        scotus_court = CourtFactory(id="scotus", jurisdiction="F")
+        scotus_docket = DocketFactory(
+            court=scotus_court, source=Docket.SCRAPER
+        )
+        older = SCOTUSDocketEntryFactory(
+            docket=scotus_docket, sequence_number="2024-01-01.001"
+        )
+        newer = SCOTUSDocketEntryFactory(
+            docket=scotus_docket, sequence_number="2024-01-02.001"
+        )
+        SCOTUSDocumentFactory(docket_entry=newer)
+        SCOTUSDocumentFactory(docket_entry=older)
+        self.client.login(username=self.user.username, password="password")
+
+        response = self.client.get(
+            reverse(
+                "view_download_docket",
+                kwargs={"docket_id": scotus_docket.id},
+            )
+        )
+
+        _, *rows = csv.reader(io.StringIO(response.content.decode()))
+        self.assertEqual(
+            [row[0] for row in rows], [str(older.pk), str(newer.pk)]
+        )
+
 
 class DocketFeedTest(TestCase):
     """Does the docket RSS feed render the right content for both RECAP
