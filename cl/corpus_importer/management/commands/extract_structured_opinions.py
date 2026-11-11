@@ -28,6 +28,7 @@ def get_opinions_to_extract(
     date_filed_gte: date | None = None,
     date_filed_lte: date | None = None,
     limit: int | None = None,
+    skip_validation: bool = False,
 ) -> QuerySet[Opinion]:
     """Find scraped opinions that Centralia's structured extraction can read.
 
@@ -39,22 +40,24 @@ def get_opinions_to_extract(
     curated type and author would still be overwritten.
 
     :param courts: The court ids to read. Should be a subset of
-    CENTRALIA_ENABLED_COURTS.
+    CENTRALIA_ENABLED_COURTS unless `skip_validation` is set.
     :param cluster_ids: If given, only these clusters are considered.
     :param date_filed_gte: If given, only clusters filed on or after it.
     :param date_filed_lte: If given, only clusters filed on or before it.
     :param limit: If given, the maximum number of opinions returned.
+    :param skip_validation: Whether to drop the source, opinion count and
+    anon 2020 filters, keeping only the stored PDF requirement. Meant for
+    previews and one-off fixes together with `cluster_ids`.
     :return: The opinions, with their cluster and docket selected, ordered
     by cluster id.
     """
-    clusters = (
-        OpinionCluster.objects.filter(
-            docket__court_id__in=courts,
-            source=ClusterSources.COURT_WEBSITE,
+    clusters = OpinionCluster.objects.filter(docket__court_id__in=courts)
+    if not skip_validation:
+        clusters = (
+            clusters.filter(source=ClusterSources.COURT_WEBSITE)
+            .annotate(opinion_count=Count("sub_opinions"))
+            .filter(opinion_count=1)
         )
-        .annotate(opinion_count=Count("sub_opinions"))
-        .filter(opinion_count=1)
-    )
     if cluster_ids:
         clusters = clusters.filter(pk__in=cluster_ids)
     if date_filed_gte:
@@ -62,15 +65,16 @@ def get_opinions_to_extract(
     if date_filed_lte:
         clusters = clusters.filter(date_filed__lte=date_filed_lte)
 
+    # Without a PDF there is nothing to send to Doctor, so this filter stays
+    # even when validation is skipped.
     opinions = (
-        Opinion.objects.filter(
-            cluster_id__in=clusters.values("pk"),
-            html_anon_2020="",
-        )
+        Opinion.objects.filter(cluster_id__in=clusters.values("pk"))
         .exclude(local_path="")
         .select_related("cluster__docket")
         .order_by("cluster_id")
     )
+    if not skip_validation:
+        opinions = opinions.filter(html_anon_2020="")
     if limit:
         opinions = opinions[:limit]
     return opinions
@@ -82,6 +86,7 @@ def extract_structured_opinion(
     dry_run: bool = False,
     compare: bool = False,
     queue: str = "batch1",
+    skip_validation: bool = False,
 ) -> dict[str, Any]:
     """Extract an opinion's PDF with Centralia and store the result.
 
@@ -95,7 +100,9 @@ def extract_structured_opinion(
     status, no scanned, textless or CID-encoded pages, and at least half the
     text of the opinion's current `plain_text`. Anything else is logged and
     skipped without changing the database. See cl.corpus_importer.centralia
-    for the details.
+    for the details. With `skip_validation`, only the single writing with
+    HTML is required, so a partial or garbled read can replace the
+    opinion's existing content.
 
     Error responses from Doctor are logged and reported in the result. Other
     errors, such as connection errors, timeouts or database errors while
@@ -110,6 +117,7 @@ def extract_structured_opinion(
     comparing the opinion's current content with the extraction. Slow, as it
     runs eyecite on both.
     :param queue: The Celery queue for the citation-finding task.
+    :param skip_validation: Whether to skip Centralia's quality checks.
     :return: A dict with the "cluster_id", the StructuredExtractionStatus as
     "status", the "reason" for it, and the "metrics" from
     compare_structured_extraction (empty unless `compare` is set and Doctor
@@ -162,7 +170,7 @@ def extract_structured_opinion(
 
     if dry_run:
         mergeable, result["reason"] = check_structured_extraction(
-            opinion, data
+            opinion, data, skip_validation=skip_validation
         )
         result["status"] = (
             StructuredExtractionStatus.WOULD_INGEST
@@ -172,7 +180,7 @@ def extract_structured_opinion(
         return result
 
     merged, result["reason"] = merge_structured_opinion_into_cl_opinion(
-        opinion, data
+        opinion, data, skip_validation=skip_validation
     )
     if not merged:
         result["status"] = StructuredExtractionStatus.SKIPPED
@@ -197,6 +205,11 @@ class Command(VerboseCommand):
     is a court website scraper, with exactly one opinion and no anon 2020
     content, are processed.
 
+    --skip-validation lifts those restrictions and the quality checks, for
+    previewing Centralia on other courts or on clusters a check would
+    decline. Use it only with --cluster-ids, ideally with --dry-run and
+    --compare, never for bulk runs.
+
     Use --dry-run with --compare on a small sample first: it calls Centralia
     and reports what would be ingested, with character and citation counts
     for the current and extracted content, without changing the database.
@@ -211,9 +224,9 @@ class Command(VerboseCommand):
         parser.add_argument(
             "--courts",
             nargs="+",
-            choices=sorted(CENTRALIA_ENABLED_COURTS),
             default=sorted(CENTRALIA_ENABLED_COURTS),
-            help="The court ids to process. Defaults to every enabled court.",
+            help="The court ids to process. Defaults to every enabled court. "
+            "Courts outside CENTRALIA_ENABLED_COURTS need --skip-validation.",
         )
         parser.add_argument(
             "--cluster-ids",
@@ -258,7 +271,19 @@ class Command(VerboseCommand):
             "--allow-pending",
             action="store_true",
             default=False,
-            help="Let Centralia read courts it has not released yet.",
+            help="Let Centralia read courts it has not released yet. Implied "
+            "by --skip-validation.",
+        )
+        parser.add_argument(
+            "--skip-validation",
+            action="store_true",
+            default=False,
+            help="Accept any court, drop the source, opinion count and anon "
+            "2020 filters, and skip Centralia's quality checks. Implies "
+            "--allow-pending. Meant for previews and one-off fixes with "
+            "--cluster-ids, not bulk runs. WARNING: without the checks, a "
+            "partial or garbled read can replace an opinion's existing "
+            "content, so pair it with --dry-run and --compare first.",
         )
         parser.add_argument(
             "--queue",
@@ -279,6 +304,21 @@ class Command(VerboseCommand):
             raise CommandError("--limit must be a positive number.")
         if options["chunk_size"] < 1:
             raise CommandError("--chunk-size must be a positive number.")
+        skip_validation = options["skip_validation"]
+        if not skip_validation and (
+            unknown := sorted(
+                set(options["courts"]) - set(CENTRALIA_ENABLED_COURTS)
+            )
+        ):
+            raise CommandError(
+                f"Courts not in CENTRALIA_ENABLED_COURTS: {unknown}. Use "
+                "--skip-validation to read them anyway."
+            )
+        if skip_validation:
+            logger.warning(
+                "Validation is skipped: a partial or garbled read can "
+                "replace existing content."
+            )
 
         opinions = get_opinions_to_extract(
             courts=options["courts"],
@@ -286,16 +326,20 @@ class Command(VerboseCommand):
             date_filed_gte=options["date_filed_gte"],
             date_filed_lte=options["date_filed_lte"],
             limit=options["limit"],
+            skip_validation=skip_validation,
         )
         results: list[dict[str, Any]] = []
         for opinion in opinions.iterator(chunk_size=options["chunk_size"]):
             try:
                 result = extract_structured_opinion(
                     opinion,
-                    allow_pending=options["allow_pending"],
+                    # Every court outside CENTRALIA_ENABLED_COURTS is
+                    # pending in Centralia.
+                    allow_pending=options["allow_pending"] or skip_validation,
                     dry_run=options["dry_run"],
                     compare=options["compare"],
                     queue=options["queue"],
+                    skip_validation=skip_validation,
                 )
             except Exception as e:
                 logger.exception(
