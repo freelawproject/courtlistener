@@ -411,6 +411,8 @@ class ParentheticalViewSet(
         DjangoModelPermissions,
         V3APIPermission,
     ]
+    # Both are indexed. Ordering by score uses page number pagination.
+    ordering_fields = ("id", "score")
     # Default cursor ordering key
     ordering = "-id"
     # Additional cursor ordering fields
