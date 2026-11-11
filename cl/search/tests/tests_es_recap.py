@@ -8626,7 +8626,9 @@ class IndexSCOTUSCommandTest(ESIndexTestCase, TestCase):
     """
 
     @classmethod
-    def setUpTestData(cls):
+    def setUpTestData(cls) -> None:
+        """Create one SCOTUS Docket per data shape the signals index or skip,
+        plus a RECAP Docket to check sources don't leak into each other."""
         court = CourtFactory(id="scotus", jurisdiction="F")
         cls.full_docket = ScotusDocketMetadataFactory(
             docket__court=court, docket__source=Docket.SCRAPER
@@ -8664,9 +8666,10 @@ class IndexSCOTUSCommandTest(ESIndexTestCase, TestCase):
             )
         )
 
-    def setUp(self):
-        # Every test starts from an empty index; rebuild_index would
-        # populate it from the DB.
+    def setUp(self) -> None:
+        """Start every test from an empty Docket index and no auto-resume
+        offsets logged in Redis."""
+        # rebuild_index would populate the index from the DB.
         self.delete_index("search.Docket")
         self.create_index("search.Docket")
         self.r = get_redis_interface("CACHE")
@@ -8683,7 +8686,8 @@ class IndexSCOTUSCommandTest(ESIndexTestCase, TestCase):
         ]
         self.r.delete(*self.redis_keys)
 
-    def tearDown(self):
+    def tearDown(self) -> None:
+        """Remove the auto-resume offsets the test logged in Redis."""
         self.r.delete(*self.redis_keys)
         super().tearDown()
 
