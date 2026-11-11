@@ -5,6 +5,7 @@ import os
 import re
 import shutil
 import threading
+from collections import Counter
 from datetime import date
 from hashlib import md5
 from http import HTTPStatus
@@ -67,7 +68,7 @@ from cl.lib.test_helpers import (
     SimpleUserDataMixin,
     SitemapTest,
 )
-from cl.opinion_page import docket_entry_sources
+from cl.opinion_page import docket_entry_sources, forms_v2
 from cl.opinion_page.docket_entry_sources import (
     _recap_document_detail_url,
     _scotus_document_detail_url,
@@ -116,6 +117,7 @@ from cl.recap.factories import (
 )
 from cl.recap.mergers import add_docket_entries, merge_attachment_page_data
 from cl.recap.models import FjcIntegratedDatabase
+from cl.search.es_docket_sources import ALL_ES_SOURCES
 from cl.search.factories import (
     CitationWithParentsFactory,
     CourtFactory,
@@ -1841,8 +1843,8 @@ class ViewRecapDocketTest(TestCase):
 
 
 class DocketEntrySourceTest(TestCase):
-    """The per-court config that lets view_docket entries
-    without hardcoding RECAP-only model names.
+    """The per-court DocketEntrySource config: which source serves each
+    court and what each source returns.
     """
 
     @classmethod
@@ -1864,6 +1866,103 @@ class DocketEntrySourceTest(TestCase):
     def test_resolves_recap_source_for_other_courts(self) -> None:
         self.assertIs(
             self.recap_docket.get_entry_source(), docket_entry_sources.RECAP
+        )
+
+    def test_every_es_source_court_has_a_display_source(self) -> None:
+        """Courts listed by a non-RECAP ES source don't fall back to the RECAP
+        display, and no court is listed by two ES sources."""
+        court_ids = [c for s in ALL_ES_SOURCES for c in s.court_ids]
+        for court_id in court_ids:
+            with self.subTest(court_id=court_id):
+                self.assertIsNot(
+                    docket_entry_sources.source_for_court_id(court_id),
+                    docket_entry_sources.RECAP,
+                )
+        duplicates = [c for c, n in Counter(court_ids).items() if n > 1]
+        self.assertEqual([], duplicates)
+
+    def test_initial_document_buttons_use_one_query_per_source(self) -> None:
+        """Each source answers for several dockets with one query."""
+        recap_ids, scotus_ids = [], []
+        for n in range(3):
+            entry = DocketEntryFactory(
+                docket=DocketFactory(
+                    court=self.recap_court, source=Docket.RECAP
+                ),
+                entry_number=1,
+            )
+            RECAPDocumentFactory(
+                docket_entry=entry,
+                document_number="1",
+                document_type=RECAPDocument.PACER_DOCUMENT,
+                pacer_doc_id=f"98765{n}",
+            )
+            recap_ids.append(entry.docket_id)
+            document = SCOTUSDocumentFactory(
+                docket_entry__docket__court=self.scotus_court,
+                attachment_number=1,
+                url="https://www.supremecourt.gov/DocketPDF/24/24-1/a.pdf",
+            )
+            scotus_ids.append(document.docket_entry.docket_id)
+        for source, docket_ids in [
+            (docket_entry_sources.RECAP, recap_ids),
+            (docket_entry_sources.SCOTUS, scotus_ids),
+        ]:
+            with self.subTest(source=source.component):
+                with self.assertNumQueries(1):
+                    buttons = source.initial_document_buttons(docket_ids)
+                self.assertEqual(set(docket_ids), set(buttons))
+
+    def test_scotus_initial_document_is_first_attachment_of_earliest_entry(
+        self,
+    ) -> None:
+        """The SCOTUS initial document is the first attachment of the earliest
+        entry, linked to our copy when we have it. A docket with no documents
+        gets no button."""
+        sample_file = SimpleUploadedFile("scotus_filename.pdf", b"file")
+        docket = DocketFactory(court=self.scotus_court)
+        # Create the later entry and the second attachment first, so a lower
+        # pk can't make them the initial document.
+        later_entry = SCOTUSDocketEntryFactory(
+            docket=docket,
+            sequence_number="2024-02-01.001",
+            date_filed=datetime.date(2024, 2, 1),
+        )
+        SCOTUSDocumentFactory(
+            docket_entry=later_entry,
+            attachment_number=1,
+            filepath_local=sample_file,
+        )
+        first_entry = SCOTUSDocketEntryFactory(
+            docket=docket,
+            sequence_number="2024-01-01.001",
+            date_filed=datetime.date(2024, 1, 1),
+        )
+        SCOTUSDocumentFactory(
+            docket_entry=first_entry,
+            attachment_number=2,
+            filepath_local=sample_file,
+        )
+        initial_document = SCOTUSDocumentFactory(
+            docket_entry=first_entry,
+            attachment_number=1,
+            filepath_local=sample_file,
+        )
+        empty_docket = DocketFactory(court=self.scotus_court)
+
+        buttons = docket_entry_sources.SCOTUS.initial_document_buttons(
+            [docket.pk, empty_docket.pk]
+        )
+
+        self.assertEqual(
+            {
+                docket.pk: docket_entry_sources.InitialDocumentButton(
+                    initial_document.get_absolute_url(),
+                    None,
+                    "Initial Document",
+                )
+            },
+            buttons,
         )
 
     def test_scotus_source_callables_execute_without_raising(self) -> None:
@@ -2131,6 +2230,39 @@ class ScotusDocketFlagEnabledTest(TestCase):
         )
         self.assertIn(
             "sourced from the Supreme Court of the United States", content
+        )
+
+    async def test_scotus_placeholder_documents_are_not_listed(self) -> None:
+        """An entry's placeholder document isn't listed under it on the
+        docket page, while real attachments are."""
+        placeholder_entry = await sync_to_async(SCOTUSDocketEntryFactory)(
+            docket=self.docket, entry_number=None
+        )
+        await sync_to_async(SCOTUSDocumentFactory)(
+            docket_entry=placeholder_entry,
+            url="",
+            document_number=None,
+            attachment_number=None,
+        )
+        attachment_entry = await sync_to_async(SCOTUSDocketEntryFactory)(
+            docket=self.docket
+        )
+        attachment = await sync_to_async(SCOTUSDocumentFactory)(
+            docket_entry=attachment_entry
+        )
+
+        r = await self.async_client.get(
+            reverse("view_docket", args=[self.docket.pk, self.docket.slug])
+        )
+
+        self.assertEqual(r.status_code, HTTPStatus.OK)
+        listed = {
+            entry.pk: [document.pk for document in entry.documents]
+            for entry in r.context["docket_entries"]
+        }
+        self.assertEqual(
+            listed,
+            {placeholder_entry.pk: [], attachment_entry.pk: [attachment.pk]},
         )
 
     async def test_scotus_docket_entry_filters_still_work(self) -> None:
@@ -5235,7 +5367,7 @@ class DocketFilterRenderTestCase(TestCase):
         cls.docket = DocketFactory(court=cls.court, source=Docket.RECAP)
         cls.empty_page = Paginator([], 100).get_page(1)
 
-    def _render(self, form: DocketEntryFilterForm) -> str:
+    def _render(self, form: forms_v2.DocketEntryFilterForm) -> str:
         # Render via a wrapper template that invokes <c-docket-filter> as a
         # child component, instead of rendering
         # cotton/docket_filter/index.html directly — the latter declares
@@ -5264,58 +5396,61 @@ class DocketFilterRenderTestCase(TestCase):
         )
 
 
-class DocketFilterDrawerAttrPropagationTest(DocketFilterRenderTestCase):
-    """The mobile filter drawer auto-opens when a filter submission fails
-    validation, so users can see the error messages inside it. That depends
-    on two pieces of plumbing — `data-has-errors` reaching the drawer's root
-    element via Cotton's `{{ attrs }}` passthrough, and the
-    `x-on:open-filter-drawer` listener being wired up on the same element so
-    `docket_filter.js` can dispatch the open event. Lock both in.
+class DocketFilterErrorDialogTest(DocketFilterRenderTestCase):
+    """The mobile filter dialog auto-opens when a filter submission fails
+    validation. That depends on two pieces of plumbing — `data-has-errors`
+    on the `docketFilter` root, which `docket_filter.js` reads on init, and
+    the dialog listening for the `open-filter-dialog` window event the
+    script dispatches. Lock both in.
+
+    Elements are found by attribute instead of XPath because `:` in
+    attribute names isn't first-class in XPath.
     """
 
-    def _find_drawer(self, html: str) -> _Element | None:
-        """Return the element with `x-on:open-filter-drawer` (the drawer root).
-
-        Done element-wise instead of XPath because `:` in attribute names
-        isn't first-class in XPath.
-        """
+    def _find_by_attr(self, html: str, name: str) -> _Element | None:
+        """Return the first element that has the attribute `name`."""
         for el in fromstring(html).iter():
-            if "x-on:open-filter-drawer" in cast(_Attrib, el.attrib):
+            if name in cast(_Attrib, el.attrib):
                 return el
         return None
 
-    def test_data_has_errors_lands_on_drawer_when_form_invalid(self) -> None:
-        request = RequestFactory().get("/?entry_gte=abc")
+    def _render_root(self, query: str) -> _Element | None:
+        request = RequestFactory().get(f"/{query}")
         request.user = AnonymousUser()
-        form = DocketEntryFilterForm(request.GET, request=request)
-        self.assertFalse(form.is_valid())
+        form = forms_v2.DocketEntryFilterForm(request.GET, request=request)
+        form.is_valid()
+        html = self._render(form)
+        for el in fromstring(html).iter():
+            if cast(_Attrib, el.attrib).get("x-data") == "docketFilter":
+                return el
+        return None
 
-        drawer = self._find_drawer(self._render(form))
+    def test_root_has_errors_when_form_invalid(self) -> None:
+        root = self._render_root("?entry_gte=abc")
+        self.assertIsNotNone(root, "docketFilter root not found")
+        self.assertIn("data-has-errors", root.attrib)
 
-        self.assertIsNotNone(
-            drawer, "drawer root with open listener not found"
-        )
-        self.assertIn(
-            "data-has-errors",
-            drawer.attrib,
-            "data-has-errors must land on the same element that listens "
-            "for open-filter-drawer — otherwise docket_filter.js can't "
-            "find the drawer to dispatch the open event",
-        )
-        self.assertEqual(
-            cast(_Attrib, drawer.attrib)["x-on:open-filter-drawer"], "open"
-        )
+    def test_root_has_no_errors_when_form_is_clean(self) -> None:
+        root = self._render_root("")
+        self.assertIsNotNone(root, "docketFilter root not found")
+        self.assertNotIn("data-has-errors", root.attrib)
 
-    def test_no_data_has_errors_when_form_is_clean(self) -> None:
+    def test_dialog_opens_on_window_event(self) -> None:
         request = RequestFactory().get("/")
         request.user = AnonymousUser()
-        form = DocketEntryFilterForm(request.GET, request=request)
-        self.assertTrue(form.is_valid())
-
-        drawer = self._find_drawer(self._render(form))
-
-        self.assertIsNotNone(drawer)
-        self.assertNotIn("data-has-errors", drawer.attrib)
+        form = forms_v2.DocketEntryFilterForm(request.GET, request=request)
+        dialog = self._find_by_attr(
+            self._render(form), "x-on:open-filter-dialog.window"
+        )
+        self.assertIsNotNone(
+            dialog,
+            "the dialog must listen for open-filter-dialog on window, "
+            "which docket_filter.js dispatches when the filters have errors",
+        )
+        self.assertEqual(
+            cast(_Attrib, dialog.attrib)["x-on:open-filter-dialog.window"],
+            "open",
+        )
 
 
 class DocketFilterSearchScopeTest(DocketFilterRenderTestCase):
@@ -5330,7 +5465,7 @@ class DocketFilterSearchScopeTest(DocketFilterRenderTestCase):
         the submit hook that merges them."""
         request = RequestFactory().get("/")
         request.user = AnonymousUser()
-        form = DocketEntryFilterForm(request.GET, request=request)
+        form = forms_v2.DocketEntryFilterForm(request.GET, request=request)
 
         tree = fromstring(self._render(form))
         # docket_filter.js reads the pristine scope from here on every
@@ -5456,6 +5591,50 @@ class DocketFilterPaginationWiringTest(TestCase):
         r = await self._get_docket_and_verify_v2(data={"entry_gte": "3"})
         numbers = sorted(e.entry_number for e in r.context["docket_entries"])  # type:ignore[attr-defined] Django inserts the context attribute in test envs
         self.assertEqual(numbers, [3, 4, 5])
+
+    async def test_profile_default_order_applies_without_order_by(
+        self,
+    ) -> None:
+        """A signed-in user who saved newest-first as their docket order gets
+        the entries descending when the URL picks no order, and the toolbar
+        checks the Desc radio to match."""
+        profile = await sync_to_async(UserProfileWithParentsFactory)(
+            docket_default_order_desc=True
+        )
+        await self.async_client.aforce_login(profile.user)
+        r = await self._get_docket_and_verify_v2()
+        numbers = [e.entry_number for e in r.context["docket_entries"]]  # type:ignore[attr-defined] Django inserts the context attribute in test envs
+        self.assertEqual(numbers, [5, 4, 3, 2, 1])
+        checked = [
+            el.get("value")
+            for el in fromstring(r.content.decode()).iter("input")
+            if el.get("type") == "radio"
+            and el.get("name") == "order_by"
+            and "checked" in cast(_Attrib, el.attrib)
+        ]
+        self.assertEqual(checked, ["desc"])
+
+    async def test_mobile_dialog_carries_current_order_by(self) -> None:
+        """The mobile filter dialog has no sort control, so its hidden
+        order_by input must always carry the current order. Otherwise an
+        ascending view submitted from the dialog falls back to the signed-in
+        user's profile default and silently flips to descending."""
+        profile = await sync_to_async(UserProfileWithParentsFactory)(
+            docket_default_order_desc=True
+        )
+        await self.async_client.aforce_login(profile.user)
+        for order in ("asc", "desc"):
+            with self.subTest(order=order):
+                r = await self._get_docket_and_verify_v2(
+                    data={"order_by": order}
+                )
+                hidden = [
+                    el.get("value")
+                    for el in fromstring(r.content.decode()).iter("input")
+                    if el.get("type") == "hidden"
+                    and el.get("name") == "order_by"
+                ]
+                self.assertEqual(hidden, [order])
 
     async def test_pagination_nav_renders_with_multiple_pages(self) -> None:
         """The bottom <c-pagination> only renders its <nav> when

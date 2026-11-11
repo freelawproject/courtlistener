@@ -3,6 +3,12 @@ import re
 
 from cl.search.models import SEARCH_TYPES, Court, Opinion
 
+# Courts served by each docket source other than RECAP, declared once and
+# read by cl.opinion_page.docket_entry_sources and
+# cl.search.es_docket_sources. Future sources may cover many courts, and
+# listing them in both modules makes it easy to miss one.
+SCOTUS_COURT_IDS: frozenset[str] = frozenset({"scotus"})
+
 PEOPLE_ES_HL_FIELDS = {
     "name": 0,
     "dob_city": 0,

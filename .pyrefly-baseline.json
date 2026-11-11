@@ -1241,27 +1241,6 @@
       "severity": "error"
     },
     {
-      "column": 35,
-      "path": "cl/favorites/views.py",
-      "name": "bad-argument-type",
-      "concise_description": "Argument `AbstractBaseUser | AnonymousUser` is not assignable to parameter `user` with type `User` in function `cl.favorites.selectors.prayer_eligible`",
-      "severity": "error"
-    },
-    {
-      "column": 25,
-      "path": "cl/favorites/views.py",
-      "name": "bad-argument-type",
-      "concise_description": "Argument `AbstractBaseUser | AnonymousUser` is not assignable to parameter `user` with type `User` in function `cl.favorites.utils.create_prayer`",
-      "severity": "error"
-    },
-    {
-      "column": 25,
-      "path": "cl/favorites/views.py",
-      "name": "bad-argument-type",
-      "concise_description": "Argument `AbstractBaseUser | AnonymousUser` is not assignable to parameter `user` with type `User` in function `cl.favorites.utils.delete_prayer`",
-      "severity": "error"
-    },
-    {
       "column": 19,
       "path": "cl/favorites/views.py",
       "name": "missing-attribute",
@@ -1294,13 +1273,6 @@
       "path": "cl/lasc/tasks.py",
       "name": "unbound-name",
       "concise_description": "`di` may be uninitialized",
-      "severity": "error"
-    },
-    {
-      "column": 17,
-      "path": "cl/lib/elasticsearch_utils.py",
-      "name": "missing-attribute",
-      "concise_description": "Object of class `Manager` has no attribute `appellate_courts`",
       "severity": "error"
     },
     {
@@ -4010,13 +3982,6 @@
       "path": "cl/search/views.py",
       "name": "bad-argument-type",
       "concise_description": "Argument `ESSearchResult` is not assignable to parameter `search_results` with type `dict[Unknown, Unknown]` in function `cl.lib.search_utils.store_search_query`",
-      "severity": "error"
-    },
-    {
-      "column": 25,
-      "path": "cl/search/views.py",
-      "name": "missing-attribute",
-      "concise_description": "Object of class `Manager` has no attribute `all_pacer_courts`",
       "severity": "error"
     },
     {

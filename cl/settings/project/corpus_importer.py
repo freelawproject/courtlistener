@@ -38,7 +38,7 @@ IQUERY_COURT_RATE = env("IQUERY_COURT_RATE", default="100/s")
 SCOTUS_PROBE_DAEMON_ENABLED = env.bool(
     "SCOTUS_PROBE_DAEMON_ENABLED", default=True
 )
-SCOTUS_PROBE_WAIT = env.int("SCOTUS_PROBE_WAIT", default=3600)
+SCOTUS_PROBE_WAIT = env.int("SCOTUS_PROBE_WAIT", default=1800)
 SCOTUS_PROBE_MAX_OFFSET = env.int("SCOTUS_PROBE_MAX_OFFSET", default=100)
 SCOTUS_COURT_BLOCKED_WAIT = env.int("SCOTUS_COURT_BLOCKED_WAIT", default=600)
 SCOTUS_COURT_BLOCKED_MAX_ATTEMPTS = env.int(
@@ -51,14 +51,14 @@ SCOTUS_EMPTY_PROBES_LIMIT_HOURS = env.int(
 SCOTUS_TIMEOUT_WAIT = env.int("SCOTUS_TIMEOUT_WAIT", default=300)
 # Seconds to sleep between sequential backfill HTTP fetches.
 SCOTUS_BACKFILL_REQUEST_DELAY = env.float(
-    "SCOTUS_BACKFILL_REQUEST_DELAY", default=1.0
+    "SCOTUS_BACKFILL_REQUEST_DELAY", default=2.0
 )
 # Cap on serials ingested per daemon iteration when catching up to a known
 # watermark (operator-seeded highest_observed, or any large observed/ingested
 # gap). Bounds the load placed on supremecourt.gov; the daemon trickles
 # through the backlog over many iterations and falls back to probe mode once
 # highest_ingested catches up to highest_observed.
-SCOTUS_FIXED_SWEEP = env.int("SCOTUS_FIXED_SWEEP", default=100)
+SCOTUS_FIXED_SWEEP = env.int("SCOTUS_FIXED_SWEEP", default=600)
 # Geometric step cap for the SCOTUS forward probe.
 SCOTUS_MAX_PROBE = env.int("SCOTUS_MAX_PROBE", default=16)
 

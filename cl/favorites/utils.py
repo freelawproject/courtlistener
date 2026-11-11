@@ -109,11 +109,22 @@ def get_note_for_target(
 
 
 async def create_prayer(
-    user: User, recap_document: RECAPDocument
+    user: User,
+    recap_document: RECAPDocument,
+    is_eligible: bool | None = None,
 ) -> Prayer | None:
-    is_user_eligible, _ = await prayer_eligible(user)
+    """Create a waiting prayer for the user on an unavailable document.
 
-    if not is_user_eligible or recap_document.is_available:
+    Returns None when the user reached their daily limit, the document is
+    already available, or the user already prayed for it.
+
+    :param is_eligible: The result of prayer_eligible() when the caller
+        already has it, to avoid querying it twice. Checked here if omitted.
+    """
+    if is_eligible is None:
+        is_eligible, _ = await prayer_eligible(user)
+
+    if not is_eligible or recap_document.is_available:
         return None
 
     new_prayer, created = await Prayer.objects.aget_or_create(

@@ -34,11 +34,12 @@ from django.utils.encoding import force_bytes
 from django.utils.http import urlsafe_base64_encode
 from django.utils.timezone import now
 from django_ses import SESBackend, signals
+from lxml.html import fromstring
 from rest_framework.authtoken.models import Token
 from rest_framework.throttling import UserRateThrottle
 from selenium.webdriver.common.by import By
 from timeout_decorator import timeout_decorator
-from waffle.testutils import override_switch
+from waffle.testutils import override_flag, override_switch
 
 from cl.alerts.factories import (
     AlertFactory,
@@ -87,6 +88,7 @@ from cl.favorites.models import (
 from cl.lib.AuthenticationBackend import MAX_EMAIL_CANDIDATES
 from cl.lib.crypto import generate_activation_key
 from cl.lib.email_backends import get_email_count
+from cl.lib.middleware import WIP_PROPS
 from cl.lib.ratelimiter import (
     FAILED_LOGIN_LIMIT,
     FAILED_LOGIN_WINDOW,
@@ -472,6 +474,64 @@ class UserDataTest(LiveServerTestCase):
 @override_settings(WAFFLE_CACHE_PREFIX="ProfileTest")
 @override_switch(DOUBLE_API_THROTTLES_SWITCH, active=False)
 class ProfileTest(SimpleUserDataMixin, TestCase):
+    @override_flag("use_new_design", True)
+    @override_flag(WIP_PROPS["flag"], True)
+    def test_api_page_renders_profile_shell(self) -> None:
+        """Does the WIP API page render the shell with Developer Tools active?"""
+        self.assertTrue(
+            self.client.login(username="pandora", password="password")
+        )
+
+        response = self.client.get(reverse("view_api"))
+
+        self.assertEqual(response.status_code, HTTPStatus.OK)
+
+        html = fromstring(response.content.decode())
+        profile_nav = html.xpath("//nav[@aria-label='Profile navigation']")
+        self.assertEqual(len(profile_nav), 1)
+
+        nav = profile_nav[0]
+        nav_labels = [
+            link.text_content().strip() for link in nav.xpath(".//a")
+        ]
+        self.assertEqual(
+            nav_labels,
+            [
+                "Alerts",
+                "Notes",
+                "Tags",
+                "Developer Tools",
+                "Prayers",
+                "Your Support",
+                "Account",
+            ],
+        )
+        self.assertEqual(len(nav.xpath(".//li[@aria-hidden='true']")), 1)
+
+        active_links = nav.xpath(".//a[@aria-current='page']")
+        self.assertEqual(len(active_links), 1)
+        self.assertEqual(
+            active_links[0].text_content().strip(), "Developer Tools"
+        )
+
+        heading = html.xpath("//h1")
+        self.assertEqual(len(heading), 1)
+        self.assertEqual(heading[0].text_content().strip(), "Developer Tools")
+
+        sign_out_form = nav.xpath(
+            ".//form[@method='post' and @action=$url]",
+            url=reverse("sign-out"),
+        )
+        self.assertEqual(len(sign_out_form), 1)
+        self.assertEqual(
+            sign_out_form[0].xpath("normalize-space(.//button)"), "Sign out"
+        )
+        # The shell renders with `only`, so the token must be passed in
+        csrf_token = sign_out_form[0].xpath(
+            "string(.//input[@name='csrfmiddlewaretoken']/@value)"
+        )
+        self.assertTrue(csrf_token)
+
     async def test_api_page_with_data(self) -> None:
         """Can we access the API stats page after the API has been used?"""
         # Get the page anonymously to populate the stats with anon data
