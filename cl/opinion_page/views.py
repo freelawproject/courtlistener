@@ -1768,7 +1768,7 @@ async def block_item(request: HttpRequest) -> HttpResponse:
     TODO: Remove all ajax logic once v2 is rolled out globally
     """
     is_htmx = bool(request.headers.get("HX-Request"))
-    if not is_htmx and not is_ajax(request):
+    if request.method != "POST" or not (is_htmx or is_ajax(request)):
         return HttpResponseNotAllowed(
             permitted_methods=["POST"], content="Not an ajax request"
         )
