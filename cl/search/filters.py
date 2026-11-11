@@ -193,11 +193,13 @@ class OpinionsCitedFilter(NoEmptyFilterSet):
 
 
 class ParentheticalFilter(NoEmptyFilterSet):
+    # Validating an opinion ID loads that opinion, so only fetch its ID
+    # instead of its full text fields.
     describing_opinion = filters.RelatedFilter(
-        OpinionFilter, queryset=Opinion.objects.all()
+        OpinionFilter, queryset=Opinion.objects.only("id")
     )
     described_opinion = filters.RelatedFilter(
-        OpinionFilter, queryset=Opinion.objects.all()
+        OpinionFilter, queryset=Opinion.objects.only("id")
     )
 
     class Meta:
