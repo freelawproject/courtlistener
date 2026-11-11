@@ -83,6 +83,7 @@ from cl.opinion_page.forms import (
     TennWorkCompClUploadForm,
 )
 from cl.opinion_page.utils import (
+    PartyGroup,
     build_docket_metadata,
     build_docket_tabs,
     build_idb_rows,
@@ -100,13 +101,22 @@ from cl.opinion_page.views import (
     view_recap_document,
 )
 from cl.people_db.factories import (
+    AttorneyFactory,
+    AttorneyOrganizationFactory,
     PartyFactory,
     PartyTypeFactory,
     PersonFactory,
     PersonWithChildrenFactory,
     PositionFactory,
+    RoleFactory,
 )
-from cl.people_db.models import Person
+from cl.people_db.models import (
+    CriminalCount,
+    Party,
+    PartyType,
+    Person,
+    Role,
+)
 from cl.recap.factories import (
     AppellateAttachmentFactory,
     AppellateAttachmentPageFactory,
@@ -4339,7 +4349,7 @@ class BuildDocketTabsTest(SimpleTestCase):
             icons,
             {
                 "entries": "file_text",
-                "parties": "group",
+                "parties": "people",
                 "idb": "circle_question_mark",
                 "authorities": "court",
             },
@@ -4462,6 +4472,443 @@ class DocketIdbV2TemplateTest(TestCase):
         ]
         self.assertEqual(len(current), 1)
         self.assertIn("FJC Integrated Database", current[0].text_content())
+
+
+@override_settings(WAFFLE_CACHE_PREFIX="test_docket_parties_context_waffle")
+@override_flag("use_new_design", active=True)
+class DocketPartiesContextTest(TestCase):
+    """The party groups the parties tab hands the v2 template, built from the
+    view's prefetched party types."""
+
+    @classmethod
+    def setUpTestData(cls) -> None:
+        cls.docket = DocketFactory(
+            court=CourtFactory(id="canb", jurisdiction="FB"),
+            source=Docket.RECAP,
+        )
+        # lookup_key is unique, so every firm sets its own.
+        cls.firm = AttorneyOrganizationFactory(
+            lookup_key="relman",
+            name="Relman Colfax",
+            address1="1225 19th St. NW",
+            address2="",
+            city="Washington",
+            state="DC",
+            zip_code="20036",
+        )
+        cls.lead = AttorneyFactory(
+            name="Sasha Samberg-Champion",
+            phone="(202) 728-1888",
+            fax="(202) 728-0000",
+            docket=cls.docket,
+            organizations=[cls.firm],
+        )
+        cls.other = AttorneyFactory(
+            name="Bruce D. Brown",
+            docket=cls.docket,
+            organizations=[AttorneyOrganizationFactory(lookup_key="rcfp")],
+        )
+        # Inserted before the plaintiff that sorts first, so a name-ordered
+        # result can only come from the view. PACER names carry HTML entities.
+        PartyTypeFactory(
+            docket=cls.docket,
+            party=PartyFactory(
+                name="M&amp;B CAPITAL ADVISERS",
+                docket=cls.docket,
+                attorneys=[cls.other],
+            ),
+            name="Plaintiff",
+        )
+        # PartyFactory links each attorney through a role with no type.
+        plaintiff = PartyFactory(
+            name="AMERICAN ASSOCIATION OF LAW LIBRARIES",
+            docket=cls.docket,
+            attorneys=[cls.lead, cls.other],
+        )
+        for role, role_raw, date_action in (
+            (Role.ATTORNEY_LEAD, "", None),
+            (Role.PRO_HAC_VICE, "PRO HAC VICE", None),
+            (Role.TERMINATED, "TERMINATED: 06/03/2021", date(2021, 6, 3)),
+        ):
+            RoleFactory(
+                party=plaintiff,
+                attorney=cls.lead,
+                docket=cls.docket,
+                role=role,
+                role_raw=role_raw,
+                date_action=date_action,
+            )
+        RoleFactory(
+            party=plaintiff,
+            attorney=cls.other,
+            docket=cls.docket,
+            role=Role.UNKNOWN,
+        )
+        PartyTypeFactory(
+            docket=cls.docket,
+            party=plaintiff,
+            name="Plaintiff",
+            date_terminated=date(2016, 4, 21),
+        )
+        defendant_type = PartyTypeFactory(
+            docket=cls.docket,
+            party=PartyFactory(
+                name="UNITED STATES OF AMERICA", docket=cls.docket
+            ),
+            name="Defendant",
+            highest_offense_level_opening="Felony",
+        )
+        CriminalCount.objects.create(
+            party_type=defendant_type,
+            name="18:1001 False Statements",
+            disposition="",
+            status=CriminalCount.PENDING,
+        )
+
+    async def get_party_groups(self) -> list[PartyGroup]:
+        """Requests the parties tab and returns its party groups."""
+        r = await self.async_client.get(
+            reverse("docket_parties", args=[self.docket.pk, self.docket.slug])
+        )
+        self.assertEqual(r.status_code, HTTPStatus.OK)
+        return r.context["party_groups"]
+
+    async def test_parties_group_by_type_in_name_order(self) -> None:
+        """One group per party type, types and parties in name order, names
+        unescaped."""
+        groups = await self.get_party_groups()
+        self.assertEqual(
+            [group["name"] for group in groups], ["Defendant", "Plaintiff"]
+        )
+        self.assertEqual(
+            [party["name"] for party in groups[1]["parties"]],
+            ["AMERICAN ASSOCIATION OF LAW LIBRARIES", "M&B CAPITAL ADVISERS"],
+        )
+
+    async def test_termination_date_is_formatted_or_empty(self) -> None:
+        """A terminated party carries its date in the site format; an
+        active one carries an empty string."""
+        groups = await self.get_party_groups()
+        defendant, plaintiff = (group["parties"][0] for group in groups)
+        self.assertEqual(plaintiff["date_terminated"], "April 21, 2016")
+        self.assertEqual(defendant["date_terminated"], "")
+
+    async def test_attorneys_are_display_ready(self) -> None:
+        """Attorneys come sorted by name with their firm's address as lines.
+        Role lines use the raw PACER value when set and the choice label
+        otherwise, followed by the action date; a role with neither reads
+        "None" and unknown roles are left out."""
+        groups = await self.get_party_groups()
+        attorneys = groups[1]["parties"][0]["attorneys"]
+        self.assertEqual(
+            [attorney["name"] for attorney in attorneys],
+            ["Bruce D. Brown", "Sasha Samberg-Champion"],
+        )
+        other, lead = attorneys
+        self.assertEqual(lead["phone"], "(202) 728-1888")
+        self.assertEqual(lead["fax"], "(202) 728-0000")
+        self.assertEqual(
+            lead["roles"],
+            [
+                "Lead attorney",
+                "PRO HAC VICE",
+                "TERMINATED: 06/03/2021 (June 3, 2021)",
+                "None",
+            ],
+        )
+        self.assertEqual(
+            lead["firms"],
+            [
+                {
+                    "pk": self.firm.pk,
+                    "name": "Relman Colfax",
+                    "label": "Relman Colfax",
+                    "address_lines": [
+                        "1225 19th St. NW",
+                        "Washington, DC 20036",
+                    ],
+                }
+            ],
+        )
+        self.assertEqual(other["roles"], ["None"])
+
+    async def test_criminal_data_only_for_parties_that_have_it(self) -> None:
+        """A party with counts, complaints or offense levels gets the
+        criminal table, with "None" rows for the kinds it lacks."""
+        groups = await self.get_party_groups()
+        defendant, plaintiff = (group["parties"][0] for group in groups)
+        self.assertNotIn("criminal", plaintiff)
+        criminal = defendant["criminal"]
+        self.assertEqual(
+            criminal["rows"],
+            [
+                {
+                    "label": "Pending Count",
+                    "name": "18:1001 False Statements",
+                    "disposition": "None",
+                },
+                {"label": "Complaint", "name": "None", "disposition": "None"},
+            ],
+        )
+        self.assertEqual(criminal["highest_offense_level_opening"], "Felony")
+        self.assertEqual(criminal["highest_offense_level_terminated"], "None")
+
+
+@override_settings(WAFFLE_CACHE_PREFIX="test_docket_parties_pages_waffle")
+class DocketPartiesPaginationTest(TestCase):
+    """Both designs of the parties tab serve 1,000 party types per page."""
+
+    @classmethod
+    def setUpTestData(cls) -> None:
+        cls.docket = DocketFactory(
+            court=CourtFactory(id="canb", jurisdiction="FB"),
+            source=Docket.RECAP,
+        )
+        # Bulk inserts: the factories would create an attorney and a firm
+        # per party, far more than a page boundary needs.
+        parties = Party.objects.bulk_create(
+            Party(name=f"PARTY {i:04d}") for i in range(1001)
+        )
+        PartyType.objects.bulk_create(
+            PartyType(
+                docket=cls.docket,
+                party=party,
+                name="Defendant" if i < 1000 else "Plaintiff",
+            )
+            for i, party in enumerate(parties)
+        )
+
+    def get_page(self, page: int) -> HttpResponse:
+        """Requests one page of the parties tab."""
+        url = reverse(
+            "docket_parties", args=[self.docket.pk, self.docket.slug]
+        )
+        r = self.client.get(url, {"page": page})
+        self.assertEqual(r.status_code, HTTPStatus.OK)
+        return r
+
+    @override_flag("use_new_design", active=True)
+    def test_v2_pages_the_party_types(self) -> None:
+        """The v2 tab renders one page of parties and its pager."""
+        r = self.get_page(1)
+        self.assertTemplateUsed(r, "v2_docket_parties.html")
+        groups = r.context["party_groups"]
+        self.assertEqual([group["name"] for group in groups], ["Defendant"])
+        self.assertEqual(len(groups[0]["parties"]), 1000)
+        self.assertEqual(r.context["parties_paginator"].paginator.num_pages, 2)
+
+        r = self.get_page(2)
+        groups = r.context["party_groups"]
+        self.assertEqual([group["name"] for group in groups], ["Plaintiff"])
+        self.assertEqual(groups[0]["parties"][0]["name"], "PARTY 1000")
+
+    @override_flag("use_new_design", active=False)
+    def test_legacy_pages_the_party_types(self) -> None:
+        """The legacy tab gets its parties grouped by type for one page."""
+        r = self.get_page(2)
+        self.assertTemplateUsed(r, "docket_parties.html")
+        self.assertTemplateNotUsed(r, "v2_docket_parties.html")
+        self.assertEqual(list(r.context["parties"]), ["Plaintiff"])
+        self.assertEqual(
+            [pt.party.name for pt in r.context["parties"]["Plaintiff"]],
+            ["PARTY 1000"],
+        )
+        self.assertEqual(r.context["parties_paginator"].number, 2)
+
+
+@override_settings(WAFFLE_CACHE_PREFIX="test_docket_parties_v2_waffle")
+@override_flag("use_new_design", active=True)
+class DocketPartiesV2TemplateTest(TestCase):
+    """The v2 Parties and Attorneys tab.
+
+    `WAFFLE_CACHE_PREFIX` isolates the flag cache from parallel workers, as
+    in DocketPageV2TemplateTest.
+    """
+
+    @classmethod
+    def setUpTestData(cls) -> None:
+        cls.docket = DocketFactory(
+            court=CourtFactory(id="canb", jurisdiction="FB"),
+            source=Docket.RECAP,
+        )
+        cls.firm = AttorneyOrganizationFactory(
+            name="Relman Colfax",
+            city="Washington",
+            state="DC",
+            zip_code="20036",
+        )
+        # PACER contact blocks without a recipient line leave the firm nameless.
+        cls.nameless_firm = AttorneyOrganizationFactory(
+            lookup_key="nameless", name="", address1="625 Indiana Avenue, NW"
+        )
+        cls.attorney = AttorneyFactory(
+            name="Sasha Samberg-Champion",
+            docket=cls.docket,
+            organizations=[cls.firm, cls.nameless_firm],
+        )
+        cls.party = PartyFactory(
+            name="AMERICAN ASSOCIATION OF LAW LIBRARIES",
+            docket=cls.docket,
+            attorneys=[cls.attorney],
+        )
+        PartyTypeFactory(docket=cls.docket, party=cls.party, name="Amicus")
+        RoleFactory(
+            party=cls.party,
+            docket=cls.docket,
+            attorney=AttorneyFactory(
+                name="Thomas &lt;Unknown&gt; &amp; Sons",
+                docket=cls.docket,
+                organizations=[
+                    AttorneyOrganizationFactory(
+                        lookup_key="mb", name="M&amp;B Capital"
+                    )
+                ],
+            ),
+        )
+        charged = PartyTypeFactory(
+            docket=cls.docket,
+            party=PartyFactory(
+                name="UNITED STATES OF AMERICA",
+                docket=cls.docket,
+                attorneys=[cls.attorney],
+            ),
+            name="Defendant",
+            highest_offense_level_opening="Felony",
+        )
+        CriminalCount.objects.create(
+            party_type=charged,
+            name="18:1001 False Statements",
+            disposition="",
+            status=CriminalCount.PENDING,
+        )
+        cls.editor = UserProfileWithParentsFactory(
+            user__username="parties_editor",
+            user__password=make_password("password"),
+            user__is_staff=True,
+        )
+        change_perms = Permission.objects.filter(
+            content_type__app_label="people_db",
+            codename__in=[
+                "change_party",
+                "change_attorney",
+                "change_attorneyorganization",
+            ],
+        )
+        cls.editor.user.user_permissions.add(*change_perms)
+
+    async def get_page(self) -> HttpResponse:
+        """Requests the parties tab and checks it rendered through the v2
+        template."""
+        r = await self.async_client.get(
+            reverse("docket_parties", args=[self.docket.pk, self.docket.slug])
+        )
+        self.assertEqual(r.status_code, HTTPStatus.OK)
+        self.assertTemplateUsed(r, "v2_docket_parties.html")
+        return r
+
+    async def test_renders_groups_parties_and_attorneys(self) -> None:
+        """Party types are h2 headings and parties h3 headings; each party
+        with attorneys gets one "Represented By:" heading and each charged
+        party one "Criminal Charges:" heading with its data."""
+        content = (await self.get_page()).content.decode()
+        card = fromstring(content).get_element_by_id("tab-content")
+        self.assertEqual(
+            [h.text_content().strip() for h in card.iter("h2")],
+            ["Amicus", "Defendant"],
+        )
+        self.assertIn(
+            "AMERICAN ASSOCIATION OF LAW LIBRARIES",
+            [h.text_content().strip() for h in card.iter("h3")],
+        )
+        self.assertEqual(content.count("Represented By:"), 2)
+        self.assertEqual(content.count("Criminal Charges:"), 1)
+        self.assertIn("Sasha Samberg-Champion", content)
+        self.assertIn("Washington, DC 20036", content)
+        self.assertIn("18:1001 False Statements", content)
+        self.assertEqual(
+            [dd.text_content().strip() for dd in card.iter("dd")],
+            ["Felony", "None"],
+        )
+
+    async def test_names_are_decoded_once_then_escaped(self) -> None:
+        """Names stored with HTML entities render decoded once and escaped
+        by the template: M&amp;B reads M&B, and a name in angle brackets
+        shows as text instead of disappearing as a tag."""
+        content = (await self.get_page()).content.decode()
+        self.assertIn("Thomas &lt;Unknown&gt; &amp; Sons", content)
+        self.assertIn("M&amp;B Capital", content)
+        self.assertNotIn("<Unknown>", content)
+        self.assertNotIn("&amp;amp;", content)
+        self.assertNotIn("&amp;lt;", content)
+
+    async def test_party_blocks_are_named_groups(self) -> None:
+        """Each party, and the representation and charges blocks inside it,
+        is a group named by its heading, so assistive technology can
+        announce and skip them as units."""
+        tree = fromstring((await self.get_page()).content.decode())
+        groups = tree.xpath(
+            '//*[@id="tab-content"]//*[@role="group"][@aria-labelledby]'
+        )
+        headings = [
+            tree.get_element_by_id(group.get("aria-labelledby"))
+            for group in groups
+        ]
+        self.assertEqual(
+            [
+                (h.tag, h.get("aria-label") or h.text_content().strip())
+                for h in headings
+            ],
+            [
+                ("h3", "AMERICAN ASSOCIATION OF LAW LIBRARIES"),
+                ("h4", "Represented By:"),
+                ("h3", "UNITED STATES OF AMERICA"),
+                ("h4", "Represented By:"),
+                ("h4", "Criminal Charges:"),
+            ],
+        )
+        self.assertIn(groups[1], groups[0].iterdescendants())
+        self.assertIn(groups[3], groups[2].iterdescendants())
+        self.assertIn(groups[4], groups[2].iterdescendants())
+
+    async def test_parties_tab_is_current(self) -> None:
+        """The tab navigation marks the parties tab as the current page."""
+        content = (await self.get_page()).content.decode()
+        current = [
+            el
+            for el in fromstring(content).iter("a")
+            if el.get("aria-current") == "page"
+        ]
+        self.assertEqual(len(current), 1)
+        self.assertIn("Parties and Attorneys", current[0].text_content())
+
+    async def test_edit_links_follow_the_change_permissions(self) -> None:
+        """Only users who may change parties, attorneys and firms get the
+        link to each admin page, nameless firms included."""
+        admin_urls = [
+            reverse("admin:people_db_party_change", args=[self.party.pk]),
+            reverse(
+                "admin:people_db_attorney_change", args=[self.attorney.pk]
+            ),
+            reverse(
+                "admin:people_db_attorneyorganization_change",
+                args=[self.firm.pk],
+            ),
+            reverse(
+                "admin:people_db_attorneyorganization_change",
+                args=[self.nameless_firm.pk],
+            ),
+        ]
+        content = (await self.get_page()).content.decode()
+        for url in admin_urls:
+            self.assertNotIn(url, content)
+
+        await self.async_client.aforce_login(self.editor.user)
+        content = (await self.get_page()).content.decode()
+        for url in admin_urls:
+            self.assertIn(url, content)
+        self.assertIn(
+            f'aria-label="Edit firm {self.nameless_firm.pk}"', content
+        )
 
 
 @override_settings(WAFFLE_CACHE_PREFIX="test_docket_page_v2_waffle")

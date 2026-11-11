@@ -97,6 +97,7 @@ from cl.opinion_page.forms import (
 )
 from cl.opinion_page.utils import (
     build_idb_rows,
+    build_party_groups,
     core_docket_data,
     es_cited_case_count,
     es_get_cited_clusters_with_cache,
@@ -477,9 +478,9 @@ async def view_parties(
     docket_id: int,
     slug: str,
 ) -> HttpResponse:
-    """Show the parties and attorneys tab on the docket with pagination."""
+    """Show the parties and attorneys tab on the docket, 1,000 party types
+    per page."""
 
-    page = request.GET.get("page", 1)
     docket, context = await core_docket_data(request, docket_id)
     # We work with this data at the level of party_types so that we can group
     # the parties by this field. From there, we do a whole mess of prefetching,
@@ -512,6 +513,8 @@ async def view_parties(
         .order_by("name", "party__name")
     )
 
+    page = request.GET.get("page", 1)
+
     @sync_to_async
     def paginate_parties(
         party_queryset: QuerySet[PartyType], parties_page: int | str
@@ -525,15 +528,19 @@ async def view_parties(
             return paginator.page(paginator.num_pages)
 
     party_types_paginator = await paginate_parties(party_types, page)
-    parties: dict[str, list] = {}
     # Page.object_list is typed as _SupportsPagination, but here it is the
     # sliced QuerySet, which supports async iteration.
-    async for party_type in cast(
-        QuerySet[PartyType], party_types_paginator.object_list
-    ):
-        if party_type.name not in parties:
-            parties[party_type.name] = []
-        parties[party_type.name].append(party_type)
+    party_types_on_page = [
+        party_type
+        async for party_type in cast(
+            QuerySet[PartyType], party_types_paginator.object_list
+        )
+    ]
+    # TODO: Remove the legacy parties dict once new design is completely
+    # rolled out.
+    parties: dict[str, list] = {}
+    for party_type in party_types_on_page:
+        parties.setdefault(party_type.name, []).append(party_type)
 
     return TemplateResponse(
         request,
@@ -541,6 +548,9 @@ async def view_parties(
         context
         | {
             "parties": parties,
+            "party_groups": await sync_to_async(build_party_groups)(
+                party_types_on_page
+            ),
             "parties_paginator": party_types_paginator,
             "docket_entries": await docket.docket_entries.aexists(),
         },
