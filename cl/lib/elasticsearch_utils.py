@@ -24,7 +24,7 @@ from django.utils.html import strip_tags
 from django_elasticsearch_dsl.search import Search
 from elasticsearch.dsl import A, MultiSearch, Q
 from elasticsearch.dsl import Search as SearchDSL
-from elasticsearch.dsl.query import Query, QueryString, Range
+from elasticsearch.dsl.query import Bool, Query, QueryString, Range
 from elasticsearch.dsl.response import Hit, Response
 from elasticsearch.dsl.utils import AttrDict
 from elasticsearch.exceptions import ApiError, RequestError, TransportError
@@ -1320,6 +1320,43 @@ def get_match_all_query(
     return final_match_all_query
 
 
+def includes_scotus(cd: CleanData) -> bool:
+    """Whether a RECAP search should include SCOTUS content. False unless
+    the caller sets cd["include_scotus"], which only the search frontend
+    does, behind the scotus_docket_page flag. Temporary: remove once
+    SCOTUS launches.
+    """
+    return bool(cd.get("include_scotus"))
+
+
+def excludes_scotus(cd: CleanData) -> bool:
+    """True for a RECAP search (r, d, rd) that must leave SCOTUS content
+    out of its results, see includes_scotus. Other search types never
+    contain SCOTUS RECAP-style content.
+    """
+    return not includes_scotus(cd) and cd["type"] in (
+        SEARCH_TYPES.RECAP,
+        SEARCH_TYPES.DOCKETS,
+        SEARCH_TYPES.RECAP_DOCUMENT,
+    )
+
+
+def exclude_scotus(query: Query | None) -> Query:
+    """Return query, or a match-everything query if it's None, without
+    SCOTUS dockets and documents.
+
+    A bool query gets the exclusion added to its own must_not rather than
+    being wrapped, so code that reads its clauses (e.g. clean_count_query)
+    still finds them.
+    """
+    scotus = Q("term", **{"court_id.raw": "scotus"})
+    if isinstance(query, Bool):
+        query = query._clone()
+        query.must_not = [*query.must_not, scotus]
+        return query
+    return Q("bool", must=[query] if query else [], must_not=[scotus])
+
+
 def build_es_base_query(
     search_query: Search,
     cd: CleanData,
@@ -1507,6 +1544,11 @@ def build_es_base_query(
         )
         boost_mode = "multiply" if string_query else "replace"
 
+    if excludes_scotus(cd):
+        main_query = exclude_scotus(cast(Query, main_query))
+        if child_query:
+            child_query = exclude_scotus(child_query)
+
     # Apply a custom function score to the main query, useful for cursor pagination
     # in the V4 API and for date decay relevance.
     main_query = apply_custom_score_to_main_query(
@@ -1576,6 +1618,10 @@ def build_child_docs_query(
     ]
     parties_has_parent_query = build_has_parent_parties_query(parties_filters)
 
+    if not child_docs_query and excludes_scotus(cd):
+        # Match all query case, where build_es_base_query had no child query
+        # to exclude SCOTUS from.
+        child_docs_query = exclude_scotus(None)
     if not child_docs_query:
         # Match all query case.
         if not exclude_docs_for_empty_field:
@@ -2668,6 +2714,22 @@ def process_feed_query_results(
         if not jurisdiction:
             limit_inner_hits(cd, response, cd["type"])
     set_results_highlights(response, cd["type"])
+
+
+def get_docket_entry_pk(doc: AttrDict[Any]) -> int | None:
+    """Return the DocketEntry pk of an ESRECAPDocument hit, whatever its
+    source. RECAP documents keep it in docket_entry_id; other sources keep
+    it in docket_entry_uid, prefixed with their uid_namespace (e.g.
+    "scotus_321").
+
+    :param doc: An ESRECAPDocument hit.
+    :return: The docket entry pk, or None if the hit has neither field.
+    """
+    if docket_entry_id := getattr(doc, "docket_entry_id", None):
+        return docket_entry_id
+    if docket_entry_uid := getattr(doc, "docket_entry_uid", None):
+        return int(docket_entry_uid.rsplit("_", 1)[1])
+    return None
 
 
 def do_es_feed_query(

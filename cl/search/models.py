@@ -283,6 +283,12 @@ class Docket(AbstractDateTimeModel, DocketSources):
     and link them together.
     """
 
+    # Not a model field - merge_scotus_docket sets this transiently, right
+    # before a Docket's first save, so the ES signal processor can tell a
+    # real SCOTUS docket from one created only to hold a scraped Opinion.
+    # Declared here only so the type checker knows the attribute exists.
+    _index_in_es: bool
+
     source = models.SmallIntegerField(
         help_text="contains the source of the Docket.",
         choices=DocketSources.SOURCE_CHOICES,
@@ -4048,6 +4054,7 @@ class ScotusDocketMetadata(AbstractDateTimeModel):
         max_length=1000,
         blank=True,
     )
+    es_rd_field_tracker = FieldTracker(fields=["capital_case"])
 
     def __str__(self) -> str:
         return f"SCOTUS metadata for docket {self.docket_id}"
@@ -4286,6 +4293,13 @@ class SCOTUSDocketEntry(AbstractDateTimeModel, CSVExportMixin):
     sequence_number = models.CharField(
         max_length=16,
     )
+    es_rd_field_tracker = FieldTracker(
+        fields=[
+            "entry_number",
+            "description",
+            "date_filed",
+        ]
+    )
 
     class Meta:
         ordering = ["-sequence_number"]
@@ -4296,6 +4310,10 @@ class SCOTUSDocketEntry(AbstractDateTimeModel, CSVExportMixin):
 class SCOTUSDocument(AbstractDateTimeModel, AbstractPDF):
     """
     Represents an attachment to a SCOTUS docket entry.
+
+    An entry without attachments gets one empty placeholder document (no
+    url), so its metadata can be indexed in ES, which indexes entries
+    through their documents. See is_placeholder.
 
     :ivar docket_entry: The Docket this document is associated with.
     :ivar description: The description of this file in SCOTUS.
@@ -4319,6 +4337,17 @@ class SCOTUSDocument(AbstractDateTimeModel, AbstractPDF):
         null=True,
     )
     url = models.URLField(max_length=1000)
+    es_rd_field_tracker = FieldTracker(
+        fields=[
+            "docket_entry_id",
+            "description",
+            "document_number",
+            "attachment_number",
+            "plain_text",
+            "page_count",
+            "filepath_local",
+        ]
+    )
 
     class Meta:
         indexes = [
@@ -4383,6 +4412,14 @@ class SCOTUSDocument(AbstractDateTimeModel, AbstractPDF):
     @property
     def is_available(self) -> bool:
         return bool(self.filepath_local)
+
+    @property
+    def is_placeholder(self) -> bool:
+        """Whether this is the empty document of an entry without
+        attachments. Placeholders have no file to download and no page of
+        their own; to find them in a query, filter on url="".
+        """
+        return not self.url
 
     @property
     def has_valid_pdf(self) -> bool:

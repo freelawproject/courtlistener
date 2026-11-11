@@ -103,6 +103,7 @@ from cl.opinion_page.utils import (
     es_get_related_clusters_with_cache,
     es_related_case_count,
     generate_docket_entries_csv_data,
+    separate_syllabus,
 )
 from cl.people_db.models import (
     AttorneyOrganization,
@@ -416,7 +417,11 @@ async def view_docket(
     def _attach_documents(entries: list) -> list:
         page_documents = []
         for entry in entries:
-            entry.documents = list(source.documents_for_entry(entry))
+            entry.documents = [
+                document
+                for document in source.documents_for_entry(entry)
+                if source.document_is_listed(document)
+            ]
             for document in entry.documents:
                 attach_display_fields(source, document)
             page_documents.extend(entry.documents)
@@ -1041,6 +1046,7 @@ async def setup_opinion_context(
         "private": cluster.blocked,
         "sponsored": sponsored,
         "citations": sorted(cluster.citations.all(), key=sort_cites),
+        "separate_syllabus": separate_syllabus(cluster),
     }
 
     download_context = await get_downloads_context(cluster)
