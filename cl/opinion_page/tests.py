@@ -5188,8 +5188,8 @@ class DocketEntryRowsV2Test(TestCase):
     async def test_csv_export_for_authenticated_user(self) -> None:
         """A signed-in user gets the download link, fetched in place by Alpine.
 
-        The view answers 501 and 429, so the page declares a message for each
-        plus a fallback.
+        The view answers 429 when rate limited, so the page declares a message
+        for it plus a fallback.
         """
         user = await sync_to_async(UserWithChildProfileFactory)()
         await sync_to_async(self.async_client.force_login)(user)
@@ -5205,7 +5205,6 @@ class DocketEntryRowsV2Test(TestCase):
         component = link.xpath('ancestor::*[@x-data="download"]')
         self.assertEqual(len(component), 1)
         for key in (
-            "data-error-message-501",
             "data-error-message-429",
             "data-error-message-default",
         ):
