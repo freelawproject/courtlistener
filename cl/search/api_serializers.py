@@ -342,7 +342,9 @@ class ParentheticalSerializer(
         queryset=Opinion.objects.all(),
         style={"base_template": "input.html"},
     )
-    describing_opinion_case_name = serializers.SerializerMethodField()
+    describing_opinion_case_name = serializers.CharField(
+        source="describing_opinion.cluster.case_name", read_only=True
+    )
     describing_opinion_citation = serializers.CharField(
         source="describing_opinion.cluster.citation_string", read_only=True
     )
@@ -359,23 +361,11 @@ class ParentheticalSerializer(
         queryset=Opinion.objects.all(),
         style={"base_template": "input.html"},
     )
-    described_opinion_case_name = serializers.SerializerMethodField()
+    described_opinion_case_name = serializers.CharField(
+        source="described_opinion.cluster.case_name", read_only=True
+    )
     group_id = serializers.ReadOnlyField()
     group = ParentheticalGroupSerializer(many=False, read_only=True)
-
-    def get_describing_opinion_case_name(self, obj) -> str:
-        """The case name of the citing opinion's cluster."""
-        try:
-            return obj.describing_opinion.cluster.case_name
-        except AttributeError:
-            return ""
-
-    def get_described_opinion_case_name(self, obj) -> str:
-        """The case name of the described opinion's cluster."""
-        try:
-            return obj.described_opinion.cluster.case_name
-        except AttributeError:
-            return ""
 
     class Meta:
         model = Parenthetical

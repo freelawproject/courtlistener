@@ -193,6 +193,10 @@ class OpinionsCitedFilter(NoEmptyFilterSet):
 
 
 class ParentheticalFilter(NoEmptyFilterSet):
+    """Filters for the parentheticals endpoint, by the described or
+    describing opinion, ID, and score.
+    """
+
     # Validating an opinion ID loads that opinion, so only fetch its ID
     # instead of its full text fields.
     describing_opinion = filters.RelatedFilter(
