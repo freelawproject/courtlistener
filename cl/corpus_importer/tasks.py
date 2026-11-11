@@ -226,6 +226,7 @@ from cl.search.state.texas.models import (
     TexasDocketEntry,
     TexasDocument,
 )
+from cl.search.tasks import index_docket_parties_in_es
 from cl.settings import COURT_REQUEST_USER_AGENT
 
 HYPERSCAN_TOKENIZER = HyperscanTokenizer(cache_dir=".hyperscan")
@@ -3663,8 +3664,9 @@ def merge_scotus_document(
     """Merge a single SCOTUSDocument attachment into CL.
 
     Checks if the document exists, creating a SCOTUSDocument object if it does
-    not. Then, if the document is new or the filename has changed,
-    fetch the attachment PDF, store it, and compute metadata.
+    not. Then, if the document is new, was a placeholder, or the filename has
+    changed, fetch the attachment PDF, store it, and compute metadata. The
+    download is queued when the current transaction commits.
 
     :param docket_entry: The docket entry this attachment belongs to.
     :param doc_data: The attachment data to merge.
@@ -3691,12 +3693,15 @@ def merge_scotus_document(
         },
     )
 
-    # Check if the filename has changed for existing documents
+    # Check if the filename has changed for existing documents. A filled-in
+    # placeholder never had a file, so it needs one whatever its URL.
     file_name_changed = False
     if not created:
         old_file_name = extract_file_name_from_url(scotus_document.url)
         new_file_name = extract_file_name_from_url(url)
-        file_name_changed = old_file_name != new_file_name
+        file_name_changed = (
+            scotus_document.is_placeholder or old_file_name != new_file_name
+        )
 
         # Update the fields
         scotus_document.description = description
@@ -3706,14 +3711,83 @@ def merge_scotus_document(
         )
 
     if download_file and (created or file_name_changed):
-        chain(
-            download_scotus_document_pdf.si(scotus_document.pk),
-            extract_pdf_document.s(
-                check_if_needed=False, model_name="search.SCOTUSDocument"
-            ),
-        ).apply_async()
+        # Queue the download once the merge commits; otherwise the worker can
+        # read the document before it exists or, for a filled-in placeholder,
+        # while its url is still empty.
+        transaction.on_commit(
+            chain(
+                download_scotus_document_pdf.si(scotus_document.pk),
+                extract_pdf_document.s(
+                    check_if_needed=False, model_name="search.SCOTUSDocument"
+                ),
+            ).apply_async
+        )
 
     return created, scotus_document.pk
+
+
+def add_scotus_placeholder_document(docket_entry: SCOTUSDocketEntry) -> None:
+    """Give a SCOTUS entry without attachments an empty placeholder
+    document, so ES, which indexes entries through their documents, can
+    index it. Does nothing if the entry already has a document.
+
+    :param docket_entry: The entry to add the placeholder to.
+    :return: None
+    """
+    if docket_entry.scotus_documents.exists():
+        return
+    SCOTUSDocument.objects.create(docket_entry=docket_entry)
+
+
+def fill_scotus_placeholder_document(
+    docket_entry: SCOTUSDocketEntry, attachment: dict[str, Any]
+) -> int | None:
+    """Turn the entry's placeholder, if it has one, into the given
+    attachment by giving it the attachment's numbers. merge_scotus_document
+    then finds it and fills in the rest, instead of creating a new document
+    and leaving the empty placeholder next to it.
+
+    If the entry already has other documents, the placeholder is stale and
+    is deleted instead, so the attachments merge as usual. If it has more
+    than one placeholder, which shouldn't happen, an error is logged and
+    they're left untouched.
+
+    :param docket_entry: The entry whose placeholder to fill in.
+    :param attachment: The attachment data the placeholder becomes.
+    :return: The placeholder's pk, or None if there was none to fill in.
+    """
+    # unique_together treats NULLs as distinct, so it doesn't stop an entry
+    # from having more than one placeholder.
+    placeholders = list(
+        docket_entry.scotus_documents.filter(
+            url="",
+            document_number__isnull=True,
+            attachment_number__isnull=True,
+        )[:2]
+    )
+    if not placeholders:
+        return None
+    if len(placeholders) > 1:
+        logger.error(
+            "Multiple placeholder SCOTUSDocuments found for "
+            "SCOTUSDocketEntry %s on Docket %s.",
+            docket_entry.pk,
+            docket_entry.docket_id,
+        )
+        return None
+    placeholder = placeholders[0]
+    # A worker running older code, e.g. during a deploy, can add documents
+    # next to the placeholder. Giving it their numbers would then break the
+    # entry's unique (document_number, attachment_number) pairs.
+    if docket_entry.scotus_documents.exclude(pk=placeholder.pk).exists():
+        placeholder.delete()
+        return None
+    placeholder.document_number = attachment["document_number"]
+    placeholder.attachment_number = attachment["attachment_number"]
+    placeholder.save(
+        update_fields=["document_number", "attachment_number", "date_modified"]
+    )
+    return placeholder.pk
 
 
 def merge_scotus_docket_entry(
@@ -3723,6 +3797,9 @@ def merge_scotus_docket_entry(
     download_file: bool = True,
 ) -> tuple[bool, int | None, list[int]]:
     """Merges a SCOTUS docket entry into CL.
+
+    An entry without attachments gets an empty placeholder document, which
+    becomes its first attachment once it has some.
 
     :param docket: The docket this entry belongs to.
     :param sequence_number: The sequence number of the docket entry.
@@ -3815,14 +3892,22 @@ def merge_scotus_docket_entry(
         de.date_filed = date_filed
         de.save()
 
+        attachments = input_docket_entry["attachments"]
+        if not attachments:
+            add_scotus_placeholder_document(de)
+            return de_created, de.pk, []
+
         # Merge attachments; only track newly created document PKs
         doc_pks = []
-        attachments = input_docket_entry["attachments"]
+        filled_placeholder_pk = fill_scotus_placeholder_document(
+            de, attachments[0]
+        )
         for document in attachments:
             created, doc_pk = merge_scotus_document(
                 de, document, download_file=download_file
             )
-            if created:
+            # A filled-in placeholder is a new document to callers too.
+            if created or doc_pk == filled_placeholder_pk:
                 doc_pks.append(doc_pk)
         return de_created, de.pk, doc_pks
 
@@ -3971,6 +4056,11 @@ def merge_scotus_docket(
             )
             oci.save()
             d.originating_court_information = oci
+        # Marks this as real SCOTUS content for the ES signal
+        # processor's docket_belongs check -- the Docket's own
+        # source=SCRAPER is indistinguishable from an opinion-scraper
+        # Docket, so it can't tell them apart on its own.
+        d._index_in_es = True
         d.save()
 
         # Merge ScotusDocketMetadata
@@ -4003,6 +4093,9 @@ def merge_scotus_docket(
     if report_data["parties"]:
         normalized_parties = normalize_scotus_parties(report_data["parties"])
         add_parties_and_attorneys(d, normalized_parties)
+        # Party rows don't trigger ES signals, and the Docket was indexed
+        # when its metadata was saved, before these parties existed.
+        index_docket_parties_in_es.delay(d.pk, percolate_parties=False)
 
     # Docket entries merger:
     enrich_scotus_attachments(report_data["docket_entries"])
