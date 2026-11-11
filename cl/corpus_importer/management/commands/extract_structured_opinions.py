@@ -40,21 +40,24 @@ def get_opinions_to_extract(
     curated type and author would still be overwritten.
 
     :param courts: The court ids to read. Should be a subset of
-    CENTRALIA_ENABLED_COURTS unless `skip_validation` is set.
+    CENTRALIA_ENABLED_COURTS. Ignored when `skip_validation` is set.
     :param cluster_ids: If given, only these clusters are considered.
     :param date_filed_gte: If given, only clusters filed on or after it.
     :param date_filed_lte: If given, only clusters filed on or before it.
     :param limit: If given, the maximum number of opinions returned.
-    :param skip_validation: Whether to drop the source, opinion count and
-    anon 2020 filters, keeping only the stored PDF requirement. Meant for
+    :param skip_validation: Whether to drop the court, source, opinion count
+    and anon 2020 filters, keeping only the stored PDF requirement. Meant for
     previews and one-off fixes together with `cluster_ids`.
     :return: The opinions, with their cluster and docket selected, ordered
     by cluster id.
     """
-    clusters = OpinionCluster.objects.filter(docket__court_id__in=courts)
+    clusters = OpinionCluster.objects.all()
     if not skip_validation:
         clusters = (
-            clusters.filter(source=ClusterSources.COURT_WEBSITE)
+            clusters.filter(
+                docket__court_id__in=courts,
+                source=ClusterSources.COURT_WEBSITE,
+            )
             .annotate(opinion_count=Count("sub_opinions"))
             .filter(opinion_count=1)
         )
@@ -226,7 +229,8 @@ class Command(VerboseCommand):
             nargs="+",
             default=sorted(CENTRALIA_ENABLED_COURTS),
             help="The court ids to process. Defaults to every enabled court. "
-            "Courts outside CENTRALIA_ENABLED_COURTS need --skip-validation.",
+            "Ignored with --skip-validation, which reads each of the "
+            "--cluster-ids from its own court.",
         )
         parser.add_argument(
             "--cluster-ids",
@@ -315,7 +319,7 @@ class Command(VerboseCommand):
         ):
             raise CommandError(
                 f"Courts not in CENTRALIA_ENABLED_COURTS: {unknown}. Use "
-                "--skip-validation to read them anyway."
+                "--skip-validation with --cluster-ids to read them anyway."
             )
         if skip_validation:
             logger.warning(
