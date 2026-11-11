@@ -5,11 +5,11 @@
 <fieldset x-bind:id="fieldsetId" class="contents" x-show="isActiveScope" x-cloak data-scope="Oral Arguments">
   <legend class="sr-only">Oral Arguments filters</legend>
 
-  <c-corpus-search.filters.input :search_form="search_form" field_name="case_name" namespace="oral_arguments" :form_prefix="form_prefix" only/>
+  <c-form.input :form="search_form" field_name="case_name" namespace="oral_arguments" :form_prefix="form_prefix" only/>
 
-  <c-corpus-search.filters.input :search_form="search_form" field_name="docket_number" namespace="oral_arguments" :form_prefix="form_prefix" only/>
+  <c-form.input :form="search_form" field_name="docket_number" namespace="oral_arguments" :form_prefix="form_prefix" only/>
 
-  <c-corpus-search.filters.input :search_form="search_form" field_name="judge" namespace="oral_arguments" :form_prefix="form_prefix" only/>
+  <c-form.input :form="search_form" field_name="judge" namespace="oral_arguments" :form_prefix="form_prefix" only/>
 
   <c-corpus-search.date-selector
     label="Argued After"
