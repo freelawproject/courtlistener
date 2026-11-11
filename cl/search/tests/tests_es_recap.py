@@ -27,6 +27,7 @@ from cl.corpus_importer.tasks import (
     add_scotus_docket_entries,
     enrich_scotus_attachments,
 )
+from cl.favorites.factories import NoteFactory
 from cl.lib.elasticsearch_utils import (
     build_es_main_query,
     build_search_feed_query,
@@ -7797,13 +7798,17 @@ class SCOTUSRECAPSearchTest(
             cls.recap_docket_path = f"/docket/{recap_entry.docket_id}/"
             # Several SCOTUS documents, so the counts tests can tell them
             # apart from a docket count.
-            for n in range(1, 6):
+            cls.scotus_documents = [
                 SCOTUSDocumentFactory(
                     docket_entry=scotus_entry,
                     attachment_number=n,
                     description="Tied",
                 )
-            RECAPDocumentFactory(docket_entry=recap_entry, description="Tied")
+                for n in range(1, 6)
+            ]
+            cls.recap_document = RECAPDocumentFactory(
+                docket_entry=recap_entry, description="Tied"
+            )
 
     def test_search_frontend_shows_scotus_only_with_the_flag(self) -> None:
         """Until launch, the search page and the RSS search feed show
@@ -8036,6 +8041,27 @@ class SCOTUSRECAPSearchTest(
         self.assertEqual(page.context["results_details"][3], 5)
         self.assertEqual(api_r.data["document_count"], 0)
         self.assertEqual(api_rd.data["count"], 0)
+
+    def test_notes_search_url_finds_the_noted_documents(self) -> None:
+        """The "Search Notes" link for documents finds the noted RECAP and
+        SCOTUS documents, and none of the other SCOTUS documents."""
+        for document in [self.scotus_documents[0], self.recap_document]:
+            NoteFactory(content_object=document, user=self.api_user)
+        search_url = self.client.get(reverse("profile_notes")).context[
+            "recap_search_url"
+        ]
+        # Users replace the "xxx" placeholder with their own terms.
+        params = urllib.parse.parse_qs(
+            urllib.parse.urlsplit(search_url.replace("xxx", "Tied")).query
+        )
+
+        r = self.client.get(reverse("show_results"), params)
+
+        # results_details is [query time, parent count, limit, child count].
+        self.assertEqual(r.context["results_details"][3], 2)
+        content = r.content.decode()
+        self.assertIn(self.recap_docket_path, content)
+        self.assertIn(self.scotus_docket_path, content)
 
 
 class RECAPFeedTest(RECAPSearchTestCase, ESIndexTestCase, TestCase):
