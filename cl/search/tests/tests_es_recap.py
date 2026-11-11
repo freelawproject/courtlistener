@@ -4,6 +4,7 @@ import re
 import urllib.parse
 from http import HTTPStatus
 from itertools import product
+from typing import Any
 from unittest import mock
 
 import time_machine
@@ -22,6 +23,10 @@ from rest_framework.serializers import CharField
 from waffle.testutils import override_flag
 
 from cl.alerts.utils import add_cutoff_timestamp_filter
+from cl.corpus_importer.tasks import (
+    add_scotus_docket_entries,
+    enrich_scotus_attachments,
+)
 from cl.lib.elasticsearch_utils import (
     build_es_main_query,
     build_search_feed_query,
@@ -96,6 +101,8 @@ from cl.search.factories import (
     OpinionsCitedByRECAPDocumentFactory,
     OpinionWithParentsFactory,
     RECAPDocumentFactory,
+    SCOTUSAttachmentDataFactory,
+    SCOTUSDocketEntryDataFactory,
     SCOTUSDocketEntryFactory,
     ScotusDocketMetadataFactory,
     SCOTUSDocumentFactory,
@@ -7163,6 +7170,60 @@ class SCOTUSESIndexingSignalTest(
                     id=ES_CHILD_ID(scotus_document.pk).SCOTUS
                 )
                 self.assertEqual(getattr(hit, es_field), expected)
+
+    def test_entry_without_attachments_is_indexed_through_placeholder(
+        self,
+    ) -> None:
+        """An entry merged without attachments is indexed in ES through its
+        placeholder document, so its description can be searched. Once the
+        entry has an attachment, the same ES document gets its fields."""
+        docket = DocketFactory(court=self.court, source=Docket.SCRAPER)
+        ScotusDocketMetadataFactory(docket=docket)
+
+        def merge(
+            document_number: int | None, attachments: list[dict[str, Any]]
+        ) -> None:
+            """Merge the same entry with the given attachments."""
+            docket_entries = [
+                SCOTUSDocketEntryDataFactory(
+                    description="DISTRIBUTED for Conference.",
+                    date_filed=datetime.date(2024, 3, 1),
+                    document_number=document_number,
+                    attachments=attachments,
+                )
+            ]
+            enrich_scotus_attachments(docket_entries)
+            add_scotus_docket_entries(
+                docket, docket_entries, download_file=False
+            )
+
+        merge(document_number=None, attachments=[])
+
+        placeholder = SCOTUSDocument.objects.get(docket_entry__docket=docket)
+        es_id = ES_CHILD_ID(placeholder.pk).SCOTUS
+        hit = ESRECAPDocument.get(id=es_id)
+        self.assertEqual(hit.description, "DISTRIBUTED for Conference.")
+        self.assertEqual(hit.absolute_url, "")
+        self.assertEqual(
+            ESRECAPDocument.search()
+            .query("match", description="DISTRIBUTED")
+            .count(),
+            1,
+        )
+
+        merge(
+            document_number=7,
+            attachments=[
+                SCOTUSAttachmentDataFactory(
+                    description="Petition", document_number=7
+                )
+            ],
+        )
+
+        hit = ESRECAPDocument.get(id=es_id)
+        self.assertEqual(hit.short_description, "Petition")
+        self.assertEqual(hit.document_number, 7)
+        self.assertEqual(hit.entry_number, 7)
 
     def test_scotus_docket_entry_delete_cascades_to_documents(self) -> None:
         """Deleting a SCOTUSDocketEntry cascades (on_delete=CASCADE) to
