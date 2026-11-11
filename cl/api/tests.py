@@ -144,6 +144,7 @@ from cl.search.api_views import (
     OpinionsCitedViewSet,
     OpinionViewSet,
     OriginatingCourtInformationViewSet,
+    ParentheticalViewSet,
     RECAPDocumentViewSet,
     TagViewSet,
 )
@@ -2929,6 +2930,18 @@ class V4DRFPaginationTest(TestCase):
             secondary_cursor_key="id",
             non_cursor_key="citing_opinion",
             viewset=OpinionsCitedViewSet,
+        )
+
+    async def test_parentheticals_endpoint(self) -> None:
+        """Test the V4 Parentheticals endpoint confirming that their cursor
+        and page number pagination works properly."""
+
+        await self._base_test_for_v4_endpoints(
+            endpoint="parenthetical-list",
+            default_ordering="-id",
+            secondary_cursor_key="id",
+            non_cursor_key="score",
+            viewset=ParentheticalViewSet,
         )
 
     async def test_tag_endpoint(self):

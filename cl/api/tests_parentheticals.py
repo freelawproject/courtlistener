@@ -1,18 +1,20 @@
 from http import HTTPStatus
+from typing import Any
 
-from asgiref.sync import sync_to_async
+from asgiref.sync import async_to_sync, sync_to_async
 from django.contrib.auth.models import Permission
 from django.db import connection
 from django.test.utils import CaptureQueriesContext
-from django.urls import reverse
+from django.urls import NoReverseMatch, reverse
 
 from cl.search.factories import (
+    CitationWithParentsFactory,
     OpinionWithParentsFactory,
     ParentheticalFactory,
     ParentheticalGroupFactory,
 )
 from cl.tests.cases import TestCase
-from cl.tests.utils import make_client
+from cl.tests.utils import AsyncAPIClient, make_client
 from cl.users.factories import UserProfileWithParentsFactory
 
 
@@ -21,6 +23,9 @@ class ParentheticalAPITest(TestCase):
 
     @classmethod
     def setUpTestData(cls) -> None:
+        """Create a user, two described opinions and a citing opinion with
+        four parentheticals of distinct scores.
+        """
         # An authenticated user is enough for read access; DjangoModelPermissions
         # only gates write methods.
         cls.user_profile = UserProfileWithParentsFactory.create()
@@ -31,6 +36,12 @@ class ParentheticalAPITest(TestCase):
         cls.described_a = OpinionWithParentsFactory.create()
         cls.described_b = OpinionWithParentsFactory.create()
         cls.describing = OpinionWithParentsFactory.create()
+        cls.citation = CitationWithParentsFactory.create(
+            cluster=cls.describing.cluster,
+            volume=576,
+            reporter="U.S.",
+            page="644",
+        )
 
         # Three parentheticals describing opinion A, authored by `describing`,
         # with distinct scores so ordering is observable.
@@ -63,21 +74,25 @@ class ParentheticalAPITest(TestCase):
         cls.list_path = reverse("parenthetical-list", kwargs={"version": "v4"})
 
     def setUp(self) -> None:
-        self.client = make_client(self.user_profile.user.pk)
+        """Build an API client authenticated as the test user."""
+        self.async_client = make_client(self.user_profile.user.pk)
 
-    async def _get(self, params=None):
-        return await self.client.get(self.list_path, params or {})
+    async def _get(self, params: dict[str, Any] | None = None) -> Any:
+        """Request the parentheticals list with the given query params."""
+        return await self.async_client.get(self.list_path, params or {})
 
     async def test_list_requires_authentication(self) -> None:
         """Anonymous users cannot read the endpoint."""
-        from cl.tests.utils import AsyncAPIClient
-
-        anon = AsyncAPIClient()
-        r = await anon.get(self.list_path)
+        r = await AsyncAPIClient().get(self.list_path)
         self.assertIn(
             r.status_code,
             (HTTPStatus.UNAUTHORIZED, HTTPStatus.FORBIDDEN),
         )
+
+    def test_endpoint_is_not_available_in_v3(self) -> None:
+        """The endpoint is new, so it is only registered in v4."""
+        with self.assertRaises(NoReverseMatch):
+            reverse("parenthetical-list", kwargs={"version": "v3"})
 
     async def test_filter_by_described_opinion(self) -> None:
         """described_opinion returns the parentheticals describing that
@@ -88,7 +103,6 @@ class ParentheticalAPITest(TestCase):
         self.assertEqual(
             ids, {self.pa_high.pk, self.pa_mid.pk, self.pa_low.pk}
         )
-        self.assertNotIn(self.pb.pk, ids)
 
     async def test_filter_by_describing_opinion(self) -> None:
         """describing_opinion returns the parentheticals authored by an
@@ -102,9 +116,30 @@ class ParentheticalAPITest(TestCase):
         )
 
     async def test_default_ordering_by_id_desc(self) -> None:
-        """Results page by descending id (stable cursor key); relevance is
-        expressed via the score filter, not ordering."""
+        """Results page by descending id, the default cursor key."""
         r = await self._get({"described_opinion": self.described_a.pk})
+        self.assertEqual(r.status_code, HTTPStatus.OK)
+        ids = [row["id"] for row in r.data["results"]]
+        self.assertEqual(ids, sorted(ids, reverse=True))
+
+    async def test_order_by_score(self) -> None:
+        """order_by=-score returns the most descriptive parentheticals first,
+        like the Summaries tab."""
+        r = await self._get(
+            {"described_opinion": self.described_a.pk, "order_by": "-score"}
+        )
+        self.assertEqual(r.status_code, HTTPStatus.OK)
+        ids = [row["id"] for row in r.data["results"]]
+        self.assertEqual(
+            ids, [self.pa_high.pk, self.pa_mid.pk, self.pa_low.pk]
+        )
+
+    async def test_order_by_unindexed_field_is_ignored(self) -> None:
+        """Ordering by a field outside ordering_fields falls back to the
+        default ordering instead of sorting on an unindexed column."""
+        r = await self._get(
+            {"described_opinion": self.described_a.pk, "order_by": "text"}
+        )
         self.assertEqual(r.status_code, HTTPStatus.OK)
         ids = [row["id"] for row in r.data["results"]]
         self.assertEqual(ids, sorted(ids, reverse=True))
@@ -118,21 +153,42 @@ class ParentheticalAPITest(TestCase):
         ids = {row["id"] for row in r.data["results"]}
         self.assertEqual(ids, {self.pa_high.pk, self.pa_mid.pk})
 
-    async def test_response_includes_links_and_text(self) -> None:
-        """Each row carries the text, score, and links to both opinions so a
-        client can render it without a follow-up request."""
-        r = await self._get({"described_opinion": self.described_a.pk})
+    async def test_response_includes_display_context(self) -> None:
+        """Each row carries the text, score, links and the citing case's
+        context, so a client can render it without a follow-up request."""
+        r = await self._get(
+            {"described_opinion": self.described_a.pk, "id": self.pa_high.pk}
+        )
         self.assertEqual(r.status_code, HTTPStatus.OK)
         row = r.data["results"][0]
-        for key in (
-            "text",
-            "score",
-            "describing_opinion",
-            "described_opinion",
-            "group",
-            "absolute_url",
-        ):
-            self.assertIn(key, row)
+        describing_cluster = self.describing.cluster
+        described_cluster = self.described_a.cluster
+        self.assertEqual(row["text"], "high score parenthetical")
+        self.assertEqual(row["score"], 0.9)
+        self.assertEqual(row["describing_opinion_id"], self.describing.pk)
+        self.assertEqual(row["described_opinion_id"], self.described_a.pk)
+        self.assertEqual(
+            row["describing_opinion_case_name"], describing_cluster.case_name
+        )
+        self.assertEqual(
+            row["described_opinion_case_name"], described_cluster.case_name
+        )
+        self.assertEqual(row["describing_opinion_citation"], "576 U.S. 644")
+        self.assertEqual(
+            row["describing_opinion_date_filed"],
+            str(describing_cluster.date_filed),
+        )
+        self.assertEqual(
+            row["describing_opinion_court_id"],
+            describing_cluster.docket.court_id,
+        )
+        self.assertEqual(
+            row["absolute_url"],
+            reverse(
+                "view_case_summaries",
+                args=[described_cluster.pk, described_cluster.slug],
+            ),
+        )
 
     async def test_group_empty_when_not_computed(self) -> None:
         """A parenthetical whose group was never computed serializes with a
@@ -144,7 +200,7 @@ class ParentheticalAPITest(TestCase):
 
     async def test_group_embedded_when_present(self) -> None:
         """When a group already exists it is embedded inline with its
-        aggregate metadata."""
+        aggregate metadata and representative parenthetical."""
         group = await sync_to_async(ParentheticalGroupFactory.create)(
             opinion=self.described_a,
             representative=self.pa_high,
@@ -154,48 +210,57 @@ class ParentheticalAPITest(TestCase):
         self.pa_high.group = group
         await sync_to_async(self.pa_high.save)()
 
-        r = await self._get({"described_opinion": self.described_a.pk})
-        self.assertEqual(r.status_code, HTTPStatus.OK)
-        row = next(
-            row for row in r.data["results"] if row["id"] == self.pa_high.pk
+        r = await self._get(
+            {"described_opinion": self.described_a.pk, "id": self.pa_high.pk}
         )
-        self.assertIsNotNone(row["group"])
+        self.assertEqual(r.status_code, HTTPStatus.OK)
+        row = r.data["results"][0]
         self.assertEqual(row["group"]["size"], 3)
         self.assertEqual(row["group"]["score"], 0.88)
+        self.assertEqual(row["group"]["representative_id"], self.pa_high.pk)
+        self.assertTrue(
+            row["group"]["representative"].endswith(
+                reverse(
+                    "parenthetical-detail",
+                    kwargs={"version": "v4", "pk": self.pa_high.pk},
+                )
+            )
+        )
 
-    def test_no_n_plus_one_queries(self) -> None:
-        """Listing many parentheticals issues a bounded number of queries
-        regardless of row count (select_related avoids N+1)."""
-        client = make_client(self.user_profile.user.pk)
-        path = self.list_path
+    def test_queries_are_bounded_and_skip_text_fields(self) -> None:
+        """Listing parentheticals issues a constant number of queries and
+        never loads the opinions' text fields."""
+        rows: list[int] = []
 
-        def hit(expected_min_results):
+        def hit() -> tuple[int, list[str]]:
+            """Request the list and return the query count and the SQL."""
             with CaptureQueriesContext(connection) as ctx:
-                from asgiref.sync import async_to_sync
-
-                resp = async_to_sync(client.get)(
-                    path, {"describing_opinion": self.describing.pk}
+                r = async_to_sync(self.async_client.get)(
+                    self.list_path, {"described_opinion": self.described_b.pk}
                 )
-                self.assertEqual(resp.status_code, HTTPStatus.OK)
-                self.assertGreaterEqual(
-                    len(resp.data["results"]), expected_min_results
-                )
-            return len(ctx.captured_queries)
+                self.assertEqual(r.status_code, HTTPStatus.OK)
+                rows.append(len(r.json()["results"]))
+            return len(ctx.captured_queries), [
+                q["sql"] for q in ctx.captured_queries
+            ]
 
-        baseline = hit(4)
-
-        # Add more parentheticals authored by the same opinion.
+        baseline, _ = hit()
         for i in range(5):
+            describing = OpinionWithParentsFactory.create()
+            CitationWithParentsFactory.create(cluster=describing.cluster)
             ParentheticalFactory.create(
                 described_opinion=self.described_b,
-                describing_opinion=self.describing,
+                describing_opinion=describing,
                 text=f"extra {i}",
-                score=0.2,
             )
+        count, sqls = hit()
 
-        after = hit(9)
-        # Query count must not grow with the number of rows (no N+1).
-        self.assertLessEqual(after, baseline)
+        # Each new row has its own citing opinion, cluster and citation.
+        self.assertEqual(rows, [1, 6])
+        self.assertEqual(count, baseline)
+        for sql in sqls:
+            for column in ("plain_text", "html_with_citations", "syllabus"):
+                self.assertNotIn(column, sql)
 
     async def test_empty_filters_ignored(self) -> None:
         """Empty filter params don't error (NoEmptyFilterSet behavior)."""
