@@ -5,6 +5,7 @@ from unittest import mock
 from asgiref.sync import async_to_sync
 from django.core import mail
 from django.core.files.base import ContentFile
+from django.forms import modelform_factory
 from django.test import TestCase
 
 from cl.alerts.models import DocketAlert
@@ -1217,6 +1218,19 @@ class ScotusPlaceholderDocumentTest(CLTestCase):
                 document_number=310278, attachment_number=1
             ).exists()
         )
+
+    def test_placeholder_can_be_saved_in_forms(self) -> None:
+        """Model forms, like the admin's, accept a placeholder's blank url,
+        so staff can save it and the entry it's an inline of."""
+        self._merge(attachments=[])
+        placeholder = SCOTUSDocument.objects.get(
+            docket_entry__docket=self.docket
+        )
+        form_class = modelform_factory(SCOTUSDocument, fields=["url"])
+
+        form = form_class(data={"url": ""}, instance=placeholder)
+
+        self.assertTrue(form.is_valid(), form.errors)
 
     @mock.patch(f"{DOWNLOAD_COMMAND}.CeleryThrottle")
     @mock.patch(f"{DOWNLOAD_COMMAND}.download_scotus_document_pdf")

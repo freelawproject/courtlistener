@@ -4336,7 +4336,8 @@ class SCOTUSDocument(AbstractDateTimeModel, AbstractPDF):
         blank=True,
         null=True,
     )
-    url = models.URLField(max_length=1000)
+    # Blank for placeholders, which have no file of their own.
+    url = models.URLField(max_length=1000, blank=True)
     es_rd_field_tracker = FieldTracker(
         fields=[
             "docket_entry_id",
