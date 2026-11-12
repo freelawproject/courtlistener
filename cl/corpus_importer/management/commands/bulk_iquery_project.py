@@ -27,8 +27,8 @@ class OptionsType(TypedDict):
 def add_all_cases_to_cl(options: OptionsType) -> None:
     """Iterate over courts and gather iquery results from them.
 
-    :param options: The options from the handle method
-    :return None
+    Args:
+        options: The options from the handle method
     """
     q = options["queue"]
     r = get_redis_interface("CACHE")

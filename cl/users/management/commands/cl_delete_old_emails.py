@@ -8,7 +8,6 @@ from cl.users.models import EmailSent
 
 def delete_old_emails(days: int) -> int:
     """Delete stored emails older than the specified number of days."""
-
     older_than = make_aware(datetime.now(), UTC) - timedelta(days=days)
     emails = EmailSent.objects.filter(date_created__lt=older_than)
     print(f"Deleting emails created before: {older_than}")
@@ -21,8 +20,7 @@ def delete_old_emails(days: int) -> int:
 
 
 class Command(VerboseCommand):
-    """Command to delete stored emails older than the specified number of
-    days."""
+    """Command to delete stored emails older than the specified number of days."""
 
     help = "Delete stored emails older than the specified number of days."
 

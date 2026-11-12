@@ -33,10 +33,13 @@ from cl.lib.redis_utils import create_redis_semaphore, get_redis_interface
 
 
 def make_disclosure_key(data_id: str) -> str:
-    """Make disclosure key to use with redis
+    """Make disclosure key to use with redis.
 
-    :param data_id: The ID of the document being processed
-    :return: Disclosure key
+    Args:
+        data_id: The ID of the document being processed
+
+    Returns:
+        Disclosure key
     """
     return f"disclosure.enqueued:fd-{data_id}"
 
@@ -44,13 +47,13 @@ def make_disclosure_key(data_id: str) -> str:
 @app.task(bind=True, max_retries=2, ignore_result=True)
 @transaction.atomic
 def make_financial_disclosure_thumbnail_from_pdf(self, pk: int) -> None:
-    """Generate Thumbnail and save to AWS
+    """Generate Thumbnail and save to AWS.
 
     Attempt to generate thumbnail from PDF and save to AWS.
 
-    :param self: The celery task
-    :param pk: PK of disclosure in database
-    :return: None
+    Args:
+        self: The celery task
+        pk: PK of disclosure in database
     """
     disclosure = FinancialDisclosure.objects.select_for_update().get(pk=pk)
     pdf_content = disclosure.filepath.read()
@@ -80,9 +83,12 @@ def extract_content(
 
     Attempt extraction using multiple methods if necessary.
 
-    :param pdf_bytes: The byte array of the PDF
-    :param disclosure_key: The disclosure ID
-    :return:The extracted content
+    Args:
+        pdf_bytes: The byte array of the PDF
+        disclosure_key: The disclosure ID
+
+    Returns:
+        The extracted content
     """
     logger.info("Attempting extraction.")
 
@@ -108,10 +114,13 @@ def extract_content(
 
 
 def get_report_type(extracted_data: dict) -> int:
-    """Get report type if available
+    """Get report type if available.
 
-    :param extracted_data: Document information
-    :return: Disclosure type
+    Args:
+        extracted_data: Document information
+
+    Returns:
+        Disclosure type
     """
     if extracted_data.get("initial"):
         return REPORT_TYPES.INITIAL
@@ -132,13 +141,16 @@ class ChristmasError(Exception):
 
 
 def get_date(text: str, year: int) -> datetime.date | None:
-    """Extract date from date strings if possible
+    """Extract date from date strings if possible.
 
     Because we know year we can verify that the date is ... close.
 
-    :param year: The year of the financial disclosure
-    :param text: The extracted string version of the date
-    :return: Date object or None
+    Args:
+        year: The year of the financial disclosure
+        text: The extracted string version of the date
+
+    Returns:
+        Date object or None
     """
     try:
         date_parsed = parse(
@@ -164,9 +176,9 @@ def save_disclosure(extracted_data: dict, disclosure) -> None:
 
     Wrapped in a transaction, we fail if anything fails.
 
-    :param disclosure: Financial disclosure
-    :param extracted_data: disclosure
-    :return:None
+    Args:
+        disclosure: Financial disclosure
+        extracted_data: disclosure
     """
     addendum = "Additional Information or Explanations"
 
@@ -318,11 +330,14 @@ def save_and_upload_disclosure(
 ) -> FinancialDisclosure | None:
     """Save disclosure PDF to S3 and generate a FinancialDisclosure object.
 
-    :param redis_db: The redis db storing our disclosure keys
-    :param disclosure_key: The disclosure key for the redis db
-    :param response: The pdf data response object
-    :param data: The judge data as a dict
-    :return: Financial discsosure object or None
+    Args:
+        redis_db: The redis db storing our disclosure keys
+        disclosure_key: The disclosure key for the redis db
+        response: The pdf data response object
+        data: The judge data as a dict
+
+    Returns:
+        Financial discsosure object or None
     """
     sha1_hash = sha1(response.content)
     disclosure = FinancialDisclosure.objects.filter(sha1=sha1_hash)
@@ -374,10 +389,11 @@ def save_and_upload_disclosure(
     ignore_result=True,
 )
 def import_disclosure(self, data: dict[str, str | int | list]) -> None:
-    """Import disclosures into Courtlistener
+    """Import disclosures into Courtlistener.
 
-    :param data: The disclosure information to process
-    :return: None
+    Args:
+        self: The bound Celery task.
+        data: The disclosure information to process
     """
     redis_db = get_redis_interface("CACHE")
     disclosure_key = make_disclosure_key(data["id"])

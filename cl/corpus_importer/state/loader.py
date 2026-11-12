@@ -79,8 +79,7 @@ RETRY_BATCH: Final = 500
 
 
 class LoadPhase(StrEnum):
-    """A phase of a load that can go wrong, and the Sentry issue it files
-    under.
+    """A phase of a load that can go wrong, and the Sentry issue it files under.
 
     Preflight has two phases to simplify reporting.
     """
@@ -96,9 +95,12 @@ class LoadPhase(StrEnum):
 def fingerprint(loader: str, phase: LoadPhase) -> dict[str, list[str]]:
     """Sentry fingerprinting helper.
 
-    :param loader: The loader's registered name, such as `nycoa`.
-    :param phase: Which phase went wrong.
-    :return: The `extra` to log the error with. See
+    Args:
+        loader: The loader's registered name, such as `nycoa`.
+        phase: Which phase went wrong.
+
+    Returns:
+        The `extra` to log the error with. See
         `cl.settings.third_party.sentry.fingerprint_sentry_error`.
     """
     return {"fingerprint": [loader, phase.value]}
@@ -137,19 +139,20 @@ class RowOutcome(Enum):
 class ExtractionReport:
     """Running stats for extractions.
 
-    :ivar dispatched: Documents the run's merges sent to the extraction queue.
-        A document with no file to read, or one already extracted, is never
-        sent and so is never expected back.
-    :ivar outstanding: Documents written since the run began that extraction
-        has not come back on.
-    :ivar failed: Documents extraction ran on and could not read. A matter for
-        the extraction pipeline rather than for the load.
-    :ivar sample: A few outstanding PKs, to go and look at.
-    :ivar since: The moment the window starts at, so a reader knows what the
-        two window-scoped counts covered.
-    :ivar wait: How the load stopped waiting on extraction, or `None` where it
-        did not wait at all. `outstanding` only means "never going to happen"
-        when this is `STALLED`.
+    Attributes:
+        dispatched: Documents the run's merges sent to the extraction queue.
+            A document with no file to read, or one already extracted, is never
+            sent and so is never expected back.
+        outstanding: Documents written since the run began that extraction
+            has not come back on.
+        failed: Documents extraction ran on and could not read. A matter for
+            the extraction pipeline rather than for the load.
+        sample: A few outstanding PKs, to go and look at.
+        since: The moment the window starts at, so a reader knows what the
+            two window-scoped counts covered.
+        wait: How the load stopped waiting on extraction, or `None` where it
+            did not wait at all. `outstanding` only means "never going to happen"
+            when this is `STALLED`.
     """
 
     dispatched: int = 0
@@ -166,8 +169,7 @@ class ExtractionReport:
 
     @property
     def abandoned(self) -> bool:
-        """Whether extraction demonstrably stopped, rather than merely not
-        having finished by the time the load gave up watching."""
+        """Whether extraction demonstrably stopped, rather than merely not having finished by the time the load gave up watching."""
         return bool(self.outstanding) and self.wait is WaitOutcome.STALLED
 
     def __str__(self) -> str:
@@ -182,42 +184,43 @@ class ExtractionReport:
 class LoadReport:
     """Summary stats for a load run.
 
-    :ivar seen: Rows the query returned.
-    :ivar invalid: Payloads that would not decode, failed validation against
-        `scrape_model`, or that `normalize` passed over by returning `None`.
-    :ivar refused: Rows `normalize` turned away with `UnusableScrape`.
-    :ivar dispatched: Rows sent to the merge queue.
-    :ivar merged: Dispatched rows whose merge came back clean.
-    :ivar rejected: Dispatched rows whose merge ran and reported failures,
-        which includes a merger turning a scrape away in its own `validate`.
-        Reported apart from `errored` because the scrape is what is wrong.
-    :ivar errored: Dispatched rows whose merge never reached a verdict: its
-        retries ran out, the payload no longer validates against the deployed
-        code, or something nothing expected was raised. Re-running the load
-        over them is what settles these.
-    :ivar missing_count: How many dispatched rows never reported anything at
-        all. These are the ones celery lost; re-running the load over the same
-        rows is how they get merged.
-    :ivar missing: A sample of at most `OUTSTANDING_SHOWN` of them, keyed by
-        row number and named by the label they were dispatched under. A
-        sample, not the set, because there is no bound on how large the set
-        can get: a broker that went down leaves the whole run in it. The rest
-        stay in the ledger's `pending` key in Redis until its TTL expires.
-    :ivar merge_wait: How the load stopped waiting on the merge queue, or
-        `None` where it did not wait at all. `missing_count` only means "never
-        going to happen" when this is `STALLED`.
-    :ivar rows_read: Whether the run database was opened. False for a
-        `verify_only` pass, whose zeroes for `seen`, `invalid` and `refused`
-        mean "did not look" rather than "found none".
-    :ivar creates: Objects created, counted per model name.
-    :ivar updates: Objects updated, counted per model name.
-    :ivar files: What the run's merges did with the scraped files they had to
-        move into the public bucket.
-    :ivar extraction: What became of the documents the run dispatched for text
-        extraction, or `None` where the load did not check.
-    :ivar preflight: What each check made of the run database before the load
-        read it, empty for a pass that opened no database. See
-        `cl.corpus_importer.state.preflight`.
+    Attributes:
+        seen: Rows the query returned.
+        invalid: Payloads that would not decode, failed validation against
+            `scrape_model`, or that `normalize` passed over by returning `None`.
+        refused: Rows `normalize` turned away with `UnusableScrape`.
+        dispatched: Rows sent to the merge queue.
+        merged: Dispatched rows whose merge came back clean.
+        rejected: Dispatched rows whose merge ran and reported failures,
+            which includes a merger turning a scrape away in its own `validate`.
+            Reported apart from `errored` because the scrape is what is wrong.
+        errored: Dispatched rows whose merge never reached a verdict: its
+            retries ran out, the payload no longer validates against the deployed
+            code, or something nothing expected was raised. Re-running the load
+            over them is what settles these.
+        missing_count: How many dispatched rows never reported anything at
+            all. These are the ones celery lost; re-running the load over the same
+            rows is how they get merged.
+        missing: A sample of at most `OUTSTANDING_SHOWN` of them, keyed by
+            row number and named by the label they were dispatched under. A
+            sample, not the set, because there is no bound on how large the set
+            can get: a broker that went down leaves the whole run in it. The rest
+            stay in the ledger's `pending` key in Redis until its TTL expires.
+        merge_wait: How the load stopped waiting on the merge queue, or
+            `None` where it did not wait at all. `missing_count` only means "never
+            going to happen" when this is `STALLED`.
+        rows_read: Whether the run database was opened. False for a
+            `verify_only` pass, whose zeroes for `seen`, `invalid` and `refused`
+            mean "did not look" rather than "found none".
+        creates: Objects created, counted per model name.
+        updates: Objects updated, counted per model name.
+        files: What the run's merges did with the scraped files they had to
+            move into the public bucket.
+        extraction: What became of the documents the run dispatched for text
+            extraction, or `None` where the load did not check.
+        preflight: What each check made of the run database before the load
+            read it, empty for a pass that opened no database. See
+            `cl.corpus_importer.state.preflight`.
     """
 
     seen: int = 0
@@ -249,8 +252,7 @@ class LoadReport:
 
     @property
     def dropped(self) -> bool:
-        """Whether rows demonstrably went astray, as against a load that
-        stopped waiting while its queue was still coming down."""
+        """Whether rows demonstrably went astray, as against a load that stopped waiting while its queue was still coming down."""
         return bool(self.missing_count) and self.merge_wait is (
             WaitOutcome.STALLED
         )
@@ -277,25 +279,26 @@ class JKentScrapeLoader[
 ](ABC):
     """Loads one jkent run database into CourtListener.
 
-    :cvar name: The key this loader is registered under in
-        `cl.corpus_importer.state.registry`. It travels on the celery message
-        in place of the loader itself.
-    :cvar query: SQL run against the run database, returning one row per
-        object to merge. It must select the payload column (`payload_column`),
-        and may select anything else `normalize` needs. Rows are streamed, so
-        a query over a large run does not have to fit in memory.
-    :cvar payload_column: The column holding the scraper's JSON blob.
-    :cvar scrape_model: The Pydantic model each normalized payload is
-        validated into. This is the merger's input type.
-    :cvar merger: The merger to run for each scrape. A merger that takes
-        parameters gets them from `params`.
-    :cvar document_model: The state document model this loader's merges write,
-        whose rows are sent for text extraction as the merges land. Leave
-        `None` for a loader that writes no documents.
-    :cvar private_prefix: Where in the private bucket the scraper leaves the
-        files it downloads. A merge stores these keys as they are, and
-        `publish_files` moves them. Leave empty for a loader whose documents
-        are downloaded some other way.
+    Attributes:
+        name: The key this loader is registered under in
+            `cl.corpus_importer.state.registry`. It travels on the celery message
+            in place of the loader itself.
+        query: SQL run against the run database, returning one row per
+            object to merge. It must select the payload column (`payload_column`),
+            and may select anything else `normalize` needs. Rows are streamed, so
+            a query over a large run does not have to fit in memory.
+        payload_column: The column holding the scraper's JSON blob.
+        scrape_model: The Pydantic model each normalized payload is
+            validated into. This is the merger's input type.
+        merger: The merger to run for each scrape. A merger that takes
+            parameters gets them from `params`.
+        document_model: The state document model this loader's merges write,
+            whose rows are sent for text extraction as the merges land. Leave
+            `None` for a loader that writes no documents.
+        private_prefix: Where in the private bucket the scraper leaves the
+            files it downloads. A merge stores these keys as they are, and
+            `publish_files` moves them. Leave empty for a loader whose documents
+            are downloaded some other way.
     """
 
     name: ClassVar[str]
@@ -323,47 +326,49 @@ class JKentScrapeLoader[
         in_flight_time: float = DEFAULT_IN_FLIGHT_TIME,
         verify_timeout: float = DEFAULT_VERIFY_TIMEOUT,
     ) -> None:
-        """
-        :param database: Path to the run's SQLite database.
-        :param limit: Stop after this many rows, counted from `start_row`. For
-            trying a loader out against a large run. A limited run keeps no
-            checkpoint, since the position it stopped at means nothing to a
-            later full load.
-        :param extract: Have each merge dispatch text extraction for the
-            documents it writes.
-        :param ingest_queue: The celery queue to merge dockets on.
-        :param ingest_throttle: Keep the merge queue at roughly this many
-            tasks, waiting for it to drain when it runs longer. Zero
-            dispatches as fast as the run database can be read, which buries
-            the queue and hands the workers a whole run's merges at once.
-        :param extraction_queue: The celery queue to extract documents on.
-        :param extraction_throttle: Keep the extraction queue at roughly this
-            many tasks the same way. Merges dispatch their own extraction, so
-            throttling the merge queue paces this one indirectly; set this as
-            well to hold extraction to a rate of its own, or see the command's
-            `--skip-extraction` for the other way to pace a backfill.
-        :param db_delay: Seconds to wait after each row, to keep a long load
-            from monopolising the queue. Zero runs flat out.
-        :param start_row: Skip this many rows before dispatching anything. The
-            rows a query returns are ordered, and a run database never
-            changes, so a row's position in one is stable enough to resume
-            from.
-        :param run_key: Redis key this run's checkpoint and ledger hang off.
-            The checkpoint records progress as the load goes, for a later run
-            to resume from, and is deleted once the load reaches the end of
-            the query so that a finished load leaves nothing behind for the
-            next one to trip over. The ledger is what `verify` reads. Defaults
-            to `default_run_key()` which should work for almost all cases.
-        :param verify: Wait for the dispatched merges to report back and check
-            what came of them. See `verify`.
-        :param in_flight_time: Seconds a phase's outstanding count has to hold
-            steady before the load concludes the rest is never coming. Has to
-            exceed the longest legitimate gap between two decrements -- a
-            merge's whole retry envelope, or the slowest extraction job -- or
-            slow work reads as lost work.
-        :param verify_timeout: Seconds to wait on a phase whose count is still
-            coming down before giving up and reporting it as outstanding. Each
-            phase gets its own.
+        """Initialize the loader.
+
+        Args:
+            database: Path to the run's SQLite database.
+            limit: Stop after this many rows, counted from `start_row`. For
+                trying a loader out against a large run. A limited run keeps no
+                checkpoint, since the position it stopped at means nothing to a
+                later full load.
+            extract: Have each merge dispatch text extraction for the
+                documents it writes.
+            ingest_queue: The celery queue to merge dockets on.
+            ingest_throttle: Keep the merge queue at roughly this many
+                tasks, waiting for it to drain when it runs longer. Zero
+                dispatches as fast as the run database can be read, which buries
+                the queue and hands the workers a whole run's merges at once.
+            extraction_queue: The celery queue to extract documents on.
+            extraction_throttle: Keep the extraction queue at roughly this
+                many tasks the same way. Merges dispatch their own extraction, so
+                throttling the merge queue paces this one indirectly; set this as
+                well to hold extraction to a rate of its own, or see the command's
+                `--skip-extraction` for the other way to pace a backfill.
+            db_delay: Seconds to wait after each row, to keep a long load
+                from monopolising the queue. Zero runs flat out.
+            start_row: Skip this many rows before dispatching anything. The
+                rows a query returns are ordered, and a run database never
+                changes, so a row's position in one is stable enough to resume
+                from.
+            run_key: Redis key this run's checkpoint and ledger hang off.
+                The checkpoint records progress as the load goes, for a later run
+                to resume from, and is deleted once the load reaches the end of
+                the query so that a finished load leaves nothing behind for the
+                next one to trip over. The ledger is what `verify` reads. Defaults
+                to `default_run_key()` which should work for almost all cases.
+            verify: Wait for the dispatched merges to report back and check
+                what came of them. See `verify`.
+            in_flight_time: Seconds a phase's outstanding count has to hold
+                steady before the load concludes the rest is never coming. Has to
+                exceed the longest legitimate gap between two decrements -- a
+                merge's whole retry envelope, or the slowest extraction job -- or
+                slow work reads as lost work.
+            verify_timeout: Seconds to wait on a phase whose count is still
+                coming down before giving up and reporting it as outstanding. Each
+                phase gets its own.
         """
         self.database = Path(database)
         self.limit = limit
@@ -393,15 +398,16 @@ class JKentScrapeLoader[
     def default_run_key(self) -> str:
         """The Redis key a load keys its ledger and checkpoint off, unless overridden.
 
-        :return: The key.
+        Returns:
+            The key.
         """
         return f"state_scrape_load:{self.name}:{self.database.name}"
 
     def all_rows(self) -> Iterator[tuple[int, sqlite3.Row]]:
         """Stream every row `query` selects.
 
-
-        :yield: The row's position in the query, counting from one, and the
+        Yields:
+            The row's position in the query, counting from one, and the
             row itself.
         """
         with self.connected() as connection:
@@ -412,9 +418,12 @@ class JKentScrapeLoader[
     def connected(self) -> Iterator[sqlite3.Connection]:
         """Open the run database read-only, for the length of the block.
 
-        :yield: The connection, handing back rows that can be read by column
+        Yields:
+            The connection, handing back rows that can be read by column
             name.
-        :raises FileNotFoundError: If the run database is not there.
+
+        Raises:
+            FileNotFoundError: If the run database is not there.
         """
         if not self.database.exists():
             raise FileNotFoundError(f"No run database at {self.database}")
@@ -426,7 +435,8 @@ class JKentScrapeLoader[
     def rows(self) -> Iterator[tuple[int, sqlite3.Row]]:
         """Stream the rows `query` selects, honouring `start_row` and `limit`.
 
-        :yield: The row's position in the query, counting from one and
+        Yields:
+            The row's position in the query, counting from one and
             counting the rows `start_row` skipped, and the row itself. The
             position is what a checkpoint and the ledger name a row by, so it
             has to be the absolute one.
@@ -443,15 +453,21 @@ class JKentScrapeLoader[
     ) -> dict[str, Any] | None:
         """Reshape one row's payload into something `scrape_model` accepts.
 
-        :param payload: The decoded `payload_column` JSON.
-        :param row: The whole row, for anything else the query selected.
-        :return: The payload to validate, or `None` to pass over this row,
+        Args:
+            payload: The decoded `payload_column` JSON.
+            row: The whole row, for anything else the query selected.
+
+        Returns:
+            The payload to validate, or `None` to pass over this row,
             which the report counts as invalid. Pass over a row there is
             nothing useful to do with; a payload that *should* merge but does
             not fit the model is better left to fail validation, which names
             the fields at fault.
-        :raises UnusableScrape: For a row that should count as refused rather
-            than a routine skip. See `UnusableScrape`."""
+
+        Raises:
+            UnusableScrape: For a row that should count as refused rather
+                than a routine skip. See `UnusableScrape`.
+        """
         return payload
 
     @classmethod
@@ -463,13 +479,13 @@ class JKentScrapeLoader[
     def label(cls, scrape: ScrapeType) -> str:
         """Something to recognise `scrape` by in a log line or the ledger.
 
-        Defaults to the scrape's docket number."""
+        Defaults to the scrape's docket number.
+        """
         return str(getattr(scrape, "docket_number", "") or "")
 
     @staticmethod
     def _identify(payload: object, number: int) -> str:
         """Narrowest identity for a row, docket_number | row number."""
-
         if isinstance(payload, dict) and (
             docket := payload.get("docket_number")
         ):
@@ -481,9 +497,12 @@ class JKentScrapeLoader[
     ) -> ScrapeType | RowOutcome:
         """Error handling wrapper over normalize.
 
-        :param number: The row's position in the query.
-        :param row: The run database row.
-        :return: The scrape, or the outcome that stopped it.
+        Args:
+            number: The row's position in the query.
+            row: The run database row.
+
+        Returns:
+            The scrape, or the outcome that stopped it.
         """
         try:
             payload = json.loads(row[self.payload_column])
@@ -528,9 +547,10 @@ class JKentScrapeLoader[
                 yield prepared
 
     @classmethod
-    def merge_one(cls, scrape: ScrapeType) -> MergeResult[Any]:
-        """Merge a single scrape, then publish its files. Runs in celery
-        worker.
+    def merge_one(cls, scrape: ScrapeType) -> MergeResult:
+        """Merge a single scrape, then publish its files.
+
+        Runs in celery worker.
         """
         merger = cls.merger(scrape, params=cls.params(scrape))
         result = merger.merge()
@@ -539,22 +559,27 @@ class JKentScrapeLoader[
         return result
 
     @classmethod
-    def merge_payload(cls, payload: str) -> tuple[str, MergeResult[Any]]:
+    def merge_payload(cls, payload: str) -> tuple[str, MergeResult]:
         """Merge one dispatched row, given the payload celery carried.
 
-        :param payload: The scrape, as the load dumped it at dispatch.
-        :return: The scrape's label and the result of merging it.
-        :raises pydantic.ValidationError: If the payload no longer fits
-            `scrape_model` -- which, since the load validated the scrape it
-            dumped before dispatching it, means the message and the code that
-            will merge it were deployed out of step, and no amount of retrying
-            will reconcile them.
+        Args:
+            payload: The scrape, as the load dumped it at dispatch.
+
+        Returns:
+            The scrape's label and the result of merging it.
+
+        Raises:
+            pydantic.ValidationError: If the payload no longer fits
+                `scrape_model` -- which, since the load validated the scrape it
+                dumped before dispatching it, means the message and the code that
+                will merge it were deployed out of step, and no amount of retrying
+                will reconcile them.
         """
         scrape = cls.scrape_model.model_validate_json(payload)
         return cls.label(scrape), cls.merge_one(scrape)
 
     @classmethod
-    def publish_files(cls, docket: Docket) -> MergeResult[int]:
+    def publish_files(cls, docket: Docket) -> MergeResult:
         """Move each of a docket's files from private to public.
 
         A file goes where the document says it belongs, which for a state
@@ -563,8 +588,11 @@ class JKentScrapeLoader[
         extension of the scraped key survives, so a file the scraper named its
         own way is renamed as it is published.
 
-        :param docket: The docket a merge just committed.
-        :return: The documents repointed, as updates, and what became of each
+        Args:
+            docket: The docket a merge just committed.
+
+        Returns:
+            The documents repointed, as updates, and what became of each
             file there was a move to make.
         """
         if not cls.private_prefix or (model := cls.document_model) is None:
@@ -630,26 +658,29 @@ class JKentScrapeLoader[
     def published_only(
         cls, documents: QuerySet[AbstractStateDocument]
     ) -> QuerySet[AbstractStateDocument]:
-        """Leave out the documents whose file has not been published yet,
-        which extraction could not read.
+        """Leave out the documents whose file has not been published yet, which extraction could not read.
 
-        :param documents: Documents of `document_model`.
-        :return: Those whose file is where CourtListener serves it from.
+        Args:
+            documents: Documents of `document_model`.
+
+        Returns:
+            Those whose file is where CourtListener serves it from.
         """
         if not cls.private_prefix:
             return documents
         return documents.exclude(filepath_local__startswith=cls.private_prefix)
 
     @classmethod
-    def dispatch_extraction(
-        cls, result: MergeResult[Any], queue: str
-    ) -> set[int]:
+    def dispatch_extraction(cls, result: MergeResult, queue: str) -> set[int]:
         """Sends doc pks to celery queue for extraction.
 
-        :param result: One merge's result, read for the document PKs it
-            created or updated.
-        :param queue: The celery queue to extract on.
-        :return: The PKs actually sent. A document with no file to read, or
+        Args:
+            result: One merge's result, read for the document PKs it
+                created or updated.
+            queue: The celery queue to extract on.
+
+        Returns:
+            The PKs actually sent. A document with no file to read, or
             one already extracted, is skipped and left out, so that what comes
             back is exactly the set worth expecting extraction of.
         """
@@ -681,9 +712,12 @@ class JKentScrapeLoader[
         Runs all of a DBs preflight checks (unless one raises). Reports all,
         even successes.
 
-        :return: What each check made of the run database.
-        :raises PreflightFailed: If any check says the load must not go on.
-            Every finding is logged and sent to Sentry before this is raised.
+        Returns:
+            What each check made of the run database.
+
+        Raises:
+            PreflightFailed: If any check says the load must not go on.
+                Every finding is logged and sent to Sentry before this is raised.
         """
         with self.connected() as connection:
             results = run_checks(
@@ -730,10 +764,13 @@ class JKentScrapeLoader[
 
         Checks the run database first; see `preflight`.
 
-        :return: What the run dispatched, and -- unless `verify` was turned
+        Returns:
+            What the run dispatched, and -- unless `verify` was turned
             off -- what came of it.
-        :raises PreflightFailed: If the run database is not one this loader
-            can read. Nothing is dispatched.
+
+        Raises:
+            PreflightFailed: If the run database is not one this loader
+                can read. Nothing is dispatched.
         """
         checks = self.preflight()
         report = self._dispatch_all()
@@ -742,14 +779,14 @@ class JKentScrapeLoader[
         return report
 
     def verify_only(self) -> LoadReport:
-        """Check up on a load that already ran, without reading its run
-        database.
+        """Check up on a load that already ran, without reading its run database.
 
         The other half of `load`, for settling a run that stopped watching its
         queues while they were still coming down. This is what the command's
         `--skip-load` calls.
 
-        :return: What the ledger says became of the run, with the counts only
+        Returns:
+            What the ledger says became of the run, with the counts only
             the run database could have supplied left at zero. See
             `LoadReport.rows_read`.
         """
@@ -772,7 +809,8 @@ class JKentScrapeLoader[
         what a retry adds to and the moment is what its extraction re-check
         is scoped by.
 
-        :return: What the retry dispatched and what came of it.
+        Returns:
+            What the retry dispatched and what came of it.
         """
         report = LoadReport(rows_read=False)
         self._retry_merges(report)
@@ -791,7 +829,8 @@ class JKentScrapeLoader[
         the run's totals, since nothing can retry them. See
         `LoadLedger.withdrawn`.
 
-        :param report: The report to fill in, modified in place.
+        Args:
+            report: The report to fill in, modified in place.
         """
         if not (retry := self.ledger.rows_to_retry()):
             return
@@ -890,10 +929,11 @@ class JKentScrapeLoader[
         return self.run_key
 
     def _checkpoint(self, row: int) -> None:
-        """Record that the load has dispatched every row up to and including
-        `row`, counting from the start of the query rather than `start_row`.
+        """Record that the load has dispatched every row up to and including `row`, counting from the start of the query rather than `start_row`.
 
-        :param row: The last row the load dispatched."""
+        Args:
+            row: The last row the load dispatched.
+        """
         if (key := self.checkpointing) is None:
             return
         try:
@@ -957,12 +997,13 @@ class JKentScrapeLoader[
     ) -> None:
         """Send one row's merge to the queue, writing it down as it goes.
 
-        :param number: The row's position in the query.
-        :param scrape: The validated scrape. Its own dump is what the worker
-            gets, so what the worker validates is what this load read.
-        :param retry: What a retry read from the ledger, when this is one
-            putting the row back rather than its first dispatch. See
-            `LoadLedger.redispatched`.
+        Args:
+            number: The row's position in the query.
+            scrape: The validated scrape. Its own dump is what the worker
+                gets, so what the worker validates is what this load read.
+            retry: What a retry read from the ledger, when this is one
+                putting the row back rather than its first dispatch. See
+                `LoadLedger.redispatched`.
         """
         # Imported here because the task module imports the registry, which
         # imports every loader, which imports this module.
@@ -1008,7 +1049,8 @@ class JKentScrapeLoader[
         This establishes the facts and then hands them to `alert`, which is
         what decides any of it is worth waking someone over.
 
-        :param report: The report to fill in, modified in place.
+        Args:
+            report: The report to fill in, modified in place.
         """
         if not self.should_verify:
             return
@@ -1054,7 +1096,8 @@ class JKentScrapeLoader[
         those reach Sentry whether or not this ever runs. Everything here
         depends on a load having stayed to verify itself.
 
-        :param report: The filled-in report.
+        Args:
+            report: The filled-in report.
         """
         if report.failed:
             # Each worker already logged the docket it gave up on. This is the
@@ -1138,11 +1181,14 @@ class JKentScrapeLoader[
         another running long, and none of the budget is spent dispatching --
         `load` sends everything before it verifies anything.
 
-        :param count: Reads how much is still outstanding. Called once per
-            pass, so it wants to be cheap.
-        :param poll: Seconds between passes.
-        :param work: What is being waited on, for the log line.
-        :return: What is still outstanding, and how the wait ended.
+        Args:
+            count: Reads how much is still outstanding. Called once per
+                pass, so it wants to be cheap.
+            poll: Seconds between passes.
+            work: What is being waited on, for the log line.
+
+        Returns:
+            What is still outstanding, and how the wait ended.
         """
         deadline = time.monotonic() + self.verify_timeout
         outstanding = count()
@@ -1172,10 +1218,13 @@ class JKentScrapeLoader[
         Waits and reports; whether what it finds is worth an alert is `alert`'s
         to decide.
 
-        :param ledger: The run's ledger, read for the count dispatched and the
-            moment the run began.
-        :param model: The document model the run's merges wrote.
-        :return: What became of them.
+        Args:
+            ledger: The run's ledger, read for the count dispatched and the
+                moment the run began.
+            model: The document model the run's merges wrote.
+
+        Returns:
+            What became of them.
         """
         totals = ledger.totals()
         since = ledger.started()
@@ -1209,12 +1258,15 @@ class JKentScrapeLoader[
 
         Updates the ledger accordingly.
 
-        :param ledger: The run's ledger, handed the outstanding PKs.
-        :param model: The document model the run's merges wrote.
-        :param dispatched: How many documents the run sent to be extracted.
-        :param since: The moment the run began.
-        :param wait: How the wait on extraction ended.
-        :return: What the database says.
+        Args:
+            ledger: The run's ledger, handed the outstanding PKs.
+            model: The document model the run's merges wrote.
+            dispatched: How many documents the run sent to be extracted.
+            since: The moment the run began.
+            wait: How the wait on extraction ended.
+
+        Returns:
+            What the database says.
         """
         outstanding: list[int] = list(
             cls.published_only(model.unextracted(since)).values_list(
