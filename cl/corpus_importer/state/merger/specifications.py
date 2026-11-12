@@ -26,11 +26,13 @@ from django.db.models import (
     ForeignObjectRel,
     Model,
     OneToOneRel,
+    QuerySet,
 )
 
 from cl.corpus_importer.state.utils import MergeResult
 
 from . import state as MergerState
+from .lookup import KeyLookup, RelationLookup
 from .parameters import (
     Create,
     RelatedParams,
@@ -587,6 +589,18 @@ class RelatedMerger[
                 )
         return errors
 
+    @property
+    def prefetch(self) -> list[str]:
+        """The `prefetch_related` lookups, relative to the parent's model,
+        loading everything that merging this relation looks for."""
+        return [
+            self._name,
+            *[
+                f"{self._name}__{path}"
+                for path in self.merger.config.registry.prefetch
+            ],
+        ]
+
     @abstractmethod
     def merge(
         self, parent: RM | None, scrape: Scrape, params: Params
@@ -735,10 +749,16 @@ class NToManyMerger[Scrape, Params, Child, RM: Model](
 
         related_params = RelatedParams(params, parent=parent)
 
-        init_result, child_mergers = self.merger.init_many(
-            transformed, params=related_params, manager=related_manager
-        )
-        result |= init_result
+        children = RelationLookup(self.merger, related_manager.all())
+        child_mergers = [
+            self.merger(
+                child,
+                params=related_params,
+                manager=related_manager,
+                siblings=children,
+            )
+            for child in transformed
+        ]
         related_objects: list[RM] = []
         for child_merger in child_mergers:
             result |= child_merger.merge()
@@ -749,7 +769,8 @@ class NToManyMerger[Scrape, Params, Child, RM: Model](
             case ManyStrategy.REPLACE:
                 if len(related_objects) == len(child_mergers):
                     to_keep = {r.pk for r in related_objects}
-                    _ = related_manager.exclude(pk__in=to_keep).delete()
+                    if stale := {o.pk for o in children.existing()} - to_keep:
+                        _ = related_manager.filter(pk__in=stale).delete()
             case ManyStrategy.DISASSOCIATE:
                 related_manager.set(related_objects)
             # If we're using the `APPEND` strategy, we don't need to do anything special since the `RelatedManager`
@@ -848,6 +869,15 @@ class ManyToManyMerger[
 
         return errors
 
+    @property
+    @override
+    def prefetch(self) -> list[str]:
+        if self.through is not None:
+            # The related objects are looked up among every object of their
+            # model rather than among those the parent already holds.
+            return []
+        return super().prefetch
+
     def merge(
         self, parent: RM | None, scrape: Scrape, params: Params
     ) -> MergeResult:
@@ -870,10 +900,11 @@ class ManyToManyMerger[
 
         # We don't pass the manager, because it will automatically create `through` objects, which we don't want in
         # this case
-        init_result, child_mergers = self.merger.init_many(
-            transformed, params=related_params
-        )
-        result |= init_result
+        children = KeyLookup(self.merger)
+        child_mergers = [
+            self.merger(child, params=related_params, siblings=children)
+            for child in transformed
+        ]
         merged_children: list[tuple[Transform, RM]] = []
         children_to_keep: set[Any] = set()
         for child_merger in child_mergers:
@@ -898,23 +929,33 @@ class ManyToManyMerger[
             # Delete everything we didn't update or create along with associated objects
             _ = related_manager.exclude(pk__in=children_to_keep).delete()
 
-        through_init_result, through_mergers = self.through.init_many(
-            [
-                (
-                    child_scrape,
-                    ThroughParameters(
-                        params,
-                        parent=parent,
-                        source=parent,
-                        source_name=related_manager.source_field_name,  # type: ignore[attr-defined]
-                        target=child,
-                        target_name=related_manager.target_field_name,  # type: ignore[attr-defined]
-                    ),
-                )
-                for child_scrape, child in merged_children
-            ],
+        # Only through objects belonging to this parent are matched or
+        # pruned; other parents' relationships are out of scope for this
+        # merge.
+        throughs = RelationLookup(
+            self.through,
+            cast(
+                QuerySet[ThruM],
+                self.through.config.model._default_manager.filter(
+                    **{related_manager.source_field_name: parent}  # type: ignore[attr-defined]
+                ),
+            ),
         )
-        result |= through_init_result
+        through_mergers = [
+            self.through(
+                child_scrape,
+                params=ThroughParameters(
+                    params,
+                    parent=parent,
+                    source=parent,
+                    source_name=related_manager.source_field_name,  # type: ignore[attr-defined]
+                    target=child,
+                    target_name=related_manager.target_field_name,  # type: ignore[attr-defined]
+                ),
+                siblings=throughs,
+            )
+            for child_scrape, child in merged_children
+        ]
         through_objects: list[ThruM] = []
         for through_merger in through_mergers:
             result |= through_merger.merge()
@@ -930,15 +971,10 @@ class ManyToManyMerger[
             and len(through_objects) == len(through_mergers)
         ):
             to_keep = {t.pk for t in through_objects}
-            # Only prune through objects belonging to this parent; other
-            # parents' relationships are out of scope for this merge.
-            _ = (
-                self.through.config.model._default_manager.filter(
-                    **{related_manager.source_field_name: parent}  # type: ignore[attr-defined]
-                )
-                .exclude(pk__in=to_keep)
-                .delete()
-            )
+            if stale := {t.pk for t in throughs.existing()} - to_keep:
+                _ = self.through.config.model._default_manager.filter(
+                    pk__in=stale
+                ).delete()
 
         return result
 

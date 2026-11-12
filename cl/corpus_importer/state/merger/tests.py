@@ -28,7 +28,11 @@ from cl.corpus_importer.state.merger.specifications import AttributeMerger
 from cl.people_db.factories import PersonFactory
 from cl.people_db.models import Party, PartyType, Person
 from cl.search.docket_sources import DocketSources
-from cl.search.factories import CourtFactory, DocketFactory
+from cl.search.factories import (
+    CourtFactory,
+    DocketEntryFactory,
+    DocketFactory,
+)
 from cl.search.models import (
     Court,
     Docket,
@@ -453,7 +457,7 @@ class BaseMergerTest(TestCase):
             set(de.docket.pk for de in des), set(result.creates["Docket"])
         )
 
-    @merger_test(expected_query_count=9)
+    @merger_test(expected_query_count=8)
     def test_related_mergers_m2m_simple(self) -> None:
         """Does a plain (no-through) many-to-many relation create the targets and link them to the parent? Uses batched candidate lookups so the bulk-linking path is exercised."""
 
@@ -507,7 +511,7 @@ class BaseMergerTest(TestCase):
             {"Doe", "Roe"},
         )
 
-    @merger_test(expected_query_count=9)
+    @merger_test(expected_query_count=8)
     def test_related_mergers_m2m_through(self) -> None:
         """Does a many-to-many relation with a `through` model create the targets, link them to the parent, and populate the through row's own fields from the same scrape?"""
 
@@ -733,7 +737,7 @@ class BaseMergerTest(TestCase):
             {"Alice"},
         )
 
-    @merger_test(expected_query_count=16)
+    @merger_test(expected_query_count=15)
     def test_related_mergers_m2m_through_replace_deletes(self) -> None:
         """Characterization: does REPLACE on a through many-to-many delete the stale related objects outright?"""
         stale_party = Party.objects.create(name="Stale Party")
@@ -939,6 +943,147 @@ class BaseMergerTest(TestCase):
         self.assertEqual(docket.docket_number, "ABCDEFGH")
         self.assertEqual(docket.source, DocketSources.SCRAPER)
         self.assertEqual(docket.assigned_to_str, ats)
+
+
+class KeyedEntryMerger(Merger[dict[str, str], Any, DocketEntry]):
+    """A docket entry found by its description among its docket's entries."""
+
+    config: ClassVar[MergerConfig[DocketEntry]] = MergerConfig(
+        model=DocketEntry, key=("description",)
+    )
+
+    description: str = Scrape(dict)["description"]
+
+
+class KeyedDocketMerger(Merger[dict[str, Any], Any, Docket]):
+    """A docket found by its docket number, with its entries."""
+
+    config: ClassVar[MergerConfig[Docket]] = MergerConfig(
+        model=Docket, key=("docket_number",)
+    )
+
+    docket_number: str = Scrape(dict)["docket_number"]
+    source: int = Constant(DocketSources.SCRAPER)
+    docket_entries: list[DocketEntry] = OneToManyRelation(
+        KeyedEntryMerger,
+        Scrape(dict)["entries"],
+    )
+
+
+class KeyedCourtMerger(Merger[dict[str, Any], None, Court]):
+    """A court found by its ID, with its dockets."""
+
+    config: ClassVar[MergerConfig[Court]] = MergerConfig(
+        model=Court, key=("id",)
+    )
+
+    id: str = Scrape(dict)["id"]
+    dockets: list[Docket] = OneToManyRelation(
+        KeyedDocketMerger,
+        Scrape(dict)["dockets"],
+    )
+
+
+class SiblingLookupTest(TestCase):
+    """How mergers created together find the objects they merge into."""
+
+    @classmethod
+    def setUpTestData(cls) -> None:
+        cls.court = CourtFactory.create()
+        cls.dockets = [
+            DocketFactory.create(
+                court=cls.court,
+                source=DocketSources.SCRAPER,
+                docket_number=f"SIBLING-{n}",
+            )
+            for n in range(2)
+        ]
+        for docket in cls.dockets:
+            for description in ("First", "Second"):
+                DocketEntryFactory.create(
+                    docket=docket, description=description
+                )
+
+    def scrape(self, docket: Docket, *descriptions: str) -> dict[str, Any]:
+        """The scrape of a docket holding entries with these descriptions."""
+        return {
+            "docket_number": docket.docket_number,
+            "entries": [{"description": d} for d in descriptions],
+        }
+
+    @merger_test(expected_query_count=2)
+    def test_siblings_are_looked_up_together(self) -> None:
+        """Do sibling mergers share one lookup query, with nothing more to do
+        when the scrape matches the DB? One query finds the docket and one
+        its entries."""
+        result = KeyedDocketMerger(
+            self.scrape(self.dockets[0], "First", "Second"), params=None
+        ).merge()
+
+        self.assertTrue(result.success, result.failures)
+        self.assertFalse(result.create)
+        self.assertFalse(result.update)
+
+    @merger_test(expected_query_count=3)
+    def test_children_are_fetched_for_every_parent_at_once(self) -> None:
+        """Does one query fetch the children of every sibling parent? One
+        query finds the court, one its dockets and one all of their entries."""
+        result = KeyedCourtMerger(
+            {
+                "id": self.court.pk,
+                "dockets": [
+                    self.scrape(docket, "First", "Second")
+                    for docket in self.dockets
+                ],
+            },
+            params=None,
+        ).merge()
+
+        self.assertTrue(result.success, result.failures)
+        self.assertFalse(result.create)
+        self.assertFalse(result.update)
+
+    def test_replace_prunes_rows_missing_from_the_scrape(self) -> None:
+        """Does REPLACE delete exactly the rows the scrape no longer has,
+        keeping those matched and those created along the way?"""
+        docket = self.dockets[0]
+        result = KeyedDocketMerger(
+            self.scrape(docket, "First", "Third"), params=None
+        ).merge()
+
+        self.assertTrue(result.success, result.failures)
+        self.assertEqual(
+            sorted(
+                docket.docket_entries.values_list("description", flat=True)
+            ),
+            ["First", "Third"],
+        )
+        self.assertEqual(
+            sorted(
+                self.dockets[1].docket_entries.values_list(
+                    "description", flat=True
+                )
+            ),
+            ["First", "Second"],
+            "Another parent's rows are out of scope.",
+        )
+
+    def test_duplicate_natural_keys_fail_once(self) -> None:
+        """Is a scrape repeating a natural key reported as a single failure,
+        with the last duplicate merged and no row pruned?"""
+        docket = self.dockets[0]
+        result = KeyedDocketMerger(
+            self.scrape(docket, "Third", "Third"), params=None
+        ).merge()
+
+        self.assertEqual(result.failures, {"DocketEntry": [None]})
+        self.assertEqual(len(result.creates["DocketEntry"]), 1)
+        self.assertEqual(
+            sorted(
+                docket.docket_entries.values_list("description", flat=True)
+            ),
+            ["First", "Second", "Third"],
+        )
 
 
 class EntryMerger(Merger[dict[str, str], Any, DocketEntry]):

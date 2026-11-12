@@ -1,4 +1,4 @@
-"""Benchmarks for every phase of a merger's life: spec construction, class creation (registry inheritance and validation), instance initialisation (transforms and natural-key hashing), the pure-Python merge paths, and the DB-backed merge paths for each kind of relation.
+"""Benchmarks for every phase of a merger's life: spec construction, class creation (registry inheritance and validation), instance initialisation (transforms and natural keys), the pure-Python merge paths, and the DB-backed merge paths for each kind of relation.
 
 Run with::
 
@@ -37,6 +37,7 @@ from .base import (
     MergerConfig,
     MergerSpecRegistry,
 )
+from .lookup import KeyLookup, NaturalKey
 from .parameters import (
     Create,
     RelatedParams,
@@ -451,7 +452,7 @@ class InstanceInitBench:
             ),
         )
 
-    def bench_hash_natural_key_transform(self, benchmark: BenchmarkFixture):
+    def bench_natural_key(self, benchmark: BenchmarkFixture):
         merger = PartyTypeMerger(
             {"name": "Alice", "type": "Plaintiff"},
             params=ThroughParameters(
@@ -464,14 +465,13 @@ class InstanceInitBench:
             ),
         )
 
-        benchmark(merger._hash_natural_key_transform, merger.state)
+        benchmark(merger.natural_key, merger.state)
 
-    def bench_hash_natural_key_model(self, benchmark: BenchmarkFixture):
+    def bench_natural_key_values_of(self, benchmark: BenchmarkFixture):
+        key = NaturalKey({}, ("docket_id", "party_id"), ("1", "1"))
         obj = PartyType(name="Plaintiff", docket_id=1, party_id=1)
 
-        benchmark(
-            PartyTypeMerger._hash_natural_key_model, obj, ("docket", "party")
-        )
+        benchmark(key.values_of, obj)
 
 
 class MergeBench:
@@ -508,7 +508,7 @@ class MergeBench:
             make_scrape("MERGE"), params=DocketParams(court_id=STUB_COURT.pk)
         )
 
-        benchmark(merger.lookup, merger.state)
+        benchmark(merger._key_query, merger.state)
 
     def bench_one_to_one_absent(self, benchmark: BenchmarkFixture):
         spec = DocketWithOriginMerger.config.registry.one_to_one[
@@ -588,14 +588,23 @@ class MergeDBBench:
 
         benchmark(run)
 
-    def bench_init_many(self, benchmark: BenchmarkFixture, court: Court):
-        """Batched natural-key lookup for `BULK_COUNT` scrapes that are all already in the DB."""
+    def bench_sibling_lookup(self, benchmark: BenchmarkFixture, court: Court):
+        """Shared natural-key lookup for `BULK_COUNT` scrapes that are all already in the DB."""
         params = DocketParams(court_id=court.pk)
         scrapes = [make_scrape(f"BULK-{n}") for n in range(BULK_COUNT)]
         for scrape in scrapes:
             DocketMerger(scrape, params=params).merge()
 
-        benchmark(DocketMerger.init_many, scrapes, params=params)
+        def run():
+            siblings = KeyLookup(DocketMerger)
+            mergers = [
+                DocketMerger(scrape, params=params, siblings=siblings)
+                for scrape in scrapes
+            ]
+            for merger in mergers:
+                merger.step()
+
+        benchmark(run)
 
     def bench_one_to_one_create(
         self, benchmark: BenchmarkFixture, court: Court

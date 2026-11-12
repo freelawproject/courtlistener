@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import json
 import logging
 from collections.abc import (
     Callable,
@@ -9,16 +8,14 @@ from collections.abc import (
     Sequence,
 )
 from dataclasses import dataclass, field
-from functools import cache, cached_property, reduce
+from functools import cache, cached_property
 from graphlib import CycleError, TopologicalSorter
 from itertools import chain
 from typing import (
     Any,
     ClassVar,
     Final,
-    Self,
     cast,
-    overload,
     override,
 )
 
@@ -31,6 +28,7 @@ from django.db.models.manager import Manager
 from cl.corpus_importer.state.utils import MergeResult
 
 from . import state as MergerState
+from .lookup import Duplicate, KeyLookup, NaturalKey, SiblingLookup
 from .parameters import (
     Create,
     Existing,
@@ -112,6 +110,14 @@ class MergerSpecRegistry[Scrape, Params]:
         return [
             related[name] for name in TopologicalSorter(graph).static_order()
         ]
+
+    @cached_property
+    def prefetch(self) -> tuple[str, ...]:
+        """The `prefetch_related` lookups, relative to the merger's model,
+        loading everything the mergers of its relations look for."""
+        return tuple(
+            path for spec in self.related.values() for path in spec.prefetch
+        )
 
     def validate(
         self, merger: type[Merger[Scrape, Params, Any]]
@@ -241,106 +247,6 @@ class Merger[Scrape, Params, M: Model](MergerState.Machine[Scrape, Params, M]):
                 )
             )
 
-    @overload
-    @classmethod
-    def init_many(
-        cls,
-        scrapes: Sequence[Scrape],
-        *,
-        params: Params,
-        manager: Manager[M] | None = ...,
-    ) -> tuple[MergeResult, list[Self]]: ...
-    @overload
-    @classmethod
-    def init_many(
-        cls,
-        scrapes: Sequence[tuple[Scrape, Params]],
-        *,
-        params: None = ...,
-        manager: Manager[M] | None = ...,
-    ) -> tuple[MergeResult, list[Self]]: ...
-    @classmethod
-    def init_many(
-        cls,
-        scrapes: Sequence[Scrape] | Sequence[tuple[Scrape, Params]],
-        *,
-        params: Params | None = None,
-        manager: Manager[M] | None = None,
-    ) -> tuple[MergeResult, list[Self]]:
-        """Create a merger for each scrape. Mergers matched by natural key are
-        looked up with a single query here rather than one each when merged.
-
-        Args:
-            scrapes: The scraped data, or pairs of it with its own params when
-                `params` is omitted.
-            params: Parameters shared by every merger.
-            manager: The manager to use for lookups and creation of objects.
-
-        Returns:
-            The failures found so far and the mergers, in the order of
-            `scrapes`."""
-        result = MergeResult.unnecessary()
-        if params is None:
-            mergers = [
-                cls(scrape, params=param, manager=manager)
-                for scrape, param in cast(
-                    Sequence[tuple[Scrape, Params]], scrapes
-                )
-            ]
-        else:
-            mergers = [
-                cls(scrape, params=params, manager=manager)
-                for scrape in cast(Sequence[Scrape], scrapes)
-            ]
-        if cls.lookup != Merger.lookup:
-            return result, mergers
-
-        model_name = cls.config.model.__name__
-        pending: dict[
-            int, tuple[Self, MergerState.Lookup[Scrape, Params, M]]
-        ] = {}
-        for merger in mergers:
-            match merger.state:
-                case MergerState.Failed(result=failed):
-                    result |= failed
-                case MergerState.Lookup() as state:
-                    k = merger._hash_natural_key_transform(state)
-                    if k in pending:
-                        logger.error(
-                            "Multiple scraped instances with same natural key for model %s",
-                            model_name,
-                        )
-                        duplicate, duplicate_state = pending[k]
-                        duplicate.state = duplicate_state.failed(
-                            "Multiple scraped instances with same natural key",
-                            MergeResult.failed(model_name),
-                        )
-                        result |= MergeResult.failed(model_name)
-                    pending[k] = (merger, state)
-                case _:
-                    pass
-
-        if not pending:
-            return result, mergers
-
-        query = reduce(
-            lambda q1, q2: q1 | q2,
-            (merger._key_query(state) for merger, state in pending.values()),
-        )
-        relation_names = next(iter(pending.values()))[1].relation_params
-        candidates: dict[int, list[M]] = {}
-        for obj in query.iterator():
-            k = cls._hash_natural_key_model(obj, relation_names)
-            candidates.setdefault(k, []).append(obj)
-
-        for k, (merger, state) in pending.items():
-            if k in candidates:
-                merger.state = state.resolve(candidates[k])
-            else:
-                merger.state = state.create()
-
-        return result, mergers
-
     def initial_state(
         self, scrape: Scrape, params: Params, existing: Existing[M]
     ) -> MergerState.AnyState[Scrape, Params, M]:
@@ -401,6 +307,7 @@ class Merger[Scrape, Params, M: Model](MergerState.Machine[Scrape, Params, M]):
         params: Params,
         existing: Existing[M] = Lookup,
         manager: Manager[M] | None = None,
+        siblings: SiblingLookup[M] | None = None,
     ):
         """Create an object to track the merge operation on the specified data.
 
@@ -410,9 +317,13 @@ class Merger[Scrape, Params, M: Model](MergerState.Machine[Scrape, Params, M]):
             existing: Whether to look the object up, create it, or merge into
                 a known one.
             manager: The manager to use for lookups and creation of objects. Defaults to the model's default manager.
+            siblings: The lookup shared with the mergers created alongside
+                this one, all of which must be created before any is merged.
+                Defaults to one of this merger's own.
 
         Attributes:
-            manager: The manager to use for lookups and creation of objects."""
+            manager: The manager to use for lookups and creation of objects.
+            siblings: The lookup that finds the object to merge into."""
 
         super().__init__(self.initial_state(scrape, params, existing))
 
@@ -426,6 +337,12 @@ class Merger[Scrape, Params, M: Model](MergerState.Machine[Scrape, Params, M]):
             manager = cast(Manager[M], self.config.model._default_manager)
         self.manager: Manager[M] = manager
 
+        if siblings is None:
+            siblings = KeyLookup(type(self))
+        self.siblings: SiblingLookup[M] = siblings
+        if isinstance(self.state, MergerState.Lookup):
+            siblings.claim(self.natural_key(self.state), self)
+
     @staticmethod
     def validator(scrape: Scrape) -> bool:
         """Validate the input data before attempting a merge operation
@@ -438,49 +355,26 @@ class Merger[Scrape, Params, M: Model](MergerState.Machine[Scrape, Params, M]):
         # TODO: This is temporary. In the future, validation should be very detailed about failures
         return True
 
-    def _hash_natural_key_transform(
+    def natural_key(
         self, state: MergerState.Lookup[Scrape, Params, M]
-    ) -> int:
-        """Hash the natural key this merger would look its object up by."""
-        return hash(
-            json.dumps(
-                {name: str(getattr(self, name)) for name in self.config.key}
-                | {
-                    name: str(obj.pk)
-                    for name, obj in state.relation_params.items()
-                },
-                sort_keys=True,
-            )
-        )
-
-    @classmethod
-    def _hash_natural_key_model(
-        cls, obj: M, relation_names: Iterable[str] = ()
-    ) -> int:
-        """Hash an object's natural key the way `_hash_natural_key_transform`
-        hashes a merger's."""
-        return hash(
-            json.dumps(
-                {name: str(getattr(obj, name)) for name in cls.config.key}
-                | {
-                    name: str(getattr(obj, f"{name}_id"))
-                    for name in relation_names
-                },
-                sort_keys=True,
-            )
+    ) -> NaturalKey:
+        """The natural key this merger looks its object up by."""
+        attributes = {name: getattr(self, name) for name in self.config.key}
+        relations = state.relation_params
+        return NaturalKey(
+            filters={**attributes, **relations},
+            attnames=(*attributes, *[f"{name}_id" for name in relations]),
+            values=tuple(
+                [str(value) for value in attributes.values()]
+                + [str(obj.pk) for obj in relations.values()]
+            ),
         )
 
     def _key_query(
         self, state: MergerState.Lookup[Scrape, Params, M]
     ) -> QuerySet[M]:
         """The objects matching this merger's natural key."""
-        qs = self.manager.filter(
-            **{name: getattr(self, name) for name in self.config.key},
-        )
-        # Filtering invalidates the cache even if the filter is empty. Try to avoid that.
-        if state.relation_params:
-            qs = qs.filter(**state.relation_params)
-        return qs
+        return self.manager.filter(**self.natural_key(state).filters)
 
     def pre_update(self, updated_fields: list[str]) -> list[str]:
         """Called before an updated instance is saved. Useful for setting attributes that are dependent on the result of the merge operation.
@@ -505,7 +399,18 @@ class Merger[Scrape, Params, M: Model](MergerState.Machine[Scrape, Params, M]):
     def lookup(
         self, state: MergerState.Lookup[Scrape, Params, M]
     ) -> MergerState.LookupOutput[Scrape, Params, M]:
-        return state.resolve(self._key_query(state))
+        candidates = self.siblings.candidates(self.natural_key(state), self)
+        if candidates is Duplicate:
+            model_name = self.config.model.__name__
+            logger.error(
+                "Multiple scraped instances with same natural key for model %s",
+                model_name,
+            )
+            return state.failed(
+                "Multiple scraped instances with same natural key",
+                MergeResult.failed(model_name),
+            )
+        return state.resolve(candidates)
 
     @override
     def resolve(
