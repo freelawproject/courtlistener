@@ -193,6 +193,24 @@ SOURCE_BY_MODEL: dict[type[models.Model], ESDocketSource] = {
 }
 
 
+def es_uid(model: type[models.Model], pk: int) -> str | None:
+    """Return the ES uid of a source's object, its pk prefixed with the
+    source's uid_namespace, e.g. "scotus_123". It's what ESRECAPDocument's
+    uid and docket_entry_uid fields hold, so it can be used to match those
+    documents in a search query.
+
+    :param model: The document model whose source namespaces the uid. For
+    docket_entry_uid, pass the document model with the docket entry's pk.
+    :param pk: The pk to prefix.
+    :return: The uid, or None for sources without a uid_namespace, like
+    RECAP, whose documents are matched by their integer id fields instead.
+    """
+    source = SOURCE_BY_MODEL.get(model)
+    if not source or not source.uid_namespace:
+        return None
+    return f"{source.uid_namespace}_{pk}"
+
+
 def skips_percolation(instance: models.Model) -> bool:
     """True for a SCOTUS Docket, so callers must skip its percolator
     request. Temporary: remove once search alerts support SCOTUS.

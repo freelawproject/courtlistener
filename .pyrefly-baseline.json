@@ -361,22 +361,8 @@
     {
       "column": 13,
       "path": "cl/api/pagination.py",
-      "name": "missing-attribute",
-      "concise_description": "Object of class `NoneType` has no attribute `aggregations`",
-      "severity": "error"
-    },
-    {
-      "column": 13,
-      "path": "cl/api/pagination.py",
       "name": "bad-return",
       "concise_description": "Returned type `Unknown | None` is not assignable to declared return type `int`",
-      "severity": "error"
-    },
-    {
-      "column": 16,
-      "path": "cl/api/pagination.py",
-      "name": "missing-attribute",
-      "concise_description": "Object of class `NoneType` has no attribute `aggregations`",
       "severity": "error"
     },
     {
@@ -1490,20 +1476,6 @@
       "path": "cl/opinion_page/types.py",
       "name": "missing-attribute",
       "concise_description": "Object of class `OpinionCluster` has no attribute `citation_depth`",
-      "severity": "error"
-    },
-    {
-      "column": 9,
-      "path": "cl/opinion_page/utils.py",
-      "name": "missing-attribute",
-      "concise_description": "Object of class `SCOTUSDocketEntry` has no attribute `recap_documents`",
-      "severity": "error"
-    },
-    {
-      "column": 26,
-      "path": "cl/opinion_page/utils.py",
-      "name": "missing-attribute",
-      "concise_description": "Object of class `SCOTUSDocketEntry` has no attribute `recap_documents`",
       "severity": "error"
     },
     {

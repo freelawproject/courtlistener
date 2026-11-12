@@ -16,7 +16,10 @@ from elasticsearch.dsl.utils import AttrDict
 from elasticsearch.exceptions import ApiError, TransportError
 
 from cl.lib.date_time import midnight_pt
-from cl.lib.elasticsearch_utils import do_es_feed_query, get_docket_entry_pk
+from cl.lib.elasticsearch_utils import (
+    do_es_feed_query,
+    get_docket_entry_fragment,
+)
 from cl.lib.mime_types import lookup_mime_type
 from cl.lib.search_index_utils import null_map
 from cl.lib.search_utils import scotus_frontend_search_enabled
@@ -146,18 +149,13 @@ class SearchFeed(Feed):
         if doc["absolute_url"]:
             return doc["absolute_url"]
         # RECAP and SCOTUS documents without a number have no page of their
-        # own, so link to their entry on the docket page, using the anchors
-        # that page renders. The slug is rebuilt the way Docket.save() does,
-        # since child documents don't store it.
+        # own, so link to their entry on the docket page. The slug is rebuilt
+        # the way Docket.save() does, since child documents don't store it.
         docket_url = reverse(
             "view_docket",
             args=[doc["docket_id"], slugify(trunc(doc["caseName"], 75))],
         )
-        if entry_number := getattr(doc, "entry_number", None):
-            return f"{docket_url}#entry-{entry_number}"
-        if docket_entry_pk := get_docket_entry_pk(doc):
-            return f"{docket_url}#minute-entry-{docket_entry_pk}"
-        return docket_url
+        return f"{docket_url}{get_docket_entry_fragment(doc)}"
 
     def get_context_data(self, **kwargs: Any) -> dict[str, Any]:
         """Add the item's link to the description template's context, so
