@@ -35,7 +35,7 @@ FAKE_STATS = {
 
 
 def data_value_for_label(label_text: str, html: str) -> str:
-    """Get the <data> value in a <dd> element for a given <dt> label"""
+    """Get the <data> value in a <dd> element for a given <dt> label."""
     tree = lhtml.fromstring(html)
     dt_nodes = tree.xpath(f"//dt[normalize-space(text())='{label_text}']")
     assert dt_nodes, f"Missing dt with label: {label_text}"
@@ -47,9 +47,7 @@ def data_value_for_label(label_text: str, html: str) -> str:
 
 @override_settings(WAFFLE_CACHE_PREFIX="test_homepage_transitional_waffle")
 class HomepageTransitionalTest(TestCase):
-    """
-    Transitional tests for current behavior that will change in the future as new templates are implemented.
-    """
+    """Transitional tests for current behavior that will change in the future as new templates are implemented."""
 
     def _assert_not_v2(self, response):
         self.assertEqual(response.status_code, 200)
@@ -79,9 +77,10 @@ class HomepageTransitionalTest(TestCase):
 @patch("cl.search.views.get_homepage_stats", return_value=FAKE_STATS)
 @override_settings(WAFFLE_CACHE_PREFIX="test_homepage_routing_waffle")
 class HomepageRoutingTest(TestCase):
-    """
-    Router chooses legacy vs new homepage correctly.
-    We patch methods to get stats so routing tests don't interact with the DB/Redis.
+    """Router chooses legacy vs new homepage correctly.
+
+    We patch methods to get stats so routing tests don't interact with the
+    DB/Redis.
     """
 
     @override_flag("use_new_design", False)
@@ -248,7 +247,7 @@ class CorpusSearchFormTest(SimpleUserDataMixin, TestCase):
         self.tree = lhtml.fromstring(self.html)
 
     def test_unique_form_field_ids(self):
-        """Test that form fields have unique IDs across desktop and mobile forms"""
+        """Test that form fields have unique IDs across desktop and mobile forms."""
         tree = self.tree
 
         # Test common fields that appear in multiple fieldsets
@@ -282,7 +281,7 @@ class CorpusSearchFormTest(SimpleUserDataMixin, TestCase):
                     )
 
     def test_no_duplicate_ids_in_dom(self):
-        """Test no duplicate ID attributes exist anywhere in the DOM
+        """Test no duplicate ID attributes exist anywhere in the DOM.
 
         Comprehensive check that validates HTML uniqueness constraint for ID
         attributes across the entire rendered page. This catches any duplicate
@@ -311,7 +310,7 @@ class CorpusSearchFormTest(SimpleUserDataMixin, TestCase):
         )
 
     def test_label_for_matches_input_id(self):
-        """Test label 'for' attributes correctly reference existing input IDs
+        """Test label 'for' attributes correctly reference existing input IDs.
 
         Validates accessibility: every <label for="..."> must have exactly one
         matching element with that ID. Ensures the unique ID solution didn't
@@ -393,8 +392,7 @@ class CorpusSearchFormTest(SimpleUserDataMixin, TestCase):
         )
 
     def test_corpus_search_menu_is_server_rendered(self):
-        """Corpus search menu trigger and options appear in HTML before Alpine
-        runs.
+        """Corpus search menu trigger and options appear in HTML before Alpine runs.
 
         Regression for #7827: menu trigger and options used Alpine x-text and
         x-for, so content was missing from the initial HTML and flashed in

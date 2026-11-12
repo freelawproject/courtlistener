@@ -30,8 +30,8 @@ def remove_words(phrase: str) -> str:
 
 
 def gen_diff_ratio(left: str, right: str) -> float:
-    """
-    Generates a difference between two strings.
+    """Generates a difference between two strings.
+
     Returns a value between 0 and 1. 0 means the strings are totally different.
     1 means they are identical.
 
@@ -58,13 +58,16 @@ class _BestMatchOutput(TypedDict):
 def find_best_match(
     items: Sequence[str], s: str, case_sensitive: bool = True
 ) -> _BestMatchOutput:
-    """Find the string in the list that is the closest match to the string
+    """Find the string in the list that is the closest match to the string.
 
-    :param items: The list to search within
-    :param s: The string to attempt to match
-    :param case_sensitive: Whether comparisons should honor case
-    :return dict with the index of the best matching value, its value, and its
-    match ratio.
+    Args:
+        items: The list to search within
+        s: The string to attempt to match
+        case_sensitive: Whether comparisons should honor case
+
+    Returns:
+        dict with the index of the best matching value, its value, and its
+        match ratio.
     """
     diff_ratios = []
     if not case_sensitive:
@@ -108,8 +111,11 @@ def find_confidences(
 def string_to_vector(text: str) -> Counter:
     """Convert strings to counter dict.
 
-    :param text: Text to vectorize
-    :return: A dictionary of words by count
+    Args:
+        text: Text to vectorize
+
+    Returns:
+        A dictionary of words by count
     """
     WORD = re.compile(r"\w+")
     words = WORD.findall(text)

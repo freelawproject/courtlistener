@@ -49,8 +49,11 @@ def PartyRelation(
     party_type: type[Merger[Any, Any, Any]] = PartyTypeMerger,
     transform: Callable[[Any, Any], Sequence[Any]] = _docket_parties,
 ) -> list[Party]:
-    """Merge a docket's parties. A re-scrape with no parties (or a party with
-    no representatives) keeps the existing links and roles."""
+    """Merge a docket's parties.
+
+    A re-scrape with no parties (or a party with no representatives) keeps the
+    existing links and roles.
+    """
     return ManyToManyRelation(
         merger, party_type, transform, strategy=ManyStrategy.DISASSOCIATE
     )

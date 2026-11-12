@@ -17,9 +17,7 @@ from cl.tests.cases import TestCase
 
 
 class FakeS3IntelligentTieringStorage:
-    """A fake storage class that simulates saving files to S3 by storing them
-    locally.
-    """
+    """A fake storage class that simulates saving files to S3 by storing them locally."""
 
     def __init__(self):
         self.saved_files = {}
@@ -168,7 +166,7 @@ class GenerateOpinionEmbeddingTest(TestCase):
         mock_aws_media_storage,
         mock_embeddings_cache_key,
     ):
-        """Test that the generate_opinion_embeddings command:
+        """Test the generate_opinion_embeddings command's behavior.
 
         - Calls the inception service to get text embeddings.
         - Saves each embedding record to S3 (using mock).
@@ -219,7 +217,6 @@ class GenerateOpinionEmbeddingTest(TestCase):
         self, mock_aws_media_storage, mock_embeddings_cache_key
     ):
         """Test generate_opinion_embeddings limit the batch size properly."""
-
         # Create an instance of fake S3IntelligentTieringStorage.
         fake_storage = FakeS3IntelligentTieringStorage()
         mock_aws_media_storage.return_value = fake_storage
@@ -281,9 +278,7 @@ class GenerateOpinionEmbeddingTest(TestCase):
         mock_aws_media_storage,
         mock_embeddings_cache_key,
     ):
-        """
-        The command uses the CPU version of inception when --device=cpu is passed.
-        """
+        """The command uses the CPU version of inception when --device=cpu is passed."""
         # Setup: replace S3IntelligentTieringStorage with a fake implementation
         mock_aws_media_storage.return_value = FakeS3IntelligentTieringStorage()
 
@@ -306,7 +301,6 @@ class GenerateOpinionEmbeddingTest(TestCase):
         self, mock_logger, mock_aws_media_storage, mock_embeddings_cache_key
     ):
         """Test log documents that individually exceed the batch size."""
-
         # Create an instance of fake S3IntelligentTieringStorage.
         fake_storage = FakeS3IntelligentTieringStorage()
         mock_aws_media_storage.return_value = fake_storage

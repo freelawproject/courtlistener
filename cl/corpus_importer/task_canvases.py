@@ -18,11 +18,9 @@ from cl.recap.tasks import process_recap_attachment
 
 
 def get_docket_and_claims(
-    docket_number, court, case_name, cookies_data, tags, q
+    docket_number, court, case_name, cookies_data, tags: list[str], q
 ):
-    """
-    Get the docket report, claims history report, and save it all to the DB
-    """
+    """Get the docket report, claims history report, and save it all to the DB."""
     chain(
         get_pacer_case_id_and_title.s(
             pass_through=None,
@@ -49,18 +47,18 @@ def get_docket_and_claims(
 
 
 def get_district_attachment_pages(options, rd_pks, tag_names, session):
-    """Get the attachment page information for all of the items selected
+    """Get the attachment page information for all of the items selected.
 
-    :param options: The options returned by argparse. Should have the following
-    keys:
-     - queue: The celery queue to use
-     - offset: The offset to skip
-     - limit: The limit to stop after
-    :param rd_pks: A list or ValuesList of RECAPDocument PKs to get attachment
-    pages for.
-    :param tag_names: A list of tags to associate with the downloaded items.
-    :param session: A PACER logged-in PacerSession object
-    :return None
+    Args:
+        options: The options returned by argparse. Should have the following
+            keys:
+            - queue: The celery queue to use
+            - offset: The offset to skip
+            - limit: The limit to stop after
+        rd_pks: A list or ValuesList of RECAPDocument PKs to get attachment
+            pages for.
+        tag_names: A list of tags to associate with the downloaded items.
+        session: A PACER logged-in PacerSession object
     """
     q = options["queue"]
     recap_user = User.objects.get(username="recap")

@@ -17,8 +17,11 @@ from cl.lib.redis_utils import create_redis_semaphore, get_redis_interface
 def enqueue_iquery_probe(court_id: str) -> bool:
     """Get iquery forward probing semaphore.
 
-    :param court_id: The identifier for the court.
-    :return: A boolean indicating if the semaphore was successfully created.
+    Args:
+        court_id: The identifier for the court.
+
+    Returns:
+        A boolean indicating if the semaphore was successfully created.
     """
     key = make_iquery_probing_key(court_id)
     return create_redis_semaphore("CACHE", key, ttl=60 * 10)
@@ -29,9 +32,12 @@ def get_latest_pacer_case_id_for_courts(
 ) -> dict[str, int]:
     """Return the latest pacer_case_id for each given court from Redis.
 
-    :param court_ids: List of court IDs to fetch the latest pacer_case_id for.
-    :param r: The redis connection to use.
-    :return: A dict mapping each court_id to its latest pacer_case_id.
+    Args:
+        court_ids: List of court IDs to fetch the latest pacer_case_id for.
+        r: The redis connection to use.
+
+    Returns:
+        A dict mapping each court_id to its latest pacer_case_id.
     """
     latest_case_ids = {}
     for court_id in court_ids:

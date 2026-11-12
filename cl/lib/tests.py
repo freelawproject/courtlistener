@@ -16,7 +16,8 @@ from django.core.cache import cache
 from django.core.exceptions import ValidationError
 from django.core.files.base import ContentFile
 from django.core.files.uploadedfile import SimpleUploadedFile
-from django.http import HttpResponse
+from django.db import models
+from django.http import Http404, HttpResponse
 from django.template.response import TemplateResponse
 from django.test import RequestFactory, override_settings
 from django.urls import ResolverMatch, reverse
@@ -33,7 +34,12 @@ from cl.lib.courts import (
     lookup_child_courts_cache,
 )
 from cl.lib.date_time import midnight_pt
-from cl.lib.decorators import _memory_cache, clear_tiered_cache, tiered_cache
+from cl.lib.decorators import (
+    _memory_cache,
+    clear_tiered_cache,
+    document_model,
+    tiered_cache,
+)
 from cl.lib.elasticsearch_utils import append_query_conjunctions
 from cl.lib.file_validation import (
     PDF_HEADER_SEARCH_BYTES,
@@ -44,6 +50,7 @@ from cl.lib.file_validation import (
 from cl.lib.filesizes import convert_size_to_bytes
 from cl.lib.middleware import (
     V2_PARTIALS_PREFIX,
+    WIP_PROPS,
     IncrementalNewTemplateMiddleware,
 )
 from cl.lib.mime_types import lookup_mime_type
@@ -501,7 +508,7 @@ class TestStringUtils(SimpleTestCase):
 
 
 class TestModelHelpers(TestCase):
-    """Test the model_utils helper functions"""
+    """Test the model_utils helper functions."""
 
     fixtures = ["test_court.json"]
 
@@ -648,11 +655,7 @@ class TestModelHelpers(TestCase):
                 )
 
     def test_avoid_generating_docket_number_core(self) -> None:
-        """Can we avoid generating docket_number_core when the docket number
-        format doesn't match a valid format or if a string contains more than
-        one docket number?
-        """
-
+        """Can we avoid generating docket_number_core when the docket number format doesn't match a valid format or if a string contains more than one docket number?"""
         # Not valid docket number formats for district, bankruptcy or appellate
         self.assertEqual(make_docket_number_core("Nos. C 123-80-123-82"), "")
         self.assertEqual(make_docket_number_core("Nos. C 123-80-123"), "")
@@ -702,7 +705,6 @@ class TestModelHelpers(TestCase):
 
     def test_is_docket_number(self) -> None:
         """Test is_docket_number method correctly detects a docket number."""
-
         self.assertEqual(is_docket_number("1:21-cv-1234-ABC"), True)
         self.assertEqual(is_docket_number("1:21-cv-1234"), True)
         self.assertEqual(is_docket_number("1:21-bk-1234"), True)
@@ -715,10 +717,7 @@ class TestModelHelpers(TestCase):
         self.assertEqual(is_docket_number("21"), False)
 
     def test_making_scotus_docket_number_core(self) -> None:
-        """Test make_scotus_docket_number_core method correctly creates
-        docket number core for scotus dockets.
-        """
-
+        """Test make_scotus_docket_number_core method correctly creates docket number core for scotus dockets."""
         test_cases = [
             # None or empty inputs
             (None, ""),
@@ -755,9 +754,7 @@ class TestModelHelpers(TestCase):
     def test_making_scotus_docket_number_core_logs_multiple(
         self, mock_logger: mock.MagicMock
     ) -> None:
-        """Test that multiple docket numbers of the same type log a
-        warning and return the lexicographically smallest match.
-        """
+        """Test that multiple docket numbers of the same type log a warning and return the lexicographically smallest match."""
         warning_cases = [
             ("No. 01A578 01A576", "01A00576"),
             ("No. 01-8149 01-8148", "01008148"),
@@ -806,8 +803,7 @@ class TestModelHelpers(TestCase):
     def test_clean_scotus_docket_number_logs_multiple(
         self, mock_logger: mock.MagicMock
     ) -> None:
-        """Test that multiple same-type docket numbers log a warning and
-        return the lexicographically smallest match."""
+        """Test that multiple same-type docket numbers log a warning and return the lexicographically smallest match."""
         warning_cases = [
             ("No. 01A578 01A576", "01a576"),
             ("No. 01-8149 01-8148", "01-8148"),
@@ -838,7 +834,7 @@ class S3PrivateUUIDStorageTest(TestCase):
 
 
 class TestMimeLookup(SimpleTestCase):
-    """Test the Mime type lookup function(s)"""
+    """Test the Mime type lookup function(s)."""
 
     def test_unsupported_extension_returns_octetstream(self) -> None:
         """For a bad extension, do we return the proper default?"""
@@ -853,7 +849,7 @@ class TestMimeLookup(SimpleTestCase):
             )
 
     def test_known_good_mimetypes(self) -> None:
-        """For known good mimetypes, make sure we return the right value"""
+        """For known good mimetypes, make sure we return the right value."""
         tests = {
             "mp3/2015/1/1/something_v._something_else.mp3": "audio/mpeg",
             "doc/2015/1/1/voutila_v._bonvini.doc": "application/msword",
@@ -1553,10 +1549,7 @@ class TestElasticsearchUtils(SimpleTestCase):
             self.assertEqual(ouput_str, test["output"])
 
     def test_check_and_sanitize_queries_bad_syntax(self) -> None:
-        """Tests for methods that check and sanitize queries with a bad search
-        syntax.
-        """
-
+        """Tests for methods that check and sanitize queries with a bad search syntax."""
         # Check for bad proximity tokens.
         tests = [
             {
@@ -1835,7 +1828,6 @@ class TestRedisUtils(SimpleTestCase):
 
     def test_redis_lock(self) -> None:
         """Test acquiring and releasing a Redis lock."""
-
         lock_key = "test_lock"
         r = get_redis_interface("CACHE")
         identifier = acquire_redis_lock(r, lock_key, 2000)
@@ -1845,8 +1837,7 @@ class TestRedisUtils(SimpleTestCase):
         self.assertEqual(result, 1)
 
     def test_redis_semaphore_has_single_winner(self) -> None:
-        """Concurrent callers get exactly one winner, and the key keeps its
-        TTL.
+        """Concurrent callers get exactly one winner, and the key keeps its TTL.
 
         Each round releases many threads at once with a barrier so their
         Redis calls interleave. A check-then-set implementation lets several
@@ -2001,7 +1992,7 @@ class TestChoicesToCsv(SimpleTestCase):
 
 
 class TestAddSqlComment(SimpleTestCase):
-    """Test the add_sql_comment function"""
+    """Test the add_sql_comment function."""
 
     def test_no_metadata_returns_unchanged_sql(self) -> None:
         """Does an empty meta dict return the original SQL unchanged?"""
@@ -2077,7 +2068,7 @@ class TestAddSqlComment(SimpleTestCase):
 
 
 class TestQueryWrapper(TestCase):
-    """Test the QueryWrapper class"""
+    """Test the QueryWrapper class."""
 
     @classmethod
     def setUpTestData(cls) -> None:
@@ -2201,7 +2192,7 @@ class TestQueryWrapper(TestCase):
 
 
 class TestSqlCommenterMiddleware(TestCase):
-    """Integration tests for SqlCommenter middleware"""
+    """Integration tests for SqlCommenter middleware."""
 
     class MockResolverMatch:
         def __init__(self, view_name="test-view"):
@@ -2262,7 +2253,7 @@ class TestSqlCommenterMiddleware(TestCase):
 @override_settings(CHARS_THRESHOLD_OCR_PER_PAGE=50)
 class TestRecapUtils(SimpleTestCase):
     def test_needs_ocr_cacb_example(self):
-        """Test needs_ocr function with multi-line headers from cacb example provided in issue #598
+        """Test needs_ocr function with multi-line headers from cacb example provided in issue #598.
 
         This text contains headers like 'Case...', 'Doc...Filed...',
         'Main Document', and 'Desc'. The function should recognize these
@@ -2291,7 +2282,7 @@ Desc
         )
 
     def test_needs_ocr_cacd_example(self):
-        """Test needs_ocr function with multi-line headers from cacd example provided in issue #598
+        """Test needs_ocr function with multi-line headers from cacd example provided in issue #598.
 
         This text contains headers like 'Case...', 'Doc...Filed...',
         'Main Document', and 'Desc'. The function should recognize these
@@ -2334,8 +2325,7 @@ Case
         )
 
     def test_needs_ocr_msnd_example(self):
-        """Test needs_ocr function with multi-line headers from msnd example
-        provided in issue #598
+        """Test needs_ocr function with multi-line headers from msnd example provided in issue #598.
 
         This text contains headers like 'Case...', 'Doc...Filed...',
         'Main Document', and 'Desc'. The function should recognize these
@@ -2489,10 +2479,11 @@ Line 3
         )
 
     def test_needs_ocr_under_threshold_page_colon(self):
-        """Test the original scenario where only 'Case...' lines and
-        'Page: Y' lines are present and good content between pages lines is
-        present. Should return True (needs OCR).
-        Example: https://storage.courtlistener.com/recap/gov.uscourts.ca1.08-9007.00105928542.0.pdf
+        """Test the original scenario with 'Case...' and 'Page: Y' lines.
+
+        Only 'Case...' lines and 'Page: Y' lines are present and good content
+        between pages lines is present. Should return True (needs OCR). Example:
+        https://storage.courtlistener.com/recap/gov.uscourts.ca1.08-9007.00105928542.0.pdf
         """
         header_text = """
 Case: 08-9007   Document: 00115928542   Page: 1   Date Filed: 07/30/2009   Entry ID: 5364336
@@ -2522,8 +2513,7 @@ Case: 08-9007   Document: 00115928542   Page: 3   Date Filed: 07/30/2009   Entry
         )
 
     def test_needs_ocr_small_text_no_header(self):
-        """Test needs_ocr function when the document has minimal text and no
-        meaningful headers.
+        """Test needs_ocr function when the document has minimal text and no meaningful headers.
 
         When the average number of characters per page
         is below CHARS_THRESHOLD_OCR_PER_PAGE, the function should return True,
@@ -2562,10 +2552,11 @@ Case No. 1:22-cv-00369-NYW-TPO   Document 1   filed 02/09/22   USDC Colorado   p
         )
 
     def test_needs_ocr_caeb(self):
-        """Test needs_ocr function with multi-line headers from caeb
-        Example: https://storage.courtlistener.com/recap/gov.uscourts.caeb.656273/gov.uscourts.caeb.656273.19.0.pdf
-        """
+        """Test needs_ocr function with multi-line headers from caeb.
 
+        Example:
+        https://storage.courtlistener.com/recap/gov.uscourts.caeb.656273/gov.uscourts.caeb.656273.19.0.pdf
+        """
         # Date includes year with 4 digits.
         caeb_text = """
     Filed 11/02/21   Case 21-23295                Doc 19
@@ -2595,14 +2586,13 @@ Case No. 1:22-cv-00369-NYW-TPO   Document 1   filed 02/09/22   USDC Colorado   p
         )
 
     def test_needs_ocr_pawd(self):
-        """Test needs_ocr function with multi-line headers from pawd
+        """Test needs_ocr function with multi-line headers from pawd.
 
         In this case, the content belongs to a seal whose character count is
         below CHARS_THRESHOLD_OCR_PER_PAGE.
 
         Example: https://storage.courtlistener.com/recap/gov.uscourts.pawb.358488/gov.uscourts.pawb.358488.28.0.pdf
         """
-
         caeb_text = """
         Case 18-24646-CMB   Doc 28   Filed 06/13/19 Entered 06/13/19 15:56:16   Desc Main
                                  Document     Page 1 of 1
@@ -2691,7 +2681,7 @@ Case No. 1:25-cv-01340-RTG   Document 1 filed 04/29/25   USDC Colorado   pg 1
 
 
 class TestS3CacheHelpers(TestCase):
-    """Tests for the S3 cache helper functions in cl/lib/s3_cache.py"""
+    """Tests for the S3 cache helper functions in cl/lib/s3_cache.py."""
 
     @override_settings(DEVELOPMENT=True, TESTING=False)
     def test_get_s3_cache_returns_fallback_in_development(self) -> None:
@@ -3029,8 +3019,9 @@ class IncrementalNewTemplateMiddlewareTest(TestCase):
     ) -> TemplateResponse:
         """Runs an unrendered TemplateResponse through the middleware.
 
-        :param template_name: The template the view would have rendered.
-        :param headers: Request headers, such as the ones htmx sends.
+        Args:
+            template_name: The template the view would have rendered.
+            headers: Request headers, such as the ones htmx sends.
         """
         middleware = IncrementalNewTemplateMiddleware(lambda request: None)
         request = RequestFactory().get("/", headers=headers)
@@ -3081,6 +3072,70 @@ class IncrementalNewTemplateMiddlewareTest(TestCase):
             response.template_name, f"{V2_PARTIALS_PREFIX}foo/button.html"
         )
         self.assertNotIn("search_form", response.context_data or {})
+
+    def test_template_selection_by_flags(self) -> None:
+        """Does each mix of templates and flags pick the right template?
+
+        No WIP template exists in the repo yet, and the ones that do are
+        renamed to v2_ once finished, so the template lookup is stubbed to
+        decide which versions of the page exist in each case.
+        """
+        prefix = WIP_PROPS["prefix"]
+        legacy, v2, wip = "foo.html", "v2_foo.html", f"{prefix}foo.html"
+        # (templates that exist, use_new_design, WIP flag, expected template)
+        # An expected template of None means the middleware raises Http404.
+        cases: list[tuple[set[str], bool, bool, str | None]] = [
+            # Legacy + WIP: only both flags reach the WIP template.
+            ({legacy, wip}, True, True, wip),
+            ({legacy, wip}, True, False, legacy),
+            ({legacy, wip}, False, True, legacy),
+            ({legacy, wip}, False, False, legacy),
+            # WIP-only: there's no template to fall back to.
+            ({wip}, True, True, wip),
+            ({wip}, True, False, None),
+            ({wip}, False, True, None),
+            ({wip}, False, False, None),
+            # WIP wins over v2 for opted-in visitors only.
+            ({legacy, v2, wip}, True, True, wip),
+            ({legacy, v2, wip}, True, False, v2),
+            # v2 pages ignore the WIP flag.
+            ({legacy, v2}, True, True, v2),
+            ({legacy, v2}, False, True, legacy),
+            ({v2}, False, True, v2),
+        ]
+        for existing, new_design, wip_design, expected in cases:
+            with (
+                self.subTest(
+                    existing=sorted(existing),
+                    use_new_design=new_design,
+                    wip_flag=wip_design,
+                ),
+                override_flag("use_new_design", active=new_design),
+                override_flag(WIP_PROPS["flag"], active=wip_design),
+                patch.object(
+                    IncrementalNewTemplateMiddleware,
+                    "template_exists",
+                    side_effect=existing.__contains__,
+                ),
+            ):
+                if expected is None:
+                    with self.assertRaises(Http404):
+                        self.process(legacy)
+                    continue
+                response = self.process(legacy)
+                self.assertEqual(response.template_name, expected)
+                # Only a swapped full page renders the new header and its
+                # search form; a page left on legacy isn't handed one.
+                self.assertEqual(
+                    "search_form" in (response.context_data or {}),
+                    expected != legacy,
+                )
+
+    @override_flag(WIP_PROPS["flag"], True)
+    def test_v2_page_unaffected_by_wip_flag(self) -> None:
+        """Does a real v2 page still get its v2 template with both flags on?"""
+        response = self.process("homepage.html")
+        self.assertEqual(response.template_name, "v2_homepage.html")
 
     def test_htmx_partial_follows_the_design_header(self) -> None:
         """A flagged htmx request gets the partial for the page that sent it.
@@ -3150,8 +3205,11 @@ class FilterByEmailTest(TestCase):
     def matched(self, email: str) -> list[str]:
         """Run the matcher and report who it found.
 
-        :param email: The address to match.
-        :return: The usernames of the matching accounts.
+        Args:
+            email: The address to match.
+
+        Returns:
+            The usernames of the matching accounts.
         """
         return list(
             filter_by_email(User.objects.all(), email).values_list(
@@ -3231,3 +3289,37 @@ class RatelimitedViewTest(SimpleTestCase):
             cast(HttpResponse, response).status_code,
             HTTPStatus.TOO_MANY_REQUESTS,
         )
+
+
+class DocumentModelTest(SimpleTestCase):
+    """Does @document_model copy Google-style attribute docs onto fields?"""
+
+    def test_attributes_section_populates_field_docs(self) -> None:
+        """Each documented field gets its whitespace-normalized description."""
+
+        @document_model
+        class Documented(models.Model):
+            """A model documented in the project's docstring convention.
+
+            Attributes:
+                name: The name of the thing.
+                notes: Free-form notes that wrap
+                    onto a second line.
+            """
+
+            name = models.TextField()
+            notes = models.TextField()
+
+            class Meta:
+                app_label = "search"
+                abstract = True
+
+        expected = {
+            "name": "The name of the thing.",
+            "notes": "Free-form notes that wrap onto a second line.",
+        }
+        fields = {f.name: f for f in Documented._meta.local_fields}
+        for field_name, doc in expected.items():
+            with self.subTest(field=field_name):
+                self.assertEqual(fields[field_name].help_text, doc)
+                self.assertEqual(fields[field_name].db_comment, doc)

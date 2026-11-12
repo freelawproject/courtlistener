@@ -98,5 +98,5 @@ class Site(OpinionSite):
 
     @staticmethod
     def cleanup_content(content):
-        """Implemented just to override OpinionSite.cleanup_content for tests"""
+        """Implemented just to override OpinionSite.cleanup_content for tests."""
         return content

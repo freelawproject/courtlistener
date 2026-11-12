@@ -22,8 +22,7 @@ BULK_OUTPUT_DIRECTORY = "/tmp/fdd-export/"
 
 
 def do_bulk_export(options):
-    """The final step of this project is to bulk export an outrageous
-    amount of bankruptcy data from our system.
+    """The final step of this project is to bulk export an outrageous amount of bankruptcy data from our system.
 
     Limit/offset work differently than in many other functions. Limit is a
     true hard limit to the number that should get done. A limit of 10 means
@@ -53,16 +52,16 @@ def do_bulk_export(options):
         )
 
 
-def get_data(options, row_transform, tags):
-    """Download dockets from a csv, then download claims register data
-    from those dockets.
+def get_data(options, row_transform, tags: list[str]):
+    """Download dockets from a csv, then download claims register data from those dockets.
 
-    :param options: The options provided at the command line.
-    :param row_transform: A function that takes the row as an argument and
-    returns a cleaned up version of the row that has the needed attributes.
-    This parameter allows this function to be able to work with almost any
-    CSV.
-    :param tags: Tags you wish to apply to the gathered data.
+    Args:
+        options: The options provided at the command line.
+        row_transform: A function that takes the row as an argument and
+            returns a cleaned up version of the row that has the needed attributes.
+            This parameter allows this function to be able to work with almost any
+            CSV.
+        tags: Tags you wish to apply to the gathered data.
     """
     f = options["file"]
     reader = csv.DictReader(f)
@@ -92,7 +91,7 @@ def get_data(options, row_transform, tags):
 
 
 def tcil_row_transform(row):
-    """A small helper to tune up the row from the tcil spreadsheet"""
+    """A small helper to tune up the row from the tcil spreadsheet."""
     row["docket_number"] = row["Docket #"].strip()
     row["court"] = row["Court"].strip()
     row["case_name"] = row["Case name"].strip()
@@ -102,8 +101,11 @@ def tcil_row_transform(row):
 def idb_row_transform(row):
     """A small helper function to tune up the row.
 
-    :param row: A dict of the row from the CSV
-    :return row: A transformed version of the row
+    Args:
+        row: A dict of the row from the CSV
+
+    Returns:
+        row: A transformed version of the row
     """
     # Convert the court field from theirs to something bearable
     row["court"] = (

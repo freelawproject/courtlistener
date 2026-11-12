@@ -202,9 +202,7 @@ class AlertTest(SimpleUserDataMixin, ESIndexTestCase, TestCase):
         await self.async_client.alogout()
 
     async def test_non_recap_rt_alert_succeeds_for_member(self) -> None:
-        """Confirm that RT alert creation for non-RECAP alerts succeeds for
-        members.
-        """
+        """Confirm that RT alert creation for non-RECAP alerts succeeds for members."""
         self.assertTrue(
             await self.async_client.alogin(
                 username=self.user_member.user.username, password="password"
@@ -263,9 +261,7 @@ class AlertTest(SimpleUserDataMixin, ESIndexTestCase, TestCase):
         await self.async_client.alogout()
 
     async def test_fail_non_recap_rt_alert_for_no_member(self) -> None:
-        """Confirm that RT alert creation for non-RECAP alerts displays the
-        regular limitation message for non-members.
-        """
+        """Confirm that RT alert creation for non-RECAP alerts displays the regular limitation message for non-members."""
         self.assertTrue(
             await self.async_client.alogin(
                 username=self.user_no_member.user.username, password="password"
@@ -289,9 +285,7 @@ class AlertTest(SimpleUserDataMixin, ESIndexTestCase, TestCase):
     async def test_fail_non_recap_rt_alert_for_expired_membership(
         self,
     ) -> None:
-        """Confirm that RT alert creation for non-RECAP alerts displays the
-        regular limitation message for expired memberships.
-        """
+        """Confirm that RT alert creation for non-RECAP alerts displays the regular limitation message for expired memberships."""
         self.assertTrue(
             await self.async_client.alogin(
                 username=self.user_member.user.username, password="password"
@@ -339,9 +333,7 @@ class AlertTest(SimpleUserDataMixin, ESIndexTestCase, TestCase):
         await self.async_client.alogout()
 
     async def test_recap_rt_alert_for_member(self) -> None:
-        """Confirm that RT alert creation for RECAP alerts succeeds for
-        members within their quota.
-        """
+        """Confirm that RT alert creation for RECAP alerts succeeds for members within their quota."""
         # Non-RECAP alerts do not count toward the RECAP alerts quota.
         await sync_to_async(AlertFactory.create_batch)(
             5,
@@ -454,9 +446,7 @@ class AlertTest(SimpleUserDataMixin, ESIndexTestCase, TestCase):
         await self.async_client.alogout()
 
     async def test_legacy_member_recap_rt_alert_fails_when_over_quota(self):
-        """RECAP + REAL_TIME should be rejected once the legacy member hits
-        their quota (0).
-        """
+        """RECAP + REAL_TIME should be rejected once the legacy member hits their quota (0)."""
         assert await self.async_client.alogin(
             username=self.user_member.user.username, password="password"
         )
@@ -492,10 +482,7 @@ class AlertTest(SimpleUserDataMixin, ESIndexTestCase, TestCase):
         await self.async_client.alogout()
 
     async def test_non_member_recap_other_rate_alert(self):
-        """Non-RT RECAP alerts should be rejected once a free user exceeds the
-        quota.
-        """
-
+        """Non-RT RECAP alerts should be rejected once a free user exceeds the quota."""
         # Non-RECAP alerts do not count toward the RECAP alerts quota.
         await sync_to_async(AlertFactory.create_batch)(
             5,
@@ -547,10 +534,7 @@ class AlertTest(SimpleUserDataMixin, ESIndexTestCase, TestCase):
         await self.async_client.alogout()
 
     async def test_member_recap_other_rate_alert(self):
-        """Non-RT RECAP alerts should be rejected once the member exceeds
-        the allowed quota.
-        """
-
+        """Non-RT RECAP alerts should be rejected once the member exceeds the allowed quota."""
         # Non-RECAP alerts do not count toward the RECAP alerts quota.
         await sync_to_async(AlertFactory.create_batch)(
             5,
@@ -610,11 +594,7 @@ class AlertTest(SimpleUserDataMixin, ESIndexTestCase, TestCase):
         await self.async_client.alogout()
 
     async def test_edit_alert_constraints(self):
-        """Confirm that alerts can be edited even if the user is over their
-        quota. Also confirm that they can’t change an off alert to an active
-        alert if doing so would exceed the quota.
-        """
-
+        """Confirm that alerts can be edited even if the user is over their quota. Also confirm that they can’t change an off alert to an active alert if doing so would exceed the quota."""
         # Create 5 RECAP alerts that would hit the user quota.
         await sync_to_async(AlertFactory.create_batch)(
             10,
@@ -681,11 +661,7 @@ class AlertTest(SimpleUserDataMixin, ESIndexTestCase, TestCase):
         await self.async_client.alogout()
 
     async def test_edit_alert_constraints_non_member(self):
-        """Confirm that alerts can be edited even if a non-member user is over
-        their quota. But they can't create additional alerts once the limit
-        is reached.
-        """
-
+        """Confirm that alerts can be edited even if a non-member user is over their quota. But they can't create additional alerts once the limit is reached."""
         # Create 5 RECAP alerts that would hit the user quota.
         await sync_to_async(AlertFactory.create_batch)(
             5,
@@ -799,7 +775,7 @@ class AlertTest(SimpleUserDataMixin, ESIndexTestCase, TestCase):
     async def test_can_we_disable_alert_using_the_one_click_link(
         self,
     ) -> None:
-        """can we disable a search alert using the one-click link?"""
+        """Can we disable a search alert using the one-click link?"""
         self.assertEqual(self.alert.rate, self.alert_params["rate"])
         response = await self.async_client.post(
             reverse("one_click_disable_alert", args=[self.alert.secret_key])
@@ -819,9 +795,7 @@ class AlertTest(SimpleUserDataMixin, ESIndexTestCase, TestCase):
         self.assertEqual(self.alert.rate, new_rate)
 
     async def test_disallows_alert_type_change_for_non_recap_alerts(self):
-        """Confirm that a frontend request that changes the alert_type in a
-        non-recap alert fails.
-        """
+        """Confirm that a frontend request that changes the alert_type in a non-recap alert fails."""
         alert_to_edit = await sync_to_async(AlertFactory)(
             user=self.user_member.user,
             rate=Alert.REAL_TIME,
@@ -844,8 +818,7 @@ class AlertTest(SimpleUserDataMixin, ESIndexTestCase, TestCase):
         await self.async_client.alogout()
 
     async def test_alert_type_change_for_recap_alerts(self):
-        """Confirm that a frontend request that changes the alert_type in a
-        recap alert succeeds."""
+        """Confirm that a frontend request that changes the alert_type in a recap alert succeeds."""
         alert_to_edit = await sync_to_async(AlertFactory)(
             user=self.user_member.user,
             rate=Alert.REAL_TIME,
@@ -879,8 +852,7 @@ class AlertTest(SimpleUserDataMixin, ESIndexTestCase, TestCase):
 )
 @override_settings(ELASTICSEARCH_DISABLED=True)
 class AlertHitsSetCleanupTest(TestCase):
-    """Are the Redis sets storing an alert's document hits removed when the
-    Alert is deleted?"""
+    """Are the Redis sets storing an alert's document hits removed when the Alert is deleted?"""
 
     def setUp(self) -> None:
         super().setUp()
@@ -896,9 +868,7 @@ class AlertHitsSetCleanupTest(TestCase):
     def test_remove_alert_hits_set_on_alert_deletion(
         self, mock_prefix
     ) -> None:
-        """Deleting an Alert should remove every per-document-type Redis set
-        that stored its hits."""
-
+        """Deleting an Alert should remove every per-document-type Redis set that stored its hits."""
         alert = AlertFactory(
             rate=Alert.REAL_TIME,
             name="Test RECAP Alert cleanup",
@@ -1062,8 +1032,7 @@ class DocketAlertTest(TestCase):
 
 
 class DocketAlertSourceTest(TestCase):
-    """Does the per-source alert registry resolve the right
-    queries and templates for RECAP vs. SCOTUS dockets?"""
+    """Does the per-source alert registry resolve the right queries and templates for RECAP vs. SCOTUS dockets?"""
 
     @classmethod
     def setUpTestData(cls) -> None:
@@ -1098,8 +1067,7 @@ class DocketAlertSourceTest(TestCase):
     def test_scotus_source_entries_by_pk_returns_scotus_docket_entries(
         self,
     ) -> None:
-        """Does SCOTUS_ALERT_SOURCE.entries_by_pk look up SCOTUSDocketEntry
-        rows, not DocketEntry?"""
+        """Does SCOTUS_ALERT_SOURCE.entries_by_pk look up SCOTUSDocketEntry rows, not DocketEntry?"""
         entries = SCOTUS_ALERT_SOURCE.entries_by_pk(
             [self.scotus_de_1.pk, self.scotus_de_2.pk]
         )
@@ -1111,8 +1079,7 @@ class DocketAlertSourceTest(TestCase):
     def test_scotus_source_entries_since_returns_scotus_docket_entries(
         self,
     ) -> None:
-        """Does SCOTUS_ALERT_SOURCE.entries_since filter by creation time,
-        same as RECAP's?"""
+        """Does SCOTUS_ALERT_SOURCE.entries_since filter by creation time, same as RECAP's?"""
         before = now()
         de_new = SCOTUSDocketEntryFactory(docket=self.scotus_docket)
         entries = SCOTUS_ALERT_SOURCE.entries_since(self.scotus_docket, before)
@@ -1142,6 +1109,35 @@ class DocketAlertSourceTest(TestCase):
             with self.subTest(lookup=lookup_name):
                 self.assertEqual([de.sequence_number for de in qs], expected)
 
+    def test_scotus_source_lookups_leave_out_placeholders(self) -> None:
+        """Do both SCOTUS lookups leave placeholder documents out, so the alert email renders entries without attachments as procedural entries instead of as a document row?"""
+        before = now()
+        placeholder_entry = SCOTUSDocketEntryFactory(docket=self.scotus_docket)
+        SCOTUSDocumentFactory(
+            docket_entry=placeholder_entry,
+            url="",
+            document_number=None,
+            attachment_number=None,
+        )
+        attachment_entry = SCOTUSDocketEntryFactory(docket=self.scotus_docket)
+        attachment = SCOTUSDocumentFactory(docket_entry=attachment_entry)
+        expected = {
+            placeholder_entry.pk: [],
+            attachment_entry.pk: [attachment],
+        }
+        lookups = {
+            "entries_by_pk": SCOTUS_ALERT_SOURCE.entries_by_pk(list(expected)),
+            "entries_since": SCOTUS_ALERT_SOURCE.entries_since(
+                self.scotus_docket, before
+            ),
+        }
+        for lookup_name, qs in lookups.items():
+            with self.subTest(lookup=lookup_name):
+                self.assertEqual(
+                    {de.pk: list(de.scotus_documents.all()) for de in qs},
+                    expected,
+                )
+
     def test_docket_get_alert_source_dispatches_by_court_id(self) -> None:
         """Does Docket.get_alert_source() route to the right registry entry?"""
         self.assertIs(self.recap_docket.get_alert_source(), RECAP_ALERT_SOURCE)
@@ -1150,9 +1146,7 @@ class DocketAlertSourceTest(TestCase):
         )
 
     def test_entries_since_preloads_what_the_alert_email_renders(self) -> None:
-        """Does entries_since load the entries, their docket and their
-        documents (minus plain_text) in two queries, however many entries
-        there are?"""
+        """Does entries_since load the entries, their docket and their documents (minus plain_text) in two queries, however many entries there are?"""
         before = now()
         # Two entries, so any per-entry query shows up in the count.
         for n in (10, 11):
@@ -1207,8 +1201,7 @@ class DocketAlertSourceTest(TestCase):
 
 
 class DocketAlertScotusTest(TestCase):
-    """Does send_alert_and_webhook work end-to-end for a SCOTUS docket --
-    resolving SCOTUSDocketEntry rows and rendering the SCOTUS templates?"""
+    """Does send_alert_and_webhook work end-to-end for a SCOTUS docket -- resolving SCOTUSDocketEntry rows and rendering the SCOTUS templates?"""
 
     @classmethod
     def setUpTestData(cls) -> None:
@@ -1223,8 +1216,7 @@ class DocketAlertScotusTest(TestCase):
         )
 
     def test_triggering_docket_alert_for_a_scotus_docket(self) -> None:
-        """Does the alert go out, using the SCOTUS entries/templates,
-        for an entry created after `since`?"""
+        """Does the alert go out, using the SCOTUS entries/templates, for an entry created after `since`?"""
         de = SCOTUSDocketEntryFactory(docket=self.docket)
         SCOTUSDocumentFactory(docket_entry=de)
         send_alert_and_webhook(self.docket.pk, self.before)
@@ -1232,8 +1224,7 @@ class DocketAlertScotusTest(TestCase):
         self.assertIn(self.docket.case_name, mail.outbox[0].body)
 
     def test_nothing_happens_for_timers_after_de_creation(self) -> None:
-        """Do we avoid sending alerts for timers after the de was
-        created?"""
+        """Do we avoid sending alerts for timers after the de was created?"""
         de = SCOTUSDocketEntryFactory(docket=self.docket)
         SCOTUSDocumentFactory(docket_entry=de)
         after = now()
@@ -1257,8 +1248,7 @@ class DocketAlertScotusTest(TestCase):
 
     @mock.patch("cl.alerts.tasks.send_docket_alert_webhook_events")
     def test_scotus_webhooks_are_gated_by_setting(self, mock_webhooks) -> None:
-        """Does the SCOTUS alert email go out while its webhook is only
-        queued when SCOTUS_DOCKET_ALERT_WEBHOOKS_ENABLED is on?"""
+        """Does the SCOTUS alert email go out while its webhook is only queued when SCOTUS_DOCKET_ALERT_WEBHOOKS_ENABLED is on?"""
         de = SCOTUSDocketEntryFactory(docket=self.docket)
         SCOTUSDocumentFactory(docket_entry=de)
         for enabled in (False, True):
@@ -1308,7 +1298,7 @@ class DisableDocketAlertTest(TestCase):
         )
 
     def test_old_alert_recent_termination(self) -> None:
-        """Flag it if alert is old and item was terminated 90-97 days ago"""
+        """Flag it if alert is old and item was terminated 90-97 days ago."""
         self.backdate_alert()
         for i in range(90, 97):
             new_date_terminated = timezone.localdate() - timedelta(days=i)
@@ -1504,7 +1494,6 @@ class AlertAPITests(ESIndexTestCase, APITestCase):
 
     async def test_make_an_alert(self) -> None:
         """Can we make an alert?"""
-
         # Make a simple search alert
         search_alert = Alert.objects.all()
         response = await self.make_an_alert(self.client)
@@ -1513,7 +1502,6 @@ class AlertAPITests(ESIndexTestCase, APITestCase):
 
     async def test_list_users_alerts(self) -> None:
         """Can we list user's own alerts?"""
-
         # Make two alerts for user_1
         await self.make_an_alert(self.client, alert_name="alert_1")
         await self.make_an_alert(self.client, alert_name="alert_2")
@@ -1533,9 +1521,9 @@ class AlertAPITests(ESIndexTestCase, APITestCase):
 
     def test_delete_alert(self) -> None:
         """Can we delete an alert?
+
         Avoid users from deleting other users' alerts.
         """
-
         with self.captureOnCommitCallbacks(execute=True):
             # Make two alerts for user_1
             alert_1 = async_to_sync(self.make_an_alert)(
@@ -1585,9 +1573,9 @@ class AlertAPITests(ESIndexTestCase, APITestCase):
 
     async def test_alert_detail(self) -> None:
         """Can we get the details of an alert?
+
         Avoid users from getting other users' alerts.
         """
-
         # Make one alerts for user_1
         alert_1 = await self.make_an_alert(self.client, alert_name="alert_1")
         search_alert = Alert.objects.all()
@@ -1608,7 +1596,6 @@ class AlertAPITests(ESIndexTestCase, APITestCase):
 
     def test_alert_update(self) -> None:
         """Can we update an alert?"""
-
         # Use a member client since the alert is updated to a Real-Time rate,
         # which is only allowed for members.
         client = self.client_member_tier_1
@@ -1742,7 +1729,6 @@ class AlertAPITests(ESIndexTestCase, APITestCase):
 
     async def test_avoid_saving_match_all_alerts(self) -> None:
         """Confirm that creating/updating a match-all alert query is rejected."""
-
         # Match all alert fails on creation:
         match_all_alert = await self.make_an_alert(
             self.client,
@@ -1786,9 +1772,7 @@ class AlertAPITests(ESIndexTestCase, APITestCase):
         )
 
     async def test_saving_case_only_and_recap_alert(self) -> None:
-        """Confirm a case only and both cases and filings alert can be
-        created/updated from the API."""
-
+        """Confirm a case only and both cases and filings alert can be created/updated from the API."""
         test_cases = [SEARCH_TYPES.RECAP, SEARCH_TYPES.DOCKETS]
 
         for search_type in test_cases:
@@ -1830,10 +1814,7 @@ class AlertAPITests(ESIndexTestCase, APITestCase):
         self.assertEqual(alert_data["alert_type"], SEARCH_TYPES.DOCKETS)
 
     async def test_invalid_recap_alert_type_fails(self) -> None:
-        """Confirm that an error is raised if an invalid alert_type is
-        provided for a RECAP search query.
-        """
-
+        """Confirm that an error is raised if an invalid alert_type is provided for a RECAP search query."""
         # Set a non-RECAP search type for a RECAP alert query.
         test_cases = [SEARCH_TYPES.RECAP, SEARCH_TYPES.DOCKETS]
         for search_type in test_cases:
@@ -1853,10 +1834,7 @@ class AlertAPITests(ESIndexTestCase, APITestCase):
                 )
 
     async def test_alert_type_not_provided_for_recap_alert(self) -> None:
-        """Confirm that if alert_type is not provided in a RECAP search query,
-        an error is raised.
-        """
-
+        """Confirm that if alert_type is not provided in a RECAP search query, an error is raised."""
         test_cases = [SEARCH_TYPES.DOCKETS, SEARCH_TYPES.RECAP]
         for search_type in test_cases:
             with self.subTest(search_type=search_type):
@@ -1874,10 +1852,7 @@ class AlertAPITests(ESIndexTestCase, APITestCase):
                 )
 
     async def test_alert_type_is_ignored_in_non_recap_alerts(self) -> None:
-        """Confirm that if alert_type is provided in the request, it is ignored.
-        The alert type is instead determined from the alert’s search query.
-        """
-
+        """Confirm that if alert_type is provided in the request, it is ignored. The alert type is instead determined from the alert’s search query."""
         test_cases = [SEARCH_TYPES.OPINION, SEARCH_TYPES.ORAL_ARGUMENT]
         for search_type in test_cases:
             with self.subTest(search_type=search_type):
@@ -1894,9 +1869,7 @@ class AlertAPITests(ESIndexTestCase, APITestCase):
     async def test_disallows_alert_type_change_for_non_recap_alerts(
         self,
     ) -> None:
-        """Confirm that an API request that changes the alert_type in a
-        non-recap alert fails.
-        """
+        """Confirm that an API request that changes the alert_type in a non-recap alert fails."""
         # Create an initial alert for testing:
         alert_1 = await self.make_an_alert(
             self.client,
@@ -1924,8 +1897,7 @@ class AlertAPITests(ESIndexTestCase, APITestCase):
         )
 
     async def test_alert_type_change_for_recap_alerts(self) -> None:
-        """Confirm that an API request that changes the alert_type in a recap
-        alert succeeds."""
+        """Confirm that an API request that changes the alert_type in a recap alert succeeds."""
         test_cases = {
             SEARCH_TYPES.DOCKETS: SEARCH_TYPES.RECAP,
             SEARCH_TYPES.RECAP: SEARCH_TYPES.DOCKETS,
@@ -1991,8 +1963,7 @@ class AlertAPITests(ESIndexTestCase, APITestCase):
         )
 
     async def test_unlimited_flag_user_can_create_rt_recap_alert(self) -> None:
-        """A non-member with the unlimited alerts flag bypasses the membership
-        and quota restrictions, including for RECAP Real-Time alerts."""
+        """A non-member with the unlimited alerts flag bypasses the membership and quota restrictions, including for RECAP Real-Time alerts."""
         self.no_member_profile.unlimited_docket_alerts = True
         await self.no_member_profile.asave()
 
@@ -2030,8 +2001,7 @@ class AlertAPITests(ESIndexTestCase, APITestCase):
         )
 
     async def test_non_recap_alerts_dont_count_toward_quota(self) -> None:
-        """Non-RECAP alerts are not subject to the RECAP quota, so a free user
-        can create more than 5 of them."""
+        """Non-RECAP alerts are not subject to the RECAP quota, so a free user can create more than 5 of them."""
         await sync_to_async(AlertFactory.create_batch)(
             5,
             user=self.user_no_member,
@@ -2049,8 +2019,7 @@ class AlertAPITests(ESIndexTestCase, APITestCase):
         )
 
     async def test_legacy_member_recap_rt_rejected(self) -> None:
-        """Legacy members have a RECAP Real-Time quota of 0, so their first
-        RECAP RT alert is rejected with the legacy help message."""
+        """Legacy members have a RECAP Real-Time quota of 0, so their first RECAP RT alert is rejected with the legacy help message."""
         response = await self.make_an_alert(
             self.client_legacy_member,
             alert_query=f"q=testing_query&type={SEARCH_TYPES.RECAP}",
@@ -2079,8 +2048,7 @@ class AlertAPITests(ESIndexTestCase, APITestCase):
         )
 
     async def test_member_recap_rt_quota_exceeded(self) -> None:
-        """Tier 1 members have a RECAP Real-Time quota of 5; the 6th RECAP RT
-        alert is rejected."""
+        """Tier 1 members have a RECAP Real-Time quota of 5; the 6th RECAP RT alert is rejected."""
         await sync_to_async(AlertFactory.create_batch)(
             5,
             user=self.user_member_tier_1,
@@ -2104,8 +2072,7 @@ class AlertAPITests(ESIndexTestCase, APITestCase):
         )
 
     async def test_editing_alert_at_quota_excludes_itself(self) -> None:
-        """A user at their quota can still edit an existing RECAP alert, since
-        the alert being edited is excluded from the quota count."""
+        """A user at their quota can still edit an existing RECAP alert, since the alert being edited is excluded from the quota count."""
         # Fill the free user's non-RT quota with 5 DOCKETS DAILY alerts.
         alerts = await sync_to_async(AlertFactory.create_batch)(
             5,
@@ -2135,8 +2102,7 @@ class AlertAPITests(ESIndexTestCase, APITestCase):
     async def test_alert_frequency_estimation_included_on_success(
         self,
     ) -> None:
-        """A successful alert creation includes the alert frequency estimation
-        for the last 100 days in the response."""
+        """A successful alert creation includes the alert frequency estimation for the last 100 days in the response."""
         with mock.patch(
             "cl.alerts.api_serializers.get_alert_estimation_count",
             return_value=(250, 0),
@@ -2149,9 +2115,7 @@ class AlertAPITests(ESIndexTestCase, APITestCase):
         self.assertEqual(response.json()["estimated_hits"], 250)
 
     async def test_alert_rejected_when_query_too_broad(self) -> None:
-        """An alert whose query averages more than MAX_ALERT_RESULTS_PER_DAY
-        hits per day is rejected, and the estimation is surfaced under the same
-        response key."""
+        """An alert whose query averages more than MAX_ALERT_RESULTS_PER_DAY hits per day is rejected, and the estimation is surfaced under the same response key."""
         # 3500 hits / 100 days = 35 hits per day, above the limit of 30.
         with mock.patch(
             "cl.alerts.api_serializers.get_alert_estimation_count",
@@ -2169,9 +2133,7 @@ class AlertAPITests(ESIndexTestCase, APITestCase):
         self.assertEqual(await Alert.objects.all().acount(), 0)
 
     async def test_alert_rejected_when_query_is_invalid(self) -> None:
-        """An alert whose query can't be validated by SearchForm (so the
-        estimation can't be computed) is rejected with a 400 instead of being
-        silently created."""
+        """An alert whose query can't be validated by SearchForm (so the estimation can't be computed) is rejected with a 400 instead of being silently created."""
         # cited_gt expects a whole number; "foo" makes SearchForm invalid, so
         # get_alert_estimation_count returns None.
         response = await self.make_an_alert(
@@ -2183,9 +2145,7 @@ class AlertAPITests(ESIndexTestCase, APITestCase):
         self.assertEqual(await Alert.objects.all().acount(), 0)
 
     async def test_alert_rejected_when_query_cant_be_built(self) -> None:
-        """An alert whose query passes SearchForm but can't be built into an ES
-        query (e.g. unbalanced parentheses) is rejected with a 400 carrying the
-        specific reason, instead of being silently created."""
+        """An alert whose query passes SearchForm but can't be built into an ES query (e.g. unbalanced parentheses) is rejected with a 400 carrying the specific reason, instead of being silently created."""
         response = await self.make_an_alert(
             self.client,
             alert_query=f"q=(testing_query&type={SEARCH_TYPES.OPINION}",
@@ -2197,8 +2157,7 @@ class AlertAPITests(ESIndexTestCase, APITestCase):
     async def test_alert_frequency_not_estimated_on_name_only_patch(
         self,
     ) -> None:
-        """The estimation only runs when the query is being set; a name-only
-        update doesn't re-run it."""
+        """The estimation only runs when the query is being set; a name-only update doesn't re-run it."""
         with mock.patch(
             "cl.alerts.api_serializers.get_alert_estimation_count",
             return_value=(100, 0),
@@ -2223,8 +2182,7 @@ class AlertAPITests(ESIndexTestCase, APITestCase):
             self.assertNotIn("estimated_hits", response.json())
 
     def test_alert_frequency_estimation_real_query(self) -> None:
-        """The estimation is computed from the alert query against ES and
-        returned in the response."""
+        """The estimation is computed from the alert query against ES and returned in the response."""
         mock_date = timezone.localtime(now()).replace(day=1, hour=5)
         with (
             time_machine.travel(mock_date, tick=False),
@@ -2248,9 +2206,7 @@ class AlertAPITests(ESIndexTestCase, APITestCase):
         opinion.cluster.delete()
 
     async def test_commercial_agreement_bypasses_alert_quota(self) -> None:
-        """A user with a commercial agreement (an ALERTS APIThrottle) bypasses
-        the membership/non-member alert quota and can create more than the free
-        limit of 5 RECAP/DOCKETS alerts."""
+        """A user with a commercial agreement (an ALERTS APIThrottle) bypasses the membership/non-member alert quota and can create more than the free limit of 5 RECAP/DOCKETS alerts."""
         commercial_user = (
             await sync_to_async(UserProfileWithParentsFactory)()
         ).user
@@ -2285,8 +2241,7 @@ class AlertAPITests(ESIndexTestCase, APITestCase):
         )
 
     async def test_commercial_alert_throttle_rate_limits(self) -> None:
-        """A commercial user's alert creation is rate-limited by their
-        configured ALERTS throttle."""
+        """A commercial user's alert creation is rate-limited by their configured ALERTS throttle."""
         commercial_user = (
             await sync_to_async(UserProfileWithParentsFactory)()
         ).user
@@ -2329,8 +2284,7 @@ class AlertAPITests(ESIndexTestCase, APITestCase):
     async def test_commercial_writes_bypass_global_user_throttle(
         self,
     ) -> None:
-        """Commercial alert writes run at the AlertThrottle rate, not the
-        global per-user API throttle.
+        """Commercial alert writes run at the AlertThrottle rate, not the global per-user API throttle.
 
         The user gets a deliberately tight global API throttle (3/min) on top
         of a generous ALERTS throttle (100/min). Without the per-method
@@ -2381,8 +2335,7 @@ class AlertAPITests(ESIndexTestCase, APITestCase):
     async def test_non_commercial_writes_keep_global_user_throttle(
         self,
     ) -> None:
-        """Non-commercial users are still bound by the global per-user API
-        throttle on the alerts endpoint (the endpoint isn't left unthrottled).
+        """Non-commercial users are still bound by the global per-user API throttle on the alerts endpoint (the endpoint isn't left unthrottled).
 
         With a tight 3/min global throttle and no ALERTS override, the 4th
         write is rejected.
@@ -2426,10 +2379,7 @@ class AlertAPITests(ESIndexTestCase, APITestCase):
     async def test_commercial_reads_do_not_consume_write_budget(
         self,
     ) -> None:
-        """A commercial user's reads use the global throttle, not the
-        AlertThrottle, so polling their alert list neither gets rejected by the
-        alert rate nor consumes their alert-write budget.
-        """
+        """A commercial user's reads use the global throttle, not the AlertThrottle, so polling their alert list neither gets rejected by the alert rate nor consumes their alert-write budget."""
         commercial_user = (
             await sync_to_async(UserProfileWithParentsFactory)()
         ).user
@@ -2471,7 +2421,7 @@ class AlertAPITests(ESIndexTestCase, APITestCase):
 class SearchAlertsWebhooksTest(
     ESIndexTestCase, TestCase, SearchAlertsAssertions
 ):
-    """Test Search Alerts Webhooks"""
+    """Test Search Alerts Webhooks."""
 
     @classmethod
     def setUpTestData(cls):
@@ -2566,7 +2516,6 @@ class SearchAlertsWebhooksTest(
 
     def test_alert_frequency_estimation(self):
         """Test alert frequency ES API endpoint for Opinion Alerts."""
-
         search_params = {
             "type": SEARCH_TYPES.OPINION,
             "q": "Frequency Test O",
@@ -2616,7 +2565,7 @@ class SearchAlertsWebhooksTest(
 
 
 class PrayAndPayAlertsWebhooksTest(TestCase):
-    """Test Pray and Pay Webhooks
+    """Test Pray and Pay Webhooks.
 
     Integration tests for pray-and-pay webhook functionality. These tests
     verify the complete signal flow:
@@ -2679,7 +2628,6 @@ class PrayAndPayAlertsWebhooksTest(TestCase):
         2. Make document available (triggers signal)
         3. Prayers are granted and webhooks sent
         """
-
         # Create unavailable RECAP document
         de = DocketEntryFactory(docket__court=self.court, entry_number=1)
         rd = RECAPDocumentFactory(
@@ -2758,7 +2706,6 @@ class PrayAndPayAlertsWebhooksTest(TestCase):
         Verifies the payload matches the expected structure through the
         complete signal flow.
         """
-
         # Create unavailable document and waiting prayer
         de = DocketEntryFactory(docket__court=self.court, entry_number=2)
         rd = RECAPDocumentFactory(
@@ -2810,7 +2757,6 @@ class PrayAndPayAlertsWebhooksTest(TestCase):
         Documents that are already available should not trigger webhooks
         when prayers are created.
         """
-
         # Create document that's already available
         de = DocketEntryFactory(docket__court=self.court, entry_number=3)
         rd = RECAPDocumentFactory(
@@ -2842,7 +2788,6 @@ class PrayAndPayAlertsWebhooksTest(TestCase):
 
     def test_pray_and_pay_webhook_disabled(self):
         """Verify that webhooks are not sent to disabled webhook endpoints."""
-
         # Create unavailable document
         de = DocketEntryFactory(docket__court=self.court, entry_number=4)
         rd = RECAPDocumentFactory(
@@ -2887,10 +2832,7 @@ class PrayAndPayAlertsWebhooksTest(TestCase):
         )
 
     def test_is_match_all_query(self):
-        """Confirm is_match_all_query correctly detects match-all
-        or non-match-all queries based on the input query string.
-        """
-
+        """Confirm is_match_all_query correctly detects match-all or non-match-all queries based on the input query string."""
         test_cases = {
             "type=o&docket_number=&order_by=score+desc&stat_Published=": True,
             "type=r&order_by=score+desc&": True,
@@ -2913,9 +2855,7 @@ class PrayAndPayAlertsWebhooksTest(TestCase):
                 self.assertEqual(is_match_all_query(query_string), expected)
 
     def test_clean_query_raises_validation_error_for_match_all(self):
-        """Confirm CreateAlertForm.clean_query raises ValidationError
-        when the query is a match-all query.
-        """
+        """Confirm CreateAlertForm.clean_query raises ValidationError when the query is a match-all query."""
         test_user = UserProfileWithParentsFactory()
         form = CreateAlertForm(
             data={
@@ -2983,7 +2923,6 @@ class DocketAlertAPITests(APITestCase):
 
     async def test_make_a_docket_alert(self) -> None:
         """Can we make a docket alert?"""
-
         # Make a simple docket alert
         docket_alert = DocketAlert.objects.all()
         ten_days_ahead = now() + timedelta(days=10)
@@ -2996,7 +2935,6 @@ class DocketAlertAPITests(APITestCase):
 
     async def test_list_users_docket_alerts(self) -> None:
         """Can we list user's own alerts?"""
-
         # Make two docket alerts for user_1
         await self.make_a_docket_alert(self.client)
         await self.make_a_docket_alert(self.client, docket_pk=self.docket_1.id)
@@ -3016,9 +2954,9 @@ class DocketAlertAPITests(APITestCase):
 
     async def test_delete_docket_alert(self) -> None:
         """Can we delete an docket alert?
+
         Avoid users from deleting other users' docket alerts.
         """
-
         # Make two docket alerts for user_1
         docket_alert_1 = await self.make_a_docket_alert(self.client)
         docket_alert_2 = await self.make_a_docket_alert(
@@ -3050,9 +2988,9 @@ class DocketAlertAPITests(APITestCase):
 
     async def test_docket_alert_detail(self) -> None:
         """Can we get the details of a docket alert?
+
         Avoid users from getting other users' docket alerts.
         """
-
         # Make one docket alert for user_1
         docket_alert_1 = await self.make_a_docket_alert(self.client)
         docket_alert = DocketAlert.objects.all()
@@ -3072,7 +3010,6 @@ class DocketAlertAPITests(APITestCase):
 
     async def test_docket_alert_update(self) -> None:
         """Can we update a docket alert?"""
-
         # Make one alerts for user_1
         docket_alert_1 = await self.make_a_docket_alert(self.client)
         docket_alert = DocketAlert.objects.all()
@@ -3112,7 +3049,6 @@ class DocketAlertAPITests(APITestCase):
 
     async def test_docket_alert_patch(self) -> None:
         """Can we update a docket alert?"""
-
         # Make one alerts for user_1
         docket_alert_1 = await self.make_a_docket_alert(self.client)
         docket_alert = DocketAlert.objects.all()
@@ -3163,8 +3099,7 @@ class DocketAlertAPITests(APITestCase):
 
 
 class OldDocketAlertsReportToggleTest(TestCase):
-    """Do old docket alerts date_modified is properly updated when toggling the
-    alert and correctly reported by OldAlertReport?"""
+    """Do old docket alerts date_modified is properly updated when toggling the alert and correctly reported by OldAlertReport?"""
 
     @classmethod
     def setUpTestData(cls):
@@ -3174,10 +3109,7 @@ class OldDocketAlertsReportToggleTest(TestCase):
         test_user.save()
 
     def test_disable_docket_alerts_without_deleting_them(self):
-        """Can we disable docket alerts that should be disabled only by
-        changing their alert_type to "Unsubscription"?
-        """
-
+        """Can we disable docket alerts that should be disabled only by changing their alert_type to "Unsubscription"?"""
         # Create an old unsubscription docket alert from a case terminated long
         # time ago.
         one_year_ago = now() - timedelta(days=365)
@@ -3229,10 +3161,7 @@ class OldDocketAlertsReportToggleTest(TestCase):
 
     @time_machine.travel("2024-01-15T12:00:00Z", tick=False)
     def test_old_docket_alert_report_timeline(self):
-        """Can we properly warn and disable docket alerts based on their age
-        considering their date_modified is updated when the alert_type change?
-        """
-
+        """Can we properly warn and disable docket alerts based on their age considering their date_modified is updated when the alert_type change?"""
         base = now()
 
         # Create today a subscription docket alert from a case terminated long
@@ -3323,10 +3252,7 @@ class OldDocketAlertsReportToggleTest(TestCase):
         self.assertEqual(active_docket_alerts.count(), 0)
 
     async def test_toggle_docket_alert_date_update(self):
-        """Does the docket alert toggle view properly update docket alerts
-        date_modified when toggling the alert_type?
-        """
-
+        """Does the docket alert toggle view properly update docket alerts date_modified when toggling the alert_type?"""
         # A docket alert is created today for a case terminated on 2020-01-01
         da = await sync_to_async(DocketAlertWithParentsFactory)(
             docket__source=Docket.RECAP,
@@ -3530,7 +3456,7 @@ class ToggleDocketAlertHtmxTest(TestCase):
 
 
 class OldDocketAlertsWebhooksTest(TestCase):
-    """Test Old Docket Alerts Webhooks"""
+    """Test Old Docket Alerts Webhooks."""
 
     @classmethod
     def setUpTestData(cls):
@@ -3580,7 +3506,6 @@ class OldDocketAlertsWebhooksTest(TestCase):
 
     def test_send_old_docket_alerts_webhook(self):
         """Can we send webhook events for old and disabled docket alerts?"""
-
         docket_alerts = DocketAlert.objects.all()
         active_docket_alerts = DocketAlert.objects.filter(
             alert_type=DocketAlert.SUBSCRIPTION
@@ -3699,7 +3624,6 @@ class OldDocketAlertsWebhooksTest(TestCase):
 
     def test_send_old_docket_alerts_webhook_only_warn(self):
         """Can we send webhook events that only warn about old docket alerts?"""
-
         docket_alerts = DocketAlert.objects.all()
         active_docket_alerts = DocketAlert.objects.filter(
             alert_type=DocketAlert.SUBSCRIPTION
@@ -3826,7 +3750,6 @@ class DocketAlertGetNotesTagsTests(TestCase):
 
     def test_get_docket_notes_and_tags_by_user(self) -> None:
         """Can we properly get the user notes and tags for a docket?"""
-
         (
             notes_docket_1_user_1,
             tags_docket_1_user_1,
@@ -3879,7 +3802,7 @@ class DocketAlertGetNotesTagsTests(TestCase):
 class SearchAlertsOAESTests(
     MockTallyStatMixin, ESIndexTestCase, TestCase, SearchAlertsAssertions
 ):
-    """Test ES Search Alerts"""
+    """Test ES Search Alerts."""
 
     @classmethod
     def setUpTestData(cls):
@@ -3973,7 +3896,6 @@ class SearchAlertsOAESTests(
 
     def test_alert_frequency_estimation(self, mock_abort_audio):
         """Test alert frequency ES API endpoint."""
-
         search_params = {
             "type": SEARCH_TYPES.ORAL_ARGUMENT,
             "q": "Frequency Test OA",
@@ -4010,7 +3932,6 @@ class SearchAlertsOAESTests(
 
     def test_send_oa_search_alert_webhooks(self, mock_abort_audio):
         """Can we send RT OA search alerts?"""
-
         mock_date = timezone.localtime(now()).replace(day=1, hour=5)
         with mock.patch(
             "cl.api.webhooks.requests.post",
@@ -4299,9 +4220,7 @@ class SearchAlertsOAESTests(
         rt_oral_argument.delete()
 
     def test_es_alert_update_and_delete(self, mock_abort_audio):
-        """Can we update and delete an alert, and expect these changes to be
-        properly reflected in Elasticsearch?"""
-
+        """Can we update and delete an alert, and expect these changes to be properly reflected in Elasticsearch?"""
         with self.captureOnCommitCallbacks(execute=True):
             # Create a new alert.
             search_alert_1 = AlertFactory(
@@ -4404,9 +4323,7 @@ class SearchAlertsOAESTests(
             )
 
     def test_send_alert_multiple_alert_rates(self, mock_abort_audio):
-        """Confirm dly, wly and mly alerts are properly stored and sent
-        according to their periodicity.
-        """
+        """Confirm dly, wly and mly alerts are properly stored and sent according to their periodicity."""
         with self.captureOnCommitCallbacks(execute=True):
             dly_oral_argument = AudioWithParentsFactory.create(
                 case_name="DLY Test OA",
@@ -4520,7 +4437,6 @@ class SearchAlertsOAESTests(
         "cl.alerts.management.commands.cl_send_scheduled_alerts.logger"
     )
     def test_group_alerts_and_hits(self, mock_logger, mock_abort_audio):
-        """"""
         with self.captureOnCommitCallbacks(execute=True):
             rt_oa_search_alert = AlertFactory(
                 user=self.user_profile.user,
@@ -4726,10 +4642,7 @@ class SearchAlertsOAESTests(
 
     @override_settings(ELASTICSEARCH_PAGINATION_BATCH_SIZE=5)
     def test_send_multiple_rt_alerts(self, mock_abort_audio):
-        """Confirm all RT alerts are properly sent if the percolator response
-        contains more than ELASTICSEARCH_PAGINATION_BATCH_SIZE results. So additional
-        requests are performed in order to retrieve all the available results.
-        """
+        """Confirm all RT alerts are properly sent if the percolator response contains more than ELASTICSEARCH_PAGINATION_BATCH_SIZE results. So additional requests are performed in order to retrieve all the available results."""
         memberships = NeonMembership.objects.all()
         self.assertEqual(memberships.count(), 2)
         self.assertEqual(len(mail.outbox), 0)
@@ -4826,10 +4739,7 @@ class SearchAlertsOAESTests(
 
     @override_settings(ELASTICSEARCH_PAGINATION_BATCH_SIZE=5)
     def test_batched_alerts_match_documents_ingestion(self, mock_abort_audio):
-        """Confirm that batched alerts are properly stored according to
-        document ingestion when percolated in real time.
-        """
-
+        """Confirm that batched alerts are properly stored according to document ingestion when percolated in real time."""
         # Create a set of 11 users, webhooks and Alerts.
         alerts_created = []
         audios_created = []
@@ -4915,10 +4825,7 @@ class SearchAlertsOAESTests(
 
     @override_settings(ELASTICSEARCH_PAGINATION_BATCH_SIZE=5)
     def test_percolate_document_in_batches(self, mock_abort_audio):
-        """Confirm when getting alerts in batches and an alert previously
-        retrieved is updated during this process. It's not returned again.
-        """
-
+        """Confirm when getting alerts in batches and an alert previously retrieved is updated during this process. It's not returned again."""
         alerts_created = []
         for i in range(6):
             with self.captureOnCommitCallbacks(execute=True):
@@ -4987,7 +4894,6 @@ class SearchAlertsOAESTests(
         self, mock_abort_audio
     ):
         """Can we avoid sending or_scheduling disabled search alerts?."""
-
         with self.captureOnCommitCallbacks(execute=True):
             rt_alert_disabled = AlertFactory(
                 user=self.user_profile.user,
@@ -5032,9 +4938,7 @@ class SearchAlertsOAESTests(
         oral_argument.delete()
 
     def test_avoid_re_sending_scheduled_sent_alerts(self, mock_abort_audio):
-        """Can we prevent re-sending scheduled alerts that have already been
-        sent?"""
-
+        """Can we prevent re-sending scheduled alerts that have already been sent?"""
         with self.captureOnCommitCallbacks(execute=True):
             dly_alert = AlertFactory(
                 user=self.user_profile.user,
@@ -5190,7 +5094,6 @@ class SearchAlertsOAESTests(
     @override_settings(SCHEDULED_ALERT_HITS_LIMIT=3)
     def test_scheduled_hits_limit(self, mock_abort_audio):
         """Confirm we only store the max number of alert hits set in settings."""
-
         with self.captureOnCommitCallbacks(execute=True):
             alert_1 = AlertFactory(
                 user=self.user_profile.user,
@@ -5279,7 +5182,7 @@ class SearchAlertsOAESTests(
 
 @override_settings(ELASTICSEARCH_DISABLED=True)
 class SearchAlertsIndexingCommandTests(ESIndexTestCase, TestCase):
-    """Test the cl_index_search_alerts command"""
+    """Test the cl_index_search_alerts command."""
 
     @classmethod
     def setUpTestData(cls):
@@ -5383,7 +5286,6 @@ class SearchAlertsIndexingCommandTests(ESIndexTestCase, TestCase):
     @mock.patch("cl.alerts.management.commands.cl_index_search_alerts.logger")
     def test_index_from_pk_offset(self, mock_logger):
         """Confirm elements with pk lt pk_offset are omitted from  indexing."""
-
         # Call cl_index_search_alerts command.
         call_command(
             "cl_index_search_alerts",
@@ -5410,7 +5312,6 @@ class SearchAlertsIndexingCommandTests(ESIndexTestCase, TestCase):
 
     def test_avoid_indexing_no_valid_alert_query(self):
         """Confirm invalid alert queries are not indexed."""
-
         with self.captureOnCommitCallbacks(execute=True):
             not_valid_alert = AlertFactory(
                 user=self.user_profile.user,

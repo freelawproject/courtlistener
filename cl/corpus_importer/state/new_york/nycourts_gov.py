@@ -1,6 +1,4 @@
-"""The schema of Court-PASS (nycourts.gov) data that the New York Court of Appeals
-mergers consume.
-"""
+"""The schema of Court-PASS (nycourts.gov) data that the New York Court of Appeals mergers consume."""
 
 import logging
 from datetime import date
@@ -64,15 +62,19 @@ def _classify[Vocabulary: CourtVocabulary](
     vocabulary: type[Vocabulary], value: Any
 ) -> Vocabulary | Unclassified:
     """The vocabulary member `value` names, or why there is none.
+
     Logging for values we might want to add to our classifiers.
 
-    :param vocabulary: The vocabulary to look `value` up in.
-    :param value: Whatever the scrape stated. `None` is `UNKNOWN`; members of
-        `vocabulary` and of `Unclassified` pass through untouched; and the
-        strings either kind of member serializes as read back as that member.
-        So this is safe to apply to a model built in Python and to one read
-        back from a dump, as well as to one parsed from a scrape.
-    :return: The member, or why the vocabulary names none.
+    Args:
+        vocabulary: The vocabulary to look `value` up in.
+        value: Whatever the scrape stated. `None` is `UNKNOWN`; members of
+            `vocabulary` and of `Unclassified` pass through untouched; and the
+            strings either kind of member serializes as read back as that member.
+            So this is safe to apply to a model built in Python and to one read
+            back from a dump, as well as to one parsed from a scrape.
+
+    Returns:
+        The member, or why the vocabulary names none.
     """
     if isinstance(value, Unclassified | vocabulary):
         return value
@@ -124,32 +126,33 @@ ClassifiedIssueSubcategory = Annotated[
 class NYCoAFile(Document):
     """A file published on a Court-PASS filing-detail page.
 
-    :ivar file_name: The name of the file as Court-PASS published it.
-    :ivar content_type: The MIME type of the file, when known. Court-PASS
-        publishes PDFs along with playlist files for oral argument recordings.
-    :ivar available: Whether the file can be downloaded. ``False`` for sealed
-        files and files the site lists but does not serve.
-    :ivar doc_role: The party role the file name states. ``UNKNOWN`` when the
-        name does not follow the Court's naming convention, and ``UNASSIGNED``
-        when it states a role the vocabulary does not cover.
-    :ivar doc_party: The party name encoded in the file name.
-    :ivar doc_type: The document type the file name states. The
-        ``_``-prefixed members are court output rather than a filing.
-        ``UNKNOWN`` and ``UNASSIGNED`` on the same terms as ``doc_role``.
-    :ivar volume: Volume number, for a record or appendix spanning volumes.
-    :ivar part: Part number, for a volume that is itself split.
-    :ivar local_path: Where the scraper stored the downloaded file, as a key in
-        the private bucket. Empty for a file the scraper did not fetch, a
-        sealed one among them. Court-PASS serves a document only to the
-        scraper, so this is the only way CourtListener learns where the file
-        is; the merge stores it and the load then copies the file to its
-        published key, so it needs no fetching.
-    :ivar content_hash: SHA-256 of the file, as the scraper hashed it on the
-        way to storage. Empty on the same terms as `local_path`, since it is
-        the download that produces it. This is how a merge tells a file the
-        Court has corrected from the one already published.
-    :ivar file_size: Size of the downloaded file in bytes, or ``None`` when the
-        scraper did not fetch it.
+    Attributes:
+        file_name: The name of the file as Court-PASS published it.
+        content_type: The MIME type of the file, when known. Court-PASS
+            publishes PDFs along with playlist files for oral argument recordings.
+        available: Whether the file can be downloaded. ``False`` for sealed
+            files and files the site lists but does not serve.
+        doc_role: The party role the file name states. ``UNKNOWN`` when the
+            name does not follow the Court's naming convention, and ``UNASSIGNED``
+            when it states a role the vocabulary does not cover.
+        doc_party: The party name encoded in the file name.
+        doc_type: The document type the file name states. The
+            ``_``-prefixed members are court output rather than a filing.
+            ``UNKNOWN`` and ``UNASSIGNED`` on the same terms as ``doc_role``.
+        volume: Volume number, for a record or appendix spanning volumes.
+        part: Part number, for a volume that is itself split.
+        local_path: Where the scraper stored the downloaded file, as a key in
+            the private bucket. Empty for a file the scraper did not fetch, a
+            sealed one among them. Court-PASS serves a document only to the
+            scraper, so this is the only way CourtListener learns where the file
+            is; the merge stores it and the load then copies the file to its
+            published key, so it needs no fetching.
+        content_hash: SHA-256 of the file, as the scraper hashed it on the
+            way to storage. Empty on the same terms as `local_path`, since it is
+            the download that produces it. This is how a merge tells a file the
+            Court has corrected from the one already published.
+        file_size: Size of the downloaded file in bytes, or ``None`` when the
+            scraper did not fetch it.
     """
 
     # Court-PASS serves files through form postbacks rather than addressable
@@ -176,29 +179,30 @@ class NYCoAFile(Document):
 class NYCoDocketEntry(DocketEntry[NYCoAFile]):
     """A filing on a Court-PASS docket.
 
-    :ivar docket_entry_id: The scraper's identifier for this filing, unique
-        within the docket and stable across scrapes.
-    :ivar entry_index: Position of this filing in the source listing.
-        Reproduces display order but shifts between scrapes, so it is not an
-        identifier.
-    :ivar raw_filing_type: The filing type exactly as the FILINGS table
-        rendered it (e.g. ``Appellant Brief``). Blank when no table row listed
-        this filing, which is what marks a filing as reconstructed.
-    :ivar entry_filing_type: The classified filing type. ``UNKNOWN`` when no
-        table row named this filing, ``UNASSIGNED`` when the scraper's
-        vocabulary does not cover what the table named; see
-        ``_tell_unlisted_from_uncovered``.
-    :ivar party: Name of the party associated with this filing.
-    :ivar date_filed: The date Court-PASS recorded the filing as received.
-        ``None`` on a filing reconstructed from a document, since the file list
-        carries no dates.
-    :ivar date_due: The date Court-PASS recorded the filing as due.
-    :ivar entry_role: The party role for this filing. ``UNKNOWN`` when the
-        filing type implies no role, ``UNASSIGNED`` when it implies one the
-        vocabulary does not cover.
-    :ivar entry_doctype: The document type for this filing. The ``_``-prefixed
-        members are court output rather than a party filing. ``UNKNOWN`` and
-        ``UNASSIGNED`` on the same terms as ``entry_role``.
+    Attributes:
+        docket_entry_id: The scraper's identifier for this filing, unique
+            within the docket and stable across scrapes.
+        entry_index: Position of this filing in the source listing.
+            Reproduces display order but shifts between scrapes, so it is not an
+            identifier.
+        raw_filing_type: The filing type exactly as the FILINGS table
+            rendered it (e.g. ``Appellant Brief``). Blank when no table row listed
+            this filing, which is what marks a filing as reconstructed.
+        entry_filing_type: The classified filing type. ``UNKNOWN`` when no
+            table row named this filing, ``UNASSIGNED`` when the scraper's
+            vocabulary does not cover what the table named; see
+            ``_tell_unlisted_from_uncovered``.
+        party: Name of the party associated with this filing.
+        date_filed: The date Court-PASS recorded the filing as received.
+            ``None`` on a filing reconstructed from a document, since the file list
+            carries no dates.
+        date_due: The date Court-PASS recorded the filing as due.
+        entry_role: The party role for this filing. ``UNKNOWN`` when the
+            filing type implies no role, ``UNASSIGNED`` when it implies one the
+            vocabulary does not cover.
+        entry_doctype: The document type for this filing. The ``_``-prefixed
+            members are court output rather than a party filing. ``UNKNOWN`` and
+            ``UNASSIGNED`` on the same terms as ``entry_role``.
     """
 
     # Court-PASS leaves some filings undated; the base's `date` assumes one.
@@ -215,9 +219,7 @@ class NYCoDocketEntry(DocketEntry[NYCoAFile]):
 
     @model_validator(mode="after")
     def _tell_unlisted_from_uncovered(self) -> "NYCoDocketEntry":
-        """Separate a filing no FILINGS row named from one whose row named a
-        type the vocabulary does not cover.
-        """
+        """Separate a filing no FILINGS row named from one whose row named a type the vocabulary does not cover."""
         if (
             self.entry_filing_type is Unclassified.UNKNOWN
             and self.raw_filing_type.strip()
@@ -229,17 +231,18 @@ class NYCoDocketEntry(DocketEntry[NYCoAFile]):
 class NYCoAIssue(BaseModel):
     """An issue the Court of Appeals assigned to a case, classified.
 
-    :ivar category_raw: The issue exactly as Court-PASS stated it, its category
-        and subcategory joined by a double dash (e.g.
-        ``Judgments--Confession of Judgment``).
-    :ivar category: The classified category. ``UNASSIGNED`` when the scraper's
-        vocabulary does not cover what the Court stated.
-    :ivar subcategory: The classified subcategory. ``UNKNOWN`` when the Court
-        stated a bare category -- roughly 13% of issues -- and ``UNASSIGNED``
-        when the vocabulary does not cover the one it stated; see
-        ``_tell_unstated_from_uncovered``.
-    :ivar detail: The Court's description of the issue. Empty when Court-PASS
-        stated none, which happens on roughly 4% of the issues observed.
+    Attributes:
+        category_raw: The issue exactly as Court-PASS stated it, its category
+            and subcategory joined by a double dash (e.g.
+            ``Judgments--Confession of Judgment``).
+        category: The classified category. ``UNASSIGNED`` when the scraper's
+            vocabulary does not cover what the Court stated.
+        subcategory: The classified subcategory. ``UNKNOWN`` when the Court
+            stated a bare category -- roughly 13% of issues -- and ``UNASSIGNED``
+            when the vocabulary does not cover the one it stated; see
+            ``_tell_unstated_from_uncovered``.
+        detail: The Court's description of the issue. Empty when Court-PASS
+            stated none, which happens on roughly 4% of the issues observed.
     """
 
     category_raw: str
@@ -249,8 +252,7 @@ class NYCoAIssue(BaseModel):
 
     @model_validator(mode="after")
     def _tell_unstated_from_uncovered(self) -> "NYCoAIssue":
-        """Separate a half of the issue the Court did not state from one it
-        stated in words the vocabulary does not cover.
+        """Separate a half of the issue the Court did not state from one it stated in words the vocabulary does not cover.
 
         Juriscraper reports both as `None`, so `_classify` can only read them
         both as `UNKNOWN`. `category_raw` is the one thing that tells them
@@ -274,9 +276,10 @@ class NYCoAIssue(BaseModel):
 class NYCoAAttorney(Representative):
     """An attorney from the ATTORNEY DETAILS section of a Court-PASS docket.
 
-    :ivar firm: The law firm the attorney filed under.
-    :ivar address: The attorney's address, as one block of text.
-    :ivar phone: The attorney's phone number.
+    Attributes:
+        firm: The law firm the attorney filed under.
+        address: The attorney's address, as one block of text.
+        phone: The attorney's phone number.
     """
 
     firm: str = ""
@@ -287,8 +290,9 @@ class NYCoAAttorney(Representative):
 class NYCoAParty(Party[NYCoAAttorney]):
     """A party on a Court-PASS docket, with the attorneys representing it.
 
-    :ivar party_role_raw: The party's role exactly as Court-PASS stated it
-        (e.g. ``Amicus Curiae``).
+    Attributes:
+        party_role_raw: The party's role exactly as Court-PASS stated it
+            (e.g. ``Amicus Curiae``).
     """
 
     party_role_raw: str = ""
@@ -297,17 +301,18 @@ class NYCoAParty(Party[NYCoAAttorney]):
 class NYCoACase(Docket[DocketTransfer, NYCoDocketEntry, NYCoAParty]):
     """A New York Court of Appeals docket.
 
-    :ivar date_filed: Court-PASS publishes no filing date for the case itself,
-        so this is the earliest date any of its filings was received.
-    :ivar argument_date: The date the case was or will be argued.
-    :ivar decision_date: The date the case was decided, for decided cases.
-    :ivar issues: The issues the Court assigned to the case, each paired with
-        its detail. Usually one, occasionally up to five.
-    :ivar official_citation: The official citation, for decided cases.
-    :ivar lower_court_citation: The "Reported Below" citation for the decision
-        under review, when Court-PASS reports one.
-    :ivar transfers: Court-PASS publishes no transfer data, so this is always
-        empty. Present because the standard docket format requires it.
+    Attributes:
+        date_filed: Court-PASS publishes no filing date for the case itself,
+            so this is the earliest date any of its filings was received.
+        argument_date: The date the case was or will be argued.
+        decision_date: The date the case was decided, for decided cases.
+        issues: The issues the Court assigned to the case, each paired with
+            its detail. Usually one, occasionally up to five.
+        official_citation: The official citation, for decided cases.
+        lower_court_citation: The "Reported Below" citation for the decision
+            under review, when Court-PASS reports one.
+        transfers: Court-PASS publishes no transfer data, so this is always
+            empty. Present because the standard docket format requires it.
     """
 
     # Undated when no filing carries a date; the base's `date` assumes one.
