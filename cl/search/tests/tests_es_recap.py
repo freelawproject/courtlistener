@@ -27,6 +27,7 @@ from cl.corpus_importer.tasks import (
     add_scotus_docket_entries,
     enrich_scotus_attachments,
 )
+from cl.favorites.factories import NoteFactory
 from cl.lib.elasticsearch_utils import (
     build_es_main_query,
     build_search_feed_query,
@@ -7767,7 +7768,10 @@ class SCOTUSESIndexingSignalTest(
 class SCOTUSRECAPSearchTest(
     AuthenticatedClientMixin, ESIndexTestCase, TestCase
 ):
-    """Confirm RECAP search shows SCOTUS content only behind its flag."""
+    """Confirm RECAP search shows SCOTUS content only behind its flag, and
+    that the search page's counts include SCOTUS documents, which have a uid
+    instead of an id.
+    """
 
     @classmethod
     def setUpTestData(cls) -> None:
@@ -7792,10 +7796,19 @@ class SCOTUSRECAPSearchTest(
             # Every docket and document URL of a docket starts with this.
             cls.scotus_docket_path = f"/docket/{scotus_entry.docket_id}/"
             cls.recap_docket_path = f"/docket/{recap_entry.docket_id}/"
-            SCOTUSDocumentFactory(
-                docket_entry=scotus_entry, description="Tied"
+            # Several SCOTUS documents, so the counts tests can tell them
+            # apart from a docket count.
+            cls.scotus_documents = [
+                SCOTUSDocumentFactory(
+                    docket_entry=scotus_entry,
+                    attachment_number=n,
+                    description="Tied",
+                )
+                for n in range(1, 6)
+            ]
+            cls.recap_document = RECAPDocumentFactory(
+                docket_entry=recap_entry, description="Tied"
             )
-            RECAPDocumentFactory(docket_entry=recap_entry, description="Tied")
 
     def test_search_frontend_shows_scotus_only_with_the_flag(self) -> None:
         """Until launch, the search page and the RSS search feed show
@@ -7818,12 +7831,10 @@ class SCOTUSRECAPSearchTest(
                 self.assertNotIn(self.scotus_docket_path, hidden)
                 self.assertIn(self.scotus_docket_path, shown)
 
-    def test_search_feed_links_numberless_documents_to_their_entry(
-        self,
-    ) -> None:
-        """RSS search feed items for RECAP and SCOTUS documents without a
-        number, which have no page of their own, link to their entry on the
-        docket page instead of the homepage."""
+    def _create_numberless_documents(self) -> list[str]:
+        """Create RECAP and SCOTUS documents without a number, matching the
+        query "Numberless", and return the links to their entries on the
+        docket page that search results should use for them."""
         filed = datetime.date(2024, 1, 3)
         with self.captureOnCommitCallbacks(execute=True):
             recap_minute_entry = DocketEntryFactory(
@@ -7859,6 +7870,22 @@ class SCOTUSRECAPSearchTest(
             ]:
                 document.save()
 
+        recap_docket_url = recap_minute_entry.docket.get_absolute_url()
+        scotus_docket_url = scotus_numbered_entry.docket.get_absolute_url()
+        return [
+            f"{recap_docket_url}#minute-entry-{recap_minute_entry.pk}",
+            f"{scotus_docket_url}#entry-7",
+            f"{scotus_docket_url}#minute-entry-{scotus_minute_entry.pk}",
+        ]
+
+    def test_search_feed_links_numberless_documents_to_their_entry(
+        self,
+    ) -> None:
+        """RSS search feed items for RECAP and SCOTUS documents without a
+        number, which have no page of their own, link to their entry on the
+        docket page instead of the homepage."""
+        expected = self._create_numberless_documents()
+
         r = self.client.get(
             reverse("search_feed", args=["search"]),
             {"type": SEARCH_TYPES.RECAP, "q": "Numberless"},
@@ -7869,13 +7896,6 @@ class SCOTUSRECAPSearchTest(
         hrefs = tree.xpath(
             "//atom:entry/atom:link/@href", namespaces=namespaces
         )
-        recap_docket_url = recap_minute_entry.docket.get_absolute_url()
-        scotus_docket_url = scotus_numbered_entry.docket.get_absolute_url()
-        expected = [
-            f"{recap_docket_url}#minute-entry-{recap_minute_entry.pk}",
-            f"{scotus_docket_url}#entry-7",
-            f"{scotus_docket_url}#minute-entry-{scotus_minute_entry.pk}",
-        ]
         # The feed makes item links absolute; compare their path and anchor.
         links = [
             urllib.parse.urlsplit(href)._replace(scheme="", netloc="").geturl()
@@ -7890,6 +7910,24 @@ class SCOTUSRECAPSearchTest(
             )
         ]
         self.assertCountEqual(summary_links, expected)
+
+    def test_search_page_links_numberless_documents_to_their_entry(
+        self,
+    ) -> None:
+        """Search page results for RECAP and SCOTUS documents without a
+        number link to their entry on the docket page, the same as the RSS
+        search feed."""
+        expected = self._create_numberless_documents()
+
+        r = self.client.get(
+            reverse("show_results"),
+            {"type": SEARCH_TYPES.RECAP, "q": "Numberless"},
+        )
+
+        links = html.fromstring(r.content.decode()).xpath(
+            "//a[contains(@href, 'entry-')]/@href"
+        )
+        self.assertCountEqual(links, expected)
 
     def test_search_apis_never_show_scotus(self) -> None:
         """The v3 and v4 search APIs leave SCOTUS out even for requests
@@ -7976,6 +8014,54 @@ class SCOTUSRECAPSearchTest(
                     self.scotus_docket_path in second.content.decode(),
                     not first_flag,
                 )
+
+    @override_settings(ELASTICSEARCH_MAX_RESULT_COUNT=1)
+    def test_document_counts_include_scotus_only_on_the_search_page(
+        self,
+    ) -> None:
+        """The search page's document count includes SCOTUS documents. The
+        API counts leave them out, like the API results, until the API
+        launch. ELASTICSEARCH_MAX_RESULT_COUNT=1 makes the type=rd API use
+        its approximate count."""
+        params = {"q": "Tied", "court": "scotus"}
+
+        page = self.client.get(
+            reverse("show_results"), {"type": SEARCH_TYPES.RECAP, **params}
+        )
+        api_r = self.client.get(
+            reverse("search-list", kwargs={"version": "v4"}),
+            {"type": SEARCH_TYPES.RECAP, **params},
+        )
+        api_rd = self.client.get(
+            reverse("search-list", kwargs={"version": "v4"}),
+            {"type": SEARCH_TYPES.RECAP_DOCUMENT, **params},
+        )
+
+        # results_details is [query time, parent count, limit, child count].
+        self.assertEqual(page.context["results_details"][3], 5)
+        self.assertEqual(api_r.data["document_count"], 0)
+        self.assertEqual(api_rd.data["count"], 0)
+
+    def test_notes_search_url_finds_the_noted_documents(self) -> None:
+        """The "Search Notes" link for documents finds the noted RECAP and
+        SCOTUS documents, and none of the other SCOTUS documents."""
+        for document in [self.scotus_documents[0], self.recap_document]:
+            NoteFactory(content_object=document, user=self.api_user)
+        search_url = self.client.get(reverse("profile_notes")).context[
+            "recap_search_url"
+        ]
+        # Users replace the "xxx" placeholder with their own terms.
+        params = urllib.parse.parse_qs(
+            urllib.parse.urlsplit(search_url.replace("xxx", "Tied")).query
+        )
+
+        r = self.client.get(reverse("show_results"), params)
+
+        # results_details is [query time, parent count, limit, child count].
+        self.assertEqual(r.context["results_details"][3], 2)
+        content = r.content.decode()
+        self.assertIn(self.recap_docket_path, content)
+        self.assertIn(self.scotus_docket_path, content)
 
 
 class RECAPFeedTest(RECAPSearchTestCase, ESIndexTestCase, TestCase):

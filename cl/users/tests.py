@@ -1202,6 +1202,36 @@ class ProfileTest(SimpleUserDataMixin, TestCase):
             f"/?type=r&q=xxx AND id:({rd.pk})",
         )
 
+    def test_recap_search_url_matches_scotus_documents_by_uid(self) -> None:
+        """SCOTUS documents have no ES id, so the "Search Notes" link for
+        documents matches them by uid, alongside RECAP documents by id."""
+        court = CourtFactory(id="scotus", jurisdiction="F")
+        sd = SCOTUSDocumentFactory(docket_entry__docket__court=court)
+        sd_2 = SCOTUSDocumentFactory(docket_entry__docket__court=court)
+        rd = RECAPDocumentFactory()
+        cases = [
+            ([sd], f"/?type=r&q=xxx AND uid:(scotus_{sd.pk})"),
+            (
+                [rd, sd, sd_2],
+                f"/?type=r&q=xxx AND (id:({rd.pk}) OR "
+                f"uid:(scotus_{sd.pk} OR scotus_{sd_2.pk}))",
+            ),
+        ]
+        for noted, expected in cases:
+            with self.subTest(noted=[type(d).__name__ for d in noted]):
+                profile = UserProfileWithParentsFactory()
+                for document in noted:
+                    NoteFactory(content_object=document, user=profile.user)
+                self.assertTrue(
+                    self.client.login(
+                        username=profile.user.username, password="password"
+                    )
+                )
+
+                r = self.client.get(reverse("profile_notes"))
+
+                self.assertEqual(r.context["recap_search_url"], expected)
+
 
 class NotesPageDeadLinkTest(TestCase):
     """A noted object with no page of its own yet must not render as a

@@ -78,6 +78,7 @@ from cl.search.constants import (
     SEARCH_RECAP_HL_FIELDS,
     SEARCH_RECAP_PARENT_QUERY_FIELDS,
     api_child_highlight_map,
+    cardinality_query_extra_unique_ids,
     cardinality_query_unique_ids,
     date_decay_relevance_types,
     jurisdiction_relevance_multipliers,
@@ -2349,7 +2350,11 @@ def fetch_es_results(
                 SEARCH_TYPES.RECAP_DOCUMENT
             ]
             child_total_query = build_cardinality_count(
-                child_docs_count_query, child_unique_field
+                child_docs_count_query,
+                child_unique_field,
+                cardinality_query_extra_unique_ids[
+                    SEARCH_TYPES.RECAP_DOCUMENT
+                ],
             )
 
         # Execute the ES main query + count queries in a single request.
@@ -2368,12 +2373,12 @@ def fetch_es_results(
         main_response = responses[0]
         main_doc_count_response = responses[1]
         parent_total = simplify_estimated_count(
-            main_doc_count_response.aggregations.unique_documents.value
+            get_cardinality_count(main_doc_count_response.aggregations)
         )
         if child_total_query:
             child_doc_count_response = responses[2]
             child_total = simplify_estimated_count(
-                child_doc_count_response.aggregations.unique_documents.value
+                get_cardinality_count(child_doc_count_response.aggregations)
             )
 
         query_time = main_response.took
@@ -2672,6 +2677,25 @@ def get_docket_entry_pk(doc: AttrDict[Any]) -> int | None:
     if docket_entry_uid := getattr(doc, "docket_entry_uid", None):
         return int(docket_entry_uid.rsplit("_", 1)[1])
     return None
+
+
+def get_docket_entry_fragment(doc: AttrDict[Any]) -> str:
+    """Return the URL fragment of an ESRECAPDocument hit's entry on the
+    docket page, e.g. "#entry-7", or "" if the hit has no entry to point to.
+
+    Use it to link documents without a page of their own, like minute
+    entries and SCOTUS placeholders, to their entry. It matches the anchors
+    the docket page renders: "entry-<number>" for numbered entries and
+    "minute-entry-<pk>" for the rest.
+
+    :param doc: An ESRECAPDocument hit.
+    :return: The fragment, including its "#", or "".
+    """
+    if entry_number := getattr(doc, "entry_number", None):
+        return f"#entry-{entry_number}"
+    if docket_entry_pk := get_docket_entry_pk(doc):
+        return f"#minute-entry-{docket_entry_pk}"
+    return ""
 
 
 def do_es_feed_query(
@@ -3439,7 +3463,9 @@ def do_es_api_query(
 
 
 def build_cardinality_count(
-    count_query: SearchDSL, unique_field: str
+    count_query: SearchDSL,
+    unique_field: str,
+    extra_unique_field: str | None = None,
 ) -> SearchDSL:
     """Build an Elasticsearch cardinality aggregation.
     This aggregation estimates the count of unique documents based on the
@@ -3453,6 +3479,9 @@ def build_cardinality_count(
     count query.
     :param unique_field: The field name on which the cardinality aggregation
     will be based to estimate uniqueness.
+    :param extra_unique_field: Optional, a second field counted the same way,
+    for documents that have no unique_field. Read the total with
+    get_cardinality_count.
 
     :return: The ES cardinality aggregation query.
     """
@@ -3463,7 +3492,25 @@ def build_cardinality_count(
         field=unique_field,
         precision_threshold=settings.ELASTICSEARCH_CARDINALITY_PRECISION,
     )
+    if extra_unique_field:
+        count_query.aggs.bucket(
+            "extra_unique_documents",
+            "cardinality",
+            field=extra_unique_field,
+            precision_threshold=settings.ELASTICSEARCH_CARDINALITY_PRECISION,
+        )
     return count_query.extra(size=0, track_total_hits=False)
+
+
+def get_cardinality_count(aggregations: AttrDict[Any]) -> int:
+    """Return the unique documents count from the aggregations of a
+    build_cardinality_count response, including its extra_unique_field
+    count if it has one.
+    """
+    count = aggregations.unique_documents.value
+    if extra := getattr(aggregations, "extra_unique_documents", None):
+        count += extra.value
+    return count
 
 
 def do_collapse_count_query(
