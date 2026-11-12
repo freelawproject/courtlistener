@@ -356,4 +356,8 @@ class Machine[Scrape, Params, M: Model](ABC):
         while not is_terminal(self.state):
             self.step()
 
+        self.state = getattr(self, self.runners[self.state.__class__])(
+            self.state
+        )
+
         return self.state

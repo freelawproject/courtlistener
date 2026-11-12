@@ -160,8 +160,12 @@ class FloridaDocumentMerger(
         Scrape(ScrapeFloridaDocument).document_type
     )
     content_type: str = Fn(_content_type)(Scrape(ScrapeFloridaDocument))
-    page_count: int | None = Scrape(ScrapeFloridaDocument).page_count
-    file_size: int | None = Scrape(ScrapeFloridaDocument).file_size
+    page_count: int | None = WithStrategy(
+        Scrape(ScrapeFloridaDocument).page_count, overwrite_if_present
+    )
+    file_size: int | None = WithStrategy(
+        Scrape(ScrapeFloridaDocument).file_size, overwrite_if_present
+    )
     link_uuid: UUID = Scrape(ScrapeFloridaDocument).document_link_uuid
 
     def scrape_link_uuids(
@@ -226,7 +230,7 @@ class FloridaDocumentMerger(
             != 1
         ):
             # This is a potential new document.
-            return state.create()
+            return state.resolve([])
 
         # Stored documents whose link UUID is still in the scrape belong to
         # those attachments (even if they were renamed), so they can't be the
@@ -242,7 +246,7 @@ class FloridaDocumentMerger(
         )
 
         if len(list(candidates)) != 1:
-            return state.create()
+            return state.resolve([])
         return state.resolve(candidates)
 
     @override
