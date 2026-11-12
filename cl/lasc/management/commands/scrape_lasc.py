@@ -1,3 +1,5 @@
+"""Scrape Los Angeles Superior Court unlimited civil cases."""
+
 import argparse
 from datetime import date, timedelta
 from glob import glob
@@ -113,9 +115,19 @@ def process_pdf_queue(options):
 
 
 class Command(VerboseCommand):
+    """Run one of the LASC scraping actions."""
+
     help = "Get all content from MAP LA Unlimited Civil Cases."
 
     def valid_actions(self, s):
+        """Look up the action function named by ``s``.
+
+        ``s`` is validated in lowercase but looked up as given.
+
+        Raises:
+            argparse.ArgumentTypeError: If ``s``, lowercased, isn't a valid
+                action.
+        """
         if s.lower() not in self.VALID_ACTIONS:
             raise argparse.ArgumentTypeError(
                 "Unable to parse action. Valid actions are: {}".format(
@@ -126,6 +138,10 @@ class Command(VerboseCommand):
         return self.VALID_ACTIONS[s]
 
     def add_arguments(self, parser):
+        """Add the action, queue, case, directory, and date range options.
+
+        The date range defaults to the last seven days.
+        """
         parser.add_argument(
             "--action",
             type=self.valid_actions,
@@ -171,6 +187,7 @@ class Command(VerboseCommand):
         )
 
     def handle(self, *args, **options):
+        """Run the chosen action with the command's options."""
         super().handle(*args, **options)
         options["action"](options)
 

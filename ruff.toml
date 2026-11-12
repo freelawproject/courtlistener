@@ -56,11 +56,6 @@ docstring-code-format = true
 # Legacy undocumented code exempt from docstring rules; remove a file once it is documented.
 "cl/asgi.py" = ["D100"]
 "cl/celery_init.py" = ["D100", "D103"]
-"cl/lasc/admin.py" = ["D100", "D101"]
-"cl/lasc/management/commands/scrape_lasc.py" = ["D100", "D101", "D102"]
-"cl/lasc/models.py" = ["D100", "D101", "D102"]
-"cl/lasc/tasks.py" = ["D100", "D101"]
-"cl/lasc/utils.py" = ["D100"]
 "cl/lib/admin.py" = ["D100", "D101", "D102"]
 "cl/lib/argparse_types.py" = ["D100", "D103"]
 "cl/lib/AuthenticationBackend.py" = ["D100", "D107"]

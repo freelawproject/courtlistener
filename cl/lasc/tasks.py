@@ -1,3 +1,5 @@
+"""Celery tasks and helpers for scraping and storing LASC cases and PDFs."""
+
 import json
 import logging
 import os
@@ -40,6 +42,8 @@ LASC_SESSION_COOKIE_KEY = "session:lasc:cookies"
 
 
 class SESSION_IS:
+    """Statuses of the shared LASC session."""
+
     LOGGING_IN = "logging_in"
     OK = "ok"
 
