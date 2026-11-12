@@ -1,3 +1,5 @@
+"""Models for donations, Neon memberships, and Neon webhook events."""
+
 from datetime import date, timedelta
 from typing import Self
 
@@ -15,12 +17,16 @@ from cl.lib.models import AbstractDateTimeModel
 
 
 class PAYMENT_TYPES:
+    """Kinds of payment."""
+
     DONATION = "donation"
     PAYMENT = "payment"
     BADGE_SIGNUP = "badge_signup"
 
 
 class FREQUENCIES:
+    """How often a donation recurs."""
+
     ONCE = "once"
     MONTHLY = "monthly"
     NAMES = (
@@ -30,6 +36,8 @@ class FREQUENCIES:
 
 
 class PROVIDERS:
+    """Payment providers, with the ones still accepted in ``ACTIVE_NAMES``."""
+
     DWOLLA = "dwolla"
     PAYPAL = "paypal"
     CREDIT_CARD = "cc"
@@ -51,6 +59,8 @@ class PROVIDERS:
 
 @pghistory.track()
 class Donation(AbstractDateTimeModel):
+    """A donation from a user, with its amount, provider, and status."""
+
     # These statuses are shown on the profile page. Be warned.
     AWAITING_PAYMENT = 0
     UNKNOWN_ERROR = 1
@@ -165,6 +175,8 @@ class MonthlyDonation(AbstractDateTimeModel):
 
 
 class NeonWebhookEvent(AbstractDateTimeModel):
+    """A membership webhook received from Neon CRM, with its payload."""
+
     MEMBERSHIP_CREATION = 1
     MEMBERSHIP_EDIT = 2
     MEMBERSHIP_DELETE = 3
@@ -194,6 +206,8 @@ class NeonWebhookEvent(AbstractDateTimeModel):
 
 
 class MembershipPaymentStatus:
+    """Payment statuses for a membership."""
+
     PENDING = 0
     SUCCEEDED = 1
     FAILED = 2
@@ -351,6 +365,8 @@ class NeonMembershipManager(models.Manager["NeonMembership"]):
 
 @pghistory.track()
 class NeonMembership(AbstractDateTimeModel):
+    """A user's membership in Neon CRM."""
+
     user = models.OneToOneField(
         User,
         related_name="membership",
