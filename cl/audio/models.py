@@ -1,3 +1,5 @@
+"""Models for oral argument audio and its transcription metadata."""
+
 import pghistory
 from django.db import models
 from django.urls import reverse
@@ -177,6 +179,7 @@ class Audio(AbstractDateTimeModel):
 
     @property
     def transcript(self) -> str:
+        """The speech-to-text transcript."""
         return self.stt_transcript
 
     class Meta:
@@ -187,6 +190,7 @@ class Audio(AbstractDateTimeModel):
         return f"{self.pk}: {self.case_name}"
 
     def get_absolute_url(self) -> str:
+        """Get the URL of the audio file's page."""
         return reverse("view_audio_file", args=[self.pk, self.docket.slug])
 
 
@@ -201,6 +205,8 @@ class AudioPanel(Audio.panel.through):  # type: ignore
 
 
 class AudioTranscriptionMetadata(models.Model):
+    """Word and segment metadata from transcribing an audio file."""
+
     audio = models.ForeignKey(Audio, on_delete=models.DO_NOTHING)
     metadata = models.JSONField(
         help_text="Word and/or segment level metadata returned by a STT model."
