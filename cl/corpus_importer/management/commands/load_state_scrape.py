@@ -65,6 +65,8 @@ def compose_redis_key(loader: str, database: str) -> str:
 
 
 class Command(BaseCommand):
+    """Merge a jkent scrape run database into CourtListener."""
+
     help = "Merge a jkent scrape run database into CourtListener."
 
     def add_arguments(self, parser: CommandParser) -> None:

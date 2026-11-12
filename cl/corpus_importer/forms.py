@@ -1,3 +1,5 @@
+"""Forms for researchers updating judges' biographical data."""
+
 import typing
 from typing import Any
 
@@ -19,6 +21,8 @@ from cl.search.models import Court
 
 
 class PersonFilterForm(forms.Form):
+    """Optional filters for judges by name, court ID, and court type."""
+
     name = forms.CharField(
         label="Judge name",
         required=False,
@@ -34,11 +38,16 @@ class PersonFilterForm(forms.Form):
 
 
 class RaceModelMultipleChoiceField(forms.ModelMultipleChoiceField):
+    """Multiple choice field of races, labeled by their display names."""
+
     def label_from_instance(self, obj: Race) -> str:
+        """Label the race with its display name."""
         return obj.get_race_display()
 
 
 class PersonForm(BootstrapModelForm):
+    """Form for a judge's name, birth, gender, race, and religion."""
+
     race = RaceModelMultipleChoiceField(
         queryset=Race.objects.all(),
         required=False,
@@ -90,6 +99,14 @@ class EmptyModelChoiceField(forms.ModelChoiceField):
 
     @typing.no_type_check
     def to_python(self, value: Any | None) -> Any:
+        """Look up the chosen object among all of the model's objects.
+
+        Returns:
+            The chosen object, or None if the value is empty.
+
+        Raises:
+            ValidationError: If no object matches the value.
+        """
         if value in self.empty_values:
             return None
         try:
@@ -109,6 +126,8 @@ class EmptyModelChoiceField(forms.ModelChoiceField):
 
 
 class EducationForm(BootstrapModelForm):
+    """Form for one of a judge's educations, with a school dropdown."""
+
     school = EmptyModelChoiceField(
         queryset=School.objects.none(),
         widget=forms.Select(attrs={"class": "select2 school-select"}),
@@ -128,6 +147,8 @@ EducationFormSet = inlineformset_factory(
 
 
 class PoliticalAffiliationForm(BootstrapModelForm):
+    """Form for one of a judge's political affiliations, without its end date."""
+
     date_start = forms.DateField(
         label="Date start",
         required=False,
@@ -154,6 +175,8 @@ PoliticalAffiliationFormSet = inlineformset_factory(
 
 
 class PositionForm(BootstrapModelForm):
+    """Form for a judge's position type, court, and start and end dates."""
+
     court = EmptyModelChoiceField(
         queryset=Court.objects.none(),
         widget=forms.Select(attrs={"class": "select2 court-select"}),
@@ -204,6 +227,8 @@ PositionsFormSet = inlineformset_factory(
 
 
 class SourceForm(BootstrapModelForm):
+    """Form for a source of a judge's data."""
+
     date_accessed = forms.DateField(
         label="Date accessed",
         required=False,

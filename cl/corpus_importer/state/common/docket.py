@@ -1,3 +1,5 @@
+"""Base merger for scraped state dockets, with their parties and entries."""
+
 from collections.abc import Callable, Sequence
 from datetime import date
 from typing import Any, ClassVar
@@ -24,6 +26,11 @@ from cl.search.models import Docket
 
 
 def add_scraper_source(scrape: int | None, db: int | None) -> int:
+    """Add the scraper to a docket's stored source, ignoring the scraped value.
+
+    A missing source is treated as 0. Sources that already include the
+    scraper are kept as they are.
+    """
     if not db:
         db = 0
     if db in Docket.NON_SCRAPER_SOURCES():
@@ -65,6 +72,11 @@ def DocketEntryRelation(
     transform: Callable[[Any, Any], Sequence[Any]] = _docket_entries,
     strategy: ManyStrategy = ManyStrategy.APPEND,
 ) -> list[Any]:
+    """Declare a docket's entries as a one-to-many relation.
+
+    Defaults to merging the scraped docket's entries and appending them to
+    the docket's existing entries.
+    """
     return OneToManyRelation(
         merger,
         transform,
@@ -75,6 +87,12 @@ def DocketEntryRelation(
 class DocketMerger[DType: ScrapeDocket[Any, Any, Any], ParamType](
     Merger[DType, ParamType, Docket], abstract=True
 ):
+    """Base merger for a scraped state docket into a ``Docket``.
+
+    Merges the docket's names, number, filing date, source, and parties in
+    one transaction.
+    """
+
     model: ClassVar[type[Model]] = Docket
 
     atomic = True

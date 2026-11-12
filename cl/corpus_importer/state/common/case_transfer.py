@@ -185,6 +185,11 @@ def CaseTransferRelation(
     *,
     strategy: ManyStrategy = ManyStrategy.APPEND,
 ) -> list[CaseTransfer]:
+    """Declare a docket's case transfers as a one-to-many relation.
+
+    Defaults to the docket's inbound transfers, appended to its existing
+    transfers.
+    """
     return OneToManyRelation(
         merger,
         transform,

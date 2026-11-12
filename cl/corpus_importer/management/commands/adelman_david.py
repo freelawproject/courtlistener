@@ -1,3 +1,5 @@
+"""Download dockets and metadata for the David Adelman project."""
+
 import csv
 import os
 
@@ -97,6 +99,8 @@ def download_dockets(options):
 
 
 class Command(VerboseCommand, CommandUtils):
+    """Download the dockets listed in the David Adelman project's CSV."""
+
     help = "Download dockets and metadata for the David Adelman project"
 
     allowed_tasks = [
@@ -104,6 +108,7 @@ class Command(VerboseCommand, CommandUtils):
     ]
 
     def add_arguments(self, parser):
+        """Add the queue, input file, offset, limit, and task options."""
         parser.add_argument(
             "--queue",
             default="batch1",
@@ -136,6 +141,7 @@ class Command(VerboseCommand, CommandUtils):
         )
 
     def handle(self, *args, **options):
+        """Check the input file, then download its dockets."""
         super().handle(*args, **options)
         self.ensure_file_ok(options["input_file"])
         download_dockets(options)

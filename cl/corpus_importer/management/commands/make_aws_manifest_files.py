@@ -1,3 +1,5 @@
+"""Create S3 manifest files listing database records for batch processing."""
+
 import csv
 import io
 import random
@@ -728,6 +730,8 @@ def compute_monthly_export(
 
 
 class Command(VerboseCommand):
+    """Export the IDs of one record type to manifest files in S3."""
+
     help = (
         "Retrieves data records from the database and creates manifest files"
         "listing those records in Amazon S3. These manifest files can then"
@@ -736,6 +740,7 @@ class Command(VerboseCommand):
     )
 
     def add_arguments(self, parser: CommandParser):
+        """Add the record type, S3, batching, sampling, and export mode options."""
         parser.add_argument(
             "--record-type",
             type=str,
@@ -818,6 +823,11 @@ class Command(VerboseCommand):
         )
 
     def handle(self, *args, **options):
+        """Export the records, then save the export's timestamp for 45 days.
+
+        A monthly export only includes changes since the last saved
+        timestamp, and does nothing if there is none.
+        """
         r = get_redis_interface("CACHE")
 
         record_type = options["record_type"]

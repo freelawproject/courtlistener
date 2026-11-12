@@ -208,6 +208,7 @@ class Command(VerboseCommand):
     help = "Download state docket entry attachments."
 
     def add_arguments(self, parser: CommandParser) -> None:
+        """Add the model, queue, throttling, delay, step-skipping, batching, page limit, ordering, and resume options."""
         parser.add_argument(
             "--model",
             type=str,

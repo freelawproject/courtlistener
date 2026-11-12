@@ -1,3 +1,5 @@
+"""Declarative mergers that write scraped data into Django models."""
+
 import json
 import logging
 import typing
@@ -74,6 +76,12 @@ def overwrite_if_present[T](scrape: T | None, db: T | None) -> T | None:
 
 
 class MergerSpecification[ScrapeType, ParamType, OutputType]:
+    """Base for a merger class attribute that declares how one model field is merged.
+
+    Assigning a specification on a ``Merger`` subclass registers it under
+    the attribute's name, which must be a field of the merger's model.
+    """
+
     __slots__: tuple[str, ...] = "name", "transform", "default"
 
     def __init__(
@@ -82,6 +90,14 @@ class MergerSpecification[ScrapeType, ParamType, OutputType]:
         transform: Callable[[ScrapeType, ParamType], OutputType] | None = None,
         default: OutputType,
     ):
+        """Build a specification.
+
+        Args:
+            transform: Gets the field's value from the scrape and params.
+                Without one, the value is read from the params by the
+                field's name, falling back to ``default``.
+            default: The value used when the params don't provide one.
+        """
         self.transform: Callable[[ScrapeType, ParamType], OutputType] = (
             transform or self._default_transform
         )
@@ -156,6 +172,7 @@ class AttributeMerger[ScrapeType, ParamType, TransformType](
         *,
         default: TransformType | None = None,
     ):
+        """Build an attribute specification from its transform, strategy, and default."""
         super().__init__(transform=transform, default=default)
         self.strategy: Callable[
             [TransformType | None, TransformType | None],
@@ -171,6 +188,17 @@ def Attribute[TransformType](
     *,
     default: TransformType | None = None,
 ) -> Any:
+    """Declare how a merger merges one attribute of its model.
+
+    Typed as ``Any`` so it can be assigned to a class attribute annotated
+    with the field's type.
+
+    Args:
+        transform: Gets the value from the scrape and params.
+        strategy: Combines the scraped and stored values. Defaults to
+            keeping the stored value when the scraped one is ``None``.
+        default: The value used when the params don't provide one.
+    """
     return AttributeMerger(transform, strategy, default=default)
 
 
@@ -202,6 +230,8 @@ class RelatedMerger[
     MergerSpecification[ScrapeType, ParamType, OutputType],
     ABC,
 ):
+    """Base specification for merging a related object with its own merger."""
+
     __slots__ = ("merger",)
 
     def __init__(
@@ -211,12 +241,14 @@ class RelatedMerger[
         *,
         default: OutputType,
     ):
+        """Build the specification with the merger used for related objects."""
         super().__init__(transform=transform, default=default)
         self.merger: type[Merger[ChildType, RelatedParams[ParamType], RM]] = (
             merger
         )
 
     def validate(self, field: Field | ForeignObjectRel) -> list[Exception]:
+        """Check that the field is a relation to the related merger's model."""
         errors = super().validate(field)
         if not field.related_model:
             errors.append(
@@ -244,7 +276,9 @@ class RelatedMerger[
     @abstractmethod
     def merge(
         self, parent: RM | None, scrape: ScrapeType, params: ParamType
-    ) -> MergeResult[Any]: ...
+    ) -> MergeResult[Any]:
+        """Merge the related objects for ``parent`` from the scrape."""
+        ...
 
 
 class OneToOneMerger[ScrapeType, ParamType, ChildType, RM: Model](
@@ -266,6 +300,7 @@ class OneToOneMerger[ScrapeType, ParamType, ChildType, RM: Model](
         transform: Callable[[ScrapeType, ParamType], ChildType | None]
         | None = None,
     ):
+        """Build the specification, assuming a forward relation until validated."""
         super().__init__(merger=merger, transform=transform, default=None)
         self.forward: bool = True
         self.parent_name: str | None = None
@@ -317,6 +352,12 @@ def OneToOneRelation[ParamType, ChildType, RM: Model](
     merger: "type[Merger[ChildType, RelatedParams[ParamType], RM]]",
     transform: Callable[..., ChildType | None] | None = None,
 ) -> Any:
+    """Declare a one-to-one relation merged with ``merger``.
+
+    Typed as ``Any`` so it can be assigned to a class attribute annotated
+    with the related model. A transform that returns ``None`` skips the
+    relation.
+    """
     return OneToOneMerger(merger, transform)
 
 
@@ -347,6 +388,7 @@ class NToManyMerger[ScrapeType, ParamType, ChildType, RM: Model](
         *,
         strategy: ManyStrategy = ManyStrategy.REPLACE,
     ):
+        """Build the specification with how to treat existing related objects."""
         super().__init__(merger=merger, transform=transform, default=[])
         self.strategy: ManyStrategy = strategy
 
@@ -417,6 +459,7 @@ class OneToManyMerger[ScrapeType, ParamType, ChildType, RM: Model](
     """
 
     def validate(self, field: Field | ForeignObjectRel) -> list[Exception]:
+        """Check that the field is a one-to-many relation to the merger's model."""
         errors = super().validate(field)
         if not field.one_to_many:
             errors.append(
@@ -431,6 +474,11 @@ def OneToManyRelation[ParamType, ChildType, RM: Model](
     *,
     strategy: ManyStrategy = ManyStrategy.REPLACE,
 ) -> Any:
+    """Declare a one-to-many relation merged with ``merger``.
+
+    Typed as ``Any`` so it can be assigned to a class attribute annotated
+    with the related objects' type.
+    """
     return OneToManyMerger(merger, transform, strategy=strategy)
 
 
@@ -479,6 +527,17 @@ class ManyToManyMerger[
         strategy: ManyStrategy = ManyStrategy.REPLACE,
         through_strategy: ManyStrategy = ManyStrategy.REPLACE,
     ):
+        """Build the specification with an optional merger for the through rows.
+
+        Args:
+            merger: Merges the related objects.
+            through: Merges the through rows linking the parent to each
+                related object.
+            transform: Turns the parent's scrape and params into the
+                related objects' inputs.
+            strategy: How to treat existing related objects.
+            through_strategy: How to treat existing through rows.
+        """
         super().__init__(merger, transform, strategy=strategy)
         self.through: (
             type[Merger[TransformType, ThroughParameters[ParamType], ThruM]]
@@ -487,6 +546,11 @@ class ManyToManyMerger[
         self.through_strategy: ManyStrategy = through_strategy
 
     def validate(self, field: Field | ForeignObjectRel) -> list[Exception]:
+        """Check that the field is a many-to-many relation.
+
+        With a through merger, also check that the field's through and
+        related models match the mergers' models.
+        """
         errors = super().validate(field)
         if not field.many_to_many:
             errors.append(
@@ -610,6 +674,11 @@ def ManyToManyRelation[ParamType, ChildType, ThruM: Model, RM: Model](
     strategy: ManyStrategy = ManyStrategy.REPLACE,
     through_strategy: ManyStrategy = ManyStrategy.REPLACE,
 ) -> Any:
+    """Declare a many-to-many relation merged with ``merger`` and, optionally, ``through``.
+
+    Typed as ``Any`` so it can be assigned to a class attribute annotated
+    with the related objects' type.
+    """
     return ManyToManyMerger(
         merger,
         through,
@@ -620,6 +689,8 @@ def ManyToManyRelation[ParamType, ChildType, ThruM: Model, RM: Model](
 
 
 class MergerSpecRegistry[ScrapeType, ParamType]:
+    """A merger's specifications, by field name, grouped by kind."""
+
     def __init__(
         self,
         *,
@@ -634,6 +705,7 @@ class MergerSpecRegistry[ScrapeType, ParamType]:
         ]
         | None = None,
     ):
+        """Build a registry, empty unless specifications are given."""
         self.related: dict[
             str, RelatedMerger[ScrapeType, ParamType, Any, Any, Model]
         ] = related or {}
@@ -686,11 +758,13 @@ class MergerSpecRegistry[ScrapeType, ParamType]:
         return errors
 
     def update(self, other: Self):
+        """Add another registry's specifications to this one in place."""
         self.related.update(other.related)
         self.attr.update(other.attr)
         self.one_to_one.update(other.one_to_one)
 
     def register(self, spec: MergerSpecification[ScrapeType, ParamType, Any]):
+        """Add a specification under its name, by kind; unknown kinds are logged."""
         match spec:
             case AttributeMerger():
                 self.attr[spec.name] = spec
@@ -703,6 +777,8 @@ class MergerSpecRegistry[ScrapeType, ParamType]:
 
 
 class MergerMeta(type):
+    """Metaclass that gives each merger class its own copy of its bases' specifications."""
+
     @classmethod
     def __prepare__(
         cls,
@@ -797,6 +873,11 @@ class Merger[ScrapeType, ParamType, M: Model](metaclass=MergerMeta):
 
     @classmethod
     def guarantee_valid(cls):
+        """Raise if the merger's configuration has errors.
+
+        Raises:
+            TypeError: If validation found any errors, listing all of them.
+        """
         if cls.errors:
             raise TypeError(
                 "Invalid merger configuration for {}:\n{}".format(
@@ -825,6 +906,16 @@ class Merger[ScrapeType, ParamType, M: Model](metaclass=MergerMeta):
         params: ParamType | Sequence[ParamType],
         manager: Manager[M] | None = None,
     ) -> tuple[MergeResult[Any], list[Self]]:
+        """Build a merger for each scrape, sharing one params value or taking one per scrape.
+
+        Mergers that use the natural key have their existing objects looked
+        up in a single query. When scrapes share a natural key, the earlier
+        merger is marked as failed and the failure is added to the result.
+        Natural keys matching several objects are also marked as failed.
+
+        Returns:
+            The result of setting up the mergers, and the mergers.
+        """
         result = MergeResult.unnecessary()
         if isinstance(params, Sequence):
             if len(params) != len(scrapes):
@@ -1142,6 +1233,11 @@ class Merger[ScrapeType, ParamType, M: Model](metaclass=MergerMeta):
         return result
 
     def create_new(self) -> tuple[M, MergeResult[Any]]:
+        """Create the object from the transformed attributes, merging its forward one-to-one relations first.
+
+        Returns:
+            The created object and the combined result of the creates.
+        """
         result = MergeResult.unnecessary()
         o2o_params: dict[str, Any] = {}
         for name, spec in self.__registry__.one_to_one.items():

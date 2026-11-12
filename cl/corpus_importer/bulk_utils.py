@@ -1,3 +1,5 @@
+"""Helpers for bulk-downloading bankruptcy petitions from PACER."""
+
 from asgiref.sync import async_to_sync
 from celery import chain
 

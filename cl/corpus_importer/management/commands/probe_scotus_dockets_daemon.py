@@ -1,3 +1,5 @@
+"""Daemon that probes supremecourt.gov for new SCOTUS dockets."""
+
 import time
 
 from celery import chain
@@ -397,6 +399,8 @@ def run_scotus_probe_iteration(r, testing: bool) -> None:
 
 
 class Command(VerboseCommand):
+    """Continually probe for and ingest new SCOTUS dockets."""
+
     help = """Run the SCOTUS JSON docket probing daemon.
 
 The goal of this daemon is to discover and ingest new SCOTUS cases as they
@@ -419,6 +423,7 @@ iteration and skips probing until the ingested watermark catches up.
 """
 
     def add_arguments(self, parser):
+        """Add the testing-iterations option."""
         parser.add_argument(
             "--testing-iterations",
             type=int,
@@ -428,6 +433,11 @@ iteration and skips probing until the ingested watermark catches up.
         )
 
     def handle(self, *args, **options):
+        """Run probe iterations while the daemon is enabled in settings.
+
+        Iterations are skipped while the probe is paused. With
+        ``--testing-iterations``, stops after that many iterations.
+        """
         super().handle(*args, **options)
         testing_iterations = options["testing_iterations"]
         testing = bool(testing_iterations)

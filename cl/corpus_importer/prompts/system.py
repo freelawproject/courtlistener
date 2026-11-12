@@ -1,3 +1,5 @@
+"""System prompts for LLM tasks."""
+
 CASE_NAME_EXTRACT_SYSTEM = """
 You are an expert in case law and case caption extraction.
 You are a legal assistant.

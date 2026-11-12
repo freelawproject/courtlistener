@@ -1,3 +1,5 @@
+"""Import Tennessee workers' compensation board opinions."""
+
 import argparse
 import json
 import logging
@@ -148,9 +150,12 @@ def import_tn_corpus(
 
 
 class Command(VerboseCommand):
+    """Import the Tennessee workers' compensation corpus from a data file."""
+
     help = "Import TN data corpus received from TN Workers Comp boards."
 
     def add_arguments(self, parser):
+        """Add the input file, log, and skip-until options."""
         parser.add_argument(
             "--input-file",
             type=argparse.FileType("r"),
@@ -170,6 +175,7 @@ class Command(VerboseCommand):
         )
 
     def handle(self, *args, **options):
+        """Import the corpus from the input file."""
         super().handle(*args, **options)
         import_tn_corpus(
             options["log"],

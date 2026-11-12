@@ -1,3 +1,5 @@
+"""Import the downloaded Harvard Caselaw Access Project corpus."""
+
 import difflib
 import itertools
 import json
@@ -241,6 +243,8 @@ def parse_extra_fields(soup, fields, long_field=False) -> dict:
 
 
 class OptionsType(TypedDict):
+    """The command options used when parsing Harvard opinions."""
+
     reporter: str
     volumes: range | None
     page: str
@@ -727,9 +731,12 @@ def find_previously_imported_cases(
 
 
 class Command(VerboseCommand):
+    """Parse downloaded Harvard opinions into the database."""
+
     help = "Download and save Harvard corpus on IA to disk."
 
     def add_arguments(self, parser):
+        """Add the volume, reporter, page, court, location, bankruptcy, and debug options."""
         parser.add_argument(
             "--volumes",
             required=False,
@@ -777,6 +784,7 @@ class Command(VerboseCommand):
         )
 
     def handle(self, *args, **options):
+        """Parse the selected Harvard opinions."""
         if options["no_debug"]:
             logging.disable(logging.DEBUG)
         parse_harvard_opinions(options)

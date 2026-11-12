@@ -53,6 +53,12 @@ class DocumentMerger[
     ParamType,
     M: AbstractStateDocument,
 ](Merger[DocType, RelatedParams[ParamType], M], abstract=True):
+    """Base merger for a scraped state document.
+
+    When a document's URL changes, its stored file and OCR status are reset
+    so it is downloaded again.
+    """
+
     url: str = Attribute(_document_url, strategy=overwrite)
 
     @override
@@ -94,6 +100,11 @@ def AttachmentRelation(
     transform: Callable[[Any, Any], Any] = _entry_attachments,
     strategy: ManyStrategy = ManyStrategy.APPEND,
 ) -> list[Any]:
+    """Declare a docket entry's attachments as a one-to-many relation.
+
+    Defaults to merging the scraped entry's attachments and appending them
+    to the entry's existing documents.
+    """
     return OneToManyRelation(
         merger,
         transform,
@@ -106,6 +117,8 @@ class DocketEntryMerger[
     ParamType,
     M: Model,
 ](Merger[EntryType, RelatedParams[ParamType], M], abstract=True):
+    """Base merger for a scraped state docket entry and its attachments."""
+
     date_filed: date = Attribute(_entry_date_filed, strategy=overwrite)
     entry_type: int = Attribute(_entry_type, strategy=overwrite)
     documents: list[Any] = AttachmentRelation()

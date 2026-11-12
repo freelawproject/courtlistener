@@ -1,3 +1,5 @@
+"""Create an S3 manifest file listing the results of an Elasticsearch search."""
+
 import csv
 import io
 import operator
@@ -88,6 +90,8 @@ def build_base_query(options: dict[str, Any]) -> Search:
 
 
 class Command(VerboseCommand):
+    """Export the IDs of a search's results to a manifest file in S3."""
+
     help = (
         "Retrieves data records from Elasticsearch and creates manifest files"
         "listing those records in Amazon S3. These manifest files can then"
@@ -96,6 +100,7 @@ class Command(VerboseCommand):
     )
 
     def add_arguments(self, parser: CommandParser):
+        """Add the bucket, search text and type, filing date, and page size options."""
         parser.add_argument(
             "--bucket-name",
             help="The name of the bucket to store documents.",
@@ -138,6 +143,7 @@ class Command(VerboseCommand):
         )
 
     def handle(self, *args, **options):
+        """Page through the search and upload a manifest with one row of IDs per page."""
         bucket_name = options["bucket_name"]
         record_type = options["search_type"]
         search_query = build_base_query(options)

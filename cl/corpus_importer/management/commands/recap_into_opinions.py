@@ -1,3 +1,5 @@
+"""Import RECAP documents from district and bankruptcy courts as opinions."""
+
 from django.conf import settings
 from django.core.management import BaseCommand
 from django.db.models import Q
@@ -108,12 +110,16 @@ def import_opinions_from_recap(
 
 
 class Command(BaseCommand):
+    """Import RECAP documents into opinions for a jurisdiction or court."""
+
     help = "Import recap documents into opinions"
 
     def __init__(self, *args, **kwargs):
+        """Build the command."""
         super().__init__(*args, **kwargs)
 
     def add_arguments(self, parser):
+        """Add the jurisdiction, court, skip, total, queue, replica, and citation options."""
         parser.add_argument(
             "--jurisdiction",
             help="Select Jurisdiction",
@@ -168,6 +174,7 @@ class Command(BaseCommand):
         )
 
     def handle(self, *args, **options):
+        """Import the RECAP documents, skipping citation finding unless ``--find-citations`` is given."""
         jurisdiction = options.get("jurisdiction")
         court = options.get("court")
         skip_until = options.get("skip_until")

@@ -1,4 +1,6 @@
 # !/usr/bin/python
+"""Query and store PACER list of creditors reports for cases listed in CSV files."""
+
 import csv
 import itertools
 import os
@@ -24,6 +26,8 @@ CLIENT_PACER_PASSWORD = os.environ.get("CLIENT_PACER_PASSWORD", "")
 
 
 class OptionsType(TypedDict):
+    """The command's options."""
+
     base_path: str
     offset: int
     limit: int
@@ -155,9 +159,12 @@ def query_and_save_creditors_data(options: OptionsType) -> None:
 
 
 class Command(VerboseCommand):
+    """Query list of creditors reports for the cases in CSV files."""
+
     help = "Query List of creditors and store the reports."
 
     def add_arguments(self, parser):
+        """Add the offset, limit, base path, files, and queue options."""
         parser.add_argument(
             "--offset",
             type=int,
@@ -195,5 +202,6 @@ class Command(VerboseCommand):
         )
 
     def handle(self, *args, **options):
+        """Query and save the list of creditors reports."""
         super().handle(*args, **options)
         query_and_save_creditors_data(options)

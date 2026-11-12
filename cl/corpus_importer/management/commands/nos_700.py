@@ -1,3 +1,5 @@
+"""Purchase PACER dockets and attachment pages for labor and N.D. Cal. cases."""
+
 import os
 
 from asgiref.sync import async_to_sync
@@ -89,6 +91,7 @@ TAG_CAND_SAMPLE = "HaWCdtXimxSfAgGKfJRe"
 
 
 def get_nos_700_items():
+    """Get IDB labor cases filed and terminated after January 1, 2009."""
     nos_codes = [
         LABOR_LITIGATION_OTHER,
         LABOR_MANAGEMENT_RELATIONS_ACT,
@@ -107,6 +110,7 @@ def get_nos_700_items():
 
 
 def get_cand_items():
+    """Get IDB N.D. Cal. cases of selected natures of suit filed and terminated after January 1, 2009."""
     # See email on 2018-12-05 for details
     nos_codes = {
         # Contract
@@ -189,6 +193,7 @@ def get_cand_items():
 
 
 def get_nos_700_docket_sample(options):
+    """Download the dockets of a random sample of 1,000 labor cases."""
     sample_size = 1000
     items = get_nos_700_items()
     tags = [TAG_NOS_700, TAG_SAMPLE]
@@ -196,12 +201,14 @@ def get_nos_700_docket_sample(options):
 
 
 def get_nos_700_full(options):
+    """Download the dockets of all the labor cases."""
     items = get_nos_700_items()
     tags = [TAG_NOS_700]
     get_dockets(options, items, tags)
 
 
 def get_cand_docket_sample(options):
+    """Download the dockets of a random sample of 654 N.D. Cal. cases."""
     sample_size = 654
     items = get_cand_items()
     tags = [TAG_CAND, TAG_CAND_SAMPLE]
@@ -209,6 +216,7 @@ def get_cand_docket_sample(options):
 
 
 def get_cand_full(options):
+    """Download the dockets of all the N.D. Cal. cases."""
     items = get_cand_items()
     tags = [TAG_CAND]
     get_dockets(options, items, tags)
@@ -274,6 +282,7 @@ def get_dockets(options, items, tags: list[str], sample_size=0):
 
 
 def get_attachment_pages(options, tag):
+    """Download the attachment pages of tagged RECAP documents whose entries mention attachments."""
     rd_pks = RECAPDocument.objects.filter(
         tags__name=tag, docket_entry__description__icontains="attachment"
     ).values_list("pk", flat=True)
@@ -286,6 +295,8 @@ def get_attachment_pages(options, tag):
 
 
 class Command(VerboseCommand):
+    """Purchase dockets or attachment pages from PACER for the chosen task."""
+
     help = "Purchase dockets and attachment pages from PACER"
 
     allowed_tasks = [
@@ -298,6 +309,7 @@ class Command(VerboseCommand):
     ]
 
     def add_arguments(self, parser):
+        """Add the queue, offset, limit, and task options."""
         parser.add_argument(
             "--queue",
             default="batch1",
@@ -325,6 +337,7 @@ class Command(VerboseCommand):
         )
 
     def handle(self, *args, **options):
+        """Run the task chosen with ``--task``."""
         logger.info(f"Using PACER username: {PACER_USERNAME}")
         if options["task"] == "dockets_nos_700_sample":
             get_nos_700_docket_sample(options)

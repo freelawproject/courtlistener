@@ -1,3 +1,5 @@
+"""Merge Harvard Caselaw Access Project opinions into existing clusters."""
+
 import itertools
 import json
 import logging
@@ -31,6 +33,8 @@ from cl.search.models import Docket, Opinion, OpinionCluster
 
 
 class HarvardConversionUtil:
+    """Mapping of Harvard opinion types to CourtListener opinion types."""
+
     types_mapping = {
         "unanimous": "015unamimous",
         "majority": "020lead",
@@ -689,9 +693,12 @@ def map_and_merge_opinions(
 
 
 class Command(VerboseCommand):
+    """Merge Harvard opinions into one cluster or a batch of clusters."""
+
     help = "Merge harvard opinions into CL opinions"
 
     def add_arguments(self, parser) -> None:
+        """Add the cluster ID, debug, fastcase, judge merger, offset, and limit options."""
         parser.add_argument(
             "--cluster-id",
             type=str,
@@ -727,6 +734,11 @@ class Command(VerboseCommand):
         )
 
     def handle(self, *args, **options) -> None:
+        """Merge the given cluster, or the clusters with unmerged Harvard data.
+
+        A given cluster that is already merged or doesn't exist is logged
+        and skipped.
+        """
         if options["no_debug"]:
             logging.disable(logging.DEBUG)
 

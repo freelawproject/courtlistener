@@ -1,3 +1,5 @@
+"""Import opinions from the scanning project's final XML files."""
+
 import copy
 import itertools
 import os
