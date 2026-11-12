@@ -1031,9 +1031,7 @@ class SiblingLookupTest(TestCase):
 
     @merger_test(expected_query_count=2)
     def test_siblings_are_looked_up_together(self) -> None:
-        """Do sibling mergers share one lookup query, with nothing more to do
-        when the scrape matches the DB? One query finds the docket and one
-        its entries."""
+        """Do sibling mergers share one lookup query, with nothing more to do when the scrape matches the DB? One query finds the docket and one its entries."""
         result = KeyedDocketMerger(
             self.scrape(self.dockets[0], "First", "Second"), params=None
         ).merge()
@@ -1044,8 +1042,7 @@ class SiblingLookupTest(TestCase):
 
     @merger_test(expected_query_count=3)
     def test_children_are_fetched_for_every_parent_at_once(self) -> None:
-        """Does one query fetch the children of every sibling parent? One
-        query finds the court, one its dockets and one all of their entries."""
+        """Does one query fetch the children of every sibling parent? One query finds the court, one its dockets and one all of their entries."""
         result = KeyedCourtMerger(
             {
                 "id": self.court.pk,
@@ -1062,8 +1059,7 @@ class SiblingLookupTest(TestCase):
         self.assertFalse(result.update)
 
     def test_replace_prunes_rows_missing_from_the_scrape(self) -> None:
-        """Does REPLACE delete exactly the rows the scrape no longer has,
-        keeping those matched and those created along the way?"""
+        """Does REPLACE delete exactly the rows the scrape no longer has, keeping those matched and those created along the way?"""
         docket = self.dockets[0]
         result = KeyedDocketMerger(
             self.scrape(docket, "First", "Third"), params=None
@@ -1087,8 +1083,7 @@ class SiblingLookupTest(TestCase):
         )
 
     def test_duplicate_natural_keys_fail_once(self) -> None:
-        """Is a scrape repeating a natural key reported as a single failure,
-        with the last duplicate merged and no row pruned?"""
+        """Is a scrape repeating a natural key reported as a single failure, with the last duplicate merged and no row pruned?"""
         docket = self.dockets[0]
         result = KeyedDocketMerger(
             self.scrape(docket, "Third", "Third"), params=None
@@ -1127,7 +1122,8 @@ class LoadedFieldsTest(TestCase):
     def merged(self, merger: Merger[Any, Any, Any]) -> Any:
         """Run a merge that is expected to succeed.
 
-        :return: The object merged into."""
+        :return: The object merged into.
+        """
         merger.merge()
         state = merger.state
         if not isinstance(state, MergerState.Complete):
@@ -1135,8 +1131,7 @@ class LoadedFieldsTest(TestCase):
         return state.output
 
     def test_lookup_loads_only_used_fields(self) -> None:
-        """Does a lookup leave out the fields no spec uses, both of the
-        objects it finds and of the related objects it loads with them?"""
+        """Does a lookup leave out the fields no spec uses, both of the objects it finds and of the related objects it loads with them?"""
         court = self.merged(
             KeyedCourtMerger(
                 {"id": self.court.pk, "dockets": [self.scrape]}, params=None
@@ -1154,8 +1149,7 @@ class LoadedFieldsTest(TestCase):
             self.assertNotIn("description", entry.get_deferred_fields())
 
     def test_relation_loads_only_used_fields(self) -> None:
-        """Are the objects a parent holds read without the fields no spec
-        uses, in a single query?"""
+        """Are the objects a parent holds read without the fields no spec uses, in a single query?"""
         merger = KeyedDocketMerger(
             self.scrape, params=None, existing=Update(self.docket)
         )
@@ -1168,8 +1162,7 @@ class LoadedFieldsTest(TestCase):
         self.assertNotIn('"entry_number"', selected)
 
     def test_one_to_one_loads_only_used_fields(self) -> None:
-        """Is the object on the other side of a one-to-one relation read
-        without the fields no spec uses?"""
+        """Is the object on the other side of a one-to-one relation read without the fields no spec uses?"""
         origin = OriginatingCourtInformation.objects.create(
             docket_number="ORIGIN-1"
         )
@@ -1212,8 +1205,7 @@ class LoadedFieldsTest(TestCase):
         self.assertNotIn("docket_number", loaded.get_deferred_fields())
 
     def test_overridden_lookup_loads_only_used_fields(self) -> None:
-        """Are the candidates of a lookup that runs its own query read
-        without the fields no spec uses?"""
+        """Are the candidates of a lookup that runs its own query read without the fields no spec uses?"""
 
         class TestMerger(KeyedDocketMerger):
             @override
@@ -1231,16 +1223,14 @@ class LoadedFieldsTest(TestCase):
         self.assertNotIn("docket_number", docket.get_deferred_fields())
 
     def test_stored_loads_only_used_fields(self) -> None:
-        """Does a query a merger builds for itself leave out the fields no
-        spec uses?"""
+        """Does a query a merger builds for itself leave out the fields no spec uses?"""
         docket = KeyedDocketMerger(self.scrape, params=None).stored.get()
 
         self.assertIn("case_name", docket.get_deferred_fields())
         self.assertNotIn("docket_number", docket.get_deferred_fields())
 
     def test_pruned_objects_are_deleted_whole(self) -> None:
-        """Does a deletion signal get every field of a pruned object, though
-        the lookup that found it loaded only some?"""
+        """Does a deletion signal get every field of a pruned object, though the lookup that found it loaded only some?"""
         deferred: list[set[str]] = []
 
         def record(instance: DocketEntry, **kwargs: Any) -> None:
@@ -1260,8 +1250,7 @@ class LoadedFieldsTest(TestCase):
         self.assertEqual(deferred, [set()])
 
     def test_declared_reads_are_loaded(self) -> None:
-        """Is a field a merger says it reads loaded although no spec uses
-        it?"""
+        """Is a field a merger says it reads loaded although no spec uses it?"""
 
         class TestMerger(KeyedDocketMerger):
             config: ClassVar[MergerConfig[Docket]] = MergerConfig(
@@ -1274,8 +1263,7 @@ class LoadedFieldsTest(TestCase):
         self.assertIn("case_name_full", docket.get_deferred_fields())
 
     def test_reads_extend_inherited_reads(self) -> None:
-        """Does a merger that declares reads of its own still load the ones
-        its parent declared?"""
+        """Does a merger that declares reads of its own still load the ones its parent declared?"""
 
         class ParentMerger(KeyedDocketMerger):
             config: ClassVar[MergerConfig[Docket]] = MergerConfig(
@@ -1305,8 +1293,7 @@ class MergerSpecOrderTest(SimpleTestCase):
     def test_after_orders_related_specs_regardless_of_declaration(
         self,
     ) -> None:
-        """Does a spec run after the specs it names in `after`, even when it
-        is declared first?"""
+        """Does a spec run after the specs it names in `after`, even when it is declared first?"""
 
         class TestMerger(Merger[dict[str, str], None, Docket]):
             config: ClassVar[MergerConfig[Docket]] = MergerConfig(model=Docket)
@@ -1322,9 +1309,7 @@ class MergerSpecOrderTest(SimpleTestCase):
         )
 
     def test_after_unknown_spec_is_a_validation_error(self) -> None:
-        """Is a dependency on a spec the merger doesn't have reported rather
-        than silently ignored?"""
-
+        """Is a dependency on a spec the merger doesn't have reported rather than silently ignored?"""
         with self.assertRaisesRegex(
             TypeError,
             "docket_entries: Runs after unknown related spec parties",
@@ -1340,9 +1325,7 @@ class MergerSpecOrderTest(SimpleTestCase):
                 )
 
     def test_after_cycle_is_rejected(self) -> None:
-        """Are circular dependencies between related specs refused when the
-        merger is defined, rather than when it first merges?"""
-
+        """Are circular dependencies between related specs refused when the merger is defined, rather than when it first merges?"""
         with self.assertRaisesRegex(TypeError, "CycleError"):
 
             class TestMerger(Merger[dict[str, str], None, Docket]):
@@ -1362,8 +1345,7 @@ class MergerSpecOrderTest(SimpleTestCase):
 
 class MergerConfigInheritanceTest(SimpleTestCase):
     def test_declared_config_keeps_inherited_specs(self) -> None:
-        """Does a subclass that declares its own config still merge the specs
-        its base declared, without leaking its own specs into the base?"""
+        """Does a subclass that declares its own config still merge the specs its base declared, without leaking its own specs into the base?"""
 
         class BaseTestMerger(
             Merger[dict[str, str], None, Docket], abstract=True
@@ -1386,8 +1368,7 @@ class MergerConfigInheritanceTest(SimpleTestCase):
         self.assertEqual(TestMerger.config.key, ("docket_number",))
 
     def test_undeclared_config_inherits_base_config(self) -> None:
-        """Does a subclass that doesn't declare a config inherit its base's
-        model and key?"""
+        """Does a subclass that doesn't declare a config inherit its base's model and key?"""
 
         class BaseTestMerger(Merger[dict[str, str], None, Docket]):
             config: ClassVar[MergerConfig[Docket]] = MergerConfig(

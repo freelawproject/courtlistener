@@ -51,7 +51,8 @@ Create = Sentinel("Create")
 class Update[M: Model]:
     """Skip the lookup and merge into a known object.
 
-    :ivar instance: The object to merge into."""
+    :ivar instance: The object to merge into.
+    """
 
     instance: M
 

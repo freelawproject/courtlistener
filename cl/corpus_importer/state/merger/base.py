@@ -77,7 +77,8 @@ class MergerSpecRegistry[Scrape, Params]:
     """The specifications declared on a merger, grouped by kind.
 
     Every spec must be registered before `related`, `merge_order` or
-    `validate` is used: the first two are computed once and kept."""
+    `validate` is used: the first two are computed once and kept.
+    """
 
     attr: dict[str, AttributeMerger[Scrape, Params, Any]] = field(
         default_factory=dict
@@ -102,10 +103,10 @@ class MergerSpecRegistry[Scrape, Params]:
 
     @cached_property
     def merge_order(self) -> list[AnyRelatedMerger[Scrape, Params]]:
-        """The related specs in an order that satisfies every spec's `after`.
-        Specs with no dependency between them may come in any order.
+        """The related specs in an order that satisfies every spec's `after`. Specs with no dependency between them may come in any order.
 
-        :raises graphlib.CycleError: If the `after` declarations are circular."""
+        :raises graphlib.CycleError: If the `after` declarations are circular.
+        """
         related = self.related
         graph = {name: spec.after for name, spec in related.items()}
         return [
@@ -114,8 +115,7 @@ class MergerSpecRegistry[Scrape, Params]:
 
     @cached_property
     def prefetch(self) -> tuple[Prefetch, ...]:
-        """The `prefetch_related` lookups, relative to the merger's model,
-        loading everything the mergers of its relations look for."""
+        """The `prefetch_related` lookups, relative to the merger's model, loading everything the mergers of its relations look for."""
         return tuple(
             path for spec in self.related.values() for path in spec.prefetch
         )
@@ -205,7 +205,8 @@ class MergerConfig[M: Model]:
         merger class is created, so it should not be passed.
     :ivar fields: The model fields loaded of an object read to be merged
         into; every other field is deferred. Filled in when the merger class
-        is created, so it should not be passed."""
+        is created, so it should not be passed.
+    """
 
     model: Final[type[M]]
     key: Final[Iterable[str]] = ()
@@ -360,8 +361,8 @@ class Merger[Scrape, Params, M: Model](MergerState.Machine[Scrape, Params, M]):
 
         Attributes:
             manager: The manager to use for lookups and creation of objects.
-            siblings: The lookup that finds the object to merge into."""
-
+            siblings: The lookup that finds the object to merge into.
+        """
         super().__init__(self.initial_state(scrape, params, existing))
 
         if (
@@ -382,13 +383,14 @@ class Merger[Scrape, Params, M: Model](MergerState.Machine[Scrape, Params, M]):
 
     @staticmethod
     def validator(scrape: Scrape) -> bool:
-        """Validate the input data before attempting a merge operation
+        """Validate the input data before attempting a merge operation.
 
         Args:
             scrape: Input data to the merge
 
         Returns:
-            True if the input is valid and the merge operation can proceed. False if the merge operation should be canceled."""
+            True if the input is valid and the merge operation can proceed. False if the merge operation should be canceled.
+        """
         # TODO: This is temporary. In the future, validation should be very detailed about failures
         return True
 
@@ -409,9 +411,7 @@ class Merger[Scrape, Params, M: Model](MergerState.Machine[Scrape, Params, M]):
 
     @classmethod
     def loading(cls, objects: QuerySet[M]) -> QuerySet[M]:
-        """Have a query load what merging its objects takes and no more: the
-        fields this merger uses, and everything the mergers of its relations
-        look for.
+        """Have a query load what merging its objects takes and no more: the fields this merger uses, and everything the mergers of its relations look for.
 
         The related objects come without their other fields too, and so does
         anything queried through the relation they were loaded into. Deleting
@@ -422,16 +422,15 @@ class Merger[Scrape, Params, M: Model](MergerState.Machine[Scrape, Params, M]):
             objects: A query for objects of this merger's model.
 
         Returns:
-            The narrowed query."""
+            The narrowed query.
+        """
         return objects.only(*cls.config.fields).prefetch_related(
             *cls.config.registry.prefetch
         )
 
     @property
     def stored(self) -> QuerySet[M]:
-        """The objects this merger can merge into, loaded with only the
-        fields it uses. A lookup that evaluates its own query should build it
-        from this rather than from `manager`."""
+        """The objects this merger can merge into, loaded with only the fields it uses. A lookup that evaluates its own query should build it from this rather than from `manager`."""
         return self.manager.only(*self.config.fields)
 
     def _key_query(
@@ -508,7 +507,6 @@ class Merger[Scrape, Params, M: Model](MergerState.Machine[Scrape, Params, M]):
 
     def merge(self) -> MergeResult:
         """Merge scraped data into the DB."""
-
         return self.run().result
 
     def _attributes(self, relation_params: Mapping[str, Model]) -> dict:

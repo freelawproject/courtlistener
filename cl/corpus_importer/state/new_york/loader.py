@@ -321,8 +321,7 @@ class NYCoACourtPassLoader(JKentScrapeLoader[NYCoACase, NYCoADocketMerger]):
     def reconcile_files(
         cls, scrape: NYCoACase, merger: NYCoADocketMerger
     ) -> FileTally:
-        """Delete the files of the documents the merge removed, and count the
-        files the scrape reported that can never be published.
+        """Delete the files of the documents the merge removed, and count the files the scrape reported that can never be published.
 
         :param scrape: The case that was merged.
         :param merger: The merger, in the state the merge left it in.

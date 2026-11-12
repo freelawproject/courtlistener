@@ -72,8 +72,7 @@ def DocketEntryRelation(
     transform: Callable[[Any, Any], Sequence[Any]] = _docket_entries,
     strategy: ManyStrategy = ManyStrategy.APPEND,
 ) -> list[Any]:
-    """Merge a docket's entries. Entries resolve the party that filed them
-    against the docket's parties, so those are merged first."""
+    """Merge a docket's entries. Entries resolve the party that filed them against the docket's parties, so those are merged first."""
     return OneToManyRelation(
         merger,
         cast(AttributeMerger, Fn(transform)(Scrape(Any), Params(Any))),

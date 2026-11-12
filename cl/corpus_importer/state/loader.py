@@ -576,8 +576,7 @@ class JKentScrapeLoader[
     def reconcile_files(
         cls, scrape: ScrapeType, merger: ScrapeMerger
     ) -> FileTally:
-        """Bring storage in line with a merge that has just committed, before
-        its files are published. Override for a merger that tracks files.
+        """Bring storage in line with a merge that has just committed, before its files are published. Override for a merger that tracks files.
 
         :param scrape: The scrape that was merged.
         :param merger: The merger, in the state the merge left it in.

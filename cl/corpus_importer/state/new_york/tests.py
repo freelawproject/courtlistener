@@ -157,8 +157,7 @@ class NYCoAMergerTestCase(TestCase):
         )
 
     def merge(self, case: NYCoACase) -> tuple[MergeResult, FileTally]:
-        """Merge a case and reconcile its files, as a load's worker does
-        before it publishes them.
+        """Merge a case and reconcile its files, as a load's worker does before it publishes them.
 
         Args:
             case: The scraped case.

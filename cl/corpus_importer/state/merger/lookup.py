@@ -1,3 +1,5 @@
+"""Shared natural-key lookups for groups of sibling mergers."""
+
 from __future__ import annotations
 
 import operator
@@ -23,7 +25,8 @@ class NaturalKey:
     :ivar attnames: The model attributes holding the key's values.
     :ivar values: The key's values, as text so that scraped and stored values
         compare equal. Two keys with the same `attnames` identify the same
-        object when their `values` are equal."""
+        object when their `values` are equal.
+    """
 
     filters: Mapping[str, Any]
     attnames: tuple[str, ...]
@@ -39,18 +42,20 @@ Duplicate = Sentinel("Duplicate")
 
 
 class SiblingLookup[M: Model](ABC):
-    """Finds the objects a group of mergers created together merge into, so
-    the group costs a fixed number of queries rather than one per merger.
+    """Finds the objects a group of mergers created together merge into, so the group costs a fixed number of queries rather than one per merger.
 
     Every merger of the group has to be created before any of them is merged:
     a merger's lookup only sees the claims made before it runs.
 
-    Whatever a lookup queries for, it loads as `Merger.loading` has it."""
+    Whatever a lookup queries for, it loads as `Merger.loading` has it.
+    """
 
     def __init__(self, merger: type[Merger[Any, Any, M]]) -> None:
-        """
+        """Start a lookup for a group of mergers.
+
         Args:
-            merger: The class of the mergers in the group."""
+            merger: The class of the mergers in the group.
+        """
         self._merger: type[Merger[Any, Any, M]] = merger
         self._owners: dict[tuple[str, ...], Merger[Any, Any, M]] = {}
         self._rows: list[M] = []
@@ -58,12 +63,12 @@ class SiblingLookup[M: Model](ABC):
         self._found: dict[tuple[str, ...], list[M]] = {}
 
     def claim(self, key: NaturalKey, merger: Merger[Any, Any, M]) -> None:
-        """Register a merger's interest in the object matching a natural key.
-        When several mergers claim the same key, the last one owns it.
+        """Register a merger's interest in the object matching a natural key. When several mergers claim the same key, the last one owns it.
 
         Args:
             key: The key the merger will look its object up by.
-            merger: The merger that will look the object up."""
+            merger: The merger that will look the object up.
+        """
         self._owners[key.values] = merger
 
     def candidates(
@@ -77,7 +82,8 @@ class SiblingLookup[M: Model](ABC):
 
         Returns:
             The matching objects, or `Duplicate` if a merger created later
-            claimed the same key."""
+            claimed the same key.
+        """
         if self._owners[key.values] is not merger:
             return Duplicate
         self._fetch(key)
@@ -88,24 +94,30 @@ class SiblingLookup[M: Model](ABC):
 
         Args:
             key: Any key of the group, for the attributes its keys are made
-                of."""
+                of.
+        """
         for obj in self._rows[self._indexed :]:
             self._found.setdefault(key.values_of(obj), []).append(obj)
         self._indexed = len(self._rows)
 
     @abstractmethod
     def _fetch(self, key: NaturalKey) -> None:
-        """Read and index whatever is needed to answer the claims made so far
-        and hasn't been yet.
+        """Read and index whatever is needed to answer the claims made so far and hasn't been yet.
 
         Args:
-            key: The key being looked up."""
+            key: The key being looked up.
+        """
 
 
 class KeyLookup[M: Model](SiblingLookup[M]):
     """Looks the claimed natural keys up with a single query."""
 
     def __init__(self, merger: type[Merger[Any, Any, M]]) -> None:
+        """Start a lookup for a group of mergers.
+
+        Args:
+            merger: The class of the mergers in the group.
+        """
         super().__init__(merger)
         self._unfetched: list[tuple[NaturalKey, Merger[Any, Any, M]]] = []
 
@@ -128,23 +140,23 @@ class KeyLookup[M: Model](SiblingLookup[M]):
 
 
 class RelationLookup[M: Model](SiblingLookup[M]):
-    """Matches natural keys against all of the objects that could be merged
-    into, such as everything a parent holds in a relation."""
+    """Matches natural keys against all of the objects that could be merged into, such as everything a parent holds in a relation."""
 
     def __init__(
         self, merger: type[Merger[Any, Any, M]], related: QuerySet[M]
     ) -> None:
-        """
+        """Start a lookup for a group of mergers.
+
         Args:
             merger: The class of the mergers in the group.
             related: The objects to match against. Nothing is queried for
-                when they have already been loaded."""
+                when they have already been loaded.
+        """
         super().__init__(merger)
         self._related: QuerySet[M] | None = related
 
     def existing(self) -> Sequence[M]:
-        """The objects matched against, as they were when first read.
-        Objects created since then are not included."""
+        """The objects matched against, as they were when first read. Objects created since then are not included."""
         self._read()
         return self._rows
 

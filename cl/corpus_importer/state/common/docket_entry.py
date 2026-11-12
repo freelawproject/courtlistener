@@ -43,8 +43,7 @@ class DocumentMerger[
     ParamType,
     M: AbstractStateDocument,
 ](Merger[DocType, RelatedParams[ParamType], M], abstract=True):
-    """Merges a scraped document's URL, and clears what was stored for the
-    old one when it changes."""
+    """Merges a scraped document's URL, and clears what was stored for the old one when it changes."""
 
     config: ClassVar[MergerConfig[AbstractStateDocument]] = MergerConfig(
         model=AbstractStateDocument,

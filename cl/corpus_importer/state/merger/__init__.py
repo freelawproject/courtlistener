@@ -1,6 +1,4 @@
-"""
-Declarative mergers that reconcile scraped state court data with the database.
-"""
+"""Declarative mergers that reconcile scraped state court data with the database."""
 
 from . import state as MergerState
 from .base import (

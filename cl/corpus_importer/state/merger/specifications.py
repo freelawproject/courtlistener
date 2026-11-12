@@ -554,7 +554,8 @@ class RelatedMerger[
         *,
         after: Iterable[str] = (),
     ):
-        """
+        """Declare a relation merged by another merger.
+
         Args:
             merger: The merger for the related objects.
             attribute: The expression computing the related scrape data.
@@ -593,8 +594,7 @@ class RelatedMerger[
 
     @property
     def prefetch(self) -> list[Prefetch]:
-        """The `prefetch_related` lookups, relative to the parent's model,
-        loading everything that merging this relation looks for."""
+        """The `prefetch_related` lookups, relative to the parent's model, loading everything that merging this relation looks for."""
         return [
             Prefetch(
                 self._name,
