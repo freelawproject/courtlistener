@@ -6465,8 +6465,8 @@ class CentraliaIngestTest(TestCase):
                 for writing, order in zip(payload["opinions"], orders):
                     writing["order"] = order
 
-                opinion_pks, reason = (
-                    merge_structured_opinion_into_cl_opinion(seed, payload)
+                opinion_pks, reason = merge_structured_opinion_into_cl_opinion(
+                    seed, payload
                 )
 
                 self.assertEqual(len(opinion_pks), 2, msg=reason)
@@ -6502,15 +6502,13 @@ class CentraliaIngestTest(TestCase):
                 if add_sibling:
                     OpinionFactory(cluster=cluster)
 
-                opinion_pks, reason = (
-                    merge_structured_opinion_into_cl_opinion(seed, payload)
+                opinion_pks, reason = merge_structured_opinion_into_cl_opinion(
+                    seed, payload
                 )
 
                 self.assertEqual(opinion_pks, [])
                 self.assertIn(expected, reason)
-                self.assertEqual(
-                    mock_logger.warning.call_args.args[2], reason
-                )
+                self.assertEqual(mock_logger.warning.call_args.args[2], reason)
                 self.assertEqual(
                     cluster.sub_opinions.count(), 2 if add_sibling else 1
                 )
@@ -6596,9 +6594,7 @@ class ExtractStructuredOpinionTest(TestCase):
         run queue citation finding for the seed and its new siblings?"""
         for dry_run in (True, False):
             with self.subTest(dry_run=dry_run):
-                result = extract_structured_opinion(
-                    self.seed, dry_run=dry_run
-                )
+                result = extract_structured_opinion(self.seed, dry_run=dry_run)
 
                 self.assertEqual(result["writings"], 2)
                 if dry_run:
