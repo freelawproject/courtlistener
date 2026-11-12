@@ -2893,9 +2893,7 @@ class V4DRFPaginationTest(TestCase):
         )
 
     async def test_parentheticals_endpoint(self) -> None:
-        """Test the V4 Parentheticals endpoint confirming that their cursor
-        and page number pagination works properly."""
-
+        """Test the V4 Parentheticals endpoint confirming that their cursor and page number pagination works properly."""
         await self._base_test_for_v4_endpoints(
             endpoint="parenthetical-list",
             default_ordering="-id",

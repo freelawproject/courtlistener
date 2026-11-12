@@ -22,8 +22,10 @@ class ParentheticalAPITest(TestCase):
 
     @classmethod
     def setUpTestData(cls) -> None:
-        """Create a user, two described opinions and a citing opinion with
-        four parentheticals of distinct scores.
+        """Create a user and the opinions and parentheticals under test.
+
+        Two described opinions and a citing opinion with four parentheticals
+        of distinct scores.
         """
         # Any authenticated user can read; DjangoModelPermissions only gates
         # write methods.
@@ -92,8 +94,7 @@ class ParentheticalAPITest(TestCase):
             reverse("parenthetical-list", kwargs={"version": "v3"})
 
     async def test_filter_by_described_opinion(self) -> None:
-        """described_opinion returns the parentheticals describing that
-        opinion, and excludes others."""
+        """described_opinion returns only the parentheticals about it."""
         r = await self._get({"described_opinion": self.described_a.pk})
         self.assertEqual(r.status_code, HTTPStatus.OK)
         ids = {row["id"] for row in r.data["results"]}
@@ -102,8 +103,7 @@ class ParentheticalAPITest(TestCase):
         )
 
     async def test_filter_by_describing_opinion(self) -> None:
-        """describing_opinion returns the parentheticals authored by an
-        opinion (the table-of-authorities direction)."""
+        """describing_opinion returns the parentheticals an opinion wrote."""
         r = await self._get({"describing_opinion": self.describing.pk})
         self.assertEqual(r.status_code, HTTPStatus.OK)
         ids = {row["id"] for row in r.data["results"]}
@@ -120,8 +120,7 @@ class ParentheticalAPITest(TestCase):
         self.assertEqual(ids, sorted(ids, reverse=True))
 
     async def test_order_by_score(self) -> None:
-        """order_by=-score returns the most descriptive parentheticals first,
-        like the Summaries tab."""
+        """order_by=-score returns the best ones first, like Summaries."""
         r = await self._get(
             {"described_opinion": self.described_a.pk, "order_by": "-score"}
         )
@@ -132,8 +131,7 @@ class ParentheticalAPITest(TestCase):
         )
 
     async def test_order_by_unindexed_field_is_ignored(self) -> None:
-        """Ordering by a field outside ordering_fields falls back to the
-        default ordering instead of sorting on an unindexed column."""
+        """order_by on a field outside ordering_fields uses the default."""
         r = await self._get(
             {"described_opinion": self.described_a.pk, "order_by": "text"}
         )
@@ -151,8 +149,11 @@ class ParentheticalAPITest(TestCase):
         self.assertEqual(ids, {self.pa_high.pk, self.pa_mid.pk})
 
     async def test_response_includes_display_context(self) -> None:
-        """Each row carries the text, score, links and the citing case's
-        context, so a client can render it without a follow-up request."""
+        """Each row has enough context to render it without more requests.
+
+        That is the text, score, links and the citing case's name, citation,
+        date filed and court.
+        """
         r = await self._get(
             {"described_opinion": self.described_a.pk, "id": self.pa_high.pk}
         )
@@ -188,16 +189,17 @@ class ParentheticalAPITest(TestCase):
         )
 
     async def test_group_empty_when_not_computed(self) -> None:
-        """A parenthetical whose group was never computed serializes with a
-        null group. The API must not compute groups on demand."""
+        """The group is null when it was never computed.
+
+        The API must not compute groups on demand.
+        """
         r = await self._get({"described_opinion": self.described_a.pk})
         self.assertEqual(r.status_code, HTTPStatus.OK)
         for row in r.data["results"]:
             self.assertIsNone(row["group"])
 
     async def test_group_embedded_when_present(self) -> None:
-        """When a group already exists it is embedded inline with its
-        aggregate metadata and representative parenthetical."""
+        """An existing group is embedded with its representative."""
         group = await sync_to_async(ParentheticalGroupFactory.create)(
             opinion=self.described_a,
             representative=self.pa_high,
@@ -225,8 +227,7 @@ class ParentheticalAPITest(TestCase):
         )
 
     def test_queries_are_bounded_and_skip_text_fields(self) -> None:
-        """Listing parentheticals issues a constant number of queries and
-        never loads the opinions' text fields."""
+        """Listing keeps a constant query count and skips opinion text."""
         rows: list[int] = []
 
         def hit() -> tuple[int, list[str]]:

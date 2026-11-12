@@ -284,8 +284,9 @@ class ParentheticalGroupSerializer(
     DynamicFieldsMixin,
     HyperlinkedModelSerializerWithId,
 ):
-    """Serialize a ParentheticalGroup for embedding inside a Parenthetical,
-    with links to the opinion it describes and to its representative
+    """Serialize a ParentheticalGroup for embedding inside a Parenthetical.
+
+    Includes links to the opinion it describes and to its representative
     parenthetical.
     """
 
@@ -322,8 +323,7 @@ class ParentheticalSerializer(
     DynamicFieldsMixin,
     HyperlinkedModelSerializerWithId,
 ):
-    """Serialize a Parenthetical with links to both opinions and embedded
-    group context.
+    """Serialize a Parenthetical with links to both opinions and its group.
 
     The explicit ``HyperlinkedRelatedField`` declarations mirror
     ``OpinionsCitedSerializer``: without them DRF issues a query that pulls

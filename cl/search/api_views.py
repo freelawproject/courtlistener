@@ -405,8 +405,7 @@ class ParentheticalViewSet(
     DeferredFieldsMixin,
     viewsets.ModelViewSet,
 ):
-    """Parentheticals are the short descriptions judges write about the
-    cases they cite.
+    """Short descriptions judges write about the cases they cite.
 
     Filter by described_opinion to see what other courts said about an
     opinion, or by describing_opinion to see what an opinion said about
