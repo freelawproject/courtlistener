@@ -1,4 +1,5 @@
 from collections import defaultdict
+from dataclasses import replace
 from datetime import datetime, time, timedelta
 from http import HTTPStatus
 from types import SimpleNamespace
@@ -1263,6 +1264,38 @@ class DocketAlertScotusTest(TestCase):
                 send_alert_and_webhook(self.docket.pk, self.before)
                 self.assertEqual(len(mail.outbox), 1)
                 self.assertEqual(mock_webhooks.delay.called, enabled)
+
+
+class DocketAlertWebhookSourceGateTest(TestCase):
+    """Do docket alert webhooks go out only for sources whose entries send_docket_alert_webhook_events can serialize?"""
+
+    @classmethod
+    def setUpTestData(cls) -> None:
+        cls.user = UserFactory()
+        cls.court = CourtFactory(id="newsource", jurisdiction="S")
+
+    @mock.patch("cl.alerts.tasks.send_docket_alert_webhook_events")
+    def test_new_source_alerts_send_email_but_no_webhook(
+        self, mock_webhooks: mock.MagicMock
+    ) -> None:
+        """Does a source added to the registry send its alert email without queuing a webhook? The webhook task looks entries up as DocketEntry pks, so another model's pks would match unrelated RECAP entries."""
+        # A copy of the SCOTUS source is a different object, standing in
+        # for any source added later.
+        new_source = replace(SCOTUS_ALERT_SOURCE)
+        docket = DocketFactory(court=self.court)
+        DocketAlert.objects.create(docket=docket, user=self.user)
+        before = now()
+        SCOTUSDocumentFactory(
+            docket_entry=SCOTUSDocketEntryFactory(docket=docket)
+        )
+        with mock.patch.dict(
+            "cl.alerts.docket_alert_sources._ALERT_SOURCES_BY_COURT_ID",
+            {self.court.pk: new_source},
+        ):
+            send_alert_and_webhook(docket.pk, before)
+
+        self.assertEqual(len(mail.outbox), 1)
+        mock_webhooks.delay.assert_not_called()
 
 
 class DisableDocketAlertTest(TestCase):
