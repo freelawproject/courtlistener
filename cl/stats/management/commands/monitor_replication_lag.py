@@ -1,3 +1,5 @@
+"""Publish Postgres replication lag metrics to CloudWatch."""
+
 import boto3
 
 from cl.lib.command_utils import VerboseCommand
@@ -8,6 +10,8 @@ REGION = "us-west-2"
 
 
 class Command(VerboseCommand):
+    """Publish per-slot and maximum replication lag to CloudWatch."""
+
     help = (
         "Publish per-slot Postgres replication lag to CloudWatch. A "
         "CloudWatch alarm on the MaxReplicationLagBytes metric fires the "
@@ -15,6 +19,10 @@ class Command(VerboseCommand):
     )
 
     def handle(self, *args, **options):
+        """Publish the lag of every slot with a known lag, plus the maximum.
+
+        Publishes nothing if no slot has a known lag.
+        """
         super().handle(*args, **options)
 
         statuses = get_replication_statuses()
