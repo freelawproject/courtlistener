@@ -54,6 +54,7 @@ def _invalid_metadata(description: str) -> Response:
 
 
 def get_dcr_rate(group: str, request: Request) -> str:
+    """Get the rate limit for dynamic client registration."""
     return settings.OAUTH2_DCR_RATELIMIT
 
 
@@ -83,6 +84,7 @@ class DynamicClientRegistrationView(APIView):
     throttle_classes: list[Any] = []
 
     def handle_exception(self, exc: Exception) -> Response:
+        """Respond to rate-limited requests with a 429 error, deferring other errors to DRF."""
         if isinstance(exc, Ratelimited):
             return Response(
                 {
@@ -97,6 +99,15 @@ class DynamicClientRegistrationView(APIView):
         return super().handle_exception(exc)
 
     def post(self, request: Request) -> Response:
+        """Register a client from the posted metadata.
+
+        Clients using the ``none`` auth method are public, and others are
+        confidential and get their client secret in the response.
+
+        Returns:
+            A 201 response describing the new client, or a 400 response if
+            the metadata is invalid.
+        """
         serializer = DynamicClientRegistrationSerializer(data=request.data)
         if not serializer.is_valid():
             return _invalid_metadata(
@@ -151,6 +162,7 @@ class IntrospectTokenView(oauth2_views.IntrospectTokenView):
 
     @staticmethod
     def get_token_response(token_value: str | None = None) -> JsonResponse:
+        """Introspect a token, adding its user's ID as ``sub`` when the token is active."""
         response = oauth2_views.IntrospectTokenView.get_token_response(
             token_value
         )
@@ -182,6 +194,7 @@ class OAuthMetadataView(APIView):
     throttle_classes: list[Any] = []
 
     def get(self, request: Request) -> Response:
+        """Return the server's OAuth metadata."""
         base = request.build_absolute_uri("/").rstrip("/")
         oidc_enabled = settings.OAUTH2_PROVIDER.get("OIDC_ENABLED")
         # Discovery serves dynamically registered clients, so advertise
