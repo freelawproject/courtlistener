@@ -6292,8 +6292,7 @@ class CentraliaShouldIngestTest(SimpleTestCase):
     def test_text_coverage_ignores_whitespace_and_counts_the_syllabus(
         self,
     ) -> None:
-        """Is text coverage measured on non-whitespace characters, with the
-        syllabus counted?
+        """Is coverage counted without whitespace and with the syllabus?
 
         pdftotext pads `plain_text` with layout whitespace a structured read
         drops, and the PDF it came from includes the syllabus.
