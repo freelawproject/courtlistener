@@ -1,11 +1,13 @@
 from http import HTTPStatus
 
+import waffle
 from asgiref.sync import sync_to_async
 from django.conf import settings
 from django.contrib import messages
 from django.contrib.auth.decorators import login_required
 from django.db import transaction
 from django.http import (
+    Http404,
     HttpRequest,
     HttpResponse,
     HttpResponseBadRequest,
@@ -13,7 +15,12 @@ from django.http import (
     HttpResponseNotFound,
     HttpResponseRedirect,
 )
-from django.shortcuts import get_list_or_404, get_object_or_404, render
+from django.shortcuts import (
+    aget_object_or_404,
+    get_list_or_404,
+    get_object_or_404,
+    render,
+)
 from django.template.response import TemplateResponse
 from django.urls import reverse
 from django.views.decorators.csrf import csrf_exempt
@@ -28,6 +35,7 @@ from cl.lib.ratelimiter import (
     ratelimiter_unsafe_3_per_m,
 )
 from cl.lib.types import AuthenticatedHttpRequest
+from cl.opinion_page import docket_entry_sources
 from cl.opinion_page.utils import make_docket_title, user_has_alert
 from cl.search.models import Docket
 from cl.users.models import UserProfile
@@ -341,8 +349,25 @@ def _toggle_docket_alert_legacy(
         )
 
 
-async def new_docket_alert(request: AuthenticatedHttpRequest) -> HttpResponse:
-    """Allow users to create docket alerts based on case and court ID."""
+async def new_docket_alert(
+    request: AuthenticatedHttpRequest, docket_id: int | None = None
+) -> HttpResponse:
+    """Allow users to create docket alerts for a docket.
+
+    The docket is found by its ID, or by its PACER case and court IDs, which
+    is how the RECAP extension links here. SCOTUS dockets are hidden behind
+    the scotus_docket_page flag, like their docket pages.
+    """
+    if docket_id is not None:
+        docket = await aget_object_or_404(Docket, pk=docket_id)
+        if docket.get_entry_source() is docket_entry_sources.SCOTUS and (
+            not await sync_to_async(waffle.flag_is_active)(
+                request, "scotus_docket_page"
+            )
+        ):
+            raise Http404("Docket not found.")
+        return await render_new_docket_alert(request, docket)
+
     pacer_case_id = request.GET.get("pacer_case_id")
     court_id = request.GET.get("court_id")
     if not pacer_case_id or not court_id:
@@ -376,6 +401,13 @@ async def new_docket_alert(request: AuthenticatedHttpRequest) -> HttpResponse:
             pacer_case_id=pacer_case_id, court_id=court_id
         ).aearliest("date_created")
 
+    return await render_new_docket_alert(request, docket)
+
+
+async def render_new_docket_alert(
+    request: AuthenticatedHttpRequest, docket: Docket
+) -> TemplateResponse:
+    """Render the new docket alert page for a docket."""
     title = f"New Docket Alert for {make_docket_title(docket)}"
     has_alert = await user_has_alert(await request.auser(), docket)  # type: ignore[arg-type]
     # docket_alerts_button.html gates the alerts button on the docket
