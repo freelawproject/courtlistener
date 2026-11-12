@@ -1,3 +1,5 @@
+"""URL routes for the index and sections of pre-generated sitemaps."""
+
 from collections import OrderedDict
 
 from django.contrib.sitemaps import views as sitemaps_views

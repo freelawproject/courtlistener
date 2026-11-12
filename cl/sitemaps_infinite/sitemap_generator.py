@@ -1,3 +1,5 @@
+"""Pre-generate large sitemaps in chunks and cache them."""
+
 import hashlib
 import logging
 from datetime import UTC, datetime
