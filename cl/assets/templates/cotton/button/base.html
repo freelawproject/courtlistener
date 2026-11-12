@@ -20,26 +20,18 @@
     'blue': 'text-white bg-sky-800 hover:bg-sky-900 outline-none focus-visible:ring-4 focus-visible:ring-sky-600 disabled:bg-sky-100 disabled:text-blue-300 aria-disabled:bg-sky-100 aria-disabled:text-blue-300 aria-disabled:pointer-events-none',
   }"
 />
-{# An unknown variant falls back to primary. #}
-{% with base="rounded-lg w-fit font-normal flex gap-1 items-center" sizing=sizes|get_item:size|default:sizes.md styles=variants|get_item:variant|default:variants.primary %}
+{# An unknown variant falls back to primary. The touch target is a pseudo-element behind the content, so the element's box and layout stay as they are. #}
+{% with base="rounded-lg w-fit font-normal flex gap-1 items-center" sizing=sizes|get_item:size|default:sizes.md styles=variants|get_item:variant|default:variants.primary hit_area="relative isolate before:absolute before:-inset-1.5 before:-z-10 before:content-['']" %}
 {% if href %}
 <a
   href="{{ href }}"
-  class="{% if variant %}{{ base }} {{ sizing }} {{ styles }}{% endif %} {{ class }}"
+  class="{% if touch_target %}{{ hit_area }} {% endif %}{% if variant %}{{ base }} {{ sizing }} {{ styles }}{% endif %} {{ class }}"
   {{ attrs }}
 >{{ slot }}</a>
-{% elif touch_target %}
-<button
-  type="{{ type }}"
-  class="min-h-13 h-fit min-w-13 w-fit flex justify-center items-center focus-visible:outline-none group"
-  {{ attrs }}
->
-  <span class="{% if variant %}{{ base }} {{ sizing }} {{ styles }} group-focus-visible:ring-4 group-focus-visible:ring-greyscale-300{% endif %} {{ class }}">{{ slot }}</span>
-</button>
 {% else %}
 <button
   type="{{ type }}"
-  class="{% if variant %}{{ base }} {{ sizing }} {{ styles }}{% endif %} {{ class }}"
+  class="{% if touch_target %}{{ hit_area }} {% endif %}{% if variant %}{{ base }} {{ sizing }} {{ styles }}{% endif %} {{ class }}"
   {{ attrs }}
 >{{ slot }}</button>
 {% endif %}

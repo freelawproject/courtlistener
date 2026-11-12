@@ -872,6 +872,7 @@ class ButtonComponentTest(CottonComponentMixin, SimpleTestCase):
         """The label alone is the accessible name while busy."""
         for source in (
             '<c-button variant="primary" aria-busy="true">Save</c-button>',
+            '<c-button variant="primary" touch_target aria-busy="true">Save</c-button>',
             '<c-button variant="primary" href="#" aria-busy="true">Save</c-button>',
         ):
             with self.subTest(source=source):

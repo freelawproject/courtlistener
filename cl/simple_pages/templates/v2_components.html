@@ -1166,9 +1166,9 @@ Sample code here.
 
     <h4 class="mt-3">Links</h4>
     <div class="flex flex-wrap gap-3 items-center">
-      <c-button variant="primary" href="#">Primary link</c-button>
-      <c-button variant="outline" href="#">Outline link</c-button>
-      <c-button variant="blue" href="#">Blue link</c-button>
+      <c-button variant="primary" href="#button">Primary link</c-button>
+      <c-button variant="outline" href="#button">Outline link</c-button>
+      <c-button variant="blue" href="#button">Blue link</c-button>
     </div>
 
     <h4 class="mt-3">Disabled states</h4>
@@ -1198,17 +1198,17 @@ Sample code here.
 
     <h5 class="mt-3">Links with <code>aria-disabled="true"</code></h5>
     <div class="flex flex-wrap gap-3 items-center">
-      <c-button variant="primary" href="#" aria-disabled="true">Primary link</c-button>
-      <c-button variant="outline" href="#" aria-disabled="true">Outline link</c-button>
-      <c-button variant="dark" href="#" aria-disabled="true">Dark link</c-button>
-      <c-button variant="ghost" href="#" aria-disabled="true">Ghost link</c-button>
-      <c-button variant="grey" href="#" aria-disabled="true">Grey link</c-button>
-      <c-button variant="blue" href="#" aria-disabled="true">Blue link</c-button>
+      <c-button variant="primary" href="#button" aria-disabled="true">Primary link</c-button>
+      <c-button variant="outline" href="#button" aria-disabled="true">Outline link</c-button>
+      <c-button variant="dark" href="#button" aria-disabled="true">Dark link</c-button>
+      <c-button variant="ghost" href="#button" aria-disabled="true">Ghost link</c-button>
+      <c-button variant="grey" href="#button" aria-disabled="true">Grey link</c-button>
+      <c-button variant="blue" href="#button" aria-disabled="true">Blue link</c-button>
     </div>
 
     <h4 class="mt-3">Busy state</h4>
     <p class="text-sm mb-2">
-      A button that may go busy declares it with <code>aria-busy</code>: set statically for a state known on the server, or bound from Alpine with <code>x-bind:aria-busy="busy"</code> while an action runs. The attribute's presence is what makes the component render the busy markup and its script, so other buttons pay nothing for them. Touch target buttons cannot go busy. <br>While <code>aria-busy="true"</code> is on the element, a spinner is centred over the content, which fades out but keeps its width and stays in the accessibility tree; the element gets <code>aria-disabled="true"</code>, so it keeps focus but reads as unavailable; clicks, <kbd>Enter</kbd>, <kbd>Space</kbd> and implicit form submission are cancelled before any other handler runs; and a status region next to the element announces <code>busy_text</code>. See <a href="https://developer.mozilla.org/en-US/docs/Web/Accessibility/ARIA/Attributes/aria-busy" class="underline">MDN: aria-busy</a>.
+      A button that may go busy declares it with <code>aria-busy</code>: set statically for a state known on the server, or bound from Alpine with <code>x-bind:aria-busy="busy"</code> while an action runs. The attribute's presence is what makes the component render the busy markup and its script, so other buttons pay nothing for them. <br>While <code>aria-busy="true"</code> is on the element, a spinner is centred over the content, which fades out but keeps its width and stays in the accessibility tree; the element gets <code>aria-disabled="true"</code>, so it keeps focus but reads as unavailable; clicks, <kbd>Enter</kbd>, <kbd>Space</kbd> and implicit form submission are cancelled before any other handler runs; and a status region next to the element announces <code>busy_text</code>. See <a href="https://developer.mozilla.org/en-US/docs/Web/Accessibility/ARIA/Attributes/aria-busy" class="underline">MDN: aria-busy</a>.
     </p>
     <div class="flex flex-wrap gap-3 items-center">
       <c-button variant="primary" aria-busy="true">Primary</c-button>
@@ -1217,7 +1217,7 @@ Sample code here.
       <c-button variant="ghost" aria-busy="true">Ghost</c-button>
       <c-button variant="grey" aria-busy="true">Grey</c-button>
       <c-button variant="blue" aria-busy="true">Blue</c-button>
-      <c-button variant="outline" href="#" aria-busy="true">Outline link</c-button>
+      <c-button variant="outline" href="#button" aria-busy="true">Outline link</c-button>
     </div>
 
     <c-library.list title="Props" only>
@@ -1239,11 +1239,11 @@ Sample code here.
       </c-library.item>
       <c-library.item optional only>
         <c-slot name="label"><code>touch_target</code></c-slot>
-        <c-slot name="description">When set, renders a larger outer <code>&lt;button&gt;</code> for touch area with an inner <code>&lt;span&gt;</code> for visual styling. Used by dialog trigger buttons. Cannot go busy.</c-slot>
+        <c-slot name="description">When set, extends the clickable area 6px beyond the element on every side with a pseudo-element, without changing its size or layout. For small controls such as icon buttons.</c-slot>
       </c-library.item>
       <c-library.item optional only>
         <c-slot name="label"><code>class</code></c-slot>
-        <c-slot name="description">Additional CSS classes. Applied to the visual element (the <code>&lt;span&gt;</code> if <code>touch_target</code>, the element itself otherwise).</c-slot>
+        <c-slot name="description">Additional CSS classes, applied to the rendered element.</c-slot>
       </c-library.item>
       <c-library.item optional only>
         <c-slot name="label"><code>aria-busy</code></c-slot>
@@ -1284,8 +1284,8 @@ Sample code here.
 
 &lt;h4&gt;Links&lt;/h4&gt;
 &lt;div class="flex flex-wrap gap-3 items-center"&gt;
-  &lt;c-button variant="primary" href="#"&gt;Primary link&lt;/c-button&gt;
-  &lt;c-button variant="outline" href="#"&gt;Outline link&lt;/c-button&gt;
+  &lt;c-button variant="primary" href="#button"&gt;Primary link&lt;/c-button&gt;
+  &lt;c-button variant="outline" href="#button"&gt;Outline link&lt;/c-button&gt;
 &lt;/div&gt;
 
 &lt;h4&gt;Disabled states&lt;/h4&gt;
@@ -1312,17 +1312,17 @@ Sample code here.
 
 &lt;h5&gt;Links with aria-disabled="true"&lt;/h5&gt;
 &lt;div class="flex flex-wrap gap-3 items-center"&gt;
-  &lt;c-button variant="primary" href="#" aria-disabled="true"&gt;Primary link&lt;/c-button&gt;
-  &lt;c-button variant="outline" href="#" aria-disabled="true"&gt;Outline link&lt;/c-button&gt;
-  &lt;c-button variant="dark" href="#" aria-disabled="true"&gt;Dark link&lt;/c-button&gt;
-  &lt;c-button variant="ghost" href="#" aria-disabled="true"&gt;Ghost link&lt;/c-button&gt;
-  &lt;c-button variant="grey" href="#" aria-disabled="true"&gt;Grey link&lt;/c-button&gt;
+  &lt;c-button variant="primary" href="#button" aria-disabled="true"&gt;Primary link&lt;/c-button&gt;
+  &lt;c-button variant="outline" href="#button" aria-disabled="true"&gt;Outline link&lt;/c-button&gt;
+  &lt;c-button variant="dark" href="#button" aria-disabled="true"&gt;Dark link&lt;/c-button&gt;
+  &lt;c-button variant="ghost" href="#button" aria-disabled="true"&gt;Ghost link&lt;/c-button&gt;
+  &lt;c-button variant="grey" href="#button" aria-disabled="true"&gt;Grey link&lt;/c-button&gt;
 &lt;/div&gt;
 
 &lt;h4&gt;Busy state&lt;/h4&gt;
 &lt;div class="flex flex-wrap gap-3 items-center"&gt;
   &lt;c-button variant="primary" aria-busy="true"&gt;Primary&lt;/c-button&gt;
-  &lt;c-button variant="outline" href="#" aria-busy="true"&gt;Outline link&lt;/c-button&gt;
+  &lt;c-button variant="outline" href="#button" aria-busy="true"&gt;Outline link&lt;/c-button&gt;
 &lt;/div&gt;
 
 &lt;!-- Toggled from Alpine --&gt;
