@@ -3,6 +3,7 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 
 from django.db.models import Model
+from typing_extensions import Sentinel
 
 
 @dataclass
@@ -38,3 +39,21 @@ class ThroughParameters[Params](RelatedParams[Params]):
     target: Model = field(kw_only=True)
     target_name: str = field(kw_only=True)
     params: Params
+
+
+Lookup = Sentinel("Lookup")
+"""Find the object to merge into in the DB, creating it if there is none."""
+Create = Sentinel("Create")
+"""Skip the lookup and create a new object."""
+
+
+@dataclass(slots=True)
+class Update[M: Model]:
+    """Skip the lookup and merge into a known object.
+
+    :ivar instance: The object to merge into."""
+
+    instance: M
+
+
+type Existing[M: Model] = Lookup | Create | Update[M]

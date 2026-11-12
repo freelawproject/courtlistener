@@ -37,8 +37,12 @@ from cl.corpus_importer.state.florida.mergers import (
     FloridaDocketMerger,
 )
 from cl.corpus_importer.state.florida.utils import make_docket_number_core
-from cl.corpus_importer.state.merger import RelatedParams
-from cl.corpus_importer.state.tests import merger_test
+from cl.corpus_importer.state.merger import (
+    MergerState,
+    RelatedParams,
+    Update,
+)
+from cl.corpus_importer.state.merger.tests import merger_test
 from cl.corpus_importer.state.utils import MergeResult
 from cl.corpus_importer.tasks import (
     download_fl_document,
@@ -172,7 +176,7 @@ class FloridaMergerTest(TestCase):
 
         result = FloridaDocketMerger(
             docket_data,
-            existing=self.docket_sc,
+            existing=Update(self.docket_sc),
             params=docket_data.entries,
         ).merge()
 
@@ -208,7 +212,7 @@ class FloridaMergerTest(TestCase):
 
         result = FloridaDocketMerger(
             docket_data,
-            existing=self.docket_sc,
+            existing=Update(self.docket_sc),
             params=docket_data.entries,
         ).merge()
 
@@ -233,7 +237,7 @@ class FloridaMergerTest(TestCase):
 
         result = FloridaDocketMerger(
             docket_data,
-            existing=self.docket_sc,
+            existing=Update(self.docket_sc),
             params=docket_data.entries,
         ).merge()
 
@@ -256,7 +260,7 @@ class FloridaMergerTest(TestCase):
 
         result = FloridaDocketMerger(
             docket_data,
-            existing=self.docket_sc,
+            existing=Update(self.docket_sc),
             params=docket_data.entries,
         ).merge()
 
@@ -646,14 +650,18 @@ class FloridaPartyMergerTest(TestCase):
             docket_data, params=docket_data.entries
         )
         first = first_merger.merge()
-        first_db = first_merger.out
         second_merger = FloridaDocketMerger(
             docket_data, params=docket_data.entries
         )
         second = second_merger.merge()
-        second_db = second_merger.out
 
-        self.assertEqual(first_db, second_db)
+        match first_merger.state, second_merger.state:
+            case MergerState.Complete(output=first_db), MergerState.Complete(
+                output=second_db
+            ):
+                self.assertEqual(first_db, second_db)
+            case states:
+                self.fail(f"Merges did not complete: {states}")
         self.assertTrue(first.success)
         self.assertTrue(second.success)
         self.assertFalse(second.create)
@@ -1576,6 +1584,7 @@ class FloridaCaseTransferMergerTest(TestCase):
 
         self.assertTrue(result.success)
         self.assertNotIn("CaseTransfer", result.creates)
+        self.assertIn("CaseTransfer", result.updates)
         self.assertIn(partial.pk, result.updates["CaseTransfer"])
         self.assertEqual(CaseTransfer.objects.count(), 1)
         partial.refresh_from_db()

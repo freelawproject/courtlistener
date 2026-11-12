@@ -35,12 +35,13 @@ from pathlib import Path
 from typing import Any, ClassVar, Final, assert_never, cast
 
 from django.conf import settings
+from django.db import transaction
 from django.db.models import QuerySet
 from django.utils import timezone
 from pydantic import BaseModel, ValidationError
 
 from cl.corpus_importer.state.ledger import LoadLedger, RetryRows
-from cl.corpus_importer.state.merger import Merger
+from cl.corpus_importer.state.merger import Merger, MergerState
 from cl.corpus_importer.state.preflight import (
     STANDARD_CHECKS,
     CheckResult,
@@ -553,9 +554,12 @@ class JKentScrapeLoader[
         Runs in celery worker.
         """
         merger = cls.merger(scrape, params=cls.params(scrape))
-        result = merger.merge()
-        if isinstance(merger.out, Docket):
-            result |= cls.publish_files(merger.out)
+        with transaction.atomic():
+            result = merger.merge()
+        if isinstance(
+            state := merger.state, MergerState.Complete
+        ) and isinstance(state.output, Docket):
+            result |= cls.publish_files(state.output)
         return result
 
     @classmethod

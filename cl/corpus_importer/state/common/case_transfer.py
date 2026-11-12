@@ -8,11 +8,10 @@ both FKs is handled later by ``CaseTransfer.fill_null_dockets``.
 """
 
 import logging
-from collections.abc import Callable, Iterable, Sequence
+from collections.abc import Callable, Sequence
 from datetime import date
 from typing import Any, ClassVar, cast, override
 
-from django.db.models import Model, QuerySet
 from juriscraper.state.docket import Docket as ScrapeDocket
 from juriscraper.state.docket import (
     DocketTransfer,
@@ -26,6 +25,8 @@ from cl.corpus_importer.state.merger import (
     Fn,
     ManyStrategy,
     Merger,
+    MergerConfig,
+    MergerState,
     OneToManyRelation,
     Params,
     RelatedParams,
@@ -94,9 +95,10 @@ def _destination_docket_id(
     return None
 
 
-class CaseTransferMerger[TransferType: DocketTransfer, ParamType](
-    Merger[TransferType, RelatedParams[ParamType], CaseTransfer], abstract=True
-):
+class CaseTransferMerger[
+    TransferType: DocketTransfer,
+    ParamType: RelatedParams,
+](Merger[TransferType, ParamType, CaseTransfer]):
     """Base merger for transfers into the docket being merged.
 
     The destination fields come from the parent docket and the origin docket
@@ -105,19 +107,16 @@ class CaseTransferMerger[TransferType: DocketTransfer, ParamType](
     Juriscraper court ID to a CourtListener one.
     """
 
-    model: ClassVar[type[Model]] = CaseTransfer
-    # Both ends are identified by court and docket number rather than by FK so
-    # a transfer can be matched with only one end present in the DB. Matching
-    # on `destination_docket_id` would restrict the lookup to transfers already
-    # attached to this docket, making the partial transfer in `query` and the
-    # back-fill in `update_existing` unreachable.
-    key: ClassVar[Iterable[str]] = [
-        "origin_court_id",
-        "origin_docket_number",
-        "destination_court_id",
-        "destination_docket_number",
-        "transfer_type",
-    ]
+    config: ClassVar[MergerConfig] = MergerConfig(
+        model=CaseTransfer,
+        key=(
+            "origin_court_id",
+            "origin_docket_number",
+            "destination_court_id",
+            "destination_docket_number",
+            "transfer_type",
+        ),
+    )
 
     destination_docket_id: int | None = Fn(_destination_docket_id)(
         Scrape(DocketTransfer), Params(RelatedParams)
@@ -141,27 +140,41 @@ class CaseTransferMerger[TransferType: DocketTransfer, ParamType](
     )
 
     @override
-    def query(self) -> QuerySet[CaseTransfer]:
+    def lookup(
+        self,
+        state: MergerState.Lookup[
+            TransferType,
+            ParamType,
+            CaseTransfer,
+        ],
+    ) -> MergerState.LookupOutput[
+        TransferType,
+        ParamType,
+        CaseTransfer,
+    ]:
         """Find an existing transfer to merge into.
 
         Prefer a partial transfer missing its destination docket FK so the FK
-        can be filled in (see `update_existing`); otherwise match a transfer
+        can be filled in (see `update`); otherwise match a transfer
         already attached to the parent docket.
 
         Returns:
-            The queryset to find the transfer.
+            The state resolving the candidate transfers.
         """
-        # `super().query()` can't be used here. For a related merger
+        # `super().lookup()` can't be used here. For a related merger
         # `self.manager` is the parent docket's reverse FK manager, so it would
         # constrain the lookup to `destination_docket = parent` and hide the
         # very partial transfers this method exists to find.
         candidates = CaseTransfer.objects.filter(
-            **{name: self.transformed[name] for name in self.key}
+            **{name: getattr(self, name) for name in self.config.key}
         )
         fillable = candidates.filter(destination_docket__isnull=True)
         if fillable.exists():
-            return fillable
-        return candidates.filter(destination_docket=self.params.parent)
+            return state.resolve(fillable)
+
+        return state.resolve(
+            candidates.filter(destination_docket=state.params.parent)
+        )
 
 
 def CaseTransferRelation(

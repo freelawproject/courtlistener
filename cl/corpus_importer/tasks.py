@@ -5667,7 +5667,8 @@ def fl_ingest_docket_task(
         )
 
     merger = FloridaDocketMerger(scrape=case, params=case.entries)
-    result = merger.merge()
+    with transaction.atomic():
+        result = merger.merge()
     if result.failures:
         logger.error(
             "An error occurred while merging Florida case %s: %s",
