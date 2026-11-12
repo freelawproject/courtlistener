@@ -2397,11 +2397,28 @@ class OgRedirectLookupViewTest(TestCase):
 
 
 class NewDocketAlertTest(SimpleUserDataMixin, TestCase):
-    fixtures = [
-        "test_objects_search.json",
-        "judge_judy.json",
-        "test_court.json",
-    ]
+    """The page that shares a docket alert.
+
+    It finds the docket by its ID, or by its PACER case and court IDs.
+    """
+
+    @classmethod
+    def setUpTestData(cls) -> None:
+        """Create a RECAP docket and a SCOTUS docket.
+
+        Only the RECAP docket has a PACER case ID.
+        """
+        super().setUpTestData()
+        cls.recap_docket = DocketFactory(
+            court=CourtFactory(id="test", jurisdiction="FD"),
+            source=Docket.RECAP,
+            pacer_case_id="666666",
+        )
+        cls.scotus_docket = DocketFactory(
+            court=CourtFactory(id="scotus", jurisdiction="F"),
+            source=Docket.SCRAPER,
+            pacer_case_id=None,
+        )
 
     @async_to_sync
     async def setUp(self) -> None:
@@ -2433,6 +2450,67 @@ class NewDocketAlertTest(SimpleUserDataMixin, TestCase):
         )
         self.assertEqual(r.status_code, HTTPStatus.OK)
         self.assertInHTML("Get Docket Alerts", r.content.decode())
+
+    async def test_docket_found_by_id(self) -> None:
+        """A RECAP docket can also be found by its ID."""
+        r = await self.async_client.get(
+            reverse("new_docket_alert_by_id", args=[self.recap_docket.pk])
+        )
+        self.assertEqual(r.status_code, HTTPStatus.OK)
+        self.assertInHTML("Get Docket Alerts", r.content.decode())
+
+    async def test_unknown_docket_id(self) -> None:
+        """An unknown docket ID is a 404, like its docket page."""
+        r = await self.async_client.get(
+            reverse("new_docket_alert_by_id", args=[999_999_999])
+        )
+        self.assertEqual(r.status_code, HTTPStatus.NOT_FOUND)
+
+    @override_settings(
+        WAFFLE_CACHE_PREFIX="NewDocketAlertTest.test_scotus_docket_needs_its_flag"
+    )
+    def test_scotus_docket_needs_its_flag(self) -> None:
+        """A SCOTUS docket needs the scotus_docket_page flag.
+
+        Without it, it's a 404, like its docket page.
+        """
+        # Sync, since override_flag queries the DB when it's entered.
+        self.client.login(username="pandora", password="password")
+        url = reverse("new_docket_alert_by_id", args=[self.scotus_docket.pk])
+        for active, status in (
+            (True, HTTPStatus.OK),
+            (False, HTTPStatus.NOT_FOUND),
+        ):
+            with (
+                self.subTest(flag_active=active),
+                override_flag("scotus_docket_page", active=active),
+            ):
+                r = self.client.get(url)
+                self.assertEqual(r.status_code, status)
+
+    @override_settings(
+        WAFFLE_CACHE_PREFIX="NewDocketAlertTest.test_share_link_on_the_docket_page"
+    )
+    @override_flag("scotus_docket_page", active=True)
+    def test_share_link_on_the_docket_page(self) -> None:
+        """The docket page shares dockets without a PACER case ID by ID.
+
+        RECAP dockets keep the PACER case ID link they had.
+        """
+        self.client.login(username="pandora", password="password")
+        recap_link = (
+            f"{reverse('new_docket_alert')}?pacer_case_id=666666&court_id=test"
+        )
+        scotus_link = reverse(
+            "new_docket_alert_by_id", args=[self.scotus_docket.pk]
+        )
+        for docket, link in (
+            (self.recap_docket, recap_link),
+            (self.scotus_docket, scotus_link),
+        ):
+            with self.subTest(court=docket.court_id):
+                r = self.client.get(docket.get_absolute_url())
+                self.assertIn(f'href="{link}"', r.content.decode())
 
 
 class OpinionSitemapTest(SitemapTest):
