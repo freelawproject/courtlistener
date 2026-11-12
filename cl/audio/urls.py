@@ -6,6 +6,7 @@ from cl.audio.feeds import (
     SearchPodcast,
 )
 from cl.audio.views import view_audio_file
+from cl.lib.ratelimiter import ratelimit_deny_list
 from cl.search.feeds import search_feed_error_handler
 
 urlpatterns = [
@@ -17,17 +18,19 @@ urlpatterns = [
     # Podcasts
     path(
         "podcast/court/all/",
-        search_feed_error_handler(AllJurisdictionsPodcast()),
+        ratelimit_deny_list(
+            search_feed_error_handler(AllJurisdictionsPodcast())
+        ),
         name="all_jurisdictions_podcast",
     ),
     path(
         "podcast/court/<str:court>/",
-        search_feed_error_handler(JurisdictionPodcast()),
+        ratelimit_deny_list(search_feed_error_handler(JurisdictionPodcast())),
         name="jurisdiction_podcast",
     ),
     re_path(
         r"^podcast/(search)/",
-        search_feed_error_handler(SearchPodcast()),
+        ratelimit_deny_list(search_feed_error_handler(SearchPodcast())),
         name="search_podcast",
     ),
 ]
