@@ -371,13 +371,19 @@ async def view_docket(
     request: HttpRequest, pk: int, slug: str
 ) -> HttpResponse:
     sort_order_asc = True
-    if await sync_to_async(flag_is_active)(request, "use_new_design"):
-        form = forms_v2.DocketEntryFilterForm(request.GET, request=request)
-    else:
-        form = DocketEntryFilterForm(request.GET, request=request)
     docket, context = await core_docket_data(request, pk)
 
     source = docket.get_entry_source()
+    form_class = (
+        forms_v2.DocketEntryFilterForm
+        if await sync_to_async(flag_is_active)(request, "use_new_design")
+        else DocketEntryFilterForm
+    )
+    form = form_class(
+        request.GET,
+        request=request,
+        has_entry_numbers=source.has_entry_numbers,
+    )
     de_list = await fetch_docket_entries(docket)
 
     if await sync_to_async(form.is_valid)():

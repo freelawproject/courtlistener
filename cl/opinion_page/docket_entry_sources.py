@@ -230,6 +230,10 @@ class DocketEntrySource:
     request, every docket and document page of the source returns a 404;
     see ``is_source_hidden`` in cl.opinion_page.utils.
 
+    ``has_entry_numbers`` says whether the source's entries carry an
+    ``entry_number``. When False, the docket page drops its "Documents"
+    range filter, since there is nothing to filter on.
+
     Every callable below touches the ORM, so callers in async views MUST
     wrap them in ``sync_to_async``.
     """
@@ -273,6 +277,7 @@ class DocketEntrySource:
         _no_metadata_sections
     )
     launch_flag: str | None = None
+    has_entry_numbers: bool = True
 
 
 def attach_display_fields(source: DocketEntrySource, document: Any) -> None:

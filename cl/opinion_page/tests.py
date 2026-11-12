@@ -8,6 +8,7 @@ import re
 import shutil
 import threading
 from collections import Counter
+from dataclasses import replace
 from datetime import date
 from hashlib import md5
 from http import HTTPStatus
@@ -4387,6 +4388,78 @@ class DocketEntryFilterFormHasFiltersTest(SimpleTestCase):
             with self.subTest(query=query):
                 form = DocketEntryFilterForm(QueryDict(query))
                 self.assertEqual(form.has_filters(), expected)
+
+
+class DocketEntryFilterFormEntryNumbersTest(SimpleTestCase):
+    """Do both filter forms drop the "Documents" range for sources whose entries have no entry number?"""
+
+    form_classes = {
+        "legacy": DocketEntryFilterForm,
+        "v2": forms_v2.DocketEntryFilterForm,
+    }
+
+    def test_range_fields_dropped_without_entry_numbers(self) -> None:
+        """Are entry_gte/entry_lte gone, and their params ignored, when has_entry_numbers is False?"""
+        data = QueryDict("entry_gte=5&entry_lte=10")
+        for stack, form_class in self.form_classes.items():
+            with self.subTest(stack=stack):
+                form = form_class(data, has_entry_numbers=False)
+                self.assertTrue(form.is_valid())
+                for name in ("entry_gte", "entry_lte"):
+                    self.assertNotIn(name, form.fields)
+                    self.assertNotIn(name, form.cleaned_data)
+                # Ignored params don't count as a filter either, so an
+                # empty docket still shows its "no entries yet" message.
+                self.assertFalse(form.has_filters())
+
+    def test_range_fields_kept_by_default(self) -> None:
+        """Do sources with entry numbers keep the "Documents" range?"""
+        for stack, form_class in self.form_classes.items():
+            with self.subTest(stack=stack):
+                form = form_class(QueryDict("entry_gte=5"))
+                self.assertTrue(form.is_valid())
+                self.assertEqual(form.cleaned_data["entry_gte"], 5)
+
+
+@override_settings(WAFFLE_CACHE_PREFIX="test_docket_without_entry_numbers")
+class DocketWithoutEntryNumbersTest(TestCase):
+    """Does the docket page ignore and hide the "Documents" filter for a source whose entries have no entry number?"""
+
+    @classmethod
+    def setUpTestData(cls) -> None:
+        cls.court = CourtFactory(id="nonumbers", jurisdiction="S")
+        cls.docket = DocketFactory(court=cls.court)
+        DocketEntry.objects.bulk_create(
+            [
+                DocketEntry(
+                    docket=cls.docket,
+                    entry_number=n,
+                    date_filed=date(2024, 1, n),
+                )
+                for n in range(1, 4)
+            ]
+        )
+
+    def test_documents_filter_ignored_and_hidden(self) -> None:
+        """Does ?entry_gte=3 leave every entry on the page, with no "Documents" inputs, in both stacks?"""
+        # A copy of RECAP without entry numbers stands in for a source like
+        # Texas, whose entries have none.
+        source = replace(docket_entry_sources.RECAP, has_entry_numbers=False)
+        url = reverse("view_docket", args=[self.docket.pk, self.docket.slug])
+        with mock.patch.dict(
+            docket_entry_sources.BY_COURT_ID, {self.court.pk: source}
+        ):
+            for new_design in (False, True):
+                with (
+                    self.subTest(new_design=new_design),
+                    override_flag("use_new_design", active=new_design),
+                ):
+                    r = self.client.get(url, {"entry_gte": "3"})
+                    self.assertEqual(r.status_code, HTTPStatus.OK)
+                    self.assertEqual(len(r.context["docket_entries"]), 3)
+                    content = r.content.decode()
+                    self.assertNotIn('name="entry_gte"', content)
+                    self.assertNotIn('name="entry_lte"', content)
 
 
 class BuildDocketTabsTest(SimpleTestCase):
