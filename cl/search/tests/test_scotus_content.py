@@ -442,7 +442,8 @@ class ScotusDocketMergeTest(TestCase):
         """Party rows don't trigger ES signals, so merging a SCOTUS docket
         with parties must index them in ES explicitly, like RECAP does. Like
         RECAP, parties within the attorney limit percolate the docket after
-        they're indexed, on every merge."""
+        they're indexed, on every merge.
+        """
         data = ScotusDocketDataFactory(
             lower_court=self.lower_court.full_name,
             parties=[SCOTUSPartyDataFactory()],
@@ -466,7 +467,8 @@ class ScotusDocketMergeTest(TestCase):
     ) -> None:
         """Without parties, a new docket is still percolated once through
         index_docket_parties_in_es, but merging into an existing docket has
-        nothing to index."""
+        nothing to index.
+        """
         data = ScotusDocketDataFactory(
             lower_court=self.lower_court.full_name,
             parties=[],
@@ -489,7 +491,8 @@ class ScotusDocketMergeTest(TestCase):
         """An existing opinion-only docket that becomes SCOTUS docket
         content (it gets its ScotusDocketMetadata now) is percolated once
         through index_docket_parties_in_es, even without parties: its first
-        ES write comes from the metadata save, which isn't percolated."""
+        ES write comes from the metadata save, which isn't percolated.
+        """
         opinion_docket = DocketFactory(
             court=self.court, source=Docket.SCRAPER, docket_number="23-1234"
         )

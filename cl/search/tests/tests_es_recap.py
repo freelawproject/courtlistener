@@ -7360,7 +7360,8 @@ class SCOTUSESIndexingSignalTest(
 
     def test_scotus_dockets_are_sent_to_the_percolator(self) -> None:
         """A SCOTUS Docket's ES save and update are percolated, like a RECAP
-        Docket's."""
+        Docket's.
+        """
         # Not indexed yet: es_save_document only percolates a first write.
         with override_settings(ELASTICSEARCH_DISABLED=True):
             scotus_docket = ScotusDocketMetadataFactory(
