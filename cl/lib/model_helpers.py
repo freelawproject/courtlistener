@@ -755,6 +755,12 @@ def linkify_orig_docket_number(agency: str, og_docket_number: str) -> str:
 
 
 class CSVExportMixin:
+    """Export model rows to CSV. Subclasses list their fields in
+    csv_columns, or override get_csv_columns and get_column_function."""
+
+    # The fields exported to CSV, in order.
+    csv_columns: list[str] = []
+
     def get_csv_columns(self, get_column_name: bool = False) -> list[str]:
         """Get list of column names required in a csv file.
         If get column name is True. It will add class name to attribute
@@ -762,18 +768,25 @@ class CSVExportMixin:
         :param: get_column_name: bool. Whether add class name to attr name
 
         :return: list of attrs of class to get into csv file"""
-        raise NotImplementedError(
-            "Subclass must implement get_csv_columns method"
-        )
+        if not self.csv_columns:
+            raise NotImplementedError(
+                "Subclass must set csv_columns or implement get_csv_columns"
+            )
+        columns = list(self.csv_columns)
+        if get_column_name:
+            columns = [self.add_class_name(col) for col in columns]
+        return columns
 
     def get_column_function(self) -> dict[str, Callable[[str], str]]:
         """Get dict of attrs: function to apply on field value if it needs
         to be pre-processed before being add to csv
 
         returns: dict -- > {attr1: function}"""
-        raise NotImplementedError(
-            "Subclass must implement get_column_fuction method"
-        )
+        if not self.csv_columns:
+            raise NotImplementedError(
+                "Subclass must set csv_columns or implement get_column_function"
+            )
+        return {}
 
     def to_csv_row(self) -> list[str]:
         """Get fields in model based on attrs column names.

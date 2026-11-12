@@ -1,5 +1,6 @@
 import logging
 import re
+from collections.abc import Callable
 from datetime import datetime
 from pathlib import Path
 from typing import TYPE_CHECKING, Literal, Self, assert_never
@@ -4302,10 +4303,18 @@ class SCOTUSDocketEntry(AbstractDateTimeModel, CSVExportMixin):
     class Meta:
         ordering = ["-sequence_number"]
 
+    csv_columns = [
+        "id",
+        "entry_number",
+        "date_filed",
+        "sequence_number",
+        "description",
+    ]
+
 
 @pghistory.track()
 @document_model
-class SCOTUSDocument(AbstractDateTimeModel, AbstractPDF):
+class SCOTUSDocument(AbstractDateTimeModel, AbstractPDF, CSVExportMixin):
     """
     Represents an attachment to a SCOTUS docket entry.
 
@@ -4358,6 +4367,42 @@ class SCOTUSDocument(AbstractDateTimeModel, AbstractPDF):
             "attachment_number",
         )
         ordering = ("document_number", "attachment_number")
+
+    csv_columns = [
+        "id",
+        "description",
+        "document_number",
+        "attachment_number",
+        "url",
+        "is_available",
+        "sha1",
+        "page_count",
+        "file_size",
+        "filepath_local",
+        "filepath_ia",
+        "ocr_status",
+    ]
+
+    def _get_readable_ocr_status(self, field: str) -> str:
+        """Return the OCR status label for the CSV export."""
+        return self.get_ocr_status_display()
+
+    def _get_full_filepath_local(self, field: str) -> str:
+        """Return the file's full storage URL for the CSV export, or an
+        empty string when there's no file."""
+        if self.filepath_local:
+            return f"https://storage.courtlistener.com/{self.filepath_local}"
+        return ""
+
+    def get_column_function(self) -> dict[str, Callable[[str], str]]:
+        """Get dict of attrs: function to apply on field value if it needs
+        to be pre-processed before being add to csv.
+
+        returns: dict -- > {attr1: function}"""
+        return {
+            "ocr_status": self._get_readable_ocr_status,
+            "filepath_local": self._get_full_filepath_local,
+        }
 
     def __str__(self) -> str:
         return f"{self.pk}: Docket_{self.docket_entry.docket.docket_number} , document_number_{self.document_number} , attachment_number_{self.attachment_number}"

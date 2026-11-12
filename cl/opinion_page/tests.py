@@ -1,5 +1,7 @@
 import asyncio
+import csv
 import datetime
+import io
 import json
 import os
 import re
@@ -146,6 +148,7 @@ from cl.search.models import (
     OpinionCluster,
     OriginatingCourtInformation,
     RECAPDocument,
+    SCOTUSDocument,
 )
 from cl.sitemaps_infinite.sitemap_generator import generate_urls_chunk
 from cl.tests.cases import ESIndexTestCase, SimpleTestCase, TestCase
@@ -3718,21 +3721,39 @@ class DocketEntryFileDownload(TestCase):
         self.client.get(download_path)
         mock_is_ratelimited.assert_called_once()
 
+    def test_csv_export_when_first_entry_has_no_documents(self) -> None:
+        """The CSV header doesn't depend on the first entry having a
+        document."""
+        scotus_court = CourtFactory(id="scotus", jurisdiction="F")
+        docket = DocketFactory(court=scotus_court, source=Docket.SCRAPER)
+        empty_entry = SCOTUSDocketEntryFactory(docket=docket)
+        entry = SCOTUSDocketEntryFactory(docket=docket)
+        SCOTUSDocumentFactory(docket_entry=entry)
+
+        header, *rows = csv.reader(
+            io.StringIO(generate_docket_entries_csv_data([empty_entry, entry]))
+        )
+
+        self.assertIn("scotusdocument_id", header)
+        self.assertEqual([row[0] for row in rows], [str(entry.pk)])
+
     @override_settings(
         WAFFLE_CACHE_PREFIX="test_csv_export_scotus_docket_waffle"
     )
     @override_flag("scotus_docket_page", active=True)
-    def test_csv_export_return_gracefully_for_scotus_docket(self) -> None:
-        """SCOTUSDocketEntry/SCOTUSDocument don't implement CSV
-        export yet, but the button should stay visible. Clicking
-        it must return a handled error status.
-        """
+    def test_csv_export_for_scotus_docket(self) -> None:
+        """A SCOTUS docket exports its entries and their documents."""
         scotus_court = CourtFactory(id="scotus", jurisdiction="F")
         scotus_docket = DocketFactory(
             court=scotus_court, source=Docket.SCRAPER
         )
         entry = SCOTUSDocketEntryFactory(docket=scotus_docket)
-        SCOTUSDocumentFactory(docket_entry=entry)
+        document = SCOTUSDocumentFactory(
+            docket_entry=entry,
+            filepath_local="scotus/test.pdf",
+            ocr_status=SCOTUSDocument.OCR_COMPLETE,
+            sha1="a" * 40,
+        )
         self.client.login(username=self.user.username, password="password")
 
         response = self.client.get(
@@ -3741,28 +3762,53 @@ class DocketEntryFileDownload(TestCase):
                 kwargs={"docket_id": scotus_docket.id},
             )
         )
-        self.assertEqual(response.status_code, HTTPStatus.NOT_IMPLEMENTED)
 
-    def test_csv_export_real_bug_still_surfaces_for_recap_docket(
-        self,
-    ) -> None:
-        """The SCOTUS error catch must not mask a real bug in the
-        RECAP CSV path. That should still raise, not quietly
-        return a handled 501.
-        """
+        self.assertEqual(response.status_code, HTTPStatus.OK)
+        header, row = csv.reader(io.StringIO(response.content.decode()))
+        self.assertEqual(header[0], "scotusdocketentry_id")
+        self.assertEqual(row[0], str(entry.pk))
+        self.assertEqual(row[header.index("scotusdocument_url")], document.url)
+        self.assertEqual(
+            row[header.index("scotusdocument_filepath_local")],
+            "https://storage.courtlistener.com/scotus/test.pdf",
+        )
+        self.assertEqual(
+            row[header.index("scotusdocument_ocr_status")], "OCR Complete"
+        )
+        self.assertEqual(row[header.index("scotusdocument_sha1")], "a" * 40)
+
+    @override_settings(
+        WAFFLE_CACHE_PREFIX="test_csv_export_scotus_docket_order_waffle"
+    )
+    @override_flag("scotus_docket_page", active=True)
+    def test_csv_export_for_scotus_docket_is_oldest_first(self) -> None:
+        """SCOTUS entries export oldest first, like RECAP entries, even
+        though SCOTUSDocketEntry's default ordering is newest first."""
+        scotus_court = CourtFactory(id="scotus", jurisdiction="F")
+        scotus_docket = DocketFactory(
+            court=scotus_court, source=Docket.SCRAPER
+        )
+        older = SCOTUSDocketEntryFactory(
+            docket=scotus_docket, sequence_number="2024-01-01.001"
+        )
+        newer = SCOTUSDocketEntryFactory(
+            docket=scotus_docket, sequence_number="2024-01-02.001"
+        )
+        SCOTUSDocumentFactory(docket_entry=newer)
+        SCOTUSDocumentFactory(docket_entry=older)
         self.client.login(username=self.user.username, password="password")
 
-        with mock.patch(
-            "cl.opinion_page.views.generate_docket_entries_csv_data",
-            side_effect=AttributeError("boom"),
-        ):
-            with self.assertRaises(AttributeError):
-                self.client.get(
-                    reverse(
-                        "view_download_docket",
-                        kwargs={"docket_id": self.mocked_docket.id},
-                    )
-                )
+        response = self.client.get(
+            reverse(
+                "view_download_docket",
+                kwargs={"docket_id": scotus_docket.id},
+            )
+        )
+
+        _, *rows = csv.reader(io.StringIO(response.content.decode()))
+        self.assertEqual(
+            [row[0] for row in rows], [str(older.pk), str(newer.pk)]
+        )
 
 
 class DocketFeedTest(TestCase):
@@ -5274,8 +5320,8 @@ class DocketEntryRowsV2Test(TestCase):
     async def test_csv_export_for_authenticated_user(self) -> None:
         """A signed-in user gets the download link, fetched in place by Alpine.
 
-        The view answers 501 and 429, so the page declares a message for each
-        plus a fallback.
+        The view answers 429 when rate limited, so the page declares a message
+        for it plus a fallback.
         """
         user = await sync_to_async(UserWithChildProfileFactory)()
         await sync_to_async(self.async_client.force_login)(user)
@@ -5291,7 +5337,6 @@ class DocketEntryRowsV2Test(TestCase):
         component = link.xpath('ancestor::*[@x-data="download"]')
         self.assertEqual(len(component), 1)
         for key in (
-            "data-error-message-501",
             "data-error-message-429",
             "data-error-message-default",
         ):
