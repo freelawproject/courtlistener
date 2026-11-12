@@ -281,7 +281,7 @@ class OpinionsCitedSerializer(
 
 
 class ParentheticalGroupSerializer(
-    DynamicFieldsMixin,
+    NestedDynamicFieldsMixin,
     HyperlinkedModelSerializerWithId,
 ):
     """Serialize a ParentheticalGroup for embedding inside a Parenthetical.
@@ -320,7 +320,7 @@ class ParentheticalGroupSerializer(
 
 class ParentheticalSerializer(
     RetrieveFilteredFieldsMixin,
-    DynamicFieldsMixin,
+    NestedDynamicFieldsMixin,
     HyperlinkedModelSerializerWithId,
 ):
     """Serialize a Parenthetical with links to both opinions and its group.

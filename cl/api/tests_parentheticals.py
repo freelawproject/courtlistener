@@ -12,6 +12,7 @@ from cl.search.factories import (
     ParentheticalFactory,
     ParentheticalGroupFactory,
 )
+from cl.search.models import Parenthetical
 from cl.tests.cases import TestCase
 from cl.tests.utils import AsyncAPIClient, make_client
 from cl.users.factories import UserProfileWithParentsFactory
@@ -259,6 +260,61 @@ class ParentheticalAPITest(TestCase):
         for sql in sqls:
             for column in ("plain_text", "html_with_citations", "syllabus"):
                 self.assertNotIn(column, sql)
+
+    async def test_nested_group_field_selection(self) -> None:
+        """Fields and omit work on the embedded group's own fields."""
+        group = await sync_to_async(ParentheticalGroupFactory.create)(
+            opinion=self.described_a,
+            representative=self.pa_high,
+            score=0.88,
+            size=3,
+        )
+        self.pa_high.group = group
+        await sync_to_async(self.pa_high.save)()
+        params = {
+            "described_opinion": self.described_a.pk,
+            "id": self.pa_high.pk,
+        }
+
+        r = await self._get({**params, "fields": "id,group__score"})
+        self.assertEqual(r.status_code, HTTPStatus.OK)
+        self.assertEqual(
+            r.json()["results"][0],
+            {"id": self.pa_high.pk, "group": {"score": 0.88}},
+        )
+
+        r = await self._get({**params, "omit": "group__representative"})
+        self.assertEqual(r.status_code, HTTPStatus.OK)
+        group_data = r.json()["results"][0]["group"]
+        self.assertNotIn("representative", group_data)
+        self.assertEqual(group_data["representative_id"], self.pa_high.pk)
+
+    def test_cursor_pagination_returns_every_row_once(self) -> None:
+        """Following next and previous walks all rows without skips or repeats."""
+        for i in range(24):
+            ParentheticalFactory.create(
+                described_opinion=self.described_b,
+                describing_opinion=self.describing,
+                text=f"page row {i}",
+            )
+        expected = list(
+            Parenthetical.objects.filter(described_opinion=self.described_b)
+            .order_by("-id")
+            .values_list("id", flat=True)
+        )
+
+        first = async_to_sync(self.async_client.get)(
+            self.list_path, {"described_opinion": self.described_b.pk}
+        ).json()
+        second = async_to_sync(self.async_client.get)(first["next"]).json()
+        back = async_to_sync(self.async_client.get)(second["previous"]).json()
+
+        first_ids = [row["id"] for row in first["results"]]
+        second_ids = [row["id"] for row in second["results"]]
+        self.assertEqual(len(expected), 25)
+        self.assertEqual(first_ids + second_ids, expected)
+        self.assertIsNone(second["next"])
+        self.assertEqual([row["id"] for row in back["results"]], first_ids)
 
     async def test_empty_filters_ignored(self) -> None:
         """Empty filter params don't error (NoEmptyFilterSet behavior)."""
