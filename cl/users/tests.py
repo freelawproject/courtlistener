@@ -24,6 +24,7 @@ from django.core.mail import (
     get_connection,
     send_mail,
 )
+from django.db import IntegrityError
 from django.db.models import QuerySet
 from django.http import HttpResponse
 from django.test import AsyncClient, RequestFactory
@@ -4395,6 +4396,36 @@ class RegisterViewTest(TestCase):
         form = response.context.get("form")
         self.assertIsNotNone(form, "Expected 'form' in template context")
         # The username field should display an error.
+        self.assertIn("username", form.errors)
+
+    async def test_failed_profile_save_does_not_leave_user(self) -> None:
+        """A failed profile save must not leave a user behind.
+
+        A user without a profile can't log in.
+        """
+        data = {
+            "username": "admin3",
+            "email": "admin3@example.com",
+            "first_name": "User",
+            "last_name": "Admin",
+            "password1": "TestPassw0rd!",
+            "password2": "TestPassw0rd!",
+            "consent": True,
+        }
+
+        with patch.object(
+            UserProfile, "save", side_effect=IntegrityError("profile")
+        ):
+            response = await self.async_client.post(
+                reverse("register"), data, follow=True
+            )
+        self.assertEqual(response.status_code, HTTPStatus.OK)
+        self.assertFalse(
+            await User.objects.filter(username="admin3").aexists()
+        )
+
+        form = response.context.get("form")
+        self.assertIsNotNone(form, "Expected 'form' in template context")
         self.assertIn("username", form.errors)
 
     def test_generate_activation_key_is_not_brute_forceable(self) -> None:
