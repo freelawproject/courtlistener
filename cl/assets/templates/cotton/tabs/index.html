@@ -11,6 +11,9 @@
     <div
       id="{{ tabs_id }}"
       class="w-full {{ class }}"
+      x-data="tabsComponent"
+      x-on:htmx:before-request="startRequest"
+      x-on:htmx:after-request="endRequest"
       hx-history="false"
     >
       <nav
@@ -27,7 +30,14 @@
           {% endfor %}
         </ul>
       </nav>
-      {{ slot }}
+      <div role="status">
+        <template x-if="errorMessage">
+          <p class="py-[10px] px-4 border rounded-lg-10 bg-red-100/75 border-red-400 text-red-800" x-text="errorMessage"></p>
+        </template>
+      </div>
+      <div x-bind:aria-busy="isBusy">
+        {{ slot }}
+      </div>
     </div>
   {% endwith %}
 {% else %}
