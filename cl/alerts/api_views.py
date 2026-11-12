@@ -1,3 +1,5 @@
+"""REST API viewsets for search and docket alerts."""
+
 from typing import cast
 
 from django.contrib.auth.models import User
