@@ -61,7 +61,6 @@ from cl.corpus_importer.state.merger import (
     Scrape,
     WithStrategy,
 )
-from cl.corpus_importer.state.merger.specifications import AttributeMerger
 from cl.corpus_importer.state.merger.strategy import overwrite_if_present
 from cl.corpus_importer.state.utils import MergeResult
 from cl.people_db.models import Attorney, Party, PartyType, Role
@@ -494,11 +493,8 @@ class FloridaDocketMerger(
     originating_court_information: OriginatingCourtInformation = (
         OneToOneRelation(
             FloridaOriginatingCourtInformationMerger,
-            cast(
-                AttributeMerger,
-                Fn(_originating_case)(
-                    Scrape(FloridaCase), Params(list[ScrapeFloridaDocketEntry])
-                ),
+            Fn(_originating_case)(
+                Scrape(FloridaCase), Params(list[ScrapeFloridaDocketEntry])
             ),
         )
     )

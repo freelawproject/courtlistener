@@ -57,8 +57,6 @@ from .strategy import (
     overwrite_if_present,
 )
 
-Scrape = dict[str, Any]
-
 # Sizes for the benches that scale with the amount of scraped data.
 ATTRIBUTE_COUNT = 20
 ENTRY_COUNT = 20
@@ -114,7 +112,7 @@ class DocketParams:
     court_id: str
 
 
-def make_scrape(docket_number: str) -> Scrape:
+def make_scrape(docket_number: str) -> dict[str, Any]:
     """Build a docket scrape with `ENTRY_COUNT` entries, `PARTY_COUNT` parties and an originating court."""
     return {
         "docket_number": docket_number,
@@ -131,56 +129,66 @@ def make_scrape(docket_number: str) -> Scrape:
     }
 
 
-class EntryMerger(Merger[Scrape, RelatedParams[DocketParams], DocketEntry]):
+class EntryMerger(
+    Merger[dict[str, Any], RelatedParams[DocketParams], DocketEntry]
+):
     config: ClassVar[MergerConfig[DocketEntry]] = MergerConfig(
         model=DocketEntry, key=("entry_number",)
     )
 
-    entry_number: int = ScrapeProxy(Scrape)["entry_number"]
-    description: str = ScrapeProxy(Scrape)["description"]
+    entry_number: int = ScrapeProxy(dict[str, Any])["entry_number"]
+    description: str = ScrapeProxy(dict[str, Any])["description"]
 
 
 class OriginMerger(
-    Merger[Scrape, RelatedParams[DocketParams], OriginatingCourtInformation]
+    Merger[
+        dict[str, Any],
+        RelatedParams[DocketParams],
+        OriginatingCourtInformation,
+    ]
 ):
     config: ClassVar[MergerConfig[OriginatingCourtInformation]] = MergerConfig(
         model=OriginatingCourtInformation
     )
 
-    docket_number: str = ScrapeProxy(Scrape)["docket_number"]
+    docket_number: str = ScrapeProxy(dict[str, Any])["docket_number"]
 
     @override
     def lookup(
         self,
         state: MergerState.Lookup[
-            Scrape, RelatedParams[DocketParams], OriginatingCourtInformation
+            dict[str, Any],
+            RelatedParams[DocketParams],
+            OriginatingCourtInformation,
         ],
     ) -> MergerState.LookupOutput[
-        Scrape, RelatedParams[DocketParams], OriginatingCourtInformation
+        dict[str, Any],
+        RelatedParams[DocketParams],
+        OriginatingCourtInformation,
     ]:
         """A forward one-to-one is only ever created from here; the parent hands over any existing object itself."""
         return state.create()
 
 
-class PartyMerger(Merger[Scrape, RelatedParams[DocketParams], Party]):
+class PartyMerger(Merger[dict[str, Any], RelatedParams[DocketParams], Party]):
     config: ClassVar[MergerConfig[Party]] = MergerConfig(
         model=Party, key=("name",)
     )
 
-    name: str = ScrapeProxy(Scrape)["name"]
+    name: str = ScrapeProxy(dict[str, Any])["name"]
 
 
 class PartyTypeMerger(
-    Merger[Scrape, ThroughParameters[DocketParams], PartyType]
+    Merger[dict[str, Any], ThroughParameters[DocketParams], PartyType]
 ):
     config: ClassVar[MergerConfig[PartyType]] = MergerConfig(
         model=PartyType, key=("name",)
     )
 
-    name: str = ScrapeProxy(Scrape)["type"]
+    name: str = ScrapeProxy(dict[str, Any])["type"]
 
 
-class DocketMerger(Merger[Scrape, DocketParams, Docket]):
+class DocketMerger(Merger[dict[str, Any], DocketParams, Docket]):
     config: ClassVar[MergerConfig[Docket]] = MergerConfig(
         model=Docket,
         key=(
@@ -191,33 +199,33 @@ class DocketMerger(Merger[Scrape, DocketParams, Docket]):
 
     court_id: str = Params(DocketParams).court_id
     source: int = Constant(DocketSources.SCRAPER)
-    docket_number: str = ScrapeProxy(Scrape)["docket_number"]
-    case_name: str = ScrapeProxy(Scrape)["case_name"]
+    docket_number: str = ScrapeProxy(dict[str, Any])["docket_number"]
+    case_name: str = ScrapeProxy(dict[str, Any])["case_name"]
 
 
 class DocketWithEntriesMerger(DocketMerger):
     docket_entries: list[DocketEntry] = OneToManyRelation(
-        EntryMerger, ScrapeProxy(Scrape)["entries"]
+        EntryMerger, ScrapeProxy(dict[str, Any])["entries"]
     )
 
 
 class DocketWithOriginMerger(DocketMerger):
     originating_court_information: OriginatingCourtInformation = (
-        OneToOneRelation(OriginMerger, ScrapeProxy(Scrape)["origin"])
+        OneToOneRelation(OriginMerger, ScrapeProxy(dict[str, Any])["origin"])
     )
 
 
 class DocketWithPartiesMerger(DocketMerger):
     parties: list[Party] = ManyToManyRelation(
         PartyMerger,
-        ScrapeProxy(Scrape)["parties"],
+        ScrapeProxy(dict[str, Any])["parties"],
         PartyTypeMerger,
     )
 
 
 class RejectingDocketMerger(DocketMerger):
     @staticmethod
-    def validator(scrape: Scrape) -> bool:
+    def validator(scrape: dict[str, Any]) -> bool:
         return False
 
 
@@ -267,7 +275,7 @@ class SpecificationBench:
 
     def bench_related_validation(self, benchmark: BenchmarkFixture):
         spec = OneToManyRelation(
-            EntryMerger, cast(AttributeMerger, ScrapeProxy(Scrape))
+            EntryMerger, ScrapeProxy(list[dict[str, Any]])
         )
         spec._name = "docket_entries"
 
@@ -309,7 +317,7 @@ class ClassCreationBench:
 
     def bench_subclass_init_one_to_one(self, benchmark: BenchmarkFixture):
         def run():
-            class OneToOneMerger(Merger[Scrape, None, Docket]):
+            class OneToOneMerger(Merger[dict[str, Any], None, Docket]):
                 config: ClassVar[MergerConfig[Docket]] = MergerConfig(
                     model=Docket
                 )
@@ -317,7 +325,7 @@ class ClassCreationBench:
                 originating_court_information: OriginatingCourtInformation = (
                     OneToOneRelation(
                         OriginMerger,
-                        cast(AttributeMerger, ScrapeProxy(Scrape)),
+                        ScrapeProxy(dict[str, Any]),
                     )
                 )
 
@@ -325,28 +333,28 @@ class ClassCreationBench:
 
     def bench_subclass_init_one_to_many(self, benchmark: BenchmarkFixture):
         def run():
-            class OneToManyMerger(Merger[Scrape, None, Docket]):
+            class OneToManyMerger(Merger[dict[str, Any], None, Docket]):
                 config: ClassVar[MergerConfig[Docket]] = MergerConfig(
                     model=Docket
                 )
 
                 docket_entries: list[DocketEntry] = OneToManyRelation(
                     EntryMerger,
-                    cast(AttributeMerger, ScrapeProxy(Scrape)),
+                    ScrapeProxy(list[dict[str, Any]]),
                 )
 
         benchmark(run)
 
     def bench_subclass_init_many_to_many(self, benchmark: BenchmarkFixture):
         def run():
-            class ManyToManyMerger(Merger[Scrape, None, Docket]):
+            class ManyToManyMerger(Merger[dict[str, Any], None, Docket]):
                 config: ClassVar[MergerConfig[Docket]] = MergerConfig(
                     model=Docket
                 )
 
                 parties: list[Party] = ManyToManyRelation(
                     PartyMerger,
-                    cast(AttributeMerger, ScrapeProxy(Scrape)),
+                    ScrapeProxy(list[dict[str, Any]]),
                     PartyTypeMerger,
                 )
 
@@ -363,10 +371,12 @@ class ClassCreationBench:
 
     def bench_subclass_init_abstract(self, benchmark: BenchmarkFixture):
         def run():
-            class AbstractMerger(Merger[Scrape, None, Docket], abstract=True):
+            class AbstractMerger(
+                Merger[dict[str, Any], None, Docket], abstract=True
+            ):
                 docket_entries: list[DocketEntry] = OneToManyRelation(
                     EntryMerger,
-                    cast(AttributeMerger, ScrapeProxy(Scrape)),
+                    ScrapeProxy(list[dict[str, Any]]),
                 )
 
         benchmark(run)
@@ -396,12 +406,12 @@ class InstanceInitBench:
         class AllRelationsMerger(DocketWithPartiesMerger):
             docket_entries: list[DocketEntry] = OneToManyRelation(
                 EntryMerger,
-                ScrapeProxy(Scrape)["entries"],
+                ScrapeProxy(dict[str, Any])["entries"],
             )
             originating_court_information: OriginatingCourtInformation = (
                 OneToOneRelation(
                     OriginMerger,
-                    ScrapeProxy(Scrape)["origin"],
+                    ScrapeProxy(dict[str, Any])["origin"],
                 )
             )
 
@@ -537,7 +547,7 @@ def court(db: None) -> Court:
     return CourtFactory.create()
 
 
-def per_round_scrapes() -> Callable[[], Scrape]:
+def per_round_scrapes() -> Callable[[], dict[str, Any]]:
     """Build a scrape with a docket number nobody has used before, for the benches that create a fresh object every round."""
     counter = count()
     return lambda: make_scrape(f"NEW-{next(counter)}")

@@ -1,6 +1,6 @@
 from collections.abc import Callable, Sequence
 from datetime import date
-from typing import Any, ClassVar, cast
+from typing import Any, ClassVar
 
 from juriscraper.state.docket import (
     Docket as ScrapeDocket,
@@ -22,7 +22,6 @@ from cl.corpus_importer.state.merger import (
     Scrape,
     WithStrategy,
 )
-from cl.corpus_importer.state.merger.specifications import AttributeMerger
 from cl.people_db.models import Party
 from cl.search.models import Docket
 
@@ -60,7 +59,7 @@ def PartyRelation(
     """
     return ManyToManyRelation(
         merger,
-        cast(AttributeMerger, Fn(transform)(Scrape(Any), Params(Any))),
+        Fn(transform)(Scrape(Any), Params(Any)),
         party_type,
         strategy=ManyStrategy.DISASSOCIATE,
     )
@@ -75,7 +74,7 @@ def DocketEntryRelation(
     """Merge a docket's entries. Entries resolve the party that filed them against the docket's parties, so those are merged first."""
     return OneToManyRelation(
         merger,
-        cast(AttributeMerger, Fn(transform)(Scrape(Any), Params(Any))),
+        Fn(transform)(Scrape(Any), Params(Any)),
         strategy=strategy,
         after=["parties"],
     )

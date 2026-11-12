@@ -226,8 +226,7 @@ def _ancestor[M: Model](model: type[M], scrape: Any, params: Any) -> M:
         The nearest parent that is an instance of `model`.
 
     Raises:
-        TypeError: If no parent of that type is in the chain, including when
-            `params` is not a `RelatedParams` at all.
+        TypeError: If no parent of that type is in the chain
     """
     current = params
     while isinstance(current, RelatedParams):
@@ -699,10 +698,12 @@ class OneToOneMerger[Scrape, Params, Child, RM: Model](
 
 def OneToOneRelation[Scrape, Params, Child, RM: Model](
     merger: type[Merger[Child, RelatedParams[Params], RM]],
-    attribute: AttributeMerger[Scrape, Params, Child | None],
+    attribute: Child | None,
     *,
     after: Iterable[str] = (),
 ) -> Any:
+    if not isinstance(attribute, AttributeMerger):
+        raise TypeError("The value of `attribute` must be an attribute merger")
     return OneToOneMerger(merger, attribute, after=after)
 
 
@@ -824,11 +825,13 @@ class OneToManyMerger[Scrape, Params, Child, RM: Model](
 
 def OneToManyRelation[Scrape, Params, Child, RM: Model](
     merger: type[Merger[Child, RelatedParams[Params], RM]],
-    attribute: AttributeMerger[Scrape, Params, Sequence[Child]],
+    attribute: Sequence[Child],
     *,
     strategy: ManyStrategy = ManyStrategy.REPLACE,
     after: Iterable[str] = (),
 ) -> Any:
+    if not isinstance(attribute, AttributeMerger):
+        raise TypeError("The value of `attribute` must be an attribute merger")
     return OneToManyMerger(merger, attribute, strategy=strategy, after=after)
 
 
@@ -1003,7 +1006,7 @@ class ManyToManyMerger[
 
 def ManyToManyRelation[Scrape, Params, Child, ThruM: Model, RM: Model](
     merger: type[Merger[Child, RelatedParams[Params], RM]],
-    attribute: AttributeMerger[Scrape, Params, Sequence[Child]],
+    attribute: Sequence[Child],
     through: type[Merger[Child, ThroughParameters[Params], ThruM]]
     | None = None,
     *,
@@ -1011,6 +1014,8 @@ def ManyToManyRelation[Scrape, Params, Child, ThruM: Model, RM: Model](
     through_strategy: ManyStrategy = ManyStrategy.REPLACE,
     after: Iterable[str] = (),
 ) -> Any:
+    if not isinstance(attribute, AttributeMerger):
+        raise TypeError("The value of `attribute` must be an attribute merger")
     return ManyToManyMerger(
         merger,
         attribute,

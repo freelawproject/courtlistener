@@ -197,11 +197,6 @@ type NonTerminal[Scrape, Params, M: Model] = (
 )
 
 
-def is_non_terminal(v: object) -> TypeIs[NonTerminal]:
-    """Whether a value is a state the merge can still move on from."""
-    return isinstance(v, Lookup | Resolve | Create | Update | Children)
-
-
 type CompleteInput[Scrape, Params, M: Model] = NonTerminal[Scrape, Params, M]
 type CompleteOutput[Scrape, Params, M: Model] = "Complete[Scrape, Params, M]"
 
@@ -285,14 +280,13 @@ class Machine[Scrape, Params, M: Model](ABC):
     """The current state of the merge operation"""
 
     def step(self) -> AnyState[Scrape, Params, M]:
-        """Take one step in the merge if it's in a non-terminal state. Otherwise, do nothing.
+        """Run the current merge state and transition to the next.
+
+        No guards are implemented to prevent repeatedly running terminal states.
 
         Returns:
             The next state
         """
-        if is_terminal(self.state):
-            return self.state
-
         state = getattr(self, self.runners[self.state.__class__])(self.state)
 
         self.state = state
@@ -355,9 +349,5 @@ class Machine[Scrape, Params, M: Model](ABC):
         """
         while not is_terminal(self.state):
             self.step()
-
-        self.state = getattr(self, self.runners[self.state.__class__])(
-            self.state
-        )
 
         return self.state

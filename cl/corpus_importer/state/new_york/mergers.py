@@ -48,7 +48,6 @@ from cl.corpus_importer.state.merger import (
     WithStrategy,
     overwrite_if_present,
 )
-from cl.corpus_importer.state.merger.specifications import AttributeMerger
 from cl.corpus_importer.state.new_york.nycourts_gov import (
     NYCoAAttorney,
     NYCoACase,
@@ -788,7 +787,7 @@ class NYCoADocketMetadataMerger(
     # the scrape is one the Court removed.
     issues: list[NYCoADocketIssue] = OneToManyRelation(
         NYCoAIssueMerger,
-        cast(AttributeMerger, Fn(_case_issues)(Scrape(NYCoACase))),
+        Fn(_case_issues)(Scrape(NYCoACase)),
         strategy=ManyStrategy.REPLACE,
     )
     decision_date: date | None = Scrape(NYCoACase).decision_date
@@ -851,7 +850,7 @@ class NYCoADocketMerger(DocketMerger[NYCoACase, None]):
     # The NYCoA metadata is spread across the case's own fields rather than
     # nested under a key of its own, so the metadata merger takes the case.
     nycoa_metadata: NYCoADocketMetadata = OneToOneRelation(
-        NYCoADocketMetadataMerger, cast(AttributeMerger, Scrape(NYCoACase))
+        NYCoADocketMetadataMerger, Scrape(NYCoACase)
     )
 
     stored_files: Mapping[int, tuple[str, str]] = {}

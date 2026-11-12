@@ -1,5 +1,5 @@
 from collections.abc import Callable, Sequence
-from typing import Any, ClassVar, cast, override
+from typing import Any, ClassVar, override
 
 from django.db import connection
 from django.db.models import Model, QuerySet
@@ -27,7 +27,6 @@ from cl.corpus_importer.state.merger import (
     ThroughParameters,
     Update,
 )
-from cl.corpus_importer.state.merger.specifications import AttributeMerger
 from cl.people_db.factories import PersonFactory
 from cl.people_db.models import Party, PartyType, Person
 from cl.search.docket_sources import DocketSources
@@ -415,7 +414,7 @@ class BaseMergerTest(TestCase):
 
                 docket_entries: list[DocketEntry] = OneToOneRelation(
                     TestRelatedMerger,
-                    cast(AttributeMerger, Scrape(Any)),
+                    Scrape(dict[str, str] | None),
                 )
 
     @merger_test(expected_query_count=5)

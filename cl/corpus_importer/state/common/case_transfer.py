@@ -10,7 +10,7 @@ both FKs is handled later by ``CaseTransfer.fill_null_dockets``.
 import logging
 from collections.abc import Callable, Sequence
 from datetime import date
-from typing import Any, ClassVar, cast, override
+from typing import Any, ClassVar, override
 
 from juriscraper.state.docket import Docket as ScrapeDocket
 from juriscraper.state.docket import (
@@ -32,7 +32,6 @@ from cl.corpus_importer.state.merger import (
     RelatedParams,
     Scrape,
 )
-from cl.corpus_importer.state.merger.specifications import AttributeMerger
 from cl.search.models import CaseTransfer, Docket
 
 logger = logging.getLogger(__name__)
@@ -177,6 +176,6 @@ def CaseTransferRelation(
 ) -> list[CaseTransfer]:
     return OneToManyRelation(
         merger,
-        cast(AttributeMerger, Fn(transform)(Scrape(Any), Params(Any))),
+        Fn(transform)(Scrape(Any), Params(Any)),
         strategy=strategy,
     )

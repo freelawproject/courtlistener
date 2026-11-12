@@ -17,7 +17,6 @@ from cl.corpus_importer.state.merger import (
     Scrape,
     ThroughParameters,
 )
-from cl.corpus_importer.state.merger.specifications import AttributeMerger
 from cl.people_db.models import Attorney, Party, PartyType, Role
 from cl.search.models import Docket
 
@@ -76,7 +75,7 @@ def AttorneyRelation(
 ) -> Sequence[Attorney]:
     return ManyToManyRelation(
         attorney,
-        cast(AttributeMerger, Fn(transform)(Scrape(Any), Params(Any))),
+        Fn(transform)(Scrape(Any), Params(Any)),
         role,
         strategy=ManyStrategy.DISASSOCIATE,
     )
