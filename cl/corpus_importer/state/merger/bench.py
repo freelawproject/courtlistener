@@ -20,18 +20,6 @@ import pytest
 from django.db.models import Model, QuerySet
 from pytest_benchmark.fixture import BenchmarkFixture
 
-from cl.corpus_importer.state.merger import (
-    Attribute,
-    ManyToManyRelation,
-    Merger,
-    MergerSpecRegistry,
-    OneToManyRelation,
-    OneToOneRelation,
-    RelatedParams,
-    ThroughParameters,
-    overwrite,
-    overwrite_if_present,
-)
 from cl.corpus_importer.state.utils import MergeResult
 from cl.people_db.models import Party, PartyType
 from cl.search.docket_sources import DocketSources
@@ -41,6 +29,23 @@ from cl.search.models import (
     Docket,
     DocketEntry,
     OriginatingCourtInformation,
+)
+
+from .base import (
+    Merger,
+    MergerSpecRegistry,
+    RelatedParams,
+    ThroughParameters,
+)
+from .specifications import (
+    Attribute,
+    ManyToManyRelation,
+    OneToManyRelation,
+    OneToOneRelation,
+)
+from .strategy import (
+    overwrite,
+    overwrite_if_present,
 )
 
 Scrape = dict[str, Any]
