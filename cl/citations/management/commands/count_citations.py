@@ -1,3 +1,5 @@
+"""Recompute the citation counts of opinion clusters."""
+
 import time
 
 from django.db import transaction
@@ -9,9 +11,12 @@ from cl.search.models import OpinionCluster, OpinionsCited
 
 
 class Command(VerboseCommand):
+    """Recompute cluster citation counts, either for given clusters or for an ID range."""
+
     help = "Update the citation counts of all items, if they are wrong."
 
     def add_arguments(self, parser):
+        """Add the doc ID, OpinionsCited mode, cluster ID range, and step size options."""
         parser.add_argument(
             "--doc-id",
             type=int,
@@ -97,6 +102,11 @@ class Command(VerboseCommand):
     def update_cluster_citation_count_from_opinions_cited(
         self, start_cluster_id: int, end_cluster_id: int
     ) -> None:
+        """Set the citation count of clusters in an ID range from the OpinionsCited table.
+
+        The range includes ``start_cluster_id`` and excludes
+        ``end_cluster_id``. Clusters with no citing rows get a count of zero.
+        """
         # Group by OpinionCluster.id and count all the OpinionsCited rows for
         # all of its subopinions
         count_by_cluster_subquery = Subquery(

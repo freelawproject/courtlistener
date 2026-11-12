@@ -1,3 +1,5 @@
+"""Helpers for reporters, citation types, and finding citations in text."""
+
 from datetime import date
 from typing import TYPE_CHECKING
 

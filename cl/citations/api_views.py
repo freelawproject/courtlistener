@@ -1,3 +1,5 @@
+"""REST API viewsets for looking up citations."""
+
 from http import HTTPStatus
 
 from asgiref.sync import async_to_sync
@@ -28,6 +30,8 @@ from cl.search.selectors import get_clusters_from_citation_str
 
 
 class CitationLookupViewSet(LoggingMixin, CreateModelMixin, GenericViewSet):
+    """API endpoint that finds the opinion clusters for citations."""
+
     queryset = OpinionCluster.objects.all()
     serializer_class = CitationAPIRequestSerializer
     permission_classes = [IsAuthenticated, V3APIPermission]
@@ -35,6 +39,11 @@ class CitationLookupViewSet(LoggingMixin, CreateModelMixin, GenericViewSet):
     citation_list: list[FullCaseCitation | ShortCaseCitation] = []
 
     def validate_request_data(self, request: Request):
+        """Validate the request's data and return it.
+
+        Raises:
+            ValidationError: If the request's data is invalid.
+        """
         # Perform object level validations before extracting citations
         citation_serializer = CitationAPIRequestSerializer(data=request.data)
         citation_serializer.is_valid(raise_exception=True)
@@ -42,6 +51,11 @@ class CitationLookupViewSet(LoggingMixin, CreateModelMixin, GenericViewSet):
         return citation_serializer.validated_data
 
     def create(self, request: Request, *args, **kwargs):
+        """Look up the citations in the request's text, or its single reporter citation.
+
+        Citations past ``MAX_CITATIONS_PER_REQUEST`` get a 429 status
+        instead of being looked up.
+        """
         citations = []
         data = self.validate_request_data(request)
         text = data.get("text", None)

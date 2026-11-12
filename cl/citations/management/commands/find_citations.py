@@ -1,3 +1,5 @@
+"""Queue tasks to find citations and parentheticals in opinions."""
+
 import sys
 import time
 from collections.abc import Iterable
@@ -20,9 +22,12 @@ DEFAULT_OPINIONS_PER_TASK = 50
 
 
 class Command(VerboseCommand):
+    """Find citations and parentheticals in a selection of opinions."""
+
     help = "Parse citations and parentheticals from court opinions."
 
     def add_arguments(self, parser: CommandParser) -> None:
+        """Add the opinion selection, queue, throttling, and disabling options."""
         parser.add_argument(
             "--doc-id",
             type=int,
@@ -118,6 +123,16 @@ class Command(VerboseCommand):
         )
 
     def handle(self, *args, **options) -> None:
+        """Select the opinions to process and queue them.
+
+        Only opinions that aren't versions of another opinion are processed.
+        ``--all`` ignores the other filters and always disables parenthetical
+        grouping and citation count updates.
+
+        Raises:
+            CommandError: If both a list of documents and ranges are given,
+                or the state has no courts.
+        """
         super().handle(*args, **options)
         both_list_and_endpoints = options.get("doc_id") is not None and (
             options.get("start_id") is not None
@@ -208,6 +223,10 @@ class Command(VerboseCommand):
         )
 
     def log_progress(self, processed_count: int, last_pk: int) -> None:
+        """Write the percent done, rate, and last ID to stdout.
+
+        The rate is updated every 1,000 items.
+        """
         if processed_count % 1000 == 1:
             self.t1 = time.time()
         if processed_count % 1000 == 0:
@@ -240,6 +259,7 @@ class Command(VerboseCommand):
         disable_parenthetical_groups: bool = False,
         disable_citation_count_update: bool = False,
     ) -> None:
+        """Queue citation-finding tasks for the opinions in chunks, throttling the queue."""
         sys.stdout.write(f"Graph size is {self.count:d} nodes.\n")
         sys.stdout.flush()
 
