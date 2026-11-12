@@ -1,3 +1,5 @@
+"""Types for showing the authorities cited by opinions and RECAP documents."""
+
 from dataclasses import dataclass, field
 from typing import Literal
 
@@ -12,6 +14,8 @@ from cl.search.models import (
 
 @dataclass
 class ViewAuthority:
+    """A cited authority as shown on a page: its caption, citation count, and link."""
+
     caption: str
     count: int
     url: str
@@ -19,6 +23,11 @@ class ViewAuthority:
 
 @dataclass
 class AuthoritiesContext:
+    """Template context for the authorities cited by an opinion cluster or RECAP document.
+
+    Call ``post_init`` before use to fill in the authorities.
+    """
+
     citation_record: OpinionCluster | RECAPDocument
     query_string: str
     full_list_authorities: (
@@ -31,6 +40,7 @@ class AuthoritiesContext:
     query_all_authorities: bool = False
 
     async def post_init(self) -> None:
+        """Set the top five authorities, and for RECAP documents the full list of authorities."""
         if isinstance(self.citation_record, RECAPDocument):
             self.full_list_authorities = (
                 self.citation_record.authorities_with_data

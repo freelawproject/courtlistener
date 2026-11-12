@@ -1,3 +1,5 @@
+"""Sitemaps of opinion cluster and docket pages."""
+
 from datetime import datetime, timedelta
 
 from django.contrib import sitemaps
@@ -22,11 +24,14 @@ from cl.sitemaps_infinite.base_sitemap import InfinitePaginatorSitemap
 
 
 class OpinionSitemap(sitemaps.Sitemap):
+    """Sitemap of unblocked, published opinion clusters that are cited or recent."""
+
     changefreq = "yearly"
     priority = 0.5
     limit = 50_000
 
     def items(self) -> QuerySet[OpinionCluster]:
+        """Get the published, unblocked clusters filed in the last 75 years that are cited or were filed in the last ten years."""
         # Unblocked precedential cases that are published in the last 75 years
         # and that have at least one citation, or that were published in the
         # last ten years and not yet cited.
@@ -45,6 +50,7 @@ class OpinionSitemap(sitemaps.Sitemap):
         )
 
     def lastmod(self, obj: OpinionCluster) -> datetime:
+        """Use the cluster's modification date."""
         return obj.date_modified
 
 
@@ -60,6 +66,7 @@ class BlockedOpinionSitemap(sitemaps.Sitemap):
     limit = 50_000
 
     def items(self) -> QuerySet[OpinionCluster]:
+        """Get the clusters blocked in the last 30 days."""
         return (
             OpinionCluster.objects.filter(
                 blocked=True,
@@ -70,22 +77,28 @@ class BlockedOpinionSitemap(sitemaps.Sitemap):
         )
 
     def lastmod(self, obj: OpinionCluster) -> datetime:
+        """Use the cluster's modification date."""
         return obj.date_modified
 
 
 class DocketSitemap(InfinitePaginatorSitemap):
+    """Sitemap of unblocked RECAP dockets that are viewed often or were filed recently."""
+
     changefreq = "weekly"
     limit = 50_000
 
     @property
     def section(self) -> str:
+        """The RECAP search type."""
         return SEARCH_TYPES.RECAP
 
     @property
     def ordering(self) -> tuple[str]:
+        """Order dockets by primary key."""
         return ("pk",)
 
     def items(self) -> QuerySet[Docket]:
+        """Get the unblocked RECAP dockets with more than ten views or filed in the last 30 days."""
         # Give items ten days to get some views.
         recent_date = datetime.today() - timedelta(days=30)
 
@@ -112,15 +125,18 @@ class DocketSitemap(InfinitePaginatorSitemap):
         )
 
     def lastmod(self, obj: Docket) -> datetime:
+        """Use the docket's modification date."""
         return obj.date_modified
 
     def get_latest_lastmod(self) -> datetime | None:
+        """Get the latest modification date among the sitemap's dockets, if there are any."""
         latest_modified = self.items().order_by("-date_modified").first()
         if latest_modified is None:
             return None
         return latest_modified.date_modified
 
     def priority(self, obj: Docket) -> float:
+        """Rank the docket from 0.3 to 0.65 by its view count."""
         view_count = obj.view_counter
         priority = 0.5
         if view_count <= 1:
@@ -137,11 +153,14 @@ class DocketSitemap(InfinitePaginatorSitemap):
 
 
 class BlockedDocketSitemap(sitemaps.Sitemap):
+    """Sitemap of RECAP dockets blocked in the last 30 days."""
+
     changefreq = "daily"
     limit = 50_000
     priority = 0.6
 
     def items(self) -> QuerySet[Docket]:
+        """Get the RECAP dockets blocked in the last 30 days."""
         return (
             Docket.objects.filter(
                 source__in=Docket.RECAP_SOURCES(),
@@ -153,4 +172,5 @@ class BlockedDocketSitemap(sitemaps.Sitemap):
         )
 
     def lastmod(self, obj: Docket) -> datetime:
+        """Use the docket's modification date."""
         return obj.date_modified

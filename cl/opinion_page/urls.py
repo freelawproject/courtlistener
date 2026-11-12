@@ -1,3 +1,5 @@
+"""URL routes for opinion, docket, and citation pages."""
+
 from django.urls import URLPattern, path, re_path
 
 from cl.opinion_page.views import (
