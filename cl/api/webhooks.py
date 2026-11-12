@@ -1,3 +1,5 @@
+"""Build and send webhook events to users' endpoints."""
+
 import json
 import random
 

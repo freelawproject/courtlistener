@@ -1,3 +1,5 @@
+"""Django admin configuration for API throttles and webhooks."""
+
 from django import forms
 from django.contrib import admin
 
@@ -19,6 +21,7 @@ class APIThrottleInlineForm(forms.ModelForm):
         fields = ("user", "throttle_type", "rate", "source", "notes")
 
     def __init__(self, *args, **kwargs):
+        """Build the form, disabling every field for existing MEMBERSHIP throttles."""
         super().__init__(*args, **kwargs)
 
         instance = self.instance
@@ -33,6 +36,8 @@ class APIThrottleInlineForm(forms.ModelForm):
 
 @admin.register(APIThrottle)
 class APIThrottleAdmin(admin.ModelAdmin):
+    """Admin for per-user API throttle overrides."""
+
     raw_id_fields = ("user",)
     list_display = (
         "user",
@@ -72,6 +77,8 @@ class APIThrottleAdmin(admin.ModelAdmin):
 
 
 class APIThrottleInline(admin.TabularInline):
+    """Inline for editing API throttles, with MEMBERSHIP throttles read-only."""
+
     model = APIThrottle
     extra = 0
     raw_id_fields = ("user",)
@@ -81,6 +88,8 @@ class APIThrottleInline(admin.TabularInline):
 
 @admin.register(Webhook)
 class WebhookAdmin(admin.ModelAdmin):
+    """Admin for webhooks."""
+
     raw_id_fields = ("user",)
     list_display = (
         "__str__",
@@ -101,12 +110,16 @@ class WebhookAdmin(admin.ModelAdmin):
 
 
 class WebhookInline(admin.TabularInline):
+    """Inline for editing webhooks on a parent object's admin page."""
+
     model = Webhook
     extra = 1
 
 
 @admin.register(WebhookEvent)
 class WebhookEventAdmin(admin.ModelAdmin):
+    """Admin for webhook events."""
+
     raw_id_fields = ("webhook",)
     list_display = (
         "__str__",

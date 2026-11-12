@@ -1,3 +1,5 @@
+"""REST API authentication classes that route eligible reads to a replica."""
+
 from contextvars import Token
 
 from django.contrib.auth.models import AbstractBaseUser, AnonymousUser
@@ -73,6 +75,7 @@ class ReplicaRoutingBasicAuthentication(BasicAuthentication):
     """BasicAuthentication that activates replica routing after auth."""
 
     def authenticate(self, request: Request):
+        """Authenticate, then activate replica routing if a user was found."""
         result = super().authenticate(request)
         if result is not None:
             _activate_replica_routing(request, result[0])
@@ -83,6 +86,7 @@ class ReplicaRoutingTokenAuthentication(TokenAuthentication):
     """TokenAuthentication that activates replica routing after auth."""
 
     def authenticate(self, request: Request):
+        """Authenticate, then activate replica routing if a user was found."""
         result = super().authenticate(request)
         if result is not None:
             _activate_replica_routing(request, result[0])
@@ -99,6 +103,13 @@ class ReplicaRoutingOAuth2Authentication(OAuth2Authentication):
     """OAuth2Authentication that requires the ``api`` scope and activates replica routing after auth."""
 
     def authenticate(self, request: Request):
+        """Authenticate a bearer token, then activate replica routing.
+
+        Raises:
+            InsufficientScope: If the token lacks the ``api`` scope.
+            exceptions.AuthenticationFailed: If a bearer token was sent but
+                is invalid or expired.
+        """
         result = super().authenticate(request)
         if result is not None:
             user, token = result
@@ -125,6 +136,7 @@ class ReplicaRoutingSessionAuthentication(SessionAuthentication):
     """
 
     def authenticate(self, request: Request):
+        """Authenticate, then activate replica routing even if no user was found."""
         result = super().authenticate(request)
         _activate_replica_routing(
             request, result[0] if result is not None else None
