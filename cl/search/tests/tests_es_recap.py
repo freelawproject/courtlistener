@@ -7359,7 +7359,9 @@ class SCOTUSESIndexingSignalTest(
         self.assertTrue(ESRECAPDocument.exists(id=ES_CHILD_ID(rd.pk).RECAP))
 
     def test_scotus_dockets_are_sent_to_the_percolator(self) -> None:
-        """A SCOTUS Docket's ES save and update are percolated, like a RECAP
+        """Check SCOTUS Docket saves and updates are percolated.
+
+        A SCOTUS Docket's ES save and update are percolated, like a RECAP
         Docket's.
         """
         # Not indexed yet: es_save_document only percolates a first write.

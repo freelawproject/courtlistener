@@ -439,8 +439,10 @@ class ScotusDocketMergeTest(TestCase):
     def test_merge_scotus_docket_indexes_parties_in_es(
         self, mock_index_parties: mock.MagicMock
     ) -> None:
-        """Party rows don't trigger ES signals, so merging a SCOTUS docket
-        with parties must index them in ES explicitly, like RECAP does. Like
+        """Check merging a SCOTUS docket indexes its parties in ES.
+
+        Party rows don't trigger ES signals, so merging a SCOTUS docket with
+        parties must index them in ES explicitly, like RECAP does. Like
         RECAP, parties within the attorney limit percolate the docket after
         they're indexed, on every merge.
         """
@@ -465,7 +467,9 @@ class ScotusDocketMergeTest(TestCase):
     def test_merge_scotus_docket_without_parties(
         self, mock_index_parties: mock.MagicMock
     ) -> None:
-        """Without parties, a new docket is still percolated once through
+        """Check merging a SCOTUS docket without parties.
+
+        A new docket is still percolated once through
         index_docket_parties_in_es, but merging into an existing docket has
         nothing to index.
         """
@@ -488,10 +492,12 @@ class ScotusDocketMergeTest(TestCase):
     def test_merge_scotus_docket_percolates_opinion_docket_becoming_scotus(
         self, mock_index_parties: mock.MagicMock
     ) -> None:
-        """An existing opinion-only docket that becomes SCOTUS docket
-        content (it gets its ScotusDocketMetadata now) is percolated once
-        through index_docket_parties_in_es, even without parties: its first
-        ES write comes from the metadata save, which isn't percolated.
+        """Check an opinion-only docket becoming SCOTUS content is percolated.
+
+        An existing opinion-only docket that gets its ScotusDocketMetadata
+        now is percolated once through index_docket_parties_in_es, even
+        without parties: its first ES write comes from the metadata save,
+        which isn't percolated.
         """
         opinion_docket = DocketFactory(
             court=self.court, source=Docket.SCRAPER, docket_number="23-1234"

@@ -640,14 +640,18 @@ def should_percolate_update(
     related_instance_app_label: str | None,
     fields_to_update: list[str],
 ) -> bool:
-    """Decide whether a partial ES update of a docket or a docket-source
-    document (RECAP, SCOTUS) should be percolated to trigger search alerts.
+    """Decide whether a partial ES update should trigger search alerts.
 
-    :param main_instance: The updated main instance.
-    :param related_instance_app_label: The app label of the related instance
-    whose change triggered the update, if any.
-    :param fields_to_update: The ES fields updated.
-    :return: True if the update should be percolated.
+    Covers dockets and docket-source documents (RECAP, SCOTUS).
+
+    Args:
+        main_instance: The updated main instance.
+        related_instance_app_label: The app label of the related instance
+            whose change triggered the update, if any.
+        fields_to_update: The ES fields updated.
+
+    Returns:
+        True if the update should be percolated.
     """
     if related_instance_app_label and (
         apps.get_model(related_instance_app_label) in SOURCE_METADATA_MODELS

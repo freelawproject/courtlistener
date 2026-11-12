@@ -844,11 +844,16 @@ def get_docket_source(
 
 
 def search_alerts_percolation_enabled(response: SaveESDocumentReturn) -> bool:
-    """Whether search alerts percolation is enabled for an indexed
-    document, according to its PERCOLATOR_*_SEARCH_ALERTS_ENABLED setting.
+    """Check whether a document's search alerts percolation is enabled.
 
-    :param response: The indexed document to percolate.
-    :return: True if the document should be percolated.
+    Each source has its own PERCOLATOR_*_SEARCH_ALERTS_ENABLED setting;
+    opinions use PERCOLATOR_OPINIONS_SEARCH_ALERTS_ENABLED.
+
+    Args:
+        response: The indexed document to percolate.
+
+    Returns:
+        True if the document should be percolated.
     """
     if source := get_docket_source(
         response.app_label, response.document_content
