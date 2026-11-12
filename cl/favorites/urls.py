@@ -1,3 +1,5 @@
+"""URL routes for notes, tags, and prayers."""
+
 from django.urls import path
 
 from cl.favorites import views

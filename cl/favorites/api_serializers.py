@@ -1,3 +1,5 @@
+"""REST API serializers for tags, prayers, and event counts."""
+
 import re
 
 from asgiref.sync import async_to_sync
@@ -14,6 +16,8 @@ from cl.search.models import Docket
 
 
 class UserTagSerializer(DynamicFieldsMixin, ModelSerializer):
+    """Serializer for tags owned by the requesting user."""
+
     user = serializers.HiddenField(default=serializers.CurrentUserDefault())
     description = serializers.CharField(
         max_length=250_000,  # Huge, but small enough to prevent DOS. ~1MB
@@ -32,6 +36,8 @@ class UserTagSerializer(DynamicFieldsMixin, ModelSerializer):
 
 
 class DocketTagSerializer(DynamicFieldsMixin, ModelSerializer):
+    """Serializer for a tag applied to a docket."""
+
     docket = serializers.PrimaryKeyRelatedField(
         queryset=Docket.objects.all(), style={"base_template": "input.html"}
     )
@@ -45,6 +51,7 @@ class DocketTagSerializer(DynamicFieldsMixin, ModelSerializer):
         fields = "__all__"
 
     def __init__(self, *args, **kwargs):
+        """Build the serializer, limiting writable tags to the requesting user's own."""
         super().__init__(*args, **kwargs)
         # Scope writable `tag` values to the requester's own tags
         # (GHSA-cvh7-rv7v-wx2j-class).
@@ -60,6 +67,8 @@ class DocketTagSerializer(DynamicFieldsMixin, ModelSerializer):
 
 
 class PrayerSerializer(DynamicFieldsMixin, serializers.ModelSerializer):
+    """Serializer for the requesting user's prayers."""
+
     user = serializers.HiddenField(default=serializers.CurrentUserDefault())
 
     class Meta:
@@ -68,6 +77,12 @@ class PrayerSerializer(DynamicFieldsMixin, serializers.ModelSerializer):
         read_only_fields = ("date_created",)
 
     def validate(self, data):
+        """Validate that the user can create this prayer.
+
+        Raises:
+            ValidationError: If the user already prayed for the document or
+                has reached their prayer limit.
+        """
         user = self.context["request"].user
         recap_document = data.get("recap_document")
 
@@ -88,9 +103,17 @@ class PrayerSerializer(DynamicFieldsMixin, serializers.ModelSerializer):
 
 
 class EventCountSerializer(serializers.Serializer):
+    """An event label to count."""
+
     label = serializers.CharField(required=True, max_length=255)
 
     def validate(self, attrs):
+        """Validate that the label is a docket, person, or opinion view label.
+
+        Raises:
+            serializers.ValidationError: If the label isn't formatted like
+                ``d.<id>:view``, ``p.<id>:view``, or ``o.<id>:view``.
+        """
         label = attrs.get("label")
         # Define a list of allowed regex patterns for valid labels
         # Currently supports:
