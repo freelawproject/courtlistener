@@ -1,3 +1,5 @@
+"""Index existing search alerts into their Elasticsearch percolator index."""
+
 from cl.alerts.models import Alert
 from cl.alerts.tasks import es_save_alert_document
 from cl.lib.command_utils import VerboseCommand, logger
@@ -10,9 +12,12 @@ from cl.search.models import SEARCH_TYPES
 
 
 class Command(VerboseCommand):
+    """Queue search alerts of one type for percolator indexing."""
+
     help = "Index existing Alert objects into Elasticsearch Percolator index."
 
     def add_arguments(self, parser):
+        """Add the pk offset, alert type, and target index options."""
         parser.add_argument(
             "--pk-offset",
             type=int,
@@ -32,6 +37,11 @@ class Command(VerboseCommand):
         )
 
     def handle(self, *args, **options):
+        """Queue an indexing task for each matching alert.
+
+        RECAP alerts include docket alerts. Unsupported alert types are
+        logged and skipped.
+        """
         super().handle(*args, **options)
         pk_offset = options["pk_offset"]
         alert_type = options["alert_type"]

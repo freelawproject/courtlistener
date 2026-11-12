@@ -1,3 +1,5 @@
+"""Helpers for percolating documents against search alerts and enforcing alert limits."""
+
 import copy
 from dataclasses import dataclass
 from datetime import date, datetime
@@ -86,12 +88,16 @@ COMMON_QUERY_PARAMS = {"type", "order_by", "semantic", "highlight"}
 
 @dataclass
 class DocketAlertReportObject:
+    """A docket alert and the docket it is on."""
+
     da_alert: DocketAlert
     docket: Docket
 
 
 @dataclass
 class TaskCompletionStatus:
+    """Progress of an Elasticsearch task."""
+
     completed: bool = False
     created: int = 0
     total: int = 0
@@ -99,24 +105,31 @@ class TaskCompletionStatus:
 
 
 class OldAlertReport:
+    """A user's docket alerts on terminated dockets, split into old, very old, and disabled alerts."""
+
     def __init__(self):
+        """Start with no alerts in any group."""
         self.old_alerts = []
         self.very_old_alerts = []
         self.disabled_alerts = []
 
     @property
     def old_dockets(self):
+        """The dockets of the old alerts."""
         return [obj.docket for obj in self.old_alerts]
 
     @property
     def very_old_dockets(self):
+        """The dockets of the very old alerts."""
         return [obj.docket for obj in self.very_old_alerts]
 
     @property
     def disabled_dockets(self):
+        """The dockets of the disabled alerts."""
         return [obj.docket for obj in self.disabled_alerts]
 
     def total_count(self):
+        """Count the alerts across all groups."""
         return (
             len(self.old_alerts)
             + len(self.very_old_alerts)
@@ -125,7 +138,7 @@ class OldAlertReport:
 
 
 class InvalidDateError(Exception):
-    pass
+    """Raised when a date is invalid."""
 
 
 def create_percolator_search_query(
@@ -700,6 +713,11 @@ def include_recap_document_hit(
 
 
 def get_field_names(mapping_dict):
+    """List the field names in an Elasticsearch mapping.
+
+    Includes subfields as ``field.subfield``, except those whose names end
+    in ``exact`` or ``raw``.
+    """
     field_names = []
     for key, value in mapping_dict["properties"].items():
         field_names.append(key)

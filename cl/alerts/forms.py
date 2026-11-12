@@ -1,3 +1,5 @@
+"""Forms for creating search alerts and confirming docket alerts."""
+
 from django import forms
 from django.core.exceptions import ValidationError
 from django.forms import ModelForm
@@ -22,6 +24,12 @@ from cl.search.models import SEARCH_TYPES
 
 
 class CreateAlertForm(ModelForm):
+    """Form for creating or editing a search alert.
+
+    Validation enforces the user's alert quotas, rejects match-all queries,
+    and blocks disallowed alert type changes.
+    """
+
     ALERT_INCLUSION_CHOICES = [
         (SEARCH_TYPES.DOCKETS, "Notifications on new cases only"),
         (
@@ -36,6 +44,10 @@ class CreateAlertForm(ModelForm):
     )
 
     def __init__(self, *args, **kwargs):
+        """Build the form for ``user``.
+
+        The alert type field is only shown for RECAP and docket alerts.
+        """
         self.user = kwargs.pop("user", None)
         initial = kwargs.get("initial", {})
         super().__init__(*args, **kwargs)
@@ -61,6 +73,12 @@ class CreateAlertForm(ModelForm):
             ].choices = SEARCH_TYPES.SUPPORTED_ALERT_TYPES
 
     def clean_rate(self):
+        """Validate that the rate is within the user's alert quotas.
+
+        Raises:
+            ValidationError: If the user may not create an alert at this
+                rate, with a message pointing them at a membership.
+        """
         rate = self.cleaned_data["rate"]
 
         alert_being_edited = self.instance and self.instance.pk
@@ -131,6 +149,7 @@ class CreateAlertForm(ModelForm):
             return query
 
     def clean_alert_type(self):
+        """Validate that the alert type hasn't changed in a disallowed way."""
         # On alert updates, validates that the alert_type hasn't changed in a
         # disallowed way.
         alert_type = self.cleaned_data["alert_type"]
@@ -154,4 +173,6 @@ class CreateAlertForm(ModelForm):
 
 
 class DocketAlertConfirmForm(forms.Form):
+    """Captcha-protected form for confirming a docket alert action."""
+
     hcaptcha = hCaptchaField(size="invisible")
