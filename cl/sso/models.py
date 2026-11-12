@@ -1,3 +1,5 @@
+"""Models for single sign-on organizations, their domains, connections, members, and sign-in events."""
+
 from typing import Any, Self
 
 import pghistory

@@ -1,3 +1,5 @@
+"""Django admin configuration for single sign-on organizations and sign-in events."""
+
 import csv
 
 from django.contrib import admin
