@@ -1,15 +1,17 @@
 /*
-Alpine component behind `<c-button.busy>`. The caller toggles `aria-busy` on
-the button; while busy, this sets `aria-disabled`, cancels any activation and
-announces the status region's `data-busy-text`. It defines only `init` and
-`guard`: the button's own bindings resolve through this scope, so any other
-name here would shadow the caller's.
+Alpine directive `x-busy-button` for the wrapper around a busy-capable
+`<c-button>`. The caller toggles `aria-busy` on the button; while busy, this
+sets `aria-disabled`, cancels any activation and announces the status
+region's `data-busy-text`. It is a directive rather than a component so it
+adds no Alpine scope: handlers on the button keep their own `$root`.
 */
 
 document.addEventListener('alpine:init', () => {
-  Alpine.data('busyButton', () => {
-    let button;
-    let status;
+  // Wrappers outside any x-data tree, such as the catalog demos, still initialize.
+  Alpine.addInitSelector(() => '[x-busy-button]');
+  Alpine.directive('busy-button', (wrapper, _directive, { cleanup }) => {
+    const button = wrapper.querySelector(':scope > :is(a, button)');
+    const status = wrapper.querySelector(':scope > [role="status"]');
     let disabledByBusy = false;
     const isBusy = () => button.getAttribute('aria-busy') === 'true';
     const sync = () => {
@@ -23,19 +25,19 @@ document.addEventListener('alpine:init', () => {
       }
       status.textContent = busy ? status.dataset.busyText : '';
     };
-    return {
-      init() {
-        button = this.$root.querySelector(':scope > :is(a, button)');
-        status = this.$root.querySelector('[role="status"]');
-        sync();
-        new MutationObserver(sync).observe(button, { attributes: true, attributeFilter: ['aria-busy'] });
-      },
-      /** Cancels activation while busy, before the caller's own click handlers run. */
-      guard(event) {
-        if (!isBusy()) return;
-        event.preventDefault();
-        event.stopPropagation();
-      },
+    /** Cancels activation while busy, before the caller's own click handlers run. */
+    const guard = (event) => {
+      if (!isBusy()) return;
+      event.preventDefault();
+      event.stopPropagation();
     };
+    sync();
+    const observer = new MutationObserver(sync);
+    observer.observe(button, { attributes: true, attributeFilter: ['aria-busy'] });
+    wrapper.addEventListener('click', guard, true);
+    cleanup(() => {
+      observer.disconnect();
+      wrapper.removeEventListener('click', guard, true);
+    });
   });
 });

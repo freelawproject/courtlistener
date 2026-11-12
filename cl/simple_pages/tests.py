@@ -837,7 +837,7 @@ class ButtonComponentTest(CottonComponentMixin, SimpleTestCase):
             with self.subTest(tag=tag, source=source):
                 root = fromstring(self.render_component(source))
                 self.assertEqual(root.tag, tag)
-                self.assertIsNone(root.get("x-data"))
+                self.assertIsNone(root.get("x-busy-button"))
                 self.assertEqual(root.xpath('.//*[local-name()="svg"]'), [])
                 self.assertEqual(root.xpath('.//*[@role="status"]'), [])
 
@@ -855,7 +855,7 @@ class ButtonComponentTest(CottonComponentMixin, SimpleTestCase):
         ):
             with self.subTest(tag=tag):
                 root = fromstring(self.render_component(source))
-                self.assertEqual(root.get("x-data"), "busyButton")
+                self.assertIsNotNone(root.get("x-busy-button"))
                 element = root.find(tag)
                 self.assertIsNotNone(element)
                 self.assertEqual(element.get("x-bind:aria-busy"), "busy")

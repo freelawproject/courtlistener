@@ -5,7 +5,7 @@
 />
 {% require_script "js/alpine/components/button.js" %}
 {# The content fades rather than hides, so the accessible name survives under the spinner. #}
-<span class="contents" x-data="busyButton" x-on:click.capture="guard">
+<span class="contents" x-busy-button>
   <c-button.base class="group/button aria-busy:relative {{ class }}" :attrs="attrs"><span class="flex items-center grow [gap:inherit] [justify-content:inherit] group-aria-busy/button:opacity-0">{{ slot }}</span>{% svg "loading" class="hidden group-aria-busy/button:block absolute inset-0 m-auto w-4 h-4 [&>path]:animate-spin [&>path]:origin-center motion-reduce:[&>path]:animate-none" aria_hidden="true" %}</c-button.base>
   <span role="status" class="sr-only" data-busy-text="{{ busy_text }}"></span>
 </span>

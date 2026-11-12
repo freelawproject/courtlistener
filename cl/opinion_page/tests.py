@@ -5224,7 +5224,7 @@ class DocketEntryRowsV2Test(TestCase):
         self.assertEqual(link.get("rel"), "nofollow")
         self.assertEqual(link.get("x-on:click.prevent"), "start")
         self.assertEqual(link.get("x-bind:aria-busy"), "busy")
-        busy_button = link.xpath('ancestor::*[@x-data="busyButton"]')
+        busy_button = link.xpath("ancestor::*[@x-busy-button]")
         self.assertEqual(len(busy_button), 1)
         status = busy_button[0].xpath('./*[@role="status"]')
         self.assertEqual(len(status), 1)
