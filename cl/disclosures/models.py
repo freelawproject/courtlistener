@@ -1,3 +1,5 @@
+"""Models for judges' financial disclosures and their parts."""
+
 from typing import TypedDict
 
 import pghistory
@@ -36,6 +38,8 @@ class _WealthEstimate(_ValueRange):
 
 
 class CODES:
+    """Value codes used in financial disclosure forms."""
+
     # FORM CODES - these are used in multiple fields in different sections
     # of the disclosures.  For example liabilities/debts uses Gross Value
     # As well as investments.
@@ -265,6 +269,7 @@ class FinancialDisclosure(AbstractDateTimeModel):
         return f"{self.pk}, person: {self.person_id}, year: {self.year}"
 
     def get_absolute_url(self) -> str:
+        """Get the URL of the disclosure's viewer page."""
         return reverse(
             "financial_disclosures_viewer",
             args=(self.person.pk, self.pk, self.person.slug),
@@ -310,6 +315,7 @@ class FinancialDisclosure(AbstractDateTimeModel):
         }
 
     def save(self, *args, **kwargs):
+        """Save the disclosure, queueing a thumbnail if one is needed."""
         super().save(*args, **kwargs)
         if self.thumbnail_status == THUMBNAIL_STATUSES.NEEDED:
             from cl.disclosures.tasks import (
