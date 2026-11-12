@@ -13,7 +13,7 @@ from cl.search.models import Docket
 
 @pghistory.track()
 class Audio(AbstractDateTimeModel):
-    """A class representing oral arguments and their associated metadata"""
+    """A class representing oral arguments and their associated metadata."""
 
     STT_NEEDED = 0
     STT_COMPLETE = 1
@@ -194,7 +194,7 @@ class Audio(AbstractDateTimeModel):
     pghistory.InsertEvent(), pghistory.DeleteEvent(), obj_field=None
 )
 class AudioPanel(Audio.panel.through):  # type: ignore
-    """A model class to track audio panel m2m relation"""
+    """A model class to track audio panel m2m relation."""
 
     class Meta:
         proxy = True

@@ -76,11 +76,12 @@ class Command(VerboseCommand):
     def update_es_in_batches(
         self, queryset: QuerySet, update_fn: Callable, batch_size: int
     ) -> None:
-        """Batch a queryset and call the updater function over batches
+        """Batch a queryset and call the updater function over batches.
 
-        :param queryset: the queryset to iterate over
-        :param update_fn: a function that takes a list of ids as input
-        :param batch_size: the size of each batch
+        Args:
+            queryset: the queryset to iterate over
+            update_fn: a function that takes a list of ids as input
+            batch_size: the size of each batch
         """
         model_name = queryset.model.__name__
         batch = []
@@ -110,9 +111,10 @@ class Command(VerboseCommand):
 
     @staticmethod
     def update_cite_count(cluster_ids_to_update: list[int]) -> None:
-        """Updates OpinionClusterDocument.citeCount
+        """Updates OpinionClusterDocument.citeCount.
 
-        :param cluster_ids_to_update: cluster ids
+        Args:
+            cluster_ids_to_update: cluster ids
         """
         documents_to_update = build_cite_count_update(cluster_ids_to_update)
         index_documents_in_bulk(documents_to_update)
@@ -123,9 +125,10 @@ class Command(VerboseCommand):
 
     @staticmethod
     def update_cites(opinion_ids: list[int]) -> None:
-        """Updates OpinionDocument.cites
+        """Updates OpinionDocument.cites.
 
-        :param opinion_ids: the opinion ids
+        Args:
+            opinion_ids: the opinion ids
         """
         base_doc = {
             "_op_type": "update",

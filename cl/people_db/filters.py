@@ -270,9 +270,7 @@ class PartyFilter(NoEmptyFilterSet, FilterManyToManyMixin):
     def filter_join_tables(
         self, qs: QuerySet, name: str, value: bool
     ) -> QuerySet:
-        """
-        Filters a QuerySet based on a many-to-many relationship involving the
-        `Role` and `PartyType` model.
+        """Filters a QuerySet based on a many-to-many relationship involving the `Role` and `PartyType` model.
 
         Args:
             qs: The original QuerySet to be filtered.
@@ -345,9 +343,7 @@ class AttorneyFilter(NoEmptyFilterSet, FilterManyToManyMixin):
         }
 
     def filter_roles(self, qs: QuerySet, name: str, value: bool) -> QuerySet:
-        """
-        Filters a QuerySet based on a many-to-many relationship involving the
-        `Role` model.
+        """Filters a QuerySet based on a many-to-many relationship involving the `Role` model.
 
         Args:
             qs: The original QuerySet to be filtered.

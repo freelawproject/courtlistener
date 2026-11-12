@@ -669,12 +669,7 @@ DEFAULT_RD_CITATION_QUEUE = "celery"
 def handle_recap_doc_change(
     sender, instance: RECAPDocument, update_fields=None, **kwargs
 ):
-    """
-    Right now, this receiver exists to enqueue the task to parse RECAPDocuments for caselaw citations.
-    More functionality can be put here later. There may be things currently in the save function
-    of RECAPDocument that would be better placed here for reasons of maintainability and testability.
-    """
-
+    """Right now, this receiver exists to enqueue the task to parse RECAPDocuments for caselaw citations. More functionality can be put here later. There may be things currently in the save function of RECAPDocument that would be better placed here for reasons of maintainability and testability."""
     # Whenever pdf text is processed, it will update the plain_text field.
     # When we get updated text for a doc, we want to parse it for citations.
     if update_fields is not None and "plain_text" in update_fields:
@@ -709,8 +704,7 @@ def handle_recap_doc_change(
 def update_unmatched_citation(
     sender, instance: Citation, created: bool, **kwargs
 ):
-    """Updates the status of matching UnmatchedCitation and
-    UnmatchedCitationFromRECAPDocument rows to FOUND"""
+    """Updates the status of matching UnmatchedCitation and UnmatchedCitationFromRECAPDocument rows to FOUND."""
     if not created:
         return
     query = {
@@ -732,10 +726,7 @@ def update_unmatched_citation(
     dispatch_uid="handle_court_changes_uid",
 )
 def update_court_cache(sender, instance: Court, created: bool, **kwargs):
-    """
-    Invalidates the cached court list to ensure data consistency when a Court
-    instance is created or updated.
-    """
+    """Invalidates the cached court list to ensure data consistency when a Court instance is created or updated."""
     cache.delete(get_cache_key_for_court_list())
 
 
@@ -747,9 +738,9 @@ def update_court_cache(sender, instance: Court, created: bool, **kwargs):
 def warn_new_court_needs_courthouse(
     sender, instance: Court, created: bool, **kwargs
 ):
-    """
-    A new courthouse should be created alongside a new court. Send a warning
-    to Sentry for someone to look at it
+    """A new courthouse should be created alongside a new court.
+
+    Send a warning to Sentry for someone to look at it.
     """
     if TESTING or DEVELOPMENT:
         return
@@ -789,12 +780,14 @@ def cleanup_document_storage[M: Model](
     origin: M | QuerySet[M],
     **kwargs,
 ):
-    """Deletes files stored in S3 after a state document is deleted. Django does not delete
-    associated files when a row is deleted so without this a docket entry's attachments would
-    linger in storage with nothing pointing to them. This is a post-delete signal which schedules
-    files to be deleted once the current transaction is commited since otherwise if a file
-    deletion failed it would raise and cancel the whole transaction."""
+    """Deletes files stored in S3 after a state document is deleted.
 
+    Django does not delete associated files when a row is deleted so without
+    this a docket entry's attachments would linger in storage with nothing
+    pointing to them. This is a post-delete signal which schedules files to be
+    deleted once the current transaction is commited since otherwise if a file
+    deletion failed it would raise and cancel the whole transaction.
+    """
     if not isinstance(instance, AbstractStateDocument):
         return
 

@@ -13,10 +13,10 @@ def import_financial_disclosures(
 ) -> None:
     """Import financial documents into courtlistener.
 
-    :param filepath: Path to file data to import.
-    :param skip_until: ID if any to skip until.
-    :param queue_name: The celery queue name.
-    :return:None
+    Args:
+        filepath: Path to file data to import.
+        skip_until: ID if any to skip until.
+        queue_name: The celery queue name.
     """
     throttle = CeleryThrottle(queue_name=queue_name)
     with open(filepath) as f:

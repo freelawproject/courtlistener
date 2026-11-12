@@ -43,8 +43,7 @@ def _is_loopback_host(host: str) -> bool:
 
 
 def check_redirect_uri(uri: str) -> str | None:
-    """Return an error message if ``uri`` is not an acceptable redirect
-    target, else ``None``.
+    """Return an error message if ``uri`` is not an acceptable redirect target, else ``None``.
 
     Acceptable: any ``https://`` URI with a host, or an ``http://`` URI
     whose host is a loopback address (RFC 8252 §7.3). The DCR serializer

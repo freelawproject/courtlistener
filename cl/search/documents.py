@@ -522,7 +522,7 @@ class AudioPercolator(AudioDocumentBase):
 
 
 class ES_CHILD_ID:
-    """Returns an ID for its use in ES child documents"""
+    """Returns an ID for its use in ES child documents."""
 
     def __init__(self, instance_id: int):
         self.instance_id = instance_id
@@ -1460,8 +1460,7 @@ class ESRECAPDocument(
         return instance.docket_entry.docket.pacer_case_id
 
     def prepare_capital_case(self, instance: SourceDocument) -> bool | None:
-        """Return the SCOTUS docket's capital_case flag; empty for other
-        sources."""
+        """Return the SCOTUS docket's capital_case flag; empty for other sources."""
         if not isinstance(instance, SCOTUSDocument):
             return None
         scotus_metadata = getattr(
@@ -1470,28 +1469,23 @@ class ESRECAPDocument(
         return scotus_metadata.capital_case if scotus_metadata else None
 
     def prepare_id(self, instance: SourceDocument) -> int | None:
-        """Return the RECAPDocument pk; empty for other sources (see
-        prepare_uid)."""
+        """Return the RECAPDocument pk; empty for other sources (see prepare_uid)."""
         if not isinstance(instance, RECAPDocument):
             return None
         return instance.pk
 
     def prepare_docket_entry_id(self, instance: SourceDocument) -> int | None:
-        """Return the DocketEntry pk; empty for other sources (see
-        prepare_docket_entry_uid)."""
+        """Return the DocketEntry pk; empty for other sources (see prepare_docket_entry_uid)."""
         if not isinstance(instance, RECAPDocument):
             return None
         return instance.docket_entry_id
 
     def prepare_uid(self, instance: SourceDocument) -> str | None:
-        """Return the pk prefixed with the source's uid_namespace, e.g.
-        "scotus_123"; empty for sources without one, like RECAP."""
+        """Return the pk prefixed with the source's uid_namespace, e.g. "scotus_123"; empty for sources without one, like RECAP."""
         return es_uid(type(instance), instance.pk)
 
     def prepare_docket_entry_uid(self, instance: SourceDocument) -> str | None:
-        """Return the docket entry pk prefixed with the source's
-        uid_namespace, e.g. "scotus_321"; empty for sources without one,
-        like RECAP."""
+        """Return the docket entry pk prefixed with the source's uid_namespace, e.g. "scotus_321"; empty for sources without one, like RECAP."""
         return es_uid(type(instance), instance.docket_entry_id)
 
 
@@ -1634,8 +1628,7 @@ class DocketDocument(
             return instance.bankruptcy_information.trustee_str
 
     def prepare_capital_case(self, instance: Docket) -> bool | None:
-        """Return the docket's SCOTUS capital_case flag; empty for dockets
-        without SCOTUS metadata."""
+        """Return the docket's SCOTUS capital_case flag; empty for dockets without SCOTUS metadata."""
         if instance.court_id != "scotus":
             return None
         scotus_metadata = getattr(instance, "scotus_metadata", None)
@@ -1713,9 +1706,11 @@ class DocketDocument(
 
 
 class DocketDocumentPlain(DocketDocument):
-    """This class is used for Docket document percolation. Here, we can
-    control whether to include parties based on
-    the MAX_ATTORNEYS_TO_PERCOLATE setting."""
+    """This class is used for Docket document percolation.
+
+    Here, we can control whether to include parties based on the
+    MAX_ATTORNEYS_TO_PERCOLATE setting.
+    """
 
     def prepare_parties(self, instance: Docket) -> _DocketDocumentPartyDict:
         out = {
@@ -2564,7 +2559,7 @@ class RECAPPercolator(
 class OpinionPercolator(
     OpinionClusterDocument, OpinionDocument, PreparePercolatorQueryMixin
 ):
-    """Opinions Percolator index"""
+    """Opinions Percolator index."""
 
     rate = fields.KeywordField(attr="rate")
     percolator_query = PercolatorField()
@@ -2579,9 +2574,7 @@ class OpinionPercolator(
 
 
 class ESOpinionDocumentPlain(OpinionClusterDocument, OpinionDocument):
-    """Document class for preparing Opinions to be percolated into the
-    OpinionPercolator index.
-    """
+    """Document class for preparing Opinions to be percolated into the OpinionPercolator index."""
 
     def prepare_non_participating_judge_ids(self, instance):
         return list(

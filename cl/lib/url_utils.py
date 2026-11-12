@@ -21,9 +21,12 @@ def parse_url_with_ada(url: str) -> str:
 
     Returns an empty string If the input URL is invalid or cannot be parsed.
 
-    :param url: The URL to parse.
-    :return: The parsed URL or an empty string if the input URL is invalid or
-    cannot be parsed.
+    Args:
+        url: The URL to parse.
+
+    Returns:
+        The parsed URL or an empty string if the input URL is invalid or
+        cannot be parsed.
     """
     if not url:
         return ""
@@ -38,22 +41,26 @@ def parse_url_with_ada(url: str) -> str:
 def get_redirect_or_abort(
     request: HttpRequest, redirect_field_name: str, throw_404: bool = False
 ) -> str:
-    """
-    Retrieves a safe redirect URL from the request or returns the login URL.
+    """Retrieves a safe redirect URL from the request or returns the login URL.
 
     This function checks for a redirect URL in both the POST and GET data of
     the provided request object. It then parses the retrieved URL using the
     `parse_url_with_ada` helper and performs safety checks using the
     `is_safe_url` function.
 
-    :param request: The HTTP request object containing potential redirect data.
-    :param redirect_field_name: The name of the field containing the redirect
-    URL.
-    :param throw_404: Whether to raise an Http404 exception for unsafe URLs.
-    Defaults to False, in which case it returns the login redirect URL.
-    :raises Http404: If `throw_404` is True and the redirect URL is unsafe.
-    :return: The safe, parsed redirect URL if found, otherwise the configured
-    login URL.
+    Args:
+        request: The HTTP request object containing potential redirect data.
+        redirect_field_name: The name of the field containing the redirect
+            URL.
+        throw_404: Whether to raise an Http404 exception for unsafe URLs.
+            Defaults to False, in which case it returns the login redirect URL.
+
+    Returns:
+        The safe, parsed redirect URL if found, otherwise the configured
+        login URL.
+
+    Raises:
+        Http404: If `throw_404` is True and the redirect URL is unsafe.
     """
     redirect_url = request.POST.get(
         redirect_field_name,
@@ -69,7 +76,7 @@ def get_redirect_or_abort(
 
 
 def is_safe_url(url: str, request: HttpRequest) -> bool:
-    """Check whether a redirect URL is safe
+    """Check whether a redirect URL is safe.
 
     Much of this code was grabbed from Django:
 
@@ -88,9 +95,12 @@ def is_safe_url(url: str, request: HttpRequest) -> bool:
 
     1. Prevent dangerous URLs (like JavaScript)
 
-    :param url: The URL to check
-    :param request: The user request
-    :return True if safe, else False
+    Args:
+        url: The URL to check
+        request: The user request
+
+    Returns:
+        True if safe, else False
     """
     sign_in_url = reverse("sign-in") in url
     register_in_url = reverse("register") in url

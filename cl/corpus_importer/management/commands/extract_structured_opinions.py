@@ -1,3 +1,5 @@
+"""Run Centralia's structured extraction over scraped opinions."""
+
 from collections import Counter
 from datetime import date
 from typing import Any
@@ -203,6 +205,8 @@ def extract_structured_opinion(
 
 
 class Command(VerboseCommand):
+    """Run Centralia's structured extraction over scraped opinions."""
+
     help = """Run Centralia's structured extraction over scraped opinions.
 
     Sends the PDF of each matching cluster to Doctor's structured opinion
@@ -230,6 +234,7 @@ class Command(VerboseCommand):
     """
 
     def add_arguments(self, parser):
+        """Register the command's arguments."""
         parser.add_argument(
             "--courts",
             nargs="+",
@@ -304,6 +309,7 @@ class Command(VerboseCommand):
         )
 
     def handle(self, *args: Any, **options: Any) -> None:
+        """Extract every matching cluster, then report the results."""
         super().handle(*args, **options)
         if options["limit"] is not None and options["limit"] < 1:
             raise CommandError("--limit must be a positive number.")

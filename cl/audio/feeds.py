@@ -36,9 +36,7 @@ class JurisdictionPodcast(JurisdictionFeed):
         return request, get_object_or_404(Court, pk=court)
 
     def items(self, obj):
-        """
-        Returns a list of items to publish in this feed.
-        """
+        """Returns a list of items to publish in this feed."""
         request, court = obj
         cd = {
             "q": "*",
