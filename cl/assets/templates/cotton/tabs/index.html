@@ -27,11 +27,21 @@
         hx-swap="outerHTML show:none"
         hx-sync="this:replace"
       >
-        <ul role="list" class="flex gap-1">
+        <ul role="list" class="gap-1 hidden md:flex">
           {% for tab in tabs %}
             <c-tabs.tab :tab="tab" :active_tab="active_tab" :tabs_id="tabs_id" />
           {% endfor %}
         </ul>
+        <select
+          id="{{ tabs_id }}-select"
+          aria-label="{{ label }}"
+          x-on:change="navigateToTab"
+          class="w-full md:hidden"
+        >
+          {% for tab in tabs %}
+            <option value="{{ tab.key }}"{% if tab.key == active_tab %} selected{% endif %}>{{ tab.label }}{% if tab.count %} ({{ tab.count }}){% endif %}</option>
+          {% endfor %}
+        </select>
       </nav>
       <div role="status">
         <template x-if="errorMessage">
@@ -70,20 +80,6 @@
           </button>
         </div>
       </template>
-    </div>
-
-    {# MOBILE tabs #}
-    <div class="bg-greyscale-100 rounded-t-2xl md:hidden pt-3 px-4">
-      <select aria-label="Select {{ label }} tabs" x-on:change="handleChange" class="w-full">
-        <template x-for="tab in tabs">
-          <option
-            x-text="tab"
-            x-bind:aria-selected="isActive"
-            x-bind:data-tab-id="tab"
-            class="appearance-none"
-          ></option>
-        </template>
-      </select>
     </div>
 
     {# Active panel content #}

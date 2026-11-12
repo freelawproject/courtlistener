@@ -17,9 +17,19 @@ document.addEventListener('alpine:init', () => {
     endRequest() {
       this.isBusy = false;
     },
+    navigateToTab(event) {
+      document.getElementById(`${this.$root.id}-tab-${event.target.value}`).click();
+    },
+    restoreSelectedTab() {
+      // The dropdown already shows the tab the user picked, but the request failed and
+      // the page still shows the previous one.
+      const select = document.getElementById(`${this.$root.id}-select`);
+      for (const option of select.options) option.selected = option.defaultSelected;
+    },
     handleSendError() {
       this.isBusy = false;
       this.errorMessage = "Couldn't load this tab. Please check your connection and try again.";
+      this.restoreSelectedTab();
     },
     handleResponseError(event) {
       this.isBusy = false;
@@ -27,6 +37,7 @@ document.addEventListener('alpine:init', () => {
 
       if (xhr.status >= 500) {
         this.errorMessage = "An error occurred on our end. Please try again.";
+        this.restoreSelectedTab();
         return;
       }
       // Not found, forbidden and similar are full pages; let the browser show them.
