@@ -4,9 +4,7 @@ from cl.lib.command_utils import VerboseCommand
 
 
 class Command(find_citations.Command):
-    """Re-run find_citations_and_parentheticals_for_opinion_by_pks for
-    opinions where unmatched citations have been found
-    """
+    """Re-run find_citations_and_parentheticals_for_opinion_by_pks for opinions where unmatched citations have been found."""
 
     help = "Try to resolve unmatched citations"
     # variables to use find_citations.Command.update_documents
@@ -29,7 +27,7 @@ class Command(find_citations.Command):
         )
 
     def handle(self, *args, **options):
-        """Re-uses find_citations.Command enqueuer and logging"""
+        """Re-uses find_citations.Command enqueuer and logging."""
         VerboseCommand.handle(self, *args, **options)
         status = [UnmatchedCitation.FOUND]
         if options["resolve_failures"]:

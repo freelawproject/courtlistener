@@ -37,8 +37,7 @@ class NeonClient:
         )
 
     def get_account_by_id(self, account_id: str) -> dict:
-        """
-        Retrieves account data using the Neon API and the provided account ID.
+        """Retrieves account data using the Neon API and the provided account ID.
 
         Neon answers an account that was merged into another one with HTTP
         222 and the surviving account's record, whose ``accountId`` differs
@@ -82,8 +81,7 @@ class NeonClient:
     def get_account_memberships(
         self, account_id: str, page_size: int = 20
     ) -> list[dict[str, Any]]:
-        """
-        Retrieve an account's membership history, newest first.
+        """Retrieve an account's membership history, newest first.
 
         No status filter is applied. Neon's ``primaryActiveMembership`` and
         ``isActive`` filters reflect flags shown on the account page and have
@@ -117,8 +115,7 @@ class NeonClient:
         return response.json().get("memberships") or []
 
     def get_membership(self, membership_id: str) -> dict[str, Any] | None:
-        """
-        Retrieves one membership record by its ID.
+        """Retrieves one membership record by its ID.
 
         The record names the account that currently holds the membership in
         ``accountId``, which can differ from the account it was bought under
@@ -142,9 +139,7 @@ class NeonClient:
         return response.json()
 
     def search_account_by_email(self, email: str) -> list[dict[str, str]]:
-        """
-        Searches for Neon accounts that match the provided email address using
-        the Neon API search endpoint.
+        """Searches for Neon accounts that match the provided email address using the Neon API search endpoint.
 
         Args:
             email (str): The email address to search for.
@@ -182,9 +177,7 @@ class NeonClient:
     def get_individual_account_payload(
         self, user: User
     ) -> dict[str, dict[str, NeonContact]]:
-        """
-        Extracts relevant data from the provided user object to form a payload
-        for creating or updating an individual account.
+        """Extracts relevant data from the provided user object to form a payload for creating or updating an individual account.
 
         Args:
             user (User): The user object containing the information to be
@@ -241,8 +234,7 @@ class NeonClient:
         return json_data["id"]
 
     def update_account(self, user: User, account_id: str) -> str:
-        """
-        Updates an existing Neon account using the Neon API.
+        """Updates an existing Neon account using the Neon API.
 
         Args:
             user (User): The user object containing the updated information for

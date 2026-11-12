@@ -23,13 +23,15 @@ V2_TEMPLATE_FILE = "cl/foo/templates/v2_help/index.html"
 LEGACY_TEMPLATE_FILE = "cl/foo/templates/help/index.html"
 V2_TEMPLATE_BODY = '{% extends "new_base.html" %}'
 V2_PARTIAL_FILE = "cl/foo/templates/v2_includes/help/button.html"
+WIP_TEMPLATE_FILE = "cl/foo/templates/wip_help/index.html"
+WIP_PARTIAL_FILE = "cl/foo/templates/wip_includes/help/button.html"
 
 
-def _run_checks_on(
+def _findings_on(
     files: dict[str, str],
     changed: dict[str, str] | None = None,
     linted: list[str] | None = None,
-) -> list[tuple[str, int, str]]:
+) -> list[frontend_checks.Finding]:
     """Lint a temp repo containing ``files`` (``{repo-relative path: content}``).
 
     ``changed`` is the ``{path: git status}`` diff, simulating
@@ -37,7 +39,8 @@ def _run_checks_on(
     in ``changed`` that is missing from ``files`` stands for a deleted file.
     ``linted`` is the subset of ``changed`` handed to the checks, the way
     ``main()`` only hands over HTML and input.css; it defaults to all of it.
-    Returns ``(file, line, check)`` per finding, in report order.
+    Returns the findings in report order. Use it when a test needs a
+    finding's severity or message; otherwise use ``_run_checks_on``.
     """
     changed = changed or dict.fromkeys(files, "M")
     with tempfile.TemporaryDirectory() as tmp:
@@ -48,10 +51,20 @@ def _run_checks_on(
             path.write_text(
                 textwrap.dedent(content).lstrip("\n"), encoding="utf-8"
             )
-        findings = frontend_checks.run_checks(
+        return frontend_checks.run_checks(
             linted if linted is not None else list(changed), root, changed
         )
-    return [(f.file, f.line, f.check) for f in findings]
+
+
+def _run_checks_on(
+    files: dict[str, str],
+    changed: dict[str, str] | None = None,
+    linted: list[str] | None = None,
+) -> list[tuple[str, int, str]]:
+    """Like ``_findings_on``, but returns ``(file, line, check)`` per finding."""
+    return [
+        (f.file, f.line, f.check) for f in _findings_on(files, changed, linted)
+    ]
 
 
 class SkipFileDirectiveTest(unittest.TestCase):
@@ -162,6 +175,158 @@ class SkipLineDirectiveTest(unittest.TestCase):
             ],
         )
 
+    def test_directive_inside_a_code_block_still_applies(self) -> None:
+        """A directive next to a live tag inside ``<c-code>`` silences its check."""
+        findings = _run_checks_on(
+            {
+                V2_TEMPLATE_FILE: """
+                    {% extends "new_base.html" %}
+                    <c-code>
+                    {% include "x.html" %} {# frontend-checks-skip-line: check_include_in_v2 #}
+                    </c-code>
+                    """
+            }
+        )
+        self.assertEqual(findings, [])
+
+
+class CodeExampleTest(unittest.TestCase):
+    """Markup inside ``<c-code>`` is shown as code; Django tags inside still run."""
+
+    def test_examples_are_not_linted(self) -> None:
+        """Escaped markup in a block raises no finding, whatever the block's shape."""
+        cases = {
+            "multi-line": """
+                {% extends "new_base.html" %}
+                <c-code>
+                &lt;div x-data="dropdown"&gt;
+                  &lt;button tabindex="2"&gt;
+                &lt;/div&gt;
+                </c-code>
+                """,
+            "single-line": """
+                {% extends "new_base.html" %}
+                <c-code>&lt;div x-data="dropdown"&gt;</c-code>
+                """,
+            "with attributes": """
+                {% extends "new_base.html" %}
+                <c-code disable_copy class="mt-2">
+                &lt;div x-data="dropdown"&gt;
+                </c-code>
+                """,
+        }
+        for shape, body in cases.items():
+            with self.subTest(shape):
+                self.assertEqual(_run_checks_on({V2_TEMPLATE_FILE: body}), [])
+
+    def test_include_check_is_decorated(self) -> None:
+        """A live ``{% include %}`` inside a block is reported."""
+        findings = _run_checks_on(
+            {
+                V2_TEMPLATE_FILE: """
+                    {% extends "new_base.html" %}
+                    <c-code>
+                    &lt;div x-data="dropdown"&gt;
+                    {% include "x.html" %}
+                    </c-code>
+                    """
+            }
+        )
+        self.assertEqual(
+            findings, [(V2_TEMPLATE_FILE, 4, "check_include_in_v2")]
+        )
+
+    def test_self_closing_tag_opens_no_block(self) -> None:
+        """A ``<c-code />`` leaves the markup after it visible to the checks."""
+        findings = _run_checks_on(
+            {
+                V2_TEMPLATE_FILE: """
+                    {% extends "new_base.html" %}
+                    <c-code />
+                    <div tabindex="2"></div>
+                    <c-code>
+                    &lt;div x-data="dropdown"&gt;
+                    </c-code>
+                    """
+            }
+        )
+        self.assertEqual(findings, [(V2_TEMPLATE_FILE, 3, "check_tabindex")])
+
+    def test_markup_outside_the_block_keeps_its_line_number(self) -> None:
+        """Real code after a block is still checked and reported where it is."""
+        cases = {
+            "one-line opening tag": (
+                """
+                {% extends "new_base.html" %}
+                <c-code>
+                &lt;div x-data="dropdown"&gt;
+                </c-code>
+                <div x-data="dropdown"></div>
+                """,
+                5,
+            ),
+            "multi-line opening tag": (
+                """
+                {% extends "new_base.html" %}
+                <c-code
+                  disable_copy
+                  class="mt-2">
+                &lt;div x-data="dropdown"&gt;
+                </c-code>
+                <div x-data="dropdown"></div>
+                """,
+                7,
+            ),
+        }
+        for shape, (body, line) in cases.items():
+            with self.subTest(shape):
+                self.assertEqual(
+                    _run_checks_on({V2_TEMPLATE_FILE: body}),
+                    [
+                        (
+                            V2_TEMPLATE_FILE,
+                            line,
+                            "check_xdata_without_require_script",
+                        )
+                    ],
+                )
+
+
+class AlsoChecksInsideCodeBlocksTest(unittest.TestCase):
+    """The decorator decides which version of a file a check receives."""
+
+    def test_decorated_check_gets_the_raw_lines(self) -> None:
+        """A decorated check sees the file as written; any other check sees the blocks emptied."""
+        seen: dict[str, list[str]] = {}
+
+        @frontend_checks.also_checks_inside_code_blocks
+        def check_decorated(lines: list[str]) -> list[tuple[int, str]]:
+            """Record the lines a decorated check receives."""
+            seen["decorated"] = lines
+            return []
+
+        def check_plain(lines: list[str]) -> list[tuple[int, str]]:
+            """Record the lines an undecorated check receives."""
+            seen["plain"] = lines
+            return []
+
+        self.addCleanup(
+            frontend_checks._checks_inside_code_blocks.discard, check_decorated
+        )
+        raw_lines = ["<c-code>", '&lt;div x-data="dropdown"&gt;', "</c-code>"]
+        frontend_checks._apply_checks(
+            [
+                (check_decorated, frontend_checks.WARN),
+                (check_plain, frontend_checks.WARN),
+            ],
+            frontend_checks._blank_code_blocks(raw_lines),
+            raw_lines,
+            V2_TEMPLATE_FILE,
+            [],
+        )
+        self.assertEqual(seen["decorated"], raw_lines)
+        self.assertEqual(seen["plain"], ["<c-code>", "", "</c-code>"])
+
 
 class LegacyTemplateDeletedTest(unittest.TestCase):
     """Deleting a legacy template makes its v2 counterpart live for everyone."""
@@ -261,12 +426,275 @@ class V2RegisterTest(unittest.TestCase):
         self.assertEqual(findings, [])
 
     def test_modified_v2_template_needs_no_registration(self) -> None:
-        """Only additions and copies of v2 templates ask for registration."""
+        """Only additions, copies and renames of v2 templates ask for registration."""
         findings = _run_checks_on(
             {V2_TEMPLATE_FILE: V2_TEMPLATE_BODY},
             changed={V2_TEMPLATE_FILE: "M"},
         )
         self.assertEqual(findings, [])
+
+    def test_promoted_template_points_to_v2_registry(self) -> None:
+        """A rename into v2_, such as a promotion from wip_, asks for V2_PAGES."""
+        findings = _findings_on(
+            {V2_TEMPLATE_FILE: V2_TEMPLATE_BODY},
+            changed={V2_TEMPLATE_FILE: "R100"},
+        )
+        self.assertEqual(
+            [(f.file, f.check) for f in findings],
+            [(V2_TEMPLATE_FILE, "check_v2_register")],
+        )
+        self.assertIn("V2PagesRegisterTest.V2_PAGES", findings[0].message)
+
+
+class WipTemplateTest(unittest.TestCase):
+    """wip_ templates are held to the same checks as v2_ ones."""
+
+    def test_wip_page_gets_the_v2_checks(self) -> None:
+        """New-stack rules apply to an unfinished page too."""
+        findings = _run_checks_on(
+            {
+                WIP_TEMPLATE_FILE: """
+                    {% extends "new_base.html" %}
+                    <script>$('.pray').click();</script>
+                    """
+            }
+        )
+        self.assertEqual(findings, [(WIP_TEMPLATE_FILE, 2, "check_jquery")])
+
+    def test_wip_page_is_not_a_legacy_template(self) -> None:
+        """Cotton in a wip_ template is not reported as new-stack leakage."""
+        findings = _run_checks_on(
+            {
+                WIP_TEMPLATE_FILE: """
+                    {% extends "new_base.html" %}
+                    <c-button>Pray</c-button>
+                    """
+            }
+        )
+        self.assertEqual(findings, [])
+
+    def test_added_wip_page_needs_base_and_registration(self) -> None:
+        """The page-only checks fire for a WIP page, registered in WIP_PAGES."""
+        findings = _findings_on(
+            {WIP_TEMPLATE_FILE: "<c-button>Pray</c-button>"},
+            changed={WIP_TEMPLATE_FILE: "A"},
+        )
+        self.assertEqual(
+            [(f.file, f.line, f.check) for f in findings],
+            [
+                (WIP_TEMPLATE_FILE, 1, "check_extends_new_base"),
+                (WIP_TEMPLATE_FILE, 1, "check_v2_register"),
+            ],
+        )
+        self.assertIn("V2PagesRegisterTest.WIP_PAGES", findings[1].message)
+
+    def test_wip_partial_is_checked_as_a_page(self) -> None:
+        """WIP is limited to whole pages, so wip_includes/ is not a partial.
+
+        A file there gets the page-only checks, which a partial can't pass.
+        """
+        findings = _run_checks_on(
+            {WIP_PARTIAL_FILE: "<c-button>Pray</c-button>"},
+            changed={WIP_PARTIAL_FILE: "A"},
+        )
+        self.assertEqual(
+            findings,
+            [
+                (WIP_PARTIAL_FILE, 1, "check_extends_new_base"),
+                (WIP_PARTIAL_FILE, 1, "check_v2_register"),
+            ],
+        )
+
+    def test_wip_page_may_only_extend_v2(self) -> None:
+        """WIP pages build on finished pages, never on other WIP ones."""
+        cases = {
+            "v2_help/base.html": [],
+            "wip_help/base.html": [
+                (WIP_TEMPLATE_FILE, 1, "check_wip_dependency"),
+                (WIP_TEMPLATE_FILE, 1, "check_extends_new_base"),
+            ],
+        }
+        for parent, expected in cases.items():
+            with self.subTest(parent):
+                findings = _run_checks_on(
+                    {WIP_TEMPLATE_FILE: f'{{% extends "{parent}" %}}'}
+                )
+                self.assertEqual(findings, expected)
+
+
+class WipDependencyTest(unittest.TestCase):
+    """No template may extend or include a wip_ template."""
+
+    def test_check_wip_dependency(self) -> None:
+        """Only extends/include of a template named with the wip_ prefix is reported."""
+        cases = {
+            '{% extends "wip_help/base.html" %}': [1],
+            "{% include 'wip_includes/card.html' %}": [1],
+            '{% include "help/wip_card.html" %}': [],
+            '{% extends "new_base.html" %}': [],
+            '{% include "v2_includes/swip_card.html" %}': [],
+            '<a href="/wip_help/">Help</a>': [],
+        }
+        for line, expected in cases.items():
+            with self.subTest(line):
+                self.assertEqual(
+                    [
+                        n
+                        for n, _ in frontend_checks.check_wip_dependency(
+                            [line]
+                        )
+                    ],
+                    expected,
+                )
+
+    def test_v2_page_extending_wip_fails(self) -> None:
+        """A wip_ parent fails both the dependency and the base check."""
+        findings = _findings_on(
+            {V2_TEMPLATE_FILE: '{% extends "wip_help/base.html" %}'}
+        )
+        self.assertEqual(
+            [(f.file, f.line, f.check, f.severity) for f in findings],
+            [
+                (
+                    V2_TEMPLATE_FILE,
+                    1,
+                    "check_wip_dependency",
+                    frontend_checks.FAIL,
+                ),
+                (
+                    V2_TEMPLATE_FILE,
+                    1,
+                    "check_extends_new_base",
+                    frontend_checks.FAIL,
+                ),
+            ],
+        )
+
+    def test_any_template_including_wip_fails(self) -> None:
+        """The check isn't limited to redesign templates."""
+        for path in (
+            "cl/assets/templates/new_base.html",
+            "cl/assets/templates/cotton/header.html",
+            LEGACY_TEMPLATE_FILE,
+        ):
+            with self.subTest(path):
+                findings = _run_checks_on(
+                    {path: '{% include "wip_includes/header.html" %}'}
+                )
+                self.assertEqual(findings, [(path, 1, "check_wip_dependency")])
+
+
+class WipCounterpartTest(unittest.TestCase):
+    """Legacy templates and their wip_ counterparts stay in sync."""
+
+    def test_wip_counterpart_needs_sync_notice(self) -> None:
+        """A changed WIP template asks for the notice on its legacy twin."""
+        findings = _run_checks_on(
+            {
+                LEGACY_TEMPLATE_FILE: "<div></div>",
+                WIP_TEMPLATE_FILE: V2_TEMPLATE_BODY,
+            },
+            changed={WIP_TEMPLATE_FILE: "M"},
+        )
+        self.assertEqual(
+            findings, [(LEGACY_TEMPLATE_FILE, 1, "check_sync_notice")]
+        )
+
+    def test_legacy_change_asks_for_every_counterpart(self) -> None:
+        """Each unchanged v2_ and wip_ twin of a legacy template is reported."""
+        findings = _findings_on(
+            {
+                LEGACY_TEMPLATE_FILE: "behind the use_new_design waffle flag.",
+                V2_TEMPLATE_FILE: V2_TEMPLATE_BODY,
+                WIP_TEMPLATE_FILE: V2_TEMPLATE_BODY,
+            },
+            changed={LEGACY_TEMPLATE_FILE: "M"},
+        )
+        self.assertEqual(
+            [(f.file, f.check) for f in findings],
+            [(LEGACY_TEMPLATE_FILE, "check_v2_counterpart_updated")] * 2,
+        )
+        self.assertIn(V2_TEMPLATE_FILE, findings[0].message)
+        self.assertIn(WIP_TEMPLATE_FILE, findings[1].message)
+
+    def test_deleted_legacy_with_only_wip_counterpart_fails(self) -> None:
+        """The page would be a 404 for everyone not opted into the WIP flag."""
+        findings = _findings_on(
+            {WIP_TEMPLATE_FILE: V2_TEMPLATE_BODY},
+            changed={LEGACY_TEMPLATE_FILE: "D"},
+        )
+        self.assertEqual(
+            [(f.file, f.check, f.severity) for f in findings],
+            [
+                (
+                    LEGACY_TEMPLATE_FILE,
+                    "check_legacy_template_deleted",
+                    frontend_checks.FAIL,
+                )
+            ],
+        )
+
+    def test_deleted_legacy_with_v2_and_wip_only_warns(self) -> None:
+        """v2_ takes over for everyone else, so it's the usual release warning."""
+        findings = _findings_on(
+            {
+                V2_TEMPLATE_FILE: V2_TEMPLATE_BODY,
+                WIP_TEMPLATE_FILE: V2_TEMPLATE_BODY,
+            },
+            changed={LEGACY_TEMPLATE_FILE: "D"},
+        )
+        self.assertEqual(
+            [(f.file, f.check, f.severity) for f in findings],
+            [
+                (
+                    LEGACY_TEMPLATE_FILE,
+                    "check_legacy_template_deleted",
+                    frontend_checks.WARN,
+                )
+            ],
+        )
+
+
+class RenamedLegacyTemplateTest(unittest.TestCase):
+    """``main()`` treats the old side of a rename as a deleted file."""
+
+    def _main(
+        self, name_status: str, files: dict[str, str]
+    ) -> tuple[int, str]:
+        """Run ``main()`` on a temp repo holding ``files``; return its exit
+        code and output."""
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            for rel_path, content in files.items():
+                path = root / rel_path
+                path.parent.mkdir(parents=True, exist_ok=True)
+                path.write_text(content, encoding="utf-8")
+            changed = root / "changed_files.txt"
+            changed.write_text(name_status, encoding="utf-8")
+            argv = ["frontend_checks.py", "--repo-root", tmp]
+            argv += ["--changed-files", str(changed)]
+            out = io.StringIO()
+            with mock.patch("sys.argv", argv), contextlib.redirect_stdout(out):
+                code = frontend_checks.main()
+        return code, out.getvalue()
+
+    def test_legacy_moved_to_wip_fails(self) -> None:
+        """The page would be a 404 for everyone not opted into WIP pages."""
+        code, out = self._main(
+            f"R100\t{LEGACY_TEMPLATE_FILE}\t{WIP_TEMPLATE_FILE}\n",
+            {WIP_TEMPLATE_FILE: V2_TEMPLATE_BODY},
+        )
+        self.assertEqual(code, 1)
+        self.assertIn("[check_legacy_template_deleted]", out)
+
+    def test_legacy_moved_to_v2_warns(self) -> None:
+        """Moving it to v2_ releases the page, like deleting the legacy file."""
+        code, out = self._main(
+            f"R100\t{LEGACY_TEMPLATE_FILE}\t{V2_TEMPLATE_FILE}\n",
+            {V2_TEMPLATE_FILE: V2_TEMPLATE_BODY},
+        )
+        self.assertEqual(code, 0)
+        self.assertIn("[check_legacy_template_deleted]", out)
 
 
 THIRD_PARTY = "cl/assets/static-global/js/third_party/"

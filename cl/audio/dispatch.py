@@ -33,16 +33,18 @@ def dispatch_transcribe(
     queue: str | None = None,
     dont_retry: bool = False,
 ) -> bool:
-    """Enqueue transcribe_from_open_ai_api for ``audio_pk`` if no other
-    transcription is already in flight for that pk.
+    """Enqueue transcribe_from_open_ai_api for ``audio_pk`` if no other transcription is already in flight for that pk.
 
-    :param audio_pk: Audio primary key.
-    :param queue: Optional Celery queue name. Defaults to the task's
-        configured queue. Used by ops backfills that target a separate
-        queue from the daemon's regular dispatches.
-    :param dont_retry: Pass-through to the task; disables its in-task
-        retry on APIConnectionError. Used for diagnostic runs.
-    :return: True if dispatched, False if skipped because the lock is held.
+    Args:
+        audio_pk: Audio primary key.
+        queue: Optional Celery queue name. Defaults to the task's
+            configured queue. Used by ops backfills that target a separate
+            queue from the daemon's regular dispatches.
+        dont_retry: Pass-through to the task; disables its in-task
+            retry on APIConnectionError. Used for diagnostic runs.
+
+    Returns:
+        True if dispatched, False if skipped because the lock is held.
     """
     # Local import to avoid a circular import with cl.audio.tasks.
     from cl.audio.tasks import transcribe_from_open_ai_api
@@ -67,11 +69,13 @@ def dispatch_transcribe(
 
 
 def dispatch_process_audio_file(audio_pk: int) -> bool:
-    """Enqueue process_audio_file for ``audio_pk`` if no other standardization
-    is already in flight for that pk.
+    """Enqueue process_audio_file for ``audio_pk`` if no other standardization is already in flight for that pk.
 
-    :param audio_pk: Audio primary key.
-    :return: True if dispatched, False if skipped because the lock is held.
+    Args:
+        audio_pk: Audio primary key.
+
+    Returns:
+        True if dispatched, False if skipped because the lock is held.
     """
     from cl.scrapers.tasks import process_audio_file
 

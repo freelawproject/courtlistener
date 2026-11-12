@@ -1,5 +1,4 @@
-"""
-Create and submit Google Gemini batch requests for files stored in S3.
+r"""Create and submit Google Gemini batch requests for files stored in S3.
 
 This command fetches files from an S3 path, creates LLMTask objects for each file,
 and submits a batch job to Google Gemini. It supports system prompt caching and
@@ -40,32 +39,32 @@ OPTIONAL ARGUMENTS:
                         Files exceeding this are split into multiple LLMRequests
 
 BASIC USAGE:
-    python manage.py send_gemini_file_batches \\
-        --path "llm-inputs/batch-2026-01/" \\
-        --system-prompt 1 \\
+    python manage.py send_gemini_file_batches \
+        --path "llm-inputs/batch-2026-01/" \
+        --system-prompt 1 \
         --user-prompt 2
 
 DOCKER USAGE:
-    docker exec cl-django python manage.py send_gemini_file_batches \\
-        --path "llm-inputs/january-scans/" \\
-        --system-prompt 1 \\
-        --user-prompt 2 \\
+    docker exec cl-django python manage.py send_gemini_file_batches \
+        --path "llm-inputs/january-scans/" \
+        --system-prompt 1 \
+        --user-prompt 2 \
         --request-name "January 2026 Scan Batch"
 
 EXAMPLE WITH CACHING:
-    docker exec cl-django python manage.py send_gemini_file_batches \\
-        --path "llm-inputs/batch-2026-01/" \\
-        --system-prompt 1 \\
-        --user-prompt 2 \\
-        --cache-name "scan-extraction-v1" \\
+    docker exec cl-django python manage.py send_gemini_file_batches \
+        --path "llm-inputs/batch-2026-01/" \
+        --system-prompt 1 \
+        --user-prompt 2 \
+        --cache-name "scan-extraction-v1" \
         --model "gemini-2.0-flash-001"
 
 EXAMPLE WITH CUSTOM BUCKET:
-    docker exec cl-django python manage.py send_gemini_file_batches \\
-        --path "external-scans/batch-jan/" \\
-        --bucket "dev-com-courtlistener-storage" \\
-        --system-prompt 1 \\
-        --user-prompt 2 \\
+    docker exec cl-django python manage.py send_gemini_file_batches \
+        --path "external-scans/batch-jan/" \
+        --bucket "dev-com-courtlistener-storage" \
+        --system-prompt 1 \
+        --user-prompt 2 \
         --store-input-files
 
 WHAT IT DOES:
@@ -170,10 +169,13 @@ def get_s3_file_list(
 ) -> Generator[tuple[str, bytes, str]]:
     """List files from S3 path and yield file information.
 
-    :param s3_path: S3 prefix/path (e.g., "llm-inputs/batch-2026-01/")
-    :param bucket_name: Optional bucket name (defaults to AWS_STORAGE_BUCKET_NAME)
-    :param file_extension: File extension to filter (e.g., ".pdf", ".txt")
-    :yields: (filename, file_content_bytes, s3_key)
+    Args:
+        s3_path: S3 prefix/path (e.g., "llm-inputs/batch-2026-01/")
+        bucket_name: Optional bucket name (defaults to AWS_STORAGE_BUCKET_NAME)
+        file_extension: File extension to filter (e.g., ".pdf", ".txt")
+
+    Yields:
+        (filename, file_content_bytes, s3_key)
     """
     # Use settings for credentials and bucket
     bucket = bucket_name or settings.AWS_STORAGE_BUCKET_NAME
@@ -272,8 +274,11 @@ def validate_inputs(
     objects with the correct types. Model validation is handled by
     :meth:`GoogleGenAIBatchWrapper.validate_model` in ``execute_batch``.
 
-    :param options: Parsed command-line options dictionary.
-    :returns: A tuple of (batch_api_key, system_prompt, user_prompt).
+    Args:
+        options: Parsed command-line options dictionary.
+
+    Returns:
+        A tuple of (batch_api_key, system_prompt, user_prompt).
     """
     env = environ.FileAwareEnv()
     batch_api_key = env("GEMINI_BATCH_API_KEY", default=None)
@@ -300,9 +305,12 @@ def validate_inputs(
 def chunk_iterator(iterator: Iterator, size: int) -> Generator[list]:
     """Yield successive lists of up to *size* items from *iterator*.
 
-    :param iterator: The source iterator to consume in chunks.
-    :param size: Maximum number of items per chunk.
-    :returns: A generator of lists, each containing up to *size* items.
+    Args:
+        iterator: The source iterator to consume in chunks.
+        size: Maximum number of items per chunk.
+
+    Returns:
+        A generator of lists, each containing up to *size* items.
     """
     iterator = iter(iterator)
     while chunk := list(islice(iterator, size)):
@@ -325,14 +333,17 @@ def create_tasks_from_files(
     This function should be called inside a ``transaction.atomic()`` block
     so that all DB writes roll back cleanly on failure.
 
-    :param llm_request: The parent request all tasks belong to.
-    :param files: List of (filename, file_content_bytes, s3_key) tuples.
-    :param store_files: When ``True``, duplicate files into CL storage;
-        otherwise only store the S3 key reference.
-    :param temp_files: Mutable list populated in-place with temporary file
-        paths. This ensures the caller can clean them up even if this
-        function fails partway through.
-    :returns: One ``BatchTask`` per file.
+    Args:
+        llm_request: The parent request all tasks belong to.
+        files: List of (filename, file_content_bytes, s3_key) tuples.
+        store_files: When ``True``, duplicate files into CL storage;
+            otherwise only store the S3 key reference.
+        temp_files: Mutable list populated in-place with temporary file
+            paths. This ensures the caller can clean them up even if this
+            function fails partway through.
+
+    Returns:
+        One ``BatchTask`` per file.
     """
     tasks_data: list[BatchTask] = []
 
@@ -386,15 +397,17 @@ def submit_batch(
     This function should be called inside a ``transaction.atomic()`` block
     so that all DB writes roll back cleanly on failure.
 
-    :param llm_request: The parent request to associate the batch with.
-    :param wrapper: Pre-initialised Google GenAI batch wrapper.
-    :param tasks_data: Tasks produced by :func:`create_tasks_from_files`.
-    :param system_prompt: The system ``Prompt`` object.
-    :param user_prompt: The user ``Prompt`` object.
-    :param cache_name: Stable display name for the system-prompt cache.
-    :returns: The batch ID assigned by the provider.
-    """
+    Args:
+        llm_request: The parent request to associate the batch with.
+        wrapper: Pre-initialised Google GenAI batch wrapper.
+        tasks_data: Tasks produced by :func:`create_tasks_from_files`.
+        system_prompt: The system ``Prompt`` object.
+        user_prompt: The user ``Prompt`` object.
+        cache_name: Stable display name for the system-prompt cache.
 
+    Returns:
+        The batch ID assigned by the provider.
+    """
     logger.info("Preparing batch requests...")
     prepared_requests = wrapper.prepare_batch_requests(
         tasks_data, user_prompt.text
@@ -421,7 +434,8 @@ def cleanup_temp_files(temp_files: list[str]) -> None:
     Logs a warning for any file that cannot be removed (except when the
     file has already been deleted).
 
-    :param temp_files: List of temporary file paths to delete.
+    Args:
+        temp_files: List of temporary file paths to delete.
     """
     logger.info("Cleaning up temporary files...")
     for temp_file_path in temp_files:
@@ -448,11 +462,14 @@ def get_successfully_processed_s3_keys(
     - parent LLMRequest used both the same system and user prompts
     - task status is SUCCEEDED or FINISHED
 
-    :param s3_path: S3 prefix to match against input_file names.
-    :param model: The API model name to match.
-    :param system_prompt_id: PK of the system Prompt.
-    :param user_prompt_id: PK of the user Prompt.
-    :returns: Set of S3 keys that have already been processed.
+    Args:
+        s3_path: S3 prefix to match against input_file names.
+        model: The API model name to match.
+        system_prompt_id: PK of the system Prompt.
+        user_prompt_id: PK of the user Prompt.
+
+    Returns:
+        Set of S3 keys that have already been processed.
     """
     return set(
         LLMTask.objects.filter(
@@ -477,9 +494,12 @@ def filter_already_processed(
 
     Yields only files not yet successfully processed. Logs each skip.
 
-    :param s3_files: Iterator of (filename, file_content, s3_key) tuples.
-    :param already_processed: Set of S3 keys to skip.
-    :returns: Generator yielding unprocessed file tuples.
+    Args:
+        s3_files: Iterator of (filename, file_content, s3_key) tuples.
+        already_processed: Set of S3 keys to skip.
+
+    Returns:
+        Generator yielding unprocessed file tuples.
     """
     skipped = 0
     for filename, file_content, s3_key in s3_files:

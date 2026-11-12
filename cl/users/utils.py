@@ -32,17 +32,18 @@ def create_stub_account(
     user_data: dict[str, str],
     profile_data: dict[str, str],
 ) -> tuple[User, UserProfile]:
-    """Create a minimal user account in CL
+    """Create a minimal user account in CL.
 
     This can be helpful when receiving anonymous donations, payments from
     external applications like XERO, etc.
 
-    :param user_data: Generally cleaned data from a cl.users.forms.UserForm
-    :type user_data: dict
-    :param profile_data: Generally cleaned data from a
-    cl.users.forms.ProfileForm
-    :type profile_data: dict
-    :return: A tuple of a User and UserProfile objects
+    Args:
+        user_data: Generally cleaned data from a cl.users.forms.UserForm
+        profile_data: Generally cleaned data from a
+            cl.users.forms.ProfileForm
+
+    Returns:
+        A tuple of a User and UserProfile objects
     """
     with transaction.atomic():
         email = user_data["email"]
@@ -73,8 +74,11 @@ def create_stub_account(
 def convert_to_stub_account(user: User) -> User:
     """Set all fields to as blank as possible.
 
-    :param user: The user to operate on.
-    :return: The new user object.
+    Args:
+        user: The user to operate on.
+
+    Returns:
+        The new user object.
     """
     user.first_name = "Deleted"
     user.last_name = ""
@@ -111,7 +115,7 @@ def convert_to_stub_account(user: User) -> User:
 
 
 def delete_user_assets(user: User) -> None:
-    """Delete any associated data from a user account and profile
+    """Delete any associated data from a user account and profile.
 
     This removes the user's live assets (alerts, notes, prayers, API
     credentials, etc.) and then purges the pghistory event rows that reference
@@ -119,10 +123,9 @@ def delete_user_assets(user: User) -> None:
     user and profile rows are not deleted here; `convert_to_stub_account`
     blanks those afterwards.
 
-    :param user: The user whose assets should be deleted.
-    :return: None
+    Args:
+        user: The user whose assets should be deleted.
     """
-
     # Store user_tags before deleting the user-related objects.
     user_tags = user.user_tags.all()
     user_tags_ids = [user_tag.pk for user_tag in user_tags]
@@ -439,8 +442,11 @@ def is_search_history_on_cached(user_pk: int) -> bool:
     Cached for five minutes, so changes may take that long to apply. Intended
     for the API; website requests should read the profile directly.
 
-    :param user_pk: The primary key of the user.
-    :return: True if the user's search queries should be saved.
+    Args:
+        user_pk: The primary key of the user.
+
+    Returns:
+        True if the user's search queries should be saved.
     """
     return UserProfile.objects.values_list(
         "save_query_history", flat=True

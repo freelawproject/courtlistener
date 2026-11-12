@@ -42,10 +42,12 @@ logger = logging.getLogger(__name__)
 def auto_now_fields(model: type[Model]) -> tuple[str, ...]:
     """Collect the names of a model's `auto_now` fields (e.g. `date_modified`).
 
-    :param model: The model to inspect.
+    Args:
+        model: The model to inspect.
 
-    :return: The names of every concrete `auto_now` field on the model."""
-
+    Returns:
+        The names of every concrete `auto_now` field on the model.
+    """
     return tuple(
         f.name
         for f in model._meta.concrete_fields
@@ -55,21 +57,19 @@ def auto_now_fields(model: type[Model]) -> tuple[str, ...]:
 
 def overwrite[T](scrape: T | None, db: T | None) -> T | None:
     """Merge strategy that always overwrites the existing value with the scraped value."""
-
     return scrape
 
 
 def overwrite_if_present[T](scrape: T | None, db: T | None) -> T | None:
-    """Merge strategy that overwrites the existing value only when the scraped
-    value is present (i.e. not `None`), otherwise keeping the DB value.
+    """Merge strategy that overwrites the existing value only when the scraped value is present (i.e. not `None`), otherwise keeping the DB value.
 
     This is the default strategy so that a partial scrape -- one that is missing
     a field it didn't manage to extract -- does not clobber good data already in
     the DB. Note that "present" means `not None`: a scraped empty string or `0`
     is treated as a real value and will overwrite the DB value. Use
     `OverwriteExisting` if `None` should be written, or `OverwriteConditionally`
-    for finer-grained control."""
-
+    for finer-grained control.
+    """
     return db if scrape is None else scrape
 
 
@@ -107,10 +107,13 @@ class MergerSpecification[ScrapeType, ParamType, OutputType]:
     def validate(self, field: Field | ForeignObjectRel) -> list[Exception]:
         """Validate this specification for the given field.
 
-        :param field: The field to validate this specification for.
+        Args:
+            field: The field to validate this specification for.
 
-        :return: A list of errors encountered during validation. These will be surfaced after the merger is fully
-        constructed and will prevent the `merge` method from being called."""
+        Returns:
+            A list of errors encountered during validation. These will be surfaced after the merger is fully
+            constructed and will prevent the `merge` method from being called.
+        """
         return []
 
     def __set_name__(self, owner: type, name: str):
@@ -134,9 +137,11 @@ class AttributeMerger[ScrapeType, ParamType, TransformType](
 ):
     """Class encapsulating logic for merging a single attribute from a scrape into a DB object.
 
-    :param transform: Defines how to get the DB value from the scrape data
-    :param strategy: How to behave when data is present in the scrape and DB. Defaults to overwriting the DB value
-        only when the scraped value is present (not `None`), so a partial scrape won't overwrite existing data."""
+    Args:
+        transform: Defines how to get the DB value from the scrape data
+        strategy: How to behave when data is present in the scrape and DB. Defaults to overwriting the DB value
+            only when the scraped value is present (not `None`), so a partial scrape won't overwrite existing data.
+    """
 
     __slots__: tuple[str, ...] = ("strategy",)
 
@@ -173,12 +178,14 @@ def Attribute[TransformType](
 class RelatedParams[ParamType]:
     """Wrapper for passing parameters to a related object.
 
-    :ivar params: The parameters passed by the user to the merger
-    :ivar parent: The object the related object hangs off of
-    :ivar parent_name: The name of the child's field pointing back at
-        `parent`, set for the reverse side of a one-to-one relation. The child
-        merger fills that field in from `parent` itself, so a child merger
-        must not declare it."""
+    Attributes:
+        params: The parameters passed by the user to the merger
+        parent: The object the related object hangs off of
+        parent_name: The name of the child's field pointing back at
+            `parent`, set for the reverse side of a one-to-one relation. The child
+            merger fills that field in from `parent` itself, so a child merger
+            must not declare it.
+    """
 
     params: ParamType
     parent: Model | None = field(kw_only=True)
@@ -249,8 +256,7 @@ class OneToOneMerger[ScrapeType, ParamType, ChildType, RM: Model](
         RM,
     ]
 ):
-    """Class encapsulating logic for merging a one-to-one relationship, in
-    either direction."""
+    """Class encapsulating logic for merging a one-to-one relationship, in either direction."""
 
     __slots__: tuple[str, ...] = "forward", "parent_name"
 
@@ -265,9 +271,7 @@ class OneToOneMerger[ScrapeType, ParamType, ChildType, RM: Model](
         self.parent_name: str | None = None
 
     def validate(self, field: Field | ForeignObjectRel) -> list[Exception]:
-        """Validate the field and, along the way, learn which side of the
-        relation it is. A reverse relation is a `OneToOneRel` rather than a
-        `OneToOneField`, and carries the name of the child's own field."""
+        """Validate the field and, along the way, learn which side of the relation it is. A reverse relation is a `OneToOneRel` rather than a `OneToOneField`, and carries the name of the child's own field."""
         errors = super().validate(field)
         if not field.one_to_one:
             errors.append(TypeError(f"{self.name}: Is not a one-to-one field"))
@@ -405,8 +409,12 @@ class NToManyMerger[ScrapeType, ParamType, ChildType, RM: Model](
 class OneToManyMerger[ScrapeType, ParamType, ChildType, RM: Model](
     NToManyMerger[ScrapeType, ParamType, ChildType, RM]
 ):
-    """Class encapsulating logic for merging a one-to-many relationship. More precisely: defines how to merge a
-    collection of `B` models which have foreign keys pointing to a single `A` model (i.e. `DocketEntry` -> `Docket`)."""
+    """Class encapsulating logic for merging a one-to-many relationship.
+
+    More precisely: defines how to merge a collection of `B` models which have
+    foreign keys pointing to a single `A` model (i.e. `DocketEntry` ->
+    `Docket`).
+    """
 
     def validate(self, field: Field | ForeignObjectRel) -> list[Exception]:
         errors = super().validate(field)
@@ -430,9 +438,11 @@ def OneToManyRelation[ParamType, ChildType, RM: Model](
 class ThroughParameters[ParamType](RelatedParams[ParamType]):
     """Wrapper for passing parameters to a `through` model.
 
-    :ivar source: The source object of the relationship
-    :ivar target: The target object of the relationship
-    :ivar params: The parameters passed by the user to the merger"""
+    Attributes:
+        source: The source object of the relationship
+        target: The target object of the relationship
+        params: The parameters passed by the user to the merger
+    """
 
     source: Model = field(kw_only=True)
     source_name: str = field(kw_only=True)
@@ -451,7 +461,8 @@ class ManyToManyMerger[
     """Class encapsulating logic for merging a many-to-many relationship.
 
     A scrape whose transform yields no children is treated as a partial
-    scrape: existing related objects and through rows are left untouched."""
+    scrape: existing related objects and through rows are left untouched.
+    """
 
     __slots__: tuple[str, ...] = (
         "through",
@@ -648,13 +659,16 @@ class MergerSpecRegistry[ScrapeType, ParamType]:
     def validate(
         self, merger: "type[Merger[ScrapeType, ParamType, Any]]"
     ) -> list[Exception]:
-        """Run validation for every attached spec against the given merger. Used to defer running validation on base
-        classes which may not have required properties defined yet.
+        """Run validation for every attached spec against the given merger.
+
+        Used to defer running validation on base classes which may not have
+        required properties defined yet.
 
         Validation is also the first point at which a one-to-one spec knows
         which side of the relation it is on, so reverse specs are moved into
         `related` here: they can only be merged once their parent exists, which
-        is when the `related` specs run."""
+        is when the `related` specs run.
+        """
         errors = []
 
         for related_spec in self.related.values():
@@ -721,26 +735,29 @@ class MergerMeta(type):
 
 
 class Merger[ScrapeType, ParamType, M: Model](metaclass=MergerMeta):
-    """Base class for a merger which takes in `D` and merges it into `model`. Subclasses should generally not be
-    instantiated; methods and attributes should be accessed directly from the class.
+    """Base class for a merger which takes in `D` and merges it into `model`.
 
-    :cvar model: The model this merger applies to.
-    :cvar atomic: Whether to wrap the entire merge operation -- the object's own attributes *and* all related/child
-        mergers -- in a single `transaction.atomic()` block, so the whole tree commits together or rolls back together
-        if an exception is raised. Nested mergers that set their own `atomic` value simply create savepoints within
-        this block.
-    :cvar key: A natural key to use for looking up objects in the DB; used in the default `get_existing` implementation.
-    :cvar errors: A list of errors encountered during validation of this merger. These will be surfaced after the merger
-        is fully constructed and will prevent the `merge` method from being called.
+    Subclasses should generally not be instantiated; methods and attributes
+    should be accessed directly from the class.
 
-    :ivar scrape: Data from scrape with no modifications
-    :ivar params: Parameters passed to the merger
-    :ivar transformed: Data from scrape after being run through all the transforms for attribute and related mergers
-    :ivar existing: A matching object in the DB or `None` if not found. Initialized lazily
-    :ivar result: Stores the result of the attempted merge operation. Initialized to `None` and updated when the
-        merge attempt completes. If the input data is invalid, the result will instead be set to `MergeResult.failed`
-    :ivar out: The object written to the DB or `None` if the merge failed. Initialized as `None` and updated after
-        the merge attempt completes"""
+    Attributes:
+        model: The model this merger applies to.
+        atomic: Whether to wrap the entire merge operation -- the object's own attributes *and* all related/child
+            mergers -- in a single `transaction.atomic()` block, so the whole tree commits together or rolls back together
+            if an exception is raised. Nested mergers that set their own `atomic` value simply create savepoints within
+            this block.
+        key: A natural key to use for looking up objects in the DB; used in the default `get_existing` implementation.
+        errors: A list of errors encountered during validation of this merger. These will be surfaced after the merger
+            is fully constructed and will prevent the `merge` method from being called.
+        scrape: Data from scrape with no modifications
+        params: Parameters passed to the merger
+        transformed: Data from scrape after being run through all the transforms for attribute and related mergers
+        existing: A matching object in the DB or `None` if not found. Initialized lazily
+        result: Stores the result of the attempted merge operation. Initialized to `None` and updated when the
+            merge attempt completes. If the input data is invalid, the result will instead be set to `MergeResult.failed`
+        out: The object written to the DB or `None` if the merge failed. Initialized as `None` and updated after
+            the merge attempt completes
+    """
 
     model: ClassVar[type[Model]]
     atomic: ClassVar[bool] = False
@@ -749,8 +766,11 @@ class Merger[ScrapeType, ParamType, M: Model](metaclass=MergerMeta):
     __registry__: ClassVar[MergerSpecRegistry[Any, Any]]
 
     def __init_subclass__(cls, abstract: bool = False) -> None:
-        """:param abstract: Whether this merger is abstract and should not be instantiated/validated."""
+        """Initialize a merger subclass.
 
+        Args:
+            abstract: Whether this merger is abstract and should not be instantiated/validated.
+        """
         super().__init_subclass__()
 
         if abstract:
@@ -787,9 +807,11 @@ class Merger[ScrapeType, ParamType, M: Model](metaclass=MergerMeta):
 
     @classmethod
     def uses_natural_key(cls) -> bool:
-        """Check if the implementor has overridden the query method. This is
-        useful because natural keys allow us to use some nice optimizations when
-        merging N-to-many relations."""
+        """Check if the implementor has overridden the query method.
+
+        This is useful because natural keys allow us to use some nice
+        optimizations when merging N-to-many relations.
+        """
         return (
             cls.query == Merger.query
             and cls.resolve_query == Merger.resolve_query
@@ -873,11 +895,15 @@ class Merger[ScrapeType, ParamType, M: Model](metaclass=MergerMeta):
 
     @staticmethod
     def validate(scrape: ScrapeType) -> bool:
-        """Validate the input data before attempting a merge operation
+        """Validate the input data before attempting a merge operation.
 
-        :param scrape: Input data to the merge
-        :return: True if the input is valid and the merge operation can proceed. False if the merge operation should be
-            canceled."""
+        Args:
+            scrape: Input data to the merge
+
+        Returns:
+            True if the input is valid and the merge operation can proceed. False if the merge operation should be
+            canceled.
+        """
         return True
 
     def __init__(
@@ -891,11 +917,14 @@ class Merger[ScrapeType, ParamType, M: Model](metaclass=MergerMeta):
     ):
         """Create an object to track the merge operation on the specified data.
 
-        :param scrape: The scraped data to transform. Parameter values are passed as kwargs.
-        :param existing: Optional existing object to override the lookup in `get_existing`.
-        :param manager: The manager to use for lookups and creation of objects. Defaults to the model's default manager.
-        :param lookup: Whether the merger should attempt to lookup missing objects. Useful for optimizing queries in
-            N-to-many relations."""
+        Args:
+            scrape: The scraped data to transform. Parameter values are passed as kwargs.
+            params: The parameters this merger was given by its parent.
+            existing: Optional existing object to override the lookup in `get_existing`.
+            manager: The manager to use for lookups and creation of objects. Defaults to the model's default manager.
+            lookup: Whether the merger should attempt to lookup missing objects. Useful for optimizing queries in
+                N-to-many relations.
+        """
         self.guarantee_valid()
         result = None
         valid = self.validate(scrape)
@@ -983,19 +1012,20 @@ class Merger[ScrapeType, ParamType, M: Model](metaclass=MergerMeta):
     def pre_update(self, updated_fields: list[str]) -> list[str]:
         """Called before an updated instance is saved. Useful for setting attributes that are dependent on the result of the merge operation.
 
-        :param updated_fields: The fields that were updated.
+        Args:
+            updated_fields: The fields that were updated.
 
-        :return: A list of additional attribute names that should be updated."""
-
+        Returns:
+            A list of additional attribute names that should be updated.
+        """
         return []
 
     def needs_update(self) -> bool:
-        """Whether `self.existing` should take the update path even when no
-        merged attribute changed. Useful for re-triggering downstream
-        processing (e.g. a re-download) driven by the merge result's updates.
+        """Whether `self.existing` should take the update path even when no merged attribute changed. Useful for re-triggering downstream processing (e.g. a re-download) driven by the merge result's updates.
 
-        :return: True to force the update path."""
-
+        Returns:
+            True to force the update path.
+        """
         return False
 
     def after(self) -> None:
@@ -1008,17 +1038,15 @@ class Merger[ScrapeType, ParamType, M: Model](metaclass=MergerMeta):
         The `merge` method will limit the queryset to returning at most two objects. If the queryset returns more than
         one object, the `resolve_query` method will be called to determine which object (if any) to merge into.
 
-        :return: The queryset to find the object."""
+        Returns:
+            The queryset to find the object.
+        """
         return self.manager.filter(
             **{name: self.transformed[name] for name in self.key},
         )
 
     def resolve_query(self, qs: QuerySet[M]) -> tuple[bool, M | None]:
-        """Called to resolve the output of `self.query()` into a single object to be merged. Returns a tuple where the
-        first entry is a boolean indicating whether the merge can continue and the second is a DB object or `None`. If
-        the query cannot continue, the `merge` method will return a failed result and cancel. If `None` is returned
-        as the DB object, a new object will be created. This method should be deterministic and always return the same
-        output for the same inputs to ensure merge operations are idempotent."""
+        """Called to resolve the output of `self.query()` into a single object to be merged. Returns a tuple where the first entry is a boolean indicating whether the merge can continue and the second is a DB object or `None`. If the query cannot continue, the `merge` method will return a failed result and cancel. If `None` is returned as the DB object, a new object will be created. This method should be deterministic and always return the same output for the same inputs to ensure merge operations are idempotent."""
         results = list(qs)
         if len(results) == 0:
             return True, None
@@ -1137,14 +1165,15 @@ class Merger[ScrapeType, ParamType, M: Model](metaclass=MergerMeta):
         return db_obj, result
 
     def merge_one(self) -> tuple[MergeResult[Any], M | None]:
-        """Merge the object's own attributes and then all of its related/child
-        mergers, returning the combined result.
+        """Merge the object's own attributes and then all of its related/child mergers, returning the combined result.
 
         When `atomic` is set, the caller runs this inside a single
         `transaction.atomic()` block, so the object and its whole related tree
         commit or roll back together.
 
-        :return: The result of the merge operation and the merged object"""
+        Returns:
+            The result of the merge operation and the merged object
+        """
         result = MergeResult.unnecessary()
 
         if self.existing is None:

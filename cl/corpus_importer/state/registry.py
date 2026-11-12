@@ -23,10 +23,15 @@ LOADERS: dict[str, type[JKentScrapeLoader[Any, Any]]] = {
 def get_loader(name: str) -> type[JKentScrapeLoader[Any, Any]]:
     """The loader registered under `name`.
 
-    :param name: A key of `LOADERS`.
-    :return: The loader class.
-    :raises KeyError: If nothing is registered under `name`. A merge task
-        given an unknown name has been sent something it cannot merge, and
-        retrying it will not help.
+    Args:
+        name: A key of `LOADERS`.
+
+    Returns:
+        The loader class.
+
+    Raises:
+        KeyError: If nothing is registered under `name`. A merge task
+            given an unknown name has been sent something it cannot merge, and
+            retrying it will not help.
     """
     return LOADERS[name]

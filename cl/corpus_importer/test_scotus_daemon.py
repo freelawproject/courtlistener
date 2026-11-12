@@ -122,8 +122,7 @@ class ScotusDaemonTest(SimpleTestCase):
     # ------------------------------------------------------------------ #
 
     def test_missing_seed_aborts(self, *_mocks):
-        """If Redis has no seeds, the iteration logs error and does NOT hit
-        HTTP."""
+        """If Redis has no seeds, the iteration logs error and does NOT hit HTTP."""
         with (
             mock.patch.object(
                 scotus_cmd_module, "fetch_scotus_docket_json"
@@ -136,10 +135,7 @@ class ScotusDaemonTest(SimpleTestCase):
         self.assertTrue(mock_error.called)
 
     def test_probe_finds_new_cases_and_backfills_inline(self, *_mocks):
-        """Probe must advance the watermark, ingest each direct hit, and
-        synchronously backfill serials skipped by the geometric probe.
-        Every hit (probe + backfill) must be archived to S3 and handed to
-        the Celery ingestion task."""
+        """Probe must advance the watermark, ingest each direct hit, and synchronously backfill serials skipped by the geometric probe. Every hit (probe + backfill) must be archived to S3 and handed to the Celery ingestion task."""
         self._seed_current_term(25, low=99, high=20000)
 
         valid_low = {f"25-{n}" for n in range(100, 116)}
@@ -232,8 +228,10 @@ class ScotusDaemonTest(SimpleTestCase):
         self.assertEqual(self.r.get(self.COURT_WAIT_KEY), "3600")
 
     def test_term_rollover_probes_outgoing_term(self, *_mocks):
-        """During July the daemon must also probe the outgoing (previous)
-        term. A late filing for term 24 must persist ``low:24``."""
+        """During July the daemon must also probe the outgoing (previous) term.
+
+        A late filing for term 24 must persist ``low:24``.
+        """
         # July 2025: current term = 25, previous term = 24.
         # Seed term 25 (current) and term 24 (outgoing with straggler room).
         self._seed_current_term(25, low=3000, high=20000)
@@ -267,8 +265,7 @@ class ScotusDaemonTest(SimpleTestCase):
         self.assertEqual(self.r.hget(self.HIGHEST_KNOWN_KEY, "low:24"), "3000")
 
     def test_applications_sequence_uses_a_format(self, *_mocks):
-        """The applications sequence must format docket numbers as YYA{serial}
-        and advance the ``applications:YY`` watermark on hits."""
+        """The applications sequence must format docket numbers as YYA{serial} and advance the ``applications:YY`` watermark on hits."""
         self._seed_current_term(25, low=3000, high=20000, applications=99)
 
         def fake_fetch(docket_number):
@@ -299,8 +296,7 @@ class ScotusDaemonTest(SimpleTestCase):
         )
 
     def test_recovery_resumes_interrupted_ingestion(self, *_mocks):
-        """If highest_observed > highest_ingested on entry the probe loop is
-        skipped and ingestion resumes for the gap without re-probing."""
+        """If highest_observed > highest_ingested on entry the probe loop is skipped and ingestion resumes for the gap without re-probing."""
         self._seed_current_term(25, low=99, high=20000)
         # Simulate a crash after probing (observed=103) but mid-ingestion.
         self.r.hset(self.HIGHEST_OBSERVED_KEY, "low:25", 103)
@@ -344,11 +340,7 @@ class ScotusDaemonTest(SimpleTestCase):
         self.assertEqual(fetched_low, ["25-100", "25-101", "25-102", "25-103"])
 
     def test_sweep_caps_per_iteration_and_falls_back_to_probe(self, *_mocks):
-        """When ``highest_observed`` is far ahead of ``highest_ingested`` (e.g.
-        operator-seeded backlog), each iteration must ingest at most
-        ``SCOTUS_FIXED_SWEEP`` serials and skip probing. Once the ingested
-        watermark catches up, the next iteration must resume normal probing.
-        """
+        """When ``highest_observed`` is far ahead of ``highest_ingested`` (e.g. operator-seeded backlog), each iteration must ingest at most ``SCOTUS_FIXED_SWEEP`` serials and skip probing. Once the ingested watermark catches up, the next iteration must resume normal probing."""
         self._seed_current_term(25, low=99, high=20000)
         # Operator seeds the observed watermark 5 serials ahead. With a sweep
         # cap of 2, this requires three iterations to drain (2 + 2 + 1) before
@@ -439,9 +431,7 @@ class ScotusDaemonTest(SimpleTestCase):
                 self.assertGreater(int(dn.split("-")[1]), 104)
 
     def test_ingestion_timeout_leaves_watermark_and_sets_wait(self, *_mocks):
-        """A Timeout mid-ingestion must not advance the watermark past the last
-        successfully processed serial, must set court_wait, and the subsequent
-        iteration's recovery path must retry the interrupted serial."""
+        """A Timeout mid-ingestion must not advance the watermark past the last successfully processed serial, must set court_wait, and the subsequent iteration's recovery path must retry the interrupted serial."""
         self._seed_current_term(25, low=99, high=20000)
         # Probe already completed (observed=103); ingestion interrupted.
         self.r.hset(self.HIGHEST_OBSERVED_KEY, "low:25", 103)
@@ -516,8 +506,7 @@ class ScotusDaemonTest(SimpleTestCase):
     # ------------------------------------------------------------------ #
 
     def test_daemon_runs_probe_iteration_when_enabled(self, *_mocks):
-        """The daemon must call ``run_scotus_probe_iteration`` synchronously
-        on each tick (no Celery apply_async for probing anymore)."""
+        """The daemon must call ``run_scotus_probe_iteration`` synchronously on each tick (no Celery apply_async for probing anymore)."""
         with (
             override_settings(SCOTUS_PROBE_DAEMON_ENABLED=True),
             mock.patch.object(
@@ -530,8 +519,7 @@ class ScotusDaemonTest(SimpleTestCase):
         self.assertEqual(mock_run.call_count, 2)
 
     def test_daemon_skips_probing_when_court_wait_is_set(self, *_mocks):
-        """When ``court_wait`` is active, the daemon must skip
-        probing entirely for that tick."""
+        """When ``court_wait`` is active, the daemon must skip probing entirely for that tick."""
         self.r.set(self.COURT_WAIT_KEY, "blocked")
 
         with (
@@ -610,8 +598,7 @@ class ScotusDaemonIntegrationTest(TestCase):
         )
 
     def test_probe_creates_docket_and_metadata(self, *_mocks):
-        """The geometric probe must create Docket + ScotusDocketMetadata
-        rows for every hit, including serials discovered via backfill.
+        """The geometric probe must create Docket + ScotusDocketMetadata rows for every hit, including serials discovered via backfill.
 
         With testing=True (jitter=0) and watermark=99 the probe visits:
           iter 1 -> 100 (2^0), iter 2 -> 101 (2^1), iter 3 -> 103 (2^2),
@@ -668,8 +655,7 @@ class ScotusDaemonIntegrationTest(TestCase):
         self.assertIn(empty_attempts, (None, "0"))
 
     def test_empty_probe_increments_counter(self, *_mocks):
-        """When no cases are found across all sequences, the empty-probe
-        counter in Redis must be incremented."""
+        """When no cases are found across all sequences, the empty-probe counter in Redis must be incremented."""
         self._seed_current_term(25, low=99, high=20000)
 
         def fake_fetch(_dn):
@@ -689,8 +675,7 @@ class ScotusDaemonIntegrationTest(TestCase):
         self.assertEqual(self.r.get(self.EMPTY_KEY), "1")
 
     def test_blocked_logger_after_max_attempts(self, *_mocks):
-        """After exceeding SCOTUS_COURT_BLOCKED_MAX_ATTEMPTS, the daemon
-        must log an error about prolonged blocking."""
+        """After exceeding SCOTUS_COURT_BLOCKED_MAX_ATTEMPTS, the daemon must log an error about prolonged blocking."""
         self._seed_current_term(25, low=99, high=20000)
         self.r.set(
             self.BLOCKED_KEY,
@@ -721,8 +706,7 @@ class ScotusDaemonIntegrationTest(TestCase):
         self.assertEqual(self.r.get(self.BLOCKED_KEY), "0")
 
     def test_empty_probes_limit_logger(self, *_mocks):
-        """When SCOTUS_EMPTY_PROBES_LIMIT_HOURS is reached, the daemon
-        must log an error about persistent silence."""
+        """When SCOTUS_EMPTY_PROBES_LIMIT_HOURS is reached, the daemon must log an error about persistent silence."""
         self._seed_current_term(25, low=99, high=20000)
         attempts_needed = max(
             1,
@@ -759,8 +743,10 @@ class ScotusDaemonIntegrationTest(TestCase):
 
     def test_empty_probe_ignored_on_weekends(self, *_mocks):
         """Empty probes on Saturday or Sunday must not increment the counter.
+
         SCOTUS doesn't publish new cases on weekends, so counting them would
-        trigger spurious alerts."""
+        trigger spurious alerts.
+        """
         self._seed_current_term(25, low=99, high=20000)
 
         def fake_fetch(_dn):

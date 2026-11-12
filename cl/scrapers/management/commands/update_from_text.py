@@ -19,18 +19,16 @@ from cl.search.models import (
 def rerun_extract_from_text(
     opinion: Opinion, juriscraper_module: str, stats: dict[str, int]
 ):
-    """
-    Reruns `update_document_from_text` from the scraper flow, saving changes
+    """Reruns `update_document_from_text` from the scraper flow, saving changes.
 
     `update_document_from_text` calls `Site.extract_from_text` and assigns
     any changes to the proper objects, in place, but they are not saved.
     This method saves the ones with actual changes
 
-    :param opinion: the Opinion on which to apply extract_from_text
-    :param juriscraper_module: the scraper module path
-    :param stats: dict to accumulate counts for reporting. Modified in place
-
-    :return None
+    Args:
+        opinion: the Opinion on which to apply extract_from_text
+        juriscraper_module: the scraper module path
+        stats: dict to accumulate counts for reporting. Modified in place
     """
     if not opinion.plain_text and not opinion.html:
         # May be an opinion entirely from a merged corpus
@@ -206,10 +204,13 @@ class Command(ScraperCommand):
         logger.info("Modified objects counts: %s", self.stats)
 
     def parse_input_date(self, date_string: str) -> datetime | str:
-        """Parses a date string in accepted formats
+        """Parses a date string in accepted formats.
 
-        :param date_string: the date string in "%Y/%m/%d" or "%Y-%m-%d"
-        :return: an empty string if the input was empty; or the date object
+        Args:
+            date_string: the date string in "%Y/%m/%d" or "%Y-%m-%d"
+
+        Returns:
+            an empty string if the input was empty; or the date object
         """
         parsed_date = ""
         if "/" in date_string:

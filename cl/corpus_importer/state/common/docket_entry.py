@@ -57,9 +57,7 @@ class DocumentMerger[
 
     @override
     def needs_update(self) -> bool:
-        """Force the update path for a document with no stored file and no
-        recorded processing error -- its download failed transiently, and
-        reporting an update gets the download re-dispatched on re-ingest."""
+        """Force the update path for a document with no stored file and no recorded processing error -- its download failed transiently, and reporting an update gets the download re-dispatched on re-ingest."""
         return (
             self.existing is not None
             and not cast(AbstractStateDocument, self.existing).filepath_local

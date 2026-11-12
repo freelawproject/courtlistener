@@ -95,19 +95,21 @@ def get_everything_full(options):
     get_dockets(options, items, tags)
 
 
-def get_dockets(options, items, tags, sample_size=0, doc_num_end=""):
+def get_dockets(
+    options, items, tags: list[str], sample_size=0, doc_num_end=""
+):
     """Download dockets from PACER.
 
-    :param options: Options provided by argparse
-    :param items: Items from our FJC IDB database
-    :param tags: A list of tag names to associate with the purchased content.
-    :param sample_size: The number of items to get. If 0, get them all. Else,
-    get only this many and do it randomly.
-    :param doc_num_end: Only get docket numbers up to this value to constrain
-    costs. If set to an empty string, no constraints are applied. Note that
-    applying this value means no unnumbered entries will be retrieved by PACER.
+    Args:
+        options: Options provided by argparse
+        items: Items from our FJC IDB database
+        tags: A list of tag names to associate with the purchased content.
+        sample_size: The number of items to get. If 0, get them all. Else,
+            get only this many and do it randomly.
+        doc_num_end: Only get docket numbers up to this value to constrain
+            costs. If set to an empty string, no constraints are applied. Note that
+            applying this value means no unnumbered entries will be retrieved by PACER.
     """
-
     if sample_size > 0:
         items = items.order_by("?")[:sample_size]
 

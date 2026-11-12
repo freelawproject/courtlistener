@@ -42,9 +42,11 @@ long_cache_timeout = 60 * 60 * 24 * 180
 # Set up a task if repetition period is set in conf
 @transaction.atomic
 def generate_urls_chunk(force_regenerate: bool = False) -> None:
-    """Generates the next chunk of URLs for the sitemap. This function is
-    responsible for managing the sitemap generation process, including caching,
-    cursor handling, and limiting the number of files generated per call.
+    """Generates the next chunk of URLs for the sitemap.
+
+    This function is responsible for managing the sitemap generation process,
+    including caching, cursor handling, and limiting the number of files
+    generated per call.
 
     The function iterates over the configured sitemap sections, loading the
     appropriate `InfinitePaginatorSitemap` class for each section. It then
@@ -58,7 +60,6 @@ def generate_urls_chunk(force_regenerate: bool = False) -> None:
     the current cursor, indicating that the sitemap data may have changed and
     needs to be regenerated.
     """
-
     redis_db: Redis = get_redis_interface(REDIS_DB)
 
     db_cache: BaseCache = caches["db_cache"]
@@ -279,7 +280,7 @@ def generate_urls_chunk(force_regenerate: bool = False) -> None:
 
 
 def reset_sitemaps_cursor() -> None:
-    """Reset the cursor data for all sitemaps sections"""
+    """Reset the cursor data for all sitemaps sections."""
     redis_db: Redis = get_redis_interface(REDIS_DB)
     redis_db.delete(HASH_NAME)
 
@@ -287,14 +288,17 @@ def reset_sitemaps_cursor() -> None:
 def make_cache_key(
     sitemapObject: InfinitePaginatorSitemap, section: str, page: str | int
 ) -> str:
-    """Make a Cache key, trying to match the same key generated in cl.sitemap.make_cache_key()
+    """Make a Cache key, trying to match the same key generated in cl.sitemap.make_cache_key().
 
     Note that the full URL will include the various GET parameters.
 
-    :param request: The HttpRequest from the client
-    :param section: The section of the sitemap that is loaded
-    :return a key that can be used to cache the request
-    scheme = sitemapObject.get_protocol()
+    Args:
+        sitemapObject: The sitemap being cached
+        section: The section of the sitemap that is loaded
+        page: The page of the sitemap section
+
+    Returns:
+        a key that can be used to cache the request
     """
     scheme = sitemapObject.get_protocol()
     host = sitemapObject.get_domain()
@@ -306,8 +310,7 @@ def make_cache_key(
 
 
 def make_expiration_time(cache: BaseCache, timeout: int) -> datetime:
-    """Make the expiration time for the cache"""
-
+    """Make the expiration time for the cache."""
     local_timeout = cache.get_backend_timeout(timeout)  # timestamp in future
 
     if local_timeout is None:

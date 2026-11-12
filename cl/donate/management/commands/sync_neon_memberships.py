@@ -128,8 +128,11 @@ def get_payment_status(record: dict[str, Any]) -> str:
     memberships. It must not be used to determine whether a SUCCEEDED
     membership has been paid.
 
-    :param record: A membership record as returned by the Neon API.
-    :return: The first payment's status, or "" if no payments exist.
+    Args:
+        record: A membership record as returned by the Neon API.
+
+    Returns:
+        The first payment's status, or "" if no payments exist.
     """
     payments = record.get("payments") or []
     return (payments[0].get("paymentStatus") or "") if payments else ""
@@ -138,8 +141,11 @@ def get_payment_status(record: dict[str, Any]) -> str:
 def get_term_end(record: dict[str, Any]) -> date | None:
     """Return the membership's term end date in the current time zone.
 
-    :param record: A membership record as returned by the Neon API.
-    :return: The localized term end date, or None if the record has no term end.
+    Args:
+        record: A membership record as returned by the Neon API.
+
+    Returns:
+        The localized term end date, or None if the record has no term end.
     """
     term_end = record.get("termEndDate")
     if not term_end:
@@ -157,8 +163,11 @@ def classify_neon_status(record: dict[str, Any]) -> NeonStatus:
     PENDING memberships are considered in progress regardless of their
     payment status.
 
-    :param record: A membership record as returned by the Neon API.
-    :return: The classification; see ``NeonStatus``.
+    Args:
+        record: A membership record as returned by the Neon API.
+
+    Returns:
+        The classification; see ``NeonStatus``.
     """
     match record.get("status"):
         case "SUCCEEDED":
@@ -194,12 +203,15 @@ def get_memberships_to_check(
     otherwise re-check forever: expired rows age out by termination date,
     unpaid rows by their last change, which marking a row FAILED refreshes.
 
-    :param min_hours: Minimum hours since the membership expired, or since
-           an unpaid membership last changed.
-    :param max_days: Maximum days since the termination date, or since an
-           unpaid membership last changed, or None for no upper limit.
-    :return: Memberships ordered by termination date, with the user and
-           profile loaded.
+    Args:
+        min_hours: Minimum hours since the membership expired, or since
+            an unpaid membership last changed.
+        max_days: Maximum days since the termination date, or since an
+            unpaid membership last changed, or None for no upper limit.
+
+    Returns:
+        Memberships ordered by termination date, with the user and
+        profile loaded.
     """
     right_now = timezone.now()
     lower = right_now - timedelta(hours=min_hours)
@@ -237,9 +249,12 @@ def select_membership_to_sync(
     of status. Its status helps distinguish an ongoing renewal attempt
     from an account that has fully lapsed.
 
-    :param memberships: The account's memberships, newest first, as
-        returned by ``NeonClient.get_account_memberships``.
-    :return: The record to hand to ``sync_membership_from_neon``, or None
+    Args:
+        memberships: The account's memberships, newest first, as
+            returned by ``NeonClient.get_account_memberships``.
+
+    Returns:
+        The record to hand to ``sync_membership_from_neon``, or None
         when the account has no memberships.
     """
     today = timezone.localdate()
@@ -293,9 +308,12 @@ def sync_membership_from_neon(
     webhook may already have changed or deleted the row. In that case the
     webhook had newer data: nothing is written and the record is skipped.
 
-    :param membership: The local membership to update.
-    :param neon_membership: A membership record as returned by the Neon API.
-    :return: Whether the record was updated, left unchanged, or skipped.
+    Args:
+        membership: The local membership to update.
+        neon_membership: A membership record as returned by the Neon API.
+
+    Returns:
+        Whether the record was updated, left unchanged, or skipped.
     """
     user = membership.user
     neon_id = str(neon_membership["id"])
@@ -411,8 +429,11 @@ def delete_expired_membership(membership: NeonMembership) -> bool:
     rather than cleared, since clearing it costs a Redis scan and the
     membership was already inactive.
 
-    :param membership: The expired membership to delete.
-    :return: True if the membership was deleted, False if a webhook got
+    Args:
+        membership: The expired membership to delete.
+
+    Returns:
+        True if the membership was deleted, False if a webhook got
         there first.
     """
     with transaction.atomic():
@@ -453,8 +474,11 @@ def revoke_membership(membership: NeonMembership) -> bool:
     since it was loaded. If a webhook has already updated it, leave the
     newer data untouched.
 
-    :param membership: The membership to revoke.
-    :return: True if the membership was marked FAILED, False if a webhook
+    Args:
+        membership: The membership to revoke.
+
+    Returns:
+        True if the membership was marked FAILED, False if a webhook
         modified or deleted it first.
     """
     with transaction.atomic():
@@ -501,10 +525,13 @@ def apply_neon_record(
     unchanged for the caller to handle, and UNEXPECTED records are logged
     for manual investigation.
 
-    :param membership: The local membership being checked.
-    :param record: The record selected by ``select_membership_to_sync``,
-        or None if Neon has no memberships for the account.
-    :return: The sync outcome and the record's classification.
+    Args:
+        membership: The local membership being checked.
+        record: The record selected by ``select_membership_to_sync``,
+            or None if Neon has no memberships for the account.
+
+    Returns:
+        The sync outcome and the record's classification.
     """
     user = membership.user
 
@@ -578,10 +605,13 @@ def adopt_neon_account(
     a second holder would make that lookup ambiguous. The refusal is logged
     at ERROR for a human to merge the local accounts.
 
-    :param membership: The membership whose user's profile is updated.
-    :param account_id: The Neon account ID to store.
-    :param reason: Why the switch is happening, for the log line.
-    :return: True if the profile now carries the new ID.
+    Args:
+        membership: The membership whose user's profile is updated.
+        account_id: The Neon account ID to store.
+        reason: Why the switch is happening, for the log line.
+
+    Returns:
+        True if the profile now carries the new ID.
     """
     user = membership.user
     profile: UserProfile = user.profile  # type: ignore
@@ -624,10 +654,13 @@ def resolve_neon_account(
     account Neon no longer has at all is reported for a human. Transport
     and server errors propagate so the caller can retry on the next run.
 
-    :param client: The Neon API client.
-    :param membership: The local membership, with its user and profile
-        loaded.
-    :return: The account ID to use, or None when the row must be skipped.
+    Args:
+        client: The Neon API client.
+        membership: The local membership, with its user and profile
+            loaded.
+
+    Returns:
+        The account ID to use, or None when the row must be skipped.
     """
     user = membership.user
     profile: UserProfile = user.profile  # type: ignore
@@ -666,9 +699,12 @@ def find_membership_account(
     the caller still picks the membership to sync from that account's list,
     so a replaced membership is not missed.
 
-    :param client: The Neon API client.
-    :param membership: The local membership, with its user loaded.
-    :return: The holding account's ID, or None when we store no membership
+    Args:
+        client: The Neon API client.
+        membership: The local membership, with its user loaded.
+
+    Returns:
+        The holding account's ID, or None when we store no membership
         ID or Neon no longer has the membership.
     """
     if not membership.neon_id:
@@ -704,13 +740,16 @@ def check_membership(
     Neon request is logged and reported as FAILED so the caller can move on
     to the next member; any other exception propagates to the caller.
 
-    :param client: The Neon API client.
-    :param membership: The local membership to check, with its user and
-        profile loaded.
-    :param delete_before: Delete confirmed lapses that ended, and revoke
-        dead unpaid records that last changed, before this instant; None
-        never deletes or revokes.
-    :return: What happened to the membership.
+    Args:
+        client: The Neon API client.
+        membership: The local membership to check, with its user and
+            profile loaded.
+        delete_before: Delete confirmed lapses that ended, and revoke
+            dead unpaid records that last changed, before this instant;
+            None never deletes or revokes.
+
+    Returns:
+        What happened to the membership.
     """
     user = membership.user
     profile: UserProfile = user.profile  # type: ignore
@@ -791,13 +830,16 @@ def sync_memberships(
     they have gone unchanged for as long. Set this value to 0 to disable
     both.
 
-    :param min_hours: See `get_memberships_to_check`.
-    :param max_days: See `get_memberships_to_check`.
-    :param delete_after_days: Age in days past the termination date after
-        which a confirmed-expired membership is deleted, and past the last
-        change after which a confirmed-dead unpaid one is marked FAILED. 0
-        disables both.
-    :return: How many memberships ended in each ``SyncResult``.
+    Args:
+        min_hours: See `get_memberships_to_check`.
+        max_days: See `get_memberships_to_check`.
+        delete_after_days: Age in days past the termination date after
+            which a confirmed-expired membership is deleted, and past the
+            last change after which a confirmed-dead unpaid one is marked
+            FAILED. 0 disables both.
+
+    Returns:
+        How many memberships ended in each ``SyncResult``.
     """
     client = NeonClient()
     delete_before = (

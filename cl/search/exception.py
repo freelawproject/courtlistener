@@ -20,27 +20,25 @@ class SyntaxQueryError(SerializationError):
 
 
 class UnbalancedParenthesesQuery(SyntaxQueryError):
-    """Data passed in has unbalanced parentheses"""
+    """Data passed in has unbalanced parentheses."""
 
     message = "The query contains unbalanced parentheses."
 
 
 class UnbalancedQuotesQuery(SyntaxQueryError):
-    """Data passed in has unbalanced quotes"""
+    """Data passed in has unbalanced quotes."""
 
     message = "The query contains unbalanced quotes."
 
 
 class BadProximityQuery(SyntaxQueryError):
-    """Data passed in has contains a not supported search proximity token"""
+    """Data passed in has contains a not supported search proximity token."""
 
     message = "The query contains an unrecognized proximity token."
 
 
 class ElasticServerError(APIException):
-    """Exception for handling internal server errors specifically related to
-    Elasticsearch requests.
-    """
+    """Exception for handling internal server errors specifically related to Elasticsearch requests."""
 
     status_code = HTTPStatus.INTERNAL_SERVER_ERROR
     default_detail = (
@@ -60,7 +58,7 @@ class ElasticBadRequestError(APIException):
 
 
 class DisallowedWildcardPattern(SyntaxQueryError):
-    """Query contains a disallowed wildcard pattern"""
+    """Query contains a disallowed wildcard pattern."""
 
     message = "The query contains a disallowed wildcard pattern."
 

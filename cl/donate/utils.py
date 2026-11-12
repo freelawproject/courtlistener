@@ -15,8 +15,11 @@ def parse_neon_date(value: str) -> datetime:
     what Django would do when saving the raw string. Parsing up front keeps
     the model typed and avoids the naive-datetime warning on save.
 
-    :param value: The date string returned by Neon.
-    :return: The parsed datetime, made timezone-aware if needed.
+    Args:
+        value: The date string returned by Neon.
+
+    Returns:
+        The parsed datetime, made timezone-aware if needed.
     """
     parsed = models.DateTimeField().to_python(value)
     if timezone.is_naive(parsed):
@@ -25,9 +28,7 @@ def parse_neon_date(value: str) -> datetime:
 
 
 def map_payment_status_value(status: str) -> int:
-    """
-    Maps a payment status string into its corresponding
-    integer value defined in the `MembershipPaymentStatus` class.
+    """Maps a payment status string into its corresponding integer value defined in the `MembershipPaymentStatus` class.
 
     An empty status means Neon attached no payment info to the membership.
     That happens for free tiers and for memberships granted manually in

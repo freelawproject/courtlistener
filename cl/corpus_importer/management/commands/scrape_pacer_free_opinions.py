@@ -76,10 +76,12 @@ def get_last_complete_date(
 
     If the most recent row is still in progress, return ``None``.
 
-    :param court_id: A PACER Court ID
-    :return: the date to resume querying from, or None if the court's latest
-    scrape is still in progress
-    :rtype: datetime.date | None
+    Args:
+        court_id: A PACER Court ID
+
+    Returns:
+        datetime.date | None: the date to resume querying from, or None if the court's latest
+        scrape is still in progress
     """
     court_id = map_pacer_to_cl_id(court_id)
     try:
@@ -119,11 +121,13 @@ def get_outstanding_failed_dates(
     than the bound. The report-stalls action calls it with a ``before`` cutoff
     only, to enumerate every still-failing day for visibility.
 
-    :param court_id: A PACER Court ID
-    :param before: if given, only dates earlier than this are considered
-    :param floor: if given, only dates on or after this are considered
-    :returns: sorted list of dates still needing a successful scrape
-    :rtype: list[datetime.date]
+    Args:
+        court_id: A PACER Court ID
+        before: if given, only dates earlier than this are considered
+        floor: if given, only dates on or after this are considered
+
+    Returns:
+        list[datetime.date]: sorted list of dates still needing a successful scrape
     """
     cl_court_id = map_pacer_to_cl_id(court_id)
     logs = PACERFreeDocumentLog.objects.filter(court_id=cl_court_id)
@@ -156,9 +160,11 @@ def collapse_date_ranges(
     Consecutive calendar days are merged into a single (start, end) tuple so
     they can be scraped in one --date-start/--date-end call.
 
-    :param dates: a sorted list of dates
-    :returns: list of inclusive (start, end) ranges
-    :rtype: list[tuple[datetime.date, datetime.date]]
+    Args:
+        dates: a sorted list of dates
+
+    Returns:
+        list[tuple[datetime.date, datetime.date]]: list of inclusive (start, end) ranges
     """
     ranges: list[tuple[datetime.date, datetime.date]] = []
     one_day = datetime.timedelta(days=1)
@@ -173,13 +179,16 @@ def collapse_date_ranges(
 def mark_court_in_progress(
     court_id: str, d: datetime.date
 ) -> PACERFreeDocumentLog:
-    """Create row with data of queried court
+    """Create row with data of queried court.
 
     Stores the pacer's court id, scraping status, and the last date queried.
 
-    :param court_id: Pacer court id
-    :param d: Last date queried
-    :return: new PACERFreeDocumentLog object
+    Args:
+        court_id: Pacer court id
+        d: Last date queried
+
+    Returns:
+        new PACERFreeDocumentLog object
     """
     return PACERFreeDocumentLog.objects.create(
         status=PACERFreeDocumentLog.SCRAPE_IN_PROGRESS,
@@ -194,15 +203,18 @@ def fetch_doc_report(
     end: datetime.date,
     day_span: int = 1,
 ) -> bool:
-    """Get free documents from pacer
+    """Get free documents from pacer.
 
     Get free documents from pacer and save each using PACERFreeDocumentRow model
 
-    :param pacer_court_id: Pacer court id to fetch
-    :param start: start date to query
-    :param end: end date to query
-    :param day_span: how many days each PACER sub-query should cover
-    :return: true if an exception occurred else false
+    Args:
+        pacer_court_id: Pacer court id to fetch
+        start: start date to query
+        end: end date to query
+        day_span: how many days each PACER sub-query should cover
+
+    Returns:
+        true if an exception occurred else false
     """
     exception_raised = False
     status = PACERFreeDocumentLog.SCRAPE_FAILED
@@ -278,9 +290,7 @@ def get_and_save_free_document_reports(
     date_end: datetime.date | None,
     day_span: int = 1,
 ) -> None:
-    """Query the Free Doc Reports on PACER and get a list of all the free
-    documents. Do not download those items, as that step is done later. For now
-    just get the list.
+    """Query the Free Doc Reports on PACER and get a list of all the free documents. Do not download those items, as that step is done later. For now just get the list.
 
     Note that the ``get_and_save_free_document_report`` Celery task is invoked
     synchronously (in-process) here, one court and date at a time, rather than
@@ -288,12 +298,13 @@ def get_and_save_free_document_reports(
     in Celery 4.2.0 (more accurately in redis-py 3.x.x) that failed nearly every
     time. This is simpler and slower, but reliable.
 
-    :param courts: optionally a list of courts to scrape
-    :param date_start: optionally a start date to query all the specified courts or all
-    courts
-    :param date_end: optionally an end date to query all the specified courts or all
-    courts
-    :param day_span: how many days each PACER sub-query should cover
+    Args:
+        courts: optionally a list of courts to scrape
+        date_start: optionally a start date to query all the specified courts or all
+            courts
+        date_end: optionally an end date to query all the specified courts or all
+            courts
+        day_span: how many days each PACER sub-query should cover
     """
     # Kill any *old* logs that report they're in progress. (They've failed.)
     three_hrs_ago = now() - datetime.timedelta(hours=3)
@@ -404,13 +415,13 @@ def get_pdfs(
     In this function, we iterate over the entire table of results, merge it
     into our normal tables, and then download and extract the PDF.
 
-    :param courts: optionally a list of courts to scrape
-    :param date_start: optionally a start date to query all the specified courts or all
-    courts
-    :param date_end: optionally an end date to query all the specified courts or all
-    courts
-    :param queue: the queue name
-    :return: None
+    Args:
+        courts: optionally a list of courts to scrape
+        date_start: optionally a start date to query all the specified courts or all
+            courts
+        date_end: optionally an end date to query all the specified courts or all
+            courts
+        queue: the queue name
     """
     q = cast(str, queue)
     cnt = CaseNameTweaker()
@@ -509,7 +520,8 @@ def get_pdfs(
 def ocr_available(queue: str) -> None:
     """Do the OCR for any items that need it, then save to the ES index.
 
-    :param queue: the queue name
+    Args:
+        queue: the queue name
     """
     q = cast(str, queue)
     rds = (
@@ -546,11 +558,13 @@ def report_free_document_scrape_stalls(
        active re-query window, which is still being retried), so individual
        stuck days behind an advancing cursor are surfaced for investigation.
 
-    :param courts: optionally a list of CL court ids to check
-    :param stale_days: a court is stalled if its newest success is older than
-    this many days
-    :returns: list of (court_id, latest_success_date) for stalled courts
-    :rtype: list[tuple[str, datetime.date | None]]
+    Args:
+        courts: optionally a list of CL court ids to check
+        stale_days: a court is stalled if its newest success is older than
+            this many days
+
+    Returns:
+        list[tuple[str, datetime.date | None]]: list of (court_id, latest_success_date) for stalled courts
     """
     base_filter = Q(in_use=True, end_date=None) & ~Q(pk__in=EXCLUDED_COURT_IDS)
     if courts:
@@ -627,16 +641,16 @@ def report_free_document_scrape_stalls(
 
 
 def do_everything(courts, date_start, date_end, queue, day_span=1):
-    """Execute the entire process of obtaining the metadata of the free documents,
-    downloading them and ingesting them into the system
+    """Execute the entire process of obtaining the metadata of the free documents, downloading them and ingesting them into the system.
 
-    :param courts: optionally a list of courts to scrape
-    :param date_start: optionally a start date to query all the specified courts or all
-    courts
-    :param date_end: optionally an end date to query all the specified courts or all
-    courts
-    :param queue: the queue name
-    :param day_span: how many days each PACER sub-query should cover
+    Args:
+        courts: optionally a list of courts to scrape
+        date_start: optionally a start date to query all the specified courts or all
+            courts
+        date_end: optionally an end date to query all the specified courts or all
+            courts
+        queue: the queue name
+        day_span: how many days each PACER sub-query should cover
     """
     logger.info("Running and compiling free document reports.")
     get_and_save_free_document_reports(
@@ -664,10 +678,13 @@ class Command(VerboseCommand):
         return self.VALID_ACTIONS[s]
 
     def validate_date_args(self, opts):
-        """Validate dates arguments if any
+        """Validate dates arguments if any.
 
-        :param opts: dictionary with arguments from the command
-        :return: true if the date validations are satisfied else false
+        Args:
+            opts: dictionary with arguments from the command
+
+        Returns:
+            true if the date validations are satisfied else false
         """
         if not opts.get("date_start") and not opts.get("date_end"):
             return True
@@ -684,11 +701,14 @@ class Command(VerboseCommand):
         return True
 
     def filter_kwargs(self, func, kwargs):
-        """Keep only the params required to call the function
+        """Keep only the params required to call the function.
 
-        :param func: function to be called by the command
-        :param kwargs: dictionary with arguments from the command
-        :return: dictionary with params required for the function
+        Args:
+            func: function to be called by the command
+            kwargs: dictionary with arguments from the command
+
+        Returns:
+            dictionary with params required for the function
         """
         valid_params = inspect.signature(func).parameters.keys()
         return {

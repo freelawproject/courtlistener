@@ -61,12 +61,13 @@ from cl.stats.utils import tally_stat
 class AlertHitsToProcess:
     """Dataclass for storing alert hits to process and related metadata.
 
-    :param results: List of hits from the main query.
-    :param parent_results: The elasticsearch response targeting parent documents if any.
-    :param child_results: The elasticsearch response targeting child documents if any.
-    :param alert_id: The ID of the alert being processed.
-    :param query_date: The date when the query was executed.
-    :param case_only_alert: Boolean flag indicating if this is a case-only alert.
+    Args:
+        results: List of hits from the main query.
+        parent_results: The elasticsearch response targeting parent documents if any.
+        child_results: The elasticsearch response targeting child documents if any.
+        alert_id: The ID of the alert being processed.
+        query_date: The date when the query was executed.
+        case_only_alert: Boolean flag indicating if this is a case-only alert.
     """
 
     results: Response
@@ -82,10 +83,13 @@ def get_task_status(
 ) -> ObjectApiResponse[Any] | dict[str, Any]:
     """Fetch the status of a task from Elasticsearch.
 
-    :param task_id: The ID of the task to fetch the status for.
-    :param es: The Elasticsearch client instance.
-    :return: The status of the task if successful, or an empty dictionary if
-    an error occurs.
+    Args:
+        task_id: The ID of the task to fetch the status for.
+        es: The Elasticsearch client instance.
+
+    Returns:
+        The status of the task if successful, or an empty dictionary if
+        an error occurs.
     """
     try:
         return es.tasks.get(task_id=task_id)
@@ -103,13 +107,15 @@ def compute_estimated_remaining_time(
 ) -> float:
     """Compute the estimated remaining time for the re_index task to complete.
 
-    :param initial_wait: The default wait time in seconds.
-    :param task_status: An instance of `TaskCompletionStatus` containing task
-    information.
-    :return: The estimated remaining time in seconds. If the start time,
-    created, or total are invalid, the initial default time is returned.
-    """
+    Args:
+        initial_wait: The default wait time in seconds.
+        task_status: An instance of `TaskCompletionStatus` containing task
+            information.
 
+    Returns:
+        The estimated remaining time in seconds. If the start time,
+        created, or total are invalid, the initial default time is returned.
+    """
     if (
         task_status.start_time_millis is None
         or not task_status.created
@@ -139,11 +145,13 @@ def retrieve_task_info(
 ) -> TaskCompletionStatus:
     """Retrieve task information from the given task dict.
 
-    :param task_info: A dictionary containing the task status information.
-    :return: A `TaskCompletionStatus` object representing the extracted task
-    information.
-    """
+    Args:
+        task_info: A dictionary containing the task status information.
 
+    Returns:
+        A `TaskCompletionStatus` object representing the extracted task
+        information.
+    """
     if task_info:
         status = task_info["task"]["status"]
         return TaskCompletionStatus(
@@ -163,22 +171,22 @@ def index_daily_recap_documents(
     testing: bool = False,
     only_rd: bool = False,
 ) -> int:
-    """Index Dockets added/modified during the day and all their RECAPDocuments
-    and RECAPDocuments added/modified during the day and their parent Dockets.
-    It uses the ES re_index API,
+    """Index Dockets added/modified during the day and all their RECAPDocuments and RECAPDocuments added/modified during the day and their parent Dockets. It uses the ES re_index API,.
 
-    :param r: Redis client instance.
-    :param source_index_name: The source Elasticsearch index name from which
-    documents will be queried.
-    :param target_index: The target Elasticsearch index to which documents will
-     be re-indexed.
-    :param query_date: The query date to which documents will be queried.
-    :param testing: Boolean flag for testing mode.
-    :param only_rd: Whether to reindex only RECAPDocuments into the
-    ESRECAPSweepDocument index.
-    :return: The total number of documents re-indexed.
+    Args:
+        r: Redis client instance.
+        source_index_name: The source Elasticsearch index name from which
+            documents will be queried.
+        target_index: The target Elasticsearch index to which documents will
+            be re-indexed.
+        query_date: The query date to which documents will be queried.
+        testing: Boolean flag for testing mode.
+        only_rd: Whether to reindex only RECAPDocuments into the
+            ESRECAPSweepDocument index.
+
+    Returns:
+        The total number of documents re-indexed.
     """
-
     if target_index is RECAPSweepDocument and r.exists(
         "alert_sweep:main_re_index_completed"
     ):
@@ -218,10 +226,13 @@ def index_daily_recap_documents(
         query_date_local_midnight_utc.isoformat().replace("+00:00", "Z")
     )
     next_day_utc_iso = next_day_utc.isoformat().replace("+00:00", "Z")
+    # Temporary: search alerts don't support SCOTUS content yet.
+    exclude_scotus = [{"term": {"court_id.raw": "scotus"}}]
     # Re Index API query.
     query = (
         {
             "bool": {
+                "must_not": exclude_scotus,
                 "should": [
                     # Dockets added/modified today
                     {
@@ -283,12 +294,13 @@ def index_daily_recap_documents(
                             },
                         }
                     },
-                ]
+                ],
             }
         }
         if not only_rd
         else {
             "bool": {
+                "must_not": exclude_scotus,
                 "should": [
                     # RECAPDocuments with parents added/modified today
                     {
@@ -320,7 +332,7 @@ def index_daily_recap_documents(
                             ]
                         }
                     },
-                ]
+                ],
             }
         }
     )
@@ -421,14 +433,16 @@ def index_daily_recap_documents(
 def should_docket_hit_be_included(
     r: Redis, alert_id: int, docket_id: int, query_date: datetime.date
 ) -> bool:
-    """Determine if a Docket alert should be triggered based on its
-    date_modified and if the docket has triggered the alert previously.
+    """Determine if a Docket alert should be triggered based on its date_modified and if the docket has triggered the alert previously.
 
-    :param r: The Redis interface.
-    :param alert_id: The ID of the alert.
-    :param docket_id: The ID of the docket.
-    :param query_date: The daily re_index query date.
-    :return: True if the Docket alert should be triggered, False otherwise.
+    Args:
+        r: The Redis interface.
+        alert_id: The ID of the alert.
+        docket_id: The ID of the docket.
+        query_date: The daily re_index query date.
+
+    Returns:
+        True if the Docket alert should be triggered, False otherwise.
     """
     docket = Docket.objects.filter(id=docket_id).only("date_modified").first()
     if not docket:
@@ -453,16 +467,18 @@ def filter_rd_alert_hits(
 ):
     """Filter RECAP document hits based on specified conditions.
 
-    :param r: The Redis interface.
-    :param alert_id: The ID of the alert.
-    :param rd_hits: A list of RECAPDocument hits to be processed.
-    :param rd_ids: A list of RECAPDocument IDs that matched the RECAPDocument
-    only query.
-    :param check_rd_matched: A boolean indicating whether to check if the RECAP
-     document hit from the main query also matches the RECAPDocument-only query
-    :return: A list of RECAP document hits that meet all specified conditions.
-    """
+    Args:
+        r: The Redis interface.
+        alert_id: The ID of the alert.
+        rd_hits: A list of RECAPDocument hits to be processed.
+        rd_ids: A list of RECAPDocument IDs that matched the RECAPDocument
+            only query.
+        check_rd_matched: A boolean indicating whether to check if the RECAP
+            document hit from the main query also matches the RECAPDocument-only query
 
+    Returns:
+        A list of RECAP document hits that meet all specified conditions.
+    """
     rds_to_send = []
     for rd_hit in rd_hits:
         conditions = [
@@ -517,14 +533,15 @@ def query_alerts(
 def process_alert_hits(
     r: Redis, hits_to_process: AlertHitsToProcess
 ) -> list[Hit]:
-    """Process alert hits by filtering and prepare the results to send based
-    on alert conditions.
+    """Process alert hits by filtering and prepare the results to send based on alert conditions.
 
-    :param r: The Redis instance.
-    :param hits_to_process: A `AlertHitsToProcess` instance.
-    :return: A list of Hit objects that are filtered and prepared to be sent.
+    Args:
+        r: The Redis instance.
+        hits_to_process: A `AlertHitsToProcess` instance.
+
+    Returns:
+        A list of Hit objects that are filtered and prepared to be sent.
     """
-
     results = hits_to_process.results
     parent_results = hits_to_process.parent_results
     child_results = hits_to_process.child_results
@@ -611,13 +628,13 @@ def process_alert_hits(
 def send_search_alert_webhooks(
     user: User, results_to_send: list[Hit], alert_id: int
 ) -> None:
-    """Send webhook events for search alerts if the user has SEARCH_ALERT
-    endpoints enabled.
+    """Send webhook events for search alerts if the user has SEARCH_ALERT endpoints enabled.
 
-    :param user: The user object whose webhooks need to be checked.
-    :param results_to_send: A list of Hit objects that contain the search
-    results to be sent.
-    :param alert_id: The Alert ID to be sent in the webhook.
+    Args:
+        user: The user object whose webhooks need to be checked.
+        results_to_send: A list of Hit objects that contain the search
+            results to be sent.
+        alert_id: The Alert ID to be sent in the webhook.
     """
     user_webhooks = user.webhooks.filter(  # pyrefly:ignore[missing-attribute]
         event_type=WebhookEventType.SEARCH_ALERT, enabled=True
@@ -634,14 +651,13 @@ def query_and_send_alerts(
     query_date: datetime.datetime,
     custom_date: bool = False,
 ) -> None:
-    """Query the sweep index and send alerts based on the specified rate
-    and date.
+    """Query the sweep index and send alerts based on the specified rate and date.
 
-    :param r: The Redis interface.
-    :param rate: The rate at which to query alerts.
-    :param query_date: The daily re_index query datetime.
-    :param custom_date: If true, send alerts on a custom date.
-    :return: None.
+    Args:
+        r: The Redis interface.
+        rate: The rate at which to query alerts.
+        query_date: The daily re_index query datetime.
+        custom_date: If true, send alerts on a custom date.
     """
     alert_users = User.objects.filter(
         alerts__rate=rate,
@@ -737,15 +753,13 @@ def query_and_send_alerts(
 def query_and_schedule_alerts(
     r: Redis, rate: Literal["wly", "mly"], query_date: datetime.date
 ) -> None:
-    """Query the sweep index and schedule alerts based on the specified rate
-    and date.
+    """Query the sweep index and schedule alerts based on the specified rate and date.
 
-    :param r: The Redis interface.
-    :param rate: The rate at which to query alerts.
-    :param query_date: The daily re_index query date.
-    :return: None.
+    Args:
+        r: The Redis interface.
+        rate: The rate at which to query alerts.
+        query_date: The daily re_index query date.
     """
-
     alert_users = User.objects.filter(
         alerts__alert_type__in=[SEARCH_TYPES.RECAP, SEARCH_TYPES.DOCKETS],
     ).distinct()
@@ -830,8 +844,9 @@ def query_and_schedule_alerts(
 def get_day_before_query_date() -> datetime.datetime:
     """Get the datetime representing the day before the current local date.
 
-    :return: A naive datetime object representing midnight of the day before
-    the current local date.
+    Returns:
+        A naive datetime object representing midnight of the day before
+        the current local date.
     """
     local_now = timezone.localtime().replace(tzinfo=None)
     local_midnight = local_now.replace(
@@ -841,11 +856,7 @@ def get_day_before_query_date() -> datetime.datetime:
 
 
 class Command(VerboseCommand):
-    """Query and re-index (into the RECAP sweep index) all the RECAP content
-    that has changed during the current period, along with their related
-    documents. Then use the RECAP sweep index to query and send real-time and
-    daily RECAP alerts. Finally, schedule weekly and monthly RECAP alerts.
-    """
+    """Query and re-index (into the RECAP sweep index) all the RECAP content that has changed during the current period, along with their related documents. Then use the RECAP sweep index to query and send real-time and daily RECAP alerts. Finally, schedule weekly and monthly RECAP alerts."""
 
     help = "Send RECAP Search Alerts."
 

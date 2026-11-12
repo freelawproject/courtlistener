@@ -27,8 +27,11 @@ cnt = CaseNameTweaker()
 def find_cites(case_data: dict[str, str]) -> list[FoundCitation]:
     """Extract citations from raw string.
 
-    :param case_data: Case information from the anon 2020 db.
-    :return: Citation objects found in the raw string.
+    Args:
+        case_data: Case information from the anon 2020 db.
+
+    Returns:
+        Citation objects found in the raw string.
     """
     found_citations: list[FoundCitation] = []
     cites = re.findall(
@@ -63,16 +66,19 @@ def merge_or_add_opinions(
     If opinion in system came from harvard, add new opinion to cluster, else
     we merge new opinion data into scraped opinion.
 
-    :param cluster_id: Opinion Cluster id.
-    :param html_str: HTML opinion to add.
-    :param data: Case data to import.
-    :param date_argued: Date case was argued.
-    :param date_filed: Date case was filed.
-    :param case_names: A dict with the three case name types
-    :param status: Whether it's precedential
-    :param docket_number: The docket number
-    :param found_citations: A list of FoundCitation objects.
-    :return: The merged docket, cluster, and opinion.
+    Args:
+        cluster_id: Opinion Cluster id.
+        html_str: HTML opinion to add.
+        data: Case data to import.
+        date_argued: Date case was argued.
+        date_filed: Date case was filed.
+        case_names: A dict with the three case name types
+        status: Whether it's precedential
+        docket_number: The docket number
+        found_citations: A list of FoundCitation objects.
+
+    Returns:
+        The merged docket, cluster, and opinion.
     """
     does_exist = (
         Opinion.objects.filter(cluster_id=cluster_id)
@@ -175,18 +181,18 @@ def add_new_records(
     found_citations: list[FoundCitation],
     court_id: str,
 ) -> Docket:
-    """Create new records in the DB based on parsed data
+    """Create new records in the DB based on parsed data.
 
-    :param html_str: HTML opinion to add
-    :param data: Case data to import
-    :param date_argued: Date case was argued.
-    :param date_filed: Date case was filed.
-    :param case_names: A dict with the three case name types
-    :param status: Whether it's precedential
-    :param docket_number: The docket number
-    :param found_citations: A list of FoundCitation objects.
-    :param court_id: The CL id of the court
-    :return: None.
+    Args:
+        html_str: HTML opinion to add
+        data: Case data to import
+        date_argued: Date case was argued.
+        date_filed: Date case was filed.
+        case_names: A dict with the three case name types
+        status: Whether it's precedential
+        docket_number: The docket number
+        found_citations: A list of FoundCitation objects.
+        court_id: The CL id of the court
     """
     docket = Docket.objects.create(
         **case_names,
@@ -246,8 +252,11 @@ def check_publication_status(found_cites: list[Citation]) -> str:
 
     Check if one of the found citations matches published reporters.
 
-    :param found_cites: List of found citations.
-    :return: Opinion status.
+    Args:
+        found_cites: List of found citations.
+
+    Returns:
+        Opinion status.
     """
     for cite in found_cites:
         if cite.reporter == "B.T.A.":
@@ -260,7 +269,7 @@ def check_publication_status(found_cites: list[Citation]) -> str:
 
 
 def clean_docket_number(docket_number: str) -> str:
-    """Strip out non-numbers from docket numbers"""
+    """Strip out non-numbers from docket numbers."""
     return re.sub(r"[^\d]", "", docket_number)
 
 
@@ -272,10 +281,13 @@ def attempt_cluster_lookup(
 
     If citation in found citations in our database, return cluster ID.
 
-    :param citations: Array of citations parsed from string.
-    :param new_docket_number: The docket number we hope to merge, to use for
-    disambiguation.
-    :return: Cluster id for citations.
+    Args:
+        citations: Array of citations parsed from string.
+        new_docket_number: The docket number we hope to merge, to use for
+            disambiguation.
+
+    Returns:
+        Cluster id for citations.
     """
     for citation in citations:
         cites = Citation.objects.filter(
@@ -298,12 +310,15 @@ def attempt_cluster_lookup(
 
 
 def do_case_name(soup, data: dict[str, Any]) -> dict[str, str]:
-    """Extract and normalize the case name
+    """Extract and normalize the case name.
 
-    :param soup: bs4 html object of opinion.
-    :param data: The full json data dict
-    :return: A dict of the case_name{short,full}, that can be put
-    into the dockets and opinions.
+    Args:
+        soup: bs4 html object of opinion.
+        data: The full json data dict
+
+    Returns:
+        A dict of the case_name{short,full}, that can be put
+        into the dockets and opinions.
     """
     case_name = harmonize(data["name"])
     return {
@@ -316,10 +331,13 @@ def do_case_name(soup, data: dict[str, Any]) -> dict[str, str]:
 
 
 def do_docket_number(data: dict[str, Any]) -> str:
-    """Extract the docket number
+    """Extract the docket number.
 
-    :param data: The full json data dict
-    :return: The docket number
+    Args:
+        data: The full json data dict
+
+    Returns:
+        The docket number
     """
     if data["docket_number"]:
         return trunc(
@@ -332,10 +350,13 @@ def do_docket_number(data: dict[str, Any]) -> str:
 
 
 def find_court_id(court_str: str) -> str:
-    """Extract cl court id from court name
+    """Extract cl court id from court name.
 
-    :param court_str: The raw court name
-    :return: The cl court id for associated tax court.
+    Args:
+        court_str: The raw court name
+
+    Returns:
+        The cl court id for associated tax court.
     """
     if court_str == "United States Board of Tax Appeals":
         return "bta"
@@ -345,12 +366,16 @@ def find_court_id(court_str: str) -> str:
 def process_dates(
     data: dict[str, Any],
 ) -> tuple[date | None, date | None]:
-    """Process date argued and date filed
+    """Process date argued and date filed.
 
     Dates in this dataset fall into two categories, argued and filed/decided.
     We use date standard as the key for filed and/or decided.
-    :param data: Import case data
-    :return: Date objects for date argued and date filed
+
+    Args:
+        data: Import case data
+
+    Returns:
+        Date objects for date argued and date filed
     """
     date_argued = date_filed = None
     if data["date_argued"]:
@@ -375,9 +400,9 @@ def import_anon_2020_db(
     case we already have or create a new docket, cluster, citations and opinion
     to our database.
 
-    :param import_dir: Location of directory of import data.
-    :param skip_until: ID for case we should begin processing, if any.
-    :return: None.
+    Args:
+        import_dir: Location of directory of import data.
+        skip_until: ID for case we should begin processing, if any.
     """
     directories = iglob(f"{import_dir}/*/????-*.json")
     for dir in directories:

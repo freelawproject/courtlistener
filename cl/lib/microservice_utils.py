@@ -28,7 +28,8 @@ logger: logging.Logger = logging.getLogger(__name__)
 def log_invalid_embedding_errors(embeddings: Any) -> None:
     """Log an error when the embeddings response is not a list.
 
-    :param embeddings: The embeddings object to validate and log.
+    Args:
+        embeddings: The embeddings object to validate and log.
     """
     if isinstance(embeddings, dict):
         logger.error(
@@ -44,13 +45,11 @@ def log_invalid_embedding_errors(embeddings: Any) -> None:
 
 
 async def clean_up_recap_document_file(item: AbstractPDF) -> None:
-    """Clean up the document's file-related fields after detecting the file
-    doesn't exist in the storage.
+    """Clean up the document's file-related fields after detecting the file doesn't exist in the storage.
 
-    :param item: The document to work on.
-    :return: None
+    Args:
+        item: The document to work on.
     """
-
     if isinstance(item, AbstractPDF):
         await sync_to_async(item.filepath_local.delete)()
         item.sha1 = ""
@@ -72,7 +71,7 @@ async def microservice(
     data: RequestData | RequestContent | None = None,
     params: QueryParamTypes | None = None,
 ) -> Response:
-    """Call a Microservice endpoint
+    """Call a Microservice endpoint.
 
     This is a helper utility to call our microservices.  To see a list of Endpoints
     check out the settings file cl/settings/public.py.
@@ -84,17 +83,19 @@ async def microservice(
     filepath. A missing PDF on item is cleaned up and falls back to filepath.
     Named Django files keep their filename unless file_type is provided.
 
-    :param service: The service to call
-    :param method: The method to use (defaults to POST)
-    :param item: The document as a db object
-    :param file: A caller-owned file or byte array; this function does not close it
-    :param file_type: Override the upload filename with dummy.<file_type>
-    :param filepath: The filepath of the file
-    :param data: The data to send
-    :param params: The params to send
-    :return: The response from the microservice
-    """
+    Args:
+        service: The service to call
+        method: The method to use (defaults to POST)
+        item: The document as a db object
+        file: A caller-owned file or byte array; this function does not close it
+        file_type: Override the upload filename with dummy.<file_type>
+        filepath: The filepath of the file
+        data: The data to send
+        params: The params to send
 
+    Returns:
+        The response from the microservice
+    """
     services = settings.MICROSERVICE_URLS
 
     file_context = nullcontext()
@@ -169,10 +170,13 @@ async def microservice(
     logger=logger,
 )
 async def doc_page_count_service(doc: AbstractPDF) -> Response:
-    """Call page-count from doctor with retries
+    """Call page-count from doctor with retries.
 
-    :param doc: the document to count pages
-    :return: Response object
+    Args:
+        doc: the document to count pages
+
+    Returns:
+        Response object
     """
     try:
         response = await microservice(
@@ -194,12 +198,15 @@ async def doc_page_count_service(doc: AbstractPDF) -> Response:
     logger=logger,
 )
 async def check_redactions_service(rd: RECAPDocument) -> Response:
-    """Call redaction check from doctor with retries
+    """Call redaction check from doctor with retries.
 
     Uses X-Ray to detect bad redactions (text visible under redaction boxes).
 
-    :param rd: The RECAPDocument to check for bad redactions
-    :return: Response object with redaction data
+    Args:
+        rd: The RECAPDocument to check for bad redactions
+
+    Returns:
+        Response object with redaction data
     """
     try:
         return await microservice(service="check-redactions", item=rd)
