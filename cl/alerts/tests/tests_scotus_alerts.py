@@ -1,3 +1,4 @@
+import datetime
 from contextlib import AbstractContextManager, nullcontext
 from unittest import mock
 
@@ -23,7 +24,9 @@ from cl.search.factories import (
     DocketEntryFactory,
     DocketFactory,
     RECAPDocumentFactory,
+    SCOTUSAttachmentDataFactory,
     ScotusDocketDataFactory,
+    SCOTUSDocketEntryDataFactory,
     SCOTUSDocketEntryFactory,
     ScotusDocketMetadataFactory,
     SCOTUSDocumentFactory,
@@ -447,6 +450,87 @@ class SCOTUSAlertsPercolatorTest(ESIndexTestCase, TransactionTestCase):
             merge_scotus_docket(report_data, download_file=False)
 
         self.assertEqual(mock_percolate.call_count, 1)
+        self.assertEqual(len(self._hits(capital_alert)), 1)
+
+    def test_document_getting_a_pdf_is_percolated_once(
+        self, mock_prefix: mock.MagicMock
+    ) -> None:
+        """Check a document is percolated once when its PDF is coming.
+
+        A placeholder that becomes an attachment, or a document whose PDF
+        changes, isn't percolated on the saves of the merge: its PDF chain
+        percolates it once its text is ready.
+        """
+        entry_data = SCOTUSDocketEntryDataFactory(
+            description="Petition for a writ of certiorari filed.",
+            date_filed=datetime.date(2025, 10, 16),
+            document_number=310278,
+            attachments=[],
+        )
+        report_data = ScotusDocketDataFactory(
+            docket_entries=[entry_data],
+            parties=[],
+            questions_presented=None,
+        )
+        docket, _, _ = merge_scotus_docket(report_data, download_file=False)
+        placeholder = SCOTUSDocument.objects.get(docket_entry__docket=docket)
+        self.assertTrue(placeholder.is_placeholder)
+
+        cases = [
+            ("placeholder becomes an attachment", "a.pdf", "Petition"),
+            ("document gets a new PDF", "b.pdf", "Petition (corrected)"),
+        ]
+        for label, file_name, description in cases:
+            with self.subTest(label):
+                entry_data["attachments"] = [
+                    SCOTUSAttachmentDataFactory(
+                        description=description,
+                        document_number=310278,
+                        document_url=f"https://www.supremecourt.gov/{file_name}",
+                    )
+                ]
+                with (
+                    self._count_percolations() as mock_percolate,
+                    mock.patch("cl.corpus_importer.tasks.chain") as mock_chain,
+                ):
+                    merge_scotus_docket(report_data, download_file=True)
+                # Not percolated by the merge; the PDF chain is queued.
+                self.assertEqual(mock_percolate.call_count, 0)
+                mock_chain.return_value.apply_async.assert_called_once()
+
+                with self._count_percolations() as mock_percolate:
+                    percolate_scotus_document(placeholder.pk)
+                self.assertEqual(mock_percolate.call_count, 1)
+
+    def test_docket_and_metadata_change_is_percolated_once(
+        self, mock_prefix: mock.MagicMock
+    ) -> None:
+        """Check a docket change with a metadata change is percolated once.
+
+        When a merge without parties changes both the docket and its
+        capital_case, only the metadata update percolates the docket.
+        """
+        report_data = ScotusDocketDataFactory(
+            capital_case=False,
+            docket_entries=[],
+            parties=[],
+            questions_presented=None,
+        )
+        merge_scotus_docket(report_data, download_file=False)
+        case_name_alert = self._make_alert(
+            'q="Doe v. Fakeville"&type=d', SEARCH_TYPES.DOCKETS
+        )
+        capital_alert = self._make_alert(
+            "q=capital_case:true&type=d", SEARCH_TYPES.DOCKETS
+        )
+
+        report_data["case_name"] = "Doe v. Fakeville"
+        report_data["capital_case"] = True
+        with self._count_percolations() as mock_percolate:
+            merge_scotus_docket(report_data, download_file=False)
+
+        self.assertEqual(mock_percolate.call_count, 1)
+        self.assertEqual(len(self._hits(case_name_alert)), 1)
         self.assertEqual(len(self._hits(capital_alert)), 1)
 
     @override_settings(PERCOLATOR_SCOTUS_SEARCH_ALERTS_ENABLED=False)

@@ -3789,6 +3789,12 @@ def merge_scotus_document(
         # Update the fields
         scotus_document.description = description
         scotus_document.url = url
+        # A new PDF is downloaded next, and the document is percolated once
+        # its text is ready (see percolate_scotus_document), so don't
+        # percolate this save too.
+        scotus_document.skip_percolator_request = (
+            download_file and file_name_changed
+        )
         scotus_document.save(
             update_fields=["description", "url", "date_modified"]
         )
@@ -3851,7 +3857,9 @@ def add_scotus_placeholder_document(docket_entry: SCOTUSDocketEntry) -> None:
 
 
 def fill_scotus_placeholder_document(
-    docket_entry: SCOTUSDocketEntry, attachment: dict[str, Any]
+    docket_entry: SCOTUSDocketEntry,
+    attachment: dict[str, Any],
+    download_file: bool = False,
 ) -> int | None:
     """Turn the entry's placeholder, if it has one, into the given attachment by giving it the attachment's numbers. merge_scotus_document then finds it and fills in the rest, instead of creating a new document and leaving the empty placeholder next to it.
 
@@ -3862,6 +3870,9 @@ def fill_scotus_placeholder_document(
 
     :param docket_entry: The entry whose placeholder to fill in.
     :param attachment: The attachment data the placeholder becomes.
+    :param download_file: Whether merge_scotus_document downloads the
+    placeholder's PDF next. If so, this save isn't percolated: the document
+    is percolated once its text is ready.
     :return: The placeholder's pk, or None if there was none to fill in.
     """
     # unique_together treats NULLs as distinct, so it doesn't stop an entry
@@ -3892,6 +3903,7 @@ def fill_scotus_placeholder_document(
         return None
     placeholder.document_number = attachment["document_number"]
     placeholder.attachment_number = attachment["attachment_number"]
+    placeholder.skip_percolator_request = download_file
     placeholder.save(
         update_fields=["document_number", "attachment_number", "date_modified"]
     )
@@ -4011,7 +4023,7 @@ def merge_scotus_docket_entry(
         # Merge attachments; only track newly created document PKs
         doc_pks = []
         filled_placeholder_pk = fill_scotus_placeholder_document(
-            de, attachments[0]
+            de, attachments[0], download_file=download_file
         )
         for document in attachments:
             created, doc_pk = merge_scotus_document(
@@ -4189,11 +4201,25 @@ def merge_scotus_docket(
         percolate_parties = set_skip_percolation_if_parties_data(
             normalized_parties, d
         )
+        scotus_metadata = (
+            ScotusDocketMetadata.objects.filter(docket=d).first()
+            if d.pk
+            else None
+        )
+        capital_case = bool(report_data.get("capital_case"))
+        if (
+            scotus_metadata is not None
+            and not percolate_parties
+            and scotus_metadata.capital_case != capital_case
+        ):
+            # The metadata update below percolates the docket after this
+            # save, so don't percolate it twice.
+            d.skip_percolator_request = True
         d.save()
 
         # Merge ScotusDocketMetadata
         defaults = {
-            "capital_case": bool(report_data.get("capital_case")),
+            "capital_case": capital_case,
             "date_discretionary_court_decision": report_data.get(
                 "discretionary_court_decision"
             ),
@@ -4209,7 +4235,6 @@ def merge_scotus_docket(
                 qp_url = urljoin("https://www.supremecourt.gov/", qp_url)
             defaults["questions_presented_url"] = qp_url
 
-        scotus_metadata = ScotusDocketMetadata.objects.filter(docket=d).first()
         # True for a new Docket, and for an existing one (e.g. created to
         # hold a scraped opinion) that becomes SCOTUS docket content now.
         metadata_created = scotus_metadata is None

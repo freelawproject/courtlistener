@@ -287,6 +287,10 @@ class Docket(AbstractDateTimeModel, DocketSources):
     # real SCOTUS docket from one created only to hold a scraped Opinion.
     # Declared here only so the type checker knows the attribute exists.
     _index_in_es: bool
+    # Not a model field either - set transiently by mergers (RECAP and
+    # SCOTUS) so the ES signal processor doesn't percolate a save that will be
+    # percolated later, e.g. after the docket's parties are indexed.
+    skip_percolator_request: bool
 
     source = models.SmallIntegerField(
         help_text="contains the source of the Docket.",

@@ -247,20 +247,6 @@
       "severity": "error"
     },
     {
-      "column": 9,
-      "path": "cl/alerts/utils.py",
-      "name": "missing-attribute",
-      "concise_description": "Object of class `Docket` has no attribute `skip_percolator_request`",
-      "severity": "error"
-    },
-    {
-      "column": 5,
-      "path": "cl/alerts/utils.py",
-      "name": "missing-attribute",
-      "concise_description": "Object of class `Docket` has no attribute `skip_percolator_request`",
-      "severity": "error"
-    },
-    {
       "column": 36,
       "path": "cl/api/api_permissions.py",
       "name": "bad-argument-type",
