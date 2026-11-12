@@ -1,3 +1,5 @@
+"""Django admin configuration for RECAP processing queues and the FJC IDB."""
+
 from admin_cursor_paginator import CursorPaginatorAdmin
 from django.contrib import admin, messages
 from django.contrib.auth.models import User
@@ -21,6 +23,8 @@ from cl.recap.tasks import (
 
 @admin.register(ProcessingQueue)
 class ProcessingQueueAdmin(CursorPaginatorAdmin):
+    """Admin for RECAP upload processing queue items."""
+
     list_display = (
         "__str__",
         "court",
@@ -49,6 +53,8 @@ class ProcessingQueueAdmin(CursorPaginatorAdmin):
 
 @admin.register(PacerFetchQueue)
 class PacerFetchQueueAdmin(CursorPaginatorAdmin):
+    """Admin for PACER fetch requests."""
+
     list_display = ("__str__", "court", "request_type", "date_created")
     list_filter = ("status", "request_type", "date_created")
     readonly_fields = (
@@ -64,6 +70,8 @@ class PacerFetchQueueAdmin(CursorPaginatorAdmin):
 
 @admin.register(PacerHtmlFiles)
 class PacerHtmlFilesAdmin(CursorPaginatorAdmin):
+    """Admin for stored PACER HTML files, listed with their upload type."""
+
     list_display = (
         "__str__",
         "upload_type",
@@ -77,6 +85,12 @@ class PacerHtmlFilesAdmin(CursorPaginatorAdmin):
 
 @admin.action(description="Reprocess selected recap.emails")
 def reprocess_failed_epq(modeladmin, request, queryset):
+    """Reprocess the selected email processing queue items.
+
+    SCOTUS emails and Texas state emails are queued for processing; other
+    state emails are skipped, and the rest are fetched as the recap-email
+    user.
+    """
     recap_email_user = User.objects.get(username="recap-email")
     for epq in queryset:
         if epq.source == EmailSource.SCOTUS:
@@ -101,6 +115,8 @@ def reprocess_failed_epq(modeladmin, request, queryset):
 
 @admin.register(EmailProcessingQueue)
 class EmailProcessingQueueAdmin(CursorPaginatorAdmin):
+    """Admin for recap.email processing queue items, with a reprocess action."""
+
     list_display = ("__str__", "status", "date_created")
     list_filter = ("status", "date_created")
     actions = [reprocess_failed_epq]

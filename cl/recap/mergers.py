@@ -1,4 +1,6 @@
 # Code for merging PACER content into the DB
+"""Merge parsed PACER content into dockets, entries, documents, parties, and claims."""
+
 import json
 import logging
 import re
@@ -991,6 +993,17 @@ def resolve_rd_in_memory(
 
 @sync_to_async
 def add_create_docket_entry_transaction(d, docket_entry):
+    """Get or create a docket's entry for parsed entry data, with the docket locked.
+
+    Entries are matched by entry number and, when given, PACER sequence
+    number. When the data has a sequence number and no exact match exists,
+    an existing entry without a sequence number is reused. Duplicates are
+    deleted.
+
+    Returns:
+        The entry and whether it was created, or None if several entries
+        match and the data has no sequence number.
+    """
     with transaction.atomic():
         Docket.objects.select_for_update().get(pk=d.pk)
         pacer_seq_no = docket_entry.get("pacer_seq_no")
@@ -2037,6 +2050,7 @@ def add_claims_to_docket(d, new_claims, tag_names: list[str] | None = None):
 
 
 def get_data_from_att_report(text: str, court_id: str) -> dict[str, str]:
+    """Parse a district or bankruptcy attachment page's text for a court."""
     att_page = AttachmentPage(map_cl_to_pacer_id(court_id))
     att_page._parse_text(text)
     att_data = att_page.data
@@ -2096,6 +2110,15 @@ def merge_pacer_docket_into_cl_docket(
     appellate=False,
     tag_names: list[str] | None = None,
 ):
+    """Merge a parsed PACER docket report into a docket.
+
+    Updates the docket's metadata, saves the report's raw content, merges
+    its parties, and adds its docket entries. Appellate dockets also get
+    their originating court information.
+
+    Returns:
+        The RECAP documents created and whether content was updated.
+    """
     # Ensure that we set the case ID. This is needed on dockets that have
     # matching docket numbers, but that never got PACER data before. This was
     # previously rare, but since we added the FJC data to the dockets table,

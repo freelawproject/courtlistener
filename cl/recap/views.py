@@ -1,3 +1,5 @@
+"""REST API viewsets for RECAP uploads, recap.email, PACER fetches, lookups, and the FJC IDB."""
+
 import asyncio
 
 from asgiref.sync import async_to_sync, sync_to_async
@@ -54,6 +56,8 @@ from cl.search.models import RECAPDocument
 
 
 class PacerProcessingQueueViewSet(LoggingMixin, ModelViewSet):
+    """API endpoint for uploading content to RECAP."""
+
     permission_classes = (RECAPUploaders,)
     queryset = ProcessingQueue.objects.all().order_by("-id")
     serializer_class = ProcessingQueueSerializer
@@ -74,6 +78,7 @@ class PacerProcessingQueueViewSet(LoggingMixin, ModelViewSet):
 
     @async_to_sync
     async def perform_create(self, serializer):
+        """Save the upload from the extension and process it, even if the client disconnects."""
         pq = await sync_to_async(serializer.save)(
             uploader=self.request.user,
             source=PROCESSING_QUEUE_SOURCE.EXTENSION,
@@ -91,6 +96,8 @@ class PacerProcessingQueueViewSet(LoggingMixin, ModelViewSet):
 
 
 class EmailProcessingQueueViewSet(LoggingMixin, ModelViewSet):
+    """API endpoint for submitting recap.email notifications."""
+
     permission_classes = (EmailProcessingQueueAPIUsersWithView,)
     queryset = EmailProcessingQueue.objects.all().order_by("-id")
     serializer_class = EmailProcessingQueueSerializer
@@ -110,18 +117,21 @@ class EmailProcessingQueueViewSet(LoggingMixin, ModelViewSet):
     ]
 
     def get_message_id_from_request_data(self):
+        """Get the mail's message ID from the request data, if it is a dict."""
         data = self.request.data
         if not isinstance(data, dict):
             return None
         return data.get("mail", {}).get("message_id")
 
     def get_destination_emails_from_request_data(self):
+        """Get the receipt's recipients from the request data, if it is a dict."""
         data = self.request.data
         if not isinstance(data, dict):
             return None
         return data.get("receipt", {}).get("recipients")
 
     def perform_create(self, serializer):
+        """Save the PACER email as the recap-email user and queue its processing."""
         recap_email_user = User.objects.get(username="recap-email")
         epq = serializer.save(
             message_id=self.get_message_id_from_request_data(),
@@ -180,16 +190,20 @@ class PacerFetchRequestViewSet(
     ]
 
     def get_queryset(self):
+        """Get the requesting user's fetch requests, newest first."""
         return PacerFetchQueue.objects.filter(user=self.request.user).order_by(
             "-id"
         )
 
     def perform_create(self, serializer):
+        """Save the fetch request for the requesting user and start the fetch."""
         fq = serializer.save(user=self.request.user)
         do_pacer_fetch(fq)
 
 
 class PacerDocIdLookupViewSet(LoggingMixin, ModelViewSet):
+    """API endpoint for looking up available RECAP documents."""
+
     permission_classes = (DjangoModelPermissions,)
     queryset = (
         RECAPDocument.objects.filter(is_available=True)
@@ -213,6 +227,7 @@ class PacerDocIdLookupViewSet(LoggingMixin, ModelViewSet):
     pagination_class = BigPagination
 
     def get_view_name(self):
+        """Name the view "RECAP lookup API", plus its suffix if it has one."""
         name = "RECAP lookup API"
         suffix = getattr(self, "suffix", None)
         if suffix:
@@ -220,6 +235,11 @@ class PacerDocIdLookupViewSet(LoggingMixin, ModelViewSet):
         return name
 
     def list(self, request, *args, **kwargs):
+        """List matching documents.
+
+        Raises:
+            ValidationError: If the request has no query parameters.
+        """
         if not [p.startswith("pacer_doc_id") for p in request.GET.keys()]:
             # Not having this parameter causes bad performance. Abort.
             raise ValidationError("pacer_doc_id is a required filter.")
@@ -229,6 +249,8 @@ class PacerDocIdLookupViewSet(LoggingMixin, ModelViewSet):
 class FjcIntegratedDatabaseViewSet(
     LoggingMixin, NoFilterCacheListMixin, ModelViewSet
 ):
+    """API endpoint for FJC Integrated Database rows."""
+
     queryset = FjcIntegratedDatabase.objects.all().order_by("-id")
     serializer_class = FjcIntegratedDatabaseSerializer
     filterset_class = FjcIntegratedDatabaseFilter

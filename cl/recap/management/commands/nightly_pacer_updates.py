@@ -1,3 +1,5 @@
+"""Nightly iquery crawl of dockets and pray-and-pay availability checks."""
+
 import random
 import re
 from datetime import datetime, timedelta
@@ -184,9 +186,12 @@ def get_docket_ids() -> set[int]:
 
 
 class Command(VerboseCommand):
+    """Queue iquery crawls of dockets and availability checks of prayed-for documents."""
+
     help = "Scrape PACER iquery report"
 
     def add_arguments(self, parser):
+        """Add the queue, old-terminated, and missing date filed options."""
         parser.add_argument(
             "--queue",
             default="iquery",
@@ -208,6 +213,14 @@ class Command(VerboseCommand):
         )
 
     def handle(self, *args, **options):
+        """Queue iquery crawls for the selected dockets, then check prayed-for documents.
+
+        Dockets without a PACER case ID or outside district and bankruptcy
+        courts are skipped, as are long-terminated, long-quiet dockets that
+        have a filing date and case name unless ``--include-old-terminated``
+        is set. Prayed-for documents without a PACER document ID are only
+        marked as checked.
+        """
         super().handle(*args, **options)
         do_missing_date_filed = options["do_missing_date_filed"]
         if do_missing_date_filed:
